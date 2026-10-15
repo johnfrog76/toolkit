@@ -15,7 +15,7 @@
          inside the package would make the Toolkit's own git tree dirty the
          first time a box was ticked, and Update refuses a dirty tree.
       2. Points this machine at it -- promptsRoot and activeSpace -- and switches
-         the three opt-in modules on, so there is a whole product to look at.
+         the four opt-in modules on (growth, communication, deck and organize), so there is a whole product to look at.
          All through the Config verb, the one writer for configuration.
       3. Opens the web UI (skip with -NoWeb).
 
