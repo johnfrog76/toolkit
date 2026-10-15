@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 intends to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) from its first
 release.
 
+## [Unreleased]
+
 ## [1.0.0] - 2026-10-15
 
 The first release. Everything below is what 1.0.0 is.
