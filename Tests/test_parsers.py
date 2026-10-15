@@ -201,7 +201,7 @@ class LineEndingTests(unittest.TestCase):
     that "helpfully" adds a BOM comes back with one. Neither may change an
     answer. The readers are all multiline regexes, so this is the assertion that
     keeps them that way.
-   
+
     """
 
     FIXTURES = [

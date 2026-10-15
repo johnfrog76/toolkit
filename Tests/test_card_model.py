@@ -346,8 +346,8 @@ class AFinishedWeekCanStillChange(unittest.TestCase):
 
     def test_a_week_that_could_not_be_built_says_so_in_its_own_field(self):
         """`days: []` is what an empty week looks like too. The page reads `error`,
-        so a broken billing can never again pass for a quiet week
-       ."""
+         so a broken billing can never again pass for a quiet week
+        ."""
         from agent.ado import reporting
 
         with mock.patch.object(reporting, "BILLING_SCRIPT", Path(self.cfg.name) / "gone.ps1"):

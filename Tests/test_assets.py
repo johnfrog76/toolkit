@@ -348,7 +348,9 @@ class TheUploadFolderIsFinished(unittest.TestCase):
             plain = Path(tempfile.mkdtemp(prefix="other-"))
             self._made.append(plain)
             (plain / "shot.png").write_bytes(PNG)
-            self.run_verb(0, [str(elsewhere), str(prefixed_deeper), str(plain / "shot.png"), "-Before", t, tempfile.gettempdir()])
+            self.run_verb(
+                0, [str(elsewhere), str(prefixed_deeper), str(plain / "shot.png"), "-Before", t, tempfile.gettempdir()]
+            )
             self.assertTrue(elsewhere.exists())
             self.assertTrue(prefixed_deeper.exists(), "only a folder directly in the system temp counts")
             self.assertTrue((plain / "shot.png").exists())
@@ -373,9 +375,8 @@ class TheUploadFolderIsFinished(unittest.TestCase):
     def test_the_agent_sweeps_on_start(self):
         from agent.app import app
 
-        with mock.patch("agent.core.assets.sweep_stale_uploads") as sweep:
-            with TestClient(app):
-                pass
+        with mock.patch("agent.core.assets.sweep_stale_uploads") as sweep, TestClient(app):
+            pass
         sweep.assert_called_once()
 
 
