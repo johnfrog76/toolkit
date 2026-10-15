@@ -56,7 +56,7 @@ agent/
 │   ├── consts.py             the reader for ../consts.json, the literals all three halves parse
 │   ├── env.py                GET /health, GET /env, POST /switch-mode
 │   ├── surfaces.py           GET /surfaces -- the CLI's optional-surface inventory, as one answer
-│   ├── cards.py              write_card_text: the agent's one writer for a card that already exists
+│   ├── cards.py              write_card_text: the agent's one writer for a hub file that already exists (today: the meeting-session save)
 │   ├── clock.py              a timestamp to the reader's LOCAL day, the one way
 │   ├── child.py              run_read: every gh, az and git child read as UTF-8, never an empty success
 │   ├── hosts.py              which PowerShell a child process gets: pwsh, else powershell.exe
@@ -619,7 +619,8 @@ decision and a reply into the card natively; it was retired as the second writer
 the page posts a reply as `ReplyPR` through `POST /cmd/ReplyPR`, which posts to the tracker and
 fills the card's `Reply:` slot through `Write-CardText`. `core/cards.write_card_text`, the Python
 side of that byte rule ([`docs/CLI.md`, "The bytes a card is written with"](../docs/CLI.md#the-bytes-a-card-is-written-with)),
-stays for the next native edit, held by `Tests/test_card_writer.py`. There is deliberately no
+has one caller today: `PUT /manager/{filename}` saves a meeting session, a hub file rather than a card,
+through it. It stays the writer for any further native edit, held by `Tests/test_card_writer.py`. There is deliberately no
 create in that module: a card is created by the CLI, through `POST /cmd/NewPrompt`.
 
 ### Deliberately absent
@@ -917,7 +918,7 @@ tests at all**.
 | `Tests/test_config.py` | The hub comes from config and not from layout -- including that it is *not* the parent of the package, that a relative value resolves against the repo root, that `PROMPTS_ROOT` is an override, and that a missing root neither raises nor lies. Plus the merge semantics and the CORS defaults |
 | `Tests/test_accounting_reasons.py` | An empty ledger says why: with `az` stubbed inside `accounting.py` to exit non-zero, time out, be missing, or print something that is not JSON, `/prs`, `/work-items`, `/dashboard` and `/dashboard/pipelines/{project}` carry the first failure in `reason`, naming the command and the target; an org with no `projects` is its own reason and asks `az` nothing; identity still comes first; rows from one project carry no reason for another's failure; a clean empty answer has none |
 | `Tests/test_child_reads.py` | Every `gh`, `az` and `git` child is read as UTF-8 through `core/child.py` `run_read`: under a stand-in for a cp1252 Windows console a title with an em dash, curly quotes and `Ï` comes back whole from `_gh_issues`, `_gh_json`, `design._gh` and `_az_json`; a reader that died (exit 0, no stdout) is a stated reason in each, never an empty list; and an AST scan finds no other `text=True` call in `agent/` without an `encoding` |
-| `Tests/test_card_writer.py` | The agent's one card writer: an edit of a CRLF card comes out all CRLF, of an LF card all LF, a mixed card consistent, never a BOM, UTF-8 intact, and no module in `agent/ado/` writes a file with a bare `write_text` |
+| `Tests/test_card_writer.py` | The agent's one writer for an existing hub file: an edit of a CRLF card comes out all CRLF, of an LF card all LF, a mixed card consistent, never a BOM, UTF-8 intact, and no module in `agent/ado/` writes a file with a bare `write_text` |
 | `Tests/test_pr_comments.py` | `GET /pr-comments` is a file read at every tier: on an ACTIVE org with the probe stubbed to fail, the open threads in a copy of the fixture hub are listed, the probe is never called, the source names no tier gate, the detail route reads the same card, a card with nothing open is not listed, and no `current/` is an empty answer rather than an error. `suggest`: no key is a 412 naming `ANTHROPIC_API_KEY` with the model never called, the prompt is the file in `agentic/` with the thread's fields in place and the prose above the fence left out. `save` is retired: the route answers 404, the module imports no card writer, and the page posts replies as `ReplyPR` |
 | `Tests/test_app_serving.py` | What the app serves around the routes: with a scratch `dist/client` mounted, `/` and a deep link are the page, `/assets` is served, a registered route still wins, and an unmatched `/api/...` path is a JSON 404 naming the path -- with the prefix read from `API_PREFIX`, not retyped; with no client directory nothing is mounted. And CORS: `PUT /api/config` passes preflight from a configured origin, every method a route is registered with is in `CORS_METHODS`, and one nothing registers still fails. And the deliberately-absent list: each retired or unbuilt route is 404 and out of the OpenAPI schema |
 | `Tests/test_bridge.py` | The allowlist is the live command table and nothing else: every name in it is admitted, names outside it are refused, the map is re-read when `utilities.psm1` changes, and -- in a scratch package, so the engineer's `config.local.json` is never written -- a module flag flipped on disk puts the module's verb in the table on the next read with no `force`, the key names every input, and a new `Config/*.commands.psd1` changes it, and `Env` is run for real so a broken PowerShell half cannot pass. Plus the parameter rules, the four statuses, the timeout lookup, and the host resolver -- `pwsh` preferred, `powershell` as the Windows-only fallback, and no host answering `error` rather than `rejected` |
