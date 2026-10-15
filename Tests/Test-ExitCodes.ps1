@@ -476,6 +476,64 @@ finally { Remove-Item $prHub -Recurse -Force -ErrorAction SilentlyContinue }
 
 Write-Host ""
 
+# -- ReplyPR typed on its success path: the reply lands in the card -----------
+# The refusal above reaches the script's first lines. The success path is the
+# wrapper's call into Send-PRReply.ps1 and that script's call into
+# Set-P20CardReply, and a suite that dot-sources either one directly stays green
+# when the wiring between them breaks. az and the REST calls are stubbed in the
+# child (global functions, as in the PR search cases), so no org is called; the
+# card sits in a scratch hub and names the pull request on its PR URL line.
+
+Write-Host "── ReplyPR typed: the reply is posted and recorded ────" -ForegroundColor Cyan
+
+$replyHub = Join-Path ([System.IO.Path]::GetTempPath()) "exitcode-replyhub-$([guid]::NewGuid())"
+$replyCurrent = Join-Path $replyHub 'azure-demo/current'
+New-Item -ItemType Directory -Path $replyCurrent -Force | Out-Null
+$replyCardPath = Join-Path $replyCurrent 'US-119-import-flow.prompt.md'
+$replyCardText = @(
+    '# US-119: Import flow', '',
+    'PR URL: https://dev.azure.com/YOUR-ADO-ORG/YourProject/_git/your-repo/pullrequest/4242', '',
+    '## PR Review Comments (PR 4242)', '',
+    '### Comment 1 (Thread 777)',
+    'Comment: This null check looks wrong.',
+    'Reply: ',
+    'Status: active', ''
+) -join "`n"
+[System.IO.File]::WriteAllText($replyCardPath, $replyCardText)
+$replyStub = @'
+$global:StubCalls = @()
+function global:az { $global:LASTEXITCODE = 0; 'stub-token' }
+function global:Invoke-RestMethod {
+    param($Uri, $Headers, $Method, $Body)
+    $global:StubCalls += "$Method $Uri"
+    if ($Method -eq 'Get') { return [pscustomobject]@{ repository = [pscustomobject]@{ name = 'your-repo'; project = [pscustomobject]@{ name = 'YourProject' } } } }
+    if ($Method -eq 'Post') { return [pscustomobject]@{ id = 2 } }
+    return $null
+}
+'@
+$replyTail = "`n'LASTEXITCODE=' + `$LASTEXITCODE`n`$global:StubCalls | ForEach-Object { 'STUB ' + `$_ }`nexit `$LASTEXITCODE"
+try {
+    $replyCmd = "${cfgPrefix}ReplyPR 4242 777 -Reply 'Done in abc1234.' -Status fixed"
+    $shells = @('pwsh')
+    if (Get-Command powershell.exe -ErrorAction SilentlyContinue) { $shells += 'powershell' }
+    foreach ($sh in $shells) {
+        [System.IO.File]::WriteAllText($replyCardPath, $replyCardText)
+        $ok = Invoke-ChildRun "$tier1Env`n$replyStub`n$replyCmd$replyTail" -Environment @{ PROMPTS_ROOT = $replyHub } -Shell $sh
+        $after = [System.IO.File]::ReadAllText($replyCardPath)
+        Assert-True "[$sh] ReplyPR typed with a stubbed tracker exits 0 (got $($ok.ExitCode))" ($ok.ExitCode -eq 0 -and $ok.Output -match 'LASTEXITCODE=0')
+        Assert-True "[$sh] the reply was posted through the stubbed tracker, then the status patched" ($ok.Output -match 'STUB Post \S+/threads/777/comments' -and $ok.Output -match 'STUB Patch \S+/threads/777\?')
+        Assert-True "[$sh] the card's Reply: slot carries the reply" ($after -match '(?m)^Reply: Done in abc1234\.$')
+        Assert-True "[$sh] the card's Status: line carries the status" ($after -match '(?m)^Status: fixed$' -and $after -notmatch '(?m)^Status: active$')
+        Assert-True "[$sh] the card says it recorded the reply" ($ok.Output -match 'Recorded in US-119-import-flow\.prompt\.md')
+    }
+}
+catch {
+    Assert-True "the ReplyPR cases ran to the end without a terminating error -- $($_.Exception.Message)" $false
+}
+finally { Remove-Item $replyHub -Recurse -Force -ErrorAction SilentlyContinue }
+
+Write-Host ""
+
 # -- Every script: a red [!] is a refusal written the old way ----------------
 # The cases above SAMPLE the contract, and a sample is how CloseWorkItem kept four
 # refusals that printed a red [!] line and returned 0 -- the bridge said success
