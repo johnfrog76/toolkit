@@ -22,7 +22,9 @@ Core, no flag: cards cannot be turned off, and neither can their cover.
 
 import os
 import re
+import shutil
 import tempfile
+import time
 from pathlib import Path
 from urllib.parse import quote
 
@@ -144,10 +146,58 @@ def upload_dir() -> Path:
     return Path(tempfile.mkdtemp(prefix=UPLOAD_PREFIX))
 
 
+# A folder this old is from an upload nobody attached (a cancelled dialog, a
+# crashed agent); the sweep at agent start removes it.
+STALE_UPLOAD_SECONDS = 24 * 60 * 60
+
+
+def remove_upload(path: str) -> bool:
+    """Remove the upload folder ``path`` lives in, once the verb that copied it is done.
+
+    Only a real upload is ever touched: ``path`` must be a file directly inside a
+    folder named ``p20-upload-*`` whose parent is the system temp directory. Anything
+    else -- a card, a file in the hub, a flag, a link -- is left alone and False comes
+    back."""
+    try:
+        folder = Path(path).parent
+        temp = Path(tempfile.gettempdir())
+        if not folder.name.startswith(UPLOAD_PREFIX) or folder.is_symlink() or not folder.is_dir():
+            return False
+        if os.path.normcase(os.path.realpath(folder.parent)) != os.path.normcase(os.path.realpath(temp)):
+            return False
+        shutil.rmtree(folder, ignore_errors=True)
+        return not folder.exists()
+    except (OSError, ValueError):
+        return False
+
+
+def sweep_stale_uploads(max_age: float = STALE_UPLOAD_SECONDS) -> int:
+    """Remove ``p20-upload-*`` folders in the system temp older than ``max_age``
+    seconds; returns how many went. Nothing else in the temp folder is touched."""
+    removed = 0
+    try:
+        entries = list(os.scandir(tempfile.gettempdir()))
+    except OSError:
+        return 0
+    now = time.time()
+    for e in entries:
+        try:
+            if not e.name.startswith(UPLOAD_PREFIX) or e.is_symlink() or not e.is_dir(follow_symlinks=False):
+                continue
+            if now - e.stat(follow_symlinks=False).st_mtime < max_age:
+                continue
+            shutil.rmtree(e.path, ignore_errors=True)
+            removed += not os.path.exists(e.path)
+        except OSError:
+            continue
+    return removed
+
+
 @api.post("/assets/upload", response_model=UploadResponse)
 async def upload_asset(request: Request, name: str = ""):
     """The browser's door to a picture (spec 4.8, C2): the bytes land in a
-    temp file and the path comes back; the web then runs ``Cover <card> <path>``
+    temp file and the path comes back (the bridge removes its folder when the
+    verb that was handed the path has finished); the web then runs ``Cover <card> <path>``
     (or ``NewPrompt -Cover <path>``) through the bridge. The route writes NOTHING
     into the hub -- the verb is the one writer, and it is the verb that checks the
     card, picks the name in ``assets/<card key>/`` and writes the line. Refused

@@ -26,6 +26,7 @@ Nothing here reaches outside the package for code, and nothing derives the
 prompt store from where this file happens to live -- see core/config.py.
 """
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, HTTPException
@@ -98,9 +99,16 @@ def mount_client(app: FastAPI, client_dir: Path) -> None:
         return FileResponse(str(client_dir / "index.html"))
 
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """On start, drop picture uploads nobody attached (``p20-upload-*`` in the temp folder, a day old)."""
+    assets.sweep_stale_uploads()
+    yield
+
+
 def create_app(client_dir: Path | None = CLIENT_DIR) -> FastAPI:
     """The app: CORS, the router, and the built client when there is one."""
-    app = FastAPI(title="Toolkit Agent", version="0.1.0")
+    app = FastAPI(title="Toolkit Agent", version="0.1.0", lifespan=lifespan)
 
     # Dev-server origins come from config (web.corsOrigins) with the same defaults
     # as before. A fixed pair of port numbers in source is a portability bug: the

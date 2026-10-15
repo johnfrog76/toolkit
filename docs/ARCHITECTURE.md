@@ -124,7 +124,7 @@ route, or `null` ([the card](hub/cards.md#a-cards-pictures----spaceassets)), whi
 the board's card face, the list's thumbnail and the card page draw what the agent serves. Attaching from
 the browser keeps the one writer: `POST /api/assets/upload?name=<file>` takes the file's
 bytes as the body (no multipart, one blob) into a temp file under the system temp folder and answers its
-path, writing nothing into the hub; the web then runs `Cover <card> <path>` -- or `NewPrompt -Cover` /
+path, writing nothing into the hub (the bridge removes that folder when the verb returns, and the agent sweeps day-old ones at start); the web then runs `Cover <card> <path>` -- or `NewPrompt -Cover` /
 `-Before <path>` from the + dialog -- through the bridge, and the verb copies the file in and writes the
 line. The route refuses only what the verb would (a type outside `assets.coverExtensions`, a size over
 `assets.coverMaxBytes`, no bytes), so the browser hears it before a shell starts.
