@@ -84,10 +84,10 @@ async def health():
 # ---------------------------------------------------------------------------
 def _git_history_check(git_present: bool, store_sync: str) -> dict:
     """The Git history row. A hub that is not a repository is a first-class case
-    (storeSync 'none', docs/CONFIGURATION.md) and the hub every first run makes,
-    so `.git not found` in red told a new user something was wrong with a
-    machine doing exactly what it was told. It FAILS only when git was wanted
-   ."""
+     (storeSync 'none', docs/CONFIGURATION.md) and the hub every first run makes,
+     so `.git not found` in red told a new user something was wrong with a
+     machine doing exactly what it was told. It FAILS only when git was wanted
+    ."""
     if git_present:
         return {"ok": True, "detail": ".git found"}
     if store_sync == "git":

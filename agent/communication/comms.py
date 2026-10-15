@@ -235,7 +235,7 @@ def _post_to_webhook(url: str, text: str) -> tuple[bool, str]:
     # The one place a message leaves the machine. While a test run is in
     # progress -- the runners set the marker for their own process tree and
     # nothing else -- nothing posts, whatever variable a suite found.
-    #An
+    # An
     # engineer's own shell has no marker, so a real send beside a running suite
     # still works: that is the normal state of a working day.
     if os.environ.get(env_test_run_marker()):

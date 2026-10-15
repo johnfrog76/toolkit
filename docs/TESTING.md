@@ -214,13 +214,14 @@ default token and the one permission a release needs. `pages.yml` deploys the la
 
 **On `ubuntu-latest`, the three halves**, in one job: the checkout; Node from `.nvmrc` with npm's cache and `npm ci` in `web/`; Python 3.12 with
 pip's cache and `python -m pip install -r agent/requirements-dev.txt`; the runner's own `pwsh`. Then three
-steps, in `tkTest`'s order, and a fourth for the documentation:
+steps, in `tkTest`'s order, then the agent's lint, the documentation and the dependencies:
 
 | Step | Runs | Read from |
 | --- | --- | --- |
 | The agent | `python -m pytest Tests/` | pytest's closing line |
 | The CLI | `tkTest -Half cli`, in a shell with exactly one toolkit in it ("One toolkit per shell", below) | the CLI runner's `Total:` line |
 | The web UI | `npm test` in `web/` | jest's `Tests:` line |
+| The agent's lint | `ruff check agent/` and `ruff format --check agent/` from the root, with `ruff.toml` | each command's exit code |
 | The documentation | `npm run lint:md` in `web/`: markdownlint-cli2 over the root `README.md` and the other root documents, `docs/`, the `design/` and `spec/` READMEs, `web/README.md` and `agent/README.md`, with `.markdownlint-cli2.jsonc` | the linter's exit code; it prints every finding |
 | The dependencies (Ubuntu) | `npm audit --omit=dev --audit-level=high` in `web/`, and `pip-audit` over `agent/requirements-dev.txt` in a throwaway environment (`docs/CONTRIBUTING.md`, "Dependencies and the audit") | each audit's exit code: an advisory at high or above in what ships, or any known vulnerability in the agent's requirements, fails the run the day it is published, before Dependabot's weekly pull request |
 
