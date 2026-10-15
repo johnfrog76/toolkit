@@ -16,6 +16,7 @@ Usage:
 
 import datetime
 import os
+import re
 import socket
 from pathlib import Path
 
@@ -55,6 +56,16 @@ def _resolve_log_path(machine: str) -> str:
     return str(log_dir() / f"usage.{machine}.log")
 
 
+# Everything the reader splits a line or a column on: tab, and every character
+# str.splitlines() treats as a line end. Each becomes one space, so a value
+# can neither forge a second entry nor shift the columns.
+_LOG_BREAKS = re.compile("[\t\r\n\v\f\x1c-\x1e\x85\u2028\u2029]")
+
+
+def _one_field(value: str) -> str:
+    return _LOG_BREAKS.sub(" ", str(value))
+
+
 def write_log(log_type: str, source: str, detail: str) -> None:
     """Append one entry to usage.{machine}.log.
 
@@ -68,7 +79,7 @@ def write_log(log_type: str, source: str, detail: str) -> None:
 
     timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     machine = _machine_name()
-    entry = f"{timestamp}\t{log_type}\t{machine}\t{source}\t{detail}\n"
+    entry = f"{timestamp}\t{log_type}\t{machine}\t{_one_field(source)}\t{_one_field(detail)}\n"
 
     try:
         with open(_resolve_log_path(machine), "a", encoding="utf-8") as f:

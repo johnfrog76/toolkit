@@ -41,7 +41,13 @@ function global:Write-ToolkitLog {
     )
     $timestamp = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss')
     $machine = Get-MachineName
-    $entry = "$timestamp`t$Type`t$machine`t$Source`t$Detail"
+    # One entry is one line of tab-separated columns: a tab, a line break or any
+    # other character the readers split a line on becomes a single space, so a
+    # value cannot forge a second entry or shift the columns.
+    $lineBreaks = '[\t\r\n\x0b\x0c\x1c-\x1e\x85\u2028\u2029]'
+    $safeSource = ($Source -replace $lineBreaks, ' ')
+    $safeDetail = ($Detail -replace $lineBreaks, ' ')
+    $entry = "$timestamp`t$Type`t$machine`t$safeSource`t$safeDetail"
     $logPath = Join-Path (Get-P20ToolkitLogDir) "usage.$machine.log"
     try {
         [System.IO.File]::AppendAllText($logPath, "$entry`n", [System.Text.Encoding]::UTF8)
@@ -62,9 +68,9 @@ function global:Write-P20TestResult {
     )
     $timestamp = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss')
     $machine = Get-MachineName
-    # Detail is a non-terminal tab-delimited column now (org follows it); strip
-    # any tabs so it can't bleed into the org field.
-    $safeDetail = ($Detail -replace "`t", ' ')
+    # Detail is a non-terminal tab-delimited column (org follows it); a tab or a
+    # line break would bleed into the org field or forge a second result line.
+    $safeDetail = ($Detail -replace '[\t\r\n\x0b\x0c\x1c-\x1e\x85\u2028\u2029]', ' ')
     $entry = "$timestamp`t$Suite`t$Result`t$Passed`t$Total`t$safeDetail`t$Org"
     $logPath = Join-Path $PSScriptRoot "test-results.$machine.log"
     try {

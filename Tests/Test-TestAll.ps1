@@ -547,6 +547,81 @@ finally {
     Remove-Item $warnBase -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+# -- 3b2. One log entry is one line -------------------------------------------
+Write-Host ""
+Write-Host "-- A tab or a line break in a logged value cannot forge an entry or shift a column --" -ForegroundColor Cyan
+$lineBase = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-testall-lines-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+New-Item -ItemType Directory -Path $lineBase -Force | Out-Null
+try {
+    Copy-Item (Join-Path $pkgRoot 'utilities.psm1'), (Join-Path $pkgRoot 'consts.json'), (Join-Path $pkgRoot 'config.default.json') $lineBase
+    Copy-Item (Join-Path $pkgRoot 'Scripts') (Join-Path $lineBase 'Scripts') -Recurse
+    if (Test-Path (Join-Path $pkgRoot 'Config')) { Copy-Item (Join-Path $pkgRoot 'Config') (Join-Path $lineBase 'Config') -Recurse }
+    $lineHost = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+    $lineModule = $lineBase -replace '\\', '/'
+    # A script file, not -Command: Windows PowerShell 5.1 drops the double quotes
+    # from a native argument, and the values here are the point of the test.
+    $probe = Join-Path $lineBase 'probe-write.ps1'
+    $probeText = @(
+        "`$ErrorActionPreference = 'Continue'",
+        "Import-Module '$lineModule/utilities.psm1' -Force 3>`$null 6>`$null",
+        "`$tab = [string][char]9; `$lf = [string][char]10; `$cr = [string][char]13",
+        "`$forged = 'failed' + `$lf + '2030-01-01T00:00:00' + `$tab + 'ERR' + `$tab + 'HOST' + `$tab + 'forged' + `$tab + 'not a real entry'",
+        "Write-ToolkitLog -Type WARN -Source ('a' + `$tab + 'b') -Detail `$forged",
+        "Write-ToolkitLog -Type INFO -Source plain -Detail ('one' + `$cr + `$lf + 'two')",
+        "Write-P20TestResult -Suite 'Lines' -Result 'fail' -Passed 1 -Total 2 -Detail ('first' + `$lf + 'second' + `$tab + 'third') -Org 'acme'"
+    )
+    [System.IO.File]::WriteAllText($probe, ($probeText -join "`r`n"))
+    $savedQuiet = $env:TOOLKIT_QUIET_STARTUP
+    $savedLogDir = $env:P20_USAGE_LOG_DIR
+    $env:TOOLKIT_QUIET_STARTUP = '1'
+    $env:P20_USAGE_LOG_DIR = $lineBase
+    try { $lineOut = (& $lineHost -NoProfile -ExecutionPolicy Bypass -File $probe 2>&1 | ForEach-Object { [string]$_ }) -join "`n" }
+    finally {
+        $env:TOOLKIT_QUIET_STARTUP = $savedQuiet
+        $env:P20_USAGE_LOG_DIR = $savedLogDir
+    }
+    $usageLogs = @(Get-ChildItem -Path $lineBase -Filter 'usage.*.log')
+    $usageLines = @()
+    if ($usageLogs.Count -eq 1) { $usageLines = @([System.IO.File]::ReadAllLines($usageLogs[0].FullName) | Where-Object { $_ -notmatch "`ttkEnv`t" }) }
+    Assert-True 'two Write-ToolkitLog calls are two lines, however many line breaks the values carried' ($usageLines.Count -eq 2) "$($usageLines.Count) lines: $lineOut"
+    $warnCols = @()
+    if ($usageLines.Count -ge 1) { $warnCols = @($usageLines[0] -split "`t") }
+    Assert-True 'a value with a forged line and tabs is still five columns' ($warnCols.Count -eq 5) ($usageLines -join ' | ')
+    Assert-True 'a tab in the source is a space, not a new column' ($warnCols.Count -eq 5 -and $warnCols[3] -eq 'a b')
+    Assert-True 'the whole detail is kept, each tab and line break as one space' ($warnCols.Count -eq 5 -and $warnCols[4] -eq 'failed 2030-01-01T00:00:00 ERR HOST forged not a real entry') ($usageLines -join ' | ')
+    $crCols = @()
+    if ($usageLines.Count -ge 2) { $crCols = @($usageLines[1] -split "`t") }
+    Assert-True 'CR and LF are one space each' ($crCols.Count -eq 5 -and $crCols[4] -eq 'one  two') ($usageLines -join ' | ')
+
+    # The reader the CLI ships: the Log verb shows the entry whole, once.
+    $logReadCmd = "`$ErrorActionPreference = 'Continue'; " +
+        "Import-Module '$lineModule/utilities.psm1' -Force 3>`$null 6>`$null; " +
+        "Get-P20ToolkitLog -Count 50 6>&1"
+    $env:TOOLKIT_QUIET_STARTUP = '1'
+    $env:P20_USAGE_LOG_DIR = $lineBase
+    try { $logReadOut = (& $lineHost -NoProfile -ExecutionPolicy Bypass -Command $logReadCmd 2>&1 | ForEach-Object { [string]$_ }) -join "`n" }
+    finally {
+        $env:TOOLKIT_QUIET_STARTUP = $savedQuiet
+        $env:P20_USAGE_LOG_DIR = $savedLogDir
+    }
+    Assert-True 'the Log verb shows the forged-looking detail as part of one entry' ($logReadOut -match 'failed 2030-01-01T00:00:00 ERR HOST forged not a real entry') $logReadOut
+    Assert-True 'and shows no entry of its own with the forged source' (@($logReadOut -split "`n" | Where-Object { $_ -match '\sforged\s+not a real entry' -and $_ -notmatch 'failed' }).Count -eq 0) $logReadOut
+
+    $resultLogs = @(Get-ChildItem -Path $lineBase -Filter 'test-results.*.log')
+    $resultLines = @()
+    if ($resultLogs.Count -eq 1) { $resultLines = @([System.IO.File]::ReadAllLines($resultLogs[0].FullName)) }
+    $resultCols = @()
+    if ($resultLines.Count -ge 1) { $resultCols = @($resultLines[0] -split "`t") }
+    Assert-True 'Write-P20TestResult strips line breaks as well as tabs: one line, seven columns' ($resultLines.Count -eq 1 -and $resultCols.Count -eq 7) "$($resultLines.Count) lines: $($resultLines -join ' | ')"
+    Assert-True 'its detail is kept whole and the org is still the last column' ($resultCols.Count -eq 7 -and $resultCols[5] -eq 'first second third' -and $resultCols[6] -eq 'acme') ($resultLines -join ' | ')
+}
+catch {
+    Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally {
+    Remove-Item $lineBase -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 # -- 3c. A MISSING suite is logged and fails the run -----------------------
 Write-Host ""
 Write-Host "-- A suite whose file is not found reaches the log and fails the run --" -ForegroundColor Cyan

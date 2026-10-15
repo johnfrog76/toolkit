@@ -1019,6 +1019,11 @@ tkLog -Ack               # dismiss the error indicator in tkMenu
 ```
 
 It lives beside the module as `usage.<MACHINE>.log`, one file per machine, and is gitignored.
+An entry is one line of tab-separated columns (time, type, machine, source, detail). Both writers --
+`Write-ToolkitLog` and the agent's `POST /api/log` -- turn a tab or a line break in the source or the
+detail into one space before writing, so a work item title or an error message with a newline in it
+cannot start a second entry or move a column. `Write-P20TestResult` does the same for
+`test-results.<MACHINE>.log`.
 
 **A test run does not write into it.** `P20_USAGE_LOG_DIR` moves the log -- a **directory**, read by
 both halves (`Get-ToolkitLogDir` in `utilities.psm1`, `log_dir()` in `agent/core/log_writer.py`),
