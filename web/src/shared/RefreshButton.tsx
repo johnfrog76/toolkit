@@ -18,7 +18,7 @@ export function RefreshButton({
     <Button
       appearance="subtle"
       size="small"
-      icon={isFetching ? <Spinner size="tiny" /> : <ArrowSyncRegular />}
+      icon={isFetching ? <Spinner size="tiny" aria-label="Refreshing..." /> : <ArrowSyncRegular />}
       onClick={onClick}
       disabled={disabled || isFetching}
       title={title}

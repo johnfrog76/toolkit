@@ -51,6 +51,13 @@ const useStyles = makeStyles({
 export function StatusMessage({ status, children, onDismiss, autoHideMs }: StatusMessageProps) {
   const styles = useStyles();
   const [visible, setVisible] = useState(true);
+  // A live region is only announced when its text changes after it is in the
+  // page, so the region mounts empty and the message arrives one tick later.
+  const [shown, setShown] = useState(false);
+
+  useEffect(() => {
+    setShown(true); // eslint-disable-line react-hooks/set-state-in-effect
+  }, []);
 
   const hide = () => {
     setVisible(false);
@@ -71,6 +78,7 @@ export function StatusMessage({ status, children, onDismiss, autoHideMs }: Statu
 
   return (
     <div
+      role={status === "error" ? "alert" : "status"}
       className={styles.container}
       style={{
         backgroundColor:
@@ -79,7 +87,7 @@ export function StatusMessage({ status, children, onDismiss, autoHideMs }: Statu
             : tokens.colorPaletteRedBackground1,
       }}
     >
-      <div className={styles.content}>{children}</div>
+      <div className={styles.content}>{shown ? children : null}</div>
       <button className={styles.dismiss} onClick={hide} aria-label="Dismiss" type="button">
         <DismissRegular fontSize={14} />
       </button>

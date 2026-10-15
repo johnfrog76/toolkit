@@ -191,7 +191,7 @@ export function ReviewPage() {
               justifyContent: "center",
             }}
           >
-            <Spinner size="medium" />
+            <Spinner size="medium" aria-label="Loading the review..." />
           </div>
         ) : reviewDetail ? (
           <>

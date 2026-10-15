@@ -275,7 +275,7 @@ export function AdoHome() {
       ) : null}
       {archiveLoading ? (
         <div className={styles.pageSpinner}>
-          <Spinner size="huge" />
+          <Spinner size="huge" aria-label="Loading engagement..." />
           <Caption1>Loading engagement...</Caption1>
         </div>
       ) : (

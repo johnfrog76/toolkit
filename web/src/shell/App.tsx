@@ -1,13 +1,12 @@
 import {
   FluentProvider,
-  Caption1,
   Button,
-  Spinner,
   makeStyles,
   tokens,
   useRestoreFocusTarget,
 } from "@fluentui/react-components";
 import { fluentThemeFor, noiseSvgUrl } from "./theme";
+import { BootSpinner } from "./BootSpinner";
 import { ThemePicker } from "./ThemePicker";
 import { AvatarMenu } from "./AvatarMenu";
 import { SpaceAnchor } from "./SpaceAnchor";
@@ -128,14 +127,6 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorNeutralBackground1,
     color: tokens.colorNeutralForeground1,
     ":focus": { left: "0.5rem" },
-  },
-  pageSpinner: {
-    display: "flex",
-    flexDirection: "column" as const,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: "60vh",
-    gap: tokens.spacingVerticalL,
   },
 });
 
@@ -397,10 +388,7 @@ export function App() {
           minHeight: "100vh",
         }}
       >
-        <div className={styles.pageSpinner} style={{ minHeight: "100vh" }}>
-          <Spinner size="huge" />
-          <Caption1>Loading toolkit...</Caption1>
-        </div>
+        <BootSpinner />
       </FluentProvider>
     );
   }
