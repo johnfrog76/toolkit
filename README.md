@@ -36,7 +36,7 @@ board, or a crew of agents, through one front door, with nothing you think locke
 | --- | --- |
 | **By yourself** | Plain Markdown prompt cards, one per piece of work. Works offline, with no login, no network call and no tracker |
 | **On a team** | The same cards, linked one to one with the items on your GitHub or Azure DevOps board, so your local context and the team's board stay in step |
-| **Orchestrating agents** | The Team Agile tab -- the standup and triage over the repository's issues -- and the Studio's prompts for the way you work, so a crew of agents can take issues, open pull requests and report back while you decide |
+| **Orchestrating agents** | The Team Agile tab -- the standup over a tracker Space's issues, or a local Space's cards, and triage over the issues -- and the Studio's prompts for the way you work, so a crew of agents can take issues, open pull requests and report back while you decide |
 
 ## The card is the truth
 
