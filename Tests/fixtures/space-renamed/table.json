@@ -1,0 +1,19 @@
+{
+  "_comment": "The renamed-Space rule (#116; consts.json spaces.renamed, test -> azure-demo), one row per input it distinguishes. Asserted by Tests/Test-HubJson.ps1 (Resolve-P20RenamedSlug, Rename-P20LegacyHubSpaces) and Tests/test_hub_json.py (renamed_slug, rename_legacy_hub_spaces) -- parity holds only for the shapes this table has. 'slugs': what an old slug a person or a file names is read as, given the Spaces that exist. 'entries': what slug a hub.json entry is read under, judged against the slugs the config ships -- a nameless entry under an old slug is a patch on the renamed shipped Space; one that names itself is a Space of its own.",
+  "slugs": [
+    { "slug": "test", "slugs": ["demo", "azure-demo"], "expect": "azure-demo", "why": "the old slug, nothing declared under it: the new Space" },
+    { "slug": "test", "slugs": ["azure-demo", "test"], "expect": "test", "why": "a Space declared under the old slug is that Space (Tests/fixtures/hub)" },
+    { "slug": "test", "slugs": ["test"], "expect": "test", "why": "a config that does not ship the new slug keeps the old one (the parity fixtures)" },
+    { "slug": "test", "slugs": [], "expect": "test", "why": "no Spaces at all: nothing to map to" },
+    { "slug": "azure-demo", "slugs": ["azure-demo"], "expect": "azure-demo", "why": "the new slug is itself" },
+    { "slug": "demo", "slugs": ["demo", "azure-demo"], "expect": "demo", "why": "a slug that was never renamed is itself" },
+    { "slug": "", "slugs": ["azure-demo"], "expect": "", "why": "no slug is no slug" }
+  ],
+  "entries": [
+    { "shipped": ["azure-demo"], "entry": { "slug": "test", "promptsFolder": "test" }, "expect": "azure-demo", "why": "the patch Config -Set spaces.test.org=... wrote" },
+    { "shipped": ["azure-demo"], "entry": { "slug": "test", "promptsFolder": "test", "org": "https://dev.azure.com/EXAMPLE-HUB-ORG", "status": "active" }, "expect": "azure-demo", "why": "a connected Example: still a patch, still nameless" },
+    { "shipped": ["azure-demo"], "entry": { "slug": "test", "name": "Example", "promptsFolder": "test" }, "expect": "test", "why": "an entry that names itself is a Space of its own" },
+    { "shipped": ["test"], "entry": { "slug": "test", "promptsFolder": "test" }, "expect": "test", "why": "a config that still ships the old slug: the entry patches that" },
+    { "shipped": ["azure-demo"], "entry": { "slug": "acme", "promptsFolder": "acme" }, "expect": "acme", "why": "a slug that was never renamed keeps its slug" }
+  ]
+}

@@ -1,0 +1,118 @@
+<!doctype html>
+<!-- The zen temple as a self-contained, zero-JavaScript document -- the
+     GRANTABLE twin of web/src/modules/lounge/zenTemple.tsx (same atoms, same
+     register, same stillness contract; a change to one changes the other, by
+     hand, on purpose -- they are one composition in two frames). Ported from
+     the CSS Wasteland studio's zen-development deck. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>zen temple</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; color-scheme: dark;
+        background: linear-gradient(180deg, #1c130a 0%, #251c10 42%, #3a2a16 78%, #4a3618 100%); }
+      .layer { position: fixed; }
+      @keyframes zn-draw       { to { stroke-dashoffset: 0; } }
+      @keyframes zn-drift      { 0%, 100% { transform: translateX(-1.1%); } 50% { transform: translateX(1.1%); } }
+      @keyframes zn-sway       { 0%, 100% { transform: rotate(-1.6deg); } 50% { transform: rotate(1.6deg); } }
+      @keyframes zn-flow       { to { stroke-dashoffset: -240; } }
+      @keyframes zn-emberpulse { 0%, 100% { opacity: 0.6; transform: scale(1); } 50% { opacity: 1; transform: scale(1.18); } }
+      .mist { position: fixed; left: -12%; right: -12%; border-radius: 50%;
+        background: radial-gradient(ellipse at 50% 50%, #7fe0a866 0%, transparent 72%); }
+      .m1 { top: -8%; height: 24%; opacity: 0.4; filter: blur(34px); animation: zn-drift 34s ease-in-out 0s infinite; }
+      .m2 { top: 1%; height: 22%; opacity: 0.3; filter: blur(46px); animation: zn-drift 44s ease-in-out -9s infinite; }
+      .m3 { top: 9%; height: 20%; opacity: 0.2; filter: blur(58px); animation: zn-drift 54s ease-in-out -18s infinite; }
+      .river { position: fixed; inset: 0; width: 100%; height: 100%; }
+      .flow1 { animation: zn-flow 18s linear infinite; }
+      .flow2 { animation: zn-flow 26s linear -6s infinite; }
+      .smokeGroup { transform-origin: 82px 330px; transform-box: view-box; animation: zn-sway 11s ease-in-out infinite; }
+      .smoke { stroke-dasharray: 560; stroke-dashoffset: 560; animation: zn-draw 3s ease-out 0.4s forwards; }
+      .ember { transform-box: fill-box; transform-origin: center; animation: zn-emberpulse 4.2s ease-in-out infinite; }
+      @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+      /* STILL, with zero JavaScript: load as temple.html#still and the body
+         matches :target -- every clock stops at the resting pose. */
+      body:target, body:target * { animation: none !important; }
+    </style>
+  </head>
+  <body id="still">
+    <!-- ceiling mist, three drifting layers -->
+    <div class="mist m1"></div>
+    <div class="mist m2"></div>
+    <div class="mist m3"></div>
+    <!-- the restoration river, in the mist -->
+    <svg class="river" viewBox="0 0 1600 900" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M -20 150 C 300 118 520 192 800 155 C 1090 118 1310 192 1620 150" fill="none" stroke="#7fd4c0" stroke-width="32" stroke-linecap="round" opacity="0.09" />
+      <path class="flow1" d="M -20 150 C 300 118 520 192 800 155 C 1090 118 1310 192 1620 150" fill="none" stroke="#8fe8cc" stroke-width="3" stroke-dasharray="16 26" opacity="0.3" />
+      <path d="M -20 268 C 340 304 620 236 900 270 C 1180 304 1400 244 1620 270" fill="none" stroke="#7fd4c0" stroke-width="24" stroke-linecap="round" opacity="0.07" />
+      <path class="flow2" d="M -20 268 C 340 304 620 236 900 270 C 1180 304 1400 244 1620 270" fill="none" stroke="#8fe8cc" stroke-width="2.5" stroke-dasharray="12 30" opacity="0.2" />
+    </svg>
+    <!-- the whole altar composition in one stage svg so it scales as a scene -->
+    <svg class="layer" style="inset:0;width:100%;height:100%" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" role="img"
+         aria-label="A zen temple: offerings on the altar, the river in the mist">
+      <!-- altar table -->
+      <g transform="translate(605,690)">
+        <rect width="390" height="26" rx="6" fill="url(#wood)"/>
+        <rect x="43" y="26" width="26" height="82" rx="3" fill="url(#leg)"/>
+        <rect x="321" y="26" width="26" height="82" rx="3" fill="url(#leg)"/>
+      </g>
+      <!-- incense: bowl, stick, ember, smoke -->
+      <g transform="translate(648,214) scale(1.19)">
+        <g class="smokeGroup">
+          <path class="smoke" d="M 82 330 C 90 276 70 236 80 178 C 88 120 68 78 78 30 C 82 12 78 4 80 -6"
+                fill="none" stroke="#7fe0a8" stroke-width="2.5" stroke-linecap="round" opacity="0.85"/>
+        </g>
+        <line x1="79" y1="446" x2="82" y2="330" stroke="#a53030" stroke-width="4" stroke-linecap="round"/>
+        <circle class="ember" cx="82" cy="330" r="4.5" fill="#ffb066"/>
+        <ellipse cx="80" cy="446" rx="35" ry="9" fill="#e9c87a" stroke="#54401f" stroke-width="1.6"/>
+        <path d="M 45 448 C 45 480 59 496 80 496 C 101 496 115 480 115 448 Z" fill="#8a6a3a" stroke="#54401f" stroke-width="1.6"/>
+        <path d="M 52 462 C 56 472 64 480 74 483" fill="none" stroke="#c9a35e" stroke-width="2" opacity="0.5" stroke-linecap="round"/>
+        <path d="M 66 496 L 94 496 L 99 510 L 61 510 Z" fill="#54401f"/>
+      </g>
+      <!-- the round stone -->
+      <ellipse cx="905" cy="650" rx="55" ry="45" fill="url(#stone)"/>
+      <!-- framing pillars, bleeding past both edges -->
+      <g transform="translate(-40,-36)" opacity="0.92">
+        <use href="#pillar"/>
+      </g>
+      <g transform="translate(1476,-36)" opacity="0.92">
+        <use href="#pillar"/>
+      </g>
+      <defs>
+        <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#4a2f16"/><stop offset="0.55" stop-color="#331d0c"/><stop offset="1" stop-color="#241206"/>
+        </linearGradient>
+        <linearGradient id="leg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#33200e"/><stop offset="1" stop-color="#1c0f05"/>
+        </linearGradient>
+        <radialGradient id="stone" cx="0.34" cy="0.28" r="1">
+          <stop offset="0" stop-color="#e8d9b0"/><stop offset="0.52" stop-color="#c9b37e"/><stop offset="1" stop-color="#7a6538"/>
+        </radialGradient>
+        <linearGradient id="shaft" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#661d1a"/><stop offset="0.34" stop-color="#a53030"/><stop offset="0.52" stop-color="#c65a4a"/><stop offset="0.7" stop-color="#a53030"/><stop offset="1" stop-color="#661d1a"/>
+        </linearGradient>
+        <linearGradient id="gilt" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#e9c87a"/><stop offset="1" stop-color="#8a6a34"/>
+        </linearGradient>
+        <g id="pillar">
+          <!-- lotus crown -->
+          <g transform="translate(-13,0)">
+            <path d="M 14 40 C 1 33 3 19 14 10 C 25 19 27 33 14 40 Z" fill="#c9b37e" stroke="#8a6a34" stroke-width="1.4" transform="translate(0,0) scale(1.6)"/>
+            <path d="M 34 40 C 21 33 23 19 34 10 C 45 19 47 33 34 40 Z" fill="#e9c87a" stroke="#8a6a34" stroke-width="1.4" transform="scale(1.6)"/>
+            <path d="M 54 40 C 41 33 43 19 54 10 C 65 19 67 33 54 40 Z" fill="#c9b37e" stroke="#8a6a34" stroke-width="1.4" transform="scale(1.6)"/>
+            <path d="M 74 40 C 61 33 63 19 74 10 C 85 19 87 33 74 40 Z" fill="#e9c87a" stroke="#8a6a34" stroke-width="1.4" transform="scale(1.6)"/>
+            <path d="M 94 40 C 81 33 83 19 94 10 C 105 19 107 33 94 40 Z" fill="#c9b37e" stroke="#8a6a34" stroke-width="1.4" transform="scale(1.6)"/>
+          </g>
+          <rect x="-10" y="64" width="180" height="20" rx="4" fill="url(#gilt)"/>
+          <rect x="0" y="84" width="160" height="30" rx="3" fill="#3f8f86"/>
+          <rect x="18" y="114" width="124" height="820" fill="url(#shaft)"/>
+          <rect x="0" y="934" width="160" height="24" rx="3" fill="url(#gilt)"/>
+          <rect x="-16" y="958" width="192" height="24" rx="4" fill="#c9b37e"/>
+        </g>
+      </defs>
+    </svg>
+    <div class="layer" style="bottom:5%;left:50%;transform:translateX(-50%);font-family:'Cascadia Code','Fira Code',Consolas,monospace;font-size:0.78rem;letter-spacing:0.18em;text-transform:uppercase;color:#7fe0a8;white-space:nowrap;text-shadow:0 2px 12px rgba(0,0,0,0.6)">
+      offerings on the altar · the river in the mist
+    </div>
+  </body>
+</html>

@@ -1,0 +1,87 @@
+{
+  "_": "Triage's grouping rule, as a table (#132; docs/modules/solitaire-agile.md, \"The verbs\"). Both halves -- tkTestToolkit -Triage and Tests/test_triage.py -- feed each case's labels and issues to their fill and assert the groups in order (the group with no milestone first, then milestones by open count descending, a tie by title), each group's counts and issue numbers, each issue's worker, size, severity and deep-water mark, and the rendered text against triage-<name>.txt in this folder, byte for byte (LF). Issues are the fields `gh issue list --state open --json number,title,state,labels,milestone,url` returns (labels may be names or gh's {name} objects; a closed one is read past); labels are `gh label list --json name,description`.",
+  "labels": [
+    { "name": "fable",  "description": "Routed to Fable -- the deep or risky work" },
+    { "name": "opus",   "description": "Routed to Opus -- the crash-through volume" },
+    { "name": "sonnet", "description": "Routed to Sonnet -- well-scoped, pattern-following work" },
+    { "name": "sev1", "description": "Severity 1 -- drop everything" },
+    { "name": "sev2", "description": "Severity 2 -- next session" },
+    { "name": "sev3", "description": "Severity 3 -- when it fits" },
+    { "name": "deep-water", "description": "Difficult or risky -- Fable's set" },
+    { "name": "bug", "description": "Something isn't working" }
+  ],
+  "cases": [
+    {
+      "name": "mixed",
+      "space": "toolkit",
+      "tracker": { "ok": true, "reason": "" },
+      "issues": [
+        { "number": 141, "title": "Port the cast atoms", "state": "OPEN", "labels": ["opus", "sev3"], "milestone": null, "url": "https://github.com/johnfrog76/toolkit/issues/141" },
+        { "number": 140, "title": "Split the drawer", "state": "OPEN", "labels": ["bug", "sev2"], "milestone": null, "url": "https://github.com/johnfrog76/toolkit/issues/140" },
+        { "number": 142, "title": "Re-plumb the bridge", "state": "OPEN", "labels": ["deep-water", "fable", "sev1"], "milestone": { "title": "Phase 6: ledgers" }, "url": "https://github.com/johnfrog76/toolkit/issues/142" },
+        { "number": 143, "title": "Ledger counts", "state": "OPEN", "labels": [], "milestone": { "title": "Phase 6: ledgers" }, "url": "https://github.com/johnfrog76/toolkit/issues/143" },
+        { "number": 144, "title": "Ledger tests", "state": "OPEN", "labels": ["sonnet", "opus"], "milestone": { "title": "Phase 6: ledgers" }, "url": "https://github.com/johnfrog76/toolkit/issues/144" },
+        { "number": 145, "title": "Lounge skins", "state": "OPEN", "labels": ["sev3", "sonnet"], "milestone": { "title": "Next three: the Lounge" }, "url": "https://github.com/johnfrog76/toolkit/issues/145" },
+        { "number": 146, "title": "Gate the IP question", "state": "OPEN", "labels": ["deep-water"], "milestone": { "title": "Going public" }, "url": "https://github.com/johnfrog76/toolkit/issues/146" },
+        { "number": 147, "title": "Lounge bells", "state": "OPEN", "labels": ["sev2", "sev1"], "milestone": { "title": "Next three: the Lounge" }, "url": "https://github.com/johnfrog76/toolkit/issues/147" },
+        { "number": 148, "title": "Write the licence note", "state": "OPEN", "labels": ["sev3"], "milestone": { "title": "Going public" }, "url": "https://github.com/johnfrog76/toolkit/issues/148" },
+        { "number": 139, "title": "Already closed", "state": "CLOSED", "labels": ["opus"], "milestone": null, "url": "https://github.com/johnfrog76/toolkit/issues/139" }
+      ],
+      "expected": {
+        "sizes": ["fable", "opus", "sonnet"],
+        "groups": [
+          { "milestone": "", "open": 2, "routed": 1, "unrouted": 1, "context": "2 open, 1 routed, 1 unrouted", "issues": [140, 141] },
+          { "milestone": "Phase 6: ledgers", "open": 3, "routed": 2, "unrouted": 1, "context": "3 open, 2 routed, 1 unrouted", "issues": [142, 143, 144] },
+          { "milestone": "Going public", "open": 2, "routed": 0, "unrouted": 2, "context": "2 open, 0 routed, 2 unrouted", "issues": [146, 148] },
+          { "milestone": "Next three: the Lounge", "open": 2, "routed": 1, "unrouted": 1, "context": "2 open, 1 routed, 1 unrouted", "issues": [145, 147] }
+        ],
+        "issues": {
+          "140": { "worker": "",       "size": "",       "severity": "sev2", "deepWater": false },
+          "141": { "worker": "Opus",   "size": "opus",   "severity": "sev3", "deepWater": false },
+          "142": { "worker": "Fable",  "size": "fable",  "severity": "sev1", "deepWater": true },
+          "143": { "worker": "",       "size": "",       "severity": "",     "deepWater": false },
+          "144": { "worker": "Sonnet", "size": "sonnet", "severity": "",     "deepWater": false },
+          "145": { "worker": "Sonnet", "size": "sonnet", "severity": "sev3", "deepWater": false },
+          "146": { "worker": "",       "size": "",       "severity": "",     "deepWater": true },
+          "147": { "worker": "",       "size": "",       "severity": "sev2", "deepWater": false },
+          "148": { "worker": "",       "size": "",       "severity": "sev3", "deepWater": false }
+        },
+        "text": "triage-mixed.txt"
+      }
+    },
+    {
+      "name": "all-placed",
+      "space": "toolkit",
+      "tracker": { "ok": true, "reason": "" },
+      "issues": [
+        { "number": 150, "title": "Count the closes", "state": "OPEN", "labels": [{ "name": "sonnet" }], "milestone": { "title": "Phase 6: ledgers" }, "url": "https://github.com/johnfrog76/toolkit/issues/150" }
+      ],
+      "expected": {
+        "sizes": ["fable", "opus", "sonnet"],
+        "groups": [
+          { "milestone": "Phase 6: ledgers", "open": 1, "routed": 1, "unrouted": 0, "context": "1 open, 1 routed, 0 unrouted", "issues": [150] }
+        ],
+        "issues": {
+          "150": { "worker": "Sonnet", "size": "sonnet", "severity": "", "deepWater": false }
+        },
+        "text": "triage-all-placed.txt"
+      }
+    },
+    {
+      "name": "nothing-open",
+      "space": "toolkit",
+      "tracker": { "ok": true, "reason": "" },
+      "issues": [],
+      "expected": { "sizes": ["fable", "opus", "sonnet"], "groups": [], "issues": {}, "text": "triage-nothing-open.txt" }
+    },
+    {
+      "name": "no-tracker",
+      "space": "toolkit",
+      "tracker": { "ok": false, "reason": "gh did not answer" },
+      "issues": [
+        { "number": 140, "title": "Not read when the tracker did not answer", "state": "OPEN", "labels": [], "milestone": null, "url": "https://github.com/johnfrog76/toolkit/issues/140" }
+      ],
+      "expected": { "sizes": [], "groups": [], "issues": {}, "text": "triage-no-tracker.txt" }
+    }
+  ]
+}

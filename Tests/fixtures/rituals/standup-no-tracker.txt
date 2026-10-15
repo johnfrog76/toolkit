@@ -1,0 +1,6 @@
+Standup -- Friday 2 October 2026
+"Can we not adjust scope."
+
+  Tracker    gh did not answer (TimeoutExpired)
+
+"Let's circle back."

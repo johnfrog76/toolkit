@@ -1,0 +1,36 @@
+# ruff, for the repository's Python: the agent (agent/) and its suites (Tests/*.py).
+# Run from the repository root:  ruff check  and  ruff format --check
+# (docs/CONTRIBUTING.md, "Lint"). The version is pinned in agent/requirements-dev.txt.
+
+# The agent runs on Python 3.12 (docs/QUICKSTART.md); the rules that know a version read it here.
+target-version = "py312"
+
+# One line length, for the formatter and for E501 alike. 120 is what the agent was
+# written to: 21 lines in agent/ were over 120 when this was decided, 173 over 100.
+line-length = 120
+
+# ruff also formats the Python inside Markdown code blocks; the documents here are
+# written by hand, so it reads .py only.
+extend-exclude = ["*.md"]
+
+[lint]
+# ruff's defaults, plus pycodestyle's errors (E) -- E501 line-too-long and E741
+# ambiguous-variable-name among them, and E402, which the suites' import guards
+# already name in their noqa comments.
+extend-select = ["E"]
+
+ignore = [
+  # The hub's dates are the engineer's calendar days: the CLI writes them without a
+  # zone, and the agent reads, compares and stamps them in the machine's local time
+  # on purpose: "local, no offset" (docs/hub/reminders.md), "on the reader's clock"
+  # (docs/hub/cards.md). An aware datetime would compare against nothing in the hub.
+  "DTZ001", "DTZ005", "DTZ006", "DTZ007", "DTZ011",
+]
+
+[lint.per-file-ignores]
+# Every suite opens with an import guard: whatever importing the agent raised -- a
+# missing dependency, a syntax error on an old interpreter -- becomes a stated
+# skip_module() rather than a collection error. Blind on purpose, one shape, ~40 files.
+# RUF012: a suite's table (CASES, ROWS, features) is a class attribute the tests read
+# and never write; a ClassVar on each of ~30 tables would say nothing a reader needs.
+"Tests/*.py" = ["BLE001", "RUF012"]

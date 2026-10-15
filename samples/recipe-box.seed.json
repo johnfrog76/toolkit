@@ -1,0 +1,201 @@
+{
+  "_comment": "What samples/seed-recipe-box.ps1 puts in the public GitHub repo the GitHub demo Space reads: a few files so the Design tab has a note and a spec, the house labels, three milestones and a dozen issues. Run once, by the repo's owner, through gh. Issues are created in this order, so on a fresh repo each lands on its `number`; the sample cards in samples/hub/github-demo/ link to those numbers (5, 6, 9 in current/, 4 in archive/). The script says so when one lands elsewhere. Everything here is sample text and belongs to nobody.",
+  "repo": "johnfrog76/recipe-box-demo",
+  "description": "RecipeBox -- a small recipe app, as a demo repository. Sample issues, milestones and labels; nothing here is real work.",
+  "files": [
+    {
+      "path": "README.md",
+      "message": "Seed the README",
+      "lines": [
+        "# RecipeBox",
+        "",
+        "A small recipe app: keep recipes, scale them by servings, plan the week, shop from the list.",
+        "",
+        "This repository is a **demo**. Its issues, milestones and labels are sample data, seeded once so",
+        "that a tool reading a real repository -- its issues, its board, its design notes -- has something to read.",
+        "Nothing here is real work, and none of it belongs to anybody.",
+        "",
+        "- `design/` holds the notes a decision came from; `spec/` holds what was decided.",
+        "- `docs/` is how to run it.",
+        ""
+      ]
+    },
+    {
+      "path": "design/scale-a-recipe-by-servings.md",
+      "message": "Seed a design note",
+      "lines": [
+        "---",
+        "description: How scaling should treat a pinch, an egg and a third of a cup.",
+        "---",
+        "# Scale a recipe by servings",
+        "",
+        "> GitHub: https://github.com/johnfrog76/recipe-box-demo/issues/6",
+        "",
+        "The conversation behind the spec. A recipe for four, cooked for six: every quantity times 1.5.",
+        "",
+        "## What we talked about",
+        "",
+        "- **Countable things round.** One and a half eggs is two eggs, and the step says so.",
+        "- **Pinches do not scale.** A pinch of salt for six is still a pinch.",
+        "- **Fractions stay fractions.** A third of a cup times 1.5 is half a cup, never 0.5.",
+        "",
+        "## What we left out",
+        "",
+        "Scaling cooking times. A bigger pot is not a longer bake in any rule we could write down.",
+        ""
+      ]
+    },
+    {
+      "path": "spec/scale-a-recipe-by-servings.spec.md",
+      "message": "Seed a spec",
+      "lines": [
+        "---",
+        "description: The contract for scaling a recipe by servings.",
+        "---",
+        "# Spec: scale a recipe by servings",
+        "",
+        "> GitHub: https://github.com/johnfrog76/recipe-box-demo/issues/6",
+        "",
+        "| Decision | Rule |",
+        "|---|---|",
+        "| D-1 | A recipe has a base serving count; scaling multiplies every quantity by target / base |",
+        "| D-2 | A countable unit (egg, clove) rounds up to a whole number |",
+        "| D-3 | A quantity marked `to taste` or `pinch` does not scale |",
+        "| D-4 | Quantities are rationals end to end; the display picks the nearest kitchen fraction |",
+        "",
+        "## Acceptance",
+        "",
+        "- 4 to 6 servings: 1/3 cup becomes 1/2 cup, 1 egg becomes 2 eggs, a pinch stays a pinch.",
+        ""
+      ]
+    },
+    {
+      "path": "docs/running-locally.md",
+      "message": "Seed the docs",
+      "lines": [
+        "# Running RecipeBox locally",
+        "",
+        "There is no app here yet -- this repository is sample data, a demo that stands on its own.",
+        "If there were, this is where `npm install` and `npm run dev` would be explained.",
+        ""
+      ]
+    }
+  ],
+  "labels": [
+    { "name": "bug", "color": "d73a4a", "description": "Something isn't working" },
+    { "name": "enhancement", "color": "a2eeef", "description": "New feature or request" },
+    { "name": "documentation", "color": "0075ca", "description": "Improvements or additions to documentation" },
+    { "name": "accessibility", "color": "f143ab", "description": "Barrier affecting people with disabilities" },
+    { "name": "sev1", "color": "B60205", "description": "Severity 1 -- drop everything" },
+    { "name": "sev2", "color": "D93F0B", "description": "Severity 2 -- next session" },
+    { "name": "sev3", "color": "FBCA04", "description": "Severity 3 -- when it fits" },
+    { "name": "deep-water", "color": "1f6feb", "description": "Difficult or risky -- architecture, scoping traps, migrations" },
+    { "name": "fable", "color": "8250df", "description": "Routed to Fable -- the deep or risky work" },
+    { "name": "opus", "color": "d4a72c", "description": "Routed to Opus -- the crash-through volume" },
+    { "name": "sonnet", "color": "2da44e", "description": "Routed to Sonnet -- well-scoped, pattern-following work" },
+    { "name": "verify-close", "color": "0e8a16", "description": "Believed shipped -- verify it landed, then close" }
+  ],
+  "milestones": [
+    { "title": "v0.1 -- Cook from it", "description": "One recipe on one page, quantities that survive a save, and a way in from the web.", "due_on": "2026-09-15T12:00:00Z", "state": "closed" },
+    { "title": "v0.2 -- Plan the week", "description": "Find a recipe, size it for the table, put it on a day, shop for it.", "due_on": "2026-11-15T12:00:00Z", "state": "open" },
+    { "title": "v0.3 -- Share", "description": "Send a recipe to someone who does not have the app, and print it.", "due_on": "2027-01-31T12:00:00Z", "state": "open" }
+  ],
+  "issues": [
+    {
+      "number": 1,
+      "title": "Show a recipe's ingredients and steps on one page",
+      "labels": ["enhancement", "sev2"],
+      "milestone": "v0.1 -- Cook from it",
+      "state": "closed",
+      "body": ["## Problem", "", "A recipe opens as two tabs, ingredients and method, and cooking from it means flipping between them with floury hands.", "", "## Fix", "", "One page: ingredients down the side, steps down the middle."]
+    },
+    {
+      "number": 2,
+      "title": "Quantities lose precision on save",
+      "labels": ["bug", "sev1"],
+      "milestone": "v0.1 -- Cook from it",
+      "state": "closed",
+      "body": ["## Problem", "", "A third of a cup comes back as 0.33, and three of them no longer make one.", "", "## Fix", "", "Store quantities as rationals, not floats, and migrate the existing rows."]
+    },
+    {
+      "number": 3,
+      "title": "Import a recipe from a URL",
+      "labels": ["enhancement", "sev2"],
+      "milestone": "v0.1 -- Cook from it",
+      "state": "closed",
+      "body": ["## Problem", "", "Every recipe is typed in by hand.", "", "## Fix", "", "Paste a link; read the page's recipe markup; land on the edit form with everything filled in."]
+    },
+    {
+      "number": 4,
+      "title": "Paginate the recipe list",
+      "labels": ["enhancement", "sev3", "sonnet"],
+      "milestone": "v0.2 -- Plan the week",
+      "state": "closed",
+      "body": ["## Problem", "", "The list renders every recipe at once and the page stalls past a few hundred.", "", "## Fix", "", "Twenty-five a page, with the page in the address so Back works."]
+    },
+    {
+      "number": 5,
+      "title": "Search returns duplicates when tags overlap",
+      "labels": ["bug", "sev2"],
+      "milestone": "v0.2 -- Plan the week",
+      "state": "open",
+      "pin": true,
+      "body": ["## Problem", "", "Searching by tag joins recipes to tags and returns one row per match, so a recipe carrying two of the searched tags comes back twice. The count in the header is wrong for the same reason.", "", "## Fix", "", "Distinct recipes, counted once."]
+    },
+    {
+      "number": 6,
+      "title": "Scale a recipe by servings",
+      "labels": ["enhancement", "sev2", "fable", "deep-water"],
+      "milestone": "v0.2 -- Plan the week",
+      "state": "open",
+      "body": ["## Problem", "", "A recipe for four, cooked for six, means arithmetic at the stove.", "", "## Fix", "", "A servings control on the recipe page. The rules are in `spec/scale-a-recipe-by-servings.spec.md`; the conversation behind them is `design/scale-a-recipe-by-servings.md`."]
+    },
+    {
+      "number": 7,
+      "title": "Extract unit conversion into a pure module",
+      "labels": ["enhancement", "sev3", "sonnet"],
+      "milestone": "v0.2 -- Plan the week",
+      "state": "open",
+      "body": ["## Problem", "", "Conversion is copied into three components, and two of them disagree about how many grams are in a cup of flour.", "", "## Fix", "", "One module, no UI imports, and the three call sites use it."]
+    },
+    {
+      "number": 8,
+      "title": "A week planner: drag recipes onto days",
+      "labels": ["enhancement", "sev2", "opus"],
+      "milestone": "v0.2 -- Plan the week",
+      "state": "open",
+      "body": ["## Problem", "", "There is no way to say what is for dinner on Thursday.", "", "## Fix", "", "Seven columns, drag a recipe onto one, and the shopping list follows."]
+    },
+    {
+      "number": 9,
+      "title": "The shopping list double-counts an ingredient used twice",
+      "labels": ["bug", "sev2"],
+      "milestone": "v0.2 -- Plan the week",
+      "state": "open",
+      "body": ["## Problem", "", "Two recipes on the plan that both use onions put onions on the list twice, as two lines.", "", "## Fix", "", "Merge lines by ingredient and unit; convert where the units differ."]
+    },
+    {
+      "number": 10,
+      "title": "Share a recipe as a read-only link",
+      "labels": ["enhancement", "sev3", "fable"],
+      "milestone": "v0.3 -- Share",
+      "state": "open",
+      "body": ["## Problem", "", "Sending a recipe to someone means a screenshot.", "", "## Fix", "", "A link that opens the recipe without an account. Who can revoke it, and how, is the open question."]
+    },
+    {
+      "number": 11,
+      "title": "The print view drops the last step",
+      "labels": ["bug", "sev3"],
+      "milestone": "v0.3 -- Share",
+      "state": "open",
+      "body": ["## Problem", "", "Printing a recipe whose method runs onto a second page leaves the final step off.", "", "## Fix", "", "Let the method break across pages."]
+    },
+    {
+      "number": 12,
+      "title": "Say how to run the app locally",
+      "labels": ["documentation", "sev3"],
+      "state": "open",
+      "body": ["## Problem", "", "`docs/running-locally.md` is a placeholder.", "", "## Fix", "", "Write it once there is an app to run."]
+    }
+  ]
+}

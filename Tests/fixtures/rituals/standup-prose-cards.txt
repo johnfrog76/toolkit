@@ -1,0 +1,8 @@
+Standup -- Friday 2 October 2026
+"Can we not adjust scope."
+
+Waiting on you to walk one in Task: 140, Read the board.
+
+Widgets: Yesterday I closed one in Bug: 198, Fix the export. Today I'm on two in Task (139, 140). Nothing blocked.
+
+"Let's circle back."

@@ -1,0 +1,69 @@
+# The landing page on GitHub Pages: the web half's second entry, built from the
+# repository by `npm run build:landing` (web/vite.config.ts, the landing mode)
+# and deployed as it was built, with nothing hand-hosted.
+#
+# It runs on every push to main and from the Actions tab's button
+# (workflow_dispatch), so the page is the repository's as it stands.
+#
+# No secret and no personal token. The build job reads the repository with the
+# default GITHUB_TOKEN; the deploy job holds the two permissions the Pages action
+# needs and nothing else. What the workflow runs is docs/TESTING.md, "In CI".
+name: pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions: {}
+
+# One deploy at a time; a run in progress finishes rather than leave the site
+# half-published.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the landing page
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: npm ci (web)
+        working-directory: web
+        run: npm ci
+
+      - name: npm run build:landing
+        working-directory: web
+        run: npm run build:landing
+
+      # The page's asset addresses are relative, so it needs nothing from the
+      # Pages settings and the build job asks for nothing past contents: read.
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist/landing
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

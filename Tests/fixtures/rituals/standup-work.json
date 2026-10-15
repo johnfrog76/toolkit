@@ -1,0 +1,161 @@
+{
+  "_": "The standup's WORK grain, as a table (#137; D-TA20; docs/modules/solitaire-agile.md, \"The work grain\"). Both halves -- tkTestToolkit -Rituals (Group-P20StandupWork, Format-P20StandupWork) and Tests/test_rituals.py (group_work, render_work) -- fill each case, then assert every group of the queue's kinds and of each worker's slots (name, by, count, refs in order, phrase) and the work text -- spoken as prose since #199, whose own table is standup-prose.json -- against standup-work-<name>.txt in this folder, byte for byte (LF). An issue groups by its milestone's title, else the design card its body names (a `> GitHub:` thread, named by that issue's head when the read has it, else #<n>; a design/<note>.md, its stem title-cased), else -- what is left in the slot -- the titles' common stem; a card groups by the design card it names, else its type. `heads`, `keys`, `types` and `counts` pin the four smaller rules row for row. Issues are `gh issue list --json number,title,state,labels,closedAt,url,milestone,body`: milestone is gh's object or a plain title, both read the same.",
+  "workerLabels": [
+    { "name": "fable",  "description": "Routed to Fable -- the deep or risky work" },
+    { "name": "opus",   "description": "Routed to Opus -- the crash-through volume" },
+    { "name": "sonnet", "description": "Routed to Sonnet -- well-scoped, pattern-following work" },
+    { "name": "verify-close", "description": "Believed shipped -- verify it landed, settle the books, close through the verb" }
+  ],
+  "heads": [
+    { "title": "Feature: Team Agile V2 -- the ritual speaks at the grain of the work", "head": "Team Agile V2" },
+    { "title": "Design lifecycle L3: the verb", "head": "Design lifecycle L3" },
+    { "title": "Rename the slug", "head": "Rename the slug" },
+    { "title": "Bug: Test-Menu reads the usage log", "head": "Test-Menu reads the usage log" },
+    { "title": "  Spaced out  ", "head": "Spaced out" }
+  ],
+  "keys": [
+    { "milestone": { "title": "Team Agile" }, "body": "Card `design/toolkit-studio.md`.", "type": "", "threads": {}, "name": "Team Agile", "by": "milestone" },
+    { "milestone": "Phase 6", "body": "", "type": "", "threads": {}, "name": "Phase 6", "by": "milestone" },
+    { "milestone": { "title": "   " }, "body": "", "type": "", "threads": {}, "name": "", "by": "" },
+    { "milestone": null, "body": "Intro.\n> GitHub: <https://github.com/acme/widgets/issues/420>\n", "type": "", "threads": { "420": "Feature: Team Agile -- the rituals" }, "name": "Team Agile", "by": "design" },
+    { "milestone": null, "body": "> GitHub: https://github.com/acme/widgets/issues/7", "type": "", "threads": {}, "name": "#7", "by": "design" },
+    { "milestone": null, "body": "> GitHub: #12", "type": "Task", "threads": {}, "name": "#12", "by": "design" },
+    { "milestone": null, "body": "Card `design/toolkit-studio.md`, D-S13.", "type": "Task", "threads": {}, "name": "Toolkit Studio", "by": "design" },
+    { "milestone": null, "body": "Notes go in the design/ folder.", "type": "Task", "threads": {}, "name": "Task", "by": "type" },
+    { "milestone": null, "body": "", "type": "", "threads": {}, "name": "", "by": "" }
+  ],
+  "types": [
+    { "content": "# Task 139: Write the docs\n", "id": "139", "type": "Task" },
+    { "content": "# User Story 144: Read the board\r\n", "id": "144", "type": "User Story" },
+    { "content": "# Spike K7M2: Photo import\n", "id": "K7M2", "type": "Spike" },
+    { "content": "# 139: A bare heading\n", "id": "139", "type": "" },
+    { "content": "# A note with: a colon\n", "id": "K7M2", "type": "" },
+    { "content": "no heading at all\n", "id": "K7M2", "type": "" }
+  ],
+  "counts": [
+    { "n": 0, "word": "zero" },
+    { "n": 1, "word": "one" },
+    { "n": 3, "word": "three" },
+    { "n": 12, "word": "twelve" },
+    { "n": 13, "word": "13" }
+  ],
+  "cases": [
+    {
+      "name": "friday",
+      "source": "issues",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "tracker": { "ok": true, "reason": "" },
+      "issues": [
+        { "number": 401, "title": "Wire the stage to the deck", "state": "CLOSED", "labels": ["opus"], "closedAt": "2026-10-01T18:00:00Z", "url": "https://github.com/acme/widgets/issues/401", "milestone": { "title": "Team Agile" }, "body": "" },
+        { "number": 402, "title": "Port the cast atoms", "state": "CLOSED", "labels": ["opus"], "closedAt": "2026-10-01T20:00:00Z", "url": "https://github.com/acme/widgets/issues/402", "milestone": { "title": "Team Agile" }, "body": "" },
+        { "number": 403, "title": "Seat the workers", "state": "CLOSED", "labels": ["opus"], "closedAt": "2026-10-02T12:00:00Z", "url": "https://github.com/acme/widgets/issues/403", "milestone": "Team Agile", "body": "" },
+        { "number": 404, "title": "Count the foyer rows", "state": "CLOSED", "labels": ["opus"], "closedAt": "2026-10-01T15:00:00Z", "url": "https://github.com/acme/widgets/issues/404", "milestone": { "title": "the Studio" }, "body": "" },
+        { "number": 405, "title": "Speak the work grain", "state": "OPEN", "labels": ["opus"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/405", "milestone": { "title": "Team Agile" }, "body": "" },
+        { "number": 406, "title": "Group the slot items", "state": "OPEN", "labels": ["opus"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/406", "milestone": { "title": "Team Agile" }, "body": "" },
+        { "number": 411, "title": "Design lifecycle L1: identity", "state": "CLOSED", "labels": ["fable"], "closedAt": "2026-10-01T16:00:00Z", "url": "https://github.com/acme/widgets/issues/411", "milestone": null, "body": "" },
+        { "number": 412, "title": "Design lifecycle L2: the reader", "state": "CLOSED", "labels": ["fable"], "closedAt": "2026-10-02T11:00:00Z", "url": "https://github.com/acme/widgets/issues/412", "milestone": null, "body": "" },
+        { "number": 413, "title": "Rename the slug", "state": "CLOSED", "labels": ["fable"], "closedAt": "2026-10-01T14:00:00Z", "url": "https://github.com/acme/widgets/issues/413", "milestone": null, "body": "" },
+        { "number": 414, "title": "Wire the voices", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/414", "milestone": null, "body": "Card `design/team-agile.md`, D-TA20." },
+        { "number": 415, "title": "Feature: the bus form", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/415", "milestone": null, "body": "## Source\n\n> GitHub: <https://github.com/acme/widgets/issues/420>\n" },
+        { "number": 416, "title": "Verify the Studio tab draws on the PC", "state": "OPEN", "labels": ["fable", "verify-close"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/416", "milestone": null, "body": "" },
+        { "number": 417, "title": "Verify the clock fix on Windows", "state": "OPEN", "labels": ["verify-close"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/417", "milestone": { "title": "Phase 6" }, "body": "" },
+        { "number": 418, "title": "Bug: Test-Menu reads the usage log", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/418", "milestone": null, "body": "> GitHub: #999" },
+        { "number": 419, "title": "Design lifecycle L3: the verb", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/419", "milestone": null, "body": "" },
+        { "number": 420, "title": "Feature: Team Agile -- the rituals", "state": "OPEN", "labels": [], "closedAt": null, "url": "https://github.com/acme/widgets/issues/420", "milestone": null, "body": "" },
+        { "number": 421, "title": "Verify the clock on Windows", "state": "OPEN", "labels": ["verify-close"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/421", "milestone": null, "body": "" }
+      ],
+      "expected": {
+        "queue": {
+          "walk": [
+            { "name": "Verify the Studio tab draws on the PC", "by": "stem", "count": 1, "refs": ["#416"], "phrase": "Verify the Studio tab draws on the PC, one to walk" },
+            { "name": "Phase 6", "by": "milestone", "count": 1, "refs": ["#417"], "phrase": "Phase 6, one" },
+            { "name": "Verify the clock on Windows", "by": "stem", "count": 1, "refs": ["#421"], "phrase": "Verify the clock on Windows, one" }
+          ],
+          "decide": [],
+          "look": []
+        },
+        "workers": [
+          {
+            "label": "fable",
+            "yesterday": [
+              { "name": "Design lifecycle", "by": "stem", "count": 2, "refs": ["#411", "#412"], "phrase": "Design lifecycle, two closed" },
+              { "name": "Rename the slug", "by": "stem", "count": 1, "refs": ["#413"], "phrase": "Rename the slug, one" }
+            ],
+            "today": [
+              { "name": "Team Agile", "by": "design", "count": 2, "refs": ["#414", "#415"], "phrase": "Team Agile, two" },
+              { "name": "#999", "by": "design", "count": 1, "refs": ["#418"], "phrase": "#999, one" },
+              { "name": "Design lifecycle L3", "by": "stem", "count": 1, "refs": ["#419"], "phrase": "Design lifecycle L3, one" }
+            ],
+            "blockers": [
+              { "name": "Verify the Studio tab draws on the PC", "by": "stem", "count": 1, "refs": ["#416"], "phrase": "Verify the Studio tab draws on the PC, one to walk" }
+            ]
+          },
+          {
+            "label": "opus",
+            "yesterday": [
+              { "name": "Team Agile", "by": "milestone", "count": 3, "refs": ["#401", "#402", "#403"], "phrase": "Team Agile, three closed" },
+              { "name": "the Studio", "by": "milestone", "count": 1, "refs": ["#404"], "phrase": "the Studio, one" }
+            ],
+            "today": [
+              { "name": "Team Agile", "by": "milestone", "count": 2, "refs": ["#405", "#406"], "phrase": "Team Agile, two" }
+            ],
+            "blockers": []
+          },
+          { "label": "sonnet", "yesterday": [], "today": [], "blockers": [] }
+        ],
+        "text": "standup-work-friday.txt"
+      }
+    },
+    {
+      "name": "no-tracker",
+      "source": "issues",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "tracker": { "ok": false, "reason": "gh did not answer (TimeoutExpired)" },
+      "issues": [],
+      "expected": {
+        "queue": { "walk": [], "decide": [], "look": [] },
+        "workers": [],
+        "text": "standup-work-no-tracker.txt"
+      }
+    },
+    {
+      "name": "cards",
+      "source": "cards",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "space": "widgets",
+      "spaceName": "Widgets",
+      "cards": [
+        { "file": "Task139-write-the-docs.prompt.md", "folder": "current", "status": "In Progress", "closed": null, "title": "Write the docs", "id": "139", "type": "Task", "body": "# Task 139: Write the docs\n" },
+        { "file": "Task140-read-the-board.prompt.md", "folder": "current", "status": "Code Review", "closed": null, "title": "Read the board", "id": "140", "type": "Task", "body": "# Task 140: Read the board\n" },
+        { "file": "K7M2-wire-the-board.prompt.md", "folder": "current", "status": "In Progress", "closed": null, "title": "Wire the board", "id": "K7M2", "type": "Spike", "body": "# Spike K7M2: Wire the board\n\nCard `design/team-agile.md`.\n" },
+        { "file": "198-fix-the-export.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-01", "title": "Fix the export", "id": "198", "type": "Bug", "body": "# Bug 198: Fix the export\n" },
+        { "file": "199-fix-the-import.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-02", "title": "Fix the import", "id": "199", "type": "Bug", "body": "# Bug 199: Fix the import\n" },
+        { "file": "Q3R9-photo-import.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-02", "title": "Photo import", "id": "Q3R9", "type": "", "body": "# Photo import\n" }
+      ],
+      "expected": {
+        "queue": {
+          "walk": [
+            { "name": "Task", "by": "type", "count": 1, "refs": ["140"], "phrase": "Task, one to walk" }
+          ],
+          "decide": [],
+          "look": []
+        },
+        "workers": [
+          {
+            "label": "widgets",
+            "yesterday": [
+              { "name": "Bug", "by": "type", "count": 2, "refs": ["198", "199"], "phrase": "Bug, two closed" },
+              { "name": "Photo import", "by": "stem", "count": 1, "refs": ["Q3R9"], "phrase": "Photo import, one" }
+            ],
+            "today": [
+              { "name": "Task", "by": "type", "count": 2, "refs": ["139", "140"], "phrase": "Task, two" },
+              { "name": "Team Agile", "by": "design", "count": 1, "refs": ["K7M2"], "phrase": "Team Agile, one" }
+            ],
+            "blockers": []
+          }
+        ],
+        "text": "standup-work-cards.txt"
+      }
+    }
+  ]
+}

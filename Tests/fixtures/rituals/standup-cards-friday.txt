@@ -1,0 +1,16 @@
+Standup -- Friday 2 October 2026
+"Can we not adjust scope."
+
+Waiting on you
+  Walk       139 Write the docs
+  Walk       144 Read the board
+
+Widgets
+  Yesterday  198 Fix the export
+  Yesterday  Q3R9 Photo import
+  Today      K7M2 Wire the board
+  Today      139 Write the docs
+  Today      144 Read the board
+  Blockers   no blockers
+
+"Let's circle back."

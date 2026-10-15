@@ -1,0 +1,4 @@
+Triage -- toolkit
+
+Phase 6: ledgers -- 1 open, 1 routed, 0 unrouted
+  #150 Count the closes  (Sonnet, --)

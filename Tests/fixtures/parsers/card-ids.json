@@ -1,0 +1,29 @@
+{
+  "_": "ONE table, read by both readers of a card's id: Scripts/Resolve-CardName.ps1 (tkTestToolkit -Archive) and agent/core/parsers.py card_id() (Tests/test_parsers.py). If they ever disagree about a row, one of them is wrong. expected is a STRING, or null for 'this name carries no id'.",
+  "prefixes": ["US-", "Task", "Feat-", "Spike-"],
+  "names": [
+    ["141-recipe-search.prompt.md", "141"],
+    ["Task139-extract-scoring.prompt.md", "139"],
+    ["US-144-paginate.prompt.md", "144"],
+    ["Feat-402-something.prompt.md", "402"],
+    ["0141-leading-zero.prompt.md", "141"],
+    ["K7M2-wallet-ticket.prompt.md", "K7M2"],
+    ["TaskK7M2-wallet-ticket.prompt.md", "K7M2"],
+    ["US-K7M2-wallet-ticket.prompt.md", "K7M2"],
+    ["Spike-Q4TN-qr-flow.prompt.md", "Q4TN"],
+    ["taskK7M2-lowercase-prefix.prompt.md", "K7M2"],
+    ["task-list-cleanup.prompt.md", null],
+    ["TASK-all-letters-is-a-prefix-not-an-id.prompt.md", null],
+    ["k7m2-lowercase-is-a-slug.prompt.md", null],
+    ["KKKK-no-digit.prompt.md", null],
+    ["K7M0-zero-is-not-in-the-alphabet.prompt.md", null],
+    ["K7M22-five-characters.prompt.md", null],
+    ["goal-2027-improve-things.prompt.md", null],
+    ["2026-05-14-PR141415.prompt.md", null],
+    ["README.md", null]
+  ],
+  "arguments": [
+    ["141", true], ["39", true], ["k7m2", true], ["K7M2", true], [" Q4TN ", true],
+    ["upload", false], ["task", false], ["KKKK", false], ["K7M0", false], ["", false], ["141-recipe", false]
+  ]
+}

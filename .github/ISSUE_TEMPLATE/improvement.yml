@@ -1,0 +1,36 @@
+name: Something could be better
+description: Suggest a change to how an existing command, page or document works, or a small addition that fits what is already here.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The most useful suggestions start from what already works and say what would make it better. If you would like to build it yourself, say so, and we can talk it through before you start.
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What you were trying to do, and what got in the way. Start from what already works.
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What changes
+      description: The change you have in mind. A short numbered list that someone could pick up cold is ideal.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: Checks that anyone could make from the repository's own page, or by running a command.
+    validations:
+      required: false
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: What this suggestion deliberately leaves alone.
+    validations:
+      required: false

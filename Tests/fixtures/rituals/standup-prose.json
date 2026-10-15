@@ -1,0 +1,210 @@
+{
+  "_": "The standup's PROSE, as a table (#199; D-SA10; docs/modules/solitaire-agile.md, \"The prose\"): the work grain (#137) spoken as standup language -- issue facts in, sentences out, a grammar and no model. Both halves -- tkTestToolkit -Rituals (Get-P20StandupProseSentence, Format-P20StandupWork) and Tests/test_rituals.py (prose_sentence, render_work) -- assert every row of `sentences` (one group, in its slot, first or not, as one sentence) and fill each case, then assert the queue's sentences, each worker's sentences in order, and the work text against standup-prose-<name>.txt in this folder, byte for byte (LF). A sentence is text.proseSentence over a lead (text.prose<Slot>, or text.prose<Slot>Also after the slot's first group) and a body: text.proseBare when a group of one is named by its item's own clause, else text.prose<Slot>One / text.proseOne for one, text.prose<Slot>Many / text.proseMany for more; the item is the ref and the title's head (workHeadRegex). A slot with a text.prose<Slot>Fold template (today's) folds when two or more groups follow its first (D-SA9): the first group is its sentence and the rest ONE sentence -- the Also lead, then text.prose<Slot>Fold ({n} the groups, {names} their names, proseNameSeparator and proseNameLast between them, no refs), or past proseFoldNames groups text.prose<Slot>FoldCount, the count alone; `folds` is that rule's table, every row asserted against prose_sentences / Get-P20StandupProse. A worker with something to say and no blockers closes on text.proseBlockersNone; a worker with nothing is its excuse. The shapes: one item, several, none; closed (yesterday) and in review (a walk, a card in Code Review); a blocked item; a queue item routed to nobody; a worker with nothing to say; eight groups in flight, folded to a count, and five, named.",
+  "workerLabels": [
+    { "name": "fable",  "description": "Routed to Fable -- the deep or risky work" },
+    { "name": "opus",   "description": "Routed to Opus -- the crash-through volume" },
+    { "name": "sonnet", "description": "Routed to Sonnet -- well-scoped, pattern-following work" },
+    { "name": "verify-close", "description": "Believed shipped -- verify it landed, settle the books, close through the verb" }
+  ],
+  "sentences": [
+    { "slot": "yesterday", "first": true,  "group": { "name": "Team Agile", "count": 2, "refs": ["#172", "#176"] }, "titles": {}, "sentence": "Yesterday I closed two in Team Agile (#172, #176)." },
+    { "slot": "yesterday", "first": true,  "group": { "name": "the Studio", "count": 1, "refs": ["#404"] }, "titles": { "#404": "Count the foyer rows" }, "sentence": "Yesterday I closed one in the Studio: #404, Count the foyer rows." },
+    { "slot": "yesterday", "first": false, "group": { "name": "Rename the slug", "count": 1, "refs": ["#413"] }, "titles": { "#413": "Rename the slug" }, "sentence": "I also closed #413, Rename the slug." },
+    { "slot": "yesterday", "first": false, "group": { "name": "Bug", "count": 3, "refs": ["198", "199", "200"] }, "titles": {}, "sentence": "I also closed three in Bug (198, 199, 200)." },
+    { "slot": "today",     "first": true,  "group": { "name": "the Studio", "count": 1, "refs": ["#175"] }, "titles": { "#175": "Studio: the archived-repository mark" }, "sentence": "Today I'm on the Studio: #175, the archived-repository mark." },
+    { "slot": "today",     "first": true,  "group": { "name": "Team Agile", "count": 2, "refs": ["#405", "#406"] }, "titles": {}, "sentence": "Today I'm on two in Team Agile (#405, #406)." },
+    { "slot": "today",     "first": false, "group": { "name": "design lifecycle l3", "count": 1, "refs": ["#419"] }, "titles": { "#419": "Design lifecycle L3: the verb" }, "sentence": "I'm also on #419, Design lifecycle L3." },
+    { "slot": "today",     "first": false, "group": { "name": "Team Agile", "count": 1, "refs": ["#414"] }, "titles": { "#414": "Feature: Wire the voices -- the az call" }, "sentence": "I'm also on Team Agile: #414, Wire the voices." },
+    { "slot": "blockers",  "first": true,  "group": { "name": "Verify the Studio tab draws on the PC", "count": 1, "refs": ["#416"] }, "titles": { "#416": "Verify the Studio tab draws on the PC" }, "sentence": "Blocked on #416, Verify the Studio tab draws on the PC." },
+    { "slot": "blockers",  "first": false, "group": { "name": "Phase 6", "count": 14, "refs": ["#1", "#2", "#3", "#4", "#5", "#6", "#7", "#8", "#9", "#10", "#11", "#12", "#13", "#14"] }, "titles": {}, "sentence": "Also blocked on 14 in Phase 6 (#1, #2, #3, #4, #5, #6, #7, #8, #9, #10, #11, #12, #13, #14)." },
+    { "slot": "walk",      "first": true,  "group": { "name": "Phase 6", "count": 2, "refs": ["#515", "#517"] }, "titles": {}, "sentence": "Waiting on you to walk two in Phase 6 (#515, #517)." },
+    { "slot": "walk",      "first": false, "group": { "name": "Task", "count": 1, "refs": ["140"] }, "titles": { "140": "Read the board" }, "sentence": "Also to walk one in Task: 140, Read the board." },
+    { "slot": "today",     "first": true,  "group": { "name": "{name}", "count": 1, "refs": ["#9"] }, "titles": { "#9": "Spell {n} and {refs} as they are" }, "sentence": "Today I'm on {name}: #9, Spell {n} and {refs} as they are." }
+  ],
+  "folds": [
+    { "slot": "today", "groups": [{"name": "Going public", "count": 2, "refs": ["#20", "#21"]}, {"name": "flights", "count": 1, "refs": ["#30"]}], "titles": {"#30": "Book the flights"}, "sentences": ["Today I'm on two in Going public (#20, #21).", "I'm also on flights: #30, Book the flights."] },
+    { "slot": "today", "groups": [{"name": "Going public", "count": 2, "refs": ["#20", "#21"]}, {"name": "flights", "count": 1, "refs": ["#30"]}, {"name": "workflow settings", "count": 1, "refs": ["#31"]}], "titles": {}, "sentences": ["Today I'm on two in Going public (#20, #21).", "I'm also on two more: flights and workflow settings."] },
+    { "slot": "today", "groups": [{"name": "Going public", "count": 2, "refs": ["#20", "#21"]}, {"name": "flights", "count": 1, "refs": ["#30"]}, {"name": "workflow settings", "count": 1, "refs": ["#31"]}, {"name": "the Studio", "count": 1, "refs": ["#32"]}, {"name": "settings workflows", "count": 1, "refs": ["#33"]}], "titles": {}, "sentences": ["Today I'm on two in Going public (#20, #21).", "I'm also on four more: flights, workflow settings, the Studio and settings workflows."] },
+    { "slot": "today", "groups": [{"name": "Going public", "count": 2, "refs": ["#20", "#21"]}, {"name": "flights", "count": 1, "refs": ["#30"]}, {"name": "workflow settings", "count": 1, "refs": ["#31"]}, {"name": "the Studio", "count": 1, "refs": ["#32"]}, {"name": "settings workflows", "count": 1, "refs": ["#33"]}, {"name": "the design lifecycle", "count": 1, "refs": ["#34"]}], "titles": {}, "sentences": ["Today I'm on two in Going public (#20, #21).", "I'm also on five more designs."] },
+    { "slot": "today", "groups": [{"name": "flights", "count": 1, "refs": ["#21"]}, {"name": "workflow settings", "count": 1, "refs": ["#31"]}, {"name": "the Studio", "count": 1, "refs": ["#32"]}, {"name": "settings workflows", "count": 1, "refs": ["#33"]}, {"name": "the design lifecycle", "count": 1, "refs": ["#34"]}, {"name": "the Toolkit card", "count": 1, "refs": ["#35"]}, {"name": "card family marks", "count": 1, "refs": ["#36"]}, {"name": "Phase 6", "count": 1, "refs": ["#40"]}], "titles": {"#21": "Book the flights"}, "sentences": ["Today I'm on flights: #21, Book the flights.", "I'm also on seven more designs."] },
+    { "slot": "today", "groups": [{"name": "Going public", "count": 2, "refs": ["#20", "#21"]}, {"name": "flights", "count": 1, "refs": ["#30"]}, {"name": "workflow settings", "count": 1, "refs": ["#31"]}, {"name": "the Studio", "count": 1, "refs": ["#32"]}, {"name": "settings workflows", "count": 1, "refs": ["#33"]}, {"name": "the design lifecycle", "count": 1, "refs": ["#34"]}, {"name": "the Toolkit card", "count": 1, "refs": ["#35"]}, {"name": "card family marks", "count": 1, "refs": ["#36"]}, {"name": "Phase 6", "count": 1, "refs": ["#37"]}, {"name": "Phase 7", "count": 1, "refs": ["#38"]}, {"name": "Phase 8", "count": 1, "refs": ["#39"]}, {"name": "Phase 9", "count": 1, "refs": ["#40"]}, {"name": "Phase 10", "count": 1, "refs": ["#41"]}, {"name": "Phase 11", "count": 1, "refs": ["#42"]}], "titles": {}, "sentences": ["Today I'm on two in Going public (#20, #21).", "I'm also on 13 more designs."] },
+    { "slot": "today", "groups": [{"name": "Team Agile", "count": 2, "refs": ["#414", "#415"]}, {"name": "#999", "count": 1, "refs": ["#418"]}, {"name": "Design lifecycle L3", "count": 1, "refs": ["#419"]}], "titles": {}, "sentences": ["Today I'm on two in Team Agile (#414, #415).", "I'm also on two more: #999 and Design lifecycle L3."] },
+    { "slot": "yesterday", "groups": [{"name": "Going public", "count": 2, "refs": ["#20", "#21"]}, {"name": "flights", "count": 1, "refs": ["#30"]}, {"name": "workflow settings", "count": 1, "refs": ["#31"]}, {"name": "the Studio", "count": 1, "refs": ["#32"]}], "titles": {"#30": "Book the flights", "#31": "Group the settings", "#32": "Draw the foyer"}, "sentences": ["Yesterday I closed two in Going public (#20, #21).", "I also closed one in flights: #30, Book the flights.", "I also closed one in workflow settings: #31, Group the settings.", "I also closed one in the Studio: #32, Draw the foyer."] },
+    { "slot": "blockers", "groups": [{"name": "Going public", "count": 2, "refs": ["#20", "#21"]}, {"name": "flights", "count": 1, "refs": ["#30"]}, {"name": "workflow settings", "count": 1, "refs": ["#31"]}], "titles": {"#30": "Book the flights", "#31": "Group the settings"}, "sentences": ["Blocked on two in Going public (#20, #21).", "Also blocked on one in flights: #30, Book the flights.", "Also blocked on one in workflow settings: #31, Group the settings."] }
+  ],
+  "cases": [
+    {
+      "name": "friday",
+      "source": "issues",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "tracker": { "ok": true, "reason": "" },
+      "issues": [
+        { "number": 501, "title": "Feature: Team Agile -- wire the stage", "state": "CLOSED", "labels": ["opus"], "closedAt": "2026-10-01T18:00:00Z", "url": "https://github.com/acme/widgets/issues/501", "milestone": { "title": "Team Agile" }, "body": "" },
+        { "number": 502, "title": "Port the cast atoms", "state": "CLOSED", "labels": ["opus"], "closedAt": "2026-10-01T20:00:00Z", "url": "https://github.com/acme/widgets/issues/502", "milestone": { "title": "Team Agile" }, "body": "" },
+        { "number": 503, "title": "Count the foyer rows", "state": "CLOSED", "labels": ["opus"], "closedAt": "2026-10-01T15:00:00Z", "url": "https://github.com/acme/widgets/issues/503", "milestone": { "title": "the Studio" }, "body": "" },
+        { "number": 504, "title": "Speak the work grain", "state": "OPEN", "labels": ["opus"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/504", "milestone": { "title": "Team Agile" }, "body": "" },
+        { "number": 505, "title": "Group the slot items", "state": "OPEN", "labels": ["opus"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/505", "milestone": "Team Agile", "body": "" },
+        { "number": 511, "title": "Studio: the archived-repository mark", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/511", "milestone": { "title": "the Studio" }, "body": "" },
+        { "number": 512, "title": "Rename the slug", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/512", "milestone": null, "body": "" },
+        { "number": 513, "title": "Verify the Studio tab draws on the PC", "state": "OPEN", "labels": ["fable", "verify-close"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/513", "milestone": null, "body": "" },
+        { "number": 514, "title": "Seat the workers", "state": "CLOSED", "labels": ["fable"], "closedAt": "2026-09-29T15:00:00Z", "url": "https://github.com/acme/widgets/issues/514", "milestone": { "title": "Team Agile" }, "body": "" },
+        { "number": 515, "title": "Verify the clock fix on Windows", "state": "OPEN", "labels": ["verify-close"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/515", "milestone": { "title": "Phase 6" }, "body": "" },
+        { "number": 517, "title": "Verify the export on the PC", "state": "OPEN", "labels": ["verify-close"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/517", "milestone": { "title": "Phase 6" }, "body": "" },
+        { "number": 520, "title": "Nobody has placed this", "state": "OPEN", "labels": [], "closedAt": null, "url": "https://github.com/acme/widgets/issues/520", "milestone": null, "body": "" }
+      ],
+      "expected": {
+        "queue": [
+          "Waiting on you to walk two in Phase 6 (#515, #517).",
+          "Also to walk #513, Verify the Studio tab draws on the PC."
+        ],
+        "workers": [
+          {
+            "label": "fable",
+            "prose": [
+              "Today I'm on the Studio: #511, the archived-repository mark.",
+              "I'm also on #512, Rename the slug.",
+              "Blocked on #513, Verify the Studio tab draws on the PC."
+            ]
+          },
+          {
+            "label": "opus",
+            "prose": [
+              "Yesterday I closed two in Team Agile (#501, #502).",
+              "I also closed one in the Studio: #503, Count the foyer rows.",
+              "Today I'm on two in Team Agile (#504, #505).",
+              "Nothing blocked."
+            ]
+          },
+          { "label": "sonnet", "prose": [] }
+        ],
+        "text": "standup-prose-friday.txt"
+      }
+    },
+    {
+      "name": "quiet",
+      "source": "issues",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "tracker": { "ok": true, "reason": "" },
+      "issues": [
+        { "number": 601, "title": "Bug: the clock drifts -- on Windows only", "state": "CLOSED", "labels": ["opus"], "closedAt": "2026-10-01T18:00:00Z", "url": "https://github.com/acme/widgets/issues/601", "milestone": { "title": "Phase 6" }, "body": "" }
+      ],
+      "expected": {
+        "queue": [],
+        "workers": [
+          { "label": "fable", "prose": [] },
+          {
+            "label": "opus",
+            "prose": [
+              "Yesterday I closed one in Phase 6: #601, the clock drifts.",
+              "Nothing blocked."
+            ]
+          },
+          { "label": "sonnet", "prose": [] }
+        ],
+        "text": "standup-prose-quiet.txt"
+      }
+    },
+    {
+      "name": "no-tracker",
+      "source": "issues",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "tracker": { "ok": false, "reason": "gh did not answer (TimeoutExpired)" },
+      "issues": [],
+      "expected": {
+        "queue": [],
+        "workers": [],
+        "text": "standup-prose-no-tracker.txt"
+      }
+    },
+    {
+      "name": "cards",
+      "source": "cards",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "space": "widgets",
+      "spaceName": "Widgets",
+      "cards": [
+        { "file": "Task139-write-the-docs.prompt.md", "folder": "current", "status": "In Progress", "closed": null, "title": "Write the docs", "id": "139", "type": "Task", "body": "# Task 139: Write the docs\n" },
+        { "file": "Task140-read-the-board.prompt.md", "folder": "current", "status": "Code Review", "closed": null, "title": "Read the board", "id": "140", "type": "Task", "body": "# Task 140: Read the board\n" },
+        { "file": "198-fix-the-export.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-01", "title": "Fix the export", "id": "198", "type": "Bug", "body": "# Bug 198: Fix the export\n" }
+      ],
+      "expected": {
+        "queue": [
+          "Waiting on you to walk one in Task: 140, Read the board."
+        ],
+        "workers": [
+          {
+            "label": "widgets",
+            "prose": [
+              "Yesterday I closed one in Bug: 198, Fix the export.",
+              "Today I'm on two in Task (139, 140).",
+              "Nothing blocked."
+            ]
+          }
+        ],
+        "text": "standup-prose-cards.txt"
+      }
+    },
+    {
+      "name": "eight-groups",
+      "source": "issues",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "tracker": { "ok": true, "reason": "" },
+      "issues": [
+        { "number": 701, "title": "Draft the landing page", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/701", "milestone": { "title": "Going public" }, "body": "" },
+        { "number": 702, "title": "Strip the names on export", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/702", "milestone": { "title": "Going public" }, "body": "" },
+        { "number": 703, "title": "Book the flights", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/703", "milestone": { "title": "flights" }, "body": "" },
+        { "number": 704, "title": "Group the settings by workflow", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/704", "milestone": { "title": "workflow settings" }, "body": "" },
+        { "number": 705, "title": "Draw the foyer", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/705", "milestone": { "title": "the Studio" }, "body": "" },
+        { "number": 706, "title": "Answer the list", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/706", "milestone": { "title": "settings workflows" }, "body": "" },
+        { "number": 707, "title": "Read the design tree", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/707", "milestone": { "title": "the design lifecycle" }, "body": "" },
+        { "number": 708, "title": "Mark the Toolkit card", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/708", "milestone": { "title": "the Toolkit card" }, "body": "" },
+        { "number": 709, "title": "Stamp the family marks", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/709", "milestone": { "title": "card family marks" }, "body": "" },
+        { "number": 710, "title": "Port the cast atoms", "state": "OPEN", "labels": ["opus"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/710", "milestone": { "title": "Team Agile" }, "body": "" },
+        { "number": 711, "title": "Seat the workers", "state": "OPEN", "labels": ["opus"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/711", "milestone": { "title": "Team Agile" }, "body": "" },
+        { "number": 712, "title": "Fix the clock", "state": "OPEN", "labels": ["opus"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/712", "milestone": { "title": "Phase 6" }, "body": "" },
+        { "number": 713, "title": "Read the export", "state": "OPEN", "labels": ["opus"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/713", "milestone": { "title": "Phase 7" }, "body": "" },
+        { "number": 714, "title": "Count the foyer rows", "state": "OPEN", "labels": ["opus"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/714", "milestone": { "title": "the Studio" }, "body": "" },
+        { "number": 715, "title": "Write the quick start", "state": "OPEN", "labels": ["opus"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/715", "milestone": { "title": "Docs" }, "body": "" },
+        { "number": 716, "title": "Trim the log", "state": "CLOSED", "labels": ["sonnet"], "closedAt": "2026-10-01T18:00:00Z", "url": "https://github.com/acme/widgets/issues/716", "milestone": { "title": "Phase 6" }, "body": "" },
+        { "number": 717, "title": "Name the column", "state": "CLOSED", "labels": ["sonnet"], "closedAt": "2026-10-01T18:00:00Z", "url": "https://github.com/acme/widgets/issues/717", "milestone": { "title": "Phase 7" }, "body": "" },
+        { "number": 718, "title": "Link the guide", "state": "CLOSED", "labels": ["sonnet"], "closedAt": "2026-10-01T18:00:00Z", "url": "https://github.com/acme/widgets/issues/718", "milestone": { "title": "Docs" }, "body": "" },
+        { "number": 719, "title": "Trim the menu", "state": "OPEN", "labels": ["sonnet"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/719", "milestone": { "title": "Phase 6" }, "body": "" },
+        { "number": 720, "title": "Name the row", "state": "OPEN", "labels": ["sonnet"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/720", "milestone": { "title": "Phase 7" }, "body": "" },
+        { "number": 721, "title": "Link the spec", "state": "OPEN", "labels": ["sonnet"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/721", "milestone": { "title": "Docs" }, "body": "" }
+      ],
+      "expected": {
+        "queue": [],
+        "workers": [
+          {
+            "label": "fable",
+            "prose": [
+              "Today I'm on two in Going public (#701, #702).",
+              "I'm also on seven more designs.",
+              "Nothing blocked."
+            ]
+          },
+          {
+            "label": "opus",
+            "prose": [
+              "Today I'm on two in Team Agile (#710, #711).",
+              "I'm also on four more: Phase 6, Phase 7, the Studio and Docs.",
+              "Nothing blocked."
+            ]
+          },
+          {
+            "label": "sonnet",
+            "prose": [
+              "Yesterday I closed one in Phase 6: #716, Trim the log.",
+              "I also closed one in Phase 7: #717, Name the column.",
+              "I also closed one in Docs: #718, Link the guide.",
+              "Today I'm on Phase 6: #719, Trim the menu.",
+              "I'm also on two more: Phase 7 and Docs.",
+              "Nothing blocked."
+            ]
+          }
+        ],
+        "text": "standup-prose-eight-groups.txt"
+      }
+    }
+  ]
+}

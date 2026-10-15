@@ -1,0 +1,14 @@
+Standup -- Monday 5 October 2026
+"Nothing to report."
+
+Waiting on you
+  Nothing is waiting on you.
+
+Widgets
+  Yesterday  161 Closed on Friday
+  Yesterday  162 Closed on Saturday
+  Yesterday  163 Closed this morning
+  Today      nothing in flight
+  Blockers   no blockers
+
+"Parking that."

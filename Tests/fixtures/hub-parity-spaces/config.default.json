@@ -1,0 +1,45 @@
+{
+  "_comment": "SPELLED THE NEW WAY: `spaces` and `activeSpace` where hub-parity says `orgs` and `activeOrg` (#64 stage 2) -- the same files otherwise, and both loaders must resolve them to the SAME expected-orgs.json. Parity fixture -- the committed half of the hub.json resolution case. Read by Tests/test_hub_json.py and Tests/Test-HubJson.ps1, which both resolve this plus hub/hub.json plus config.local.json and compare the answer to expected-orgs.json. Not a real config: it is deliberately the smallest one both loaders accept.",
+  "cliVersion": 2,
+  "commandPrefix": "tk",
+  "quietStart": true,
+  "storeSync": "none",
+  "activeSpace": "test",
+  "promptsRoot": "",
+  "features": {},
+  "web": {
+    "agentPort": 4100,
+    "corsOrigins": []
+  },
+  "spaces": [
+    {
+      "slug": "test",
+      "name": "Example",
+      "status": "active",
+      "orgType": "portfolio",
+      "org": "https://dev.azure.com/YOUR-ADO-ORG",
+      "tenant": "",
+      "promptsFolder": "test",
+      "projects": [
+        {
+          "name": "YourProject",
+          "repo": "your-repo",
+          "defaultBranch": "main"
+        }
+      ]
+    },
+    {
+      "slug": "shipped-only",
+      "name": "Shipped Only",
+      "status": "archive",
+      "orgType": "engagement",
+      "org": "",
+      "tenant": "",
+      "promptsFolder": "shipped-only",
+      "projects": []
+    }
+  ],
+  "aliases": {},
+  "commands": {},
+  "workItemTypes": {}
+}

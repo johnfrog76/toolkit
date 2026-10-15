@@ -1,0 +1,29 @@
+{
+  "_comment": "The hub declares its own orgs. This one declares the fixture's own 'test' Space -- the shape the shipped Example had before it became the Azure demo, slug azure-demo (#116) -- and the folder names the modules already read. Because it carries a 'name' it is a Space of its own, NOT a patch on the shipped one under its old slug (consts.json spaces.renamed), so the fixture keeps 'test' while config.default.json ships azure-demo beside it. 'status' is 'local' and 'example' true, the values the shipped Space used to lend it by merge, so no answer changed: a hub-declared 'active' would flip two Python suites into a live `az` probe.",
+  "hub": 1,
+  "orgs": [
+    {
+      "slug": "test",
+      "name": "Example",
+      "status": "local",
+      "example": true,
+      "orgType": "portfolio",
+      "org": "https://dev.azure.com/YOUR-ADO-ORG",
+      "tenant": "",
+      "promptsFolder": "test",
+      "projects": [
+        { "name": "YourProject", "repo": "your-repo", "defaultBranch": "main" }
+      ]
+    }
+  ],
+  "folders": {
+    "growth": "growth",
+    "manager": "manager",
+    "reviews": "reviews",
+    "resume": "resume",
+    "agentic": "agentic",
+    "reminders": "reminders",
+    "design": "design",
+    "spec": "spec"
+  }
+}

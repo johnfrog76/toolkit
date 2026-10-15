@@ -1,0 +1,19 @@
+Standup -- Friday 2 October 2026
+"Can we not adjust scope."
+
+Waiting on you
+  Walk       #104 Verify the Studio tab draws on the PC
+  Walk       #105 Verify the clock fix on Windows
+
+Fable
+  Yesterday  #107 Port the cast atoms
+  Today      nothing in flight
+  Blockers   #104 Verify the Studio tab draws on the PC (verify-close)
+Opus
+  Yesterday  #102 Rename the slug
+  Today      #101 Build the foyer counts — Chloé’s “Ïle” row
+  Blockers   no blockers
+Sonnet
+  Mug        "Nothing on the board for me. All green, no blockers."
+
+"Let's circle back."

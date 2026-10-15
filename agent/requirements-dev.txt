@@ -1,0 +1,14 @@
+# Test-only dependencies for the agent half.
+#
+#   python3 -m pip install -r agent/requirements-dev.txt
+#
+# This is what `python3 -m pytest Tests/` needs on top of the runtime file,
+# and the linter: ruff is the one exact pin (==), because a new ruff release can add
+# findings to unchanged code (ruff.toml at the repository root is its settings); the
+# rest are floors (>=), like requirements.txt. Python 3.12 or newer.
+# httpx is not imported by the agent: fastapi.testclient imports it, and
+# without it TestClient raises at import and every file that uses it skips.
+-r requirements.txt
+pytest>=9.1.1
+httpx>=0.28.1
+ruff==0.16.10

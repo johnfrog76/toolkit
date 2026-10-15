@@ -1,0 +1,12 @@
+# The web image builds from the PACKAGE ROOT, because the bundle inlines
+# consts.json (web/Dockerfile says why). Everything the image does not need is
+# excluded here rather than shipped into the build context.
+.git
+.pytest_cache
+**/node_modules
+**/dist
+**/__pycache__
+*.log
+**/*.log
+.env
+config.local.json

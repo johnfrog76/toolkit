@@ -1,0 +1,26 @@
+{
+  "_comment": "How do you want to work in this Space? The answer is the Space's, derived from the tracker its address names, and asked only on GitHub. ONE table, two readers -- tkTestToolkit -Environment runs Scripts/Resolve-HowIWork.ps1 over it, Tests/test_how_i_work.py runs agent/core/config.py's how_i_work() and apply_how_i_work(). `rows`: org is spaces[].org, stored is spaces[].howIWork (null when unset). `gate`: the switch is features.solitaireAgile as resolved (null when unset), answer the Space's, and on is what the module reads -- null when the flag stays absent. If the two halves ever disagree about a row, one of them is wrong.",
+  "rows": [
+    { "org": "",                                         "stored": null,      "answer": "alone",  "source": "derived", "tracker": "none",   "locked": true },
+    { "org": "",                                         "stored": "agents",  "answer": "alone",  "source": "derived", "tracker": "none",   "locked": true },
+    { "org": "https://dev.azure.com/acme",               "stored": null,      "answer": "team",   "source": "derived", "tracker": "ado",    "locked": true },
+    { "org": "https://dev.azure.com/acme",               "stored": "agents",  "answer": "team",   "source": "derived", "tracker": "ado",    "locked": true },
+    { "org": "https://acme.visualstudio.com",            "stored": "alone",   "answer": "team",   "source": "derived", "tracker": "ado",    "locked": true },
+    { "org": "https://github.com/acme/widgets",          "stored": null,      "answer": "alone",  "source": "default", "tracker": "github", "locked": false },
+    { "org": "https://github.com/acme/widgets",          "stored": "",        "answer": "alone",  "source": "default", "tracker": "github", "locked": false },
+    { "org": "https://github.com/acme/widgets",          "stored": "alone",   "answer": "alone",  "source": "chosen",  "tracker": "github", "locked": false },
+    { "org": "https://github.com/acme/widgets",          "stored": "agents",  "answer": "agents", "source": "chosen",  "tracker": "github", "locked": false },
+    { "org": "https://github.com/acme/widgets",          "stored": " Agents ", "answer": "agents", "source": "chosen",  "tracker": "github", "locked": false },
+    { "org": "https://github.com/acme/widgets",          "stored": "team",    "answer": "alone",  "source": "default", "tracker": "github", "locked": false },
+    { "org": "https://github.com/acme/widgets",          "stored": "crew",    "answer": "alone",  "source": "default", "tracker": "github", "locked": false }
+  ],
+  "gate": [
+    { "switch": true,  "answer": "agents", "on": true },
+    { "switch": true,  "answer": "alone",  "on": false },
+    { "switch": true,  "answer": "team",   "on": false },
+    { "switch": false, "answer": "agents", "on": false },
+    { "switch": false, "answer": "alone",  "on": false },
+    { "switch": null,  "answer": "agents", "on": null },
+    { "switch": null,  "answer": "alone",  "on": null }
+  ]
+}

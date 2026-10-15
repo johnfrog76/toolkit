@@ -1,0 +1,101 @@
+{
+  "_": "ONE table, read by both readers of the line a card carries naming the design it was worked against (docs/hub/cards.md, \"2. The sections -- by type, from the template\"; #157): Scripts/Read-DesignTree.ps1 Get-P20CardDesign (tkTestToolkit -Design) and agent/core/parsers.py card_design() (Tests/test_parsers.py). Each row's lines are joined with LF, or CRLF when crlf is true, into a card's text, and both readers are asked for its design. expected is null for 'names no design', else kind (design or spec, lowercase), title (the link's text, or the line's words when it has no link), link (the link's target, '' when none), id (the design's id when the words after the link are one, consts.json design.idRegex; '' otherwise) and note (what is left of those words). A card names ONE design: its first > Design: line, else its first > Spec: line. The pattern is consts.json design.cardLineRegex. If the two halves ever disagree about a row, one of them is wrong.",
+  "rows": [
+    {
+      "name": "the line NewPrompt -Design writes for a hub design",
+      "crlf": false,
+      "lines": ["# Spike K7M2: Import a recipe from a photo", "", "> Template: [Spike.template.md](../../toolkit/templates/Spike.template.md)", "> Design: [Board ideas](../../design/board-ideas.md) ee925272-9564-4816-8944-e6b39c86339c", "", "## Branch"],
+      "expected": { "kind": "design", "title": "Board ideas", "link": "../../design/board-ideas.md", "id": "ee925272-9564-4816-8944-e6b39c86339c", "note": "" }
+    },
+    {
+      "name": "a repo design, linked by its URL",
+      "crlf": false,
+      "lines": ["# Task 141: Wire the board", "", "> Design: [Toolkit card](https://github.com/acme/widgets/blob/HEAD/spec/toolkit-card.spec.md) 53913fc8-08cc-4b3f-9da7-40050b690010"],
+      "expected": { "kind": "design", "title": "Toolkit card", "link": "https://github.com/acme/widgets/blob/HEAD/spec/toolkit-card.spec.md", "id": "53913fc8-08cc-4b3f-9da7-40050b690010", "note": "" }
+    },
+    {
+      "name": "the same line in a CRLF card",
+      "crlf": true,
+      "lines": ["# Task 141: Wire the board", "", "> Design: [Board ideas](../../design/board-ideas.md) ee925272-9564-4816-8944-e6b39c86339c", "", "## Branch"],
+      "expected": { "kind": "design", "title": "Board ideas", "link": "../../design/board-ideas.md", "id": "ee925272-9564-4816-8944-e6b39c86339c", "note": "" }
+    },
+    {
+      "name": "the corpus's hand-written Spec line, read as written: no id, its words kept",
+      "crlf": false,
+      "lines": ["# User Story 461: Browse Prize Vault", "", "> Template: [UserStory.template.md](../../../toolkit/templates/UserStory.template.md)", "> Spec: [Prize-Store.spec.md](../spec/402-prize-store/Prize-Store.spec.md) S3.1, S5, S7 (terminology: points)"],
+      "expected": { "kind": "spec", "title": "Prize-Store.spec.md", "link": "../spec/402-prize-store/Prize-Store.spec.md", "id": "", "note": "S3.1, S5, S7 (terminology: points)" }
+    },
+    {
+      "name": "a Spec line with a short decision after it",
+      "crlf": true,
+      "lines": ["# User Story 459: View Prize Vault", "", "> Spec: [Prize-Store.spec.md](../spec/402-prize-store/Prize-Store.spec.md) (D4)"],
+      "expected": { "kind": "spec", "title": "Prize-Store.spec.md", "link": "../spec/402-prize-store/Prize-Store.spec.md", "id": "", "note": "(D4)" }
+    },
+    {
+      "name": "a Spec line with nothing after its link",
+      "crlf": false,
+      "lines": ["> Spec: [2.7 QR Code Implementation Strategy](../spec/2.7-QR-Code-Implementation-Strategy.spec.md)"],
+      "expected": { "kind": "spec", "title": "2.7 QR Code Implementation Strategy", "link": "../spec/2.7-QR-Code-Implementation-Strategy.spec.md", "id": "", "note": "" }
+    },
+    {
+      "name": "a Design line and a Spec line: the Design line is the card's design, wherever it sits",
+      "crlf": false,
+      "lines": ["> Spec: [Old spec](../spec/old.spec.md)", "> Design: [Board ideas](../../design/board-ideas.md) ee925272-9564-4816-8944-e6b39c86339c"],
+      "expected": { "kind": "design", "title": "Board ideas", "link": "../../design/board-ideas.md", "id": "ee925272-9564-4816-8944-e6b39c86339c", "note": "" }
+    },
+    {
+      "name": "two Design lines: the first",
+      "crlf": false,
+      "lines": ["> Design: [First](../../design/first.md) ee925272-9564-4816-8944-e6b39c86339c", "> Design: [Second](../../design/second.md) 53913fc8-08cc-4b3f-9da7-40050b690010"],
+      "expected": { "kind": "design", "title": "First", "link": "../../design/first.md", "id": "ee925272-9564-4816-8944-e6b39c86339c", "note": "" }
+    },
+    {
+      "name": "a hand-written Design line with no link: the id alone",
+      "crlf": false,
+      "lines": ["> Design: ee925272-9564-4816-8944-e6b39c86339c"],
+      "expected": { "kind": "design", "title": "", "link": "", "id": "ee925272-9564-4816-8944-e6b39c86339c", "note": "" }
+    },
+    {
+      "name": "a hand-written Spec line with no link: its words are its title",
+      "crlf": false,
+      "lines": ["> Spec: the prize store spec, section 6"],
+      "expected": { "kind": "spec", "title": "the prize store spec, section 6", "link": "", "id": "", "note": "" }
+    },
+    {
+      "name": "an id in capitals is not a design's id: it is kept as words",
+      "crlf": false,
+      "lines": ["> Design: [Board ideas](../../design/board-ideas.md) EE925272-9564-4816-8944-E6B39C86339C"],
+      "expected": { "kind": "design", "title": "Board ideas", "link": "../../design/board-ideas.md", "id": "", "note": "EE925272-9564-4816-8944-E6B39C86339C" }
+    },
+    {
+      "name": "an id, then words a person added",
+      "crlf": false,
+      "lines": ["> Design: [Board ideas](../../design/board-ideas.md) ee925272-9564-4816-8944-e6b39c86339c (the lanes part)"],
+      "expected": { "kind": "design", "title": "Board ideas", "link": "../../design/board-ideas.md", "id": "ee925272-9564-4816-8944-e6b39c86339c", "note": "(the lanes part)" }
+    },
+    {
+      "name": "an empty Design line names nothing",
+      "crlf": false,
+      "lines": ["> Design:", "", "## Branch"],
+      "expected": null
+    },
+    {
+      "name": "a card with no such line",
+      "crlf": false,
+      "lines": ["# Bug 214: Search returns duplicates", "", "> Template: [Bug.template.md](../../toolkit/templates/Bug.template.md)", "", "## Branch"],
+      "expected": null
+    },
+    {
+      "name": "the word in the middle of a line is not the line",
+      "crlf": false,
+      "lines": ["Read the > Design: [x](y) line, it said so."],
+      "expected": null
+    },
+    {
+      "name": "a lowercase word is not the token",
+      "crlf": false,
+      "lines": ["> design: [Board ideas](../../design/board-ideas.md) ee925272-9564-4816-8944-e6b39c86339c"],
+      "expected": null
+    }
+  ]
+}

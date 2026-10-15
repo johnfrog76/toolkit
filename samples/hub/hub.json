@@ -1,0 +1,54 @@
+{
+  "_comment": "The sample hub that Start copies out on a first run. It declares TWO Spaces of its own, and the shipped config.default.json adds the third (Azure demo) -- three demo Spaces, one per grain (D-W17), each an invitation and none required. 'demo' is the out-of-the-box Space and where Start lands: status 'local', it works from these files alone and never contacts a tracker, so it needs no login. 'github-demo' is the same RecipeBox product tracked on GitHub, pointing at the public repo johnfrog76/recipe-box-demo (seeded once by samples/seed-recipe-box.ps1); it ships 'local' too, so a cold machine never reads it as unreachable, and the connect wizard (Connect github-demo, /connect/github-demo) turns it active once gh is signed in -- or points it at your own repo. Its address is a public repo, which is why it is declared HERE and not in config.default.json, where Portability Clause 2a refuses any real address. sprintAwareness is off: the sprint charts read the hub's history, and a hub copied a minute ago has none -- a row of zeros is a poor first thing to show. laneNames are Demo's own words for the four lanes -- To do, Doing, Waiting, Done -- for someone with no team and no tracker; a Space that says nothing gets Active, In Progress, Code Review, Done. Display only.",
+  "hub": 1,
+  "storeSync": "none",
+  "spaces": [
+    {
+      "slug": "demo",
+      "example": true,
+      "name": "Demo",
+      "status": "local",
+      "orgType": "portfolio",
+      "org": "",
+      "tenant": "",
+      "promptsFolder": "demo",
+      "projects": [
+        {
+          "name": "RecipeBox",
+          "repo": "recipe-box",
+          "defaultBranch": "main"
+        }
+      ],
+      "features": {
+        "sprintAwareness": false
+      },
+      "laneNames": {
+        "active": "To do",
+        "inProgress": "Doing",
+        "codeReview": "Waiting",
+        "done": "Done"
+      }
+    },
+    {
+      "slug": "github-demo",
+      "example": true,
+      "name": "GitHub demo",
+      "status": "local",
+      "orgType": "portfolio",
+      "org": "https://github.com/johnfrog76/recipe-box-demo",
+      "tenant": "",
+      "promptsFolder": "github-demo",
+      "features": {
+        "sprintAwareness": false
+      }
+    }
+  ],
+  "folders": {
+    "growth": "growth",
+    "manager": "manager",
+    "reviews": "reviews",
+    "resume": "resume",
+    "agentic": "agentic",
+    "reminders": "reminders"
+  }
+}

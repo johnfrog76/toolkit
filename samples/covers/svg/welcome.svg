@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="1600" height="1000">
+<defs>
+  <radialGradient id="g" cx="50%" cy="42%" r="75%"><stop offset="0" stop-color="#1d4a4a"/><stop offset="1" stop-color="#0f2a2c"/></radialGradient>
+  <filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="18"/></filter>
+</defs>
+<rect width="1600" height="1000" fill="url(#g)"/>
+<rect x="28" y="28" width="1544" height="944" rx="26" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="2"/>
+
+    <circle cx="800" cy="470" r="420" fill="#f2b84b" opacity="0.18" filter="url(#soft)"/>
+    <rect x="620" y="200" width="360" height="620" rx="30" fill="#f3ead8"/>
+    <rect x="660" y="240" width="280" height="540" rx="18" fill="#f2b84b" opacity="0.95"/>
+    <circle cx="900" cy="520" r="18" fill="#1b2230" opacity="0.6"/>
+    <path d="M980 520 q100 0 150 -150" fill="none" stroke="rgba(255,255,255,0.78)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="18 20"/>
+    <path d="M980 520 q100 0 150 150" fill="none" stroke="rgba(255,255,255,0.78)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="18 20"/>
+    <g transform="rotate(6 1250 305)"><rect x="1130" y="240" width="240" height="130" rx="22" fill="#f3ead8"/><rect x="1166" y="276" width="100.8" height="22" rx="11" fill="#3ec7bb"/><rect x="1166" y="346" width="144" height="14" rx="7" fill="#1b2230" opacity="0.28"/></g>
+    <g transform="rotate(-5 1250 705)"><rect x="1130" y="640" width="240" height="130" rx="22" fill="#f3ead8"/><rect x="1166" y="676" width="100.8" height="22" rx="11" fill="#a99bf0"/><rect x="1166" y="746" width="144" height="14" rx="7" fill="#1b2230" opacity="0.28"/></g>
+    <path d="M260 560 l220 0 m-50 -50 l50 50 l-50 50" fill="none" stroke="#f2b84b" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

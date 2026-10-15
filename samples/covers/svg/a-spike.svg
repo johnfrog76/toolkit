@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="1600" height="1000">
+<defs>
+  <radialGradient id="g" cx="50%" cy="42%" r="75%"><stop offset="0" stop-color="#2a3443"/><stop offset="1" stop-color="#171c26"/></radialGradient>
+  <filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="18"/></filter>
+</defs>
+<rect width="1600" height="1000" fill="url(#g)"/>
+<rect x="28" y="28" width="1544" height="944" rx="26" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="2"/>
+
+    <circle cx="800" cy="560" r="360" fill="#a99bf0" opacity="0.18" filter="url(#soft)"/>
+    <path d="M300 700 l1000 0" fill="none" stroke="rgba(255,255,255,0.42)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M800 160 l170 540 l-340 0 z" fill="#a99bf0" opacity="0.95"/>
+    <path d="M800 160 l60 190 l-120 0 z" fill="#f3ead8"/>
+    <path d="M620 760 q0 70 70 70 l220 0 q70 0 70 -70" fill="none" stroke="rgba(255,255,255,0.42)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="16 20"/>
+    <circle cx="1140" cy="300" r="60" fill="none" stroke="#f2b84b" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/><path d="M1120 285 q20 -30 45 -5 q15 20 -15 35 l-5 20 M1145 360 l0 8" fill="none" stroke="#f2b84b" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

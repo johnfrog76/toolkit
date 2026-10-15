@@ -1,0 +1,44 @@
+# A release: the owner pushes a tag (v1.0.0) and this makes the GitHub Release
+# for it, with the notes read out of CHANGELOG.md's section for that version.
+# Nothing else triggers it; a tag is the deliberate act. No secret and no
+# personal token: the default GITHUB_TOKEN with the one permission a release
+# needs. What the workflow runs is docs/TESTING.md, "In CI".
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions: {}
+
+jobs:
+  release:
+    name: Publish the GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # The tag's section of the changelog: from its "## [x.y.z]" heading to
+      # the next "## [" heading. A tag with no section stops here, so a
+      # release never ships with empty notes.
+      - name: The notes, from CHANGELOG.md
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            $0 ~ "^## \\[" v "\\]" { on = 1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          if [ ! -s "$RUNNER_TEMP/notes.md" ]; then
+            echo "CHANGELOG.md has no section for $version" >&2
+            exit 1
+          fi
+
+      - name: gh release create
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag

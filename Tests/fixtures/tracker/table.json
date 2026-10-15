@@ -1,0 +1,16 @@
+{
+  "_comment": "D-G2: the board's address decides the tracker. ONE table, two readers -- Tests/Test-Setup.ps1 runs Scripts/Resolve-Tracker.ps1 over it, Tests/test_tracker.py runs agent/core/config.py's tracker(). org is orgs[].org as configured. Rows that carry `owner` also pin the owner rule (Get-P20TrackerOwner / tracker_owner): the address's first path segment, case preserved. If the two halves ever disagree about a row, one of them is wrong.",
+  "rows": [
+    { "org": "",                                          "tracker": "none",   "owner": "",                "why": "a blank address is a local board: no tracker, no owner" },
+    { "org": "https://dev.azure.com/SomeoneDemo",         "tracker": "ado",    "owner": "SomeoneDemo",    "why": "a real Azure DevOps org" },
+    { "org": "https://dev.azure.com/YOUR-ADO-ORG",        "tracker": "ado",    "owner": "YOUR-ADO-ORG",    "why": "the shipped placeholder is ADO-SHAPED; whether it is contacted is the tier's business, not this rule's" },
+    { "org": "https://myorg.visualstudio.com",            "tracker": "ado",    "owner": "",                "why": "the legacy Azure DevOps address -- its org lives in the HOST, so the owner rule answers nothing" },
+    { "org": "https://github.com/johnfrog76",             "tracker": "github", "owner": "johnfrog76",      "why": "a GitHub owner: the second tracker" },
+    { "org": "https://github.com/johnfrog76/BowlingApp",  "tracker": "github", "owner": "johnfrog76",      "why": "a repo-grained GitHub address is still GitHub, and still names its owner; owner-or-repo grain is the spec's open item, not this rule's" },
+    { "org": "https://WWW.GitHub.COM/SomeOwner",          "tracker": "github", "owner": "SomeOwner",       "why": "case and the www prefix do not change the host, and the owner keeps its case -- it is a display name too" },
+    { "org": "github.com/johnfrog76",                     "tracker": "github", "owner": "johnfrog76",      "why": "a pasted address without a scheme still names the host and the owner" },
+    { "org": "https://github.com:443/johnfrog76",         "tracker": "github", "owner": "johnfrog76",      "why": "a port does not change the host" },
+    { "org": "https://gitlab.com/someone",                "tracker": "ado",    "owner": "someone",         "why": "an unknown host keeps today's behavior -- every address meant ADO before this rule; a third tracker changes this row ON PURPOSE, here first" },
+    { "org": "https://github.enterprise.example/owner",   "tracker": "ado",    "owner": "owner",           "why": "GitHub Enterprise is the spec's open item; until it is designed, an unknown host is ADO like any other" }
+  ]
+}

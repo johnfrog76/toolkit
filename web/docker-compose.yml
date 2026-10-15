@@ -1,0 +1,45 @@
+services:
+  web:
+    # The PACKAGE ROOT, not web/. The bundle inlines ../consts.json (the contract
+    # file every half parses) at build time, so a context rooted at web/ cannot
+    # build the image at all. See web/Dockerfile.
+    build:
+      context: ..
+      dockerfile: web/Dockerfile
+    ports:
+      # The loopback only (docs/ARCHITECTURE.md, "Trust model"): the UI is served to
+      # the machine it runs on, as the agent behind it is.
+      - "127.0.0.1:5174:5173"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # The agent's port, for nginx's proxy_pass (see nginx.conf.template). The
+    # value comes from the shell that runs compose: Start-Web.ps1 resolves
+    # web.agentPort from the merged config and exports it under this name
+    # (consts.json env.agentPort) before `docker compose up`. The fallback is
+    # for a `docker compose up` typed by hand with nothing exported, and it
+    # mirrors config.default.json's shipped web.agentPort -- a machine that
+    # patched the port in config.local.json should start the container with
+    # `tkWeb`, or export the variable itself.
+    environment:
+      - P20_AGENT_PORT=${P20_AGENT_PORT:-4100}
+    # 127.0.0.1, not localhost. nginx.conf has `listen 5173;`, which binds IPv4
+    # only, and this image's /etc/hosts maps localhost to ::1 as well as to
+    # 127.0.0.1 -- so wget tried IPv6 first and the check failed with
+    # "Connection refused" against a container that was serving perfectly on the
+    # published port. Found the first time this path was ever run:
+    # the container reported `unhealthy` after three strikes while
+    # http://localhost:5174/ answered 200 the whole time.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://127.0.0.1:5173/",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

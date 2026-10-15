@@ -1,0 +1,14 @@
+* text=auto
+# The autoload manifest is regenerated on every install and compared byte-for-byte by the
+# Autoload drift check, so it must check out LF on every platform -- Windows included, where
+# core.autocrlf=true would otherwise give it CRLF and the first install would dirty the tree.
+Prompt20Toolkit/Prompt20Toolkit.psd1 text eol=lf
+# The fixtures are compared byte for byte by all three runners (the ritual and triage golden
+# texts, previous-round.md), so they check out LF on every platform too. text=auto keeps
+# a binary fixture binary. A checkout that predates this line keeps its CRLF files until they
+# are checked out again: delete Tests/fixtures and `git checkout -- Tests/fixtures`.
+Tests/fixtures/** text=auto eol=lf
+# Prettier checks web/src with endOfLine "lf" (web/.prettierrc.json), and the index already holds
+# these files LF, so under core.autocrlf=true a fresh Windows checkout made every file read as
+# unformatted. text=auto keeps the binary files under web/src (the mp3s) binary.
+web/src/** text=auto eol=lf

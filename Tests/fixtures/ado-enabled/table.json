@@ -1,0 +1,18 @@
+{
+  "_comment": "docs/modules/ado.md, \"The switch, and its scope\": is Azure DevOps part of what this machine SHOWS? ONE table, two readers -- Tests/Test-Setup.ps1 runs Scripts/Test-AdoEnabled.ps1 over it, Tests/test_ado_enabled.py runs agent/core/config.py's ado_enabled. flag is features.ado as configured: true, false, or null when nobody has said; tracker is what the Space's address names (Resolve-Tracker.ps1, tracker()): ado, github or none. If the two halves ever disagree about a row, one of them is wrong.",
+  "rows": [
+    { "spaceStatus": "active",  "tracker": "ado",    "flag": null,  "enabled": true,  "why": "an active Azure DevOps org, nobody has said: ON -- a real user sees no difference" },
+    { "spaceStatus": "local",   "tracker": "ado",    "flag": null,  "enabled": false, "why": "a local org, nobody has said: OFF -- the machine Start leaves" },
+    { "spaceStatus": "archive", "tracker": "ado",    "flag": null,  "enabled": false, "why": "an archived org: OFF" },
+    { "spaceStatus": "",        "tracker": "none",   "flag": null,  "enabled": false, "why": "no org known: OFF" },
+    { "spaceStatus": "active",  "tracker": "github", "flag": null,  "enabled": false, "why": "a connected GitHub Space is active, and its tracker is GitHub: OFF -- the GitHub row says it is connected" },
+    { "spaceStatus": "local",   "tracker": "github", "flag": null,  "enabled": false, "why": "the GitHub demo as shipped, local with an address: OFF" },
+    { "spaceStatus": "active",  "tracker": "none",   "flag": null,  "enabled": false, "why": "active with no address: there is no Azure DevOps to show, OFF" },
+    { "spaceStatus": "active",  "tracker": "ado",    "flag": false, "enabled": false, "why": "features.ado=false wins over an active org" },
+    { "spaceStatus": "local",   "tracker": "ado",    "flag": true,  "enabled": true,  "why": "features.ado=true wins over a local org -- the way back to the old menu" },
+    { "spaceStatus": "active",  "tracker": "ado",    "flag": true,  "enabled": true,  "why": "on and active: ON" },
+    { "spaceStatus": "active",  "tracker": "github", "flag": true,  "enabled": true,  "why": "features.ado=true wins over a GitHub tracker too: the explicit answer is the person's" },
+    { "spaceStatus": "local",   "tracker": "none",   "flag": false, "enabled": false, "why": "off and local: OFF" },
+    { "spaceStatus": "archive", "tracker": "ado",    "flag": true,  "enabled": true,  "why": "the explicit answer wins over an archived org too" }
+  ]
+}

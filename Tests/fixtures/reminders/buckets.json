@@ -1,0 +1,25 @@
+{
+  "_": "The Organize add-on's two time rules, one row per input each rule distinguishes. Asserted from BOTH halves that implement the bucket rule (Tests/Test-Reminders.ps1 for the CLI's Reminders, Tests/test_reminders.py for GET /api/reminders) -- parity only holds for the shapes a table has. Times are LOCAL with no offset, as a reminder stores them. A due DATE with no time is due at the end of that day. The snooze table is the CLI's alone: the web snoozes through the verb.",
+  "buckets": [
+    { "now": "2026-09-23T10:00", "due": null,               "bucket": "upcoming", "why": "no due date: nothing to be late for" },
+    { "now": "2026-09-23T10:00", "due": "2026-09-22",       "bucket": "overdue",  "why": "a date before today" },
+    { "now": "2026-09-23T10:00", "due": "2026-09-23",       "bucket": "today",    "why": "today's date, no time" },
+    { "now": "2026-09-23T23:59", "due": "2026-09-23",       "bucket": "today",    "why": "a date is due at the END of its day" },
+    { "now": "2026-09-23T10:00", "due": "2026-09-24",       "bucket": "upcoming", "why": "tomorrow's date" },
+    { "now": "2026-09-23T10:00", "due": "2026-09-23T09:59", "bucket": "overdue",  "why": "a time earlier today" },
+    { "now": "2026-09-23T10:00", "due": "2026-09-23T10:00", "bucket": "today",    "why": "due this minute is not late yet" },
+    { "now": "2026-09-23T10:00", "due": "2026-09-23T14:00", "bucket": "today",    "why": "a time later today" },
+    { "now": "2026-09-23T23:30", "due": "2026-09-23T23:59", "bucket": "today",    "why": "late evening, still today (the UTC trap)" },
+    { "now": "2026-09-23T10:00", "due": "2026-09-22T18:00", "bucket": "overdue",  "why": "a time yesterday" },
+    { "now": "2026-09-23T23:30", "due": "2026-09-24T00:00", "bucket": "upcoming", "why": "midnight is tomorrow" },
+    { "now": "2026-09-23T10:00", "due": "2026-10-05T09:00", "bucket": "upcoming", "why": "a time weeks out" }
+  ],
+  "snooze": [
+    { "now": "2026-09-23T10:15", "word": "1h",       "due": "2026-09-23T11:15", "why": "an hour from NOW, not from the due time" },
+    { "now": "2026-09-23T23:30", "word": "1h",       "due": "2026-09-24T00:30", "why": "an hour can cross midnight" },
+    { "now": "2026-09-23T10:15", "word": "tomorrow", "due": "2026-09-24T09:00", "why": "tomorrow at 09:00" },
+    { "now": "2026-09-23T10:15", "word": "nextweek", "due": "2026-09-28T09:00", "why": "a Wednesday: the coming Monday" },
+    { "now": "2026-09-27T10:15", "word": "nextweek", "due": "2026-09-28T09:00", "why": "a Sunday: tomorrow is the Monday" },
+    { "now": "2026-09-28T10:15", "word": "nextweek", "due": "2026-10-05T09:00", "why": "a Monday: NEXT Monday, never today" }
+  ]
+}

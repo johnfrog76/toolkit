@@ -1,0 +1,219 @@
+# The three halves' suites on Ubuntu, and what only Windows proves -- the CLI from
+# Windows PowerShell 5.1 and the browser smoke -- on Windows. Both jobs run on
+# every pull request and every push to main, and from the Actions tab's button
+# (workflow_dispatch); a local run on each host remains the proof.
+#
+# Each runner's output is teed to a transcript and read by Scripts/Test-CiHalf.ps1,
+# which parses the summary line the runner prints last -- the rule tkTest reads it
+# with (Scripts/TestAll-Rules.ps1) -- so a half that skipped, counted nothing or
+# stopped before it reported fails its step, whatever its exit code said. The
+# smoke is read the same way, by its closing `smoke:` line.
+#
+# No secret and no personal token: each job reads the repository with the default
+# GITHUB_TOKEN and nothing else, and no TEAMS_WEBHOOK_* or model key exists here.
+# What the jobs run, and what stays a walk, is docs/TESTING.md, "In CI".
+name: verify
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A newer push to the same pull request or branch replaces the run in progress.
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ubuntu:
+    name: Three halves on Ubuntu
+    runs-on: ubuntu-latest
+    # The CLI half spawns a child pwsh per case and a slow two-core runner has taken
+    # four times what a quick one does for the same tree (33 minutes against a
+    # 90-minute cut). The budget covers the slow runner; a true hang is still cut.
+    timeout-minutes: 150
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: npm ci (web)
+        id: npm
+        working-directory: web
+        run: npm ci
+
+      # Each install runs whatever the one before it did, so a failed npm ci cannot
+      # take the agent's answer with it; each runner below waits on its own install.
+      - uses: actions/setup-python@v5
+        if: ${{ !cancelled() }}
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            agent/requirements.txt
+            agent/requirements-dev.txt
+
+      - name: pip install (agent)
+        id: pip
+        if: ${{ !cancelled() }}
+        run: python -m pip install -r agent/requirements-dev.txt
+
+      - name: Versions
+        if: ${{ !cancelled() }}
+        run: |
+          pwsh -NoProfile -Command '"pwsh " + $PSVersionTable.PSVersion.ToString()'
+          python --version
+          node --version
+          git --version
+
+      # The agent: pytest's closing line.
+      - name: The agent -- python -m pytest Tests/
+        if: ${{ !cancelled() && steps.pip.outcome == 'success' }}
+        run: |
+          set +e
+          python -m pytest Tests/ 2>&1 | tee "$RUNNER_TEMP/agent.log"
+          code=${PIPESTATUS[0]}
+          pwsh -NoProfile -File Scripts/Test-CiHalf.ps1 -Half agent -Path "$RUNNER_TEMP/agent.log" -ExitCode "$code"
+
+      # The CLI: tkTest's CLI half in a shell with exactly one toolkit in it
+      # (AGENTS.md, "One toolkit per shell"); the runner's Total line.
+      - name: The CLI -- tkTest -Half cli
+        if: ${{ !cancelled() }}
+        run: |
+          set +e
+          pwsh -NoProfile -Command '$env:PSModulePath = (Resolve-Path .); Import-Module ./Prompt20Toolkit/Prompt20Toolkit.psd1 -Force; tkTest -Half cli; exit $LASTEXITCODE' 2>&1 | tee "$RUNNER_TEMP/cli.log"
+          code=${PIPESTATUS[0]}
+          pwsh -NoProfile -File Scripts/Test-CiHalf.ps1 -Half cli -Path "$RUNNER_TEMP/cli.log" -ExitCode "$code"
+
+      # The web UI: jest's Tests: line.
+      - name: The web UI -- npm test
+        if: ${{ !cancelled() && steps.npm.outcome == 'success' }}
+        working-directory: web
+        run: |
+          set +e
+          npm test 2>&1 | tee "$RUNNER_TEMP/web.log"
+          code=${PIPESTATUS[0]}
+          pwsh -NoProfile -File ../Scripts/Test-CiHalf.ps1 -Half web -Path "$RUNNER_TEMP/web.log" -ExitCode "$code"
+
+      # The documentation lints: markdownlint over the root README.md and the other
+      # root documents, docs/, web/README.md and agent/README.md, with the tree's
+      # own settings (.markdownlint-cli2.jsonc).
+      - name: The documentation -- npm run lint:md
+        if: ${{ !cancelled() && steps.npm.outcome == 'success' }}
+        working-directory: web
+        run: npm run lint:md
+
+      # The dependency audits, so an advisory fails a run the day it lands rather
+      # than waiting on Dependabot's weekly pull request. npm audits what ships
+      # (--omit=dev) at high or above; pip-audit reads the agent's requirements in
+      # a throwaway environment of its own, as docs/CONTRIBUTING.md describes.
+      - name: The dependencies -- npm audit
+        if: ${{ !cancelled() && steps.npm.outcome == 'success' }}
+        working-directory: web
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: The dependencies -- pip-audit
+        if: ${{ !cancelled() }}
+        run: |
+          python -m venv "$RUNNER_TEMP/audit"
+          "$RUNNER_TEMP/audit/bin/python" -m pip install --quiet pip-audit
+          "$RUNNER_TEMP/audit/bin/python" -m pip_audit -r agent/requirements-dev.txt
+
+  windows:
+    name: Windows PowerShell 5.1 and the browser smoke
+    runs-on: windows-latest
+    # The CLI runner starts a shell per case, which Windows does more slowly.
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: npm ci (web)
+        id: npm
+        working-directory: web
+        run: npm ci
+
+      # npm ci installs Playwright the library; the browser is a download of its own.
+      - name: Playwright's chromium
+        id: chromium
+        if: ${{ !cancelled() && steps.npm.outcome == 'success' }}
+        working-directory: web
+        run: npx playwright install chromium
+
+      - uses: actions/setup-python@v5
+        if: ${{ !cancelled() }}
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            agent/requirements.txt
+            agent/requirements-dev.txt
+
+      # The smoke starts its own agent with this interpreter; it runs no pytest.
+      - name: pip install (agent)
+        id: pip
+        if: ${{ !cancelled() }}
+        run: python -m pip install -r agent/requirements.txt
+
+      - name: Versions
+        if: ${{ !cancelled() }}
+        run: |
+          powershell.exe -NoProfile -Command '"powershell " + $PSVersionTable.PSVersion.ToString()'
+          pwsh -NoProfile -Command '"pwsh " + $PSVersionTable.PSVersion.ToString()'
+          python --version
+          node --version
+          git --version
+
+      # The browser smoke, in the two modes that start and stop their own agent and
+      # Vite on a scratch copy of the package, so nothing else has to be running:
+      # each module flag alone and the flip with no restart (smoke:matrix), and axe
+      # on every page the registry mounts (smoke:a11y). The closing smoke: line.
+      - name: The smoke -- npm run smoke:matrix
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' && steps.pip.outcome == 'success' }}
+        working-directory: web
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'smoke-matrix.log'
+          npm run smoke:matrix 2>&1 | Tee-Object -FilePath $log
+          $code = $LASTEXITCODE
+          pwsh -NoProfile -File ../Scripts/Test-CiHalf.ps1 -Half smoke -Path $log -ExitCode $code
+
+      - name: The smoke -- npm run smoke:a11y
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' && steps.pip.outcome == 'success' }}
+        working-directory: web
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'smoke-a11y.log'
+          npm run smoke:a11y 2>&1 | Tee-Object -FilePath $log
+          $code = $LASTEXITCODE
+          pwsh -NoProfile -File ../Scripts/Test-CiHalf.ps1 -Half smoke -Path $log -ExitCode $code
+
+      # The CLI from Windows PowerShell 5.1, the floor: powershell.exe, not pwsh, with
+      # PSModulePath set inside that shell before anything loads, so a module path
+      # PowerShell 7 handed down cannot answer for a name (AGENTS.md, "One toolkit
+      # per shell"); then tkTest's CLI half. The runner starts every suite in pwsh,
+      # as it does on every host. The runner's Total line.
+      - name: The CLI from Windows PowerShell 5.1 -- tkTest -Half cli
+        if: ${{ !cancelled() }}
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'cli.log'
+          powershell.exe -NoProfile -Command '$env:PSModulePath = (Resolve-Path .); Import-Module ./Prompt20Toolkit/Prompt20Toolkit.psd1 -Force; tkTest -Half cli; exit $LASTEXITCODE' 2>&1 | Tee-Object -FilePath $log
+          $code = $LASTEXITCODE
+          pwsh -NoProfile -File Scripts/Test-CiHalf.ps1 -Half cli -Path $log -ExitCode $code

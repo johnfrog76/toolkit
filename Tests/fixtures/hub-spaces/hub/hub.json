@@ -1,0 +1,35 @@
+{
+  "_comment": "The Studio smoke's hub (#179): one Space of each kind the Spaces card's filter knows (web/src/modules/studio/foyer.ts, spaceBucket) -- a GitHub product, a work Space with no tracker (the one the run is in), an out-of-box example and an archived one. The product is 'local', so no row asks gh anything (a tracker is not asked below Tier 1). config.default.json's own shipped example, the Azure demo, is listed beside these as a second Out of box row; the smoke reads it from there rather than retyping it. Names and addresses are placeholders and belong to nobody.",
+  "hub": 1,
+  "spaces": [
+    {
+      "slug": "work",
+      "name": "Work Space",
+      "status": "local",
+      "org": "",
+      "promptsFolder": "work"
+    },
+    {
+      "slug": "product",
+      "name": "Product Space",
+      "status": "local",
+      "org": "https://github.com/example-owner/example-product",
+      "promptsFolder": "product"
+    },
+    {
+      "slug": "sample",
+      "name": "Sample Space",
+      "status": "local",
+      "example": true,
+      "org": "",
+      "promptsFolder": "sample"
+    },
+    {
+      "slug": "retired",
+      "name": "Retired Space",
+      "status": "archive",
+      "org": "",
+      "promptsFolder": "retired"
+    }
+  ]
+}

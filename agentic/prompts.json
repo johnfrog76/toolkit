@@ -1,0 +1,133 @@
+{
+  "_about": "Which way of working each shipped prompt belongs to, who sends it, and its category. workflows: alone (by myself), team (on a team in Azure), agents (with agents) -- the three answers to How do you want to work in <Space>? sender: 'by hand' for a prompt a person opens in their assistant, else the verb or route that sends it. category: one of categories, the vocabulary agentic/README.md describes under The shape of a prompt. Read by the Studio's Prompts card and held to the folder by Tests/test_agentic_index.py.",
+  "categories": [
+    "ship",
+    "review",
+    "tracker",
+    "growth",
+    "meetings",
+    "rituals",
+    "design"
+  ],
+  "prompts": {
+    "ado-comments": {
+      "workflows": [
+        "team"
+      ],
+      "sender": "by hand",
+      "module": "core",
+      "drives": "ReplyPR",
+      "category": "review"
+    },
+    "pr-ship": {
+      "workflows": [
+        "team"
+      ],
+      "sender": "by hand",
+      "module": "core",
+      "drives": "NewPR",
+      "category": "ship"
+    },
+    "pr-publish": {
+      "workflows": [
+        "team"
+      ],
+      "sender": "by hand",
+      "module": "core",
+      "drives": "PublishPR, SendTeams",
+      "category": "ship"
+    },
+    "new-bug": {
+      "workflows": [
+        "team"
+      ],
+      "sender": "by hand",
+      "module": "core",
+      "drives": "NewItem, NewPrompt",
+      "category": "tracker"
+    },
+    "new-user-story": {
+      "workflows": [
+        "team"
+      ],
+      "sender": "by hand",
+      "module": "core",
+      "drives": "NewItem, NewPrompt",
+      "category": "tracker"
+    },
+    "new-issue": {
+      "workflows": [
+        "alone",
+        "agents"
+      ],
+      "sender": "by hand",
+      "module": "core",
+      "drives": "gh issue create",
+      "category": "tracker"
+    },
+    "generate-review": {
+      "workflows": [
+        "alone",
+        "team",
+        "agents"
+      ],
+      "sender": "by hand",
+      "module": "growth",
+      "drives": "NewWorkReview, PublishWorkReview",
+      "category": "growth"
+    },
+    "growth-create-training": {
+      "workflows": [
+        "alone",
+        "team",
+        "agents"
+      ],
+      "sender": "by hand",
+      "module": "growth",
+      "drives": "NewGrowth",
+      "category": "growth"
+    },
+    "growth-create-presentation": {
+      "workflows": [
+        "alone",
+        "team",
+        "agents"
+      ],
+      "sender": "by hand",
+      "module": "growth",
+      "drives": "NewGrowth",
+      "category": "growth"
+    },
+    "manager1on1": {
+      "workflows": [
+        "team"
+      ],
+      "sender": "by hand",
+      "module": "communication",
+      "drives": "MeetingAgenda -Plan, -Retro",
+      "category": "meetings"
+    },
+    "pr-review": {
+      "workflows": [
+        "alone",
+        "team",
+        "agents"
+      ],
+      "sender": "AddPRReview",
+      "module": "core",
+      "drives": "the review the verb posts",
+      "category": "review"
+    },
+    "pr-suggest": {
+      "workflows": [
+        "alone",
+        "team",
+        "agents"
+      ],
+      "sender": "POST /api/pr-comments/{filename}/suggest",
+      "module": "core",
+      "drives": "Suggest a reply on the PR Comments page",
+      "category": "review"
+    }
+  }
+}

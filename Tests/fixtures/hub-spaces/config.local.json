@@ -1,0 +1,6 @@
+{
+  "_comment": "The Studio smoke's seed (#179, D-S13): the line a person once typed by hand, from before the Studio was core. web/tests/smoke.mjs --studio copies this file into its scratch package as config.local.json before the agent starts; the Studio tab must be there regardless, and every change after that goes through PUT /api/config. Force-tracked, like every config.local.json under Tests/fixtures/.",
+  "features": {
+    "studio": false
+  }
+}

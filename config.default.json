@@ -1,0 +1,770 @@
+{
+  "cliVersion": 2,
+  "commandPrefix": "tk",
+  "branchUser": "",
+  "quietStart": true,
+  "email": "",
+  "wsRoot": "",
+  "promptsRoot": "",
+  "_agenticExtensionPath": "A folder of your own whose copy of a shipped agentic prompt WINS on this machine: <folder>/pr-review.prompt.md is read instead of agentic/pr-review.prompt.md when it exists, and a name it does not carry falls back to the package. Absolute, or relative to the hub. Empty means the shipped set. Set it in config.local.json; the package stays generic for everyone else.",
+  "agenticExtensionPath": "",
+  "_storeSync": "How the prompt store is kept in sync -- 'git' or 'none'. Default none: the tool writes files into a directory and has no opinion about what you do with it. State derivation never reads git (spec 1.3), so the WORKFLOW loses nothing. Reporting is different: review generation reads git log, and cards created before created/closed stamps existed can only be dated from history. If you intend to generate reviews over an existing corpus, set this to 'git' and keep the history. The hub may declare this itself, in <promptsRoot>/hub.json -- whether the store is a git repository is a fact about the hub, so a hub kept in sync from two machines needs no per-machine switch. Order: this file, then the hub, then config.local.json.",
+  "storeSync": "none",
+  "activeSpace": "azure-demo",
+  "_features": "Feature flags. The default scope is the engineer: a flag here (growth, communication, deck, anything a later module adds) is the person's, holds steady across activeOrg, and an org cannot override it -- nothing other than the ADO flow is org-dependent. The exceptions are flags that belong to the ADO core and describe one org's board or store: sprintAwareness lives on orgs[].features. GET /api/env serves the merged view, and the web shell mounts a module only when its flag is true. Off means absent: no route, no nav entry, no card, no chunk.",
+  "features": {},
+  "_isDemoDismissed": "Hide the shipped demo Spaces (every one marked example: true -- Demo, the GitHub demo, the Azure demo) from the orgs you pick from -- the switcher, Settings, SwitchOrg Status. It is never removed from config, and the org you are IN is always shown. Off here; the Settings drawer's switch sets it.",
+  "isDemoDismissed": false,
+  "_firstRun": "What the first run shows, and nothing else. welcome is the Home banner that offers the deck Introducing ToolKit; tkStart turns it on when it copies the sample hub, and Get Started or Dismiss turns it off for good, through Config. False here, so a machine that was never started from the sample hub never sees it.",
+  "firstRun": {
+    "welcome": false
+  },
+  "_web": "Settings for the web UI and the agent that serves it. agentPort is where the agent listens; corsOrigins is the list of dev-server origins allowed to call it. Both used to be fixed numbers in source, which meant a second person could not choose their own ports. Leave corsOrigins empty to accept the two defaults (5173, 5174).",
+  "web": {
+    "agentPort": 4100,
+    "corsOrigins": [
+      "http://localhost:5174",
+      "http://localhost:5173"
+    ]
+  },
+  "_ai": "The provider profile for everything that calls a model: AddPRReview in the CLI, and the agent's suggest (a draft reply to a review thread) and rewrite (tidy a notes box) routes. model is the model id all three send; override it per machine in config.local.json. The KEY is never here -- ANTHROPIC_API_KEY in the environment, or CLAUDE_API_KEY as the fallback name .env.example documents.",
+  "ai": {
+    "model": "claude-opus-5-5"
+  },
+  "managerWorkflow": {
+    "retroChannel": "manager",
+    "postRetroSummary": true,
+    "communication": {
+      "recipients": {
+        "manager": {
+          "type": "channel",
+          "display": "My Manager (DM via Workflow)",
+          "webhookEnv": "TEAMS_WEBHOOK_MANAGER"
+        }
+      }
+    }
+  },
+  "spaces": [
+    {
+      "slug": "azure-demo",
+      "example": true,
+      "name": "Azure demo",
+      "status": "local",
+      "orgType": "portfolio",
+      "_comment": "The Azure demo: one of the three demo Spaces, one per grain, ready for YOUR Azure DevOps organisation -- there is no public one to point at. Local and with no address until you connect it (Connect azure-demo -Address https://dev.azure.com/<org>, or /connect/azure-demo in the web, which also makes it active), so a cold machine never reads it as unreachable. Its slug was once 'test', and a machine's hub.json or config.local.json that still names 'test' is read as this Space (consts.json spaces.renamed). YourProject/your-repo is a placeholder that Connect -Discover replaces with your organisation's projects; see docs/modules/ado.md, 'The demo Spaces: one per grain'.",
+      "org": "",
+      "tenant": "",
+      "promptsFolder": "azure-demo",
+      "projects": [
+        {
+          "name": "YourProject",
+          "repo": "your-repo",
+          "defaultBranch": "main"
+        }
+      ]
+    }
+  ],
+  "_aliases": "Navigation shortcuts. The keys are BARE, exactly as commands.<Name> is, and the prefix is applied once -- at registration and at render -- so changing commandPrefix moves the shortcuts with everything else. Paths ship empty because a path is personal: set one per machine with Config -Set aliases.<Name>.path=<path>, which writes config.local.json. A local key that still carries the prefix (tkHub) is read as the bare name with a one-time warning.",
+  "aliases": {
+    "Hub": {
+      "path": "",
+      "display": true,
+      "description": "Prompt hub"
+    },
+    "Home": {
+      "path": "",
+      "display": true,
+      "description": "Home directory"
+    },
+    "Repos": {
+      "path": "",
+      "display": true,
+      "description": "Workspace root"
+    },
+    "Prompt": {
+      "path": "",
+      "display": true,
+      "description": "Toolkit package"
+    }
+  },
+  "_commands": "Help metadata for every registered verb: category, description, usage and examples, all rendered through -Help and Menu with {cliPrefix} standing in for whichever prefix is registered. One optional key is not about help: bridgeTimeoutSeconds is how long the agent's POST /api/cmd/{name} lets this verb run before killing it and replying with status timeout. Absent, the bridge allows 120 seconds -- enough for a PowerShell start, a module import and an ADO round trip. Set it where that is wrong in either direction: longer for a verb that calls a model or runs the suite, shorter for a read the web UI polls, which must not hold a connection for two minutes because az is hanging. A description is ONE LINE, at most 53 characters after {cliPrefix} is expanded, and says what the verb does: flags, keys, examples, mechanism and edge cases belong in usage, switches, examples and notes (tkTestToolkit -Menu holds the length).",
+  "commands": {
+    "MyWork": {
+      "category": "work",
+      "description": "List my assigned work items",
+      "usage": "{cliPrefix}MyWork [<State>] [-Help]",
+      "examples": [
+        "{cliPrefix}MyWork"
+      ]
+    },
+    "Menu": {
+      "category": "info",
+      "description": "Show the command menu",
+      "usage": "{cliPrefix}Menu [-All] [-Help]",
+      "examples": [
+        "{cliPrefix}Menu",
+        "{cliPrefix}Menu -All"
+      ]
+    },
+    "Start": {
+      "category": "setup",
+      "description": "First run: copy the sample hub here and open the UI",
+      "usage": "{cliPrefix}Start [-Path <folder>] [-NoWeb] [-WhatIf] [-Help]",
+      "examples": [
+        "{cliPrefix}Start",
+        "{cliPrefix}Start -Path ~/work/hub",
+        "{cliPrefix}Start -WhatIf     # say what would happen; change nothing"
+      ],
+      "notes": [
+        "The sample org, Demo, works from its own files: no account, no login.",
+        "Never overwrites: a machine that already has a hub keeps it, and a folder with anything in it is never written to."
+      ]
+    },
+    "Update": {
+      "category": "sync",
+      "description": "Pull and re-import this Toolkit, report what moved",
+      "usage": "{cliPrefix}Update [-Sync] [-WhatIf] [-Help]",
+      "examples": [
+        "{cliPrefix}Update",
+        "{cliPrefix}Update -Sync      # software first, then data",
+        "{cliPrefix}Update -WhatIf    # fetch and report; change nothing"
+      ],
+      "notes": [
+        "Fast-forward only. It then says what else moved: the autoload shim, the web UI's lockfile, the agent's requirements.",
+        "-Sync syncs the hub (your cards) afterwards -- software first, then data."
+      ]
+    },
+    "Sync": {
+      "category": "sync",
+      "description": "Sync the hub (your cards): pull, then push",
+      "usage": "{cliPrefix}Sync [-Help]",
+      "examples": [
+        "{cliPrefix}Sync",
+        "# storeSync lives in the hub's hub.json; config.local.json overrides it per machine"
+      ],
+      "notes": [
+        "Only when storeSync is 'git'. Your uncommitted cards are auto-committed first; package links are refreshed after the pull.",
+        "The Toolkit itself is {cliPrefix}Update; {cliPrefix}Update -Sync does both."
+      ]
+    },
+    "Archive": {
+      "category": "prompt",
+      "description": "Archive a card, and commit if git-synced",
+      "usage": "{cliPrefix}Archive <ID|PromptName> [-WhatIf] [-List] [-Relink] [-Help]",
+      "examples": [
+        "{cliPrefix}Archive 114",
+        "{cliPrefix}Archive -WhatIf 114",
+        "{cliPrefix}Archive -List"
+      ],
+      "notes": [
+        "An all-digit argument is an ID and matches only the card whose id is exactly that number -- '{cliPrefix}Archive 39' never reaches Task139.",
+        "-Relink rewrites every card's Template and workflow links in current/ and archive/ from where the hub and the package are now, and archives nothing."
+      ]
+    },
+    "Status": {
+      "bridgeTimeoutSeconds": 30,
+      "category": "prompt",
+      "description": "Show active cards and their state",
+      "usage": "{cliPrefix}Status [-Board] [-Help]",
+      "examples": [
+        "{cliPrefix}Status",
+        "{cliPrefix}Status -Board"
+      ],
+      "switches": {
+        "-Board": "Also read each linked card's work item state from the board and flag a card in current/ whose item is closed. Read-only; needs Azure DevOps on and az signed in",
+        "-Help": "This"
+      }
+    },
+    "Move": {
+      "category": "prompt",
+      "description": "Move a card to a lane by hand",
+      "usage": "{cliPrefix}Move <id|file> -To InProgress|CodeReview|Done [-Help]",
+      "examples": [
+        "{cliPrefix}Move K7M2 -To InProgress",
+        "{cliPrefix}Move K7M2 -To CodeReview",
+        "{cliPrefix}Move K7M2 -To Done"
+      ],
+      "notes": [
+        "In Progress writes **Started:**, Code Review writes **Review:**, Done is Archive. A card travels one way.",
+        "For a card with nothing checked in, or no pull request -- the tokens git or NewPR would have written."
+      ]
+    },
+    "Billable": {
+      "category": "prompt",
+      "description": "Mark a card billable or not",
+      "usage": "{cliPrefix}Billable <id|file> [-No] [-Help]",
+      "examples": [
+        "{cliPrefix}Billable K7M2 -No",
+        "{cliPrefix}Billable K7M2"
+      ],
+      "notes": [
+        "-No keeps the card off Daily; without it the card is billable again. A card is billable unless it says otherwise."
+      ]
+    },
+    "Cover": {
+      "category": "prompt",
+      "description": "Give a card a picture -- its cover, or the before",
+      "usage": "{cliPrefix}Cover <id|file> <image> [-Before] [-Remove] [-WhatIf] [-Help] | -Samples [-WhatIf]",
+      "examples": [
+        "{cliPrefix}Cover K7M2 ./snap.png",
+        "{cliPrefix}Cover 214 ./before.png -Before",
+        "{cliPrefix}Cover K7M2 -Remove",
+        "{cliPrefix}Cover -Samples -WhatIf",
+        "{cliPrefix}Cover -Samples"
+      ],
+      "notes": [
+        "The picture is copied to the Space's assets/<card key>/ and the card names it with one footer line, **Cover:** (or **Before:**). png, jpg, jpeg, webp or gif, at most 5 MB.",
+        "Found in current/ or archive/. Attaching again replaces the card's own picture; a card that came back takes the next free name (cover-r2). -Remove deletes the picture and the line.",
+        "-Samples dresses a Demo copied out before the covers shipped: each sample card in this hub with no **Cover:** line gets the picture the package ships for it, through the same writer. Never a card that has a cover, never a card the sample does not ship, never a Space that is not a sample's. {cliPrefix}Update says when it is worth running; -WhatIf lists and writes nothing."
+      ]
+    },
+    "GetPRComments": {
+      "category": "pr",
+      "description": "Fetch PR review comments into the card",
+      "usage": "{cliPrefix}GetPRComments [<PrId>] [-BranchName <branch>] [-Repository <r>] [-Project <p>] [-OutputFile <file>] [-Help]",
+      "examples": [
+        "{cliPrefix}GetPRComments 6789"
+      ]
+    },
+    "ReplyPR": {
+      "category": "pr",
+      "description": "Reply to a PR thread and set its status",
+      "usage": "{cliPrefix}ReplyPR <PrId> <ThreadId> -Reply <Message> [-Status <state>] [-Repository <r>] [-Project <p>] [-Help]",
+      "examples": [
+        "{cliPrefix}ReplyPR 6789 12 'Fixed, please re-review'"
+      ]
+    },
+    "ThreadHash": {
+      "category": "pr",
+      "description": "Add this branch's commits to its card",
+      "usage": "{cliPrefix}ThreadHash [<file>] [-Hash <hash>] [-Help]",
+      "examples": [
+        "{cliPrefix}ThreadHash",
+        "{cliPrefix}ThreadHash current/137-something-is-wrong.prompt.md",
+        "{cliPrefix}ThreadHash -Hash abc1234"
+      ],
+      "notes": [
+        "Run it from the code repository: the branch names the card, and the commits come from git."
+      ]
+    },
+    "Env": {
+      "category": "info",
+      "description": "Show machine, tier, hub, org and identity",
+      "usage": "{cliPrefix}Env [-Startup] [-Help]",
+      "examples": [
+        "{cliPrefix}Env"
+      ],
+      "notes": [
+        "The full report: OS, tier and why, hub and hub.json, active org, az identity, ADO access, and the opt-in surfaces with their state."
+      ]
+    },
+    "Log": {
+      "category": "info",
+      "description": "View the diagnostic log",
+      "usage": "{cliPrefix}Log [-Errors] [-Today] [-Days <n>] [-Command <name>] [-Type CMD|ERR|WARN|INFO] [-Count <n>] [-Tail] [-Ack] [-Clear] [-Help]",
+      "examples": [
+        "{cliPrefix}Log -Errors",
+        "{cliPrefix}Log -Today"
+      ],
+      "switches": {
+        "-Errors": "Failures only",
+        "-Today": "Today's entries",
+        "-Days <n>": "The last n days",
+        "-Command <name>": "One verb's entries",
+        "-Type <type>": "One kind of entry: CMD, ERR, WARN or INFO",
+        "-Count <n>": "How many entries. Default: 20",
+        "-Tail": "Follow the log live",
+        "-Ack": "Dismiss the error indicator in Menu",
+        "-Clear": "Archive the log and start a new one",
+        "-Help": "This"
+      }
+    },
+    "Setup": {
+      "category": "setup",
+      "description": "Check what the tool needs and state the tier",
+      "usage": "{cliPrefix}Setup [-Help]",
+      "examples": [
+        "{cliPrefix}Setup"
+      ]
+    },
+    "InstallAutoload": {
+      "category": "setup",
+      "description": "Make commands autoload in every shell",
+      "usage": "{cliPrefix}InstallAutoload [-Force] [-Remove] [-WhatIf] [-Help]",
+      "examples": [
+        "{cliPrefix}InstallAutoload",
+        "{cliPrefix}InstallAutoload -Force",
+        "{cliPrefix}InstallAutoload -Remove -WhatIf",
+        "{cliPrefix}InstallAutoload -Remove"
+      ],
+      "switches": {
+        "-Force": "Replace an existing install even when it already matches this checkout",
+        "-Remove": "Take the shim out of every PowerShell Modules folder it is in (a link or a copy), then check in a cold shell that the commands no longer resolve. The checkout, your hub and config.local.json are not touched. Cannot be combined with -Force",
+        "-WhatIf": "Print what would be installed or removed, and change nothing",
+        "-Help": "This"
+      },
+      "notes": [
+        "For shells that never run the profile: agent tool calls, pwsh -c, CI. Re-running it is the update step for a copied shim."
+      ]
+    },
+    "SwitchSpace": {
+      "category": "org",
+      "description": "Switch Space, or show which is active with Status",
+      "usage": "{cliPrefix}SwitchSpace <slug>|Status [-Help]",
+      "examples": [
+        "{cliPrefix}SwitchSpace azure-demo",
+        "{cliPrefix}SwitchSpace Status"
+      ]
+    },
+    "Config": {
+      "category": "org",
+      "description": "Read and write machine and hub config",
+      "usage": "{cliPrefix}Config [-List] [-Set <key>=<value>] [-Unset <key>] [-Schema] [-AsJson] [-Local] [-Hub] [-Help]",
+      "switches": {
+        "-List": "Every resolved setting with the file it came from: default, hub, local or env. The default when no other switch is given",
+        "-Set": "One key=value pair, repeatable. Dotted paths: email, activeOrg, features.growth, web.corsOrigins (a JSON array), orgs.<slug>.status",
+        "-Unset": "Remove a local override. The hub's value and the shipped default stand. spaces.<slug> with -Hub un-declares a Space (its folder stays)",
+        "-Schema": "What may be set: key, scope, type, allowed values and one line of help. -Schema -AsJson is what the web card's tooltips come from",
+        "-AsJson": "Machine-readable output for -List and -Schema -- what GET /api/config and GET /api/config/schema read through the bridge",
+        "-Local": "Send an orgs.<slug>.* write to config.local.json -- this machine's override -- instead of to the hub",
+        "-Hub": "Write, or unset, the hub's own declaration: storeSync, folders.*, or a field of an org in hub.json",
+        "-Help": "Show this help"
+      },
+      "examples": [
+        "{cliPrefix}Config",
+        "{cliPrefix}Config -Set email=you@example.com",
+        "{cliPrefix}Config -Set features.growth=true -Set activeOrg=acme",
+        "{cliPrefix}Config -Set orgs.acme.status=archive",
+        "{cliPrefix}Config -Unset email",
+        "{cliPrefix}Config -Schema"
+      ],
+      "notes": [
+        "Three files, and the scope decides which: machine keys go to config.local.json, orgs and the hub-root folder names go to <promptsRoot>/hub.json, and config.default.json -- the team's table -- is never written.",
+        "Retire a Space with -Set spaces.<slug>.status=archive -- RetireSpace runs it -- the value the web shell renders as the retrospective view. -Unset spaces.<slug> -Hub un-declares one and -Unset spaces.<slug> drops this machine's patch for it -- RemoveSpace runs both. Neither touches the Space's folder.",
+        "Almost nothing needs a restart: the agent re-reads config per request. web.agentPort and web.corsOrigins are bound at startup and say so."
+      ]
+    },
+    "Connect": {
+      "category": "setup",
+      "description": "Connect a Space to its tracker, in four named steps",
+      "usage": "{cliPrefix}Connect <slug> [-Address <url>] [-Discover] [-Projects <Name/repo;...>] [-Repo <owner/name>] [-Sprint <true|false>] [-As <new-slug>] [-AsJson] [-WhatIf] [-Help]",
+      "examples": [
+        "{cliPrefix}Connect github-demo -Repo owner/name",
+        "{cliPrefix}Connect azure-demo -Address https://dev.azure.com/acme",
+        "{cliPrefix}Connect wasteland -Discover",
+        "{cliPrefix}Connect azure-demo -As acme"
+      ],
+      "notes": [
+        "A Space's grain follows its tracker (D-W17): a GitHub Space is one repo (-Repo writes the address); an Azure DevOps Space is an organisation with projects inside it (-Projects); a Space with no address works from your cards alone.",
+        "The address is yours; we write it through Config, and an address implies active. Signing in (gh auth login / az login) is yours -- said and checked, never run for you. Discovery and sprint awareness are ours.",
+        "With no step it reports where the Space stands. -As graduates a shipped demo Space (the Azure demo, the GitHub demo) into your own Space: declared from its settings, its folder moved, made active."
+      ]
+    },
+    "Test": {
+      "bridgeTimeoutSeconds": 3600,
+      "category": "test",
+      "description": "Run all three halves' suites and report them",
+      "usage": "{cliPrefix}Test [-Half cli|agent|web] [-Fast] [-Help]",
+      "examples": [
+        "{cliPrefix}Test",
+        "{cliPrefix}Test -Half agent",
+        "{cliPrefix}Test -Fast"
+      ],
+      "notes": [
+        "In order: the agent (pytest, the interpreter from Resolve-Python -- never python3 on Windows), the CLI ({cliPrefix}TestToolkit's runner), the web UI (npm test in web/). Each runner sets its own environment; npm test, which sets none, gets the webhooks removed and the run marker set.",
+        "A half that cannot run is skipped and says why -- no Python, no pytest or httpx, no pwsh, no npm, no web/node_modules -- and the verdict names it SKIPPED, not passed.",
+        "Exit 0 when every half that ran passed; exit 2, after the summary, when a half failed or none ran.",
+        "Expected vs actual, per half, from docs/TESTING.md's own lines: information, not a failure -- the merger pastes those counts from the Mac's run.",
+        "test-summary.<machine>.json gains a half field per suite and a halves block; the System page's Health card and {cliPrefix}Setup read the whole machine from it."
+      ],
+      "switches": {
+        "-Half": "One half: cli, agent or web",
+        "-Fast": "Passed to the CLI runner's -Fast (the suites that spawn no shell); the agent and web halves run in full",
+        "-Help": "This"
+      }
+    },
+    "TestToolkit": {
+      "bridgeTimeoutSeconds": 300,
+      "category": "test",
+      "description": "Run the PowerShell test suites",
+      "usage": "{cliPrefix}TestToolkit [-<Suite> ...] [-Fast] [-Slow] [-Failed] [-List] [-Help]",
+      "examples": [
+        "{cliPrefix}TestToolkit",
+        "{cliPrefix}TestToolkit -Review",
+        "{cliPrefix}TestToolkit -Compat -Menu",
+        "{cliPrefix}TestToolkit -List",
+        "{cliPrefix}TestToolkit -Fast",
+        "{cliPrefix}TestToolkit -Failed"
+      ],
+      "notes": [
+        "A suite switch is its name in the list below -- name several and they all run.",
+        "A skip is not a pass: read the per-suite summary line, not the total.",
+        "test-summary.<machine>.json carries each suite's seconds; the Health card reads it, and -Failed reads its results."
+      ],
+      "switches": {
+        "-<Suite>": "One suite by name; name several and they all run",
+        "-Fast": "The suites that spawn no shell -- a few minutes; run these after a pull",
+        "-Slow": "The rest: one host process per case, where the time goes on Windows",
+        "-Failed": "Whatever failed in the last run on this machine (test-summary.<machine>.json)",
+        "-List": "Name every suite",
+        "-Help": "This"
+      }
+    },
+    "TestCompat": {
+      "category": "test",
+      "description": "Run the 5.1 compatibility suite only",
+      "usage": "{cliPrefix}TestCompat [-Help]",
+      "examples": [
+        "{cliPrefix}TestCompat"
+      ]
+    },
+    "TestMenu": {
+      "category": "test",
+      "description": "Run the menu suite only",
+      "usage": "{cliPrefix}TestMenu [-Help]",
+      "examples": [
+        "{cliPrefix}TestMenu"
+      ]
+    },
+    "TestSync": {
+      "category": "test",
+      "description": "Run the Sync hook interaction suite only",
+      "usage": "{cliPrefix}TestSync [-Help]",
+      "examples": [
+        "{cliPrefix}TestSync"
+      ]
+    },
+    "NewPR": {
+      "category": "pr",
+      "description": "Ship it: open the PR and move the card to review",
+      "usage": "{cliPrefix}NewPR [[-File] <card|id>] [-TargetBranch <name>] [-Draft] [-AutoComplete] [-SkipWorkItem] [-Repository <name>] [-Project <name>] [-WhatIf] [-Help]",
+      "examples": [
+        "{cliPrefix}NewPR",
+        "{cliPrefix}NewPR 119 -Draft -WhatIf"
+      ],
+      "switches": {
+        "-File <card|id>": "The card: a path, a filename or its id. Default: the card for this branch",
+        "-TargetBranch <name>": "Where it merges. Default: the project's defaultBranch, else master",
+        "-Draft": "Open it as a draft",
+        "-AutoComplete": "Set auto-complete with squash merge",
+        "-SkipWorkItem": "Leave the ADO work item alone",
+        "-Repository <name>": "The repository, when it cannot be told",
+        "-Project <name>": "The ADO project, when it cannot be told",
+        "-WhatIf": "Say what would be opened; call nothing",
+        "-Help": "This"
+      },
+      "notes": [
+        "Opens the PR, moves the ADO card to Code Review, comments on it, and writes PR URL: into the card.",
+        "From the code repository everything is inferred from the branch. Named by id from anywhere else, the card answers: its ADO Link names the project, its ## Branch section the source branch.",
+        "A project or repository it cannot tell is a refusal, never the first configured project. -WhatIf shows the resolved PR and calls nothing."
+      ]
+    },
+    "PublishPR": {
+      "category": "pr",
+      "description": "Publish the card's draft PR: flip it to ready",
+      "usage": "{cliPrefix}PublishPR [[-Card] <card|id>] [-WhatIf] [-Help]",
+      "examples": [
+        "{cliPrefix}PublishPR 119 -WhatIf",
+        "{cliPrefix}PublishPR 119"
+      ],
+      "switches": {
+        "-Card <card|id>": "The card: a path, a filename or its id. Default: the card for this branch",
+        "-WhatIf": "Print the exact PATCH; send nothing, write nothing",
+        "-Help": "This"
+      },
+      "notes": [
+        "Stage 2 of the ship flow: reads the card's PR URL: line, confirms the pull request is an active draft, and PATCHes it with isDraft false -- the token is az's, as NewPR's is.",
+        "Writes one line under the PR URL: line, PR published: <url>, once. Not a dated stamp, and not state.",
+        "Azure DevOps only: a GitHub pull request is published with gh pr ready <url>. No PR URL: line, a pull request that is not active, or one already ready is a refusal that writes nothing."
+      ]
+    },
+    "NewPrompt": {
+      "category": "work",
+      "description": "Create a prompt file from an ADO work item",
+      "descriptionWithoutAdo": "Make a card: -Title names it, -Type its kind",
+      "usage": "{cliPrefix}NewPrompt <WorkItemId> | -Title <text> [-Type <name>] [-Id <id>] [-Date <date>] [-AssignTo <email>] [-ReadOnly] [-Force] [-OutputFolder <name>] [-Cover <image>] [-Before <image>] [-Design <name|id>] [-Help]",
+      "examples": [
+        "{cliPrefix}NewPrompt 12345",
+        "{cliPrefix}NewPrompt -Title \"Timeout on large files\" -Type Bug",
+        "{cliPrefix}NewPrompt -Title \"Wallet ticket from a QR code\" -Type Spike   # a card with no work item gets a short id: Spike-K7M2-...",
+        "{cliPrefix}NewPrompt -Title \"Import flow\" -Type UserStory -Id 144",
+        "{cliPrefix}NewPrompt -Title \"Sprint review with the client\" -Type Meeting -Date 2026-09-21",
+        "{cliPrefix}NewPrompt -Title \"Tags overlap in search\" -Type Bug -Before ./snap.png   # born with the picture of what is wrong",
+        "{cliPrefix}NewPrompt -Title \"Lanes, part one\" -Design board-ideas   # bound to the design it is worked against"
+      ],
+      "notes": [
+        "Offline: -Title makes the same card with no ADO (Tier 2); it gets a short id of its own. -Type picks the kind of thing it is.",
+        "-Date YYYY-MM-DD sets **Created:** to the day the work was -- a meeting attended yesterday -- so Daily lands the card on that day.",
+        "-Cover / -Before <image> attach a picture as the card is made, through the same code as Cover. The picture is checked first, so a refused one writes no card.",
+        "-Design <name|id> binds the card to the design it is worked against: one header line, > Design: [<title>](<link>) <id>, under its Template line -- the design's own title and id, a link relative to the card for a hub design or its GitHub page for a repo design. Resolved against the hub's design/ and spec/ (and their archives), and the repository you stand in when it is this Space's; a file name, its stem, or an id prefix of four or more. A name that resolves to nothing, or to two, writes no card."
+      ]
+    },
+    "NewItem": {
+      "category": "work",
+      "description": "Create a work item -- an issue, on a GitHub space",
+      "usage": "{cliPrefix}NewItem -Title <text> [-Type UserStory|Task|Bug|Feature] [-Description <text>] [-Project <name>] [-Parent <id>] [-Sprint <name>] [-AssignTo <email>] [-Priority <1-4>] [-Points <n>] [-AcceptanceCriteria <text>] [-ReproSteps <text>] [-Tags <a;b>] [-FromDesign <note>] [-FromCard <id>] [-ReadOnly] [-WhatIf] [-Help]",
+      "examples": [
+        "{cliPrefix}NewItem 'Fix login bug' -Type Bug",
+        "{cliPrefix}NewItem -FromCard K7M2 -WhatIf   # the issue it would file, in full; nothing is created or written"
+      ],
+      "notes": [
+        "-Type UserStory, Task, Bug or Feature; the rest of the fields are switches.",
+        "On a GitHub space the same verb creates an issue: Bug/Feature fold to labels, -Tags become labels (sev1..3 land here), -Sprint is the milestone, AC and repro steps join the body; -Parent <n> makes the new issue a sub-issue of #n (a '- [ ] #<new>' line in #n's body where GitHub refuses the sub-issue, and the output says which); -Priority and -Points are refused by name.",
+        "-FromDesign <note> promotes a hub design note (the Studio): the issue's title and body are the note's, it is labelled design, and its URL is written back into the note as its > GitHub: line. GitHub Spaces only; a note that names another Space is refused until you switch to it.",
+        "-FromCard <id> publishes a card made with no tracker: the issue's title is the card's name, its body the card's Summary ending with the line 'Toolkit card: <id>', a Bug or Feature card folds to its label, and the issue's URL is written into the card's **ADO Link:** line -- the card is linked from then on and keeps its id. GitHub Spaces only; a card already linked is refused, and so is a Space with no tracker.",
+        "-WhatIf is the same dry run as -ReadOnly: what would be filed, and nothing created or written."
+      ]
+    },
+    "NewDesign": {
+      "category": "studio",
+      "description": "Scaffold a design note in the hub",
+      "usage": "{cliPrefix}NewDesign -Title <text> [-Description <text>] [-Space <slug>] [-Help]",
+      "examples": [
+        "{cliPrefix}NewDesign -Title \"Board ideas\" -Description \"What the board could show next\"",
+        "{cliPrefix}NewDesign -Title \"Spike: offline specs\" -Space toolkit"
+      ],
+      "notes": [
+        "Writes design/<slug>.md in the hub from templates/DesignNote.template.md: a frontmatter id (a fresh UUID) and description, the title, the template's headings and a Created stamp. Never overwrites.",
+        "-Space names the Space the note is for (one that is declared); NewItem -FromDesign then files its thread there. A note may name none: the hub's design/ holds what belongs to no product yet.",
+        "Promote a note with NewItem -FromDesign <name>: an issue labelled design, its URL written back as the note's > GitHub: line."
+      ]
+    },
+    "StampDesign": {
+      "category": "studio",
+      "description": "Give every design note and spec an id",
+      "usage": "{cliPrefix}StampDesign [-Hub] [-WhatIf] [-Help]",
+      "examples": [
+        "{cliPrefix}StampDesign -WhatIf",
+        "{cliPrefix}StampDesign",
+        "{cliPrefix}StampDesign -Hub"
+      ],
+      "notes": [
+        "Walks design/, design/archive/, spec/ and spec/archive/ and adds an id: <uuid> line to the frontmatter of every markdown file that has none, creating the frontmatter block when there is none. README.md is not a design and is skipped.",
+        "A spec gets the SAME id as the note whose file stem it shares (design/<stem>.md and spec/<stem>.spec.md). An id that is already there is never changed, a file that needs nothing is not written, and a second run writes nothing. Each file keeps its own line endings.",
+        "By default it works on the git root of the current directory, printed on the first line, which must hold design/. -Hub works on the hub's design/ and spec/ instead (and a Space folder's own). -WhatIf names every file it would stamp and writes none.",
+        "It stamps files; it does not commit them. Nothing is stamped until the owner runs it."
+      ]
+    },
+    "MoveDesign": {
+      "category": "studio",
+      "description": "Move a design to a spec, the archive, or complete",
+      "usage": "{cliPrefix}MoveDesign <name|id> -To Spec|Archive|Complete [-Dropped] [-Reason <text>] [-Doc <path>] [-Hub] [-Space <slug>] [-WhatIf] [-Help]",
+      "examples": [
+        "{cliPrefix}MoveDesign board-ideas -To Spec",
+        "{cliPrefix}MoveDesign a-second-room -To Archive -Dropped -Reason \"The Lounge already does this.\"",
+        "{cliPrefix}MoveDesign ee925272 -To Complete -Doc docs/hub/design.md",
+        "{cliPrefix}MoveDesign board-ideas -To Archive -Hub -WhatIf"
+      ],
+      "notes": [
+        "The design lifecycle's one verb. A design is one id, a note and at most one spec, named by a file name, the stem both share, or any unique prefix of its id (four characters or more). Its state is read from where the files are, and the verb refuses by that rule.",
+        "-To Spec scaffolds spec/<stem>.spec.md from templates/Spec.template.md with the note's id, description and thread; the note stays in design/. Refused for a spec standing alone, a design that already has its spec, or an archived note.",
+        "-To Archive moves the note to design/archive/ and stamps **Closed:** and **Outcome:** shipped -- or dropped with -Dropped, which needs -Reason. Refused while the spec is live (-To Complete archives both), or when the archive already has a file of that name.",
+        "-To Complete moves the spec to spec/archive/ and the note to design/archive/ in one go, stamps **Closed:** on both and writes > Docs: <path> into the spec. -Doc is the gate: a path that exists in the same tree. Refused for anything that is not a Spec.",
+        "Every move appends one dated, self-contained line to the note's ## Journey: the date, the repository, every path in full -- the note's own path after the move included. -Reason is appended to any move's line.",
+        "Where: the git root of the current directory, named on the first line, which must hold design/ -- there it STAGES (git mv, git add) and never commits, printing the commit line it suggests. -Hub works on the hub's folders instead, -Hub -Space <slug> on that Space's own, and follows storeSync the way Archive does. It never overwrites; -WhatIf prints every move and stamp and writes nothing."
+      ]
+    },
+    "NewSpace": {
+      "category": "studio",
+      "description": "Add a Space: a repo, an ADO org, or your own cards",
+      "usage": "{cliPrefix}NewSpace [<slug>] [-Repo <owner/name>] [-Address <url>] [-Name <text>] [-Discover] [-Owner <owner>] [-AsJson] [-WhatIf] [-Help]",
+      "examples": [
+        "{cliPrefix}NewSpace -Repo you/juggling-engine",
+        "{cliPrefix}NewSpace acme -Address https://dev.azure.com/acme",
+        "{cliPrefix}NewSpace notes",
+        "{cliPrefix}NewSpace -Discover",
+        "{cliPrefix}NewSpace -Discover -Owner collaborator",
+        "{cliPrefix}NewSpace -Discover -Repo someone/their-project"
+      ],
+      "notes": [
+        "-Repo owner/name is a GitHub Space, status active: the slug is the repository's name lowercased, the name is it title-cased with dashes as spaces (-Name and <slug> change either). <slug> -Address <url> is an Azure DevOps organisation, status active; its projects are the next step, Connect <slug> -Discover. A slug alone is your own cards, no tracker, status local.",
+        "Every key is written through Config (hub.json), and the cards folder <slug>/current and archive is made. A folder that is already there is adopted, never touched, and its cards are counted. It does not switch: the last line is the SwitchSpace that does.",
+        "With gh signed in it checks the repository and says PUBLIC or PRIVATE, or that it is not visible to this login; without gh it adds the Space anyway and says the repository was not checked. -Discover lists your repositories, marks the ones already Spaces, and prints the line that adds each; -Owner <org> lists an organisation's, -Owner collaborator the ones shared with you, and a repository you can read but not write is marked READ-ONLY (it can still be added). A list is read to 1000 repositories and says when there are more. -Discover -Repo owner/name reads one repository before it is added. -WhatIf prints every key and the folder, and writes nothing."
+      ]
+    },
+    "RetireSpace": {
+      "category": "studio",
+      "description": "Retire a Space: archived, its cards kept",
+      "usage": "{cliPrefix}RetireSpace <slug> [-WhatIf] [-Help]",
+      "examples": [
+        "{cliPrefix}RetireSpace acme",
+        "{cliPrefix}RetireSpace acme -WhatIf"
+      ],
+      "notes": [
+        "The engagement is over, keep the record: the Space stays declared with status archive. Its cards stay where they are and stay readable, Daily and reviews still count them, and nothing asks its tracker again.",
+        "Written through Config (Config -Set spaces.<slug>.status=archive -Hub), and a status this machine overrides in config.local.json is unset with it. The output names the line that brings the Space back. -WhatIf prints the keys and the folder, and writes nothing.",
+        "To un-declare a Space instead -- it should never have been one -- RemoveSpace."
+      ]
+    },
+    "RemoveSpace": {
+      "category": "studio",
+      "description": "Remove a Space; its folder and cards stay",
+      "usage": "{cliPrefix}RemoveSpace <slug> [-Force] [-WhatIf] [-Help]",
+      "examples": [
+        "{cliPrefix}RemoveSpace side-notes -WhatIf",
+        "{cliPrefix}RemoveSpace side-notes",
+        "{cliPrefix}RemoveSpace old-work -Force"
+      ],
+      "notes": [
+        "Un-declares the Space: its entry leaves hub.json and this machine's patch for it leaves config.local.json, through Config (Config -Unset spaces.<slug> -Hub).",
+        "Removing never deletes a card. The folder stays in the hub exactly as it is; the output says where and how many cards it holds, and names the NewSpace line that brings them back. Deleting the folder is yours to do, on purpose.",
+        "Refused: the Space you are in (switch first), a Space config.default.json ships (hide or retire it), a slug that is not declared. A Space with cards in current/ asks first, naming the count; a caller that cannot answer needs -Force. -WhatIf prints the keys that would go and the folder that would stay."
+      ]
+    },
+    "AddPRReview": {
+      "bridgeTimeoutSeconds": 300,
+      "category": "work",
+      "description": "Post an AI code review to a PR",
+      "usage": "{cliPrefix}AddPRReview <PrId> [-Repository <r>] [-Project <p>] [-Model <m>] [-DryRun] [-Help]",
+      "examples": [
+        "{cliPrefix}AddPRReview 34",
+        "{cliPrefix}AddPRReview 34 -DryRun"
+      ],
+      "notes": [
+        "Needs ANTHROPIC_API_KEY. Run it from the repository the PR belongs to: the diff is computed locally."
+      ]
+    },
+    "CloseItem": {
+      "category": "work",
+      "description": "Close or resolve an ADO work item",
+      "usage": "{cliPrefix}CloseItem <Id> -Comment <text> [-Reason Fixed|AsDesigned|CannotReproduce|Duplicate|WontFix|Deferred] [-WhatIf] [-Help]",
+      "examples": [
+        "{cliPrefix}CloseItem 12345 -Comment \"Shipped.\"",
+        "{cliPrefix}CloseItem 232271 -Comment \"No repro on iOS 18 / VoiceOver.\" -Reason CannotReproduce"
+      ],
+      "notes": [
+        "Bug goes to Resolved; Story, Task and Feature go to Closed. -Reason passes through to ADO unvalidated; -WhatIf prints the transition without calling it."
+      ]
+    },
+    "EditItem": {
+      "category": "work",
+      "description": "Change what a work item says or wears",
+      "usage": "{cliPrefix}EditItem <id> [-Title <text>] [-Description <text>] [-Sprint <name>] [-AssignTo <who>] [-AddTag <a;b>] [-RemoveTag <a;b>] [-Pin] [-Unpin] [-WhatIf] [-Help]",
+      "examples": [
+        "{cliPrefix}EditItem 67 -AddTag sev2 -Sprint 'Milestone P'",
+        "{cliPrefix}EditItem 100 -Pin -WhatIf"
+      ],
+      "switches": {
+        "-Title <text>": "The new title",
+        "-Description <text>": "The new description -- the issue's body on a GitHub Space; replaces it whole",
+        "-Sprint <name>": "The sprint (iteration) on ADO; the milestone on a GitHub Space",
+        "-AssignTo <who>": "An assignee: an address on ADO, a login or @me on GitHub",
+        "-AddTag <a;b>": "Tags to add -- labels on a GitHub Space; merged, never replacing the ones already there",
+        "-RemoveTag <a;b>": "Tags (labels) to remove",
+        "-Pin": "Pin the issue on GitHub -- the tracker's own pin, so it sorts first on the Issues tab on every machine. GitHub pins three per repository. A GitHub Space only; refused on ADO, where a work item has no pin",
+        "-Unpin": "Unpin it -- the same seam, the other way; a closed issue that is still pinned can be unpinned",
+        "-WhatIf": "Print the exact edit, the pin included, and change nothing",
+        "-Help": "This"
+      },
+      "notes": [
+        "On a GitHub space the words translate: tags are labels (sev1..3 live here), -Sprint is the milestone, -Description is the body, -AssignTo a login or @me.",
+        "On ADO, tags merge read-modify-write -- the tags someone else set survive. -WhatIf prints the exact edit and changes nothing.",
+        "A fourth pin is refused by GitHub, and the verb says so: GitHub pins three issues per repository; unpin one first."
+      ]
+    },
+    "Dashboard": {
+      "category": "work",
+      "description": "Morning view: PRs, work items, pipelines",
+      "usage": "{cliPrefix}Dashboard [-Help]",
+      "examples": [
+        "{cliPrefix}Dashboard"
+      ],
+      "notes": [
+        "Across every configured project: your PRs, assigned work items with staleness, recent pipeline runs."
+      ]
+    },
+    "Web": {
+      "category": "org",
+      "description": "Start, stop or check the web UI",
+      "usage": "{cliPrefix}Web [-Dev] [-Fixture] [-Modules <on|off>] [-Stop] [-Restart] [-Status] [-NoBrowser] [-Help]",
+      "examples": [
+        "{cliPrefix}Web -Dev",
+        "{cliPrefix}Web -Dev -Fixture -Modules on",
+        "{cliPrefix}Web -Status",
+        "{cliPrefix}Web -Stop"
+      ],
+      "switches": {
+        "(none)": "Start the production build -- docker compose up --build in web/, with the agent alongside it",
+        "-Dev": "Start Vite on the host ({cliPrefix}Web -Dev) plus the agent, with hot reload and no Docker",
+        "-Fixture": "With -Dev: restart the agent against Tests/fixtures/hub as a test run -- no webhook, no .env, Space 'test' -- through its environment, so config.local.json is never written. What npm run smoke drives",
+        "-Modules <on|off>": "With -Fixture: 'on' starts the agent with growth and communication on (smoke --modules=on); 'off', the default, with no flag set",
+        "-Restart": "Stop both halves, then start again -- production unless -Dev is given too",
+        "-Stop": "Stop the web server, any dev server left on its port, AND the agent",
+        "-Status": "What is up and on which port -- the dev server, the container, and the agent",
+        "-NoBrowser": "Do not open the URL. It is opened only for an interactive session anyway",
+        "-Help": "This"
+      },
+      "notes": [
+        "URLs:  production http://localhost:{devPort}   dev http://localhost:{devPort} (Vite HMR)   health http://localhost:{agentPort}/api/health",
+        "Vite takes the next free port if {devPort} is busy, so -Status reads the real URL out of web.log.",
+        "-Stop and -Restart handle the agent too. Use {cliPrefix}Agent when you want the API without the UI.",
+        "After a -Fixture run, {cliPrefix}Web -Dev puts the agent back on your own hub: it sees the fixture hub and restarts."
+      ]
+    },
+    "Agent": {
+      "category": "org",
+      "description": "Start, stop or check the agent",
+      "usage": "{cliPrefix}Agent [-Dev] [-Stop] [-Status] [-Port <n>] [-Help]",
+      "examples": [
+        "{cliPrefix}Agent",
+        "{cliPrefix}Agent -Status",
+        "{cliPrefix}Agent -Dev"
+      ],
+      "switches": {
+        "(none)": "Start the agent on web.agentPort ({agentPort} as configured)",
+        "-Dev": "Start with auto-reload -- uvicorn --reload, for editing the agent itself",
+        "-Stop": "Stop the agent this command started",
+        "-Status": "Is it running, is it healthy, and which hub it serves -- plus any listener that is not ours",
+        "-Port <n>": "Override the configured port for one run",
+        "-Help": "This"
+      },
+      "notes": [
+        "URLs:  health http://localhost:{agentPort}/api/health   env http://localhost:{agentPort}/api/env",
+        "{cliPrefix}Web starts and stops this for you; reach for {cliPrefix}Agent when you want the API without the UI.",
+        "It refuses to start beside a listener that is not this package's agent, and names what is there.",
+        "It binds web.agentPort: the web UI's read layer, and the bridge back into this CLI (POST /api/cmd/{name})."
+      ]
+    },
+    "MyPRs": {
+      "category": "work",
+      "description": "List your active pull requests",
+      "usage": "{cliPrefix}MyPRs [-CreatorOnly] [-Help]",
+      "examples": [
+        "{cliPrefix}MyPRs"
+      ]
+    }
+  },
+  "workItemTypes": {
+    "_comment": "Naming conventions per work-item type. filePrefix goes in front of the id in the prompt filename; branchSeparator joins the id to the slug in the suggested branch. These are house style, not rules -- the shipped values match a ~180-file corpus (96 bare bugs, 38 Task, 25 US-, and 22 three-segment story branches). Override per team in config.local.json.",
+    "User Story": {
+      "filePrefix": "US-",
+      "template": "UserStory.template.md",
+      "branchSeparator": "/"
+    },
+    "Task": {
+      "filePrefix": "Task",
+      "template": "Task.template.md",
+      "branchSeparator": "-"
+    },
+    "Feature": {
+      "filePrefix": "Feat-",
+      "template": "Feature.template.md",
+      "branchSeparator": "-"
+    },
+    "Bug": {
+      "filePrefix": "",
+      "template": "Bug.template.md",
+      "branchSeparator": "-"
+    },
+    "Spike": {
+      "filePrefix": "Spike-",
+      "template": "Spike.template.md",
+      "branchSeparator": "-"
+    },
+    "Meeting": {
+      "filePrefix": "Meeting-",
+      "template": "Meeting.template.md",
+      "branchSeparator": "-"
+    }
+  }
+}

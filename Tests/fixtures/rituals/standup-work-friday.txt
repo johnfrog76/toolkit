@@ -1,0 +1,10 @@
+Standup -- Friday 2 October 2026
+"Can we not adjust scope."
+
+Waiting on you to walk #416, Verify the Studio tab draws on the PC. Also to walk one in Phase 6: #417, Verify the clock fix on Windows. Also to walk #421, Verify the clock on Windows.
+
+Fable: Yesterday I closed two in Design lifecycle (#411, #412). I also closed #413, Rename the slug. Today I'm on two in Team Agile (#414, #415). I'm also on two more: #999 and Design lifecycle L3. Blocked on #416, Verify the Studio tab draws on the PC.
+Opus: Yesterday I closed three in Team Agile (#401, #402, #403). I also closed one in the Studio: #404, Count the foyer rows. Today I'm on two in Team Agile (#405, #406). Nothing blocked.
+Sonnet: "Nothing on the board for me. All green, no blockers."
+
+"Let's circle back."

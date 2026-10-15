@@ -1,0 +1,55 @@
+name: Something is broken
+description: A command, a page or a route does something other than what its documentation says.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time. A report that says what you ran and what you saw can usually be worked the same day.
+        If it is a security problem, please do not file it here: [SECURITY.md](https://github.com/johnfrog76/toolkit/blob/main/SECURITY.md) says how to report it privately.
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: What the documentation, or the command's own help, led you to expect.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead
+      description: Paste the output as text, including any `Error:` and `Hint:` lines.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The commands you ran or the pages you opened, in order, starting from a fresh shell.
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: dropdown
+    id: half
+    attributes:
+      label: Which part
+      description: The Toolkit has three halves. Pick the one where you saw the problem.
+      options:
+        - The command line (the PowerShell verbs)
+        - The agent (the local service)
+        - The web UI
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Your environment
+      description: The output of the `Env` verb (`tkEnv` with the default prefix), with anything private removed, or your operating system, PowerShell edition and version, Node and Python versions.
+      render: text
+    validations:
+      required: false

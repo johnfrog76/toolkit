@@ -1,0 +1,29 @@
+{
+  "_comment": "The engineer's half. Exercises every rule at once: a shipped slug deep-merged, a new slug appended, an unusable entry skipped, an org-scoped flag honoured, an engineer flag ignored, a machine key ignored, one folder renamed, and storeSync declared -- the shipped config says 'none' and the machine's half says nothing, so 'git' here is the hub's word and is what both loaders must resolve.",
+  "hub": 1,
+  "activeOrg": "acme",
+  "storeSync": "git",
+  "orgs": [
+    {
+      "slug": "test",
+      "name": "Contoso",
+      "org": "https://dev.azure.com/EXAMPLE-HUB-ORG",
+      "promptsFolder": "test",
+      "features": { "sprintAwareness": true, "growth": true }
+    },
+    {
+      "slug": "acme",
+      "name": "Acme",
+      "status": "active",
+      "orgType": "engagement",
+      "org": "https://dev.azure.com/EXAMPLE-HUB-ORG",
+      "tenant": "",
+      "promptsFolder": "acme",
+      "projects": [
+        { "name": "Widgets", "repo": "widgets", "defaultBranch": "main" }
+      ]
+    },
+    { "name": "No slug, so no way to key it", "promptsFolder": "nowhere" }
+  ],
+  "folders": { "growth": "development" }
+}

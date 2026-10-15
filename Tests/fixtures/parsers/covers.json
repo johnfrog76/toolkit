@@ -1,0 +1,123 @@
+{
+  "_": "ONE table, read by both readers of a card's pictures: Scripts/Add-CardImage.ps1 Resolve-P20CardImage (tkTestToolkit -Cover) and agent/core/assets.py card_image() (Tests/test_assets.py). Each row is built as a scratch Space -- the card at <folder>/<cardName>, written LF or CRLF, and every path in files created under the Space's root -- and both readers are asked for cover and before. expected is '<card key>/<file>' inside the Space's assets/, or null for 'no picture'. The rule (docs/hub/cards.md, \"A card's pictures\"): the line is the truth, and it is served only when it resolves INSIDE the Space's assets/, exactly one folder deep, is an image type (consts.json assets.coverExtensions), and the file is there. If the two halves ever disagree about a row, one of them is wrong.",
+  "cardName": "Spike-K7M2-can-we-import-a-recipe-from-a-photo.prompt.md",
+  "rows": [
+    {
+      "name": "a normal cover",
+      "folder": "current",
+      "crlf": false,
+      "footer": ["**Cover:** ../assets/Spike-K7M2/cover.png"],
+      "files": ["assets/Spike-K7M2/cover.png"],
+      "cover": "Spike-K7M2/cover.png",
+      "before": null
+    },
+    {
+      "name": "a before and a cover, side by side",
+      "folder": "current",
+      "crlf": false,
+      "footer": ["**Before:** ../assets/Spike-K7M2/before.jpg", "**Cover:** ../assets/Spike-K7M2/cover.webp"],
+      "files": ["assets/Spike-K7M2/before.jpg", "assets/Spike-K7M2/cover.webp"],
+      "cover": "Spike-K7M2/cover.webp",
+      "before": "Spike-K7M2/before.jpg"
+    },
+    {
+      "name": "a line whose file is missing reads as no cover",
+      "folder": "current",
+      "crlf": false,
+      "footer": ["**Cover:** ../assets/Spike-K7M2/cover.png"],
+      "files": [],
+      "cover": null,
+      "before": null
+    },
+    {
+      "name": "a path that climbs out of assets/ through ..",
+      "folder": "current",
+      "crlf": false,
+      "footer": ["**Cover:** ../assets/../current/shot.png"],
+      "files": ["current/shot.png"],
+      "cover": null,
+      "before": null
+    },
+    {
+      "name": "a path that climbs out of the Space altogether",
+      "folder": "current",
+      "crlf": false,
+      "footer": ["**Cover:** ../assets/Spike-K7M2/../../../outside.png"],
+      "files": ["../outside.png"],
+      "cover": null,
+      "before": null
+    },
+    {
+      "name": "an absolute path is not a card's picture",
+      "folder": "current",
+      "crlf": false,
+      "footer": ["**Cover:** /etc/cover.png"],
+      "files": [],
+      "cover": null,
+      "before": null
+    },
+    {
+      "name": "a CRLF card reads the same",
+      "folder": "current",
+      "crlf": true,
+      "footer": ["**Before:** ../assets/Spike-K7M2/before.png", "**Cover:** ../assets/Spike-K7M2/cover.png"],
+      "files": ["assets/Spike-K7M2/before.png", "assets/Spike-K7M2/cover.png"],
+      "cover": "Spike-K7M2/cover.png",
+      "before": "Spike-K7M2/before.png"
+    },
+    {
+      "name": "a card with no line has no picture",
+      "folder": "current",
+      "crlf": false,
+      "footer": [],
+      "files": ["assets/Spike-K7M2/cover.png"],
+      "cover": null,
+      "before": null
+    },
+    {
+      "name": "an archived card reads its picture from the same assets/",
+      "folder": "archive",
+      "crlf": false,
+      "footer": ["**Cover:** ../assets/Spike-K7M2/cover-r2.png"],
+      "files": ["assets/Spike-K7M2/cover-r2.png"],
+      "cover": "Spike-K7M2/cover-r2.png",
+      "before": null
+    },
+    {
+      "name": "a file that is not an image type is not a cover",
+      "folder": "current",
+      "crlf": false,
+      "footer": ["**Cover:** ../assets/Spike-K7M2/add_prize_drawer.html"],
+      "files": ["assets/Spike-K7M2/add_prize_drawer.html"],
+      "cover": null,
+      "before": null
+    },
+    {
+      "name": "the extension is read ignoring case",
+      "folder": "current",
+      "crlf": false,
+      "footer": ["**Cover:** ../assets/Spike-K7M2/cover.PNG"],
+      "files": ["assets/Spike-K7M2/cover.PNG"],
+      "cover": "Spike-K7M2/cover.PNG",
+      "before": null
+    },
+    {
+      "name": "a picture straight in assets/, with no card key folder, is not served",
+      "folder": "current",
+      "crlf": false,
+      "footer": ["**Cover:** ../assets/cover.png"],
+      "files": ["assets/cover.png"],
+      "cover": null,
+      "before": null
+    },
+    {
+      "name": "a picture two folders deep is not served",
+      "folder": "current",
+      "crlf": false,
+      "footer": ["**Cover:** ../assets/Spike-K7M2/old/cover.png"],
+      "files": ["assets/Spike-K7M2/old/cover.png"],
+      "cover": null,
+      "before": null
+    }
+  ]
+}

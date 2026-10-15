@@ -1,0 +1,13 @@
+{
+  "_": "ONE table for what NewSpace proposes from a repository's name (#165): the slug (lowercased, every run of anything but a-z and 0-9 one dash, trimmed of dashes) and the display name (dashes, underscores and dots as spaces, each word's first letter capitalised, the rest kept). valid is whether the proposed slug is a slug (^[a-z][a-z0-9-]*$) -- when it is not, the verb refuses and asks for one. Read by the verb's suite (tkTestToolkit -NewSpace, through NewSpace -Repo ... -WhatIf -AsJson, and through NewSpace -Discover -Repo ... -AsJson, the row the dialog's Add owner/name reads -- the same slug and name for every row there, valid or not) and by the web's mirror (web/src/modules/studio/newSpace.test.ts). If they disagree about a row, one of them is wrong. No row names this repository or a Space of a fixture hub: the public export renames toolkit to toolkit, and a proposal for a slug a Space already has is a refusal, not a proposal (#422).",
+  "rows": [
+    { "repo": "juggling-engine", "slug": "juggling-engine", "name": "Juggling Engine", "valid": true },
+    { "repo": "Notes_App", "slug": "notes-app", "name": "Notes App", "valid": true },
+    { "repo": "BowlingApp", "slug": "bowlingapp", "name": "BowlingApp", "valid": true },
+    { "repo": "recipe.box", "slug": "recipe-box", "name": "Recipe Box", "valid": true },
+    { "repo": "sample-app", "slug": "sample-app", "name": "Sample App", "valid": true },
+    { "repo": "my--odd__repo", "slug": "my-odd-repo", "name": "My Odd Repo", "valid": true },
+    { "repo": "-edge-", "slug": "edge", "name": "Edge", "valid": true },
+    { "repo": "2048-game", "slug": "2048-game", "name": "2048 Game", "valid": false }
+  ]
+}

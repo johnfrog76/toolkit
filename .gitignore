@@ -1,0 +1,50 @@
+# Machine-specific config
+config.local.json
+# ...except the parity fixture, which is a test input, not a machine's config
+!Tests/fixtures/**/config.local.json
+config.local.backup.json
+
+# Machine-specific logs and test artifacts
+*.log
+**/*.log
+**/*.pid
+test-summary.*.json
+test-results.*
+
+# Secrets
+.env
+secrets/
+
+# OS junk
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Scratch
+*.tmp
+*~
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Vendor agent adapters -- GENERATED from AGENTS.md, never committed.
+# AGENTS.md is the source and is vendor-neutral. These directories are each
+# assistant's own discovery convention, so committing one would put this tool's
+# knowledge in a vendor-shaped box and pick a winner. Scripts/Update-AgentDocs.ps1
+# writes whichever the machine actually needs.
+.claude/
+.github/copilot-instructions.md
+.cursor/
+.cursorrules
+.windsurfrules
+
+# Web UI build artefacts
+web/node_modules/
+web/dist/
+# Screenshots from `npm run smoke -- --shots=...`. Evidence for a gate, kept on
+# the machine that ran it -- never committed. web/README.md says why.
+web/shots/
+
+# Agent virtualenv
+agent/.venv/

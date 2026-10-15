@@ -1,0 +1,40 @@
+{
+  "_": "The standup's vocabulary (D-TA13, D-TA14, D-SA2, D-SA5, D-SA11): five families kept apart. phrasebook carries no nouns and is what the chair says; nothing is what the REAL register's worker with nothing on the board says -- a status, first person, that claims no work; excuses are plainly fiction and belong to the NONSENSE register beside fakeWork -- the real register never reads them, and a test says so; fakeWork is plausible and is the NONSENSE register's only -- the real register never reads it either; verbs carry no nouns and are the standup register's words, offered to the model that dresses a worker's sentences -- the only family it is shown. phrasebook and nothing are picked deterministically: index = (day of year + position) mod length.",
+  "phrasebook": [
+    "All green.",
+    "No blockers on my side.",
+    "Let's take that offline.",
+    "Can we not adjust scope.",
+    "Let's circle back.",
+    "Quick one from me.",
+    "Nothing to report.",
+    "Parking that."
+  ],
+  "nothing": [
+    "Nothing on the board for me. All green, no blockers."
+  ],
+  "excuses": [
+    "My cat deleted my dev branch.",
+    "The dog ate the sprint.",
+    "I was waiting on the key vault to call back.",
+    "The submodules took the day off.",
+    "I had a meeting about the meeting.",
+    "The pipeline wanted to talk about its feelings."
+  ],
+  "fakeWork": [
+    "Synced the submodules.",
+    "Smoke-tested the edge cases.",
+    "Whispered secrets to the key vault.",
+    "Straightened permissions.",
+    "Fired up DataDog.",
+    "Ran CRUD trials."
+  ],
+  "verbs": [
+    "wired up",
+    "plumbing for",
+    "smashed",
+    "landed",
+    "chased",
+    "unblocked"
+  ]
+}

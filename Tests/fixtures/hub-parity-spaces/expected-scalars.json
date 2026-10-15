@@ -1,0 +1,5 @@
+{
+  "_comment": "The scalar half of the parity expectation, beside expected-orgs.json. Kept separate because the org list is a list of orgs and widening it to carry a hub-wide value would say something untrue about the shape. Resolution here: config.default.json says 'none', hub/hub.json says 'git', config.local.json says nothing -- so the hub's word stands.",
+  "storeSync": "git",
+  "growthFolder": "development"
+}

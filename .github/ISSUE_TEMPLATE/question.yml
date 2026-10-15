@@ -1,0 +1,22 @@
+name: A question
+description: Ask how something works, or whether the Toolkit can do something.
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before you ask, the [quick start](https://github.com/johnfrog76/toolkit/blob/main/docs/QUICKSTART.md) and the [command reference](https://github.com/johnfrog76/toolkit/blob/main/docs/CLI.md) answer most first questions, and every command prints its own help with `-Help`.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What you are trying to do, and what you have tried so far.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else we should know
+      description: Your operating system, and whether you use the command line, the web UI or both.
+    validations:
+      required: false

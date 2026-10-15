@@ -1,0 +1,117 @@
+{
+  "_": "The standup's slot rule, as a table (docs/modules/solitaire-agile.md, \"The file shape, and how a standup is read\"). Both halves -- tkTestToolkit -Rituals and Tests/test_rituals.py -- feed each case's labels and issues to their fill and assert the expected slots by issue number, the computed `since`, the vocabulary indices, and the rendered text against standup-<name>.txt in this folder, byte for byte (LF). Times carry offsets on purpose so the comparison is the same on every machine. Issues are the fields `gh issue list --json number,title,state,labels,closedAt,url` returns; labels are `gh label list --json name,description`.",
+  "workerLabels": [
+    { "name": "fable",  "description": "Routed to Fable -- the deep or risky work" },
+    { "name": "opus",   "description": "Routed to Opus -- the crash-through volume" },
+    { "name": "sonnet", "description": "Routed to Sonnet -- well-scoped, pattern-following work" },
+    { "name": "verify-close", "description": "Believed shipped -- verify it landed, settle the books, close through the verb" },
+    { "name": "bug", "description": "Something isn't working" }
+  ],
+  "cases": [
+    {
+      "name": "friday",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "tracker": { "ok": true, "reason": "" },
+      "labels": "workerLabels",
+      "issues": [
+        { "number": 101, "title": "Build the foyer counts — Chloé’s “Ïle” row", "state": "OPEN", "labels": ["opus"], "closedAt": null, "url": "https://github.com/johnfrog76/toolkit/issues/101" },
+        { "number": 102, "title": "Rename the slug", "state": "CLOSED", "labels": ["opus"], "closedAt": "2026-10-01T19:00:00Z", "url": "https://github.com/johnfrog76/toolkit/issues/102" },
+        { "number": 103, "title": "Seed the GitHub demo", "state": "CLOSED", "labels": ["opus"], "closedAt": "2026-09-29T12:00:00Z", "url": "https://github.com/johnfrog76/toolkit/issues/103" },
+        { "number": 104, "title": "Verify the Studio tab draws on the PC", "state": "OPEN", "labels": ["fable", "verify-close"], "closedAt": null, "url": "https://github.com/johnfrog76/toolkit/issues/104" },
+        { "number": 105, "title": "Verify the clock fix on Windows", "state": "OPEN", "labels": ["verify-close"], "closedAt": null, "url": "https://github.com/johnfrog76/toolkit/issues/105" },
+        { "number": 106, "title": "A bug nobody has routed", "state": "OPEN", "labels": ["bug"], "closedAt": null, "url": "https://github.com/johnfrog76/toolkit/issues/106" },
+        { "number": 107, "title": "Port the cast atoms", "state": "CLOSED", "labels": ["fable"], "closedAt": "2026-10-02T12:30:00Z", "url": "https://github.com/johnfrog76/toolkit/issues/107" }
+      ],
+      "expected": {
+        "since": "2026-10-01T00:00:00-04:00",
+        "dayOfYear": 275,
+        "chair": { "openIndex": 3, "closeIndex": 4 },
+        "queue": { "walk": [104, 105], "decide": [], "look": [] },
+        "workers": [
+          { "label": "fable",  "name": "Fable",  "yesterday": [107], "today": [],    "blockers": [104], "empty": false, "nothingIndex": null },
+          { "label": "opus",   "name": "Opus",   "yesterday": [102], "today": [101], "blockers": [],    "empty": false, "nothingIndex": null },
+          { "label": "sonnet", "name": "Sonnet", "yesterday": [],    "today": [],    "blockers": [],    "empty": true,  "nothingIndex": 0 }
+        ],
+        "text": "standup-friday.txt",
+        "brief": "standup-friday.brief.txt"
+      }
+    },
+    {
+      "name": "monday",
+      "asOf": "2026-10-05T09:00:00-04:00",
+      "tracker": { "ok": true, "reason": "" },
+      "labels": "workerLabels",
+      "issues": [
+        { "number": 201, "title": "Add the registry mock", "state": "CLOSED", "labels": ["sonnet"], "closedAt": "2026-10-02T20:00:00Z", "url": "https://github.com/johnfrog76/toolkit/issues/201" },
+        { "number": 202, "title": "Fix the bell's label", "state": "CLOSED", "labels": ["sonnet"], "closedAt": "2026-10-01T20:00:00Z", "url": "https://github.com/johnfrog76/toolkit/issues/202" }
+      ],
+      "expected": {
+        "since": "2026-10-02T00:00:00-04:00",
+        "dayOfYear": 278,
+        "chair": { "openIndex": 6, "closeIndex": 7 },
+        "queue": { "walk": [], "decide": [], "look": [] },
+        "workers": [
+          { "label": "fable",  "name": "Fable",  "yesterday": [],    "today": [], "blockers": [], "empty": true,  "nothingIndex": 0 },
+          { "label": "opus",   "name": "Opus",   "yesterday": [],    "today": [], "blockers": [], "empty": true,  "nothingIndex": 0 },
+          { "label": "sonnet", "name": "Sonnet", "yesterday": [201], "today": [], "blockers": [], "empty": false, "nothingIndex": null }
+        ],
+        "text": "standup-monday.txt",
+        "brief": "standup-monday.brief.txt"
+      }
+    },
+    {
+      "name": "saturday",
+      "asOf": "2026-10-03T10:00:00-04:00",
+      "tracker": { "ok": true, "reason": "" },
+      "labels": "workerLabels",
+      "issues": [],
+      "expected": {
+        "since": "2026-10-02T00:00:00-04:00",
+        "dayOfYear": 276,
+        "chair": { "openIndex": 4, "closeIndex": 5 },
+        "queue": { "walk": [], "decide": [], "look": [] },
+        "workers": [
+          { "label": "fable",  "name": "Fable",  "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 0 },
+          { "label": "opus",   "name": "Opus",   "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 0 },
+          { "label": "sonnet", "name": "Sonnet", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 0 }
+        ],
+        "text": null,
+        "brief": "standup-saturday.brief.txt"
+      }
+    },
+    {
+      "name": "no-tracker",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "tracker": { "ok": false, "reason": "gh did not answer (TimeoutExpired)" },
+      "labels": [],
+      "issues": [],
+      "expected": {
+        "since": "2026-10-01T00:00:00-04:00",
+        "dayOfYear": 275,
+        "chair": { "openIndex": 3, "closeIndex": 4 },
+        "queue": { "walk": [], "decide": [], "look": [] },
+        "workers": [],
+        "text": "standup-no-tracker.txt",
+        "brief": "standup-no-tracker.brief.txt"
+      }
+    },
+    {
+      "name": "no-worker-labels",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "tracker": { "ok": true, "reason": "" },
+      "labels": [ { "name": "bug", "description": "Something isn't working" } ],
+      "issues": [
+        { "number": 301, "title": "Open and unrouted", "state": "OPEN", "labels": ["bug"], "closedAt": null, "url": "https://github.com/johnfrog76/toolkit/issues/301" }
+      ],
+      "expected": {
+        "since": "2026-10-01T00:00:00-04:00",
+        "dayOfYear": 275,
+        "chair": { "openIndex": 3, "closeIndex": 4 },
+        "queue": { "walk": [], "decide": [], "look": [] },
+        "workers": [],
+        "text": "standup-no-worker-labels.txt",
+        "brief": "standup-no-worker-labels.brief.txt"
+      }
+    }
+  ]
+}

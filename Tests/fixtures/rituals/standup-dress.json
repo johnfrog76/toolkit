@@ -1,0 +1,61 @@
+{
+  "_": "The standup's DRESS, as a table (#140; D-SA11; docs/modules/solitaire-agile.md, \"The agentic layer\"): a model may re-say a worker's prose sentence (#199) in standup language and may never add a fact. The prose is the floor and the fallback; dress_guard / Test-P20StandupDress hold each dressed sentence to its group's facts and answer '' (it stands) or the first of consts.json rituals.dressGuards it fails (the prose stands). Both halves -- tkTestToolkit -Rituals and Tests/test_rituals.py -- assert every row of `rows` (a group, a sentence, the reason), and the `reply` case: the model's answer per id, and the sentences that are said, the floor wherever the guard refused. The model's output is never pinned; the guard is. Three groups: Opus's yesterday in Team Agile (three, one a bug and two features), its yesterday in the Studio (one), and its today in Phase 6 (ten, all bugs). The shapes: a dressed sentence that keeps every fact, with kind counts and with a persona's colour ('20g of protein' -- a number glued to a unit is no number, a lowercase word no name); a fact ADDED (#999, a card-id-shaped word, an invented milestone); a fact DROPPED (a ref, the count, the group's name); a number CHANGED (four for three, Phase 7 for Phase 6); a kind counted wrong or said for a kind the group has none of; blank and two-line answers.",
+  "groups": [
+    {
+      "id": "opus/0", "worker": "Opus", "slot": "yesterday", "first": true,
+      "floor": "Yesterday I closed three in Team Agile (#501, #502, #506).",
+      "name": "Team Agile", "count": 3, "refs": ["#501", "#502", "#506"],
+      "titles": { "#501": "Feature: Team Agile -- wire the stage", "#502": "Port the cast atoms", "#506": "Bug: the stage drops a voice" },
+      "kinds": { "bugs": 1, "features": 2 }
+    },
+    {
+      "id": "opus/1", "worker": "Opus", "slot": "yesterday", "first": false,
+      "floor": "I also closed one in the Studio: #503, Count the foyer rows.",
+      "name": "the Studio", "count": 1, "refs": ["#503"],
+      "titles": { "#503": "Count the foyer rows" },
+      "kinds": {}
+    },
+    {
+      "id": "opus/2", "worker": "Opus", "slot": "today", "first": true,
+      "floor": "Today I'm on ten in Phase 6 (#601, #602, #603, #604, #605, #606, #607, #608, #609, #610).",
+      "name": "Phase 6", "count": 10, "refs": ["#601", "#602", "#603", "#604", "#605", "#606", "#607", "#608", "#609", "#610"],
+      "titles": {},
+      "kinds": { "bugs": 10 }
+    }
+  ],
+  "rows": [
+    { "group": 0, "sentence": "Wired up three in Team Agile (#501, #502, #506) and smashed a bug along the way.", "reason": "" },
+    { "group": 0, "sentence": "Landed three in Team Agile (#501, #502, #506), including one bug and two features.", "reason": "" },
+    { "group": 0, "sentence": "Ate 20g of protein, then I wired up three in Team Agile (#501, #502, #506).", "reason": "" },
+    { "group": 0, "sentence": "Wired up three in Team Agile (#501, #502, #506) and #999.", "reason": "ref-added" },
+    { "group": 0, "sentence": "Wired up three in Team Agile (#501, #502, #506), and K7M2.", "reason": "ref-added" },
+    { "group": 0, "sentence": "Wired up three in Team Agile (#501, #502, #506) for the Reminders milestone.", "reason": "name" },
+    { "group": 0, "sentence": "Wired up three in Team Agile (#501, #502).", "reason": "ref-dropped" },
+    { "group": 0, "sentence": "Wired up Team Agile (#501, #502, #506).", "reason": "count-dropped" },
+    { "group": 0, "sentence": "Wired up three for the stage (#501, #502, #506).", "reason": "name-dropped" },
+    { "group": 0, "sentence": "Wired up four in Team Agile (#501, #502, #506).", "reason": "number" },
+    { "group": 0, "sentence": "Smashed three bugs in Team Agile (#501, #502, #506).", "reason": "kind" },
+    { "group": 0, "sentence": "", "reason": "empty" },
+    { "group": 0, "sentence": "Wired up three in Team Agile\n(#501, #502, #506).", "reason": "empty" },
+    { "group": 1, "sentence": "Plumbing for the Studio: #503, counted the foyer rows.", "reason": "" },
+    { "group": 1, "sentence": "Chased one in the Studio: #503, and two more.", "reason": "number" },
+    { "group": 1, "sentence": "Smashed a bug in the Studio: #503.", "reason": "kind" },
+    { "group": 2, "sentence": "Smashing ten bugs in Phase 6 (#601, #602, #603, #604, #605, #606, #607, #608, #609, #610).", "reason": "" },
+    { "group": 2, "sentence": "Smashing 10 bugs in Phase 6 (#601, #602, #603, #604, #605, #606, #607, #608, #609, #610).", "reason": "" },
+    { "group": 2, "sentence": "Smashing ten bugs in Phase 7 (#601, #602, #603, #604, #605, #606, #607, #608, #609, #610).", "reason": "number" }
+  ],
+  "reply": {
+    "answer": {
+      "opus/0": "Wired up three in Team Agile (#501, #502, #506) and #999.",
+      "opus/1": "Plumbing for the Studio: #503, counted the foyer rows.",
+      "opus/2": "Smashing ten bugs in Phase 6 (#601, #602, #603, #604, #605, #606, #607, #608, #609, #610)."
+    },
+    "said": [
+      "Yesterday I closed three in Team Agile (#501, #502, #506).",
+      "Plumbing for the Studio: #503, counted the foyer rows.",
+      "Smashing ten bugs in Phase 6 (#601, #602, #603, #604, #605, #606, #607, #608, #609, #610)."
+    ],
+    "dressed": 2,
+    "refused": 1
+  }
+}

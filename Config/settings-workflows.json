@@ -1,0 +1,235 @@
+{
+  "_comment": "Settings BY WORKFLOW (D-W1, D-W8; docs/CONFIGURATION.md, \"Settings by workflow: the questions, and the one list behind them\"): the questions a person asks, in their words, each tied to the surfaces of Scripts/Get-OptionalSurfaces.ps1 by key. ONE file, read by the CLI (Scripts/Get-SettingsWorkflows.ps1 -- the question on every inventory row, printed by Env and Menu -All), by the agent (GET /api/surfaces, through the CLI's resolver) and by the web (the drawer's 'How do I' section and the tips at the foot of Home, through the @workflows alias). Held to the inventory both ways by tkTestToolkit -Environment and web/src/shell/settingsWorkflows.test.ts: every inventory key has an entry, every entry names a real key. An entry may carry `answers` (How do you want to work in {space}? -- {space} is the Space you are in): radios in the drawer, each a `label`, the `value` it writes to `answerKey` ({slug} is the active Space) through Config -Set -Hub over the bridge, its `sentence`, and the trackers it is `live` on; the answer checked is the one the agent resolved (/env howIWork), a radio whose `live` list lacks the Space's tracker is shown disabled -- never hidden -- and `why` is the one sentence, per tracker, saying why. Its door still goes to `anchor`. A door is one of three: 'change' opens the drawer at `anchor` ({slug} is the active Space); 'walk' is a journey: with a `route` it opens the wizard there (`/connect/{slug}`, W2); with only an anchor it opens the drawer like change; 'sentence' is the whole answer (an environment variable this tool never writes). An entry with a `tip` is offered at the foot of Home while EVERY one of its surfaces reads 'not configured' -- never 'off', an answered no is respected (D-W3). An entry that names a `space` (the three demo Spaces, one per grain, D-W17) is about THAT Space and tips by where it stands instead: a journey (an entry with a `route`) tips while the Space is declared and still 'local' -- connecting it retires the tip -- and walks THAT Space when it is declared, the one you are in when it is not; any other entry tips while you are in that Space. A Space hidden by Hide Demo is not declared, so its tip goes with it.",
+  "entries": [
+    {
+      "id": "cards-live",
+      "question": "Where do my cards live, and can I move them?",
+      "sentence": "Your hub is a folder: a Space per context, each with its cards and archive. Point the toolkit at it, or move the folder and point again.",
+      "surfaces": [
+        "promptsRoot"
+      ],
+      "door": "change",
+      "anchor": "promptsRoot"
+    },
+    {
+      "id": "connect-github",
+      "question": "How do I connect a GitHub repo?",
+      "sentence": "A GitHub Space is one repo. Sign in with gh and the GitHub demo reads a real repo's issues -- or give it your own repo's address. The wizard walks the four steps and says which are yours.",
+      "surfaces": [
+        "tracker.github"
+      ],
+      "door": "walk",
+      "route": "/connect/{slug}",
+      "space": "github-demo",
+      "tip": "Set up a GitHub-connected Space. Sign in with gh and the GitHub demo reads a real repo's issues; or point it at your own."
+    },
+    {
+      "id": "connect-azure",
+      "question": "How do I connect an Azure DevOps organisation?",
+      "sentence": "An Azure DevOps Space is an organisation, with projects inside it. Give the Azure demo your organisation's address and sign in with az -- or give the address to any Space; with none it works from your cards alone. The wizard walks the four steps and says which are yours.",
+      "surfaces": [
+        "features.ado"
+      ],
+      "door": "walk",
+      "anchor": "spaces.{slug}.org",
+      "route": "/connect/{slug}",
+      "space": "azure-demo",
+      "tip": "Set up an Azure DevOps-linked Space. Give the Azure demo your organisation's address and sign in with az."
+    },
+    {
+      "id": "spaces",
+      "question": "How do I add a second Space, and switch between them?",
+      "sentence": "A Space holds its own cards. Add one for each context you work in with the + on the Studio's Spaces card -- pick one of your repositories, or keep your own cards -- or NewSpace in a terminal; switch from the menu under your avatar.",
+      "surfaces": [
+        "spaces"
+      ],
+      "door": "walk",
+      "route": "/studio"
+    },
+    {
+      "id": "demo",
+      "question": "What is the Demo Space for?",
+      "sentence": "This is the Demo Space: cards with no tracker. Everything works from the files.",
+      "surfaces": [
+        "spaces"
+      ],
+      "door": "sentence",
+      "space": "demo",
+      "tip": "This is the Demo Space: cards with no tracker. Everything works from the files."
+    },
+    {
+      "id": "identity",
+      "question": "Who does it think I am?",
+      "sentence": "Your email decides which work items and pull requests are yours. Set it here, or leave it and the toolkit reads it from your sign-in.",
+      "surfaces": [
+        "email"
+      ],
+      "door": "change",
+      "anchor": "email"
+    },
+    {
+      "id": "sprint",
+      "question": "Can it see my sprint?",
+      "sentence": "Sprint awareness reads this Space's iterations so cards can say which sprint they are in. It is this Space's setting, not yours.",
+      "surfaces": [
+        "sprintAwareness"
+      ],
+      "door": "change",
+      "anchor": "spaces.{slug}.features.sprintAwareness"
+    },
+    {
+      "id": "training-hours",
+      "question": "How many training hours does my quarter require?",
+      "sentence": "If this Space's engagement requires training each quarter, say how many hours. The Growth page then adds up the trainings dated this quarter and says where you stand. Leave it unset and nothing is shown.",
+      "surfaces": [
+        "trainingHoursPerQuarter"
+      ],
+      "door": "change",
+      "anchor": "spaces.{slug}.features.trainingHoursPerQuarter"
+    },
+    {
+      "id": "sync",
+      "question": "Does my hub follow me between machines?",
+      "sentence": "With store sync on, the hub is a git repository and Sync pulls and pushes it, so a second machine sees the same cards.",
+      "surfaces": [
+        "storeSync"
+      ],
+      "door": "walk",
+      "anchor": "storeSync"
+    },
+    {
+      "id": "growth",
+      "question": "How do I track what I learned -- trainings, goals, my resume?",
+      "sentence": "Growth keeps trainings, presentations and goals, builds work reviews from your cards, and keeps your resume current.",
+      "surfaces": [
+        "features.growth"
+      ],
+      "door": "change",
+      "anchor": "features.growth",
+      "tip": "Turn on Growth to keep your trainings, goals and resume beside your work."
+    },
+    {
+      "id": "organize",
+      "question": "Can it keep my meetings and reminders?",
+      "sentence": "Meetings plans and captures your recurring meetings; Organize keeps reminders with due dates. Two switches, one question.",
+      "surfaces": [
+        "features.communication",
+        "features.organize"
+      ],
+      "door": "change",
+      "anchor": "modules",
+      "tip": "Turn on Meetings and Organize to keep your 1:1s and reminders in one place."
+    },
+    {
+      "id": "teams",
+      "question": "Can it post to Teams for me?",
+      "sentence": "It can, once you create a webhook in Teams and put it in .env in the package root as TEAMS_WEBHOOK_<RECIPIENT> (copy .env.example). The toolkit never writes that variable, and the agent reads .env when it starts; a -WhatIf send proves it before anything goes out.",
+      "surfaces": [
+        "TEAMS_WEBHOOK_*"
+      ],
+      "door": "walk",
+      "tip": "Teams delivery needs a webhook URL in .env (copy .env.example), then a restart of the agent."
+    },
+    {
+      "id": "review",
+      "question": "Can it review my pull request?",
+      "sentence": "With ANTHROPIC_API_KEY in your environment, AddPRReview reads the diff and writes a review into the card. The key never goes in a file this tool writes.",
+      "surfaces": [
+        "ANTHROPIC_API_KEY"
+      ],
+      "door": "sentence"
+    },
+    {
+      "id": "deck",
+      "question": "Can I give a talk from it?",
+      "sentence": "Decks turns a presentation into slides you present from the browser, with the deck's notes beside them.",
+      "surfaces": [
+        "features.deck"
+      ],
+      "door": "change",
+      "anchor": "features.deck",
+      "tip": "Turn on Decks to present a talk straight from the toolkit."
+    },
+    {
+      "id": "solitaireAgile",
+      "question": "How do you want to work in {space}?",
+      "sentence": "The answer is this Space's, and its tracker says which answers there are.",
+      "surfaces": [
+        "features.solitaireAgile"
+      ],
+      "door": "change",
+      "anchor": "features.solitaireAgile",
+      "answerKey": "spaces.{slug}.howIWork",
+      "answers": [
+        {
+          "label": "With agents",
+          "value": "agents",
+          "sentence": "Team Agile on for this Space: the standup and triage over the repository's issues.",
+          "live": [
+            "github"
+          ]
+        },
+        {
+          "label": "Alone",
+          "value": "alone",
+          "sentence": "No background rituals: solo coding, or a course in your own codebase.",
+          "live": [
+            "github"
+          ]
+        },
+        {
+          "label": "On a team in Azure",
+          "value": "team",
+          "sentence": "Their board and their people hold the rituals.",
+          "live": []
+        }
+      ],
+      "why": {
+        "github": "On a team in Azure is an Azure DevOps Space's answer; this Space's tracker is GitHub.",
+        "ado": "Their board holds the rituals; Team Agile is off here.",
+        "none": "Connect a tracker to unlock working with agents."
+      },
+      "tip": "Turn on Team Agile for a standup filled from your issues every morning."
+    },
+    {
+      "id": "lounge",
+      "question": "Is there somewhere to look up from the work?",
+      "sentence": "The Lounge is a room that asks nothing: a few small games, and the skins the whole product can wear.",
+      "surfaces": [
+        "features.lounge"
+      ],
+      "door": "change",
+      "anchor": "features.lounge",
+      "tip": "Turn on the Lounge for a restful place and restored creative thought."
+    },
+    {
+      "id": "shortcuts",
+      "question": "How do I jump to my repos fast?",
+      "sentence": "A navigation shortcut is a verb that takes you to a folder. Give each one a path and it appears in the menu.",
+      "surfaces": [
+        "aliases"
+      ],
+      "door": "change",
+      "anchor": "shortcuts"
+    },
+    {
+      "id": "web",
+      "question": "Where does the web UI run?",
+      "sentence": "The agent and the web UI share one port setting; Web -Dev starts both, and this page is the result.",
+      "surfaces": [
+        "web"
+      ],
+      "door": "change",
+      "anchor": "web.agentPort"
+    },
+    {
+      "id": "design-lifecycle",
+      "question": "How do I keep a design with its product?",
+      "sentence": "A product keeps four folders -- design/, design/archive/, spec/, spec/archive/ -- and every note and spec carries an id in its frontmatter. StampDesign gives the files their ids; the Design tab reads the folders and groups what it finds by state: Design, Spec, Complete, Archived. The hub keeps the same four folders for the designs that belong to no product yet.",
+      "surfaces": [
+        "design"
+      ],
+      "door": "sentence"
+    }
+  ]
+}

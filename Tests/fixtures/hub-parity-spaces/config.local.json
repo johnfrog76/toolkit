@@ -1,0 +1,9 @@
+{
+  "_comment": "SPELLED THE NEW WAY (#64 stage 2): Parity fixture -- the machine's half. promptsRoot points at the sibling hub/ folder (resolved against the package root, as a relative promptsRoot always is); the shipped activeOrg is left alone (the hub's own activeOrg key must be ignored, and this file not naming one proves the default still decides); the one per-slug patch flips acme from the hub's 'active' to 'local', proving the machine's patch lands last. This file is force-tracked: the repo ignores config.local.json everywhere else on purpose, and Tests/fixtures/ is the one exception.",
+  "promptsRoot": "hub",
+  "spaces": {
+    "acme": {
+      "status": "local"
+    }
+  }
+}

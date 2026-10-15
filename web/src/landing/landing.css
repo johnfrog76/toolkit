@@ -1,0 +1,440 @@
+/* The landing page's look: the family's (the juggling and bowling engines,
+   Connected Deck). A dark ground, the wordmark and one cyan accent, kickers in
+   mono small caps, one teal call to action. One column on a phone; the hero's
+   words beside the commercial from 900px up. */
+
+:root {
+  --lp-bg: #131022;
+  --lp-text: #eae6f6;
+  --lp-muted: #9a92b8;
+  --lp-accent: #62e6ff;
+  --lp-panel: rgba(8, 7, 16, 0.5);
+  --lp-line: rgba(234, 230, 246, 0.14);
+  --lp-cta: #d97706;
+  --lp-cta-hover: #f59e0b;
+  --lp-cta-text: #1b1b1f;
+  --lp-blob: rgba(245, 158, 11, 0.5);
+  --lp-dot: #f59e0b;
+  --lp-mono: "Cascadia Code", "Fira Code", Consolas, ui-monospace, monospace;
+  color-scheme: dark;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--lp-bg);
+  color: var(--lp-text);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  line-height: 1.55;
+}
+
+.lp a {
+  color: var(--lp-accent);
+}
+
+.lp :focus-visible {
+  outline: 3px solid var(--lp-accent);
+  outline-offset: 2px;
+}
+
+.lp code,
+.lp pre {
+  font-family: var(--lp-mono);
+}
+
+.lp {
+  box-sizing: border-box;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px 24px;
+}
+
+/* The banner: a bordered panel, the words beside the commercial's room. */
+
+.lp-banner {
+  display: grid;
+  gap: 32px;
+  align-items: center;
+  margin-top: 32px;
+  padding: 36px;
+  border: 1px solid var(--lp-line);
+  border-radius: 16px;
+  background:
+    radial-gradient(1200px 420px at 85% 20%, rgba(34, 211, 238, 0.1), transparent 60%),
+    var(--lp-panel);
+}
+
+@media (min-width: 900px) {
+  .lp-banner {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    padding: 52px 44px 52px 48px;
+  }
+}
+
+/* The many faces, in the banner's right column. */
+
+.lp-banner-figure {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.lp-faces-block {
+  width: 100%;
+  max-width: 420px;
+}
+
+.lp-faces {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-faces-line {
+  margin: 18px 0 0;
+  text-align: center;
+  font-size: 1.05rem;
+  color: var(--lp-muted);
+}
+
+.lp-faces li {
+  line-height: 0;
+}
+
+/* The butler, beside the quick start's shell, at half his banner size. His
+   keyframes are the deck's, named here for the page. */
+
+.lp-quick-row {
+  display: grid;
+  gap: 20px 32px;
+  align-items: end;
+}
+
+@media (min-width: 768px) {
+  .lp-quick-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .lp-quick-figure {
+    order: -1;
+  }
+}
+
+.lp-quick-figure {
+  display: flex;
+  justify-content: center;
+}
+
+.lp-butler {
+  width: min(104px, 30vw);
+  height: auto;
+  filter: drop-shadow(0 12px 20px rgba(0, 0, 0, 0.45));
+}
+
+@keyframes tc-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+@keyframes tc-eyescan {
+  0%,
+  100% {
+    transform: translateX(-16px);
+  }
+  50% {
+    transform: translateX(16px);
+  }
+}
+
+@keyframes tc-eyestep {
+  0%,
+  30% {
+    opacity: 0.4;
+  }
+  44%,
+  80% {
+    opacity: 1;
+  }
+  96%,
+  100% {
+    opacity: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-butler * {
+    animation: none !important;
+  }
+}
+
+.lp-title {
+  margin: 0 0 30px;
+  line-height: 0;
+}
+
+.lp-offer {
+  margin: 0;
+  font-size: clamp(1.5rem, 2.8vw, 2.15rem);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.22;
+}
+
+.lp-bullets {
+  margin: 26px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 1.1rem;
+}
+
+.lp-bullets li {
+  padding: 4px 0 4px 22px;
+  position: relative;
+}
+
+.lp-bullets li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.95em;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--lp-dot);
+}
+
+.lp-bullets a {
+  color: var(--lp-text);
+  text-decoration: none;
+}
+
+.lp-bullets a:hover {
+  color: var(--lp-accent);
+}
+
+.lp-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+  margin-top: 40px;
+}
+
+.lp-cta-button {
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--lp-cta);
+  color: var(--lp-cta-text);
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lp-cta-button:hover {
+  background: var(--lp-cta-hover);
+}
+
+/* How you work: each way with its window, sides alternating */
+
+.lp-kicker {
+  margin: 0 0 8px;
+  font-family: var(--lp-mono);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--lp-muted);
+}
+
+.lp-ways {
+  padding-top: 56px;
+}
+
+.lp-way {
+  display: grid;
+  gap: 24px 48px;
+  align-items: center;
+  padding: 28px 0;
+  scroll-margin-top: 24px;
+}
+
+@media (min-width: 768px) {
+  .lp-way {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .lp-way--left .lp-window {
+    order: -1;
+  }
+}
+
+.lp-way-copy h3 {
+  margin: 0 0 10px;
+  font-size: clamp(1.4rem, 2.4vw, 1.9rem);
+  letter-spacing: -0.02em;
+  color: var(--lp-vibe, var(--lp-text));
+}
+
+/* Three vibes: each way's heading and its window's frame take one face's
+   colour (the stage's --sa-speaker is the frame's). */
+.lp-way {
+  --sa-speaker: var(--lp-vibe);
+}
+
+#way-alone {
+  --lp-vibe: #5ee3f7;
+}
+
+#way-team {
+  --lp-vibe: #f58fc6;
+}
+
+#way-agents {
+  --lp-vibe: #f5b041;
+}
+
+.lp-way-copy p {
+  margin: 0;
+  font-size: 1.08rem;
+  color: var(--lp-muted);
+}
+
+.lp-window {
+  position: relative;
+}
+
+.lp-window-tile {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  width: 100%;
+}
+
+/* The bubble sits in the window over the figure, its tail on them, as the
+   standup's does on a tile. */
+.lp-bubble {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 64%;
+  z-index: 2;
+  margin: 0;
+}
+
+.lp-bubble blockquote {
+  position: relative;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #1b1b1f;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.lp-bubble blockquote::after {
+  content: "";
+  position: absolute;
+  right: 26px;
+  bottom: -9px;
+  width: 20px;
+  height: 20px;
+  background: #ffffff;
+  rotate: 45deg;
+  border-radius: 3px;
+}
+
+/* Quick start: a real heading, and the lines coloured as a Solarized terminal would */
+
+.lp-quick {
+  padding-top: 48px;
+}
+
+.lp-quick h2 {
+  margin: 0 0 16px;
+  font-size: clamp(1.4rem, 2.4vw, 1.9rem);
+  letter-spacing: -0.02em;
+}
+
+.lp-code {
+  margin: 0;
+  padding: 18px 22px;
+  overflow-x: auto;
+  background: var(--lp-panel);
+  color: var(--lp-text);
+  border: 1px solid var(--lp-line);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+
+.lp-tok-verb {
+  color: #5db3f0;
+  font-weight: 600;
+}
+
+.lp-tok-flag {
+  color: #d9a521;
+}
+
+.lp-tok-string {
+  color: #3cc4b9;
+}
+
+.lp-tok-comment {
+  color: var(--lp-muted);
+  font-style: italic;
+}
+
+/* The footer */
+
+.lp-footer {
+  margin-top: 56px;
+  padding-top: 24px;
+  border-top: 1px solid var(--lp-line);
+  font-size: 0.9rem;
+  color: var(--lp-muted);
+}
+
+.lp-footer a {
+  color: var(--lp-muted);
+}
+
+.lp-footer a:hover {
+  color: var(--lp-text);
+}
+
+.lp-repo {
+  margin: 0 0 12px;
+  font-family: var(--lp-mono);
+  font-weight: 700;
+}
+
+.lp-docs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-disclosure {
+  margin: 0;
+}

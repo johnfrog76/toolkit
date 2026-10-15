@@ -1,0 +1,47 @@
+{
+ "_about": "One instant, many clocks. A day read from git is the reader's LOCAL day: git's %at (seconds since the epoch) converted in the reader's zone -- never %ai's date, which is the author's. Read by Tests/Test-BackfillStamps.ps1 and Tests/test_clock.py; both halves must agree on every row. A row is a day the git instant must give in that zone, whatever the host's own clock says.",
+ "rows": [
+  [
+   1790231400,
+   -420,
+   "2026-09-23",
+   "23:30 Pacific: the UTC date is already tomorrow"
+  ],
+  [
+   1790231400,
+   0,
+   "2026-09-24",
+   "the same instant in UTC"
+  ],
+  [
+   1790231400,
+   540,
+   "2026-09-24",
+   "the same instant in Tokyo"
+  ],
+  [
+   1790148600,
+   -420,
+   "2026-09-23",
+   "00:30 Pacific: just after local midnight"
+  ],
+  [
+   1790146799,
+   -420,
+   "2026-09-22",
+   "23:59:59 Pacific the day before"
+  ],
+  [
+   1790109000,
+   600,
+   "2026-09-23",
+   "06:30 in Sydney: east of UTC runs ahead"
+  ],
+  [
+   1798790399,
+   -480,
+   "2026-12-31",
+   "the last second of the year in Pacific standard time"
+  ]
+ ]
+}

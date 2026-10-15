@@ -1,0 +1,51 @@
+{
+  "_": "The reminder to attend (#133, D-TA15): the cadence rule both halves implement -- the CLI's Scripts/Standup-Remind.ps1 (Standup -Remind, and attending) and the agent's agent/solitaire/remind.py (POST /api/ritual/standup/attend). Asserted from tkTestToolkit -StandupRemind and Tests/test_standup_remind.py. Times are LOCAL with no offset, as every reminder's are. 2026-10-02 is a Friday. days: what -Days accepts, normalised to how the Ref line writes it (null: refused). times: what -Remind accepts (null: refused). first: the due -Remind writes -- the first day in the cadence whose time is still AHEAD of now, today included. attend: what opening the standup does to the one open standup reminder -- rearm (archive it, write the next day in the cadence AFTER today), none (its due is after today: today's was attended already), unreadable (its Ref is not a cadence: left alone, said in one line).",
+  "days": [
+    { "input": "Mon-Fri", "days": "Mon-Fri" },
+    { "input": "mon,tue,wed,thu,fri", "days": "Mon-Fri" },
+    { "input": "Fri,Mon", "days": "Mon,Fri" },
+    { "input": "Monday,Wednesday", "days": "Mon,Wed" },
+    { "input": "Mon, Wed , Fri", "days": "Mon,Wed,Fri" },
+    { "input": "Sat-Sun", "days": "Sat,Sun" },
+    { "input": "Mon-Sun", "days": "Mon-Sun" },
+    { "input": "Mon,Tue,Wed", "days": "Mon-Wed" },
+    { "input": "Tue-Thu,Sat", "days": "Tue,Wed,Thu,Sat" },
+    { "input": "Fri", "days": "Fri" },
+    { "input": "Funday", "days": null },
+    { "input": "Fri-Mon", "days": null },
+    { "input": "Mon,,Tue", "days": null },
+    { "input": "", "days": null }
+  ],
+  "times": [
+    { "input": "09:00", "time": "09:00" },
+    { "input": "9:00", "time": "09:00" },
+    { "input": "23:59", "time": "23:59" },
+    { "input": "00:00", "time": "00:00" },
+    { "input": "24:00", "time": null },
+    { "input": "09:60", "time": null },
+    { "input": "9", "time": null },
+    { "input": "9am", "time": null },
+    { "input": "", "time": null }
+  ],
+  "first": [
+    { "name": "Friday before the hour: today", "now": "2026-10-02T08:00", "time": "09:00", "days": "Mon-Fri", "due": "2026-10-02T09:00" },
+    { "name": "Friday on the hour: Monday", "now": "2026-10-02T09:00", "time": "09:00", "days": "Mon-Fri", "due": "2026-10-05T09:00" },
+    { "name": "Friday after the hour: Monday", "now": "2026-10-02T10:00", "time": "09:00", "days": "Mon-Fri", "due": "2026-10-05T09:00" },
+    { "name": "Saturday: Monday", "now": "2026-10-03T08:00", "time": "09:00", "days": "Mon-Fri", "due": "2026-10-05T09:00" },
+    { "name": "Monday, the afternoon slot still ahead", "now": "2026-10-05T08:00", "time": "17:30", "days": "Mon,Wed,Fri", "due": "2026-10-05T17:30" },
+    { "name": "Monday evening: Wednesday", "now": "2026-10-05T18:00", "time": "17:30", "days": "Mon,Wed,Fri", "due": "2026-10-07T17:30" },
+    { "name": "a weekend cadence from Friday", "now": "2026-10-02T12:00", "time": "10:00", "days": "Sat,Sun", "due": "2026-10-03T10:00" },
+    { "name": "one day a week, that day already gone: next week", "now": "2026-10-02T12:00", "time": "09:00", "days": "Fri", "due": "2026-10-09T09:00" }
+  ],
+  "attend": [
+    { "name": "Friday's, attended: Monday's", "now": "2026-10-02T10:00", "due": "2026-10-02T09:00", "ref": "09:00 Mon-Fri", "action": "rearm", "next": "2026-10-05T09:00" },
+    { "name": "Friday's, attended early: still Monday's", "now": "2026-10-02T08:30", "due": "2026-10-02T09:00", "ref": "09:00 Mon-Fri", "action": "rearm", "next": "2026-10-05T09:00" },
+    { "name": "attended twice in a day: nothing more", "now": "2026-10-02T11:00", "due": "2026-10-05T09:00", "ref": "09:00 Mon-Fri", "action": "none", "next": "" },
+    { "name": "missed for days: one archive, the next after today", "now": "2026-10-05T09:30", "due": "2026-09-29T09:00", "ref": "09:00 Mon-Fri", "action": "rearm", "next": "2026-10-06T09:00" },
+    { "name": "Monday's on a Mon/Wed/Fri cadence, attended Tuesday: Wednesday's", "now": "2026-10-06T10:00", "due": "2026-10-05T09:00", "ref": "09:00 Mon,Wed,Fri", "action": "rearm", "next": "2026-10-07T09:00" },
+    { "name": "attended on a Saturday: Monday's", "now": "2026-10-03T10:00", "due": "2026-10-02T09:00", "ref": "09:00 Mon-Fri", "action": "rearm", "next": "2026-10-05T09:00" },
+    { "name": "a date with no time is due that day", "now": "2026-10-02T10:00", "due": "2026-10-02", "ref": "09:00 Mon-Fri", "action": "rearm", "next": "2026-10-05T09:00" },
+    { "name": "no due at all: re-armed", "now": "2026-10-02T10:00", "due": "", "ref": "09:00 Mon-Fri", "action": "rearm", "next": "2026-10-05T09:00" },
+    { "name": "a Ref that is not a cadence: left alone", "now": "2026-10-02T10:00", "due": "2026-10-01T09:00", "ref": "whenever", "action": "unreadable", "next": "" }
+  ]
+}

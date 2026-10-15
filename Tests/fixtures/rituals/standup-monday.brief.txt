@@ -1,0 +1,6 @@
+Nothing is waiting on you.
+Fable: nothing today.
+Opus: nothing today.
+Sonnet: 1 closed yesterday, nothing open, none in flight, no blockers.
+In flight is not yet known: every routed issue reads as open.
+Next: nothing is waiting on you.

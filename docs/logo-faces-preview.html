@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ToolKit Logo Faces Preview</title>
+<style>
+  body {
+    background: #fff;
+    color: #000;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    gap: 48px;
+  }
+
+  h1 { font-size: 14px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.4; margin: 0; }
+
+  .row {
+    display: flex;
+    gap: 48px;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-end;
+  }
+
+  .item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .label {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.45;
+  }
+
+  /* ── shared logo base ── */
+  .logo {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.05rem;
+    position: relative;
+    top: -6px;
+    line-height: 1;
+  }
+
+  .logo::before {
+    content: "";
+    position: absolute;
+    width: 1.4em;
+    height: 1.4em;
+    background: #d9d9d9;
+    z-index: -1;
+    border-radius: 50%;
+    top: 10%;
+    left: 11.5%;
+  }
+
+  .logo::after {
+    position: absolute;
+    font-weight: 400;
+  }
+
+  /* ── 1. current light: ) smile ── */
+  .smile::after  { content: ")"; font-size: 54%; rotate: 90deg;  top: 18px; left: 31px; }
+
+  /* ── 2. current dark: { curly ── */
+  .curly::after  { content: "{"; font-size: 81%; rotate: 97deg;  top: 19px; left: 27px; }
+
+  /* ── 3. squiggle ~ ── */
+  .squiggle::after { content: "~"; font-size: 90%; rotate: 15deg; top: 16px; left: 28px; }
+
+  /* ── 4. cat ω ── */
+  .cat::after    { content: "ω"; font-size: 55%; rotate: 0deg;   top: 20px; left: 27px; }
+
+  /* ── 5. gasp o ── */
+  .gasp::after   { content: "o"; font-size: 55%; rotate: 0deg;   top: 20px; left: 29px; }
+
+  /* ── 6. sharp smirk > ── */
+  .smirk::after  { content: ">"; font-size: 65%; rotate: 90deg;  top: 17px; left: 30px; }
+
+  /* ── 7. skeptic / ── */
+  .skeptic::after { content: "/"; font-size: 75%; rotate: 0deg;  top: 16px; left: 29px; }
+
+  .divider {
+    width: 1px;
+    height: 60px;
+    background: #e0e0e0;
+    align-self: center;
+  }
+
+  .section-label {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.3;
+    border-top: 1px solid #ccc;
+    padding-top: 6px;
+    width: 100%;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<h1>ToolKit Logo — Face Options</h1>
+
+<div class="row">
+  <div class="item">
+    <span class="logo smile">ToolKit</span>
+    <span class="label">current light<br>smile )</span>
+  </div>
+  <div class="item">
+    <span class="logo curly">ToolKit</span>
+    <span class="label">current dark<br>curly {</span>
+  </div>
+</div>
+
+<div class="section-label">new options</div>
+
+<div class="row">
+  <div class="item">
+    <span class="logo squiggle">ToolKit</span>
+    <span class="label">squiggle ~</span>
+  </div>
+  <div class="item">
+    <span class="logo cat">ToolKit</span>
+    <span class="label">cat ω</span>
+  </div>
+  <div class="item">
+    <span class="logo gasp">ToolKit</span>
+    <span class="label">gasp o</span>
+  </div>
+  <div class="item">
+    <span class="logo smirk">ToolKit</span>
+    <span class="label">smirk ></span>
+  </div>
+  <div class="item">
+    <span class="logo skeptic">ToolKit</span>
+    <span class="label">skeptic /</span>
+  </div>
+</div>
+
+</body>
+</html>

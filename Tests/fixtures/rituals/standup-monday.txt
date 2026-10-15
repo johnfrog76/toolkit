@@ -1,0 +1,16 @@
+Standup -- Monday 5 October 2026
+"Nothing to report."
+
+Waiting on you
+  Nothing is waiting on you.
+
+Fable
+  Mug        "Nothing on the board for me. All green, no blockers."
+Opus
+  Mug        "Nothing on the board for me. All green, no blockers."
+Sonnet
+  Yesterday  #201 Add the registry mock
+  Today      nothing in flight
+  Blockers   no blockers
+
+"Parking that."

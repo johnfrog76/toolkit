@@ -1,0 +1,105 @@
+{
+  "_": "The standup's SECOND source, cards, as a table (#130; docs/modules/solitaire-agile.md, \"The second source: cards\"; docs/hub/cards.md, 'A card in a standup'). Both halves -- tkTestToolkit -Rituals and Tests/test_rituals.py -- feed each case's cards to their cards fill and assert the computed `since`, the chair's vocabulary indices, the walk queue and the one worker's slots by card id, and the rendered text against standup-cards-<name>.txt in this folder, byte for byte (LF). A card is a row the thin layer reads out of the Space's current/ and archive/: its file, its folder, its DERIVED state (docs/hub/cards.md, 'State is derived, never stored'), its **Closed:** day when archived (null when it has none), the title its heading gives and the id the filename gives. `sources` pins which source a Space's address and status choose; `titles` pins the heading-to-title rule.",
+  "sources": [
+    { "address": "", "status": "local", "source": "cards", "reason": "" },
+    { "address": "", "status": "active", "source": "cards", "reason": "" },
+    { "address": "https://github.com/acme/widgets", "status": "active", "source": "issues", "reason": "" },
+    { "address": "https://github.com/acme/widgets", "status": "local", "source": "cards", "reason": "" },
+    { "address": "https://github.com/acme/widgets", "status": "archive", "source": "cards", "reason": "" },
+    { "address": "https://dev.azure.com/acme-org", "status": "active", "source": "none", "reason": "adoTracker" },
+    { "address": "https://dev.azure.com/acme-org", "status": "local", "source": "none", "reason": "adoTracker" }
+  ],
+  "titles": [
+    { "content": "# Task 139: Write the docs\n\nbody", "file": "Task139-write-the-docs.prompt.md", "id": "139", "title": "Write the docs" },
+    { "content": "# Bug 214: Search returns duplicates\n", "file": "214-search-returns-duplicates.prompt.md", "id": "214", "title": "Search returns duplicates" },
+    { "content": "# User Story 144: Read the board\r\n", "file": "US-144-read-the-board.prompt.md", "id": "144", "title": "Read the board" },
+    { "content": "# Spike K7M2: Photo import\n", "file": "Spike-K7M2-photo-import.prompt.md", "id": "K7M2", "title": "Photo import" },
+    { "content": "# A note with: a colon\n", "file": "K7M2-a-note.prompt.md", "id": "K7M2", "title": "A note with: a colon" },
+    { "content": "no heading at all\n", "file": "K7M2-wire-the-board.prompt.md", "id": "K7M2", "title": "K7M2-wire-the-board" }
+  ],
+  "cases": [
+    {
+      "name": "friday",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "space": "widgets",
+      "spaceName": "Widgets",
+      "cards": [
+        { "file": "K7M2-wire-the-board.prompt.md", "folder": "current", "status": "In Progress", "closed": null, "title": "Wire the board", "id": "K7M2" },
+        { "file": "Task139-write-the-docs.prompt.md", "folder": "current", "status": "Code Review", "closed": null, "title": "Write the docs", "id": "139" },
+        { "file": "US-144-read-the-board.prompt.md", "folder": "current", "status": "Code Review", "closed": null, "title": "Read the board", "id": "144" },
+        { "file": "214-search-returns-duplicates.prompt.md", "folder": "current", "status": "Active", "closed": null, "title": "Search returns duplicates", "id": "214" },
+        { "file": "198-fix-the-export.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-01", "title": "Fix the export", "id": "198" },
+        { "file": "Spike-Q3R9-photo-import.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-02", "title": "Photo import", "id": "Q3R9" },
+        { "file": "150-an-older-close.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-09-30", "title": "An older close", "id": "150" },
+        { "file": "151-never-stamped.prompt.md", "folder": "archive", "status": "Done", "closed": null, "title": "Never stamped", "id": "151" }
+      ],
+      "expected": {
+        "since": "2026-10-01T00:00:00-04:00",
+        "dayOfYear": 275,
+        "chair": { "openIndex": 3, "closeIndex": 4 },
+        "queue": { "walk": ["139", "144"], "decide": [], "look": [] },
+        "worker": { "label": "widgets", "name": "Widgets", "yesterday": ["198", "Q3R9"], "today": ["K7M2", "139", "144"], "blockers": [], "empty": false, "nothingIndex": null },
+        "text": "standup-cards-friday.txt",
+        "brief": "standup-cards-friday.brief.txt"
+      }
+    },
+    {
+      "name": "monday-weekend",
+      "asOf": "2026-10-05T09:00:00-04:00",
+      "space": "widgets",
+      "spaceName": "Widgets",
+      "cards": [
+        { "file": "160-closed-thursday.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-01", "title": "Closed on Thursday", "id": "160" },
+        { "file": "161-closed-friday.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-02", "title": "Closed on Friday", "id": "161" },
+        { "file": "162-closed-saturday.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-03", "title": "Closed on Saturday", "id": "162" },
+        { "file": "163-closed-this-morning.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-05", "title": "Closed this morning", "id": "163" },
+        { "file": "164-closed-tomorrow.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-06", "title": "Stamped for tomorrow", "id": "164" },
+        { "file": "TaskC4D7-not-started.prompt.md", "folder": "current", "status": "Active", "closed": null, "title": "Not started", "id": "C4D7" }
+      ],
+      "expected": {
+        "since": "2026-10-02T00:00:00-04:00",
+        "dayOfYear": 278,
+        "chair": { "openIndex": 6, "closeIndex": 7 },
+        "queue": { "walk": [], "decide": [], "look": [] },
+        "worker": { "label": "widgets", "name": "Widgets", "yesterday": ["161", "162", "163"], "today": [], "blockers": [], "empty": false, "nothingIndex": null },
+        "text": "standup-cards-monday-weekend.txt",
+        "brief": "standup-cards-monday-weekend.brief.txt"
+      }
+    },
+    {
+      "name": "nothing-in-flight",
+      "asOf": "2026-10-05T09:00:00-04:00",
+      "space": "widgets",
+      "spaceName": "Widgets",
+      "cards": [
+        { "file": "214-search-returns-duplicates.prompt.md", "folder": "current", "status": "Active", "closed": null, "title": "Search returns duplicates", "id": "214" },
+        { "file": "160-closed-thursday.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-01", "title": "Closed on Thursday", "id": "160" }
+      ],
+      "expected": {
+        "since": "2026-10-02T00:00:00-04:00",
+        "dayOfYear": 278,
+        "chair": { "openIndex": 6, "closeIndex": 7 },
+        "queue": { "walk": [], "decide": [], "look": [] },
+        "worker": { "label": "widgets", "name": "Widgets", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 0 },
+        "text": "standup-cards-nothing-in-flight.txt",
+        "brief": "standup-cards-nothing-in-flight.brief.txt"
+      }
+    },
+    {
+      "name": "no-cards-no-name",
+      "asOf": "2026-10-03T10:00:00-04:00",
+      "space": "scratch",
+      "spaceName": "",
+      "cards": [],
+      "expected": {
+        "since": "2026-10-02T00:00:00-04:00",
+        "dayOfYear": 276,
+        "chair": { "openIndex": 4, "closeIndex": 5 },
+        "queue": { "walk": [], "decide": [], "look": [] },
+        "worker": { "label": "scratch", "name": "scratch", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 0 },
+        "text": null,
+        "brief": "standup-cards-no-cards-no-name.brief.txt"
+      }
+    }
+  ]
+}
