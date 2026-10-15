@@ -12,8 +12,10 @@ Run:  python3 -m pytest Tests/test_assets.py
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -291,6 +293,90 @@ class TheUploadRoute(unittest.TestCase):
         res = self.client.post("/api/assets/upload", content=PNG)
         self.assertEqual(res.status_code, 400)
         self.assertEqual(self.snapshot(), before)
+
+
+class TheUploadFolderIsFinished(unittest.TestCase):
+    """The folder an upload made is removed when the verb handed its path is done
+    (success or failure), only ever for a real ``p20-upload-`` folder directly in
+    the system temp, and a sweep at agent start drops the stale ones."""
+
+    def setUp(self):
+        from agent.app import app
+
+        self.client = TestClient(app)
+        self._made = []
+
+    def tearDown(self):
+        for d in self._made:
+            shutil.rmtree(d, ignore_errors=True)
+
+    def upload(self) -> Path:
+        res = self.client.post("/api/assets/upload?name=shot.png", content=PNG)
+        self.assertEqual(res.status_code, 200, res.text)
+        path = Path(res.json()["path"])
+        self._made.append(path.parent)
+        return path
+
+    def run_verb(self, returncode: int, params: list):
+        from agent.ado import bridge
+
+        done = subprocess.CompletedProcess([], returncode, stdout="", stderr="" if returncode == 0 else "no")
+        with (
+            mock.patch.object(bridge, "resolve_host", return_value="pwsh"),
+            mock.patch.object(bridge, "command_map", return_value={"Cover": "Set-CardCover"}),
+            mock.patch.object(bridge, "_run", return_value=done),
+        ):
+            return self.client.post("/api/cmd/Cover", json={"params": params}).json()
+
+    def test_the_folder_is_gone_after_an_attach(self):
+        path = self.upload()
+        self.assertEqual(self.run_verb(0, ["K7M2-a-card.prompt.md", str(path)])["status"], "success")
+        self.assertFalse(path.parent.exists())
+
+    def test_the_folder_is_gone_after_a_failed_attach(self):
+        path = self.upload()
+        self.assertEqual(self.run_verb(1, ["K7M2-a-card.prompt.md", str(path)])["status"], "error")
+        self.assertFalse(path.parent.exists())
+
+    def test_a_path_that_is_not_an_upload_is_never_deleted(self):
+        with tempfile.TemporaryDirectory() as t:
+            elsewhere = Path(t) / "shot.png"
+            elsewhere.write_bytes(PNG)
+            prefixed_deeper = Path(t) / "p20-upload-x" / "shot.png"
+            prefixed_deeper.parent.mkdir()
+            prefixed_deeper.write_bytes(PNG)
+            plain = Path(tempfile.mkdtemp(prefix="other-"))
+            self._made.append(plain)
+            (plain / "shot.png").write_bytes(PNG)
+            self.run_verb(0, [str(elsewhere), str(prefixed_deeper), str(plain / "shot.png"), "-Before", t, tempfile.gettempdir()])
+            self.assertTrue(elsewhere.exists())
+            self.assertTrue(prefixed_deeper.exists(), "only a folder directly in the system temp counts")
+            self.assertTrue((plain / "shot.png").exists())
+            self.assertTrue(Path(tempfile.gettempdir()).is_dir())
+
+    def test_the_sweep_removes_only_old_prefixed_folders(self):
+        from agent.core.assets import UPLOAD_PREFIX, sweep_stale_uploads
+
+        old = Path(tempfile.mkdtemp(prefix=UPLOAD_PREFIX))
+        fresh = Path(tempfile.mkdtemp(prefix=UPLOAD_PREFIX))
+        other_old = Path(tempfile.mkdtemp(prefix="not-an-upload-"))
+        self._made += [old, fresh, other_old]
+        for d in (old, other_old):
+            (d / "f.png").write_bytes(PNG)
+            long_ago = time.time() - 3 * 24 * 60 * 60
+            os.utime(d, (long_ago, long_ago))
+        sweep_stale_uploads()
+        self.assertFalse(old.exists())
+        self.assertTrue(fresh.exists())
+        self.assertTrue(other_old.exists())
+
+    def test_the_agent_sweeps_on_start(self):
+        from agent.app import app
+
+        with mock.patch("agent.core.assets.sweep_stale_uploads") as sweep:
+            with TestClient(app):
+                pass
+        sweep.assert_called_once()
 
 
 if __name__ == "__main__":

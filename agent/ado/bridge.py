@@ -54,6 +54,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from ..core import config as _config
+from ..core.assets import remove_upload
 from ..core.config import REPO_ROOT, load_config
 from ..core.hosts import NO_HOST_ERROR, host_argv, resolve_host
 from ..core.log_writer import write_log
@@ -330,6 +331,19 @@ def _run(
 
 @api.post("/cmd/{name}", response_model=CommandResponse)
 async def run_command(name: str, req: CommandRequest | None = None):
+    """Run one allowlisted CLI verb (see ``_run_command``), then drop any upload folder
+    among its parameters: a picture the browser staged for ``Cover`` or
+    ``NewPrompt -Cover`` is a temp file the verb only copies, so whatever the
+    outcome, the folder is finished with. ``remove_upload`` touches nothing that
+    is not a ``p20-upload-`` folder directly under the system temp."""
+    try:
+        return await _run_command(name, req)
+    finally:
+        for p in (req.params if req else []):
+            remove_upload(p)
+
+
+async def _run_command(name: str, req: CommandRequest | None = None):
     """Run one allowlisted CLI verb and report what it did.
 
     Always 200 with a typed body, including refusals: a client that types the
