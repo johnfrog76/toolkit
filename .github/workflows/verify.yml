@@ -86,13 +86,13 @@ jobs:
           code=${PIPESTATUS[0]}
           pwsh -NoProfile -File Scripts/Test-CiHalf.ps1 -Half agent -Path "$RUNNER_TEMP/agent.log" -ExitCode "$code"
 
-      # The agent's Python lint, both halves of the gate docs/CONTRIBUTING.md names
+      # The Python lint (the agent and Tests/), both halves of the gate docs/CONTRIBUTING.md names
       # ("Lint"), from the root at the version agent/requirements-dev.txt pins.
-      - name: The agent's lint -- ruff check and ruff format --check
+      - name: The Python lint -- ruff check and ruff format --check
         if: ${{ !cancelled() && steps.pip.outcome == 'success' }}
         run: |
-          ruff check agent/
-          ruff format --check agent/
+          ruff check
+          ruff format --check
 
       # The CLI: tkTest's CLI half in a shell with exactly one toolkit in it
       # (AGENTS.md, "One toolkit per shell"); the runner's Total line.

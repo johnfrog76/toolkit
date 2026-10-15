@@ -118,7 +118,7 @@ class ManagerRouteTestCase(unittest.TestCase):
         # The create goes through the bridge, whose child pwsh reads this
         # checkout's config, not the scratch one above -- and a checkout with no
         # config.local.json has every module off, so the child has no NewMeeting.
-        #P20_FEATURES is the per-process stand-in both halves
+        # P20_FEATURES is the per-process stand-in both halves
         # read for config.local.json's features block (consts.json env.features).
         os.environ[FEATURES_ENV] = json.dumps(self.features)
 
@@ -287,13 +287,13 @@ class CarriedFromOnTheDetail(ManagerRouteTestCase):
 @unittest.skipIf(shutil.which("pwsh") is None, "pwsh is not on this machine")
 class Create(ManagerRouteTestCase):
     """``POST /manager`` runs the real ``NewMeeting`` through the bridge, in a
-    SCRATCH package: the bridge imports the manifest beside itself, the verb is
-    in the command table only while the checkout's own config turns the module
-    on, and a test that wrote this checkout's ``config.local.json`` would be
-    editing the engineer's machine. So the package is copied, its
-    ``config.local.json`` turns the module on and names the test's hub, and the
-    bridge is pointed at the copy
-   ."""
+     SCRATCH package: the bridge imports the manifest beside itself, the verb is
+     in the command table only while the checkout's own config turns the module
+     on, and a test that wrote this checkout's ``config.local.json`` would be
+     editing the engineer's machine. So the package is copied, its
+     ``config.local.json`` turns the module on and names the test's hub, and the
+     bridge is pointed at the copy
+    ."""
 
     def setUp(self):
         super().setUp()

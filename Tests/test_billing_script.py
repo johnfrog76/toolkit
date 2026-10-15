@@ -241,9 +241,7 @@ class BillingScript(unittest.TestCase):
         _git(self.hub, "add", "-A", when="2026-09-14T12:00:00")
         _git(self.hub, "commit", "-q", "-m", "new card", when="2026-09-14T12:00:00")
         card.write_text(
-            f"# {heading}\n\n"
-            "PR URL: https://dev.azure.com/x/y/_git/z/pullrequest/7\n\n"
-            "**Created:** 2026-09-14\n"
+            f"# {heading}\n\nPR URL: https://dev.azure.com/x/y/_git/z/pullrequest/7\n\n**Created:** 2026-09-14\n"
         )
         _git(self.hub, "add", "-A", when="2026-09-15T12:00:00")
         _git(self.hub, "commit", "-q", "-m", "in review", when="2026-09-15T12:00:00")
@@ -260,10 +258,10 @@ class BillingScript(unittest.TestCase):
     def test_a_configured_type_prefix_reads_its_git_review_day(self):
         """A prefix beyond the shipped four is a card because config says so, in
         the git pass as much as in the cards pass."""
-        script = _scratch_package(
-            self.tmp / "pkg", {"workItemTypes": {"Chore": {"filePrefix": "Chore-"}}}
+        script = _scratch_package(self.tmp / "pkg", {"workItemTypes": {"Chore": {"filePrefix": "Chore-"}}})
+        status = self._review_day_status(
+            script, "Chore-170-rotate-the-keys.prompt.md", "Chore 170: Rotate the keys", "170"
         )
-        status = self._review_day_status(script, "Chore-170-rotate-the-keys.prompt.md", "Chore 170: Rotate the keys", "170")
         self.assertEqual(status, "code review")
 
     def _week(self, script, since, until):

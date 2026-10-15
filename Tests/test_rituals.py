@@ -677,8 +677,13 @@ class TheDressTable(unittest.TestCase):
         fable, opus = facts["fable/1"], facts["opus/1"]
         self.assertEqual((fable["name"], fable["count"], fable["refs"], fable["first"]), ("", 7, [], False))
         self.assertEqual((opus["name"], opus["count"], opus["refs"]), ("Phase 6, Phase 7, the Studio and Docs", 4, []))
-        self.assertEqual(standup.dress_guard(opus, "Also chipping at four more: Phase 6, Phase 7, the Studio and Docs."), "")
-        self.assertEqual(standup.dress_guard(opus, "Also on four more, #712 among them: Phase 6, Phase 7, the Studio and Docs."), "ref-added")
+        self.assertEqual(
+            standup.dress_guard(opus, "Also chipping at four more: Phase 6, Phase 7, the Studio and Docs."), ""
+        )
+        self.assertEqual(
+            standup.dress_guard(opus, "Also on four more, #712 among them: Phase 6, Phase 7, the Studio and Docs."),
+            "ref-added",
+        )
         self.assertEqual(standup.dress_guard(fable, "Plus seven more designs on the go."), "")
         self.assertEqual(standup.dress_guard(fable, "Plus eight more designs on the go."), "number")
         thread = standup.dress_facts(_fill_work(WORK_CASES["friday"]))

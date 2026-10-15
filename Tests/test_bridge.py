@@ -145,13 +145,13 @@ class AllowlistIsTheCommandTable(unittest.TestCase):
 @unittest.skipUnless(HAVE_PWSH, "needs pwsh to read the command table")
 class TheTableFollowsTheFlags(unittest.TestCase):
     """A module's verbs are in the table only while its flag is on, so the
-    cache key has to see the flag change -- from a terminal's `Config -Set`
-    (an mtime on config.local.json) and from the Configuration card (whose
-    write primes the cache with the pre-flip table, hence `force`). Run against
-    a SCRATCH package: the bridge imports the manifest beside itself, and a
-    test that wrote this checkout's config.local.json would be editing the
-    engineer's machine
-   ."""
+     cache key has to see the flag change -- from a terminal's `Config -Set`
+     (an mtime on config.local.json) and from the Configuration card (whose
+     write primes the cache with the pre-flip table, hence `force`). Run against
+     a SCRATCH package: the bridge imports the manifest beside itself, and a
+     test that wrote this checkout's config.local.json would be editing the
+     engineer's machine
+    ."""
 
     # A verb the growth module contributes, from Config/growth.commands.psd1.
     MODULE_VERB = "NewGrowth"
@@ -198,8 +198,8 @@ class TheTableFollowsTheFlags(unittest.TestCase):
 
     def test_a_module_verb_declares_its_own_timeout_through_the_one_table(self):
         """Config/growth.commands.psd1 says NewWorkReview may run 300 s; the agent
-        never reads a .psd1, so the table it does read carries the number
-       ."""
+         never reads a .psd1, so the table it does read carries the number
+        ."""
         self._flip(True)
         table = bridge.command_map(force=True)
         self.assertNotIn("_timeouts", table, "the reserved key is stripped from the allowlist")
