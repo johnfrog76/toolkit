@@ -294,6 +294,18 @@ if ($whyStart -ge 0 -and $whyEnd -gt $whyStart) {
         Assert-Equal "VERIFY.md's module verb count is the data files'" $moduleVerbs.Count $cm.Groups[2].Value
         Assert-Equal "VERIFY.md's total verb count is the sum" $allVerbs.Count $cm.Groups[3].Value
     }
+
+    # docs/CLI.md's command reference opens with the same counts: "42 always on, 55 with
+    # every opt-in module switched on." Read it back against the same two sources.
+    $cliPath = Join-Path $pkgRoot 'docs/CLI.md'
+    $cliText = ''
+    if (Test-Path -LiteralPath $cliPath) { $cliText = Get-Content -LiteralPath $cliPath -Raw -Encoding UTF8 }
+    $km = [regex]::Match($cliText, '\*\*(\d+) always on, (\d+) with every opt-in module')
+    Assert-True 'docs/CLI.md states its verb counts in the expected shape' $km.Success 'pattern not found -- has the sentence been reworded?'
+    if ($km.Success) {
+        Assert-Equal "docs/CLI.md's always-on verb count is config.default.json's" $coreVerbs.Count $km.Groups[1].Value
+        Assert-Equal "docs/CLI.md's with-every-module verb count is the sum" $allVerbs.Count $km.Groups[2].Value
+    }
 }
 
 Write-Host ""
