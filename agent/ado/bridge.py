@@ -339,7 +339,7 @@ async def run_command(name: str, req: CommandRequest | None = None):
     try:
         return await _run_command(name, req)
     finally:
-        for p in (req.params if req else []):
+        for p in req.params if req else []:
             remove_upload(p)
 
 
