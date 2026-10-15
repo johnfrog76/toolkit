@@ -70,7 +70,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `ReplyPR` | `PRComments` (script only: the reply written into the card; not the live post) | 6 |
 | `AddPRReview` | `ExitCodes` (the missing-key refusal; the branch search's and the details fetch's 401/403/404 with the REST call stubbed) | 12 (a real expired token) |
 | `ThreadHash` | `ThreadHash` (script only) | 6 |
-| `CloseItem` | `CloseWorkItem` (script only: the transition rule and error parsing) | 6, 12 |
+| `CloseItem` | `CloseWorkItem` (the transition rule and error parsing; typed in a fresh shell with `az` and the REST calls stubbed: `-WhatIf`, a Task to Closed, a Bug to Resolved, an item already closed) | 6 (the live close on a real board), 12 |
 | `EditItem` | `EditItem` (typed, with `gh` and `az` stubbed) | 12 (a real repository) |
 | `MyWork` | neither | 6, 8c |
 | `MyPRs` | neither | 8c |
@@ -395,6 +395,20 @@ tkReplyPR <pr> <thread> -Reply "verified"
 
 - [ ] Reply visible on the PR
 - [ ] Result threaded back into the prompt file
+
+Then close a **test** work item -- a Task made for the purpose, never a real one -- dry run first:
+
+```powershell
+tkCloseItem <id> -WhatIf -Comment "verified"
+tkCloseItem <id> -Comment "verified"
+tkCloseItem <id> -Comment "verified"          # deliberately twice
+```
+
+- [ ] `-WhatIf` names the work item, its current state and the planned transition (`Active -> Closed (Completed)` for a Task), and the board is unchanged afterwards
+- [ ] The real run sets the state to **Closed** (a Bug goes to **Resolved**) and ends with a `[RESULT]` line naming the type, state and reason
+- [ ] The board shows the new state, and the comment is in the item's discussion
+- [ ] The second run says the item is already closed, changes no state, and still posts the comment
+- [ ] A `-Reason` the project's process does not accept is refused (exit 2) with ADO's own sentence, and the item is left as it was
 
 ```powershell
 tkMyWork
