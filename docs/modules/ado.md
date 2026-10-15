@@ -233,7 +233,7 @@ and `hub.json`), or the first `az` call that failed, as one sentence naming the 
 - **The filter drawer** -- ToolKit's card filters wherever cards are drawn; the repo row (the
   org's projects, matched on a card's ADO link) on an Azure DevOps Space only; and on a GitHub Space's
   Issues tab the issue filters -- state, assignee, worked by, kind, severity, milestone -- with search
-  over the issue's number, title and labels. The Issues list shows what they are set to in one line.
+  over the issue's number, title and labels. The Issues list shows what they are set to in one line. A collapsed drawer is inert: Tab skips it and a screen reader does not read it.
   A card with no ADO repository -- no link, or a GitHub issue link -- belongs to none of those projects and is never hidden by the repo row; only a card whose ADO link names a different project is filtered out.
   `drawerSections` in `homeTabs.ts` decides, per tab; [SCENARIOS](../SCENARIOS.md) has the grid. The
   control is drawn on every tab of a strip: on a tab with no sections (Stats) it is disabled, with
