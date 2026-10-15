@@ -169,6 +169,7 @@ export function FilterDrawer({
   }, [env?.config?.projects]);
 
   const totalCount = Object.values(repoCounts).reduce((s, c) => s + c, 0);
+  const panelOpen = open && !none;
 
   return (
     <div className={styles.root}>
@@ -192,7 +193,11 @@ export function FilterDrawer({
       <div
         id="filter-panel"
         role="region"
-        className={`${styles.panel} ${open && !none ? styles.panelOpen : styles.panelClosed}`}
+        className={`${styles.panel} ${panelOpen ? styles.panelOpen : styles.panelClosed}`}
+        // Closed, the panel is only collapsed to nothing, so its controls would
+        // still take focus and be read aloud. inert takes them out of the tab
+        // order and the accessibility tree and leaves the transition alone.
+        inert={!panelOpen}
       >
         <div className={styles.panelInner}>
           <div className={styles.searchRow}>
