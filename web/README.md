@@ -141,7 +141,7 @@ web/
     │   ├── Commercial.tsx  the deck's poster and player, the app's own engine and clips
     │   └── people.ts       band 3's three lines -- empty, and the band held, until they are written
     ├── shared/           reusable UI: PageCard, Pagination, FilterBadge, listRowStyles (the house list row), MarkdownViewer, ImageDropZone (one picture in: drop, paste, or a file; C2),
-    │                     StatusMessage, StatTile (the one way a card counts), CardActions,
+    │                     StatusMessage (a live region: role=status, role=alert for an error), StatTile (the one way a card counts), CardActions,
     │                     ConfirmDialog and CreateButton (one grammar for acting), ToolKitLogo over Wordmark (the SVG mark, its outlines in wordmarkPaths.ts),
     │                     usePersistedState, faces, health,
 │                     thinScrollbar (the one themed scrollbar -- spread it, never retype it), ...
@@ -815,6 +815,9 @@ hunt through -- in the owner's words, *"find a way to get the user there when th
 
 Two sentences no module can say, both in `src/shell/ShellStates.tsx`, where a blank page would
 otherwise be.
+
+Before either, the first load draws `src/shell/BootSpinner.tsx`: a progressbar named "Loading toolkit...", so
+a screen reader says what the page is waiting for.
 
 **The agent is not there.** The shell polls `GET /api/health` -- every 15s, every 4s while it fails.
 If `/env` has never loaded, the routes are replaced by one panel: what is wrong, the command that
