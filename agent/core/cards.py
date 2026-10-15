@@ -1,17 +1,18 @@
-"""The agent's one writer for a card that already exists.
+"""The agent's one writer for a hub file that already exists.
 
 The CLI has one, ``Write-CardText`` in ``Scripts/Write-CardText.ps1``, and the
 rule it keeps is the card's byte contract (docs/CLI.md, "The bytes a card is
 written with"): UTF-8 with no BOM, and a file the tool EDITS keeps the line
-ending it already has. The agent edits one kind of card natively -- the PR
-comments ``save`` writes a decision and a reply into it -- and it once
-did so with a bare ``write_text``, which on a CRLF card (most of a Windows
-hub) wrote the edited section LF and left the file mixed
-(item 2).
+ending it already has. A bare ``write_text`` on a CRLF file (most of a
+Windows hub) writes the edited section LF and leaves the file mixed.
 
-So: every agent-side edit of a card goes through ``write_card_text``, which
-reads the file's terminator first and writes with it. There is deliberately no
-create here. A card is CREATED by the CLI, through ``POST /api/cmd/NewPrompt``
+So: every agent-side edit of a hub file goes through ``write_card_text``, which
+reads the file's terminator first and writes with it. Today its one caller is
+the meeting-session save, ``PUT /api/manager/{filename}`` -- a session is a
+hub file rather than a card. No ADO-core route edits a card natively: the
+card edits go through the CLI, which has its own writer. This stays the
+Python side of the byte rule for any further native edit. There is
+deliberately no create here. A card is CREATED by the CLI, through ``POST /api/cmd/NewPrompt``
 and its siblings, and the web has no second implementation to get that wrong
 (AGENTS.md, "``current/`` is protected").
 """

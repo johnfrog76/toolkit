@@ -76,28 +76,3 @@ def write_log(log_type: str, source: str, detail: str) -> None:
     except OSError:
         # Logging must never take a request down.
         pass
-
-
-def _resolve_test_log_path(machine: str) -> str:
-    return str(REPO_ROOT / f"test-results.{machine}.log")
-
-
-def write_test_result(suite: str, result: str, passed: int, total: int, detail: str = "ok") -> None:
-    """Append one test result entry to test-results.{machine}.log.
-
-    Args:
-        suite: Test suite name (e.g. 'Billing', 'Menu')
-        result: 'pass' or 'fail'
-        passed: Number of assertions passed
-        total: Total number of assertions
-        detail: 'ok' on pass, failure message on fail
-    """
-    if result not in ("pass", "fail"):
-        raise ValueError(f"Invalid result: {result!r}")
-
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-    machine = _machine_name()
-    entry = f"{timestamp}\t{suite}\t{result}\t{passed}\t{total}\t{detail}\n"
-
-    with open(_resolve_test_log_path(machine), "a", encoding="utf-8") as f:
-        f.write(entry)
