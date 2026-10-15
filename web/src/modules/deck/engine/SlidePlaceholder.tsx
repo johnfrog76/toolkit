@@ -1,5 +1,10 @@
 import { ComponentFrame } from "./ComponentFrame";
 
+// Part of the deck engine's public toolkit for deck authors. No shipped deck
+// uses it yet; it is kept for drafting a new deck, where a slide's visual can
+// be marked "to build" with its storyboard caption before the real component
+// exists.
+
 interface SlidePlaceholderProps {
   /** Short title for the intended visual, e.g. "Title hero" or "Billing timeline". */
   label: string;

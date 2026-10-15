@@ -191,6 +191,111 @@ Assert-True "valid JSON with no message field returns null" `
 
 Write-Host ""
 
+# -- The verb, typed in a fresh shell ------------------------------------------
+# Everything above drives pieces of the script. This section types the verb the
+# way a person does (AGENTS.md: a suite that runs a script directly does not test
+# the verb), in a child shell with the scratch package alone on PSModulePath, no
+# webhook in reach, and az and Invoke-RestMethod replaced by functions that write
+# down each call and change nothing. No tracker is contacted.
+
+. (Join-Path (Join-Path $pkgRoot 'Scripts') 'Resolve-CliPrefix.ps1')
+$cfgPrefix = Resolve-P20ConfigPrefix -PackageRoot $pkgRoot
+
+$typedRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-closeitem-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+$typedPkg  = Join-Path $typedRoot 'pkg'
+$typedHub  = Join-Path $typedRoot 'hub'
+$typedLog  = Join-Path $typedRoot 'log'
+$typedCalls = Join-Path $typedRoot 'calls.log'
+
+function Invoke-TypedClose {
+    param([string]$Snippet, [string]$WorkItemType = 'Task', [string]$State = 'Active')
+    if (Test-Path $typedCalls) { Remove-Item $typedCalls -Force }
+    $pkg = $typedPkg -replace "'", "''"; $hub = $typedHub -replace "'", "''"; $log = $typedLog -replace "'", "''"; $calls = $typedCalls -replace "'", "''"
+    $pre = @"
+`$env:PSModulePath = '$pkg'
+`$env:PROMPTS_ROOT = '$hub'
+`$env:P20_USAGE_LOG_DIR = '$log'
+`$env:P20_TEST_WI_TYPE = '$WorkItemType'
+`$env:P20_TEST_WI_STATE = '$State'
+Get-ChildItem Env: | Where-Object { `$_.Name -like 'TEAMS_WEBHOOK_*' } | ForEach-Object { Remove-Item "Env:\`$(`$_.Name)" -ErrorAction SilentlyContinue }
+function global:az {
+    Add-Content -Path '$calls' -Value ("az " + (`$args -join ' '))
+    `$global:LASTEXITCODE = 0
+    if (`$args[0] -eq 'account' -and `$args[1] -eq 'get-access-token') { return 'stub-token' }
+}
+function global:Invoke-RestMethod {
+    param(`$Uri, `$Headers, `$Method, `$Body)
+    `$line = "REST `$Method `$Uri"
+    if (`$Body) { `$line += " " + (`$Body -replace '\s+', ' ') }
+    Add-Content -Path '$calls' -Value `$line
+    if ("`$Method" -eq 'Get') {
+        return [pscustomobject]@{ fields = [pscustomobject]@{ 'System.State' = `$env:P20_TEST_WI_STATE; 'System.Title' = 'A scratch item'; 'System.WorkItemType' = `$env:P20_TEST_WI_TYPE; 'System.TeamProject' = 'Acme Project' } }
+    }
+    return [pscustomobject]@{ id = 4242 }
+}
+Import-Module '$pkg/utilities.psm1' -Force -DisableNameChecking *>`$null
+`$global:P20Env = [pscustomobject]@{ Tier = 1 }
+"@
+    $runner = Join-Path $typedRoot ("run-" + [guid]::NewGuid().ToString('N').Substring(0, 8) + ".ps1")
+    [System.IO.File]::WriteAllText($runner, ($pre + "`n" + $Snippet + "`n; `"EXIT=`$LASTEXITCODE`"`n"), (New-Object System.Text.UTF8Encoding($false)))
+    $out = & pwsh -NoProfile -File $runner 2>&1
+    $text = (($out | ForEach-Object { $_.ToString() }) -join "`n")
+    $callLines = if (Test-Path $typedCalls) { @(Get-Content $typedCalls) } else { @() }
+    return [pscustomobject]@{ Text = $text; Calls = $callLines }
+}
+
+try {
+    New-Item -ItemType Directory -Path $typedPkg, $typedHub, $typedLog -Force | Out-Null
+    foreach ($f in @('utilities.psm1', 'config.default.json', 'consts.json')) { Copy-Item (Join-Path $pkgRoot $f) $typedPkg -Force }
+    Copy-Item (Join-Path $pkgRoot 'Scripts') $typedPkg -Recurse -Force
+    Copy-Item (Join-Path $pkgRoot 'Config')  $typedPkg -Recurse -Force
+    $hubJson = '{ "hub": 1, "spaces": [ { "slug": "board", "name": "Board", "status": "active", "promptsFolder": "board", "org": "https://dev.azure.com/acme-org" } ] }'
+    [System.IO.File]::WriteAllText((Join-Path $typedHub 'hub.json'), $hubJson, (New-Object System.Text.UTF8Encoding($false)))
+    New-Item -ItemType Directory -Path (Join-Path $typedHub 'board/current') -Force | Out-Null
+    $localCfg = [ordered]@{ quietStart = $true; promptsRoot = $typedHub; activeSpace = 'board' }
+    [System.IO.File]::WriteAllText((Join-Path $typedPkg 'config.local.json'), ($localCfg | ConvertTo-Json -Depth 4), (New-Object System.Text.UTF8Encoding($false)))
+
+    $itemUri = 'https://dev.azure.com/acme-org/_apis/wit/workitems/4242?api-version=7.1'
+    $commentUri = 'https://dev.azure.com/acme-org/Acme%20Project/_apis/wit/workItems/4242/comments?api-version=7.1-preview'
+
+    # -WhatIf: reads the item, prints the transition, writes nothing.
+    $r = Invoke-TypedClose "${cfgPrefix}CloseItem 4242 -Comment 'Shipped' -WhatIf"
+    $writes = @($r.Calls | Where-Object { $_ -match '^REST (Patch|Post) ' })
+    Assert-True "typed CloseItem -WhatIf exits 0" ($r.Text -match 'EXIT=0') $r.Text
+    Assert-True "typed CloseItem -WhatIf says what it would set" ($r.Text -match 'Would set Task #4242 : Active -> Closed \(Completed\)') $r.Text
+    Assert-True "typed CloseItem -WhatIf makes no PATCH and no comment POST" ($writes.Count -eq 0) ($r.Calls -join ' | ')
+
+    # The real close of a Task: one PATCH with the state and the reason, one comment.
+    $r = Invoke-TypedClose "${cfgPrefix}CloseItem 4242 -Comment 'Shipped in the scratch branch'"
+    $patches = @($r.Calls | Where-Object { $_ -match '^REST Patch ' })
+    $posts = @($r.Calls | Where-Object { $_ -match '^REST Post ' })
+    $restCalls = @($r.Calls | Where-Object { $_ -match '^REST ' })
+    Assert-True "typed CloseItem exits 0" ($r.Text -match 'EXIT=0') $r.Text
+    Assert-True "typed CloseItem reads the item, then PATCHes it once at its address" ($patches.Count -eq 1 -and $patches[0].StartsWith("REST Patch $itemUri ") -and $restCalls[0] -eq "REST Get $itemUri") ($r.Calls -join ' | ')
+    # JSON key order differs between hosts, so the body is read back, not matched as text.
+    $ops = @(); if ($patches.Count -eq 1) { $ops = @(($patches[0] -replace '^REST Patch \S+ ', '') | ConvertFrom-Json) }
+    Assert-True "the PATCH sets System.State to Closed" (@($ops | Where-Object { $_.path -eq '/fields/System.State' -and $_.value -eq 'Closed' -and $_.op -eq 'add' }).Count -eq 1) ($patches -join ' | ')
+    Assert-True "the PATCH sets System.Reason to Completed" (@($ops | Where-Object { $_.path -eq '/fields/System.Reason' -and $_.value -eq 'Completed' }).Count -eq 1) ($patches -join ' | ')
+    Assert-True "the comment is POSTed once, with the text given" ($posts.Count -eq 1 -and $posts[0].StartsWith("REST Post $commentUri ") -and $posts[0].Contains('Shipped in the scratch branch')) ($posts -join ' | ')
+    Assert-True "typed CloseItem reports the result line" ($r.Text -match '\[RESULT\] workItemType=Task targetState=Closed reason=Completed') $r.Text
+
+    # A Bug goes to Resolved / Fixed, and an item already closed is left alone.
+    $r = Invoke-TypedClose "${cfgPrefix}CloseItem 4242 -Comment 'Fixed'" -WorkItemType 'Bug'
+    $patches = @($r.Calls | Where-Object { $_ -match '^REST Patch ' })
+    $ops = @(); if ($patches.Count -eq 1) { $ops = @(($patches[0] -replace '^REST Patch \S+ ', '') | ConvertFrom-Json) }
+    Assert-True "typed CloseItem on a Bug sets Resolved / Fixed" (@($ops | Where-Object { $_.path -eq '/fields/System.State' -and $_.value -eq 'Resolved' }).Count -eq 1 -and @($ops | Where-Object { $_.path -eq '/fields/System.Reason' -and $_.value -eq 'Fixed' }).Count -eq 1) ($patches -join ' | ')
+    $r = Invoke-TypedClose "${cfgPrefix}CloseItem 4242 -Comment 'Again'" -State 'Closed'
+    Assert-True "typed CloseItem on a closed item sends no PATCH, still comments, exits 0" (@($r.Calls | Where-Object { $_ -match '^REST Patch ' }).Count -eq 0 -and @($r.Calls | Where-Object { $_ -match '^REST Post ' }).Count -eq 1 -and $r.Text -match 'EXIT=0') $r.Text
+}
+catch {
+    Assert-True "the typed cases ran to the end without a terminating error" $false $_.Exception.Message
+}
+finally {
+    if (Test-Path $typedRoot) { Remove-Item $typedRoot -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+Write-Host ""
+
 # -- Summary -----------------------------------------------------------------
 
 Write-Host "=======================================================" -ForegroundColor Cyan
