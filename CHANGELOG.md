@@ -8,6 +8,10 @@ release.
 
 ## [Unreleased]
 
+### Fixed
+
+- The agent no longer fails to start, or answers 500 on every route, when `config.local.json` has a typo; it falls back to the defaults and `/env` names the broken file.
+
 ## [1.0.0] - 2026-10-15
 
 The first release. Everything below is what 1.0.0 is.

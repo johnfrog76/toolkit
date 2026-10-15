@@ -571,14 +571,40 @@ def features_override() -> dict | None:
     return value
 
 
+def read_config_file(path: Path) -> tuple[dict, str]:
+    """Read one config file as ``(data, problem)``. Never raises.
+
+    A missing file is ``({}, "")`` -- the ordinary case. An unreadable file,
+    malformed JSON or a top level that is not an object is ``({}, <sentence>)``
+    and the sentence is also logged, so the caller falls back to the layers
+    below and ``/env`` can say why. Same posture as ``read_hub_manifest``.
+    """
+    if not path.exists():
+        return {}, ""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError) as exc:
+        problem = f"{path.name} is not valid JSON ({exc}) -- ignored, the defaults stand. Fix the file or delete it."
+        _warn(f"{path}: {problem}")
+        return {}, problem
+    if not isinstance(data, dict):
+        problem = f"{path.name} must hold a JSON object at the top level -- ignored, the defaults stand."
+        _warn(f"{path}: {problem}")
+        return {}, problem
+    return data, ""
+
+
 def load_config() -> dict:
-    """Resolve the effective config: defaults, then per-machine overrides."""
-    defaults = {}
-    if DEFAULT_CONFIG_PATH.exists():
-        defaults = space_keys(json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8-sig")))
-    local = {}
-    if LOCAL_CONFIG_PATH.exists():
-        local = space_keys(json.loads(LOCAL_CONFIG_PATH.read_text(encoding="utf-8-sig")))
+    """Resolve the effective config: defaults, then per-machine overrides.
+
+    An unreadable or malformed config file never raises: it is skipped, and the
+    sentence lands in ``configProblems`` for ``/env`` to report.
+    """
+    defaults, default_problem = read_config_file(DEFAULT_CONFIG_PATH)
+    defaults = space_keys(defaults)
+    local, local_problem = read_config_file(LOCAL_CONFIG_PATH)
+    local = space_keys(local)
+    config_problems = [p for p in (default_problem, local_problem) if p]
     # The environment's stand-ins, applied to the local layer so every reader
     # below (and every route that reads load_config) sees one answer.
     slug_override = active_space_override()
@@ -732,6 +758,8 @@ def load_config() -> dict:
             "path": hub["path"],
             "spaces": len(hub["spaces"]),
         },
+        # One sentence per config file that could not be read (read_config_file).
+        "configProblems": config_problems,
     }
     return cfg
 
