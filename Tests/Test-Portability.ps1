@@ -793,7 +793,7 @@ $cpParenRx = [regex]'\([^()]*\)'
 $cpStringRx = [regex]'"(?:\\.|[^"\\])*"|''(?:\\.|[^''\\])*''|`(?:\\.|[^`\\])*`'
 $cpBlankEval = [System.Text.RegularExpressions.MatchEvaluator] { param($m) 'x' * $m.Length }
 $cpDataPath = '^(samples|templates|design|docs|spec)/|(^|/)(fixtures|__fixtures__)/|^\.claude/'
-$cpSkipFiles = @('Scripts/Export-Public.ps1', 'Tests/Test-ExportPublic.ps1')
+$cpSkipFiles = @()
 $cpKinds = @{
     '.ps1' = 'ps'; '.psm1' = 'ps'; '.psd1' = 'ps'
     '.py' = 'py'

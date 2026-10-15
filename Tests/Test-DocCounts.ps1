@@ -135,6 +135,37 @@ if ($combinedRow.Count -eq 1) {
     Assert-Equal 'the combined row names every registry suite once, in the runner''s order' ($registryNames -join ', ') ($named -join ', ')
 }
 
+
+# The paste block under "The counts, after a merge" is what a full run prints:
+# the per-suite line and the total line. It went stale once -- a deleted suite
+# still listed, a total that was no one's sum -- because nothing read it. Read it
+# back against the registry: the same suite count, the same names in the same
+# order, and a total that is the sum of its own lines. Deliberately not against a
+# live run: assertion counts move with a machine's config.local.json (see above).
+$pasteHead = [regex]::Match($testingText, '(?s)\*\*The counts, after a merge\.\*\*.*?```text\r?\n(.*?)\r?\n```')
+Assert-True 'docs/TESTING.md has the paste block under "The counts, after a merge"' $pasteHead.Success 'fenced block not found -- has the heading been reworded?'
+if ($pasteHead.Success) {
+    $pasteLines = @($pasteHead.Groups[1].Value -split "\r?\n" | Where-Object { $_.Trim() })
+    $pasteNames = @()
+    $pasteSum = 0
+    $pasteTotal = $null
+    foreach ($pl in $pasteLines) {
+        $tm = [regex]::Match($pl, '^\s*(\d+) suites, (\d+) assertions\s*$')
+        if ($tm.Success) { $pasteTotal = $tm; continue }
+        $parts = @([regex]::Matches($pl, '(?<=^\s*|,\s)([A-Z][A-Za-z]+) (\d+)(?=,|\s*$)'))
+        if ($parts.Count -gt 0) {
+            foreach ($pm in $parts) { $pasteNames += $pm.Groups[1].Value; $pasteSum += [int]$pm.Groups[2].Value }
+        }
+    }
+    Assert-Equal 'the paste block lists as many suites as the registry has' $realCount $pasteNames.Count
+    Assert-Equal 'the paste block names every registry suite once, in the runner''s order' ($registryNames -join ', ') ($pasteNames -join ', ')
+    Assert-True 'the paste block ends with its "N suites, M assertions" line' ($null -ne $pasteTotal) 'line not found'
+    if ($null -ne $pasteTotal) {
+        Assert-Equal 'the paste block''s suite count is the registry''s' $realCount $pasteTotal.Groups[1].Value
+        Assert-Equal 'the paste block''s total is the sum of its own per-suite lines' $pasteSum $pasteTotal.Groups[2].Value
+    }
+}
+
 $suiteRows = @($testingRows | Where-Object { $_ -match '^\|\s*`tkTestToolkit -[A-Za-z]+`\s*\|' })
 Assert-True 'docs/TESTING.md has single-suite rows to check' ($suiteRows.Count -gt 0)
 foreach ($row in $suiteRows) {
