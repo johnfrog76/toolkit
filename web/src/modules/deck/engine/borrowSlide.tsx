@@ -1,7 +1,9 @@
 import type { Deck, Slide } from "../decks/types";
 import { Say, Beat, Context } from "./PresenterNoteKit";
 
-// Compilation-deck helper: build a deck from other decks' slides.
+// Compilation-deck helper: build a deck from other decks' slides. Part of the
+// deck engine's public toolkit for deck authors; no shipped deck uses it yet,
+// and it is kept for a deck that gathers slides from other decks.
 //
 // A borrowed slide arrives WHOLE — `copy` and `content` untouched, in the
 // source deck's own visual voice (safe because every deck's Stage mounts its
@@ -11,8 +13,7 @@ import { Say, Beat, Context } from "./PresenterNoteKit";
 // (your re-narration — typically a one-line story Say).
 //
 // Slide numbers are 1-based, exactly as the presenter's "N / M" counter shows
-// them — curate by watching the deck, not by reading its code. First used by
-// why-i-make-decks ("X tells the story of Y", fourteen frames); the spread
+// them — curate by watching the deck, not by reading its code. The spread
 // pattern is:
 //
 //   ...HITS.map(borrowSlide)
