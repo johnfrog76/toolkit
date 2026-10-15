@@ -66,7 +66,7 @@ GitHub Space, where they answer through `gh`.
 
 | Half | Azure DevOps's | NOT Azure DevOps's, though it sits beside it |
 | --- | --- | --- |
-| CLI | eleven verbs and the work-item form of `NewPrompt` (below), the `Scripts/` they run, the tier check | `NewPrompt -Title`, `Archive`, `Billable`, `Status`, `Sync`, `ThreadHash` |
+| CLI | twelve verbs and the work-item form of `NewPrompt` (below), the `Scripts/` they run, the tier check | `NewPrompt -Title`, `Archive`, `Billable`, `Status`, `Sync`, `ThreadHash` |
 | Agent | `ado/accounting.py` -- `/prs`, `/work-items`, `/dashboard`, `/dashboard/pipelines/{project}`; the identity those filter by | `ado/status.py`, `ado/reporting.py` (Daily, engagement), `ado/pr_comments.py` (reads files), `ado/bridge.py` |
 | Web | `MyWork`, `MyPRs`, `Dashboard`, the work-item tab of the New card dialog, *Open in ADO* and *Create PR* on a card, the repo filter, `ConnectAdoCard` | `Board`, `PromptStatus`, `PromptDetailPage`, `Billing` (Daily), `EnvCard`, `ConfigSettings` |
 | A card | the `**ADO Link:**` line, the `PR URL:` line, the review rounds | everything else ([the card](../hub/cards.md)) |
@@ -129,10 +129,12 @@ the card's `reason` line, never an error (`gh_repo_reason` in `agent/ado/account
 
 ## The verbs
 
-Eleven verbs belong to the add-on -- the core ones in `$script:ModuleState.AdoCommands` in `utilities.psm1` -- plus ONE FORM of a twelfth:
+Twelve verbs are on the add-on's list, `$script:ModuleState.AdoCommands` in `utilities.psm1`, plus ONE FORM of a thirteenth:
 `NewPrompt <id>` needs ADO, `NewPrompt -Title` does not, so the verb itself is not on the list. All of them
 check the tier ONCE, before running, and say what is unavailable and why -- never a silent empty result,
 never a raw API error.
+
+Eleven of the twelve are in the table below; the twelfth is `LogPeerReview`, a growth verb that logs a review of a colleague's pull request and is org-scoped. Being on the list does one thing: `Menu` leaves its row out where no tracker is shown, and marks it `(unavailable)` at Tier 2 or 3. It is not a tier check on the verb itself.
 
 | Verb | Does | Touches a card? |
 | --- | --- | --- |
@@ -267,7 +269,7 @@ Take all four away and a card is still a card: that is the whole meaning of "plu
 | Tier | Means | This add-on |
 | --- | --- | --- |
 | 1 | `az` present, signed in, ADO reachable, org `active` | everything |
-| 2 | repo and git, no ADO -- or an org that is `local` / `archive` | the eleven verbs say what is unavailable and why; the Tier-1 routes are empty; **cards, the board, Daily and Sync are unaffected** |
+| 2 | repo and git, no ADO -- or an org that is `local` / `archive` | the twelve verbs say what is unavailable and why; the Tier-1 routes are empty; **cards, the board, Daily and Sync are unaffected** |
 | 3 | repo or git missing | `Menu` and the tests |
 
 An `archive` or a `local` org is never probed, so it cannot FAIL a check. The Environment card and `tkEnv`
