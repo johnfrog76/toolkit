@@ -574,6 +574,67 @@ catch {
 }
 finally { if (Test-Path $dBase) { Remove-Item -Path $dBase -Recurse -Force -ErrorAction SilentlyContinue } }
 
+# -- The work item's comments cannot be read: no token ------------------------
+# The comments are fetched with a bearer token from `az account get-access-token`.
+# An empty token used to skip the fetch with no message and write a card without
+# the discussion; it is a stated refusal now (exit 2, one Error and one Hint), and
+# nothing is written -- the work item is not assigned or moved either. A child
+# shell carries a stand-in `az` function, which shadows any real one on the PATH.
+
+Write-Host "-- No ADO token: a stated refusal, no card ------------" -ForegroundColor Cyan
+
+$sandbox = New-PromptSandbox
+try {
+    $azLog = Join-Path $sandbox 'az-calls.txt'
+    $driver = Join-Path $sandbox 'driver.ps1'
+    $driverText = @'
+param([string]$Sandbox, [string]$Script, [string]$Mode)
+$global:P20Config = [pscustomobject]@{
+    Org = 'https://dev.azure.com/example'; PromptsRoot = $Sandbox; PromptsFolder = 'current'
+    Tenant = ''; ActiveOrgName = 'example'; Projects = @(); BranchUser = 'someone'; CommandPrefix = 'tk'
+}
+function global:az {
+    Add-Content -Path (Join-Path $Sandbox 'az-calls.txt') -Value ($args -join ' ')
+    $global:LASTEXITCODE = 0
+    if ($args -contains 'get-access-token') {
+        if ($Mode -eq 'EmptyToken') { return }
+        if ($Mode -eq 'NoToken') { $global:LASTEXITCODE = 1; return 'ERROR: Please run az login to setup account.' }
+        return 'a-token'
+    }
+    if ($args -contains 'show') {
+        return '{"fields":{"System.WorkItemType":"Bug","System.Title":"Timeout on large files","System.State":"Active","System.AssignedTo":{"uniqueName":"someone@example.com"}}}'
+    }
+}
+& $Script -OutputFolder (Join-Path $Sandbox 'current') -AssignTo 'someone@example.com' 77
+exit $LASTEXITCODE
+'@
+    [System.IO.File]::WriteAllText($driver, $driverText, (New-Object System.Text.UTF8Encoding $false))
+
+    $ErrorActionPreference = 'Continue'
+    $out = (& pwsh -NoProfile -File $driver -Sandbox $sandbox -Script $targetScript -Mode NoToken 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+
+    Assert-Equal 'an empty token exits 2, a stated refusal' 2 $code
+    Assert-True 'it says the comments could not be read because no ADO token was available' ($out -match "Error: Could not read work item 77's comments: no ADO token was available") $out
+    Assert-True 'and the hint names az login' ($out -match "Hint:\s+Run 'az login'") $out
+    Assert-Equal 'and no card was written' 0 @(Get-ChildItem (Join-Path $sandbox 'current') -Filter '*.prompt.md').Count
+    $azCalls = if (Test-Path $azLog) { [System.IO.File]::ReadAllText($azLog) } else { '' }
+    Assert-True 'and the work item was never assigned or moved' ($azCalls -notmatch 'work-item update') $azCalls
+
+    $empty = (& pwsh -NoProfile -File $driver -Sandbox $sandbox -Script $targetScript -Mode EmptyToken 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    Assert-True 'az printing nothing and exiting 0 is refused the same way' ($LASTEXITCODE -eq 2 -and $empty -match 'no ADO token was available') $empty
+    Assert-Equal 'and that wrote no card either' 0 @(Get-ChildItem (Join-Path $sandbox 'current') -Filter '*.prompt.md').Count
+
+    # The same stand-in with a token gets past the check: the refusal is the token, not the harness.
+    $ok = (& pwsh -NoProfile -File $driver -Sandbox $sandbox -Script $targetScript -Mode Token 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    Assert-True 'with a token the same run does not refuse for it' ($ok -notmatch 'no ADO token was available') $ok
+}
+catch {
+    Assert-True 'the no-token cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally { Remove-PromptSandbox $sandbox }
+
 Write-Host ""
 Write-Host "=======================================================" -ForegroundColor Cyan
 $total = $script:passed + $script:failed
