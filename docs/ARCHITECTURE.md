@@ -340,12 +340,12 @@ templates/              Prompt file templates by work item type, plus the module
 agentic/                Six card-workflow prompts, pr-suggest, new-issue, four module
                         prompts, and prompts.json -- which way of working each belongs to,
                         who sends it and its category (the Studio's Prompts card reads it)
-spec/                   Design contracts -- a larger idea is worked here before it is built
+spec/                   Where a product may keep its specs; this tree keeps only the README ([spec/README.md](../spec/README.md))
 samples/hub/            The sample hub `tkStart` copies out on a first run: one `local` org, Demo, with cards,
                         meetings, a goal and a review. Read-only here -- it is never used in place
-design/                 The product's living design notes -- the conversations behind each spec
-issues/                 The build order (ROADMAP.md); the backlog is GitHub Issues
+design/                 Where a product may keep its design notes; this tree keeps only the README ([design/README.md](../design/README.md))
 .github/workflows/      verify.yml, the suites in CI; pages.yml, the landing page's deploy (docs/TESTING.md, "In CI")
+AGENTS.md  CHANGELOG.md  VERIFY.md  the agent guide, the change log, the verification gates
 docs/                   The documentation. The root README is the map; each subject has one owner
   QUICKSTART.md           Requirements, install, the first run, a first card, the web UI up
   CONFIGURATION.md        tkConfig, the three config files, consts.json, the hub's hub.json
@@ -354,6 +354,7 @@ docs/                   The documentation. The root README is the map; each subj
   ARCHITECTURE.md         How the three halves fit; the agent and the web UI in overview; this layout
   SCENARIOS.md            Every configuration a machine can be in, what it shows, the test that holds it
   KNOWN-GAPS.md           The roadmap of known gaps, each with what you see and its issue
+  ROADMAP.md              The order the design ideas get built in; the backlog is GitHub Issues
   CONTRIBUTING.md         The contributor's first page: setup, the runners, the rules a change meets
   modules/README.md       The modules, "off means absent", and D-CM
   modules/deck.md         The deck module, briefly -- it points at Connected Deck's README
