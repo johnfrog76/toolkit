@@ -138,7 +138,7 @@ Eleven of the twelve are in the table below; the twelfth is `LogPeerReview`, a g
 
 | Verb | Does | Touches a card? |
 | --- | --- | --- |
-| `NewPrompt <id>` | scaffolds a card from a work item (the `-Title` form needs no ADO and is not part of this add-on) | creates it |
+| `NewPrompt <id>` | scaffolds a card from a work item, with its comments (the `-Title` form needs no ADO and is not part of this add-on); with no `az` token to read the comments it refuses (exit 2, naming `az login`) and writes nothing | creates it |
 | `NewItem <title> [-Type]` | creates a work item from the terminal | no |
 | `MyWork` | work items assigned to you | no |
 | `MyPRs` | your active pull requests across the org | no |
