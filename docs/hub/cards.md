@@ -184,7 +184,7 @@ A card can carry a picture: a screen snap of what was wrong (`**Before:**`) and 
   Add before / Remove cover, and the + dialog's picture field all go one way: the bytes to
   `POST /api/assets/upload`, which puts them in a temp file under the system temp folder and answers its
   path, writing nothing into the hub; then `Cover <card> <path>` (or `NewPrompt -Cover` / `-Before <path>`)
-  through the bridge, which copies the file into `assets/<card key>/` and writes the line. The route
+  through the bridge, which copies the file into `assets/<card key>/` and writes the line, after which the bridge removes the upload's temp folder (success or failure; and the agent sweeps any a day old at start). The route
   refuses what the verb would -- a type not in the list, a size over the limit, no bytes -- so the person
   hears it before a shell starts; the zone says the same sentence before the upload. `Tests/test_assets.py`
   asserts the hub's bytes are unchanged after an upload with no `Cover` call. A drop only stages the
