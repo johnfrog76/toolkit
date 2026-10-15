@@ -404,9 +404,9 @@ tkCloseItem <id> -Comment "verified"
 tkCloseItem <id> -Comment "verified"          # deliberately twice
 ```
 
-- [ ] `-WhatIf` names the work item, its current state and the planned transition (`Active -> Closed (Completed)` for a Task), and the board is unchanged afterwards
-- [ ] The real run sets the state to **Closed** (a Bug goes to **Resolved**) and ends with a `[RESULT]` line naming the type, state and reason
-- [ ] The board shows the new state, and the comment is in the item's discussion
+- [x] `-WhatIf` names the work item, its current state and the planned transition (`Active -> Closed (Completed)` for a Task), and the board is unchanged afterwards
+- [x] The real run sets the state to **Closed** (a Bug goes to **Resolved**) and ends with a `[RESULT]` line naming the type, state and reason
+- [x] The board shows the new state, and the comment is in the item's discussion
 - [ ] The second run says the item is already closed, changes no state, and still posts the comment
 - [ ] A `-Reason` the project's process does not accept is refused (exit 2) with ADO's own sentence, and the item is left as it was
 
