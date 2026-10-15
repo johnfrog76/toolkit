@@ -130,9 +130,9 @@ the card's `reason` line, never an error (`gh_repo_reason` in `agent/ado/account
 ## The verbs
 
 Twelve verbs are on the add-on's list, `$script:ModuleState.AdoCommands` in `utilities.psm1`, plus ONE FORM of a thirteenth:
-`NewPrompt <id>` needs ADO, `NewPrompt -Title` does not, so the verb itself is not on the list. All of them
+`NewPrompt <id>` needs ADO, `NewPrompt -Title` does not, so the verb itself is not on the list. Ten of them
 check the tier ONCE, before running, and say what is unavailable and why -- never a silent empty result,
-never a raw API error.
+never a raw API error. `Dashboard` has its own Tier 2 view of local cards and repo status, and `LogPeerReview` has no tier check at all.
 
 Eleven of the twelve are in the table below; the twelfth is `LogPeerReview`, a growth verb that logs a review of a colleague's pull request and is org-scoped. Being on the list does one thing: `Menu` leaves its row out where no tracker is shown, and marks it `(unavailable)` at Tier 2 or 3. It is not a tier check on the verb itself.
 
@@ -269,7 +269,7 @@ Take all four away and a card is still a card: that is the whole meaning of "plu
 | Tier | Means | This add-on |
 | --- | --- | --- |
 | 1 | `az` present, signed in, ADO reachable, org `active` | everything |
-| 2 | repo and git, no ADO -- or an org that is `local` / `archive` | the twelve verbs say what is unavailable and why; the Tier-1 routes are empty; **cards, the board, Daily and Sync are unaffected** |
+| 2 | repo and git, no ADO -- or an org that is `local` / `archive` | ten verbs say what is unavailable and why, `Dashboard` shows a local view, and `LogPeerReview` (it needs the hub, not a tracker) runs; the Tier-1 routes are empty; **cards, the board, Daily and Sync are unaffected** |
 | 3 | repo or git missing | `Menu` and the tests |
 
 An `archive` or a `local` org is never probed, so it cannot FAIL a check. The Environment card and `tkEnv`
