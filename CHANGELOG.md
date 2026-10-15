@@ -11,6 +11,9 @@ release.
 ### Fixed
 
 - The agent no longer fails to start, or answers 500 on every route, when `config.local.json` has a typo; it falls back to the defaults and `/env` names the broken file.
+- Saving a meeting from the browser on Windows no longer rewrites the whole session file with CRLF
+  line endings; a save keeps the ending the file already has.
+- A collapsed filter drawer no longer keeps its search box and chips in the Tab order or in what a screen reader reads.
 - Screen readers now announce the name of each field in the create and action dialogs (Work Item ID, Reason, Comment and the rest) instead of its placeholder text.
 
 ## [1.0.0] - 2026-10-15

@@ -70,7 +70,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `ReplyPR` | `PRComments` (script only: the reply written into the card; not the live post) | 6 |
 | `AddPRReview` | `ExitCodes` (the missing-key refusal; the branch search's and the details fetch's 401/403/404 with the REST call stubbed) | 12 (a real expired token) |
 | `ThreadHash` | `ThreadHash` (script only) | 6 |
-| `CloseItem` | `CloseWorkItem` (script only: the transition rule and error parsing) | 6, 12 |
+| `CloseItem` | `CloseWorkItem` (the transition rule and error parsing; typed in a fresh shell with `az` and the REST calls stubbed: `-WhatIf`, a Task to Closed, a Bug to Resolved, an item already closed) | 6 (the live close on a real board), 12 |
 | `EditItem` | `EditItem` (typed, with `gh` and `az` stubbed) | 12 (a real repository) |
 | `MyWork` | neither | 6, 8c |
 | `MyPRs` | neither | 8c |
@@ -283,7 +283,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **43 suites, 6748 assertions** with a `config.local.json`, every one
+findings. On this commit that is **43 suites, 6987 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -395,6 +395,20 @@ tkReplyPR <pr> <thread> -Reply "verified"
 
 - [ ] Reply visible on the PR
 - [ ] Result threaded back into the prompt file
+
+Then close a **test** work item -- a Task made for the purpose, never a real one -- dry run first:
+
+```powershell
+tkCloseItem <id> -WhatIf -Comment "verified"
+tkCloseItem <id> -Comment "verified"
+tkCloseItem <id> -Comment "verified"          # deliberately twice
+```
+
+- [ ] `-WhatIf` names the work item, its current state and the planned transition (`Active -> Closed (Completed)` for a Task), and the board is unchanged afterwards
+- [ ] The real run sets the state to **Closed** (a Bug goes to **Resolved**) and ends with a `[RESULT]` line naming the type, state and reason
+- [ ] The board shows the new state, and the comment is in the item's discussion
+- [ ] The second run says the item is already closed, changes no state, and still posts the comment
+- [ ] A `-Reason` the project's process does not accept is refused (exit 2) with ADO's own sentence, and the item is left as it was
 
 ```powershell
 tkMyWork
@@ -939,7 +953,14 @@ names the command, what you should see, and the issue it closes. A row stays unt
 it and records that on the issue. Then the row moves into the gate it belongs to, or goes if a suite
 now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on the verifying host: it prints each `verify-close` issue with the row below that names it, by issue number.
 
-No fix has left a row here yet.
+- [x] **A save from the browser keeps a session's line endings.** In a scratch hub with
+  `communication` on, `NewMeeting -Date 2026-10-20` from a fresh shell writes an LF session. Make the hub a git
+  repository with `core.autocrlf` off (with it on, git hides the difference) and commit it, start the agent,
+  save that session once with `PUT /api/manager/2026-10-20.md` and `{"since": "notes"}`, then run
+  `git diff --stat` in the hub. You should see only the edited lines changed (a few insertions and
+  deletions), not every line of the file, and `git diff` shows no `^M`. Repeat on a session whose
+  lines end CRLF: it stays CRLF.
+  CONFIRMED on Windows: an LF session saved through the agent changed only its edited lines and gained no CR.
 
 ## Recording a run
 

@@ -653,6 +653,35 @@ class CommsSendRoute(ManagerRouteTestCase):
         post.assert_not_called()
 
 
+class SaveKeepsLineEndings(ManagerRouteTestCase):
+    """A save keeps the terminator the session file already has, on every OS."""
+
+    NAME = "2026-01-22.md"
+
+    def _put(self, since):
+        res = self.client.put(f"/api/manager/{self.NAME}", json={"since": since})
+        self.assertEqual(res.status_code, 200)
+        return self.session(self.NAME).read_bytes()
+
+    def test_an_lf_session_stays_lf_and_only_the_edit_changes(self):
+        first = self._put("first notes")
+        self.assertNotIn(b"\r", first)
+        second = self._put("second notes")
+        self.assertNotIn(b"\r", second)
+        a, b = first.split(b"\n"), second.split(b"\n")
+        self.assertEqual(len(a), len(b))
+        self.assertEqual([x for x, y in zip(a, b) if x != y], [b"first notes"])
+
+    def test_a_crlf_session_stays_crlf(self):
+        first = self._put("first notes")
+        self.session(self.NAME).write_bytes(first.replace(b"\n", b"\r\n"))
+        second = self._put("second notes")
+        self.assertEqual(second, first.replace(b"first notes", b"second notes").replace(b"\n", b"\r\n"))
+
+    def test_no_bom_is_written(self):
+        self.assertFalse(self._put("notes").startswith(b"\xef\xbb\xbf"))
+
+
 class RewriteRoute(ManagerRouteTestCase):
     def test_no_model_key_declines_with_a_reason(self):
         # clear=True takes P20_USAGE_LOG_DIR with it, and the decline is

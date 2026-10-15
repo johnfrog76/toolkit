@@ -144,3 +144,32 @@ describe("the filter drawer's linkedness row", () => {
     ).toBe("true");
   });
 });
+
+// A closed drawer is collapsed to nothing, not removed, so it has to be made
+// unreachable: inert takes its controls out of the tab order and the
+// accessibility tree. jsdom does not implement inert (userEvent.tab() would
+// still land on the search box), so this holds the attribute that browsers act
+// on; the tab order itself is walked in a real browser.
+describe("the filter drawer's panel when it is closed", () => {
+  it("is inert while collapsed and not once opened", () => {
+    prompts = [LINKED_GH, CUSTOM];
+    drawer("All");
+    const panel = document.getElementById("filter-panel") as HTMLElement;
+    const search = screen.getByPlaceholderText("Card id, title or file");
+    expect(panel.hasAttribute("inert")).toBe(true);
+    expect(panel.contains(search)).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    expect(panel.hasAttribute("inert")).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    expect(panel.hasAttribute("inert")).toBe(true);
+  });
+
+  it("stays inert on a tab with no filters, where the control is disabled", () => {
+    prompts = [CUSTOM];
+    drawer("All", jest.fn(), []);
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    expect(document.getElementById("filter-panel")?.hasAttribute("inert")).toBe(true);
+  });
+});
