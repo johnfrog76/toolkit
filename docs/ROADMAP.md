@@ -154,7 +154,7 @@ system on their own board -- and has not been asked for an account.
 
 *Behind this phase, and not scheduled: going public -- a project page and a feature tour generated from the
 software -- the open-source front page and feature tour's design note, with the gates that come before it;
-the bar they became is `PUBLIC-BAR.md`.*
+the gates became a checklist that the public release was held to, and was met at 1.0.0.*
 
 ### 6. Ledgers -- *needs 3 and 4*
 
@@ -233,7 +233,7 @@ because we must get the commercial right"): the **Going public** milestone's des
 order with the commercial first, and the **After the flip** milestone holds F1-F4 as issues. The file and
 the milestones say the same thing; when one changes, both do.
 
-The public milestone is the bar (`docs/PUBLIC-BAR.md`) plus three pieces of one story, decided from
+The public milestone is the release checklist (met at 1.0.0) plus three pieces of one story, decided from
 the front-door design note on 2026-10-09: the README's first screen says what ToolKit is in one
 sentence -- a studio where you work on software by yourself, on a team, or orchestrating agents, and the
 cards are the record either way (with the deck's order, the commercial); Settings asks "How do I work on this
