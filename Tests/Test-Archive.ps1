@@ -1062,6 +1062,76 @@ catch {
 }
 finally { Remove-ArchiveSandbox $sandbox }
 
+# -- A card archived before its first commit; a failed commit is a refusal ------
+# A card created and archived with no commit in between has no tracked path in
+# current/. The move used to stage exact file paths, so git aborted the whole
+# add and the archive was left uncommitted behind a warning. It stages the two
+# folders now, and a commit that fails is a stated refusal (exit 2) that says
+# the file has already moved.
+
+Write-Host "-- archive before the first commit ---------------------" -ForegroundColor Cyan
+
+$sandbox = New-ArchiveSandbox
+try {
+    Add-CurrentFile $sandbox 'Task701-never-committed.prompt.md'
+    $out = Invoke-Archive @{ File = '701' }
+    Assert-Equal "an untracked card archives with exit 0" 0 $script:LastArchiveExit
+    Assert-True "the card is in archive/" (Test-Path (Join-Path $sandbox 'archive/Task701-never-committed.prompt.md'))
+    Assert-True "the archive commit is in the log" ((Get-CommitSubjects $sandbox) -contains 'archive: move Task701-never-committed.prompt.md to archive') ((Get-CommitSubjects $sandbox) -join '; ')
+    Push-Location $sandbox
+    try { $dirty = @(git status --short) } finally { Pop-Location }
+    Assert-True "the working tree is clean afterwards" ($dirty.Count -eq 0) ($dirty -join '; ')
+}
+catch {
+    Assert-True "the cases ran to the end without a terminating error -- $($_.Exception.Message)" $false
+}
+finally { Remove-ArchiveSandbox $sandbox }
+
+Write-Host "-- a tracked card still commits as a rename ------------" -ForegroundColor Cyan
+
+$sandbox = New-ArchiveSandbox
+try {
+    Add-CurrentFile $sandbox 'Task702-tracked.prompt.md'
+    Save-SandboxState $sandbox
+    $out = Invoke-Archive @{ File = '702' }
+    Assert-Equal "a tracked card archives with exit 0" 0 $script:LastArchiveExit
+    Push-Location $sandbox
+    try {
+        $show = @(git show --name-status --format='%s' HEAD)
+        $dirty = @(git status --short)
+    }
+    finally { Pop-Location }
+    Assert-True "the last commit is the archive commit" ($show[0] -eq 'archive: move Task702-tracked.prompt.md to archive') ($show -join '; ')
+    Assert-True "git records a rename" (($show -join ' ') -match 'R\d*\s+current/Task702-tracked\.prompt\.md\s+archive/Task702-tracked\.prompt\.md') ($show -join '; ')
+    Assert-True "the working tree is clean afterwards" ($dirty.Count -eq 0) ($dirty -join '; ')
+}
+catch {
+    Assert-True "the cases ran to the end without a terminating error -- $($_.Exception.Message)" $false
+}
+finally { Remove-ArchiveSandbox $sandbox }
+
+Write-Host "-- a failed commit is a stated refusal -----------------" -ForegroundColor Cyan
+
+$sandbox = New-ArchiveSandbox
+try {
+    $hook = Join-Path $sandbox '.git/hooks/pre-commit'
+    [System.IO.File]::WriteAllText($hook, "#!/bin/sh`necho 'hook says no'`nexit 1`n")
+    Add-CurrentFile $sandbox 'Task703-hook-refuses.prompt.md'
+    $out = Invoke-Archive @{ File = '703' }
+    Assert-Equal "a failed commit exits 2" 2 $script:LastArchiveExit
+    Assert-Contains "the refusal says the file was moved" $out 'was moved to archive/'
+    Assert-Contains "the refusal carries git's own sentence" $out 'hook says no'
+    Assert-Contains "the refusal names the way out" $out 'Hint:'
+    Assert-True "the card is in archive/" (Test-Path (Join-Path $sandbox 'archive/Task703-hook-refuses.prompt.md'))
+    Assert-True "the card is gone from current/" (-not (Test-Path (Join-Path $sandbox 'current/Task703-hook-refuses.prompt.md')))
+}
+catch {
+    Assert-True "the cases ran to the end without a terminating error -- $($_.Exception.Message)" $false
+}
+finally { Remove-ArchiveSandbox $sandbox }
+
+Write-Host ""
+
 Write-Host "═══════════════════════════════════════════════════════" -ForegroundColor Cyan
 $total = $script:passed + $script:failed
 Write-Host "  Results: $($script:passed)/$total passed" -ForegroundColor $(if ($script:failed -eq 0) { 'Green' } else { 'Red' })

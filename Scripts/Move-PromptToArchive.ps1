@@ -87,6 +87,11 @@ $archiveDir = $folders.Archive
 #
 . (Join-Path $PSScriptRoot 'Repair-CardLinks.ps1')
 
+# git runs through the one helper that keeps stderr as text on both hosts: a
+# raw `git ... 2>&1` under $ErrorActionPreference = 'Stop' throws on Windows
+# PowerShell 5.1 before the exit code can be read.
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
+
 function Show-Help {
     Write-Host @"
 
@@ -283,6 +288,18 @@ $destPath = Join-Path $archiveDir $fileName
 $currentRel = $sourcePath.Replace('\', '/')
 $archiveRel = $destPath.Replace('\', '/')
 $rootNorm = $promptsRoot.Replace('\', '/').TrimEnd('/')
+# The two folders a move touches, relative to the hub root. git is staged with
+# these (directory pathspecs), never with the card's own paths: a card that was
+# never committed has no tracked path in current/, and an exact pathspec that
+# matches nothing makes the whole `git add` abort.
+$currentDirRel = $currentDir.Replace('\', '/')
+$archiveDirRel = $archiveDir.Replace('\', '/')
+if ($currentDirRel.StartsWith($rootNorm, [System.StringComparison]::OrdinalIgnoreCase)) {
+    $currentDirRel = $currentDirRel.Substring($rootNorm.Length).TrimStart('/')
+}
+if ($archiveDirRel.StartsWith($rootNorm, [System.StringComparison]::OrdinalIgnoreCase)) {
+    $archiveDirRel = $archiveDirRel.Substring($rootNorm.Length).TrimStart('/')
+}
 if ($currentRel.StartsWith($rootNorm, [System.StringComparison]::OrdinalIgnoreCase)) {
     $currentRel = $currentRel.Substring($rootNorm.Length + 1)
 }
@@ -360,7 +377,8 @@ if ($existingRounds -and $existingRounds.Count -gt 0) {
         try {
             Rename-Item -Path $plainArchive -NewName $r1Name
             if ($storeIsGit) {
-                git add $plainRel $r1Rel 2>&1 | Out-Null
+                # archive/ as a directory: the prior round may never have been committed.
+                $null = Invoke-P20TrackerRead 'git' @('add', '-A', '--', $archiveDirRel)
                 git commit -m "archive: rename $($plainRounds[0].Name) to $r1Name (round history)" 2>&1 | Out-Null
             }
         }
@@ -409,17 +427,36 @@ if ($PSCmdlet.ShouldProcess("$fileName", "Move to archive and commit")) {
             Write-Host "Archived. Store is not git (storeSync='$($cfg.StoreSync)') -- nothing committed." -ForegroundColor DarkGray
         }
         else {
-            git add $currentRel $archiveRel 2>&1 | Out-Null
-            git commit -m "archive: move $fileName to archive" 2>&1 | ForEach-Object { Write-Host $_ }
-            if ($LASTEXITCODE -ne 0) {
-                Write-Warning "Commit failed. Files have been moved but not committed."
+            $gitFailure = $null
+            $add = Invoke-P20TrackerRead 'git' @('add', '-A', '--', $currentDirRel, $archiveDirRel)
+            if ($add.Code -ne 0) {
+                $gitFailure = "git add failed: $(@($add.Lines | Where-Object { $_ })[0])"
             }
             else {
-                Write-Host "Committed." -ForegroundColor Green
+                # Nothing staged (the move left no difference git can see) is not a failure.
+                $staged = Invoke-P20TrackerRead 'git' @('diff', '--cached', '--quiet', '--', $currentDirRel, $archiveDirRel)
+                if ($staged.Code -eq 0) {
+                    Write-Host "Nothing to commit." -ForegroundColor DarkGray
+                }
+                else {
+                    $commit = Invoke-P20TrackerRead 'git' @('commit', '-m', "archive: move $fileName to archive")
+                    foreach ($line in $commit.Lines) { Write-Host $line }
+                    if ($commit.Code -ne 0) {
+                        $gitFailure = "git commit failed: $(@($commit.Lines | Where-Object { $_ })[0])"
+                    }
+                    else {
+                        Write-Host "Committed." -ForegroundColor Green
+                    }
+                }
             }
         }
     }
     finally {
         Pop-Location
+    }
+    if ($gitFailure) {
+        Write-CliError -Message "$fileName was moved to archive/, but it is not committed -- $gitFailure" `
+            -Hint "The file is already in archive/. Commit it yourself (git add -A; git commit) or run '$(Get-CliPrefix)Sync'."
+        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
 }
