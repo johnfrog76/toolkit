@@ -175,44 +175,18 @@ if (-not $Project -or -not $Repository) {
 $ErrorActionPreference = 'Stop'
 
 # -- Auth ----------------------------------------------------------------------
-function Get-AdoToken {
-    $tenantArg = if ($global:P20Config.Tenant) { @('--tenant', $global:P20Config.Tenant) } else { @() }
-    $tokenOutput = az account get-access-token @tenantArg --resource "499b84ac-1321-427f-aa17-267ca6975798" --query accessToken -o tsv 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        Write-CliError -Message "Failed to get ADO access token. Run 'az login' first."
-        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
-    }
-    return ($tokenOutput | Where-Object { $_ -notmatch '^WARNING:' })
-}
-
-function Get-AdoHeaders { param([string]$Token)
-    return @{ Authorization = "Bearer $Token"; "Content-Type" = "application/json" }
-}
-
-function Get-AdoHttpStatus { param($ErrorRecord)
-    # The status as a number: Windows PowerShell 5.1 hands back an HttpStatusCode enum,
-    # pwsh 7 a System.Net.HttpStatusCode too -- [int] reads both. 0 when there is no response.
-    try {
-        $resp = $ErrorRecord.Exception.Response
-        if ($resp -and $null -ne $resp.StatusCode) { return [int]$resp.StatusCode }
-    } catch { $null = $_ }
-    return 0
-}
-
-function Show-AdoForbiddenHint { param($ErrorRecord)
-    # 401 (an expired or unprovisioned token) is the same advice as 403; the status
-    # is read by Get-AdoHttpStatus, the rule the branch search uses too.
-    $status = Get-AdoHttpStatus $ErrorRecord
-    if ($status -ne 401 -and $status -ne 403) { return $false }
-    Write-Host "  Access denied (HTTP $status) -- your az identity may not be provisioned in this org." -ForegroundColor Yellow
-    Write-Host "  Fix: run 'az login', open $org in a browser, sign in, then retry." -ForegroundColor Yellow
-    return $true
-}
+# The token, the headers, the HTTP status and the 401/403 advice: one helper for
+# every ADO script. The branch search and the PR fetch read the status the same way.
+. (Join-Path $PSScriptRoot 'Get-AdoToken.ps1')
 
 # -- Main ----------------------------------------------------------------------
 try {
-    $token   = Get-AdoToken
-    $headers = Get-AdoHeaders -Token $token
+    $tokenRead = Get-P20AdoToken -Tenant $global:P20Config.Tenant
+    if (-not $tokenRead.Ok) {
+        Write-CliError -Message $tokenRead.Message -Hint $tokenRead.Hint
+        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+    }
+    $headers = Get-P20AdoHeaders -Token $tokenRead.Token
     $encodedProject = [Uri]::EscapeDataString($Project)
 
     # --- Resolve PR ID from branch if not supplied ---
@@ -244,7 +218,7 @@ try {
                 # 404 (no such repo here) is "not in this project": the search goes on.
                 # 401/403 is the token or the permission, and reading it as "no PR" sends
                 # the user to look for a PR that exists -- stop and say so.
-                $httpStatus = Get-AdoHttpStatus $_
+                $httpStatus = Get-P20AdoHttpStatus $_
                 if ($httpStatus -eq 401 -or $httpStatus -eq 403) {
                     Write-CliError -Message "Azure DevOps refused the PR search in '$($proj.Name)' (HTTP $httpStatus)." -Hint "Run 'az login' (and open $org in a browser once), then retry; or pass -PullRequestId."
                     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
@@ -263,7 +237,7 @@ try {
         $prUri  = "$org/$encodedProject/_apis/git/repositories/$Repository/pullRequests/$($PullRequestId)?api-version=7.1"
         $pr     = Invoke-RestMethod -Uri $prUri -Headers $headers -Method Get
     } catch {
-        $handled = Show-AdoForbiddenHint $_
+        $handled = Show-P20AdoForbiddenHint $_ -Org $org
         if (-not $handled) {
             Write-CliError -Message "Could not fetch PR #$PullRequestId. $($_.Exception.Message)"
         }

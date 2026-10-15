@@ -325,36 +325,8 @@ function Write-P20PRCommentsRecord {
     }
 }
 
-function Get-AdoToken {
-    $tenantArg = if ($global:P20Config.Tenant) { @('--tenant', $global:P20Config.Tenant) } else { @() }
-    $tokenOutput = az account get-access-token @tenantArg --resource "499b84ac-1321-427f-aa17-267ca6975798" --query accessToken -o tsv 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        Write-CliError -Message "Failed to get ADO access token. Run 'az login' first." -Hint "az said: $tokenOutput"
-        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
-    }
-    return ($tokenOutput | Where-Object { $_ -notmatch '^WARNING:' })
-}
-
-function Get-AdoHeaders {
-    param([string]$Token)
-    return @{ Authorization = "Bearer $Token"; "Content-Type" = "application/json" }
-}
-
-# Surface a clear, actionable hint when ADO rejects the token with 403.
-# Most commonly this is an unmaterialized identity: the signed-in az account
-# has never logged into the org via browser, so ADO has no user record yet.
-# Returns $true if it handled a 403 (so callers can skip generic messaging).
-function Show-AdoForbiddenHint {
-    param($ErrorRecord)
-    $status = $ErrorRecord.Exception.Response.StatusCode
-    if ($status -ne 403 -and "$status" -ne 'Forbidden') { return $false }
-    Write-Host "  Access denied by Azure DevOps (HTTP 403)." -ForegroundColor Yellow
-    Write-Host "  Your az identity is likely not provisioned in this org yet." -ForegroundColor Yellow
-    Write-Host "  Fix (one-time): open the org in a browser and sign in, then retry:" -ForegroundColor Yellow
-    Write-Host "    $org" -ForegroundColor Yellow
-    Write-Host "  Or run: az devops login --organization $org" -ForegroundColor Yellow
-    return $true
-}
+# The token, the headers and the 401/403 advice: one helper for every ADO script.
+. (Join-Path $PSScriptRoot 'Get-AdoToken.ps1')
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 try {
@@ -380,8 +352,12 @@ try {
         Write-Host "Detected branch: $BranchName" -ForegroundColor DarkGray
     }
 
-    $token = Get-AdoToken
-    $headers = Get-AdoHeaders -Token $token
+    $tokenRead = Get-P20AdoToken -Tenant $global:P20Config.Tenant
+    if (-not $tokenRead.Ok) {
+        Write-CliError -Message $tokenRead.Message -Hint $tokenRead.Hint
+        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+    }
+    $headers = Get-P20AdoHeaders -Token $tokenRead.Token
     $encodedProject = [Uri]::EscapeDataString($Project)
     $userSpecifiedProject = $PSBoundParameters.ContainsKey('Project')
 
@@ -398,7 +374,7 @@ try {
             }
             catch {
                 Write-CliError -Message "Failed to query PRs for branch '$BranchName' in $Project/$Repository." -Hint $_.Exception.Message
-                [void](Show-AdoForbiddenHint $_)
+                [void](Show-P20AdoForbiddenHint $_ -Org $org)
                 exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
             }
             if ($prList.count -eq 0) {
@@ -429,16 +405,16 @@ try {
                     }
                 }
                 catch {
-                    # Remember a 403 so we can distinguish "no access" from "no PR".
-                    $status = $_.Exception.Response.StatusCode
-                    if ($status -eq 403 -or "$status" -eq 'Forbidden') { $lastForbidden = $_ }
+                    # Remember a 401 or 403 so we can distinguish "no access" from "no PR".
+                    $status = Get-P20AdoHttpStatus $_
+                    if ($status -eq 401 -or $status -eq 403) { $lastForbidden = $_ }
                     # Skip this project, try next
                 }
             }
             if (-not $foundPR) {
                 if ($lastForbidden) {
                     Write-CliError -Message "Could not query PRs - access denied for branch '$BranchName'."
-                    [void](Show-AdoForbiddenHint $lastForbidden)
+                    [void](Show-P20AdoForbiddenHint $lastForbidden -Org $org)
                     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
                 }
                 $projNames = ($allProjects | ForEach-Object { $_.Name }) -join ', '
@@ -470,7 +446,7 @@ try {
             }
             else {
                 Write-CliError -Message "Failed to look up PR #$($PullRequestId)." -Hint $_.Exception.Message
-                [void](Show-AdoForbiddenHint $_)
+                [void](Show-P20AdoForbiddenHint $_ -Org $org)
             }
             exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
         }
@@ -488,7 +464,7 @@ try {
         }
         else {
             Write-CliError -Message "Failed to fetch threads for PR #$($PullRequestId)." -Hint $_.Exception.Message
-            [void](Show-AdoForbiddenHint $_)
+            [void](Show-P20AdoForbiddenHint $_ -Org $org)
         }
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }

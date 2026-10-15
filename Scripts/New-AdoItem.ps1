@@ -664,22 +664,18 @@ if ($ReadOnly) {
 }
 
 # -- Auth token ----------------------------------------------------------------
-$tenantArg = if ($cfg.Tenant) { @('--tenant', $cfg.Tenant) } else { @() }
-$tokenOutput = az account get-access-token @tenantArg --resource "499b84ac-1321-427f-aa17-267ca6975798" --query accessToken -o tsv 2>&1
-$adoToken = ($tokenOutput | Where-Object { $_ -notmatch '^WARNING:' }) -join ''
-
-if ([string]::IsNullOrWhiteSpace($adoToken)) {
+. (Join-Path $PSScriptRoot 'Get-AdoToken.ps1')
+$tokenRead = Get-P20AdoToken -Tenant $cfg.Tenant
+if (-not $tokenRead.Ok) {
     # A stated refusal, not a bare return: exit 0 here reported success to the
-    # bridge and to any script checking $LASTEXITCODE.
-    Write-CliError -Message "Failed to get ADO access token. Run 'az login' first." -Hint "az said: $tokenOutput"
+    # bridge and to any script checking $LASTEXITCODE. az exiting non-zero is a
+    # failure even when it printed something: its "ERROR: ..." is not a token.
+    Write-CliError -Message $tokenRead.Message -Hint $tokenRead.Hint
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
+$adoToken = $tokenRead.Token
 
-
-$headers = @{
-    Authorization  = "Bearer $adoToken"
-    "Content-Type" = "application/json-patch+json"
-}
+$headers = Get-P20AdoHeaders -Token $adoToken -ContentType 'application/json-patch+json'
 
 # -- Build patch body ----------------------------------------------------------
 $patches = @()

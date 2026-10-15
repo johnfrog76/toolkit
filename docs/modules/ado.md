@@ -284,6 +284,12 @@ name this add-on's row -- **ADO Add-on** in `tkEnv`; in the card, the Space's tr
 Only an `active` org that tried and failed is a warning. **The invariant:** losing the
 tracker degrades the workflow; it must never break the record.
 
+On Tier 1, every verb that calls the Azure DevOps API asks `az` for a token first, through one helper
+(`Scripts/Get-AdoToken.ps1`), and with one rule: `az` exiting non-zero, or printing no token, is a
+stated refusal naming `az login`, before anything is read or written. A 401 or 403 from Azure DevOps
+gets the same sign-in advice wherever it is explained. The messages are in [the CLI
+reference](../CLI.md#errors), under "Not authenticated" and "Access denied".
+
 ## The tests
 
 | Suite | Holds |
@@ -292,7 +298,7 @@ tracker degrades the workflow; it must never break the record.
 | `Tests/test_ado_enabled.py` | the agent's copy of the rule over the SAME table; what `/env` serves |
 | `Tests/test_env_org_state.py` | "never asked" is not a failure |
 | `Tests/test_identity.py`, `test_env_probe.py` | who "me" is, with `az` stubbed; `/env` neither blocks on the probe nor repeats it |
-| `tkTestToolkit -PullRequest -CloseItem -PRComments` | the PR description parser, the transition rule and ADO's error messages, the actionable-thread filter |
+| `tkTestToolkit -PullRequest -CloseItem -PRComments` | the PR description parser, the transition rule and ADO's error messages, the actionable-thread filter; `-CloseItem` also holds the token helper on both PowerShells -- `az` failing with error text, or printing nothing, is a refusal and never a token |
 | `web`: `cliBridge.test.ts`, `homeView.test.ts` | the exact argv each dialog sends; which view of Home an org gets |
 | `VERIFY.md` | the verbs that cannot be automated, because they need a real board -- the manual runbook |
 

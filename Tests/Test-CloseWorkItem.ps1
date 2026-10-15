@@ -191,6 +191,82 @@ Assert-True "valid JSON with no message field returns null" `
 
 Write-Host ""
 
+# -- The token helper, Scripts/Get-AdoToken.ps1 --------------------------------
+# One helper gets the Azure DevOps token for every ADO script, and one failure
+# contract holds for all of them: az exiting non-zero OR printing no token is a
+# failure. Before it, CloseItem and NewItem merged az's stderr into the output
+# with 2>&1 and checked only for an empty string, so "ERROR: ..." from a failed
+# az read as a token and the refusal was skipped. The helper is dot-sourced in a
+# child shell on each host with $ErrorActionPreference = 'Stop', where a stand-in
+# az writes down its arguments and answers by mode. No tracker is contacted.
+
+Write-Host "-- The token helper ------------------------------------" -ForegroundColor Cyan
+
+$tokenHelperPath = (Join-Path $pkgRoot 'Scripts/Get-AdoToken.ps1') -replace "'", "''"
+$tokenCases = @'
+. '__HELPER__'
+$ErrorActionPreference = 'Stop'
+function global:az {
+    $global:LASTEXITCODE = 0
+    $global:AzArgs = ($args -join ' ')
+    if ($env:P20_TEST_AZ_MODE -eq 'fail') { $global:LASTEXITCODE = 1; Write-Error 'ERROR: AADSTS70043: The refresh token has expired.'; return }
+    if ($env:P20_TEST_AZ_MODE -eq 'empty') { return }
+    if ($env:P20_TEST_AZ_MODE -eq 'warnonly') { return 'WARNING: a newer az is available', '   ' }
+    return 'WARNING: a newer az is available', ' a-token '
+}
+foreach ($mode in @('ok', 'fail', 'empty', 'warnonly')) {
+    $env:P20_TEST_AZ_MODE = $mode
+    $r = Get-P20AdoToken -Tenant 'tenant-1'
+    "$mode ok=$($r.Ok) token=[$($r.Token)] message=$($r.Message) hint=$($r.Hint)"
+}
+"ARGS=$global:AzArgs"
+$env:P20_TEST_AZ_MODE = 'ok'
+$null = Get-P20AdoToken
+"NOTENANT=$global:AzArgs"
+$h = Get-P20AdoHeaders -Token 'a-token'
+$p = Get-P20AdoHeaders -Token 'a-token' -ContentType 'application/json-patch+json'
+"HEADERS=$($h.Authorization)|$($h['Content-Type'])|$($p['Content-Type'])"
+foreach ($code in @(401, 403, 404)) {
+    $ex = New-Object System.Exception 'stubbed REST failure'
+    $ex | Add-Member -NotePropertyName Response -NotePropertyValue ([pscustomobject]@{ StatusCode = $code })
+    $rec = New-Object System.Management.Automation.ErrorRecord($ex, 'stub', 'NotSpecified', $null)
+    $handled = Show-P20AdoForbiddenHint $rec -Org 'https://dev.azure.com/acme-org'
+    "HINT$code=$handled"
+}
+"PREF=$ErrorActionPreference"
+'@.Replace('__HELPER__', $tokenHelperPath)
+$tokenRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-adotoken-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+try {
+    New-Item -ItemType Directory -Path $tokenRoot -Force | Out-Null
+    $tokenScript = Join-Path $tokenRoot 'token-cases.ps1'
+    [System.IO.File]::WriteAllText($tokenScript, $tokenCases, (New-Object System.Text.UTF8Encoding($false)))
+    foreach ($exe in @('pwsh', 'powershell.exe')) {
+        if (-not (Get-Command $exe -ErrorAction SilentlyContinue)) { continue }
+        $savedPref = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        $to = (& $exe -NoProfile -File $tokenScript 2>&1 | ForEach-Object { $_.ToString() }) -join "`n"
+        $ErrorActionPreference = $savedPref
+        Assert-True "token helper, ${exe}: a token is read from stdout, WARNING lines and spaces dropped" ($to -match 'ok ok=True token=\[a-token\]') $to
+        Assert-True "token helper, ${exe}: az exiting non-zero with error text is a failure, not a token" ($to -match 'fail ok=False token=\[\] message=Failed to get ADO access token\. hint=Run ''az login'' first\. az said: ERROR: AADSTS70043') $to
+        Assert-True "token helper, ${exe}: az printing nothing and exiting 0 is a failure, and the hint still names az login" ($to -match 'empty ok=False token=\[\] message=Failed to get ADO access token\. hint=Run ''az login'' first\.(\n|$)') $to
+        Assert-True "token helper, ${exe}: only WARNING lines and blanks is a failure" ($to -match 'warnonly ok=False token=\[\]') $to
+        Assert-True "token helper, ${exe}: asks for the Azure DevOps resource with the tenant given" ($to -match 'ARGS=account get-access-token --tenant tenant-1 --resource 499b84ac-1321-427f-aa17-267ca6975798 --query accessToken -o tsv') $to
+        Assert-True "token helper, ${exe}: no tenant, no --tenant" ($to -match 'NOTENANT=account get-access-token --resource ') $to
+        Assert-True "token helper, ${exe}: the headers carry the bearer token and the content type asked for" ($to -match 'HEADERS=Bearer a-token\|application/json\|application/json-patch\+json') $to
+        Assert-True "token helper, ${exe}: 401 and 403 get the access advice naming az login and the org" ($to -match 'HINT401=True' -and $to -match 'HINT403=True' -and $to -match 'Access denied \(HTTP 401\)' -and $to -match 'Access denied \(HTTP 403\)' -and $to -match "run 'az login'" -and $to -match 'az devops login --organization https://dev\.azure\.com/acme-org') $to
+        Assert-True "token helper, ${exe}: any other status is left to the caller" ($to -match 'HINT404=False' -and $to -notmatch 'HTTP 404') $to
+        Assert-True "token helper, ${exe}: the caller's ErrorActionPreference is still Stop after the calls" ($to -match 'PREF=Stop') $to
+    }
+}
+catch {
+    Assert-True "the token helper cases ran to the end without a terminating error" $false $_.Exception.Message
+}
+finally {
+    if (Test-Path $tokenRoot) { Remove-Item $tokenRoot -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+Write-Host ""
+
 # -- The verb, typed in a fresh shell ------------------------------------------
 # Everything above drives pieces of the script. This section types the verb the
 # way a person does (AGENTS.md: a suite that runs a script directly does not test
@@ -221,6 +297,7 @@ Get-ChildItem Env: | Where-Object { `$_.Name -like 'TEAMS_WEBHOOK_*' } | ForEach
 function global:az {
     Add-Content -Path '$calls' -Value ("az " + (`$args -join ' '))
     `$global:LASTEXITCODE = 0
+    if (`$args[0] -eq 'account' -and `$args[1] -eq 'get-access-token' -and `$env:P20_TEST_AZ_FAIL) { `$global:LASTEXITCODE = 1; Write-Error 'ERROR: AADSTS70043: The refresh token has expired.'; return }
     if (`$args[0] -eq 'account' -and `$args[1] -eq 'get-access-token') { return 'stub-token' }
 }
 function global:Invoke-RestMethod {
@@ -286,6 +363,13 @@ try {
     Assert-True "typed CloseItem on a Bug sets Resolved / Fixed" (@($ops | Where-Object { $_.path -eq '/fields/System.State' -and $_.value -eq 'Resolved' }).Count -eq 1 -and @($ops | Where-Object { $_.path -eq '/fields/System.Reason' -and $_.value -eq 'Fixed' }).Count -eq 1) ($patches -join ' | ')
     $r = Invoke-TypedClose "${cfgPrefix}CloseItem 4242 -Comment 'Again'" -State 'Closed'
     Assert-True "typed CloseItem on a closed item sends no PATCH, still comments, exits 0" (@($r.Calls | Where-Object { $_ -match '^REST Patch ' }).Count -eq 0 -and @($r.Calls | Where-Object { $_ -match '^REST Post ' }).Count -eq 1 -and $r.Text -match 'EXIT=0') $r.Text
+
+    # az failing with error text: a stated refusal before any REST call. The
+    # error text came back through 2>&1 as a non-empty string and was sent as
+    # the bearer token.
+    $r = Invoke-TypedClose "`$env:P20_TEST_AZ_FAIL = '1'`n${cfgPrefix}CloseItem 4242 -Comment 'Shipped'"
+    Assert-True "typed CloseItem with az failing states the token refusal and exits 2" ($r.Text -match 'Error: Failed to get ADO access token\.' -and $r.Text -match "Run 'az login' first\." -and $r.Text -match 'EXIT=2') $r.Text
+    Assert-True "typed CloseItem with az failing says it once and calls no REST" ((@([regex]::Matches($r.Text, '(?m)^Error: ')).Count) -eq 1 -and @($r.Calls | Where-Object { $_ -match '^REST ' }).Count -eq 0) (($r.Calls -join ' | ') + ' // ' + $r.Text)
 }
 catch {
     Assert-True "the typed cases ran to the end without a terminating error" $false $_.Exception.Message

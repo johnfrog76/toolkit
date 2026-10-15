@@ -1086,17 +1086,16 @@ try {
     # card is left without the discussion it was meant to carry and the work
     # item is not assigned or moved for a card that was never made.
     $adoComments = @()
-    $tenantArg = if ($global:P20Config.Tenant) { @('--tenant', $global:P20Config.Tenant) } else { @() }
-    $tokenOutput = az account get-access-token @tenantArg --resource "499b84ac-1321-427f-aa17-267ca6975798" --query accessToken -o tsv 2>&1
-    $adoToken = ($tokenOutput | Where-Object { $_ -notmatch '^WARNING:' }) -join ''
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($adoToken)) {
+    . (Join-Path $PSScriptRoot 'Get-AdoToken.ps1')
+    $tokenRead = Get-P20AdoToken -Tenant $global:P20Config.Tenant
+    if (-not $tokenRead.Ok) {
         Write-CliError -Message "Could not read work item $WorkItemId's comments: no ADO token was available, and the card is not made without them." `
-            -Hint ("Run 'az login' first." + $(if ("$tokenOutput".Trim()) { " az said: $tokenOutput" } else { '' }))
+            -Hint $tokenRead.Hint
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
     try {
         $commentsUri = "$org/$([Uri]::EscapeDataString($project))/_apis/wit/workItems/$WorkItemId/comments?api-version=7.1-preview"
-        $commentsHeaders = @{ Authorization = "Bearer $adoToken"; "Content-Type" = "application/json" }
+        $commentsHeaders = Get-P20AdoHeaders -Token $tokenRead.Token
         $commentsResponse = Invoke-RestMethod -Uri $commentsUri -Headers $commentsHeaders -Method Get
         if ($commentsResponse.comments) {
             $adoComments = $commentsResponse.comments | ForEach-Object {

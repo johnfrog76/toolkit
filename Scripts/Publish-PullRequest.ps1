@@ -112,7 +112,7 @@ NOTES:
 
 . (Join-Path $PSScriptRoot 'Write-CardText.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-CardName.ps1')
-. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
+. (Join-Path $PSScriptRoot 'Get-AdoToken.ps1')
 
 # The line this verb writes. CLI-only: nothing in the agent or the web reads it, and
 # it is not state -- the PR URL: line above it is the gate into Code Review.
@@ -236,18 +236,12 @@ if (-not $PSCmdlet.ShouldProcess($prUrl, "Publish pull request $prId (draft -> r
 }
 
 # -- Auth: the token NewPR takes -----------------------------------------------
-$azArgs = @('account', 'get-access-token')
-if ($cfg.Tenant) { $azArgs += @('--tenant', [string]$cfg.Tenant) }
-$azArgs += @('--resource', '499b84ac-1321-427f-aa17-267ca6975798', '--query', 'accessToken', '-o', 'tsv')
-$tokenRead = Invoke-P20TrackerRead 'az' $azArgs
-$token = @($tokenRead.Out | Where-Object { $_ -and $_ -notmatch '^WARNING:' }) | Select-Object -Last 1
-if ($tokenRead.Code -ne 0 -or -not $token) {
-    Write-CliError -Message "Failed to get an Azure DevOps access token. Run 'az login' first." `
-        -Hint "az said: $(($tokenRead.Lines -join ' ').Trim())"
+$tokenRead = Get-P20AdoToken -Tenant ([string]$cfg.Tenant)
+if (-not $tokenRead.Ok) {
+    Write-CliError -Message $tokenRead.Message -Hint $tokenRead.Hint
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
-$token = ([string]$token).Trim()
-$headers = @{ Authorization = "Bearer $token"; 'Content-Type' = 'application/json' }
+$headers = Get-P20AdoHeaders -Token $tokenRead.Token
 
 # Azure DevOps puts the reason in the response body; the exception only says the status.
 $adoSentence = {

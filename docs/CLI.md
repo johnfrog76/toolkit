@@ -985,7 +985,8 @@ switch to a script and its help, and that suite tells you the wrapper is missing
 | Condition | Message |
 | --- | --- |
 | Work item not found, or not fetchable | `Could not fetch work item <id>.` -- check the id and that `az` is signed in to this org; what ADO said is in the `Hint:`. Like every refusal in `CloseItem` and `NewItem`, it exits 2 |
-| Not authenticated | `Failed to get ADO access token. Run 'az login' first.` -- every ADO call, with what `az` said as the hint |
+| Not authenticated | `Failed to get ADO access token.` with the hint `Run 'az login' first.` and what `az` said -- every verb that calls the Azure DevOps API, before any call is made; exit 2. `az` exiting non-zero is this refusal even when it printed something, and so is `az` printing no token. One helper, `Scripts/Get-AdoToken.ps1`, asks every time (`NewPrompt <id>` words its own sentence, about the comments it could not read) |
+| Access denied | `Access denied (HTTP <status>) by Azure DevOps`, then the fix: `az login`, and if that is not enough, sign in to the org once in a browser (or `az devops login --organization <org>`). Said for a 401 and a 403 alike, by `GetPRComments` and `AddPRReview`; exit 2 |
 | Tier too low | `<command> needs ADO (Tier 1); currently Tier <n>.` -- on a GitHub board the sentence says `needs GitHub` and the hint names `gh` (`gh auth login`); either way the hint says why (the org is `local`, the tool is not signed in, the tracker did not answer); exit 2, so the bridge reports it as an error. `-Help` answers on any tier |
 | Branch matches no prompt file | `No prompt file matches branch '<branch>'.` -- the hint names the folder it looked in; `-File` names the card |
 | Branch matches several | `Branch '<branch>' matches <n> prompt files.` -- the candidates are listed; `-File` picks one. Never the first of them |
@@ -1060,7 +1061,7 @@ answer of 401 or 403 is the token or the permission, not a missing PR, so the se
 `Azure DevOps refused the PR search in '<project>' (HTTP 401)`, with a hint to `az login` and exit
 2. Only when every project answered "not here" does it say `No open PR found for branch`.
 The fetch of the PR's details (with or without a number) reads the status the same way: 401 and 403 both
-print `Access denied (HTTP <status>)` with the `az login` fix and exit 2, where 401 used to fall through to
+print `Access denied (HTTP <status>)` with the `az login` fix ("Access denied" under [Errors](#errors)) and exit 2, where 401 used to fall through to
 `Could not fetch PR #N` with the raw exception. Any other failure there is unchanged.
 
 **It is optional and nothing depends on it.** Without `ANTHROPIC_API_KEY` the command declines and
