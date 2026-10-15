@@ -28,8 +28,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ..ado import bridge
 from ..core import log_writer, model
-from ..core.config import hub_folder, hub_root, load_config
 from ..core.cards import write_card_text
+from ..core.config import hub_folder, hub_root, load_config
 from ..core.consts import folder_archive, folder_current, re_session_name
 from . import comms
 
@@ -468,7 +468,7 @@ async def get_manager_detail(filename: str):
 # the CLI's. This route used to build the file in Python, from its own
 # copy of the shape, and the two scaffolds drifted from the day they were
 # written -- HTML comments in the template, parenthesised placeholders here.
-#Now the verb
+# Now the verb
 # writes the file, from the template, with the one card writer, and this route
 # reads it back to answer in the shape it always answered in.
 #

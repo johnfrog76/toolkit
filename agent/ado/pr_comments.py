@@ -237,6 +237,7 @@ def prompt_instruction(text: str) -> str:
     fence = text.find(_PROMPT_FENCE, max(start - 1, 0))
     return text[fence + len(_PROMPT_FENCE) :] if fence != -1 else text[start:]
 
+
 # The decline, in words a person can act on. 412: the route exists and the
 # request was fine; a precondition on this machine is not met. The sentences
 # are the profile's (core/model.py), so /rewrite says the same thing.
