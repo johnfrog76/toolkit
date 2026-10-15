@@ -29,6 +29,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..ado import bridge
 from ..core import log_writer, model
 from ..core.config import hub_folder, hub_root, load_config
+from ..core.cards import write_card_text
 from ..core.consts import folder_archive, folder_current, re_session_name
 from . import comms
 
@@ -607,7 +608,9 @@ async def update_manager_session(filename: str, req: ManagerSaveRequest):
         retro=req.retro,
         sent=sent,
     )
-    path.write_text(content, encoding="utf-8")
+    # The file keeps the line ending it already has (the byte contract the CLI
+    # keeps in Write-CardText); a plain write_text turns every LF into CRLF on Windows.
+    write_card_text(path, content)
     log_writer.write_log("CMD", "agent/manager", f"saved {filename}")
 
     item = _parse_manager_session(path, folder_current())

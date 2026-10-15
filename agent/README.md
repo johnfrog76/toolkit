@@ -391,6 +391,10 @@ that `load_config()` produces, not `spaces[].features`.
 `PUT /manager/{filename}` is the one session write in this API that does not go out through the
 CLI. The reason is stated rather than assumed: it saves a form someone is typing into, and
 round-tripping keystrokes through a PowerShell process start would make the editor unusable.
+It writes the file the way the CLI's `Write-CardText` does (`core/cards.py`, `write_card_text`): UTF-8
+with no BOM, and the line ending the session file already has -- LF stays LF and CRLF stays CRLF, on
+every OS -- so a save in the browser changes the lines that were edited and not the whole file in a
+git-synced hub. `Tests/test_manager.py` holds both endings.
 
 `POST /manager` creates a session by running `NewMeeting` through the bridge -- `-Date`, and `-Type`
 for a series -- with `PROMPTS_ROOT` set to the hub this process resolved, and reads the file the
