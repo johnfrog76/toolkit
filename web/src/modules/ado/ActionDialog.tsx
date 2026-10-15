@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useId, useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogSurface,
@@ -160,6 +160,9 @@ export function ActionDialog({
     if (open) setTab(initialTab);
   }
   const styles = useStyles();
+  // Each field's visible caption names it: ids are per instance, so two open
+  // dialogs never share one.
+  const uid = useId();
   const { data: env } = useGetEnvQuery();
   const { data: statusData } = useGetStatusQuery();
   const isGithub = env?.tracker === "github";
@@ -676,8 +679,11 @@ export function ActionDialog({
                   <>
                     <div className={styles.fieldRow}>
                       <div className={styles.field}>
-                        <Caption1>{isGithub ? "Issue number" : "Work Item ID"}</Caption1>
+                        <Caption1 id={`${uid}-f1`}>
+                          {isGithub ? "Issue number" : "Work Item ID"}
+                        </Caption1>
                         <Input
+                          aria-labelledby={`${uid}-f1`}
                           type="text"
                           inputMode="numeric"
                           pattern="[0-9]*"
@@ -688,8 +694,9 @@ export function ActionDialog({
                         />
                       </div>
                       <div className={styles.field}>
-                        <Caption1>Assignment</Caption1>
+                        <Caption1 id={`${uid}-f2`}>Assignment</Caption1>
                         <TruncatedDropdown
+                          aria-labelledby={`${uid}-f2`}
                           maxToggleLength={15}
                           value={assignOptions.find((o) => o.key === assign)?.label}
                           selectedOptions={[assign]}
@@ -719,8 +726,9 @@ export function ActionDialog({
                     </Body1>
                     <div className={styles.fieldRow}>
                       <div className={styles.field}>
-                        <Caption1>{isGithub ? "Issue" : "Work Item ID"}</Caption1>
+                        <Caption1 id={`${uid}-f3`}>{isGithub ? "Issue" : "Work Item ID"}</Caption1>
                         <Input
+                          aria-labelledby={`${uid}-f3`}
                           type="text"
                           inputMode="numeric"
                           pattern="[0-9]*"
@@ -732,8 +740,9 @@ export function ActionDialog({
                       </div>
                       {isBug ? (
                         <div className={styles.field}>
-                          <Caption1>Reason</Caption1>
+                          <Caption1 id={`${uid}-f4`}>Reason</Caption1>
                           <TruncatedDropdown
+                            aria-labelledby={`${uid}-f4`}
                             maxToggleLength={15}
                             value={reasonOptions.find((o) => o.key === resolveReason)?.label}
                             selectedOptions={[resolveReason]}
@@ -751,8 +760,14 @@ export function ActionDialog({
                         </div>
                       ) : (
                         <div className={styles.field}>
-                          <Caption1>Resolution</Caption1>
-                          <Input type="text" value="Completed" disabled readOnly />
+                          <Caption1 id={`${uid}-f5`}>Resolution</Caption1>
+                          <Input
+                            aria-labelledby={`${uid}-f5`}
+                            type="text"
+                            value="Completed"
+                            disabled
+                            readOnly
+                          />
                         </div>
                       )}
                     </div>
@@ -763,8 +778,9 @@ export function ActionDialog({
                       </Caption1>
                     )}
                     <div className={styles.field}>
-                      <Caption1>Comment</Caption1>
+                      <Caption1 id={`${uid}-f6`}>Comment</Caption1>
                       <Textarea
+                        aria-labelledby={`${uid}-f6`}
                         placeholder="e.g. Fixed in PR 141234"
                         value={resolveComment}
                         onChange={(_e, d) => setResolveComment(d.value)}
@@ -781,8 +797,9 @@ export function ActionDialog({
                   <>
                     <div className={styles.fieldRow}>
                       <div className={styles.field}>
-                        <Caption1>Work Item ID</Caption1>
+                        <Caption1 id={`${uid}-f7`}>Work Item ID</Caption1>
                         <Input
+                          aria-labelledby={`${uid}-f7`}
                           type="text"
                           inputMode="numeric"
                           pattern="[0-9]*"
@@ -793,8 +810,9 @@ export function ActionDialog({
                         />
                       </div>
                       <div className={styles.field}>
-                        <Caption1>Target Branch</Caption1>
+                        <Caption1 id={`${uid}-f8`}>Target Branch</Caption1>
                         <Input
+                          aria-labelledby={`${uid}-f8`}
                           type="text"
                           placeholder="main"
                           value={prTargetBranch}
@@ -831,8 +849,9 @@ export function ActionDialog({
                   <>
                     <div className={styles.fieldRow}>
                       <div className={styles.field}>
-                        <Caption1>Type</Caption1>
+                        <Caption1 id={`${uid}-f9`}>Type</Caption1>
                         <TruncatedDropdown
+                          aria-labelledby={`${uid}-f9`}
                           maxToggleLength={12}
                           value={itemTypeOptions.find((o) => o.key === niType)?.label}
                           selectedOptions={[niType]}
@@ -849,10 +868,11 @@ export function ActionDialog({
                         </TruncatedDropdown>
                       </div>
                       <div className={styles.field}>
-                        <Caption1>
+                        <Caption1 id={`${uid}-f10`}>
                           Title <span style={{ color: tokens.colorPaletteRedForeground1 }}>*</span>
                         </Caption1>
                         <Input
+                          aria-labelledby={`${uid}-f10`}
                           placeholder="e.g. Add dark mode toggle"
                           value={niTitle}
                           onChange={(_e, d) => setNiTitle(d.value)}
@@ -865,9 +885,10 @@ export function ActionDialog({
                         address already says which repo. Absent, not empty. */}
                       {!(isGithub && projectList.length === 0) && (
                         <div className={styles.field}>
-                          <Caption1>Project</Caption1>
+                          <Caption1 id={`${uid}-f11`}>Project</Caption1>
                           {projectList.length > 1 ? (
                             <TruncatedDropdown
+                              aria-labelledby={`${uid}-f11`}
                               maxToggleLength={14}
                               value={niProject || "— auto —"}
                               selectedOptions={[niProject]}
@@ -885,6 +906,7 @@ export function ActionDialog({
                             </TruncatedDropdown>
                           ) : (
                             <Input
+                              aria-labelledby={`${uid}-f11`}
                               placeholder={projectList[0]?.name ?? "project name"}
                               value={niProject}
                               onChange={(_e, d) => setNiProject(d.value)}
@@ -894,8 +916,9 @@ export function ActionDialog({
                         </div>
                       )}
                       <div className={styles.field}>
-                        <Caption1>{isGithub ? "Milestone" : "Sprint"}</Caption1>
+                        <Caption1 id={`${uid}-f12`}>{isGithub ? "Milestone" : "Sprint"}</Caption1>
                         <Input
+                          aria-labelledby={`${uid}-f12`}
                           placeholder={isGithub ? "e.g. Milestone P" : "e.g. Sprint 72"}
                           value={niSprint}
                           onChange={(_e, d) => setNiSprint(d.value)}
@@ -903,12 +926,14 @@ export function ActionDialog({
                         />
                       </div>
                       <div className={styles.field}>
-                        <Caption1>{isGithub ? "Parent issue" : "Parent ID"}</Caption1>
+                        <Caption1 id={`${uid}-f13`}>
+                          {isGithub ? "Parent issue" : "Parent ID"}
+                        </Caption1>
                         <Input
+                          aria-labelledby={`${uid}-f13`}
                           type="text"
                           inputMode="numeric"
                           pattern="[0-9]*"
-                          aria-label={isGithub ? "Parent issue" : "Parent ID"}
                           placeholder={isGithub ? "e.g. 140" : "e.g. 195551"}
                           value={niParent}
                           onChange={(_e, d) => setNiParent(d.value.replace(/\D/g, ""))}
@@ -918,8 +943,9 @@ export function ActionDialog({
                     </div>
                     {niType === "UserStory" && (
                       <div className={styles.field}>
-                        <Caption1>Acceptance Criteria</Caption1>
+                        <Caption1 id={`${uid}-f14`}>Acceptance Criteria</Caption1>
                         <Textarea
+                          aria-labelledby={`${uid}-f14`}
                           placeholder="- [ ] ..."
                           value={niAC}
                           onChange={(_e, d) => setNiAC(d.value)}
@@ -931,8 +957,9 @@ export function ActionDialog({
                     )}
                     {niType === "Bug" && (
                       <div className={styles.field}>
-                        <Caption1>Repro Steps</Caption1>
+                        <Caption1 id={`${uid}-f15`}>Repro Steps</Caption1>
                         <Textarea
+                          aria-labelledby={`${uid}-f15`}
                           placeholder="1. Go to ... 2. Click ..."
                           value={niReproSteps}
                           onChange={(_e, d) => setNiReproSteps(d.value)}
@@ -943,8 +970,9 @@ export function ActionDialog({
                       </div>
                     )}
                     <div className={styles.field}>
-                      <Caption1>Description</Caption1>
+                      <Caption1 id={`${uid}-f16`}>Description</Caption1>
                       <Textarea
+                        aria-labelledby={`${uid}-f16`}
                         placeholder="Optional context or scope"
                         value={niDescription}
                         onChange={(_e, d) => setNiDescription(d.value)}
@@ -956,8 +984,9 @@ export function ActionDialog({
                     <div className={styles.fieldRow3}>
                       {!isGithub && (
                         <div className={styles.field}>
-                          <Caption1>Priority</Caption1>
+                          <Caption1 id={`${uid}-f17`}>Priority</Caption1>
                           <TruncatedDropdown
+                            aria-labelledby={`${uid}-f17`}
                             maxToggleLength={12}
                             value={priorityOptions.find((o) => o.key === niPriority)?.label}
                             selectedOptions={[niPriority]}
@@ -974,8 +1003,9 @@ export function ActionDialog({
                       )}
                       {!isGithub && (
                         <div className={styles.field}>
-                          <Caption1>Points</Caption1>
+                          <Caption1 id={`${uid}-f18`}>Points</Caption1>
                           <Input
+                            aria-labelledby={`${uid}-f18`}
                             type="text"
                             inputMode="numeric"
                             pattern="[0-9]*"
@@ -987,8 +1017,9 @@ export function ActionDialog({
                         </div>
                       )}
                       <div className={styles.field}>
-                        <Caption1>{isGithub ? "Labels" : "Tags"}</Caption1>
+                        <Caption1 id={`${uid}-f19`}>{isGithub ? "Labels" : "Tags"}</Caption1>
                         <Input
+                          aria-labelledby={`${uid}-f19`}
                           placeholder={isGithub ? "e.g. bug; sev2" : "e.g. ux; a11y"}
                           value={niTags}
                           onChange={(_e, d) => setNiTags(d.value)}

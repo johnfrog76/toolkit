@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import {
   Subtitle2,
   Caption1,
@@ -143,6 +143,9 @@ function ResultBox({
 
 export function PromptActions() {
   const styles = useStyles();
+  // Each field's visible caption names it: ids are per instance, so two open
+  // dialogs never share one.
+  const uid = useId();
   const [activeTab, setActiveTab] = useState<"create" | "fetch" | "resolve" | "pr" | "new-item">(
     "new-item",
   );
@@ -413,8 +416,9 @@ export function PromptActions() {
           <div className={styles.form}>
             <div className={styles.fieldRow}>
               <div className={styles.field}>
-                <Caption1>Work Item ID</Caption1>
+                <Caption1 id={`${uid}-f1`}>Work Item ID</Caption1>
                 <Input
+                  aria-labelledby={`${uid}-f1`}
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
@@ -429,8 +433,9 @@ export function PromptActions() {
               </div>
 
               <div className={styles.field}>
-                <Caption1>Assignment</Caption1>
+                <Caption1 id={`${uid}-f2`}>Assignment</Caption1>
                 <TruncatedDropdown
+                  aria-labelledby={`${uid}-f2`}
                   maxToggleLength={15}
                   value={assignOptions.find((o) => o.key === assign)?.label}
                   selectedOptions={[assign]}
@@ -480,8 +485,9 @@ export function PromptActions() {
           <div className={styles.form}>
             <div className={styles.fieldRow}>
               <div className={styles.field} style={{ gridColumn: "1 / 3" }}>
-                <Caption1>PR ID</Caption1>
+                <Caption1 id={`${uid}-f3`}>PR ID</Caption1>
                 <Input
+                  aria-labelledby={`${uid}-f3`}
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
@@ -528,8 +534,9 @@ export function PromptActions() {
           <div className={styles.form}>
             <div className={styles.fieldRow}>
               <div className={styles.field}>
-                <Caption1>Work Item ID</Caption1>
+                <Caption1 id={`${uid}-f4`}>Work Item ID</Caption1>
                 <Input
+                  aria-labelledby={`${uid}-f4`}
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
@@ -544,8 +551,9 @@ export function PromptActions() {
               </div>
 
               <div className={styles.field}>
-                <Caption1>Target Branch</Caption1>
+                <Caption1 id={`${uid}-f5`}>Target Branch</Caption1>
                 <Input
+                  aria-labelledby={`${uid}-f5`}
                   type="text"
                   placeholder="main"
                   value={prTargetBranch}
@@ -608,8 +616,9 @@ export function PromptActions() {
           <div className={styles.form}>
             <div className={styles.fieldRow}>
               <div className={styles.field}>
-                <Caption1>Work Item ID</Caption1>
+                <Caption1 id={`${uid}-f6`}>Work Item ID</Caption1>
                 <Input
+                  aria-labelledby={`${uid}-f6`}
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
@@ -621,8 +630,9 @@ export function PromptActions() {
               </div>
 
               <div className={styles.field}>
-                <Caption1>Reason</Caption1>
+                <Caption1 id={`${uid}-f7`}>Reason</Caption1>
                 <TruncatedDropdown
+                  aria-labelledby={`${uid}-f7`}
                   maxToggleLength={15}
                   value={reasonOptions.find((o) => o.key === resolveReason)?.label}
                   selectedOptions={[resolveReason]}
@@ -642,8 +652,9 @@ export function PromptActions() {
 
             <div className={styles.fieldRow}>
               <div className={styles.field} style={{ gridColumn: "1 / 3" }}>
-                <Caption1>Comment</Caption1>
+                <Caption1 id={`${uid}-f8`}>Comment</Caption1>
                 <Textarea
+                  aria-labelledby={`${uid}-f8`}
                   placeholder="e.g. Fixed in PR 141234"
                   value={resolveComment}
                   onChange={(_e, data) => setResolveComment(data.value)}
@@ -687,8 +698,9 @@ export function PromptActions() {
             {/* Type | Title */}
             <div className={styles.fieldRow2}>
               <div className={styles.field}>
-                <Caption1>Type</Caption1>
+                <Caption1 id={`${uid}-f9`}>Type</Caption1>
                 <TruncatedDropdown
+                  aria-labelledby={`${uid}-f9`}
                   maxToggleLength={12}
                   value={adoItemTypeOptions.find((o) => o.key === niType)?.label}
                   selectedOptions={[niType]}
@@ -705,10 +717,11 @@ export function PromptActions() {
                 </TruncatedDropdown>
               </div>
               <div className={styles.field}>
-                <Caption1>
+                <Caption1 id={`${uid}-f10`}>
                   Title <span style={{ color: tokens.colorPaletteRedForeground1 }}>*</span>
                 </Caption1>
                 <Input
+                  aria-labelledby={`${uid}-f10`}
                   placeholder="e.g. Add dark mode toggle"
                   value={niTitle}
                   onChange={(_e, d) => setNiTitle(d.value)}
@@ -720,9 +733,10 @@ export function PromptActions() {
             {/* Project | Sprint | Parent */}
             <div className={styles.fieldRow3}>
               <div className={styles.field}>
-                <Caption1>Project</Caption1>
+                <Caption1 id={`${uid}-f11`}>Project</Caption1>
                 {projectList.length > 1 ? (
                   <TruncatedDropdown
+                    aria-labelledby={`${uid}-f11`}
                     maxToggleLength={14}
                     value={niProject || "— auto —"}
                     selectedOptions={[niProject]}
@@ -740,6 +754,7 @@ export function PromptActions() {
                   </TruncatedDropdown>
                 ) : (
                   <Input
+                    aria-labelledby={`${uid}-f11`}
                     placeholder={projectList[0]?.name ?? "project name"}
                     value={niProject}
                     onChange={(_e, d) => setNiProject(d.value)}
@@ -748,8 +763,9 @@ export function PromptActions() {
                 )}
               </div>
               <div className={styles.field}>
-                <Caption1>Sprint</Caption1>
+                <Caption1 id={`${uid}-f12`}>Sprint</Caption1>
                 <Input
+                  aria-labelledby={`${uid}-f12`}
                   placeholder="e.g. Sprint 72"
                   value={niSprint}
                   onChange={(_e, d) => setNiSprint(d.value)}
@@ -757,8 +773,9 @@ export function PromptActions() {
                 />
               </div>
               <div className={styles.field}>
-                <Caption1>Parent ID</Caption1>
+                <Caption1 id={`${uid}-f13`}>Parent ID</Caption1>
                 <Input
+                  aria-labelledby={`${uid}-f13`}
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
@@ -773,8 +790,9 @@ export function PromptActions() {
             {/* Acceptance Criteria — User Story only */}
             {niType === "UserStory" && (
               <div className={styles.field}>
-                <Caption1>Acceptance Criteria</Caption1>
+                <Caption1 id={`${uid}-f14`}>Acceptance Criteria</Caption1>
                 <Textarea
+                  aria-labelledby={`${uid}-f14`}
                   placeholder="- [ ] ..."
                   value={niAC}
                   onChange={(_e, d) => setNiAC(d.value)}
@@ -788,8 +806,9 @@ export function PromptActions() {
             {/* Repro Steps — Bug only */}
             {niType === "Bug" && (
               <div className={styles.field}>
-                <Caption1>Repro Steps</Caption1>
+                <Caption1 id={`${uid}-f15`}>Repro Steps</Caption1>
                 <Textarea
+                  aria-labelledby={`${uid}-f15`}
                   placeholder="1. Go to ... 2. Click ..."
                   value={niReproSteps}
                   onChange={(_e, d) => setNiReproSteps(d.value)}
@@ -802,8 +821,9 @@ export function PromptActions() {
 
             {/* Description */}
             <div className={styles.field}>
-              <Caption1>Description</Caption1>
+              <Caption1 id={`${uid}-f16`}>Description</Caption1>
               <Textarea
+                aria-labelledby={`${uid}-f16`}
                 placeholder="Optional context or scope"
                 value={niDescription}
                 onChange={(_e, d) => setNiDescription(d.value)}
@@ -816,8 +836,9 @@ export function PromptActions() {
             {/* Priority | Points | Tags | Go */}
             <div className={styles.fieldRow4}>
               <div className={styles.field}>
-                <Caption1>Priority</Caption1>
+                <Caption1 id={`${uid}-f17`}>Priority</Caption1>
                 <TruncatedDropdown
+                  aria-labelledby={`${uid}-f17`}
                   maxToggleLength={12}
                   value={priorityOptions.find((o) => o.key === niPriority)?.label}
                   selectedOptions={[niPriority]}
@@ -832,8 +853,9 @@ export function PromptActions() {
                 </TruncatedDropdown>
               </div>
               <div className={styles.field}>
-                <Caption1>Points</Caption1>
+                <Caption1 id={`${uid}-f18`}>Points</Caption1>
                 <Input
+                  aria-labelledby={`${uid}-f18`}
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
@@ -844,8 +866,9 @@ export function PromptActions() {
                 />
               </div>
               <div className={styles.field}>
-                <Caption1>Tags</Caption1>
+                <Caption1 id={`${uid}-f19`}>Tags</Caption1>
                 <Input
+                  aria-labelledby={`${uid}-f19`}
                   placeholder="e.g. ux; a11y"
                   value={niTags}
                   onChange={(_e, d) => setNiTags(d.value)}
