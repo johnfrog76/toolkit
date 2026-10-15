@@ -1116,6 +1116,8 @@ $sandbox = New-ArchiveSandbox
 try {
     $hook = Join-Path $sandbox '.git/hooks/pre-commit'
     [System.IO.File]::WriteAllText($hook, "#!/bin/sh`necho 'hook says no'`nexit 1`n")
+    # git runs a hook only when the file is executable; Windows has no execute bit, Unix does.
+    if (Get-Command chmod -ErrorAction SilentlyContinue) { & chmod '+x' $hook }
     Add-CurrentFile $sandbox 'Task703-hook-refuses.prompt.md'
     $out = Invoke-Archive @{ File = '703' }
     Assert-Equal "a failed commit exits 2" 2 $script:LastArchiveExit
