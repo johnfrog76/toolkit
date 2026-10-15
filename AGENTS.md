@@ -667,6 +667,28 @@ file shape changes that document in the same commit.
 but-unbuilt goes on that list with what you see when you hit it. Anything a reader could mistake for
 a bug is either fixed or listed.
 
+## A release is a tag on main
+
+Main is the release line. There is no release branch: a card merges to main through its own pull
+request, and a release is a moment on main that a tag names. The version is semantic,
+MAJOR.MINOR.PATCH, and the question that picks the number is what a user with a hub full of cards from
+the last version would have to do: touch their files or their config, **major**; nothing, and they
+find the new thing when they go looking, **minor**; nothing, and something stopped being broken,
+**patch**.
+
+What every change does: **a change a user would notice adds one line under `## [Unreleased]` in
+`CHANGELOG.md`, in the same commit**, under `### Added`, `### Changed`, `### Fixed` or `### Removed`
+(Keep a Changelog). Written for the user who reads release notes, not for this project: what they
+can now do, or what stopped going wrong, in a sentence. A fix nobody would notice adds nothing.
+
+What a release does, in one small pull request on main: rename `## [Unreleased]` to `## [x.y.z] - YYYY-MM-DD`
+and open a fresh empty `## [Unreleased]` above it; set the same version in the three places that state
+it, `Prompt20Toolkit/Prompt20Toolkit.psd1` (`ModuleVersion`), `consts.json` (`version`) and
+`web/package.json` (`version`); merge; then push the tag, `git tag vx.y.z && git push origin vx.y.z`.
+`.github/workflows/release.yml` makes the GitHub Release from the changelog section with that
+version and refuses a tag that has none, so a release never ships with empty notes. Only the owner
+tags; an agent never does.
+
 ## Conventions come from the corpus, not from taste
 
 Prompt filenames and branch names follow house style, and the style is **evidence, not
