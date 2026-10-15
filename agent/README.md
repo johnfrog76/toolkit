@@ -159,6 +159,12 @@ What the agent does with it:
   as on a shipped org. An org without `slug` or `promptsFolder` is skipped with a WARN; a malformed
   file is a WARN naming the path, never a raise; an absent file changes nothing.
 - `/env` reports `hub` (`manifest`, `path`, `orgs`) and a `hubManifest` check row.
+- `load_config()` reads `config.default.json` and `config.local.json` through `read_config_file`, which
+  never raises: an unreadable file, malformed JSON or a top level that is not an object is logged as a
+  WARN naming the path, the file is skipped (the defaults, then `hub.json`, stand), and the sentence
+  lands in `load_config()["configProblems"]`. `/env` reports it as a failing `configLoaded` check row (the "Settings files" row),
+  so a typo in `config.local.json` costs a red row rather than the agent. `POST /switch-mode` reads the
+  local file the same way and answers 409 with that sentence instead of writing over a file it could not read.
 - `folders` names the hub-root siblings. `DEFAULT_HUB_FOLDERS` holds the defaults and
   `hub_folder(name)` is the one accessor the modules read; no module types a folder name.
 - `storeSync` (`git` or `none`, `STORE_SYNC_VALUES`) resolves in the orgs' order and lands in

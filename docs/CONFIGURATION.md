@@ -147,6 +147,11 @@ recent-errors count) calls the same helper, `Write-P20ConfigParseWarning` in
 module variable. The readers still fall back to the defaults; fix the file and open a new shell. A
 child `pwsh` (the web bridge, a test runner) is its own process and says it once for itself.
 
+The agent behaves the same way: it starts on the defaults, keeps answering, and `GET /api/env` carries a
+failing `configLoaded` check (the "Settings files" row) whose detail names the file and the parser's message. Fix the file and the
+next request reads it again; no restart is needed. `POST /api/switch-mode` answers 409 with the same
+sentence rather than overwrite a file it could not read.
+
 That is every reader in the tree, not a list of six: the agent port, the Space lifecycle
 read, the other scripts that look at the file when no module is loaded (`SwitchSpace`'s status,
 `Connect`, `SendTeams`, `NewGrowth`, the review generator, the weekly billing script, the

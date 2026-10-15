@@ -29,6 +29,7 @@ from .config import (
     lane_names,
     load_config,
     offered_spaces,
+    read_config_file,
     renamed_slug,
     resolve_dirs,
     tracker,
@@ -143,6 +144,7 @@ async def get_env(refresh: int = 0):
 
     # Check 3: Config loaded
     config_loaded = bool(cfg)
+    config_problems = cfg.get("configProblems") or []
 
     # Check 4: Git history available
     git_history = (root / ".git").exists()
@@ -282,9 +284,15 @@ async def get_env(refresh: int = 0):
                 "ok": prompts_writable,
                 "detail": "writable" if prompts_writable else "read-only",
             },
+            # A config file that would not parse is skipped, not fatal; this row
+            # is where the user is told so (the sentence names the file).
             "configLoaded": {
-                "ok": config_loaded,
-                "detail": "config loaded" if config_loaded else "config not found",
+                "ok": config_loaded and not config_problems,
+                "detail": (
+                    " ".join(config_problems)
+                    if config_problems
+                    else ("config loaded" if config_loaded else "config not found")
+                ),
             },
             "gitHistory": _git_history_check(git_history, str(cfg.get("storeSync") or "none")),
             # An ARCHIVED org is supposed to have nothing in flight: none is the
@@ -374,9 +382,11 @@ async def switch_mode(body: SwitchModeRequest):
     # the Space rename; a file that still said activeOrg comes out saying the new
     # name and not the old.
     local_path = LOCAL_CONFIG_PATH
-    local = {}
-    if local_path.exists():
-        local = json.loads(local_path.read_text(encoding="utf-8-sig"))
+    local, problem = read_config_file(local_path)
+    if problem:
+        # Writing activeSpace into a file we could not read would replace
+        # whatever the person had in it; say so and leave it alone.
+        raise HTTPException(status_code=409, detail=problem)
     local.pop("activeOrg", None)
     local["activeSpace"] = slug
     local_path.write_text(json.dumps(local, indent=2) + "\n", encoding="utf-8")
