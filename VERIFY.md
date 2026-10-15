@@ -939,7 +939,14 @@ names the command, what you should see, and the issue it closes. A row stays unt
 it and records that on the issue. Then the row moves into the gate it belongs to, or goes if a suite
 now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on the verifying host: it prints each `verify-close` issue with the row below that names it, by issue number.
 
-No fix has left a row here yet.
+- [x] **A save from the browser keeps a session's line endings.** In a scratch hub with
+  `communication` on, `NewMeeting -Date 2026-10-20` from a fresh shell writes an LF session. Make the hub a git
+  repository with `core.autocrlf` off (with it on, git hides the difference) and commit it, start the agent,
+  save that session once with `PUT /api/manager/2026-10-20.md` and `{"since": "notes"}`, then run
+  `git diff --stat` in the hub. You should see only the edited lines changed (a few insertions and
+  deletions), not every line of the file, and `git diff` shows no `^M`. Repeat on a session whose
+  lines end CRLF: it stays CRLF.
+  CONFIRMED on Windows: an LF session saved through the agent changed only its edited lines and gained no CR.
 
 ## Recording a run
 

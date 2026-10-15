@@ -11,6 +11,8 @@ release.
 ### Fixed
 
 - The agent no longer fails to start, or answers 500 on every route, when `config.local.json` has a typo; it falls back to the defaults and `/env` names the broken file.
+- Saving a meeting from the browser on Windows no longer rewrites the whole session file with CRLF
+  line endings; a save keeps the ending the file already has.
 
 ## [1.0.0] - 2026-10-15
 
