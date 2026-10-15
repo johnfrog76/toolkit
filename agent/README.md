@@ -470,7 +470,7 @@ route list.
 | `GET /config/schema` | `core/config_routes` | any | `Config -Schema -AsJson`, through the bridge; cached per process | — |
 | `GET /config` | `core/config_routes` | any | `Config -List -AsJson`, through the bridge | — |
 | `PUT /config` | `core/config_routes` | any | the reply of the write, then the re-read | **whatever `Config` writes** -- `config.local.json`, or the hub's `hub.json` |
-| `POST /log` | `core/log` | any | — | `usage.{machine}.log` (or `P20_USAGE_LOG_DIR`) |
+| `POST /log` | `core/log` | any | — | `usage.{machine}.log` (or `P20_USAGE_LOG_DIR`); a tab or line break in `source` or `detail` is written as one space, so an entry is always one line of five columns |
 | `GET /log-entries` | `core/log` | any | `usage.*.log`, from the same directory the writer uses | — |
 | `GET /test-history` | `core/log` | any | `test-results.{machine}.log`, `test-summary.*.json` | — |
 | `GET /status` | `ado/status` | Tier 2+ | `{hub}/{org}/current/`; on a GitHub Space at Tier 1 each card also carries `pinned` (one `gh api graphql` `pinnedIssues` call per repo, held 60 s, dropped when `/cmd/EditItem` runs) -- at Tier 2, on ADO and with no tracker `gh` is not asked. `?space=<slug>` reads THAT Space's `{hub}/{promptsFolder}/current/` instead (the Studio's Spaces card): a folder read, no tracker asked and no `pinned` set for a Space you are not in; an undeclared slug is **404**, the same lookup as `/issue-report`'s (`space_entry()`) | — |

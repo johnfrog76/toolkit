@@ -11,6 +11,7 @@ release.
 ### Fixed
 
 - Attaching a cover or a before picture from the browser no longer leaves a copy of the image in the system temp folder for good; it is removed once the card has the picture, and stale ones are cleared when the agent starts.
+- A tab or a line break in a logged work item title or error message no longer splits the usage log entry into a forged second entry or shifts its columns; both log writers now write it as a space.
 - The agent no longer fails to start, or answers 500 on every route, when `config.local.json` has a typo; it falls back to the defaults and `/env` names the broken file.
 - Saving a meeting from the browser on Windows no longer rewrites the whole session file with CRLF
   line endings; a save keeps the ending the file already has.
