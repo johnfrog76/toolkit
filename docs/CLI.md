@@ -385,7 +385,7 @@ three the agent's `GET /api/visibility` serves: `public`, `private`, `unknown`.
 
 ## Command reference
 
-**40 always on, 53 with every opt-in module switched on.** The 40 are `config.default.json`'s
+**42 always on, 55 with every opt-in module switched on.** The 42 are `config.default.json`'s
 `commands`, and are below -- the Studio's `NewDesign`, `StampDesign`, `MoveDesign`, `NewSpace`, `RetireSpace` and `RemoveSpace` among them, because the Studio is
 core ([Studio](modules/studio.md); D-S13); the thirteen the growth,
 communication, organize and Team Agile modules contribute have their own table further down, each marked
