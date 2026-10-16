@@ -1485,6 +1485,19 @@ foreach ($cmdName in $commandNames) {
     if (-not $scriptCmd) { continue }
     $parityChecked++
 
+    # A script that states a refusal (exit 2) is reached through the guard,
+    # Invoke-ToolkitScript, or the refusal is never logged and a non-interactive
+    # caller is told it succeeded (AGENTS.md, "The refusal contract"). The two
+    # launchers below are the only exceptions, and each is listed with its reason.
+    $bareByDesign = @{
+        Web   = 'Start-Web.ps1 logs, prints and exits its own refusals; a second report from the wrapper would print a generic block under the readable one.'
+        Agent = 'Start-Agent.ps1 logs, prints and exits its own refusals (ERR included); the guard would add a second ERR line and a generic block.'
+    }
+    $scriptRaw = [System.IO.File]::ReadAllText($scriptPath)
+    if ($scriptRaw -match '(?m)^\s*exit 2' -and -not $bareByDesign.ContainsKey($cmdName)) {
+        Assert-True "$cmdName : its script states refusals (exit 2), so the wrapper reaches it through Invoke-ToolkitScript" ($wrapper.Definition -match 'Invoke-ToolkitScript')
+    }
+
     $scriptNames  = Get-ParameterNames $scriptCmd
     $wrapperNames = Get-ParameterNames $wrapper
 

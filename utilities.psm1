@@ -1950,7 +1950,11 @@ function global:Get-P20ToolkitLog {
         [switch]$Help,
         [int]$Count
     )
-    & "$toolkitRoot\Scripts\Get-ToolkitLog.ps1" @PSBoundParameters
+    # No success line: a CMD line for every read would be a new entry in the
+    # very log being read, and -Clear would leave one behind in the fresh file.
+    $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'Log'
+    Invoke-ToolkitScript -Path "$toolkitRoot\Scripts\Get-ToolkitLog.ps1" -Parameters $PSBoundParameters `
+        -Name $inv.Name -Prefix $inv.Prefix -NoSuccessLog
 }
 
 function global:Test-P20Prerequisites {
@@ -2110,7 +2114,11 @@ function global:Add-P20CommitHash {
         [string]$Hash,
         [switch]$Help
     )
-    & "$toolkitRoot\Scripts\Thread-CommitHash.ps1" @PSBoundParameters
+    # The script logs its own CMD line (with the count it threaded), so the
+    # guard adds only what the script cannot: the ERR line and the re-raise.
+    $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'ThreadHash'
+    Invoke-ToolkitScript -Path "$toolkitRoot\Scripts\Thread-CommitHash.ps1" -Parameters $PSBoundParameters `
+        -Name $inv.Name -Prefix $inv.Prefix -NoSuccessLog
 }
 
 function global:Start-P20Web {
@@ -2154,7 +2162,10 @@ function global:Install-P20ToolkitAutoload {
         [switch]$Help
     )
     if ($Help) { Show-CommandHelp 'InstallAutoload'; return }
-    & "$toolkitRoot\Scripts\Install-ToolkitAutoload.ps1" @PSBoundParameters
+    # The script logs its own CMD line (installed or removed), so no second one.
+    $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'InstallAutoload'
+    Invoke-ToolkitScript -Path "$toolkitRoot\Scripts\Install-ToolkitAutoload.ps1" -Parameters $PSBoundParameters `
+        -Name $inv.Name -Prefix $inv.Prefix -NoSuccessLog
 }
 
 function global:Start-P20Agent {
@@ -2170,7 +2181,10 @@ function global:Start-P20Agent {
     # Forwarded, not wrapped in a try/catch that re-reports. This script owns
     # its own failures: it calls Write-CliError, logs ERR and exits non-zero,
     # and Tests/Test-Agent.ps1 asserts all three. A second report from here would
-    # print 'Error: exit code 1' under the readable one the script just gave.
+    # print 'Error: exit code 1' under the readable one the script just gave, and
+    # the guard's own ERR line would be a second entry for the same refusal.
+    # Tests/Test-Menu.ps1 lists this wrapper (and Web's) as the deliberate
+    # exceptions to "a script that exits 2 is reached through the guard".
     & "$toolkitRoot\Scripts\Start-Agent.ps1" @PSBoundParameters
 }
 
@@ -2183,7 +2197,9 @@ function global:Switch-P20Mode {
     )
     Write-P20DeprecationHint $MyInvocation.InvocationName
     if ($Help) { Show-CommandHelp 'SwitchSpace'; return }
-    & "$toolkitRoot\Scripts\Switch-Mode.ps1" @PSBoundParameters
+    $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'SwitchSpace'
+    Invoke-ToolkitScript -Path "$toolkitRoot\Scripts\Switch-Mode.ps1" -Parameters $PSBoundParameters `
+        -Name $inv.Name -Prefix $inv.Prefix
 }
 
 # The one writer for configuration. Goes through Invoke-ToolkitScript like

@@ -628,6 +628,44 @@ Assert-True "#9: ...and the pipeline section names the project it could not read
 
 Write-Host ""
 
+# -- Scripts that refuse are reached through the guard ------------------------
+# ThreadHash and SwitchSpace used to run their script bare: the refusal printed,
+# nothing was logged, a terminal run could still read exit 2 but the bridge
+# (which exits on whether the FUNCTION threw) reported success, and SwitchSpace
+# of a Space that does not exist printed a notice and returned 0. Each case runs
+# a terminal call (exit 2, one Error block, one ERR line in the usage log) and a
+# bridge-style call (TOOLKIT_QUIET_STARTUP: a throw carrying the sentence).
+
+Write-Host "-- ThreadHash and SwitchSpace refuse through the guard --" -ForegroundColor Cyan
+
+$guardCases = @(
+    @{ Verb = 'ThreadHash'; Call = "${cfgPrefix}ThreadHash -File __no-such-card__.prompt.md -Hash deadbee"; Sentence = 'File not found' },
+    @{ Verb = 'SwitchSpace'; Call = "${cfgPrefix}SwitchSpace nope"; Sentence = 'Unknown Space: nope' }
+)
+foreach ($case in $guardCases) {
+    foreach ($shell in @('pwsh', 'powershell')) {
+        if ($shell -eq 'powershell' -and -not (Get-Command powershell.exe -ErrorAction SilentlyContinue)) { continue }
+        $logDir = Join-Path ([System.IO.Path]::GetTempPath()) "guard-log-$([guid]::NewGuid())"
+        New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+        try {
+            $term = Invoke-ChildRun "$($case.Call)`n'LASTEXITCODE=' + `$LASTEXITCODE`nexit `$LASTEXITCODE" -Environment @{ P20_USAGE_LOG_DIR = $logDir } -Shell $shell
+            $logText = ''
+            foreach ($f in @(Get-ChildItem -Path $logDir -Filter 'usage.*.log' -ErrorAction SilentlyContinue)) { $logText += [System.IO.File]::ReadAllText($f.FullName) }
+            $errLines = @($logText -split "`n" | Where-Object { $_ -match "`tERR`t" })
+            $cmdLines = @($logText -split "`n" | Where-Object { $_ -match "`tCMD`t" })
+            Assert-True "$($case.Verb) [$shell]: a terminal run exits 2 (got $($term.ExitCode))" ($term.ExitCode -eq 2 -and $term.Output -match 'LASTEXITCODE=2')
+            Assert-True "$($case.Verb) [$shell]: one Error block, no generic 'exit code'" ((@([regex]::Matches($term.Output, '(?m)^Error: ')).Count) -eq 1 -and $term.Output -match $case.Sentence -and $term.Output -notmatch 'exit code')
+            Assert-True "$($case.Verb) [$shell]: exactly one ERR line in the usage log, naming the verb, and no CMD line" ($errLines.Count -eq 1 -and $errLines[0] -match "$($case.Verb)" -and $cmdLines.Count -eq 0) $logText
+        }
+        finally { Remove-Item $logDir -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+    $bridged = Invoke-ChildRun "$($case.Call)`nexit 0" -Environment @{ TOOLKIT_QUIET_STARTUP = '1' }
+    Assert-True "$($case.Verb): a non-interactive caller sees a failure (got $($bridged.ExitCode))" ($bridged.ExitCode -ne 0)
+    Assert-True "$($case.Verb): and is handed the sentence" ($bridged.Output -match $case.Sentence)
+}
+
+Write-Host ""
+
 Remove-Item $script:probeDir -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Host ""
