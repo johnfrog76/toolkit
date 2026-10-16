@@ -24,6 +24,8 @@ be read, and holds nothing real), a weakness in a dependency that has no effect 
 uses it (report that upstream), and anything that needs an attacker who already has your user
 account on the machine, since the Toolkit acts with your own permissions.
 
+Code scanning runs: CodeQL scans the web UI and the agent on every push to `main`, on every pull request and weekly, and its findings are in this repository's **Security** tab.
+
 ## The trust model, in two paragraphs
 
 The Toolkit is tooling for one person's own machine, and it has no accounts or sign-in of its own.

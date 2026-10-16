@@ -372,6 +372,21 @@ class TheMoveDesignVerb(unittest.TestCase):
         text = self.read(self.hub / "design/archive/hub-note.md")
         self.assertIn("This note is now design/archive/hub-note.md in the hub.", text)
 
+    def test_a_hub_move_whose_commit_fails_is_a_stated_refusal(self):
+        hook = self.hub / ".git" / "hooks" / "pre-commit"
+        hook.write_bytes(b"#!/bin/sh\necho 'hook says no'\nexit 1\n")
+        hook.chmod(0o755)  # git runs a hook only when it is executable; Windows ignores the bit
+        out = self.move("hub-note -To Archive -Hub", at=self.hub)
+        self.assertIn("X=2", out)
+        self.assertEqual(out.count("Error:"), 1, out)
+        self.assertIn("is not committed", out)
+        self.assertIn("hook says no", out)
+        self.assertIn("Hint:", out)
+        self.assertNotIn("Committed.", out)
+        self.assertTrue((self.hub / "design/archive/hub-note.md").exists(), "the move is on disk")
+        self.assertFalse((self.hub / "design/hub-note.md").exists())
+        self.assertEqual(_git(self.hub, "rev-list", "--count", "HEAD").strip(), "1")
+
     def test_hub_space_moves_that_spaces_own_folder(self):
         out = self.move("space-note -To Archive -Hub -Space demo -Dropped -Reason because", at=self.hub)
         self.assertIn("X=0", out)

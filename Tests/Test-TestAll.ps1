@@ -228,6 +228,26 @@ Assert-True 'every action release.yml uses is pinned to a major version' `
     (($releaseUses.Count -gt 0) -and (@($releaseUses | Where-Object { $_ -notmatch '^actions/[a-z-]+@v\d+$' }).Count -eq 0)) ($releaseUses -join ', ')
 Assert-True 'release.yml reads its notes out of CHANGELOG.md and refuses an empty section' (($release -match 'CHANGELOG\.md') -and ($release -match 'no section for'))
 
+# The code-scanning workflow: every push to main, every pull request and a weekly
+# schedule, the web's and the agent's languages, a read and the one write a scan
+# uploads with, no secret, and every action held to a major version.
+$codeqlPath = Join-Path $pkgRoot '.github/workflows/codeql.yml'
+$codeql = ''
+if (Test-Path -LiteralPath $codeqlPath) { $codeql = [System.IO.File]::ReadAllText($codeqlPath) }
+Assert-True 'codeql.yml runs on every push to main, every pull request and a weekly schedule' `
+    (($codeql -match '(?ms)^on:\s*\r?\n\s+push:\s*\r?\n\s+branches: \[main\]\s*\r?\n\s+pull_request:\s*\r?\n\s+schedule:\s*\r?\n\s+- cron: "[^"\r\n]+"\s*\r?\n') -and ($codeql -notmatch '(?m)^\s+(pull_request_target|workflow_run):'))
+Assert-True 'codeql.yml scans the web and the agent: javascript-typescript and python' `
+    (($codeql -match '(?m)^\s+- language: javascript-typescript\s*$') -and ($codeql -match '(?m)^\s+- language: python\s*$'))
+Assert-True 'codeql.yml asks for no secret' (($codeql -ne '') -and ($codeql -notmatch 'secrets\.'))
+$codeqlGrants = @([regex]::Matches($codeql, '(?m)^\s+([a-z-]+): (read|write)\s*$') | ForEach-Object { $_.Groups[1].Value + ':' + $_.Groups[2].Value } | Sort-Object -Unique)
+Assert-True 'codeql.yml grants contents: read and security-events: write, and nothing else' `
+    (($codeql -match '(?m)^permissions:\s*\r?\n\s+contents: read\s*$') -and (($codeqlGrants -join ',') -eq 'contents:read,security-events:write')) ($codeqlGrants -join ',')
+$codeqlUses = @([regex]::Matches($codeql, '(?m)^\s+(?:- )?uses: (\S+)\s*$') | ForEach-Object { $_.Groups[1].Value })
+Assert-True 'every action codeql.yml uses is pinned to a major version' `
+    (($codeqlUses.Count -gt 0) -and (@($codeqlUses | Where-Object { $_ -notmatch '^(actions/[a-z-]+|github/codeql-action/[a-z-]+)@v\d+$' }).Count -eq 0)) ($codeqlUses -join ', ')
+Assert-True 'codeql.yml runs the default queries: init names no queries or config file' (($codeql -ne '') -and ($codeql -notmatch '(?m)^\s+(queries|config-file|config):'))
+Assert-True 'every job in codeql.yml has a timeout' (($codeql -ne '') -and ([regex]::Matches($codeql, '(?m)^\s+runs-on:').Count -eq [regex]::Matches($codeql, '(?m)^\s+timeout-minutes: \d+').Count))
+
 $real = Read-P20ExpectedCounts -Path (Join-Path $pkgRoot 'docs/TESTING.md')
 Assert-True 'docs/TESTING.md: the tkTestToolkit line is read' ($null -ne $real.cli -and $real.cli.Total -gt 0)
 Assert-True 'docs/TESTING.md: the pytest line is read' ($null -ne $real.agent -and $real.agent.Passed -gt 0)

@@ -162,7 +162,11 @@ if ($Samples) {
         if ($changedPaths.Count -gt 0) {
             $note = Save-P20CardImageCommit -PromptsRoot $promptsRoot -StoreSync ([string]$cfg.StoreSync) -Paths $changedPaths `
                 -Message "cover: dress $dressed sample card(s)"
-            Write-Host "    $note" -ForegroundColor DarkGray
+            Write-Host "    $($note.Note)" -ForegroundColor DarkGray
+            if (-not $note.Ok) {
+                Write-CliError -Message $note.Message -Hint $note.Hint
+                exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+            }
         }
     }
     if ($refused -gt 0) {
@@ -244,7 +248,11 @@ if ($Remove) {
     }
     $note = Save-P20CardImageCommit -PromptsRoot $promptsRoot -StoreSync ([string]$cfg.StoreSync) -Paths $outcome.Changed `
         -Message "cover: remove $label's $word"
-    Write-Host "    $note" -ForegroundColor DarkGray
+    Write-Host "    $($note.Note)" -ForegroundColor DarkGray
+    if (-not $note.Ok) {
+        Write-CliError -Message $note.Message -Hint $note.Hint
+        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+    }
     exit 0
 }
 
@@ -270,5 +278,9 @@ else {
 }
 $note = Save-P20CardImageCommit -PromptsRoot $promptsRoot -StoreSync ([string]$cfg.StoreSync) -Paths $outcome.Changed `
     -Message "cover: $label $($outcome.File)"
-Write-Host "    $note" -ForegroundColor DarkGray
+Write-Host "    $($note.Note)" -ForegroundColor DarkGray
+if (-not $note.Ok) {
+    Write-CliError -Message $note.Message -Hint $note.Hint
+    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+}
 exit 0
