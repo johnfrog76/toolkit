@@ -62,10 +62,10 @@ tkTestToolkit -GitRoot   # a folder inside someone else's repository is not a ch
 
 ```bash
 python3 -m pip install -r agent/requirements-dev.txt   # once -- runtime deps plus pytest, httpx and ruff
-python3 -m pytest Tests/     # 1050 passed, 3 skipped, 1199 subtests -- the agent
+python3 -m pytest Tests/     # 1072 passed, 3 skipped, 1205 subtests -- the agent
 cd web && npm ci             # once
 cd web && npx playwright install chromium   # once -- for `npm run smoke` only
-cd web && npm test           # 5 build-contract checks, then 126 suites, 1445 tests -- the shell
+cd web && npm test           # 5 build-contract checks, then 129 suites, 1462 tests -- the shell
 cd web && npm run smoke              # 23 checks, flags off -- the browser; needs two servers up
 cd web && npm run smoke -- --modules=on  # 30 checks, both module flags on
 cd web && npm run smoke -- --studio      # the Studio's contract -- starts and stops its own servers
