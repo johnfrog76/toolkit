@@ -143,7 +143,7 @@ function PresenterTimer() {
 
 export function PresenterNotes({
   voices = NARRATION_VOICES,
-  hasApi = true,
+  hasApi = false,
   resolveNarrationUrl,
   decks = PUBLIC_DECKS,
 }: {
@@ -153,11 +153,10 @@ export function PresenterNotes({
    */
   voices?: readonly NarrationVoice[];
   /**
-   * Whether /api/narrate is reachable. Defaults TRUE so web — the app this popout
-   * was built for — behaves exactly as before. CSS Wasteland passes false plus a
-   * resolver: narration then plays committed mp3s and the picker is gated by what
-   * was baked. This is the fact the notes window previously could not see, so
-   * every toggle there was a doomed fetch against a backend that isn't running.
+   * Whether /api/narrate is reachable. Defaults FALSE: a host that forgets to say
+   * so gets silence rather than a doomed fetch against a route that may not be
+   * served. A host that does serve it passes true; a host with committed mp3s
+   * passes false plus a resolver, and the picker is gated by what was baked.
    */
   hasApi?: boolean;
   /**

@@ -16,17 +16,12 @@
  * org that tried and failed is "Offline", the only yellow here.
  */
 import type { EnvStatus } from "../../shell/api";
+import { trackerName } from "./TrackerBadge";
 
 export interface EnvBadge {
   label: string;
   color: "success" | "warning" | "danger" | "informative";
   tooltip: string;
-}
-
-/** The tracker by name, in the sentence a reader sees (never "ADO" on
- *  GitHub soil, D-G13). */
-export function trackerName(tracker: EnvStatus["tracker"]): string {
-  return tracker === "github" ? "GitHub" : "Azure DevOps";
 }
 
 /** What each Environment check is CALLED (the string pass): the place and
@@ -42,7 +37,7 @@ export function checkLabel(key: string, tracker: EnvStatus["tracker"]): string {
     configLoaded: "Settings files",
     gitHistory: "Hub git history",
     activePrompts: "Cards in this Space",
-    adoReachable: tracker === "none" ? "Tracker" : trackerName(tracker),
+    adoReachable: trackerName(tracker) || "Tracker",
     orgState: "Space state",
     bridgeHost: "Bridge host",
     identity: "Identity",
@@ -53,7 +48,8 @@ export function checkLabel(key: string, tracker: EnvStatus["tracker"]): string {
 export function envBadge(
   env: Pick<EnvStatus, "tier" | "spaceStatus"> & Partial<Pick<EnvStatus, "tracker">>,
 ): EnvBadge {
-  const name = trackerName(env.tracker);
+  // A Space with no tracker (or an older agent that does not say) has no name to give.
+  const name = trackerName(env.tracker) || "tracker";
   // Tier 3 is about the machine, not the org: nothing else matters until it is fixed.
   if (env.tier >= 3) {
     return {
