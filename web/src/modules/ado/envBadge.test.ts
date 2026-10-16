@@ -23,6 +23,17 @@ describe("the Environment card's words", () => {
     expect(checkLabel("adoReachable", tracker)).toBe(label);
   });
 
+  it.each([["none"], [undefined]] as const)(
+    "a Space whose tracker is %s never names Azure DevOps",
+    (tracker) => {
+      for (const tier of [1, 2]) {
+        const badge = envBadge({ tier, spaceStatus: "active", tracker });
+        expect(badge.tooltip).not.toMatch(/Azure|ADO/);
+      }
+      expect(checkLabel("adoReachable", tracker)).toBe("Tracker");
+    },
+  );
+
   it("calls the hub's checks by the hub, and a card a card", () => {
     expect(checkLabel("promptsVolume", "none")).toBe("Hub folder");
     expect(checkLabel("activePrompts", "none")).toBe("Cards in this Space");
