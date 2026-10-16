@@ -263,6 +263,36 @@ Assert-True "Re-running does not duplicate PR URL: line (idempotent)"   (($repea
 
 Remove-Item $tmpFile -ErrorAction SilentlyContinue
 
+# The side record a fetch leaves in pr-comments/ is a hub file the tool creates, so it
+# carries the card byte contract: UTF-8 with no byte-order mark, LF. Run the real
+# Write-P20PRCommentsRecord against a scratch hub and read the bytes back.
+. (Join-Path $pkgRoot 'Scripts/Write-CardText.ps1')
+$recFunc = [regex]::Match($sourceText, '(?s)function Write-P20PRCommentsRecord \{.*?\n\}\n')
+Assert-True "Write-P20PRCommentsRecord is found in the script source" $recFunc.Success
+Invoke-Expression $recFunc.Value
+$recHub = Join-Path ([System.IO.Path]::GetTempPath()) ("prrec-" + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $recHub -Force | Out-Null
+$savedRecCfg = $global:P20Config
+$savedRecConsts = $script:Consts
+try {
+    $global:P20Config = [pscustomobject]@{ PromptsRoot = $recHub; PromptsFolder = 'org' }
+    $script:Consts = [pscustomobject]@{ tokens = [pscustomobject]@{ prUrl = 'PR URL:' } }
+    Write-P20PRCommentsRecord -PullRequestId 42 -Title 'A title' -Url 'https://example.test/pr/42' -Repository 'repo' -Count 3 | Out-Null
+    $recFiles = @(Get-ChildItem -Path (Join-Path $recHub 'org/pr-comments') -Filter '*-PR42.md' -ErrorAction SilentlyContinue)
+    Assert-True "the fetch writes one pr-comments record" ($recFiles.Count -eq 1)
+    if ($recFiles.Count -eq 1) {
+        $recBytes = [System.IO.File]::ReadAllBytes($recFiles[0].FullName)
+        Assert-True "the record has no byte-order mark" (-not ($recBytes.Length -ge 3 -and $recBytes[0] -eq 0xEF -and $recBytes[1] -eq 0xBB -and $recBytes[2] -eq 0xBF))
+        Assert-True "the record has no carriage return" (-not ($recBytes -contains 13))
+        Assert-True "the record carries the fetched count" ([System.Text.Encoding]::UTF8.GetString($recBytes) -match 'Comments: 3')
+    }
+}
+finally {
+    $global:P20Config = $savedRecCfg
+    $script:Consts = $savedRecConsts
+    Remove-Item -Path $recHub -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 Write-Host ""
 
 # ── The agentic workflow link ────────────────────────────────────────────────
