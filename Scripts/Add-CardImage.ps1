@@ -43,6 +43,9 @@
         . (Join-Path $PSScriptRoot 'Add-CardImage.ps1')
 #>
 
+if (-not (Get-Command Invoke-P20TrackerRead -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
+}
 if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
 }
@@ -373,7 +376,10 @@ function Save-P20CardImageCommit {
     <#
         With storeSync: git, the picture and the card are one commit -- the way
         Archive commits its move. Anything else commits nothing and says so.
-        Returns a sentence for the caller to print.
+        Returns @{ Ok; Note; Message; Hint }: Note is the sentence for the caller
+        to print; when Ok is false the commit failed, Message is git's own
+        sentence and Hint says the files are written, and the caller states the
+        refusal (Write-CliError, exit 2 -- AGENTS.md, "The refusal contract").
     #>
     param(
         [Parameter(Mandatory = $true)][string]$PromptsRoot,
@@ -381,7 +387,7 @@ function Save-P20CardImageCommit {
         [string[]]$Paths,
         [Parameter(Mandatory = $true)][string]$Message
     )
-    if ($StoreSync -ne 'git') { return "Store is not git (storeSync='$StoreSync') -- nothing committed." }
+    if ($StoreSync -ne 'git') { return @{ Ok = $true; Note = "Store is not git (storeSync='$StoreSync') -- nothing committed." } }
     $root = [System.IO.Path]::GetFullPath($PromptsRoot).TrimEnd('\', '/')
     $rels = @()
     foreach ($p in @($Paths | Where-Object { $_ })) {
@@ -390,20 +396,26 @@ function Save-P20CardImageCommit {
             $rels += $full.Substring($root.Length + 1).Replace('\', '/')
         }
     }
-    if ($rels.Count -eq 0) { return 'Nothing to commit.' }
+    if ($rels.Count -eq 0) { return @{ Ok = $true; Note = 'Nothing to commit.' } }
+    $hint = 'The picture and the card are already written. Commit them yourself (git add -A; git commit) or sync the store.'
     Push-Location $PromptsRoot
     try {
         # One path at a time: a picture deleted before git ever saw it is not a
         # pathspec git knows, and one unknown path would fail the whole add.
         $staged = @()
         foreach ($rel in $rels) {
-            & git add -A -- $rel 2>&1 | Out-Null
-            if ($LASTEXITCODE -eq 0) { $staged += $rel }
+            $add = Invoke-P20TrackerRead 'git' @('add', '-A', '--', $rel)
+            if ($add.Code -eq 0) { $staged += $rel }
         }
-        if ($staged.Count -eq 0) { return 'Commit failed: the picture and the card are written but not committed.' }
-        & git commit -m $Message -- @staged 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { return 'Commit failed: the picture and the card are written but not committed.' }
-        return 'Committed.'
+        if ($staged.Count -eq 0) {
+            return @{ Ok = $false; Note = ''; Message = 'The picture and the card were written, but git could not stage them.'; Hint = $hint }
+        }
+        $commit = Invoke-P20TrackerRead 'git' (@('commit', '-m', $Message, '--') + $staged)
+        if ($commit.Code -ne 0) {
+            $said = @($commit.Lines | Where-Object { $_ })[0]
+            return @{ Ok = $false; Note = ''; Message = "The picture and the card were written, but they are not committed -- git commit failed: $said"; Hint = $hint }
+        }
+        return @{ Ok = $true; Note = 'Committed.' }
     }
     finally {
         Pop-Location

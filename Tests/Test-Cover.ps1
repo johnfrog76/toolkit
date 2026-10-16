@@ -315,6 +315,19 @@ try {
     $status = @(git -C $gitHub status --porcelain 2>$null)
     Assert-True 'and leaves nothing uncommitted' ($status.Count -eq 0) ($status -join '; ')
 
+    # A pre-commit hook that refuses: the picture and the card are written, the
+    # commit is not, and the verb says so as a stated refusal -- exit 2.
+    $hook = Join-Path $gitHub '.git/hooks/pre-commit'
+    [System.IO.File]::WriteAllText($hook, "#!/bin/sh`necho 'hook says no'`nexit 1`n")
+    # git runs a hook only when the file is executable; Windows has no execute bit, Unix does.
+    if (Get-Command chmod -ErrorAction SilentlyContinue) { & chmod '+x' $hook }
+    $out = (& pwsh -NoProfile -NonInteractive -Command ($gitPreamble + "${prefix}Cover 7 ./before.png -Before; 'HOOK-EXIT=' + `$LASTEXITCODE") 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    Assert-True 'a refused commit exits 2' ($out -match 'HOOK-EXIT=2') $out
+    Assert-True 'the refusal says the picture and the card are written but not committed' ($out -match 'written, but they are not committed') $out
+    Assert-True 'the refusal carries git''s own sentence and a hint' ($out -match 'hook says no' -and $out -match 'Hint:') $out
+    Assert-True 'the picture is on disk' (Test-Path (Join-Path $gitHub 'demo/assets/Task7/before.png'))
+    Remove-Item $hook -Force
+
     # -- -Samples: a Demo copied out before the covers shipped ------------------
     Write-Host ""
     Write-Host "-- Cover -Samples: an older Demo ----------------------" -ForegroundColor Cyan
