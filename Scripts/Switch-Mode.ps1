@@ -144,13 +144,11 @@ if (-not $spaceEntry) {
 }
 
 if (-not $spaceEntry) {
-    Write-Host ""
-    Write-Host "  [!] Unknown Space: $Mode" -ForegroundColor Red
-    if ($spaces.Count -gt 0) {
-        Write-Host "      Available: $(($spaces | ForEach-Object { $_.slug }) -join ', ')" -ForegroundColor DarkGray
-    }
-    Write-Host ""
-    return
+    $known = if ($spaces.Count -gt 0) { "Available: $(($spaces | ForEach-Object { $_.slug }) -join ', ')." } else { 'No Spaces are configured.' }
+    $why = "Unknown Space: $Mode"
+    if (Get-Command Write-CliError -ErrorAction SilentlyContinue) { Write-CliError -Message $why -Hint $known }
+    else { Write-Host "Error: $why" -ForegroundColor Red; Write-Host "Hint:  $known" -ForegroundColor Yellow }
+    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
 
 # Update the active Space in config.local.json (preserves machine-specific
