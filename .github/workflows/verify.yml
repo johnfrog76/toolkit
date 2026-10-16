@@ -55,7 +55,7 @@ jobs:
 
       # Each install runs whatever the one before it did, so a failed npm ci cannot
       # take the agent's answer with it; each runner below waits on its own install.
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         if: ${{ !cancelled() }}
         with:
           python-version: "3.12"
@@ -167,7 +167,7 @@ jobs:
         working-directory: web
         run: npx playwright install chromium
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         if: ${{ !cancelled() }}
         with:
           python-version: "3.12"
