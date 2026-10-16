@@ -18,6 +18,7 @@ release.
 
 ### Fixed
 
+- The scripts behind Connect, EditItem, MyPRs, InstallAutoload, Agent and Web, run on their own without the module, now keep their stated reason when they refuse, as every other script does; they printed the error and then lost the reason.
 - Play with narration in a deck's notes window now plays the baked voice clips instead of failing.
 - A new usage log no longer starts with a byte-order mark, so its first line reads the same as every other and the same on every host.
 - Moving a design in the hub, or attaching a cover or before picture, now reports a commit git refuses as an error (exit 2) with git's own message and says the files are already written, instead of a warning that reads as success.

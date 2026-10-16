@@ -690,6 +690,47 @@ Assert-True "#9: ...and the pipeline section names the project it could not read
 
 Write-Host ""
 
+# -- A script run with no module states its reason the module's way -----------
+# Run on its own, a script takes Get-CliPrefix and Write-CliError from
+# Scripts/Initialize-CliFallbacks.ps1. Each script once carried its own copy, and
+# some of the copies stopped recording $global:P20StatedError -- so a refusal
+# from one of them printed its sentence and then lost it. Edit-WorkItem.ps1 was
+# one; here it is run in a child with no module imported at all, refusing on its
+# own parameter check, and the child reads the global back in the same process.
+
+Write-Host "-- A script run on its own records its stated reason --" -ForegroundColor Cyan
+
+$standaloneScript = (Join-Path (Join-Path $pkgRoot 'Scripts') 'Edit-WorkItem.ps1') -replace "'", "''"
+$standaloneBody = @"
+$(Get-IsolationLine)
+& '$standaloneScript' 42
+`$code = `$LASTEXITCODE
+Write-Host "STATED=`$global:P20StatedError"
+Write-Host "MODULE=`$(@(Get-Module utilities, Prompt20Toolkit).Count)"
+exit `$code
+"@
+$standaloneTmp = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "exitcode-standalone-$([guid]::NewGuid()).ps1")
+Set-Content -Path $standaloneTmp -Value $standaloneBody -Encoding UTF8
+try {
+    foreach ($sh in @('pwsh', 'powershell')) {
+        if (-not (Get-Command $sh -ErrorAction SilentlyContinue)) { continue }
+        $ErrorActionPreference = 'Continue'
+        $alone = (& $sh -NoProfile -File $standaloneTmp 2>&1 | ForEach-Object { "$_" }) -join "`n"
+        $aloneCode = $LASTEXITCODE
+        $ErrorActionPreference = 'Stop'
+        Assert-True "[$sh] standalone Edit-WorkItem.ps1 with no edit switch: no module was loaded" ($alone -match '(?m)^MODULE=0\s*$')
+        Assert-True "[$sh] ...it refuses with exit 2 (got $aloneCode)" ($aloneCode -eq 2)
+        Assert-True "[$sh] ...in one Error: block with its Hint:" ((@([regex]::Matches($alone, '(?m)^Error: ')).Count) -eq 1 -and $alone -match '(?m)^Error: Nothing to change: no edit switch was given\.' -and $alone -match '(?m)^Hint:  Pass at least one of -Title')
+        Assert-True "[$sh] ...and `$global:P20StatedError carries the sentence" ($alone -match '(?m)^STATED=Nothing to change: no edit switch was given\.\s*$')
+    }
+}
+catch {
+    Assert-True "the standalone cases ran to the end without a terminating error -- $($_.Exception.Message)" $false
+}
+finally { Remove-Item $standaloneTmp -Force -ErrorAction SilentlyContinue }
+
+Write-Host ""
+
 Remove-Item $script:probeDir -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Host ""

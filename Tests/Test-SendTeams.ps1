@@ -76,7 +76,8 @@ function New-SendSandbox {
     # The one reader of hub.json, which gate 2 goes through for a hub-declared org.
     Copy-Item (Join-Path (Split-Path $sendScript -Parent) 'Resolve-HubConfig.ps1') (Join-Path $root 'Scripts/Resolve-HubConfig.ps1')
     # The contract file and its reader: the webhook prefix, the run marker, the Sent line.
-    foreach ($helper in @('Get-Consts.ps1', 'Add-SentLine.ps1', 'Write-CardText.ps1', 'Write-ConfigParseWarning.ps1')) {
+    # ...and Get-CliPrefix and Write-CliError for a run with no module.
+    foreach ($helper in @('Get-Consts.ps1', 'Add-SentLine.ps1', 'Write-CardText.ps1', 'Write-ConfigParseWarning.ps1', 'Initialize-CliFallbacks.ps1')) {
         Copy-Item (Join-Path (Split-Path $sendScript -Parent) $helper) (Join-Path $root "Scripts/$helper")
     }
     Copy-Item (Join-Path (Split-Path (Split-Path $sendScript -Parent) -Parent) 'consts.json') (Join-Path $root 'consts.json')

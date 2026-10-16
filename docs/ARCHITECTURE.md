@@ -333,6 +333,7 @@ Scripts/                One script per command, core and module alike
   Get-Consts.ps1          The CLI's reader for consts.json -- dot-sourced, not a verb
   Invoke-TrackerRead.ps1  Invoke-P20TrackerRead, the one gh/az call (stderr as text on 5.1 too) -- dot-sourced
   Get-AdoToken.ps1        The Azure DevOps token, its headers and the 401/403 advice, for every ADO script -- dot-sourced
+  Initialize-CliFallbacks.ps1  Get-CliPrefix and Write-CliError for a script run with no module -- dot-sourced
 Prompt20Toolkit/        Autoload shim installed into the module path
 templates/              Prompt file templates by work item type, plus the module ones:
                         Training, Presentation, Goal (growth), ManagerSession (communication),

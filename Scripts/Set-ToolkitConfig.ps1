@@ -100,14 +100,7 @@ $toolkitRoot = Split-Path -Parent $PSScriptRoot
 # These scripts also run with no module in the session -- a test sandbox,
 # `pwsh -File`, a -Help before the first import -- so a missing module helper
 # must not be fatal. Same guard Switch-Mode.ps1 carries.
-if (-not (Get-Command Write-CliError -ErrorAction SilentlyContinue)) {
-    function Write-CliError {
-        param([Parameter(Mandatory)][string]$Message, [string]$Hint)
-        $global:P20StatedError = $Message
-        Write-Host "Error: $Message" -ForegroundColor Red
-        if ($Hint) { Write-Host "Hint:  $Hint" -ForegroundColor Yellow }
-    }
-}
+. (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
 
 $defaultPath = Join-Path $toolkitRoot 'config.default.json'
 $localPath = Join-Path $toolkitRoot 'config.local.json'

@@ -97,23 +97,8 @@ param(
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 
-if (-not (Get-Command Get-CliPrefix -ErrorAction SilentlyContinue)) {
-    function Get-CliPrefix {
-        if ($global:P20Config -and $global:P20Config.CommandPrefix) { return $global:P20Config.CommandPrefix }
-        return ''
-    }
-}
+. (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
 . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
-# Write-CliError normally comes from the module; it is what makes a refusal ONE
-# block. See AGENTS.md, "The refusal contract".
-if (-not (Get-Command Write-CliError -ErrorAction SilentlyContinue)) {
-    function Write-CliError {
-        param([string]$Message, [string]$Hint)
-        $global:P20StatedError = $Message
-        Write-Host "Error: $Message" -ForegroundColor Red
-        if ($Hint) { Write-Host "Hint:  $Hint" -ForegroundColor Yellow }
-    }
-}
 
 if ($Help) {
     $p = Get-CliPrefix

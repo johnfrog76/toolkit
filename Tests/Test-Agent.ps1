@@ -101,6 +101,8 @@ function Invoke-Agent {
         # Dot-sourced by the script at load; a sandbox without it is a sandbox
         # that fails for the wrong reason.
         Copy-Item (Join-Path $pkgRoot 'Scripts/Resolve-Python.ps1') (Join-Path $sandboxScripts 'Resolve-Python.ps1')
+        # Dot-sourced at load: Get-CliPrefix and Write-CliError for a run with no module.
+        Copy-Item (Join-Path $pkgRoot 'Scripts/Initialize-CliFallbacks.ps1') (Join-Path $sandboxScripts 'Initialize-CliFallbacks.ps1')
         # Dot-sourced at load: the OS port probe both launchers share.
         Copy-Item (Join-Path $pkgRoot 'Scripts/Get-PortListeners.ps1') (Join-Path $sandboxScripts 'Get-PortListeners.ps1')
         # Dot-sourced by -Help: the shared config-help renderer.

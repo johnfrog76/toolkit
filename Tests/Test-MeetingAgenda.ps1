@@ -93,6 +93,8 @@ function New-AgendaSandbox {
     # The byte contract underneath the stamp, dot-sourced by both the stamp and
     # this script's own writers.
     Copy-Item (Join-Path $pkgRoot 'Scripts/Write-CardText.ps1') (Join-Path $root 'pkg/Scripts/Write-CardText.ps1')
+    # Get-CliPrefix and Write-CliError for a run with no module, dot-sourced at load.
+    Copy-Item (Join-Path $pkgRoot 'Scripts/Initialize-CliFallbacks.ps1') (Join-Path $root 'pkg/Scripts/Initialize-CliFallbacks.ps1')
     # consts.json and its reader: the stamp's literal is a cross-half contract
     # and is read from the file, not typed. A sandbox without it is a package
     # without its contract, and the stamp cannot be written at all.

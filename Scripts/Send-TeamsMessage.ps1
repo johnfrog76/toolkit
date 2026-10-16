@@ -59,15 +59,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
 $script:SendConsts = Get-P20Consts
 
-# Get-CliPrefix normally comes from the module. This script is also invoked
-# directly -- by the tests, by a user running the .ps1 -- so a missing helper
-# must not be fatal.
-if (-not (Get-Command Get-CliPrefix -ErrorAction SilentlyContinue)) {
-    function Get-CliPrefix {
-        if ($global:P20Config -and $global:P20Config.CommandPrefix) { return $global:P20Config.CommandPrefix }
-        return ''
-    }
-}
+. (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
 
 if ($Help) {
     $p = Get-CliPrefix

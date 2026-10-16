@@ -135,6 +135,9 @@ function Invoke-Web {
         # -Dev dot-sources it before its first guard: it owns the npm resolver
         # as well as the launch, so a sandbox without it cannot reach either.
         Copy-Item $detachedScript (Join-Path $sandboxScripts 'Start-Detached.ps1')
+        # Dot-sourced at load by both launchers: Get-CliPrefix and Write-CliError
+        # for a run with no module.
+        Copy-Item (Join-Path $pkgRoot 'Scripts/Initialize-CliFallbacks.ps1') (Join-Path $sandboxScripts 'Initialize-CliFallbacks.ps1')
         # Dot-sourced at load: the OS port probe both launchers share.
         Copy-Item (Join-Path $pkgRoot 'Scripts/Get-PortListeners.ps1') (Join-Path $sandboxScripts 'Get-PortListeners.ps1')
         # Dot-sourced by -Help: the shared config-help renderer.

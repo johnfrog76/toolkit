@@ -30,7 +30,7 @@ $targetScript = Join-Path (Join-Path $pkgRoot 'Scripts') 'Update-Toolkit.ps1'
 # Every script Update-Toolkit.ps1 dot-sources. Resolve-Python.ps1 was missing
 # from this list, so the sandbox's Update fell back to `python3` -- wrong on the
 # Windows, right by coincidence on macOS.
-$helperScripts = @('Test-GitRoot.ps1', 'Resolve-Python.ps1')
+$helperScripts = @('Test-GitRoot.ps1', 'Resolve-Python.ps1', 'Initialize-CliFallbacks.ps1')
 
 $script:passed = 0
 $script:failed = 0

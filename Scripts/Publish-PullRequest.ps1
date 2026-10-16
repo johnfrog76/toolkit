@@ -55,20 +55,7 @@ $c = Get-P20Consts
 # Get-CliPrefix, Write-CliError and Write-ToolkitLog normally come from the module.
 # This script is also run directly -- by -Help without an import, by a test -- so a
 # missing helper must not be fatal (the same shape as New-PullRequest.ps1).
-if (-not (Get-Command Get-CliPrefix -ErrorAction SilentlyContinue)) {
-    function Get-CliPrefix {
-        if ($global:P20Config -and $global:P20Config.CommandPrefix) { return $global:P20Config.CommandPrefix }
-        return ''
-    }
-}
-if (-not (Get-Command Write-CliError -ErrorAction SilentlyContinue)) {
-    function Write-CliError {
-        param([string]$Message, [string]$Hint)
-        $global:P20StatedError = $Message
-        Write-Host "Error: $Message" -ForegroundColor Red
-        if ($Hint) { Write-Host "Hint:  $Hint" -ForegroundColor Yellow }
-    }
-}
+. (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
 if (-not (Get-Command Write-ToolkitLog -ErrorAction SilentlyContinue)) {
     function Write-ToolkitLog { param([string]$Type, [string]$Source, [string]$Detail) $null = $Type, $Source, $Detail }
 }

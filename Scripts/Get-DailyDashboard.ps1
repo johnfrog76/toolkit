@@ -8,15 +8,7 @@
 [CmdletBinding()]
 param()
 
-# Get-CliPrefix normally comes from the module. These scripts are also invoked
-# directly -- by tests, by a user running the .ps1, by anything that wants -Help
-# without importing first -- so a missing helper must not be fatal.
-if (-not (Get-Command Get-CliPrefix -ErrorAction SilentlyContinue)) {
-    function Get-CliPrefix {
-        if ($global:P20Config -and $global:P20Config.CommandPrefix) { return $global:P20Config.CommandPrefix }
-        return ''
-    }
-}
+. (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
 
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path

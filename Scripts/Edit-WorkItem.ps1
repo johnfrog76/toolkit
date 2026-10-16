@@ -45,20 +45,7 @@ param(
 # refuses a fourth; that refusal is said in the product's own sentence. A work
 # item on Azure DevOps has no pin, so there the switches are a stated refusal.
 
-if (-not (Get-Command Get-CliPrefix -ErrorAction SilentlyContinue)) {
-    function Get-CliPrefix {
-        if ($global:P20Config -and $global:P20Config.CommandPrefix) { return $global:P20Config.CommandPrefix }
-        return ''
-    }
-}
-
-if (-not (Get-Command Write-CliError -ErrorAction SilentlyContinue)) {
-    function Write-CliError {
-        param([string]$Message, [string]$Hint)
-        Write-Host "Error: $Message" -ForegroundColor Red
-        if ($Hint) { Write-Host "Hint:  $Hint" -ForegroundColor Yellow }
-    }
-}
+. (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
 
 function Show-Help {
     Write-Host ""
