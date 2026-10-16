@@ -21,6 +21,7 @@ from .config import (
     REPO_ROOT,
     ado_enabled,
     anthropic_configured,
+    card_types,
     how_i_work,
     hub_configured,
     hub_detail,
@@ -263,7 +264,7 @@ async def get_env(refresh: int = 0):
         # CardType names (docs/hub/cards.md, "The filename"), in config's order, so
         # the web's "New card" dialog offers a team's own types and never a
         # hardcoded four.
-        "cardTypes": [n for n in (cfg.get("workItemTypes", {}) or {}) if not n.startswith("_")],
+        "cardTypes": card_types(cfg)[0],
         # {email, source} -- source is "config", "branchUser", "az" or "" when
         # nothing answered. tkEnv prints the same two facts.
         "identity": identity,

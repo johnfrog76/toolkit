@@ -18,23 +18,13 @@ from pydantic import BaseModel
 
 from ..core.assets import card_images
 from ..core.clock import local_day
-from ..core.config import hub_root, load_config, org_folder, resolve_dirs, tracker, tracker_repos
+from ..core.config import card_types, hub_root, load_config, org_folder, resolve_dirs, tracker, tracker_repos
 from ..core.consts import folder_current
 from ..core.parsers import _parse_status_metadata, card_id, status_sort_key
 from ..core.tier import _resolve_tier
 from .accounting import _gh_json, space_entry
 
 api = APIRouter()
-
-
-def _card_types() -> tuple[list[str], list[str]]:
-    """(type names, file prefixes) from ``workItemTypes`` -- CardType, spec 5.0.
-    Read per request, like every other config read here, so a type a team adds
-    needs no restart."""
-    types = load_config().get("workItemTypes", {}) or {}
-    names = [n for n in types if not n.startswith("_")]
-    prefixes = [str(types[n].get("filePrefix") or "") for n in names]
-    return names, prefixes
 
 
 class CardDesign(BaseModel):
@@ -226,7 +216,7 @@ async def get_status(space: str = ""):
         return StatusResponse(count=0, prompts=[])
 
     files = sorted(current_dir.iterdir())
-    type_names, prefixes = _card_types()
+    type_names, prefixes = card_types()
     space = space or active
     prompts: list[PromptInfo] = []
 
@@ -304,7 +294,7 @@ async def get_status_detail(filename: str):
     if not path.exists() or not path.is_file():
         raise HTTPException(status_code=404, detail=f"{filename} not found")
     content = path.read_text(encoding="utf-8-sig", errors="replace")
-    type_names, prefixes = _card_types()
+    type_names, prefixes = card_types()
     meta = _parse_status_metadata(content, type_names)
     images = card_images(content, path, load_config().get("activeSpace", ""))
     meta["design"] = await resolve_card_design(meta["design"])

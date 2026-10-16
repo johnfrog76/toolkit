@@ -44,7 +44,7 @@ from pydantic import BaseModel
 
 from ..core import log_writer
 from ..core.child import did_not_answer, run_read
-from ..core.config import load_config, org_folder, resolve_dirs, tracker, tracker_owner
+from ..core.config import card_types, load_config, org_folder, resolve_dirs, tracker, tracker_owner
 from ..core.consts import (
     design_id_key,
     design_outcomes,
@@ -650,9 +650,7 @@ def space_card_folders(spaces: list[dict]) -> list[tuple[str, Path]]:
 def bound_cards(folders: list[tuple[str, Path]]) -> dict[str, list[BoundCard]]:
     """Every card in these Spaces' current/ and archive/ whose design line names
     a design by id, grouped by that id."""
-    from .status import _card_types  # status.py imports nothing from here
-
-    type_names, prefixes = _card_types()
+    type_names, prefixes = card_types()
     out: dict[str, list[BoundCard]] = {}
     seen: set[Path] = set()
     for slug, folder in folders:

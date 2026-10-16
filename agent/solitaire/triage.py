@@ -30,14 +30,12 @@ from pydantic import BaseModel
 
 from ..ado import accounting
 from ..core import log_writer
-from ..core.config import API_PREFIX, load_config, tracker, tracker_repos
+from ..core.config import API_PREFIX, load_config
 from ..core.consts import rituals_label_width, rituals_text, rituals_triage_route, rituals_worker_label_prefix
-from ..core.tier import _resolve_tier
-from .standup import NO_REPO_REASON, _label_names, api, ceremonies, worker_name
+from .standup import _label_names, api, ceremonies, worker_name
+from .tracker import read_tracker
 
 CEREMONY = "triage"
-
-NOT_GITHUB_REASON = "This Space's tracker is not GitHub -- triage reads a GitHub Space's issues."
 
 
 # -- The response -------------------------------------------------------------
@@ -201,39 +199,11 @@ def render_triage(filled: Triage) -> str:
 # -- The gh layer -------------------------------------------------------------
 
 
-def _read_tracker(org: str, status: str, projects: list[dict]) -> tuple[list[dict], list[dict], dict]:
-    """(labels, open issues, tracker state) for a Space. Never raises: a failure is a reason."""
-    if tracker(org) != "github":
-        return [], [], {"ok": False, "reason": NOT_GITHUB_REASON}
-    tier, _ = _resolve_tier(org, status)
-    if tier != 1:
-        return [], [], {"ok": False, "reason": f"The tracker is not reachable from here (tier {tier})."}
-    repos = tracker_repos(org, projects)
-    if not repos:
-        return [], [], {"ok": False, "reason": NO_REPO_REASON}
-    labels: dict[str, dict] = {}
-    issues: list[dict] = []
-    try:
-        for repo in repos:
-            rows, why = accounting._gh_labels(repo)
-            if why:
-                return [], [], {"ok": False, "reason": why}
-            for r in rows:
-                labels.setdefault(str(r.get("name", "")), r)
-            rows, why = accounting._gh_issues(repo, True, "open")
-            if why:
-                return [], [], {"ok": False, "reason": why}
-            issues += rows
-    except Exception as exc:  # noqa: BLE001 -- a reader that raised is a tracker that did not answer
-        return [], [], {"ok": False, "reason": f"The tracker read failed: {exc.__class__.__name__}: {exc}"}
-    return list(labels.values()), issues, {"ok": True, "reason": ""}
-
-
 def triage_for(space: str = "") -> Triage:
     """The whole triage for a Space -- the active one when ``space`` is ""."""
     cfg = load_config()
     org, status, projects = accounting.space_scope(cfg, space)
-    labels, issues, state = _read_tracker(org, status, projects)
+    labels, issues, state = read_tracker(org, status, projects, state="open", ritual="triage")
     filled = fill_triage(labels, issues, state, space=space or cfg.get("activeSpace", ""))
     filled.text = render_triage(filled)
     log_writer.write_log(

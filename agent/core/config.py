@@ -363,6 +363,15 @@ def offered_spaces(spaces: list[dict], active_slug: str, dismissed: bool) -> lis
     return [o for o in spaces if not (dismissed and o.get("example") is True and o.get("slug") != active_slug)]
 
 
+def card_types(cfg: dict | None = None) -> tuple[list[str], list[str]]:
+    """(type names, file prefixes) from ``workItemTypes`` -- CardType, in config's
+    order. Read per request when ``cfg`` is not given, like every other config
+    read here, so a type a team adds needs no restart."""
+    types = (load_config() if cfg is None else cfg).get("workItemTypes", {}) or {}
+    names = [n for n in types if not n.startswith("_")]
+    return names, [str((types[n] or {}).get("filePrefix") or "") for n in names]
+
+
 def lane_names(org: dict | None) -> dict[str, str]:
     """``{contract word: display name}`` for one org -- the contract's own words
     where the org says nothing, its ``laneNames`` where it does."""

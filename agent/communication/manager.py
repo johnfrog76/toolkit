@@ -31,6 +31,7 @@ from ..core import log_writer, model
 from ..core.cards import write_card_text
 from ..core.config import hub_folder, hub_root, load_config
 from ..core.consts import folder_archive, folder_current, re_session_name
+from ..core.parsers import _heading_value
 from . import comms
 
 # The verb that scaffolds a session -- a key in the CLI's command table, which is
@@ -145,22 +146,6 @@ _PLACEHOLDERS = {
     "retro": "(populated by the Retro pass)",
     "sent": "(nothing sent yet)",
 }
-
-
-def _heading_value(lines: list[str], heading: str) -> str | None:
-    """The first non-empty line under a ## heading, matched case-insensitively."""
-    needle = heading.lower()
-    found = False
-    for line in lines:
-        if found:
-            stripped = line.strip()
-            if stripped:
-                return stripped
-            if line.startswith("##"):
-                return None  # next heading -- give up
-        elif line.strip().lower().startswith("## ") and line.strip()[3:].lower() == needle:
-            found = True
-    return None
 
 
 def _section_content(lines: list[str], heading: str) -> str:

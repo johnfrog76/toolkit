@@ -32,6 +32,7 @@ release.
 - Every page now has one top-level heading for screen-reader navigation, and the loading spinners inside buttons are named.
 - Fetching pull request comments now writes them into the card whose id is the linked work item, never into another card whose name merely contains that number.
 - The pull request comments record GetPRComments leaves in pr-comments/ is now written with the same bytes on every host: UTF-8 with no byte-order mark and LF line endings.
+- A one-on-one session file whose Stage heading is followed by a comment now reads its stage correctly instead of showing the comment as the stage.
 
 ## [1.0.0] - 2026-10-15
 

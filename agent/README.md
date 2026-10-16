@@ -299,7 +299,7 @@ macOS is UTF-8.
 So a byte that is not UTF-8 becomes U+FFFD and the read goes on, and an output that still did not
 arrive raises `ChildReadError`. Each caller states that as its reason, the way it states a timeout
 (`<repo>: gh's output could not be read (exit code 0)`), and never as rows. The standup's and
-triage's `_read_tracker` also turn any exception out of a reader into `tracker.ok: false` with the
+triage's shared reader, `read_tracker` in `solitaire/tracker.py`, also turns any exception out of a reader into `tracker.ok: false` with the
 reason. The shell rule is unchanged: on Windows `gh` and `az` run through the shell (`az.cmd`
 needs it), so a `&` in an argument is cmd's, and `accounting.unsafe_for_shell` refuses one before
 it reaches the helper. A `git` read passes `shell=False`. The bridge and `/surfaces` read their
