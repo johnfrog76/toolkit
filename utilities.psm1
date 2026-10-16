@@ -678,8 +678,8 @@ function global:Get-P20SurfaceInventory {
 }
 
 # THE container, for the global functions that need more of it than one
-# accessor answers: Get-P20Menu, Register-PromptAlias, Get-P20CommandMap,
-# Get-P20ModuleCommands, Write-P20DeprecationHint. They stay ordinary
+# accessor answers: Get-P20Menu, Get-P20MenuMarkdown, Register-PromptAlias,
+# Get-P20CommandMap, Get-P20ModuleCommands, Write-P20DeprecationHint. They stay ordinary
 # `function global:` bodies -- so their module-private helpers resolve -- and
 # open with `$s = Get-P20ModuleState`. This closure is the only thing that may
 # hold the table by reference; a GetNewClosure() body cannot call a private
@@ -1329,10 +1329,122 @@ function global:Write-P20DeprecationHint {
 }
 
 # -- Menu ---------------------------------------------------------------------
-# Reads module state through Get-P20ModuleState, never `$script:`: reached
+# Four jobs, four functions, one switch each on the Menu verb: the help printer
+# (-Help), the docs-table emitter (-Markdown), the scores reset (-Reset), and
+# the menu itself (default and -All), which keeps the name Get-P20Menu and
+# hands the other three to their own functions.
+#
+# Each reads module state through Get-P20ModuleState, never `$script:`: reached
 # from a module-launched script, `$script:` binds to that script and answers
-# $null. Not a GetNewClosure() body either -- that is bound to a NEW dynamic
-# module, where this function's private helpers are not visible.
+# $null. Not GetNewClosure() bodies either -- that is bound to a NEW dynamic
+# module, where the module's private helpers are not visible.
+
+# -Help. The prefix is the one the menu was invoked under, passed in.
+function global:Show-P20MenuHelp {
+    [CmdletBinding()]
+    param([string]$Prefix)
+    if (-not $Prefix) { $Prefix = (Get-P20ModuleState).CommandPrefix }
+    Write-Host ""
+    Write-Host "  $($Prefix)Menu           Show most-used + nav aliases" -ForegroundColor Cyan
+    Write-Host "  $($Prefix)Menu -All      Show all aliases grouped by intent category" -ForegroundColor Cyan
+    Write-Host "  $($Prefix)Menu -Markdown Emit the command tables as markdown (for docs)" -ForegroundColor Cyan
+    Write-Host "  $($Prefix)Menu -Help     Show this help message" -ForegroundColor Cyan
+    Write-Host "  $($Prefix)Menu -Reset    Reset usage scores (menu re-learns from scratch)" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "  Categories: pr work prompt review growth org setup info test" -ForegroundColor Yellow
+    Write-Host ""
+}
+
+# -Markdown: emit grouped command tables from config so docs derive from the
+# single source of truth (docs/CLI.md, "Command reference"). Excludes nav + legacy.
+function global:Get-P20MenuMarkdown {
+    [CmdletBinding()]
+    param([string]$Prefix)
+    $s = Get-P20ModuleState
+    $menuPrefix = $Prefix
+    if (-not $menuPrefix) { $menuPrefix = $s.CommandPrefix }
+    $cmds = $s.Commands
+    # 'sync' sits after 'prompt', where the console renderer's label switch
+    # already put it. Both lists omitted it, so Sync and Update -- the verb
+    # that updates the Toolkit -- rendered in no section at all while being
+    # registered, aliased and documented.
+    #
+    # 'studio' joined later: NewDesign and StampDesign became core
+    # verbs, and this list had never met the category -- a module verb is not in
+    # $s.Commands' config half -- so they rendered in no section, the same
+    # omission 'sync' had.
+    $catOrder = @('pr', 'work', 'prompt', 'sync', 'sprint', 'review', 'growth', 'studio', 'org', 'setup', 'info', 'test')
+    $labels = @{
+        pr = 'Pull Requests'; work = 'Work Items'; prompt = 'Prompts'; sync = 'Sync'; sprint = 'Sprint Awareness'
+        review = 'Reviews & Reporting'; growth = 'Growth & Meetings'; studio = 'Studio'; org = 'Org & Infra'
+        setup = 'Setup'; info = 'Info'; test = 'Tests'
+    }
+    foreach ($cat in $catOrder) {
+        $items = $cmds.GetEnumerator() | Where-Object { $_.Value.category -eq $cat } | Sort-Object Key
+        if (-not $items) { continue }
+        Write-Output "### $($labels[$cat])"
+        Write-Output ''
+        Write-Output '| Command | Description |'
+        Write-Output '|---|---|'
+        foreach ($item in $items) {
+            $usage = if ($item.Value.usage) { $item.Value.usage } else { $item.Key }
+            $usage = Expand-CliPrefix $usage $menuPrefix
+            Write-Output "| ``$usage`` | $(Expand-CliPrefix $item.Value.description $menuPrefix) |"
+        }
+        Write-Output ''
+    }
+}
+
+# -Reset: the menu's scores start over from now. The marker, menuResetTimestamp
+# in config.local.json, is written by Config -- the one writer of that file
+# (AGENTS.md, "Configuration is written by Config, and by nothing else") -- so
+# the file comes out the way Config writes it: no BOM, LF, the same bytes on
+# both hosts. The script is run directly rather than through the Config verb,
+# so the reset does not log a Config use that would head the fresh scores.
+function global:Reset-P20MenuScoring {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'One marker key, written through the Config script, which owns validation and the write.')]
+    [CmdletBinding()]
+    param([string]$Name)
+    $s = Get-P20ModuleState
+    if (-not $Name) { $Name = "$($s.CommandPrefix)Menu" }
+    $root = $s.PackageRoot
+    $localCfgPath = Join-Path $root 'config.local.json'
+    if (Test-Path $localCfgPath) {
+        # A file that will not parse is left exactly as it is: writing the marker
+        # into what was read (nothing) would replace the person's settings.
+        try { $null = Get-Content $localCfgPath -Raw | ConvertFrom-Json }
+        catch {
+            $null = Write-P20ConfigParseWarning -Path $localCfgPath -Message $_.Exception.Message
+            Write-WrapperRefusal -Name $Name -Message "config.local.json will not parse, so the menu scores were not reset." `
+                -Hint 'Fix the file by hand (or delete it); it was not changed.'
+            return
+        }
+    }
+    $stamp = Get-Date -Format 'yyyy-MM-ddTHH:mm:ss'
+    $configScript = Join-Path (Join-Path $root 'Scripts') 'Set-ToolkitConfig.ps1'
+    # Config's own lines ("[+] menuResetTimestamp ...") are kept back on success:
+    # the reset says what it did in its own sentence. A refusal is printed as
+    # Config stated it, and its exit code is left for the caller.
+    $global:LASTEXITCODE = 0
+    try { $out = & $configScript -Set "menuResetTimestamp=$stamp" *>&1 | Out-String }
+    catch {
+        Write-WrapperRefusal -Name $Name -Message "The menu scores were not reset: $($_.Exception.Message)" `
+            -Hint "Run '$($s.CommandPrefix)Log -Errors' for details."
+        return
+    }
+    $code = $LASTEXITCODE
+    if ($code) {
+        Write-Host $out.TrimEnd()
+        Write-ToolkitLog -Type ERR -Source $Name -Detail "scores not reset: Config exit $code"
+        $global:LASTEXITCODE = $code
+        return
+    }
+    Write-Host "  Menu scores reset. Usage scoring starts fresh from now." -ForegroundColor Green
+    Write-ToolkitLog -Type INFO -Source $Name -Detail 'scores reset'
+}
+
+# The menu itself: default (the most used) and -All (everything, by category,
+# and the opt-in inventory). The other three switches hand off above.
 function global:Get-P20Menu {
     [CmdletBinding()]
     param(
@@ -1350,79 +1462,9 @@ function global:Get-P20Menu {
     $menuPrefix = $s.CommandPrefix
     if ($MyInvocation.InvocationName -match '^(.+)Menu$') { $menuPrefix = $Matches[1] }
 
-    # -Help: preserved unchanged from the original
-    if ($Help) {
-        Write-Host ""
-        Write-Host "  $($menuPrefix)Menu           Show most-used + nav aliases" -ForegroundColor Cyan
-        Write-Host "  $($menuPrefix)Menu -All      Show all aliases grouped by intent category" -ForegroundColor Cyan
-        Write-Host "  $($menuPrefix)Menu -Markdown Emit the command tables as markdown (for docs)" -ForegroundColor Cyan
-        Write-Host "  $($menuPrefix)Menu -Help     Show this help message" -ForegroundColor Cyan
-        Write-Host "  $($menuPrefix)Menu -Reset    Reset usage scores (menu re-learns from scratch)" -ForegroundColor Cyan
-        Write-Host ""
-        Write-Host "  Categories: pr work prompt review growth org setup info test" -ForegroundColor Yellow
-        Write-Host ""
-        return
-    }
-
-    # -Markdown: emit grouped command tables from config so docs derive from the
-    # single source of truth (docs/CLI.md, "Command reference"). Excludes nav + legacy.
-    if ($Markdown) {
-        $cmds = $s.Commands
-        # 'sync' sits after 'prompt', where the console renderer's label switch
-        # already put it. Both lists omitted it, so Sync and Update -- the verb
-        # that updates the Toolkit -- rendered in no section at all while being
-        # registered, aliased and documented.
-        #
-        # 'studio' joined later: NewDesign and StampDesign became core
-        # verbs, and this list had never met the category -- a module verb is not in
-        # $s.Commands' config half -- so they rendered in no section, the same
-        # omission 'sync' had.
-        $catOrder = @('pr', 'work', 'prompt', 'sync', 'sprint', 'review', 'growth', 'studio', 'org', 'setup', 'info', 'test')
-        $labels = @{
-            pr = 'Pull Requests'; work = 'Work Items'; prompt = 'Prompts'; sync = 'Sync'; sprint = 'Sprint Awareness'
-            review = 'Reviews & Reporting'; growth = 'Growth & Meetings'; studio = 'Studio'; org = 'Org & Infra'
-            setup = 'Setup'; info = 'Info'; test = 'Tests'
-        }
-        foreach ($cat in $catOrder) {
-            $items = $cmds.GetEnumerator() | Where-Object { $_.Value.category -eq $cat } | Sort-Object Key
-            if (-not $items) { continue }
-            Write-Output "### $($labels[$cat])"
-            Write-Output ''
-            Write-Output '| Command | Description |'
-            Write-Output '|---|---|'
-            foreach ($item in $items) {
-                $usage = if ($item.Value.usage) { $item.Value.usage } else { $item.Key }
-                $usage = Expand-CliPrefix $usage $menuPrefix
-                Write-Output "| ``$usage`` | $(Expand-CliPrefix $item.Value.description $menuPrefix) |"
-            }
-            Write-Output ''
-        }
-        return
-    }
-
-    # -Reset: write marker timestamp to config.local.json
-    if ($Reset) {
-        $localCfgPath = Join-Path $PSScriptRoot 'config.local.json'
-        if (Test-Path $localCfgPath) {
-            # A file that will not parse is left exactly as it is: writing the marker
-            # into what was read (nothing) would replace the person's settings.
-            try { $localCfg = Get-Content $localCfgPath -Raw | ConvertFrom-Json }
-            catch {
-                $null = Write-P20ConfigParseWarning -Path $localCfgPath -Message $_.Exception.Message
-                Write-WrapperRefusal -Name $inv.Name -Message "config.local.json will not parse, so the menu scores were not reset." `
-                    -Hint 'Fix the file by hand (or delete it); it was not changed.'
-                return
-            }
-        }
-        else {
-            $localCfg = [PSCustomObject]@{}
-        }
-        $localCfg | Add-Member -NotePropertyName 'menuResetTimestamp' -NotePropertyValue (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss') -Force
-        $localCfg | ConvertTo-Json -Depth 10 | Set-Content $localCfgPath -Encoding UTF8
-        Write-Host "  Menu scores reset. Usage scoring starts fresh from now." -ForegroundColor Green
-        Write-ToolkitLog -Type INFO -Source $inv.Name -Detail 'scores reset'
-        return
-    }
+    if ($Help) { Show-P20MenuHelp -Prefix $menuPrefix; return }
+    if ($Markdown) { Get-P20MenuMarkdown -Prefix $menuPrefix; return }
+    if ($Reset) { Reset-P20MenuScoring -Name $inv.Name; return }
 
     $cmds = $s.Commands
     $tier = Get-CurrentTier

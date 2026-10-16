@@ -18,6 +18,7 @@ release.
 
 ### Fixed
 
+- Resetting the menu's usage scores, switching Space and acknowledging logged errors no longer write a byte-order mark into `config.local.json` under Windows PowerShell; all three now save through the same writer as `Config`, so the file comes out the same on every host.
 - A refusal from `Log`, `ThreadHash`, `InstallAutoload` or `SwitchSpace` is now written to the usage log and reported to the browser as an error instead of success, and `SwitchSpace` of a Space that does not exist refuses with the Spaces it knows (exit 2) instead of reporting success.
 - Play with narration in a deck's notes window now plays the baked voice clips instead of failing.
 - A new usage log no longer starts with a byte-order mark, so its first line reads the same as every other and the same on every host.
