@@ -476,6 +476,68 @@ finally { Remove-Item $prHub -Recurse -Force -ErrorAction SilentlyContinue }
 
 Write-Host ""
 
+# -- NewPR on a GitHub Space: gh's refusal is said under 'Stop' ----------------
+# NewPR sets $ErrorActionPreference = 'Stop' itself before its GitHub flow, so
+# the child sets no preference of its own. A raw gh call with its stderr
+# redirected there THROWS on Windows PowerShell 5.1 at the first stderr line,
+# before the exit code is read, so the stated refusal ("is not on GitHub") was
+# never printed and the guard's generic block said gh's sentence instead. pwsh 7 reads the same line as text, so only the 5.1 run can tell.
+# gh is a real executable here -- a script first on PATH, not a PowerShell
+# function -- because the trap is a native command's. It writes one line to
+# stderr and exits 1 for every call, and writes each call down.
+
+Write-Host "-- NewPR on a GitHub Space: the branch probe's refusal --" -ForegroundColor Cyan
+
+$ghHub = Join-Path ([System.IO.Path]::GetTempPath()) "exitcode-ghhub-$([guid]::NewGuid())"
+$ghBin = Join-Path $ghHub 'bin'
+$ghCalls = Join-Path $ghHub 'gh-calls.log'
+New-Item -ItemType Directory -Path (Join-Path $ghHub 'widgets/current'), $ghBin -Force | Out-Null
+$ghHubJson = '{ "hub": 1, "spaces": [ { "slug": "widgets", "name": "Widgets", "status": "active", "promptsFolder": "widgets", "org": "https://github.com/acme/widgets" } ] }'
+[System.IO.File]::WriteAllText((Join-Path $ghHub 'hub.json'), $ghHubJson)
+$ghCard = @(
+    '# Task K7M2: A widget', '',
+    '**ADO Link:** (not linked)', '',
+    '## Branch', 'you/K7M2-a-widget', '',
+    '## Described Changes', '- The widget.', ''
+) -join "`n"
+[System.IO.File]::WriteAllText((Join-Path $ghHub 'widgets/current/TaskK7M2-a-widget.prompt.md'), $ghCard)
+$onWindows = ($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows
+if ($onWindows) {
+    $ghStub = "@echo off`r`necho %* >> `"$ghCalls`"`r`necho gh: Not Found (HTTP 404) 1>&2`r`nexit /b 1`r`n"
+    [System.IO.File]::WriteAllText((Join-Path $ghBin 'gh.cmd'), $ghStub)
+}
+else {
+    $ghStub = "#!/bin/sh`necho `"`$*`" >> '$ghCalls'`necho 'gh: Not Found (HTTP 404)' >&2`nexit 1`n"
+    $ghStubPath = Join-Path $ghBin 'gh'
+    [System.IO.File]::WriteAllText($ghStubPath, $ghStub)
+    & chmod +x $ghStubPath
+}
+$ghEnv = @{ PROMPTS_ROOT = $ghHub }
+$ghEnv[(Get-Content (Join-Path $pkgRoot 'consts.json') -Raw | ConvertFrom-Json).env.activeSpace] = 'widgets'
+$ghTier = "`$global:P20Env = @{ Tier = 1; OrgStatus = 'active'; ActiveSpace = 'widgets'; GitInstalled = `$true; RepoFound = `$true }"
+$ghPath = "`$env:PATH = '$($ghBin -replace "'", "''")' + [System.IO.Path]::PathSeparator + `$env:PATH"
+$ghSnippet = "$ghTier`n$ghPath`nSet-Location '$outside'`n${cfgPrefix}NewPR K7M2`n'LASTEXITCODE=' + `$LASTEXITCODE`nexit `$LASTEXITCODE"
+try {
+    $shells = @('pwsh')
+    if (Get-Command powershell.exe -ErrorAction SilentlyContinue) { $shells += 'powershell' }
+    foreach ($sh in $shells) {
+        Remove-Item $ghCalls -Force -ErrorAction SilentlyContinue
+        $gr = Invoke-ChildRun $ghSnippet -Environment $ghEnv -Shell $sh
+        $probed = if (Test-Path $ghCalls) { [System.IO.File]::ReadAllText($ghCalls) } else { '' }
+        Assert-True "[$sh] the branch probe reached the stubbed gh" ($probed -match 'api repos/acme/widgets/branches/') $probed
+        Assert-True "[$sh] NewPR says the branch is not on GitHub" ($gr.Output -match "Error: Branch 'you/K7M2-a-widget' is not on GitHub \(acme/widgets\)") $gr.Output
+        Assert-True "[$sh] and its hint is to push the branch" ($gr.Output -match 'Hint:.*git push -u origin you/K7M2-a-widget') $gr.Output
+        Assert-True "[$sh] one block, exit 2 (got $($gr.ExitCode))" ((@([regex]::Matches($gr.Output, '(?m)^Error: ')).Count) -eq 1 -and $gr.ExitCode -eq 2) $gr.Output
+        Assert-True "[$sh] no NativeCommandError, and not gh's own sentence as the error" ($gr.Output -notmatch 'NativeCommandError' -and $gr.Output -notmatch 'Error: .*HTTP 404') $gr.Output
+    }
+}
+catch {
+    Assert-True "the NewPR GitHub cases ran to the end without a terminating error -- $($_.Exception.Message)" $false
+}
+finally { Remove-Item $ghHub -Recurse -Force -ErrorAction SilentlyContinue }
+
+Write-Host ""
+
 # -- ReplyPR typed on its success path: the reply lands in the card -----------
 # The refusal above reaches the script's first lines. The success path is the
 # wrapper's call into Send-PRReply.ps1 and that script's call into

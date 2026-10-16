@@ -51,6 +51,7 @@ $repoFound = [bool]($cfg.PromptsRoot -and (Test-Path $cfg.PromptsRoot))
 # ADO board (and a local one, whose rows keep their exact words) walks the az
 # path below, byte for byte what it always was; a GitHub board probes gh.
 . (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 $trackerKind = Resolve-P20Tracker -OrgUrl $cfg.Org
 $trackerName = if ($trackerKind -eq 'github') { 'GitHub' } else { 'Azure DevOps' }
 
@@ -68,16 +69,16 @@ $trackerOwner = Get-P20TrackerOwner -OrgUrl $cfg.Org
 if ($trackerKind -eq 'github') {
     $ghCliInstalled = [bool](Get-Command gh -ErrorAction SilentlyContinue)
     if ($ghCliInstalled) {
-        $null = gh auth status 2>&1
-        $ghAuthenticated = ($LASTEXITCODE -eq 0)
+        $ghAuthenticated = ((Invoke-P20TrackerRead 'gh' @('auth', 'status')).Code -eq 0)
         if ($ghAuthenticated) {
-            $ghIdentity = [string](gh api user -q .login 2>$null)
-            if ($LASTEXITCODE -ne 0) { $ghIdentity = '' }
+            $userRead = Invoke-P20TrackerRead 'gh' @('api', 'user', '-q', '.login')
+            $ghIdentity = [string]($userRead.Out -join '')
+            if ($userRead.Code -ne 0) { $ghIdentity = '' }
             if ($cfg.OrgStatus -ne 'local' -and $cfg.OrgStatus -ne 'archive' -and $trackerOwner) {
                 # Probe via the same path real GitHub calls use -- the gh CLI --
                 # so reachability reflects actual access, the az probe's rule.
-                $probe = gh api "users/$trackerOwner" -q .login 2>$null
-                $ghReachable = ($LASTEXITCODE -eq 0 -and $probe)
+                $ownerRead = Invoke-P20TrackerRead 'gh' @('api', "users/$trackerOwner", '-q', '.login')
+                $ghReachable = ($ownerRead.Code -eq 0 -and [bool](($ownerRead.Out -join '').Trim()))
             }
         }
     }
@@ -87,8 +88,9 @@ else {
 }
 
 if ($azCliInstalled) {
-    $azAcct = az account show --output json 2>$null
-    $azAuthenticated = ($LASTEXITCODE -eq 0 -and $azAcct)
+    $acctRead = Invoke-P20TrackerRead 'az' @('account', 'show', '--output', 'json')
+    $azAcct = $acctRead.Out
+    $azAuthenticated = ($acctRead.Code -eq 0 -and [bool](($azAcct -join '').Trim()))
 
     # The account is already in hand; reporting a bare boolean where the docs
     # promised an identity was the whole of that drift. Setup computes the same
@@ -110,8 +112,8 @@ if ($azCliInstalled) {
             # Probe via the same path real ADO calls use - the `az devops` CLI -
             # so reachability reflects actual access, not mere org reachability.
             # (A raw connectionData/token probe can 302 even when the CLI works.)
-            $proj = az devops project list --org $cfg.Org --query "value[0].name" -o tsv 2>$null
-            $adoReachable = ($LASTEXITCODE -eq 0 -and $proj)
+            $projRead = Invoke-P20TrackerRead 'az' @('devops', 'project', 'list', '--org', $cfg.Org, '--query', 'value[0].name', '-o', 'tsv')
+            $adoReachable = ($projRead.Code -eq 0 -and [bool](($projRead.Out -join '').Trim()))
         }
     }
 }

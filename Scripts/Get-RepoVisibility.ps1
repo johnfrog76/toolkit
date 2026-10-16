@@ -33,6 +33,9 @@ if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) {
 if (-not (Get-Command Resolve-P20Tracker -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
 }
+if (-not (Get-Command Invoke-P20TrackerRead -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
+}
 
 function ConvertTo-P20Visibility {
     # gh's word -- PUBLIC | PRIVATE | INTERNAL, any case -- as the contract's.
@@ -62,8 +65,9 @@ function Get-P20RepoVisibility {
     param([AllowEmptyString()][AllowNull()][string]$Repo)
     if (-not $Repo -or -not (Get-Command gh -ErrorAction SilentlyContinue)) { return ConvertTo-P20Visibility '' }
     try {
-        $raw = & gh api "repos/$Repo" 2>$null
-        if ($LASTEXITCODE -ne 0 -or -not $raw) { return ConvertTo-P20Visibility '' }
+        $read = Invoke-P20TrackerRead 'gh' @('api', "repos/$Repo")
+        $raw = $read.Out
+        if ($read.Code -ne 0 -or -not ($raw -join '').Trim()) { return ConvertTo-P20Visibility '' }
         $obj = (@($raw) -join "`n") | ConvertFrom-Json -ErrorAction Stop
     }
     catch { return ConvertTo-P20Visibility '' }

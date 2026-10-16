@@ -147,6 +147,7 @@ if ([string]::IsNullOrWhiteSpace($Comment)) {
 # GitHub renders links and #n references natively, so the ADO HTML conversion
 # below never runs on this path.
 . (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 # Which space, which tracker, before the id is sent anywhere.
 #
 Write-P20TrackerHeader -Name $cfg.ActiveOrgName -OrgUrl $org
@@ -170,8 +171,9 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
     }
 
     Write-Host "[*] Closing issue $Id..." -ForegroundColor Cyan
-    $raw = gh issue view $Id --repo $repoFull --json 'title,state,url' 2>$null
-    if ($LASTEXITCODE -ne 0 -or -not $raw) {
+    $viewRead = Invoke-P20TrackerRead 'gh' @('issue', 'view', "$Id", '--repo', $repoFull, '--json', 'title,state,url')
+    $raw = $viewRead.Out
+    if ($viewRead.Code -ne 0 -or -not ($raw -join '').Trim()) {
         Write-CliError -Message "Could not fetch issue $Id from $repoFull." `
             -Hint 'Check the number and that gh is signed in (gh auth status).'
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
@@ -201,8 +203,8 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
 
     if ($issueState -eq 'CLOSED') {
         Write-Host "[!] Issue is already closed. Skipping state change." -ForegroundColor Yellow
-        gh issue comment $Id --repo $repoFull --body $Comment *> $null
-        if ($LASTEXITCODE -eq 0) { Write-Host "[+] Posted comment" -ForegroundColor Green }
+        $commentRead = Invoke-P20TrackerRead 'gh' @('issue', 'comment', "$Id", '--repo', $repoFull, '--body', $Comment)
+        if ($commentRead.Code -eq 0) { Write-Host "[+] Posted comment" -ForegroundColor Green }
         else {
             # A notice, exit 0: the state asked for is already true.
             Write-Host "[!] Failed to post comment. The issue stays closed; add it on GitHub." -ForegroundColor Yellow
@@ -210,8 +212,8 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
     }
     else {
         # One call closes and comments together.
-        gh issue close $Id --repo $repoFull --reason $ghReason --comment $Comment *> $null
-        if ($LASTEXITCODE -ne 0) {
+        $closeRead = Invoke-P20TrackerRead 'gh' @('issue', 'close', "$Id", '--repo', $repoFull, '--reason', $ghReason, '--comment', $Comment)
+        if ($closeRead.Code -ne 0) {
             Write-CliError -Message "Failed to close issue $Id." `
                 -Hint "Nothing was changed. Check gh auth status, or $(Get-CliPrefix)Log -Errors."
             exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"

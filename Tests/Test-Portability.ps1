@@ -40,6 +40,7 @@ if ($Help) {
   Clause 13 No work-marker comment (the four words a seam must not hide behind) ships
   Clause 14 No comment carries a date, a name, an agent, a nickname for a host, a tracker
             number, an archive pointer, a private repository or a machine path
+  Clause 15 No gh or az call with a redirected stderr outside Invoke-TrackerRead.ps1
 
   Scope: all three halves -- *.psm1 at the root, Scripts/, Prompt20Toolkit/,
   web/src, web/tests and agent/ -- plus root JSON and Markdown, and Tests/
@@ -1074,6 +1075,82 @@ catch {
 }
 finally {
     Remove-Item -Path $cpScratch -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# -- Clause 15: a script calls gh or az through Invoke-P20TrackerRead ----------
+# AGENTS.md, "Traps worth knowing": under Windows PowerShell 5.1 a native call
+# whose stderr is redirected (2>&1, 2>$null, *> $null) while the preference is
+# 'Stop' throws on the first stderr line, before the exit code can be read, so a
+# verb's own refusal is never printed. pwsh 7 reads the same line as text, so a
+# run there is green either way. Scripts/Invoke-TrackerRead.ps1 is the one place
+# that redirection is written; every other gh or az call goes through it.
+#
+# Read with the PowerShell tokenizer, not a grep: a comment or a string that
+# NAMES such a call (help text, a hint) is not a call. The file set is the CLI's
+# runtime code -- the root *.psm1, Scripts/ and Config/.
+#
+# The allow-list is files that keep their own copy of the split for now, each
+# with its reason. It only shrinks.
+$rawTrackerAllowed = @{
+    'Scripts/Invoke-TrackerRead.ps1' = 'the one place the redirection is written'
+    'Scripts/Get-Standup.ps1'        = 'the ritual readers keep their own copy until they share one skeleton'
+    'Scripts/Get-Triage.ps1'         = 'the ritual readers keep their own copy until they share one skeleton'
+}
+$rawTrackerPattern = '(?<![\w$-])(gh|az)\s[^|\r\n]*(2>|\*>)'
+function Get-RawTrackerCalls {
+    # Every match of the pattern that starts outside a comment and a string.
+    param([string]$Text)
+    $tokens = $null; $parseErrors = $null
+    [void][System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$tokens, [ref]$parseErrors)
+    $skip = @($tokens | Where-Object {
+            $_.Kind -eq 'Comment' -or $_ -is [System.Management.Automation.Language.StringToken]
+        })
+    $found = @()
+    foreach ($m in [regex]::Matches($Text, $rawTrackerPattern)) {
+        $inside = $false
+        foreach ($t in $skip) {
+            if ($m.Index -ge $t.Extent.StartOffset -and $m.Index -lt $t.Extent.EndOffset) { $inside = $true; break }
+        }
+        if ($inside) { continue }
+        $lineNo = ([regex]::Matches($Text.Substring(0, $m.Index), "`n")).Count + 1
+        $found += "${lineNo}: $($m.Value.Trim())"
+    }
+    return $found
+}
+$rawTrackerFiles = @()
+$rawTrackerRoot = Get-ChildItem (Join-Path $pkgRoot '*.psm1') -File -ErrorAction SilentlyContinue
+if ($rawTrackerRoot) { $rawTrackerFiles += $rawTrackerRoot }
+foreach ($d in @('Scripts', 'Config')) {
+    $dir = Join-Path $pkgRoot $d
+    if (Test-Path $dir) { $rawTrackerFiles += Get-ChildItem $dir -Filter '*.ps1' -File -ErrorAction SilentlyContinue }
+}
+$rawTrackerHits = @()
+foreach ($f in $rawTrackerFiles) {
+    $rel = Get-RelPath $f
+    if ($rawTrackerAllowed.ContainsKey($rel)) { continue }
+    foreach ($hit in (Get-RawTrackerCalls ([System.IO.File]::ReadAllText($f.FullName)))) {
+        $rawTrackerHits += "${rel}:$hit"
+    }
+}
+$rawTrackerDetail = "read $($rawTrackerFiles.Count) files"
+if ($rawTrackerHits.Count -gt 0) {
+    $rawTrackerDetail = "call it as Invoke-P20TrackerRead 'gh' @(...) and read .Code/.Out/.Err (Scripts/Invoke-TrackerRead.ps1): " + ($rawTrackerHits -join '; ')
+}
+Assert-True "Clause 15: no gh or az call with a redirected stderr outside Invoke-TrackerRead.ps1" (($rawTrackerHits.Count -eq 0) -and ($rawTrackerFiles.Count -ge 80)) $rawTrackerDetail
+
+# The sweep's own cases: what it must find, and what only names a call.
+$rawTrackerCases = @(
+    @{ Hit = $true;  Why = 'a raw call that drops stderr';             Body = '$x = gh api user -q .login 2>$null' }
+    @{ Hit = $true;  Why = 'a raw call that keeps stderr as records';  Body = '$out = & gh @Arguments 2>&1' }
+    @{ Hit = $true;  Why = 'a raw az call that silences every stream'; Body = 'az boards work-item update --id 1 *> $null' }
+    @{ Hit = $false; Why = 'a call through the one helper';            Body = '$r = Invoke-P20TrackerRead ''gh'' @(''api'', ''user'')' }
+    @{ Hit = $false; Why = 'a comment that names the trap';            Body = '# gh x 2>&1 throws under Stop on 5.1' }
+    @{ Hit = $false; Why = 'a hint string that names a call';          Body = 'Write-Host "run: gh auth status 2>&1"' }
+    @{ Hit = $false; Why = 'a variable that only ends in the name';    Body = '$gh 2>$null' }
+)
+foreach ($case in $rawTrackerCases) {
+    $caseHits = @(Get-RawTrackerCalls $case.Body).Count
+    Assert-True "Clause 15: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
 }
 
 # -- Clause 9: the documented config shape is the implemented one --------------

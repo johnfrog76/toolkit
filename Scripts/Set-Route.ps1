@@ -110,6 +110,7 @@ if ($Help) {
 
 . (Join-Path $PSScriptRoot 'Triage-Rules.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 
 $row = (Get-P20TriageRow -PackageRoot $repoRoot).Row
 $severities = @($row.severities | ForEach-Object { [string]$_ })
@@ -189,13 +190,13 @@ if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
 # -- The reads that make the answers checkable ----------------------------------
 function Invoke-P20RouteGh {
     # One gh call -> @{ ok; out; reason }. stderr's first line is the reason.
+    # The call itself is Invoke-P20TrackerRead's; this only shapes its answer.
     param([string[]]$Arguments)
-    $global:LASTEXITCODE = 0
-    try { $raw = & gh @Arguments 2>&1 }
+    try { $read = Invoke-P20TrackerRead 'gh' $Arguments }
     catch { return @{ ok = $false; out = ''; reason = "gh did not answer ($($_.Exception.Message))" } }
-    $code = $LASTEXITCODE
-    $stdout = @($raw | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] } | ForEach-Object { [string]$_ }) -join "`n"
-    $stderr = @($raw | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] } | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
+    $code = $read.Code
+    $stdout = @($read.Out) -join "`n"
+    $stderr = @($read.Err | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
     if ($code -ne 0) {
         $why = 'gh returned an error'
         if ($stderr.Count -gt 0) { $why = $stderr[0] }

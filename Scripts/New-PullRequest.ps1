@@ -248,6 +248,9 @@ $allProjects = @($cfg.Projects | ForEach-Object { @{ Name = $_.name; Repo = $_.r
 # one board rule (Resolve-P20TrackerRepo); the OWNER plays the project's role
 # in every message below. The ADO sniffing blocks are gated off this path.
 . (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
+# Every gh call below goes through Invoke-P20TrackerRead: this script runs under
+# 'Stop', where a raw redirected stderr throws on Windows PowerShell 5.1.
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 $trackerKind = Resolve-P20Tracker -OrgUrl $org
 # Which space, which tracker, before anything is opened against it.
 #
@@ -526,14 +529,15 @@ if ($trackerKind -eq 'github') {
     # (found by the first
     # dogfood PR: toolkit's default is main, like most of the world's).
     if (-not $PSBoundParameters.ContainsKey('TargetBranch') -and $TargetBranch -eq 'master') {
-        $repoDefault = [string](gh repo view $ghRepoFull --json defaultBranchRef -q '.defaultBranchRef.name' 2>$null)
-        if ($LASTEXITCODE -eq 0 -and $repoDefault) { $TargetBranch = $repoDefault.Trim() }
+        $defaultRead = Invoke-P20TrackerRead 'gh' @('repo', 'view', $ghRepoFull, '--json', 'defaultBranchRef', '-q', '.defaultBranchRef.name')
+        $repoDefault = [string]($defaultRead.Out -join '')
+        if ($defaultRead.Code -eq 0 -and $repoDefault.Trim()) { $TargetBranch = $repoDefault.Trim() }
     }
 
     # Is the branch on GitHub? From the web UI there is no checkout to push
     # from -- asked first, so the refusal says what to do (the ADO rule, kept).
-    $null = gh api "repos/$ghRepoFull/branches/$([Uri]::EscapeDataString($currentBranch))" 2>$null
-    if ($LASTEXITCODE -ne 0) {
+    $branchRead = Invoke-P20TrackerRead 'gh' @('api', "repos/$ghRepoFull/branches/$([Uri]::EscapeDataString($currentBranch))")
+    if ($branchRead.Code -ne 0) {
         Write-CliError -Message "Branch '$currentBranch' is not on GitHub ($ghRepoFull), so there is nothing to open a pull request from." `
             -Hint "Push it from the code repository: git push -u origin $currentBranch -- then run $(Get-CliPrefix)NewPR again."
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
@@ -551,8 +555,9 @@ if ($trackerKind -eq 'github') {
     $ghCreateArgs = @('pr', 'create', '--repo', $ghRepoFull, '--head', $currentBranch,
         '--base', $TargetBranch, '--title', $prTitle, '--body', $prBodyText)
     if ($Draft) { $ghCreateArgs += '--draft' }
-    $createOut = @(gh @ghCreateArgs 2>&1)
-    if ($LASTEXITCODE -ne 0) {
+    $createRead = Invoke-P20TrackerRead 'gh' $ghCreateArgs
+    $createOut = @($createRead.Lines)
+    if ($createRead.Code -ne 0) {
         $said = ($createOut -join ' ').Trim()
         if ($said -match 'already exists') {
             Write-CliError -Message "A PR already exists for branch '$currentBranch' targeting '$TargetBranch'." -Hint $said
@@ -568,8 +573,8 @@ if ($trackerKind -eq 'github') {
     if ($Draft) { Write-Host "    (draft)" -ForegroundColor DarkGray }
 
     if ($AutoComplete -and $prUrl) {
-        gh pr merge --auto --squash --delete-branch $prUrl *> $null
-        if ($LASTEXITCODE -eq 0) { Write-Host "[+] Auto-merge enabled (squash, delete branch)" -ForegroundColor Green }
+        $mergeRead = Invoke-P20TrackerRead 'gh' @('pr', 'merge', '--auto', '--squash', '--delete-branch', $prUrl)
+        if ($mergeRead.Code -eq 0) { Write-Host "[+] Auto-merge enabled (squash, delete branch)" -ForegroundColor Green }
         else {
             Write-Host "[~] PR created but auto-merge could not be enabled -- the repo may not allow it." -ForegroundColor Yellow
             Write-ToolkitLog -Type WARN -Source "$(Get-CliPrefix)NewPR" -Detail "gh auto-merge failed"
@@ -588,8 +593,8 @@ if ($trackerKind -eq 'github') {
             $ghCommentLines += '**Described Changes:**'
             $ghCommentLines += $describedChanges
         }
-        gh issue comment $workItemId --repo $ghRepoFull --body ($ghCommentLines -join "`n") *> $null
-        if ($LASTEXITCODE -eq 0) { Write-Host "[+] Comment posted to the issue" -ForegroundColor Green }
+        $commentRead = Invoke-P20TrackerRead 'gh' @('issue', 'comment', "$workItemId", '--repo', $ghRepoFull, '--body', ($ghCommentLines -join "`n"))
+        if ($commentRead.Code -eq 0) { Write-Host "[+] Comment posted to the issue" -ForegroundColor Green }
         else {
             Write-Host "[~] Failed to comment on issue #$workItemId -- the PR exists; add the link on GitHub." -ForegroundColor Yellow
             Write-ToolkitLog -Type WARN -Source "$(Get-CliPrefix)NewPR" -Detail "gh issue comment failed"

@@ -22,6 +22,7 @@ $bel = [char]7
 
 # -- The dispatch: the board's address names the tracker that answers --------
 . (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 # Which space, which tracker.
 Write-P20TrackerHeader -Name $cfg.ActiveOrgName -OrgUrl $org
 if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
@@ -40,8 +41,11 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
         '--json', 'number,title,state,repository,updatedAt,url', '--limit', '50')
     if ($repoGrain) { $ghArgs += @('--repo', $repoGrain) } else { $ghArgs += @('--owner', $owner) }
 
-    $issues = gh @ghArgs 2>$null | ConvertFrom-Json
-    if ($LASTEXITCODE -ne 0) {
+    $searchRead = Invoke-P20TrackerRead 'gh' $ghArgs
+    $issues = $null
+    $searchJson = (@($searchRead.Out) -join "`n")
+    if ($searchRead.Code -eq 0 -and $searchJson.Trim()) { $issues = $searchJson | ConvertFrom-Json }
+    if ($searchRead.Code -ne 0) {
         $p = if (Get-Command Get-CliPrefix -ErrorAction SilentlyContinue) { Get-CliPrefix } else { '' }
         Write-Host "GitHub did not answer for $owner -- ${p}Env shows the tier." -ForegroundColor Yellow
         return

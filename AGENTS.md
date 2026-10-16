@@ -403,7 +403,8 @@ Done locally is not Closed on the board. If the card should be closed, run `tkCl
   running with `$ErrorActionPreference = 'Stop'` throws a NativeCommandError on the first stderr line, before `$LASTEXITCODE` can be
   read, so the verb prints gh's sentence through the generic block instead of its own answer; pwsh 7 reads it as text, so
   a run under pwsh 7 alone is green either way. `Invoke-P20TrackerRead` (`Scripts/Invoke-TrackerRead.ps1`, dot-sourced) is the one way a
-  script calls `gh` or `az`: it returns `Code`, `Lines`, `Out` and `Err`, and a raw `gh ... 2>&1` in a script is the bug.
+  script calls `gh` or `az`: it returns `Code`, `Lines`, `Out` and `Err`, and a raw `gh ... 2>&1` in a script is the bug --
+  `Test-Portability`'s Clause 15 fails naming the line.
 - **On Windows a child inherits every inheritable handle its launcher holds, not only the std ones.** Windows
   PowerShell 5.1 keeps a second inheritable copy of its stdout (the .NET Framework's, at startup), so clearing
   `GetStdHandle`'s is not enough and `powershell -c tkAgent | ...` waits for the agent. A long-lived

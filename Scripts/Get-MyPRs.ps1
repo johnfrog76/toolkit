@@ -37,10 +37,10 @@ if (-not (Get-Command Write-CliError -ErrorAction SilentlyContinue)) {
 # rejection can be NAMED rather than swallowed; `2>$null` is what hid it.
 function Invoke-AdoPrList {
     param([string[]]$Arguments)
-    $raw = @(az repos pr list @Arguments --output json 2>&1)
-    $code = $LASTEXITCODE
-    $errText = (@($raw | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] } | ForEach-Object { "$_" }) -join ' ').Trim()
-    $json = (@($raw | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] }) -join "`n")
+    $read = Invoke-P20TrackerRead 'az' (@('repos', 'pr', 'list') + @($Arguments) + @('--output', 'json'))
+    $code = $read.Code
+    $errText = (@($read.Err) -join ' ').Trim()
+    $json = (@($read.Out) -join "`n")
     # Through a variable, then @(): Windows PowerShell 5.1 writes a JSON array as ONE
     # object, so @($json | ConvertFrom-Json) is a one-item list holding every PR.
     $items = @()
@@ -53,6 +53,7 @@ function Invoke-AdoPrList {
 # authored, and PRs awaiting your review, across the board's repos -- the
 # owner-wide search is the WIQL org-wide shape. Same table, same links block.
 . (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 # Which space, which tracker.
 Write-P20TrackerHeader -Name $cfg.ActiveOrgName -OrgUrl $org
 if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
