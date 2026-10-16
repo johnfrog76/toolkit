@@ -155,7 +155,7 @@ export function ManagerDetailPage() {
     if (!rewriteAvailable) return null;
     return (
       <Button
-        icon={rewriting === field ? <Spinner size="tiny" /> : <SparkleFilled />}
+        icon={rewriting === field ? <Spinner size="tiny" aria-label="Rewriting..." /> : <SparkleFilled />}
         size="small"
         appearance="subtle"
         title="Magic rewrite — fix typos, tidy into bullets"

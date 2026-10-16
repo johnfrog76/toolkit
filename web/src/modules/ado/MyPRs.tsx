@@ -189,7 +189,7 @@ export function MyPRs({
               secondaryActions={[
                 {
                   icon: fetchingPrIds.has(pr.pull_request_id) ? (
-                    <Spinner size="tiny" />
+                    <Spinner size="tiny" aria-label="Fetching comments..." />
                   ) : (
                     <CommentRegular />
                   ),
