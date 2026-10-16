@@ -328,6 +328,26 @@ Assert-True "Get-PRComments emits no literal workflow link" `
 Assert-True "Get-PRComments asks the builder for the line" `
     ($sourceText -match 'New-P20WorkflowLine')
 
+# -- A work item finds its own card, never one whose name merely contains it --
+. (Join-Path $pkgRoot 'Scripts/Resolve-CardName.ps1')
+$fm = [regex]::Match($sourceText, "(?s)function Find-P20CardForWorkItem \{.*?\n\}")
+Assert-True "Find-P20CardForWorkItem is in the script" $fm.Success
+Assert-True "Get-PRComments reads the one card-filename rule" ($sourceText -match 'Resolve-CardName\.ps1')
+if ($fm.Success) {
+    Invoke-Expression $fm.Value
+    $cardDir = Join-Path ([System.IO.Path]::GetTempPath()) ("cardmatch-" + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $cardDir -Force | Out-Null
+    foreach ($n in @('Task140-fix-39-bugs.prompt.md', '39-real.prompt.md', 'Feat-402-x.prompt.md')) {
+        [System.IO.File]::WriteAllText((Join-Path $cardDir $n), 'x')
+    }
+    $files = @(Get-ChildItem -LiteralPath $cardDir -Filter '*.prompt.md' -File)
+    $hit39 = @(Find-P20CardForWorkItem -PromptFiles $files -WorkItemId '39' -Config $null)
+    Assert-True "work item 39 picks 39-real, not Task140-fix-39-bugs" ($hit39.Count -eq 1 -and $hit39[0].Name -eq '39-real.prompt.md')
+    $hit402 = @(Find-P20CardForWorkItem -PromptFiles $files -WorkItemId '402' -Config $null)
+    Assert-True "work item 402 matches Feat-402-x" ($hit402.Count -eq 1 -and $hit402[0].Name -eq 'Feat-402-x.prompt.md')
+    Remove-Item -LiteralPath $cardDir -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 # -- The link follows the card, not the machine that wrote it -----------------
 # Every hub card written before a hub reorganisation had one `../` too many,
 # and the only fix was counting them by hand. A card is now REFRESHED from
