@@ -48,8 +48,18 @@ function Player() {
   );
 }
 
+// The notes window narrates from the same baked files the player does, so it is
+// handed the same facts: there is no narration service to ask.
 function Notes() {
-  return <PresenterNotes decks={DECKS} />;
+  const { deckId } = useParams<{ deckId: string }>();
+  return (
+    <PresenterNotes
+      decks={DECKS}
+      voices={BAKED_VOICES}
+      hasApi={false}
+      resolveNarrationUrl={(slide, voice) => voiceUrl(deckId, slide.id, voice)}
+    />
+  );
 }
 
 /** `/deck/:deckId` */

@@ -14,6 +14,7 @@ release.
 
 ### Fixed
 
+- Play with narration in a deck's notes window now plays the baked voice clips instead of failing.
 - A new usage log no longer starts with a byte-order mark, so its first line reads the same as every other and the same on every host.
 - Moving a design in the hub, or attaching a cover or before picture, now reports a commit git refuses as an error (exit 2) with git's own message and says the files are already written, instead of a warning that reads as success.
 - The Environment badge no longer calls a Space with no tracker an Azure DevOps one.
