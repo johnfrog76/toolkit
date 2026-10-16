@@ -11,11 +11,12 @@ import os
 import platform
 import socket
 import time
+from dataclasses import dataclass
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from . import consts, model
+from . import consts, log_writer, model
 from .config import (
     LOCAL_CONFIG_PATH,
     REPO_ROOT,
@@ -40,6 +41,10 @@ from .identity import identity_block, identity_cache_clear
 from .tier import _resolve_tier, probe_cache_clear
 
 api = APIRouter()
+
+
+def _warn(detail: str) -> None:
+    log_writer.write_log("WARN", "agent/env", detail)
 
 
 def _display_name(cfg: dict, identity: dict | None = None) -> str:
@@ -125,15 +130,24 @@ def _ado_access_check(space_status: str, org_url: str, reachable: bool) -> dict:
     return {"ok": False, "detail": f"unreachable ({name})" if org_url else "no org URL configured"}
 
 
-@api.get("/env")
-async def get_env(refresh: int = 0):
-    """The one round trip the web shell gates on.
+@dataclass(frozen=True)
+class _Probe:
+    """What /env learned by looking: the hub on disk, the tracker, the bridge's
+    host and who "me" is. Gathered once per request by ``_probe``; the check rows
+    and the top-level fields both read it, so nothing is asked twice."""
 
-    ``?refresh=1`` bypasses the reachability cache. Everything else reads a
-    probe that is at most ADO_PROBE_TTL_SECONDS old, because the shell gates
-    EVERY page on this route and the probe is a cold `az` start.
-    """
-    cfg = load_config()
+    prompts_readable: bool
+    prompts_writable: bool
+    git_history: bool
+    active_count: int
+    tier: int
+    ado_reachable: bool
+    bridge_host: dict
+    identity: dict
+
+
+async def _probe(cfg: dict, refresh: int) -> _Probe:
+    """Every probe /env reports, gathered in one place."""
     org_url = cfg.get("org", "")
     root = hub_root()
     # Check 1: Prompts volume readable. An unconfigured or missing promptsRoot
@@ -142,10 +156,6 @@ async def get_env(refresh: int = 0):
 
     # Check 2: Prompts writable
     prompts_writable = os.access(str(root), os.W_OK) if prompts_readable else False
-
-    # Check 3: Config loaded
-    config_loaded = bool(cfg)
-    config_problems = cfg.get("configProblems") or []
 
     # Check 4: Git history available
     git_history = (root / ".git").exists()
@@ -184,41 +194,188 @@ async def get_env(refresh: int = 0):
     # costs one probe.
     identity = await asyncio.to_thread(identity_block, bool(refresh))
 
-    tier_labels = {1: "Full (Tier 1)", 2: "Local (Tier 2)", 3: "Minimal (Tier 3)"}
+    return _Probe(
+        prompts_readable=prompts_readable,
+        prompts_writable=prompts_writable,
+        git_history=git_history,
+        active_count=active_count,
+        tier=tier,
+        ado_reachable=ado_reachable,
+        bridge_host=bridge_host,
+        identity=identity,
+    )
 
-    # What a module adds to /env, asked of the module rather than known here.
-    #
-    # The communication module needs one thing reported before any of its UI
-    # renders: whether each recipient's webhook environment variable is actually
-    # set. That is gate 2, it can only be answered at runtime, and discovering
-    # it on click is how a send button lies about being available.
-    #
-    # The import is lazy AND inside the flag check on purpose. core does not
-    # depend on a module -- it asks one that is switched on to describe itself,
-    # and a checkout without the module still serves /env.
+
+def _module_blocks(cfg: dict) -> dict:
+    """What a module adds to /env, asked of the module rather than known here.
+
+    The communication module needs one thing reported before any of its UI
+    renders: whether each recipient's webhook environment variable is actually
+    set. That is gate 2, it can only be answered at runtime, and discovering
+    it on click is how a send button lies about being available.
+
+    The import is lazy AND inside the flag check on purpose. core does not
+    depend on a module -- it asks one that is switched on to describe itself,
+    and a checkout without the module still serves /env. A module that cannot
+    describe itself is not fatal, and it is not silent either: its block is left
+    out and the log says why.
+    """
     module_blocks = {}
     if (cfg.get("features") or {}).get("communication"):
         try:
             from ..communication.manager import communication_env
 
             module_blocks["communication"] = communication_env()
-        except Exception:  # noqa: BLE001, S110 -- a module that cannot describe itself is not fatal  # pragma: no cover
-            pass
+        except Exception as exc:  # noqa: BLE001 -- a module that cannot describe itself is not fatal
+            _warn(f"communication could not describe itself: {exc}")
+    return module_blocks
 
-    # Org state — full | local | archive (active surfaces as "full"). This is the
-    # three-way status the tier badge can't show, since local and archive are both
-    # Tier 2. Informational row; always "ok".
-    space_status = cfg.get("status", "local")
-    # Derive label from resolved tier, not raw config status. active + probe pass
-    # = full; active + probe fail = local (Tier 2); local/archive always = their label.
+
+def _org_state_label(space_status: str, tier: int) -> str:
+    """Org state -- full | local | archive (active surfaces as "full"). This is the
+    three-way status the tier badge can't show, since local and archive are both
+    Tier 2. Informational row; always "ok".
+
+    Derived from the resolved tier, not raw config status: active + probe pass =
+    full; active + probe fail = local (Tier 2); local/archive always = their label.
+    """
     if space_status == "archive":
-        org_state_label = "archive"
-    elif space_status == "local":
-        org_state_label = "local"
-    elif tier == 1:
-        org_state_label = "full"
-    else:
-        org_state_label = "local"
+        return "archive"
+    if space_status == "local":
+        return "local"
+    if tier == 1:
+        return "full"
+    return "local"
+
+
+def _checks(cfg: dict, probe: _Probe, ado_on: bool) -> dict:
+    """The ``checks`` rows -- one {ok, detail} per row the Environment card lists."""
+    org_url = cfg.get("org", "")
+    space_status = cfg.get("status", "local")
+
+    # Check 3: Config loaded
+    config_loaded = bool(cfg)
+    config_problems = cfg.get("configProblems") or []
+
+    active_count = probe.active_count
+    bridge_host = probe.bridge_host
+    return {
+        "promptsVolume": {
+            "ok": probe.prompts_readable,
+            "detail": hub_detail(),
+        },
+        # Whether the hub declared its own orgs. Informational, never a
+        # failure: a hub with no hub.json is the ordinary case and every
+        # org then comes from config alone.
+        "hubManifest": {
+            "ok": True,
+            "detail": hub_manifest_detail(),
+        },
+        "promptsWritable": {
+            "ok": probe.prompts_writable,
+            "detail": "writable" if probe.prompts_writable else "read-only",
+        },
+        # A config file that would not parse is skipped, not fatal; this row
+        # is where the user is told so (the sentence names the file).
+        "configLoaded": {
+            "ok": config_loaded and not config_problems,
+            "detail": (
+                " ".join(config_problems)
+                if config_problems
+                else ("config loaded" if config_loaded else "config not found")
+            ),
+        },
+        "gitHistory": _git_history_check(probe.git_history, str(cfg.get("storeSync") or "none")),
+        # An ARCHIVED org is supposed to have nothing in flight: none is the
+        # expected answer there, not a failure.
+        "activePrompts": {
+            "ok": active_count > 0 or space_status == "archive",
+            "detail": (
+                "none -- an archived organisation has nothing in flight"
+                if space_status == "archive" and active_count == 0
+                else f"{active_count} active prompt{'s' if active_count != 1 else ''}"
+            ),
+        },
+        # "Tried and failed" is a failure. "Never asked" is not: an archived org
+        # and a local one are never probed (docs/CLI.md, "Tiers: what works without ADO"), so a red
+        # "no org URL configured" told a person something was wrong with a
+        # machine doing exactly what it was configured to do. The owner's rule:
+        # "archive doesn't request at all, and local tried and failed."
+        "adoReachable": _ado_access_check(space_status, org_url, probe.ado_reachable),
+        "orgState": {
+            "ok": True,
+            "detail": _org_state_label(space_status, probe.tier),
+        },
+        # Not ok when nothing resolved: the PR routes filter by this address
+        # and return empty without it, which is a config gap rather than an
+        # empty board.
+        "identity": _identity_check(probe.identity, ado_on),
+        "bridgeHost": {
+            "ok": bridge_host["resolved"] is not None,
+            "detail": (
+                f"{bridge_host['resolved']} ({bridge_host['path']})"
+                if bridge_host["resolved"]
+                else "no pwsh or powershell on PATH"
+            ),
+        },
+    }
+
+
+def _config_block(cfg: dict) -> dict:
+    """The ``config`` block: the active Space's settings and the Spaces offered."""
+    return {
+        "org": cfg.get("org", ""),
+        "projects": cfg.get("projects", []),
+        "promptsFolder": cfg.get("promptsFolder", ""),
+        "activeSpace": cfg.get("activeSpace", ""),
+        # What a person is OFFERED -- the switcher, Settings, Reviews' org
+        # chips all read this list, so none of them needs a rule of its own.
+        # Each carries the tracker its address names (D-G2), derived here
+        # and never in the browser: the Studio's foyer is one row per
+        # GitHub Space (D-S2), and it asks this list which those are.
+        # Each carries its lane names too, resolved the way the active
+        # Space's `laneNames` below is ({contract word: display name}), so
+        # the foyer counts another Space's cards under ITS names.
+        "spaces": [
+            {**o, "tracker": tracker(o.get("org", "")), "laneNames": lane_names(o)}
+            for o in offered_spaces(
+                cfg.get("spaces", []), cfg.get("activeSpace", ""), cfg.get("isDemoDismissed", False)
+            )
+        ],
+        "isDemoDismissed": bool(cfg.get("isDemoDismissed", False)),
+        # {contract word: display name} for the active Space's lanes.
+        "laneNames": cfg.get("laneNames", {}),
+        # The first-run banner's switch. The web renders it only when this
+        # is true AND the deck module is on.
+        "firstRunWelcome": bool((cfg.get("firstRun") or {}).get("welcome", False)),
+    }
+
+
+@api.get("/env")
+async def get_env(refresh: int = 0):
+    """The one round trip the web shell gates on.
+
+    ``?refresh=1`` bypasses the reachability cache. Everything else reads a
+    probe that is at most ADO_PROBE_TTL_SECONDS old, because the shell gates
+    EVERY page on this route and the probe is a cold `az` start.
+
+    Composed from three parts: what was probed (``_probe``), the check rows
+    built from it (``_checks``) and the config block (``_config_block``). The
+    top-level keys and their order are the shell's contract, so they are all
+    written in the one literal below.
+    """
+    cfg = load_config()
+    org_url = cfg.get("org", "")
+    probe = await _probe(cfg, refresh)
+    tier = probe.tier
+    identity = probe.identity
+    bridge_host = probe.bridge_host
+    module_blocks = _module_blocks(cfg)
+    # Whether Azure DevOps is part of what is SHOWN -- derived once, read by the
+    # `ado` block and by the Identity row.
+    ado_on = ado_enabled(cfg.get("status", "local"), (cfg.get("features") or {}).get("ado"), tracker(org_url))
+
+    tier_labels = {1: "Full (Tier 1)", 2: "Local (Tier 2)", 3: "Minimal (Tier 3)"}
 
     return {
         # Which build this is -- consts.json's version, the same string Env prints.
@@ -238,9 +395,7 @@ async def get_env(refresh: int = 0):
         # the web never re-derives it. `explicit` says whether someone set
         # features.ado or the org answered (docs/modules/ado.md).
         "ado": {
-            "enabled": ado_enabled(
-                cfg.get("status", "local"), (cfg.get("features") or {}).get("ado"), tracker(org_url)
-            ),
+            "enabled": ado_on,
             "explicit": "ado" in (cfg.get("features") or {}),
         },
         # WHICH tracker the active board's address names -- "ado", "github" or
@@ -269,96 +424,9 @@ async def get_env(refresh: int = 0):
         # nothing answered. tkEnv prints the same two facts.
         "identity": identity,
         "uptime": int(time.monotonic()),
-        "checks": {
-            "promptsVolume": {
-                "ok": prompts_readable,
-                "detail": hub_detail(),
-            },
-            # Whether the hub declared its own orgs. Informational, never a
-            # failure: a hub with no hub.json is the ordinary case and every
-            # org then comes from config alone.
-            "hubManifest": {
-                "ok": True,
-                "detail": hub_manifest_detail(),
-            },
-            "promptsWritable": {
-                "ok": prompts_writable,
-                "detail": "writable" if prompts_writable else "read-only",
-            },
-            # A config file that would not parse is skipped, not fatal; this row
-            # is where the user is told so (the sentence names the file).
-            "configLoaded": {
-                "ok": config_loaded and not config_problems,
-                "detail": (
-                    " ".join(config_problems)
-                    if config_problems
-                    else ("config loaded" if config_loaded else "config not found")
-                ),
-            },
-            "gitHistory": _git_history_check(git_history, str(cfg.get("storeSync") or "none")),
-            # An ARCHIVED org is supposed to have nothing in flight: none is the
-            # expected answer there, not a failure.
-            "activePrompts": {
-                "ok": active_count > 0 or space_status == "archive",
-                "detail": (
-                    "none -- an archived organisation has nothing in flight"
-                    if space_status == "archive" and active_count == 0
-                    else f"{active_count} active prompt{'s' if active_count != 1 else ''}"
-                ),
-            },
-            # "Tried and failed" is a failure. "Never asked" is not: an archived org
-            # and a local one are never probed (docs/CLI.md, "Tiers: what works without ADO"), so a red
-            # "no org URL configured" told a person something was wrong with a
-            # machine doing exactly what it was configured to do. The owner's rule:
-            # "archive doesn't request at all, and local tried and failed."
-            "adoReachable": _ado_access_check(space_status, org_url, ado_reachable),
-            "orgState": {
-                "ok": True,
-                "detail": org_state_label,
-            },
-            # Not ok when nothing resolved: the PR routes filter by this address
-            # and return empty without it, which is a config gap rather than an
-            # empty board.
-            "identity": _identity_check(
-                identity,
-                ado_enabled(cfg.get("status", "local"), (cfg.get("features") or {}).get("ado"), tracker(org_url)),
-            ),
-            "bridgeHost": {
-                "ok": bridge_host["resolved"] is not None,
-                "detail": (
-                    f"{bridge_host['resolved']} ({bridge_host['path']})"
-                    if bridge_host["resolved"]
-                    else "no pwsh or powershell on PATH"
-                ),
-            },
-        },
+        "checks": _checks(cfg, probe, ado_on),
         **module_blocks,
-        "config": {
-            "org": org_url,
-            "projects": cfg.get("projects", []),
-            "promptsFolder": cfg.get("promptsFolder", ""),
-            "activeSpace": cfg.get("activeSpace", ""),
-            # What a person is OFFERED -- the switcher, Settings, Reviews' org
-            # chips all read this list, so none of them needs a rule of its own.
-            # Each carries the tracker its address names (D-G2), derived here
-            # and never in the browser: the Studio's foyer is one row per
-            # GitHub Space (D-S2), and it asks this list which those are.
-            # Each carries its lane names too, resolved the way the active
-            # Space's `laneNames` below is ({contract word: display name}), so
-            # the foyer counts another Space's cards under ITS names.
-            "spaces": [
-                {**o, "tracker": tracker(o.get("org", "")), "laneNames": lane_names(o)}
-                for o in offered_spaces(
-                    cfg.get("spaces", []), cfg.get("activeSpace", ""), cfg.get("isDemoDismissed", False)
-                )
-            ],
-            "isDemoDismissed": bool(cfg.get("isDemoDismissed", False)),
-            # {contract word: display name} for the active Space's lanes.
-            "laneNames": cfg.get("laneNames", {}),
-            # The first-run banner's switch. The web renders it only when this
-            # is true AND the deck module is on.
-            "firstRunWelcome": bool((cfg.get("firstRun") or {}).get("welcome", False)),
-        },
+        "config": _config_block(cfg),
     }
 
 

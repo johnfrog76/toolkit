@@ -610,6 +610,24 @@ class EnvReportsGateTwo(ManagerRouteTestCase):
         self.assertTrue(self._block()["postRetroSummary"])
 
 
+class EnvWhenTheModuleCannotDescribeItself(ManagerRouteTestCase):
+    """A module that raises while describing itself is left out of /env, and the
+    log says so: an empty answer is stated, never silent."""
+
+    def test_env_answers_without_the_block_and_writes_one_warn(self):
+        with (
+            mock.patch.object(manager, "communication_env", side_effect=RuntimeError("recipients unreadable")),
+            mock.patch.object(env.log_writer, "write_log") as logged,
+        ):
+            res = self.client.get("/api/env")
+        self.assertEqual(res.status_code, 200)
+        self.assertNotIn("communication", res.json())
+        warns = [c.args for c in logged.call_args_list if c.args[:2] == ("WARN", "agent/env")]
+        self.assertEqual(len(warns), 1, logged.call_args_list)
+        self.assertIn("communication could not describe itself", warns[0][2])
+        self.assertIn("recipients unreadable", warns[0][2])
+
+
 class CommsSendRoute(ManagerRouteTestCase):
     """The route is a wrapper. What it must not do is reach the network when a
     gate says no -- so the engine's transport is asserted untouched."""
