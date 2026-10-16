@@ -6,7 +6,7 @@ import { NARRATION_VOICES, NO_NARRATION_TITLE, VOICE_STORAGE_KEY } from "./narra
 // Where narration audio COMES FROM is the subtlest host divergence in the
 // shared player, and the one a consolidation would regress first:
 //
-//   web (hasApi, the default) — every toggle synthesizes via POST /api/narrate,
+//   An opted-in host (hasApi true; the default is false) — every toggle synthesizes via POST /api/narrate,
 //     and the backend caches the result to disk keyed (deck, slide, voice).
 //     That side effect is load-bearing: it's how voices get baked WHILE UAT
 //     happens, so a deck that's been rehearsed is a deck that's been baked.
@@ -102,23 +102,40 @@ function mountNotes(props?: Parameters<typeof PresenterNotes>[0]) {
 }
 
 describe("PresenterNotes — narration source follows the host facts", () => {
-  it("web (default props): toggling narration synthesizes via /api/narrate", async () => {
-    // Mounted BARE, exactly as web's route does — hasApi defaulting true IS
-    // web's contract, so this test fails if the default ever flips.
+  it("the Toolkit's popout (DeckHost's facts): plays the baked clip, never fetches", async () => {
+    // Mounted the way DeckHost's Notes() mounts it: no service, baked clips.
+    mountNotes({
+      hasApi: false,
+      voices: NARRATION_VOICES,
+      resolveNarrationUrl: (slide, voiceId) => `/voices/fake-deck/${slide.id}-${voiceId}.mp3`,
+    });
+
+    fireEvent.click(screen.getByTitle("Play with narration"));
+
+    await waitFor(() => expect(audioUrls).toEqual([`/voices/fake-deck/s1-${JENNY}.mp3`]));
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("a host that passes nothing gets no fetch: hasApi defaults to false", async () => {
     mountNotes();
+
+    fireEvent.click(screen.getByTitle("Play with narration"));
+    await Promise.resolve();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("an opted-in host (hasApi true): toggling narration synthesizes via /api/narrate", async () => {
+    mountNotes({ hasApi: true });
 
     fireEvent.click(screen.getByTitle("Play with narration"));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("/api/narrate");
-    // (deck, slide, voice) is the backend's bake/cache key — the rehearse-is-
-    // bake side effect depends on all three arriving.
     const body = JSON.parse(String(init.body));
     expect(body.deck).toBe("fake-deck");
     expect(body.slide).toBe("s1");
     expect(body.voice).toBe(JENNY);
-    // The audio that plays is the synthesized response, not a committed file.
     await waitFor(() => expect(audioUrls).toEqual(["blob:narrated"]));
   });
 
