@@ -631,9 +631,10 @@ try {
     Copy-Item (Join-Path $toolkitRoot 'consts.json')         $menuScratch -Force
     Copy-Item (Join-Path $toolkitRoot 'Scripts')             $menuScratch -Recurse -Force
     Copy-Item (Join-Path $toolkitRoot 'Config')              $menuScratch -Recurse -Force
-    @{ quietStart = $true; features = @{ growth = $true; communication = $true } } |
-        ConvertTo-Json -Depth 6 |
-        Set-Content -Path (Join-Path $menuScratch 'config.local.json') -Encoding UTF8
+    # A byte-level write, as the scoring fixture's: Set-Content -Encoding UTF8 into a
+    # folder a scanner may still hold throws "Stream was not readable" under 5.1.
+    $menuLocalJson = @{ quietStart = $true; features = @{ growth = $true; communication = $true } } | ConvertTo-Json -Depth 6
+    [System.IO.File]::WriteAllText((Join-Path $menuScratch 'config.local.json'), $menuLocalJson, (New-Object System.Text.UTF8Encoding $false))
 
     $scratchModule = (Join-Path $menuScratch 'utilities.psm1') -replace "'", "''"
     $onMenu = (& pwsh -NoProfile -Command "Import-Module '$scratchModule' -Force -DisableNameChecking; tkMenu -All" 2>&1 |
@@ -703,7 +704,12 @@ try {
         "$($now.AddDays(-100).ToString('yyyy-MM-ddTHH:mm:ss'))`tCMD`tTESTMENU`t${cfgPrefix}Archive`tok"
         "$($now.AddDays(-1).ToString('yyyy-MM-ddTHH:mm:ss'))`tERR`tTESTMENU`t${cfgPrefix}MyPRs`ttest error"
     )
-    $lines | Set-Content $tempLog -Encoding UTF8
+    # Byte-level writes, here and below: under Windows PowerShell 5.1,
+    # Set-Content -Encoding UTF8 on a file something still holds for a moment
+    # (a scanner, the read just before the rewrite) throws "Stream was not
+    # readable". The log's own writer appends BOM-less UTF-8 the same way.
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($tempLog, (($lines -join "`n") + "`n"), $utf8NoBom)
     $cleanupLog = $true
 
     $scores = Get-P20CommandScores
@@ -739,7 +745,7 @@ try {
         "$($now.AddDays(-1).ToString('yyyy-MM-ddTHH:mm:ss'))`tCMD`tTESTMENU`tagent/prs`t0 PRs"
         "$($now.AddDays(-1).ToString('yyyy-MM-ddTHH:mm:ss'))`tCMD`tTESTMENU`tagent/work-items`t3 items"
     )
-    ($lines + $more) | Set-Content $tempLog -Encoding UTF8
+    [System.IO.File]::WriteAllText($tempLog, ((($lines + $more) -join "`n") + "`n"), $utf8NoBom)
     $bare = Get-P20CommandScores -CommandNames $names -Prefix $cfgPrefix
     # The two Dashboard rows are prefixed: the bare key carries their score, and
     # at least everything the raw (un-normalised) read saw under the prefixed name.
@@ -1357,8 +1363,8 @@ try {
     # The suite table lives beside the runner now; a copy of
     # the runner without it dies before -Help prints a line.
     Copy-Item (Join-Path $toolkitRoot 'Tests/Get-ToolkitSuiteRegistry.ps1') (Join-Path $runnerScratch 'Tests') -Force
-    (@{ quietStart = $true; commandPrefix = 'zz' } | ConvertTo-Json) |
-        Set-Content -Path (Join-Path $runnerScratch 'config.local.json') -Encoding UTF8
+    $runnerLocalJson = @{ quietStart = $true; commandPrefix = 'zz' } | ConvertTo-Json
+    [System.IO.File]::WriteAllText((Join-Path $runnerScratch 'config.local.json'), $runnerLocalJson, (New-Object System.Text.UTF8Encoding $false))
 
     $runnerHelp = (& pwsh -NoProfile -File (Join-Path $runnerScratch 'Tests/Test-Toolkit.ps1') -Help 2>&1 |
         ForEach-Object { $_.ToString() }) -join "`n"

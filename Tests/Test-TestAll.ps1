@@ -521,7 +521,7 @@ try {
     $zeroCols = @()
     if ($zeroLine) { $zeroCols = @($zeroLine -split "`t") }
     Assert-True 'a warn suite is a line in the log, as the word warn, in the same seven columns' ($zeroCols.Count -eq 7 -and $zeroCols[2] -eq 'warn' -and $zeroCols[3] -eq '0' -and $zeroCols[4] -eq '0') "$zeroLine"
-    Assert-True 'the writer did not throw on warn, and nothing said Failed to log' ($warnOut -notmatch 'Cannot validate argument' -and $warnOut -notmatch 'Failed to log') $warnOut
+    Assert-True 'the writer did not throw on warn, and nothing said Failed to log' ($warnOut -notmatch 'Cannot validate argument' -and $warnOut -notmatch 'Failed to log' -and $warnOut -notmatch 'Failed to write') $warnOut
     Assert-True 'a pass line is unchanged' (@($warnLines | Where-Object { $_ -match "`tGreen`tpass`t3`t3`t" }).Count -eq 1)
     Assert-True 'a word that is none of the three is still refused, and not logged' ($warnOut -match 'REFUSED-BAD-WORD' -and @($warnLines | Where-Object { $_ -match "`tBad`t" }).Count -eq 0)
 
