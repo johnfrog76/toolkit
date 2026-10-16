@@ -164,7 +164,18 @@ function Test-IsActionableThread {
     return ($hasFileContext -or $hasHumanComment -or $hasBotReview) -and -not $isSystemThread -and -not $isBuildService
 }
 
+function Find-P20CardForWorkItem {
+    # The cards in a folder that carry exactly this work item id, by the one
+    # card-filename rule (Resolve-CardName.ps1) -- never by substring.
+    param($PromptFiles, [string]$WorkItemId, $Config)
+    $pattern = Get-P20CardIdPattern -WorkItemTypes (Get-P20WorkItemTypes -Config $Config)
+    return @($PromptFiles | Where-Object { (Get-P20CardId -Name $_.Name -Pattern $pattern) -eq $WorkItemId })
+}
+
 if ($Help) { Show-Help }
+
+# The one card-filename rule: the type table and how an id is read from a name.
+. (Join-Path $PSScriptRoot 'Resolve-CardName.ps1')
 
 # The one byte contract for a card this script writes into.
 . (Join-Path $PSScriptRoot 'Write-CardText.ps1')
@@ -512,7 +523,7 @@ try {
                 Write-Host "Linked work item(s): $($workItemIds -join ', ')" -ForegroundColor DarkGray
                 $promptFiles = Get-ChildItem -Path $currentDir -Filter "*.prompt.md" -File
                 foreach ($wiId in $workItemIds) {
-                    $match = $promptFiles | Where-Object { $_.Name -match "(^|[-.])(US-)?$wiId-" -or $_.Name -match "^Task$wiId-" }
+                    $match = Find-P20CardForWorkItem -PromptFiles $promptFiles -WorkItemId ([string]$wiId) -Config $cfg
                     if ($match) {
                         $targetFile = $match[0].FullName
                         Write-Host "Matched prompt file: $($match[0].Name)" -ForegroundColor Green
