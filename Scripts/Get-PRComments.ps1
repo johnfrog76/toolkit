@@ -316,7 +316,7 @@ function Write-P20PRCommentsRecord {
                 "Repository: $Repository"
                 "Comments: $Count"
             )
-            $recordLines -join "`n" | Out-File -FilePath $recordFile -Encoding UTF8 -NoNewline
+            Write-CardText -Path $recordFile -Content ($recordLines -join "`n") -New
             Write-Host "Record written to pr-comments/$($fetchDate)-PR$PullRequestId.md" -ForegroundColor DarkGray
         }
     }
