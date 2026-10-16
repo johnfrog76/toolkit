@@ -1,0 +1,56 @@
+# Code scanning with CodeQL, with its default queries, over the two halves it can
+# read: the web (JavaScript and TypeScript, web/) and the agent (Python, agent/).
+# It runs on every push to main, on every pull request and once a week, so a
+# pattern that only a newly published query recognises is still found in code
+# nobody has touched.
+#
+# PowerShell is not a CodeQL language. The CLI half's scanner is the PSScriptAnalyzer
+# lint step (docs/CONTRIBUTING.md, "Lint"), not this workflow.
+#
+# No secret and no personal token: the default GITHUB_TOKEN, reading the repository
+# and writing the scan's results to the Security tab. On a public repository the
+# CodeQL action needs no further grant (actions: read is required only on a
+# private one, where it lets the upload read the workflow run), so none is asked
+# for. What the workflow runs is docs/TESTING.md, "In CI".
+name: codeql
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "23 4 * * 1"
+
+permissions:
+  contents: read
+
+# A newer push to the same pull request or branch replaces the scan in progress.
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: javascript-typescript
+          - language: python
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"

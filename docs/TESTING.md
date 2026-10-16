@@ -207,9 +207,10 @@ with no Python at all.
 
 ## In CI
 
-Three workflows. `release.yml` runs on a tag push alone: it reads the tag's section out of
+Four workflows. `release.yml` runs on a tag push alone: it reads the tag's section out of
 `CHANGELOG.md` and publishes the GitHub Release with it, refusing a tag with no section, with the
 default token and the one permission a release needs. `pages.yml` deploys the landing page.
+`codeql.yml` runs CodeQL's default queries over the web (JavaScript and TypeScript) and the agent (Python) on every push to `main`, on every pull request and weekly, with `contents: read` and `security-events: write`; PowerShell is not a CodeQL language, and the CLI half's scanner is the PSScriptAnalyzer lint that `docs/CONTRIBUTING.md` ("Lint") names.
 `.github/workflows/verify.yml` has two jobs, an Ubuntu one and a Windows one, and both run on every pull request, on every push to `main`, and from the Actions tab's button.
 
 **On `ubuntu-latest`, the three halves**, in one job: the checkout; Node from `.nvmrc` with npm's cache and `npm ci` in `web/`; Python 3.12 with
