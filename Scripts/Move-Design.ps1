@@ -103,6 +103,7 @@ if (-not (Get-Command Get-CliPrefix -ErrorAction SilentlyContinue)) {
         return ''
     }
 }
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 # Write-CliError normally comes from the module; it is what makes a refusal ONE
 # block. See AGENTS.md, "The refusal contract".
 if (-not (Get-Command Write-CliError -ErrorAction SilentlyContinue)) {
@@ -437,18 +438,46 @@ function Complete-P20Staging {
         Write-Host "Moved. Store is not git (storeSync='$storeSync') -- nothing committed." -ForegroundColor DarkGray
         return
     }
+    $gitFailure = $null
     Push-Location $promptsRoot
     try {
+        # Stage by directory: a moved file's old path is gone from disk, and a
+        # pathspec git no longer knows would fail a per-file add.
+        $dirs = @()
         foreach ($p in $paths) {
             $abs = & $full $p
             $hubRel = $abs.Substring($promptsRoot.TrimEnd('\', '/').Length).TrimStart('\', '/') -replace '\\', '/'
-            git add -A -- $hubRel 2>&1 | Out-Null
+            $dir = Split-Path -Parent $hubRel
+            if (-not $dir) { $dir = '.' }
+            $dirs += ($dir -replace '\\', '/')
         }
-        git commit -m "design: $Summary" 2>&1 | ForEach-Object { Write-Host $_ }
-        if ($LASTEXITCODE -ne 0) { Write-Warning 'Commit failed. Files have been moved but not committed.' }
-        else { Write-Host 'Committed.' -ForegroundColor Green }
+        $dirs = @($dirs | Select-Object -Unique)
+        $add = Invoke-P20TrackerRead 'git' (@('add', '-A', '--') + $dirs)
+        if ($add.Code -ne 0) {
+            $gitFailure = "git add failed: $(@($add.Lines | Where-Object { $_ })[0])"
+        }
+        else {
+            # Nothing staged (the move left no difference git can see) is not a failure.
+            $staged = Invoke-P20TrackerRead 'git' (@('diff', '--cached', '--quiet', '--') + $dirs)
+            if ($staged.Code -eq 0) {
+                Write-Host 'Nothing to commit.' -ForegroundColor DarkGray
+            }
+            else {
+                $commit = Invoke-P20TrackerRead 'git' @('commit', '-m', "design: $Summary")
+                foreach ($line in $commit.Lines) { Write-Host $line }
+                if ($commit.Code -ne 0) {
+                    $gitFailure = "git commit failed: $(@($commit.Lines | Where-Object { $_ })[0])"
+                }
+                else { Write-Host 'Committed.' -ForegroundColor Green }
+            }
+        }
     }
     finally { Pop-Location }
+    if ($gitFailure) {
+        Write-CliError -Message "The design was moved, but it is not committed -- $gitFailure" `
+            -Hint "The files are already moved in the hub. Commit them yourself (git add -A; git commit) or run '$(Get-CliPrefix)Sync'."
+        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+    }
 }
 
 # One voice for what the verb does and what it would do: `Would move ...`
