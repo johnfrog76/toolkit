@@ -20,7 +20,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The tag's section of the changelog: from its "## [x.y.z]" heading to
       # the next "## [" heading. A tag with no section stops here, so a
