@@ -1,7 +1,6 @@
 """The growth module's routes, its gate, and the file-shape contract.
 
-Three claims, and the third is the one that needed a test rather than an
-agreement:
+Three claims:
 
   (a) the routes read and write ``<promptsRoot>/growth``, ``reviews`` and
       ``resume`` -- hub-root folders, resolved from config, never from where
@@ -9,10 +8,11 @@ agreement:
   (b) ``features.growth`` false means the routes are ABSENT: 404, not 403. Off
       means absent is the rule the whole shell is built on, and a 403 would be
       saying something else;
-  (c) the CLI and the agent write the SAME BYTES for the same inputs. Two
-      consumers of one documented file shape do not stay honest by agreeing to;
-      this runs ``New-GrowthItem.ps1`` in a scratch hub, posts the same fields,
-      and compares the files.
+  (c) the reader takes what the writer writes. There is one writer of a growth
+      item, ``NewGrowth`` (the browser runs it through the bridge), so there is
+      no second writer to compare bytes with; what is held here is that a file
+      in the documented shape -- and one made by hand from the template -- reads
+      the way docs/hub/growth.md says.
 
 Run directly:  python3 Tests/test_growth.py
 Under pytest:  python3 -m pytest Tests/
@@ -20,8 +20,6 @@ Under pytest:  python3 -m pytest Tests/
 
 import json
 import os
-import shutil
-import subprocess
 import sys
 import tempfile
 import unittest
@@ -42,7 +40,6 @@ except Exception as e:  # pragma: no cover - environment without the deps
     skip_module(f"cannot import the app ({type(e).__name__}: {e})")
 
 FIXTURE_HUB = PKG_ROOT / "Tests" / "fixtures" / "hub"
-NEW_GROWTH = PKG_ROOT / "Scripts" / "New-GrowthItem.ps1"
 
 
 def _client(hub: Path, *, growth: bool = True, extra_default: dict | None = None):
@@ -314,17 +311,6 @@ class FlagOffTests(_RoutesCase):
     def test_the_write_routes_are_404_too(self):
         self.assertEqual(
             self.client.post(
-                "/api/growth",
-                json={
-                    "type": "goal",
-                    "title": "x",
-                    "date": "2026-01-01",
-                },
-            ).status_code,
-            404,
-        )
-        self.assertEqual(
-            self.client.post(
                 "/api/review/generate",
                 json={
                     "start_date": "2026-04-01",
@@ -364,88 +350,6 @@ class FlagOffTests(_RoutesCase):
 # ---------------------------------------------------------------------------
 
 
-class GrowthCreateTests(unittest.TestCase):
-    def setUp(self):
-        self._hub = tempfile.TemporaryDirectory()
-        self.hub = Path(self._hub.name)
-        self.client, self._patches, self._tmp = _client(self.hub)
-
-    def tearDown(self):
-        for p in reversed(self._patches):
-            p.stop()
-        self._tmp.cleanup()
-        self._hub.cleanup()
-
-    def test_creates_a_training_and_names_it_by_type_date_and_slug(self):
-        r = self.client.post(
-            "/api/growth",
-            json={
-                "type": "training",
-                "title": "Clean Architecture",
-                "date": "2026-03-02",
-                "due_date": "2026-04-30",
-            },
-        )
-        self.assertEqual(r.status_code, 200, r.text)
-        self.assertEqual(r.json()["filename"], "training-2026-03-02-clean-architecture.prompt.md")
-        self.assertTrue((self.hub / "growth/current" / r.json()["filename"]).exists())
-
-    def test_a_goal_is_dated_by_year(self):
-        r = self.client.post(
-            "/api/growth",
-            json={
-                "type": "goal",
-                "title": "Improve test coverage patterns",
-                "date": "2026-01-01",
-            },
-        )
-        self.assertEqual(r.json()["filename"], "goal-2026-improve-test-coverage-patterns.prompt.md")
-
-    def test_the_new_file_is_immediately_listed(self):
-        self.client.post(
-            "/api/growth",
-            json={
-                "type": "goal",
-                "title": "Read more code",
-                "date": "2026-02-01",
-            },
-        )
-        titles = [i["title"] for i in self.client.get("/api/growth").json()["items"]]
-        self.assertIn("Read more code", titles)
-
-    def test_writing_over_an_existing_file_is_refused(self):
-        body = {"type": "goal", "title": "Read more code", "date": "2026-02-01"}
-        self.assertEqual(self.client.post("/api/growth", json=body).status_code, 200)
-        self.assertEqual(self.client.post("/api/growth", json=body).status_code, 409)
-
-    def test_a_training_must_say_when_it_is_due(self):
-        r = self.client.post(
-            "/api/growth",
-            json={
-                "type": "training",
-                "title": "Something",
-                "date": "2026-03-02",
-            },
-        )
-        self.assertEqual(r.status_code, 400)
-        self.assertIn("due_date", r.json()["detail"])
-
-    def test_a_type_this_module_does_not_have_is_refused(self):
-        r = self.client.post(
-            "/api/growth",
-            json={
-                "type": "podcast",
-                "title": "Something",
-                "date": "2026-03-02",
-            },
-        )
-        self.assertEqual(r.status_code, 400)
-
-    def test_a_date_that_is_not_a_date_is_refused(self):
-        r = self.client.post("/api/growth", json={"type": "goal", "title": "Something", "date": "March"})
-        self.assertEqual(r.status_code, 400)
-
-
 class HeadingReaderTests(unittest.TestCase):
     """A heading's value is the first VALUE line under it, not the first
     non-empty one. Two fixtures the reader used to misread:
@@ -469,18 +373,22 @@ class HeadingReaderTests(unittest.TestCase):
     def _items(self) -> dict:
         return {i["filename"]: i for i in self.client.get("/api/growth").json()["items"]}
 
+    # What ``NewGrowth -Type training -Title "No Provider Yet" -Date 2026-03-02
+    # -DueDate 2026-04-30`` writes (Scripts/New-GrowthItem.ps1): the provider's
+    # heading is followed by an empty line and then the writer's ``---``.
+    NO_PROVIDER = (
+        "# Training Artifact\n\n---\n\n## Title\n\nNo Provider Yet\n\n## Type\n\nVoluntary\n\n"
+        "## Date(s)\n\n2026-03-02 to 2026-04-30\n\n## Hours\n\nTBD\n\n## Provider\n\n\n\n---\n\n"
+        "## Description\n\n\n\n---\n\n## Status\n\nNot Started\n\n## Key Takeaways\n\n-\n-\n-\n\n---\n\n"
+        "## Outcome\n\n- **Completed**: No\n- **Certificate / badge**:\n- **Applied to work**:\n"
+    )
+
     def test_an_empty_provider_is_none_not_the_separator(self):
-        r = self.client.post(
-            "/api/growth",
-            json={
-                "type": "training",
-                "title": "No Provider Yet",
-                "date": "2026-03-02",
-                "due_date": "2026-04-30",
-            },
-        )
-        self.assertEqual(r.status_code, 200, r.text)
-        item = self._items()[r.json()["filename"]]
+        folder = self.hub / "growth" / "current"
+        folder.mkdir(parents=True, exist_ok=True)
+        name = "training-2026-03-02-no-provider-yet.prompt.md"
+        (folder / name).write_bytes(self.NO_PROVIDER.encode("utf-8"))
+        item = self._items()[name]
         self.assertIsNone(item["provider"], item)
         # The rest of the file is still read: the separator was skipped, not
         # the section boundary.
@@ -534,137 +442,10 @@ class HeadingReaderTests(unittest.TestCase):
         self.assertIs(manager_reader, growth_reader)
 
 
-@unittest.skipIf(shutil.which("pwsh") is None, "pwsh is not on this machine")
-class CliParityTests(unittest.TestCase):
-    """The CLI and the agent write the same bytes for the same inputs.
+class DocumentedShapeTests(unittest.TestCase):
+    """docs/hub/growth.md is the contract for a growth file's shape."""
 
-    Not "the same headings" or "the same fields": the same bytes, because the
-    file IS the record and a person reads it in an editor. Line endings, the
-    trailing newline and the absence of a BOM are all part of the shape.
-    """
-
-    CASES = [
-        (
-            "training",
-            {
-                "type": "training",
-                "title": "Clean Architecture",
-                "date": "2026-03-02",
-                "due_date": "2026-04-30",
-                "provider": "Internal Academy",
-                "hours": "8",
-                "notes": "Boundaries, and which ones are worth the indirection.",
-            },
-            [
-                "-Type",
-                "training",
-                "-Title",
-                "Clean Architecture",
-                "-Date",
-                "2026-03-02",
-                "-DueDate",
-                "2026-04-30",
-                "-Provider",
-                "Internal Academy",
-                "-Hours",
-                "8",
-                "-Notes",
-                "Boundaries, and which ones are worth the indirection.",
-            ],
-        ),
-        (
-            "presentation",
-            {
-                "type": "presentation",
-                "title": "Designing for Non-Determinism",
-                "date": "2026-05-14",
-                "notes": "Testing systems whose answers are allowed to differ.",
-            },
-            [
-                "-Type",
-                "presentation",
-                "-Title",
-                "Designing for Non-Determinism",
-                "-Date",
-                "2026-05-14",
-                "-Notes",
-                "Testing systems whose answers are allowed to differ.",
-            ],
-        ),
-        (
-            "goal",
-            {
-                "type": "goal",
-                "title": "Improve test coverage patterns",
-                "date": "2026-01-01",
-                "due_date": "2026-12-31",
-                "notes": "Make the suites say something about behaviour.",
-            },
-            [
-                "-Type",
-                "goal",
-                "-Title",
-                "Improve test coverage patterns",
-                "-Date",
-                "2026-01-01",
-                "-DueDate",
-                "2026-12-31",
-                "-Notes",
-                "Make the suites say something about behaviour.",
-            ],
-        ),
-    ]
-
-    def test_the_two_consumers_write_identical_files(self):
-        # Whose name goes on a presentation comes from config, and the two
-        # halves must be reading the SAME config for that -- so the agent is
-        # told what the CLI will resolve rather than a value invented here.
-        branch_user = (config.load_config().get("branchUser") or "").strip()
-
-        for label, payload, cli_args in self.CASES:
-            with (
-                self.subTest(type=label),
-                tempfile.TemporaryDirectory() as cli_hub,
-                tempfile.TemporaryDirectory() as api_hub,
-            ):
-                env = {**os.environ, "PROMPTS_ROOT": cli_hub, "TOOLKIT_QUIET_STARTUP": "1"}
-                run = subprocess.run(
-                    ["pwsh", "-NoProfile", "-File", str(NEW_GROWTH), *cli_args],
-                    capture_output=True,
-                    text=True,
-                    timeout=120,
-                    env=env,
-                    check=False,
-                )
-                self.assertEqual(run.returncode, 0, run.stderr or run.stdout)
-
-                client, patches, tmp = _client(Path(api_hub), extra_default={"branchUser": branch_user})
-                try:
-                    r = client.post("/api/growth", json=payload)
-                    self.assertEqual(r.status_code, 200, r.text)
-                    api_name = r.json()["filename"]
-                finally:
-                    for p in reversed(patches):
-                        p.stop()
-                    tmp.cleanup()
-
-                cli_files = sorted((Path(cli_hub) / "growth/current").iterdir())
-                self.assertEqual(len(cli_files), 1, cli_files)
-                self.assertEqual(cli_files[0].name, api_name)
-
-                cli_bytes = cli_files[0].read_bytes()
-                api_bytes = (Path(api_hub) / "growth/current" / api_name).read_bytes()
-                self.assertEqual(
-                    cli_bytes.decode("utf-8"),
-                    api_bytes.decode("utf-8"),
-                    f"{label}: the CLI and the agent disagree about the file shape",
-                )
-                self.assertEqual(cli_bytes, api_bytes, f"{label}: same text, different bytes")
-                self.assertFalse(cli_bytes.startswith(b"\xef\xbb\xbf"), "a BOM crept in")
-                self.assertNotIn(b"\r\n", cli_bytes, "CRLF crept in")
-                self.assertTrue(cli_bytes.endswith(b"\n"), "no trailing newline")
-
-    def test_the_documented_shape_is_what_both_of_them_write(self):
+    def test_the_fixture_files_use_only_documented_headings(self):
         # docs/hub/growth.md is the contract, and a reader has to be able to
         # find the headings it names in a real file.
         doc = (PKG_ROOT / "docs" / "hub" / "growth.md").read_text(encoding="utf-8")

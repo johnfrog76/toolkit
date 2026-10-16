@@ -23,7 +23,7 @@ jest.mock("./api.growth", () => ({
     isError: false,
     refetch: jest.fn(),
   }),
-  useCreateGrowthMutation: () => [jest.fn(), { isLoading: false }],
+  useRunNewGrowthMutation: () => [jest.fn(), { isLoading: false }],
   useGetEngagementReviewsQuery: () => ({
     data: [],
     isLoading: false,

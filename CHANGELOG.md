@@ -12,6 +12,10 @@ release.
 
 - CodeQL scans the web and the agent on every push to main, every pull request and weekly.
 
+### Changed
+
+- Creating a training, presentation or goal from the browser now runs the same command the terminal does, so both write the same file; a refusal shows the command's own message in the dialog.
+
 ### Fixed
 
 - Play with narration in a deck's notes window now plays the baked voice clips instead of failing.

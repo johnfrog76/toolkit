@@ -139,6 +139,55 @@ export function buildGrowthCloseParams(fields: { file: string }): string[] {
   return ["-Close", fields.file];
 }
 
+/** The New Growth Item dialog's fields. Named for the CLI parameters they feed. */
+export interface NewGrowthFields {
+  type: "training" | "presentation" | "goal";
+  title: string;
+  /** YYYY-MM-DD: a training's start, a talk's day, a goal's year. */
+  date: string;
+  /** YYYY-MM-DD; the verb refuses a training without one. */
+  dueDate?: string;
+  provider?: string;
+  hours?: string;
+  notes?: string;
+}
+
+/**
+ * argv for `POST /cmd/NewGrowth` -> `Scripts/New-GrowthItem.ps1`: a new
+ * training, presentation or goal in growth/current/, written by the verb the
+ * terminal types, so the browser and the CLI make one file with one writer.
+ *
+ * Flag/value pairs in the order the `param()` block declares them: Type, Title,
+ * Date, DueDate, Provider, Hours, Notes. Only what was given goes on the line --
+ * an empty field is omitted, so the verb's own default stands (`TBD` hours, no
+ * provider). The verb checks every value again and refuses in its own words.
+ */
+export function buildNewGrowthParams(fields: NewGrowthFields): string[] {
+  const params = ["-Type", fields.type, "-Title", fields.title.trim()];
+  if (fields.date.trim()) params.push("-Date", fields.date.trim());
+  if (fields.dueDate?.trim()) params.push("-DueDate", fields.dueDate.trim());
+  if (fields.provider?.trim()) params.push("-Provider", fields.provider.trim());
+  if (fields.hours?.trim()) params.push("-Hours", fields.hours.trim());
+  if (fields.notes?.trim()) params.push("-Notes", fields.notes.trim());
+  return params;
+}
+
+/**
+ * The file name on a verb's `FILE: <path>` line, or null when it printed none.
+ * `NewGrowth` ends both "Created" and "Already there" with that line; the path
+ * is the agent machine's, so either separator ends the folder part.
+ */
+export function fileFromCommandOutput(output: string | null | undefined): string | null {
+  const line = (output ?? "")
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("FILE:"))
+    .pop();
+  if (!line) return null;
+  const name = line.slice("FILE:".length).trim().split(/[\\/]/).pop() ?? "";
+  return name || null;
+}
+
 /** `NewDesign` (the Studio add-on): a note in the hub's design/. Only what was
  *  given goes on the line -- a note may have no description and name no Space. */
 export interface NewDesignFields {

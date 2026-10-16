@@ -135,6 +135,9 @@ class DeliberatelyAbsentRoutes(unittest.TestCase):
     """The routes app.py's docstring and agent/README.md's "Deliberately absent"
     table name: each is 404 and out of the OpenAPI schema. The two engagement
     reads joined the list with no caller left in web/src.
+
+    ``POST /growth`` is absent beside a ``GET /growth`` that is not, so its
+    path is answered with a 405 rather than a 404: the METHOD is what is gone.
     """
 
     ABSENT = [
@@ -143,7 +146,11 @@ class DeliberatelyAbsentRoutes(unittest.TestCase):
         ("post", "/resolve-bug"),
         ("get", "/engagement/test/activity"),
         ("get", "/engagement/test/billing-timeline"),
+        ("post", "/growth"),
     ]
+
+    # A path that keeps another method answers 405 for the one that went.
+    SIBLING_KEPT = {"/growth"}
 
     def setUp(self):
         self.app = app_module.create_app(None)
@@ -153,16 +160,18 @@ class DeliberatelyAbsentRoutes(unittest.TestCase):
         for method, path in self.ABSENT:
             with self.subTest(path=path):
                 r = self.client.request(method.upper(), f"{API_PREFIX}{path}", json={})
-                self.assertEqual(r.status_code, 404, r.text)
+                expected = 405 if path in self.SIBLING_KEPT else 404
+                self.assertEqual(r.status_code, expected, r.text)
 
     def test_none_is_in_the_schema(self):
-        paths = set(self.app.openapi()["paths"])
-        for _method, path in self.ABSENT:
+        paths = self.app.openapi()["paths"]
+        for method, path in self.ABSENT:
             with self.subTest(path=path):
                 template = path.replace("/test/", "/{slug}/")
-                self.assertNotIn(f"{API_PREFIX}{template}", paths)
+                self.assertNotIn(method, paths.get(f"{API_PREFIX}{template}", {}))
         # And the siblings that stayed are still there, so the check is not vacuous.
         self.assertIn(f"{API_PREFIX}/engagement/{{slug}}/summary", paths)
+        self.assertIn("get", paths[f"{API_PREFIX}/growth"])
 
 
 class NoClientDirTests(unittest.TestCase):

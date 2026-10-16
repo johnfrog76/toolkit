@@ -55,16 +55,6 @@ export interface GrowthDetailResponse {
   content: string;
 }
 
-export interface CreateGrowthRequest {
-  type: GrowthType;
-  title: string;
-  date: string;
-  due_date?: string;
-  provider?: string;
-  hours?: string;
-  notes?: string;
-}
-
 export interface ResumeResponse {
   content: string;
   last_modified: string | null;
@@ -157,16 +147,12 @@ export const growthEndpoints = growthApi.injectEndpoints({
       keepUnusedDataFor: CACHE_TTL,
     }),
 
-    // POST /api/growth
-    createGrowth: builder.mutation<GrowthDetailResponse, CreateGrowthRequest>({
-      query: (body) => ({ url: "growth", method: "POST", body }),
-      invalidatesTags: ["Growth"],
-    }),
-
-    // POST /api/cmd/NewGrowth -- the one write here that moves a file goes the
-    // way every other write in the app goes: the CLI verb runs, in a child pwsh,
-    // and this page only asks. `-Close <file>` retires an item to growth/archive/
-    // and stamps it; the argv is `buildGrowthCloseParams` (../ado/cliBridge.ts).
+    // POST /api/cmd/NewGrowth -- every growth write goes the way every other
+    // write in the app goes: the CLI verb runs, in a child pwsh, and this page
+    // only asks. A new item is `buildNewGrowthParams`; `-Close <file>` retires
+    // one to growth/archive/ and stamps it, `buildGrowthCloseParams`
+    // (../ado/cliBridge.ts). There is no native create: the verb is the one
+    // writer, so the browser and the terminal write the same file.
     runNewGrowth: builder.mutation<CommandResponse, { params: string[] }>({
       query: ({ params }) => ({ url: "cmd/NewGrowth", method: "POST", body: { params } }),
       invalidatesTags: ["Growth"],
@@ -219,7 +205,6 @@ export const growthEndpoints = growthApi.injectEndpoints({
 export const {
   useGetGrowthQuery,
   useGetGrowthDetailQuery,
-  useCreateGrowthMutation,
   useRunNewGrowthMutation,
   useGetResumeQuery,
   useGetResumePreviewQuery,

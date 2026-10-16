@@ -31,7 +31,12 @@ import { PageCard } from "../../shared/PageCard";
 import { CreateButton } from "../../shared/CreateButton";
 import { Pagination } from "../../shared/Pagination";
 import { usePagination } from "../../hooks/usePagination";
-import { useGetGrowthQuery, useCreateGrowthMutation } from "./api.growth";
+import { useGetGrowthQuery, useRunNewGrowthMutation } from "./api.growth";
+import {
+  buildNewGrowthParams,
+  commandResultMessage,
+  fileFromCommandOutput,
+} from "../ado/cliBridge";
 import type { GrowthItem, GrowthType } from "./api.growth";
 import { TargetArrowRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
@@ -184,7 +189,10 @@ export function Goals() {
   const styles = useStyles();
   const navigate = useNavigate();
   const { data, isLoading, isFetching, isError, refetch } = useGetGrowthQuery();
-  const [createGrowth, { isLoading: creating }] = useCreateGrowthMutation();
+  const [runNewGrowth, { isLoading: creating }] = useRunNewGrowthMutation();
+  // What the verb said when it did not make a new item: a refusal in its own
+  // words, or "Already there" for an item growth/current/ already holds.
+  const [createMessage, setCreateMessage] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newType, setNewType] = useState<GrowthType>("training");
@@ -217,23 +225,40 @@ export function Goals() {
     setNewProvider("");
     setNewHours("");
     setNewNotes("");
+    setCreateMessage(null);
   };
 
+  // `NewGrowth` through the bridge: the verb the terminal types writes the
+  // file, and its answer is a CommandResponse, not the item -- so the new
+  // item's name comes off the verb's `FILE:` line. An item that was already in
+  // the list before the call is the verb's "Already there": nothing was
+  // written, so the dialog stays open and says so rather than opening it.
   const handleSubmit = async () => {
+    setCreateMessage(null);
+    const before = new Set(allItems.map((i) => i.filename));
     try {
-      const result = await createGrowth({
-        type: newType,
-        title: newTitle.trim(),
-        date: newDate,
-        due_date: newDueDate || undefined,
-        provider: newProvider.trim() || undefined,
-        hours: newHours.trim() || undefined,
-        notes: newNotes.trim() || undefined,
+      const result = await runNewGrowth({
+        params: buildNewGrowthParams({
+          type: newType,
+          title: newTitle,
+          date: newDate,
+          dueDate: newDueDate,
+          provider: newProvider,
+          hours: newHours,
+          notes: newNotes,
+        }),
       }).unwrap();
+      const filename = result.status === "success" ? fileFromCommandOutput(result.output) : null;
+      if (!filename || before.has(filename)) {
+        setCreateMessage(commandResultMessage(result, "Nothing was written."));
+        return;
+      }
       setDialogOpen(false);
       resetDialog();
-      navigate(`/growth/goals/${encodeURIComponent(result.filename)}`);
-    } catch {}
+      navigate(`/growth/goals/${encodeURIComponent(filename)}`);
+    } catch {
+      setCreateMessage("Could not reach the agent. Nothing was written.");
+    }
   };
 
   const filterLabel: Record<StatusFilter, string> = {
@@ -424,6 +449,14 @@ export function Goals() {
                     }
                   />
                 </Field>
+                {createMessage && (
+                  <Caption1
+                    role="alert"
+                    style={{ color: tokens.colorPaletteRedForeground1, whiteSpace: "pre-wrap" }}
+                  >
+                    {createMessage}
+                  </Caption1>
+                )}
               </div>
             </DialogContent>
             <DialogActions>
