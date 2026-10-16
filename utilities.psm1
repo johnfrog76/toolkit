@@ -50,7 +50,7 @@ function global:Write-ToolkitLog {
     $entry = "$timestamp`t$Type`t$machine`t$safeSource`t$safeDetail"
     $logPath = Join-Path (Get-P20ToolkitLogDir) "usage.$machine.log"
     try {
-        [System.IO.File]::AppendAllText($logPath, "$entry`n", [System.Text.Encoding]::UTF8)
+        [System.IO.File]::AppendAllText($logPath, "$entry`n", (New-Object System.Text.UTF8Encoding $false))
     }
     catch {
         Write-Warning "Failed to write to usage.$machine.log: $_"

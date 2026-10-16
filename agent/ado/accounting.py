@@ -1141,7 +1141,7 @@ def _get_repo_health() -> RepoHealth:
         cutoff = time.time() - 86400  # 24 hours ago
         for log_file in REPO_ROOT.glob("usage.*.log"):
             try:
-                for line in log_file.read_text(encoding="utf-8", errors="replace").splitlines():
+                for line in log_file.read_text(encoding="utf-8-sig", errors="replace").splitlines():
                     parts = line.split("\t")
                     if len(parts) >= 2 and parts[1] == "ERR":
                         try:
