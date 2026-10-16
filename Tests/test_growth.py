@@ -525,6 +525,14 @@ class HeadingReaderTests(unittest.TestCase):
         self.assertIsNone(_heading_value(lines, "provider"))
         self.assertEqual(_heading_value(lines, "description"), "Not the provider.")
 
+    def test_a_manager_session_stage_skips_a_comment_under_its_heading(self):
+        from agent.communication.manager import _heading_value as manager_reader
+        from agent.growth.growth import _heading_value as growth_reader
+
+        lines = ["## Stage", "<!-- draft, sent or closed -->", "draft", "", "## Agenda"]
+        self.assertEqual(manager_reader(lines, "stage"), "draft")
+        self.assertIs(manager_reader, growth_reader)
+
 
 @unittest.skipIf(shutil.which("pwsh") is None, "pwsh is not on this machine")
 class CliParityTests(unittest.TestCase):

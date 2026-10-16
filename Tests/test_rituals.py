@@ -38,6 +38,7 @@ try:
     from agent.core import config
     from agent.core import consts as C
     from agent.solitaire import standup
+    from agent.solitaire import tracker as solitaire_tracker
 except Exception as e:  # pragma: no cover - environment without the deps
     skip_module(f"cannot import the app ({type(e).__name__}: {e})")
 
@@ -945,7 +946,7 @@ class TheRoute(unittest.TestCase):
             return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(issues), stderr="")
 
         with (
-            mock.patch.object(standup, "_resolve_tier", return_value=(tier, True)),
+            mock.patch.object(solitaire_tracker, "_resolve_tier", return_value=(tier, True)),
             mock.patch.object(standup, "_now", return_value=datetime.fromisoformat(fx["asOf"])),
             mock.patch.object(accounting.subprocess, "run", side_effect=fake_run),
             mock.patch.object(standup.model, "complete", complete),
@@ -1087,7 +1088,7 @@ class TheRoute(unittest.TestCase):
     def _get_windows(self, path: str, run):
         fx = CASES["friday"]
         with (
-            mock.patch.object(standup, "_resolve_tier", return_value=(1, True)),
+            mock.patch.object(solitaire_tracker, "_resolve_tier", return_value=(1, True)),
             mock.patch.object(standup, "_now", return_value=datetime.fromisoformat(fx["asOf"])),
             mock.patch.object(accounting.subprocess, "run", side_effect=run),
         ):

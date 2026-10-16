@@ -59,7 +59,7 @@ from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from ..ado import accounting
 from ..core import log_writer, model
-from ..core.config import API_PREFIX, REPO_ROOT, load_config, org_folder, tracker, tracker_repos
+from ..core.config import API_PREFIX, REPO_ROOT, load_config, org_folder, tracker
 from ..core.consts import (
     folder_archive,
     folder_current,
@@ -86,7 +86,7 @@ from ..core.consts import (
     status_in_progress,
 )
 from ..core.parsers import _parse_status_metadata, card_id
-from ..core.tier import _resolve_tier
+from .tracker import read_tracker
 
 FEATURE = "solitaireAgile"
 CEREMONY = "standup"
@@ -1271,41 +1271,6 @@ def render_brief(filled: Standup) -> str:
 
 # -- The gh layer -------------------------------------------------------------
 
-NOT_GITHUB_REASON = "This Space's tracker is not GitHub -- the standup reads a GitHub Space's issues."
-NO_REPO_REASON = "This GitHub space names no repository."
-
-
-def _read_tracker(org: str, status: str, projects: list[dict]) -> tuple[list[dict], list[dict], dict]:
-    """(labels, issues, tracker state) for a Space. Never raises: a failure is a reason.
-
-    Any repo that fails fails the whole read: a standup over half the repos would
-    say "no blockers" when it does not know (principle 2).
-    """
-    if tracker(org) != "github":
-        return [], [], {"ok": False, "reason": NOT_GITHUB_REASON}
-    tier, _ = _resolve_tier(org, status)
-    if tier != 1:
-        return [], [], {"ok": False, "reason": f"The tracker is not reachable from here (tier {tier})."}
-    repos = tracker_repos(org, projects)
-    if not repos:
-        return [], [], {"ok": False, "reason": NO_REPO_REASON}
-    labels: dict[str, dict] = {}
-    issues: list[dict] = []
-    try:
-        for repo in repos:
-            rows, why = accounting._gh_labels(repo)
-            if why:
-                return [], [], {"ok": False, "reason": why}
-            for r in rows:
-                labels.setdefault(str(r.get("name", "")), r)
-            rows, why = accounting._gh_issues(repo, True, "all", body=True)
-            if why:
-                return [], [], {"ok": False, "reason": why}
-            issues += rows
-    except Exception as exc:  # noqa: BLE001 -- a reader that raised is a tracker that did not answer
-        return [], [], {"ok": False, "reason": f"The tracker read failed: {exc.__class__.__name__}: {exc}"}
-    return list(labels.values()), issues, {"ok": True, "reason": ""}
-
 
 def _now() -> datetime:
     """The local clock, offset-aware, to the second -- one seam for the tests."""
@@ -1327,17 +1292,17 @@ def standup_for(space: str = "", as_of: datetime | None = None) -> Standup:
     source, reason = standup_source(org, status)
     if source == "cards":
         # Imported here, not at the top: status.py is the ledger route's module.
-        from ..ado.status import _card_types
+        from ..core.config import card_types
 
         entry = _space_entry(cfg, space)
-        type_names, prefixes = _card_types()
+        type_names, prefixes = card_types()
         cards = read_cards(org_folder(entry), type_names, prefixes)
         filled = fill_cards_standup(now, cards, space=slug, space_name=str(entry.get("name") or ""))
     else:
         if source == "none":
             labels, issues, state = [], [], {"ok": False, "reason": reason}
         else:
-            labels, issues, state = _read_tracker(org, status, projects)
+            labels, issues, state = read_tracker(org, status, projects, state="all", body=True)
         filled = fill_standup(now, labels, issues, state, space=slug)
     filled.text = render_standup(filled)
     filled.work.text = render_work(filled)

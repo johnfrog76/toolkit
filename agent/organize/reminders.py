@@ -28,7 +28,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from ..core.config import hub_folder, load_config, resolve_dirs
+from ..core.config import card_types, hub_folder, load_config, resolve_dirs
 from ..core.consts import (
     card_id_shape,
     folder_archive,
@@ -158,18 +158,10 @@ def ref_card_id(ref: str) -> str | None:
     return card_id(f"{ref}-")
 
 
-def _card_types() -> tuple[list[str], list[str]]:
-    """(type names, file prefixes) from ``workItemTypes`` -- read per request,
-    as the status route reads them, so a type a team adds needs no restart."""
-    types = load_config().get("workItemTypes", {}) or {}
-    names = [n for n in types if not n.startswith("_")]
-    return names, [str((types[n] or {}).get("filePrefix") or "") for n in names]
-
-
 def card_index() -> dict[str, ReminderCard]:
     """Every card id in the active Space, to the card it names. ``current/``
     wins over ``archive/``: a card that came back is the one being worked."""
-    names, prefixes = _card_types()
+    names, prefixes = card_types()
     found: dict[str, ReminderCard] = {}
     for folder, label in zip(resolve_dirs(), (folder_current(), folder_archive())):
         if not folder.is_dir():

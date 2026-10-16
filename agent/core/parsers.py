@@ -239,3 +239,40 @@ def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES) -> dict
         "commits": commits,
         "status": prompt_status,
     }
+
+
+def _heading_value(lines: list[str], heading: str) -> str | None:
+    """The first line of VALUE under a ``## Heading``, or None.
+
+    Not the first non-empty line: the section ends at the next ``##``, and two
+    kinds of line inside it are not values. The writer puts ``---`` between
+    groups of headings and writes every heading even when it is empty, so a
+    training with no provider used to read its provider as ``---``; and a file
+    made by hand from ``templates/Training.template.md`` keeps the template's
+    ``<!-- ... -->`` hints, which used to be read as its title, date and status.
+    docs/hub/growth.md promises that a template-made file reads the same as a
+    generated one, and this is where that promise is kept.
+    """
+    needle = heading.lower()
+    found = False
+    in_comment = False
+    for line in lines:
+        stripped = line.strip()
+        if not found:
+            if stripped.lower().startswith("## ") and stripped[3:].strip().lower() == needle:
+                found = True
+            continue
+        if in_comment:
+            if "-->" in stripped:
+                in_comment = False
+            continue
+        if stripped.startswith("##"):
+            return None  # the next heading -- the section was empty
+        if not stripped or stripped == "---":
+            continue
+        if stripped.startswith("<!--"):
+            if "-->" not in stripped:
+                in_comment = True
+            continue
+        return stripped
+    return None
