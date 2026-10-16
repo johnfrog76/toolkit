@@ -34,6 +34,7 @@
 #>
 
 . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 
 # The states of a work item that mean the work is over, across the process
 # templates Agile, Scrum, Basic and CMMI use. Only this half reads them (the
@@ -46,13 +47,12 @@ function Get-P20WorkItemRecord {
         [Parameter(Mandatory = $true)][string]$Org
     )
     $result = [pscustomobject]@{ Ok = $false; Item = $null; State = ''; Raw = ''; Error = '' }
-    $all = @(az boards work-item show --id $Id --org $Org --output json 2>&1)
-    $code = $LASTEXITCODE
+    $read = Invoke-P20TrackerRead 'az' @('boards', 'work-item', 'show', '--id', $Id, '--org', $Org, '--output', 'json')
+    $code = $read.Code
     # stdout and stderr are told apart: a WARNING on stderr must not reach the
     # JSON parser, and an error's text is what the caller's hint quotes.
-    $errText = @($all | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] } | ForEach-Object { "$_" })
-    $out = @($all | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] } |
-            Where-Object { "$_" -notmatch '^WARNING:' } | ForEach-Object { "$_" })
+    $errText = @($read.Err)
+    $out = @($read.Out | Where-Object { "$_" -notmatch '^WARNING:' })
     $result.Raw = $out -join "`n"
     if ($code -ne 0 -or -not $result.Raw.Trim()) {
         $said = (@($errText) + @($out)) -join ' '

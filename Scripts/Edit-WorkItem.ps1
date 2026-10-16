@@ -111,6 +111,7 @@ $org = $cfg.Org
 
 # -- The tracker seam ----------------------------------------------------------
 . (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
     $repoAnswer = Resolve-P20TrackerRepo -OrgUrl $org -Projects $cfg.Projects -CliPrefix (Get-CliPrefix)
     if (-not $repoAnswer.Repo) {
@@ -120,8 +121,9 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
     $repoFull = $repoAnswer.Repo
 
     # Name the target before touching it -- the near-miss rule.
-    $raw = gh issue view $Id --repo $repoFull --json 'title,state,url' 2>$null
-    if ($LASTEXITCODE -ne 0 -or -not $raw) {
+    $viewRead = Invoke-P20TrackerRead 'gh' @('issue', 'view', "$Id", '--repo', $repoFull, '--json', 'title,state,url')
+    $raw = $viewRead.Out
+    if ($viewRead.Code -ne 0 -or -not ($raw -join '').Trim()) {
         Write-CliError -Message "Could not fetch issue $Id from $repoFull." `
             -Hint 'Check the number and that gh is signed in (gh auth status).'
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
@@ -152,8 +154,9 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
     }
 
     if ($editAsked.Count -gt 0) {
-        $out = gh @ghArgs 2>&1
-        if ($LASTEXITCODE -ne 0) {
+        $editRead = Invoke-P20TrackerRead 'gh' $ghArgs
+        $out = $editRead.Lines
+        if ($editRead.Code -ne 0) {
             Write-CliError -Message "Failed to edit issue ${Id}: $(@($out) -join ' ')" `
                 -Hint "A label or milestone must already exist on $repoFull."
             exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
@@ -161,8 +164,9 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
     }
     if ($Pin -or $Unpin) {
         $pinVerb = if ($Pin) { 'pin' } else { 'unpin' }
-        $out = gh issue $pinVerb "$Id" --repo $repoFull 2>&1
-        if ($LASTEXITCODE -ne 0) {
+        $pinRead = Invoke-P20TrackerRead 'gh' @('issue', $pinVerb, "$Id", '--repo', $repoFull)
+        $out = $pinRead.Lines
+        if ($pinRead.Code -ne 0) {
             $said = @($out) -join ' '
             # GitHub pins three issues per repository and refuses a fourth; the
             # tracker's refusal is said in the product's own sentence.
@@ -245,8 +249,9 @@ if ($WhatIf) {
 }
 
 Write-Host "[*] Editing work item $Id..." -ForegroundColor Cyan
-$out = az @updateArgs 2>&1
-if ($LASTEXITCODE -ne 0) {
+$updateRead = Invoke-P20TrackerRead 'az' $updateArgs
+$out = $updateRead.Lines
+if ($updateRead.Code -ne 0) {
     Write-CliError -Message "Failed to edit work item ${Id}." -Hint "az said: $(@($out) -join ' ' | Select-Object -First 1)"
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }

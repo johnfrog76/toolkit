@@ -1134,8 +1134,12 @@ function script:Resolve-InvokedCommand {
         if ($global:P20Config -and $global:P20Config.Email) { $email = $global:P20Config.Email }
         if ([string]::IsNullOrWhiteSpace($email)) {
             try {
-                $probe = az account show --query user.name -o tsv 2>$null
-                if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($probe)) {
+                # The one way to call az (Scripts/Invoke-TrackerRead.ps1), loaded
+                # here: this body is a closure, so a module-scope copy is not seen.
+                . (Join-Path (Join-Path $s.PackageRoot 'Scripts') 'Invoke-TrackerRead.ps1')
+                $probeRead = Invoke-P20TrackerRead 'az' @('account', 'show', '--query', 'user.name', '-o', 'tsv')
+                $probe = [string]($probeRead.Out -join '')
+                if ($probeRead.Code -eq 0 -and -not [string]::IsNullOrWhiteSpace($probe)) {
                     $email = $probe.Trim()
                 }
             }

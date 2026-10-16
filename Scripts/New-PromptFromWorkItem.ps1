@@ -892,6 +892,7 @@ if (-not (Test-P20IsWorkItemId $WorkItemId)) {
 # writes the contract's tokens, never redefines them). Here it carries the
 # issue's URL.
 . (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 # Which space, which tracker -- said before the id is even sent, so a number
 # meant for one tracker cannot fetch the other tracker's card of the same
 # number without a person seeing where it stood.
@@ -911,8 +912,9 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
     $repoName = $repoFull.Split('/')[1]
 
     Write-Host "[*] Fetching issue #$WorkItemId from $repoFull..." -ForegroundColor Cyan
-    $raw = gh issue view $WorkItemId --repo $repoFull --json 'number,title,body,state,labels,assignees,milestone,url,comments' 2>$null
-    if ($LASTEXITCODE -ne 0 -or -not $raw) {
+    $viewRead = Invoke-P20TrackerRead 'gh' @('issue', 'view', "$WorkItemId", '--repo', $repoFull, '--json', 'number,title,body,state,labels,assignees,milestone,url,comments')
+    $raw = $viewRead.Out
+    if ($viewRead.Code -ne 0 -or -not ($raw -join '').Trim()) {
         Write-CliError -Message "Could not fetch issue $WorkItemId from $repoFull." `
             -Hint 'Check the number and that gh is signed in (gh auth status).'
         exit 2  # stated refusal
@@ -922,8 +924,9 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
     $title = $issue.title
     $issueState = "$($issue.state)".ToUpperInvariant()
     $assigneeLogins = @($issue.assignees | ForEach-Object { $_.login })
-    $myLogin = [string](gh api user -q .login 2>$null)
-    if ($LASTEXITCODE -ne 0) { $myLogin = '' }
+    $userRead = Invoke-P20TrackerRead 'gh' @('api', 'user', '-q', '.login')
+    $myLogin = [string]($userRead.Out -join '')
+    if ($userRead.Code -ne 0) { $myLogin = '' }
 
     # The card's TYPE is the card's own (cards spec, phase 1): a label that
     # names one of workItemTypes' keys wins ("bug" -> Bug), else Task. GitHub
@@ -942,8 +945,8 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
         if ($assigneeLogins.Count -eq 0) {
             Write-Host ""
             Write-Host "[>] Assigning unassigned issue to you..." -ForegroundColor Yellow
-            gh issue edit $WorkItemId --repo $repoFull --add-assignee '@me' *> $null
-            if ($LASTEXITCODE -eq 0) { Write-Host "[+] Assigned issue #$WorkItemId to you" -ForegroundColor Green }
+            $assignRead = Invoke-P20TrackerRead 'gh' @('issue', 'edit', "$WorkItemId", '--repo', $repoFull, '--add-assignee', '@me')
+            if ($assignRead.Code -eq 0) { Write-Host "[+] Assigned issue #$WorkItemId to you" -ForegroundColor Green }
             else { Write-Host "[!] Warning: Could not assign the issue" -ForegroundColor Yellow }
         }
         elseif ($myLogin -and ($assigneeLogins -contains $myLogin)) {
@@ -958,8 +961,8 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
         else {
             Write-Host ""
             Write-Host "[>] Adding you beside $($assigneeLogins -join ', ')..." -ForegroundColor Yellow
-            gh issue edit $WorkItemId --repo $repoFull --add-assignee '@me' *> $null
-            if ($LASTEXITCODE -eq 0) { Write-Host "[+] Added you as an assignee of issue #$WorkItemId" -ForegroundColor Green }
+            $assignRead = Invoke-P20TrackerRead 'gh' @('issue', 'edit', "$WorkItemId", '--repo', $repoFull, '--add-assignee', '@me')
+            if ($assignRead.Code -eq 0) { Write-Host "[+] Added you as an assignee of issue #$WorkItemId" -ForegroundColor Green }
             else { Write-Host "[!] Warning: Could not add you as an assignee" -ForegroundColor Yellow }
         }
 
@@ -970,8 +973,8 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
             Write-Host "[!] Issue $WorkItemId is closed." -ForegroundColor Yellow
             $answer = Read-Host "    Reopen it? [Y/N]"
             if ($answer -match '^[Yy]') {
-                gh issue reopen $WorkItemId --repo $repoFull *> $null
-                if ($LASTEXITCODE -eq 0) { Write-Host "[+] Reopened issue #$WorkItemId" -ForegroundColor Green }
+                $reopenRead = Invoke-P20TrackerRead 'gh' @('issue', 'reopen', "$WorkItemId", '--repo', $repoFull)
+                if ($reopenRead.Code -eq 0) { Write-Host "[+] Reopened issue #$WorkItemId" -ForegroundColor Green }
                 else { Write-Host "[!] Warning: Could not reopen the issue" -ForegroundColor Yellow }
             }
             else { Write-Host "[*] Skipped -- the issue stays closed" -ForegroundColor DarkGray }
@@ -1130,12 +1133,13 @@ try {
         if ([string]::IsNullOrWhiteSpace($assignedTo)) {
             Write-Host ""
             Write-Host "[>] Assigning unassigned work item to $AssignTo..." -ForegroundColor Yellow
-            az boards work-item update --id $WorkItemId --assigned-to $AssignTo --org $org --output none
-            if ($LASTEXITCODE -eq 0) {
+            $updateRead = Invoke-P20TrackerRead 'az' @('boards', 'work-item', 'update', '--id', "$WorkItemId", '--assigned-to', $AssignTo, '--org', $org, '--output', 'none')
+            if ($updateRead.Code -eq 0) {
                 Write-Host "[+] Assigned work item $WorkItemId to $AssignTo" -ForegroundColor Green
             }
             else {
                 Write-Host "[!] Warning: Could not assign work item" -ForegroundColor Yellow
+                if ($updateRead.Err) { Write-Host "    az said: $($updateRead.Err[0])" -ForegroundColor DarkGray }
             }
         }
         elseif ($assignedTo -ne $AssignTo) {
@@ -1147,12 +1151,13 @@ try {
             }
             Write-Host ""
             Write-Host "[>] Reassigning work item from $assignedTo to $AssignTo..." -ForegroundColor Yellow
-            az boards work-item update --id $WorkItemId --assigned-to $AssignTo --org $org --output none
-            if ($LASTEXITCODE -eq 0) {
+            $updateRead = Invoke-P20TrackerRead 'az' @('boards', 'work-item', 'update', '--id', "$WorkItemId", '--assigned-to', $AssignTo, '--org', $org, '--output', 'none')
+            if ($updateRead.Code -eq 0) {
                 Write-Host "[+] Reassigned work item $WorkItemId to $AssignTo" -ForegroundColor Green
             }
             else {
                 Write-Host "[!] Warning: Could not reassign work item" -ForegroundColor Yellow
+                if ($updateRead.Err) { Write-Host "    az said: $($updateRead.Err[0])" -ForegroundColor DarkGray }
             }
         }
 
@@ -1162,12 +1167,13 @@ try {
         elseif ($state -eq "New") {
             Write-Host ""
             Write-Host "[>] Setting work item state to Active..." -ForegroundColor Yellow
-            az boards work-item update --id $WorkItemId --state "Active" --org $org --output none
-            if ($LASTEXITCODE -eq 0) {
+            $updateRead = Invoke-P20TrackerRead 'az' @('boards', 'work-item', 'update', '--id', "$WorkItemId", '--state', 'Active', '--org', $org, '--output', 'none')
+            if ($updateRead.Code -eq 0) {
                 Write-Host "[+] Set work item $WorkItemId state to Active" -ForegroundColor Green
             }
             else {
                 Write-Host "[!] Warning: Could not update work item state" -ForegroundColor Yellow
+                if ($updateRead.Err) { Write-Host "    az said: $($updateRead.Err[0])" -ForegroundColor DarkGray }
             }
         }
         else {
@@ -1175,12 +1181,13 @@ try {
             Write-Host "[!] Work item $WorkItemId is currently '$state'." -ForegroundColor Yellow
             $answer = Read-Host "    Set to Active? [Y/N]"
             if ($answer -match '^[Yy]') {
-                az boards work-item update --id $WorkItemId --state "Active" --org $org --output none
-                if ($LASTEXITCODE -eq 0) {
+                $updateRead = Invoke-P20TrackerRead 'az' @('boards', 'work-item', 'update', '--id', "$WorkItemId", '--state', 'Active', '--org', $org, '--output', 'none')
+                if ($updateRead.Code -eq 0) {
                     Write-Host "[+] Set work item $WorkItemId state to Active" -ForegroundColor Green
                 }
                 else {
                     Write-Host "[!] Warning: Could not update work item state" -ForegroundColor Yellow
+                    if ($updateRead.Err) { Write-Host "    az said: $($updateRead.Err[0])" -ForegroundColor DarkGray }
                 }
             }
             else {

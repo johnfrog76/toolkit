@@ -109,6 +109,7 @@ if ($Board) {
     . (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
     . (Join-Path $PSScriptRoot 'Get-WorkItemRecord.ps1')
     . (Join-Path $PSScriptRoot 'Resolve-CardName.ps1')
+    . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
     $adoFlag = $null
     if (Get-Command Get-P20Features -ErrorAction SilentlyContinue) {
         $features = Get-P20Features
@@ -136,8 +137,7 @@ if ($Board) {
         $boardHint = 'Install it from https://aka.ms/installazurecli, then az login.'
     }
     else {
-        $null = az account show --output none 2>&1
-        if ($LASTEXITCODE -ne 0) {
+        if ((Invoke-P20TrackerRead 'az' @('account', 'show', '--output', 'none')).Code -ne 0) {
             $boardRefusal = 'az is not signed in, so the board cannot be read.'
             $boardHint = 'Run: az login'
         }

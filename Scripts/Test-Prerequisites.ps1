@@ -104,6 +104,7 @@ else {
 # a GitHub board, az everywhere else --
 # and the rule above reads it too, since a GitHub tracker is not Azure DevOps.
 . (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 $trackerKind = Resolve-P20Tracker -OrgUrl $cfg.Org
 $adoFlag = $null
 if (Get-Command Get-P20Features -ErrorAction SilentlyContinue) {
@@ -121,12 +122,12 @@ $ghSignedIn = $false
 if ($trackerKind -eq 'github' -and $cfg.OrgStatus -eq 'active') {
     $hasGh = [bool](Get-Command gh -ErrorAction SilentlyContinue)
     if ($hasGh) {
-        $ghVersion = ((gh --version 2>$null | Select-Object -First 1) -replace 'gh version ', '') -replace ' \(.*', ''
+        $ghVersion = ((@((Invoke-P20TrackerRead 'gh' @('--version')).Out) | Select-Object -First 1) -replace 'gh version ', '') -replace ' \(.*', ''
         Write-ReportOk "gh CLI $ghVersion"
-        $null = gh auth status 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            $ghLogin = [string](gh api user -q .login 2>$null)
-            if ($LASTEXITCODE -eq 0 -and $ghLogin) { Write-ReportOk "gh signed in as $ghLogin" }
+        if ((Invoke-P20TrackerRead 'gh' @('auth', 'status')).Code -eq 0) {
+            $userRead = Invoke-P20TrackerRead 'gh' @('api', 'user', '-q', '.login')
+            $ghLogin = [string]($userRead.Out -join '')
+            if ($userRead.Code -eq 0 -and $ghLogin) { Write-ReportOk "gh signed in as $ghLogin" }
             else { Write-ReportOk "gh signed in" }
             $ghSignedIn = $true
         }
@@ -143,10 +144,14 @@ elseif (-not $adoEnabled) {
     Write-ReportNote "Azure DevOps: not in use here -- this Space works from its cards. Nothing to install."
 }
 elseif ($hasAz) {
-    $azVersion = (az version --output json 2>$null | ConvertFrom-Json).'azure-cli'
+    $azVersion = $null
+    $versionJson = (@((Invoke-P20TrackerRead 'az' @('version', '--output', 'json')).Out) -join "`n")
+    if ($versionJson.Trim()) { $azVersion = ($versionJson | ConvertFrom-Json).'azure-cli' }
     Write-ReportOk "az CLI $azVersion"
 
-    $azAccount = az account show --output json 2>$null | ConvertFrom-Json
+    $azAccount = $null
+    $accountJson = (@((Invoke-P20TrackerRead 'az' @('account', 'show', '--output', 'json')).Out) -join "`n")
+    if ($accountJson.Trim()) { $azAccount = $accountJson | ConvertFrom-Json }
     if ($azAccount) {
         Write-ReportOk "az logged in as $($azAccount.user.name)"
         $azLoggedIn = $true
@@ -155,7 +160,9 @@ elseif ($hasAz) {
         Write-ReportWarn "az CLI not logged in - run: az login"
     }
 
-    $devopsExt = az extension show --name azure-devops --output json 2>$null | ConvertFrom-Json
+    $devopsExt = $null
+    $extensionJson = (@((Invoke-P20TrackerRead 'az' @('extension', 'show', '--name', 'azure-devops', '--output', 'json')).Out) -join "`n")
+    if ($extensionJson.Trim()) { $devopsExt = $extensionJson | ConvertFrom-Json }
     if ($devopsExt) {
         Write-ReportOk "az devops extension installed"
     }
