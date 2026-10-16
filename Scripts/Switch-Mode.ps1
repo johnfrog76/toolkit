@@ -32,6 +32,8 @@ $toolkitDir = Split-Path -Parent $PSScriptRoot
 $localPath = Join-Path $toolkitDir "config.local.json"
 # The container's keys in both spellings (ConvertTo-P20SpaceKeys, stage 2).
 . (Join-Path $PSScriptRoot 'Resolve-HubConfig.ps1')
+# The byte contract for a config file -- Config's own writer (no BOM, LF, atomic).
+. (Join-Path $PSScriptRoot 'Write-ConfigJson.ps1')
 
 # Load orgs array from default config
 $defaultCfgPath = Join-Path $toolkitDir "config.default.json"
@@ -52,8 +54,13 @@ if ($global:P20Config -and $global:P20Config.Spaces) {
 # Load current local config
 $localCfg = $null
 $localUnreadable = $false
+# Read so it can be written back as it was: PowerShell 7 would otherwise turn an
+# ISO-8601-looking string (errorsAckedAt, menuResetTimestamp) into a [datetime],
+# and the writer below would put it back in another format. 5.1 never does.
+$localJsonArgs = @{}
+if ((Get-Command ConvertFrom-Json).Parameters.ContainsKey('DateKind')) { $localJsonArgs['DateKind'] = 'String' }
 if (Test-Path $localPath) {
-    try { $localCfg = ConvertTo-P20SpaceKeys (Get-Content $localPath -Raw | ConvertFrom-Json) }
+    try { $localCfg = ConvertTo-P20SpaceKeys (Get-Content $localPath -Raw -Encoding UTF8 | ConvertFrom-Json @localJsonArgs) }
     catch {
         # Said once; Status reads on with defaults, but a switch refuses below
         # rather than write one key over a file it could not read.
@@ -166,10 +173,10 @@ if ($localUnreadable) {
 if ($localCfg) {
     if ($localCfg.PSObject.Properties['activeOrg']) { $localCfg.PSObject.Properties.Remove('activeOrg') }
     $localCfg | Add-Member -NotePropertyName 'activeSpace' -NotePropertyValue $slug -Force
-    (ConvertTo-P20SpaceSpelling $localCfg) | ConvertTo-Json -Depth 10 | Set-Content $localPath -Encoding UTF8
+    Write-ConfigJson -Path $localPath -Value (ConvertTo-P20SpaceSpelling $localCfg)
 }
 else {
-    [PSCustomObject]@{ activeSpace = $slug } | ConvertTo-Json | Set-Content $localPath -Encoding UTF8
+    Write-ConfigJson -Path $localPath -Value ([PSCustomObject]@{ activeSpace = $slug })
 }
 
 # Reload the module so in-memory config picks up the new org

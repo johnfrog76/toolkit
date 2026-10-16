@@ -72,7 +72,18 @@ function Get-P20MachineOnlyKeys {
       they cannot be derived from it. Both are read by utilities.psm1 and both
       are per machine by construction.
     #>
-    return @('suppressDeprecationHints')
+    return @('suppressDeprecationHints', 'menuResetTimestamp')
+}
+
+function Get-P20MarkerKeys {
+    <#
+      Machine keys a VERB writes as a marker -- not settings a person chooses.
+      They are rows of the schema so Config can write them (it is the one
+      writer of config.local.json), and -Schema names them; -List, and so the
+      web's settings form, leaves them out, as it did before Config wrote them.
+      menuResetTimestamp: Menu -Reset's stamp.
+    #>
+    return @('menuResetTimestamp')
 }
 
 function Get-P20EngineerFeatureKeys {
@@ -197,6 +208,8 @@ function Get-P20ConfigSchema {
     $rows += New-P20SchemaRow -Key 'storeSync' -Scope 'machine' -Type 'enum' -Allowed (Get-P20StoreSyncValues) -Help "How the prompt store is kept in sync. The hub may declare it too -- pass -Hub to write the hub's instead of this machine's override."
     $rows += New-P20SchemaRow -Key 'quietStart' -Scope 'machine' -Type 'bool' -Help 'Suppress the import banner.'
     $rows += New-P20SchemaRow -Key 'suppressDeprecationHints' -Scope 'machine' -Type 'bool' -Help 'Mute the one-time hint printed when a command is reached through a deprecated alias.'
+    # Written by Menu -Reset, through this command, so config.local.json has one writer.
+    $rows += New-P20SchemaRow -Key 'menuResetTimestamp' -Scope 'machine' -Type 'string' -Help 'When the menu''s usage scores last started over, yyyy-MM-ddTHH:mm:ss local time: the menu counts only the commands used since. Menu -Reset writes it; a value that is not a date is named and ignored.'
     $rows += New-P20SchemaRow -Key 'isDemoDismissed' -Scope 'machine' -Type 'bool' -Help "Hide the shipped demo Spaces (example: true -- Demo, the GitHub demo, the Azure demo) from the orgs you pick from -- the web's switcher and Settings, SwitchOrg Status. Nothing is removed from config, and the org you are in is always shown."
     $rows += New-P20SchemaRow -Key 'firstRun.welcome' -Scope 'machine' -Type 'bool' -Help "The Home banner that offers the deck Introducing ToolKit. Start sets it true; Get Started or Dismiss sets it false, and then it is gone for good. Shown only while the deck module is on."
     $rows += New-P20SchemaRow -Key 'web.agentPort' -Scope 'machine' -Type 'int' -Help 'The port the agent listens on and the web half proxies to.'
