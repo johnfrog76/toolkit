@@ -23,10 +23,12 @@ on:
 permissions:
   contents: read
 
-# A newer push to the same pull request or branch replaces the run in progress.
+# A newer push to the same pull request replaces the run in progress. A push to
+# main never cancels the run before it: at merge cadence a cancelled run is a
+# run that never reports, and main's checks have to complete to mean anything.
 concurrency:
   group: verify-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   ubuntu:
