@@ -111,12 +111,11 @@ class TestBomCarryingLog(unittest.TestCase):
             self.skipTest(f"cannot import accounting ({type(e).__name__}: {e})")
         stamp = time.strftime("%Y-%m-%dT%H:%M:%S")
         with tempfile.TemporaryDirectory() as td:
-            Path(td, "usage.M.log").write_bytes(
-                b"\xef\xbb\xbf" + f"{stamp}\tERR\tM\tsrc\tdetail\n".encode()
-            )
+            Path(td, "usage.M.log").write_bytes(b"\xef\xbb\xbf" + f"{stamp}\tERR\tM\tsrc\tdetail\n".encode())
             fail = SimpleNamespace(returncode=1, stdout="", stderr="")
-            with mock.patch.object(accounting, "REPO_ROOT", Path(td)), mock.patch.object(
-                accounting, "run_read", return_value=fail
+            with (
+                mock.patch.object(accounting, "REPO_ROOT", Path(td)),
+                mock.patch.object(accounting, "run_read", return_value=fail),
             ):
                 health = accounting._get_repo_health()
         self.assertEqual(health.recent_errors, 1)
