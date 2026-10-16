@@ -233,8 +233,8 @@ because we must get the commercial right"): the **Going public** milestone's des
 order with the commercial first, and the **After the flip** milestone holds F1-F4 as issues. The file and
 the milestones say the same thing; when one changes, both do.
 
-The public milestone is the release checklist (met at 1.0.0) plus three pieces of one story, decided from
-the front-door design note on 2026-10-09: the README's first screen says what ToolKit is in one
+The public milestone is the release checklist (met at 1.0.0) plus three pieces of one story:
+the README's first screen says what ToolKit is in one
 sentence -- a studio where you work on software by yourself, on a team, or orchestrating agents, and the
 cards are the record either way (with the deck's order, the commercial); Settings asks "How do I work on this
 Space?" and the answer sets Team Agile per Space; the Studio lists the agentic prompts that ship.

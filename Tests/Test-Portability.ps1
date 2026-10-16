@@ -137,8 +137,7 @@ function Get-RuntimeFiles {
 # a clause whose baseline was zero.
 #
 # Tests/fixtures/ stays out for the usual reason: a fixture is meant to look
-# like real input. issues/ stays out because an issue file's whole job is to
-# describe the defect, and describing this one means naming the namespace.
+# like real input.
 function Get-PrefixScanFiles {
     $files = @()
     $root = Get-ChildItem (Join-Path $pkgRoot '*.psm1') -File -ErrorAction SilentlyContinue
@@ -769,13 +768,12 @@ Assert-True "Clause 13: the marker pattern matches a word, case-sensitively, and
 #
 # Two kinds of reference are allowed to stay where a rewrite drops them cleanly:
 # on a comment that fills its whole line, a closed parenthetical made only of
-# tracker numbers or archive citations is the export's to remove (its issue-ref
-# and fixed-issue-citation rules read the same shapes). Everything else is flat.
+# tracker numbers or archive citations may stay. Everything else is flat.
 #
 # The words are assembled from halves so this file does not match its own sweep.
 # Scope: every shipped source file of the three halves plus the root files, minus
-# the documents (docs/, spec/, design/, issues/ -- the export's job), the data
-# (samples/, templates/, any fixtures/ folder), the export script and its suite,
+# the documents (docs/, spec/, design/), the data
+# (samples/, templates/, any fixtures/ folder),
 # and the vendored or generated folders of Tests/ScanExclusions.ps1.
 $cpPatterns = @(
     @{ Name = 'date'; Rx = '(?<!\d)20\d\d-\d\d-\d\d(?!\d)' }
@@ -785,7 +783,7 @@ $cpPatterns = @(
     @{ Name = 'agent';   Rx = ('\b(?:Fa' + 'ble|Op' + 'us|Son' + 'net|Hai' + 'ku)\b') }
     @{ Name = 'host';    Rx = ('(?i:\b(?:the|this|that|our|windows))\s+(?:PC|Mac)\b|\b5\.1-only (?:PC|Mac)\b|\b(?:PC|Mac)''s\b|\bMac Fa' + 'ble\b|\bPC (?:team|crew|walk)\b') }
     @{ Name = 'archive pointer'; Rx = ('fixed-' + 'issues|\bissues?:\s+[a-z0-9]+(?:-[a-z0-9]+)+|\b(?:bug|improve|feature|enhancement)(?:-[a-z0-9]+){3,}')
-       ItemRx = ('^`*(?:\.\./)*issues/fixed-' + 'issues/[^`\s]*`*$|^issues?:\s+[a-z0-9][a-z0-9-]+(?:\.prompt\.md)?$') }
+       ItemRx = ('^issues?:\s+[a-z0-9][a-z0-9-]+(?:\.prompt\.md)?$') }
     @{ Name = 'private repository'; Rx = ('(?i)\bcss-was' + 'teland[\w-]*|\bdeck-' + 'qa\b|Repos/pro' + 'mpts\b|johnfr' + 'og76') }
     @{ Name = 'machine path'; Rx = '(?i)\b[a-z]:(?:\\\\|\\|/)+Users(?:\\\\|\\|/)+(?!runneradmin\b|RUNNER~1\b|<|\.\.\.|you\b|\*)[^\\/\s''"`]+|/Users/[a-z][^/\s''"`]*/|/home/[a-z][^/\s''"`]*/' }  # export:example
 )
