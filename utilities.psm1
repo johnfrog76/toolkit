@@ -73,8 +73,13 @@ function global:Write-P20TestResult {
     $safeDetail = ($Detail -replace '[\t\r\n\x0b\x0c\x1c-\x1e\x85\u2028\u2029]', ' ')
     $entry = "$timestamp`t$Suite`t$Result`t$Passed`t$Total`t$safeDetail`t$Org"
     $logPath = Join-Path $PSScriptRoot "test-results.$machine.log"
+    # A byte-level append, as Write-ToolkitLog's: under Windows PowerShell 5.1,
+    # Add-Content -Encoding UTF8 on a file something still holds for a moment (a
+    # scanner, the write just before this one) throws "Stream was not readable",
+    # and the line was lost behind the warning below. UTF-8 with no BOM, and the
+    # host's line ending, as Add-Content wrote it; every reader takes either.
     try {
-        Add-Content -Path $logPath -Value $entry -Encoding UTF8 -ErrorAction Stop
+        [System.IO.File]::AppendAllText($logPath, $entry + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding $false))
     }
     catch {
         Write-Warning "Failed to write to test-results.$machine.log: $_"
