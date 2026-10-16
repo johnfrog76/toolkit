@@ -373,8 +373,8 @@ class HeadingReaderTests(unittest.TestCase):
     def _items(self) -> dict:
         return {i["filename"]: i for i in self.client.get("/api/growth").json()["items"]}
 
-    # What ``NewGrowth -Type training -Title "No Provider Yet" -Date 2026-03-02
-    # -DueDate 2026-04-30`` writes (Scripts/New-GrowthItem.ps1): the provider's
+    # What ``NewGrowth -Type training -Title "No Provider Yet"`` with a start day and a
+    # later due day writes (Scripts/New-GrowthItem.ps1): the provider's
     # heading is followed by an empty line and then the writer's ``---``.
     NO_PROVIDER = (
         "# Training Artifact\n\n---\n\n## Title\n\nNo Provider Yet\n\n## Type\n\nVoluntary\n\n"
