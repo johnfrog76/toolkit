@@ -215,7 +215,7 @@ export function TestHealth() {
       disabled={isRunning}
       onClick={handleRunNow}
     >
-      {isRunning ? <Spinner size="tiny" /> : "Run"}
+      {isRunning ? <Spinner size="tiny" aria-label="Running..." /> : "Run"}
     </Button>
   ) : (
     <>
@@ -226,7 +226,7 @@ export function TestHealth() {
         disabled={isRunning}
         onClick={handleRunNow}
       >
-        {isRunning ? <Spinner size="tiny" /> : "Run"}
+        {isRunning ? <Spinner size="tiny" aria-label="Running..." /> : "Run"}
       </Button>
       <RefreshButton onClick={refetch} isFetching={isFetching} />
     </>

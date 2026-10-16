@@ -413,7 +413,7 @@ function ResumeItemCard({ lastModified }: { lastModified: string }) {
               </DialogTrigger>
               {!generateMeta && (
                 <Button
-                  icon={isGenerating ? <Spinner size="tiny" /> : <DocumentSearchRegular />}
+                  icon={isGenerating ? <Spinner size="tiny" aria-label="Generating..." /> : <DocumentSearchRegular />}
                   appearance="primary"
                   disabled={isGenerating || !startDate || !endDate}
                   onClick={handleGenerate}
@@ -768,7 +768,7 @@ export function ReviewArchive({ activeTag }: { activeTag?: string | null }) {
                 </Button>
               </DialogTrigger>
               <Button
-                icon={isGenerating ? <Spinner size="tiny" /> : <DocumentSearchRegular />}
+                icon={isGenerating ? <Spinner size="tiny" aria-label="Generating..." /> : <DocumentSearchRegular />}
                 appearance="primary"
                 disabled={isGenerating || !startDate || !endDate || selectedSlugs.size === 0}
                 onClick={handleGenerate}

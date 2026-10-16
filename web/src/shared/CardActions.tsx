@@ -114,7 +114,7 @@ export function CardActions({
         <Menu>
           <MenuTrigger disableButtonEnhancement>
             <Button
-              icon={busy ? <Spinner size="extra-tiny" /> : <MoreHorizontalRegular />}
+              icon={busy ? <Spinner size="extra-tiny" aria-label="Working..." /> : <MoreHorizontalRegular />}
               size="small"
               appearance="subtle"
               aria-label={menuLabel}

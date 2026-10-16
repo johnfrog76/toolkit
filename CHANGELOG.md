@@ -10,6 +10,7 @@ release.
 
 ### Fixed
 
+- Every page now has one top-level heading for screen-reader navigation, and the loading spinners inside buttons are named.
 - Archiving a card that was created and archived with no commit in between now commits the move instead of silently leaving it uncommitted, and a commit git refuses is reported as an error (exit 2) with git's own message instead of a warning.
 - Attaching a cover or a before picture from the browser no longer leaves a copy of the image in the system temp folder for good; it is removed once the card has the picture, and stale ones are cleared when the agent starts.
 - A tab or a line break in a logged work item title or error message no longer splits the usage log entry into a forged second entry or shifts its columns; both log writers now write it as a space.

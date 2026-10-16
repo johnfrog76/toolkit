@@ -10,6 +10,7 @@ import { BootSpinner } from "./BootSpinner";
 import { ThemePicker } from "./ThemePicker";
 import { AvatarMenu } from "./AvatarMenu";
 import { SpaceAnchor } from "./SpaceAnchor";
+import { PageHeading } from "./PageHeading";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -540,6 +541,7 @@ export function App() {
         </header>
 
         <main id="main" tabIndex={-1} className={styles.main}>
+          <PageHeading name={pageName ?? "ToolKit"} mainId="main" />
           {agentAway && !env ? (
             <AgentUnreachable onRetry={checkAgent} retrying={heartbeatFetching || envFetching} />
           ) : (
