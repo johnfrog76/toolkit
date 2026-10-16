@@ -82,7 +82,7 @@ table; this is the shape of it:
 
 | Scope | Keys | Goes to |
 | --- | --- | --- |
-| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `web.agentPort`, `web.corsOrigins`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display` | `config.local.json`, created as a sparse patch if it is not there |
+| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `web.agentPort`, `web.corsOrigins`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display` | `config.local.json`, created as a sparse patch if it is not there |
 | **org** | `spaces.<slug>.name` / `.status` / `.orgType` / `.org` / `.tenant` / `.promptsFolder` / `.projects` / `.howIWork` / `.features.sprintAwareness` / `.features.trainingHoursPerQuarter` | the hub's `hub.json` -- or `config.local.json`'s `spaces.<slug>` patch with **`-Local`** |
 | **hub** | `storeSync`, `folders.<name>` | the hub's `hub.json`, and only with **`-Hub`** |
 | **default** | `commands`, `workItemTypes`, `cliVersion`, `managerWorkflow` | nowhere. These are the team's, and a `-Set` on one is refused by name |
@@ -164,6 +164,14 @@ does. `tkTestToolkit -Config` holds the list: it walks every script's syntax tre
 `ConvertFrom-Json` over `config.local.json`, and fails naming the file and line when its `catch`
 neither calls the helper nor states a refusal, so a new reader cannot be added quietly. The same
 file spelled with `/` or `\` counts as one file for the once-only rule.
+
+When those three DO write, they write the way `Config` does: `Menu -Reset` sets `menuResetTimestamp` through
+`Config` itself, and `SwitchSpace` and `Log -Ack` through its writer (`Write-ConfigJson` in
+`Scripts/Write-ConfigJson.ps1`), so the file is UTF-8 with no BOM, LF, two-space indent and atomic on
+both hosts, and a date-looking string comes back out as the string it was. The same syntax-tree walk
+fails naming the file and line of any other write into `config.local.json` -- `Set-Content`,
+`Add-Content`, `Out-File`, a `[System.IO.File]` write or a redirection -- in `utilities.psm1`, `Scripts/`
+or `Config/`.
 
 A file that **does** parse but holds a value that is not a date -- `menuResetTimestamp` (the menu's
 scores) or `errorsAckedAt` (the error indicator) -- is not called unparseable. The warning names the

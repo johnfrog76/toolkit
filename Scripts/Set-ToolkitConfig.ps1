@@ -440,7 +440,9 @@ function Get-ListRows {
     # A schema row whose key carries a <name> is a PATTERN -- aliases.<name>.path
     # -- and there is nothing to resolve it against. The real ones are listed
     # below, one per alias the machine has.
-    foreach ($row in @($configSchema | Where-Object { $_.scope -eq 'machine' -and $_.key -notlike '*<*' })) {
+    # A marker a verb writes (Get-P20MarkerKeys) is not a setting to list.
+    $markerKeys = @(Get-P20MarkerKeys)
+    foreach ($row in @($configSchema | Where-Object { $_.scope -eq 'machine' -and $_.key -notlike '*<*' -and $markerKeys -notcontains $_.key })) {
         $resolved = Get-ResolvedSetting $row.key
         $rows += [PSCustomObject]@{
             key = $row.key; scope = 'machine'; file = 'config.local.json'

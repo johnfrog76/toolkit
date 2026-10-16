@@ -925,7 +925,7 @@ finally { Remove-Item $badCfgPkg -Recurse -Force -ErrorAction SilentlyContinue }
 # The scan is an AST walk, so a comment or a string that mentions the file is not a reader.
 function Get-ConfigLocalReaderScan {
     param([string]$Root)
-    $result = @{ Readers = 0; Gaps = @() }
+    $result = @{ Readers = 0; Gaps = @(); Writers = @() }
     $files = @()
     foreach ($dir in @('Scripts', 'Config', 'Prompt20Toolkit', 'agent/ado')) {
         $d = Join-Path $Root $dir
@@ -1017,6 +1017,46 @@ function Get-ConfigLocalReaderScan {
                 $result.Gaps += ($rel + ':' + $cmd.Extent.StartLineNumber)
             }
         }
+        # WRITERS. config.local.json has one writer, Config's (Write-ConfigJson in
+        # Scripts/Write-ConfigJson.ps1: no BOM, LF, atomic). Anything else that puts bytes
+        # into the file -- Set-Content, Add-Content, Out-File, Tee-Object, a [System.IO.File]
+        # write, a > redirection -- is a second writer, and is named by file and line.
+        $writeNodes = @($tree.FindAll({ param($n)
+                    ($n -is [System.Management.Automation.Language.CommandAst] -and $n.GetCommandName() -in @('Set-Content', 'Add-Content', 'Out-File', 'Tee-Object')) -or
+                    ($n -is [System.Management.Automation.Language.InvokeMemberExpressionAst] -and $n.Member.Extent.Text -match '^(WriteAllText|WriteAllBytes|WriteAllLines|AppendAllText|AppendAllLines)$') -or
+                    ($n -is [System.Management.Automation.Language.FileRedirectionAst])
+                }, $true))
+        foreach ($w in $writeNodes) {
+            # The write's TARGET only -- what it writes is not where it writes: the path argument
+            # (-Path / -LiteralPath / -FilePath, else the first positional), the call's first
+            # argument, or the redirection's location.
+            $target = ''
+            if ($w -is [System.Management.Automation.Language.FileRedirectionAst]) { $target = $w.Location.Extent.Text }
+            elseif ($w -is [System.Management.Automation.Language.InvokeMemberExpressionAst]) {
+                if ($w.Arguments -and $w.Arguments.Count -gt 0) { $target = $w.Arguments[0].Extent.Text }
+            }
+            else {
+                $els = @($w.CommandElements)
+                for ($i = 1; $i -lt $els.Count; $i++) {
+                    $el = $els[$i]
+                    if ($el -is [System.Management.Automation.Language.CommandParameterAst]) {
+                        if ($el.ParameterName -match '^(Path|LiteralPath|FilePath|PSPath)$') {
+                            if ($el.Argument) { $target = $el.Argument.Extent.Text }
+                            elseif ($i + 1 -lt $els.Count) { $target = $els[$i + 1].Extent.Text }
+                            break
+                        }
+                        # A switch or a named value: step over the value it takes.
+                        if (-not $el.Argument -and $i + 1 -lt $els.Count -and $els[$i + 1] -isnot [System.Management.Automation.Language.CommandParameterAst] -and $el.ParameterName -notmatch '^(Force|NoNewline|Append|NoClobber|PassThru|WhatIf|Confirm)$') { $i++ }
+                        continue
+                    }
+                    if (-not $target) { $target = $el.Extent.Text; break }
+                }
+            }
+            if (-not $target) { continue }
+            if (-not (& $isLocalText $target (& $scopeOf $w))) { continue }
+            $rel = $f.FullName.Substring($Root.TrimEnd('\', '/').Length).TrimStart('\', '/') -replace '\\', '/'
+            $result.Writers += ($rel + ':' + $w.Extent.StartLineNumber)
+        }
     }
     return $result
 }
@@ -1024,6 +1064,7 @@ function Get-ConfigLocalReaderScan {
 $scan = Get-ConfigLocalReaderScan -Root $pkgRoot
 Assert-True ('the tree scan finds the readers of config.local.json (' + $scan.Readers + ')') ($scan.Readers -ge 8) 'the scan went blind: it should see at least the loader, the prefix, hub root, agentic path, help ports, menu scores, recent errors and the agent port'
 Assert-True 'every reader of config.local.json says so when the file will not parse' ($scan.Gaps.Count -eq 0) ('no Write-P20ConfigParseWarning (or stated refusal) in the catch at: ' + ($scan.Gaps -join ', '))
+Assert-True 'nothing but Config''s writer (Write-ConfigJson) writes config.local.json -- utilities.psm1, Scripts/, Config/' ($scan.Writers.Count -eq 0) ('a second writer of config.local.json at: ' + ($scan.Writers -join ', '))
 
 # The scan is only worth having if it can fail: a scratch tree with one unrouted reader and one routed.
 $scanProbe = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-config-scan-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -1034,11 +1075,17 @@ $p = Join-Path $root 'config.local.json'
 try { $a = Get-Content $p -Raw | ConvertFrom-Json } catch { $a = $null }
 try { $b = Get-Content $p -Raw | ConvertFrom-Json } catch { $null = Write-P20ConfigParseWarning -Path $p -Message $_.Exception.Message }
 $c = Get-Content (Join-Path $root 'config.default.json') -Raw | ConvertFrom-Json
+$a | ConvertTo-Json | Set-Content $p -Encoding UTF8
+[System.IO.File]::WriteAllText($p, '{}')
+Write-ConfigJson -Path $p -Value $a
+$c | ConvertTo-Json | Set-Content (Join-Path $root 'config.default.json')
 '@
     Invoke-LockRetry 'write of a scratch file' { Set-Content -Path (Join-Path $scanProbe 'Scripts/Probe.ps1') -Value $probeSrc -Encoding ASCII }
     $probeScan = Get-ConfigLocalReaderScan -Root $scanProbe
     Assert-True 'the scan counts both readers of config.local.json in a probe, and not the default file' ($probeScan.Readers -eq 2) ('readers=' + $probeScan.Readers)
     Assert-True 'and names only the one that swallows the failure, with its line' ($probeScan.Gaps.Count -eq 1 -and $probeScan.Gaps[0] -eq 'Scripts/Probe.ps1:2') ($probeScan.Gaps -join ', ')
+    Assert-True 'the scan names both second writers of config.local.json by line, not Config''s writer and not the default file' `
+        (($probeScan.Writers -join ',') -eq 'Scripts/Probe.ps1:5,Scripts/Probe.ps1:6') ($probeScan.Writers -join ', ')
 }
 catch { Assert-True 'the scan probe ran to the end without a terminating error' $false $_.Exception.Message }
 finally { Remove-Item $scanProbe -Recurse -Force -ErrorAction SilentlyContinue }
@@ -1106,6 +1153,36 @@ try {
     Assert-True 'SwitchSpace on a malformed file exits 2' ($outD -match 'SWITCH-CODE=2\b') $outD
     Assert-True 'and states why, as an Error' ($outD -match 'SWITCH-OUT=.*Error:.*will not parse, so the Space was not switched') $outD
     Assert-True 'and leaves the file byte for byte as it was' ([System.IO.File]::ReadAllText($p405Local) -eq $badBytes) ([System.IO.File]::ReadAllText($p405Local))
+
+    # (e) The two that write when the file DOES parse -- SwitchSpace and Log -Ack -- write it the way
+    # Config does (Write-ConfigJson): no BOM, LF, every other key kept, and a date-looking string kept
+    # as the string it was. Run on THIS host, which the suite runs under both: Set-Content -Encoding
+    # UTF8 put a BOM on the file under Windows PowerShell 5.1 and not under 7.
+    $hostExe = (Get-Process -Id $PID).Path
+    $goodJson = '{ "quietStart": true, "menuResetTimestamp": "2026-10-01T09:00:00" }'
+    Invoke-LockRetry 'write of a scratch file' { [System.IO.File]::WriteAllText($p405Local, $goodJson, (New-Object System.Text.UTF8Encoding($true))) }
+    $cmdE = "`$env:PSModulePath = '$p405Q' + [System.IO.Path]::PathSeparator + `$env:PSModulePath; `$env:P20_USAGE_LOG_DIR = '$p405LogsQ'; " +
+        "Import-Module '$p405Q/utilities.psm1' -Force -DisableNameChecking 3>`$null; " +
+        "`$null = & { ${p405Prefix}SwitchSpace azure-demo } *>&1; 'SWITCH-CODE=' + `$LASTEXITCODE"
+    $outE = (& $hostExe -NoProfile -EncodedCommand ([Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($cmdE))) 2>&1 | ForEach-Object { $_.ToString() }) -join "`n"
+    $eBytes = [System.IO.File]::ReadAllBytes($p405Local)
+    $eText = [System.Text.Encoding]::UTF8.GetString($eBytes)
+    Assert-True 'SwitchSpace over a parsing file exits 0' ($outE -match 'SWITCH-CODE=0\b') $outE
+    Assert-True 'and writes config.local.json with no BOM on this host' (-not ($eBytes.Length -ge 3 -and $eBytes[0] -eq 0xEF -and $eBytes[1] -eq 0xBB -and $eBytes[2] -eq 0xBF)) (($eBytes | Select-Object -First 3) -join ',')
+    Assert-True 'with LF line endings and the two-space indent Config writes' (($eText -notmatch "`r") -and ($eText -match '(?m)^  "activeSpace": "azure-demo"')) $eText
+    Assert-True 'keeping the keys it did not change, a date-looking string as itself' (($eText -match '"quietStart": true') -and ($eText -match '"menuResetTimestamp": "2026-10-01T09:00:00"')) $eText
+
+    Invoke-LockRetry 'write of a scratch file' { [System.IO.File]::WriteAllText($p405Local, $goodJson, (New-Object System.Text.UTF8Encoding($true))) }
+    $cmdF = "`$env:PSModulePath = '$p405Q' + [System.IO.Path]::PathSeparator + `$env:PSModulePath; `$env:P20_USAGE_LOG_DIR = '$p405LogsQ'; " +
+        "Import-Module '$p405Q/utilities.psm1' -Force -DisableNameChecking 3>`$null; " +
+        "`$null = & { ${p405Prefix}Log -Ack } *>&1; 'ACK-CODE=' + `$LASTEXITCODE"
+    $outF = (& $hostExe -NoProfile -EncodedCommand ([Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($cmdF))) 2>&1 | ForEach-Object { $_.ToString() }) -join "`n"
+    $fBytes = [System.IO.File]::ReadAllBytes($p405Local)
+    $fText = [System.Text.Encoding]::UTF8.GetString($fBytes)
+    Assert-True 'Log -Ack over a parsing file exits 0' ($outF -match 'ACK-CODE=0\b') $outF
+    Assert-True 'and writes config.local.json with no BOM on this host' (-not ($fBytes.Length -ge 3 -and $fBytes[0] -eq 0xEF -and $fBytes[1] -eq 0xBB -and $fBytes[2] -eq 0xBF)) (($fBytes | Select-Object -First 3) -join ',')
+    Assert-True 'with LF line endings, and the stamp it writes' (($fText -notmatch "`r") -and ($fText -match '(?m)^  "errorsAckedAt": "\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}"')) $fText
+    Assert-True 'keeping the keys it did not change, a date-looking string as itself' (($fText -match '"quietStart": true') -and ($fText -match '"menuResetTimestamp": "2026-10-01T09:00:00"')) $fText
 }
 catch { Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message }
 finally { Remove-Item $p405 -Recurse -Force -ErrorAction SilentlyContinue }

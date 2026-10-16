@@ -1485,6 +1485,19 @@ foreach ($cmdName in $commandNames) {
     if (-not $scriptCmd) { continue }
     $parityChecked++
 
+    # A script that states a refusal (exit 2) is reached through the guard,
+    # Invoke-ToolkitScript, or the refusal is never logged and a non-interactive
+    # caller is told it succeeded (AGENTS.md, "The refusal contract"). The two
+    # launchers below are the only exceptions, and each is listed with its reason.
+    $bareByDesign = @{
+        Web   = 'Start-Web.ps1 logs, prints and exits its own refusals; a second report from the wrapper would print a generic block under the readable one.'
+        Agent = 'Start-Agent.ps1 logs, prints and exits its own refusals (ERR included); the guard would add a second ERR line and a generic block.'
+    }
+    $scriptRaw = [System.IO.File]::ReadAllText($scriptPath)
+    if ($scriptRaw -match '(?m)^\s*exit 2' -and -not $bareByDesign.ContainsKey($cmdName)) {
+        Assert-True "$cmdName : its script states refusals (exit 2), so the wrapper reaches it through Invoke-ToolkitScript" ($wrapper.Definition -match 'Invoke-ToolkitScript')
+    }
+
     $scriptNames  = Get-ParameterNames $scriptCmd
     $wrapperNames = Get-ParameterNames $wrapper
 
@@ -1561,6 +1574,85 @@ foreach ($cmdName in $commandNames) {
     }
 }
 Assert-True "parity ran over the script-backed verbs" ($parityChecked -ge 18)
+
+Write-Host ""
+
+# -- Menu -Reset writes through Config -----------------------------------------
+# config.local.json has one writer, Config (Scripts/Set-ToolkitConfig.ps1). The
+# reset used to write the file itself with Set-Content -Encoding UTF8, which puts
+# a byte-order mark on it under Windows PowerShell 5.1 and not under 7. Run on
+# THIS host -- the suite runs under both -- in a scratch package, twice: with no
+# config.local.json, and with one that already carries a BOM (as an earlier
+# reset left it). Either way the file comes out BOM-less, with the stamp, and
+# with the keys it already had.
+
+Write-Host "-- Menu -Reset: Config is the writer ----------------------" -ForegroundColor Cyan
+
+$resetHost = (Get-Process -Id $PID).Path
+$resetLogs = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-menu-reset-logs-" + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $resetLogs -Force | Out-Null
+foreach ($resetCase in @(
+        @{ Label = 'with no config.local.json'; Bom = $false; Json = '' },
+        @{ Label = 'over a config.local.json that has a BOM'; Bom = $true; Json = '{ "quietStart": true }' })) {
+    $resetScratch = New-MenuScratch ''
+    try {
+        $resetLocal = Join-Path $resetScratch 'config.local.json'
+        if ($resetCase.Json) {
+            [System.IO.File]::WriteAllText($resetLocal, $resetCase.Json, (New-Object System.Text.UTF8Encoding($resetCase.Bom)))
+        }
+        # The scratch has no config.local.json of this machine's, so its prefix is the shipped one.
+        $resetPrefix = ((Get-Content (Join-Path $resetScratch 'config.default.json') -Raw) | ConvertFrom-Json).commandPrefix
+        $resetModule = (Join-Path $resetScratch 'utilities.psm1') -replace "'", "''"
+        $resetLogsQ = $resetLogs -replace "'", "''"
+        $resetCmd = "`$env:PSModulePath = '$($resetScratch -replace "'", "''")' + [System.IO.Path]::PathSeparator + `$env:PSModulePath; `$env:P20_USAGE_LOG_DIR = '$resetLogsQ'; " +
+            "Get-ChildItem Env: | Where-Object { `$_.Name -like 'TEAMS_WEBHOOK_*' } | ForEach-Object { Remove-Item ('Env:' + `$_.Name) }; " +
+            "Import-Module '$resetModule' -Force -DisableNameChecking 3>`$null; " +
+            "`$r = & { ${resetPrefix}Menu -Reset } *>&1 | Out-String; 'RESET-CODE=' + `$LASTEXITCODE; 'RESET-OUT=' + (`$r -replace '\s+', ' ')"
+        $resetEncoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($resetCmd))
+        $savedEap = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        $resetOut = (& $resetHost -NoProfile -EncodedCommand $resetEncoded 2>&1 | ForEach-Object { $_.ToString() }) -join "`n"
+        $ErrorActionPreference = $savedEap
+
+        Assert-True "Menu -Reset $($resetCase.Label): says the scores were reset" ($resetOut -match 'RESET-OUT=.*Menu scores reset') $resetOut
+        Assert-True "Menu -Reset $($resetCase.Label): exit 0" ($resetOut -match 'RESET-CODE=0\b') $resetOut
+        Assert-True "Menu -Reset $($resetCase.Label): Config's own lines are not printed on success" ($resetOut -notmatch '\[\+\] menuResetTimestamp') $resetOut
+        Assert-True "Menu -Reset $($resetCase.Label): config.local.json exists" (Test-Path $resetLocal)
+        if (Test-Path $resetLocal) {
+            $resetBytes = [System.IO.File]::ReadAllBytes($resetLocal)
+            $hasBom = ($resetBytes.Length -ge 3 -and $resetBytes[0] -eq 0xEF -and $resetBytes[1] -eq 0xBB -and $resetBytes[2] -eq 0xBF)
+            Assert-True "Menu -Reset $($resetCase.Label): config.local.json has no BOM on this host" (-not $hasBom) (($resetBytes | Select-Object -First 3) -join ',')
+            $resetText = [System.Text.Encoding]::UTF8.GetString($resetBytes)
+            Assert-True "Menu -Reset $($resetCase.Label): the stamp is written" ($resetText -match '"menuResetTimestamp":\s*"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}"') $resetText
+            Assert-True "Menu -Reset $($resetCase.Label): with Config's line endings (LF)" ($resetText -notmatch "`r") $resetText
+            if ($resetCase.Json) {
+                Assert-True "Menu -Reset $($resetCase.Label): the keys already there are kept" ($resetText -match '"quietStart":\s*true') $resetText
+            }
+        }
+    }
+    catch {
+        Assert-True "Menu -Reset $($resetCase.Label): ran to the end without a terminating error -- $($_.Exception.Message)" $false
+    }
+    finally { Remove-Item $resetScratch -Recurse -Force -ErrorAction SilentlyContinue }
+}
+Remove-Item $resetLogs -Recurse -Force -ErrorAction SilentlyContinue
+
+# Config is the only writer: no Set-Content into config.local.json in the module,
+# and the reset reaches the file through the Config script.
+$resetModuleText = Get-Content (Join-Path $toolkitRoot 'utilities.psm1') -Raw
+Assert-True 'utilities.psm1 has no Set-Content into config.local.json' ($resetModuleText -notmatch 'Set-Content.*config\.local')
+$resetFn = Get-Command Reset-P20MenuScoring -ErrorAction SilentlyContinue
+Assert-True 'the scores reset is a function of its own' ($null -ne $resetFn)
+if ($resetFn) {
+    Assert-True 'and it writes through the Config script' ($resetFn.Definition -match 'Set-ToolkitConfig\.ps1')
+}
+foreach ($menuJob in @('Show-P20MenuHelp', 'Get-P20MenuMarkdown')) {
+    Assert-True "$menuJob is a function of its own" ($null -ne (Get-Command $menuJob -ErrorAction SilentlyContinue))
+}
+$menuFn = Get-Command Get-P20Menu -ErrorAction SilentlyContinue
+if ($menuFn) {
+    Assert-True 'Get-P20Menu writes no file itself' ($menuFn.Definition -notmatch 'Set-Content|WriteAllText|ConvertTo-Json')
+}
 
 Write-Host ""
 

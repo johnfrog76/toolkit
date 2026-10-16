@@ -163,7 +163,7 @@ module and you add a mock line to every one of these files.
 **Four test runners**, one per half plus one for the two together. Run the ones your change touches:
 
 ```powershell
-tkTestToolkit                 # the CLI -- 43 suites, 7065 assertions on this commit
+tkTestToolkit                 # the CLI -- 43 suites, 7172 assertions on this commit
 ```
 
 ```bash
@@ -360,14 +360,14 @@ Done locally is not Closed on the board. If the card should be closed, run `tkCl
   where the read is correct, from a function body, where it is the trap). Every module variable a
   global function reads -- `Config`, `Commands`, `CommandMap`, `AdoCommands`, `DeprecatedAliases`,
   `ShownDeprecationHints`, `SkipNavAliases`, `ModuleCommandsLoaded` -- is a key of
-  `$script:ModuleState`, and the five functions that read them (`Get-P20Menu`, `Register-PromptAlias`,
-  `Get-P20CommandMap`, `Get-P20ModuleCommands`, `Write-P20DeprecationHint`) open with
+  `$script:ModuleState`, and the six functions that read them (`Get-P20Menu`, `Get-P20MenuMarkdown`,
+  `Register-PromptAlias`, `Get-P20CommandMap`, `Get-P20ModuleCommands`, `Write-P20DeprecationHint`) open with
   `$s = Get-P20ModuleState` -- an accessor that IS a closure over the container -- and stay ordinary
   `function global:` bodies. **They are not closures themselves, on purpose**: a `GetNewClosure()`
   body is bound to a NEW dynamic module, so a module-private helper (`function script:Register-P20NavAliases`,
   `Resolve-InvokedCommand`) is not visible from inside it -- make `Register-PromptAlias` a
   closure and the module stops importing. A closure may hold the table; a function that calls
-  helpers reads it through the accessor. `tkTestToolkit -Environment` runs all five in both call
+  helpers reads it through the accessor. `tkTestToolkit -Environment` runs all six in both call
   shapes with every name shadowed. A new global function that needs module state adds a key to the
   container and reads it through `Get-P20ModuleState` -- not a `$script:` read, because Clause 8 will
   refuse it, and not a closure of its own if it calls anything private. **A module's command file is

@@ -47,10 +47,19 @@ if ($env:P20_USAGE_LOG_DIR -and $env:P20_USAGE_LOG_DIR.Trim()) { $logRoot = $env
 # -- Ack: dismiss error indicator ----------------------------------------------
 if ($Ack) {
     $localCfgPath = Join-Path $toolkitRoot 'config.local.json'
+    # Config's own writer for the file: no BOM, LF, atomic, the same on both hosts.
+    # Resolve-HubConfig.ps1 gives it the long form of a short (8.3) folder name.
+    if (-not (Get-Command ConvertTo-P20LongPath -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Resolve-HubConfig.ps1') }
+    if (-not (Get-Command Write-ConfigJson -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Write-ConfigJson.ps1') }
+    # Read so it can be written back as it was: PowerShell 7 would otherwise turn an
+    # ISO-8601-looking string (menuResetTimestamp) into a [datetime], and the writer
+    # would put it back in another format. 5.1 never does.
+    $ackJsonArgs = @{}
+    if ((Get-Command ConvertFrom-Json).Parameters.ContainsKey('DateKind')) { $ackJsonArgs['DateKind'] = 'String' }
     if (Test-Path $localCfgPath) {
         # A file that will not parse is left exactly as it is: writing the ack into
         # what was read (nothing) would replace the person's settings.
-        try { $localCfg = Get-Content $localCfgPath -Raw | ConvertFrom-Json }
+        try { $localCfg = Get-Content $localCfgPath -Raw -Encoding UTF8 | ConvertFrom-Json @ackJsonArgs }
         catch {
             if (-not (Get-Command Write-P20ConfigParseWarning -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Write-ConfigParseWarning.ps1') }
             $null = Write-P20ConfigParseWarning -Path $localCfgPath -Message $_.Exception.Message
@@ -65,7 +74,7 @@ if ($Ack) {
         $localCfg = [PSCustomObject]@{}
     }
     $localCfg | Add-Member -NotePropertyName 'errorsAckedAt' -NotePropertyValue (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss') -Force
-    $localCfg | ConvertTo-Json -Depth 10 | Set-Content $localCfgPath -Encoding UTF8
+    Write-ConfigJson -Path $localCfgPath -Value $localCfg
     Write-Host "  Errors acknowledged - indicator dismissed until new errors occur." -ForegroundColor Green
     return
 }
