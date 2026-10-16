@@ -70,7 +70,7 @@ What ships in the browser bundle: 248 packages, besides the web package itself (
 | `@fluentui/react-divider` | 9.7.5 |
 | `@fluentui/react-drawer` | 9.13.4 |
 | `@fluentui/react-field` | 9.5.5 |
-| `@fluentui/react-icons` | 2.0.343 |
+| `@fluentui/react-icons` | 2.0.344 |
 | `@fluentui/react-image` | 9.4.5 |
 | `@fluentui/react-infobutton` | 9.0.1-beta.1 |
 | `@fluentui/react-infolabel` | 9.4.27 |

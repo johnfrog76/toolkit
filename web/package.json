@@ -30,7 +30,7 @@
   "dependencies": {
     "@fluentui/keyboard-keys": "^9.0.9",
     "@fluentui/react-components": "^9.74.9",
-    "@fluentui/react-icons": "^2.0.343",
+    "@fluentui/react-icons": "^2.0.344",
     "@reduxjs/toolkit": "^2.13.0",
     "luxon": "^3.7.2",
     "react": "^19.3.0",
@@ -61,11 +61,11 @@
     "jest-environment-jsdom": "^30.5.2",
     "markdownlint-cli2": "^0.23.3",
     "playwright": "^1.63.0",
-    "prettier": "^3.9.9",
+    "prettier": "^3.9.10",
     "ts-jest": "^29.4.14",
     "typescript": "6.0.3",
-    "typescript-eslint": "^8.71.1",
-    "vite": "^8.3.3"
+    "typescript-eslint": "^8.71.2",
+    "vite": "^8.3.4"
   },
   "overrides": {
     "eslint": "$eslint"
