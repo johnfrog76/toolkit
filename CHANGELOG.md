@@ -20,6 +20,7 @@ release.
 - Screen readers now announce the name of each field in the create and action dialogs (Work Item ID, Reason, Comment and the rest) instead of its placeholder text.
 - NewPrompt on an Azure DevOps work item now stops with a message pointing at `az login` when no token is available to read the work item's comments, instead of quietly writing a card without them.
 - A screen reader now announces the web UI's success and error messages as they appear, and names the "Loading toolkit..." spinner on first load.
+- Every Azure DevOps verb now stops with a message pointing at `az login` when `az` cannot give a token, before calling Azure DevOps (CloseItem and NewItem used to send az's error text as the token), and GetPRComments and AddPRReview give the same sign-in advice for a 401 as for a 403.
 
 ## [1.0.0] - 2026-10-15
 

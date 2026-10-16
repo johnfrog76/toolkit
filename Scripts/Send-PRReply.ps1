@@ -158,14 +158,13 @@ $ErrorActionPreference = 'Stop'
 # ── Main ─────────────────────────────────────────────────────────────────────
 try {
     # Auth
-    $tenantArg = if ($global:P20Config.Tenant) { @('--tenant', $global:P20Config.Tenant) } else { @() }
-    $tokenOutput = az account get-access-token @tenantArg --resource "499b84ac-1321-427f-aa17-267ca6975798" --query accessToken -o tsv 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        Write-CliError -Message "Failed to get ADO access token. Run 'az login' first." -Hint "az said: $tokenOutput"
+    . (Join-Path $PSScriptRoot 'Get-AdoToken.ps1')
+    $tokenRead = Get-P20AdoToken -Tenant $global:P20Config.Tenant
+    if (-not $tokenRead.Ok) {
+        Write-CliError -Message $tokenRead.Message -Hint $tokenRead.Hint
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
-    $token = $tokenOutput | Where-Object { $_ -notmatch '^WARNING:' }
-    $headers = @{ Authorization = "Bearer $token"; "Content-Type" = "application/json" }
+    $headers = Get-P20AdoHeaders -Token $tokenRead.Token
 
     # Auto-resolve project/repo from PR ID if user didn't specify
     if (-not $userSpecifiedProject -and -not $userSpecifiedRepo) {

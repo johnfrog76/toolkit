@@ -397,7 +397,7 @@ Assert-True "AddPRReview search: HTTP 404 is one block and exit 2 (got $($notHer
 
 # The PR-details fetch is the second call in the same script. It knew only 403, so a
 # 401 fell through to "Could not fetch PR" with the raw exception instead of the az
-# login advice. It reads the status through the same Get-AdoHttpStatus.
+# login advice. It reads the status through Get-P20AdoHttpStatus (Scripts/Get-AdoToken.ps1).
 foreach ($code in @(401, 403)) {
     $stub = $prSearchStub.Replace('__STATUS__', "$code")
     $det = Invoke-ChildRun "$tier1Env`n$stub`n${cfgPrefix}AddPRReview -PullRequestId 4242`n'LASTEXITCODE=' + `$LASTEXITCODE`nexit `$LASTEXITCODE"
