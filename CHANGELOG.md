@@ -8,6 +8,10 @@ release.
 
 ## [Unreleased]
 
+### Added
+
+- CodeQL scans the web and the agent on every push to main, every pull request and weekly.
+
 ### Fixed
 
 - Archiving a card that was created and archived with no commit in between now commits the move instead of silently leaving it uncommitted, and a commit git refuses is reported as an error (exit 2) with git's own message instead of a warning.
