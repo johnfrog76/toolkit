@@ -241,7 +241,7 @@ try {
     # Update SAYS, once, and writes nothing: the verb that dresses them is Cover -Samples.
     Write-Host ""
     Write-Host "-- An older Demo: Update says, and writes nothing -----" -ForegroundColor Cyan
-    $coverHelpers = @('Get-SampleCoverGaps.ps1', 'Add-CardImage.ps1', 'Get-Consts.ps1', 'Resolve-CardName.ps1', 'Set-CardLine.ps1', 'Write-CardText.ps1')
+    $coverHelpers = @('Get-SampleCoverGaps.ps1', 'Add-CardImage.ps1', 'Invoke-TrackerRead.ps1', 'Get-Consts.ps1', 'Resolve-CardName.ps1', 'Set-CardLine.ps1', 'Write-CardText.ps1')
     function New-CoverConsumer {
         param([string]$Name)
         $path = New-Consumer $Name
