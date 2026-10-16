@@ -96,5 +96,31 @@ class TheOverrideMovesTheLog(unittest.TestCase):
         )
 
 
+class TestBomCarryingLog(unittest.TestCase):
+    """A log an older Windows PowerShell created starts with a byte-order mark;
+    the repo-health error count must still see its first line."""
+
+    def test_first_line_of_a_bom_log_is_counted(self):
+        import time
+        from types import SimpleNamespace
+        from unittest import mock
+
+        try:
+            from agent.ado import accounting
+        except Exception as e:  # pragma: no cover - environment without the deps
+            self.skipTest(f"cannot import accounting ({type(e).__name__}: {e})")
+        stamp = time.strftime("%Y-%m-%dT%H:%M:%S")
+        with tempfile.TemporaryDirectory() as td:
+            Path(td, "usage.M.log").write_bytes(
+                b"\xef\xbb\xbf" + f"{stamp}\tERR\tM\tsrc\tdetail\n".encode()
+            )
+            fail = SimpleNamespace(returncode=1, stdout="", stderr="")
+            with mock.patch.object(accounting, "REPO_ROOT", Path(td)), mock.patch.object(
+                accounting, "run_read", return_value=fail
+            ):
+                health = accounting._get_repo_health()
+        self.assertEqual(health.recent_errors, 1)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

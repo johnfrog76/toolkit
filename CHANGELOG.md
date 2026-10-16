@@ -14,7 +14,7 @@ release.
 
 ### Fixed
 
-- Fetching pull request comments now writes them into the card whose id is the linked work item, never into another card whose name merely contains that number.
+- A new usage log no longer starts with a byte-order mark, so its first line reads the same as every other and the same on every host.
 - Moving a design in the hub, or attaching a cover or before picture, now reports a commit git refuses as an error (exit 2) with git's own message and says the files are already written, instead of a warning that reads as success.
 - Archiving a card that was created and archived with no commit in between now commits the move instead of silently leaving it uncommitted, and a commit git refuses is reported as an error (exit 2) with git's own message instead of a warning.
 - Attaching a cover or a before picture from the browser no longer leaves a copy of the image in the system temp folder for good; it is removed once the card has the picture, and stale ones are cleared when the agent starts.
@@ -28,6 +28,7 @@ release.
 - A screen reader now announces the web UI's success and error messages as they appear, and names the "Loading toolkit..." spinner on first load.
 - Every Azure DevOps verb now stops with a message pointing at `az login` when `az` cannot give a token, before calling Azure DevOps (CloseItem and NewItem used to send az's error text as the token), and GetPRComments and AddPRReview give the same sign-in advice for a 401 as for a 403.
 - Every page now has one top-level heading for screen-reader navigation, and the loading spinners inside buttons are named.
+- Fetching pull request comments now writes them into the card whose id is the linked work item, never into another card whose name merely contains that number.
 
 ## [1.0.0] - 2026-10-15
 

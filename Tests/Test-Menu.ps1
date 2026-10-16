@@ -799,6 +799,8 @@ try {
     Assert-True 'a write lands in the directory the override names' (Test-Path $scratchLog)
     if (Test-Path $scratchLog) {
         Assert-Contains 'the entry is the one that was written' (Get-Content $scratchLog -Raw) 'this is an assertion, not an event'
+        $logHead = [System.IO.File]::ReadAllBytes($scratchLog) | Select-Object -First 3
+        Assert-True 'a fresh usage log does not start with a byte-order mark' (-not ($logHead.Count -eq 3 -and $logHead[0] -eq 0xEF -and $logHead[1] -eq 0xBB -and $logHead[2] -eq 0xBF))
     }
     else {
         Assert-True 'the entry is the one that was written' $false
