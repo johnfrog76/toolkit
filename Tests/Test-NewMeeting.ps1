@@ -86,6 +86,8 @@ function New-MeetingSandbox {
     Copy-Item (Join-Path $pkgRoot 'Scripts/Write-ConfigParseWarning.ps1') (Join-Path $root 'pkg/Scripts/Write-ConfigParseWarning.ps1')
     # The one writer: a scaffolded session gets the same bytes a card does.
     Copy-Item (Join-Path $pkgRoot 'Scripts/Write-CardText.ps1') (Join-Path $root 'pkg/Scripts/Write-CardText.ps1')
+    # Get-CliPrefix and Write-CliError for a run with no module, dot-sourced at load.
+    Copy-Item (Join-Path $pkgRoot 'Scripts/Initialize-CliFallbacks.ps1') (Join-Path $root 'pkg/Scripts/Initialize-CliFallbacks.ps1')
     Copy-Item $templateFile (Join-Path $root 'pkg/templates/ManagerSession.template.md')
     # The record's name rule is the contract's: the script reads it.
     Copy-Item (Join-Path $pkgRoot 'Scripts/Get-Consts.ps1') (Join-Path $root 'pkg/Scripts/Get-Consts.ps1')

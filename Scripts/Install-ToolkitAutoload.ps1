@@ -70,15 +70,7 @@ param(
     [switch]$Help
 )
 
-# Get-CliPrefix normally comes from the module. These scripts are also invoked
-# directly -- by tests, by a user running the .ps1, by anything that wants -Help
-# without importing first -- so a missing helper must not be fatal.
-if (-not (Get-Command Get-CliPrefix -ErrorAction SilentlyContinue)) {
-    function Get-CliPrefix {
-        if ($global:P20Config -and $global:P20Config.CommandPrefix) { return $global:P20Config.CommandPrefix }
-        return ''
-    }
-}
+. (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
 
 
 $ErrorActionPreference = 'Stop'
@@ -91,10 +83,6 @@ if ($Help) {
 # The prefix this package registers, and the shipped default behind it, read
 # from one place rather than typed here.
 . (Join-Path $PSScriptRoot 'Resolve-CliPrefix.ps1')
-
-if (-not (Get-Command Write-CliError -ErrorAction SilentlyContinue)) {
-    function Write-CliError { param([string]$Message, [string]$Hint) Write-Host "Error: $Message" -ForegroundColor Red; if ($Hint) { Write-Host "Hint: $Hint" -ForegroundColor Yellow } }
-}
 
 # -Remove is the way back out: it undoes what the install wrote, and nothing else.
 # It never reads the shim's source and never touches the checkout a link points at.

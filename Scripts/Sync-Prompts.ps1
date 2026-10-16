@@ -39,24 +39,7 @@ if ($global:P20Config.StoreSync -ne 'git') {
 }
 
 $promptsRoot = $global:P20Config.PromptsRoot
-if (-not (Get-Command Get-CliPrefix -ErrorAction SilentlyContinue)) {
-    function Get-CliPrefix {
-        if ($global:P20Config -and $global:P20Config.CommandPrefix) { return $global:P20Config.CommandPrefix }
-        return ''
-    }
-}
-
-# Write-CliError normally comes from the module too, and it is what makes a
-# refusal ONE block: the wrapper sees the stated exit code and adds nothing.
-# See AGENTS.md, "The refusal contract".
-if (-not (Get-Command Write-CliError -ErrorAction SilentlyContinue)) {
-    function Write-CliError {
-        param([string]$Message, [string]$Hint)
-        $global:P20StatedError = $Message
-        Write-Host "Error: $Message" -ForegroundColor Red
-        if ($Hint) { Write-Host "Hint:  $Hint" -ForegroundColor Yellow }
-    }
-}
+. (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
 
 # Test-P20HubRoot and the one "hub not found" sentence live here, and this file
 # is dot-sourced rather than reached through the module because this script also

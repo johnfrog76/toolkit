@@ -97,10 +97,12 @@ A command that refuses says why once, and the exit code carries that across the 
 script in `Scripts/` and the wrapper in `utilities.psm1` that ran it. A script that refuses calls
 `Write-CliError`, which prints the `Error:` and the `Hint:`, and exits **2**; the wrapper then prints
 nothing on top. Any other non-zero exit is a failure that said nothing, and the wrapper explains it
-with a generic block. Exit 0 is success and nothing else is. A switch you add to a script goes in
-three places -- the script's `param()`, the wrapper's `param()` in `utilities.psm1`, and the verb's
-`usage` in `config.default.json` -- and `tkTestToolkit -Menu` checks the three against each other. The
-full contract is [`AGENTS.md`, "The refusal contract"](../AGENTS.md#the-refusal-contract).
+with a generic block. Exit 0 is success and nothing else is. A new script dot-sources
+`Scripts/Initialize-CliFallbacks.ps1` near its top, before its first refusal, so it refuses the same
+way when it is run with no module loaded; it does not carry its own copy of either helper. A switch
+you add to a script goes in three places -- the script's `param()`, the wrapper's `param()` in
+`utilities.psm1`, and the verb's `usage` in `config.default.json` -- and `tkTestToolkit -Menu`
+checks the three against each other. The full contract is [`AGENTS.md`, "The refusal contract"](../AGENTS.md#the-refusal-contract).
 
 ## The documentation rule
 

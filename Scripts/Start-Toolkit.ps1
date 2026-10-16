@@ -59,12 +59,7 @@ param(
 
 # The prefix is config, never a literal. Run without the module there may be no
 # config at all, and then the bare verb name is still right.
-if (-not (Get-Command Get-CliPrefix -ErrorAction SilentlyContinue)) {
-    function Get-CliPrefix {
-        if ($global:P20Config -and $global:P20Config.CommandPrefix) { return $global:P20Config.CommandPrefix }
-        return ''
-    }
-}
+. (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
 
 function Write-StartRefusal {
     param([string]$Message, [string]$Hint)

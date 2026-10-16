@@ -25,13 +25,7 @@ $p = if (Get-Command Get-CliPrefix -ErrorAction SilentlyContinue) { Get-CliPrefi
 # A failed `az`/`gh` call used to leave its exit code behind a script that then
 # `return`ed -- "No active PRs found." followed by the wrapper's reasonless
 # "Error: exit code 1". Every way out of this script now says which.
-if (-not (Get-Command Write-CliError -ErrorAction SilentlyContinue)) {
-    function Write-CliError {
-        param([string]$Message, [string]$Hint)
-        Write-Host "Error: $Message" -ForegroundColor Red
-        if ($Hint) { Write-Host "Hint:  $Hint" -ForegroundColor Yellow }
-    }
-}
+. (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
 
 # One PR query, and whether the tracker answered it. stderr is kept so a
 # rejection can be NAMED rather than swallowed; `2>$null` is what hid it.

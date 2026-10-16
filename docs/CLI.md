@@ -971,6 +971,13 @@ readable sentence followed by a generic `Error: exit code 1` that says less than
 A refusal is a failure the caller can see. `tkArchive does-not-exist` leaves `$LASTEXITCODE = 2`,
 and through the agent it is `status: error` with the stated sentence -- never `success`.
 
+**A script run on its own refuses the same way.** A script in `Scripts/` can be run with no module
+loaded (`pwsh -File Scripts/<name>.ps1`, a test, a `-Help` before the first import). It then takes
+`Get-CliPrefix` and `Write-CliError` from `Scripts/Initialize-CliFallbacks.ps1`, which it dot-sources
+at the top and which defines each one only when the module has not: the same `Error:`/`Hint:` block,
+the same exit 2, and the stated reason recorded in `$global:P20StatedError` as the module records it.
+That file is the one copy; `Tests/Test-Portability.ps1` refuses a script that carries its own.
+
 **A verb is two `param()` blocks, and they are held in step by a test.** The wrapper in
 `utilities.psm1` owns the alias and forwards `$PSBoundParameters`; the script in `Scripts/` does the
 work. A switch the wrapper does not declare is rejected by the **binder**, before the script runs --

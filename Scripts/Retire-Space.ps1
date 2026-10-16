@@ -42,14 +42,7 @@ $loadHelpers = {
     }
 }
 . $loadHelpers
-if (-not (Get-Command Write-CliError -ErrorAction SilentlyContinue)) {
-    function Write-CliError {
-        param([string]$Message, [string]$Hint)
-        $global:P20StatedError = $Message
-        Write-Host "Error: $Message" -ForegroundColor Red
-        if ($Hint) { Write-Host "Hint:  $Hint" -ForegroundColor Yellow }
-    }
-}
+. (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
 $prefix = ''
 if (Get-Command Get-CliPrefix -ErrorAction SilentlyContinue) { $prefix = Get-CliPrefix }
 if (-not $prefix) { $prefix = Resolve-P20ConfigPrefix -PackageRoot $packageRoot }

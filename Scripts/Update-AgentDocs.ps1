@@ -52,16 +52,7 @@ if ($Help) {
     return
 }
 
-# Write-CliError normally comes from the module; it is what makes a refusal ONE
-# block. See AGENTS.md, "The refusal contract".
-if (-not (Get-Command Write-CliError -ErrorAction SilentlyContinue)) {
-    function Write-CliError {
-        param([string]$Message, [string]$Hint)
-        $global:P20StatedError = $Message
-        Write-Host "Error: $Message" -ForegroundColor Red
-        if ($Hint) { Write-Host "Hint:  $Hint" -ForegroundColor Yellow }
-    }
-}
+. (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
 
 $pkgRoot   = Split-Path -Parent $PSScriptRoot
 $sourcePath = Join-Path $pkgRoot 'AGENTS.md'

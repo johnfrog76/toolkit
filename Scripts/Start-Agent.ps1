@@ -43,19 +43,7 @@ $repoRoot = Split-Path $PSScriptRoot -Parent
 # These normally come from the module. The script is also run directly -- by
 # the suite, by a person running the .ps1, by Start-Web.ps1 -- so a missing
 # helper must not be fatal. Same pattern as Get-Environment.ps1.
-if (-not (Get-Command Get-CliPrefix -ErrorAction SilentlyContinue)) {
-    function Get-CliPrefix {
-        if ($global:P20Config -and $global:P20Config.CommandPrefix) { return $global:P20Config.CommandPrefix }
-        return ''
-    }
-}
-if (-not (Get-Command Write-CliError -ErrorAction SilentlyContinue)) {
-    function Write-CliError {
-        param([string]$Message, [string]$Hint)
-        Write-Host "Error: $Message" -ForegroundColor Red
-        if ($Hint) { Write-Host "Hint:  $Hint" -ForegroundColor Yellow }
-    }
-}
+. (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
 
 $script:IsWin = ($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows
 

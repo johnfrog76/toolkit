@@ -41,6 +41,8 @@ if ($Help) {
   Clause 14 No comment carries a date, a name, an agent, a nickname for a host, a tracker
             number, an archive pointer, a private repository or a machine path
   Clause 15 No gh or az call with a redirected stderr outside Invoke-TrackerRead.ps1
+  Clause 16 No script in Scripts/ carries its own Get-CliPrefix or Write-CliError fallback;
+            Scripts/Initialize-CliFallbacks.ps1 is the one copy
 
   Scope: all three halves -- *.psm1 at the root, Scripts/, Prompt20Toolkit/,
   web/src, web/tests and agent/ -- plus root JSON and Markdown, and Tests/
@@ -455,6 +457,7 @@ $adHome = Join-Path $adScratch 'home'
 New-Item -ItemType Directory -Path (Join-Path $adPkg 'Scripts'), $adHome -Force | Out-Null
 Copy-Item $genScript (Join-Path $adPkg 'Scripts/Update-AgentDocs.ps1')
 Copy-Item (Join-Path $pkgRoot 'Scripts/Write-CardText.ps1') (Join-Path $adPkg 'Scripts/Write-CardText.ps1')
+Copy-Item (Join-Path $pkgRoot 'Scripts/Initialize-CliFallbacks.ps1') (Join-Path $adPkg 'Scripts/Initialize-CliFallbacks.ps1')
 Copy-Item (Join-Path $pkgRoot 'AGENTS.md') (Join-Path $adPkg 'AGENTS.md')
 $adScript = Join-Path $adPkg 'Scripts/Update-AgentDocs.ps1'
 $adHomeSkill = Join-Path $adHome '.claude/skills/toolkit-ado/SKILL.md'
@@ -497,6 +500,7 @@ $u8Home = Join-Path $u8Scratch 'home'
 New-Item -ItemType Directory -Path (Join-Path $u8Pkg 'Scripts'), $u8Home -Force | Out-Null
 Copy-Item $genScript (Join-Path $u8Pkg 'Scripts/Update-AgentDocs.ps1')
 Copy-Item (Join-Path $pkgRoot 'Scripts/Write-CardText.ps1') (Join-Path $u8Pkg 'Scripts/Write-CardText.ps1')
+Copy-Item (Join-Path $pkgRoot 'Scripts/Initialize-CliFallbacks.ps1') (Join-Path $u8Pkg 'Scripts/Initialize-CliFallbacks.ps1')
 $u8Enc = New-Object System.Text.UTF8Encoding($false)
 $u8Marker = "configurable $([char]0x2014) caf$([char]0x00E9)"
 $u8Src = @('<!--', 'ONE LINE SUMMARY', "A summary $([char]0x2014) for the trigger.", '-->', '', '# Guide', '', $u8Marker) -join "`n"
@@ -1264,6 +1268,47 @@ catch {
 finally {
     Remove-Item -Path $cfgScratch -Recurse -Force -ErrorAction SilentlyContinue
 }
+
+# -- Clause 16: one copy of the standalone fallbacks ---------------------------
+# A script run with no module loaded takes Get-CliPrefix and Write-CliError from
+# Scripts/Initialize-CliFallbacks.ps1, which it dot-sources. Every script used to
+# carry its own pair, and copies drift: some of them stopped recording the stated
+# reason in $global:P20StatedError, so a refusal from those lost it. A definition
+# of either name anywhere else in Scripts/ is a new copy waiting to drift.
+$fbFile    = 'Initialize-CliFallbacks.ps1'
+$fbPattern = '^\s*function\s+(global:)?(Get-CliPrefix|Write-CliError)\b'
+$fbScripts = @(Get-ChildItem (Join-Path $pkgRoot 'Scripts') -Filter '*.ps1' -File -ErrorAction SilentlyContinue)
+$fbHits = @()
+foreach ($f in $fbScripts) {
+    if ($f.Name -eq $fbFile) { continue }
+    $lineNo = 0
+    foreach ($line in [System.IO.File]::ReadAllLines($f.FullName)) {
+        $lineNo++
+        if ($line -match $fbPattern) { $fbHits += "Scripts/$($f.Name):$lineNo  $($Matches[2])" }
+    }
+}
+$fbDetail = "read $($fbScripts.Count) scripts"
+if ($fbHits.Count -gt 0) {
+    $fbDetail = "dot-source Scripts/$fbFile instead of defining the helper: " + ($fbHits -join '; ')
+}
+Assert-True "Clause 16: no script in Scripts/ defines its own Get-CliPrefix or Write-CliError" (($fbHits.Count -eq 0) -and ($fbScripts.Count -ge 40)) $fbDetail
+$fbPrelude = Join-Path (Join-Path $pkgRoot 'Scripts') $fbFile
+$fbNames = @()
+if (Test-Path $fbPrelude) {
+    foreach ($line in [System.IO.File]::ReadAllLines($fbPrelude)) {
+        if ($line -match $fbPattern) { $fbNames += $Matches[2] }
+    }
+}
+Assert-True "Clause 16: Scripts/$fbFile defines both, once each" (
+    (@($fbNames | Where-Object { $_ -eq 'Get-CliPrefix' }).Count -eq 1) -and
+    (@($fbNames | Where-Object { $_ -eq 'Write-CliError' }).Count -eq 1)) "found: $($fbNames -join ', ')"
+$fbDotSourced = @($fbScripts | Where-Object { $_.Name -ne $fbFile -and ([System.IO.File]::ReadAllText($_.FullName)).Contains("'$fbFile'") })
+Assert-True "Clause 16: the scripts dot-source it ($($fbDotSourced.Count))" ($fbDotSourced.Count -ge 40) "dot-sourced by $($fbDotSourced.Count)"
+Assert-True "Clause 16: the sweep finds an inline definition, indented or global, and not a call" (
+    ('    function Write-CliError {' -match $fbPattern) -and
+    ('function global:Get-CliPrefix {' -match $fbPattern) -and
+    (-not ('    Write-CliError -Message "x"' -match $fbPattern)) -and
+    (-not ('function Get-CliPrefixes {' -match $fbPattern))) ''
 
 Write-Host ""
 Write-Host "  Results: $script:passed/$($script:passed + $script:failed) passed" -ForegroundColor $(if ($script:failed -eq 0) { 'Green' } else { 'Red' })

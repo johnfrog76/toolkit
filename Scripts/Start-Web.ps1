@@ -60,19 +60,7 @@ $repoRoot = Split-Path $PSScriptRoot -Parent
 $webPath = Join-Path $repoRoot 'web'
 $agentScript = Join-Path $PSScriptRoot 'Start-Agent.ps1'
 
-if (-not (Get-Command Get-CliPrefix -ErrorAction SilentlyContinue)) {
-    function Get-CliPrefix {
-        if ($global:P20Config -and $global:P20Config.CommandPrefix) { return $global:P20Config.CommandPrefix }
-        return ''
-    }
-}
-if (-not (Get-Command Write-CliError -ErrorAction SilentlyContinue)) {
-    function Write-CliError {
-        param([string]$Message, [string]$Hint)
-        Write-Host "Error: $Message" -ForegroundColor Red
-        if ($Hint) { Write-Host "Hint:  $Hint" -ForegroundColor Yellow }
-    }
-}
+. (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
 
 $script:IsWin = ($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows
 
