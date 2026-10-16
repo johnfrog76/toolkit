@@ -3,7 +3,7 @@
 # Python 3.12 or newer (docs/QUICKSTART.md, "Requirements"); nothing older is run.
 fastapi>=0.143.0
 uvicorn[standard]>=0.54.0
-pydantic>=2.14.0
+pydantic>=2.14.1
 # The model-assisted routes (suggest, rewrite) call the model through the
 # official SDK; agent/core/model.py imports it lazily, so an agent without it
 # still starts and declines those two routes by name.
