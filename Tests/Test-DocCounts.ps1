@@ -339,6 +339,40 @@ if ($whyStart -ge 0 -and $whyEnd -gt $whyStart) {
     }
 }
 
+# -- docs/TESTING.md's agent row counts its test files ------------------------------
+# The inventory row for `pytest Tests/` says "in N files" and gives each file a plain
+# "(N)" that is the file's `def test_` count. Nothing read them back, so each new test
+# file or test left them stale. N is a digit on purpose, so the regex stays simple.
+# Only a plain "(N)" or "(N," is held: an entry written another way, such as
+# "(3 tables, 20 cases)", or one with no count, is left to its prose.
+Write-Host ""
+Write-Host "  docs/TESTING.md's agent row counts the test files" -ForegroundColor Cyan
+$testingPath = Join-Path $pkgRoot 'docs/TESTING.md'
+$testingText = ''
+if (Test-Path -LiteralPath $testingPath) { $testingText = Get-Content -LiteralPath $testingPath -Raw -Encoding UTF8 }
+$agentRow = @($testingText -split "`n" | Where-Object { $_.StartsWith('| `python3 -m pytest Tests/` |') })
+Assert-True 'docs/TESTING.md has the agent inventory row' ($agentRow.Count -eq 1)
+if ($agentRow.Count -eq 1) {
+    $realFiles = @(Get-ChildItem -LiteralPath $scriptDir -Filter 'test_*.py' -File)
+    $fm = [regex]::Match($agentRow[0], 'in (\d+) files')
+    Assert-True 'the agent row states its file count as "in N files"' $fm.Success 'pattern not found -- has the sentence been reworded?'
+    if ($fm.Success) {
+        Assert-Equal "the agent row's file count is the number of Tests/test_*.py files" $realFiles.Count $fm.Groups[1].Value
+    }
+    $perFile = @([regex]::Matches($agentRow[0], '`(test_\w+\.py)` \((\d+)[,)]'))
+    Assert-True 'the agent row carries per-file counts' ($perFile.Count -gt 0)
+    foreach ($pf in $perFile) {
+        $name = $pf.Groups[1].Value
+        $file = Join-Path $scriptDir $name
+        if (-not (Test-Path -LiteralPath $file)) {
+            Assert-True "$name (named in the agent row) exists" $false 'no such file in Tests/'
+            continue
+        }
+        $defs = @([regex]::Matches((Get-Content -LiteralPath $file -Raw -Encoding UTF8), 'def test_')).Count
+        Assert-Equal "$name's count in the agent row is its def test_ count" $defs $pf.Groups[2].Value
+    }
+}
+
 Write-Host ""
 Write-Host "  Results: $($script:passed)/$($script:passed + $script:failed) passed" -ForegroundColor $(if ($script:failed -eq 0) { 'Green' } else { 'Red' })
 if ($script:errors.Count -gt 0) {
