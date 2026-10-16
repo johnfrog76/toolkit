@@ -5,12 +5,11 @@ and **goals**. They live in the hub next to your cards, they are read by the
 review generator the same way cards are, and they are plain markdown a person
 can open.
 
-**This document is the contract.** Two consumers read and write these files --
-the CLI verb `{cliPrefix}NewGrowth` and the agent's `POST /api/growth` -- and
-neither one's source is the source of truth. Both are held to what is written
-here, and `Tests/test_growth.py` asserts they produce identical bytes for
-identical inputs. A change to the shape below is a breaking change: both
-consumers' fixtures and this file change in the same sitting.
+**This document is the contract.** One writer makes these files -- the CLI verb
+`{cliPrefix}NewGrowth`, which the web UI's create runs through the bridge -- and
+the agent reads them; neither one's source is the source of truth. Both are held
+to what is written here. A change to the shape below is a breaking change: the
+verb, the reader's fixtures and this file change in the same sitting.
 
 ## Where it lives
 

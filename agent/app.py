@@ -18,9 +18,10 @@ gated on features.organize, and every reminder write goes through the bridge.
 Deliberately absent, each accounted for rather than dropped:
 /narrate (the deck module, docs/modules/deck.md); the two native ADO mutations
 /create-ado-item and /resolve-bug, retired as duplicates of bridge calls
-(docs/ARCHITECTURE.md, "The bridge"); and the two engagement reads
+(docs/ARCHITECTURE.md, "The bridge"); the two engagement reads
 /engagement/{slug}/activity and /engagement/{slug}/billing-timeline, retired
-with no caller left in web/src.
+with no caller left in web/src; and POST /growth, a second writer of a growth
+item beside NewGrowth, which the Growth page now runs through the bridge.
 
 Nothing here reaches outside the package for code, and nothing derives the
 prompt store from where this file happens to live -- see core/config.py.

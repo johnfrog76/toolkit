@@ -132,6 +132,15 @@ argv `buildGrowthCloseParams`) behind the house's one confirm
 `**Closed:**` by the shared writer -- the module closes its own data, since
 `Archive` is org-scoped and a hub-root sibling is invisible to it.
 
+**A new item from the browser is the same verb.** The `Goals` card's New Growth
+Item dialog runs `POST /api/cmd/NewGrowth` (argv `buildNewGrowthParams`), so the
+browser and the terminal write one file with one writer, and opens the new item
+by the name on the `FILE:` line the verb prints. A refusal -- a bad date, a
+training with no due date -- is the bridge's `status: error`, and the dialog
+shows the verb's own sentence. An item already in `growth/current/` is never
+written over: the verb answers "Already there", and the dialog shows that and
+stays open.
+
 ### `tkNewWorkReview`
 
 Writes a review **scaffold** from local history.
@@ -197,7 +206,6 @@ later is gated by existing.
 | Route | Reads / writes | Serves |
 | --- | --- | --- |
 | `GET /api/growth` | `growth/current/`, and the active Space's `trainingHoursPerQuarter` | Goals card, and the quarter line |
-| `POST /api/growth` | writes one file into `growth/current/` | the create dialog |
 | `GET /api/growth/{filename}` | one file from `growth/current/` | GoalDetailPage |
 | `GET /api/resume` | `resume/resume.md`; answers `content`, `last_modified` and the file's absolute `path` | SkillsPage |
 | `GET /api/resume-preview` | `UpdateResume -Preview`, via the bridge | SkillsPage |
@@ -308,14 +316,13 @@ an error -- verified in a browser, not assumed.
 ## The file shape
 
 [docs/hub/growth.md](../hub/growth.md) is the contract, and it is neither
-consumer's source. `tkNewGrowth` and `POST /api/growth` are both held to it, and
-`Tests/test_growth.py` runs the CLI in a scratch hub, posts the same fields to a
-second one, and compares the files **byte for byte** -- line endings, the
-trailing newline and the absence of a BOM included, because the file is the
-record and a person opens it in an editor.
+consumer's source. `tkNewGrowth` is its one writer -- the browser's create runs
+the same verb through the bridge -- and writes it UTF-8 with no BOM and LF,
+through `Write-CardText -New`, because the file is the record and a person opens
+it in an editor. The agent's reader is held to it by `Tests/test_growth.py`.
 
-A change to the shape is a breaking change: both fixtures and that document
-change in the same sitting.
+A change to the shape is a breaking change: the verb, the reader's fixtures and
+that document change in the same sitting.
 
 **How an item's status is read** -- from the file's own words, never stored beside it:
 
@@ -379,8 +386,9 @@ committed config where every module flag is off, so it resolves after
 | --- | --- |
 | `tkTestToolkit -ModuleCommands` | D-CM end to end: off means absent, the prefix is data, help comes from the module's own file, a colliding name refuses the module whole, a malformed or `[ordered]` data file is skipped by path, `Order` decides registration order, a data file cannot run code, and a locally-enabled module stays out of the autoload manifest |
 | `tkTestToolkit -Review` | `Generate-Review.ps1` against a scratch git hub: the bare-date regression, what the scan includes and excludes, the scaffold's sections, multi-org slug sets, edge cases, and the publish preview |
-| `pytest Tests/test_growth.py` | the routes against the fixture hub, the 404 gate, writing, CLI/agent byte parity, and the heading reader: an empty provider is `None`, not the writer's `---`, and a file made from the template reads its comments as nothing |
+| `pytest Tests/test_growth.py` | the routes against the fixture hub, the 404 gate, and the heading reader: an empty provider is `None`, not the writer's `---`, and a file made from the template reads its comments as nothing |
 | `pytest Tests/test_reviews_multi_org.py` | a review folder's membership is split-on-`+` SET membership, not a substring search |
+| `npm test -- Goals.create` | the New Growth Item dialog runs `NewGrowth` through the bridge with the dialog's fields as argv, opens the file the verb names, and keeps a refusal or an "Already there" in the dialog |
 | `npm test -- registry.growth` | the module contributes routes and nav only when the flag is true, and no home cards of its own |
 | `pytest Tests/test_growth_status.py` | the status rules in "The file shape", one row per input the rule distinguishes |
 | `npm run smoke` | with everything off, no Growth nav, no growth page, no growth data fetched, no page errors |

@@ -5,8 +5,9 @@
     Writes <promptsRoot>/growth/current/{type}-{date}-{slug}.prompt.md in the
     hub, in the shape docs/hub/growth.md documents. The folder is named by the
     hub -- hub.json's folders.growth, defaulting to 'growth'. That document --
-    not this script and not the agent -- is the contract: POST /api/growth writes the same bytes for the
-    same inputs, and Tests/test_growth.py compares the two.
+    not this script and not the agent -- is the contract. This script is the
+    one writer: the web UI's create runs it through the bridge
+    (POST /api/cmd/NewGrowth), and the agent only reads what it writes.
 
     growth/ is a HUB-ROOT folder. It sits beside the per-org folders, not inside
     one, because a training you took does not stop having happened when you
@@ -409,10 +410,9 @@ $notesVal
 }
 
 # LF, no BOM, one trailing newline. Every one of those three is part of the
-# documented shape, because the parity test in Tests/test_growth.py compares
-# these bytes with what POST /api/growth writes for the same inputs -- and a
-# CRLF here would make the two disagree on a Windows machine only. The LF is
-# -New's job now, not a -replace of this script's own: one writer, one rule.
+# documented shape, so the file comes out the same from a terminal and from the
+# browser on every host. The LF is -New's job, not a -replace of this script's
+# own: one writer, one rule.
 #
 Write-CardText -Path $filePath -Content ($content + "`n") -New
 

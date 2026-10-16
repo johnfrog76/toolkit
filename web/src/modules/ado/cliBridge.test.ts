@@ -9,6 +9,8 @@ import {
   buildMoveParams,
   buildMeetingAgendaParams,
   buildGrowthCloseParams,
+  buildNewGrowthParams,
+  fileFromCommandOutput,
   buildNewReminderParams,
   buildReminderArchiveParams,
   buildReminderSnoozeParams,
@@ -443,6 +445,103 @@ describe("buildGrowthCloseParams", () => {
     expect(
       buildGrowthCloseParams({ file: "training-2026-09-01-clean-architecture.prompt.md" }),
     ).toEqual(["-Close", "training-2026-09-01-clean-architecture.prompt.md"]);
+  });
+});
+
+describe("buildNewGrowthParams", () => {
+  // Scripts/New-GrowthItem.ps1: -Type -Title -Date -DueDate -Provider -Hours
+  // -Notes, in that order; only what was given goes on the line.
+  const rows: [string, Parameters<typeof buildNewGrowthParams>[0], string[]][] = [
+    [
+      "a goal with only a title and a date",
+      { type: "goal", title: "Improve test coverage patterns", date: "2026-01-01" },
+      ["-Type", "goal", "-Title", "Improve test coverage patterns", "-Date", "2026-01-01"],
+    ],
+    [
+      "a training with every field",
+      {
+        type: "training",
+        title: "Clean Architecture",
+        date: "2026-03-02",
+        dueDate: "2026-04-30",
+        provider: "Internal Academy",
+        hours: "8",
+        notes: "Boundaries, and which ones are worth the indirection.",
+      },
+      [
+        "-Type",
+        "training",
+        "-Title",
+        "Clean Architecture",
+        "-Date",
+        "2026-03-02",
+        "-DueDate",
+        "2026-04-30",
+        "-Provider",
+        "Internal Academy",
+        "-Hours",
+        "8",
+        "-Notes",
+        "Boundaries, and which ones are worth the indirection.",
+      ],
+    ],
+    [
+      "a presentation with notes, blank fields left off and the rest trimmed",
+      {
+        type: "presentation",
+        title: "  Designing for Non-Determinism ",
+        date: "2026-05-14",
+        dueDate: "",
+        provider: "   ",
+        hours: "",
+        notes: " Testing systems whose answers may differ. ",
+      },
+      [
+        "-Type",
+        "presentation",
+        "-Title",
+        "Designing for Non-Determinism",
+        "-Date",
+        "2026-05-14",
+        "-Notes",
+        "Testing systems whose answers may differ.",
+      ],
+    ],
+    [
+      "a title that starts with a dash is still one element after -Title",
+      { type: "goal", title: "-Type training", date: "2026-02-01" },
+      ["-Type", "goal", "-Title", "-Type training", "-Date", "2026-02-01"],
+    ],
+    [
+      "no date is no -Date, and the verb's default (today) stands",
+      { type: "goal", title: "Read more code", date: "" },
+      ["-Type", "goal", "-Title", "Read more code"],
+    ],
+  ];
+
+  it.each(rows)("%s", (_label, fields, argv) => {
+    expect(buildNewGrowthParams(fields)).toEqual(argv);
+  });
+});
+
+describe("fileFromCommandOutput", () => {
+  // NewGrowth ends "Created" and "Already there" with a `    FILE: <path>` line.
+  it.each([
+    [
+      "a Windows path",
+      "Created goal-2026-x.prompt.md\r\n    FILE: C:\\hub\\growth\\current\\goal-2026-x.prompt.md\r\n",
+      "goal-2026-x.prompt.md",
+    ],
+    [
+      "a POSIX path",
+      "Already there: /hub/growth/current/goal-2026-x.prompt.md\n    FILE: /hub/growth/current/goal-2026-x.prompt.md",
+      "goal-2026-x.prompt.md",
+    ],
+    ["no FILE line", "Error: -Title is required.", null],
+    ["no output at all", null, null],
+    ["an empty FILE line", "    FILE:   ", null],
+  ])("%s", (_label, output, expected) => {
+    expect(fileFromCommandOutput(output)).toBe(expected);
   });
 });
 

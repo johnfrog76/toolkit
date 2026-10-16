@@ -1,10 +1,9 @@
-"""GET /growth, POST /growth, GET /growth/{filename}.
+"""GET /growth, GET /growth/{filename}.
 
-The hub's ``growth/current/`` folder, read and written in the shape
-``docs/hub/growth.md`` documents. That document is the contract, not this file
-and not ``Scripts/New-GrowthItem.ps1`` -- two consumers of one file format stay
-honest by both being held to a written shape, and ``Tests/test_growth.py``
-asserts the two write the same bytes for the same inputs.
+The hub's ``growth/current/`` folder, read in the shape ``docs/hub/growth.md``
+documents. Nothing here writes one: a new growth item is ``NewGrowth`` through
+the bridge (``POST /cmd/NewGrowth``), so the CLI's ``Scripts/New-GrowthItem.ps1``
+is the one writer and the browser and the terminal write the same file.
 
 Three types, distinguished by filename prefix, because the filename is the one
 piece of a markdown file a person can see without opening it:
@@ -21,7 +20,7 @@ from datetime import date
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from ..core.config import hub_folder, load_config
 from ..core.parsers import _heading_value
@@ -78,16 +77,6 @@ class GrowthDetailResponse(BaseModel):
     type: str
     status: str
     content: str
-
-
-class CreateGrowthRequest(BaseModel):
-    type: str
-    title: str = Field(..., min_length=1, max_length=200)
-    date: str  # YYYY-MM-DD
-    due_date: str | None = None  # YYYY-MM-DD; required for a training
-    provider: str | None = None
-    hours: str | None = None
-    notes: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -204,192 +193,6 @@ def _status_word(raw: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Writing a file -- the CLI writes exactly these bytes, see docs/hub/growth.md
-# ---------------------------------------------------------------------------
-
-
-def _training_file(title: str, date_str: str, provider: str | None, hours: str | None, notes: str | None) -> str:
-    return f"""# Training Artifact
-
----
-
-## Title
-
-{title}
-
-## Type
-
-Voluntary
-
-## Date(s)
-
-{date_str}
-
-## Hours
-
-{hours or "TBD"}
-
-## Provider
-
-{provider or ""}
-
----
-
-## Description
-
-{(notes or "").strip()}
-
----
-
-## Status
-
-Not Started
-
-## Key Takeaways
-
--
--
--
-
----
-
-## Outcome
-
-- **Completed**: No
-- **Certificate / badge**:
-- **Applied to work**:
-"""
-
-
-def _presentation_file(title: str, date_str: str, notes: str | None, presenter: str) -> str:
-    return f"""# Presentation Artifact
-
----
-
-## Title
-
-{title}
-
-## Presenter
-
-{presenter}
-
-## Date & Time
-
-{date_str}
-
-## Format
-
-## Prep Estimate
-
-## Audience
-
----
-
-## Context & Intent
-
-{(notes or "").strip()}
-
----
-
-## Outline / Slide Summary
-
-### Section 1 -
-### Section 2 -
-### Section 3 -
-
----
-
-## Key Themes
-
----
-
-## Outcome & Follow-Up
-
-- **Delivered**: No
-- **Audience size**:
-- **Feedback received**:
-- **Follow-up actions**:
-- **Recording / materials link**:
-"""
-
-
-def _goal_file(title: str, date_str: str, notes: str | None) -> str:
-    return f"""# Goal Artifact
-
----
-
-## Goal
-
-{title}
-
-## Category
-
-## Time Frame
-
-{date_str}
-
----
-
-## Why This Matters
-
-{(notes or "").strip()}
-
----
-
-## Milestones
-
-- [ ]
-- [ ]
-- [ ]
-
----
-
-## Progress Log
-
-| Date | Update |
-|------|--------|
-|      |        |
-
----
-
-## Outcome
-
-- **Status**: Not Started
-- **Evidence**:
-- **Impact**:
-"""
-
-
-def build_growth_file(req: CreateGrowthRequest, presenter: str = "") -> tuple[str, str]:
-    """(filename, content) for a request, and the single place either consumer
-    decides what a new growth file is called and contains."""
-    # ASCII 'to', not a dash: this string is parsed back by both readers, and a
-    # PS 5.1 shell on a Windows-1252 code page misreads an en dash inside a
-    # double-quoted string -- so the CLI cannot write one.
-    date_str = f"{req.date} to {req.due_date}" if req.due_date else req.date
-    slug = re.sub(r"[^a-z0-9]+", "-", req.title.lower()).strip("-")[:40].rstrip("-")
-
-    if req.type == "goal":
-        # A goal is dated by YEAR: it belongs to a review period, not to an
-        # afternoon.
-        filename = f"goal-{req.date[:4]}-{slug}.prompt.md"
-        content = _goal_file(req.title, date_str, req.notes)
-    elif req.type == "training":
-        filename = f"training-{req.date}-{slug}.prompt.md"
-        content = _training_file(req.title, date_str, req.provider, req.hours, req.notes)
-    else:
-        filename = f"presentation-{req.date}-{slug}.prompt.md"
-        content = _presentation_file(req.title, date_str, req.notes, presenter)
-    return filename, content
-
-
-def _presenter() -> str:
-    """Whose name goes on a presentation. Config, never a name in source."""
-    return (load_config().get("branchUser") or "").strip()
-
-
-# ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 
@@ -482,33 +285,6 @@ async def get_growth():
         items=items,
         trainingQuarter=training_quarter(items, space_training_hours(), date.today()),
     )
-
-
-@api.post("/growth", response_model=GrowthDetailResponse)
-async def create_growth(req: CreateGrowthRequest):
-    if req.type not in TYPES:
-        raise HTTPException(status_code=400, detail=f"type must be one of: {', '.join(TYPES)}")
-    try:
-        date.fromisoformat(req.date)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid date -- use YYYY-MM-DD")
-    if req.due_date:
-        try:
-            date.fromisoformat(req.due_date)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid due_date -- use YYYY-MM-DD")
-    if req.type == "training" and not req.due_date:
-        raise HTTPException(status_code=400, detail="due_date is required for a training item")
-
-    filename, content = build_growth_file(req, presenter=_presenter())
-    directory = growth_dir()
-    directory.mkdir(parents=True, exist_ok=True)
-    path = directory / filename
-    if path.exists():
-        raise HTTPException(status_code=409, detail=f"{filename} already exists")
-    # newline="\n" and no BOM: the same bytes the CLI writes, on every platform.
-    path.write_text(content, encoding="utf-8", newline="\n")
-    return GrowthDetailResponse(filename=filename, title=req.title, type=req.type, status="new", content=content)
 
 
 @api.get("/growth/{filename}", response_model=GrowthDetailResponse)

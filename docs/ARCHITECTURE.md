@@ -289,7 +289,6 @@ natively in these places, and no others:
 | --- | --- | --- |
 | `POST /api/switch-mode` | `activeSpace` in `config.local.json` | Refuses a slug that is not a declared Space |
 | `PUT /api/config` | a setting, by running `Config -Set` through the bridge | The schema decides what may be set; a refusal comes back as a typed body |
-| `POST /api/growth` | a new growth item (opt-in module) | Refuses an existing file with a 409 |
 | `PUT /api/manager/{filename}` | an existing 1:1 session (opt-in module) | Edits a file that exists; creating one (`POST /api/manager`) runs the `NewMeeting` verb, which refuses an existing session |
 | `POST /api/assets/upload` | one image, into a fresh folder under the system temp directory | Never the hub; the `Cover` verb copies it in, through the bridge |
 | `POST /api/comms/send` | nothing on disk; posts to a Teams webhook | Needs the webhook variable set; `dryRun` runs every gate and sends nothing |

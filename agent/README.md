@@ -79,7 +79,7 @@ agent/
 │   └── Get-WeeklyBilling.ps1 module-private; /billing shells out to it
 ├── growth/                 opt-in, features.growth -- one router, one gate
 │   ├── __init__.py           growth_router(): the gate, declared once on the router
-│   ├── growth.py             GET/POST /growth, GET /growth/{filename}
+│   ├── growth.py             GET /growth, GET /growth/{filename}
 │   ├── reviews.py            /reviews, /reviews/{folder}, /review-preview, POST /review/generate
 │   └── resume.py             /resume, /resume-preview
 ├── communication/          opt-in, features.communication
@@ -452,14 +452,14 @@ not explain the difference.
 ## The route table
 
 47 core routes, all mounted under `/api` -- the Studio's six among them since it became core,
-the Prompts card's two the newest. The modules add 20 more -- 9 from growth, 6 from
+the Prompts card's two the newest. The modules add 19 more -- 8 from growth, 6 from
 communication, 1 from organize and 4 from solitaire
 -- listed below and documented in
 [`../docs/modules/growth.md`](../docs/modules/growth.md),
 [`../docs/modules/communication.md`](../docs/modules/communication.md),
 [`../docs/modules/organize.md`](../docs/modules/organize.md) and
 [`../docs/modules/solitaire-agile.md`](../docs/modules/solitaire-agile.md); the Studio's are in
-[`../docs/modules/studio.md`](../docs/modules/studio.md). 67 in total, counted off the app's own
+[`../docs/modules/studio.md`](../docs/modules/studio.md). 66 in total, counted off the app's own
 route list.
 
 | Route | Module | Gate | Reads | Writes |
@@ -526,7 +526,6 @@ And the modules', gated per request on their flag and 404 when it is off:
 | Route | Package | Reads | Writes |
 | --- | --- | --- | --- |
 | `GET /growth` | `growth/growth` | `{hub}/growth/current/` | — |
-| `POST /growth` | `growth/growth` | — | **one file in `{hub}/growth/current/`** |
 | `GET /growth/{filename}` | `growth/growth` | one artifact | — |
 | `GET /resume` | `growth/resume` | `{hub}/resume/resume.md` | — |
 | `GET /resume-preview` | `growth/resume` | `UpdateResume -Preview`, through the bridge | — |
@@ -571,10 +570,10 @@ bridge.
 
 Every write in the core table is either config or the card's own side record. **No core route
 mutates a prompt file or ADO** in Python; that is the bridge's job, and the bridge does it by
-running the CLI. The modules add exactly two Python writes, both inside the hub and neither a prompt
-file nor an ADO card: `POST /growth` and `PUT /manager/{filename}`. The second is the deliberate
-exception, argued above; the first writes a growth artifact whose shape `Tests/test_growth.py`
-compares **byte for byte** against the one `tkNewGrowth` writes, so the two paths cannot drift.
+running the CLI. The modules add exactly one Python write, inside the hub and neither a prompt
+file nor an ADO card: `PUT /manager/{filename}`, the deliberate exception argued above. A new
+growth item is `NewGrowth` through the bridge (`POST /cmd/NewGrowth`), so the browser and the
+terminal write it with one writer and there is no second shape to drift.
 
 **Feature flags have a scope, and the default scope is the engineer**
 ([the modules guide](../docs/modules/README.md) owns the rule): every top-level `features` key is
@@ -626,15 +625,17 @@ create in that module: a card is created by the CLI, through `POST /cmd/NewPromp
 
 ### Deliberately absent
 
-One route belongs to the deck module, and four are retired outright. `app.py`'s module docstring
+One route belongs to the deck module, and six are retired outright. `app.py`'s module docstring
 names each with its owner, so the 404 is a statement about ownership rather than a regression.
-Every row is asserted 404, and absent from the OpenAPI schema, by `Tests/test_app_serving.py`.
+Every row is asserted 404 (405 for `POST /growth`, whose path keeps its `GET`), and absent from the
+OpenAPI schema, by `Tests/test_app_serving.py`.
 
 | Absent | Owner |
 | --- | --- |
 | `POST /narrate` | the deck module, [`docs/modules/deck.md`](../docs/modules/deck.md) |
 | `POST /pr-comments/{filename}/save` | **Retired 2026-10-01.** A second writer of the card's `Decision:` and `Reply:` slots beside `ReplyPR`, which the page runs through the bridge. `Tests/test_pr_comments.py` asserts the 404 |
 | `POST /create-ado-item`, `POST /resolve-bug` | **Retired.** Both built their own command string instead of calling the CLI. They are `POST /cmd/NewItem` and `POST /cmd/CloseItem` |
+| `POST /growth` | **Retired.** A second writer of a growth item beside `NewGrowth`, retyping the verb's three file shapes in Python. The Growth page runs `POST /cmd/NewGrowth` instead; `GET /growth` stays, so the path answers **405** for a POST |
 | `GET /engagement/{slug}/activity`, `GET /engagement/{slug}/billing-timeline` | **Retired 2026-09-22.** Nothing in `web/src` requests either, and nothing draws them (`ActivityHeatmap`, `BillingTimeline` are not in this product). The `**Closed:**` stamps the timeline read are still read, by `/engagement/{slug}/summary` |
 
 A module route with its flag **off** is also a 404, which is the same answer for a different
@@ -925,7 +926,7 @@ tests at all**.
 | `Tests/test_bridge.py` | The allowlist is the live command table and nothing else: every name in it is admitted, names outside it are refused, the map is re-read when `utilities.psm1` changes, and -- in a scratch package, so the engineer's `config.local.json` is never written -- a module flag flipped on disk puts the module's verb in the table on the next read with no `force`, the key names every input, and a new `Config/*.commands.psd1` changes it, and `Env` is run for real so a broken PowerShell half cannot pass. Plus the parameter rules, the four statuses, the timeout lookup, and the host resolver -- `pwsh` preferred, `powershell` as the Windows-only fallback, and no host answering `error` rather than `rejected` |
 | `Tests/test_bridge_refusals.py` | A verb that refuses is `status: error` with its stated sentence, never `success`: `Archive` of a name that matches nothing, run end to end through the real bridge (it writes nothing on any hub) |
 | `Tests/test_features.py` | The flag-scope rule: a top-level key is the engineer's and an org cannot override it; `sprintAwareness` is read from the active Space; `/env` serves the merged view |
-| `Tests/test_growth.py` | The nine growth routes against the fixture hub, the 404 gate, the write, and **CLI/agent byte parity** -- the same fields written by `tkNewGrowth` and by `POST /growth`, compared byte for byte, line endings and trailing newline included, because the file is the record and a person opens it in an editor. Plus the heading reader: a value is the first VALUE line under a heading, so the writer's `---` and the template's `<!-- -->` hints read as nothing |
+| `Tests/test_growth.py` | The growth routes against the fixture hub and the 404 gate. There is no write to test here: a growth item is written by `NewGrowth` alone, through the bridge from the browser. Plus the heading reader: a value is the first VALUE line under a heading, so the writer's `---` and the template's `<!-- -->` hints read as nothing |
 | `Tests/test_reviews_multi_org.py` | A review folder's membership is split-on-`+` **set** membership, not a substring search. `first+second` must surface for `first` and for `second` and nobody else, and `first` must not drag in `firstclass` |
 | `Tests/test_manager.py` | The 1:1 routes against a **copy** of the fixture hub -- list, read, create (the real `NewMeeting`, through the bridge, in a scratch package: the file is the template's byte for byte, notes are a 422 on create and an edit through `PUT`, the verb's absence from the table is a 503 that names it, and it is run with `PROMPTS_ROOT` set to the test's hub), save -- plus both gates: off is a 404 that writes nothing, and `/env` reports the recipient unconfigured with its variable's name, then configured once it is set. Also that a save never deletes an agenda, never moves the stage and never loses a `Sent` line |
 | `Tests/test_comms_format.py` | The engine: tone formatting, the Adaptive Card envelope, recipient resolution, the master switch, validation, dry run and fail-soft failure |
