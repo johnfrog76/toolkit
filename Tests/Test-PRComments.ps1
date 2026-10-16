@@ -287,6 +287,9 @@ try {
         Assert-True "the record carries the fetched count" ([System.Text.Encoding]::UTF8.GetString($recBytes) -match 'Comments: 3')
     }
 }
+catch {
+    Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
+}
 finally {
     $global:P20Config = $savedRecCfg
     $script:Consts = $savedRecConsts
