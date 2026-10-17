@@ -40,7 +40,7 @@ if ($Help) {
   Clause 13 No work-marker comment (the four words a seam must not hide behind) ships
   Clause 14 No comment carries a date, a name, an agent, a nickname for a host, a tracker
             number, an archive pointer, a private repository or a machine path
-  Clause 15 No gh or az call with a redirected stderr outside Invoke-TrackerRead.ps1
+  Clause 15 No gh, az or git call with a redirected stderr outside Invoke-TrackerRead.ps1
   Clause 16 No script in Scripts/ carries its own Get-CliPrefix or Write-CliError fallback;
             Scripts/Initialize-CliFallbacks.ps1 is the one copy
 
@@ -1093,14 +1093,35 @@ finally {
 # NAMES such a call (help text, a hint) is not a call. The file set is the CLI's
 # runtime code -- the root *.psm1, Scripts/ and Config/.
 #
+# The sweep covers git as well (D3J7): New-PullRequest.ps1 called it raw, and a
+# caller holding 'Stop' stopped it outside a repository before it could say so.
+#
 # The allow-list is files that keep their own copy of the split for now, each
-# with its reason. It only shrinks.
+# with its reason. It only shrinks. A git entry is either DELIBERATE (the reason
+# says why a raw call is right) or marked 'D3J7 follow-up': a file not yet
+# converted to Invoke-P20TrackerRead, listed so the clause is green without
+# claiming more than it proves.
 $rawTrackerAllowed = @{
     'Scripts/Invoke-TrackerRead.ps1' = 'the one place the redirection is written'
     'Scripts/Get-Standup.ps1'        = 'the ritual readers keep their own copy until they share one skeleton'
     'Scripts/Get-Triage.ps1'         = 'the ritual readers keep their own copy until they share one skeleton'
+    # git, deliberate: the hub sync prints git's own pull/push output as it arrives and reads the exit code itself
+    'Scripts/Sync-Prompts.ps1'       = 'the hub sync passes git output through to the terminal'
+    # git, temporary: each of these is the same fix as New-PullRequest.ps1 and needs its own card
+    'Scripts/Backfill-CardStamps.ps1'    = 'D3J7 follow-up'
+    'Scripts/Get-DailyDashboard.ps1'     = 'D3J7 follow-up'
+    'Scripts/Get-PRComments.ps1'         = 'D3J7 follow-up'
+    'Scripts/Get-PromptStatus.ps1'       = 'D3J7 follow-up'
+    'Scripts/Invoke-PRReview.ps1'        = 'D3J7 follow-up'
+    'Scripts/Move-Design.ps1'            = 'D3J7 follow-up'
+    'Scripts/Move-PromptToArchive.ps1'   = 'D3J7 follow-up'
+    'Scripts/Test-GitRoot.ps1'           = 'D3J7 follow-up'
+    'Scripts/Thread-CommitHash.ps1'      = 'D3J7 follow-up'
+    'Scripts/Update-Resume.ps1'          = 'D3J7 follow-up'
+    'Scripts/Update-Review.ps1'          = 'D3J7 follow-up'
+    'Scripts/Update-Toolkit.ps1'         = 'D3J7 follow-up'
 }
-$rawTrackerPattern = '(?<![\w$-])(gh|az)\s[^|\r\n]*(2>|\*>)'
+$rawTrackerPattern = '(?<![\w$-])(gh|az|git)\s[^|\r\n]*(2>|\*>)'
 function Get-RawTrackerCalls {
     # Every match of the pattern that starts outside a comment and a string.
     param([string]$Text)
@@ -1138,15 +1159,17 @@ foreach ($f in $rawTrackerFiles) {
 }
 $rawTrackerDetail = "read $($rawTrackerFiles.Count) files"
 if ($rawTrackerHits.Count -gt 0) {
-    $rawTrackerDetail = "call it as Invoke-P20TrackerRead 'gh' @(...) and read .Code/.Out/.Err (Scripts/Invoke-TrackerRead.ps1): " + ($rawTrackerHits -join '; ')
+    $rawTrackerDetail = "call it as Invoke-P20TrackerRead 'gh' (or 'git') @(...) and read .Code/.Out/.Err (Scripts/Invoke-TrackerRead.ps1): " + ($rawTrackerHits -join '; ')
 }
-Assert-True "Clause 15: no gh or az call with a redirected stderr outside Invoke-TrackerRead.ps1" (($rawTrackerHits.Count -eq 0) -and ($rawTrackerFiles.Count -ge 80)) $rawTrackerDetail
+Assert-True "Clause 15: no gh, az or git call with a redirected stderr outside Invoke-TrackerRead.ps1" (($rawTrackerHits.Count -eq 0) -and ($rawTrackerFiles.Count -ge 80)) $rawTrackerDetail
 
 # The sweep's own cases: what it must find, and what only names a call.
 $rawTrackerCases = @(
     @{ Hit = $true;  Why = 'a raw call that drops stderr';             Body = '$x = gh api user -q .login 2>$null' }
     @{ Hit = $true;  Why = 'a raw call that keeps stderr as records';  Body = '$out = & gh @Arguments 2>&1' }
     @{ Hit = $true;  Why = 'a raw az call that silences every stream'; Body = 'az boards work-item update --id 1 *> $null' }
+    @{ Hit = $true;  Why = 'a raw git call that drops stderr';         Body = '$top = & git rev-parse --show-toplevel 2>$null' }
+    @{ Hit = $false; Why = 'a git call through the one helper';        Body = '$r = Invoke-P20TrackerRead ''git'' @(''rev-parse'', ''--show-toplevel'')' }
     @{ Hit = $false; Why = 'a call through the one helper';            Body = '$r = Invoke-P20TrackerRead ''gh'' @(''api'', ''user'')' }
     @{ Hit = $false; Why = 'a comment that names the trap';            Body = '# gh x 2>&1 throws under Stop on 5.1' }
     @{ Hit = $false; Why = 'a hint string that names a call';          Body = 'Write-Host "run: gh auth status 2>&1"' }
@@ -1326,6 +1349,27 @@ Assert-True "Clause 16: the sweep finds an inline definition, indented or global
     ('function global:Get-CliPrefix {' -match $fbPattern) -and
     (-not ('    Write-CliError -Message "x"' -match $fbPattern)) -and
     (-not ('function Get-CliPrefixes {' -match $fbPattern))) ''
+
+# ── The scan exclusions are relative to the package root ─────────────────────
+# A checkout whose own path runs through an excluded name (an agent worktree
+# under .claude/worktrees/) must still be read; a decoy INSIDE the tree must not.
+$pinBase = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-scan-" + [guid]::NewGuid().ToString('N'))
+$pinRoot = Join-Path (Join-Path (Join-Path $pinBase '.dot') 'worktrees') 'pkg'
+try {
+    foreach ($rel in @('Scripts/a.ps1', 'Scripts/b.ps1', 'web/src/c.ts', 'web/node_modules/x.js')) {
+        $pinPath = Join-Path $pinRoot $rel
+        New-Item -ItemType Directory -Force -Path (Split-Path $pinPath -Parent) | Out-Null
+        Set-Content -LiteralPath $pinPath -Value 'x'
+    }
+    $pinFiles = @(Get-ChildItem $pinRoot -Recurse -File)
+    $pinKept = @($pinFiles | Select-ScannableFile -Root $pinRoot | ForEach-Object { $_.Name } | Sort-Object)
+    Assert-True "Scan exclusions: a tree under a .dot/worktrees path is read, the node_modules decoy is not" (
+        ($pinKept -join ',') -eq 'a.ps1,b.ps1,c.ts') "kept: $($pinKept -join ', ')"
+} catch {
+    Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
+} finally {
+    Remove-Item -LiteralPath $pinBase -Recurse -Force -ErrorAction SilentlyContinue
+}
 
 Write-Host ""
 Write-Host "  Results: $script:passed/$($script:passed + $script:failed) passed" -ForegroundColor $(if ($script:failed -eq 0) { 'Green' } else { 'Red' })

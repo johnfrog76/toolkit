@@ -476,6 +476,51 @@ finally { Remove-ThreadSandbox $sb }
 
 Write-Host ""
 
+# -- The card is an id, typed as a verb -----------------------------------------
+
+Write-Host "-- ThreadHash <id>, typed as a verb -------------------" -ForegroundColor Cyan
+
+$sb = New-ThreadSandbox
+try {
+    $prefix = (Get-Content (Join-Path $pkgRoot 'config.default.json') -Raw | ConvertFrom-Json).commandPrefix
+    $logDir = Join-Path $sb.Base 'log'
+    New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+    $preamble = "`$env:PSModulePath = '$pkgRoot'; `$env:PROMPTS_ROOT = '$($sb.Hub)'; `$env:P20_USAGE_LOG_DIR = '$logDir'; " +
+        "Import-Module '$pkgRoot/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; Set-Location '$($sb.Code)'; "
+    function Invoke-ThreadVerb {
+        param([string]$Commands)
+        return (& pwsh -NoProfile -NonInteractive -Command ($preamble + $Commands) 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    }
+
+    # The verb looks in its own current/, so the card is made by the verb.
+    $null = Invoke-ThreadVerb "${prefix}NewPrompt -Title 'Thread by id' -Type Task -Id K7M2 | Out-Null"
+    $card = @(Get-ChildItem $sb.Hub -Recurse -Filter 'TaskK7M2-*.prompt.md')
+    Assert-Equal 'the verb made the card to thread into' 1 $card.Count
+    $cardPath = $card[0].FullName
+    $before = Get-CardText $cardPath
+    $out = Invoke-ThreadVerb "${prefix}ThreadHash W3X7 -Hash $($sb.CodeHashes[0]); 'ID-NONE-EXIT=' + `$LASTEXITCODE"
+    Assert-True 'an id that matches nothing is refused naming the id, exit 2' ($out -match "No card with id 'W3X7'" -and $out -match 'ID-NONE-EXIT=2') $out
+    Assert-Equal 'and the refusal wrote nothing' $before (Get-CardText $cardPath)
+
+    $out = Invoke-ThreadVerb "${prefix}ThreadHash k7m2 -Hash $($sb.CodeHashes[0]); 'ID-EXIT=' + `$LASTEXITCODE"
+    Assert-True 'the id form exits 0' ($out -match 'ID-EXIT=0') $out
+    Assert-True 'the id form threads the hash' ((Get-CardText $cardPath) -match "(?m)^- $($sb.CodeHashes[0])\b") $out
+
+    $out = Invoke-ThreadVerb "${prefix}ThreadHash thread-by -Hash $($sb.CodeHashes[1]); 'PART-EXIT=' + `$LASTEXITCODE"
+    Assert-True 'the partial-name form exits 0' ($out -match 'PART-EXIT=0') $out
+    Assert-True 'and names the card it chose' ($out -match "Matched 'thread-by' -> $([regex]::Escape($card[0].Name))") $out
+    Assert-True 'and threads the hash' ((Get-CardText $cardPath) -match "(?m)^- $($sb.CodeHashes[1])\b") $out
+
+    $out = Invoke-ThreadVerb "${prefix}ThreadHash '$cardPath' -Hash $($sb.CodeHashes[2]); 'PATH-EXIT=' + `$LASTEXITCODE"
+    Assert-True 'a full path still works' ($out -match 'PATH-EXIT=0' -and (Get-CardText $cardPath) -match "(?m)^- $($sb.CodeHashes[2])\b") $out
+}
+catch {
+    Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally { Remove-ThreadSandbox $sb }
+
+Write-Host ""
+
 # -- Help ----------------------------------------------------------------------
 
 Write-Host "-- Help -----------------------------------------------" -ForegroundColor Cyan

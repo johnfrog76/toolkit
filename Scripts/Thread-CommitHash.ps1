@@ -18,12 +18,14 @@
     recorded the hub's own last commit, reported success, and left the card
     reading In Progress on a commit from another repository.
 .PARAMETER File
-    Path to the prompt file (positional). If omitted, resolved from the current
+    The card: its id, its filename, a partial name, or a path (positional).
+    If omitted, resolved from the current
     git branch, the same way NewPR resolves it.
 .PARAMETER Hash
     Thread one explicit commit instead of scanning the branch. The alternative
     when the current location is not a git repository.
 .EXAMPLE
+    {cliPrefix}ThreadHash 178497
     {cliPrefix}ThreadHash current/178497-teams-search-coach.prompt.md
     {cliPrefix}ThreadHash -Hash abc1234
 #>
@@ -42,7 +44,7 @@ param(
 
 if ($Help) {
     Write-Host ""
-    Write-Host "  $(Get-CliPrefix)ThreadHash [file]            Thread this branch's commits into the card" -ForegroundColor Cyan
+    Write-Host "  $(Get-CliPrefix)ThreadHash [<id|file>]       Thread this branch's commits into the card" -ForegroundColor Cyan
     Write-Host "  $(Get-CliPrefix)ThreadHash -Hash abc1234     Thread one explicit hash" -ForegroundColor Cyan
     Write-Host "  $(Get-CliPrefix)ThreadHash -Help             Show this help" -ForegroundColor Cyan
     Write-Host ""
@@ -61,6 +63,7 @@ $promptsRoot = $cfg.PromptsRoot
 . (Join-Path $PSScriptRoot 'Resolve-HubConfig.ps1')
 . (Join-Path $PSScriptRoot 'Write-CardText.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-CardForBranch.ps1')
+. (Join-Path $PSScriptRoot 'Resolve-CardName.ps1')
 # The bullet shape this writes is what Get-PromptStatus.ps1 and
 # agent/core/parsers.py both read to call a card In Progress -- one pattern, in
 # consts.json, compiled by each half.
@@ -199,15 +202,52 @@ if (-not $File) {
     Write-Host "  Card: $(Split-Path $File -Leaf)" -ForegroundColor DarkGray
 }
 
-if (-not (Test-Path $File)) {
-    # Try relative to promptsRoot
-    $resolved = Join-Path $promptsRoot $File
-    if (Test-Path $resolved) { $File = $resolved }
-    else {
-        Write-CliError -Message "File not found: $File" `
-            -Hint "Pass a path to a card under the hub's current/ folder."
+# A full path (or one relative to the hub or the current location) is used as
+# typed. Anything else is what a person types for every other card verb: an id,
+# a filename, or a partial name, turned into a card by the one shared rule,
+# Resolve-P20CardArgument (AGENTS.md, "An id is not a substring").
+$asPath = $null
+if (Test-Path -LiteralPath $File -PathType Leaf) { $asPath = $File }
+elseif (Test-Path -LiteralPath (Join-Path $promptsRoot $File) -PathType Leaf) { $asPath = Join-Path $promptsRoot $File }
+
+if ($asPath) {
+    $File = $asPath
+}
+else {
+    $typed = $File
+    $currentDir = (Get-PromptFolders).Current
+    $resolved = Resolve-P20CardArgument -Argument $typed -Folder $currentDir `
+        -WorkItemTypes (Get-P20WorkItemTypes -Config $cfg)
+    $match = @($resolved.Match | Where-Object { $_.Name -like '*.md' })
+    if ($match.Count -eq 0) {
+        if ($resolved.IsId) {
+            Write-CliError -Message "No card with id '$typed' in current/." `
+                -Hint "'$typed' has the shape of an ID, and an ID is not a partial name. Run '$(Get-CliPrefix)Status' to see the cards."
+        }
+        else {
+            Write-CliError -Message "No card matching '$typed' found in current/." `
+                -Hint "Pass the card's ID, its filename, or a path. Run '$(Get-CliPrefix)Status' to see the cards."
+        }
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
+    if ($match.Count -gt 1) {
+        Write-Host "Matches for '$typed':" -ForegroundColor Yellow
+        $match | ForEach-Object { Write-Host "  $($_.Name)" }
+        Write-CliError -Message "'$typed' matches $($match.Count) files in current/." `
+            -Hint "Be more specific, or pass the card's ID."
+        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+    }
+    # A partial name is named before anything is written; with nobody to read it
+    # (the bridge) it refuses rather than guessing.
+    if ($resolved.Fuzzy) {
+        if ($env:TOOLKIT_QUIET_STARTUP) {
+            Write-CliError -Message "'$typed' is not a card in current/; it matches '$($match[0].Name)' only by partial name." `
+                -Hint "Pass the card's ID or its full filename."
+            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+        }
+        Write-Host "Matched '$typed' -> $($match[0].Name)" -ForegroundColor Cyan
+    }
+    $File = $match[0].FullName
 }
 
 # -- Edit the card -------------------------------------------------------------

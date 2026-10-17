@@ -42,17 +42,49 @@ $script:ScanExcludedSegments = @(
     'worktrees'         # .claude/worktrees -- an agent's checkout of this same package, gitignored
 )
 
+# The package root: the folder above Tests/. An exclusion is judged on a path
+# RELATIVE to this, never on the absolute one, so where the checkout itself
+# lives (an agent worktree under .claude/worktrees/, a folder named `dist`)
+# never changes what is scanned.
+$script:ScanRoot = Split-Path -Parent $PSScriptRoot
+
+function Get-ScanRelativePath {
+    <#
+    .SYNOPSIS
+        A path relative to the package root (or -Root); unchanged if outside it.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [string]$Root
+    )
+
+    if (-not $Root) { $Root = $script:ScanRoot }
+    $rootFull = [System.IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+    $pathFull = [System.IO.Path]::GetFullPath($Path)
+    $sep = [System.IO.Path]::DirectorySeparatorChar
+    if ($pathFull.Length -gt $rootFull.Length -and
+        $pathFull.StartsWith($rootFull + $sep, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $pathFull.Substring($rootFull.Length + 1)
+    }
+    return $Path
+}
+
 function Test-ScanExcluded {
     <#
     .SYNOPSIS
-        True when a path runs through a vendored or generated folder.
+        True when a path runs through a vendored or generated folder INSIDE
+        the package.
     .DESCRIPTION
-        Splits on both separators so the answer is the same on Windows and
-        macOS, and compares whole segments.
+        Splits the root-relative path on both separators so the answer is the
+        same on Windows and macOS, and compares whole segments.
     #>
-    param([Parameter(Mandatory)][string]$Path)
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [string]$Root
+    )
 
-    foreach ($seg in ($Path -split '[\\/]')) {
+    $rel = Get-ScanRelativePath -Path $Path -Root $Root
+    foreach ($seg in ($rel -split '[\\/]')) {
         if ($script:ScanExcludedSegments -contains $seg) { return $true }
     }
     return $false
@@ -63,10 +95,13 @@ function Select-ScannableFile {
     .SYNOPSIS
         Drops anything under an excluded folder from a list of FileInfo.
     #>
-    param([Parameter(ValueFromPipeline)]$File)
+    param(
+        [Parameter(ValueFromPipeline)]$File,
+        [string]$Root
+    )
 
     process {
         if ($null -eq $File) { return }
-        if (-not (Test-ScanExcluded $File.FullName)) { $File }
+        if (-not (Test-ScanExcluded -Path $File.FullName -Root $Root)) { $File }
     }
 }

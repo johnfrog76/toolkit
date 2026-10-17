@@ -18,6 +18,7 @@ release.
 
 ### Fixed
 
+- `ThreadHash` now takes a card id like every other card verb, as well as a filename, a partial name or a path.
 - An empty `config.local.json` no longer stops `Log -Ack` from acknowledging errors or `SwitchSpace` from switching Space.
 - `UpdateResume`, `PublishWorkReview` and `LogPeerReview` now state a refusal once, with git's own sentence and a hint where a commit fails, and exit 2; a commit git refused used to print a second, generic error block on top of it.
 - Running the tests from the web UI's Test Health card no longer fails every refusal case.
@@ -46,6 +47,7 @@ release.
 - The pull request comments record GetPRComments leaves in pr-comments/ is now written with the same bytes on every host: UTF-8 with no byte-order mark and LF line endings.
 - A one-on-one session file whose Stage heading is followed by a comment now reads its stage correctly instead of showing the comment as the stage.
 - The scripts behind Connect, EditItem, MyPRs, InstallAutoload, Agent and Web, run on their own without the module, now keep their stated reason when they refuse, as every other script does; they printed the error and then lost the reason.
+- `NewPR` run from a folder that is not a repository now says so in its own words on Windows PowerShell 5.1 even when the calling shell stops on errors, instead of printing a raw error from the version control tool.
 - A message the browser shows from a command, such as a refusal in a dialog, no longer begins with the first-run "not set up yet" banner on a machine with no `config.local.json`.
 
 ## [1.0.0] - 2026-10-15
