@@ -15,6 +15,11 @@
 [CmdletBinding()]
 param()
 
+# Its own preference, like every other script: left unset it is the caller's,
+# and a caller holding 'Stop' would turn the first stderr line of a native
+# call into a throw on Windows PowerShell 5.1.
+$ErrorActionPreference = 'Stop'
+
 # The tool maintains files in a directory and has no opinion about what keeps
 # that directory safe. Sync exists only for stores that happen to be git; any
 # other arrangement -- a synced folder, a share, a zip -- syncs itself or does
@@ -45,6 +50,10 @@ $promptsRoot = $global:P20Config.PromptsRoot
 # is dot-sourced rather than reached through the module because this script also
 # runs with no module in the session (a test sandbox, `pwsh -File`).
 . (Join-Path $PSScriptRoot 'Resolve-HubConfig.ps1')
+
+# Every git call here goes through this, except the pull and the push, which
+# pass git's own output to the terminal as it arrives.
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 
 # A card's links back into the package are relative paths, and a hub pulled onto
 # a second machine is a hub whose clone sits somewhere else -- so the pull is
@@ -89,36 +98,47 @@ try {
     # Runs through the normal pre-commit hook (no --no-verify) so a runaway
     # dirty tree (missing .gitignore, or a corrupted-file blowup past the
     # staged-file guard) stops sync here instead of auto-committing silently.
-    $dirty = git status --porcelain 2>&1
-    if ($dirty) {
+    $status = Invoke-P20TrackerRead 'git' @('status', '--porcelain')
+    if ($status.Code -ne 0) {
+        Write-CliError -Message "git status failed in '$promptsRoot', so nothing was synced." -Hint "git said: $(@($status.Lines)[0])"
+        exit 2  # stated refusal
+    }
+    if (@($status.Out).Count -gt 0) {
         # Remember anything already staged before we widen with -A. On a hook
         # failure the recovery reset unstages everything, which would silently
         # flatten a deliberate partial-staging setup -- exactly the state the
         # user most wants preserved when a runaway tree trips the guard.
-        $preStaged = @(git diff --cached --name-only 2>$null)
+        $preStaged = @((Invoke-P20TrackerRead 'git' @('diff', '--cached', '--name-only')).Out)
 
-        git add -A 2>&1 | Out-Null
-        $commitOutput = git commit -m "auto-commit before sync" 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            git reset 2>&1 | Out-Null
+        $null = Invoke-P20TrackerRead 'git' @('add', '-A')
+        $commit = Invoke-P20TrackerRead 'git' @('commit', '-m', 'auto-commit before sync')
+        if ($commit.Code -ne 0) {
+            $null = Invoke-P20TrackerRead 'git' @('reset')
             if ($preStaged.Count -gt 0) {
                 # Re-stage exactly what was staged before, nothing more. -- ends
                 # the option list so paths that look like flags still resolve.
-                git add -- $preStaged 2>&1 | Out-Null
+                $null = Invoke-P20TrackerRead 'git' (@('add', '--') + $preStaged)
                 Write-Host "  Restored $($preStaged.Count) previously staged file(s)." -ForegroundColor DarkGray
             }
             Write-Warning "Pre-commit hook blocked auto-commit - aborting sync to leave repo unchanged."
-            $commitOutput | ForEach-Object { Write-Host $_ }
+            $commit.Lines | ForEach-Object { Write-Host $_ }
             return
         }
         Write-Host "  Committed pending changes before pull." -ForegroundColor DarkGray
     }
 
+    # The pull and the push are the two raw calls: git prints its progress on
+    # stderr as it goes and the person watching wants it as it arrives. 'Stop'
+    # would make the first line a throw on 5.1, so each runs under 'Continue'
+    # and the exit code is read right after.
     # Pull with rebase
+    $ErrorActionPreference = 'Continue'
     git pull --rebase 2>&1 | ForEach-Object { Write-Host $_ }
-    if ($LASTEXITCODE -ne 0) {
+    $pullCode = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    if ($pullCode -ne 0) {
         Write-Warning "Rebase failed - aborting to leave repo unchanged."
-        git rebase --abort 2>&1 | Out-Null
+        $null = Invoke-P20TrackerRead 'git' @('rebase', '--abort')
         return
     }
 
@@ -129,9 +149,10 @@ try {
     $manifestPath = Join-Path $promptsRoot (Get-P20HubManifestName)
     if (Update-P20SpaceKeysInFile -Path $manifestPath) {
         Write-Host "  hub.json now says spaces -- the Space rename." -ForegroundColor DarkGray
-        git add -- (Get-P20HubManifestName) 2>&1 | Out-Null
-        $spellOut = (git commit -m "sync: hub.json says spaces" 2>&1 | Out-String)
-        if ($LASTEXITCODE -ne 0 -and $spellOut -notmatch 'nothing to commit|nothing added to commit|no changes added') {
+        $null = Invoke-P20TrackerRead 'git' @('add', '--', (Get-P20HubManifestName))
+        $spell = Invoke-P20TrackerRead 'git' @('commit', '-m', 'sync: hub.json says spaces')
+        $spellOut = ($spell.Lines -join "`n")
+        if ($spell.Code -ne 0 -and $spellOut -notmatch 'nothing to commit|nothing added to commit|no changes added') {
             Write-Warning "Could not commit hub.json's new spelling; it is still on disk. git said: $($spellOut.Trim())"
         }
     }
@@ -152,19 +173,23 @@ try {
     }
     if ($relinked -gt 0) {
         Write-Host "  Refreshed package links in $relinked card(s)." -ForegroundColor DarkGray
-        git add -A 2>&1 | Out-Null
-        $commitOut = (git commit -m "sync: refresh package links after a move" 2>&1 | Out-String)
+        $null = Invoke-P20TrackerRead 'git' @('add', '-A')
+        $linkCommit = Invoke-P20TrackerRead 'git' @('commit', '-m', 'sync: refresh package links after a move')
+        $commitOut = ($linkCommit.Lines -join "`n")
         # "nothing to commit" exits non-zero too: on a Windows hub with
         # core.autocrlf, git ignores a line-ending-only change, and a refresh
         # that changed no bytes git cares about is not a failed commit.
-        if ($LASTEXITCODE -ne 0 -and $commitOut -notmatch 'nothing to commit|nothing added to commit|no changes added') {
+        if ($linkCommit.Code -ne 0 -and $commitOut -notmatch 'nothing to commit|nothing added to commit|no changes added') {
             Write-Warning "Could not commit the refreshed links; they are still on disk. git said: $($commitOut.Trim())"
         }
     }
 
     # Push
+    $ErrorActionPreference = 'Continue'
     git push 2>&1 | ForEach-Object { Write-Host $_ }
-    if ($LASTEXITCODE -ne 0) {
+    $pushCode = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    if ($pushCode -ne 0) {
         Write-Warning "Push failed. Check remote status."
         return
     }
