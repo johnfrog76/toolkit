@@ -79,10 +79,9 @@ public issues are closed, and main's verify is green on both hosts.
 - The two quality passes, the Muse pass (2026-10-15, 27 findings) and the Fable pass (2026-10-16): each
   finding a card, worked or closed with a reason. The bugs already in the queue came out of them.
 - The two public issues the flip left open: the landing page's links, and the Docker image on Linux.
-- **The bar stays where it is.** The checklist the release was held to lives in the owner's hub, and
-  on 2026-10-16 the decision was to keep it there and reword this file rather than publish it. Whether a
-  public `docs/PUBLIC-BAR.md` is written for every release after this one is a question for the owner,
-  raised again on 2026-10-17, and the big-picture session's fourth question below.
+- The public bar was the gate the flip was held to, met at 1.0.0; every release after it is held to
+  [Contributing](CONTRIBUTING.md), "How a pull request is reviewed", and the release section in
+  [AGENTS.md](../AGENTS.md), which is where those rules now live.
 - The counts pasted from full runs, once, at the end.
 
 The CHANGELOG's Unreleased section already holds Added and Changed lines a user would notice, so by the
@@ -151,7 +150,7 @@ question's smaller cousins. The known gaps a reader can trip over are in [Known 
 
 ## The big-picture session
 
-After M1, before M4 is built, one session with the owner answers four questions, and the answers
+After M1, before M4 is built, one session with the owner answers three questions, and the answers
 go into this file:
 
 1. **Who is the user now?** The front door says a studio developer orchestrating agents, and the owner
@@ -161,9 +160,6 @@ go into this file:
    a better three-line install. This decides whether M5 exists.
 3. **Is the ritual engine a feature or a product?** Its own repository with ToolKit as one consumer
    changes who files its issues and where its design lives.
-4. **What is the bar for a release, and is it public?** The checklist lives in the hub today. Publishing
-   it as `docs/PUBLIC-BAR.md` would let a contributor hold a release to it; keeping it private keeps the
-   owner's notes out of the tree. The owner raised writing it "for real" on 2026-10-17.
 
 ## Keeping this file honest
 
