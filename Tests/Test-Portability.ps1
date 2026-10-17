@@ -1224,7 +1224,24 @@ try {
     # 9a -- the no-config notice points at Start, and never at a copy. Earlier,
     # it was a WARNING teaching the sparse patch by hand, with a dev.azure.com
     # example, one command before Start writes the file itself.
-    $noConfig = Invoke-WithLocalConfig -LocalJson $null -Snippet '$null'
+    # An interactive shell has no TOOLKIT_QUIET_STARTUP, so the banner must still print there;
+    # a marker inherited from the runner is cleared for this one import and put back.
+    $prevQuiet9a = $env:TOOLKIT_QUIET_STARTUP
+    Remove-Item Env:\TOOLKIT_QUIET_STARTUP -ErrorAction SilentlyContinue
+    try { $noConfig = Invoke-WithLocalConfig -LocalJson $null -Snippet '$null' }
+    finally { if ($null -ne $prevQuiet9a) { $env:TOOLKIT_QUIET_STARTUP = $prevQuiet9a } }
+    # A non-interactive caller (the agent's bridge) sets TOOLKIT_QUIET_STARTUP and gets the
+    # verb's own output with nothing before it.
+    try {
+        $env:TOOLKIT_QUIET_STARTUP = '1'
+        $noConfigQuiet = Invoke-WithLocalConfig -LocalJson $null -Snippet '$null'
+    }
+    finally {
+        if ($null -eq $prevQuiet9a) { Remove-Item Env:\TOOLKIT_QUIET_STARTUP -ErrorAction SilentlyContinue }
+        else { $env:TOOLKIT_QUIET_STARTUP = $prevQuiet9a }
+    }
+    Assert-True "Clause 9a: TOOLKIT_QUIET_STARTUP keeps the not-set-up banner out of a non-interactive import" `
+        ($noConfigQuiet -notmatch 'not set up yet') $noConfigQuiet
     Assert-True "Clause 9a: the no-config notice does not say to copy config.default.json" `
         ($noConfig -notmatch 'Copy config\.default\.json') $noConfig
     Assert-True "Clause 9a: it says the machine is not set up and names the Start verb" `

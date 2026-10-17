@@ -259,6 +259,13 @@ describe("commandResultMessage", () => {
     expect(commandResultMessage(base, "✓ Done")).toBe("✓ Done");
   });
 
+  it("ignores blank lines around a successful command's output", () => {
+    expect(commandResultMessage({ ...base, output: "\n\n  Already there.\n\n" }, "✓ Done")).toBe(
+      "Already there.",
+    );
+    expect(commandResultMessage({ ...base, output: "\n  \n" }, "✓ Done")).toBe("✓ Done");
+  });
+
   it("labels each of the three failure statuses", () => {
     expect(
       commandResultMessage({ ...base, status: "rejected", error: "Unknown command" }, "✓"),

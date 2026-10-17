@@ -214,8 +214,13 @@ else {
     # stops tracking the committed one the moment either changes).
     $firstRunPrefix = 'tk'
     if ($defaultConfig -and $defaultConfig.commandPrefix) { $firstRunPrefix = [string]$defaultConfig.commandPrefix }
-    Write-Host "  This machine is not set up yet -- no config.local.json, so the shipped defaults are in use." -ForegroundColor Yellow
-    Write-Host "  Run ${firstRunPrefix}Start for a sample hub that works with no account, or see docs/CONFIGURATION.md to point it at your own." -ForegroundColor Gray
+    # A non-interactive caller (the agent's bridge) marks itself with
+    # TOOLKIT_QUIET_STARTUP, and what it returns is the verb's own sentence, so
+    # the banner stays out of it -- the same marker the startup banner honours.
+    if (-not $env:TOOLKIT_QUIET_STARTUP) {
+        Write-Host "  This machine is not set up yet -- no config.local.json, so the shipped defaults are in use." -ForegroundColor Yellow
+        Write-Host "  Run ${firstRunPrefix}Start for a sample hub that works with no account, or see docs/CONFIGURATION.md to point it at your own." -ForegroundColor Gray
+    }
 }
 
 # Merge helper: local overrides default for simple properties
