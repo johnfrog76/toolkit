@@ -49,9 +49,8 @@ if ($Help) {
 }
 
 if (-not $PullRequestId) {
-    Write-Host "Error: a pull request id is required." -ForegroundColor Red
-    Write-Host "Hint:  run '$(Get-CliPrefix)LogPeerReview -Help' for usage." -ForegroundColor Yellow
-    exit 1
+    Write-CliError -Message 'a pull request id is required.' -Hint "run '$(Get-CliPrefix)LogPeerReview -Help' for usage."
+    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
 
 # -- Resolve the hub ----------------------------------------------------------
@@ -69,9 +68,8 @@ $promptsFolder = ''
 if ($cfg -and $cfg.PromptsFolder) { $promptsFolder = $cfg.PromptsFolder }
 
 if (-not $promptsRoot -or -not (Test-Path $promptsRoot)) {
-    Write-Host "Error: the prompt store is not configured or does not exist: '$promptsRoot'" -ForegroundColor Red
-    Write-Host "Hint:  set promptsRoot in config.local.json." -ForegroundColor Yellow
-    exit 1
+    Write-CliError -Message "the prompt store is not configured or does not exist: '$promptsRoot'" -Hint 'set promptsRoot in config.local.json.'
+    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
 
 $prCommentsDir = if ($promptsFolder) {

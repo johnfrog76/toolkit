@@ -172,7 +172,9 @@ tkPublishWorkReview [-NoPush] [-Preview] [-Help]
 
 Stages `reviews/`, commits `chore: update review (YYYY-MM-DD)`, then syncs.
 `-NoPush` commits without syncing. `-Preview` emits the pending diff as JSON for
-the web UI instead of committing. Script: `Scripts/Update-Review.ps1`.
+the web UI instead of committing. A commit git refuses (a pre-commit hook, say)
+is a stated refusal: git's own first line and a hint that the files are already
+written, then exit 2. Script: `Scripts/Update-Review.ps1`.
 
 ### `tkUpdateResume`
 
@@ -180,7 +182,8 @@ the web UI instead of committing. Script: `Scripts/Update-Review.ps1`.
 tkUpdateResume [-NoPush] [-Preview] [-Help]
 ```
 
-The same three for `resume/`. Script: `Scripts/Update-Resume.ps1`.
+The same three for `resume/`, and the same exit 2 when the commit is refused.
+Script: `Scripts/Update-Resume.ps1`.
 
 ### `tkLogPeerReview`
 
@@ -191,7 +194,8 @@ tkLogPeerReview <PullRequestId> [-Title <string>] [-Notes <string>] [-Help]
 Writes `pr-comments/reviewed-YYYY-MM-DD-PR<id>.md` under the active Space. This is
 the half of review work that otherwise leaves no trace in your own record: the
 PR carries your comments, and nothing else says you spent the afternoon on it.
-The year-end review reads these. Script: `Scripts/Write-PeerReviewLog.ps1` --
+The year-end review reads these. A missing id or an unusable prompt store is a
+stated refusal (exit 2). Script: `Scripts/Write-PeerReviewLog.ps1` --
 a script rather than a function body in `utilities.psm1`, so file writing stays
 out of the command table's own file and within reach of the suites.
 
