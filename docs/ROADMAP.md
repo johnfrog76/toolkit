@@ -17,6 +17,12 @@ or with agents, and the cards are the record either way.
   line, so the board's sprint filter shows a milestone's cards without a tracker.
 - **A milestone is a release** (semantic version, [CHANGELOG.md](../CHANGELOG.md), a tag on main) or a
   refactor that ships no user-visible change and gets no version of its own.
+- **The Azure DevOps way of working is not legacy.** The owner expects to work that way again -- an
+  organisation's board, its sprints, its 1:1s and its accounting against Azure DevOps cards -- so every
+  milestone keeps that path first-class: its verbs stay registered and tested, an Azure DevOps Space
+  stays in the sample hub and in the owner's, and a release is not cut on the GitHub path alone. Where
+  the Azure path can only be proved against a live organisation (VERIFY.md's gates), the release walks
+  them or says it did not.
 - **The public milestones on GitHub are the releases only**, named by version, so a visitor sees what
   shipped and what is next without seeing the crew's cards.
 
@@ -139,8 +145,9 @@ question's smaller cousins. The known gaps a reader can trip over are in [Known 
 After M1, before M3 is built, one session with the owner answers four questions, and the answers
 go into this file:
 
-1. **Who is the user now?** The front door says a studio developer orchestrating agents. The first run
-   is built for that person or for the solo engineer with a board; the tour cannot be for both.
+1. **Who is the user now?** The front door says a studio developer orchestrating agents, and the owner
+   is also the engineer who will work the Azure way again. Both are first-class (above); the question
+   left is only which of them the first run walks first, since a ten-minute tour cannot do both.
 2. **What does "installs itself" mean?** An Electron shell around the three halves, a single binary, or
    a better three-line install. This decides whether M5 exists.
 3. **Is the ritual engine a feature or a product?** Its own repository with ToolKit as one consumer
