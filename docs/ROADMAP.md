@@ -22,6 +22,11 @@ or with agents, and the cards are the record either way.
 
 ## The road so far
 
+Where it started, in the owner's words: an Azure-based system -- agile, prompt engineering, 1:1s and
+accounting, all against Azure DevOps cards, for one engineer in one organisation. Every row below is a
+step from that to a studio with Spaces, where the card is the engineer's own record and Azure DevOps is
+one tracker of two.
+
 | Date | What changed |
 | --- | --- |
 | 2026-09-19 | Azure DevOps can be absent: a `local` org runs the product from its files |
