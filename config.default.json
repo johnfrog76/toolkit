@@ -237,9 +237,10 @@
     "ThreadHash": {
       "category": "pr",
       "description": "Add this branch's commits to its card",
-      "usage": "{cliPrefix}ThreadHash [<file>] [-Hash <hash>] [-Help]",
+      "usage": "{cliPrefix}ThreadHash [<id|file>] [-Hash <hash>] [-Help]",
       "examples": [
         "{cliPrefix}ThreadHash",
+        "{cliPrefix}ThreadHash 137",
         "{cliPrefix}ThreadHash current/137-something-is-wrong.prompt.md",
         "{cliPrefix}ThreadHash -Hash abc1234"
       ],
