@@ -1,262 +1,169 @@
-# Roadmap -- the order the three design ideas get built in
+# Roadmap -- what ToolKit builds next, now that it is public
 
-The owner, 2026-09-20: "I give you freedom to organise them in the order we need, because this is waterfall --
-we can't have a first run experience until we have custom cards, and we need to put a primary experience
-as an add-on -- and technically this is what we did when we said we need a Demo slug for FRE."
+ToolKit 1.0.0 left its private repository on 2026-10-15. The roadmap that got it there was a waterfall
+of eight phases and a public bar, and every line of it is either done or carried below. This file is
+what replaced it: **the road so far**, kept short because the record is the cards; **five milestones**,
+each a release or a refactor with a named "done when"; and the rule for keeping the file honest.
 
-The designs are notes, each worked into a spec and built from there. This file is only their ORDER, and why.
-Each phase is a handful of small steps, each with its own GitHub issue, commit, docs and UAT.
+The owner's three sentences still set the direction. *"This is the core purpose of this software and it
+can't be turned off -- ADO can be turned off."* *"Software is an offering."* And the front door: the
+product is the answer to one question -- how do you want to work? -- by yourself, on a team in Azure,
+or with agents, and the cards are the record either way.
 
-| Design idea (the owner's three) | Where it stands |
+## How the work is carried
+
+- **Internal work is a card** in the hub's toolkit Space, never a public issue. GitHub issues are for
+  what strangers report and ask for. A card names the milestone it belongs to on its `**Sprint:**`
+  line, so the board's sprint filter shows a milestone's cards without a tracker.
+- **A milestone is a release** (semantic version, [CHANGELOG.md](../CHANGELOG.md), a tag on main) or a
+  refactor that ships no user-visible change and gets no version of its own.
+- **The Azure DevOps way of working is not legacy.** The owner expects to work that way again -- an
+  organisation's board, its sprints, its 1:1s and its accounting against Azure DevOps cards -- so every
+  milestone keeps that path first-class: its verbs stay registered and tested, an Azure DevOps Space
+  stays in the sample hub and in the owner's, and a release is not cut on the GitHub path alone. Where
+  the Azure path can only be proved against a live organisation (VERIFY.md's gates), the release walks
+  them or says it did not.
+- **The public milestones on GitHub are the releases only**, named by version, so a visitor sees what
+  shipped and what is next without seeing the crew's cards.
+
+## The road so far
+
+Where it started, in the owner's words: an Azure-based system -- agile, prompt engineering, 1:1s and
+accounting, all against Azure DevOps cards, for one engineer in one organisation. Every row below is a
+step from that to a studio with Spaces, where the card is the engineer's own record and Azure DevOps is
+one tracker of two.
+
+| Date | What changed |
 | --- | --- |
-| Swim-lane view for all cards, custom and ADO-linked -- *the feature* | the cards design; phases 1-3 below, DONE |
-| The first run, leveraging custom cards | the first-run design: watch, do, make your own; phase 5 |
-| Solitaire Agile -- the Lounge tab | the Lounge design; phase 7, specced and built to M3 |
+| 2026-09-19 | Azure DevOps can be absent: a `local` org runs the product from its files |
+| 2026-09-20 | A card no longer needs Azure DevOps. One id rule, a short id of its own, the Spike type, the board with lanes, Billable, Daily from the cards' own dates -- "a huge milestone" |
+| 2026-09-22 | Meeting agendas, not manager agendas: the communication add-on's series and carry-forward |
+| 2026-09-27 | The second tracker: GitHub Issues through the same seam as Azure DevOps, dogfooded on the product's own backlog |
+| 2026-09-28 | The Lounge: the room and the skins |
+| 2026-09-29 | The Studio: every product a Space with its ledger, its designs and its specs |
+| 2026-10-02 | Team Agile: the standup and triage over a repository's issues, the engine as text first |
+| 2026-10-09 | The front door: how do you want to work? Core is ToolKit alone; Azure DevOps and orchestration are the add-ons |
+| 2026-10-15 | **1.0.0, public.** The bar met, one squashed commit, CI on every push, the landing page, Dependabot |
 
-## Milestones
+The waterfall's phases 0 to 4 and 7 are in that table. Phase 5 (the first run), phase 6 (ledgers) and
+phase 8 (the rename) are below, under the milestones they now belong to. The four post-flip features F1
+to F4 are there too, by their cards.
 
-- **2026-09-20 -- a card no longer needs Azure DevOps.** The owner: "that is a huge milestone -- note that."
-  On one Sunday the product's definition changed and the code caught up with it the same day: the idea
-  in the morning ("ADO is just an add-on -- it is not core at all?"), three designs, a spec, and by the
-  evening roadmap phase 1 built -- one id rule, a short id of its own for a card with no work item, the
-  Spike type, the card as a MODEL with `type` a first-class field, and the **+** in the browser making a
-  card from a title and a type on an org with no Azure anywhere. "Spike DG4C: Wallet ticket from a QR
-  code" was the first one. Cards are the core purpose of this software and cannot be turned off; ADO
-  can. Found on the way, because it was tried for real: `Archive` had been broken as a verb for three
-  days, and `current/` was not protected from the keyboard.
-
-- **2026-10-09 -- the front door.** The owner: "this is a foundational shift." The product stopped being a card
-  system with add-ons and became the answer to one question -- how do you want to work? -- with three
-  answers in his words: by yourself, on a team in Azure, with agents. Core is ToolKit alone; the other
-  two are the add-ons the tree already had. Everything moves to the disruption, and the disruption is
-  orchestrated development, so GitHub issues and AI orchestration is the commercial's first window and
-  Azure DevOps is the shelf -- agile on the shelf, literally. The ritual engine is the proof: once the
-  work is orchestrated, the person's problem is keeping up, and the standup is the first thing built for
-  that. The record is what you carry across the shift. Written the same morning in
-  the front-door design note, *how do you want to work?* (the thesis, the platforms' layer and ours, the bottom line, eight
-  decisions) and placed below as the pre-flip set and F1-F4.
-
-## The waterfall
+## The milestones
 
 ```text
-0  ADO can be absent            DONE 2026-09-19 -- the Demo org
+M1  1.1.0  The bar, held            the defect queue dry, the three refactors done, the two public issues
         |
-1  Custom cards                 DONE 2026-09-20 -- a card with no work item is first-class
+M2  1.2.0  The Studio opens in a second   the gh reads: one call per Space, per repository, per tab
         |
-2  Lanes                        DONE 2026-09-20 -- the board: all cards, moving by themselves
+M3  1.3.0  The standup sees the work    Team Agile reads the cards; what moved, and how much
         |
-3  Accounting from the card     DONE 2026-09-20 -- Billable; Daily from the cards' own dates, git or no git
+M4  1.4.0  Ten minutes to your own board   the first run, the tour, the word for a Space
         |
-4  Azure DevOps is a plugin     the thin, visible half DONE 2026-09-20; unregistering the verbs is phase 8
-        |
-5  The first run                watch, do, make your own
-        |
-6  Ledgers                      what ADO and billing know, shown on the card; publish a card to ADO
-        |
-7  The Lounge                   Solitaire Agile
+M5         The rename                 a cards core and an ado module; no version
         :
-8  The rename                   the invisible half of the carve -- any time after 4
+M6  2.0    ToolKit installs itself    the big-picture session decides what the product becomes
 ```
 
-### 0. ADO can be absent -- done
+### M1 -- 1.1.0, the bar held
 
-What the owner noticed: the moment First Run needed a Demo org that never contacts Azure, the primary
-experience had already been made an add-on -- in behaviour. An org whose status is `local` runs the
-product from its files; the ADO-only cards are absent; a Connect card says what is missing. `Start`,
-`samples/hub`, 2026-09-19. Everything below builds on that being true.
+The first release after the flip is the one that proves the public bar was not a one-day event.
+**Done when:** the defect queue is dry, the three refactors from the quick-wins note are done, the two
+public issues are closed, and main's verify is green on both hosts.
 
-### 1. Custom cards -- *needs 0*
+- The defect cards: every bug in the toolkit Space's `current/`, including the raw `git` sweep behind
+  the widened Portability clause.
+- The three refactors (the hub's quick-wins note, 2026-10-16): the standalone shims folded into one
+  prelude -- done; `Menu` split into its four jobs -- done; one skeleton for the Team Agile rituals --
+  open.
+- The two quality passes, the Muse pass (2026-10-15, 27 findings) and the Fable pass (2026-10-16): each
+  finding a card, worked or closed with a reason. The bugs already in the queue came out of them.
+- The two public issues the flip left open: the landing page's links, and the Docker image on Linux.
+- The public bar was the gate the flip was held to, met at 1.0.0; every release after it is held to
+  [Contributing](CONTRIBUTING.md), "How a pull request is reviewed", and the release section in
+  [AGENTS.md](../AGENTS.md), which is where those rules now live.
+- The counts pasted from full runs, once, at the end.
 
-**DONE 2026-09-20.** Steps A (one id rule), B (a short id at creation, the Spike type), C (the card model,
-served by `/api/status`) and D ("New card" from the web **+**). A card with no work item is a first-class card,
-from the terminal and from the browser.
+The CHANGELOG's Unreleased section already holds Added and Changed lines a user would notice, so by the
+versioning rule this is a minor release; the quality batch was first planned as 1.0.1, and the owner
+picks the number when the section is renamed. After the first post-flip release, a tag ruleset (`v*`,
+no deletion or update) is the natural next protection beside main's.
 
-A card with no work item is a first-class card. One id rule, read one way by every verb; a short id
-(`K7M2`) at creation; the **Spike** type; `/api/status` carries `id` and `type`; the web **+** makes a
-card from a title and a type. *Cards design, steps 1-4.*
-**Done when:** the owner presses **+**, types "Wallet ticket from a QR code", picks Spike, and it appears --
-with no Azure anywhere.
+### M2 -- 1.2.0, the Studio opens in a second
 
-### 2. Lanes -- *needs 1*
+Every GitHub Space costs the same on every machine: the foyer fires three `gh` reads per Space on
+every mount, a repository's design notes are read one `gh` call per note, the Docs tab one call per
+folder, and the standup re-reads the tracker and re-dresses unchanged facts through the model on every
+open. Measured on 2026-10-17 against a hub with thirteen Spaces; each is a card with its numbers.
+**Done when:** the foyer, the Design tab, the Docs tab and the standup each read GitHub in one call
+cold and none warm, through one cache helper on disk keyed by what GitHub already hands back (shas,
+updated-at), with the GUI untouched; the browser's own cache already holds a session. Its own milestone
+because it is new scope since the flip and should not be judged as part of the quality batch.
 
-**DONE 2026-09-20.** Steps E (the board), F (drop on Done, and the Move menu) and G (the sample hub has a card
-in every lane, and a Spike with no work item). `docs/images/board-in-action.gif` is it working.
+### M3 -- 1.3.0, the standup sees the work
 
-The board as a second view of Home, with Home's filters plus Sprint: Active, In Progress, Code Review,
-Done. Cards move by themselves -- a commit, a pull request. The one move a person makes is dropping a
-card on Done to archive it, and every card has a "Move to..." menu for the keyboard. *Cards spec, E-F.*
-**Minimum deliverable -- the owner, 2026-09-20: "not planning yet and no backlog."** A card is in play the
-moment it is created. Planning (a Planned mark or a `backlog/` folder, My Work in the first lane) is a
-later build-out, and is not a phase yet.
-**Done when:** the Costco week's cards can be made on Monday and watched across the board by Friday.
+Now that the team's own work runs on cards and the issues are the public's, Team Agile is blind to the
+work that actually happens. **Done when:** on a GitHub Space the standup says the cards being worked as
+well as the issues, says what moved and how many commits it took, and can answer for a stretch of days.
 
-### 3. Accounting from the card -- *needs 1*
+1. *Team Agile reads both records on a tracker Space* -- issues and cards joined on the id; a card
+   checked not billable is not a standup row. (The card carries the Definition of Done.)
+2. *The standup says what moved* -- closed, started, in progress, a counts line with the commits, and a
+   `-Since <date>` window.
+3. *The mirror points* -- a derived next move on the standup, and **Start work** beside Route that hands
+   a seat its prompt, the card and the Space's how-we-work note. This is the old F2.
+4. One skeleton for the rituals comes first, so the three above are built on it, not copied again.
 
-`**Billable:** yes / no` on a card (decided 2026-09-20; built here because nothing a user sees changes
-until Daily honours it). Daily is built from the cards' own `Created` and `Closed` dates, honouring Billable, with git only as
-enrichment. *Cards design, step 9.* Closes the two open billing bugs.
-**Done when:** Friday's timesheet is right after a hub folder move, and a first-run user's Daily is not empty.
-Why before 5: a first run whose Daily page says "nothing recorded" undoes the introduction.
+### M4 -- 1.4.0, ten minutes to your own board
 
-**Done 2026-09-20** -- built on `feature/accounting-from-the-card`, accepted by the owner and merged the same day. Both halves of "done when"
-were checked for real: a scratch first-run hub with NO git shows the sample cards on Daily, Monday to
-Friday, and the folder-move case is pinned by a test that failed before. Billable shipped as **no / absent**
-rather than yes / no -- a card is billable unless it says otherwise, so nothing needed migrating; the verb
-is `Billable <id> [-No]`, and the board and the list both carry the mark and the toggle. Along the way:
-the agent's in-memory "last week" cache went (a finished week CAN change -- a closed card gets marked on
-Monday), and a week that could not be built now says so on Daily instead of reading as a quiet one.
-**Asked for next, not built** (the owner, 2026-09-20): page Daily back further than last week, with the same
-pattern in the CLI -- an open issue. **This phase and that draft share one
-spec, Daily's.**
+A stranger clones the repository, runs three lines, and ten minutes later has used the whole system on
+their own board, without being asked for an account. **Done when:** that sentence is tested on a machine
+that has never seen the product, and the tour is narrated.
 
-### 4. Azure DevOps is a plugin -- *needs 1-2; the VISIBLE half of the carve*
+- The first run: watch, do, make your own -- the tutorial cards, the Welcome page. This is the old phase 5.
+- Kit's guided tour, built and baked in the Wasteland studio and shipped into the deck module.
+- The word for a Space and its one-sentence definition, now that a Space is a connection to software.
+- New Space asks how you want to work, and the orchestrating answer writes the team's files. The old F4.
+- The landing page's links back and forth, and its look at banner size.
 
-The owner: "we keep always custom cards and user can plug in to Azure", and: "this is the core purpose of this
-software and it can't be turned off -- ADO can be turned off." Cards have no flag and never will. ADO
-gets one. A switch, like Growth: Settings ->
-Modules -> Azure DevOps. Off means absent -- no ADO verbs in the menu, no ADO cards on Home, no Connect
-nagging. On, and everything it does today comes back. The org's `local` / `active` status remains the
-per-org answer; this is the product-level one.
-**Done when:** a new user never meets the words "Azure DevOps" unless they go looking, and an existing
-user sees no difference at all.
-Why before 5: the first run should describe the product in its final shape -- "plug in Azure DevOps" --
-not be rewritten a month later.
+### M5 -- the rename, no version
 
-**The thin half, done 2026-09-20** -- built on `feature/ado-is-a-plugin`, merged on the owner's word the same day, to the
-Azure DevOps plugin's spec ([the add-on](modules/ado.md) is its record). The owner: "only if it isn't disruptive", so the switch is DERIVED
-(`features.ado`, else the status of the org you are in) and a user in an active org sees no difference:
-`Menu`, `Menu -All` and `Menu -Markdown` on `main` and on the branch differ by one line pair, the new
-inventory row. A machine `Start` made is shown only what it can use -- in `Menu`, `Setup` (which no longer
-fails a machine with no `az`, and states the tier), the New card dialog and Settings. The verbs stay
-registered; unregistering them is phase 8. The Settings "Modules -> Azure DevOps" switch this section
-describes exists as the labelled `features.ado` row; whether it should sit with Growth and Meetings is
-an open item in the spec.
+One structural change that ships no user-visible difference and is cleaner done in public than held:
+a `cards` core and `ado` a module beside growth, communication and deck. The invisible half of the
+carve, the old phase 8, done alone when nothing else is in flight.
 
-*Done 2026-09-22, before phase 5: lane names for people who do not ship code -- org-scoped lane
-names with a plain default for Demo, the `Move` verb and the two tokens a person writes, and drag-and-drop
-to every lane ahead of a card. Also the path-with-copy on every file page, and the pager on the toggle row --
-which went on 2026-09-24, when Home became three named tabs, Cards | Sprint | Actions, and the toggle took its
-place at the row's right edge. On 2026-09-28 the toggle went too (cards spec D-C14): Home is Focus | Board | Sprint | Actions, and a space shows only the tabs it has.*
+### M6 -- 2.0, ToolKit installs itself
 
-*Agreed 2026-09-22, and next after the PC's triage: **the Meeting Agenda Planner**
-([the communication add-on](modules/communication.md)). The owner: "I agree -- we do this. Meeting agendas, not manager agendas ...
-What Teams does not do: it has no memory between meetings ... And an agenda item that becomes work becomes
-a card, on the board, with the meeting it came from written in it." Built in the order the spec's
-acceptance is written: the 1:1 unchanged first, then the second series. **Stage one built the same day**:
-the series in the record's name, carry-forward per series, the quick menu, the web's list and dialog.*
+The owner's "ultimate milestone": ToolKit delivered as an app that installs itself, rather than a
+PowerShell module, a Python agent and a Node build a person assembles. It is a major version because
+it changes what a user does to get the product. **It is not designed yet.** It waits on the big-picture
+session, below, and nothing in M1 to M5 builds toward it or away from it.
 
-### 5. The first run -- *needs 1, 2, 3, 4*
+## Not placed
 
-The tutorial cards (custom cards, in the sample hub), the Welcome page, the intro deck that is also the
-README's demo. *First-run design.*
-**Done when:** someone clones the repo, runs three lines, and ten minutes later has used the whole
-system on their own board -- and has not been asked for an account.
+Kept as cards, fitted in when a milestone has room, none of them scheduled: the ritual engine in its
+own repository (the old F3; "refine what exists" first, said on 2026-10-16, so it waits for the features
+talk); a backlog of cards (plan one for later); local sprints' write side; flights that protect unfinished work; Daily paging back
+past last week, and a week that is not one engagement; Teams as a connection; a real stress-check verb;
+the review archive's averages and exceptions; meet the team; the standup's voices; the Electron
+question's smaller cousins. The known gaps a reader can trip over are in [Known gaps](KNOWN-GAPS.md).
 
-*Behind this phase, and not scheduled: going public -- a project page and a feature tour generated from the
-software -- the open-source front page and feature tour's design note, with the gates that come before it;
-the gates became a checklist that the public release was held to, and was met at 1.0.0.*
+## The big-picture session
 
-### 6. Ledgers -- *needs 3 and 4*
+After M1, before M4 is built, one session with the owner answers three questions, and the answers
+go into this file:
 
-A card says what each ledger knows about it and offers the one action that settles a drift ("Done here,
-still Active there"). **Publish a card to Azure DevOps**: the work item is made FROM the card. *Cards
-design, section 2.*
-**Done when:** the double entry is the tool's job, not the engineer's.
-Why here and not earlier: it is only meaningful once ADO is a plugin a card may or may not report to.
-
-### 7. The Lounge -- *needs 1-2; specced 2026-09-26, M1-M2 scheduled (see "The next three")*
-
-*M3 -- the Skins dialog, the room in the GUI's clothes, two small games -- proposed from the issue that
-asked to evolve the Lounge and the owner's hub note, LOCKED and BUILT the same day, 2026-09-28. The
-living card keeps everything past it.*
-
-Solitaire Agile. The Lounge's spec carves the buildable slice: the room and the skins
-first (M1-M2), the study, the company and the story behind them; replay before live stands -- it
-reads a build that already happened and costs nothing. The living design card keeps everything the
-spec does not schedule. The live-team work still comes in behind a flight
-(the flights design note: protect unfinished work), the first thing here likely to need one.
-
-### 8. The rename -- *any time after 4; the INVISIBLE half of the carve*
-
-Folders, module ids and docs stop saying "ADO core": a `cards` core, and `ado` a module beside growth,
-communication and deck. No user-visible change, a large diff, every registry test and a good deal of
-documentation. Deliberately separated from 4 so the part a user sees does not wait on it, and so it can
-be done alone, when nothing else is in flight.
-
-## The next three (agreed 2026-09-26)
-
-The owner: "you can build first the github, then the lounge and then we go back to workflow based
-settings." In order:
-
-1. **The GitHub tracker** -- its spec's milestone 1: the second tracker
-   through a real seam (which carves the SEAM SLICE of phase 8 first -- dispatch by board, not the
-   rename), dogfooding on toolkit's own issues. This is `what-this-is.md` item 6 made real: "ADO is
-   one of two" is the only version a stranger can verify.
-2. **The Lounge, M1-M2** -- the Lounge's spec: the room and the skins, where the spec
-   now ENDS (the owner, 2026-09-26: the Virtual Team is "not ready for spec -- I think the skins are").
-   The living design note keeps everything beyond -- the study,
-   the company, the story -- until the owner calls one ready.
-3. **Workflow-based settings** -- back to the connect wizard as the family's first instance
-   (the Azure DevOps on-ramp's issue for the wizard, the family's rules on the settings drawer's
-   issue).
-
-Phases 5-8 keep their places in the waterfall; these three interleave ahead of them because the
-seam, the room and the wizards are what the day's design work made ready.
-
-**Where that list stands, 2026-09-29:** 1 is built (Milestone P, 2026-09-27) and 2 is built (Lounge
-M1-M3, 2026-09-28); 3 is next and is SPECCED as settings BY WORKFLOW ([Configuration](CONFIGURATION.md),
-"Settings by workflow: the questions, and the one list behind them"; the owner, 2026-09-28: a FAQ-like section in the drawer plus Tips on Home; fourteen questions held to
-the CLI's surface inventory; W1 the list and the section, W2 the connect wizard, W3 the family). Behind it, **the Studio** --
-its spec, built as [the Studio](modules/studio.md) (2026-09-29, the owner: "gh issues is inspirational and brings us closer to
-a studio experience"): every product a GitHub Space with a complete ledger (S1, the backfill and the closed issues in the web),
-a foyer across products with design notes in the hub (S2), specs read from the product's repo and
-review in the tracker's thread (S3). D-S8 orders it after the settings work, because the
-out-of-the-box user is a studio developer connecting a first product.
-
-## What is NOT on this list
-
-The settings drawer's grouping (on hold at the owner's word), the remaining UX-audit issues, closing a meeting
-from the web, and everything else on the GitHub issue list -- small, independent, and
-fitted in between phases. A read-only **Issues page** in the web UI is also independent and can land
-any time.
-
-**Solitaire Agile** (specced 2026-10-02 from the Team Agile issue; built as [Team Agile](modules/solitaire-agile.md)) is written in
-three phases -- M0 the engine as text, V1 the deck and triage, V2 the voices. **M0 DONE 2026-10-02**
-(the owner: "ship because it has value now just seeing the status"). **V1 DONE 2026-10-03** (the owner: "continue driving towards
-Team Agile"; seven issues, and two UX issues -- the Space's home icon and the Studio's design component -- shipped the same morning). V2 and
-the running state are NOT placed yet.
-
-## The front door, and the order after the flip (2026-10-09)
-
-**The tracker carries this order** (the owner, 2026-10-09: "push the roadmap into the public milestone,
-because we must get the commercial right"): the **Going public** milestone's description is the pre-flip
-order with the commercial first, and the **After the flip** milestone holds F1-F4 as issues. The file and
-the milestones say the same thing; when one changes, both do.
-
-The public milestone is the release checklist (met at 1.0.0) plus three pieces of one story:
-the README's first screen says what ToolKit is in one
-sentence -- a studio where you work on software by yourself, on a team, or orchestrating agents, and the
-cards are the record either way (with the deck's order, the commercial); Settings asks "How do I work on this
-Space?" and the answer sets Team Agile per Space; the Studio lists the agentic prompts that ship.
-Nothing else is added before the flip.
-
-After the flip, in this order, each from its design note into a spec first:
-
-```text
-F1  Daily: the record for everyone     the outcomes layer, edit-then-save; the billing format as the opt-in export
-        |
-F2  Start work                         the mirror points; Start work beside Route writes the hand-off: the seat's prompt, the card, the how-we-work note
-        |
-F3  The ritual engine's own repo       done in public; the standup's moved-items line and its folded also-ons are its first issues
-        :
-F4  New Space asks the question        when the orchestrating answer writes the team's files into the Space's hub folder
-```
-
-Why that order: F1 changes a page everyone sees from the first run; F2 is a button over three things that
-exist; F3 moves code and is cleaner as a refactor on stage than as a delay before it; F4 waits for the
-answer to have a consequence worth a dialog.
+1. **Who is the user now?** The front door says a studio developer orchestrating agents, and the owner
+   is also the engineer who will work the Azure way again. Both are first-class (above); the question
+   left is only which of them the first run walks first, since a ten-minute tour cannot do both.
+2. **What does "installs itself" mean?** An Electron shell around the three halves, a single binary, or
+   a better three-line install. This decides whether M5 exists.
+3. **Is the ritual engine a feature or a product?** Its own repository with ToolKit as one consumer
+   changes who files its issues and where its design lives.
 
 ## Keeping this file honest
 
-When a phase finishes, mark it DONE with the date, here, in the same commit. When the order changes,
-change it here and say why. This is the only place the order is written down.
+When a milestone's "done when" is met, mark it with the date, here, in the same commit as the release
+or the refactor's merge. When the order changes, change it here and say why. A card names its milestone
+on its `**Sprint:**` line; this file names the milestones. This is the only place the order is written
+down, and the GitHub milestones carry only the release versions.
