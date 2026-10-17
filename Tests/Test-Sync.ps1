@@ -445,7 +445,7 @@ function Invoke-SyncInModule {
     <# Import the sandboxed module in a fresh child pwsh -- so StoreSync is
        resolved for real, from config + hub.json + whatever local config this
        case writes -- and run Sync-Prompts.ps1 against it. #>
-    param($Sandbox, [string]$LocalJson)
+    param($Sandbox, [string]$LocalJson, [string]$CallerPreference = 'SilentlyContinue')
 
     # The previous case's child pwsh, or a scanner reading what it just wrote, can still
     # hold the file for a moment; retry the write rather than ending the run on it.
@@ -464,6 +464,7 @@ function Invoke-SyncInModule {
 Remove-Item Env:PROMPTS_ROOT -ErrorAction SilentlyContinue
 Import-Module '$modulePath' -Force -DisableNameChecking *>`$null
 Write-Host "RESOLVED-STORESYNC=`$(`$global:P20Config.StoreSync)"
+`$ErrorActionPreference = '$CallerPreference'
 & '$syncPath' *>&1 | ForEach-Object { Write-Host `$_ }
 "@
     return (pwsh -NoProfile -Command $command 2>&1 | Out-String)
@@ -511,6 +512,15 @@ try {
     Assert-Equal "and the hub's storeSync intact" 'git' $manifestAfter.storeSync
     Assert-True "the new spelling reached the remote as its own commit" (@($remoteSubjects | Where-Object { $_ -like '*hub.json says spaces*' }).Count -eq 1)
     Assert-Contains "and Sync said so" $output 'hub.json now says spaces'
+
+    # A caller holding 'Stop', a hub with nothing to commit: the status read is a
+    # native call and must not throw before Sync can report. (On 5.1 this is the
+    # throw; pwsh 7 reads it as text, so the 5.1 run in CI is what proves it.)
+    $output = Invoke-SyncInModule -Sandbox $rs -LocalJson "{ `"promptsRoot`": `"$($rs.Hub -replace '\\', '/')`" }" -CallerPreference 'Stop'
+
+    Assert-Contains "a Stop caller with a clean hub still syncs to the end" $output 'Sync complete'
+    Assert-True "and nothing was committed, because there was nothing to commit" ($output -notmatch 'Committed pending changes')
+    Assert-True "and no error escaped the status read" ($output -notmatch 'NativeCommandError|Error:|Exception')
 
     # Same hub, same declaration -- and a machine that must never push says so.
     $output = Invoke-SyncInModule -Sandbox $rs -LocalJson "{ `"promptsRoot`": `"$($rs.Hub -replace '\\', '/')`", `"storeSync`": `"none`" }"
