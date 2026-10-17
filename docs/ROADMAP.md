@@ -88,8 +88,10 @@ the release was held to is a document in the tree, and main's verify is green on
 - The two public issues the flip left open: the landing page's links, and the Docker image on Linux.
 - The counts pasted from full runs, once, at the end.
 
-The CHANGELOG's Unreleased section already holds a Changed line a user would notice, so this is a minor
-release, not a patch.
+The CHANGELOG's Unreleased section already holds Added and Changed lines a user would notice, so by the
+versioning rule this is a minor release; the quality batch was first planned as 1.0.1, and the owner
+picks the number when the section is renamed. After the first post-flip release, a tag ruleset (`v*`,
+no deletion or update) is the natural next protection beside main's.
 
 ### M2 -- 1.2.0, the standup sees the work
 
