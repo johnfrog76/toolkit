@@ -52,40 +52,37 @@ to F4 are there too, by their cards.
 ## The milestones
 
 ```text
-M1  1.1.0  The bar, held            the defect queue dry, the three refactors done, the bar written down
+M1  1.1.0  The bar, held            the defect queue dry, the three refactors done, the two public issues
         |
-M2  1.2.0  The standup sees the work    Team Agile reads the cards; what moved, and how much
+M2  1.2.0  The Studio opens in a second   the gh reads: one call per Space, per repository, per tab
         |
-M3  1.3.0  Ten minutes to your own board   the first run, the tour, the word for a Space
+M3  1.3.0  The standup sees the work    Team Agile reads the cards; what moved, and how much
         |
-M4         The engine on stage        the ritual engine in its own repository; the rename
+M4  1.4.0  Ten minutes to your own board   the first run, the tour, the word for a Space
+        |
+M5         The rename                 a cards core and an ado module; no version
         :
-M5  2.0    ToolKit installs itself    the big-picture session decides what the product becomes
+M6  2.0    ToolKit installs itself    the big-picture session decides what the product becomes
 ```
 
 ### M1 -- 1.1.0, the bar held
 
 The first release after the flip is the one that proves the public bar was not a one-day event.
-**Done when:** the defect queue is dry, the three refactors from the quick-wins note are done, the bar
-the release was held to is a document in the tree, and main's verify is green on both hosts.
+**Done when:** the defect queue is dry, the three refactors from the quick-wins note are done, the two
+public issues are closed, and main's verify is green on both hosts.
 
 - The defect cards: every bug in the toolkit Space's `current/`, including the raw `git` sweep behind
   the widened Portability clause.
-- **The performance set, measured on 2026-10-17 against a hub with thirteen Spaces:** the foyer's three
-  `gh` reads per GitHub Space on every mount; a repository's design notes read one `gh` call per note;
-  the Docs tab's call per folder; the standup re-reading the tracker and re-dressing unchanged facts
-  through the model on every open; the ledger's `git log` per card; the prompts list carrying every
-  body. One cache helper on disk, keyed by what GitHub already hands back (shas, updated-at), shared by
-  all of them; the browser's own cache already holds a session. Each is a card with its numbers.
 - The three refactors (the hub's quick-wins note, 2026-10-16): the standalone shims folded into one
   prelude -- done; `Menu` split into its four jobs -- done; one skeleton for the Team Agile rituals --
   open.
 - The two quality passes, the Muse pass (2026-10-15, 27 findings) and the Fable pass (2026-10-16): each
   finding a card, worked or closed with a reason. The bugs already in the queue came out of them.
-- **The public bar, written for real.** The old roadmap pointed at a bar document that was never written.
-  `docs/PUBLIC-BAR.md` says what the release was held to and what every release after it is held to:
-  the suites, the two hosts, the documentation rule, the changelog line, the refusal contract.
 - The two public issues the flip left open: the landing page's links, and the Docker image on Linux.
+- **The bar stays where it is.** The checklist the release was held to lives in the owner's hub, and
+  on 2026-10-16 the decision was to keep it there and reword this file rather than publish it. Whether a
+  public `docs/PUBLIC-BAR.md` is written for every release after this one is a question for the owner,
+  raised again on 2026-10-17, and the big-picture session's fourth question below.
 - The counts pasted from full runs, once, at the end.
 
 The CHANGELOG's Unreleased section already holds Added and Changed lines a user would notice, so by the
@@ -93,7 +90,18 @@ versioning rule this is a minor release; the quality batch was first planned as 
 picks the number when the section is renamed. After the first post-flip release, a tag ruleset (`v*`,
 no deletion or update) is the natural next protection beside main's.
 
-### M2 -- 1.2.0, the standup sees the work
+### M2 -- 1.2.0, the Studio opens in a second
+
+Every GitHub Space costs the same on every machine: the foyer fires three `gh` reads per Space on
+every mount, a repository's design notes are read one `gh` call per note, the Docs tab one call per
+folder, and the standup re-reads the tracker and re-dresses unchanged facts through the model on every
+open. Measured on 2026-10-17 against a hub with thirteen Spaces; each is a card with its numbers.
+**Done when:** the foyer, the Design tab, the Docs tab and the standup each read GitHub in one call
+cold and none warm, through one cache helper on disk keyed by what GitHub already hands back (shas,
+updated-at), with the GUI untouched; the browser's own cache already holds a session. Its own milestone
+because it is new scope since the flip and should not be judged as part of the quality batch.
+
+### M3 -- 1.3.0, the standup sees the work
 
 Now that the team's own work runs on cards and the issues are the public's, Team Agile is blind to the
 work that actually happens. **Done when:** on a GitHub Space the standup says the cards being worked as
@@ -107,7 +115,7 @@ well as the issues, says what moved and how many commits it took, and can answer
    a seat its prompt, the card and the Space's how-we-work note. This is the old F2.
 4. One skeleton for the rituals comes first, so the three above are built on it, not copied again.
 
-### M3 -- 1.3.0, ten minutes to your own board
+### M4 -- 1.4.0, ten minutes to your own board
 
 A stranger clones the repository, runs three lines, and ten minutes later has used the whole system on
 their own board, without being asked for an account. **Done when:** that sentence is tested on a machine
@@ -119,32 +127,31 @@ that has never seen the product, and the tour is narrated.
 - New Space asks how you want to work, and the orchestrating answer writes the team's files. The old F4.
 - The landing page's links back and forth, and its look at banner size.
 
-### M4 -- the engine on stage, no version
+### M5 -- the rename, no version
 
-Two structural changes that ship no user-visible difference and are cleaner done in public than held.
+One structural change that ships no user-visible difference and is cleaner done in public than held:
+a `cards` core and `ado` a module beside growth, communication and deck. The invisible half of the
+carve, the old phase 8, done alone when nothing else is in flight.
 
-- The ritual engine in its own repository: a portfolio piece that ToolKit consumes. The old F3.
-- The rename: a `cards` core and `ado` a module beside growth, communication and deck. The invisible
-  half of the carve, the old phase 8, done alone when nothing else is in flight.
-
-### M5 -- 2.0, ToolKit installs itself
+### M6 -- 2.0, ToolKit installs itself
 
 The owner's "ultimate milestone": ToolKit delivered as an app that installs itself, rather than a
 PowerShell module, a Python agent and a Node build a person assembles. It is a major version because
 it changes what a user does to get the product. **It is not designed yet.** It waits on the big-picture
-session, below, and nothing in M1 to M4 builds toward it or away from it.
+session, below, and nothing in M1 to M5 builds toward it or away from it.
 
 ## Not placed
 
-Kept as cards, fitted in when a milestone has room, none of them scheduled: a backlog of cards (plan
-one for later); local sprints' write side; flights that protect unfinished work; Daily paging back
+Kept as cards, fitted in when a milestone has room, none of them scheduled: the ritual engine in its
+own repository (the old F3; "refine what exists" first, said on 2026-10-16, so it waits for the features
+talk); a backlog of cards (plan one for later); local sprints' write side; flights that protect unfinished work; Daily paging back
 past last week, and a week that is not one engagement; Teams as a connection; a real stress-check verb;
 the review archive's averages and exceptions; meet the team; the standup's voices; the Electron
 question's smaller cousins. The known gaps a reader can trip over are in [Known gaps](KNOWN-GAPS.md).
 
 ## The big-picture session
 
-After M1, before M3 is built, one session with the owner answers four questions, and the answers
+After M1, before M4 is built, one session with the owner answers four questions, and the answers
 go into this file:
 
 1. **Who is the user now?** The front door says a studio developer orchestrating agents, and the owner
@@ -154,7 +161,9 @@ go into this file:
    a better three-line install. This decides whether M5 exists.
 3. **Is the ritual engine a feature or a product?** Its own repository with ToolKit as one consumer
    changes who files its issues and where its design lives.
-4. **What is the bar for a release?** What `docs/PUBLIC-BAR.md` says, once it exists, is the answer.
+4. **What is the bar for a release, and is it public?** The checklist lives in the hub today. Publishing
+   it as `docs/PUBLIC-BAR.md` would let a contributor hold a release to it; keeping it private keeps the
+   owner's notes out of the tree. The owner raised writing it "for real" on 2026-10-17.
 
 ## Keeping this file honest
 
