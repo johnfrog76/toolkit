@@ -982,6 +982,13 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   deletions), not every line of the file, and `git diff` shows no `^M`. Repeat on a session whose
   lines end CRLF: it stays CRLF.
   CONFIRMED on Windows: an LF session saved through the agent changed only its edited lines and gained no CR.
+- [ ] **A git refusal reads the same under Windows PowerShell 5.1.** In `powershell` (5.1), with the module imported
+  and `$ErrorActionPreference = 'Stop'` set in the shell, stand OUTSIDE any git repository (`cd $env:TEMP`) and run
+  `tkThreadHash <id> -Hash 0000000` for a card in `current/`, then `tkStatus`, then `tkDashboard`. You should see each
+  verb's own sentence (`Error:` and a `Hint:` from the verb, or the Dashboard's git-less line) and `$LASTEXITCODE` of 2
+  for the refusals -- never a `NativeCommandError` naming `git`, and never the generic `Error: exit code` block. Then
+  `tkTestToolkit -Portability -GitRoot -ThreadHash -Update` on that host: green, and the Portability summary names no
+  `D3J7 follow-up`. Closes the git sweep merged as PR #78.
 
 ## Recording a run
 
