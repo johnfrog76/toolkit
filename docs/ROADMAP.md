@@ -59,7 +59,13 @@ The first release after the flip is the one that proves the public bar was not a
 the release was held to is a document in the tree, and main's verify is green on both hosts.
 
 - The defect cards: every bug in the toolkit Space's `current/`, including the raw `git` sweep behind
-  the widened Portability clause and the Design tab's one-call-per-note read.
+  the widened Portability clause.
+- **The performance set, measured on 2026-10-17 against a hub with thirteen Spaces:** the foyer's three
+  `gh` reads per GitHub Space on every mount; a repository's design notes read one `gh` call per note;
+  the Docs tab's call per folder; the standup re-reading the tracker and re-dressing unchanged facts
+  through the model on every open; the ledger's `git log` per card; the prompts list carrying every
+  body. One cache helper on disk, keyed by what GitHub already hands back (shas, updated-at), shared by
+  all of them; the browser's own cache already holds a session. Each is a card with its numbers.
 - The three refactors (the hub's quick-wins note, 2026-10-16): the standalone shims folded into one
   prelude -- done; `Menu` split into its four jobs -- done; one skeleton for the Team Agile rituals --
   open.
