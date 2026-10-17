@@ -46,6 +46,7 @@ release.
 - The pull request comments record GetPRComments leaves in pr-comments/ is now written with the same bytes on every host: UTF-8 with no byte-order mark and LF line endings.
 - A one-on-one session file whose Stage heading is followed by a comment now reads its stage correctly instead of showing the comment as the stage.
 - The scripts behind Connect, EditItem, MyPRs, InstallAutoload, Agent and Web, run on their own without the module, now keep their stated reason when they refuse, as every other script does; they printed the error and then lost the reason.
+- `NewPR` run from a folder that is not a repository now says so in its own words on Windows PowerShell 5.1 even when the calling shell stops on errors, instead of printing a raw error from the version control tool.
 - Syncing the hub from Windows PowerShell 5.1 under a caller that stops on errors no longer throws on git's own status line; a status read git refuses is now a stated refusal (exit 2) instead of being read as a dirty hub.
 
 ## [1.0.0] - 2026-10-15
