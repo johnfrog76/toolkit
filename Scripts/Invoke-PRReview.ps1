@@ -158,6 +158,7 @@ $ErrorActionPreference = 'Stop'
 # The token, the headers, the HTTP status and the 401/403 advice: one helper for
 # every ADO script. The branch search and the PR fetch read the status the same way.
 . (Join-Path $PSScriptRoot 'Get-AdoToken.ps1')
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 
 # -- Main ----------------------------------------------------------------------
 try {
@@ -171,7 +172,7 @@ try {
 
     # --- Resolve PR ID from branch if not supplied ---
     if (-not $PullRequestId) {
-        $branchName = git rev-parse --abbrev-ref HEAD 2>$null
+        $branchName = (Invoke-P20TrackerRead 'git' @('rev-parse', '--abbrev-ref', 'HEAD')).Out
         if (-not $branchName -or $branchName -eq 'HEAD') {
             Write-CliError -Message "Could not detect current branch." -Hint "Pass -PullRequestId explicitly."
             exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
@@ -232,8 +233,7 @@ try {
     # --- Get diff via git ---
     $inGitRepo = $false
     try {
-        git rev-parse --git-dir 2>&1 | Out-Null
-        $inGitRepo = ($LASTEXITCODE -eq 0)
+        $inGitRepo = ((Invoke-P20TrackerRead 'git' @('rev-parse', '--git-dir')).Code -eq 0)
     } catch { $null = $_ }
 
     if (-not $inGitRepo) {
@@ -242,10 +242,11 @@ try {
     }
 
     Write-Host "Fetching branches and computing diff ..." -ForegroundColor DarkGray
-    git fetch origin $targetBranch $sourceBranch --quiet 2>&1 | Out-Null
+    $null = Invoke-P20TrackerRead 'git' @('fetch', 'origin', $targetBranch, $sourceBranch, '--quiet')
 
-    $diffLines  = git diff "origin/$targetBranch...origin/$sourceBranch" --unified=3 2>&1
-    $gitExit    = $LASTEXITCODE
+    $diffRead   = Invoke-P20TrackerRead 'git' @('diff', "origin/$targetBranch...origin/$sourceBranch", '--unified=3')
+    $diffLines  = $diffRead.Lines
+    $gitExit    = $diffRead.Code
     $diff       = $diffLines -join "`n"
 
     # 2>&1 folds stderr into $diffLines, so a git failure arrives looking like

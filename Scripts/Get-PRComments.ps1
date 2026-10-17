@@ -318,6 +318,7 @@ function Write-P20PRCommentsRecord {
 
 # The token, the headers and the 401/403 advice: one helper for every ADO script.
 . (Join-Path $PSScriptRoot 'Get-AdoToken.ps1')
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 try {
@@ -329,13 +330,13 @@ try {
         # a wrong PR URL: into a card, which is the Code Review token.
         #
         # Asked of git, not by comparing paths.
-        $cwdGitDir = "$(git rev-parse --absolute-git-dir 2>$null)".Trim()
-        $toolkitGitDir = "$(git -C (Split-Path -Parent $PSScriptRoot) rev-parse --absolute-git-dir 2>$null)".Trim()
+        $cwdGitDir = "$((Invoke-P20TrackerRead 'git' @('rev-parse', '--absolute-git-dir')).Out)".Trim()
+        $toolkitGitDir = "$((Invoke-P20TrackerRead 'git' @('-C', (Split-Path -Parent $PSScriptRoot), 'rev-parse', '--absolute-git-dir')).Out)".Trim()
         if ($cwdGitDir -and $toolkitGitDir -and $cwdGitDir -eq $toolkitGitDir) {
             Write-CliError -Message "No PullRequestId or BranchName provided, and this is the Toolkit's own checkout, not a card's code repository." -Hint "Pass the pull request: $(Get-CliPrefix)GetPRComments <PullRequestId>, or -BranchName <branch>."
             exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
         }
-        $BranchName = git rev-parse --abbrev-ref HEAD 2>$null
+        $BranchName = (Invoke-P20TrackerRead 'git' @('rev-parse', '--abbrev-ref', 'HEAD')).Out
         if (-not $BranchName -or $BranchName -eq 'HEAD') {
             Write-CliError -Message "No PullRequestId or BranchName provided, and could not detect current branch." -Hint "Usage: $(Get-CliPrefix)GetPRComments <PullRequestId>  or  $(Get-CliPrefix)GetPRComments -Help"
             exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"

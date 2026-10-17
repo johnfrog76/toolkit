@@ -62,6 +62,7 @@ param(
 # person running the .ps1) there may be no config at all, and then there is no
 # prefix to print -- which is honest: the bare verb name is still right.
 . (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 
 function Write-UpdateRefusal {
     param([string]$Message, [string]$Hint)
@@ -95,7 +96,7 @@ function Invoke-ToolkitGit {
     # Always FROM the package, never the current directory. Output is returned
     # as strings; the caller reads $LASTEXITCODE.
     param([string[]]$GitArgs)
-    return @(& git -C $pkgRoot @GitArgs 2>&1 | ForEach-Object { "$_" })
+    return @((Invoke-P20TrackerRead 'git' (@('-C', $pkgRoot) + @($GitArgs))).Lines)
 }
 
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {

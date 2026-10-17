@@ -43,6 +43,10 @@
     once git is the one answering.
 #>
 
+# The one way a script calls git with stderr read as text (Invoke-TrackerRead.ps1).
+# Dot-sourced here, relative to this file, because this file is itself dot-sourced.
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
+
 function Get-P20GitToplevel {
     <#
       The root of the work tree the folder belongs to, or '' when it belongs to
@@ -55,8 +59,9 @@ function Get-P20GitToplevel {
     if (-not (Test-Path -LiteralPath $Path)) { return '' }
 
     $previous = $global:LASTEXITCODE
-    $out = @(& git -C $Path rev-parse --show-toplevel 2>$null | ForEach-Object { "$_" })
-    $ok = ($LASTEXITCODE -eq 0)
+    $read = Invoke-P20TrackerRead 'git' @('-C', $Path, 'rev-parse', '--show-toplevel')
+    $out = @($read.Out | ForEach-Object { "$_" })
+    $ok = ($read.Code -eq 0)
     $global:LASTEXITCODE = $previous
     if (-not $ok) { return '' }
     $top = ($out | Where-Object { $_ } | Select-Object -First 1)
@@ -82,8 +87,9 @@ function Test-P20GitRoot {
     # Taken whole and joined: a native command piped into something that stops
     # early never exits, and $LASTEXITCODE then reports the PREVIOUS command's
     # result (the trap Test-P20GitTracksPath's comment records).
-    $out = @(& git -C $Path rev-parse --show-prefix 2>$null)
-    $ok = ($LASTEXITCODE -eq 0)
+    $read = Invoke-P20TrackerRead 'git' @('-C', $Path, 'rev-parse', '--show-prefix')
+    $out = @($read.Out)
+    $ok = ($read.Code -eq 0)
     $global:LASTEXITCODE = $previous
     if (-not $ok) { return $false }
     # Empty output IS the answer: no prefix means nothing between the root and
@@ -136,8 +142,9 @@ function Test-P20GitTracksPath {
     # exit code. That read as "not a git repository" for a perfectly good hub,
     # and only when something non-zero had run first, which is why it survived
     # every isolated probe and why adding a debug line made it pass.
-    $out = @(& git -C $Path ls-files -- . 2>$null)
-    $ok = ($LASTEXITCODE -eq 0)
+    $read = Invoke-P20TrackerRead 'git' @('-C', $Path, 'ls-files', '--', '.')
+    $out = @($read.Out)
+    $ok = ($read.Code -eq 0)
     $global:LASTEXITCODE = $previous
     return ($ok -and (@($out | Where-Object { $_ }).Count -gt 0))
 }

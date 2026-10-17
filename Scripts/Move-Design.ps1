@@ -194,7 +194,7 @@ if ($Hub) {
 }
 else {
     $top = ''
-    try { $top = "$(git rev-parse --show-toplevel 2>$null)".Trim() } catch { $top = '' }
+    try { $top = "$((Invoke-P20TrackerRead 'git' @('rev-parse', '--show-toplevel')).Out)".Trim() } catch { $top = '' }
     if (-not $top) {
         Write-CliError -Message "$((Get-Location).Path) is not inside a git repository." `
             -Hint "Run it from the repository whose design/ holds the design, or use -Hub for the hub's."
@@ -215,7 +215,7 @@ else {
     # origin remote when there is one, else the folder's name.
     $repoName = Split-Path -Leaf $top
     try {
-        $origin = "$(git remote get-url origin 2>$null)".Trim()
+        $origin = "$((Invoke-P20TrackerRead 'git' @('remote', 'get-url', 'origin')).Out)".Trim()
         $m = [regex]::Match($origin, '[:/]([^/:]+)/([^/]+?)(?:\.git)?/?$')
         if ($m.Success) { $repoName = "$($m.Groups[1].Value)/$($m.Groups[2].Value)" }
     } catch { $null = $_ }
@@ -392,12 +392,12 @@ function Move-P20DesignFile {
     $tracked = $false
     if ($inRepo) {
         Push-Location $base
-        try { git ls-files --error-unmatch -- $FromRel 2>$null | Out-Null; $tracked = ($LASTEXITCODE -eq 0) }
+        try { $tracked = ((Invoke-P20TrackerRead 'git' @('ls-files', '--error-unmatch', '--', $FromRel)).Code -eq 0) }
         finally { Pop-Location }
     }
     if ($tracked) {
         Push-Location $base
-        try { git mv -- $FromRel $ToRel 2>&1 | Out-Null } finally { Pop-Location }
+        try { $null = Invoke-P20TrackerRead 'git' @('mv', '--', $FromRel, $ToRel) } finally { Pop-Location }
         if (-not (Test-Path -LiteralPath $to)) { Move-Item -LiteralPath $from -Destination $to }
     }
     else {
@@ -412,7 +412,7 @@ function Complete-P20Staging {
     $paths = @($staged | Select-Object -Unique)
     if ($inRepo) {
         Push-Location $base
-        try { foreach ($p in $paths) { git add -A -- $p 2>&1 | Out-Null } } finally { Pop-Location }
+        try { foreach ($p in $paths) { $null = Invoke-P20TrackerRead 'git' @('add', '-A', '--', $p) } } finally { Pop-Location }
         Write-Host "Staged, not committed. Suggested:" -ForegroundColor DarkGray
         Write-Host "  git commit -m `"design: $Summary`"" -ForegroundColor DarkGray
         return

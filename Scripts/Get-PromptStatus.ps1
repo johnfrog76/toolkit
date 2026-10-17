@@ -41,6 +41,7 @@ $promptsRoot = $cfg.PromptsRoot
 # `pwsh -File` can reach.
 . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
 . (Join-Path $PSScriptRoot 'ConvertTo-LocalDay.ps1')
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 $script:Consts = Get-P20Consts
 if (-not (Test-P20HubRoot $promptsRoot)) {
     Write-CliError -Message (Get-P20HubMissingMessage $promptsRoot)
@@ -156,8 +157,7 @@ if ($files.Count -eq 0) {
 $hubIsRepo = $false
 Push-Location $promptsRoot
 try {
-    $null = git rev-parse --is-inside-work-tree 2>$null
-    $hubIsRepo = ($LASTEXITCODE -eq 0)
+    $hubIsRepo = ((Invoke-P20TrackerRead 'git' @('rev-parse', '--is-inside-work-tree')).Code -eq 0)
 }
 catch { $hubIsRepo = $false }
 finally { Pop-Location }
@@ -221,8 +221,9 @@ foreach ($file in $files) {
     if ($hubIsRepo) {
         Push-Location $promptsRoot
         try {
-            $gitEpoch = git log -1 --format="%at" -- $relPath 2>$null
-            if ($LASTEXITCODE -eq 0 -and $gitEpoch) {
+            $gitLog = Invoke-P20TrackerRead 'git' @('log', '-1', '--format=%at', '--', $relPath)
+            $gitEpoch = $gitLog.Out
+            if ($gitLog.Code -eq 0 -and $gitEpoch) {
                 $gitDay = ConvertTo-P20LocalDay "$gitEpoch"
             }
         }

@@ -64,6 +64,7 @@ $promptsRoot = $cfg.PromptsRoot
 . (Join-Path $PSScriptRoot 'Write-CardText.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-CardForBranch.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-CardName.ps1')
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 # The bullet shape this writes is what Get-PromptStatus.ps1 and
 # agent/core/parsers.py both read to call a card In Progress -- one pattern, in
 # consts.json, compiled by each half.
@@ -90,8 +91,9 @@ if (-not (Test-P20HubRoot $promptsRoot)) {
 # archived cards, not of the work. Reading it is how three BowlingApp commits
 # were reported as one hub commit, three times, with exit 0.
 $codeRepoRoot = $null
-$gitTop = git rev-parse --show-toplevel 2>$null
-if ($LASTEXITCODE -eq 0 -and $gitTop) { $codeRepoRoot = "$gitTop".Trim() }
+$topRead = Invoke-P20TrackerRead 'git' @('rev-parse', '--show-toplevel')
+$gitTop = $topRead.Out
+if ($topRead.Code -eq 0 -and $gitTop) { $codeRepoRoot = "$gitTop".Trim() }
 
 if (-not $codeRepoRoot -and -not $Hash) {
     Write-CliError -Message "Not in a git repository: $((Get-Location).Path)" `
@@ -108,8 +110,9 @@ function Resolve-P20BaseBranch {
     param([string]$RepoRoot)
 
     $repoName = $null
-    $remoteUrl = git -C $RepoRoot remote get-url origin 2>$null
-    if ($LASTEXITCODE -eq 0 -and $remoteUrl) {
+    $remoteRead = Invoke-P20TrackerRead 'git' @('-C', $RepoRoot, 'remote', 'get-url', 'origin')
+    $remoteUrl = $remoteRead.Out
+    if ($remoteRead.Code -eq 0 -and $remoteUrl) {
         $remoteUrl = "$remoteUrl".Trim()
         if ($remoteUrl -match 'dev\.azure\.com/[^/]+/([^/]+)/_git/([^/]+)' -or
             $remoteUrl -match 'ssh\.dev\.azure\.com[:/]v3/[^/]+/([^/]+)/([^/]+?)(?:\.git)?$') {
@@ -125,15 +128,16 @@ function Resolve-P20BaseBranch {
     }
 
     # What the remote says its default is.
-    $originHead = git -C $RepoRoot symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>$null
-    if ($LASTEXITCODE -eq 0 -and $originHead) {
+    $headRead = Invoke-P20TrackerRead 'git' @('-C', $RepoRoot, 'symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD')
+    $originHead = $headRead.Out
+    if ($headRead.Code -eq 0 -and $originHead) {
         return ("$originHead".Trim() -replace '^origin/', '')
     }
 
     # Last resort: whichever conventional name this repo actually has.
     foreach ($name in @('main', 'master')) {
-        git -C $RepoRoot rev-parse --verify --quiet "refs/heads/$name" 2>$null | Out-Null
-        if ($LASTEXITCODE -eq 0) { return $name }
+        $verify = Invoke-P20TrackerRead 'git' @('-C', $RepoRoot, 'rev-parse', '--verify', '--quiet', "refs/heads/$name")
+        if ($verify.Code -eq 0) { return $name }
     }
     return $null
 }
@@ -145,29 +149,31 @@ $firstHash = $null
 if ($Hash) {
     $subject = ''
     if ($codeRepoRoot) {
-        $subject = git -C $codeRepoRoot log -1 --format=%s $Hash 2>$null
-        if ($LASTEXITCODE -ne 0) { $subject = '' }
+        $subjectRead = Invoke-P20TrackerRead 'git' @('-C', $codeRepoRoot, 'log', '-1', '--format=%s', $Hash)
+        $subject = $subjectRead.Out
+        if ($subjectRead.Code -ne 0) { $subject = '' }
     }
     $subject = "$subject".Trim()
     if ($subject) { $wanted = @("- $Hash $subject") } else { $wanted = @("- $Hash") }
     $firstHash = $Hash
 }
 else {
-    $currentBranch = "$(git -C $codeRepoRoot rev-parse --abbrev-ref HEAD 2>$null)".Trim()
+    $currentBranch = "$((Invoke-P20TrackerRead 'git' @('-C', $codeRepoRoot, 'rev-parse', '--abbrev-ref', 'HEAD')).Out)".Trim()
     $baseBranch = Resolve-P20BaseBranch -RepoRoot $codeRepoRoot
 
     $lines = @()
     if ($baseBranch -and $baseBranch -ne $currentBranch) {
         # --abbrev=7 rather than git's default "auto": Status only reads a
         # bullet whose hash is 7+ hex characters.
-        $lines = @(git -C $codeRepoRoot log --reverse --abbrev=7 "--format=- %h %s" "$baseBranch..HEAD" 2>$null)
-        if ($LASTEXITCODE -ne 0) { $lines = @() }
+        $logRead = Invoke-P20TrackerRead 'git' @('-C', $codeRepoRoot, 'log', '--reverse', '--abbrev=7', '--format=- %h %s', "$baseBranch..HEAD")
+        $lines = @($logRead.Out)
+        if ($logRead.Code -ne 0) { $lines = @() }
     }
     if ($lines.Count -eq 0) {
         # On the default branch, or no base to measure against: the branch is
         # not the unit of work here, so record HEAD and say so.
-        $head = @(git -C $codeRepoRoot log -1 --reverse --abbrev=7 "--format=- %h %s" 2>$null)
-        if ($LASTEXITCODE -eq 0) { $lines = $head }
+        $headLog = Invoke-P20TrackerRead 'git' @('-C', $codeRepoRoot, 'log', '-1', '--reverse', '--abbrev=7', '--format=- %h %s')
+        if ($headLog.Code -eq 0) { $lines = @($headLog.Out) }
     }
     $wanted = @($lines | Where-Object { $_ -and $_.Trim() } | ForEach-Object { $_.TrimEnd() })
     if ($wanted.Count -eq 0) {
@@ -184,7 +190,7 @@ if (-not $File) {
     $currentDir = $folders.Current
     $branchForCard = ''
     if ($codeRepoRoot) {
-        $branchForCard = "$(git -C $codeRepoRoot rev-parse --abbrev-ref HEAD 2>$null)".Trim()
+        $branchForCard = "$((Invoke-P20TrackerRead 'git' @('-C', $codeRepoRoot, 'rev-parse', '--abbrev-ref', 'HEAD')).Out)".Trim()
     }
     $found = Resolve-P20CardForBranch -Branch $branchForCard -CurrentDir $currentDir -Detailed
     $File = $found.Path
