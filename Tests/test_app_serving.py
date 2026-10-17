@@ -142,6 +142,7 @@ class DeliberatelyAbsentRoutes(unittest.TestCase):
 
     ABSENT = [
         ("post", "/narrate"),
+        ("post", "/pr-comments/test/save"),
         ("post", "/create-ado-item"),
         ("post", "/resolve-bug"),
         ("get", "/engagement/test/activity"),
