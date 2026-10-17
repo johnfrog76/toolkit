@@ -136,6 +136,7 @@ function Read-JsonFile {
     if (-not (Test-Path -LiteralPath $Path)) { return $null }
     try {
         $raw = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+        if ([string]::IsNullOrWhiteSpace($raw)) { $raw = '{}' }  # an empty file is an empty object
         $cmd = Get-Command ConvertFrom-Json
         # Both spellings of the container's keys are read (ConvertTo-P20SpaceKeys,
         # the Space rename); the write below puts the new one on disk.

@@ -52,7 +52,12 @@ $localUnreadable = $false
 $localJsonArgs = @{}
 if ((Get-Command ConvertFrom-Json).Parameters.ContainsKey('DateKind')) { $localJsonArgs['DateKind'] = 'String' }
 if (Test-Path $localPath) {
-    try { $localCfg = ConvertTo-P20SpaceKeys (Get-Content $localPath -Raw -Encoding UTF8 | ConvertFrom-Json @localJsonArgs) }
+    try {
+        $localRaw = Get-Content $localPath -Raw -Encoding UTF8
+        # A zero-byte or whitespace-only file is an empty object, not a parse failure.
+        if ([string]::IsNullOrWhiteSpace($localRaw)) { $localRaw = '{}' }
+        $localCfg = ConvertTo-P20SpaceKeys ($localRaw | ConvertFrom-Json @localJsonArgs)
+    }
     catch {
         # Said once; Status reads on with defaults, but a switch refuses below
         # rather than write one key over a file it could not read.

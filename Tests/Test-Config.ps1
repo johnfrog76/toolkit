@@ -1183,6 +1183,21 @@ try {
     Assert-True 'and writes config.local.json with no BOM on this host' (-not ($fBytes.Length -ge 3 -and $fBytes[0] -eq 0xEF -and $fBytes[1] -eq 0xBB -and $fBytes[2] -eq 0xBF)) (($fBytes | Select-Object -First 3) -join ',')
     Assert-True 'with LF line endings, and the stamp it writes' (($fText -notmatch "`r") -and ($fText -match '(?m)^  "errorsAckedAt": "\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}"')) $fText
     Assert-True 'keeping the keys it did not change, a date-looking string as itself' (($fText -match '"quietStart": true') -and ($fText -match '"menuResetTimestamp": "2026-10-01T09:00:00"')) $fText
+
+    # (g) A zero-byte (or whitespace-only) config.local.json is an empty object, not a parse failure:
+    # Log -Ack and SwitchSpace both write through it instead of dereferencing a null.
+    foreach ($emptyCase in @(@{ Name = 'zero-byte'; Text = '' }, @{ Name = 'whitespace-only'; Text = "  `n" })) {
+        foreach ($verbCase in @(@{ Verb = 'Log -Ack'; Call = "${p405Prefix}Log -Ack"; Key = 'errorsAckedAt' }, @{ Verb = 'SwitchSpace'; Call = "${p405Prefix}SwitchSpace azure-demo"; Key = 'activeSpace' })) {
+            Invoke-LockRetry 'write of a scratch file' { [System.IO.File]::WriteAllText($p405Local, $emptyCase.Text) }
+            $cmdG = "`$env:PSModulePath = '$p405Q' + [System.IO.Path]::PathSeparator + `$env:PSModulePath; `$env:P20_USAGE_LOG_DIR = '$p405LogsQ'; " +
+                "Import-Module '$p405Q/utilities.psm1' -Force -DisableNameChecking 3>`$null; " +
+                "`$null = & { $($verbCase.Call) } *>&1; 'EMPTY-CODE=' + `$LASTEXITCODE"
+            $outG = (& $hostExe -NoProfile -EncodedCommand ([Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($cmdG))) 2>&1 | ForEach-Object { $_.ToString() }) -join "`n"
+            $gText = [System.IO.File]::ReadAllText($p405Local)
+            Assert-True "$($verbCase.Verb) over a $($emptyCase.Name) config.local.json exits 0" ($outG -match 'EMPTY-CODE=0\b') $outG
+            Assert-True "and writes $($verbCase.Key) into it" ($gText -match ('"' + $verbCase.Key + '"')) $gText
+        }
+    }
 }
 catch { Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message }
 finally { Remove-Item $p405 -Recurse -Force -ErrorAction SilentlyContinue }

@@ -301,7 +301,7 @@ if ($defaultConfig.spaces) { $spaces = @($defaultConfig.spaces) }
 $hubPromptsRoot = ''
 if ($localConfig -and $localConfig.promptsRoot) { $hubPromptsRoot = [string]$localConfig.promptsRoot }
 elseif ($defaultConfig.promptsRoot) { $hubPromptsRoot = [string]$defaultConfig.promptsRoot }
-$script:HubRoot = Resolve-P20HubRoot -PromptsRoot $hubPromptsRoot -PackageRoot $toolkitRoot
+$script:HubRoot = Resolve-P20HubRoot -PromptsRoot $hubPromptsRoot -PackageRoot $s.PackageRoot
 # Checked ONCE, here, before anything joins a path onto it. A configured hub on
 # a drive that is not mapped (an unplugged disk, a `subst` that has not run, a
 # typo) used to be met with a stack trace from Join-Path, a null Test-Path under
@@ -1521,7 +1521,7 @@ function global:Get-P20Menu {
                 # -- Test-PS51Compat scans for a dash that Windows-1252 misreads.
                 if ($cat -ne 'nav') { continue }
                 $navSurface = @(Get-P20OptionalSurfaces -Config $s.Config -Features (Get-P20Features) `
-                    -NavAliases (Get-P20NavAliases) -Prefix $menuPrefix -PackageRoot $toolkitRoot |
+                    -NavAliases (Get-P20NavAliases) -Prefix $menuPrefix -PackageRoot $s.PackageRoot |
                     Where-Object { $_.key -eq 'aliases' })
                 Write-Host "  Navigation" -ForegroundColor Yellow
                 Write-Host "    not configured" -ForegroundColor DarkGray
@@ -1574,7 +1574,7 @@ function global:Get-P20Menu {
         # inventory, the categories above are the surface you can use now.
         Write-Host "  Opt in by configuration" -ForegroundColor Yellow
         foreach ($surface in (Get-P20OptionalSurfaces -Config $s.Config -Features (Get-P20Features) `
-                -NavAliases (Get-P20NavAliases) -Prefix $menuPrefix -PackageRoot $toolkitRoot)) {
+                -NavAliases (Get-P20NavAliases) -Prefix $menuPrefix -PackageRoot $s.PackageRoot)) {
             $state = $surface.state
             if ($surface.note) { $state = "$state ($($surface.note))" }
             if ($surface.question) { Write-Host "    $($surface.question)" -ForegroundColor White }
