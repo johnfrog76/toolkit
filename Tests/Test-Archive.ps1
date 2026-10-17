@@ -1132,6 +1132,32 @@ catch {
 }
 finally { Remove-ArchiveSandbox $sandbox }
 
+Write-Host "-- a failed round-history rename commit is a stated refusal --" -ForegroundColor Cyan
+
+$sandbox = New-ArchiveSandbox
+try {
+    Add-ArchiveFile $sandbox 'Task704-second-round.prompt.md' '# first round'
+    Add-CurrentFile $sandbox 'Task704-second-round.prompt.md' '# second round'
+    Save-SandboxState $sandbox
+    # The hook goes in after the fixture is committed, so only Archive's own commits meet it.
+    $hook = Join-Path $sandbox '.git/hooks/pre-commit'
+    [System.IO.File]::WriteAllText($hook, "#!/bin/sh`necho 'hook says no'`nexit 1`n")
+    if (Get-Command chmod -ErrorAction SilentlyContinue) { & chmod '+x' $hook }
+    $out = Invoke-Archive @{ File = '704' }
+    Assert-Equal "a refused rename commit exits 2" 2 $script:LastArchiveExit
+    Assert-Contains "the refusal carries git's own sentence" $out 'hook says no'
+    Assert-Contains "the refusal names the rename" $out 'Task704-second-round-r1.prompt.md'
+    Assert-Contains "the refusal says the rename is not committed" $out 'the rename is not committed'
+    Assert-Contains "the refusal names the way out" $out 'Hint:'
+    Assert-True "no generic exit-code block is printed" ($out -notmatch 'exit code') $out
+    Assert-True "the rename is on disk" (Test-Path (Join-Path $sandbox 'archive/Task704-second-round-r1.prompt.md'))
+    Assert-True "the incoming card is still in current/" (Test-Path (Join-Path $sandbox 'current/Task704-second-round.prompt.md'))
+}
+catch {
+    Assert-True "the cases ran to the end without a terminating error -- $($_.Exception.Message)" $false
+}
+finally { Remove-ArchiveSandbox $sandbox }
+
 Write-Host ""
 
 Write-Host "═══════════════════════════════════════════════════════" -ForegroundColor Cyan
