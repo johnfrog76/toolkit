@@ -18,12 +18,14 @@ release.
 
 ### Fixed
 
-- `NewPR` run from a folder that is not a repository now says so in its own words on Windows PowerShell 5.1 even when the calling shell stops on errors, instead of printing a raw error from the version control tool.
+- An empty `config.local.json` no longer stops `Log -Ack` from acknowledging errors or `SwitchSpace` from switching Space.
+- `UpdateResume`, `PublishWorkReview` and `LogPeerReview` now state a refusal once, with git's own sentence and a hint where a commit fails, and exit 2; a commit git refused used to print a second, generic error block on top of it.
 - Running the tests from the web UI's Test Health card no longer fails every refusal case.
 - Resetting the menu's usage scores, switching Space and acknowledging logged errors no longer write a byte-order mark into `config.local.json` under Windows PowerShell; all three now save through the same writer as `Config`, so the file comes out the same on every host.
 - A refusal from `Log`, `ThreadHash`, `InstallAutoload` or `SwitchSpace` is now written to the usage log and reported to the browser as an error instead of success, and `SwitchSpace` of a Space that does not exist refuses with the Spaces it knows (exit 2) instead of reporting success.
 - Play with narration in a deck's notes window now plays the baked voice clips instead of failing.
 - A new usage log no longer starts with a byte-order mark, so its first line reads the same as every other and the same on every host.
+- Archiving a card that comes back for a second round now stops with git's own message and exit 2 if git refuses the commit that renames the earlier archived copy to `-r1`, instead of leaving that rename staged and saying nothing.
 - Moving a design in the hub, or attaching a cover or before picture, now reports a commit git refuses as an error (exit 2) with git's own message and says the files are already written, instead of a warning that reads as success.
 - The Environment badge no longer calls a Space with no tracker an Azure DevOps one.
 - Archiving a card that was created and archived with no commit in between now commits the move instead of silently leaving it uncommitted, and a commit git refuses is reported as an error (exit 2) with git's own message instead of a warning.
@@ -44,6 +46,7 @@ release.
 - The pull request comments record GetPRComments leaves in pr-comments/ is now written with the same bytes on every host: UTF-8 with no byte-order mark and LF line endings.
 - A one-on-one session file whose Stage heading is followed by a comment now reads its stage correctly instead of showing the comment as the stage.
 - The scripts behind Connect, EditItem, MyPRs, InstallAutoload, Agent and Web, run on their own without the module, now keep their stated reason when they refuse, as every other script does; they printed the error and then lost the reason.
+- `NewPR` run from a folder that is not a repository now says so in its own words on Windows PowerShell 5.1 even when the calling shell stops on errors, instead of printing a raw error from the version control tool.
 
 ## [1.0.0] - 2026-10-15
 

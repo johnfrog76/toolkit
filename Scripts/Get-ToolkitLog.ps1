@@ -59,7 +59,12 @@ if ($Ack) {
     if (Test-Path $localCfgPath) {
         # A file that will not parse is left exactly as it is: writing the ack into
         # what was read (nothing) would replace the person's settings.
-        try { $localCfg = Get-Content $localCfgPath -Raw -Encoding UTF8 | ConvertFrom-Json @ackJsonArgs }
+        try {
+            $ackRaw = Get-Content $localCfgPath -Raw -Encoding UTF8
+            # A zero-byte or whitespace-only file is an empty object, not a parse failure.
+            if ([string]::IsNullOrWhiteSpace($ackRaw)) { $ackRaw = '{}' }
+            $localCfg = $ackRaw | ConvertFrom-Json @ackJsonArgs
+        }
         catch {
             if (-not (Get-Command Write-P20ConfigParseWarning -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Write-ConfigParseWarning.ps1') }
             $null = Write-P20ConfigParseWarning -Path $localCfgPath -Message $_.Exception.Message

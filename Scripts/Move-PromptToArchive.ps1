@@ -341,6 +341,7 @@ if ($existingRounds -and $existingRounds.Count -gt 0) {
         $null = $plainRounds[0].Name -match '^(.+?)(\.prompt\.md)$'
         $plainStem = $Matches[1]
     }
+    $renameFailure = $null
     if ($plainArchive -and (Test-Path $plainArchive)) {
         $r1Name = "$plainStem-r1$ext"
         $r1Path = Join-Path $archiveDir $r1Name
@@ -359,10 +360,21 @@ if ($existingRounds -and $existingRounds.Count -gt 0) {
             if ($storeIsGit) {
                 # archive/ as a directory: the prior round may never have been committed.
                 $null = Invoke-P20TrackerRead 'git' @('add', '-A', '--', $archiveDirRel)
-                git commit -m "archive: rename $($plainRounds[0].Name) to $r1Name (round history)" 2>&1 | Out-Null
+                # Same failure path as the main archive commit below: a hook or a lock that
+                # refuses it is a stated refusal, not a staged rename nobody hears about.
+                $renameCommit = Invoke-P20TrackerRead 'git' @('commit', '-m', "archive: rename $($plainRounds[0].Name) to $r1Name (round history)")
+                foreach ($line in $renameCommit.Lines) { Write-Host $line }
+                if ($renameCommit.Code -ne 0) {
+                    $renameFailure = "git commit failed: $(@($renameCommit.Lines | Where-Object { $_ })[0])"
+                }
             }
         }
         finally { Pop-Location }
+        if ($renameFailure) {
+            Write-CliError -Message "The earlier archive was renamed to $r1Name (round history), but the rename is not committed -- $renameFailure. $fileName was not archived." `
+                -Hint "The rename is already done and staged, and the card is still in current/. Fix what git refused (a hook, a lock), then run '$(Get-CliPrefix)Archive' again."
+            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+        }
         if ($maxRound -lt 1) { $maxRound = 1 }
     }
 
