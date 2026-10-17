@@ -1096,30 +1096,22 @@ finally {
 # The sweep covers git as well (D3J7): New-PullRequest.ps1 called it raw, and a
 # caller holding 'Stop' stopped it outside a repository before it could say so.
 #
-# The allow-list is files that keep their own copy of the split for now, each
-# with its reason. It only shrinks. A git entry is either DELIBERATE (the reason
-# says why a raw call is right) or marked 'D3J7 follow-up': a file not yet
-# converted to Invoke-P20TrackerRead, listed so the clause is green without
-# claiming more than it proves.
+# The allow-list is files that keep their own copy of the split, each with its
+# reason. It only shrinks. A value is one of two shapes: a reason string (the
+# whole file is allowed), or a hashtable @{ Reason = '...'; Lines = @(...) }, an
+# entry-level allowance: only a raw call whose matched text (the sweep's regex
+# match, trimmed, as printed after the line number) is in Lines is allowed, and
+# any other raw call in that file is a hit, so a new one cannot arrive quietly
+# beside a deliberate one. The files once marked 'D3J7 follow-up' are converted.
 $rawTrackerAllowed = @{
     'Scripts/Invoke-TrackerRead.ps1' = 'the one place the redirection is written'
     'Scripts/Get-Standup.ps1'        = 'the ritual readers keep their own copy until they share one skeleton'
     'Scripts/Get-Triage.ps1'         = 'the ritual readers keep their own copy until they share one skeleton'
     # git, deliberate: the hub sync prints git's own pull/push output as it arrives and reads the exit code itself
-    'Scripts/Sync-Prompts.ps1'       = 'the hub sync passes git output through to the terminal'
-    # git, temporary: each of these is the same fix as New-PullRequest.ps1 and needs its own card
-    'Scripts/Backfill-CardStamps.ps1'    = 'D3J7 follow-up'
-    'Scripts/Get-DailyDashboard.ps1'     = 'D3J7 follow-up'
-    'Scripts/Get-PRComments.ps1'         = 'D3J7 follow-up'
-    'Scripts/Get-PromptStatus.ps1'       = 'D3J7 follow-up'
-    'Scripts/Invoke-PRReview.ps1'        = 'D3J7 follow-up'
-    'Scripts/Move-Design.ps1'            = 'D3J7 follow-up'
-    'Scripts/Move-PromptToArchive.ps1'   = 'D3J7 follow-up'
-    'Scripts/Test-GitRoot.ps1'           = 'D3J7 follow-up'
-    'Scripts/Thread-CommitHash.ps1'      = 'D3J7 follow-up'
-    'Scripts/Update-Resume.ps1'          = 'D3J7 follow-up'
-    'Scripts/Update-Review.ps1'          = 'D3J7 follow-up'
-    'Scripts/Update-Toolkit.ps1'         = 'D3J7 follow-up'
+    'Scripts/Sync-Prompts.ps1'       = @{
+        Reason = 'the hub sync passes git output through to the terminal'
+        Lines  = @('git pull --rebase 2>', 'git push 2>')
+    }
 }
 $rawTrackerPattern = '(?<![\w$-])(gh|az|git)\s[^|\r\n]*(2>|\*>)'
 function Get-RawTrackerCalls {
@@ -1149,11 +1141,22 @@ foreach ($d in @('Scripts', 'Config')) {
     $dir = Join-Path $pkgRoot $d
     if (Test-Path $dir) { $rawTrackerFiles += Get-ChildItem $dir -Filter '*.ps1' -File -ErrorAction SilentlyContinue }
 }
+function Get-UnlistedRawTrackerCalls {
+    # The calls a file's allow-list value does not cover. A reason string allows
+    # the whole file; a hashtable allows only the calls whose matched text is in
+    # its Lines. $null (no entry) allows nothing.
+    param([string]$Text, $Allowance)
+    if ($Allowance -is [string]) { return @() }
+    $listed = @()
+    if ($Allowance -is [hashtable]) { $listed = @($Allowance.Lines) }
+    return @(Get-RawTrackerCalls $Text | Where-Object { $listed -notcontains ($_ -replace '^\d+:\s*', '') })
+}
 $rawTrackerHits = @()
 foreach ($f in $rawTrackerFiles) {
     $rel = Get-RelPath $f
-    if ($rawTrackerAllowed.ContainsKey($rel)) { continue }
-    foreach ($hit in (Get-RawTrackerCalls ([System.IO.File]::ReadAllText($f.FullName)))) {
+    $allowance = $null
+    if ($rawTrackerAllowed.ContainsKey($rel)) { $allowance = $rawTrackerAllowed[$rel] }
+    foreach ($hit in (Get-UnlistedRawTrackerCalls ([System.IO.File]::ReadAllText($f.FullName)) $allowance)) {
         $rawTrackerHits += "${rel}:$hit"
     }
 }
@@ -1179,6 +1182,15 @@ foreach ($case in $rawTrackerCases) {
     $caseHits = @(Get-RawTrackerCalls $case.Body).Count
     Assert-True "Clause 15: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
 }
+
+# An entry-level allowance covers its listed calls and nothing else in the file.
+$entryBody = "git push 2>&1 | ForEach-Object { Write-Host `$_ }`n`$x = git rev-parse HEAD 2>`$null"
+$entryAllow = @{ Reason = 'test'; Lines = @('git push 2>') }
+$entryHits = @(Get-UnlistedRawTrackerCalls $entryBody $entryAllow)
+Assert-True "Clause 15: an entry-level file reports the raw call its Lines do not list" (($entryHits.Count -eq 1) -and ($entryHits[0] -match 'rev-parse')) "hits: $($entryHits -join '; ')"
+Assert-True "Clause 15: an entry-level file lets its listed call through" (@(Get-UnlistedRawTrackerCalls "git push 2>&1 | Out-Null" $entryAllow).Count -eq 0) 'the listed call was reported'
+Assert-True "Clause 15: a whole-file reason string allows every raw call in the file" (@(Get-UnlistedRawTrackerCalls $entryBody 'reason').Count -eq 0) 'a string entry reported a call'
+Assert-True "Clause 15: no allow-list entry is left marked D3J7 follow-up" (-not (($rawTrackerAllowed.Values | ForEach-Object { if ($_ -is [hashtable]) { $_.Reason } else { $_ } }) -match 'D3J7 follow-up')) 'a follow-up entry remains'
 
 # -- Clause 9: the documented config shape is the implemented one --------------
 # Two failures of the same kind, both found on a cold start: the no-config

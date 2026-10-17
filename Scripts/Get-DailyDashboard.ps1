@@ -9,6 +9,7 @@
 param()
 
 . (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -56,15 +57,15 @@ if ($tier -ge 2) {
     Push-Location $cfg.PromptsRoot
     try {
         # %at on this machine's clock, not %ai in the author's zone
-        $lastLog = git log -1 --format="%at%x09%an" 2>$null
+        $lastLog = (Invoke-P20TrackerRead 'git' @('log', '-1', '--format=%at%x09%an')).Out
         if ($lastLog) {
             $lastAt, $lastWho = "$lastLog" -split "`t", 2
             . (Join-Path $PSScriptRoot 'ConvertTo-LocalDay.ps1')
             Write-Host "  Last commit:   $(ConvertTo-P20LocalStamp $lastAt) ($lastWho)" -ForegroundColor Gray
         }
-        $unpushed = (git log --oneline '@{u}..HEAD' 2>$null | Measure-Object).Count
+        $unpushed = @((Invoke-P20TrackerRead 'git' @('log', '--oneline', '@{u}..HEAD')).Out).Count
         Write-Host "  Unpushed:      $unpushed commits" -ForegroundColor Gray
-        $uncommitted = (git status --porcelain 2>$null | Measure-Object).Count
+        $uncommitted = @((Invoke-P20TrackerRead 'git' @('status', '--porcelain')).Out).Count
         Write-Host "  Uncommitted:   $uncommitted files" -ForegroundColor Gray
     } finally {
         Pop-Location

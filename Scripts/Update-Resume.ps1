@@ -73,7 +73,7 @@ if ($Preview) {
         # reading it produced an entry whose content was null and a 500 from the
         # route that renders this. A first review lands in a brand new folder,
         # so that is the normal case, not the edge one.
-        $status = git status --porcelain --untracked-files=all -- $resumePathspec 2>&1
+        $status = (Invoke-P20TrackerRead 'git' @('status', '--porcelain', '--untracked-files=all', '--', $resumePathspec)).Lines
         $files = @()
         if (-not [string]::IsNullOrWhiteSpace($status)) {
             $changedPaths = $status -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ } | ForEach-Object {
@@ -114,7 +114,7 @@ if (-not (Test-Path $resumePath)) {
 
 Push-Location $promptsRoot
 try {
-    $status = git status --porcelain -- $resumePathspec 2>&1
+    $status = (Invoke-P20TrackerRead 'git' @('status', '--porcelain', '--', $resumePathspec)).Lines
     if ([string]::IsNullOrWhiteSpace($status)) {
         Write-Host "Nothing to commit -- $resumePathspec is unchanged." -ForegroundColor Yellow
         exit 0
@@ -123,7 +123,7 @@ try {
     Write-Host "Changes in ${resumePathspec}:" -ForegroundColor Cyan
     Write-Host $status
 
-    git add $resumePathspec 2>&1 | ForEach-Object { Write-Host $_ }
+    (Invoke-P20TrackerRead 'git' @('add', $resumePathspec)).Lines | ForEach-Object { Write-Host $_ }
     $timestamp = Get-Date -Format 'yyyy-MM-dd'
     $commitMsg = "chore: update resume ($timestamp)"
     $commit = Invoke-P20TrackerRead 'git' @('commit', '-m', $commitMsg)

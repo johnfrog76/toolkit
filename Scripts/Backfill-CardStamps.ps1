@@ -74,6 +74,7 @@ param(
 . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
 . (Join-Path $PSScriptRoot 'ConvertTo-LocalDay.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-HubConfig.ps1')
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 
 function Write-BackfillError {
     param([string]$Message, [string]$Hint)
@@ -116,7 +117,7 @@ function Get-P20CardHistoryDates {
         # %at, not `%ad --date=short`: that was the AUTHOR's day in the author's
         # zone, written into a card for good. The day is read on this machine's
         # clock (ConvertTo-P20LocalDay).
-        $LogLines = @(& git -C $RepoRoot log --follow --format='COMMIT %at' --name-status -- $RelPath 2>$null)
+        $LogLines = @((Invoke-P20TrackerRead 'git' @('-C', $RepoRoot, 'log', '--follow', '--format=COMMIT %at', '--name-status', '--', $RelPath)).Out)
     }
 
     $stem = Get-P20CardStem $RelPath
