@@ -121,8 +121,8 @@ tkNewGrowth -Title <string> [-Type training|presentation|goal] [-Date YYYY-MM-DD
 | `-Provider`, `-Hours` | trainings only. `-Hours` defaults to `TBD` |
 | `-Notes` | one line of context: Description / Context & Intent / Why This Matters |
 
-Exits 0 on success and on "already there"; 1 on a missing title, a bad date, a
-training with no due date, or an unconfigured hub. Script:
+Exits 0 on success and on "already there"; 2 (a stated refusal) on a missing
+title, a bad date, a training with no due date, or an unconfigured hub. Script:
 `Scripts/New-GrowthItem.ps1`.
 
 **`-Close <file>` retires an item**, from the terminal or the browser: *Retire* on
