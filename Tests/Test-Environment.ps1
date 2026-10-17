@@ -419,14 +419,16 @@ $script:Config = 'shadow'; $script:Commands = 'shadow'; $script:AdoCommands = 's
 $script:CommandMap = 'shadow'; $script:DeprecatedAliases = 'shadow'; $script:ShownDeprecationHints = 'shadow'
 $script:SkipNavAliases = 'shadow'; $script:ModuleCommandsLoaded = 'shadow'; $script:ModuleState = 'shadow'
 $Config = 'shadow'; $Commands = 'shadow'; $CommandMap = 'shadow'; $ModuleState = 'shadow'
+$toolkitRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'no-such-toolkit'; $script:toolkitRoot = $toolkitRoot
 $map = Get-P20CommandMap | ConvertFrom-Json
 $mods = Get-P20ModuleCommands
 $menu = (Get-P20Menu -Markdown *>&1 | Out-String)
+$menuAll = (Get-P20Menu -All *>&1 | Out-String)
 Register-PromptAlias -Prefix 'zq' -Commands @('Status') -Force *>$null
 $alias = if (Get-Command zqStatus -ErrorAction SilentlyContinue) { 'registered' } else { 'missing' }
 $hintA = (Write-P20DeprecationHint 'tkSwitchOrg' *>&1 | Out-String).Trim()
 $hintB = (Write-P20DeprecationHint 'tkNewAdoItem' *>&1 | Out-String).Trim()
-"MAPKEYS=$(@($map.PSObject.Properties.Name).Count) TIMEOUTS=$([bool]$map._timeouts) MODS=$($mods.Length -gt 1) MENULINES=$(@($menu -split "`n" | Where-Object { $_ -match '\S' }).Count) ALIAS=$alias HINTA=$([bool]($hintA -match 'deprecated')) HINTB=$([bool]($hintB -match 'deprecated'))"
+"MAPKEYS=$(@($map.PSObject.Properties.Name).Count) TIMEOUTS=$([bool]$map._timeouts) MODS=$($mods.Length -gt 1) MENULINES=$(@($menu -split "`n" | Where-Object { $_ -match '\S' }).Count) ALLVIEW=$([bool]($menuAll -match 'Opt in by configuration')) ALIAS=$alias HINTA=$([bool]($hintA -match 'deprecated')) HINTB=$([bool]($hintB -match 'deprecated'))"
 '@
 [System.IO.File]::WriteAllText((Join-Path $sandboxRoot 'sweep-probe.ps1'), $sweepProbe,
     (New-Object System.Text.UTF8Encoding($false)))
@@ -444,7 +446,7 @@ $sweepDirect = (Get-Marked $sweepOut 'SWEEP-DIRECT').Trim()
 $sweepModule = (Get-Marked $sweepOut 'SWEEP-MODULE').Trim()
 
 Assert-True 'the swept probe answered in the direct shape, with a command map, module commands, a menu and an alias' `
-    ($sweepDirect -match 'MAPKEYS=[1-9]\d* TIMEOUTS=True MODS=True MENULINES=[1-9]\d* ALIAS=registered') $sweepOut
+    ($sweepDirect -match 'MAPKEYS=[1-9]\d* TIMEOUTS=True MODS=True MENULINES=[1-9]\d* ALLVIEW=True ALIAS=registered') $sweepOut
 Assert-True 'the direct shape printed the deprecation hint the first time, for both aliases' `
     ($sweepDirect -match 'HINTA=True HINTB=True') $sweepDirect
 Assert-True 'the module shape answered the same for the map, the module commands, the menu and the alias' `

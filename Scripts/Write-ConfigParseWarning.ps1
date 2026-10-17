@@ -54,7 +54,11 @@ function Read-P20LocalConfigJson {
     #>
     param([Parameter(Mandatory = $true)][string]$Path)
     if (-not (Test-Path -LiteralPath $Path)) { return $null }
-    try { return (Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json) }
+    try {
+        $raw = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+        if ([string]::IsNullOrWhiteSpace($raw)) { return [PSCustomObject]@{} }  # an empty file is an empty object
+        return ($raw | ConvertFrom-Json)
+    }
     catch { $null = Write-P20ConfigParseWarning -Path $Path -Message $_.Exception.Message; return $null }
 }
 
