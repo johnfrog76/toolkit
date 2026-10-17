@@ -945,6 +945,27 @@ that cannot run is named SKIPPED, not passed -- and writes all three into `test-
 **Expect:** every row checked on both hosts, recorded in the run table below with the machine
 name and both suite totals, and every defect filed as a GitHub issue.
 
+### A cold-start walk on Windows
+
+Three things a Mac or Linux walk never meets, and that cost a cold Windows walk time the first
+time. Python as `python` or `py -3`, and the port check, are already above and in `docs/TESTING.md`.
+
+- **Walk from a short path.** Clone into something like `C:\wt\p20cold` or `$env:TEMP\p20cold`, never
+  a deep folder: `node_modules` under a long path hits the Windows path-length limit and `npm ci`
+  fails partway. Set `$env:PSModulePath` to that folder **inside the shell that runs the walk** and
+  import the manifest from it (AGENTS.md, "One toolkit per shell"). Forward slashes are fine in git
+  and in pwsh. Use `pwsh` 7 for the walk itself; 5.1 is for the rows that name it.
+- **Give the walk its own `web.agentPort` from the start.** Windows lets two processes bind the same
+  port, and `localhost` then answers from the other one, so a cold walk can quietly talk to your real
+  agent. Set `web.agentPort` in the walk's `config.local.json`, and check which agent answers
+  `/api/health`: it names its package root, which must be the scratch folder. The agent prints its
+  own hint when another agent already holds the port (`Scripts/Start-Agent.ps1`). To end a stray one,
+  `Stop-Process -Id <pid>` takes the place of `kill`.
+- **Stop the servers before removing the worktree.** Windows locks files in use, so
+  `git worktree remove` fails with "permission denied" or "directory not empty" while the dev
+  server, the agent or the shell itself is inside the folder. `tkWeb -Stop`, change directory out of
+  the folder, then remove it.
+
 ### Rows added by a fix
 
 A fix built and tested on one host that only another machine can CONFIRM leaves its check here, in
