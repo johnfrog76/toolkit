@@ -54,9 +54,9 @@ to F4 are there too, by their cards.
 ```text
 M1  1.1.0  The bar, held            the defect queue dry, the three refactors done, the two public issues
         |
-M2  1.2.0  The Studio opens in a second   the gh reads: one call per Space, per repository, per tab
+M2  1.2.0  The standup sees the work    Team Agile reads the cards; what moved, and the agent in the room
         |
-M3  1.3.0  The standup sees the work    Team Agile reads the cards; what moved, and how much
+M3  1.3.0  The Studio opens in a second   the gh reads: one call per Space, per repository, per tab
         |
 M4  1.4.0  Ten minutes to your own board   the first run, the tour, the word for a Space
         |
@@ -89,18 +89,7 @@ versioning rule this is a minor release; the quality batch was first planned as 
 picks the number when the section is renamed. After the first post-flip release, a tag ruleset (`v*`,
 no deletion or update) is the natural next protection beside main's.
 
-### M2 -- 1.2.0, the Studio opens in a second
-
-Every GitHub Space costs the same on every machine: the foyer fires three `gh` reads per Space on
-every mount, a repository's design notes are read one `gh` call per note, the Docs tab one call per
-folder, and the standup re-reads the tracker and re-dresses unchanged facts through the model on every
-open. Measured on 2026-10-17 against a hub with thirteen Spaces; each is a card with its numbers.
-**Done when:** the foyer, the Design tab, the Docs tab and the standup each read GitHub in one call
-cold and none warm, through one cache helper on disk keyed by what GitHub already hands back (shas,
-updated-at), with the GUI untouched; the browser's own cache already holds a session. Its own milestone
-because it is new scope since the flip and should not be judged as part of the quality batch.
-
-### M3 -- 1.3.0, the standup sees the work
+### M2 -- 1.2.0, the standup sees the work
 
 Now that the team's own work runs on cards and the issues are the public's, Team Agile is blind to the
 work that actually happens. **Done when:** on a GitHub Space the standup says the cards being worked as
@@ -110,9 +99,24 @@ well as the issues, says what moved and how many commits it took, and can answer
    checked not billable is not a standup row. (The card carries the Definition of Done.)
 2. *The standup says what moved* -- closed, started, in progress, a counts line with the commits, and a
    `-Since <date>` window.
-3. *The mirror points* -- a derived next move on the standup, and **Start work** beside Route that hands
-   a seat its prompt, the card and the Space's how-we-work note. This is the old F2.
+3. *The agent in the room* -- the old F2, the mirror points, grown into a spec: the hand-off block and the
+   `StartWork` verb, triage assigning who, the suggestion rule as a shared table, the PM Corner's one derived line
+   with the chevron that sends the work, and the launch through the bridge. The spec is written from the hub's
+   `design/the-agent-in-the-room.md` before its cards build.
 4. One skeleton for the rituals comes first, so the three above are built on it, not copied again.
+
+### M3 -- 1.3.0, the Studio opens in a second
+
+Every GitHub Space costs the same on every machine: the foyer fires three `gh` reads per Space on
+every mount, a repository's design notes are read one `gh` call per note, the Docs tab one call per
+folder, and the standup re-reads the tracker and re-dresses unchanged facts through the model on every
+open. Measured on 2026-10-17 against a hub with thirteen Spaces; each is a card with its numbers.
+**Done when:** the foyer, the Design tab, the Docs tab and the standup each read GitHub in one call
+cold and none warm, through one cache helper on disk keyed by what GitHub already hands back (shas,
+updated-at), with the GUI untouched; the browser's own cache already holds a session. Its own milestone
+because it is new scope since the flip and should not be judged as part of the quality batch; it follows the
+standup release because the cards are small and independent and can be interleaved, while the standup is the
+product's edge.
 
 ### M4 -- 1.4.0, ten minutes to your own board
 
