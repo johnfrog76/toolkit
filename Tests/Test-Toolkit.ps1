@@ -148,6 +148,17 @@ foreach ($v in @(Get-ChildItem Env: | Where-Object { $_.Name.StartsWith($webhook
 $previousMarker = [System.Environment]::GetEnvironmentVariable($runMarker)
 [System.Environment]::SetEnvironmentVariable($runMarker, '1')
 
+# The bridge's quiet marker. The web UI's Test Health card runs this verb through
+# POST /api/cmd/Test, and the bridge sets TOOLKIT_QUIET_STARTUP=1 for that child
+# to mark it non-interactive -- which this runner and every pwsh a suite starts
+# then inherit. The refusal guard re-raises a stated refusal as a throw for a
+# non-interactive caller, so each bare verb a suite types stopped its -Command
+# string and exited 1 where it states 2: every refusal case failed. A suite types
+# its verbs as a person at a terminal would, so the variable is removed for the
+# run and put back in the finally, the way the webhooks are.
+$previousQuiet = [System.Environment]::GetEnvironmentVariable('TOOLKIT_QUIET_STARTUP')
+[System.Environment]::SetEnvironmentVariable('TOOLKIT_QUIET_STARTUP', $null)
+
 try {
 
 # Load utilities.psm1 for Write-P20TestResult
@@ -490,4 +501,5 @@ finally {
     foreach ($name in $savedWebhooks.Keys) { [System.Environment]::SetEnvironmentVariable($name, $savedWebhooks[$name]) }
     if ($null -eq $previousMarker) { [System.Environment]::SetEnvironmentVariable($runMarker, $null) }
     else { [System.Environment]::SetEnvironmentVariable($runMarker, $previousMarker) }
+    [System.Environment]::SetEnvironmentVariable('TOOLKIT_QUIET_STARTUP', $previousQuiet)
 }

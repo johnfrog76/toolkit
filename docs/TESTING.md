@@ -99,7 +99,7 @@ suite once in the runner's order, and no single suite's row carrying a count of 
 `Tests/conftest.py` -- removes every `TEAMS_WEBHOOK_*` variable for its own process tree by pattern and
 puts it back afterwards, points `P20_USAGE_LOG_DIR` at a scratch folder so the run never writes into
 your real usage log, and sets the run marker (`consts.json` `env.testRunMarker`, `P20_TEST_RUN`) that the
-engine's one POST and `SendTeams` refuse on while it is set. Nothing to unset by hand, and a send from
+engine's one POST and `SendTeams` refuse on while it is set. `Tests/Test-Toolkit.ps1` also removes `TOOLKIT_QUIET_STARTUP` for the run (and `Test` removes it around the CLI half): the web UI's Test Health card runs `Test` through the bridge, which marks its child non-interactive with that variable, and every suite's shell would inherit it, where a stated refusal throws instead of exiting 2. Nothing to unset by hand, and a send from
 another shell still works while a suite runs: the marker is an environment variable and lives only
 in the runner's children. `Tests/test_runner_environment.py` and `tkTestToolkit -SendTeams` prove it.
 `Tests/Test-Menu.ps1` does not lean on that: its scoring section points `P20_USAGE_LOG_DIR` at a scratch folder of its own and seeds the log it asserts against, so the "Most used" cases give the same answer run directly (`pwsh -NoProfile -File Tests/Test-Menu.ps1`) as through the runner, whatever this machine has typed.

@@ -684,6 +684,58 @@ finally {
     Remove-Item $missBase -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+# -- 3d. The bridge's quiet marker does not reach the suites ----------------
+Write-Host ""
+Write-Host "-- A run started with TOOLKIT_QUIET_STARTUP set: a suite's bare refusal exits 2, and the variable comes back --" -ForegroundColor Cyan
+$quietBase = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-testall-edk6-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+New-Item -ItemType Directory -Path (Join-Path $quietBase 'Tests') -Force | Out-Null
+try {
+    # The web UI's Test Health card runs Test through the bridge, which sets the marker for
+    # that child; the runner and every pwsh a suite starts inherited it, and the refusal
+    # guard then threw instead of exiting 2. A scratch package with the REAL runner and
+    # registry and a one-file suite (registered as Consts) that types a bare refusing verb
+    # from the real module in a fresh shell, the way the suites do.
+    Copy-Item (Join-Path $pkgRoot 'utilities.psm1'), (Join-Path $pkgRoot 'consts.json'), (Join-Path $pkgRoot 'config.default.json') $quietBase
+    Copy-Item (Join-Path $pkgRoot 'Scripts') (Join-Path $quietBase 'Scripts') -Recurse
+    if (Test-Path (Join-Path $pkgRoot 'Config')) { Copy-Item (Join-Path $pkgRoot 'Config') (Join-Path $quietBase 'Config') -Recurse }
+    Copy-Item (Join-Path $scriptDir 'Test-Toolkit.ps1'), (Join-Path $scriptDir 'Get-ToolkitSuiteRegistry.ps1') (Join-Path $quietBase 'Tests')
+    $quietProbe = Join-Path $quietBase 'probe.txt'
+    $quietPkg = $pkgRoot -replace "'", "''"
+    $quietProbeQ = $quietProbe -replace "'", "''"
+    $suiteText = @"
+`$sawQuiet = [string]`$env:TOOLKIT_QUIET_STARTUP
+`$child = 'Import-Module ''$quietPkg/Prompt20Toolkit/Prompt20Toolkit.psd1'' -Force 3>`$null 6>`$null; tkBillable *>`$null; exit `$LASTEXITCODE'
+`$env:PSModulePath = '$quietPkg'
+`$h = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+& `$h -NoProfile -NonInteractive -Command `$child *>`$null
+[System.IO.File]::WriteAllText('$quietProbeQ', "QUIET=[`$sawQuiet] EXIT=`$LASTEXITCODE")
+exit 0
+"@
+    [System.IO.File]::WriteAllText((Join-Path $quietBase 'Tests/Test-Consts.ps1'), $suiteText)
+    $quietHost = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+    $savedQuiet = $env:TOOLKIT_QUIET_STARTUP
+    $env:TOOLKIT_QUIET_STARTUP = '1'
+    try {
+        $null = & $quietHost -NoProfile -ExecutionPolicy Bypass -File (Join-Path $quietBase 'Tests/Test-Toolkit.ps1') -Consts 2>&1
+        $quietAfter = $env:TOOLKIT_QUIET_STARTUP
+    }
+    finally { $env:TOOLKIT_QUIET_STARTUP = $savedQuiet }
+    $probeText = ''
+    if (Test-Path $quietProbe) { $probeText = [System.IO.File]::ReadAllText($quietProbe) }
+    Assert-True 'the suite ran and wrote its probe' ($probeText -ne '') 'no probe file'
+    Assert-True 'the suite''s environment does not carry the bridge''s marker' ($probeText -match 'QUIET=\[\]') $probeText
+    Assert-True 'a bare refusing verb typed in a fresh shell under that run exits 2, not 1' ($probeText -match 'EXIT=2$') $probeText
+    Assert-True 'the marker is still set in the shell that started the run' ($quietAfter -eq '1') "[$quietAfter]"
+    $testAllSource = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'Scripts/Invoke-TestAll.ps1'))
+    Assert-True 'Invoke-TestAll removes the marker around the CLI half and puts it back' ($testAllSource -match '(?s)savedQuiet.*Invoke-P20HalfProcess -Exe \$pwshExe.*finally.*SetEnvironmentVariable\(.TOOLKIT_QUIET_STARTUP., \$savedQuiet\)')
+}
+catch {
+    Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally {
+    Remove-Item $quietBase -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 # -- 4. The wiring -----------------------------------------------------------------
 Write-Host ""
 Write-Host "-- The wiring --" -ForegroundColor Cyan
