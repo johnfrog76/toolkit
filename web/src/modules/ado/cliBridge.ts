@@ -466,7 +466,9 @@ export function buildCloseWorkItemParams(fields: CloseWorkItemFields): string[] 
  * `[!]` line is.
  */
 export function commandResultMessage(result: CommandResponse, successFallback: string): string {
-  if (result.status === "success") return result.output || successFallback;
+  // Trimmed like the failure path below: a verb may open or close with blank lines, and the
+  // dialogs that show this keep line breaks.
+  if (result.status === "success") return result.output?.trim() || successFallback;
 
   const label =
     result.status === "rejected"
