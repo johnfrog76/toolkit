@@ -359,6 +359,14 @@ $newPr = Invoke-ChildRun "$tier1Env`nSet-Location '$outside'`n${cfgPrefix}NewPR`
 Assert-True "NewPR outside a repository states the refusal" ($newPr.Output -match 'Error: Not in a git repository, and no card was named\.')
 Assert-True "NewPR prints one block and exits 2 (got $($newPr.ExitCode))" ($newPr.Output -notmatch 'exit code' -and (@([regex]::Matches($newPr.Output, '(?m)^Error: ')).Count) -eq 1 -and $newPr.ExitCode -eq 2)
 
+# The same, from a caller that holds 'Stop' (a profile, a parent script). NewPR's git
+# reads go through Invoke-P20TrackerRead, so the script's own sentence prints and a
+# redirected stderr line never becomes a NativeCommandError (the throw is 5.1-only;
+# CI proves that host, this case holds the contract on pwsh).
+$newPrStop = Invoke-ChildRun "$tier1Env`nSet-Location '$outside'`n`$ErrorActionPreference = 'Stop'`n${cfgPrefix}NewPR`n'LASTEXITCODE=' + `$LASTEXITCODE`nexit `$LASTEXITCODE"
+Assert-True "NewPR outside a repository under a Stop caller states its own refusal" ($newPrStop.Output -match 'Error: Not in a git repository, and no card was named\.')
+Assert-True "NewPR under a Stop caller prints no NativeCommandError and exits 2 (got $($newPrStop.ExitCode))" ($newPrStop.Output -notmatch 'NativeCommandError|fatal: not a git repository' -and $newPrStop.Output -notmatch 'exit code' -and $newPrStop.ExitCode -eq 2)
+
 $review = Invoke-ChildRun "$tier1Env`nRemove-Item Env:ANTHROPIC_API_KEY -ErrorAction SilentlyContinue`nRemove-Item Env:CLAUDE_API_KEY -ErrorAction SilentlyContinue`n${cfgPrefix}AddPRReview 1`n'LASTEXITCODE=' + `$LASTEXITCODE`nexit `$LASTEXITCODE"
 Assert-True "AddPRReview with no key states the refusal" ($review.Output -match "Error: ${cfgPrefix}AddPRReview needs ANTHROPIC_API_KEY; it is not set\.")
 Assert-True "AddPRReview's missing key is exit 2, not a bare return (got $($review.ExitCode))" ($review.Output -match 'LASTEXITCODE=2' -and $review.ExitCode -eq 2)

@@ -178,9 +178,15 @@ if ($File -and -not (Test-Path -LiteralPath $File)) {
 # terms (--absolute-git-dir, resolved identically on both sides), not by
 # comparing path strings.
 $toolkitRoot = Split-Path -Parent $PSScriptRoot
-$cwdGitDir = "$(git rev-parse --absolute-git-dir 2>$null)".Trim()
-$cwdIsRepo = ($LASTEXITCODE -eq 0 -and $cwdGitDir)
-$toolkitGitDir = "$(git -C $toolkitRoot rev-parse --absolute-git-dir 2>$null)".Trim()
+# Every gh and git call goes through Invoke-P20TrackerRead: a caller may hold
+# 'Stop', where a raw redirected stderr throws on Windows PowerShell 5.1.
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
+$gitTopRead = Invoke-P20TrackerRead 'git' @('rev-parse', '--absolute-git-dir')
+$cwdGitDir = "$(@($gitTopRead.Out)[0])".Trim()
+$cwdIsRepo = ($gitTopRead.Code -eq 0 -and $cwdGitDir)
+$toolkitRead = Invoke-P20TrackerRead 'git' @('-C', $toolkitRoot, 'rev-parse', '--absolute-git-dir')
+$toolkitGitDir = ''
+if ($toolkitRead.Code -eq 0) { $toolkitGitDir = "$(@($toolkitRead.Out)[0])".Trim() }
 $cwdIsToolkit = ($cwdIsRepo -and $toolkitGitDir -and ($cwdGitDir -eq $toolkitGitDir))
 $cwdIsCode = ($cwdIsRepo -and -not $cwdIsToolkit)
 
@@ -205,7 +211,8 @@ if ($File -and (Test-Path -LiteralPath $File)) {
 # card named: the card's ## Branch. Neither: there is nothing honest to use.
 $currentBranch = ''
 if ($cwdIsCode) {
-    $currentBranch = "$(git rev-parse --abbrev-ref HEAD 2>$null)".Trim()
+    $branchRead = Invoke-P20TrackerRead 'git' @('rev-parse', '--abbrev-ref', 'HEAD')
+    if ($branchRead.Code -eq 0) { $currentBranch = "$(@($branchRead.Out)[0])".Trim() }
 }
 elseif ($cardBranch) {
     $currentBranch = $cardBranch
@@ -228,9 +235,6 @@ $allProjects = @($cfg.Projects | ForEach-Object { @{ Name = $_.name; Repo = $_.r
 # one board rule (Resolve-P20TrackerRepo); the OWNER plays the project's role
 # in every message below. The ADO sniffing blocks are gated off this path.
 . (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
-# Every gh call below goes through Invoke-P20TrackerRead: this script runs under
-# 'Stop', where a raw redirected stderr throws on Windows PowerShell 5.1.
-. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 $trackerKind = Resolve-P20Tracker -OrgUrl $org
 # Which space, which tracker, before anything is opened against it.
 #
@@ -239,8 +243,9 @@ $ghRepoFull = ''
 if ($trackerKind -eq 'github') {
     $ghOwner = Get-P20TrackerOwner -OrgUrl $org
     if (-not $Repository -and $cwdIsCode) {
-        $ghRemote = "$(git remote get-url origin 2>$null)".Trim()
-        if ($LASTEXITCODE -eq 0 -and $ghRemote -match 'github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?$') {
+        $remoteRead = Invoke-P20TrackerRead 'git' @('remote', 'get-url', 'origin')
+        $ghRemote = "$(@($remoteRead.Out)[0])".Trim()
+        if ($remoteRead.Code -eq 0 -and $ghRemote -match 'github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?$') {
             $ghOwner = $Matches[1]
             $Repository = $Matches[2]
         }
@@ -287,9 +292,9 @@ if ($trackerKind -ne 'github' -and $File -and (Test-Path -LiteralPath $File) -an
 # checkout. The Toolkit's own remote says nothing about a card.
 $remoteUrl = ''
 if ($trackerKind -ne 'github' -and $cwdIsCode -and (-not $Project -or -not $Repository)) {
-    $remoteUrl = git remote get-url origin 2>&1
-    if ($LASTEXITCODE -eq 0) {
-        $remoteUrl = "$remoteUrl".Trim()
+    $remoteRead = Invoke-P20TrackerRead 'git' @('remote', 'get-url', 'origin')
+    if ($remoteRead.Code -eq 0) {
+        $remoteUrl = "$(@($remoteRead.Out)[0])".Trim()
         # HTTPS clone URL shape: dev.azure.com/org/project/_git/repo
         # SSH clone URL shape:   ssh.dev.azure.com:v3/org/project/repo
         if ($remoteUrl -match 'dev\.azure\.com/[^/]+/([^/]+)/_git/([^/]+)' -or
@@ -400,8 +405,8 @@ if ($promptContent -match $p20TitlePattern) {
     $prTitle = $Matches[1].Trim()
 }
 if (-not $prTitle) {
-    $prTitle = git log -1 --format='%s' 2>&1
-    $prTitle = "$prTitle".Trim()
+    $titleRead = Invoke-P20TrackerRead 'git' @('log', '-1', '--format=%s')
+    if ($titleRead.Code -eq 0) { $prTitle = "$(@($titleRead.Out)[0])".Trim() }
     Write-Host "[!] No title heading found in prompt -- using commit message instead." -ForegroundColor Yellow
     Write-ToolkitLog -Type WARN -Source "$(Get-CliPrefix)NewPR" -Detail "title fallback to commit message"
 }
