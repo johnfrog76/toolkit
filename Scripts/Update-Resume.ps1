@@ -25,6 +25,7 @@ param(
 $repoRoot = Split-Path -Parent $PSScriptRoot
 
 . (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 
 if ($Help) {
     $p = Get-CliPrefix
@@ -125,11 +126,15 @@ try {
     git add $resumePathspec 2>&1 | ForEach-Object { Write-Host $_ }
     $timestamp = Get-Date -Format 'yyyy-MM-dd'
     $commitMsg = "chore: update resume ($timestamp)"
-    git commit -m $commitMsg 2>&1 | ForEach-Object { Write-Host $_ }
+    $commit = Invoke-P20TrackerRead 'git' @('commit', '-m', $commitMsg)
+    $commit.Lines | ForEach-Object { Write-Host $_ }
 
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Error: the commit failed." -ForegroundColor Red
-        exit 1
+    if ($commit.Code -ne 0) {
+        $said = @($commit.Lines | Where-Object { $_ })[0]
+        if (-not $said) { $said = "git commit exited $($commit.Code)" }
+        Write-CliError -Message "the commit failed -- $said" `
+            -Hint "The resume files are already written. Commit them yourself (git add; git commit) once git accepts the commit."
+        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
 
     Write-Host "Committed: $commitMsg" -ForegroundColor Green

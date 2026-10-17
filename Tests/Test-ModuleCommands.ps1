@@ -474,6 +474,46 @@ $committedDiscovered = Invoke-InScratch -Package $committedPkg `
 Assert-True 'a module enabled in the COMMITTED config is visible to it' `
     ($committedDiscovered -match 'NewGrowth') $committedDiscovered
 
+# -- A refused commit is a stated refusal: exit 2, one block ----------------
+# UpdateResume and PublishWorkReview run the commit; a pre-commit hook that
+# refuses must come back as Write-CliError and exit 2, not a bare exit 1 that
+# the wrapper then explains a second time. LogPeerReview states its refusals
+# the same way.
+Write-Host ""
+Write-Host "  A refused commit" -ForegroundColor Magenta
+
+$hookHub = Join-Path $script:ScratchRoot 'hook-hub'
+New-Item -ItemType Directory -Path (Join-Path $hookHub 'resume') -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $hookHub 'reviews/x') -Force | Out-Null
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText((Join-Path $hookHub 'resume/resume.md'), "# Resume`n", $utf8)
+[System.IO.File]::WriteAllText((Join-Path $hookHub 'reviews/x/review.md'), "# Review`n", $utf8)
+Push-Location $hookHub
+try {
+    git init --quiet 2>&1 | Out-Null
+    git config user.email 'test@example.invalid' 2>&1 | Out-Null
+    git config user.name 'Hook test' 2>&1 | Out-Null
+    git config core.autocrlf false 2>&1 | Out-Null
+    $hook = Join-Path $hookHub '.git/hooks/pre-commit'
+    [System.IO.File]::WriteAllText($hook, "#!/bin/sh`necho 'hook says no'`nexit 1`n")
+    # git runs a hook only when the file is executable; Windows has no execute bit, Unix does.
+    if (Get-Command chmod -ErrorAction SilentlyContinue) { & chmod '+x' $hook }
+}
+finally { Pop-Location }
+$hookEnv = "`$env:PROMPTS_ROOT = '$($hookHub -replace "'", "''")'; "
+foreach ($case in @(
+        @{ Verb = 'UpdateResume' }
+        @{ Verb = 'PublishWorkReview' }
+    )) {
+    $hookOut = Invoke-InScratch -Package $onPkg -Snippet ($hookEnv + "tk$($case.Verb) -NoPush; 'HOOK-EXIT=' + `$LASTEXITCODE")
+    Assert-True "$($case.Verb): a refused commit exits 2" ($hookOut -match 'HOOK-EXIT=2') $hookOut
+    Assert-True "$($case.Verb): it carries git's own sentence and a hint" ($hookOut -match 'Error: the commit failed -- .*hook says no' -and $hookOut -match 'Hint:') $hookOut
+    Assert-True "$($case.Verb): and the wrapper adds no second, generic block" ($hookOut -notmatch 'exit code') $hookOut
+}
+$peerOut = Invoke-InScratch -Package $onPkg -Snippet ($hookEnv + "tkLogPeerReview; 'PEER-EXIT=' + `$LASTEXITCODE")
+Assert-True 'LogPeerReview with no id is a stated refusal: exit 2, no generic block' `
+    ($peerOut -match 'PEER-EXIT=2' -and $peerOut -match 'Error:' -and $peerOut -notmatch 'exit code') $peerOut
+
 # -- 8. The shipped growth data file is well formed ---------------------------
 Write-Host ""
 Write-Host "  The shipped file" -ForegroundColor Magenta
