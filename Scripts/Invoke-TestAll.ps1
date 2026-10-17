@@ -166,8 +166,19 @@ $runCli = {
     }
     $runnerArgs = @('-NoProfile', '-File', $runner)
     if ($Fast) { $runnerArgs += '-Fast'; $rec.fast = $true }
+    # The bridge marks the child that runs this verb non-interactive with
+    # TOOLKIT_QUIET_STARTUP, and the runner would hand it to every suite's shell,
+    # where a stated refusal then throws instead of exiting 2. Removed for this
+    # child alone and put back after, like the webhooks for npm test below.
+    $savedQuiet = [System.Environment]::GetEnvironmentVariable('TOOLKIT_QUIET_STARTUP')
+    [System.Environment]::SetEnvironmentVariable('TOOLKIT_QUIET_STARTUP', $null)
     $start = Get-Date
-    $run = Invoke-P20HalfProcess -Exe $pwshExe -Arguments $runnerArgs -WorkDir $packageRoot
+    try {
+        $run = Invoke-P20HalfProcess -Exe $pwshExe -Arguments $runnerArgs -WorkDir $packageRoot
+    }
+    finally {
+        [System.Environment]::SetEnvironmentVariable('TOOLKIT_QUIET_STARTUP', $savedQuiet)
+    }
     $rec.seconds = [math]::Round(((Get-Date) - $start).TotalSeconds, 1)
     $c = ConvertFrom-P20ToolkitOutput -Text $run.Text
     $v = Get-P20HalfVerdict -Counts $c -ExitCode $run.ExitCode
