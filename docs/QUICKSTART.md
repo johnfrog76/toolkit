@@ -88,7 +88,8 @@ tkStart          # a hub of sample cards in ~/toolkit-hub, this machine pointed 
 ```
 
 Before it, a fresh clone says so on its first import -- `This machine is not set up yet ... Run
-tkStart for a sample hub` -- a notice, not a warning: nothing is wrong, nothing is configured yet.
+tkStart for a sample hub` -- a notice, not a warning: nothing is wrong, nothing is configured yet. It is for a person
+at a terminal: the agent's bridge sets `TOOLKIT_QUIET_STARTUP`, and then the import prints nothing.
 
 That is the whole setup on a new machine. `tkStart` copies the sample hub that ships in
 [`samples/hub`](../samples/hub) out to a folder you own (`-Path` to choose it), writes
