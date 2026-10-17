@@ -18,6 +18,7 @@ release.
 
 ### Fixed
 
+- `ThreadHash` now takes a card id like every other card verb, as well as a filename, a partial name or a path.
 - An empty `config.local.json` no longer stops `Log -Ack` from acknowledging errors or `SwitchSpace` from switching Space.
 - `UpdateResume`, `PublishWorkReview` and `LogPeerReview` now state a refusal once, with git's own sentence and a hint where a commit fails, and exit 2; a commit git refused used to print a second, generic error block on top of it.
 - Running the tests from the web UI's Test Health card no longer fails every refusal case.

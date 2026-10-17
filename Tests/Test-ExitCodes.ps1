@@ -748,7 +748,7 @@ finally { Remove-Item $standaloneTmp -Force -ErrorAction SilentlyContinue }
 Write-Host "-- ThreadHash and SwitchSpace refuse through the guard --" -ForegroundColor Cyan
 
 $guardCases = @(
-    @{ Verb = 'ThreadHash'; Call = "${cfgPrefix}ThreadHash -File __no-such-card__.prompt.md -Hash deadbee"; Sentence = 'File not found' },
+    @{ Verb = 'ThreadHash'; Call = "${cfgPrefix}ThreadHash -File __no-such-card__.prompt.md -Hash deadbee"; Sentence = 'No card matching' },
     @{ Verb = 'SwitchSpace'; Call = "${cfgPrefix}SwitchSpace nope"; Sentence = 'Unknown Space: nope' }
 )
 foreach ($case in $guardCases) {
