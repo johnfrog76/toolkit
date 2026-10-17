@@ -49,6 +49,7 @@ release.
 - The scripts behind Connect, EditItem, MyPRs, InstallAutoload, Agent and Web, run on their own without the module, now keep their stated reason when they refuse, as every other script does; they printed the error and then lost the reason.
 - `NewPR` run from a folder that is not a repository now says so in its own words on Windows PowerShell 5.1 even when the calling shell stops on errors, instead of printing a raw error from the version control tool.
 - Syncing the hub from Windows PowerShell 5.1 under a caller that stops on errors no longer throws on git's own status line; a status read git refuses is now a stated refusal (exit 2) instead of being read as a dirty hub.
+- A message the browser shows from a command, such as a refusal in a dialog, no longer begins with the first-run "not set up yet" banner on a machine with no `config.local.json`.
 - On Windows PowerShell 5.1 the verbs that read git (`Status`, `Dashboard`, `ThreadHash`, `Archive`, `MoveDesign`, `GetPRComments`, `AddPRReview`, `UpdateResume`, `UpdateReview`, `Update` and `Backfill`) no longer stop on git's first stderr line when the calling shell stops on errors, so a git refusal reads the same as on PowerShell 7.
 
 ## [1.0.0] - 2026-10-15

@@ -221,6 +221,17 @@ class TheTableFollowsTheFlags(unittest.TestCase):
         self._flip(False)
         self.assertNotIn(self.MODULE_VERB, bridge.command_map())
 
+    def test_a_verb_with_no_config_local_json_does_not_open_with_the_first_run_banner(self):
+        """A non-interactive caller says so with TOOLKIT_QUIET_STARTUP, and the
+        not-set-up notice honours it: a dialog showing the verb's own sentence
+        must not begin with "This machine is not set up yet"."""
+        self.assertFalse((self.pkg / "config.local.json").exists())
+        body = client.post("/api/cmd/Env", json={"params": []}).json()
+        self.assertEqual(body["status"], "success", body.get("error"))
+        self.assertIn("Environment", body["output"])
+        self.assertNotIn("not set up yet", body["output"])
+        self.assertTrue(body["output"].lstrip().startswith("Environment"), body["output"][:80])
+
     def test_the_key_names_every_input(self):
         key = bridge._map_key_now()
         self.assertEqual(len(key), 4)
