@@ -1310,6 +1310,27 @@ Assert-True "Clause 16: the sweep finds an inline definition, indented or global
     (-not ('    Write-CliError -Message "x"' -match $fbPattern)) -and
     (-not ('function Get-CliPrefixes {' -match $fbPattern))) ''
 
+# ── The scan exclusions are relative to the package root ─────────────────────
+# A checkout whose own path runs through an excluded name (an agent worktree
+# under .claude/worktrees/) must still be read; a decoy INSIDE the tree must not.
+$pinBase = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-scan-" + [guid]::NewGuid().ToString('N'))
+$pinRoot = Join-Path (Join-Path (Join-Path $pinBase '.dot') 'worktrees') 'pkg'
+try {
+    foreach ($rel in @('Scripts/a.ps1', 'Scripts/b.ps1', 'web/src/c.ts', 'web/node_modules/x.js')) {
+        $pinPath = Join-Path $pinRoot $rel
+        New-Item -ItemType Directory -Force -Path (Split-Path $pinPath -Parent) | Out-Null
+        Set-Content -LiteralPath $pinPath -Value 'x'
+    }
+    $pinFiles = @(Get-ChildItem $pinRoot -Recurse -File)
+    $pinKept = @($pinFiles | Select-ScannableFile -Root $pinRoot | ForEach-Object { $_.Name } | Sort-Object)
+    Assert-True "Scan exclusions: a tree under a .dot/worktrees path is read, the node_modules decoy is not" (
+        ($pinKept -join ',') -eq 'a.ps1,b.ps1,c.ts') "kept: $($pinKept -join ', ')"
+} catch {
+    Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
+} finally {
+    Remove-Item -LiteralPath $pinBase -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 Write-Host ""
 Write-Host "  Results: $script:passed/$($script:passed + $script:failed) passed" -ForegroundColor $(if ($script:failed -eq 0) { 'Green' } else { 'Red' })
 if ($script:failed -gt 0) {
