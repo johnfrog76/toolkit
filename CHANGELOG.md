@@ -8,6 +8,8 @@ release.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-18
+
 ### Added
 
 - CodeQL scans the web and the agent on every push to main, every pull request and weekly.
