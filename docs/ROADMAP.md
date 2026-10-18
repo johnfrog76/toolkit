@@ -52,7 +52,7 @@ to F4 are there too, by their cards.
 ## The milestones
 
 ```text
-M1  1.1.0  The bar, held            the defect queue dry, the three refactors done, the two public issues
+M1  1.1.0  The bar, held            done 2026-10-18: the defect queue dry, two refactors in, verify green
         |
 M2  1.2.0  The standup sees the work    Team Agile reads the cards; what moved, and the agent in the room
         |
@@ -65,20 +65,23 @@ M5         The rename                 a cards core and an ado module; no version
 M6  2.0    ToolKit installs itself    the big-picture session decides what the product becomes
 ```
 
-### M1 -- 1.1.0, the bar held
+### M1 -- 1.1.0, the bar held -- done 2026-10-18
 
 The first release after the flip is the one that proves the public bar was not a one-day event.
-**Done when:** the defect queue is dry, the three refactors from the quick-wins note are done, the two
-public issues are closed, and main's verify is green on both hosts.
+**Done when:** the defect queue is dry, the two refactors that belong to it are done, and main's verify is
+green on both hosts. **Met 2026-10-18**, the day 1.1.0 was cut: the defect queue was empty, both refactors were
+in, and the verify run on the release commit completed green on Ubuntu and on Windows PowerShell 5.1.
 
 - The defect cards: every bug in the toolkit Space's `current/`, including the raw `git` sweep behind
   the widened Portability clause.
-- The three refactors (the hub's quick-wins note, 2026-10-16): the standalone shims folded into one
-  prelude -- done; `Menu` split into its four jobs -- done; one skeleton for the Team Agile rituals --
-  open.
+- Two of the three refactors from the hub's quick-wins note (2026-10-16): the standalone shims folded into
+  one prelude, and `Menu` split into its four jobs. The third, one skeleton for the Team Agile rituals, is
+  M2's first item by the agent-in-the-room spec's build order, so the rituals are built on it rather than
+  copied again; it is not part of this release.
 - The two quality passes, the Muse pass (2026-10-15, 27 findings) and the Fable pass (2026-10-16): each
   finding a card, worked or closed with a reason. The bugs already in the queue came out of them.
-- The two public issues the flip left open: the landing page's links, and the Docker image on Linux.
+- The two public issues the flip left open, the landing page's links and the Docker image on Linux, were
+  not in this release; they are the first patch after it, 1.1.1, and need no milestone of their own.
 - The public bar was the gate the flip was held to, met at 1.0.0; every release after it is held to
   [Contributing](CONTRIBUTING.md), "How a pull request is reviewed", and the release section in
   [AGENTS.md](../AGENTS.md), which is where those rules now live.
