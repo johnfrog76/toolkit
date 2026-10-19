@@ -1103,10 +1103,11 @@ finally {
 # match, trimmed, as printed after the line number) is in Lines is allowed, and
 # any other raw call in that file is a hit, so a new one cannot arrive quietly
 # beside a deliberate one. The files once marked 'D3J7 follow-up' are converted.
+# Get-Standup.ps1 and Get-Triage.ps1 shared their raw copy out into
+# Scripts/Ritual-Common.ps1 (Task3WGP), which reads through Invoke-P20TrackerRead
+# like every other script, so neither needs an entry here any more.
 $rawTrackerAllowed = @{
     'Scripts/Invoke-TrackerRead.ps1' = 'the one place the redirection is written'
-    'Scripts/Get-Standup.ps1'        = 'the ritual readers keep their own copy until they share one skeleton'
-    'Scripts/Get-Triage.ps1'         = 'the ritual readers keep their own copy until they share one skeleton'
     # git, deliberate: the hub sync prints git's own pull/push output as it arrives and reads the exit code itself
     'Scripts/Sync-Prompts.ps1'       = @{
         Reason = 'the hub sync passes git output through to the terminal'

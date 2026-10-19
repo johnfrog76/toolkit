@@ -98,6 +98,7 @@ if ($Help) {
 . (Join-Path $PSScriptRoot 'Triage-Rules.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
 . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
+. (Join-Path $PSScriptRoot 'Ritual-Common.ps1')
 
 $row = (Get-P20TriageRow -PackageRoot $repoRoot).Row
 $severities = @($row.severities | ForEach-Object { [string]$_ })
@@ -127,31 +128,16 @@ if ($Severity) {
 }
 
 # -- Which Space ----------------------------------------------------------------
+# Scripts/Ritual-Common.ps1 holds the rule, shared with Standup and Triage.
 $cfg = $global:P20Config
-$org = ''
-$status = ''
-$projects = @()
-if ($Space) {
-    $spaceValue = $Space.Trim()
-    $declared = @()
-    if ($cfg -and $cfg.Spaces) { $declared = @($cfg.Spaces | Where-Object { $_ } | ForEach-Object { [string]$_.slug }) }
-    $entry = $null
-    if ($cfg -and $cfg.Spaces) { $entry = @($cfg.Spaces | Where-Object { $_ -and [string]$_.slug -eq $spaceValue }) | Select-Object -First 1 }
-    if (-not $entry) {
-        $hint = 'Leave -Space out for the Space you are in.'
-        if ($declared.Count -gt 0) { $hint = "Declared: $($declared -join ', '). Or leave -Space out for the Space you are in." }
-        Write-CliError -Message "No Space '$spaceValue' is declared." -Hint $hint
-        exit 2
-    }
-    $org = [string]$entry.org
-    $status = [string]$entry.status
-    if ($entry.projects) { $projects = @($entry.projects) }
-}
-elseif ($cfg) {
-    $org = [string]$cfg.Org
-    $status = [string]$cfg.OrgStatus
-    if ($cfg.Projects) { $projects = @($cfg.Projects) }
-}
+# A name that is not $space: PowerShell variables are case-insensitive, so
+# $space would be the same variable as the -Space PARAMETER above (the
+# $help/[switch]$Help trap in AGENTS.md, same shape) and the assignment would
+# coerce the resolved object into that parameter's [string] type.
+$resolvedSpace = Resolve-P20RitualSpace -Space $Space -Config $cfg
+$org = $resolvedSpace.org
+$status = $resolvedSpace.status
+$projects = $resolvedSpace.projects
 
 if ((Resolve-P20Tracker -OrgUrl $org) -ne 'github') {
     Write-CliError -Message "Route writes a GitHub issue's labels and milestone, and this Space's tracker is not GitHub." `
