@@ -8,6 +8,14 @@ release.
 
 ## [Unreleased]
 
+### Added
+
+- On a GitHub Space the standup now says the cards being worked as well as the issues, and adds a `Check` line where a card and its issue disagree.
+
+### Changed
+
+- A card marked not billable (`Billable -No`) is now left off the standup as well as off Daily.
+
 ## [1.1.0] - 2026-10-18
 
 ### Added

@@ -49,3 +49,16 @@ function Get-PromptFileStatus {
     if ($Content -match $c.regex.startedLine) { return $c.status.inProgress }
     return $c.status.active
 }
+
+function Test-P20CardBillable {
+    <#
+      False when the card says `**Billable:** no` (stamps.billable); no line means
+      billable, so no existing card needed migrating. The CLI's one reader of the
+      stamp: Daily (agent/ado/Get-WeeklyBilling.ps1) and the standup
+      (Get-P20StandupCards) both read through it. agent/core/parsers.py's
+      card_billable is the same rule.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Content)
+    $stamp = [string](Get-P20Consts).stamps.billable
+    return -not ([regex]::IsMatch("$Content", '(?mi)^' + [regex]::Escape($stamp) + '\s*no\b'))
+}

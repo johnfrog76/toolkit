@@ -18,8 +18,13 @@
     milestone and body are the work grain's: an item groups by its
     milestone, else by the design card its body names.
 
+    The same Space's CARDS are read too (Get-P20StandupCards) and joined to the
+    issues on the id by Invoke-P20StandupJoinedFill: a card whose id is an
+    issue's number adds its lane, and a Check line where the two disagree; a card
+    of its own is a row under you; a not-billable card is not a row.
+
     A Space with no tracker address, or a local or archive one, fills from its
-    CARDS instead: the hub's current/ and archive/ for that Space, read by
+    CARDS alone: the hub's current/ and archive/ for that Space, read by
     Get-P20StandupCards and filled by Invoke-P20StandupCardsFill -- no gh call.
 
     The ritual happens anyway (principle 3): an Azure DevOps Space (D-TA19), a
@@ -192,9 +197,10 @@ $spaceName = $resolvedSpace.spaceName
 $promptsFolder = $resolvedSpace.promptsFolder
 
 # -- Which source ---------------------------------------------------------
-# GitHub -> its issues; no tracker address, or a local/archive Space -> its cards;
-# Azure DevOps -> the Tracker line (D-TA19). One pure rule, Get-P20StandupSource,
-# held to the agent's by Tests/fixtures/rituals/standup-cards.json.
+# GitHub -> its issues AND its cards, joined on the id; no tracker address, or a
+# local/archive Space -> its cards; Azure DevOps -> the Tracker line (D-TA19). One
+# pure rule, Get-P20StandupSource, held to the agent's by
+# Tests/fixtures/rituals/standup-cards.json.
 $choice = Get-P20StandupSource -Address $org -Status $status
 
 $tracker = @{ ok = $false; reason = '' }
@@ -204,7 +210,7 @@ if ($choice.source -eq 'none') {
     # D-TA19: Azure DevOps is the human team's board; the sentence is consts.json's.
     $tracker.reason = $choice.reason
 }
-elseif ($choice.source -eq 'issues') {
+elseif ($choice.source -eq 'both') {
     $target = Resolve-P20TrackerRepo -OrgUrl $org -Projects $projects -CliPrefix (Get-CliPrefix)
     if ($target.Reason) {
         $tracker.reason = $target.Reason
@@ -233,21 +239,27 @@ elseif ($choice.source -eq 'issues') {
 }
 
 # -- The fill, the rendering, the printing --------------------------------------
-if ($choice.source -eq 'cards') {
+$cards = @()
+if ($choice.source -eq 'cards' -or $choice.source -eq 'both') {
     # The Space's own current/ and archive/, read by the rules every card verb uses.
     $hubRoot = ''
     if ($cfg) { $hubRoot = [string]$cfg.PromptsRoot }
     $spaceDir = $hubRoot
     if ($hubRoot -and $promptsFolder) { $spaceDir = Join-Path $hubRoot $promptsFolder }
     $folderNames = (Get-P20Consts).folders
-    $cards = @()
     if ($spaceDir) {
         $pattern = Get-P20CardIdPattern -WorkItemTypes (Get-P20WorkItemTypes -Config $cfg)
         $cards = @(Get-P20StandupCards -CurrentDir (Join-Path $spaceDir $folderNames.current) `
                 -ArchiveDir (Join-Path $spaceDir $folderNames.archive) -Pattern $pattern)
     }
+}
+if ($choice.source -eq 'cards') {
     $standup = Invoke-P20StandupCardsFill -AsOf ([DateTimeOffset]::Now) -Cards $cards -Space $slug -SpaceName $spaceName `
         -PackageRoot $repoRoot
+}
+elseif ($choice.source -eq 'both') {
+    $standup = Invoke-P20StandupJoinedFill -AsOf ([DateTimeOffset]::Now) -Labels $labels -Issues $issues -Tracker $tracker `
+        -Cards $cards -Space $slug -SpaceName $spaceName -PackageRoot $repoRoot
 }
 else {
     $standup = Invoke-P20StandupFill -AsOf ([DateTimeOffset]::Now) -Labels $labels -Issues $issues -Tracker $tracker `

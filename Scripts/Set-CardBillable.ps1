@@ -40,7 +40,7 @@ param(
 if ($Help) {
     $p = Get-CliPrefix
     Write-Host ""
-    Write-Host "  ${p}Billable <id|file> -No     Keep this card OFF Daily -- it is not billable" -ForegroundColor Cyan
+    Write-Host "  ${p}Billable <id|file> -No     Keep this card OFF Daily and the standup" -ForegroundColor Cyan
     Write-Host "  ${p}Billable <id|file>         Make it billable again" -ForegroundColor Cyan
     Write-Host "  ${p}Billable -Help             Show this help" -ForegroundColor Cyan
     Write-Host ""

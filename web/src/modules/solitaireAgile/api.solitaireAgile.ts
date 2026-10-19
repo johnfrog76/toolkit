@@ -101,9 +101,10 @@ export interface StandupResponse {
   asOf: string;
   since: string;
   space: string;
-  /** Which source filled it: a GitHub Space's issues, a local Space's cards,
-   * or none when nothing answered (an ADO Space, gh down). */
-  source?: "issues" | "cards" | "none";
+  /** Which source filled it: an active GitHub Space's issues and cards joined
+   * on the id ("both"), a local Space's cards, or none when nothing answered
+   * (an ADO Space, gh down). "issues" is what an agent that predates the join says. */
+  source?: "issues" | "cards" | "both" | "none";
   /** false: no tracker answered. The ritual still happens (principle 3). */
   tracker: { ok: boolean; reason: string };
   chair: { open: string; close: string };
@@ -120,6 +121,11 @@ export interface StandupResponse {
   /** The chair's reading: a few lines, each a count or a derived fact, LF-joined.
    *  Absent from an agent that predates it. */
   brief?: string;
+  /** The "both" source: where a card and its issue disagree, one sentence each
+   *  (already in `text`). Absent from an agent that predates the join. */
+  checks?: string[];
+  /** The "both" source: each card joined to its issue, with the card's lane. */
+  links?: { number: number; id: string; lane: string; path: string }[];
 }
 
 /** The standup reminder, as `GET /api/ritual/standup/remind` reads it. */

@@ -77,14 +77,15 @@ tracker can be the team: the routing labels are the roster, the agents work in w
 and the rituals tell that process back. Team Agile is that Space's feature by nature. The design card
 holds the decision (D-TA19) and the reasoning behind it. A LOCAL Space -- no
 tracker address, or one whose status is `local` -- has a standup over its CARDS, with the engineer as
-its one worker ([the second source](#the-second-source-cards)); an Azure DevOps Space still does not,
-and its `Tracker` line says why.
+its one worker, and an active GitHub Space reads its cards beside its issues, joined on the id
+([the two sources, joined](#the-two-sources-joined)); an Azure DevOps Space still does not, and its
+`Tracker` line says why.
 
 ## What it owns
 
 | Half | Team Agile's | Not Team Agile's, though it sits beside it |
 | --- | --- | --- |
-| CLI | `Config/solitaireAgile.commands.psd1` + `.ps1` (three wrappers); `Scripts/Get-Standup.ps1` (the verb: which Space, which source, the two `gh` reads or the card read, the printing); `Scripts/Standup-Rules.ps1` (the two fills and the rendering, pure; the source rule; the card reader); `Scripts/Get-Triage.ps1` and `Scripts/Triage-Rules.ps1` (triage's read, and its grouping and text, pure); `Scripts/Set-Route.ps1` (the one write: one `gh issue edit` per switch); `Scripts/Ritual-Common.ps1` (the skeleton the three verb scripts share -- which Space, and the two-reads-to-`@{ ok; value }` gh layer Standup and Triage call; Route keeps its own gh-call shape but shares the Space resolution); the inventory row (from the psd1) and its question in `Config/settings-workflows.json`; the menu heading `Team Agile` (category `rituals`) | `Scripts/Resolve-Tracker.ps1` -- which repo a GitHub Space means, shared with every GitHub verb; the card rules the second source reads through -- `Resolve-CardName.ps1` (the id), `Get-PromptFileStatus.ps1` (the state) |
+| CLI | `Config/solitaireAgile.commands.psd1` + `.ps1` (three wrappers); `Scripts/Get-Standup.ps1` (the verb: which Space, which source, the two `gh` reads or the card read, the printing); `Scripts/Standup-Rules.ps1` (the issues, cards and joined fills and the rendering, pure; the source rule; the card reader); `Scripts/Get-Triage.ps1` and `Scripts/Triage-Rules.ps1` (triage's read, and its grouping and text, pure); `Scripts/Set-Route.ps1` (the one write: one `gh issue edit` per switch); `Scripts/Ritual-Common.ps1` (the skeleton the three verb scripts share -- which Space, and the two-reads-to-`@{ ok; value }` gh layer Standup and Triage call; Route keeps its own gh-call shape but shares the Space resolution); the inventory row (from the psd1) and its question in `Config/settings-workflows.json`; the menu heading `Team Agile` (category `rituals`) | `Scripts/Resolve-Tracker.ps1` -- which repo a GitHub Space means, shared with every GitHub verb; the card rules a standup reads cards through -- `Resolve-CardName.ps1` (the id), `Get-PromptFileStatus.ps1` (the state, and `Test-P20CardBillable`) |
 | Agent | `agent/solitaire/standup.py` and `triage.py` -- one gated router, `GET /api/ritual/standup` and `GET /api/ritual/triage`, **reads only**; a triage answer reaches the tracker only as `POST /api/cmd/Route`, the bridge | `space_scope` in `agent/ado/accounting.py`, the `?space=` rule `/issue-report` uses; `card_id` and the state rule in `agent/core/parsers.py` |
 | Web | `web/src/modules/solitaireAgile/` -- the descriptor, the Standup \| Triage strip (`RitualPage.tsx`), the standup page, the Triage page, and `stage/`: the cast atoms (by copy), the seats, the generated deck and the played route | the shell; the deck engine (`web/src/modules/deck/engine/`) and its second resolver `GeneratedDeckHost.tsx`, which the played view borrows |
 | Data | `Config/ceremonies.json` (the standup's slots, queue kinds, registers and `kinds` -- the bug and feature kinds a dressed sentence may count by; triage's three question slots, its severities `sev1`-`sev3`, its `deepWaterLabel` and the words of its text) and `Config/standup-vocabulary.json` (`phrasebook`, `nothing`, `excuses`, `fakeWork`, and `verbs`, the standup register's words offered to the model), read by both halves, never typed in code (D-SA2) | the model profile, `agent/core/model.py` (`ai.model`, `ANTHROPIC_API_KEY`), which the dress calls through and the PR review and the notes tidy-up share |
@@ -191,7 +192,8 @@ visibility once (`gh api repos/<owner>/<name>`) and, when it is public, prints `
 public` ([CLI](../CLI.md), "A write to a public repository says so"). It asks nothing.
 
 A Space with no address, or a `local` or `archive` one, makes no `gh` call at all: it reads its own
-`current/` and `archive/` in the hub ([the second source](#the-second-source-cards)).
+`current/` and `archive/` in the hub ([the two sources, joined](#the-two-sources-joined)). An active
+GitHub Space makes its two `gh` reads and reads those folders too.
 
 **Not answering is not a refusal.** An Azure DevOps Space (`rituals.text.adoTracker`: "Azure DevOps is
 the human team's board, ...", D-TA19), a Space whose repo is ambiguous, `gh` missing, or `gh` failing --
@@ -382,8 +384,10 @@ One line per queue kind that has items ("Nothing is waiting on you." when none);
 running state is unbuilt, because every routed issue reads as open; and "Next", the rule -- the kind
 with the most items (ties go to the ceremony's queue order) and who they wait on. A GitHub Space's
 walks are `verify-close` issues, so they wait on "the PC"; a local Space's cards in Code Review wait
-on "you", and say neither "all on the PC" nor "none in flight". With the tracker not answering, the
-brief is the one `Tracker` line.
+on "you", and say neither "all on the PC" nor "none in flight". A joined GitHub Space reads as a
+GitHub Space, except that a card on its walk puts the walks on "you" (and drops "all on the PC"), its
+card tile says no "none in flight", and its `Check` lines follow the workers. With the tracker not
+answering, the brief is the one `Tracker` line.
 
 ## The reminder to attend
 
@@ -406,8 +410,8 @@ reads the reminder's state for the drawer. `docs/modules/organize.md` names the 
 
 ## The file shape, and how a standup is read
 
-Team Agile writes nothing to the hub, so it has no file shape of its own; a local Space's standup reads the
-cards' ([the second source](#the-second-source-cards)). What regresses is the **slot rule**, and it is
+Team Agile writes nothing to the hub, so it has no file shape of its own; a standup reads the cards'
+([the two sources, joined](#the-two-sources-joined)). What regresses is the **slot rule**, and it is
 read the same in both halves (`Scripts/Standup-Rules.ps1`, `agent/solitaire/standup.py`), held by one table:
 
 | Rule | Reading |
@@ -452,24 +456,67 @@ With no tracker, a `Tracker` line replaces both the queue and the blocks; with n
 `No worker labels in this Space.` replaces the blocks. The date is `dddd d MMMM yyyy` in the invariant
 culture. The golden files in `Tests/fixtures/rituals/` are the law where this sketch and they disagree.
 
-### The second source: cards
+### The two sources, joined
 
-**Issues or cards**. A Space with no tracker address,
-or one whose status is `local` or `archive`, fills its standup from the CARDS in the hub -- its own
-`current/` and `archive/` -- so the ritual happens whatever the board is made of. Which source a Space
-gets is one pure rule of its address and status (`Get-P20StandupSource` in `Scripts/Standup-Rules.ps1`,
-`standup_source` in `agent/solitaire/standup.py`):
+**Issues and cards**. Both are records of work done: the card is the job record, the tracker the
+product record. A GitHub Space that is `active` reads BOTH -- its issues, and the CARDS in its own
+`current/` and `archive/` in the hub -- joined on the id. A Space with no tracker address, or one whose
+status is `local` or `archive`, has only its cards, so the ritual happens whatever the board is made
+of. Which source a Space gets is one pure rule of its address and status (`Get-P20StandupSource` in
+`Scripts/Standup-Rules.ps1`, `standup_source` in `agent/solitaire/standup.py`):
 
 | The Space | Source | What you see |
 | --- | --- | --- |
-| GitHub, `active` | `issues` | the standup above |
-| no address (any status), or GitHub `local` / `archive` | `cards` | the standup below |
+| GitHub, `active` | `both` | the standup above, joined with the Space's cards ([below](#the-join)) |
+| no address (any status), or GitHub `local` / `archive` | `cards` | the cards' standup ([below](#the-cards-alone)) |
 | Azure DevOps (any status) | `none` | the chair's lines and `Tracker  Azure DevOps is the human team's board, ...` (`rituals.text.adoTracker`, D-TA19) -- no card is read |
 
 The module itself is on only in a Space answered *With agents* -- a GitHub Space -- so the cards
 source is what a GitHub Space that is still `local` reads, and what `-Space <slug>` (or `?space=`) reads
 for a Space with no address while you stand in one that works with agents. A Space with no tracker, as the
-Space you are in, answers *Alone* and has no standup of its own.
+Space you are in, answers *Alone* and has no standup of its own. `"issues"` is what the issues fill says
+on its own; no Space chooses it any more, and an agent that predates the join still answers it.
+
+**Which cards a standup mentions.** Every card in play, unless it is checked not billable: a card that
+says `**Billable:** no` (`stamps.billable`, written by `Billable -No`) is not a standup row and adds
+nothing to one -- the rule Daily applies, read by the same reader (`card_billable` in
+`agent/core/parsers.py`, `Test-P20CardBillable` in `Scripts/Get-PromptFileStatus.ps1`). No line means
+billable.
+
+#### The join
+
+The join is keyed on the card's id, by the one id rule (`Resolve-CardName.ps1`, `card_id()`): a tracker
+number, or an id of the card's own.
+
+| The card | In the standup |
+| --- | --- |
+| its id is the number of an issue in the read | **ONE row, the issue's** -- title, labels, worker, milestone and slot are the tracker's, placed as the issues fill places them, and the card never overrides them. The card adds what only it knows: its lane (`links[]`: `number`, `id`, `lane`, `path`; the lane read the way `Status` reads it, Done in `archive/`) |
+| ... archived, and the issue is open | the issue's row, and one `Check` line: `#<n> <title> -- the card is archived, but the issue is still open.` (`rituals.text.checkCardArchived`) |
+| ... in `current/`, and the issue is closed | the issue's row, and one `Check` line: `#<n> <title> -- the issue is closed, but the card is not archived.` (`rituals.text.checkIssueClosed`) |
+| an id of its own, or a number the read has no issue for | **its own row, under you**: one tile labelled with the Space's slug and named for it, in the slot its lane maps to ([the cards alone](#the-cards-alone)), after the worker tiles -- and only when it has something to say; its Code Review cards follow the issues on the walk |
+| not billable | nothing |
+
+**When the two disagree, it is said, and nothing is written.** The `Check` lines (`checks[]`, by issue
+number) come after the worker tiles in every grain -- the detail as rows under the `Check` label, the
+work grain and the brief as `Check: <sentence>` lines -- and `Route` stays the one write, to the
+tracker. Rounds share an id (`-r1`, `-r2`): the one in `current/` is the card, else the archived one closed
+last, so an earlier round is never "archived while the issue is open". With no card in play the joined
+standup is the issues' alone, byte for byte; with the tracker not answering it is the `Tracker` line and
+no card. Daily is unchanged.
+
+```text
+  Check      #142 Port the cast atoms -- the card is archived, but the issue is still open.
+  Check      #143 Rename the slug -- the issue is closed, but the card is not archived.
+```
+
+`Tests/fixtures/rituals/standup-joined.json` holds the shapes -- a linked card and an open issue, a linked
+card archived while its issue is open, an issue closed while its card is in `current/`, a card of its own,
+an issue alone, a not-billable card -- and all of them on one day, whose goldens
+(`standup-joined-together.txt`, `.work.txt`, `.brief.txt`) are generated by
+`python3 Tests/regenerate_joined_goldens.py` (Windows: `py -3`; `--check` to compare) and never typed. Both suites assert
+every row.
+
+#### The cards alone
 
 A card's state is the card rules' own ([`docs/hub/cards.md`](../hub/cards.md#state-is-derived-never-stored)),
 read the way `Status` reads it, and it maps to a slot like this:
@@ -482,6 +529,7 @@ read the way `Status` reads it, and it maps to a slot like this:
 | in `current/`, Active | nowhere -- not started |
 | in `archive/` with no `**Closed:**` line, or closed before `since` | nowhere |
 | a file the one id rule finds no id in (a dated PR-comment record, a note) | not a card; skipped |
+| a card that says `**Billable:** no` | nowhere -- not a standup row |
 
 **One worker.** A local Space has one worker, the engineer, so the standup has one tile: labelled with
 the Space's slug and named with its display name (the slug when it has none). `blockers` is always
@@ -529,7 +577,7 @@ is one, in both halves (`Group-P20StandupWork` and `Format-P20StandupWork` in `S
 | --- | --- | --- |
 | 1 | its milestone's title | `milestone` |
 | 2 | the design card its body names: a `> GitHub:` thread (`rituals.workThreadRegex`), named by that issue's head when the read has it, else `#<n>`; else a `design/<note>.md` (`rituals.workDesignRegex`), its stem title-cased (`team-agile` is `Team Agile`) | `design` |
-| 3 | a card's type, from its heading (`# Task 139: ...` is `Task`) -- the second source only | `type` |
+| 3 | a card's type, from its heading (`# Task 139: ...` is `Task`) -- a card's row only | `type` |
 | 4 | what is left in the slot, by the titles' common stem: each title's head (`rituals.workHeadRegex` -- a one-word tag like `Bug:` dropped, cut at ` -- ` or `: `); heads that share their first two words or more group under the words they all share (`Design lifecycle L1: ...` and `Design lifecycle L2: ...` are `Design lifecycle`), a trailing small word (`rituals.workSmallWordRegex`: `the`, `of`) not counted; a head alone names itself | `stem` <!-- markdownlint-disable-line MD038 -- the span shows a separator with the spaces the pattern cuts at --> |
 
 Groups with the same name, ignoring case, are one group, named as first seen -- so a milestone and a
@@ -739,8 +787,8 @@ standup is complete and correct; nothing on screen says a dress was skipped.
 
 | Suite | Holds |
 | --- | --- |
-| `tkTestToolkit -Rituals` | every case of `Tests/fixtures/rituals/standup.json` and of `standup-cards.json` (the second source: the one worker's slots and the walk queue by card id, the source and title tables, the card reader over real folders) -- `since`, the day of the year, the chair's two lines, the queue, each worker's slots by number, `empty` and the status sentence -- and the rendered text against `standup-<name>.txt` and the chair's reading against `standup-<name>.brief.txt`, byte for byte, with `Standup -Brief` typed in a fresh shell printing that reading alone and `-AsJson` carrying it; the same object read back from JSON rendering the same text; no `fakeWork` line in any case; off is no verb, no function, no bridge entry and no `Menu -All` line; **`Standup` typed in a fresh shell** with only this package's manifest and `gh` stubbed as a function answering the friday case: the text the rule renders for now, the queue, the blocks, the window, `-AsJson` round-tripping to the same text, `gh` failing and an ADO Space each a `Tracker` line with exit 0 (ADO's the contract's sentence), a local Space filling from its scratch cards line for line with `source: cards` in `-AsJson`, an undeclared `-Space` a stated refusal, `-Help`, and the hub untouched; the work grain over `standup-work.json`, the same rows `Tests/test_rituals.py` asserts -- every group (name, `by`, count, refs, phrase) of the queue and of each worker's slots, the `heads`, `keys`, `types` and `counts` tables, `standup-work-<case>.txt` byte for byte and again after a JSON round trip, `Get-P20StandupGrainText`; the prose over `standup-prose.json`, the same rows the agent asserts -- every `sentences` row, each case's queue sentences and each worker's in order, `standup-prose-<case>.txt` byte for byte and again after a JSON round trip; the dress guard over `standup-dress.json`, the same rows the agent asserts -- every row's reason, every group's prose sentence passing its own guard, every guard of `rituals.dressGuards` with a row, the `verbs` family and the two `kinds`, and the reply that names a ref the group lacks keeping the prose for that group; and typed, `Standup -Grain work` printing the rule's work text for now and `-AsJson` carrying it, `-Grain detail` the standup as it always printed, `-Grain brief` the same as `-Brief`, and a word that is not a grain or `-Brief -Grain work` a stated refusal |
-| `Tests/test_rituals.py` | the agent's two fills and the rendering over the same two tables and goldens; the work grain over `standup-work.json` -- every group of the queue and of each worker's slots, the `heads`, `keys`, `types` and `counts` tables, `standup-work-<case>.txt` byte for byte, the JSON round trip, the work grain's own phrases; the prose over `standup-prose.json` -- every `sentences` row, each case's queue and worker sentences, `standup-prose-<case>.txt` byte for byte, the JSON round trip, the prose's own sentences, no word that is not the contract's or the tracker's; the dress over `standup-dress.json` -- every row, every guard with a row, the rows its issue asked for (a ref the group lacks refused, "20g of protein" kept), the reply that names one, and around it with the model STUBBED: the facts are the workers' group sentences and nothing else, the kinds counted from labels and a card's type, the prompt offering the `verbs` and no other family, a model that answers dressed and guarded, the same groups dressed once, no key / a failing model / a reply that is not JSON all the prose, nothing to dress asking nothing; the route with no key answering `spoken: null` and `work` unchanged, and with a stubbed model `spoken` beside `work` with `text`, `brief` and the register untouched; the route asking `gh` for `milestone` and `body` and answering `work`; `read_cards` over real folders (with each card's type and body); a local Space's route filling from its cards with no `gh` call; an ADO Space's `adoTracker` reason; 404 off |
+| `tkTestToolkit -Rituals` | every case of `Tests/fixtures/rituals/standup.json` and of `standup-cards.json` (the cards alone: the one worker's slots and the walk queue by card id, the source and title tables, the card reader over real folders, a not-billable card nowhere) and of `standup-joined.json` (the two sources joined: every shape's walk, each worker's slots by ref, the `Check` lines and the links, the together case's detail, work and brief goldens and their JSON round trip, no card in play reading as the issues alone, the tracker down, rounds of one id) -- `since`, the day of the year, the chair's two lines, the queue, each worker's slots by number, `empty` and the status sentence -- and the rendered text against `standup-<name>.txt` and the chair's reading against `standup-<name>.brief.txt`, byte for byte, with `Standup -Brief` typed in a fresh shell printing that reading alone and `-AsJson` carrying it; the same object read back from JSON rendering the same text; no `fakeWork` line in any case; off is no verb, no function, no bridge entry and no `Menu -All` line; **`Standup` typed in a fresh shell** with only this package's manifest and `gh` stubbed as a function answering the friday case: the text the rule renders for now, the queue, the blocks, the window, `-AsJson` round-tripping to the same text, `gh` failing and an ADO Space each a `Tracker` line with exit 0 (ADO's the contract's sentence), a local Space filling from its scratch cards line for line with `source: cards` in `-AsJson`, the GitHub Space with `source: both` and, with scratch cards in its folder, the joined standup line for line (a card of its own under the Space's tile, a `Check` line for a card whose issue is closed, a not-billable card nowhere, the hub untouched), an undeclared `-Space` a stated refusal, `-Help`, and the hub untouched; the work grain over `standup-work.json`, the same rows `Tests/test_rituals.py` asserts -- every group (name, `by`, count, refs, phrase) of the queue and of each worker's slots, the `heads`, `keys`, `types` and `counts` tables, `standup-work-<case>.txt` byte for byte and again after a JSON round trip, `Get-P20StandupGrainText`; the prose over `standup-prose.json`, the same rows the agent asserts -- every `sentences` row, each case's queue sentences and each worker's in order, `standup-prose-<case>.txt` byte for byte and again after a JSON round trip; the dress guard over `standup-dress.json`, the same rows the agent asserts -- every row's reason, every group's prose sentence passing its own guard, every guard of `rituals.dressGuards` with a row, the `verbs` family and the two `kinds`, and the reply that names a ref the group lacks keeping the prose for that group; and typed, `Standup -Grain work` printing the rule's work text for now and `-AsJson` carrying it, `-Grain detail` the standup as it always printed, `-Grain brief` the same as `-Brief`, and a word that is not a grain or `-Brief -Grain work` a stated refusal |
+| `Tests/test_rituals.py` | the agent's issues, cards and joined fills and the rendering over the same three tables and goldens (the joined goldens also against `Tests/regenerate_joined_goldens.py`'s output); the work grain over `standup-work.json` -- every group of the queue and of each worker's slots, the `heads`, `keys`, `types` and `counts` tables, `standup-work-<case>.txt` byte for byte, the JSON round trip, the work grain's own phrases; the prose over `standup-prose.json` -- every `sentences` row, each case's queue and worker sentences, `standup-prose-<case>.txt` byte for byte, the JSON round trip, the prose's own sentences, no word that is not the contract's or the tracker's; the dress over `standup-dress.json` -- every row, every guard with a row, the rows its issue asked for (a ref the group lacks refused, "20g of protein" kept), the reply that names one, and around it with the model STUBBED: the facts are the workers' group sentences and nothing else, the kinds counted from labels and a card's type, the prompt offering the `verbs` and no other family, a model that answers dressed and guarded, the same groups dressed once, no key / a failing model / a reply that is not JSON all the prose, nothing to dress asking nothing; the route with no key answering `spoken: null` and `work` unchanged, and with a stubbed model `spoken` beside `work` with `text`, `brief` and the register untouched; the route asking `gh` for `milestone` and `body` and answering `work`; `read_cards` over real folders (with each card's type, body and billable); a local Space's route filling from its cards with no `gh` call; a GitHub Space's route joining its cards to its issues (`checks`, `links`, a card of its own on the Space's tile, a not-billable card nowhere, the hub unwritten); an ADO Space's `adoTracker` reason; 404 off |
 | `tkTestToolkit -Triage` | every case of `Tests/fixtures/rituals/triage.json` -- the groups in order, each group's counts, context and numbers, each issue's worker, size, severity and deep-water, the sizes -- and the text against `triage-<name>.txt` byte for byte, again after a JSON round trip; off is no `Triage`, no `Route`, no bridge entry; `Triage` typed with `gh` stubbed; **`Route` typed with `gh` stubbed as a function that writes down every call**: the exact `gh issue edit` argv for each switch, alone and all four in order, `-WhatIf` writing nothing, the two moves printed, every refusal exit 2 with one `Error:` block and no write, the hub untouched |
 | `Tests/test_triage.py` | the agent's grouping and text over the same table and goldens; the route's `gh` calls; ADO and tier below 1 a `Tracker` line; 404 off |
 | `tkTestToolkit -Consts`, `Tests/test_consts.py`, `web/src/shell/consts.test.ts` | the `rituals` values (`triageRoute`, `grains`, `numberWords`, the four `work*Regex` patterns, the `work*` phrases and the `prose*` words among them, and the dress's `dressGuards` and four `dress*Regex` patterns), stated from all three halves; `{n} to walk`, `Nothing blocked.` and `Yesterday I closed` never retyped in the CLI's scripts or the agent; `Waiting on you`, `nothing in flight` and `Routed to` never retyped in the CLI's scripts |
@@ -791,6 +839,10 @@ repository", is the real write).
 - **Not on Azure DevOps, by design.** An ADO Space answers `rituals.text.adoTracker` on its `Tracker`
   line (D-TA19: ADO is the human team's board, and its standup is the one the team holds). A local Space
   fills from its cards.
+- **A linked card follows its issue, even to nowhere.** A card whose id is an issue's number adds no
+  row of its own ([the join](#the-join)), so when that issue is open and no worker label routes it, the
+  issue is in no slot and neither is the card's work: the card's lane is in `links[]`, but the text says
+  nothing. Give the issue a worker label and it shows.
 - **The work grain's nouns are the tracker's own words**. A design note is named from its file stem
   (`team-agile.md` is `Team Agile`), not from its heading, which the read does not fetch; a
   `> GitHub:` thread outside the read (closed long ago, another repo) is named `#<n>`; a card's type

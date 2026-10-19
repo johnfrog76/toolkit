@@ -22,14 +22,18 @@
       Invoke-P20StandupFill    (asOf, labels, issues, tracker) -> the response
                                object of the standup's shape, text left empty.
       Get-P20StandupSource     (address, status) -> which source fills it:
-                               issues (a GitHub Space that is not local),
-                               cards (no tracker address, or a local or archive
+                               both (a GitHub Space that is not local: its
+                               issues and its cards, joined on the id), cards
+                               (no tracker address, or a local or archive
                                Space), none (Azure DevOps -- D-TA19).
       Get-P20StandupCardTitle  a card's heading -> the title a slot shows.
       Get-P20StandupCards      the impure half of the second source: a Space's
                                current/ and archive/ read into card rows.
       Invoke-P20StandupCardsFill (asOf, cards, space, spaceName) -> the same
                                response, filled from cards.
+      Invoke-P20StandupJoinedFill (asOf, labels, issues, tracker, cards, space,
+                               spaceName) -> the issues fill joined with the
+                               cards on the id: the Check lines and the links.
       Format-P20StandupText    the filled object -> the text, LF-joined, every
                                fixed word from consts.json rituals.text.
       Group-P20StandupWork     the work grain: one slot's items grouped
@@ -44,9 +48,9 @@
                                CLI calls no model; the guard is the contract.
 
     The agent's agent/solitaire/standup.py implements the same rule over the
-    same files; Tests/fixtures/rituals/standup.json (issues) and
-    standup-cards.json (cards), with the golden texts beside them, hold the two
-    to one table, byte for byte.
+    same files; Tests/fixtures/rituals/standup.json (issues),
+    standup-cards.json (cards) and standup-joined.json (both), with the golden
+    texts beside them, hold the two to one table, byte for byte.
 
     The real register never reads the vocabulary's fakeWork family (D-SA5) --
     nor excuses (the nonsense register's) -- only phrasebook (the chair)
@@ -69,7 +73,8 @@ if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) {
 # the one id rule and the status verb's state rule, each from its own file.
 if (-not (Get-Command Resolve-P20Tracker -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1') }
 if (-not (Get-Command Get-P20CardId -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Resolve-CardName.ps1') }
-if (-not (Get-Command Get-PromptFileStatus -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Get-PromptFileStatus.ps1') }
+# Get-PromptFileStatus.ps1 also holds Test-P20CardBillable, the one reader of **Billable:**.
+if (-not (Get-Command Test-P20CardBillable -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Get-PromptFileStatus.ps1') }
 
 function Get-P20RitualData {
     <# The rituals contract plus the two data files it names, read from the package. #>
@@ -162,6 +167,23 @@ function Get-P20IssueLabelNames {
     return $names.ToArray()
 }
 
+function Get-P20StandupIssueKeys {
+    <#
+      Every issue's work-grain key, '#<n>|' -> Get-P20StandupWorkKey's answer. A
+      `> GitHub:` thread is named by its issue's head: every issue in the read.
+      agent/solitaire/standup.py's issue_keys is the same rule.
+    #>
+    param($Issues)
+    $threads = @{}
+    foreach ($issue in @($Issues)) { if ($null -ne $issue) { $threads[[string][int]$issue.number] = [string]$issue.title } }
+    $keys = @{}
+    foreach ($issue in @($Issues)) {
+        if ($null -eq $issue) { continue }
+        $keys['#' + [int]$issue.number + '|'] = Get-P20StandupWorkKey -Milestone $issue.milestone -Body ([string]$issue.body) -Threads $threads
+    }
+    return $keys
+}
+
 function Invoke-P20StandupFill {
     <#
       The fill. Pure over its inputs: no gh, no clock, no file but the two data
@@ -214,6 +236,7 @@ function Invoke-P20StandupFill {
     $workers = New-Object System.Collections.ArrayList
     # The work grain's key for every item: '<ref>|<path>' -> @{ name; by }.
     $keyOf = @{}
+    if ($ok) { $keyOf = Get-P20StandupIssueKeys -Issues $Issues }
 
     if ($ok) {
         $defs = @(Get-P20StandupWorkers -Labels $Labels -Prefix ([string]$rituals.workerLabelPrefix))
@@ -226,9 +249,6 @@ function Invoke-P20StandupFill {
             $fills[$def.label] = $lists
         }
         $walkLabel = [string]$rituals.walkLabel
-        # A `> GitHub:` thread is named by its issue's head: every issue in the read.
-        $threads = @{}
-        foreach ($issue in @($Issues)) { if ($null -ne $issue) { $threads[[string][int]$issue.number] = [string]$issue.title } }
 
         foreach ($issue in @($Issues)) {
             if ($null -eq $issue) { continue }
@@ -244,7 +264,6 @@ function Invoke-P20StandupFill {
             # issue's id is null and its path ''; a card's number is null and
             # its url ''.
             $item = [ordered]@{ number = [int]$issue.number; id = $null; title = [string]$issue.title; url = [string]$issue.url; path = '' }
-            $keyOf['#' + $item.number + '|'] = Get-P20StandupWorkKey -Milestone $issue.milestone -Body ([string]$issue.body) -Threads $threads
 
             if ($isOpen -and $isWalk -and $queueLists.Contains('walk')) {
                 $workerName = ''
@@ -304,6 +323,8 @@ function Invoke-P20StandupFill {
         workers  = [object[]]$workers.ToArray()
         work     = $work
         text     = ''
+        checks   = [object[]]@()
+        links    = [object[]]@()
     }
 }
 
@@ -323,10 +344,13 @@ function Invoke-P20StandupFill {
 function Get-P20StandupSource {
     <#
       Which source fills a Space's standup, from its address and status, as
-      @{ source; reason }. Pure. issues: a GitHub Space that is not local or
-      archive. cards: no tracker address, or a local or archive Space. none: an
-      Azure DevOps Space -- the human team's board, whose standup the team holds
-      in its own room (D-TA19); the reason is rituals.text.adoTracker.
+      @{ source; reason }. Pure. both: a GitHub Space that is not local or
+      archive -- its issues AND its cards, joined on the id
+      (Invoke-P20StandupJoinedFill). cards: no tracker address, or a local or
+      archive Space. none: an Azure DevOps Space -- the human team's board, whose
+      standup the team holds in its own room (D-TA19); the reason is
+      rituals.text.adoTracker. Invoke-P20StandupFill alone still says issues; no
+      Space chooses it.
     #>
     param([AllowEmptyString()][AllowNull()][string]$Address, [AllowEmptyString()][AllowNull()][string]$Status)
     $kind = Resolve-P20Tracker -OrgUrl $Address
@@ -336,7 +360,7 @@ function Get-P20StandupSource {
     if ($kind -eq 'none' -or $Status -eq 'local' -or $Status -eq 'archive') {
         return @{ source = 'cards'; reason = '' }
     }
-    return @{ source = 'issues'; reason = '' }
+    return @{ source = 'both'; reason = '' }
 }
 
 function Get-P20StandupCardTitle {
@@ -369,7 +393,8 @@ function Get-P20StandupCardTitle {
 function Get-P20StandupCards {
     <#
       The impure half: a Space's current/ and archive/ read into the rows the
-      cards fill takes -- @{ file; folder; status; closed; title; id; path }.
+      cards fill takes -- @{ file; folder; status; closed; title; id; path; type;
+      body; billable }. billable is Test-P20CardBillable's answer.
       A file the one id rule finds no id in is not a card and is skipped (a
       dated PR-comment record in archive/, a person's note). State is the
       status verb's own rule (Get-PromptFileStatus); a card in archive/ is Done.
@@ -401,8 +426,10 @@ function Get-P20StandupCards {
                     title  = (Get-P20StandupCardTitle -Content $content -File $f.Name -Id $id)
                     id     = $id
                     path   = $f.FullName
-                    type   = (Get-P20StandupCardType -Content $content -Id $id)
-                    body   = $content
+                    type     = (Get-P20StandupCardType -Content $content -Id $id)
+                    body     = $content
+                    # A card that says **Billable:** no is not a standup row.
+                    billable = (Test-P20CardBillable $content)
                 })
         }
     }
@@ -419,35 +446,13 @@ function ConvertTo-P20StandupDay {
     return ''
 }
 
-function Invoke-P20StandupCardsFill {
+function Get-P20StandupCardsInPlay {
     <#
-      The second fill. Pure over its inputs, like the first: card rows in (the
-      shape Get-P20StandupCards returns and the fixture states), the response of
-      the standup's response out, with source 'cards', text ''. Days compare as
-      yyyy-MM-dd strings: a Closed stamp is a day, and since and asOf are read
-      as the days they fall on in asOf's own offset. Within a slot, cards are in
-      file-name order (ordinal) -- the ledger's tie-break.
+      The cards a standup may mention: one per file, in file-name order (ordinal),
+      and none that says **Billable:** no (a row with no billable key is billable
+      -- no line means billable, the rule Daily reads). cards_in_play in the agent.
     #>
-    param(
-        [Parameter(Mandatory)]$AsOf,
-        $Cards,
-        [string]$Space = '',
-        [string]$SpaceName = '',
-        [string]$PackageRoot
-    )
-    $data = Get-P20RitualData -PackageRoot $PackageRoot
-    $st = (Get-P20Consts).status
-    $archiveName = [string](Get-P20Consts).folders.archive
-    $at = ConvertTo-P20RitualTime $AsOf
-    if ($null -eq $at) { throw "asOf '$AsOf' is not a time." }
-    $since = Get-P20StandupSince -AsOf $at
-    $inv = [System.Globalization.CultureInfo]::InvariantCulture
-    $fromDay = $since.ToString('yyyy-MM-dd', $inv)
-    $toDay = $at.ToString('yyyy-MM-dd', $inv)
-    $d = $at.DayOfYear
-    $phrases = @($data.Vocabulary.phrasebook)
-    $nothing = @($data.Vocabulary.nothing)
-
+    param($Cards)
     $byFile = @{}
     $names = New-Object 'System.Collections.Generic.List[string]'
     foreach ($card in @($Cards)) {
@@ -458,18 +463,43 @@ function Invoke-P20StandupCardsFill {
         $names.Add($file)
     }
     $names.Sort([System.StringComparer]::Ordinal)
-
-    $name = $SpaceName
-    if (-not $name) { $name = $Space }
-    $slots = @($data.Ceremony.slots | ForEach-Object { [string]$_ })
-    $kinds = @($data.Ceremony.queue | ForEach-Object { [string]$_ })
-    $keyOf = @{}
-    $lists = @{}
-    foreach ($slot in $slots) { $lists[$slot] = New-Object System.Collections.ArrayList }
-    $walk = New-Object System.Collections.ArrayList
-
+    $rows = New-Object System.Collections.ArrayList
     foreach ($file in $names) {
         $card = $byFile[$file]
+        $billable = $true
+        if ($card -is [System.Collections.IDictionary]) { if ($card.Contains('billable')) { $billable = $card['billable'] } }
+        elseif ($card.PSObject.Properties['billable']) { $billable = $card.billable }
+        if ($billable -is [bool] -and -not $billable) { continue }
+        [void]$rows.Add($card)
+    }
+    # Unrolled: every caller wraps the answer in @().
+    return $rows.ToArray()
+}
+
+function Get-P20StandupCardTile {
+    <#
+      Cards already in play -> one worker's slots, its walk items and the work
+      keys, as @{ worker; walk; keyOf }. yesterday: in archive/, its Closed day in
+      [since, asOf] (as days). today: in current/, In Progress or Code Review.
+      walk: in current/, Code Review. An Active card is nowhere; so is an archived
+      card with no Closed day. worker.empty is set; its status sentence is the
+      caller's. _cards_tile in the agent.
+    #>
+    param([Parameter(Mandatory)][DateTimeOffset]$AsOf, $Cards, [string]$Label, [string]$Name, [string[]]$Slots)
+    $c = Get-P20Consts
+    $st = $c.status
+    $archiveName = [string]$c.folders.archive
+    $since = Get-P20StandupSince -AsOf $AsOf
+    $inv = [System.Globalization.CultureInfo]::InvariantCulture
+    $fromDay = $since.ToString('yyyy-MM-dd', $inv)
+    $toDay = $AsOf.ToString('yyyy-MM-dd', $inv)
+    $keyOf = @{}
+    $lists = @{}
+    foreach ($slot in $Slots) { $lists[$slot] = New-Object System.Collections.ArrayList }
+    $walk = New-Object System.Collections.ArrayList
+    foreach ($card in @($Cards)) {
+        if ($null -eq $card) { continue }
+        $file = [string]$card.file
         $path = [string]$card.path
         if (-not $path) { $path = ([string]$card.folder) + '/' + $file }
         $item = [ordered]@{ number = $null; id = [string]$card.id; title = [string]$card.title; url = ''; path = $path }
@@ -485,25 +515,59 @@ function Invoke-P20StandupCardsFill {
         }
         if ($status -ceq [string]$st.inProgress -or $status -ceq [string]$st.codeReview) { [void]$lists['today'].Add($item) }
         if ($status -ceq [string]$st.codeReview) {
-            [void]$walk.Add([ordered]@{ number = $null; id = $item.id; title = $item.title; url = ''; path = $path; worker = $name })
+            [void]$walk.Add([ordered]@{ number = $null; id = $item.id; title = $item.title; url = ''; path = $path; worker = $Name })
         }
     }
-
-    $w = [ordered]@{ label = $Space; name = $name }
+    $w = [ordered]@{ label = $Label; name = $Name }
     $empty = $true
-    foreach ($slot in $slots) {
+    foreach ($slot in $Slots) {
         $arr = [object[]]$lists[$slot].ToArray()
         if ($arr.Count -gt 0) { $empty = $false }
         $w[$slot] = $arr
     }
     $w['empty'] = $empty
     $w['excuse'] = ''
-    if ($empty -and $nothing.Count -gt 0) { $w['excuse'] = [string]$nothing[$d % $nothing.Count] }
+    return @{ worker = $w; walk = [object[]]$walk.ToArray(); keyOf = $keyOf }
+}
+
+function Invoke-P20StandupCardsFill {
+    <#
+      The second fill. Pure over its inputs, like the first: card rows in (the
+      shape Get-P20StandupCards returns and the fixture states), the response of
+      the standup's response out, with source 'cards', text ''. The cards in play
+      (Get-P20StandupCardsInPlay: a not-billable card is left out) on ONE worker,
+      the engineer, named for the Space, by Get-P20StandupCardTile's mapping. Days
+      compare as yyyy-MM-dd strings: a Closed stamp is a day, and since and asOf
+      are read as the days they fall on in asOf's own offset. Within a slot, cards
+      are in file-name order (ordinal) -- the ledger's tie-break.
+    #>
+    param(
+        [Parameter(Mandatory)]$AsOf,
+        $Cards,
+        [string]$Space = '',
+        [string]$SpaceName = '',
+        [string]$PackageRoot
+    )
+    $data = Get-P20RitualData -PackageRoot $PackageRoot
+    $at = ConvertTo-P20RitualTime $AsOf
+    if ($null -eq $at) { throw "asOf '$AsOf' is not a time." }
+    $since = Get-P20StandupSince -AsOf $at
+    $d = $at.DayOfYear
+    $phrases = @($data.Vocabulary.phrasebook)
+    $nothing = @($data.Vocabulary.nothing)
+
+    $name = $SpaceName
+    if (-not $name) { $name = $Space }
+    $slots = @($data.Ceremony.slots | ForEach-Object { [string]$_ })
+    $kinds = @($data.Ceremony.queue | ForEach-Object { [string]$_ })
+    $tile = Get-P20StandupCardTile -AsOf $at -Cards @(Get-P20StandupCardsInPlay -Cards $Cards) -Label $Space -Name $name -Slots $slots
+    $w = $tile.worker
+    if ($w.empty -and $nothing.Count -gt 0) { $w['excuse'] = [string]$nothing[$d % $nothing.Count] }
 
     $queue = [ordered]@{}
     foreach ($kind in @($data.Ceremony.queue)) { $queue[[string]$kind] = [object[]]@() }
-    if ($queue.Contains('walk')) { $queue['walk'] = [object[]]$walk.ToArray() }
-    $work = New-P20StandupWork -Standup @{ queue = $queue; workers = @($w) } -KeyOf $keyOf -QueueKinds $kinds -Slots $slots
+    if ($queue.Contains('walk')) { $queue['walk'] = [object[]]$tile.walk }
+    $work = New-P20StandupWork -Standup @{ queue = $queue; workers = @($w) } -KeyOf $tile.keyOf -QueueKinds $kinds -Slots $slots
 
     $open = ''
     $close = ''
@@ -524,7 +588,113 @@ function Invoke-P20StandupCardsFill {
         workers  = [object[]]@($w)
         work     = $work
         text     = ''
+        checks   = [object[]]@()
+        links    = [object[]]@()
     }
+}
+
+# -- Both: issues and cards, joined on the id ---------------------------------
+# The card is the job record, the tracker the product record; an active GitHub
+# Space reads both (Tests/fixtures/rituals/standup-joined.json is the law):
+#
+#   a card whose id is an issue's number in the read IS that issue's job record:
+#     ONE row, the issue's, placed by the issue as Invoke-P20StandupFill places
+#     it. The card adds its lane (links) and, where the two disagree, one Check
+#     line: archived while the issue is open, or not archived while the issue is
+#     closed. Rounds share an id: the one in current/ is the card, else the
+#     archived one closed last.
+#   any other card -- an id of its own, or a number the read has no issue for --
+#     is its own row, under you: one tile labelled with the Space's slug and
+#     named for it, by the cards fill's mapping, after the worker tiles, and only
+#     when it has something to say. Its Code Review cards follow the issues on
+#     the walk.
+#   a not-billable card is not a row and adds nothing to one.
+
+function Invoke-P20StandupJoinedFill {
+    <#
+      The issues fill, joined with the cards on the id. Pure over its inputs.
+      With the tracker not answering it is the issues fill as it stands: the
+      chair's lines and the reason. fill_joined_standup in the agent.
+    #>
+    param(
+        [Parameter(Mandatory)]$AsOf,
+        $Labels,
+        $Issues,
+        $Tracker,
+        $Cards,
+        [string]$Space = '',
+        [string]$SpaceName = '',
+        [string]$PackageRoot
+    )
+    $out = Invoke-P20StandupFill -AsOf $AsOf -Labels $Labels -Issues $Issues -Tracker $Tracker -Space $Space -PackageRoot $PackageRoot
+    if (-not $out.tracker.ok) { return $out }
+    $out.source = 'both'
+    $data = Get-P20RitualData -PackageRoot $PackageRoot
+    $c = Get-P20Consts
+    $t = $c.rituals.text
+    $currentName = [string]$c.folders.current
+    $at = ConvertTo-P20RitualTime $AsOf
+    $slots = @($data.Ceremony.slots | ForEach-Object { [string]$_ })
+    $kinds = @($data.Ceremony.queue | ForEach-Object { [string]$_ })
+
+    $byNumber = @{}
+    foreach ($issue in @($Issues)) { if ($null -ne $issue) { $byNumber[[int]$issue.number] = $issue } }
+    $joined = @{}
+    $alone = New-Object System.Collections.ArrayList
+    foreach ($card in @(Get-P20StandupCardsInPlay -Cards $Cards)) {
+        if ($null -eq $card) { continue }
+        $cid = [string]$card.id
+        $n = 0
+        if ($cid -match '^\d+$' -and [int]::TryParse($cid, [ref]$n) -and $byNumber.ContainsKey($n)) {
+            if (-not $joined.ContainsKey($n)) { $joined[$n] = New-Object System.Collections.ArrayList }
+            [void]$joined[$n].Add($card)
+        }
+        else { [void]$alone.Add($card) }
+    }
+
+    $checks = New-Object System.Collections.ArrayList
+    $links = New-Object System.Collections.ArrayList
+    foreach ($n in @($joined.Keys | Sort-Object)) {
+        $rounds = @($joined[$n])
+        $current = @($rounds | Where-Object { [string]$_.folder -eq $currentName })
+        if ($current.Count -gt 0) { $card = $current[0] }
+        else {
+            # The archived round closed last; the later file breaks a tie.
+            $card = $rounds[0]
+            foreach ($r in $rounds) {
+                $byDay = [string]::CompareOrdinal((ConvertTo-P20StandupDay $r.closed), (ConvertTo-P20StandupDay $card.closed))
+                if ($byDay -gt 0 -or ($byDay -eq 0 -and [string]::CompareOrdinal([string]$r.file, [string]$card.file) -gt 0)) { $card = $r }
+            }
+        }
+        $path = [string]$card.path
+        if (-not $path) { $path = ([string]$card.folder) + '/' + [string]$card.file }
+        [void]$links.Add([ordered]@{ number = [int]$n; id = [string]$card.id; lane = [string]$card.status; path = $path })
+        $issue = $byNumber[$n]
+        $isOpen = (([string]$issue.state).ToUpperInvariant() -eq 'OPEN')
+        $item = '#' + $n + ' ' + [string]$issue.title
+        if ($current.Count -gt 0 -and -not $isOpen) { [void]$checks.Add(([string]$t.checkIssueClosed).Replace('{item}', $item)) }
+        elseif ($current.Count -eq 0 -and $isOpen) { [void]$checks.Add(([string]$t.checkCardArchived).Replace('{item}', $item)) }
+    }
+
+    $name = $SpaceName
+    if (-not $name) { $name = $Space }
+    $tile = Get-P20StandupCardTile -AsOf $at -Cards $alone.ToArray() -Label $Space -Name $name -Slots $slots
+    $workers = New-Object System.Collections.ArrayList
+    foreach ($w in @($out.workers | Where-Object { $null -ne $_ })) { [void]$workers.Add($w) }
+    if (-not $tile.worker.empty) { [void]$workers.Add($tile.worker) }
+    $out.workers = [object[]]$workers.ToArray()
+    if ($out.queue.Contains('walk')) {
+        $walk = New-Object System.Collections.ArrayList
+        foreach ($i in @($out.queue.walk | Where-Object { $null -ne $_ })) { [void]$walk.Add($i) }
+        foreach ($i in @($tile.walk | Where-Object { $null -ne $_ })) { [void]$walk.Add($i) }
+        $out.queue['walk'] = [object[]]$walk.ToArray()
+    }
+    $keyOf = Get-P20StandupIssueKeys -Issues $Issues
+    foreach ($k in @($tile.keyOf.Keys)) { $keyOf[$k] = $tile.keyOf[$k] }
+    $out.work = New-P20StandupWork -Standup @{ queue = $out.queue; workers = $out.workers } -KeyOf $keyOf -QueueKinds $kinds -Slots $slots
+    $out.checks = [object[]]$checks.ToArray()
+    $out.links = [object[]]$links.ToArray()
+    return $out
 }
 
 function Get-P20StandupItemRef {
@@ -1141,6 +1311,11 @@ function Format-P20StandupWork {
             if ($ww) { $said = @($ww.prose | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_ }) }
             $lines.Add([string]$w.name + ': ' + ($said -join ' '))
         }
+        $checks = @($Standup.checks | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_ })
+        if ($checks.Count -gt 0) {
+            $lines.Add('')
+            foreach ($check in $checks) { $lines.Add([string]$t.check + ': ' + $check) }
+        }
     }
     $lines.Add('')
     $lines.Add('"' + [string]$Standup.chair.close + '"')
@@ -1223,6 +1398,12 @@ function Format-P20StandupText {
                 }
             }
         }
+        # Where a card and its issue disagree: said, one line each, never fixed.
+        $checks = @($Standup.checks | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_ })
+        if ($checks.Count -gt 0) {
+            $lines.Add('')
+            foreach ($check in $checks) { $lines.Add((& $row $t.check $check)) }
+        }
     }
 
     $lines.Add('')
@@ -1246,7 +1427,10 @@ function Format-P20StandupBrief {
         Next: the walks -- 7 on <who>.             the kind with the most items
 
       An issues Space says its walks are all on one machine (every walk there is a verify-close) and
-      "none in flight"; a cards Space says neither, and its walks wait on "you".
+      "none in flight"; a cards Space says neither, and its walks wait on "you". A
+      both Space reads as an issues Space, except that a card on its walk puts the
+      walks on "you", and its card tile (labelled with the Space's slug) does not
+      say "none in flight"; its Check lines follow the workers.
       With tracker.ok false the brief is the Tracker line and nothing else.
     #>
     param([Parameter(Mandatory)]$Standup, [string]$PackageRoot)
@@ -1258,9 +1442,15 @@ function Format-P20StandupBrief {
     if (-not $Standup.tracker.ok) {
         return (([string]$t.tracker + ': ' + [string]$Standup.tracker.reason) + "`n")
     }
-    $issues = ([string]$Standup.source -ceq 'issues')
+    $both = ([string]$Standup.source -ceq 'both')
+    $issues = ([string]$Standup.source -ceq 'issues' -or $both)
+    # The walks wait on the verifying machine only while every one is an issue (a verify-close).
+    $onPc = $issues
+    foreach ($i in @($Standup.queue.walk | Where-Object { $null -ne $_ })) {
+        if ($null -eq $i.number -or "$($i.number)" -eq '') { $onPc = $false }
+    }
     $who = [string]$t.briefWhoYou
-    if ($issues) { $who = [string]$t.briefWhoPc }
+    if ($onPc) { $who = [string]$t.briefWhoPc }
 
     # The queue: a line per kind that has items; the biggest kind is "next".
     $bestKind = ''
@@ -1274,7 +1464,7 @@ function Format-P20StandupBrief {
         $noun = [string]$t.$manyKey
         if ($count -eq 1) { $noun = [string]$t.$oneKey }
         $line = [string]$t.queueHeading + ': ' + $count + ' ' + $noun
-        if ($issues -and $kind -eq 'walk') { $line += ', ' + [string]$t.briefAllPc }
+        if ($onPc -and $kind -eq 'walk') { $line += ', ' + [string]$t.briefAllPc }
         $lines.Add($line + '.')
         if ($count -gt $bestCount) { $bestCount = $count; $bestKind = $noun }
     }
@@ -1289,7 +1479,7 @@ function Format-P20StandupBrief {
         $bits = @()
         if ($closed -gt 0) { $bits += (& $fill $t.briefClosed $closed) } else { $bits += [string]$t.briefClosedNone }
         if ($open -gt 0) { $bits += (& $fill $t.briefOpen $open) } else { $bits += [string]$t.briefOpenNone }
-        if ($issues) { $bits += [string]$t.briefInFlight }
+        if ($issues -and -not ($both -and [string]$w.label -ceq [string]$Standup.space)) { $bits += [string]$t.briefInFlight }
         if ($blockers -gt 1) { $bits += (& $fill $t.briefBlockers $blockers) }
         elseif ($blockers -eq 1) { $bits += (& $fill $t.briefBlocker $blockers) }
         else { $bits += [string]$t.blockersEmpty }
@@ -1297,6 +1487,7 @@ function Format-P20StandupBrief {
     }
     if ($workers.Count -eq 0) { $lines.Add([string]$t.noWorkers) }
     elseif ($issues) { $lines.Add([string]$t.briefInFlightUnknown) }
+    foreach ($check in @($Standup.checks | Where-Object { $null -ne $_ })) { $lines.Add([string]$t.check + ': ' + [string]$check) }
 
     if ($bestCount -eq 0) { $lines.Add([string]$t.briefNextNone) }
     else { $lines.Add(([string]$t.briefNext).Replace('{kind}', $bestKind).Replace('{n}', [string]$bestCount).Replace('{who}', $who)) }

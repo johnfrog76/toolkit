@@ -198,7 +198,7 @@
         "{cliPrefix}Billable K7M2"
       ],
       "notes": [
-        "-No keeps the card off Daily; without it the card is billable again. A card is billable unless it says otherwise."
+        "-No keeps the card off Daily and the standup; without it the card is billable again. A card is billable unless it says otherwise."
       ]
     },
     "Cover": {

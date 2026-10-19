@@ -1,9 +1,9 @@
 {
-  "_": "The standup's SECOND source, cards, as a table (#130; docs/modules/solitaire-agile.md, \"The second source: cards\"; docs/hub/cards.md, 'A card in a standup'). Both halves -- tkTestToolkit -Rituals and Tests/test_rituals.py -- feed each case's cards to their cards fill and assert the computed `since`, the chair's vocabulary indices, the walk queue and the one worker's slots by card id, and the rendered text against standup-cards-<name>.txt in this folder, byte for byte (LF). A card is a row the thin layer reads out of the Space's current/ and archive/: its file, its folder, its DERIVED state (docs/hub/cards.md, 'State is derived, never stored'), its **Closed:** day when archived (null when it has none), the title its heading gives and the id the filename gives. `sources` pins which source a Space's address and status choose; `titles` pins the heading-to-title rule.",
+  "_": "The standup's SECOND source, cards, as a table (#130; docs/modules/solitaire-agile.md, \"The second source: cards\"; docs/hub/cards.md, 'A card in a standup'). Both halves -- tkTestToolkit -Rituals and Tests/test_rituals.py -- feed each case's cards to their cards fill and assert the computed `since`, the chair's vocabulary indices, the walk queue and the one worker's slots by card id, and the rendered text against standup-cards-<name>.txt in this folder, byte for byte (LF). A card is a row the thin layer reads out of the Space's current/ and archive/: its file, its folder, its DERIVED state (docs/hub/cards.md, 'State is derived, never stored'), its **Closed:** day when archived (null when it has none), the title its heading gives and the id the filename gives. A row with `billable: false` is a card that says **Billable:** no, and is nowhere (the rule Daily reads). `sources` pins which source a Space's address and status choose -- an active GitHub Space reads `both` (standup-joined.json); `titles` pins the heading-to-title rule.",
   "sources": [
     { "address": "", "status": "local", "source": "cards", "reason": "" },
     { "address": "", "status": "active", "source": "cards", "reason": "" },
-    { "address": "https://github.com/acme/widgets", "status": "active", "source": "issues", "reason": "" },
+    { "address": "https://github.com/acme/widgets", "status": "active", "source": "both", "reason": "" },
     { "address": "https://github.com/acme/widgets", "status": "local", "source": "cards", "reason": "" },
     { "address": "https://github.com/acme/widgets", "status": "archive", "source": "cards", "reason": "" },
     { "address": "https://dev.azure.com/acme-org", "status": "active", "source": "none", "reason": "adoTracker" },
@@ -31,7 +31,8 @@
         { "file": "198-fix-the-export.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-01", "title": "Fix the export", "id": "198" },
         { "file": "Spike-Q3R9-photo-import.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-02", "title": "Photo import", "id": "Q3R9" },
         { "file": "150-an-older-close.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-09-30", "title": "An older close", "id": "150" },
-        { "file": "151-never-stamped.prompt.md", "folder": "archive", "status": "Done", "closed": null, "title": "Never stamped", "id": "151" }
+        { "file": "151-never-stamped.prompt.md", "folder": "archive", "status": "Done", "closed": null, "title": "Never stamped", "id": "151" },
+        { "file": "TaskC4D7-bench-reading.prompt.md", "folder": "current", "status": "In Progress", "closed": null, "title": "Bench reading", "id": "C4D7", "billable": false }
       ],
       "expected": {
         "since": "2026-10-01T00:00:00-04:00",

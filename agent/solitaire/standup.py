@@ -31,7 +31,9 @@ A second source: a Space with no tracker address, or a local or archive
 one, fills from its CARDS -- ``standup_source`` chooses, ``read_cards`` is the
 thin folder layer, ``fill_cards_standup`` the pure fill, and the SAME
 ``render_standup`` draws it. ``Tests/fixtures/rituals/standup-cards.json`` is
-that table, asserted from both suites. An Azure DevOps Space keeps its
+that table, asserted from both suites. An active GitHub Space reads BOTH,
+joined on the id (``fill_joined_standup``, held by
+``Tests/fixtures/rituals/standup-joined.json``). An Azure DevOps Space keeps its
 ``Tracker`` line (D-TA19).
 
 The ritual happens anyway (principle 3): an Azure DevOps Space, a tier below 1,
@@ -85,7 +87,7 @@ from ..core.consts import (
     status_done,
     status_in_progress,
 )
-from ..core.parsers import _parse_status_metadata, card_id
+from ..core.parsers import _parse_status_metadata, card_billable, card_id
 from .tracker import read_tracker
 
 FEATURE = "solitaireAgile"
@@ -229,6 +231,16 @@ class SpokenWorker(BaseModel):
     prose: list[str] = []
 
 
+class CardLink(BaseModel):
+    # A card joined to the issue its id names (the "both" source): the issue
+    # keeps its row; the card adds what only it knows -- its lane, read the way
+    # Status reads it (Done in archive/) -- and where it is.
+    number: int
+    id: str = ""
+    lane: str = ""
+    path: str = ""
+
+
 class Spoken(BaseModel):
     # The dress (D-SA11): present only when a model answered. ``dressed``
     # counts the sentences in the model's words, ``refused`` the ones where the
@@ -250,7 +262,9 @@ class Standup(BaseModel):
     asOf: str = ""
     since: str = ""
     space: str = ""
-    # Which source filled it: "issues", "cards", or "none" when nothing answered.
+    # Which source filled it: "issues", "cards", "both" (an active GitHub
+    # Space: its issues and its cards, joined on the id), or "none" when
+    # nothing answered.
     source: str = "none"
     tracker: TrackerState = TrackerState()
     chair: Chair = Chair()
@@ -265,6 +279,12 @@ class Standup(BaseModel):
     text: str = ""
     # The chair's reading: a few lines, every one a count or a derived fact.
     brief: str = ""
+    # The "both" source: where a card and its issue disagree, one sentence
+    # each (rituals.text.checkCardArchived / checkIssueClosed), by issue number.
+    # Said, never fixed: Route stays the only write.
+    checks: list[str] = []
+    # The "both" source: each in-play card joined to its issue, by number.
+    links: list[CardLink] = []
     # What kind each item is: ref -> its label names (an issue) or its
     # type (a card), read against the ceremony's kinds. Not served.
     _marks: dict[str, list[str]] = PrivateAttr(default_factory=dict)
@@ -308,6 +328,16 @@ def _item(issue: dict) -> SlotItem:
     )
 
 
+def issue_keys(issues: list[dict]) -> dict[str, tuple[str, str]]:
+    """Every issue's work-grain key, ``#<n>|`` -> (name, by). A `> GitHub:`
+    thread is named by its issue's head: every issue in the read. The mirror of
+    ``Get-P20StandupIssueKeys``."""
+    threads = {str(int(i.get("number", 0))): str(i.get("title") or "") for i in issues or []}
+    return {
+        f"#{int(i.get('number', 0))}|": work_key(i.get("milestone"), i.get("body"), "", threads) for i in issues or []
+    }
+
+
 def fill_standup(
     as_of: datetime, labels: list[dict], issues: list[dict], tracker_state: dict, space: str = ""
 ) -> Standup:
@@ -345,13 +375,10 @@ def fill_standup(
     )
     names = dict(routes)
     workers = {label: Worker(label=label, name=name) for label, name in routes}
-    # A `> GitHub:` thread is named by its issue's head: every issue in the read.
-    threads = {str(int(i.get("number", 0))): str(i.get("title") or "") for i in issues or []}
-    key_of: dict[str, tuple[str, str]] = {}
+    key_of = issue_keys(issues)
 
     walk: list[WalkItem] = []
     for issue in sorted(issues or [], key=lambda i: int(i.get("number", 0))):
-        key_of[f"#{int(issue.get('number', 0))}|"] = work_key(issue.get("milestone"), issue.get("body"), "", threads)
         tags = _label_names(issue.get("labels"))
         out._marks[f"#{int(issue.get('number', 0))}"] = tags
         owner = next((t for t in tags if t in names), "")
@@ -386,16 +413,18 @@ def fill_standup(
 def standup_source(address: str, status: str) -> tuple[str, str]:
     """(source, reason) for a Space. Pure; the mirror of ``Get-P20StandupSource``.
 
-    ``issues``: a GitHub Space that is not local or archive. ``cards``: no
-    tracker address, or a local or archive Space. ``none``: Azure DevOps -- the
-    human team's board (D-TA19), with ``rituals.text.adoTracker`` as the reason.
+    ``both``: a GitHub Space that is not local or archive -- its issues AND its
+    cards, joined on the id (``fill_joined_standup``). ``cards``: no tracker
+    address, or a local or archive Space. ``none``: Azure DevOps -- the human
+    team's board (D-TA19), with ``rituals.text.adoTracker`` as the reason.
+    ``fill_standup`` alone still says ``issues``; no Space chooses it.
     """
     kind = tracker(address)
     if kind == "ado":
         return "none", rituals_text()["adoTracker"]
     if kind == "none" or status in ("local", "archive"):
         return "cards", ""
-    return "issues", ""
+    return "both", ""
 
 
 _HEADING = re.compile(r"(?m)^#[ \t]+([^\r\n]+)")
@@ -423,7 +452,7 @@ def card_title(content: str, file: str, cid: str | None) -> str:
 
 def read_cards(space_dir: Path, type_names: list[str], prefixes: list[str]) -> list[dict]:
     """The thin layer: a Space's ``current/`` and ``archive/`` as card rows --
-    ``{file, folder, status, closed, title, id, path}``. A file with no id by the
+    ``{file, folder, status, closed, title, id, path, type, body, billable}``. A file with no id by the
     one id rule is not a card and is skipped. State is the parser's rule; a card
     in ``archive/`` is Done and carries its Closed stamp's day."""
     rows: list[dict] = []
@@ -457,44 +486,47 @@ def read_cards(space_dir: Path, type_names: list[str], prefixes: list[str]) -> l
                     "path": str(f),
                     "type": card_type(content, cid),
                     "body": content,
+                    # A card that says `**Billable:** no` is not a standup row.
+                    "billable": card_billable(content),
                 }
             )
     return rows
 
 
-def fill_cards_standup(as_of: datetime, cards: list[dict], space: str = "", space_name: str = "") -> Standup:
-    """The second fill, from card rows. Pure; the mirror of ``Invoke-P20StandupCardsFill``.
-
-    yesterday: in ``archive/``, ``closed`` (a day) in [since's day, asOf's day].
-    today: in ``current/``, In Progress or Code Review. queue.walk: in
-    ``current/``, Code Review. An Active card is nowhere; so is an archived card
-    with no Closed day. ONE worker, the engineer, named for the Space.
-    Within a slot, file-name order.
-    """
-    words = vocabulary()
-    phrasebook, nothing = words["phrasebook"], words["nothing"]
-    d = as_of.timetuple().tm_yday
-    since = previous_working_day_start(as_of)
-    first, last = since.date().isoformat(), as_of.date().isoformat()
-    name = space_name or space
-    out = Standup(
-        register_=ceremonies()[CEREMONY]["registers"][0],
-        asOf=as_of.isoformat(),
-        since=since.isoformat(),
-        space=space,
-        source="cards",
-        tracker=TrackerState(ok=True, reason=""),
-        chair=Chair(open=phrasebook[d % len(phrasebook)], close=phrasebook[(d + 1) % len(phrasebook)]),
-    )
-    worker = Worker(label=space, name=name)
-    walk: list[WalkItem] = []
+def cards_in_play(cards: list[dict]) -> list[dict]:
+    """The cards a standup may mention: one per file, in file-name order, and
+    none that says ``**Billable:** no`` (a row with no ``billable`` key is
+    billable -- no line means billable, the rule Daily reads). The mirror of
+    ``Get-P20StandupCardsInPlay``."""
     seen: set[str] = set()
-    key_of: dict[str, tuple[str, str]] = {}
+    out: list[dict] = []
     for card in sorted(cards or [], key=lambda c: str(c.get("file", ""))):
         file = str(card.get("file", ""))
         if file in seen:
             continue
         seen.add(file)
+        if card.get("billable", True) is False:
+            continue
+        out.append(card)
+    return out
+
+
+def _cards_tile(
+    as_of: datetime, cards: list[dict], label: str, name: str, marks: dict
+) -> tuple[Worker, list[WalkItem], dict[str, tuple[str, str]]]:
+    """Cards (already in play) -> one worker's slots, its walk items and the
+    work keys. yesterday: in ``archive/``, ``closed`` (a day) in [since's day,
+    asOf's day]. today: in ``current/``, In Progress or Code Review. walk: in
+    ``current/``, Code Review. An Active card is nowhere; so is an archived
+    card with no Closed day. ``empty`` is the caller's. The mirror of
+    ``Get-P20StandupCardTile``."""
+    since = previous_working_day_start(as_of)
+    first, last = since.date().isoformat(), as_of.date().isoformat()
+    worker = Worker(label=label, name=name)
+    walk: list[WalkItem] = []
+    key_of: dict[str, tuple[str, str]] = {}
+    for card in cards:
+        file = str(card.get("file", ""))
         folder = str(card.get("folder", ""))
         item = SlotItem(
             number=None,
@@ -505,7 +537,7 @@ def fill_cards_standup(as_of: datetime, cards: list[dict], space: str = "", spac
         )
         # A card groups by the design card it names, else its type.
         key_of[f"{item.id}|{item.path}"] = work_key(None, card.get("body"), card.get("type"), {})
-        out._marks[item.id or ""] = [str(card.get("type") or "")]
+        marks[item.id or ""] = [str(card.get("type") or "")]
         if folder == folder_archive():
             day = str(card.get("closed") or "")[:10]
             if day and first <= day <= last:
@@ -516,12 +548,110 @@ def fill_cards_standup(as_of: datetime, cards: list[dict], space: str = "", spac
             worker.today.append(item)
         if state == status_code_review():
             walk.append(WalkItem(**item.model_dump(), worker=name))
+    return worker, walk, key_of
+
+
+def fill_cards_standup(as_of: datetime, cards: list[dict], space: str = "", space_name: str = "") -> Standup:
+    """The second fill, from card rows. Pure; the mirror of ``Invoke-P20StandupCardsFill``.
+
+    The cards in play (``cards_in_play``: a not-billable card is left out) on
+    ONE worker, the engineer, named for the Space, by ``_cards_tile``'s mapping.
+    Within a slot, file-name order.
+    """
+    words = vocabulary()
+    phrasebook, nothing = words["phrasebook"], words["nothing"]
+    d = as_of.timetuple().tm_yday
+    since = previous_working_day_start(as_of)
+    name = space_name or space
+    out = Standup(
+        register_=ceremonies()[CEREMONY]["registers"][0],
+        asOf=as_of.isoformat(),
+        since=since.isoformat(),
+        space=space,
+        source="cards",
+        tracker=TrackerState(ok=True, reason=""),
+        chair=Chair(open=phrasebook[d % len(phrasebook)], close=phrasebook[(d + 1) % len(phrasebook)]),
+    )
+    worker, walk, key_of = _cards_tile(as_of, cards_in_play(cards), space, name, out._marks)
     if not (worker.yesterday or worker.today or worker.blockers):
         worker.empty = True
         worker.excuse = nothing[d % len(nothing)]
     out.queue = Queue(walk=walk)
     out.workers = [worker]
     out.work = build_work(out, key_of)
+    return out
+
+
+# -- Both: issues and cards, joined on the id -------------------------------
+#
+# The card is the job record, the tracker the product record; an active GitHub
+# Space reads both (Tests/fixtures/rituals/standup-joined.json is the law):
+#
+#   a card whose id is an issue's number in the read IS that issue's job record:
+#     ONE row, the issue's, placed by the issue as the issues fill places it.
+#     The card adds its lane (``links``) and, where the two disagree, one
+#     ``Check`` line: archived while the issue is open, or not archived while
+#     the issue is closed. Rounds share an id: the one in current/ is the card,
+#     else the archived one closed last.
+#   any other card -- an id of its own, or a number the read has no issue for --
+#     is its own row, under you: one tile labelled with the Space's slug and
+#     named for it, by the cards fill's mapping, after the worker tiles, and
+#     only when it has something to say. Its Code Review cards follow the
+#     issues on the walk.
+#   a not-billable card is not a row and adds nothing to one.
+
+
+def fill_joined_standup(
+    as_of: datetime,
+    labels: list[dict],
+    issues: list[dict],
+    tracker_state: dict,
+    cards: list[dict],
+    space: str = "",
+    space_name: str = "",
+) -> Standup:
+    """The issues fill, joined with the cards on the id. Pure; the mirror of
+    ``Invoke-P20StandupJoinedFill``. With the tracker not answering it is the
+    issues fill as it stands: the chair's lines and the reason."""
+    out = fill_standup(as_of, labels, issues, tracker_state, space=space)
+    if not out.tracker.ok:
+        return out
+    out.source = "both"
+    t = rituals_text()
+    by_number = {int(i.get("number", 0)): i for i in issues or []}
+    joined: dict[int, list[dict]] = {}
+    alone: list[dict] = []
+    for card in cards_in_play(cards):
+        cid = str(card.get("id") or "")
+        if cid.isdigit() and int(cid) in by_number:
+            joined.setdefault(int(cid), []).append(card)
+        else:
+            alone.append(card)
+    for number in sorted(joined):
+        rounds = joined[number]
+        current = [c for c in rounds if str(c.get("folder", "")) == folder_current()]
+        if current:
+            card = current[0]
+        else:
+            # The archived round closed last; the later file breaks a tie.
+            card = max(rounds, key=lambda c: (str(c.get("closed") or "")[:10], str(c.get("file", ""))))
+        path = str(card.get("path") or f"{card.get('folder', '')}/{card.get('file', '')}")
+        out.links.append(
+            CardLink(number=number, id=str(card.get("id") or ""), lane=str(card.get("status") or ""), path=path)
+        )
+        issue = by_number[number]
+        is_open = str(issue.get("state", "")).upper() == "OPEN"
+        item = f"#{number} {issue.get('title', '') or ''}"
+        if current and not is_open:
+            out.checks.append(t["checkIssueClosed"].replace("{item}", item))
+        elif not current and is_open:
+            out.checks.append(t["checkCardArchived"].replace("{item}", item))
+
+    tile, walk, card_keys = _cards_tile(as_of, alone, space, space_name or space, out._marks)
+    if tile.yesterday or tile.today or tile.blockers:
+        out.workers.append(tile)
+    out.queue.walk.extend(walk)
+    out.work = build_work(out, {**issue_keys(issues), **card_keys})
     return out
 
 
@@ -1175,6 +1305,10 @@ def render_standup(filled: Standup) -> str:
                 else:
                     lines.append(row(t[slot], t[f"{slot}Empty"]))
         lines.append("")
+        # Where a card and its issue disagree: said, one line each, never fixed.
+        if filled.checks:
+            lines += [row(t["check"], c) for c in filled.checks]
+            lines.append("")
     lines.append(f'"{filled.chair.close}"')
     return "\n".join(lines) + "\n"
 
@@ -1206,6 +1340,9 @@ def render_work(filled: Standup) -> str:
                 continue
             ww = grained.get(w.label)
             lines.append(f"{w.name}: {' '.join(ww.prose if ww else [])}")
+        if filled.checks:
+            lines.append("")
+            lines += [f"{t['check']}: {c}" for c in filled.checks]
     lines += ["", f'"{filled.chair.close}"']
     return "\n".join(lines) + "\n"
 
@@ -1216,13 +1353,17 @@ def render_brief(filled: Standup) -> str:
     Pure; the mirror of ``Format-P20StandupBrief``, held by the ``.brief.txt`` goldens.
 
     An issues Space says its walks are all on one machine (every walk there is a verify-close) and
-    "none in flight"; a cards Space says neither, and its walks wait on "you".
+    "none in flight"; a cards Space says neither, and its walks wait on "you". A
+    both Space reads as an issues Space, except that a card on its walk puts the
+    walks on "you", and its card tile (labelled with the Space's slug) does not
+    say "none in flight"; its Check lines follow the workers.
     With the tracker not ok the brief is the Tracker line and nothing else."""
     t = rituals_text()
     if not filled.tracker.ok:
         return f"{t['tracker']}: {filled.tracker.reason}\n"
-    issues = filled.source == "issues"
-    who = t["briefWhoPc"] if issues else t["briefWhoYou"]
+    issues = filled.source in ("issues", "both")
+    on_pc = issues and all(i.number is not None for i in filled.queue.walk)
+    who = t["briefWhoPc"] if on_pc else t["briefWhoYou"]
     lines: list[str] = []
     best_noun, best_count = "", 0
     for kind in ceremonies()[CEREMONY]["queue"]:
@@ -1232,7 +1373,7 @@ def render_brief(filled: Standup) -> str:
         cap = kind[:1].upper() + kind[1:]
         noun = t[f"brief{cap}One"] if count == 1 else t[f"brief{cap}Many"]
         line = f"{t['queueHeading']}: {count} {noun}"
-        if issues and kind == "walk":
+        if on_pc and kind == "walk":
             line += f", {t['briefAllPc']}"
         lines.append(line + ".")
         if count > best_count:
@@ -1249,7 +1390,7 @@ def render_brief(filled: Standup) -> str:
             t["briefClosed"].replace("{n}", str(len(w.yesterday))) if w.yesterday else t["briefClosedNone"],
             t["briefOpen"].replace("{n}", str(opened)) if opened else t["briefOpenNone"],
         ]
-        if issues:
+        if issues and not (filled.source == "both" and w.label == filled.space):
             bits.append(t["briefInFlight"])
         if blockers > 1:
             bits.append(t["briefBlockers"].replace("{n}", str(blockers)))
@@ -1262,6 +1403,7 @@ def render_brief(filled: Standup) -> str:
         lines.append(t["noWorkers"])
     elif issues:
         lines.append(t["briefInFlightUnknown"])
+    lines += [f"{t['check']}: {c}" for c in filled.checks]
     if best_count:
         lines.append(t["briefNext"].replace("{kind}", best_noun).replace("{n}", str(best_count)).replace("{who}", who))
     else:
@@ -1290,14 +1432,21 @@ def standup_for(space: str = "", as_of: datetime | None = None) -> Standup:
     now = as_of or _now()
     slug = space or cfg.get("activeSpace", "")
     source, reason = standup_source(org, status)
-    if source == "cards":
+    cards: list[dict] = []
+    name = ""
+    if source in ("cards", "both"):
         # Imported here, not at the top: status.py is the ledger route's module.
         from ..core.config import card_types
 
         entry = _space_entry(cfg, space)
         type_names, prefixes = card_types()
         cards = read_cards(org_folder(entry), type_names, prefixes)
-        filled = fill_cards_standup(now, cards, space=slug, space_name=str(entry.get("name") or ""))
+        name = str(entry.get("name") or "")
+    if source == "cards":
+        filled = fill_cards_standup(now, cards, space=slug, space_name=name)
+    elif source == "both":
+        labels, issues, state = read_tracker(org, status, projects, state="all", body=True)
+        filled = fill_joined_standup(now, labels, issues, state, cards, space=slug, space_name=name)
     else:
         if source == "none":
             labels, issues, state = [], [], {"ok": False, "reason": reason}
