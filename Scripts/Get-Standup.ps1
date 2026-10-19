@@ -68,6 +68,15 @@
     once a day -- silent when it works, one line when it does not, never a
     refusal. With features.organize off it does nothing.
 
+.PARAMETER Since
+    yyyy-MM-dd. Widen yesterday's window back to that day: every issue closed
+    and every card archived since it is said, and the counts line -- the first
+    line of the brief -- sums the window: closed, started, in progress and
+    commits, per worker and in total. Today and the blockers do not move: they
+    are what is open now. The default is the previous working day (D-SA3). Not
+    -Days, which is the reminder's cadence. A day that is not one, or is after
+    today, is a stated refusal.
+
 .PARAMETER Walk
     Print ONLY the walk list: each open verify-close issue by number, and
     under it the VERIFY.md Gate 12 row that names it (or "no VERIFY row"). A walker's
@@ -82,6 +91,8 @@
     {cliPrefix}Standup -Grain work
 .EXAMPLE
     {cliPrefix}Standup -Space toolkit -AsJson
+.EXAMPLE
+    {cliPrefix}Standup -Since <yyyy-MM-dd> -Brief
 .EXAMPLE
     {cliPrefix}Standup -Remind 09:00 -Days Mon,Wed,Fri
 
@@ -105,6 +116,8 @@ param(
     [Parameter(Mandatory = $false)]
     [switch]$Walk,
     [Parameter(Mandatory = $false)]
+    [string]$Since,
+    [Parameter(Mandatory = $false)]
     [switch]$Help
 )
 
@@ -118,13 +131,15 @@ if ($Help) {
     Write-Host "  ${p}Standup -- today's standup, filled from the tracker" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "  Usage:" -ForegroundColor Yellow
-    Write-Host "    ${p}Standup [-Space <slug>] [-AsJson] [-Brief] [-Grain <detail|work|brief>]"
+    Write-Host "    ${p}Standup [-Space <slug>] [-AsJson] [-Brief] [-Grain <detail|work|brief>] [-Since <yyyy-MM-dd>]"
     Write-Host "    ${p}Standup -Walk [-Space <slug>] [-AsJson]"
     Write-Host "    ${p}Standup -Remind <HH:mm> [-Days <Mon,Tue,...>]"
     Write-Host ""
     Write-Host "  The queue waiting on you, then one block per worker label. Writes nothing"
     Write-Host "  to the tracker. -Brief prints only the chair's reading, in a few lines. -Grain work speaks"
     Write-Host "  at the grain of the work: items grouped by milestone or feature, one sentence a group."
+    Write-Host "  Each item says what moved -- closed, started or in progress, and its card's commits -- and the"
+    Write-Host "  brief opens on the counts. -Since <yyyy-MM-dd> widens yesterday back to that day."
     Write-Host "  -Remind sets an Organize reminder to attend (features.organize);"
     Write-Host "  attending -- running Standup -- re-arms it for the next day in the cadence."
     Write-Host ""
@@ -137,6 +152,10 @@ if ($Help) {
 . (Join-Path $PSScriptRoot 'Standup-Remind.ps1')
 if ($Walk -and $PSBoundParameters.ContainsKey('Remind')) {
     Write-CliError -Message '-Walk and -Remind are one thing at a time.' -Hint "$(Get-CliPrefix)Standup -Walk (reads the walk list), or $(Get-CliPrefix)Standup -Remind 09:00 (sets the reminder)."
+    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+}
+if ($PSBoundParameters.ContainsKey('Since') -and $PSBoundParameters.ContainsKey('Remind')) {
+    Write-CliError -Message '-Since and -Remind are one thing at a time.' -Hint "$(Get-CliPrefix)Standup -Since 2026-10-12 (reads the window), or $(Get-CliPrefix)Standup -Remind 09:00 (sets the reminder)."
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
 if ($PSBoundParameters.ContainsKey('Days') -and -not $PSBoundParameters.ContainsKey('Remind')) {
@@ -178,6 +197,22 @@ if ($PSBoundParameters.ContainsKey('Remind')) {
 . (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
 . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 . (Join-Path $PSScriptRoot 'Ritual-Common.ps1')
+
+# -- The window -------------------------------------------------------
+# -Since moves yesterday's lower bound back; today and the blockers stay what is
+# open now. One clock for the check and the fill. Test-P20StandupSince holds the
+# rule, the agent's since_refusal the same one.
+$asOf = [DateTimeOffset]::Now
+$window = ''
+if ($PSBoundParameters.ContainsKey('Since')) {
+    $why = Test-P20StandupSince -AsOf $asOf -Since $Since
+    if (-not $why -and -not ([string]$Since).Trim()) { $why = "-Since '' is not a day: yyyy-MM-dd." }
+    if ($why) {
+        Write-CliError -Message $why -Hint "$(Get-CliPrefix)Standup -Since $($asOf.AddDays(-3).ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture))"
+        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+    }
+    $window = ([string]$Since).Trim()
+}
 
 # -- Which Space ---------------------------------------------------------------
 # No -Space: the one you are in. A slug: that Space's own entry, read without
@@ -254,16 +289,16 @@ if ($choice.source -eq 'cards' -or $choice.source -eq 'both') {
     }
 }
 if ($choice.source -eq 'cards') {
-    $standup = Invoke-P20StandupCardsFill -AsOf ([DateTimeOffset]::Now) -Cards $cards -Space $slug -SpaceName $spaceName `
-        -PackageRoot $repoRoot
+    $standup = Invoke-P20StandupCardsFill -AsOf $asOf -Cards $cards -Space $slug -SpaceName $spaceName `
+        -Window $window -PackageRoot $repoRoot
 }
 elseif ($choice.source -eq 'both') {
-    $standup = Invoke-P20StandupJoinedFill -AsOf ([DateTimeOffset]::Now) -Labels $labels -Issues $issues -Tracker $tracker `
-        -Cards $cards -Space $slug -SpaceName $spaceName -PackageRoot $repoRoot
+    $standup = Invoke-P20StandupJoinedFill -AsOf $asOf -Labels $labels -Issues $issues -Tracker $tracker `
+        -Cards $cards -Space $slug -SpaceName $spaceName -Window $window -PackageRoot $repoRoot
 }
 else {
-    $standup = Invoke-P20StandupFill -AsOf ([DateTimeOffset]::Now) -Labels $labels -Issues $issues -Tracker $tracker `
-        -Space $slug -PackageRoot $repoRoot
+    $standup = Invoke-P20StandupFill -AsOf $asOf -Labels $labels -Issues $issues -Tracker $tracker `
+        -Space $slug -Window $window -PackageRoot $repoRoot
 }
 $standup.text = Format-P20StandupText -Standup $standup -PackageRoot $repoRoot
 $standup.work.text = Format-P20StandupWork -Standup $standup -PackageRoot $repoRoot

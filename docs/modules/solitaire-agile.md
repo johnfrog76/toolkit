@@ -134,7 +134,7 @@ every module is off), so it answers once any `tk*` command has loaded the module
 
 | Verb | Does | Touches a file |
 | --- | --- | --- |
-| `Standup [-Space <slug>] [-AsJson] [-Brief] [-Grain <detail\|work\|brief>] [-Remind <HH:mm>] [-Days <Mon,Tue,...>] [-Walk]` | prints today's standup for the Space you are in, or the declared Space `-Space` names, read without switching into it. `-AsJson` prints the response the agent serves, `text`, `work` and `brief` included -- the bridge's shape and the parity test's. `-Brief` prints only the chair's reading (below) and, being a read, does not re-arm the reminder. `-Grain` picks the register of detail ([the work grain](#the-work-grain)): `detail`, the default, is the text as it always printed; `work` is the ritual's grain, spoken as standup prose ([the prose](#the-prose)); `brief` is `-Brief`. A word that is not a grain, or `-Brief` with another grain, is a stated refusal (exit 2) | none |
+| `Standup [-Space <slug>] [-AsJson] [-Brief] [-Grain <detail\|work\|brief>] [-Since <yyyy-MM-dd>] [-Remind <HH:mm>] [-Days <Mon,Tue,...>] [-Walk]` | prints today's standup for the Space you are in, or the declared Space `-Space` names, read without switching into it. `-AsJson` prints the response the agent serves, `text`, `work` and `brief` included -- the bridge's shape and the parity test's. `-Brief` prints only the chair's reading (below) and, being a read, does not re-arm the reminder. `-Grain` picks the register of detail ([the work grain](#the-work-grain)): `detail`, the default, is the text as it always printed; `work` is the ritual's grain, spoken as standup prose ([the prose](#the-prose)); `brief` is `-Brief`. A word that is not a grain, or `-Brief` with another grain, is a stated refusal (exit 2). `-Since <yyyy-MM-dd>` widens yesterday back to that day ([what moved](#what-moved-and-the-window)) -- not `-Days`, which is the reminder's cadence; a day that is not one, or is after today, or `-Since` with `-Remind`, is a stated refusal | none |
 | `Triage [-Space <slug>] [-AsJson]` | prints the Space's open issues grouped by milestone -- no milestone first, then most open first -- each milestone under its context line, each issue one line: number, title, worker (its size) or `--`, severity or `--`, `deep-water` marked. `-AsJson` is the route's shape | none |
 | `Route <n> [-Size <label>] [-Milestone <title>] [-Severity <sev>] [-DeepWater] [-Space <slug>] [-WhatIf]` | answers triage's questions for issue `<n>`: **one `gh issue edit` per switch given**, in that order. `-WhatIf` prints every write and makes none | none -- it writes the tracker |
 
@@ -205,7 +205,7 @@ The one stated refusal (`Error:`, `Hint:`, exit 2) is a `-Space` nobody declared
 
 | Route | Gate | Reads | Writes |
 | --- | --- | --- | --- |
-| `GET /api/ritual/standup?space=<slug>` | `features.solitaireAgile` per request, with the active Space's answer applied (**404** unless the switch is on and the Space you are in works with agents; the detail names which is off); `space` scoped like `/api/issue-report` (an undeclared slug 404) | the same two `gh` reads (the issues with `milestone` and `body`), through the same data files -- or, for a local Space, its cards | nothing |
+| `GET /api/ritual/standup?space=<slug>&since=<yyyy-MM-dd>` | `features.solitaireAgile` per request, with the active Space's answer applied (**404** unless the switch is on and the Space you are in works with agents; the detail names which is off); `space` scoped like `/api/issue-report` (an undeclared slug 404); `since` widens yesterday's window as `Standup -Since` does, and a `since` that is not a day, or is after today, is a **422** naming it | the same two `gh` reads (the issues with `milestone` and `body`), through the same data files -- or, for a local Space, its cards | nothing |
 | `GET /api/ritual/triage?space=<slug>` | the same | `gh label list`, and `gh issue list --state open` with `milestone` | nothing |
 | `POST /api/cmd/Route` | the bridge: `Route` is in the CLI's command table only while the flag resolves on -- the switch on and the Space answered `agents` | -- | what `Route` writes, and nothing else |
 
@@ -218,8 +218,11 @@ The response is the spec's ("The M0 build contract"): `ceremony`, `register` (`r
 `phrase`), `spoken` (the dress, [the agentic layer](#the-agentic-layer): `model`, `workers` -- each
 `label` and `prose`, the worker's sentences as the stage says them --, `dressed`, `refused`; null when no
 model answered, and the agent's alone: `Standup -AsJson` has no such key, because the CLI calls no
-model), `text` and `brief` (the chair's reading). Every item has five keys -- `number`, `id`, `title`,
-`url`, `path` (a walk item also `worker`): an issue's `id` is null and its `path` `""`; a card's `number`
+model), `text` and `brief` (the chair's reading), and `counts` -- what moved in the window
+([below](#what-moved-and-the-window)): `workers`, each `label`, `name`, `closed`, `started`, `inProgress`,
+`commits`, and `total`, the same with `label` and `name` `""`. Every item has seven keys -- `number`, `id`,
+`title`, `url`, `path`, `motion` (`closed`, `started` or `inProgress`, `consts.json` `rituals.motions`) and
+`commits` (a walk item also `worker`): an issue's `id` is null and its `path` `""`; a card's `number`
 is null and its `url` `""`. `tracker.ok` false still answers 200 with the ritual. `Standup -AsJson`
 prints the same shape.
 
@@ -371,6 +374,7 @@ only. No model: every sentence is a count or a derived fact, the fixed words are
 goldens `standup-<case>.brief.txt` (an `expected.brief` entry per case, in both fixtures).
 
 ```text
+Since Thursday 1 October 2026: 2 closed, 2 in progress.
 Waiting on you: 2 walks, all on the PC.
 Fable: 1 closed yesterday, 1 open, none in flight, 1 blocker.
 Opus: 1 closed yesterday, 1 open, none in flight, no blockers.
@@ -379,8 +383,13 @@ In flight is not yet known: every routed issue reads as open.
 Next: the walks -- 2 on the PC.
 ```
 
-One line per queue kind that has items ("Nothing is waiting on you." when none); one line per worker
-(open is today plus blockers; an empty worker is "nothing today"); the in-flight sentence while the
+**The counts line opens it**: the window's first day and what moved in it, in total
+([what moved](#what-moved-and-the-window)) -- `Since <day>: <n> closed, <n> started, <n> in progress, <n>
+commits.`, a part said only when it is not zero, `nothing moved` when all are. Then one line per queue kind
+that has items ("Nothing is waiting on you." when none); one line per worker
+(open is today plus blockers; an empty worker is "nothing today"; a worker whose open items began in the
+window adds `<n> started`, and one whose cards thread commits adds `<n> commits` -- the per-worker
+counts; under a wider window a worker's closes are `<n> closed`, not "closed yesterday"); the in-flight sentence while the
 running state is unbuilt, because every routed issue reads as open; and "Next", the rule -- the kind
 with the most items (ties go to the ceremony's queue order) and who they wait on. A GitHub Space's
 walks are `verify-close` issues, so they wait on "the PC"; a local Space's cards in Code Review wait
@@ -416,7 +425,7 @@ read the same in both halves (`Scripts/Standup-Rules.ps1`, `agent/solitaire/stan
 
 | Rule | Reading |
 | --- | --- |
-| the window | `since` is local midnight at the start of the previous WORKING day (Mon-Fri) relative to `asOf`, in `asOf`'s offset: Friday's is Thursday; Monday's, Saturday's and Sunday's are Friday. No timestamp is kept (D-SA3) |
+| the window | `since` is local midnight at the start of the previous WORKING day (Mon-Fri) relative to `asOf`, in `asOf`'s offset: Friday's is Thursday; Monday's, Saturday's and Sunday's are Friday. No timestamp is kept (D-SA3). **Or a wider one**: `Standup -Since <yyyy-MM-dd>` (`?since=`) moves it back to that day's local midnight, in `asOf`'s offset -- yesterday's lower bound only; today and the blockers are what is open now ([what moved](#what-moved-and-the-window)) |
 | a worker | a label whose description starts with `workerLabelPrefix`; the name is after it, up to ` -- `, trimmed. Ordered by label name. An issue's worker is its FIRST such label |
 | yesterday | closed, with the worker label, `closedAt` in `[since, asOf]` |
 | today | open, with the worker label and NOT `verify-close` |
@@ -426,6 +435,8 @@ read the same in both halves (`Scripts/Standup-Rules.ps1`, `agent/solitaire/stan
 | empty | a worker with all three slots empty shows `Mug` and one status sentence: `nothing[(d + i) mod len]`, `d` the day of the year of `asOf`, `i` the worker's position |
 | the chair | opens on `phrasebook[d mod len]`, closes on `phrasebook[(d + 1) mod len]` |
 | no fake work | the real register never reads `fakeWork` (D-SA5), nor `excuses` (the nonsense register's, since the empty worker reports status) |
+| what moved | each slot item's `motion`: `closed` in yesterday; in today and the blockers, `started` when its card began in the window, else `in progress`; and `commits`, its card's distinct hashes ([below](#what-moved-and-the-window)) |
+| the counts | per worker and in total, each item by its motion and the distinct commits its cards thread -- a hash once however many cards thread it; the brief's first line |
 
 **The text**, LF-joined, every fixed word from `consts.json` `rituals.text`, slot labels padded to
 `labelWidth` (9) then two spaces:
@@ -439,12 +450,12 @@ Waiting on you
   Walk       #<n> Verify the clock fix on Windows
 
 Fable
-  Yesterday  #<n> Port the cast atoms
+  Yesterday  #<n> (closed) Port the cast atoms
   Today      nothing in flight
-  Blockers   #<n> Verify the Studio tab draws on the PC (verify-close)
+  Blockers   #<n> (in progress) Verify the Studio tab draws on the PC (verify-close)
 Opus
-  Yesterday  #<n> Rename the slug
-  Today      #<n> Build the foyer counts
+  Yesterday  #<n> (closed) Rename the slug
+  Today      #<n> (in progress) Build the foyer counts
   Blockers   no blockers
 Sonnet
   Mug        "Nothing on the board for me. All green, no blockers."
@@ -455,6 +466,64 @@ Sonnet
 With no tracker, a `Tracker` line replaces both the queue and the blocks; with no worker labels,
 `No worker labels in this Space.` replaces the blocks. The date is `dddd d MMMM yyyy` in the invariant
 culture. The golden files in `Tests/fixtures/rituals/` are the law where this sketch and they disagree.
+
+### What moved, and the window
+
+A line naming `#155` should say whether it was closed or only started, and the standup should say how
+much moved -- a sense of velocity, derived, nothing stored. **Each slot item says its
+motion after its ref** (`rituals.text.itemMotion`, `{ref} ({motion}) {title}`), and its card's commits
+when it has any:
+
+| The item | Its motion |
+| --- | --- |
+| in yesterday (an issue closed, a card archived, in the window) | `closed` |
+| in today or the blockers, its card -- its own, or the card an issue's number names -- began in the window | `started` |
+| in today or the blockers, otherwise | `in progress` |
+| an issue with no card | `closed` or `in progress`, never `started` |
+
+**Began** is the card's `**Started:**` day (`Move -To InProgress` writes it), else its `**Created:**` day
+-- the card's own footer, read with its lane. An issue alone cannot say `started`: the read
+(`number,title,state,labels,closedAt,url,milestone,body`) carries no time its work began -- not when a
+worker label was added, not whether a branch exists -- and finding out is a timeline read per issue that
+the standup does not make. So an issue with no card is closed or in progress, said plainly; a team whose
+work runs on cards gets the three words from the cards.
+
+**Commits** are the card's `- <hash>` bullets -- the same lines that put it In Progress
+(`rituals.commitHashRegex`, the lane rule's bullet with the hash captured), so counting them is no new
+read. A hash is compared by its first seven characters, lowercase: a short and a full hash of one commit
+are one. A card with no bullets counts none; an issue with no card counts none; a not-billable card is
+not a row and adds nothing to one, its commits included. A card's commits are all it threads, not only
+the window's: a bullet has no date.
+
+```text
+Fable
+  Yesterday  #153 (closed, 2 commits) Close the books
+  Today      #154 (in progress) Read the label
+Opus
+  Today      #151 (started, 2 commits) Count the commits
+  Today      #152 (in progress, 1 commit) Fold the window
+```
+
+**The counts** (`counts` in the response) sum the slots per worker and in total -- closed, started, in
+progress and commits -- and **a hash is counted once however many cards thread it**, per worker and in
+the total. The brief opens on the total ([the chair's reading](#the-chairs-reading)):
+`Since Thursday 1 October 2026: 2 closed, 2 started, 2 in progress, 5 commits.` The counts are the
+page's, at the top -- the brief sits above every grain -- and not the stage's: the played view speaks
+the work grain, one sentence a group, and the dress guard holds every number a sentence says to the
+group's own; a velocity line there would be a number the group does not carry.
+
+**A window, not only yesterday.** `Standup -Since <yyyy-MM-dd>` (`?since=` on the route) moves
+yesterday's lower bound back to that day: every issue closed and every card archived since then is
+listed, once -- an issue and the card joined to it are one row -- and the counts sum the window. Today and
+the blockers are unchanged by it: they are what is open now. The slot keeps its label (`Yesterday`); the
+counts line names the day, and a worker's brief line says `<n> closed` rather than "closed yesterday".
+The default stays the previous working day (D-SA3). `-Days` is not this: it is the reminder's cadence.
+
+`Tests/fixtures/rituals/standup-joined.json` holds it: the `counts` case (each motion, commits per item,
+a hash two cards thread counted once), `not-billable-counts` (a not-billable card absent from the
+counts) and `window-three-days` (a three-day window with a close on each day, listed and counted once, and a
+close the day before the window not), with `expected.motions` and `expected.counts`; card rows carry
+`begun` and `commits`, as `read_cards` / `Get-P20StandupCards` read them.
 
 ### The two sources, joined
 
@@ -511,8 +580,9 @@ no card. Daily is unchanged.
 
 `Tests/fixtures/rituals/standup-joined.json` holds the shapes -- a linked card and an open issue, a linked
 card archived while its issue is open, an issue closed while its card is in `current/`, a card of its own,
-an issue alone, a not-billable card -- and all of them on one day, whose goldens
-(`standup-joined-together.txt`, `.work.txt`, `.brief.txt`) are generated by
+an issue alone, a not-billable card -- and all of them on one day, and the three of
+[what moved](#what-moved-and-the-window). Its goldens (`standup-joined-<case>.txt`, `.work.txt`, `.brief.txt`) --
+and `standup.json`'s and `standup-cards.json`'s -- are generated by
 `python3 Tests/regenerate_joined_goldens.py` (Windows: `py -3`; `--check` to compare) and never typed. Both suites assert
 every row.
 
@@ -547,11 +617,11 @@ Waiting on you
   Walk       144 Read the board
 
 Widgets
-  Yesterday  198 Fix the export
-  Yesterday  Q3R9 Photo import
-  Today      K7M2 Wire the board
-  Today      139 Write the docs
-  Today      144 Read the board
+  Yesterday  198 (closed) Fix the export
+  Yesterday  Q3R9 (closed) Photo import
+  Today      K7M2 (in progress) Wire the board
+  Today      139 (in progress) Write the docs
+  Today      144 (in progress) Read the board
   Blockers   no blockers
 
 "Let's circle back."
@@ -787,12 +857,12 @@ standup is complete and correct; nothing on screen says a dress was skipped.
 
 | Suite | Holds |
 | --- | --- |
-| `tkTestToolkit -Rituals` | every case of `Tests/fixtures/rituals/standup.json` and of `standup-cards.json` (the cards alone: the one worker's slots and the walk queue by card id, the source and title tables, the card reader over real folders, a not-billable card nowhere) and of `standup-joined.json` (the two sources joined: every shape's walk, each worker's slots by ref, the `Check` lines and the links, the together case's detail, work and brief goldens and their JSON round trip, no card in play reading as the issues alone, the tracker down, rounds of one id) -- `since`, the day of the year, the chair's two lines, the queue, each worker's slots by number, `empty` and the status sentence -- and the rendered text against `standup-<name>.txt` and the chair's reading against `standup-<name>.brief.txt`, byte for byte, with `Standup -Brief` typed in a fresh shell printing that reading alone and `-AsJson` carrying it; the same object read back from JSON rendering the same text; no `fakeWork` line in any case; off is no verb, no function, no bridge entry and no `Menu -All` line; **`Standup` typed in a fresh shell** with only this package's manifest and `gh` stubbed as a function answering the friday case: the text the rule renders for now, the queue, the blocks, the window, `-AsJson` round-tripping to the same text, `gh` failing and an ADO Space each a `Tracker` line with exit 0 (ADO's the contract's sentence), a local Space filling from its scratch cards line for line with `source: cards` in `-AsJson`, the GitHub Space with `source: both` and, with scratch cards in its folder, the joined standup line for line (a card of its own under the Space's tile, a `Check` line for a card whose issue is closed, a not-billable card nowhere, the hub untouched), an undeclared `-Space` a stated refusal, `-Help`, and the hub untouched; the work grain over `standup-work.json`, the same rows `Tests/test_rituals.py` asserts -- every group (name, `by`, count, refs, phrase) of the queue and of each worker's slots, the `heads`, `keys`, `types` and `counts` tables, `standup-work-<case>.txt` byte for byte and again after a JSON round trip, `Get-P20StandupGrainText`; the prose over `standup-prose.json`, the same rows the agent asserts -- every `sentences` row, each case's queue sentences and each worker's in order, `standup-prose-<case>.txt` byte for byte and again after a JSON round trip; the dress guard over `standup-dress.json`, the same rows the agent asserts -- every row's reason, every group's prose sentence passing its own guard, every guard of `rituals.dressGuards` with a row, the `verbs` family and the two `kinds`, and the reply that names a ref the group lacks keeping the prose for that group; and typed, `Standup -Grain work` printing the rule's work text for now and `-AsJson` carrying it, `-Grain detail` the standup as it always printed, `-Grain brief` the same as `-Brief`, and a word that is not a grain or `-Brief -Grain work` a stated refusal |
-| `Tests/test_rituals.py` | the agent's issues, cards and joined fills and the rendering over the same three tables and goldens (the joined goldens also against `Tests/regenerate_joined_goldens.py`'s output); the work grain over `standup-work.json` -- every group of the queue and of each worker's slots, the `heads`, `keys`, `types` and `counts` tables, `standup-work-<case>.txt` byte for byte, the JSON round trip, the work grain's own phrases; the prose over `standup-prose.json` -- every `sentences` row, each case's queue and worker sentences, `standup-prose-<case>.txt` byte for byte, the JSON round trip, the prose's own sentences, no word that is not the contract's or the tracker's; the dress over `standup-dress.json` -- every row, every guard with a row, the rows its issue asked for (a ref the group lacks refused, "20g of protein" kept), the reply that names one, and around it with the model STUBBED: the facts are the workers' group sentences and nothing else, the kinds counted from labels and a card's type, the prompt offering the `verbs` and no other family, a model that answers dressed and guarded, the same groups dressed once, no key / a failing model / a reply that is not JSON all the prose, nothing to dress asking nothing; the route with no key answering `spoken: null` and `work` unchanged, and with a stubbed model `spoken` beside `work` with `text`, `brief` and the register untouched; the route asking `gh` for `milestone` and `body` and answering `work`; `read_cards` over real folders (with each card's type, body and billable); a local Space's route filling from its cards with no `gh` call; a GitHub Space's route joining its cards to its issues (`checks`, `links`, a card of its own on the Space's tile, a not-billable card nowhere, the hub unwritten); an ADO Space's `adoTracker` reason; 404 off |
+| `tkTestToolkit -Rituals` | every case of `Tests/fixtures/rituals/standup.json` and of `standup-cards.json` (the cards alone: the one worker's slots and the walk queue by card id, the source and title tables, the card reader over real folders, a not-billable card nowhere) and of `standup-joined.json` (the two sources joined: every shape's walk, each worker's slots by ref, the `Check` lines and the links, the together case's detail, work and brief goldens and their JSON round trip, no card in play reading as the issues alone, the tracker down, rounds of one id; what moved: each item's motion and commits, the counts per worker and in total, the counts and window cases' goldens, the window rule and the hash rule in words) -- `since`, the day of the year, the chair's two lines, the queue, each worker's slots by number, `empty` and the status sentence -- and the rendered text against `standup-<name>.txt` and the chair's reading against `standup-<name>.brief.txt`, byte for byte, with `Standup -Brief` typed in a fresh shell printing that reading alone and `-AsJson` carrying it; the same object read back from JSON rendering the same text; no `fakeWork` line in any case; off is no verb, no function, no bridge entry and no `Menu -All` line; **`Standup` typed in a fresh shell** with only this package's manifest and `gh` stubbed as a function answering the friday case: the text the rule renders for now, the queue, the blocks, the window, `-AsJson` round-tripping to the same text, `gh` failing and an ADO Space each a `Tracker` line with exit 0 (ADO's the contract's sentence), a local Space filling from its scratch cards line for line with `source: cards` in `-AsJson`, the GitHub Space with `source: both` and, with scratch cards in its folder, the joined standup line for line (a card of its own under the Space's tile, a `Check` line for a card whose issue is closed, a not-billable card nowhere, the hub untouched), an undeclared `-Space` a stated refusal, `-Since` widening yesterday (an issue closed a month ago said, closed; the brief's counts line naming the day) and a day after today, a word that is not a day and `-Since -Remind` each a stated refusal, `-Help`, and the hub untouched; the work grain over `standup-work.json`, the same rows `Tests/test_rituals.py` asserts -- every group (name, `by`, count, refs, phrase) of the queue and of each worker's slots, the `heads`, `keys`, `types` and `counts` tables, `standup-work-<case>.txt` byte for byte and again after a JSON round trip, `Get-P20StandupGrainText`; the prose over `standup-prose.json`, the same rows the agent asserts -- every `sentences` row, each case's queue sentences and each worker's in order, `standup-prose-<case>.txt` byte for byte and again after a JSON round trip; the dress guard over `standup-dress.json`, the same rows the agent asserts -- every row's reason, every group's prose sentence passing its own guard, every guard of `rituals.dressGuards` with a row, the `verbs` family and the two `kinds`, and the reply that names a ref the group lacks keeping the prose for that group; and typed, `Standup -Grain work` printing the rule's work text for now and `-AsJson` carrying it, `-Grain detail` the standup as it always printed, `-Grain brief` the same as `-Brief`, and a word that is not a grain or `-Brief -Grain work` a stated refusal |
+| `Tests/test_rituals.py` | the agent's issues, cards and joined fills and the rendering over the same three tables and goldens (the joined goldens also against `Tests/regenerate_joined_goldens.py`'s output); the work grain over `standup-work.json` -- every group of the queue and of each worker's slots, the `heads`, `keys`, `types` and `counts` tables, `standup-work-<case>.txt` byte for byte, the JSON round trip, the work grain's own phrases; the prose over `standup-prose.json` -- every `sentences` row, each case's queue and worker sentences, `standup-prose-<case>.txt` byte for byte, the JSON round trip, the prose's own sentences, no word that is not the contract's or the tracker's; the dress over `standup-dress.json` -- every row, every guard with a row, the rows its issue asked for (a ref the group lacks refused, "20g of protein" kept), the reply that names one, and around it with the model STUBBED: the facts are the workers' group sentences and nothing else, the kinds counted from labels and a card's type, the prompt offering the `verbs` and no other family, a model that answers dressed and guarded, the same groups dressed once, no key / a failing model / a reply that is not JSON all the prose, nothing to dress asking nothing; the route with no key answering `spoken: null` and `work` unchanged, and with a stubbed model `spoken` beside `work` with `text`, `brief` and the register untouched; the route asking `gh` for `milestone` and `body` and answering `work`; `read_cards` over real folders (with each card's type, body and billable, and its `begun` day and commit hashes); what moved over `standup-joined.json` -- each item's motion and commits, the counts, the counts line opening the brief, the window rule, the hash rule; the route's `?since=` widening the window and a `since` that is not a day before today a 422 naming it; a local Space's route filling from its cards with no `gh` call; a GitHub Space's route joining its cards to its issues (`checks`, `links`, a card of its own on the Space's tile, a not-billable card nowhere, the hub unwritten); an ADO Space's `adoTracker` reason; 404 off |
 | `tkTestToolkit -Triage` | every case of `Tests/fixtures/rituals/triage.json` -- the groups in order, each group's counts, context and numbers, each issue's worker, size, severity and deep-water, the sizes -- and the text against `triage-<name>.txt` byte for byte, again after a JSON round trip; off is no `Triage`, no `Route`, no bridge entry; `Triage` typed with `gh` stubbed; **`Route` typed with `gh` stubbed as a function that writes down every call**: the exact `gh issue edit` argv for each switch, alone and all four in order, `-WhatIf` writing nothing, the two moves printed, every refusal exit 2 with one `Error:` block and no write, the hub untouched |
 | `Tests/test_triage.py` | the agent's grouping and text over the same table and goldens; the route's `gh` calls; ADO and tier below 1 a `Tracker` line; 404 off |
-| `tkTestToolkit -Consts`, `Tests/test_consts.py`, `web/src/shell/consts.test.ts` | the `rituals` values (`triageRoute`, `grains`, `numberWords`, the four `work*Regex` patterns, the `work*` phrases and the `prose*` words among them, and the dress's `dressGuards` and four `dress*Regex` patterns), stated from all three halves; `{n} to walk`, `Nothing blocked.` and `Yesterday I closed` never retyped in the CLI's scripts or the agent; `Waiting on you`, `nothing in flight` and `Routed to` never retyped in the CLI's scripts |
-| `web/src/modules/solitaireAgile/StandupPage.test.tsx` | the page over the shared fixture and goldens (above); the grain: three tabs from `rituals.grains`, Detail by default, Work showing `work.text` (`standup-prose-friday.txt`, the prose) verbatim and Copy copying it, Brief the brief as the body once, the choice remembered by the browser, a stored word that is not a grain read as Detail |
+| `tkTestToolkit -Consts`, `Tests/test_consts.py`, `web/src/shell/consts.test.ts` | the `rituals` values (`triageRoute`, `grains`, `numberWords`, the four `work*Regex` patterns, the `work*` phrases and the `prose*` words among them, the dress's `dressGuards` and four `dress*Regex` patterns, and what moved's `motions`, `commitHashRegex` and the `itemMotion`, `motion*`, `commit*` and `counts*` words), stated from all three halves; `{n} to walk`, `Nothing blocked.` and `Yesterday I closed` never retyped in the CLI's scripts or the agent; `Waiting on you`, `nothing in flight` and `Routed to` never retyped in the CLI's scripts |
+| `web/src/modules/solitaireAgile/StandupPage.test.tsx` | the page over the shared fixture and goldens (above); the counts line the first line at the top of the page, and an item's motion in the text; the grain: three tabs from `rituals.grains`, Detail by default, Work showing `work.text` (`standup-prose-friday.txt`, the prose) verbatim and Copy copying it, Brief the brief as the body once, the choice remembered by the browser, a stored word that is not a grain read as Detail |
 | `web/src/modules/solitaireAgile/stage/standupDeck.test.tsx` | at the work grain, spoken as prose over `standup-prose.json`'s `friday`: the queue's sentences as one Say line each, Opus's and Fable's sentences as the agent wrote them with nothing for an empty slot, an empty queue the contract's sentence, the mug unchanged, the tracker's line whatever `work` says; dressed, from `standup-dress.json`'s reply: a worker in `spoken` speaking and showing its spoken sentences, a worker not in it its prose, `spoken: null` the prose, the queue and the mug never dressed, the slide ids unchanged; and the played deck built from the shared fixture's `friday` and `no-tracker` cases: the slides in order with their ids, the plates, the Say lines, the mug on Sonnet, nine tiles and the register on every slide, reduced motion; the deal of workers onto seats |
 | `web/src/modules/solitaireAgile/stage/StandupPlay.test.tsx`, `web/src/modules/deck/engine/DeckPlayer.audiobook.test.tsx`, `web/src/modules/deck/GeneratedDeckHost.mute.test.tsx` | the mute, the played route's loading, error and Suitcase states; the audiobook hint at desktop width with prev and next, the browser voice, and a deck without the hint untouched |
 | `tkTestToolkit -Environment`, `Tests/test_surfaces.py` | its inventory row has its question; the Space's answer over `Tests/fixtures/how-i-work/table.json` -- every row and every gate row -- and, typed in a fresh shell with the switch on, a GitHub Space answered with agents (`on`, `Standup` a verb), one nobody answered (`not configured`), an Azure DevOps Space and one with no tracker (`off`, derived, no verb), each with the line that changes it, and the question naming the Space |
@@ -857,6 +927,13 @@ repository", is the real write).
   `verify-close` issue -- waiting on your walk), *yesterday* is the closed-in-the-window slot, and a
   `blocked` label is not read. A clause is the title's head as written -- not lower-cased, so a title
   that starts with a capital keeps it (`#<n>, Rename the slug`).
+- **An issue alone never says `started`.** The issue read carries no time its work began, so an issue
+  with no card is `closed` or `in progress` ([what moved](#what-moved-and-the-window)); `started` needs a
+  card. A card's commits are every bullet it carries, not only the window's -- a bullet has no date -- so
+  a card worked over weeks counts all of them the day it closes.
+- **A window keeps the slot's name.** Under `-Since` the `Yesterday` slot holds the whole window; the
+  counts line names its first day, the brief says `<n> closed`, and the detail and work grains still say
+  `Yesterday`.
 - **A card has no worker but the engineer.** A local Space's standup is one tile; a card's type is not a
   worker, and a card cannot be a blocker (there is no walk label on a card).
 - **The card read is every file in `archive/`.** Each archived card is read for its `**Closed:**` day on

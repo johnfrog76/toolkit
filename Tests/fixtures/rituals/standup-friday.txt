@@ -6,12 +6,12 @@ Waiting on you
   Walk       #105 Verify the clock fix on Windows
 
 Fable
-  Yesterday  #107 Port the cast atoms
+  Yesterday  #107 (closed) Port the cast atoms
   Today      nothing in flight
-  Blockers   #104 Verify the Studio tab draws on the PC (verify-close)
+  Blockers   #104 (in progress) Verify the Studio tab draws on the PC (verify-close)
 Opus
-  Yesterday  #102 Rename the slug
-  Today      #101 Build the foyer counts — Chloé’s “Ïle” row
+  Yesterday  #102 (closed) Rename the slug
+  Today      #101 (in progress) Build the foyer counts — Chloé’s “Ïle” row
   Blockers   no blockers
 Sonnet
   Mug        "Nothing on the board for me. All green, no blockers."

@@ -216,6 +216,8 @@ describe("consts.json", () => {
       dressNumberRegex: "(?<![\\w#])\\d+(?!\\w)",
       dressNameRegex: "(?<![\\w'-])[A-Z][A-Za-z0-9'-]*",
       dressPronounRegex: "^I(?:'[a-z]+)?$",
+      motions: ["closed", "started", "inProgress"],
+      commitHashRegex: "(?m)^\\s*-\\s+`?([0-9a-f]{7,})",
       text: {
         title: "Standup -- {date}",
         dateFormat: "dddd d MMMM yyyy",
@@ -286,6 +288,18 @@ describe("consts.json", () => {
         proseTodayFoldCount: "{n} more designs",
         proseNameSeparator: ", ",
         proseNameLast: " and ",
+        itemMotion: "{ref} ({motion}) {title}",
+        motionClosed: "closed",
+        motionStarted: "started",
+        motionInProgress: "in progress",
+        commitOne: "{n} commit",
+        commitMany: "{n} commits",
+        countsTotal: "Since {date}: {counts}.",
+        countsNone: "nothing moved",
+        countsSeparator: ", ",
+        countsClosed: "{n} closed",
+        countsStarted: "{n} started",
+        countsInProgress: "{n} in progress",
       },
     });
   });

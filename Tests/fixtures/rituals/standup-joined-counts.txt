@@ -1,0 +1,21 @@
+Standup -- Friday 2 October 2026
+"Can we not adjust scope."
+
+Waiting on you
+  Nothing is waiting on you.
+
+Fable
+  Yesterday  #153 (closed, 2 commits) Close the books
+  Today      #154 (in progress) Read the label
+  Blockers   no blockers
+Opus
+  Yesterday  nothing closed
+  Today      #151 (started, 2 commits) Count the commits
+  Today      #152 (in progress, 1 commit) Fold the window
+  Blockers   no blockers
+Widgets
+  Yesterday  199 (closed) Write the counts docs
+  Today      M7K3 (started, 1 commit) Draw the counts line
+  Blockers   no blockers
+
+"Let's circle back."

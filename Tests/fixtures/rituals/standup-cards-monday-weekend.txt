@@ -5,9 +5,9 @@ Waiting on you
   Nothing is waiting on you.
 
 Widgets
-  Yesterday  161 Closed on Friday
-  Yesterday  162 Closed on Saturday
-  Yesterday  163 Closed this morning
+  Yesterday  161 (closed) Closed on Friday
+  Yesterday  162 (closed) Closed on Saturday
+  Yesterday  163 (closed) Closed this morning
   Today      nothing in flight
   Blockers   no blockers
 

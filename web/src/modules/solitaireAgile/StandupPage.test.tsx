@@ -210,6 +210,18 @@ describe("the standup page", () => {
     expect(copyMock).toHaveBeenCalledWith(data.text);
   });
 
+  it("opens on the counts line: what moved since the window began, at the top of the page", () => {
+    const data = responseFor("friday");
+    answer = { data };
+    render(<StandupPage />);
+    const first = screen.getByTestId("standup-brief").children[0]?.textContent ?? "";
+    // The brief's own first line, verbatim: the counts line the agent and the CLI render.
+    expect(first).toBe((data.brief ?? "").split("\n")[0]);
+    expect(first).toBe("Since Thursday 1 October 2026: 2 closed, 2 in progress.");
+    // Each item says what moved, after its number, in the text shown verbatim.
+    expect(shown()).toContain("#102 (closed) Rename the slug");
+  });
+
   it("Play opens the same standup, played on the stage", () => {
     answer = { data: responseFor("friday") };
     render(<StandupPage />);

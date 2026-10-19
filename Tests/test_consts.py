@@ -164,6 +164,9 @@ EXPECTED = {
     ("rituals", "dressNumberRegex"): r"(?<![\w#])\d+(?!\w)",
     ("rituals", "dressNameRegex"): r"(?<![\w'-])[A-Z][A-Za-z0-9'-]*",
     ("rituals", "dressPronounRegex"): r"^I(?:'[a-z]+)?$",
+    # What moved: a slot item's motion, and the hash its card's bullet threads.
+    ("rituals", "motions"): ["closed", "started", "inProgress"],
+    ("rituals", "commitHashRegex"): r"(?m)^\s*-\s+`?([0-9a-f]{7,})",
     ("rituals", "text"): {
         "title": "Standup -- {date}",
         "dateFormat": "dddd d MMMM yyyy",
@@ -235,6 +238,18 @@ EXPECTED = {
         "proseTodayFoldCount": "{n} more designs",
         "proseNameSeparator": ", ",
         "proseNameLast": " and ",
+        "itemMotion": "{ref} ({motion}) {title}",
+        "motionClosed": "closed",
+        "motionStarted": "started",
+        "motionInProgress": "in progress",
+        "commitOne": "{n} commit",
+        "commitMany": "{n} commits",
+        "countsTotal": "Since {date}: {counts}.",
+        "countsNone": "nothing moved",
+        "countsSeparator": ", ",
+        "countsClosed": "{n} closed",
+        "countsStarted": "{n} started",
+        "countsInProgress": "{n} in progress",
     },
 }
 
@@ -395,6 +410,8 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.rituals_dress_number_regex(), EXPECTED[("rituals", "dressNumberRegex")])
         self.assertEqual(C.rituals_dress_name_regex(), EXPECTED[("rituals", "dressNameRegex")])
         self.assertEqual(C.rituals_dress_pronoun_regex(), EXPECTED[("rituals", "dressPronounRegex")])
+        self.assertEqual(C.rituals_motions(), tuple(EXPECTED[("rituals", "motions")]))
+        self.assertEqual(C.rituals_commit_hash_regex(), EXPECTED[("rituals", "commitHashRegex")])
 
     def test_the_worker_rule_reads_the_contract(self):
         """The pane's worker chips and the standup read one prefix, not two."""

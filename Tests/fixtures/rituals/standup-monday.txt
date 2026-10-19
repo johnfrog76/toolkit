@@ -9,7 +9,7 @@ Fable
 Opus
   Mug        "Nothing on the board for me. All green, no blockers."
 Sonnet
-  Yesterday  #201 Add the registry mock
+  Yesterday  #201 (closed) Add the registry mock
   Today      nothing in flight
   Blockers   no blockers
 

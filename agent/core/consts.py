@@ -501,6 +501,19 @@ def rituals_prose_fold_names() -> int:
     return int(consts()["rituals"]["proseFoldNames"])
 
 
+# -- What moved ---------------------------------------------
+
+
+def rituals_motions() -> tuple[str, ...]:
+    """A slot item's motion, by index: closed, started, inProgress -- also the counts' field names."""
+    return tuple(consts()["rituals"]["motions"])
+
+
+def rituals_commit_hash_regex() -> str:
+    """A card's ``- <hash>`` bullet, the hash in group 1 -- the lane rule's bullet, captured."""
+    return consts()["rituals"]["commitHashRegex"]
+
+
 # -- The dress (D-SA11) ---------------------------------------------------
 
 

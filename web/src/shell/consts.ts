@@ -193,6 +193,10 @@ export const RITUALS = consts.rituals as {
   dressNumberRegex: string;
   dressNameRegex: string;
   dressPronounRegex: string;
+  /** What moved: a slot item's motion -- closed, started, inProgress --
+   *  and the card bullet whose hash it counts. The agent and the CLI read them. */
+  motions: string[];
+  commitHashRegex: string;
   text: {
     title: string;
     dateFormat: string;
@@ -263,6 +267,20 @@ export const RITUALS = consts.rituals as {
     proseTodayFoldCount: string;
     proseNameSeparator: string;
     proseNameLast: string;
+    /** What moved: a detail line's motion after its ref, and the counts
+     *  line that opens the brief. Already rendered into `text` and `brief`. */
+    itemMotion: string;
+    motionClosed: string;
+    motionStarted: string;
+    motionInProgress: string;
+    commitOne: string;
+    commitMany: string;
+    countsTotal: string;
+    countsNone: string;
+    countsSeparator: string;
+    countsClosed: string;
+    countsStarted: string;
+    countsInProgress: string;
   };
 };
 

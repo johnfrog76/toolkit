@@ -17,7 +17,10 @@
                      and the links, and the together case's detail, work and
                      brief against standup-joined-together*.txt, byte for byte,
                      again after a JSON round trip; typed, a GitHub Space with
-                     cards in its folder prints the joined standup.
+                     cards in its folder prints the joined standup. What moved
+                    : each item's motion and commits, the counts per
+                     worker and in total, the counts and window cases' goldens;
+                     typed, Standup -Since and its refusals.
     2b. The work grain  Tests/fixtures/rituals/standup-work.json: every
                      group of the queue and of each worker's slots, the small
                      tables, the work text against standup-work-<name>.txt --
@@ -270,6 +273,7 @@ for ($n = 0; $n -lt $cardCases.Count; $n++) {
     }
     $back = ($s | ConvertTo-Json -Depth 8) | ConvertFrom-Json
     $back.asOf = $s.asOf
+    $back.since = $s.since
     $again = Format-P20StandupText -Standup $back -PackageRoot $pkgRoot
     Assert-True "${name}: the JSON round trip renders the same text" ($again -ceq $text) $again
     Assert-True "${name}: no fakeWork line in the real register ($($fakeWork.Count) checked)" (@($fakeWork | Where-Object { $text.Contains([string]$_) }).Count -eq 0)
@@ -278,7 +282,7 @@ for ($n = 0; $n -lt $cardCases.Count; $n++) {
 $friday = Invoke-P20StandupCardsFill -AsOf $cardAsOf[0] -Cards @($cardCases[0].cards) -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
 $first = @($friday.workers)[0].yesterday[0]
 Assert-True 'a card item has an id and a path, and no number and no url' ($null -eq $first.number -and $first.id -ceq '198' -and $first.url -ceq '' -and $first.path -ceq 'archive/198-fix-the-export.prompt.md') "$($first.number) $($first.id) '$($first.url)' $($first.path)"
-Assert-True 'its keys are the five every item has' (((@($first.Keys)) -join ',') -ceq 'number,id,title,url,path') ((@($first.Keys)) -join ',')
+Assert-True 'its keys are the seven every item has' (((@($first.Keys)) -join ',') -ceq 'number,id,title,url,path,motion,commits') ((@($first.Keys)) -join ',')
 
 Write-Host ""
 Write-Host "-- Which source a Space chooses --" -ForegroundColor Cyan
@@ -330,6 +334,20 @@ try {
     Assert-True 'Get-P20StandupCards: state by the status rule, the Closed day, the title, the id; a file with no id is not a card' ($seen -ceq $want) ("`n--- got ---`n$seen`n--- want ---`n$want")
     $none = @(Get-P20StandupCards -CurrentDir (Join-Path $readerDir 'nope') -ArchiveDir (Join-Path $readerDir 'nada') -Pattern $pattern)
     Assert-True 'a Space with no folders is no cards' ($none.Count -eq 0)
+
+    # What moved: begun is the **Started:** day, else **Created:**; commits every `- <hash>` bullet's hash.
+    $movedDir = Join-Path $readerDir 'moved'
+    New-Item -ItemType Directory -Path (Join-Path $movedDir 'current') -Force | Out-Null
+    $movedFiles = [ordered]@{
+        'current/Task139-write-the-docs.prompt.md'  = "# Task 139: Write the docs`n`nCommits:`n- a41c2e9 first`n  - ``b52d3f0aa`` second`n- not a hash`n`n---`n`n**Created:** 2026-09-20`n**Started:** 2026-10-01`n"
+        'current/TaskK7M2-wire-the-board.prompt.md' = "# Task K7M2: Wire the board`n`nCommits:`n- (pending)`n`n---`n`n**Created:** 2026-09-30`n"
+        'current/140-no-footer.prompt.md'           = "# Bug 140: No footer`n"
+    }
+    foreach ($k in $movedFiles.Keys) { [System.IO.File]::WriteAllText((Join-Path $movedDir $k), $movedFiles[$k], $utf8r) }
+    $moved = @(Get-P20StandupCards -CurrentDir (Join-Path $movedDir 'current') -ArchiveDir (Join-Path $movedDir 'archive') -Pattern $pattern)
+    $seenMoved = (@($moved | Sort-Object { $_.id } | ForEach-Object { "$($_.id)|$($_.begun)|$((@($_.commits)) -join ',')" })) -join "`n"
+    $wantMoved = "139|2026-10-01|a41c2e9,b52d3f0aa`n140||`nK7M2|2026-09-30|"
+    Assert-True 'Get-P20StandupCards: begun is the Started day, else the Created day; commits every bullet''s hash' ($seenMoved -ceq $wantMoved) ("`n--- got ---`n$seenMoved`n--- want ---`n$wantMoved")
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
@@ -353,16 +371,24 @@ $joinedCases = @($joinedTable.cases)
 $joinedAsOf = ([regex]::Match($joinedRaw, '"asOf"\s*:\s*"([^"]+)"')).Groups[1].Value
 $joinedSince = ([regex]::Match($joinedRaw, '"since"\s*:\s*"([^"]+)"')).Groups[1].Value
 $joinedNames = (@($joinedCases | ForEach-Object { [string]$_.name })) -join ','
-Assert-True 'the joined table is read: the six shapes, then all of them together' ($joinedNames -ceq 'linked-card-open-issue,linked-card-archived-issue-open,issue-closed-card-current,custom-card-alone,issue-alone,not-billable,together') $joinedNames
+Assert-True 'the joined table is read: the six shapes, all of them together, then what moved' ($joinedNames -ceq 'linked-card-open-issue,linked-card-archived-issue-open,issue-closed-card-current,custom-card-alone,issue-alone,not-billable,together,counts,not-billable-counts,window-three-days') $joinedNames
 
 foreach ($case in $joinedCases) {
     $name = 'joined-' + [string]$case.name
     $exp = $case.expected
     Write-Host ""
     Write-Host "-- $name --" -ForegroundColor Cyan
+    $window = ConvertTo-P20StandupDay $case.window
     $s = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @($joinedTable.workerLabels) -Issues @($case.issues) -Tracker @{ ok = $true; reason = '' } `
-        -Cards @($case.cards) -Space ([string]$joinedTable.space) -SpaceName ([string]$joinedTable.spaceName) -PackageRoot $pkgRoot
-    Assert-True "${name}: source is both, since is the previous working day's" ($s.source -ceq 'both' -and $s.since -ceq $joinedSince) "$($s.source) $($s.since)"
+        -Cards @($case.cards) -Space ([string]$joinedTable.space) -SpaceName ([string]$joinedTable.spaceName) -Window $window -PackageRoot $pkgRoot
+    if ($window) {
+        # A window's since is that day's midnight in asOf's own offset (7's ConvertFrom-Json may hand back a [datetime]: the instant is compared).
+        $wantSince = ConvertTo-P20RitualTime $exp.since
+        Assert-True "${name}: source is both, since is the window's first day" ($s.source -ceq 'both' -and (ConvertTo-P20RitualTime $s.since) -eq $wantSince -and $s.since.EndsWith($joinedAsOf.Substring($joinedAsOf.Length - 6))) "$($s.source) $($s.since)"
+    }
+    else {
+        Assert-True "${name}: source is both, since is the previous working day's" ($s.source -ceq 'both' -and $s.since -ceq $joinedSince) "$($s.source) $($s.since)"
+    }
     $want = (@($exp.walk | ForEach-Object { [string]$_ })) -join ','
     $got = Get-Refs $s.queue.walk
     Assert-True "${name}: the walk is [$want]" ($got -ceq $want) "got [$got]"
@@ -375,6 +401,17 @@ foreach ($case in $joinedCases) {
     $wantLinks = (@($exp.links | ForEach-Object { "$($_.number)/$($_.id)/$($_.lane)" })) -join ','
     $gotLinks = (@($s.links | ForEach-Object { "$($_.number)/$($_.id)/$($_.lane)" })) -join ','
     Assert-True "${name}: the links are [$wantLinks]" ($gotLinks -ceq $wantLinks) "got [$gotLinks]"
+    if ($null -ne $exp.motions) {
+        $wantMotions = (@($exp.motions.PSObject.Properties | ForEach-Object { "$($_.Name)=$(@($_.Value)[0])/$(@($_.Value)[1])" }) | Sort-Object) -join ','
+        $gotMotions = (@(foreach ($w in @($s.workers)) { foreach ($slot in @('yesterday', 'today', 'blockers')) { foreach ($it in @($w.$slot | Where-Object { $null -ne $_ })) { "$(Get-P20StandupItemRef $it)=$($it.motion)/$($it.commits)" } } }) | Sort-Object) -join ','
+        Assert-True "${name}: each item's motion and commits" ($gotMotions -ceq $wantMotions) ("`n got: $gotMotions`nwant: $wantMotions")
+    }
+    if ($null -ne $exp.counts) {
+        $countLine = { param($c) "$($c.closed)/$($c.started)/$($c.inProgress)/$($c.commits)" }
+        $wantCounts = (@($exp.counts.workers | ForEach-Object { "$($_.label) " + (& $countLine $_) }) + @('total ' + (& $countLine $exp.counts.total))) -join ' | '
+        $gotCounts = (@($s.counts.workers | ForEach-Object { "$($_.label) " + (& $countLine $_) }) + @('total ' + (& $countLine $s.counts.total))) -join ' | '
+        Assert-True "${name}: the counts per worker and in total (closed/started/in progress/commits)" ($gotCounts -ceq $wantCounts) ("`n got: $gotCounts`nwant: $wantCounts")
+    }
 
     $text = Format-P20StandupText -Standup $s -PackageRoot $pkgRoot
     $s.work.text = Format-P20StandupWork -Standup $s -PackageRoot $pkgRoot
@@ -387,6 +424,7 @@ foreach ($case in $joinedCases) {
     }
     $back = ($s | ConvertTo-Json -Depth 10) | ConvertFrom-Json
     $back.asOf = $s.asOf
+    $back.since = $s.since
     $again = (Format-P20StandupText -Standup $back -PackageRoot $pkgRoot) + (Format-P20StandupWork -Standup $back -PackageRoot $pkgRoot) + (Format-P20StandupBrief -Standup $back -PackageRoot $pkgRoot)
     Assert-True "${name}: the JSON round trip renders the same three texts" ($again -ceq ($text + $s.work.text + $brief)) $again
     Assert-True "${name}: no fakeWork line in the real register" (@($fakeWork | Where-Object { ($text + $s.work.text + $brief).Contains([string]$_) }).Count -eq 0)
@@ -406,6 +444,16 @@ $rounds = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @($joinedTable.w
     -Issues @([pscustomobject]@{ number = 141; title = 'Build'; state = 'OPEN'; labels = @('opus'); closedAt = $null }) `
     -Cards @([pscustomobject]@{ file = '141-build-r1.prompt.md'; folder = 'archive'; status = 'Done'; closed = '2026-09-01'; id = '141' },
     [pscustomobject]@{ file = '141-build.prompt.md'; folder = 'current'; status = 'In Progress'; closed = $null; id = '141' })
+$readAsOf = [DateTimeOffset]::Parse('2026-10-02T09:00:00-04:00', [System.Globalization.CultureInfo]::InvariantCulture)
+Assert-True 'a window is a yyyy-MM-dd day on or before today; empty is the default' ((Test-P20StandupSince -AsOf $readAsOf -Since '') -ceq '' -and (Test-P20StandupSince -AsOf $readAsOf -Since '2026-10-02') -ceq '' -and (Test-P20StandupSince -AsOf $readAsOf -Since '2026-09-29') -ceq '')
+$badSince = @(@('2026-10-03', 'yesterday', '2026-9-29', '2026-02-30', '29/09/2026') | Where-Object { -not (Test-P20StandupSince -AsOf $readAsOf -Since $_) })
+Assert-True 'a day after today, or one that is not a day, says why' ($badSince.Count -eq 0) "no reason for: $($badSince -join ', ')"
+Assert-True 'a window starts at that day''s midnight in asOf''s own offset' ((Format-P20RitualTime (Get-P20StandupSince -AsOf $readAsOf -Window '2026-09-29')) -ceq '2026-09-29T00:00:00-04:00')
+Assert-True 'a card''s hashes are distinct by their first seven characters, lowercase' (((Get-P20StandupCardHashes ([pscustomobject]@{ commits = @('A1B2C3D', 'a1b2c3d4e5f6', 'b2c3d4e', '') })) -join ',') -ceq 'a1b2c3d,b2c3d4e' -and (Get-P20StandupCardHashes ([pscustomobject]@{ file = 'x' })).Count -eq 0)
+$countsCase = @($joinedCases | Where-Object { $_.name -eq 'counts' })[0]
+$countsFill = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @($joinedTable.workerLabels) -Issues @($countsCase.issues) -Tracker @{ ok = $true; reason = '' } -Cards @($countsCase.cards) -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
+$countsFirst = @((Format-P20StandupBrief -Standup $countsFill -PackageRoot $pkgRoot) -split "`n")[0]
+Assert-True 'the counts line opens the brief' ($countsFirst -ceq 'Since Thursday 1 October 2026: 2 closed, 2 started, 2 in progress, 5 commits.') $countsFirst
 Assert-True 'rounds share an id: the one in current/ is the card, so an earlier archived round is no Check line' (@($rounds.checks).Count -eq 0 -and (@($rounds.links | ForEach-Object { "$($_.lane)|$($_.path)" }) -join ',') -ceq 'In Progress|current/141-build.prompt.md') ((@($rounds.links | ForEach-Object { "$($_.lane)|$($_.path)" })) -join ',')
 
 # -- 1c. The work grain (D-TA20) -------------------------------------------
@@ -739,8 +787,8 @@ try {
     Assert-True 'and prints the text the rule renders for now, line for line' ($r.Inner -ceq $expectText) ("`n--- got ---`n$($r.Inner)`n--- want ---`n$expectText")
     Assert-True 'the queue first: both open verify-close issues, worker or none' ($r.Inner -match '(?m)^  Walk {7}#104 ' -and $r.Inner -match '(?m)^  Walk {7}#105 ') $r.Inner
     Assert-True 'one block per worker label found in the labels'' own descriptions' ($r.Inner -match '(?s)\nFable\n.*\nOpus\n.*\nSonnet\n') $r.Inner
-    Assert-True 'a closed issue a minute ago is yesterday; a month ago is nowhere' ($r.Inner -match '#102 Rename the slug' -and $r.Inner -notmatch '#103') $r.Inner
-    Assert-True 'a blocker carries the walk label''s suffix' ($r.Inner -match ('#104 Verify the Studio tab draws on the PC' + [regex]::Escape([string]$consts.rituals.text.blockerSuffix))) $r.Inner
+    Assert-True 'a closed issue a minute ago is yesterday, and says closed; a month ago is nowhere' ($r.Inner -match '#102 \(closed\) Rename the slug' -and $r.Inner -notmatch '#103') $r.Inner
+    Assert-True 'a blocker says in progress and carries the walk label''s suffix' ($r.Inner -match ('#104 \(in progress\) Verify the Studio tab draws on the PC' + [regex]::Escape([string]$consts.rituals.text.blockerSuffix))) $r.Inner
     Assert-True 'an open issue with no worker and no walk label appears nowhere' ($r.Inner -notmatch '#106') $r.Inner
     Assert-True 'no fakeWork line reaches the terminal' (@($fakeWork | Where-Object { $r.Inner.Contains([string]$_) }).Count -eq 0)
     Assert-True 'nothing is written to the hub' ($before -ceq $after)
@@ -786,6 +834,25 @@ try {
     $gc = Invoke-Standup 'tkStandup -Brief -Grain work'
     Assert-True '-Brief with another grain is a stated refusal: exit 2, one Error block' ($gc.Exit -eq '2' -and (@([regex]::Matches($gc.All, '(?m)^Error: ')).Count -eq 1) -and $gc.All -notmatch 'exit code') $gc.All
 
+    # -Since: yesterday widened back to a day -- the issue closed a month ago is said,
+    # and the brief's counts line names the day. Today and the blockers do not move.
+    $sinceDay = [DateTimeOffset]::Now.AddDays(-40).ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
+    $sw = Invoke-Standup "tkStandup -Since $sinceDay"
+    $expectSince = Invoke-P20StandupJoinedFill -AsOf ([DateTimeOffset]::Now) -Labels $ghLabels -Issues $ghIssues -Tracker @{ ok = $true; reason = '' } -Cards @() -Space 'widgets' -SpaceName 'Widgets' -Window $sinceDay -PackageRoot $pkgRoot
+    $expectSinceText = (Format-P20StandupText -Standup $expectSince -PackageRoot $pkgRoot).TrimEnd([char]10)
+    Assert-True '-Since widens yesterday: exit 0, the text the rule renders for that window, line for line' ($sw.Exit -eq '0' -and $sw.Inner -ceq $expectSinceText) ("`n--- got ---`n$($sw.Inner)`n--- want ---`n$expectSinceText")
+    Assert-True '-Since: the issue closed a month ago is said, closed' ($sw.Inner -match '#103 \(closed\) ' -and $r.Inner -notmatch '#103') $sw.Inner
+    $sb = Invoke-Standup "tkStandup -Since $sinceDay -Brief"
+    $expectSinceBrief = (Format-P20StandupBrief -Standup $expectSince -PackageRoot $pkgRoot).TrimEnd([char]10)
+    Assert-True '-Since -Brief: the counts line names the window''s first day' ($sb.Exit -eq '0' -and $sb.Inner -ceq $expectSinceBrief -and $sb.Inner -match '^Since \w+ ') ("`n--- got ---`n$($sb.Inner)`n--- want ---`n$expectSinceBrief")
+    $tomorrow = [DateTimeOffset]::Now.AddDays(2).ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
+    foreach ($badArg in @($tomorrow, 'yesterday')) {
+        $sx = Invoke-Standup "tkStandup -Since $badArg"
+        Assert-True "-Since $badArg is a stated refusal: exit 2, one Error block naming it" ($sx.Exit -eq '2' -and (@([regex]::Matches($sx.All, '(?m)^Error: ')).Count -eq 1) -and $sx.All.Contains($badArg) -and $sx.All -notmatch 'exit code') $sx.All
+    }
+    $sr = Invoke-Standup "tkStandup -Since $sinceDay -Remind 09:00"
+    Assert-True '-Since -Remind is a stated refusal: one thing at a time' ($sr.Exit -eq '2' -and $sr.All -match 'one thing at a time' -and (@([regex]::Matches($sr.All, '(?m)^Error: ')).Count -eq 1)) $sr.All
+
     $down = Invoke-Standup 'tkStandup' -GhDown
     Assert-True 'gh not answering: the standup still happens, exit 0' ($down.Exit -eq '0' -and $down.Inner -match '^Standup -- ') $down.All
     Assert-True 'with the reason on its Tracker line' ($down.Inner -match '(?m)^  Tracker {4}gh did not answer') $down.Inner
@@ -814,7 +881,7 @@ try {
         -Cards $widgetCards -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
     $joinedText = (Format-P20StandupText -Standup $joinedNow -PackageRoot $pkgRoot).TrimEnd([char]10)
     Assert-True 'a GitHub Space with cards: the joined standup, exit 0, line for line' ($jv.Exit -eq '0' -and $jv.Inner -ceq $joinedText) ("`n--- got ---`n$($jv.Inner)`n--- want ---`n$joinedText")
-    Assert-True 'a card of its own is a row under you, on the Space''s tile' ($jv.Inner -match '(?m)^Widgets$' -and $jv.Inner -match '(?m)^  Today {6}K7M2 Wire the board$') $jv.Inner
+    Assert-True 'a card of its own is a row under you, on the Space''s tile, with its commit' ($jv.Inner -match '(?m)^Widgets$' -and $jv.Inner -match '(?m)^  Today {6}K7M2 \(in progress, 1 commit\) Wire the board$') $jv.Inner
     $check102 = ([string]$consts.rituals.text.checkIssueClosed).Replace('{item}', '#102 Rename the slug')
     Assert-True 'a card linked to a closed issue, still in current/: one Check line' ($jv.Inner -match ('(?m)^  Check {6}' + [regex]::Escape($check102) + '$')) $jv.Inner
     Assert-True 'a not-billable card is not a row' ($jv.Inner -notmatch 'C4D7') $jv.Inner
@@ -840,7 +907,7 @@ try {
     Assert-True 'a local Space: the standup fills from its cards, exit 0, line for line' ($solo.Exit -eq '0' -and $solo.Inner -ceq $soloText) ("`n--- got ---`n$($solo.Inner)`n--- want ---`n$soloText")
     Assert-True 'one tile, named for the Space' ($solo.Inner -match '(?m)^Solo Work$') $solo.Inner
     Assert-True 'Code Review waits on you, by the card''s id' ($solo.Inner -match '(?m)^  Walk {7}K7M2 Wire the board$') $solo.Inner
-    Assert-True 'In Progress and Code Review are today; archived today is yesterday; Active is nowhere' ($solo.Inner -match '(?m)^  Today {6}139 Write the docs$' -and $solo.Inner -match '(?m)^  Yesterday  198 Fix the export$' -and $solo.Inner -notmatch '214') $solo.Inner
+    Assert-True 'In Progress and Code Review are today; archived today is yesterday; Active is nowhere' ($solo.Inner -match '(?m)^  Today {6}139 \(in progress, 1 commit\) Write the docs$' -and $solo.Inner -match '(?m)^  Yesterday  198 \(closed\) Fix the export$' -and $solo.Inner -notmatch '214') $solo.Inner
     Assert-True 'and reading the cards wrote nothing' ($beforeSolo -ceq $afterSolo)
     $soloJson = Invoke-Standup 'tkStandup -Space solo -AsJson'
     $soloParsed = $null
@@ -916,7 +983,7 @@ try {
     Assert-True '-Walk leaves before the attend block, so it never re-arms the reminder' ($walkAt -gt 0 -and $attendAt -gt $walkAt -and $standupSource.IndexOf('exit 0', $walkAt) -lt $attendAt)
 
     $usage = Invoke-Standup 'tkStandup -Help'
-    Assert-True '-Help renders the usage' ($usage.Inner -match 'Standup \[-Space <slug>\] \[-AsJson\]') $usage.Inner
+    Assert-True '-Help renders the usage' ($usage.Inner -match 'Standup \[-Space <slug>\] \[-AsJson\]' -and $usage.Inner -match '\[-Since <yyyy-MM-dd>\]') $usage.Inner
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message

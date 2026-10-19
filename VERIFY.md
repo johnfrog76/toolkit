@@ -996,6 +996,14 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `features.solitaireAgile` on in a GitHub Space answered `agents` whose hub folder holds a card of
   its own in `current/`, `tkStandup`: that card under the Space's tile, and a card marked
   `tkBillable <id> -No` gone from it. Closes Feature V2C7 (the standup reads both records).
+- [ ] **What moved, and the window, read the same under Windows PowerShell 5.1.** In `powershell` (5.1) run
+  `tkTestToolkit -Rituals -Consts`: green, with `joined-counts`, `joined-not-billable-counts` and
+  `joined-window-three-days` passing -- their motions, counts and goldens byte for byte -- and the typed
+  `Standup -Since` rows (a day forty days back saying the issue closed a month ago, a day after today and
+  `-Since yesterday` each exit 2 with one `Error:` block). Then, in a GitHub Space answered `agents` with a
+  card in `current/` that has commit bullets, `tkStandup`: its line reads `(in progress, <n> commits)` or
+  `(started, ...)`, and `tkStandup -Brief` opens on `Since <day>: ...`. Closes Feature RC6D (the standup says
+  what moved).
 
 ## Recording a run
 

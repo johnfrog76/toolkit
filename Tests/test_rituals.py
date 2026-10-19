@@ -369,6 +369,7 @@ def _fill_joined(case: dict, tracker_state: dict | None = None) -> "standup.Stan
         case["cards"],
         space=JOINED_TABLE["space"],
         space_name=JOINED_TABLE["spaceName"],
+        window=case.get("window", ""),
     )
     filled.text = standup.render_standup(filled)
     filled.work.text = standup.render_work(filled)
@@ -395,6 +396,9 @@ class TheJoinedTable(unittest.TestCase):
                 "issue-alone",
                 "not-billable",
                 "together",
+                "counts",
+                "not-billable-counts",
+                "window-three-days",
             ],
         )
 
@@ -402,7 +406,67 @@ class TheJoinedTable(unittest.TestCase):
         for name, case in JOINED_CASES.items():
             with self.subTest(case=name):
                 filled = _fill_joined(case)
-                self.assertEqual((filled.source, filled.since), ("both", JOINED_TABLE["since"]))
+                want = case["expected"].get("since", JOINED_TABLE["since"])
+                self.assertEqual((filled.source, filled.since), ("both", want))
+
+    def test_each_items_motion_and_commits(self):
+        """What moved: every row with a motions map, ref -> [motion, commits]."""
+        for name, case in JOINED_CASES.items():
+            want = case["expected"].get("motions")
+            if want is None:
+                continue
+            filled = _fill_joined(case)
+            got = {
+                _ref(i): [i.motion, i.commits]
+                for w in filled.workers
+                for slot in ("yesterday", "today", "blockers")
+                for i in getattr(w, slot)
+            }
+            with self.subTest(case=name):
+                self.assertEqual(got, want)
+
+    def test_the_counts_per_worker_and_in_total(self):
+        """The counts line's numbers: per worker, in total, a hash once however many cards thread it."""
+        for name, case in JOINED_CASES.items():
+            want = case["expected"].get("counts")
+            if want is None:
+                continue
+            counts = _fill_joined(case).counts
+            fields = ("closed", "started", "inProgress", "commits")
+            with self.subTest(case=name):
+                self.assertEqual(
+                    [{"label": c.label, **{f: getattr(c, f) for f in fields}} for c in counts.workers], want["workers"]
+                )
+                self.assertEqual({f: getattr(counts.total, f) for f in fields}, want["total"])
+
+    def test_the_counts_line_opens_the_brief(self):
+        t = C.rituals_text()
+        filled = _fill_joined(JOINED_CASES["counts"])
+        self.assertEqual(
+            filled.brief.split("\n")[0], "Since Thursday 1 October 2026: 2 closed, 2 started, 2 in progress, 5 commits."
+        )
+        self.assertTrue(filled.brief.startswith(t["countsTotal"].split("{date}")[0]))
+        quiet = _fill_joined(JOINED_CASES["not-billable-counts"])
+        self.assertEqual(quiet.brief.split("\n")[0], "Since Thursday 1 October 2026: 1 in progress.")
+
+    def test_a_window_is_a_day_on_or_before_today(self):
+        at = datetime.fromisoformat(JOINED_TABLE["asOf"])
+        self.assertEqual(standup.since_refusal(at, ""), "")
+        self.assertEqual(standup.since_refusal(at, "2026-10-02"), "")
+        self.assertEqual(standup.since_refusal(at, "2026-09-29"), "")
+        for bad in ("2026-10-03", "yesterday", "2026-9-29", "2026-02-30", "29/09/2026"):
+            with self.subTest(since=bad):
+                self.assertTrue(standup.since_refusal(at, bad))
+                with self.assertRaises(ValueError):
+                    standup.window_start(at, bad)
+        self.assertEqual(standup.window_start(at, "2026-09-29").isoformat(), "2026-09-29T00:00:00-04:00")
+        self.assertEqual(standup.window_start(at, ""), standup.previous_working_day_start(at))
+
+    def test_a_card_hash_is_counted_by_its_first_seven_characters(self):
+        self.assertEqual(
+            standup.card_hashes({"commits": ["A1B2C3D", "a1b2c3d4e5f6", "b2c3d4e", ""]}), ["a1b2c3d", "b2c3d4e"]
+        )
+        self.assertEqual(standup.card_hashes({}), [])
 
     def test_the_walk_by_ref(self):
         for name, case in JOINED_CASES.items():
@@ -443,6 +507,7 @@ class TheJoinedTable(unittest.TestCase):
             if not exp.get("text"):
                 continue
             filled = _fill_joined(case)
+            self.assertTrue(exp.get("work") and exp.get("brief"), name)
             with self.subTest(case=name, grain="detail"):
                 self.assertEqual(filled.text, _golden(exp["text"]))
             with self.subTest(case=name, grain="work"):
@@ -980,6 +1045,35 @@ class TheCardReader(unittest.TestCase):
             },
         )
 
+    def test_begun_and_commits(self):
+        """What moved: begun is the **Started:** day, else the **Created:** day;
+        commits every `- <hash>` bullet's hash, as the card has it."""
+        with tempfile.TemporaryDirectory() as tmp:
+            space = Path(tmp)
+            (space / "current").mkdir()
+            files = {
+                "current/Task139-write-the-docs.prompt.md": (
+                    "# Task 139: Write the docs\n\nCommits:\n- a41c2e9 first\n  - `b52d3f0aa` second\n"
+                    "- not a hash\n\n---\n\n**Created:** 2026-09-20\n**Started:** 2026-10-01\n"
+                ),
+                "current/TaskK7M2-wire-the-board.prompt.md": (
+                    "# Task K7M2: Wire the board\n\nCommits:\n- (pending)\n\n---\n\n**Created:** 2026-09-30\n"
+                ),
+                "current/140-no-footer.prompt.md": "# Bug 140: No footer\n",
+            }
+            for rel, text in files.items():
+                (space / rel).write_bytes(text.encode("utf-8"))
+            rows = standup.read_cards(space, ["Task", "Bug"], ["Task", ""])
+        got = {r["id"]: (r["begun"], r["commits"]) for r in rows}
+        self.assertEqual(
+            got,
+            {
+                "139": ("2026-10-01", ["a41c2e9", "b52d3f0aa"]),
+                "K7M2": ("2026-09-30", []),
+                "140": (None, []),
+            },
+        )
+
     def test_a_space_with_no_folders_is_no_cards(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertEqual(standup.read_cards(Path(tmp) / "missing", [], []), [])
@@ -1003,12 +1097,14 @@ TOP_FIELDS = {
     "brief",
     "checks",
     "links",
+    "counts",
 }
 WORK_FIELDS = {"queue", "workers", "queueProse", "text"}
 GROUP_FIELDS = {"name", "by", "count", "refs", "phrase"}
 WORKER_FIELDS = {"label", "name", "yesterday", "today", "blockers", "empty", "excuse"}
-WALK_FIELDS = {"number", "id", "title", "url", "path", "worker"}
-ITEM_FIELDS = {"number", "id", "title", "url", "path"}
+WALK_FIELDS = {"number", "id", "title", "url", "path", "motion", "commits", "worker"}
+ITEM_FIELDS = {"number", "id", "title", "url", "path", "motion", "commits"}
+COUNT_FIELDS = {"label", "name", "closed", "started", "inProgress", "commits"}
 
 TOOLKIT = "https://github.com/johnfrog76/toolkit"
 ACME = "https://dev.azure.com/acme"
@@ -1185,6 +1281,10 @@ class TheRoute(unittest.TestCase):
         self.assertEqual(set(body["work"]["queue"]["walk"][0]), GROUP_FIELDS)
         for w in body["work"]["workers"]:
             self.assertEqual(set(w), {"label", "name", "yesterday", "today", "blockers", "prose"})
+        self.assertEqual(set(body["counts"]), {"workers", "total"})
+        self.assertEqual(set(body["counts"]["total"]), COUNT_FIELDS)
+        for c in body["counts"]["workers"]:
+            self.assertEqual(set(c), COUNT_FIELDS)
         self.assertEqual(body["queue"]["walk"][0]["worker"], "Fable")
         self.assertEqual(body["queue"]["walk"][1]["worker"], "")
         for w in body["workers"]:
@@ -1196,6 +1296,23 @@ class TheRoute(unittest.TestCase):
     def test_no_space_is_the_active_one(self):
         body = self._get("/api/ritual/standup")[0].json()
         self.assertEqual(body["space"], "toolkit")
+
+    def test_since_widens_yesterdays_window(self):
+        """?since=<yyyy-MM-dd> moves yesterday's lower bound back (Standup -Since); the counts line says the day."""
+        res = self._get("/api/ritual/standup?space=toolkit&since=2026-09-28")[0]
+        self.assertEqual(res.status_code, 200)
+        body = res.json()
+        self.assertEqual(body["since"], "2026-09-28T00:00:00-04:00")
+        self.assertTrue(body["brief"].startswith("Since Monday 28 September 2026: "), body["brief"])
+        self.assertEqual(set(body["counts"]), {"workers", "total"})
+
+    def test_a_since_that_is_not_a_day_before_today_is_a_422_naming_it(self):
+        for bad in ("yesterday", "2026-10-03"):
+            with self.subTest(since=bad):
+                res, calls = self._get(f"/api/ritual/standup?space=toolkit&since={bad}")
+                self.assertEqual(res.status_code, 422)
+                self.assertIn(bad, res.json()["detail"])
+                self.assertEqual(calls, [])
 
     def test_an_ado_space_is_still_a_standup_and_gh_is_never_asked(self):
         res, calls = self._get("/api/ritual/standup?space=acme")
@@ -1234,7 +1351,7 @@ class TheRoute(unittest.TestCase):
         self.assertEqual((item["number"], item["id"], item["url"]), (None, "198", ""))
         self.assertTrue(item["path"].endswith("198-fix-the-export.prompt.md"))
         self.assertIn("  Walk       K7M2 Wire the board\n", body["text"])
-        self.assertIn("  Yesterday  198 Fix the export\n", body["text"])
+        self.assertIn("  Yesterday  198 (closed) Fix the export\n", body["text"])
 
     def test_a_github_space_joins_its_cards_to_its_issues(self):
         """The both source over real folders: a card of its own is a row under you, a
@@ -1314,7 +1431,10 @@ class TheRoute(unittest.TestCase):
         body = res.json()
         self.assertEqual(body["tracker"], {"ok": True, "reason": ""})
         self.assertEqual(body["text"], _golden("standup-friday.txt"))
-        self.assertIn("#101 Build the foyer counts \u2014 Chlo\u00e9\u2019s \u201c\u00cfle\u201d row\n", body["text"])
+        self.assertIn(
+            "#101 (in progress) Build the foyer counts \u2014 Chlo\u00e9\u2019s \u201c\u00cfle\u201d row\n",
+            body["text"],
+        )
         opus = next(w for w in body["workers"] if w["label"] == "opus")
         self.assertEqual([i["title"] for i in opus["today"]], [fx["issues"][0]["title"]])
 
@@ -1367,6 +1487,8 @@ class TheRouteWithTheFlagOff(TheRoute):
     test_on_it_answers_the_fixtures_friday_byte_for_byte = None
     test_the_response_field_names_are_section_4bs = None
     test_no_space_is_the_active_one = None
+    test_since_widens_yesterdays_window = None
+    test_a_since_that_is_not_a_day_before_today_is_a_422_naming_it = None
     test_an_ado_space_is_still_a_standup_and_gh_is_never_asked = None
     test_a_local_space_fills_from_its_cards_and_gh_is_never_asked = None
     test_below_tier_1_is_still_a_standup = None
