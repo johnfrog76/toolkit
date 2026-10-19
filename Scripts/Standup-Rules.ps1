@@ -503,7 +503,7 @@ function Get-P20StandupCards {
       cards fill takes -- @{ file; folder; status; closed; title; id; path; type;
       body; billable; begun; commits }. billable is Test-P20CardBillable's
       answer; begun the day its **Started:** stamp, else its **Created:** stamp,
-      carries; commits the hash of every `- <hash>` bullet (commitHashRegex).
+      carries; commits the hash of every `- <hash>` bullet (regex.commitBullet, group 1 -- the lane rule's own pattern).
       A file the one id rule finds no id in is not a card and is skipped (a
       dated PR-comment record in archive/, a person's note). State is the
       status verb's own rule (Get-PromptFileStatus); a card in archive/ is Done.
@@ -514,7 +514,7 @@ function Get-P20StandupCards {
     # What moved: the day its work began -- **Started:**, else **Created:** -- and its bullets.
     $startedRx = '(?m)^' + [regex]::Escape([string]$c.stamps.started) + '\s*(\d{4}-\d{2}-\d{2})'
     $createdRx = '(?m)^' + [regex]::Escape([string]$c.stamps.created) + '\s*(\d{4}-\d{2}-\d{2})'
-    $hashRx = [string]$c.rituals.commitHashRegex
+    $hashRx = [string]$c.regex.commitBullet
     $rows = New-Object System.Collections.ArrayList
     foreach ($pair in @(@([string]$c.folders.current, $CurrentDir), @([string]$c.folders.archive, $ArchiveDir))) {
         $folder = $pair[0]
@@ -1550,7 +1550,7 @@ function Format-P20StandupText {
                 $suffix = ''
                 if ($slot -eq 'blockers') { $suffix = [string]$t.blockerSuffix }
                 foreach ($item in $items) {
-                    # What moved, after the ref: "#143 (closed, 2 commits) Rename the slug".
+                    # What moved, after the ref, where it adds to the slot: "#141 (started, 2 commits) Rename the slug".
                     $said = Get-P20StandupMotionText $item
                     if ($said) {
                         $body = Format-P20ProseTemplate ([string]$t.itemMotion) @{ ref = (Get-P20StandupItemRef $item); motion = $said; title = [string]$item.title }
@@ -1593,24 +1593,25 @@ function Get-P20StandupCommitsText {
 
 function Get-P20StandupMotionText {
     <#
-      An item's motion word, then its commits when it has any ("in progress, 3
-      commits"); '' for an item that carries no motion (the queue's, or an older
-      response's). motion_said in the agent.
+      What an item's line adds to its slot: the started word when it began in
+      the window, then its commits when it has any ("started, 2 commits", "3
+      commits"). Closed under Yesterday and in progress under Today or Blockers
+      are what the slot label already says, so they are not said; '' for those
+      with no commits, and for an item that carries no motion (the queue's, or
+      an older response's). motion_said in the agent.
     #>
     param($Item)
     $c = Get-P20Consts
     $t = $c.rituals.text
     $m = @($c.rituals.motions | ForEach-Object { [string]$_ })
     $mo = [string]$Item.motion
-    $word = ''
-    if ($mo -ceq $m[0]) { $word = [string]$t.motionClosed }
-    elseif ($mo -ceq $m[1]) { $word = [string]$t.motionStarted }
-    elseif ($mo -ceq $m[2]) { $word = [string]$t.motionInProgress }
-    if (-not $word) { return '' }
+    if (-not ($m -ccontains $mo)) { return '' }
+    $bits = New-Object System.Collections.Generic.List[string]
+    if ($mo -ceq $m[1]) { $bits.Add([string]$t.motionStarted) }
     $n = 0
     if ($null -ne $Item.commits -and "$($Item.commits)" -ne '') { $n = [int]$Item.commits }
-    if ($n -gt 0) { $word += [string]$t.countsSeparator + (Get-P20StandupCommitsText $n) }
-    return $word
+    if ($n -gt 0) { $bits.Add((Get-P20StandupCommitsText $n)) }
+    return ($bits -join [string]$t.countsSeparator)
 }
 
 function Get-P20StandupCountsText {

@@ -1351,7 +1351,7 @@ class TheRoute(unittest.TestCase):
         self.assertEqual((item["number"], item["id"], item["url"]), (None, "198", ""))
         self.assertTrue(item["path"].endswith("198-fix-the-export.prompt.md"))
         self.assertIn("  Walk       K7M2 Wire the board\n", body["text"])
-        self.assertIn("  Yesterday  198 (closed) Fix the export\n", body["text"])
+        self.assertIn("  Yesterday  198 Fix the export\n", body["text"])
 
     def test_a_github_space_joins_its_cards_to_its_issues(self):
         """The both source over real folders: a card of its own is a row under you, a
@@ -1432,7 +1432,7 @@ class TheRoute(unittest.TestCase):
         self.assertEqual(body["tracker"], {"ok": True, "reason": ""})
         self.assertEqual(body["text"], _golden("standup-friday.txt"))
         self.assertIn(
-            "#101 (in progress) Build the foyer counts \u2014 Chlo\u00e9\u2019s \u201c\u00cfle\u201d row\n",
+            "#101 Build the foyer counts \u2014 Chlo\u00e9\u2019s \u201c\u00cfle\u201d row\n",
             body["text"],
         )
         opus = next(w for w in body["workers"] if w["label"] == "opus")

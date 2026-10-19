@@ -51,7 +51,7 @@ EXPECTED = {
     ("tokens", "spec"): "> Spec:",
     ("regex", "prUrlLine"): r"(?m)^PR URL:\s*https://",
     ("regex", "prReviewHeading"): r"(?m)^##\s+PR Review Comments",
-    ("regex", "commitBullet"): r"(?m)^\s*-\s+`?[0-9a-f]{7,}`?",
+    ("regex", "commitBullet"): r"(?m)^\s*-\s+`?([0-9a-f]{7,})`?",
     ("regex", "startedLine"): r"(?m)^\*\*Started:\*\*",
     ("regex", "reviewLine"): r"(?m)^\*\*Review:\*\*",
     ("regex", "sessionName"): r"^(?:([a-z0-9]+(?:-[a-z0-9]+)*)-)?(\d{4}-\d{2}-\d{2})\.md$",
@@ -166,7 +166,6 @@ EXPECTED = {
     ("rituals", "dressPronounRegex"): r"^I(?:'[a-z]+)?$",
     # What moved: a slot item's motion, and the hash its card's bullet threads.
     ("rituals", "motions"): ["closed", "started", "inProgress"],
-    ("rituals", "commitHashRegex"): r"(?m)^\s*-\s+`?([0-9a-f]{7,})",
     ("rituals", "text"): {
         "title": "Standup -- {date}",
         "dateFormat": "dddd d MMMM yyyy",
@@ -239,9 +238,7 @@ EXPECTED = {
         "proseNameSeparator": ", ",
         "proseNameLast": " and ",
         "itemMotion": "{ref} ({motion}) {title}",
-        "motionClosed": "closed",
         "motionStarted": "started",
-        "motionInProgress": "in progress",
         "commitOne": "{n} commit",
         "commitMany": "{n} commits",
         "countsTotal": "Since {date}: {counts}.",
@@ -411,7 +408,6 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.rituals_dress_name_regex(), EXPECTED[("rituals", "dressNameRegex")])
         self.assertEqual(C.rituals_dress_pronoun_regex(), EXPECTED[("rituals", "dressPronounRegex")])
         self.assertEqual(C.rituals_motions(), tuple(EXPECTED[("rituals", "motions")]))
-        self.assertEqual(C.rituals_commit_hash_regex(), EXPECTED[("rituals", "commitHashRegex")])
 
     def test_the_worker_rule_reads_the_contract(self):
         """The pane's worker chips and the standup read one prefix, not two."""
@@ -432,6 +428,10 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertFalse(C.re_pr_url_line().search("# Card\nPR URL: not-a-url"))
         self.assertTrue(C.re_commit_bullet().search("Commits:\n- 80e2168 add grid"))
         self.assertFalse(C.re_commit_bullet().search("Commits:\n- (pending)"))
+        # One group: findall returns the hashes, and their number is the lane rule's count.
+        self.assertEqual(
+            C.re_commit_bullet().findall("- 80e2168 a\n- `abcdef1234` b\n- (pending)"), ["80e2168", "abcdef1234"]
+        )
         self.assertTrue(C.re_pr_review_heading().search("## PR Review Comments -- Round 2 (PR 35)"))
         m = C.re_closed_stamp_date().search("body\n**Closed:** 2026-09-17\n")
         self.assertEqual(m.group(1), "2026-09-17")

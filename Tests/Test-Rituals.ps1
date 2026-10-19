@@ -787,8 +787,8 @@ try {
     Assert-True 'and prints the text the rule renders for now, line for line' ($r.Inner -ceq $expectText) ("`n--- got ---`n$($r.Inner)`n--- want ---`n$expectText")
     Assert-True 'the queue first: both open verify-close issues, worker or none' ($r.Inner -match '(?m)^  Walk {7}#104 ' -and $r.Inner -match '(?m)^  Walk {7}#105 ') $r.Inner
     Assert-True 'one block per worker label found in the labels'' own descriptions' ($r.Inner -match '(?s)\nFable\n.*\nOpus\n.*\nSonnet\n') $r.Inner
-    Assert-True 'a closed issue a minute ago is yesterday, and says closed; a month ago is nowhere' ($r.Inner -match '#102 \(closed\) Rename the slug' -and $r.Inner -notmatch '#103') $r.Inner
-    Assert-True 'a blocker says in progress and carries the walk label''s suffix' ($r.Inner -match ('#104 \(in progress\) Verify the Studio tab draws on the PC' + [regex]::Escape([string]$consts.rituals.text.blockerSuffix))) $r.Inner
+    Assert-True 'a closed issue a minute ago is yesterday, the slot saying closed; a month ago is nowhere' ($r.Inner -match '(?m)^  Yesterday  #102 Rename the slug$' -and $r.Inner -notmatch '#103') $r.Inner
+    Assert-True 'a blocker carries the walk label''s suffix, and no in-progress word the slot already says' ($r.Inner -match ('#104 Verify the Studio tab draws on the PC' + [regex]::Escape([string]$consts.rituals.text.blockerSuffix))) $r.Inner
     Assert-True 'an open issue with no worker and no walk label appears nowhere' ($r.Inner -notmatch '#106') $r.Inner
     Assert-True 'no fakeWork line reaches the terminal' (@($fakeWork | Where-Object { $r.Inner.Contains([string]$_) }).Count -eq 0)
     Assert-True 'nothing is written to the hub' ($before -ceq $after)
@@ -841,7 +841,7 @@ try {
     $expectSince = Invoke-P20StandupJoinedFill -AsOf ([DateTimeOffset]::Now) -Labels $ghLabels -Issues $ghIssues -Tracker @{ ok = $true; reason = '' } -Cards @() -Space 'widgets' -SpaceName 'Widgets' -Window $sinceDay -PackageRoot $pkgRoot
     $expectSinceText = (Format-P20StandupText -Standup $expectSince -PackageRoot $pkgRoot).TrimEnd([char]10)
     Assert-True '-Since widens yesterday: exit 0, the text the rule renders for that window, line for line' ($sw.Exit -eq '0' -and $sw.Inner -ceq $expectSinceText) ("`n--- got ---`n$($sw.Inner)`n--- want ---`n$expectSinceText")
-    Assert-True '-Since: the issue closed a month ago is said, closed' ($sw.Inner -match '#103 \(closed\) ' -and $r.Inner -notmatch '#103') $sw.Inner
+    Assert-True '-Since: the issue closed a month ago is said, under yesterday' ($sw.Inner -match '(?m)^  Yesterday  #103 ' -and $r.Inner -notmatch '#103') $sw.Inner
     $sb = Invoke-Standup "tkStandup -Since $sinceDay -Brief"
     $expectSinceBrief = (Format-P20StandupBrief -Standup $expectSince -PackageRoot $pkgRoot).TrimEnd([char]10)
     Assert-True '-Since -Brief: the counts line names the window''s first day' ($sb.Exit -eq '0' -and $sb.Inner -ceq $expectSinceBrief -and $sb.Inner -match '^Since \w+ ') ("`n--- got ---`n$($sb.Inner)`n--- want ---`n$expectSinceBrief")
@@ -881,7 +881,7 @@ try {
         -Cards $widgetCards -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
     $joinedText = (Format-P20StandupText -Standup $joinedNow -PackageRoot $pkgRoot).TrimEnd([char]10)
     Assert-True 'a GitHub Space with cards: the joined standup, exit 0, line for line' ($jv.Exit -eq '0' -and $jv.Inner -ceq $joinedText) ("`n--- got ---`n$($jv.Inner)`n--- want ---`n$joinedText")
-    Assert-True 'a card of its own is a row under you, on the Space''s tile, with its commit' ($jv.Inner -match '(?m)^Widgets$' -and $jv.Inner -match '(?m)^  Today {6}K7M2 \(in progress, 1 commit\) Wire the board$') $jv.Inner
+    Assert-True 'a card of its own is a row under you, on the Space''s tile, with its commit' ($jv.Inner -match '(?m)^Widgets$' -and $jv.Inner -match '(?m)^  Today {6}K7M2 \(1 commit\) Wire the board$') $jv.Inner
     $check102 = ([string]$consts.rituals.text.checkIssueClosed).Replace('{item}', '#102 Rename the slug')
     Assert-True 'a card linked to a closed issue, still in current/: one Check line' ($jv.Inner -match ('(?m)^  Check {6}' + [regex]::Escape($check102) + '$')) $jv.Inner
     Assert-True 'a not-billable card is not a row' ($jv.Inner -notmatch 'C4D7') $jv.Inner
@@ -907,7 +907,7 @@ try {
     Assert-True 'a local Space: the standup fills from its cards, exit 0, line for line' ($solo.Exit -eq '0' -and $solo.Inner -ceq $soloText) ("`n--- got ---`n$($solo.Inner)`n--- want ---`n$soloText")
     Assert-True 'one tile, named for the Space' ($solo.Inner -match '(?m)^Solo Work$') $solo.Inner
     Assert-True 'Code Review waits on you, by the card''s id' ($solo.Inner -match '(?m)^  Walk {7}K7M2 Wire the board$') $solo.Inner
-    Assert-True 'In Progress and Code Review are today; archived today is yesterday; Active is nowhere' ($solo.Inner -match '(?m)^  Today {6}139 \(in progress, 1 commit\) Write the docs$' -and $solo.Inner -match '(?m)^  Yesterday  198 \(closed\) Fix the export$' -and $solo.Inner -notmatch '214') $solo.Inner
+    Assert-True 'In Progress and Code Review are today; archived today is yesterday; Active is nowhere' ($solo.Inner -match '(?m)^  Today {6}139 \(1 commit\) Write the docs$' -and $solo.Inner -match '(?m)^  Yesterday  198 Fix the export$' -and $solo.Inner -notmatch '214') $solo.Inner
     Assert-True 'and reading the cards wrote nothing' ($beforeSolo -ceq $afterSolo)
     $soloJson = Invoke-Standup 'tkStandup -Space solo -AsJson'
     $soloParsed = $null

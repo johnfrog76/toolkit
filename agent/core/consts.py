@@ -509,11 +509,6 @@ def rituals_motions() -> tuple[str, ...]:
     return tuple(consts()["rituals"]["motions"])
 
 
-def rituals_commit_hash_regex() -> str:
-    """A card's ``- <hash>`` bullet, the hash in group 1 -- the lane rule's bullet, captured."""
-    return consts()["rituals"]["commitHashRegex"]
-
-
 # -- The dress (D-SA11) ---------------------------------------------------
 
 

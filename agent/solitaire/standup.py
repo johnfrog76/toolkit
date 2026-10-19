@@ -37,7 +37,8 @@ joined on the id (``fill_joined_standup``, held by
 ``Tracker`` line (D-TA19).
 
 What moved: every slot item carries its ``motion`` (closed,
-started or inProgress) and its card's ``commits``; ``standup_counts`` sums them
+started or inProgress) and its card's ``commits`` -- a detail line says only what
+adds to its slot, ``started`` and the commits; ``standup_counts`` sums them
 per worker and in total -- a hash once however many cards thread it -- and the
 brief opens on that counts line. ``window_start`` widens yesterday's lower bound
 (``?since=<yyyy-MM-dd>``); today and the blockers are what is open now.
@@ -72,8 +73,8 @@ from ..core.consts import (
     folder_archive,
     folder_current,
     re_closed_stamp_date,
+    re_commit_bullet,
     rituals_ceremonies_file,
-    rituals_commit_hash_regex,
     rituals_dress_name_regex,
     rituals_dress_number_regex,
     rituals_dress_pronoun_regex,
@@ -597,7 +598,7 @@ def read_cards(space_dir: Path, type_names: list[str], prefixes: list[str]) -> l
                     "billable": card_billable(content),
                     # What moved: the day its work began, and its commit bullets.
                     "begun": _stamp_day(content, stamp_started()) or _stamp_day(content, stamp_created()),
-                    "commits": [m.group(1) for m in re.finditer(rituals_commit_hash_regex(), content)],
+                    "commits": re_commit_bullet().findall(content),
                 }
             )
     return rows
@@ -1444,17 +1445,22 @@ def commits_said(n: int) -> str:
 
 
 def motion_said(item: SlotItem) -> str:
-    """An item's motion word, then its commits when it has any ("in progress, 3
-    commits"); "" for an item that carries no motion (the queue's, or an older
-    response's). Pure; the mirror of ``Get-P20StandupMotionText``."""
+    """What an item's line adds to its slot: ``started`` when it began in the
+    window, then its commits when it has any ("started, 2 commits", "3 commits").
+    Closed under Yesterday and in progress under Today or Blockers are what the
+    slot label already says, so a closed or in-progress item with no commits
+    says nothing; "" too for an item that carries no motion (the queue's, or an
+    older response's). Pure; the mirror of ``Get-P20StandupMotionText``."""
     t = rituals_text()
-    closed, started, in_progress = rituals_motions()
-    word = {closed: t["motionClosed"], started: t["motionStarted"], in_progress: t["motionInProgress"]}.get(
-        item.motion or "", ""
-    )
-    if word and item.commits:
-        word += t["countsSeparator"] + commits_said(item.commits)
-    return word
+    motions = rituals_motions()
+    if (item.motion or "") not in motions:
+        return ""
+    bits = []
+    if item.motion == motions[1]:
+        bits.append(t["motionStarted"])
+    if item.commits:
+        bits.append(commits_said(item.commits))
+    return t["countsSeparator"].join(bits)
 
 
 def counts_said(c: MotionCount) -> str:
@@ -1500,7 +1506,7 @@ def render_standup(filled: Standup) -> str:
         return f"{ref} {item.title}{suffix}"
 
     def moved(item: SlotItem, suffix: str = "") -> str:
-        # A slot line says what moved after the ref: "#143 (closed, 2 commits) Rename the slug".
+        # A slot line says what moved after the ref, where it adds to the slot: "#141 (started, 2 commits) ...".
         said = motion_said(item)
         if not said:
             return numbered(item, suffix)

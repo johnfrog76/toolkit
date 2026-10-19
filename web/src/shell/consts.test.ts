@@ -217,7 +217,6 @@ describe("consts.json", () => {
       dressNameRegex: "(?<![\\w'-])[A-Z][A-Za-z0-9'-]*",
       dressPronounRegex: "^I(?:'[a-z]+)?$",
       motions: ["closed", "started", "inProgress"],
-      commitHashRegex: "(?m)^\\s*-\\s+`?([0-9a-f]{7,})",
       text: {
         title: "Standup -- {date}",
         dateFormat: "dddd d MMMM yyyy",
@@ -289,9 +288,7 @@ describe("consts.json", () => {
         proseNameSeparator: ", ",
         proseNameLast: " and ",
         itemMotion: "{ref} ({motion}) {title}",
-        motionClosed: "closed",
         motionStarted: "started",
-        motionInProgress: "in progress",
         commitOne: "{n} commit",
         commitMany: "{n} commits",
         countsTotal: "Since {date}: {counts}.",
@@ -397,6 +394,9 @@ describe("toRegExp", () => {
     expect(RE.prUrlLine.test("# Card\nPR URL: not-a-url")).toBe(false);
     expect(RE.commitBullet.test("Commits:\n- 80e2168 add grid")).toBe(true);
     expect(RE.commitBullet.test("Commits:\n- (pending)")).toBe(false);
+    // The hash is group 1: the standup's commit count reads the lane rule's own bullet.
+    const bullet = new RegExp(RE.commitBullet.source, RE.commitBullet.flags.replace("g", ""));
+    expect(bullet.exec("Commits:\n- `80e2168` add grid")?.[1]).toBe("80e2168");
   });
 
   // The shape of a card's id crosses all three halves: a work item number, or the

@@ -274,8 +274,8 @@ counted once by its first seven characters, however many cards thread it
 | `current/`, Code Review | **today**, and the walk queue ("what waits on you") |
 | `current/`, Active; `archive/` closed earlier or never stamped | nowhere |
 
-The line names the card by its id, what moved and its title from the heading
-(`K7M2 (in progress, 2 commits) Wire the board`). Both halves
+The line names the card by its id, what moved where it adds to the slot -- `started`, its commits -- and its
+title from the heading (`K7M2 (started, 2 commits) Wire the board`, `139 (1 commit) Write the docs`). Both halves
 hold it to one table, `Tests/fixtures/rituals/standup-cards.json`; the add-on's document has the rest
 ([Team Agile](../modules/solitaire-agile.md#the-two-sources-joined)).
 

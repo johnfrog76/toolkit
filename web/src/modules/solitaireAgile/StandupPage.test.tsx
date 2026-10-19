@@ -218,8 +218,11 @@ describe("the standup page", () => {
     // The brief's own first line, verbatim: the counts line the agent and the CLI render.
     expect(first).toBe((data.brief ?? "").split("\n")[0]);
     expect(first).toBe("Since Thursday 1 October 2026: 2 closed, 2 in progress.");
-    // Each item says what moved, after its number, in the text shown verbatim.
-    expect(shown()).toContain("#102 (closed) Rename the slug");
+    // An item says what moved only where it adds to its slot (started, commits): a closed
+    // item under Yesterday with no commits is its number and title, the label says the rest.
+    expect(shown()).toContain("Yesterday  #102 Rename the slug");
+    expect(shown()).not.toContain("(closed)");
+    expect(shown()).not.toContain("(in progress)");
   });
 
   it("Play opens the same standup, played on the stage", () => {

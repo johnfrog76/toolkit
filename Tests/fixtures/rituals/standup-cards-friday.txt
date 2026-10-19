@@ -6,11 +6,11 @@ Waiting on you
   Walk       144 Read the board
 
 Widgets
-  Yesterday  198 (closed) Fix the export
-  Yesterday  Q3R9 (closed) Photo import
-  Today      K7M2 (in progress) Wire the board
-  Today      139 (in progress) Write the docs
-  Today      144 (in progress) Read the board
+  Yesterday  198 Fix the export
+  Yesterday  Q3R9 Photo import
+  Today      K7M2 Wire the board
+  Today      139 Write the docs
+  Today      144 Read the board
   Blockers   no blockers
 
 "Let's circle back."

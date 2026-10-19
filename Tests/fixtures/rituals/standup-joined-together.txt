@@ -7,18 +7,18 @@ Waiting on you
 
 Fable
   Yesterday  nothing closed
-  Today      #142 (in progress) Port the cast atoms
-  Today      #145 (in progress) Verify the clock fix
-  Blockers   #146 (in progress) Verify the Studio tab draws on the PC (verify-close)
+  Today      #142 Port the cast atoms
+  Today      #145 Verify the clock fix
+  Blockers   #146 Verify the Studio tab draws on the PC (verify-close)
 Opus
-  Yesterday  #143 (closed) Rename the slug
-  Today      #141 (in progress) Build the foyer counts
-  Today      #144 (in progress) Seed the GitHub demo
+  Yesterday  #143 Rename the slug
+  Today      #141 Build the foyer counts
+  Today      #144 Seed the GitHub demo
   Blockers   no blockers
 Widgets
-  Yesterday  198 (closed) Fix the export
-  Yesterday  Q3R9 (closed) Photo import
-  Today      K7M2 (in progress) Wire the board
+  Yesterday  198 Fix the export
+  Yesterday  Q3R9 Photo import
+  Today      K7M2 Wire the board
   Blockers   no blockers
 
   Check      #142 Port the cast atoms -- the card is archived, but the issue is still open.

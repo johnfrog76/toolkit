@@ -1001,7 +1001,7 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `joined-window-three-days` passing -- their motions, counts and goldens byte for byte -- and the typed
   `Standup -Since` rows (a day forty days back saying the issue closed a month ago, a day after today and
   `-Since yesterday` each exit 2 with one `Error:` block). Then, in a GitHub Space answered `agents` with a
-  card in `current/` that has commit bullets, `tkStandup`: its line reads `(in progress, <n> commits)` or
+  card in `current/` that has commit bullets, `tkStandup`: its line reads `(<n> commits)` or
   `(started, ...)`, and `tkStandup -Brief` opens on `Since <day>: ...`. Closes Feature RC6D (the standup says
   what moved).
 

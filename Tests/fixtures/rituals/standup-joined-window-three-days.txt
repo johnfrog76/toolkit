@@ -5,15 +5,15 @@ Waiting on you
   Nothing is waiting on you.
 
 Fable
-  Yesterday  #162 (closed) Ship the stage
+  Yesterday  #162 Ship the stage
   Today      nothing in flight
   Blockers   no blockers
 Opus
-  Yesterday  #161 (closed, 1 commit) Ship the foyer
+  Yesterday  #161 (1 commit) Ship the foyer
   Today      nothing in flight
   Blockers   no blockers
 Widgets
-  Yesterday  W4X9 (closed, 2 commits) Ship the docs
+  Yesterday  W4X9 (2 commits) Ship the docs
   Today      nothing in flight
   Blockers   no blockers
 
