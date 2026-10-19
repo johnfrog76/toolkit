@@ -371,7 +371,7 @@ $joinedCases = @($joinedTable.cases)
 $joinedAsOf = ([regex]::Match($joinedRaw, '"asOf"\s*:\s*"([^"]+)"')).Groups[1].Value
 $joinedSince = ([regex]::Match($joinedRaw, '"since"\s*:\s*"([^"]+)"')).Groups[1].Value
 $joinedNames = (@($joinedCases | ForEach-Object { [string]$_.name })) -join ','
-Assert-True 'the joined table is read: the six shapes, all of them together, then what moved' ($joinedNames -ceq 'linked-card-open-issue,linked-card-archived-issue-open,issue-closed-card-current,custom-card-alone,issue-alone,not-billable,together,counts,not-billable-counts,window-three-days') $joinedNames
+Assert-True 'the joined table is read: the six shapes, all of them together, then what moved' ($joinedNames -ceq 'linked-card-open-issue,linked-card-archived-issue-open,issue-closed-card-current,linked-card-issue-unrouted,custom-card-alone,issue-alone,not-billable,together,counts,not-billable-counts,window-three-days') $joinedNames
 
 foreach ($case in $joinedCases) {
     $name = 'joined-' + [string]$case.name

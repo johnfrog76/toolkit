@@ -564,6 +564,7 @@ number, or an id of the card's own.
 | its id is the number of an issue in the read | **ONE row, the issue's** -- title, labels, worker, milestone and slot are the tracker's, placed as the issues fill places them, and the card never overrides them. The card adds what only it knows: its lane (`links[]`: `number`, `id`, `lane`, `path`; the lane read the way `Status` reads it, Done in `archive/`) |
 | ... archived, and the issue is open | the issue's row, and one `Check` line: `#<n> <title> -- the card is archived, but the issue is still open.` (`rituals.text.checkCardArchived`) |
 | ... in `current/`, and the issue is closed | the issue's row, and one `Check` line: `#<n> <title> -- the issue is closed, but the card is not archived.` (`rituals.text.checkIssueClosed`) |
+| ... the issue has no worker label, so the issues fill gives it no slot at all | the issue's row stands (never duplicated), but the card -- when it is itself in `current/` -- also joins the under-you tile, in the slot its own lane maps to: the same fallback an unlinked card already takes, so the link is not invisible for want of a route |
 | an id of its own, or a number the read has no issue for | **its own row, under you**: one tile labelled with the Space's slug and named for it, in the slot its lane maps to ([the cards alone](#the-cards-alone)), after the worker tiles -- and only when it has something to say; its Code Review cards follow the issues on the walk |
 | not billable | nothing |
 
