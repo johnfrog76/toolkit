@@ -65,62 +65,23 @@ if ($Help) {
 
 . (Join-Path $PSScriptRoot 'Triage-Rules.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
+. (Join-Path $PSScriptRoot 'Ritual-Common.ps1')
 
 # -- Which Space ---------------------------------------------------------------
 # No -Space: the one you are in. A slug: that Space's own entry, read without
 # switching into it -- the same three things the agent's space_scope() takes.
+# Scripts/Ritual-Common.ps1 holds the rule, shared with Standup and Route.
 $cfg = $global:P20Config
-$slug = ''
-$org = ''
-$status = ''
-$projects = @()
-if ($Space) {
-    $spaceValue = $Space.Trim()
-    $declared = @()
-    if ($cfg -and $cfg.Spaces) { $declared = @($cfg.Spaces | Where-Object { $_ } | ForEach-Object { [string]$_.slug }) }
-    $entry = $null
-    if ($cfg -and $cfg.Spaces) { $entry = @($cfg.Spaces | Where-Object { $_ -and [string]$_.slug -eq $spaceValue }) | Select-Object -First 1 }
-    if (-not $entry) {
-        $hint = 'Leave -Space out for the Space you are in.'
-        if ($declared.Count -gt 0) { $hint = "Declared: $($declared -join ', '). Or leave -Space out for the Space you are in." }
-        Write-CliError -Message "No Space '$spaceValue' is declared." -Hint $hint
-        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
-    }
-    $slug = $spaceValue
-    $org = [string]$entry.org
-    $status = [string]$entry.status
-    if ($entry.projects) { $projects = @($entry.projects) }
-}
-elseif ($cfg) {
-    $slug = [string]$cfg.ActiveSpace
-    $org = [string]$cfg.Org
-    $status = [string]$cfg.OrgStatus
-    if ($cfg.Projects) { $projects = @($cfg.Projects) }
-}
-
-# -- The thin layer: two gh reads ----------------------------------------------
-function Invoke-P20TriageGh {
-    # One gh call -> @{ ok; value } or @{ ok = $false; reason }. stderr's first
-    # line is the reason; the value is the parsed JSON array, enumerated so 5.1's
-    # unrolled-array quirk cannot hand back an array of one array.
-    param([string[]]$Arguments, [string]$Repo)
-    $global:LASTEXITCODE = 0
-    try { $out = & gh @Arguments 2>&1 }
-    catch { return @{ ok = $false; reason = "gh did not answer ($($_.Exception.Message))" } }
-    $code = $LASTEXITCODE
-    $stdout = @($out | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] } | ForEach-Object { [string]$_ }) -join "`n"
-    $stderr = @($out | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] } | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
-    if ($code -ne 0) {
-        $why = "gh did not answer for $Repo"
-        if ($stderr.Count -gt 0) { $why += ": $($stderr[0])" }
-        return @{ ok = $false; reason = $why }
-    }
-    try { $parsed = ConvertFrom-Json -InputObject $stdout }
-    catch { return @{ ok = $false; reason = "gh answered for $Repo with something that is not JSON" } }
-    $list = New-Object System.Collections.ArrayList
-    foreach ($x in $parsed) { if ($null -ne $x) { [void]$list.Add($x) } }
-    return @{ ok = $true; value = $list.ToArray() }
-}
+# A name that is not $space: PowerShell variables are case-insensitive, so
+# $space would be the same variable as the -Space PARAMETER above (the
+# $help/[switch]$Help trap in AGENTS.md, same shape) and the assignment would
+# coerce the resolved object into that parameter's [string] type.
+$resolvedSpace = Resolve-P20RitualSpace -Space $Space -Config $cfg
+$slug = $resolvedSpace.slug
+$org = $resolvedSpace.org
+$status = $resolvedSpace.status
+$projects = $resolvedSpace.projects
 
 $tracker = @{ ok = $false; reason = '' }
 $labels = @()
@@ -142,11 +103,12 @@ else {
         $tracker.reason = 'gh is not installed, so the tracker was not asked.'
     }
     else {
+        # -- The thin layer: two gh reads (Scripts/Ritual-Common.ps1) --------
         $repo = $target.Repo
-        $got = Invoke-P20TriageGh -Repo $repo -Arguments @('label', 'list', '--repo', $repo, '--limit', '500', '--json', 'name,description')
+        $got = Invoke-P20RitualGh -Repo $repo -Arguments @('label', 'list', '--repo', $repo, '--limit', '500', '--json', 'name,description')
         if ($got.ok) {
             $labels = $got.value
-            $got = Invoke-P20TriageGh -Repo $repo -Arguments @('issue', 'list', '--repo', $repo, '--state', 'open', '--limit', '500',
+            $got = Invoke-P20RitualGh -Repo $repo -Arguments @('issue', 'list', '--repo', $repo, '--state', 'open', '--limit', '500',
                 '--json', 'number,title,state,labels,milestone,url')
         }
         if ($got.ok) {
