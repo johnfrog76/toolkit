@@ -258,7 +258,14 @@ row (and a `Check` line where the two disagree), and any other card goes in the 
 says `**Billable:** no` is in neither. For a card of its own:
 the derived state above, plus the `**Closed:**` day of an archived card, puts each card in at most one
 slot of the engineer's one tile, read fresh every time and never written back. The days are the
-standup's window: `since` is the start of the previous working day, `asOf` is now.
+standup's window: `since` is the start of the previous working day (or the day `Standup -Since`
+names), `asOf` is now.
+
+What moved is read from the same file: a card in today is **started** when its `**Started:**` day,
+else its `**Created:**` day, is in the window, and **in progress** otherwise; an archived one is
+**closed**. Its **commits** are its `- <hash>` bullets -- the lines that make it In Progress -- each hash
+counted once by its first seven characters, however many cards thread it
+([Team Agile](../modules/solitaire-agile.md#what-moved-and-the-window)).
 
 | The card | Slot |
 | --- | --- |
@@ -267,7 +274,8 @@ standup's window: `since` is the start of the previous working day, `asOf` is no
 | `current/`, Code Review | **today**, and the walk queue ("what waits on you") |
 | `current/`, Active; `archive/` closed earlier or never stamped | nowhere |
 
-The line names the card by its id (`K7M2 Wire the board`) and its title from the heading. Both halves
+The line names the card by its id, what moved where it adds to the slot -- `started`, its commits -- and its
+title from the heading (`K7M2 (started, 2 commits) Wire the board`, `139 (1 commit) Write the docs`). Both halves
 hold it to one table, `Tests/fixtures/rituals/standup-cards.json`; the add-on's document has the rest
 ([Team Agile](../modules/solitaire-agile.md#the-two-sources-joined)).
 

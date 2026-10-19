@@ -1,0 +1,20 @@
+Standup -- Friday 2 October 2026
+"Can we not adjust scope."
+
+Waiting on you
+  Nothing is waiting on you.
+
+Fable
+  Yesterday  #162 Ship the stage
+  Today      nothing in flight
+  Blockers   no blockers
+Opus
+  Yesterday  #161 (1 commit) Ship the foyer
+  Today      nothing in flight
+  Blockers   no blockers
+Widgets
+  Yesterday  W4X9 (2 commits) Ship the docs
+  Today      nothing in flight
+  Blockers   no blockers
+
+"Let's circle back."

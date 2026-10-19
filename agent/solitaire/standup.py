@@ -36,6 +36,13 @@ joined on the id (``fill_joined_standup``, held by
 ``Tests/fixtures/rituals/standup-joined.json``). An Azure DevOps Space keeps its
 ``Tracker`` line (D-TA19).
 
+What moved: every slot item carries its ``motion`` (closed,
+started or inProgress) and its card's ``commits`` -- a detail line says only what
+adds to its slot, ``started`` and the commits; ``standup_counts`` sums them
+per worker and in total -- a hash once however many cards thread it -- and the
+brief opens on that counts line. ``window_start`` widens yesterday's lower bound
+(``?since=<yyyy-MM-dd>``); today and the blockers are what is open now.
+
 The ritual happens anyway (principle 3): an Azure DevOps Space, a tier below 1,
 or a gh that does not answer is still a 200 -- the chair's two lines, an empty
 queue and no workers, and the reason in ``tracker.reason`` and in the text.
@@ -53,7 +60,7 @@ import hashlib
 import json
 import re
 from collections import OrderedDict
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -66,12 +73,14 @@ from ..core.consts import (
     folder_archive,
     folder_current,
     re_closed_stamp_date,
+    re_commit_bullet,
     rituals_ceremonies_file,
     rituals_dress_name_regex,
     rituals_dress_number_regex,
     rituals_dress_pronoun_regex,
     rituals_dress_ref_regex,
     rituals_label_width,
+    rituals_motions,
     rituals_number_words,
     rituals_prose_fold_names,
     rituals_route,
@@ -83,6 +92,8 @@ from ..core.consts import (
     rituals_work_small_word_regex,
     rituals_work_thread_regex,
     rituals_worker_label_prefix,
+    stamp_created,
+    stamp_started,
     status_code_review,
     status_done,
     status_in_progress,
@@ -161,6 +172,13 @@ class SlotItem(BaseModel):
     title: str = ""
     url: str = ""
     path: str = ""
+    # What moved: ``rituals.motions`` -- closed (yesterday's), started or
+    # inProgress (open). An issue with no card is closed or inProgress; a card,
+    # or the card an issue's number names, is started when its **Started:** day,
+    # else its **Created:** day, falls in the window. ``commits`` is the distinct
+    # hashes of that card's ``- <hash>`` bullets; 0 with no card.
+    motion: str = ""
+    commits: int = 0
 
 
 class WalkItem(SlotItem):
@@ -241,6 +259,24 @@ class CardLink(BaseModel):
     path: str = ""
 
 
+class MotionCount(BaseModel):
+    # One worker's motion in the window (``label`` and ``name`` "" for the
+    # total): its items by motion, and the distinct commits their cards thread.
+    label: str = ""
+    name: str = ""
+    closed: int = 0
+    started: int = 0
+    inProgress: int = 0
+    commits: int = 0
+
+
+class Counts(BaseModel):
+    # The velocity at a glance: per worker, in the workers' order, and in
+    # total -- a hash counted once however many cards thread it.
+    workers: list[MotionCount] = []
+    total: MotionCount = MotionCount()
+
+
 class Spoken(BaseModel):
     # The dress (D-SA11): present only when a model answered. ``dressed``
     # counts the sentences in the model's words, ``refused`` the ones where the
@@ -285,6 +321,8 @@ class Standup(BaseModel):
     checks: list[str] = []
     # The "both" source: each in-play card joined to its issue, by number.
     links: list[CardLink] = []
+    # What moved in the window, per worker and in total; the brief's first line.
+    counts: Counts = Counts()
     # What kind each item is: ref -> its label names (an issue) or its
     # type (a card), read against the ceremony's kinds. Not served.
     _marks: dict[str, list[str]] = PrivateAttr(default_factory=dict)
@@ -300,6 +338,61 @@ def previous_working_day_start(as_of: datetime) -> datetime:
     back = {0: 3, 6: 2, 5: 1}.get(as_of.weekday(), 1)
     day = (as_of - timedelta(days=back)).date()
     return datetime.combine(day, time(0, 0), tzinfo=as_of.tzinfo)
+
+
+_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def since_refusal(as_of: datetime, since: str) -> str:
+    """'' when ``since`` is a window the standup can read: empty (the default,
+    the previous working day) or a ``yyyy-MM-dd`` day no later than ``as_of``'s.
+    Else the reason, which the route answers with a 422. The mirror of
+    ``Test-P20StandupSince``."""
+    text = (since or "").strip()
+    if not text:
+        return ""
+    try:
+        day = date.fromisoformat(text) if _DAY.match(text) else None
+    except ValueError:
+        day = None
+    if day is None:
+        return f"since '{since}' is not a day: yyyy-MM-dd."
+    if day > as_of.date():
+        return f"since '{since}' is after {as_of.date().isoformat()}: a window looks back."
+    return ""
+
+
+def window_start(as_of: datetime, since: str = "") -> datetime:
+    """Yesterday's lower bound: the previous working day's start, or -- given a
+    window's first day (``Standup -Since``, ``?since=``) -- local midnight of that
+    day in ``as_of``'s offset. Today and the blockers do not move with it: they are
+    what is open now. Raises ValueError with ``since_refusal``'s reason."""
+    text = (since or "").strip()
+    if not text:
+        return previous_working_day_start(as_of)
+    why = since_refusal(as_of, text)
+    if why:
+        raise ValueError(why)
+    return datetime.combine(date.fromisoformat(text), time(0, 0), tzinfo=as_of.tzinfo)
+
+
+def card_hashes(card: dict) -> list[str]:
+    """A card row's commits: its ``commits`` hashes, distinct by their first seven
+    characters (lowercase, so a short and a full hash of one commit are one), in
+    first-seen order. A card with no bullets has none."""
+    seen: list[str] = []
+    for h in card.get("commits") or []:
+        key = str(h).strip().lower()[:7]
+        if key and key not in seen:
+            seen.append(key)
+    return seen
+
+
+def card_begun_in(card: dict, first: str, last: str) -> bool:
+    """Whether a card row's ``begun`` day (its **Started:** day, else its
+    **Created:** day) is in [first, last], as yyyy-MM-dd days."""
+    day = str(card.get("begun") or "")[:10]
+    return bool(day) and first <= day <= last
 
 
 def worker_name(description: str) -> str:
@@ -323,8 +416,15 @@ def _when(stamp) -> datetime | None:
 
 
 def _item(issue: dict) -> SlotItem:
+    # An issue alone says closed or in progress: the read has no fact that
+    # marks when its work began. A card joined to it may say started.
+    closed, _started, in_progress = rituals_motions()
+    is_open = str(issue.get("state", "")).upper() == "OPEN"
     return SlotItem(
-        number=int(issue.get("number", 0)), title=issue.get("title", "") or "", url=issue.get("url", "") or ""
+        number=int(issue.get("number", 0)),
+        title=issue.get("title", "") or "",
+        url=issue.get("url", "") or "",
+        motion=in_progress if is_open else closed,
     )
 
 
@@ -339,18 +439,19 @@ def issue_keys(issues: list[dict]) -> dict[str, tuple[str, str]]:
 
 
 def fill_standup(
-    as_of: datetime, labels: list[dict], issues: list[dict], tracker_state: dict, space: str = ""
+    as_of: datetime, labels: list[dict], issues: list[dict], tracker_state: dict, space: str = "", window: str = ""
 ) -> Standup:
     """The standup's slots, queue and vocabulary from labels and issues. Pure.
 
     ``as_of`` is offset-aware; every comparison is between offset-aware times.
     ``tracker_state`` is ``{"ok": bool, "reason": str}``; when it is not ok the
     labels and issues are not read -- the ritual is the chair's lines and the reason.
+    ``window`` is ``since``'s day (``window_start``); "" is the previous working day.
     """
     words = vocabulary()
     phrasebook, nothing = words["phrasebook"], words["nothing"]
     d = as_of.timetuple().tm_yday
-    since = previous_working_day_start(as_of)
+    since = window_start(as_of, window)
     state = TrackerState(ok=bool(tracker_state.get("ok")), reason=str(tracker_state.get("reason") or ""))
     out = Standup(
         register_=ceremonies()[CEREMONY]["registers"][0],
@@ -404,6 +505,7 @@ def fill_standup(
             w.excuse = nothing[(d + i) % len(nothing)]
     out.workers = [workers[label] for label, _ in routes]
     out.work = build_work(out, key_of)
+    out.counts = standup_counts(out, {})
     return out
 
 
@@ -450,9 +552,15 @@ def card_title(content: str, file: str, cid: str | None) -> str:
     return heading
 
 
+def _stamp_day(content: str, stamp: str) -> str | None:
+    """The yyyy-MM-dd a footer stamp (``**Started:**``, ``**Created:**``) carries; None without one."""
+    m = re.search(r"(?m)^" + re.escape(stamp) + r"\s*(\d{4}-\d{2}-\d{2})", content or "")
+    return m.group(1) if m else None
+
+
 def read_cards(space_dir: Path, type_names: list[str], prefixes: list[str]) -> list[dict]:
     """The thin layer: a Space's ``current/`` and ``archive/`` as card rows --
-    ``{file, folder, status, closed, title, id, path, type, body, billable}``. A file with no id by the
+    ``{file, folder, status, closed, title, id, path, type, body, billable, begun, commits}``. A file with no id by the
     one id rule is not a card and is skipped. State is the parser's rule; a card
     in ``archive/`` is Done and carries its Closed stamp's day."""
     rows: list[dict] = []
@@ -488,6 +596,9 @@ def read_cards(space_dir: Path, type_names: list[str], prefixes: list[str]) -> l
                     "body": content,
                     # A card that says `**Billable:** no` is not a standup row.
                     "billable": card_billable(content),
+                    # What moved: the day its work began, and its commit bullets.
+                    "begun": _stamp_day(content, stamp_started()) or _stamp_day(content, stamp_created()),
+                    "commits": re_commit_bullet().findall(content),
                 }
             )
     return rows
@@ -512,19 +623,22 @@ def cards_in_play(cards: list[dict]) -> list[dict]:
 
 
 def _cards_tile(
-    as_of: datetime, cards: list[dict], label: str, name: str, marks: dict
-) -> tuple[Worker, list[WalkItem], dict[str, tuple[str, str]]]:
-    """Cards (already in play) -> one worker's slots, its walk items and the
-    work keys. yesterday: in ``archive/``, ``closed`` (a day) in [since's day,
-    asOf's day]. today: in ``current/``, In Progress or Code Review. walk: in
-    ``current/``, Code Review. An Active card is nowhere; so is an archived
-    card with no Closed day. ``empty`` is the caller's. The mirror of
-    ``Get-P20StandupCardTile``."""
-    since = previous_working_day_start(as_of)
+    as_of: datetime, cards: list[dict], label: str, name: str, marks: dict, since: datetime | None = None
+) -> tuple[Worker, list[WalkItem], dict[str, tuple[str, str]], dict[str, list[str]]]:
+    """Cards (already in play) -> one worker's slots, its walk items, the
+    work keys and each item's hashes. yesterday: in ``archive/``, ``closed`` (a
+    day) in [since's day, asOf's day]. today: in ``current/``, In Progress or
+    Code Review. walk: in ``current/``, Code Review. An Active card is nowhere;
+    so is an archived card with no Closed day. A yesterday item is closed; a
+    today item started when its ``begun`` day is in the window, else in
+    progress. ``empty`` is the caller's. The mirror of ``Get-P20StandupCardTile``."""
+    since = since or previous_working_day_start(as_of)
     first, last = since.date().isoformat(), as_of.date().isoformat()
+    closed, started, in_progress = rituals_motions()
     worker = Worker(label=label, name=name)
     walk: list[WalkItem] = []
     key_of: dict[str, tuple[str, str]] = {}
+    hashes: dict[str, list[str]] = {}
     for card in cards:
         file = str(card.get("file", ""))
         folder = str(card.get("folder", ""))
@@ -538,20 +652,26 @@ def _cards_tile(
         # A card groups by the design card it names, else its type.
         key_of[f"{item.id}|{item.path}"] = work_key(None, card.get("body"), card.get("type"), {})
         marks[item.id or ""] = [str(card.get("type") or "")]
+        hashes[f"{item.id}|{item.path}"] = card_hashes(card)
+        item.commits = len(hashes[f"{item.id}|{item.path}"])
         if folder == folder_archive():
+            item.motion = closed
             day = str(card.get("closed") or "")[:10]
             if day and first <= day <= last:
                 worker.yesterday.append(item)
             continue
+        item.motion = started if card_begun_in(card, first, last) else in_progress
         state = card.get("status")
         if state in (status_in_progress(), status_code_review()):
             worker.today.append(item)
         if state == status_code_review():
             walk.append(WalkItem(**item.model_dump(), worker=name))
-    return worker, walk, key_of
+    return worker, walk, key_of, hashes
 
 
-def fill_cards_standup(as_of: datetime, cards: list[dict], space: str = "", space_name: str = "") -> Standup:
+def fill_cards_standup(
+    as_of: datetime, cards: list[dict], space: str = "", space_name: str = "", window: str = ""
+) -> Standup:
     """The second fill, from card rows. Pure; the mirror of ``Invoke-P20StandupCardsFill``.
 
     The cards in play (``cards_in_play``: a not-billable card is left out) on
@@ -561,7 +681,7 @@ def fill_cards_standup(as_of: datetime, cards: list[dict], space: str = "", spac
     words = vocabulary()
     phrasebook, nothing = words["phrasebook"], words["nothing"]
     d = as_of.timetuple().tm_yday
-    since = previous_working_day_start(as_of)
+    since = window_start(as_of, window)
     name = space_name or space
     out = Standup(
         register_=ceremonies()[CEREMONY]["registers"][0],
@@ -572,13 +692,14 @@ def fill_cards_standup(as_of: datetime, cards: list[dict], space: str = "", spac
         tracker=TrackerState(ok=True, reason=""),
         chair=Chair(open=phrasebook[d % len(phrasebook)], close=phrasebook[(d + 1) % len(phrasebook)]),
     )
-    worker, walk, key_of = _cards_tile(as_of, cards_in_play(cards), space, name, out._marks)
+    worker, walk, key_of, hashes = _cards_tile(as_of, cards_in_play(cards), space, name, out._marks, since)
     if not (worker.yesterday or worker.today or worker.blockers):
         worker.empty = True
         worker.excuse = nothing[d % len(nothing)]
     out.queue = Queue(walk=walk)
     out.workers = [worker]
     out.work = build_work(out, key_of)
+    out.counts = standup_counts(out, hashes)
     return out
 
 
@@ -609,15 +730,24 @@ def fill_joined_standup(
     cards: list[dict],
     space: str = "",
     space_name: str = "",
+    window: str = "",
 ) -> Standup:
     """The issues fill, joined with the cards on the id. Pure; the mirror of
     ``Invoke-P20StandupJoinedFill``. With the tracker not answering it is the
-    issues fill as it stands: the chair's lines and the reason."""
-    out = fill_standup(as_of, labels, issues, tracker_state, space=space)
+    issues fill as it stands: the chair's lines and the reason. A joined card
+    gives its issue's row its commits, and says started for an open one whose
+    card began in the window."""
+    out = fill_standup(as_of, labels, issues, tracker_state, space=space, window=window)
     if not out.tracker.ok:
         return out
     out.source = "both"
     t = rituals_text()
+    since = datetime.fromisoformat(out.since)
+    first, last = since.date().isoformat(), as_of.date().isoformat()
+    _closed, started, in_progress = rituals_motions()
+    hashes: dict[str, list[str]] = {}
+    issue_items = [i for w in out.workers for slot in ceremonies()[CEREMONY]["slots"] for i in getattr(w, slot)]
+    issue_items += list(out.queue.walk)
     by_number = {int(i.get("number", 0)): i for i in issues or []}
     joined: dict[int, list[dict]] = {}
     alone: list[dict] = []
@@ -639,6 +769,13 @@ def fill_joined_standup(
         out.links.append(
             CardLink(number=number, id=str(card.get("id") or ""), lane=str(card.get("status") or ""), path=path)
         )
+        hashes[f"#{number}|"] = card_hashes(card)
+        begun = card_begun_in(card, first, last)
+        for it in issue_items:
+            if it.number == number:
+                it.commits = len(hashes[f"#{number}|"])
+                if begun and it.motion == in_progress:
+                    it.motion = started
         issue = by_number[number]
         is_open = str(issue.get("state", "")).upper() == "OPEN"
         item = f"#{number} {issue.get('title', '') or ''}"
@@ -647,11 +784,47 @@ def fill_joined_standup(
         elif not current and is_open:
             out.checks.append(t["checkCardArchived"].replace("{item}", item))
 
-    tile, walk, card_keys = _cards_tile(as_of, alone, space, space_name or space, out._marks)
+    tile, walk, card_keys, tile_hashes = _cards_tile(as_of, alone, space, space_name or space, out._marks, since)
     if tile.yesterday or tile.today or tile.blockers:
         out.workers.append(tile)
     out.queue.walk.extend(walk)
     out.work = build_work(out, {**issue_keys(issues), **card_keys})
+    out.counts = standup_counts(out, {**hashes, **tile_hashes})
+    return out
+
+
+def standup_counts(filled: Standup, hashes: dict[str, list[str]]) -> Counts:
+    """What moved in the window, per worker (in the workers' order) and in total:
+    each slot item by its motion, and the distinct hashes its card threads --
+    ``hashes`` maps an item's ``<ref>|<path>`` to them. A hash is counted once
+    per worker and once in the total, however many cards thread it; an issue
+    with no card, and a card with no bullets, count none. Pure; the mirror of
+    ``Get-P20StandupCounts``."""
+    closed, started, in_progress = rituals_motions()
+    out = Counts()
+    every: list[str] = []
+    for w in filled.workers:
+        c = MotionCount(label=w.label, name=w.name)
+        mine: list[str] = []
+        for slot in ceremonies()[CEREMONY]["slots"]:
+            for it in getattr(w, slot):
+                if it.motion == closed:
+                    c.closed += 1
+                elif it.motion == started:
+                    c.started += 1
+                elif it.motion == in_progress:
+                    c.inProgress += 1
+                ref = f"#{it.number}" if it.number is not None else (it.id or "")
+                for h in hashes.get(f"{ref}|{it.path}", []):
+                    if h not in mine:
+                        mine.append(h)
+        c.commits = len(mine)
+        every += [h for h in mine if h not in every]
+        out.workers.append(c)
+        out.total.closed += c.closed
+        out.total.started += c.started
+        out.total.inProgress += c.inProgress
+    out.total.commits = len(every)
     return out
 
 
@@ -852,7 +1025,7 @@ def build_work(filled: Standup, key_of: dict[str, tuple[str, str]]) -> Work:
 # The mirror of the CLI's Get-P20StandupProseSentence and Get-P20StandupProse;
 # standup-prose.json is the table.
 
-_PLACEHOLDER = re.compile(r"\{(n|names|name|item|refs|ref|clause|lead|body)\}")
+_PLACEHOLDER = re.compile(r"\{(n|names|name|item|refs|ref|clause|lead|body|motion|title|date|counts)\}")
 
 
 def _fill(template: str, values: dict[str, str]) -> str:
@@ -1265,6 +1438,60 @@ def format_date(when: datetime, pattern: str) -> str:
     return _DATE_TOKENS.sub(lambda m: sub[m.group(0)], pattern)
 
 
+def commits_said(n: int) -> str:
+    """A commit count as the standup says it: ``text.commitOne`` or ``commitMany``, in digits."""
+    t = rituals_text()
+    return _fill(t["commitOne"] if n == 1 else t["commitMany"], {"n": str(n)})
+
+
+def motion_said(item: SlotItem) -> str:
+    """What an item's line adds to its slot: ``started`` when it began in the
+    window, then its commits when it has any ("started, 2 commits", "3 commits").
+    Closed under Yesterday and in progress under Today or Blockers are what the
+    slot label already says, so a closed or in-progress item with no commits
+    says nothing; "" too for an item that carries no motion (the queue's, or an
+    older response's). Pure; the mirror of ``Get-P20StandupMotionText``."""
+    t = rituals_text()
+    motions = rituals_motions()
+    if (item.motion or "") not in motions:
+        return ""
+    bits = []
+    if item.motion == motions[1]:
+        bits.append(t["motionStarted"])
+    if item.commits:
+        bits.append(commits_said(item.commits))
+    return t["countsSeparator"].join(bits)
+
+
+def counts_said(c: MotionCount) -> str:
+    """One count as its non-zero parts -- closed, started, in progress, commits --
+    joined, or ``text.countsNone`` when nothing moved."""
+    t = rituals_text()
+    bits = [
+        _fill(t[key], {"n": str(n)})
+        for key, n in (
+            ("countsClosed", c.closed),
+            ("countsStarted", c.started),
+            ("countsInProgress", c.inProgress),
+        )
+        if n
+    ]
+    if c.commits:
+        bits.append(commits_said(c.commits))
+    return t["countsSeparator"].join(bits) if bits else t["countsNone"]
+
+
+def render_counts(filled: Standup) -> str:
+    """The counts line: the window's first day and what moved in it, in total.
+    The brief's first line. Pure; the mirror of ``Format-P20StandupCounts``."""
+    t = rituals_text()
+    since = datetime.fromisoformat(filled.since)
+    return _fill(
+        t["countsTotal"],
+        {"date": format_date(since, t["dateFormat"]), "counts": counts_said(filled.counts.total)},
+    )
+
+
 def render_standup(filled: Standup) -> str:
     """The text, LF-joined and LF-terminated, exactly as the golden files have it. Pure."""
     t = rituals_text()
@@ -1277,6 +1504,14 @@ def render_standup(filled: Standup) -> str:
         # An issue is "#<number>"; a card is its id.
         ref = f"#{item.number}" if item.number is not None else (item.id or "")
         return f"{ref} {item.title}{suffix}"
+
+    def moved(item: SlotItem, suffix: str = "") -> str:
+        # A slot line says what moved after the ref, where it adds to the slot: "#141 (started, 2 commits) ...".
+        said = motion_said(item)
+        if not said:
+            return numbered(item, suffix)
+        ref = f"#{item.number}" if item.number is not None else (item.id or "")
+        return _fill(t["itemMotion"], {"ref": ref, "motion": said, "title": item.title}) + suffix
 
     as_of = datetime.fromisoformat(filled.asOf)
     lines = [t["title"].replace("{date}", format_date(as_of, t["dateFormat"])), f'"{filled.chair.open}"', ""]
@@ -1301,7 +1536,7 @@ def render_standup(filled: Standup) -> str:
                 items = getattr(w, slot)
                 suffix = t["blockerSuffix"] if slot == "blockers" else ""
                 if items:
-                    lines += [row(t[slot], numbered(i, suffix)) for i in items]
+                    lines += [row(t[slot], moved(i, suffix)) for i in items]
                 else:
                     lines.append(row(t[slot], t[f"{slot}Empty"]))
         lines.append("")
@@ -1357,6 +1592,9 @@ def render_brief(filled: Standup) -> str:
     both Space reads as an issues Space, except that a card on its walk puts the
     walks on "you", and its card tile (labelled with the Space's slug) does not
     say "none in flight"; its Check lines follow the workers.
+    It opens on the counts line (``render_counts``), and a worker's line adds its
+    own started and commits; under a window wider than yesterday a worker's
+    closes are ``countsClosed``, not "closed yesterday".
     With the tracker not ok the brief is the Tracker line and nothing else."""
     t = rituals_text()
     if not filled.tracker.ok:
@@ -1364,7 +1602,12 @@ def render_brief(filled: Standup) -> str:
     issues = filled.source in ("issues", "both")
     on_pc = issues and all(i.number is not None for i in filled.queue.walk)
     who = t["briefWhoPc"] if on_pc else t["briefWhoYou"]
-    lines: list[str] = []
+    # A window wider than yesterday (?since=) says a worker's closes without "yesterday".
+    as_of = datetime.fromisoformat(filled.asOf)
+    widened = filled.since != previous_working_day_start(as_of).isoformat()
+    counted = {c.label: c for c in filled.counts.workers}
+    # The counts line opens the reading: what moved in the window, in total.
+    lines: list[str] = [render_counts(filled)]
     best_noun, best_count = "", 0
     for kind in ceremonies()[CEREMONY]["queue"]:
         count = len(getattr(filled.queue, kind))
@@ -1386,10 +1629,17 @@ def render_brief(filled: Standup) -> str:
             continue
         blockers = len(w.blockers)
         opened = len(w.today) + blockers
+        closed_key, none_key = ("countsClosed", "yesterdayEmpty") if widened else ("briefClosed", "briefClosedNone")
         bits = [
-            t["briefClosed"].replace("{n}", str(len(w.yesterday))) if w.yesterday else t["briefClosedNone"],
+            t[closed_key].replace("{n}", str(len(w.yesterday))) if w.yesterday else t[none_key],
             t["briefOpen"].replace("{n}", str(opened)) if opened else t["briefOpenNone"],
         ]
+        # What moved, the worker's own: how many of the open began in the window, and the commits.
+        mine = counted.get(w.label) or MotionCount()
+        if mine.started:
+            bits.append(t["countsStarted"].replace("{n}", str(mine.started)))
+        if mine.commits:
+            bits.append(commits_said(mine.commits))
         if issues and not (filled.source == "both" and w.label == filled.space):
             bits.append(t["briefInFlight"])
         if blockers > 1:
@@ -1425,11 +1675,16 @@ def _space_entry(cfg: dict, space: str) -> dict:
     return next((s for s in cfg.get("spaces", []) or [] if s.get("slug") == slug), {}) or {}
 
 
-def standup_for(space: str = "", as_of: datetime | None = None) -> Standup:
-    """The whole standup for a Space -- the active one when ``space`` is ""."""
+def standup_for(space: str = "", as_of: datetime | None = None, since: str = "") -> Standup:
+    """The whole standup for a Space -- the active one when ``space`` is "".
+    ``since`` (yyyy-MM-dd) widens yesterday's window back to that day; a day that
+    is not one, or is after today, is a 422 with ``since_refusal``'s reason."""
     cfg = load_config()
     org, status, projects = accounting.space_scope(cfg, space)
     now = as_of or _now()
+    why = since_refusal(now, since)
+    if why:
+        raise HTTPException(status_code=422, detail=why)
     slug = space or cfg.get("activeSpace", "")
     source, reason = standup_source(org, status)
     cards: list[dict] = []
@@ -1443,16 +1698,16 @@ def standup_for(space: str = "", as_of: datetime | None = None) -> Standup:
         cards = read_cards(org_folder(entry), type_names, prefixes)
         name = str(entry.get("name") or "")
     if source == "cards":
-        filled = fill_cards_standup(now, cards, space=slug, space_name=name)
+        filled = fill_cards_standup(now, cards, space=slug, space_name=name, window=since)
     elif source == "both":
         labels, issues, state = read_tracker(org, status, projects, state="all", body=True)
-        filled = fill_joined_standup(now, labels, issues, state, cards, space=slug, space_name=name)
+        filled = fill_joined_standup(now, labels, issues, state, cards, space=slug, space_name=name, window=since)
     else:
         if source == "none":
             labels, issues, state = [], [], {"ok": False, "reason": reason}
         else:
             labels, issues, state = read_tracker(org, status, projects, state="all", body=True)
-        filled = fill_standup(now, labels, issues, state, space=slug)
+        filled = fill_standup(now, labels, issues, state, space=slug, window=since)
     filled.text = render_standup(filled)
     filled.work.text = render_work(filled)
     filled.brief = render_brief(filled)
@@ -1460,7 +1715,7 @@ def standup_for(space: str = "", as_of: datetime | None = None) -> Standup:
         "CMD",
         f"agent{ROUTE}",
         f"space={filled.space} source={filled.source} ok={int(filled.tracker.ok)} "
-        f"workers={len(filled.workers)} walk={len(filled.queue.walk)}",
+        f"workers={len(filled.workers)} walk={len(filled.queue.walk)} since={filled.since}",
     )
     return filled
 
@@ -1469,10 +1724,11 @@ ROUTE = rituals_route().removeprefix(API_PREFIX)
 
 
 @api.get(ROUTE, response_model=Standup)
-async def get_standup(space: str = ""):
-    # space_scope raises the 404 for an unknown slug, exactly as /issue-report does.
+async def get_standup(space: str = "", since: str = ""):
+    # space_scope raises the 404 for an unknown slug, exactly as /issue-report does;
+    # a since that is not a day, or is after today, is a 422 (standup_for).
     # The tier probe and gh both block, so the whole read runs off the event loop.
-    filled = await asyncio.to_thread(standup_for, space)
+    filled = await asyncio.to_thread(standup_for, space, None, since)
     # The dress: after the read, on the loop -- the model call is async.
     filled.spoken = await dress_standup(filled)
     return filled

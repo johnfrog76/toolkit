@@ -1,0 +1,10 @@
+Standup -- Friday 2 October 2026
+"Can we not adjust scope."
+
+Nothing is waiting on you.
+
+Fable: Yesterday I closed #162, Ship the stage. Nothing blocked.
+Opus: Yesterday I closed #161, Ship the foyer. Nothing blocked.
+Widgets: Yesterday I closed W4X9, Ship the docs. Nothing blocked.
+
+"Let's circle back."

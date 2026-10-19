@@ -41,9 +41,11 @@
                 '-Remind <HH:mm> [-Days ...] sets the reminder to attend: ONE Organize reminder, source standup, its cadence (time and days, Monday to Friday unless -Days says otherwise) on its own Ref line, due the next time in the cadence. A second -Remind rewrites it rather than adding one. Needs features.organize.',
                 '-Walk prints only the walk list, by issue number: each verify-close issue and, under it, the VERIFY.md Gate 12 row that names it (or "no VERIFY row -- close on the issue''s own words"). The PC''s morning as one printout; -AsJson carries walk[] of number, title, url, verifyRow. It is a read, not attending (it does not re-arm the reminder), and it does not go with -Remind.',
                 '-Grain detail|work|brief picks the register of detail: detail is the text above, every item and its number; work is the ritual''s grain, each worker''s items grouped by milestone, else the design card the issue names, else the titles'' common stem, spoken as standup prose, one sentence a group, no model ("Opus: Yesterday I closed two in Team Agile (#<n>, #<n>). Nothing blocked."); brief is -Brief''s reading. The played view speaks the work grain. -AsJson carries all three (text, work, brief).',
+                'Each item says what moved, after its number: closed (yesterday''s), started or in progress (today''s and the blockers'') -- started is a card whose **Started:** day, else its **Created:** day, is in the window; an issue with no card says closed or in progress -- and its card''s commits ("#143 (closed, 2 commits) Rename the slug"). The brief opens on the counts line: what moved since the window began, closed, started, in progress and commits, a hash counted once however many cards thread it; each worker''s brief line adds its own.',
+                '-Since <yyyy-MM-dd> widens yesterday back to that day: every issue closed and every card archived since then is said, and the counts sum the window. Today and the blockers are what is open now. The default is the previous working day. Not -Days, which is the reminder''s cadence; a day that is not one, or is after today, is a stated refusal, and it does not go with -Remind.',
                 'Attending re-arms it: Standup (or the Team Agile page) archives the open standup reminder and writes the next day''s in the cadence, once a day, through Organize''s own verbs. To stop it, archive it in Organize.'
             )
-            usage       = '{cliPrefix}Standup [-Space <slug>] [-AsJson] [-Brief] [-Grain <detail|work|brief>] [-Remind <HH:mm>] [-Days <Mon,Tue,...>] [-Walk] [-Help]'
+            usage       = '{cliPrefix}Standup [-Space <slug>] [-AsJson] [-Brief] [-Grain <detail|work|brief>] [-Since <yyyy-MM-dd>] [-Remind <HH:mm>] [-Days <Mon,Tue,...>] [-Walk] [-Help]'
             examples    = @(
                 '{cliPrefix}Standup',
                 '{cliPrefix}Standup -Space toolkit',
@@ -51,6 +53,7 @@
                 '{cliPrefix}Standup -Walk',
                 '{cliPrefix}Standup -Brief',
                 '{cliPrefix}Standup -Grain work',
+                '{cliPrefix}Standup -Since 2026-10-12 -Brief',
                 '{cliPrefix}Standup -Remind 09:00',
                 '{cliPrefix}Standup -Remind 17:30 -Days Mon,Wed,Fri'
             )

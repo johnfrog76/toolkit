@@ -1,5 +1,5 @@
 {
-  "_": "The standup's two sources JOINED on the id (docs/modules/solitaire-agile.md, \"The two sources, joined\"): an active GitHub Space reads its issues AND its cards. Both halves -- tkTestToolkit -Rituals and Tests/test_rituals.py -- feed each case's labels, issues and card rows to their joined fill (fill_joined_standup / Invoke-P20StandupJoinedFill) and assert the source, the walk queue and every worker's slots by ref (#<n> for an issue, the id for a card), the Check lines and the links; a case that names goldens is rendered and compared byte for byte (LF): standup-joined-<name>.txt (the detail), standup-joined-<name>.work.txt (the work grain) and standup-joined-<name>.brief.txt (the chair's reading). One case per shape, then all of them on one day. A card row is what the thin layer reads (read_cards / Get-P20StandupCards); `billable: false` is a card that says **Billable:** no, and a row without the key is billable. The goldens are generated from this table by Tests/regenerate_joined_goldens.py, never typed.",
+  "_": "The standup's two sources JOINED on the id (docs/modules/solitaire-agile.md, \"The two sources, joined\"): an active GitHub Space reads its issues AND its cards. Both halves -- tkTestToolkit -Rituals and Tests/test_rituals.py -- feed each case's labels, issues and card rows to their joined fill (fill_joined_standup / Invoke-P20StandupJoinedFill) and assert the source, the walk queue and every worker's slots by ref (#<n> for an issue, the id for a card), the Check lines and the links; a case that names goldens is rendered and compared byte for byte (LF): standup-joined-<name>.txt (the detail), standup-joined-<name>.work.txt (the work grain) and standup-joined-<name>.brief.txt (the chair's reading). One case per shape, then all of them on one day. A card row is what the thin layer reads (read_cards / Get-P20StandupCards); `billable: false` is a card that says **Billable:** no, and a row without the key is billable. What moved: a card row's `begun` is the day its work began (its **Started:** day, else its **Created:** day) and `commits` the hashes of its `- <hash>` bullets; a row without them began outside any window and threads none. A case's `window` is Standup -Since's day (yesterday's lower bound moved back; `expected.since` then says where it landed). `expected.motions` is each item's motion and commit count by ref; `expected.counts` is the counts per worker and in total. The goldens are generated from this table -- and from standup.json and standup-cards.json -- by Tests/regenerate_joined_goldens.py, never typed.",
   "asOf": "2026-10-02T09:00:00-04:00",
   "since": "2026-10-01T00:00:00-04:00",
   "space": "widgets",
@@ -172,6 +172,122 @@
         "text": "standup-joined-together.txt",
         "work": "standup-joined-together.work.txt",
         "brief": "standup-joined-together.brief.txt"
+      }
+    },
+    {
+      "name": "counts",
+      "shape": "what moved, and the counts line: each item closed, started or in progress with its card's commits; a card that began in the window (its begun day) is started, one that began before it is in progress, an issue with no card is in progress with none; a hash two cards thread (a1b2c3d, once short and once in full) is counted once in the total",
+      "issues": [
+        { "number": 151, "title": "Count the commits", "state": "OPEN", "labels": ["opus"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/151" },
+        { "number": 152, "title": "Fold the window", "state": "OPEN", "labels": ["opus"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/152" },
+        { "number": 153, "title": "Close the books", "state": "CLOSED", "labels": ["fable"], "closedAt": "2026-10-01T15:00:00Z", "url": "https://github.com/acme/widgets/issues/153" },
+        { "number": 154, "title": "Read the label", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/154" }
+      ],
+      "cards": [
+        { "file": "153-close-the-books.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-01", "title": "Close the books", "id": "153", "begun": "2026-09-24", "commits": ["d4e5f6a", "a1b2c3d4e5f60718293a"] },
+        { "file": "199-write-the-counts-docs.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-02", "title": "Write the counts docs", "id": "199", "begun": "2026-09-30", "commits": [] },
+        { "file": "Task151-count-the-commits.prompt.md", "folder": "current", "status": "In Progress", "closed": null, "title": "Count the commits", "id": "151", "begun": "2026-10-01", "commits": ["a1b2c3d", "b2c3d4e", "B2C3D4E"] },
+        { "file": "Task152-fold-the-window.prompt.md", "folder": "current", "status": "In Progress", "closed": null, "title": "Fold the window", "id": "152", "begun": "2026-09-20", "commits": ["c3d4e5f"] },
+        { "file": "TaskM7K3-draw-the-counts-line.prompt.md", "folder": "current", "status": "In Progress", "closed": null, "title": "Draw the counts line", "id": "M7K3", "begun": "2026-10-02", "commits": ["e5f6a7b"] }
+      ],
+      "expected": {
+        "walk": [],
+        "workers": [
+          { "label": "fable", "name": "Fable", "yesterday": ["#153"], "today": ["#154"], "blockers": [], "empty": false },
+          { "label": "opus", "name": "Opus", "yesterday": [], "today": ["#151", "#152"], "blockers": [], "empty": false },
+          { "label": "widgets", "name": "Widgets", "yesterday": ["199"], "today": ["M7K3"], "blockers": [], "empty": false }
+        ],
+        "checks": [],
+        "links": [
+          { "number": 151, "id": "151", "lane": "In Progress" },
+          { "number": 152, "id": "152", "lane": "In Progress" },
+          { "number": 153, "id": "153", "lane": "Done" }
+        ],
+        "motions": {
+          "#153": ["closed", 2],
+          "#154": ["inProgress", 0],
+          "#151": ["started", 2],
+          "#152": ["inProgress", 1],
+          "199": ["closed", 0],
+          "M7K3": ["started", 1]
+        },
+        "counts": {
+          "workers": [
+            { "label": "fable", "closed": 1, "started": 0, "inProgress": 1, "commits": 2 },
+            { "label": "opus", "closed": 0, "started": 1, "inProgress": 1, "commits": 3 },
+            { "label": "widgets", "closed": 1, "started": 1, "inProgress": 0, "commits": 1 }
+          ],
+          "total": { "closed": 2, "started": 2, "inProgress": 2, "commits": 5 }
+        },
+        "text": "standup-joined-counts.txt",
+        "work": "standup-joined-counts.work.txt",
+        "brief": "standup-joined-counts.brief.txt"
+      }
+    },
+    {
+      "name": "not-billable-counts",
+      "shape": "a not-billable card is absent from the counts: its commits are not its issue's, and a card of its own is no row and no count",
+      "issues": [
+        { "number": 155, "title": "Tune the bench", "state": "OPEN", "labels": ["opus"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/155" }
+      ],
+      "cards": [
+        { "file": "Task155-tune-the-bench.prompt.md", "folder": "current", "status": "In Progress", "closed": null, "title": "Tune the bench", "id": "155", "begun": "2026-10-01", "commits": ["f6a7b8c"], "billable": false },
+        { "file": "TaskR4T6-bench-notes.prompt.md", "folder": "current", "status": "In Progress", "closed": null, "title": "Bench notes", "id": "R4T6", "begun": "2026-10-01", "commits": ["a7b8c9d"], "billable": false }
+      ],
+      "expected": {
+        "walk": [],
+        "workers": [
+          { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true },
+          { "label": "opus", "name": "Opus", "yesterday": [], "today": ["#155"], "blockers": [], "empty": false }
+        ],
+        "checks": [],
+        "links": [],
+        "motions": { "#155": ["inProgress", 0] },
+        "counts": {
+          "workers": [
+            { "label": "fable", "closed": 0, "started": 0, "inProgress": 0, "commits": 0 },
+            { "label": "opus", "closed": 0, "started": 0, "inProgress": 1, "commits": 0 }
+          ],
+          "total": { "closed": 0, "started": 0, "inProgress": 1, "commits": 0 }
+        },
+        "text": null
+      }
+    },
+    {
+      "name": "window-three-days",
+      "shape": "a window (Standup -Since 2026-09-29, ?since=2026-09-29): yesterday's lower bound moves back, so a close on each of three days is listed -- an issue and the card joined to it are ONE row and one close -- and a close the day before the window is not; a hash two cards thread is counted once",
+      "window": "2026-09-29",
+      "issues": [
+        { "number": 160, "title": "Ship the clock", "state": "CLOSED", "labels": ["opus"], "closedAt": "2026-09-28T14:00:00Z", "url": "https://github.com/acme/widgets/issues/160" },
+        { "number": 161, "title": "Ship the foyer", "state": "CLOSED", "labels": ["opus"], "closedAt": "2026-09-29T14:00:00Z", "url": "https://github.com/acme/widgets/issues/161" },
+        { "number": 162, "title": "Ship the stage", "state": "CLOSED", "labels": ["fable"], "closedAt": "2026-09-30T14:00:00Z", "url": "https://github.com/acme/widgets/issues/162" }
+      ],
+      "cards": [
+        { "file": "161-ship-the-foyer.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-09-29", "title": "Ship the foyer", "id": "161", "begun": "2026-09-21", "commits": ["1a2b3c4"] },
+        { "file": "TaskW4X9-ship-the-docs.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-01", "title": "Ship the docs", "id": "W4X9", "begun": "2026-09-29", "commits": ["2b3c4d5", "1a2b3c4"] }
+      ],
+      "expected": {
+        "since": "2026-09-29T00:00:00-04:00",
+        "walk": [],
+        "workers": [
+          { "label": "fable", "name": "Fable", "yesterday": ["#162"], "today": [], "blockers": [], "empty": false },
+          { "label": "opus", "name": "Opus", "yesterday": ["#161"], "today": [], "blockers": [], "empty": false },
+          { "label": "widgets", "name": "Widgets", "yesterday": ["W4X9"], "today": [], "blockers": [], "empty": false }
+        ],
+        "checks": [],
+        "links": [{ "number": 161, "id": "161", "lane": "Done" }],
+        "motions": { "#162": ["closed", 0], "#161": ["closed", 1], "W4X9": ["closed", 2] },
+        "counts": {
+          "workers": [
+            { "label": "fable", "closed": 1, "started": 0, "inProgress": 0, "commits": 0 },
+            { "label": "opus", "closed": 1, "started": 0, "inProgress": 0, "commits": 1 },
+            { "label": "widgets", "closed": 1, "started": 0, "inProgress": 0, "commits": 2 }
+          ],
+          "total": { "closed": 3, "started": 0, "inProgress": 0, "commits": 2 }
+        },
+        "text": "standup-joined-window-three-days.txt",
+        "work": "standup-joined-window-three-days.work.txt",
+        "brief": "standup-joined-window-three-days.brief.txt"
       }
     }
   ]

@@ -1,0 +1,10 @@
+Standup -- Friday 2 October 2026
+"Can we not adjust scope."
+
+Nothing is waiting on you.
+
+Fable: Yesterday I closed #153, Close the books. Today I'm on #154, Read the label. Nothing blocked.
+Opus: Today I'm on #151, Count the commits. I'm also on #152, Fold the window. Nothing blocked.
+Widgets: Yesterday I closed 199, Write the counts docs. Today I'm on M7K3, Draw the counts line. Nothing blocked.
+
+"Let's circle back."

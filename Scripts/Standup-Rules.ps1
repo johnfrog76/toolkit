@@ -34,8 +34,13 @@
       Invoke-P20StandupJoinedFill (asOf, labels, issues, tracker, cards, space,
                                spaceName) -> the issues fill joined with the
                                cards on the id: the Check lines and the links.
+      Test-P20StandupSince     Standup -Since's day: '' or why it is not a window.
+      Get-P20StandupCounts     what moved: each item by its motion and
+                               the distinct commits its cards thread, per
+                               worker and in total.
       Format-P20StandupText    the filled object -> the text, LF-joined, every
-                               fixed word from consts.json rituals.text.
+                               fixed word from consts.json rituals.text; a slot
+                               line says what moved after its ref.
       Group-P20StandupWork     the work grain: one slot's items grouped
                                by milestone, design card, card type or the
                                titles' common stem, one phrase per group.
@@ -117,13 +122,69 @@ function Format-P20RitualTime {
 }
 
 function Get-P20StandupSince {
-    <# Local midnight at the start of the previous working day (Mon-Fri), in AsOf's offset. #>
-    param([Parameter(Mandatory)][DateTimeOffset]$AsOf)
+    <#
+      Yesterday's lower bound. With no Window: local midnight at the start of the
+      previous working day (Mon-Fri), in AsOf's offset. With a Window -- a
+      yyyy-MM-dd day (Standup -Since), already held by Test-P20StandupSince --
+      local midnight of that day in AsOf's offset. window_start in the agent.
+    #>
+    param([Parameter(Mandatory)][DateTimeOffset]$AsOf, [string]$Window)
+    if ($Window) {
+        $day = [datetime]::ParseExact($Window.Trim(), 'yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
+        return (New-Object DateTimeOffset -ArgumentList $day.Year, $day.Month, $day.Day, 0, 0, 0, $AsOf.Offset)
+    }
     $day = $AsOf.Date.AddDays(-1)
     while ($day.DayOfWeek -eq [DayOfWeek]::Saturday -or $day.DayOfWeek -eq [DayOfWeek]::Sunday) {
         $day = $day.AddDays(-1)
     }
     return (New-Object DateTimeOffset -ArgumentList $day.Year, $day.Month, $day.Day, 0, 0, 0, $AsOf.Offset)
+}
+
+function Test-P20StandupSince {
+    <#
+      '' when Since is a window the standup can read: empty (the default, the
+      previous working day) or a yyyy-MM-dd day no later than AsOf's. Else the
+      reason -- Standup -Since states it and exits 2. since_refusal in the agent.
+    #>
+    param([Parameter(Mandatory)][DateTimeOffset]$AsOf, [AllowEmptyString()][AllowNull()][string]$Since)
+    $text = ([string]$Since).Trim()
+    if (-not $text) { return '' }
+    $day = [datetime]::MinValue
+    if ($text -notmatch '^\d{4}-\d{2}-\d{2}$' -or -not [datetime]::TryParseExact($text, 'yyyy-MM-dd',
+            [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::None, [ref]$day)) {
+        return "-Since '$Since' is not a day: yyyy-MM-dd."
+    }
+    if ($day.Date -gt $AsOf.Date) {
+        return "-Since '$Since' is after $($AsOf.ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)): a window looks back."
+    }
+    return ''
+}
+
+function Get-P20StandupCardHashes {
+    <#
+      A card row's commits: its commits hashes, distinct by their first seven
+      characters (lowercase, so a short and a full hash of one commit are one),
+      in first-seen order. card_hashes in the agent.
+    #>
+    param($Card)
+    $seen = New-Object 'System.Collections.Generic.List[string]'
+    $list = $null
+    if ($Card -is [System.Collections.IDictionary]) { if ($Card.Contains('commits')) { $list = $Card['commits'] } }
+    elseif ($null -ne $Card -and $Card.PSObject.Properties['commits']) { $list = $Card.commits }
+    foreach ($h in @($list)) {
+        if ($null -eq $h) { continue }
+        $key = ([string]$h).Trim().ToLowerInvariant()
+        if ($key.Length -gt 7) { $key = $key.Substring(0, 7) }
+        if ($key -and -not $seen.Contains($key)) { $seen.Add($key) }
+    }
+    return , ([string[]]$seen.ToArray())
+}
+
+function Test-P20StandupCardBegun {
+    <# Whether a card row's begun day (its **Started:** day, else **Created:**) is in [From, To], as days. card_begun_in in the agent. #>
+    param($Card, [string]$From, [string]$To)
+    $day = ConvertTo-P20StandupDay $Card.begun
+    return ([bool]$day -and [string]::CompareOrdinal($day, $From) -ge 0 -and [string]::CompareOrdinal($day, $To) -le 0)
 }
 
 function Get-P20StandupWorkers {
@@ -210,13 +271,15 @@ function Invoke-P20StandupFill {
         $Issues,
         $Tracker,
         [string]$Space = '',
+        [string]$Window = '',
         [string]$PackageRoot
     )
     $data = Get-P20RitualData -PackageRoot $PackageRoot
     $rituals = $data.Rituals
+    $motions = @($rituals.motions | ForEach-Object { [string]$_ })
     $at = ConvertTo-P20RitualTime $AsOf
     if ($null -eq $at) { throw "asOf '$AsOf' is not a time." }
-    $since = Get-P20StandupSince -AsOf $at
+    $since = Get-P20StandupSince -AsOf $at -Window $Window
     $d = $at.DayOfYear
 
     $phrases = @($data.Vocabulary.phrasebook)
@@ -260,15 +323,18 @@ function Invoke-P20StandupFill {
             foreach ($n in $names) {
                 if ($byLabel.ContainsKey($n)) { $worker = $byLabel[$n]; break }
             }
-            # Every item has the same five keys whichever source filled it: an
+            # Every item has the same seven keys whichever source filled it: an
             # issue's id is null and its path ''; a card's number is null and
-            # its url ''.
-            $item = [ordered]@{ number = [int]$issue.number; id = $null; title = [string]$issue.title; url = [string]$issue.url; path = '' }
+            # its url ''. An issue alone says closed or in progress: the read
+            # has no fact that marks when its work began.
+            $motion = $motions[2]
+            if (-not $isOpen) { $motion = $motions[0] }
+            $item = [ordered]@{ number = [int]$issue.number; id = $null; title = [string]$issue.title; url = [string]$issue.url; path = ''; motion = $motion; commits = 0 }
 
             if ($isOpen -and $isWalk -and $queueLists.Contains('walk')) {
                 $workerName = ''
                 if ($worker) { $workerName = [string]$worker.name }
-                [void]$queueLists['walk'].Add([ordered]@{ number = $item.number; id = $null; title = $item.title; url = $item.url; path = ''; worker = $workerName })
+                [void]$queueLists['walk'].Add([ordered]@{ number = $item.number; id = $null; title = $item.title; url = $item.url; path = ''; motion = $motion; commits = 0; worker = $workerName })
             }
             if (-not $worker) { continue }
             $lists = $fills[$worker.label]
@@ -302,6 +368,7 @@ function Invoke-P20StandupFill {
     foreach ($kind in $queueLists.Keys) { $queue[$kind] = [object[]]@($queueLists[$kind] | Sort-Object { [int]$_.number }) }
     $work = New-P20StandupWorkEmpty -QueueKinds $kinds
     if ($ok) { $work = New-P20StandupWork -Standup @{ queue = $queue; workers = $workers.ToArray() } -KeyOf $keyOf -QueueKinds $kinds -Slots $slots }
+    $counts = Get-P20StandupCounts -Standup @{ workers = $workers.ToArray() } -Hashes @{} -Slots $slots
 
     $open = ''
     $close = ''
@@ -325,7 +392,47 @@ function Invoke-P20StandupFill {
         text     = ''
         checks   = [object[]]@()
         links    = [object[]]@()
+        counts   = $counts
     }
+}
+
+function Get-P20StandupCounts {
+    <#
+      What moved in the window, per worker (in the workers' order) and in total,
+      as [ordered]@{ workers; total }, each count [ordered]@{ label; name; closed;
+      started; inProgress; commits } (the total's label and name ''). Each slot
+      item by its motion, and the distinct hashes its card threads -- Hashes
+      maps an item's '<ref>|<path>' to them. A hash is counted once per worker
+      and once in the total, however many cards thread it; an issue with no
+      card, and a card with no bullets, count none. standup_counts in the agent.
+    #>
+    param($Standup, [hashtable]$Hashes, [string[]]$Slots)
+    $m = @((Get-P20Consts).rituals.motions | ForEach-Object { [string]$_ })
+    $rows = New-Object System.Collections.ArrayList
+    $every = New-Object 'System.Collections.Generic.List[string]'
+    $total = [ordered]@{ label = ''; name = ''; closed = 0; started = 0; inProgress = 0; commits = 0 }
+    foreach ($w in @($Standup.workers | Where-Object { $null -ne $_ })) {
+        $c = [ordered]@{ label = [string]$w.label; name = [string]$w.name; closed = 0; started = 0; inProgress = 0; commits = 0 }
+        $mine = New-Object 'System.Collections.Generic.List[string]'
+        foreach ($slot in $Slots) {
+            foreach ($it in @($w.$slot | Where-Object { $null -ne $_ })) {
+                $mo = [string]$it.motion
+                if ($mo -ceq $m[0]) { $c['closed'] = $c['closed'] + 1 }
+                elseif ($mo -ceq $m[1]) { $c['started'] = $c['started'] + 1 }
+                elseif ($mo -ceq $m[2]) { $c['inProgress'] = $c['inProgress'] + 1 }
+                $key = (Get-P20StandupItemRef $it) + '|' + [string]$it.path
+                if ($Hashes -and $Hashes.ContainsKey($key)) {
+                    foreach ($h in @($Hashes[$key])) { if ($h -and -not $mine.Contains([string]$h)) { $mine.Add([string]$h) } }
+                }
+            }
+        }
+        $c['commits'] = $mine.Count
+        foreach ($h in $mine) { if (-not $every.Contains($h)) { $every.Add($h) } }
+        foreach ($k in @('closed', 'started', 'inProgress')) { $total[$k] = $total[$k] + $c[$k] }
+        [void]$rows.Add($c)
+    }
+    $total['commits'] = $every.Count
+    return [ordered]@{ workers = [object[]]$rows.ToArray(); total = $total }
 }
 
 # -- The second source: cards -------------------------------------------
@@ -394,7 +501,9 @@ function Get-P20StandupCards {
     <#
       The impure half: a Space's current/ and archive/ read into the rows the
       cards fill takes -- @{ file; folder; status; closed; title; id; path; type;
-      body; billable }. billable is Test-P20CardBillable's answer.
+      body; billable; begun; commits }. billable is Test-P20CardBillable's
+      answer; begun the day its **Started:** stamp, else its **Created:** stamp,
+      carries; commits the hash of every `- <hash>` bullet (regex.commitBullet, group 1 -- the lane rule's own pattern).
       A file the one id rule finds no id in is not a card and is skipped (a
       dated PR-comment record in archive/, a person's note). State is the
       status verb's own rule (Get-PromptFileStatus); a card in archive/ is Done.
@@ -402,6 +511,10 @@ function Get-P20StandupCards {
     param([string]$CurrentDir, [string]$ArchiveDir, [Parameter(Mandatory)][string]$Pattern)
     $c = Get-P20Consts
     $closedRx = '(?m)^' + [regex]::Escape([string]$c.stamps.closed) + '\s*(\d{4}-\d{2}-\d{2})'
+    # What moved: the day its work began -- **Started:**, else **Created:** -- and its bullets.
+    $startedRx = '(?m)^' + [regex]::Escape([string]$c.stamps.started) + '\s*(\d{4}-\d{2}-\d{2})'
+    $createdRx = '(?m)^' + [regex]::Escape([string]$c.stamps.created) + '\s*(\d{4}-\d{2}-\d{2})'
+    $hashRx = [string]$c.regex.commitBullet
     $rows = New-Object System.Collections.ArrayList
     foreach ($pair in @(@([string]$c.folders.current, $CurrentDir), @([string]$c.folders.archive, $ArchiveDir))) {
         $folder = $pair[0]
@@ -412,6 +525,11 @@ function Get-P20StandupCards {
             if (-not $id) { continue }
             $content = [System.IO.File]::ReadAllText($f.FullName)
             $closed = $null
+            $begun = $null
+            $bm = [regex]::Match($content, $startedRx)
+            if (-not $bm.Success) { $bm = [regex]::Match($content, $createdRx) }
+            if ($bm.Success) { $begun = $bm.Groups[1].Value }
+            $hashes = @([regex]::Matches($content, $hashRx) | ForEach-Object { $_.Groups[1].Value })
             $status = [string]$c.status.done
             if ($folder -eq [string]$c.folders.current) { $status = Get-PromptFileStatus $content }
             else {
@@ -430,6 +548,8 @@ function Get-P20StandupCards {
                     body     = $content
                     # A card that says **Billable:** no is not a standup row.
                     billable = (Test-P20CardBillable $content)
+                    begun    = $begun
+                    commits  = [object[]]$hashes
                 })
         }
     }
@@ -482,17 +602,22 @@ function Get-P20StandupCardTile {
       keys, as @{ worker; walk; keyOf }. yesterday: in archive/, its Closed day in
       [since, asOf] (as days). today: in current/, In Progress or Code Review.
       walk: in current/, Code Review. An Active card is nowhere; so is an archived
-      card with no Closed day. worker.empty is set; its status sentence is the
-      caller's. _cards_tile in the agent.
+      card with no Closed day. A yesterday item is closed; a today item started
+      when its begun day is in the window, else in progress. worker.empty is
+      set; its status sentence is the caller's. Also returns hashes, each item's
+      '<ref>|<path>' -> its card's hashes. _cards_tile in the agent.
     #>
-    param([Parameter(Mandatory)][DateTimeOffset]$AsOf, $Cards, [string]$Label, [string]$Name, [string[]]$Slots)
+    param([Parameter(Mandatory)][DateTimeOffset]$AsOf, $Cards, [string]$Label, [string]$Name, [string[]]$Slots, $From)
     $c = Get-P20Consts
     $st = $c.status
+    $motions = @($c.rituals.motions | ForEach-Object { [string]$_ })
     $archiveName = [string]$c.folders.archive
-    $since = Get-P20StandupSince -AsOf $AsOf
+    $start = $From
+    if ($null -eq $start) { $start = Get-P20StandupSince -AsOf $AsOf }
     $inv = [System.Globalization.CultureInfo]::InvariantCulture
-    $fromDay = $since.ToString('yyyy-MM-dd', $inv)
+    $fromDay = ([DateTimeOffset]$start).ToString('yyyy-MM-dd', $inv)
     $toDay = $AsOf.ToString('yyyy-MM-dd', $inv)
+    $hashesOf = @{}
     $keyOf = @{}
     $lists = @{}
     foreach ($slot in $Slots) { $lists[$slot] = New-Object System.Collections.ArrayList }
@@ -502,11 +627,15 @@ function Get-P20StandupCardTile {
         $file = [string]$card.file
         $path = [string]$card.path
         if (-not $path) { $path = ([string]$card.folder) + '/' + $file }
-        $item = [ordered]@{ number = $null; id = [string]$card.id; title = [string]$card.title; url = ''; path = $path }
+        $hashes = Get-P20StandupCardHashes $card
+        $item = [ordered]@{ number = $null; id = [string]$card.id; title = [string]$card.title; url = ''; path = $path; motion = $motions[2]; commits = $hashes.Count }
+        if (Test-P20StandupCardBegun -Card $card -From $fromDay -To $toDay) { $item['motion'] = $motions[1] }
         # A card groups by the design card it names, else its type.
         $keyOf[$item.id + '|' + $path] = Get-P20StandupWorkKey -Milestone $null -Body ([string]$card.body) -Type ([string]$card.type) -Threads @{}
+        $hashesOf[$item.id + '|' + $path] = $hashes
         $status = [string]$card.status
         if ([string]$card.folder -eq $archiveName) {
+            $item['motion'] = $motions[0]
             $day = ConvertTo-P20StandupDay $card.closed
             if ($day -and [string]::CompareOrdinal($day, $fromDay) -ge 0 -and [string]::CompareOrdinal($day, $toDay) -le 0) {
                 [void]$lists['yesterday'].Add($item)
@@ -515,7 +644,7 @@ function Get-P20StandupCardTile {
         }
         if ($status -ceq [string]$st.inProgress -or $status -ceq [string]$st.codeReview) { [void]$lists['today'].Add($item) }
         if ($status -ceq [string]$st.codeReview) {
-            [void]$walk.Add([ordered]@{ number = $null; id = $item.id; title = $item.title; url = ''; path = $path; worker = $Name })
+            [void]$walk.Add([ordered]@{ number = $null; id = $item.id; title = $item.title; url = ''; path = $path; motion = $item.motion; commits = $item.commits; worker = $Name })
         }
     }
     $w = [ordered]@{ label = $Label; name = $Name }
@@ -527,7 +656,7 @@ function Get-P20StandupCardTile {
     }
     $w['empty'] = $empty
     $w['excuse'] = ''
-    return @{ worker = $w; walk = [object[]]$walk.ToArray(); keyOf = $keyOf }
+    return @{ worker = $w; walk = [object[]]$walk.ToArray(); keyOf = $keyOf; hashes = $hashesOf }
 }
 
 function Invoke-P20StandupCardsFill {
@@ -546,12 +675,13 @@ function Invoke-P20StandupCardsFill {
         $Cards,
         [string]$Space = '',
         [string]$SpaceName = '',
+        [string]$Window = '',
         [string]$PackageRoot
     )
     $data = Get-P20RitualData -PackageRoot $PackageRoot
     $at = ConvertTo-P20RitualTime $AsOf
     if ($null -eq $at) { throw "asOf '$AsOf' is not a time." }
-    $since = Get-P20StandupSince -AsOf $at
+    $since = Get-P20StandupSince -AsOf $at -Window $Window
     $d = $at.DayOfYear
     $phrases = @($data.Vocabulary.phrasebook)
     $nothing = @($data.Vocabulary.nothing)
@@ -560,7 +690,7 @@ function Invoke-P20StandupCardsFill {
     if (-not $name) { $name = $Space }
     $slots = @($data.Ceremony.slots | ForEach-Object { [string]$_ })
     $kinds = @($data.Ceremony.queue | ForEach-Object { [string]$_ })
-    $tile = Get-P20StandupCardTile -AsOf $at -Cards @(Get-P20StandupCardsInPlay -Cards $Cards) -Label $Space -Name $name -Slots $slots
+    $tile = Get-P20StandupCardTile -AsOf $at -Cards @(Get-P20StandupCardsInPlay -Cards $Cards) -Label $Space -Name $name -Slots $slots -From $since
     $w = $tile.worker
     if ($w.empty -and $nothing.Count -gt 0) { $w['excuse'] = [string]$nothing[$d % $nothing.Count] }
 
@@ -568,6 +698,7 @@ function Invoke-P20StandupCardsFill {
     foreach ($kind in @($data.Ceremony.queue)) { $queue[[string]$kind] = [object[]]@() }
     if ($queue.Contains('walk')) { $queue['walk'] = [object[]]$tile.walk }
     $work = New-P20StandupWork -Standup @{ queue = $queue; workers = @($w) } -KeyOf $tile.keyOf -QueueKinds $kinds -Slots $slots
+    $counts = Get-P20StandupCounts -Standup @{ workers = @($w) } -Hashes $tile.hashes -Slots $slots
 
     $open = ''
     $close = ''
@@ -590,6 +721,7 @@ function Invoke-P20StandupCardsFill {
         text     = ''
         checks   = [object[]]@()
         links    = [object[]]@()
+        counts   = $counts
     }
 }
 
@@ -624,9 +756,10 @@ function Invoke-P20StandupJoinedFill {
         $Cards,
         [string]$Space = '',
         [string]$SpaceName = '',
+        [string]$Window = '',
         [string]$PackageRoot
     )
-    $out = Invoke-P20StandupFill -AsOf $AsOf -Labels $Labels -Issues $Issues -Tracker $Tracker -Space $Space -PackageRoot $PackageRoot
+    $out = Invoke-P20StandupFill -AsOf $AsOf -Labels $Labels -Issues $Issues -Tracker $Tracker -Space $Space -Window $Window -PackageRoot $PackageRoot
     if (-not $out.tracker.ok) { return $out }
     $out.source = 'both'
     $data = Get-P20RitualData -PackageRoot $PackageRoot
@@ -636,6 +769,18 @@ function Invoke-P20StandupJoinedFill {
     $at = ConvertTo-P20RitualTime $AsOf
     $slots = @($data.Ceremony.slots | ForEach-Object { [string]$_ })
     $kinds = @($data.Ceremony.queue | ForEach-Object { [string]$_ })
+    $motions = @($c.rituals.motions | ForEach-Object { [string]$_ })
+    $inv = [System.Globalization.CultureInfo]::InvariantCulture
+    $since = Get-P20StandupSince -AsOf $at -Window $Window
+    $fromDay = $since.ToString('yyyy-MM-dd', $inv)
+    $toDay = $at.ToString('yyyy-MM-dd', $inv)
+    # Every issue row, the slots' and the walk's: a joined card gives its row its commits.
+    $issueItems = New-Object System.Collections.ArrayList
+    foreach ($w in @($out.workers | Where-Object { $null -ne $_ })) {
+        foreach ($slot in $slots) { foreach ($it in @($w.$slot | Where-Object { $null -ne $_ })) { [void]$issueItems.Add($it) } }
+    }
+    foreach ($it in @($out.queue.walk | Where-Object { $null -ne $_ })) { [void]$issueItems.Add($it) }
+    $hashesOf = @{}
 
     $byNumber = @{}
     foreach ($issue in @($Issues)) { if ($null -ne $issue) { $byNumber[[int]$issue.number] = $issue } }
@@ -669,6 +814,15 @@ function Invoke-P20StandupJoinedFill {
         $path = [string]$card.path
         if (-not $path) { $path = ([string]$card.folder) + '/' + [string]$card.file }
         [void]$links.Add([ordered]@{ number = [int]$n; id = [string]$card.id; lane = [string]$card.status; path = $path })
+        $hashes = Get-P20StandupCardHashes $card
+        $hashesOf['#' + $n + '|'] = $hashes
+        $begun = Test-P20StandupCardBegun -Card $card -From $fromDay -To $toDay
+        foreach ($it in $issueItems) {
+            if ($null -ne $it.number -and [int]$it.number -eq [int]$n) {
+                $it['commits'] = $hashes.Count
+                if ($begun -and [string]$it.motion -ceq $motions[2]) { $it['motion'] = $motions[1] }
+            }
+        }
         $issue = $byNumber[$n]
         $isOpen = (([string]$issue.state).ToUpperInvariant() -eq 'OPEN')
         $item = '#' + $n + ' ' + [string]$issue.title
@@ -678,7 +832,8 @@ function Invoke-P20StandupJoinedFill {
 
     $name = $SpaceName
     if (-not $name) { $name = $Space }
-    $tile = Get-P20StandupCardTile -AsOf $at -Cards $alone.ToArray() -Label $Space -Name $name -Slots $slots
+    $tile = Get-P20StandupCardTile -AsOf $at -Cards $alone.ToArray() -Label $Space -Name $name -Slots $slots -From $since
+    foreach ($k in @($tile.hashes.Keys)) { $hashesOf[$k] = $tile.hashes[$k] }
     $workers = New-Object System.Collections.ArrayList
     foreach ($w in @($out.workers | Where-Object { $null -ne $_ })) { [void]$workers.Add($w) }
     if (-not $tile.worker.empty) { [void]$workers.Add($tile.worker) }
@@ -694,6 +849,7 @@ function Invoke-P20StandupJoinedFill {
     $out.work = New-P20StandupWork -Standup @{ queue = $out.queue; workers = $out.workers } -KeyOf $keyOf -QueueKinds $kinds -Slots $slots
     $out.checks = [object[]]$checks.ToArray()
     $out.links = [object[]]$links.ToArray()
+    $out.counts = Get-P20StandupCounts -Standup @{ workers = $out.workers } -Hashes $hashesOf -Slots $slots
     return $out
 }
 
@@ -986,7 +1142,7 @@ function Format-P20ProseTemplate {
         if ($Values.ContainsKey($k)) { return [string]$Values[$k] }
         return $m.Value
     }
-    return [regex]::Replace([string]$Template, '\{(n|names|name|item|refs|ref|clause|lead|body)\}', $evaluator)
+    return [regex]::Replace([string]$Template, '\{(n|names|name|item|refs|ref|clause|lead|body|motion|title|date|counts)\}', $evaluator)
 }
 
 function Get-P20StandupProseText {
@@ -1394,7 +1550,13 @@ function Format-P20StandupText {
                 $suffix = ''
                 if ($slot -eq 'blockers') { $suffix = [string]$t.blockerSuffix }
                 foreach ($item in $items) {
-                    $lines.Add((& $row $label ((Get-P20StandupItemRef $item) + ' ' + $item.title + $suffix)))
+                    # What moved, after the ref, where it adds to the slot: "#141 (started, 2 commits) Rename the slug".
+                    $said = Get-P20StandupMotionText $item
+                    if ($said) {
+                        $body = Format-P20ProseTemplate ([string]$t.itemMotion) @{ ref = (Get-P20StandupItemRef $item); motion = $said; title = [string]$item.title }
+                    }
+                    else { $body = (Get-P20StandupItemRef $item) + ' ' + $item.title }
+                    $lines.Add((& $row $label ($body + $suffix)))
                 }
             }
         }
@@ -1412,6 +1574,78 @@ function Format-P20StandupText {
 }
 
 
+# -- What moved ------------------------------------------------
+# Every slot item carries its motion (rituals.motions: closed, started,
+# inProgress) and its card's commits; a detail line says them after the ref
+# (text.itemMotion), and the brief opens on the counts line (text.countsTotal):
+# the window's first day and what moved in it, in total -- a hash once however
+# many cards thread it. agent/solitaire/standup.py's motion_said, counts_said and
+# render_counts are the same rule; the goldens hold the two to the byte.
+
+function Get-P20StandupCommitsText {
+    <# A commit count as the standup says it: text.commitOne or commitMany, in digits. #>
+    param([int]$N)
+    $t = (Get-P20Consts).rituals.text
+    $template = [string]$t.commitMany
+    if ($N -eq 1) { $template = [string]$t.commitOne }
+    return $template.Replace('{n}', [string]$N)
+}
+
+function Get-P20StandupMotionText {
+    <#
+      What an item's line adds to its slot: the started word when it began in
+      the window, then its commits when it has any ("started, 2 commits", "3
+      commits"). Closed under Yesterday and in progress under Today or Blockers
+      are what the slot label already says, so they are not said; '' for those
+      with no commits, and for an item that carries no motion (the queue's, or
+      an older response's). motion_said in the agent.
+    #>
+    param($Item)
+    $c = Get-P20Consts
+    $t = $c.rituals.text
+    $m = @($c.rituals.motions | ForEach-Object { [string]$_ })
+    $mo = [string]$Item.motion
+    if (-not ($m -ccontains $mo)) { return '' }
+    $bits = New-Object System.Collections.Generic.List[string]
+    if ($mo -ceq $m[1]) { $bits.Add([string]$t.motionStarted) }
+    $n = 0
+    if ($null -ne $Item.commits -and "$($Item.commits)" -ne '') { $n = [int]$Item.commits }
+    if ($n -gt 0) { $bits.Add((Get-P20StandupCommitsText $n)) }
+    return ($bits -join [string]$t.countsSeparator)
+}
+
+function Get-P20StandupCountsText {
+    <# One count as its non-zero parts -- closed, started, in progress, commits -- joined, or text.countsNone. counts_said in the agent. #>
+    param($Count)
+    $t = (Get-P20Consts).rituals.text
+    $bits = New-Object System.Collections.Generic.List[string]
+    foreach ($pair in @(@('countsClosed', 'closed'), @('countsStarted', 'started'), @('countsInProgress', 'inProgress'))) {
+        $n = 0
+        if ($null -ne $Count) { $n = [int]$Count.($pair[1]) }
+        if ($n -gt 0) { $bits.Add(([string]$t.($pair[0])).Replace('{n}', [string]$n)) }
+    }
+    $commits = 0
+    if ($null -ne $Count) { $commits = [int]$Count.commits }
+    if ($commits -gt 0) { $bits.Add((Get-P20StandupCommitsText $commits)) }
+    if ($bits.Count -eq 0) { return [string]$t.countsNone }
+    return ($bits -join [string]$t.countsSeparator)
+}
+
+function Format-P20StandupCounts {
+    <#
+      The counts line: the window's first day (since, in asOf's offset) and what
+      moved in it, in total. The brief's first line. render_counts in the agent.
+    #>
+    param([Parameter(Mandatory)]$Standup)
+    $t = (Get-P20Consts).rituals.text
+    $at = ConvertTo-P20RitualTime $Standup.asOf
+    $since = (ConvertTo-P20RitualTime $Standup.since).ToOffset($at.Offset)
+    $total = $null
+    if ($null -ne $Standup.counts) { $total = $Standup.counts.total }
+    $date = $since.ToString([string]$t.dateFormat, [System.Globalization.CultureInfo]::InvariantCulture)
+    return (Format-P20ProseTemplate ([string]$t.countsTotal) @{ date = $date; counts = (Get-P20StandupCountsText $total) })
+}
+
 function Format-P20StandupBrief {
     <#
       The chair's reading: the filled object -> a few lines, every one a count
@@ -1421,6 +1655,8 @@ function Format-P20StandupBrief {
       read back from JSON; agent/solitaire/standup.py's render_brief is the same
       rule, and the goldens standup-<case>.brief.txt hold the two to the byte.
 
+        Since Thursday 1 October 2026: 4 closed, 1 started, 6 in progress, 9 commits.
+                                                   the counts line, first
         Waiting on you: 7 walks, all on <who>.     one line per queue kind with items
         <worker>: 4 closed yesterday, 6 open, none in flight, 1 blocker.
         In flight is not yet known: ...            one sentence, while it is unbuilt
@@ -1451,6 +1687,15 @@ function Format-P20StandupBrief {
     }
     $who = [string]$t.briefWhoYou
     if ($onPc) { $who = [string]$t.briefWhoPc }
+    # A window wider than yesterday (-Since) says a worker's closes without "yesterday".
+    $at = ConvertTo-P20RitualTime $Standup.asOf
+    $widened = ((ConvertTo-P20RitualTime $Standup.since) -ne (Get-P20StandupSince -AsOf $at))
+    $counted = @{}
+    if ($null -ne $Standup.counts) {
+        foreach ($cw in @($Standup.counts.workers | Where-Object { $null -ne $_ })) { $counted[[string]$cw.label] = $cw }
+    }
+    # The counts line opens the reading: what moved in the window, in total.
+    $lines.Add((Format-P20StandupCounts -Standup $Standup))
 
     # The queue: a line per kind that has items; the biggest kind is "next".
     $bestKind = ''
@@ -1477,8 +1722,15 @@ function Format-P20StandupBrief {
         $blockers = @($w.blockers | Where-Object { $null -ne $_ }).Count
         $open = @($w.today | Where-Object { $null -ne $_ }).Count + $blockers
         $bits = @()
-        if ($closed -gt 0) { $bits += (& $fill $t.briefClosed $closed) } else { $bits += [string]$t.briefClosedNone }
+        $closedKey = 'briefClosed'
+        $noneKey = 'briefClosedNone'
+        if ($widened) { $closedKey = 'countsClosed'; $noneKey = 'yesterdayEmpty' }
+        if ($closed -gt 0) { $bits += (& $fill $t.$closedKey $closed) } else { $bits += [string]$t.$noneKey }
         if ($open -gt 0) { $bits += (& $fill $t.briefOpen $open) } else { $bits += [string]$t.briefOpenNone }
+        # What moved, the worker's own: how many of the open began in the window, and the commits.
+        $mine = $counted[[string]$w.label]
+        if ($null -ne $mine -and [int]$mine.started -gt 0) { $bits += (& $fill $t.countsStarted ([int]$mine.started)) }
+        if ($null -ne $mine -and [int]$mine.commits -gt 0) { $bits += (Get-P20StandupCommitsText ([int]$mine.commits)) }
         if ($issues -and -not ($both -and [string]$w.label -ceq [string]$Standup.space)) { $bits += [string]$t.briefInFlight }
         if ($blockers -gt 1) { $bits += (& $fill $t.briefBlockers $blockers) }
         elseif ($blockers -eq 1) { $bits += (& $fill $t.briefBlocker $blockers) }

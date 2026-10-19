@@ -28,6 +28,21 @@ export interface RitualItem {
   title: string;
   url: string;
   path?: string;
+  /** What moved (RITUALS.motions): closed, started or inProgress -- already said
+   *  in `text` after the ref. Absent from an agent that predates it. */
+  motion?: string;
+  /** The distinct commits its card threads; 0 with no card. */
+  commits?: number;
+}
+
+/** One worker's motion in the window, or the total's (label and name ""). */
+export interface MotionCount {
+  label: string;
+  name: string;
+  closed: number;
+  started: number;
+  inProgress: number;
+  commits: number;
 }
 
 /** A walk item also names the worker it is routed to. */
@@ -126,6 +141,10 @@ export interface StandupResponse {
   checks?: string[];
   /** The "both" source: each card joined to its issue, with the card's lane. */
   links?: { number: number; id: string; lane: string; path: string }[];
+  /** What moved in the window, per worker and in total -- a hash counted once
+   *  however many cards thread it. The brief's first line says the total.
+   *  Absent from an agent that predates it. */
+  counts?: { workers: MotionCount[]; total: MotionCount };
 }
 
 /** The standup reminder, as `GET /api/ritual/standup/remind` reads it. */
