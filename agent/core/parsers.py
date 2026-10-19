@@ -137,6 +137,16 @@ def _split_heading(heading: str, type_names) -> tuple[str | None, str]:
 _DEFAULT_TYPE_NAMES = ("User Story", "Task", "Feature", "Bug", "Spike")
 
 
+def card_billable(content: str) -> bool:
+    """False when the card says ``**Billable:** no``; no line means billable.
+
+    The one reader of ``stamps.billable`` in this half: the card model reads it,
+    and so does the standup (a not-billable card is not a standup row). The CLI's
+    mirror is ``Test-P20CardBillable`` in ``Scripts/Get-PromptFileStatus.ps1``,
+    which Daily and the standup read through."""
+    return not re.search(r"(?mi)^" + re.escape(stamp_billable()) + r"\s*no\b", content or "")
+
+
 def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES) -> dict:
     """Extract the file-content-derived fields of PromptInfo.
 
@@ -225,7 +235,7 @@ def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES) -> dict
         # honest when Spaces mingle. "none" exactly when not linked.
         "tracker": tracker(ado_url),
         # No line means billable: the whole existing corpus needs no migration.
-        "billable": not re.search(r"(?mi)^" + re.escape(stamp_billable()) + r"\s*no\b", content),
+        "billable": card_billable(content),
         "sprint": sprint,
         "progress": progress,
         "checked": checked,

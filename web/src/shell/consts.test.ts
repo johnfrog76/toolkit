@@ -233,7 +233,10 @@ describe("consts.json", () => {
         blockerSuffix: " (verify-close)",
         noWorkers: "No worker labels in this Space.",
         adoTracker:
-          "Azure DevOps is the human team's board, and its standup is the one the team holds; Team Agile reads a GitHub Space's issues or a local Space's cards.",
+          "Azure DevOps is the human team's board, and its standup is the one the team holds; Team Agile reads a GitHub Space's issues and cards, or a local Space's cards.",
+        check: "Check",
+        checkCardArchived: "{item} -- the card is archived, but the issue is still open.",
+        checkIssueClosed: "{item} -- the issue is closed, but the card is not archived.",
         briefWalkOne: "walk",
         briefWalkMany: "walks",
         briefDecideOne: "decision",

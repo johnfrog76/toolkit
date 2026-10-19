@@ -989,6 +989,13 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   never a `NativeCommandError` naming `git`, and never the generic `Error: exit code` block. Then
   `tkTestToolkit -Portability -GitRoot -ThreadHash -Update` on that host: green, and the Portability summary names no
   `D3J7 follow-up`. Closes the git sweep merged as PR #78.
+- [ ] **The joined standup reads the same under Windows PowerShell 5.1.** In `powershell` (5.1) run
+  `tkTestToolkit -Rituals -Billable -Consts`: green, with every `joined-*` row passing -- the
+  together case's `standup-joined-together.txt`, `.work.txt` and `.brief.txt` byte for byte, and the
+  typed GitHub Space with scratch cards printing a `Widgets` tile and a `Check` line. Then, with
+  `features.solitaireAgile` on in a GitHub Space answered `agents` whose hub folder holds a card of
+  its own in `current/`, `tkStandup`: that card under the Space's tile, and a card marked
+  `tkBillable <id> -No` gone from it. Closes Feature V2C7 (the standup reads both records).
 
 ## Recording a run
 

@@ -325,7 +325,7 @@ const rows: [string, EnvStatus | undefined, ReturnType<typeof see>][] = [
     },
   ],
   [
-    "solitaireAgile alone, on a GitHub Space answered With agents: Team Agile shows, after the Studio's place and before the Lounge's; Home's strip is unchanged (the standup is its own tab)",
+    "solitaireAgile alone, on a GitHub Space answered With agents: Team Agile shows, after the Studio's place and before the Lounge's; Home's strip is unchanged (the standup is its own tab, reading the Space's issues and its cards, joined on the id)",
     env({ status: "active", tier: 1, tracker: "github", features: { solitaireAgile: true } }),
     {
       anchor: "Home",

@@ -118,7 +118,7 @@ After a `---` rule, bold-label lines. **This is the part of the model that is st
 | `**Sprint:**` | The iteration path. Only the LAST segment is shown (`Sprint 8`) | `NewPrompt`, from the work item; `(not linked)` text offline | the board's Sprint filter; the card's tag |
 | `**Story Points:**` | As the work item had it | `NewPrompt` | people |
 | `**ADO Link:**` | The work item's address. **An `https://` value here is what makes a card `linked`**; offline it reads `(not linked -- created offline with -Title)` | `NewPrompt`; and `NewItem -FromCard`, which publishes a card made offline as a GitHub issue and writes the issue's URL here, through `Set-P20CardLine` (the card keeps its id) | `linked`, `ado_url`, the repo filter (a card with no ADO link is never hidden by it), *Open in ADO* |
-| `**Billable:**` | `no` takes the card off Daily. **No line means billable** -- "billable again" removes the line | `Billable -No`, through `Set-P20CardLine` | Daily; the *Not billable* tag. `stamps.billable` |
+| `**Billable:**` | `no` takes the card off Daily and the standup. **No line means billable** -- "billable again" removes the line | `Billable -No`, through `Set-P20CardLine` | Daily and Team Agile's standup (one reader a half: `card_billable`, `Test-P20CardBillable`); the *Not billable* tag. `stamps.billable` |
 | `**Cover:**` | The card's picture: a path relative to the card's folder, `../assets/<card key>/cover.<ext>`. **No line means no picture**; a line whose file is missing, or that resolves outside the Space's `assets/`, reads as none too | `Cover`, or `NewPrompt -Cover`, through `Set-P20CardLine` | the board's card face, the list's thumbnail, the card page; the model's `cover`. `stamps.cover` |
 | `**Before:**` | The other half of a before/after proof, the same way: `../assets/<card key>/before.<ext>` | `Cover -Before`, or `NewPrompt -Before` | the card page, side by side with the cover; the model's `before`. `stamps.before` |
 | `**Created:**` | `yyyy-MM-dd`, the day the card was made -- or the day the work was, with `NewPrompt -Date` | `NewPrompt` | Daily, reviews, the engagement timeline. `stamps.created` |
@@ -252,7 +252,10 @@ person's `**Review:**` line, and need not enter it at all: a Spike may go from I
 
 A local Space -- no tracker address, or status `local` -- has a standup over its cards (Team Agile;
 Team Agile is on only in a Space answered *With agents*, so this is a GitHub Space still
-`local`, or a no-tracker Space read with `-Space` from one):
+`local`, or a no-tracker Space read with `-Space` from one). An active GitHub Space reads its cards
+too, joined to its issues on the id: a card whose id is an issue's number adds its lane to the issue's
+row (and a `Check` line where the two disagree), and any other card goes in the tile below. A card that
+says `**Billable:** no` is in neither. For a card of its own:
 the derived state above, plus the `**Closed:**` day of an archived card, puts each card in at most one
 slot of the engineer's one tile, read fresh every time and never written back. The days are the
 standup's window: `since` is the start of the previous working day, `asOf` is now.
@@ -266,7 +269,7 @@ standup's window: `since` is the start of the previous working day, `asOf` is no
 
 The line names the card by its id (`K7M2 Wire the board`) and its title from the heading. Both halves
 hold it to one table, `Tests/fixtures/rituals/standup-cards.json`; the add-on's document has the rest
-([Team Agile](../modules/solitaire-agile.md#the-second-source-cards)).
+([Team Agile](../modules/solitaire-agile.md#the-two-sources-joined)).
 
 ## The model, as the agent serves it
 

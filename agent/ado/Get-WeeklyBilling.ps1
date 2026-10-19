@@ -222,7 +222,7 @@ while ($d -le $endDate) {
 # through Scripts/Resolve-CardName.ps1 (docs/hub/cards.md, "The filename"), so they cannot
 # disagree about what a card is.
 $pkgScripts = Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'Scripts'
-foreach ($needed in @('Get-Consts.ps1', 'Resolve-CardName.ps1')) {
+foreach ($needed in @('Get-Consts.ps1', 'Resolve-CardName.ps1', 'Get-PromptFileStatus.ps1')) {
     # LOUDLY. Without the id rule every file reads as "not a card" and the week
     # comes out empty -- a timesheet that says nothing was done is the worst
     # possible way for a broken install to show itself.
@@ -233,6 +233,8 @@ foreach ($needed in @('Get-Consts.ps1', 'Resolve-CardName.ps1')) {
 }
 . (Join-Path $pkgScripts 'Get-Consts.ps1')
 . (Join-Path $pkgScripts 'Resolve-CardName.ps1')
+# The one reader of **Billable:** (Test-P20CardBillable), shared with the standup.
+. (Join-Path $pkgScripts 'Get-PromptFileStatus.ps1')
 # The CONFIGURED types, the machine's own included: a team that files `Chore-Q4TN-...`
 # said so in config, and a card the id rule cannot read is a card that is never billed.
 # Both files are merged key by key; config.local.json wins, as it does everywhere else.
@@ -514,7 +516,6 @@ if ($pendingPrChecks.Count -gt 0) {
 $billingConsts = Get-P20Consts
 $createdRx = '(?m)^' + [regex]::Escape($billingConsts.stamps.created) + '\s*(\d{4}-\d{2}-\d{2})'
 $closedRx = '(?m)^' + [regex]::Escape($billingConsts.stamps.closed) + '\s*(\d{4}-\d{2}-\d{2})'
-$notBillableRx = '(?mi)^' + [regex]::Escape($billingConsts.stamps.billable) + '\s*no\b'
 $prUrlRx = $billingConsts.regex.prUrlLine
 # A person's own tokens: the day a card was moved by hand -- Move -To InProgress
 # writes **Started:**, -To CodeReview writes **Review:** -- read the way git's
@@ -569,7 +570,7 @@ foreach ($where in @('current', 'archive')) {
         # Outside the window altogether: closed before it, or opened after it.
         if ($closed -and $closed -lt $sinceStr) { continue }
         if ($created -gt $endDate.ToString('yyyy-MM-dd')) { continue }
-        if ($text -match $notBillableRx) { $script:BillingNonBillable++; continue }
+        if (-not (Test-P20CardBillable $text)) { $script:BillingNonBillable++; continue }
 
         # Type and title from the H1 -- the record of a card's type (spec 5.0).
         $heading = if ($text -match '(?m)^#\s+(.+)$') { $Matches[1].Trim() } else { $f.BaseName }

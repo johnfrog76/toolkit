@@ -122,7 +122,7 @@ when the Space's repository is -- said, never asked (`ActionDialog.titles.test.t
 | deck | + Decks | -- unless Growth is on too: then the deck launcher sits under Growth and Decks hides |
 | organize | + Organize, before the Studio | |
 | a leftover `features.studio`, `true` or `false` | nothing changes | the Studio has no switch (D-S13); the line is ignored and is never an error |
-| solitaireAgile | + Team Agile, after the Studio and before the Lounge's place -- **on a GitHub Space answered With agents** | today's standup (M0). The switch is the engineer's, the answer the Space's: on an Azure DevOps Space, a Space with no tracker, or a GitHub Space answered Alone (or not yet), the agent serves the flag off and there is no tab -- the "How do I…" table below. An active GitHub Space fills from its issues, a local one from its cards |
+| solitaireAgile | + Team Agile, after the Studio and before the Lounge's place -- **on a GitHub Space answered With agents** | today's standup (M0). The switch is the engineer's, the answer the Space's: on an Azure DevOps Space, a Space with no tracker, or a GitHub Space answered Alone (or not yet), the agent serves the flag off and there is no tab -- the "How do I…" table below. An active GitHub Space fills from its issues and its cards, joined on the id; a local one from its cards |
 | lounge | + Lounge, **last** | you look up from the work, so the room stands apart |
 | all six | [Space] \| System · Daily · Growth · Organize · Studio · Team Agile · Lounge | Meetings and Decks are carried, not lost |
 
@@ -308,6 +308,7 @@ Team Agile section (the reminder: a time and the days), saved through `POST /api
 | The route answers | The page shows |
 | --- | --- |
 | the tracker read (`tracker.ok` true) | the standup's first line as the card's header, every line after it verbatim in a monospace block; each `#<n>` the response names links to its issue. Besides the numbers: **Copy** (the `text`, exactly; "Copied!" for a moment) and **Play**, quiet, in the header, and a quiet **Show as list** under the prose that opens the same items as linked rows (a card shows its id, no link) |
+| the tracker and the cards read, joined (`source: both`, a GitHub Space) | the same page: each `#<n>` links to its issue, a card of its own shows its id with no link, and a `Check` line (a card and its issue disagreeing) is text like any other line |
 | no tracker (`tracker.ok` false) | the same page: the chair's two lines and the `Tracker` line with the reason -- the ritual happens anyway; no links; Play |
 | nothing (the agent is away) | `Could not read today's standup` -- an error, never an empty standup; no Play |
 

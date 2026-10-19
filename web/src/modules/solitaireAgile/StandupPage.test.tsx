@@ -306,6 +306,68 @@ describe("copy and the list", () => {
     expect(screen.queryByTestId("standup-list")).toBeNull();
   });
 
+  it("shows a GitHub Space's joined standup verbatim: issues linked, a card by its id, the Check lines as text", () => {
+    // The shared joined fixture (Tests/fixtures/rituals/standup-joined.json) and its golden.
+    const joined = JSON.parse(
+      fs.readFileSync(path.join(FIXTURES, "standup-joined.json"), "utf8"),
+    ) as {
+      asOf: string;
+      since: string;
+      cases: {
+        name: string;
+        issues: FixtureIssue[];
+        cards: { id: string; title: string; file: string; folder: string }[];
+        expected: {
+          walk: string[];
+          workers: { label: string; name: string; [slot: string]: unknown }[];
+        };
+      }[];
+    };
+    const c = joined.cases.find((x) => x.name === "together");
+    if (!c) throw new Error("no joined case together");
+    const item = (ref: string): RitualItem => {
+      if (ref.startsWith("#")) {
+        const i = c.issues.find((x) => x.number === Number(ref.slice(1)));
+        if (!i) throw new Error(`no issue ${ref}`);
+        return { number: i.number, id: null, title: i.title, url: i.url, path: "" };
+      }
+      const k = c.cards.find((x) => x.id === ref);
+      if (!k) throw new Error(`no card ${ref}`);
+      return { number: null, id: k.id, title: k.title, url: "", path: `${k.folder}/${k.file}` };
+    };
+    const slot = (w: Record<string, unknown>, s: string) => (w[s] as string[]).map(item);
+    const text = fs.readFileSync(path.join(FIXTURES, "standup-joined-together.txt"), "utf8");
+    const data: StandupResponse = {
+      ceremony: "standup",
+      register: "real",
+      asOf: joined.asOf,
+      since: joined.since,
+      space: "widgets",
+      source: "both",
+      tracker: { ok: true, reason: "" },
+      chair: { open: "", close: "" },
+      queue: { walk: c.expected.walk.map(item), decide: [], look: [] },
+      workers: c.expected.workers.map((w) => ({
+        label: w.label,
+        name: w.name,
+        yesterday: slot(w, "yesterday"),
+        today: slot(w, "today"),
+        blockers: slot(w, "blockers"),
+        empty: Boolean(w.empty),
+        excuse: "",
+      })),
+      text,
+    };
+    answer = { data };
+    render(<StandupPage />);
+    expect(shown()).toBe(text);
+    expect(screen.getAllByRole("link", { name: "#146" })[0].getAttribute("href")).toBe(
+      "https://github.com/acme/widgets/issues/146",
+    );
+    expect(screen.queryByRole("link", { name: "K7M2" })).toBeNull();
+    expect(shown()).toMatch(/^ {2}Check {6}#142 Port the cast atoms -- /m);
+  });
+
   it("shows a card by its id, with no link", () => {
     const data = responseFor("friday");
     data.source = "cards";

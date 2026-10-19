@@ -1,0 +1,27 @@
+Standup -- Friday 2 October 2026
+"Can we not adjust scope."
+
+Waiting on you
+  Walk       #146 Verify the Studio tab draws on the PC
+  Walk       K7M2 Wire the board
+
+Fable
+  Yesterday  nothing closed
+  Today      #142 Port the cast atoms
+  Today      #145 Verify the clock fix
+  Blockers   #146 Verify the Studio tab draws on the PC (verify-close)
+Opus
+  Yesterday  #143 Rename the slug
+  Today      #141 Build the foyer counts
+  Today      #144 Seed the GitHub demo
+  Blockers   no blockers
+Widgets
+  Yesterday  198 Fix the export
+  Yesterday  Q3R9 Photo import
+  Today      K7M2 Wire the board
+  Blockers   no blockers
+
+  Check      #142 Port the cast atoms -- the card is archived, but the issue is still open.
+  Check      #143 Rename the slug -- the issue is closed, but the card is not archived.
+
+"Let's circle back."

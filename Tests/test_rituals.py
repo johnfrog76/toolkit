@@ -355,6 +355,163 @@ class TheCardsTable(unittest.TestCase):
                 self.assertEqual(standup.card_title(row["content"], row["file"], row["id"]), row["title"])
 
 
+# -- Both: issues and cards, joined on the id -------------------------------
+JOINED_TABLE = json.loads((FIXTURES / "standup-joined.json").read_text(encoding="utf-8"))
+JOINED_CASES = {c["name"]: c for c in JOINED_TABLE["cases"]}
+
+
+def _fill_joined(case: dict, tracker_state: dict | None = None) -> "standup.Standup":
+    filled = standup.fill_joined_standup(
+        datetime.fromisoformat(JOINED_TABLE["asOf"]),
+        JOINED_TABLE["workerLabels"],
+        case["issues"],
+        tracker_state or {"ok": True, "reason": ""},
+        case["cards"],
+        space=JOINED_TABLE["space"],
+        space_name=JOINED_TABLE["spaceName"],
+    )
+    filled.text = standup.render_standup(filled)
+    filled.work.text = standup.render_work(filled)
+    filled.brief = standup.render_brief(filled)
+    return filled
+
+
+def _ref(item) -> str:
+    return f"#{item.number}" if item.number is not None else (item.id or "")
+
+
+class TheJoinedTable(unittest.TestCase):
+    """Every case of standup-joined.json -- the same rows tkTestToolkit -Rituals
+    asserts against Invoke-P20StandupJoinedFill."""
+
+    def test_the_table_has_its_shapes(self):
+        self.assertEqual(
+            list(JOINED_CASES),
+            [
+                "linked-card-open-issue",
+                "linked-card-archived-issue-open",
+                "issue-closed-card-current",
+                "custom-card-alone",
+                "issue-alone",
+                "not-billable",
+                "together",
+            ],
+        )
+
+    def test_the_source_and_the_window(self):
+        for name, case in JOINED_CASES.items():
+            with self.subTest(case=name):
+                filled = _fill_joined(case)
+                self.assertEqual((filled.source, filled.since), ("both", JOINED_TABLE["since"]))
+
+    def test_the_walk_by_ref(self):
+        for name, case in JOINED_CASES.items():
+            with self.subTest(case=name):
+                self.assertEqual([_ref(i) for i in _fill_joined(case).queue.walk], case["expected"]["walk"])
+
+    def test_every_workers_slots_by_ref(self):
+        for name, case in JOINED_CASES.items():
+            filled = _fill_joined(case)
+            got = [
+                {
+                    "label": w.label,
+                    "name": w.name,
+                    **{slot: [_ref(i) for i in getattr(w, slot)] for slot in ("yesterday", "today", "blockers")},
+                    "empty": w.empty,
+                }
+                for w in filled.workers
+            ]
+            with self.subTest(case=name):
+                self.assertEqual(got, case["expected"]["workers"])
+
+    def test_the_check_lines(self):
+        t = C.rituals_text()
+        for name, case in JOINED_CASES.items():
+            with self.subTest(case=name):
+                want = [t[c["key"]].replace("{item}", c["item"]) for c in case["expected"]["checks"]]
+                self.assertEqual(_fill_joined(case).checks, want)
+
+    def test_the_links(self):
+        for name, case in JOINED_CASES.items():
+            with self.subTest(case=name):
+                got = [{"number": lk.number, "id": lk.id, "lane": lk.lane} for lk in _fill_joined(case).links]
+                self.assertEqual(got, case["expected"]["links"])
+
+    def test_the_goldens_byte_for_byte(self):
+        for name, case in JOINED_CASES.items():
+            exp = case["expected"]
+            if not exp.get("text"):
+                continue
+            filled = _fill_joined(case)
+            with self.subTest(case=name, grain="detail"):
+                self.assertEqual(filled.text, _golden(exp["text"]))
+            with self.subTest(case=name, grain="work"):
+                self.assertEqual(filled.work.text, _golden(exp["work"]))
+            with self.subTest(case=name, grain="brief"):
+                self.assertEqual(filled.brief, _golden(exp["brief"]))
+
+    def test_the_goldens_are_the_scripts(self):
+        """Generated, never typed: the regeneration script finds nothing to change."""
+        sys.path.insert(0, str(REPO_ROOT / "Tests"))
+        import regenerate_joined_goldens as regen
+
+        for name, text in regen.goldens().items():
+            with self.subTest(golden=name):
+                self.assertEqual(_golden(name), text)
+
+    def test_the_json_round_trip_renders_the_same_texts(self):
+        for name, case in JOINED_CASES.items():
+            with self.subTest(case=name):
+                filled = _fill_joined(case)
+                back = standup.Standup.model_validate(json.loads(filled.model_dump_json(by_alias=True)))
+                self.assertEqual(
+                    (standup.render_standup(back), standup.render_work(back), standup.render_brief(back)),
+                    (filled.text, filled.work.text, filled.brief),
+                )
+
+    def test_with_no_card_in_play_it_reads_as_the_issues_alone(self):
+        """No card: the issues fill's own text, brief and work, only the source says both."""
+        friday = CASES["friday"]
+        at = datetime.fromisoformat(friday["asOf"])
+        alone = standup.fill_standup(at, _labels(friday), friday["issues"], friday["tracker"], space="toolkit")
+        joined = standup.fill_joined_standup(
+            at, _labels(friday), friday["issues"], friday["tracker"], [], space="toolkit", space_name="Toolkit"
+        )
+        self.assertEqual(joined.source, "both")
+        for render in (standup.render_standup, standup.render_brief):
+            with self.subTest(render=render.__name__):
+                self.assertEqual(render(joined), render(alone))
+        self.assertEqual(joined.work.model_dump(), alone.work.model_dump())
+
+    def test_the_tracker_not_answering_is_the_tracker_line_and_no_card(self):
+        filled = _fill_joined(JOINED_CASES["together"], {"ok": False, "reason": "gh did not answer"})
+        self.assertEqual((filled.source, filled.workers, filled.checks, filled.links), ("none", [], [], []))
+        self.assertNotIn("K7M2", filled.text)
+
+    def test_a_card_round_in_current_is_the_card(self):
+        """Rounds share an id: the one in current/ is the card, so an earlier round in
+        archive/ is not 'archived while the issue is open'."""
+        case = {
+            "issues": [{"number": 141, "title": "Build", "state": "OPEN", "labels": ["opus"], "closedAt": None}],
+            "cards": [
+                {"file": "141-build-r1.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-09-01"},
+                {"file": "141-build.prompt.md", "folder": "current", "status": "In Progress", "closed": None},
+            ],
+        }
+        for card in case["cards"]:
+            card["id"] = "141"
+        filled = _fill_joined(case)
+        self.assertEqual(filled.checks, [])
+        self.assertEqual([(lk.lane, lk.path) for lk in filled.links], [("In Progress", "current/141-build.prompt.md")])
+
+    def test_the_real_register_never_says_fake_work(self):
+        for name, case in JOINED_CASES.items():
+            filled = _fill_joined(case)
+            for phrase in VOCAB["fakeWork"]:
+                with self.subTest(case=name, phrase=phrase):
+                    self.assertNotIn(phrase, filled.text + filled.work.text + filled.brief)
+
+
 # -- The work grain (D-TA20) ---------------------------------------------
 WORK_TABLE = json.loads((FIXTURES / "standup-work.json").read_text(encoding="utf-8"))
 WORK_CASES = {c["name"]: c for c in WORK_TABLE["cases"]}
@@ -795,12 +952,19 @@ class TheCardReader(unittest.TestCase):
                 "archive/198-fix-the-export.prompt.md": "# Bug 198: Fix the export\n\n**Closed:** 2026-10-01\n",
                 "archive/151-never-stamped.prompt.md": "# Bug 151: Never stamped\n",
                 "archive/2026-05-14-PR141415.prompt.md": "# PR comments\n\n**Closed:** 2026-10-01\n",
+                "archive/160-off-the-clock.prompt.md": (
+                    "# Bug 160: Off the clock\n\n**Billable:** no\n**Closed:** 2026-10-01\n"
+                ),
             }
             for rel, text in files.items():
                 (space / rel).write_bytes(text.encode("utf-8"))
             rows = standup.read_cards(
                 space, ["User Story", "Task", "Feature", "Bug", "Spike"], ["US-", "Task", "Feat-", "", "Spike-"]
             )
+        # A card that says **Billable:** no reads billable False -- the card model's own reader.
+        off_the_clock = {r["file"] for r in rows if not r["billable"]}
+        self.assertEqual(off_the_clock, {"160-off-the-clock.prompt.md"}, "only the card that says no")
+        rows = [r for r in rows if r["file"] != "160-off-the-clock.prompt.md"]
         got = {r["file"]: (r["folder"], r["status"], r["closed"], r["title"], r["id"]) for r in rows}
         # The work grain reads each card's type and body.
         self.assertEqual({r["file"]: r["type"] for r in rows}["Task139-write-the-docs.prompt.md"], "Task")
@@ -837,6 +1001,8 @@ TOP_FIELDS = {
     "spoken",
     "text",
     "brief",
+    "checks",
+    "links",
 }
 WORK_FIELDS = {"queue", "workers", "queueProse", "text"}
 GROUP_FIELDS = {"name", "by", "count", "refs", "phrase"}
@@ -993,7 +1159,9 @@ class TheRoute(unittest.TestCase):
         self.assertEqual(body["brief"], _golden("standup-friday.brief.txt"))
         self.assertEqual((body["ceremony"], body["register"], body["space"]), ("standup", "real", "toolkit"))
         self.assertEqual(body["tracker"], {"ok": True, "reason": ""})
-        self.assertEqual(body["source"], "issues")
+        # An active GitHub Space reads both; with no card in its folders the text is the issues' alone.
+        self.assertEqual(body["source"], "both")
+        self.assertEqual((body["checks"], body["links"]), ([], []))
         self.assertEqual([c[:3] for c in calls], [["gh", "label", "list"], ["gh", "issue", "list"]])
         self.assertIn("johnfrog76/toolkit", calls[0])
         self.assertIn("all", calls[1])
@@ -1067,6 +1235,35 @@ class TheRoute(unittest.TestCase):
         self.assertTrue(item["path"].endswith("198-fix-the-export.prompt.md"))
         self.assertIn("  Walk       K7M2 Wire the board\n", body["text"])
         self.assertIn("  Yesterday  198 Fix the export\n", body["text"])
+
+    def test_a_github_space_joins_its_cards_to_its_issues(self):
+        """The both source over real folders: a card of its own is a row under you, a
+        card linked to a closed issue is a Check line, a not-billable card is nothing,
+        and the hub is read, never written."""
+        hub = Path(self.tmp.name) / "hub" / "toolkit"
+        (hub / "archive").mkdir(parents=True)
+        cards = {
+            "current/K7M2-wire-the-board.prompt.md": "# Task K7M2: Wire the board\n\n- a41c2e9 first\n",
+            # 102 is CLOSED in the friday case.
+            "current/102-rename-the-slug.prompt.md": "# Task 102: Rename the slug\n\n- b52d3f0 first\n",
+            "current/C4D7-bench.prompt.md": "# Task C4D7: Bench\n\n- c63e4a1 first\n\n**Billable:** no\n",
+        }
+        for rel, text in cards.items():
+            (hub / rel).write_text(text, encoding="utf-8")
+        before = {f: f.stat().st_mtime_ns for f in hub.rglob("*") if f.is_file()}
+        res, calls = self._get("/api/ritual/standup?space=toolkit")
+        self.assertEqual(res.status_code, 200, res.text)
+        body = res.json()
+        self.assertEqual(body["source"], "both")
+        self.assertEqual([c[:3] for c in calls], [["gh", "label", "list"], ["gh", "issue", "list"]])
+        self.assertEqual(body["workers"][-1]["label"], "toolkit")
+        self.assertEqual([i["id"] for i in body["workers"][-1]["today"]], ["K7M2"])
+        self.assertNotIn("C4D7", body["text"])
+        self.assertEqual([(lk["number"], lk["id"], lk["lane"]) for lk in body["links"]], [(102, "102", "In Progress")])
+        item = "#102 Rename the slug"
+        self.assertEqual(body["checks"], [C.rituals_text()["checkIssueClosed"].replace("{item}", item)])
+        self.assertIn(f"  Check      {body['checks'][0]}\n", body["text"])
+        self.assertEqual(before, {f: f.stat().st_mtime_ns for f in hub.rglob("*") if f.is_file()})
 
     def test_below_tier_1_is_still_a_standup(self):
         res, calls = self._get("/api/ritual/standup?space=toolkit", tier=2)
@@ -1180,6 +1377,7 @@ class TheRouteWithTheFlagOff(TheRoute):
     test_on_a_cp1252_console_the_issues_are_read_whole = None
     test_an_answer_that_could_not_be_read_is_not_an_empty_success = None
     test_a_reader_that_raises_is_a_tracker_that_did_not_answer = None
+    test_a_github_space_joins_its_cards_to_its_issues = None
 
 
 class TheAppMountsIt(unittest.TestCase):

@@ -11,6 +11,13 @@
     2. The goldens   the rendered text against standup-<name>.txt, byte for byte
                      (LF), wherever a case names one; every case rendered again
                      from its own JSON round trip.
+    2a. Both         Tests/fixtures/rituals/standup-joined.json: an active
+                     GitHub Space's issues and cards joined on the id -- every
+                     shape's walk, each worker's slots by ref, the Check lines
+                     and the links, and the together case's detail, work and
+                     brief against standup-joined-together*.txt, byte for byte,
+                     again after a JSON round trip; typed, a GitHub Space with
+                     cards in its folder prints the joined standup.
     2b. The work grain  Tests/fixtures/rituals/standup-work.json: every
                      group of the queue and of each worker's slots, the small
                      tables, the work text against standup-work-<name>.txt --
@@ -304,10 +311,14 @@ try {
         'archive/198-fix-the-export.prompt.md'       = "# Bug 198: Fix the export`n`n**Closed:** 2026-10-01`n"
         'archive/151-never-stamped.prompt.md'        = "# Bug 151: Never stamped`n"
         'archive/2026-05-14-PR141415.prompt.md'      = "# PR comments`n`n**Closed:** 2026-10-01`n"
+        'archive/160-off-the-clock.prompt.md'        = "# Bug 160: Off the clock`n`n**Billable:** no`n**Closed:** 2026-10-01`n"
     }
     foreach ($k in $readerFiles.Keys) { [System.IO.File]::WriteAllText((Join-Path $readerDir $k), $readerFiles[$k], $utf8r) }
     $pattern = Get-P20CardIdPattern -WorkItemTypes (Get-P20WorkItemTypes -Config $null)
     $rows = @(Get-P20StandupCards -CurrentDir (Join-Path $readerDir 'current') -ArchiveDir (Join-Path $readerDir 'archive') -Pattern $pattern)
+    $offClock = (@($rows | Where-Object { -not $_.billable } | ForEach-Object { $_.file })) -join ','
+    Assert-True 'Get-P20StandupCards: a card that says **Billable:** no reads billable false, and only that one' ($offClock -ceq '160-off-the-clock.prompt.md') "got [$offClock]"
+    $rows = @($rows | Where-Object { $_.file -ne '160-off-the-clock.prompt.md' })
     $seen = (@($rows | Sort-Object { $_.file } | ForEach-Object { "$($_.file)|$($_.folder)|$($_.status)|$($_.closed)|$($_.title)|$($_.id)" })) -join "`n"
     $want = (@(
             '151-never-stamped.prompt.md|archive|Done||Never stamped|151',
@@ -326,6 +337,76 @@ catch {
 finally {
     Remove-Item $readerDir -Recurse -Force -ErrorAction SilentlyContinue
 }
+
+# -- 1b'. Both: issues and cards, joined on the id ----------------------------
+# Tests/fixtures/rituals/standup-joined.json, every case, the SAME rows
+# Tests/test_rituals.py asserts against fill_joined_standup.
+function Get-Refs {
+    # A slot's refs -- #<n> for an issue, the id for a card -- as one comparable string.
+    param($Items)
+    return ((@($Items | Where-Object { $null -ne $_ } | ForEach-Object { Get-P20StandupItemRef $_ })) -join ',')
+}
+
+$joinedRaw = [System.IO.File]::ReadAllText((Join-Path $fixtureDir 'standup-joined.json'))
+$joinedTable = $joinedRaw | ConvertFrom-Json
+$joinedCases = @($joinedTable.cases)
+$joinedAsOf = ([regex]::Match($joinedRaw, '"asOf"\s*:\s*"([^"]+)"')).Groups[1].Value
+$joinedSince = ([regex]::Match($joinedRaw, '"since"\s*:\s*"([^"]+)"')).Groups[1].Value
+$joinedNames = (@($joinedCases | ForEach-Object { [string]$_.name })) -join ','
+Assert-True 'the joined table is read: the six shapes, then all of them together' ($joinedNames -ceq 'linked-card-open-issue,linked-card-archived-issue-open,issue-closed-card-current,custom-card-alone,issue-alone,not-billable,together') $joinedNames
+
+foreach ($case in $joinedCases) {
+    $name = 'joined-' + [string]$case.name
+    $exp = $case.expected
+    Write-Host ""
+    Write-Host "-- $name --" -ForegroundColor Cyan
+    $s = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @($joinedTable.workerLabels) -Issues @($case.issues) -Tracker @{ ok = $true; reason = '' } `
+        -Cards @($case.cards) -Space ([string]$joinedTable.space) -SpaceName ([string]$joinedTable.spaceName) -PackageRoot $pkgRoot
+    Assert-True "${name}: source is both, since is the previous working day's" ($s.source -ceq 'both' -and $s.since -ceq $joinedSince) "$($s.source) $($s.since)"
+    $want = (@($exp.walk | ForEach-Object { [string]$_ })) -join ','
+    $got = Get-Refs $s.queue.walk
+    Assert-True "${name}: the walk is [$want]" ($got -ceq $want) "got [$got]"
+    $wantWorkers = (@($exp.workers | ForEach-Object { "$($_.label)/$($_.name) y[$((@($_.yesterday)) -join ',')] t[$((@($_.today)) -join ',')] b[$((@($_.blockers)) -join ',')] $([bool]$_.empty)" })) -join ' | '
+    $gotWorkers = (@($s.workers | ForEach-Object { "$($_.label)/$($_.name) y[$(Get-Refs $_.yesterday)] t[$(Get-Refs $_.today)] b[$(Get-Refs $_.blockers)] $([bool]$_.empty)" })) -join ' | '
+    Assert-True "${name}: every worker's slots by ref" ($gotWorkers -ceq $wantWorkers) ("`n got: $gotWorkers`nwant: $wantWorkers")
+    $wantChecks = (@($exp.checks | ForEach-Object { ([string]$consts.rituals.text.([string]$_.key)).Replace('{item}', [string]$_.item) })) -join "`n"
+    $gotChecks = (@($s.checks | ForEach-Object { [string]$_ })) -join "`n"
+    Assert-True "${name}: the Check lines ($(@($exp.checks).Count))" ($gotChecks -ceq $wantChecks) ("`n got: $gotChecks`nwant: $wantChecks")
+    $wantLinks = (@($exp.links | ForEach-Object { "$($_.number)/$($_.id)/$($_.lane)" })) -join ','
+    $gotLinks = (@($s.links | ForEach-Object { "$($_.number)/$($_.id)/$($_.lane)" })) -join ','
+    Assert-True "${name}: the links are [$wantLinks]" ($gotLinks -ceq $wantLinks) "got [$gotLinks]"
+
+    $text = Format-P20StandupText -Standup $s -PackageRoot $pkgRoot
+    $s.work.text = Format-P20StandupWork -Standup $s -PackageRoot $pkgRoot
+    $brief = Format-P20StandupBrief -Standup $s -PackageRoot $pkgRoot
+    if ($exp.text) {
+        foreach ($pair in @(@($text, [string]$exp.text), @([string]$s.work.text, [string]$exp.work), @($brief, [string]$exp.brief))) {
+            $golden = [System.IO.File]::ReadAllText((Join-Path $fixtureDir $pair[1]))
+            Assert-True "${name}: $($pair[1]), byte for byte" ($pair[0] -ceq $golden) ("`n--- got ---`n$($pair[0])--- want ---`n$golden")
+        }
+    }
+    $back = ($s | ConvertTo-Json -Depth 10) | ConvertFrom-Json
+    $back.asOf = $s.asOf
+    $again = (Format-P20StandupText -Standup $back -PackageRoot $pkgRoot) + (Format-P20StandupWork -Standup $back -PackageRoot $pkgRoot) + (Format-P20StandupBrief -Standup $back -PackageRoot $pkgRoot)
+    Assert-True "${name}: the JSON round trip renders the same three texts" ($again -ceq ($text + $s.work.text + $brief)) $again
+    Assert-True "${name}: no fakeWork line in the real register" (@($fakeWork | Where-Object { ($text + $s.work.text + $brief).Contains([string]$_) }).Count -eq 0)
+}
+
+Write-Host ""
+Write-Host "-- Both, said in words --" -ForegroundColor Cyan
+$fridayCase = @($cases | Where-Object { $_.name -eq 'friday' })[0]
+$fridayAsOf = $asOfTexts[[array]::IndexOf(@($cases | ForEach-Object { $_.name }), 'friday')]
+$aloneFill = Invoke-P20StandupFill -AsOf $fridayAsOf -Labels @($fixture.workerLabels) -Issues @($fridayCase.issues) -Tracker @{ ok = $true; reason = '' } -Space 'toolkit' -PackageRoot $pkgRoot
+$joinedFill = Invoke-P20StandupJoinedFill -AsOf $fridayAsOf -Labels @($fixture.workerLabels) -Issues @($fridayCase.issues) -Tracker @{ ok = $true; reason = '' } -Cards @() -Space 'toolkit' -SpaceName 'Toolkit' -PackageRoot $pkgRoot
+Assert-True 'no card in play: the issues'' own text and brief, only the source says both' ($joinedFill.source -ceq 'both' -and (Format-P20StandupText -Standup $joinedFill -PackageRoot $pkgRoot) -ceq (Format-P20StandupText -Standup $aloneFill -PackageRoot $pkgRoot) -and (Format-P20StandupBrief -Standup $joinedFill -PackageRoot $pkgRoot) -ceq (Format-P20StandupBrief -Standup $aloneFill -PackageRoot $pkgRoot))
+$together = @($joinedCases | Where-Object { $_.name -eq 'together' })[0]
+$downFill = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @($joinedTable.workerLabels) -Issues @($together.issues) -Tracker @{ ok = $false; reason = 'gh did not answer' } -Cards @($together.cards) -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
+Assert-True 'the tracker not answering: the Tracker line, no worker, no Check line, no link' ($downFill.source -ceq 'none' -and @($downFill.workers).Count -eq 0 -and @($downFill.checks).Count -eq 0 -and @($downFill.links).Count -eq 0)
+$rounds = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @($joinedTable.workerLabels) -Tracker @{ ok = $true; reason = '' } -Space 'widgets' -PackageRoot $pkgRoot `
+    -Issues @([pscustomobject]@{ number = 141; title = 'Build'; state = 'OPEN'; labels = @('opus'); closedAt = $null }) `
+    -Cards @([pscustomobject]@{ file = '141-build-r1.prompt.md'; folder = 'archive'; status = 'Done'; closed = '2026-09-01'; id = '141' },
+    [pscustomobject]@{ file = '141-build.prompt.md'; folder = 'current'; status = 'In Progress'; closed = $null; id = '141' })
+Assert-True 'rounds share an id: the one in current/ is the card, so an earlier archived round is no Check line' (@($rounds.checks).Count -eq 0 -and (@($rounds.links | ForEach-Object { "$($_.lane)|$($_.path)" }) -join ',') -ceq 'In Progress|current/141-build.prompt.md') ((@($rounds.links | ForEach-Object { "$($_.lane)|$($_.path)" })) -join ',')
 
 # -- 1c. The work grain (D-TA20) -------------------------------------------
 # Tests/fixtures/rituals/standup-work.json, every case and every small table, the
@@ -642,7 +723,8 @@ try {
     $before = Get-HubSnapshot
     $r = Invoke-Standup 'tkStandup'
     $after = Get-HubSnapshot
-    $expectNow = Invoke-P20StandupFill -AsOf ([DateTimeOffset]::Now) -Labels $ghLabels -Issues $ghIssues -Tracker @{ ok = $true; reason = '' } -Space 'widgets' -PackageRoot $pkgRoot
+    # An active GitHub Space reads both; its folder has no card yet, so the text is the issues' alone.
+    $expectNow = Invoke-P20StandupJoinedFill -AsOf ([DateTimeOffset]::Now) -Labels $ghLabels -Issues $ghIssues -Tracker @{ ok = $true; reason = '' } -Cards @() -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
     $expectText = (Format-P20StandupText -Standup $expectNow -PackageRoot $pkgRoot).TrimEnd([char]10)
     Assert-True 'Standup exits 0' ($r.Exit -eq '0') $r.All
     # A launch from a non-UTF-8 console (Git bash on Windows, code page 437)
@@ -668,7 +750,7 @@ try {
     try { $parsed = $j.Inner | ConvertFrom-Json } catch { $parsed = $null }
     Assert-True '-AsJson prints JSON' ($null -ne $parsed -and $j.Exit -eq '0') $j.All
     if ($parsed) {
-        Assert-True '-AsJson carries the response''s fields' ($parsed.ceremony -eq 'standup' -and $parsed.register -eq 'real' -and $parsed.space -eq 'widgets' -and [bool]$parsed.tracker.ok -and $parsed.source -eq 'issues') $j.Inner
+        Assert-True '-AsJson carries the response''s fields' ($parsed.ceremony -eq 'standup' -and $parsed.register -eq 'real' -and $parsed.space -eq 'widgets' -and [bool]$parsed.tracker.ok -and $parsed.source -eq 'both') $j.Inner
         Assert-True '-AsJson''s text is the text the verb prints' (([string]$parsed.text).TrimEnd([char]10) -ceq $r.Inner) $parsed.text
         Assert-True '-AsJson''s queue.walk is [104,105], each naming its worker' ((Get-Numbers $parsed.queue.walk) -eq '104,105' -and @($parsed.queue.walk)[0].worker -eq 'Fable' -and @($parsed.queue.walk)[1].worker -eq '') $j.Inner
         Assert-True '-AsJson keeps empty slots as arrays' ($j.Inner -match '"decide"\s*:\s*\[\s*\]') $j.Inner
@@ -712,6 +794,32 @@ try {
     $ado = Invoke-Standup 'tkStandup -Space board'
     Assert-True 'an Azure DevOps Space: the human team''s board (D-TA19), said on the Tracker line, exit 0' ($ado.Exit -eq '0' -and $ado.Inner -match ('(?m)^  Tracker {4}' + [regex]::Escape([string]$consts.rituals.text.adoTracker) + '$')) $ado.All
     Assert-True 'and no card is read for it: no queue, no worker' ($ado.Inner -notmatch [regex]::Escape([string]$consts.rituals.text.queueHeading)) $ado.Inner
+
+    # A GitHub Space with cards: both, joined on the id. widgets/ gets a card of its
+    # own in flight, a card linked to the closed issue 102 still in current/, and a
+    # not-billable card -- and they are taken away again after.
+    $widgetsCurrent = Join-Path $hub 'widgets/current'
+    $joinedFiles = [ordered]@{
+        'TaskK7M2-wire-the-board.prompt.md'  = "# Task K7M2: Wire the board`n`n- a41c2e9 first`n"
+        'Task102-rename-the-slug.prompt.md'  = "# Task 102: Rename the slug`n`n- b52d3f0 first`n"
+        'TaskC4D7-bench.prompt.md'           = "# Task C4D7: Bench`n`n- c63e4a1 first`n`n**Billable:** no`n"
+    }
+    foreach ($k in $joinedFiles.Keys) { [System.IO.File]::WriteAllText((Join-Path $widgetsCurrent $k), $joinedFiles[$k], $utf8) }
+    $beforeJoined = Get-HubSnapshot
+    $jv = Invoke-Standup 'tkStandup'
+    $afterJoined = Get-HubSnapshot
+    $widgetCards = @(Get-P20StandupCards -CurrentDir $widgetsCurrent -ArchiveDir (Join-Path $hub 'widgets/archive') `
+            -Pattern (Get-P20CardIdPattern -WorkItemTypes (Get-P20WorkItemTypes -Config $null)))
+    $joinedNow = Invoke-P20StandupJoinedFill -AsOf ([DateTimeOffset]::Now) -Labels $ghLabels -Issues $ghIssues -Tracker @{ ok = $true; reason = '' } `
+        -Cards $widgetCards -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
+    $joinedText = (Format-P20StandupText -Standup $joinedNow -PackageRoot $pkgRoot).TrimEnd([char]10)
+    Assert-True 'a GitHub Space with cards: the joined standup, exit 0, line for line' ($jv.Exit -eq '0' -and $jv.Inner -ceq $joinedText) ("`n--- got ---`n$($jv.Inner)`n--- want ---`n$joinedText")
+    Assert-True 'a card of its own is a row under you, on the Space''s tile' ($jv.Inner -match '(?m)^Widgets$' -and $jv.Inner -match '(?m)^  Today {6}K7M2 Wire the board$') $jv.Inner
+    $check102 = ([string]$consts.rituals.text.checkIssueClosed).Replace('{item}', '#102 Rename the slug')
+    Assert-True 'a card linked to a closed issue, still in current/: one Check line' ($jv.Inner -match ('(?m)^  Check {6}' + [regex]::Escape($check102) + '$')) $jv.Inner
+    Assert-True 'a not-billable card is not a row' ($jv.Inner -notmatch 'C4D7') $jv.Inner
+    Assert-True 'and reading both wrote nothing' ($beforeJoined -ceq $afterJoined)
+    foreach ($k in $joinedFiles.Keys) { Remove-Item -LiteralPath (Join-Path $widgetsCurrent $k) -Force }
 
     # A local Space: its cards, not gh. The scratch hub's solo/ has a card
     # in review, one in flight, one not started, and one archived today.

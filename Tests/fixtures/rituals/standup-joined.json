@@ -1,0 +1,178 @@
+{
+  "_": "The standup's two sources JOINED on the id (docs/modules/solitaire-agile.md, \"The two sources, joined\"): an active GitHub Space reads its issues AND its cards. Both halves -- tkTestToolkit -Rituals and Tests/test_rituals.py -- feed each case's labels, issues and card rows to their joined fill (fill_joined_standup / Invoke-P20StandupJoinedFill) and assert the source, the walk queue and every worker's slots by ref (#<n> for an issue, the id for a card), the Check lines and the links; a case that names goldens is rendered and compared byte for byte (LF): standup-joined-<name>.txt (the detail), standup-joined-<name>.work.txt (the work grain) and standup-joined-<name>.brief.txt (the chair's reading). One case per shape, then all of them on one day. A card row is what the thin layer reads (read_cards / Get-P20StandupCards); `billable: false` is a card that says **Billable:** no, and a row without the key is billable. The goldens are generated from this table by Tests/regenerate_joined_goldens.py, never typed.",
+  "asOf": "2026-10-02T09:00:00-04:00",
+  "since": "2026-10-01T00:00:00-04:00",
+  "space": "widgets",
+  "spaceName": "Widgets",
+  "workerLabels": [
+    { "name": "fable", "description": "Routed to Fable -- the deep or risky work" },
+    { "name": "opus", "description": "Routed to Opus -- the crash-through volume" },
+    { "name": "verify-close", "description": "Believed shipped -- verify it landed, settle the books, close through the verb" }
+  ],
+  "cases": [
+    {
+      "name": "linked-card-open-issue",
+      "shape": "a card whose id is an open issue's number: ONE row, the issue's; the card adds its lane",
+      "issues": [
+        { "number": 141, "title": "Build the foyer counts", "state": "OPEN", "labels": ["opus"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/141" }
+      ],
+      "cards": [
+        { "file": "Task141-build-the-foyer-counts.prompt.md", "folder": "current", "status": "In Progress", "closed": null, "title": "Build the foyer counts (the card's words)", "id": "141" }
+      ],
+      "expected": {
+        "walk": [],
+        "workers": [
+          { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true },
+          { "label": "opus", "name": "Opus", "yesterday": [], "today": ["#141"], "blockers": [], "empty": false }
+        ],
+        "checks": [],
+        "links": [{ "number": 141, "id": "141", "lane": "In Progress" }],
+        "text": null
+      }
+    },
+    {
+      "name": "linked-card-archived-issue-open",
+      "shape": "a card archived while its issue is open: the issue's row, and one Check line",
+      "issues": [
+        { "number": 142, "title": "Port the cast atoms", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/142" }
+      ],
+      "cards": [
+        { "file": "142-port-the-cast-atoms.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-01", "title": "Port the cast atoms", "id": "142" }
+      ],
+      "expected": {
+        "walk": [],
+        "workers": [
+          { "label": "fable", "name": "Fable", "yesterday": [], "today": ["#142"], "blockers": [], "empty": false },
+          { "label": "opus", "name": "Opus", "yesterday": [], "today": [], "blockers": [], "empty": true }
+        ],
+        "checks": [{ "key": "checkCardArchived", "item": "#142 Port the cast atoms" }],
+        "links": [{ "number": 142, "id": "142", "lane": "Done" }],
+        "text": null
+      }
+    },
+    {
+      "name": "issue-closed-card-current",
+      "shape": "an issue closed while its card is still in current/: the issue's row, and one Check line; the card's Code Review does not put it on the walk",
+      "issues": [
+        { "number": 143, "title": "Rename the slug", "state": "CLOSED", "labels": ["opus"], "closedAt": "2026-10-01T19:00:00Z", "url": "https://github.com/acme/widgets/issues/143" }
+      ],
+      "cards": [
+        { "file": "Task143-rename-the-slug.prompt.md", "folder": "current", "status": "Code Review", "closed": null, "title": "Rename the slug", "id": "143" }
+      ],
+      "expected": {
+        "walk": [],
+        "workers": [
+          { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true },
+          { "label": "opus", "name": "Opus", "yesterday": ["#143"], "today": [], "blockers": [], "empty": false }
+        ],
+        "checks": [{ "key": "checkIssueClosed", "item": "#143 Rename the slug" }],
+        "links": [{ "number": 143, "id": "143", "lane": "Code Review" }],
+        "text": null
+      }
+    },
+    {
+      "name": "custom-card-alone",
+      "shape": "a card with an id of its own -- or a number the read has no issue for -- is its own row, under you, in the slot its lane maps to",
+      "issues": [],
+      "cards": [
+        { "file": "198-fix-the-export.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-01", "title": "Fix the export", "id": "198" },
+        { "file": "Spike-Q3R9-photo-import.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-02", "title": "Photo import", "id": "Q3R9" },
+        { "file": "TaskK7M2-wire-the-board.prompt.md", "folder": "current", "status": "Code Review", "closed": null, "title": "Wire the board", "id": "K7M2" },
+        { "file": "TaskW3X7-not-started.prompt.md", "folder": "current", "status": "Active", "closed": null, "title": "Not started", "id": "W3X7" }
+      ],
+      "expected": {
+        "walk": ["K7M2"],
+        "workers": [
+          { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true },
+          { "label": "opus", "name": "Opus", "yesterday": [], "today": [], "blockers": [], "empty": true },
+          { "label": "widgets", "name": "Widgets", "yesterday": ["198", "Q3R9"], "today": ["K7M2"], "blockers": [], "empty": false }
+        ],
+        "checks": [],
+        "links": [],
+        "text": null
+      }
+    },
+    {
+      "name": "issue-alone",
+      "shape": "an issue with no card: the issue's row, as the issues fill reads it; no tile for you",
+      "issues": [
+        { "number": 144, "title": "Seed the GitHub demo", "state": "OPEN", "labels": ["opus"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/144" }
+      ],
+      "cards": [],
+      "expected": {
+        "walk": [],
+        "workers": [
+          { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true },
+          { "label": "opus", "name": "Opus", "yesterday": [], "today": ["#144"], "blockers": [], "empty": false }
+        ],
+        "checks": [],
+        "links": [],
+        "text": null
+      }
+    },
+    {
+      "name": "not-billable",
+      "shape": "a not-billable card is not a standup row: a card of its own is nowhere, and a linked one adds no lane and no Check line -- the issue's row stands",
+      "issues": [
+        { "number": 145, "title": "Verify the clock fix", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/145" }
+      ],
+      "cards": [
+        { "file": "145-verify-the-clock-fix.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-01", "title": "Verify the clock fix", "id": "145", "billable": false },
+        { "file": "TaskC4D7-bench-reading.prompt.md", "folder": "current", "status": "In Progress", "closed": null, "title": "Bench reading", "id": "C4D7", "billable": false }
+      ],
+      "expected": {
+        "walk": [],
+        "workers": [
+          { "label": "fable", "name": "Fable", "yesterday": [], "today": ["#145"], "blockers": [], "empty": false },
+          { "label": "opus", "name": "Opus", "yesterday": [], "today": [], "blockers": [], "empty": true }
+        ],
+        "checks": [],
+        "links": [],
+        "text": null
+      }
+    },
+    {
+      "name": "together",
+      "shape": "every shape on one day, with a verify-close issue on the walk beside a card in review",
+      "issues": [
+        { "number": 141, "title": "Build the foyer counts", "state": "OPEN", "labels": ["opus"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/141" },
+        { "number": 142, "title": "Port the cast atoms", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/142" },
+        { "number": 143, "title": "Rename the slug", "state": "CLOSED", "labels": ["opus"], "closedAt": "2026-10-01T19:00:00Z", "url": "https://github.com/acme/widgets/issues/143" },
+        { "number": 144, "title": "Seed the GitHub demo", "state": "OPEN", "labels": ["opus"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/144" },
+        { "number": 145, "title": "Verify the clock fix", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/145" },
+        { "number": 146, "title": "Verify the Studio tab draws on the PC", "state": "OPEN", "labels": ["fable", "verify-close"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/146" }
+      ],
+      "cards": [
+        { "file": "142-port-the-cast-atoms.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-01", "title": "Port the cast atoms", "id": "142" },
+        { "file": "145-verify-the-clock-fix.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-01", "title": "Verify the clock fix", "id": "145", "billable": false },
+        { "file": "198-fix-the-export.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-01", "title": "Fix the export", "id": "198" },
+        { "file": "Spike-Q3R9-photo-import.prompt.md", "folder": "archive", "status": "Done", "closed": "2026-10-02", "title": "Photo import", "id": "Q3R9" },
+        { "file": "Task141-build-the-foyer-counts.prompt.md", "folder": "current", "status": "In Progress", "closed": null, "title": "Build the foyer counts (the card's words)", "id": "141" },
+        { "file": "Task143-rename-the-slug.prompt.md", "folder": "current", "status": "Code Review", "closed": null, "title": "Rename the slug", "id": "143" },
+        { "file": "TaskC4D7-bench-reading.prompt.md", "folder": "current", "status": "In Progress", "closed": null, "title": "Bench reading", "id": "C4D7", "billable": false },
+        { "file": "TaskK7M2-wire-the-board.prompt.md", "folder": "current", "status": "Code Review", "closed": null, "title": "Wire the board", "id": "K7M2" },
+        { "file": "TaskW3X7-not-started.prompt.md", "folder": "current", "status": "Active", "closed": null, "title": "Not started", "id": "W3X7" }
+      ],
+      "expected": {
+        "walk": ["#146", "K7M2"],
+        "workers": [
+          { "label": "fable", "name": "Fable", "yesterday": [], "today": ["#142", "#145"], "blockers": ["#146"], "empty": false },
+          { "label": "opus", "name": "Opus", "yesterday": ["#143"], "today": ["#141", "#144"], "blockers": [], "empty": false },
+          { "label": "widgets", "name": "Widgets", "yesterday": ["198", "Q3R9"], "today": ["K7M2"], "blockers": [], "empty": false }
+        ],
+        "checks": [
+          { "key": "checkCardArchived", "item": "#142 Port the cast atoms" },
+          { "key": "checkIssueClosed", "item": "#143 Rename the slug" }
+        ],
+        "links": [
+          { "number": 141, "id": "141", "lane": "In Progress" },
+          { "number": 142, "id": "142", "lane": "Done" },
+          { "number": 143, "id": "143", "lane": "Code Review" }
+        ],
+        "text": "standup-joined-together.txt",
+        "work": "standup-joined-together.work.txt",
+        "brief": "standup-joined-together.brief.txt"
+      }
+    }
+  ]
+}
