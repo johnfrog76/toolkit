@@ -392,6 +392,7 @@ class TheJoinedTable(unittest.TestCase):
                 "linked-card-open-issue",
                 "linked-card-archived-issue-open",
                 "issue-closed-card-current",
+                "linked-card-issue-unrouted",
                 "custom-card-alone",
                 "issue-alone",
                 "not-billable",

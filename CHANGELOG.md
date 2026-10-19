@@ -11,6 +11,7 @@ release.
 ### Added
 
 - On a GitHub Space the standup now says the cards being worked as well as the issues, and adds a `Check` line where a card and its issue disagree.
+- A card linked to an issue with no worker label now shows on the standup under you, in the slot its own lane maps to, instead of being invisible because the issue itself got no slot.
 - The standup says what moved: an item says when it started in the window and how many commits its card carries, and the brief opens on a counts line -- closed, started, in progress and commits, per worker and in total.
 - `Standup -Since <yyyy-MM-dd>` (and `?since=` on the standup route) reports over a window of days instead of only yesterday, and counts everything that closed in it.
 

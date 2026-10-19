@@ -71,6 +71,27 @@
       }
     },
     {
+      "name": "linked-card-issue-unrouted",
+      "shape": "a linked card whose issue has no worker label: the issues fill gives it no slot, but the card -- in current/ -- joins the under-you tile, in the slot its own lane maps to; the issue's row is still not duplicated",
+      "issues": [
+        { "number": 160, "title": "Fix the loader with no route", "state": "OPEN", "labels": [], "closedAt": null, "url": "https://github.com/acme/widgets/issues/160" }
+      ],
+      "cards": [
+        { "file": "Task160-fix-the-loader-with-no-route.prompt.md", "folder": "current", "status": "In Progress", "closed": null, "title": "Fix the loader with no route", "id": "160" }
+      ],
+      "expected": {
+        "walk": [],
+        "workers": [
+          { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true },
+          { "label": "opus", "name": "Opus", "yesterday": [], "today": [], "blockers": [], "empty": true },
+          { "label": "widgets", "name": "Widgets", "yesterday": [], "today": ["160"], "blockers": [], "empty": false }
+        ],
+        "checks": [],
+        "links": [{ "number": 160, "id": "160", "lane": "In Progress" }],
+        "text": null
+      }
+    },
+    {
       "name": "custom-card-alone",
       "shape": "a card with an id of its own -- or a number the read has no issue for -- is its own row, under you, in the slot its lane maps to",
       "issues": [],

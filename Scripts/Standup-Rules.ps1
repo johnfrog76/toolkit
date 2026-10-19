@@ -740,6 +740,11 @@ function Invoke-P20StandupCardsFill {
 #     named for it, by the cards fill's mapping, after the worker tiles, and only
 #     when it has something to say. Its Code Review cards follow the issues on
 #     the walk.
+#   a linked card whose issue got no slot at all (no worker label, so the
+#     issues fill placed it nowhere) still gives the issue its link and its
+#     row stays the issue's alone -- but when that card is itself in current/,
+#     it also joins the under-you tile, in the slot its own lane maps to, the
+#     same path an unlinked card of its own already takes.
 #   a not-billable card is not a row and adds nothing to one.
 
 function Invoke-P20StandupJoinedFill {
@@ -799,6 +804,7 @@ function Invoke-P20StandupJoinedFill {
 
     $checks = New-Object System.Collections.ArrayList
     $links = New-Object System.Collections.ArrayList
+    $unrouted = New-Object System.Collections.ArrayList
     foreach ($n in @($joined.Keys | Sort-Object)) {
         $rounds = @($joined[$n])
         $current = @($rounds | Where-Object { [string]$_.folder -eq $currentName })
@@ -817,8 +823,10 @@ function Invoke-P20StandupJoinedFill {
         $hashes = Get-P20StandupCardHashes $card
         $hashesOf['#' + $n + '|'] = $hashes
         $begun = Test-P20StandupCardBegun -Card $card -From $fromDay -To $toDay
+        $placed = $false
         foreach ($it in $issueItems) {
             if ($null -ne $it.number -and [int]$it.number -eq [int]$n) {
+                $placed = $true
                 $it['commits'] = $hashes.Count
                 if ($begun -and [string]$it.motion -ceq $motions[2]) { $it['motion'] = $motions[1] }
             }
@@ -828,11 +836,23 @@ function Invoke-P20StandupJoinedFill {
         $item = '#' + $n + ' ' + [string]$issue.title
         if ($current.Count -gt 0 -and -not $isOpen) { [void]$checks.Add(([string]$t.checkIssueClosed).Replace('{item}', $item)) }
         elseif ($current.Count -eq 0 -and $isOpen) { [void]$checks.Add(([string]$t.checkCardArchived).Replace('{item}', $item)) }
+        # The issue gave it no slot at all (no worker label) -- its own card,
+        # if it is in current/, falls back to the under-you tile by its lane.
+        if (-not $placed -and $current.Count -gt 0) { [void]$unrouted.Add($card) }
     }
 
     $name = $SpaceName
     if (-not $name) { $name = $Space }
-    $tile = Get-P20StandupCardTile -AsOf $at -Cards $alone.ToArray() -Label $Space -Name $name -Slots $slots -From $since
+    $tileByFile = @{}
+    $tileFileNames = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($c in (@($alone.ToArray()) + @($unrouted.ToArray()))) {
+        $f = [string]$c.file
+        if (-not $tileByFile.ContainsKey($f)) { $tileFileNames.Add($f) }
+        $tileByFile[$f] = $c
+    }
+    $tileFileNames.Sort([System.StringComparer]::Ordinal)
+    $tileCards = @($tileFileNames | ForEach-Object { $tileByFile[$_] })
+    $tile = Get-P20StandupCardTile -AsOf $at -Cards $tileCards -Label $Space -Name $name -Slots $slots -From $since
     foreach ($k in @($tile.hashes.Keys)) { $hashesOf[$k] = $tile.hashes[$k] }
     $workers = New-Object System.Collections.ArrayList
     foreach ($w in @($out.workers | Where-Object { $null -ne $_ })) { [void]$workers.Add($w) }

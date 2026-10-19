@@ -719,6 +719,11 @@ def fill_cards_standup(
 #     named for it, by the cards fill's mapping, after the worker tiles, and
 #     only when it has something to say. Its Code Review cards follow the
 #     issues on the walk.
+#   a linked card whose issue got no slot at all (no worker label, so the
+#     issues fill placed it nowhere) still gives the issue its link and its
+#     row stays the issue's alone -- but when that card is itself in
+#     current/, it also joins the under-you tile, in the slot its own lane
+#     maps to, the same path an unlinked card of its own already takes.
 #   a not-billable card is not a row and adds nothing to one.
 
 
@@ -757,6 +762,7 @@ def fill_joined_standup(
             joined.setdefault(int(cid), []).append(card)
         else:
             alone.append(card)
+    unrouted: list[dict] = []
     for number in sorted(joined):
         rounds = joined[number]
         current = [c for c in rounds if str(c.get("folder", "")) == folder_current()]
@@ -771,8 +777,10 @@ def fill_joined_standup(
         )
         hashes[f"#{number}|"] = card_hashes(card)
         begun = card_begun_in(card, first, last)
+        placed = False
         for it in issue_items:
             if it.number == number:
+                placed = True
                 it.commits = len(hashes[f"#{number}|"])
                 if begun and it.motion == in_progress:
                     it.motion = started
@@ -783,8 +791,13 @@ def fill_joined_standup(
             out.checks.append(t["checkIssueClosed"].replace("{item}", item))
         elif not current and is_open:
             out.checks.append(t["checkCardArchived"].replace("{item}", item))
+        # The issue gave it no slot at all (no worker label) -- its own card,
+        # if it is in current/, falls back to the under-you tile by its lane.
+        if not placed and current:
+            unrouted.append(card)
 
-    tile, walk, card_keys, tile_hashes = _cards_tile(as_of, alone, space, space_name or space, out._marks, since)
+    tile_cards = sorted(alone + unrouted, key=lambda c: str(c.get("file", "")))
+    tile, walk, card_keys, tile_hashes = _cards_tile(as_of, tile_cards, space, space_name or space, out._marks, since)
     if tile.yesterday or tile.today or tile.blockers:
         out.workers.append(tile)
     out.queue.walk.extend(walk)
