@@ -9,7 +9,7 @@ import type { RitualItem } from "./api.solitaireAgile";
 /** True for an issue (a number), false for a card of its own. */
 export const isIssue = (i: RitualItem): boolean => i.number != null;
 
-/** How the item is named in text: `#143`, or a card's id (`2HNU`). */
+/** How the item is named in text: `#<n>`, or a card's id. */
 export const itemRef = (i: RitualItem): string => (isIssue(i) ? `#${i.number}` : (i.id ?? ""));
 
 /** A stable React key: the issue's number, else the card's id. */
@@ -21,6 +21,6 @@ export const itemFacts = (i: RitualItem): IssueFacts =>
     ? { title: i.title, label: itemRef(i), url: i.url }
     : { title: i.title, label: itemRef(i), path: i.path };
 
-/** How the voice reads it: `issue 143, <title>` or `card 2HNU, <title>`. */
+/** How the voice reads it: `issue <n>, <title>` or `card <id>, <title>`. */
 export const itemSpoken = (i: RitualItem): string =>
   `${isIssue(i) ? `issue ${i.number}` : `card ${i.id}`}, ${i.title}`;
