@@ -56,6 +56,7 @@ import { WORKFLOW_ENTRIES, answerLive, answerTarget } from "./settingsWorkflows"
 import type { SpaceBucket, SpaceLifecycleAction } from "../modules/studio/foyer";
 import { promptSets, spaceWorkflow } from "../modules/studio/prompts";
 import type { PromptRow, PromptWorkflow } from "../modules/studio/api.studio";
+import { itemFacts, itemRef, itemSpoken } from "../modules/solitaireAgile/itemRef";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -482,6 +483,18 @@ describe("the scenario grid: what each configuration shows", () => {
     expect(at({ solitaireAgile: true, deck: false })).toEqual({ route: true, chromeless: true });
     expect(at({ solitaireAgile: false, deck: true }).route).toBe(false);
     expect(at({ solitaireAgile: false, deck: false })).toEqual({ route: false, chromeless: false });
+  });
+
+  // The joined source (source: both) puts cards among the issues, and the page
+  // and the played deck read an item one way: a number is an issue (#n, linked),
+  // otherwise a card (its id, no link). Held in full by stage/standupDeck.test.tsx.
+  it("the played standup names an issue #<n> and a card by its id, never #null", () => {
+    const issue = { number: 143, title: "A", url: "https://example.test/143" };
+    const card = { number: null, id: "2HNU", title: "B", url: "", path: "current/x.md" };
+    expect([itemRef(issue), itemRef(card)]).toEqual(["#143", "2HNU"]);
+    expect([itemSpoken(issue), itemSpoken(card)]).toEqual(["issue 143, A", "card 2HNU, B"]);
+    expect(itemFacts(issue).url).toBe("https://example.test/143");
+    expect(itemFacts(card)).toEqual({ title: "B", label: "2HNU", path: "current/x.md" });
   });
 
   // Team Agile's Triage is a second page under the ONE Team Agile

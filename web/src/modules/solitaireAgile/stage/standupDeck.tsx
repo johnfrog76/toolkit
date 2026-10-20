@@ -12,6 +12,7 @@ import type {
 } from "../api.solitaireAgile";
 import { STANDUP_DECK_ID } from "../paths";
 import { IssuePopover } from "../IssuePopover";
+import { itemFacts, itemKey, itemRef, itemSpoken } from "../itemRef";
 import {
   CAST,
   CastScene,
@@ -84,10 +85,10 @@ interface Script {
   say: string[];
 }
 
-/** `#<n> Verify the Studio tab` -- how a bubble shows an issue. */
-const shown = (i: RitualItem) => `#${i.number} ${i.title}`;
-/** `issue 104, Verify the Studio tab` -- how the voice reads one. */
-const spoken = (i: RitualItem) => `issue ${i.number}, ${i.title}`;
+/** `#<n> Verify the Studio tab`, or `2HNU Verify the Studio tab` for a card -- how a bubble shows an item. */
+const shown = (i: RitualItem) => `${itemRef(i)} ${i.title}`;
+/** `issue 104, Verify the Studio tab`, or `card 2HNU, ...` -- how the voice reads one. */
+const spoken = itemSpoken;
 
 /** The date part of asOf, as written (its own offset): the slide ids' stem. */
 export function standupDate(asOf: string): string {
@@ -265,9 +266,8 @@ function Tile({ id, label, t }: { id: string; label: string; t: TileState }) {
                 <strong>{s.label}</strong>
                 <ul style={{ margin: 0, paddingLeft: "16px" }}>
                   {s.items.map((i) => (
-                    <li key={i.number}>
-                      <IssuePopover facts={{ title: i.title, label: `#${i.number}`, url: i.url }} />{" "}
-                      {i.title}
+                    <li key={itemKey(i)}>
+                      <IssuePopover facts={itemFacts(i)} /> {i.title}
                     </li>
                   ))}
                 </ul>

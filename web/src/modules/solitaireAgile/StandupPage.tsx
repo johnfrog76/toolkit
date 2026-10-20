@@ -31,6 +31,7 @@ import {
 import type { RitualItem, StandupResponse, TriageResponse } from "./api.solitaireAgile";
 import { IssuePopover } from "./IssuePopover";
 import type { IssueFacts } from "./IssuePopover";
+import { isIssue, itemFacts, itemRef } from "./itemRef";
 import { ROUTES } from "./paths";
 import { SEATS, plateFor } from "./stage/seats";
 
@@ -401,16 +402,14 @@ export function StandupPage() {
                   <li key={r.key} className={styles.row}>
                     <span className={styles.kind}>{r.kind}</span>
                     <span>
-                      {r.item.number != null && facts?.get(r.item.number) ? (
-                        <IssuePopover facts={facts.get(r.item.number)!} />
-                      ) : r.item.number != null ? (
+                      {isIssue(r.item) && facts?.get(r.item.number!) ? (
+                        <IssuePopover facts={facts.get(r.item.number!)!} />
+                      ) : isIssue(r.item) ? (
                         <Link href={r.item.url} target="_blank" rel="noopener noreferrer">
-                          #{r.item.number}
+                          {itemRef(r.item)}
                         </Link>
                       ) : r.item.id ? (
-                        <IssuePopover
-                          facts={{ label: r.item.id, title: r.item.title, path: r.item.path }}
-                        />
+                        <IssuePopover facts={itemFacts(r.item)} />
                       ) : (
                         ""
                       )}

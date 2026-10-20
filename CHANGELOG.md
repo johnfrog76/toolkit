@@ -19,6 +19,10 @@ release.
 
 - A card marked not billable (`Billable -No`) is now left off the standup as well as off Daily.
 
+### Fixed
+
+- The played standup now names a card by its id (and reads it as "card 2HNU") instead of `#null`, and its overflow list no longer links cards.
+
 ## [1.1.0] - 2026-10-18
 
 ### Added
