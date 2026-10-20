@@ -101,7 +101,14 @@ export const FEATURES = consts.features as { spaceScoped: string[] };
  * other path; the reading room's link resolver opens exactly these in the room
  * and sends every other relative link to github.com -- the same rule.
  */
-export const DOCS = consts.docs as { readme: string; root: string; segment: string };
+export const DOCS = consts.docs as {
+  readme: string;
+  root: string;
+  segment: string;
+  /** The public landing page's deployed address (GitHub Pages) -- a different
+   *  thing with a similar name: not a Docs-tab file, the page Home's foot links. */
+  landingUrl: string;
+};
 
 /**
  * Whether a GitHub Space's repository is public: the three words the
