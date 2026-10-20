@@ -316,7 +316,9 @@ Team Agile section (the reminder: a time and the days), saved through `POST /api
 (`docs/modules/solitaire-agile.md`, "The played view"): Team Agile's route, chromeless, there with
 `features.deck` off and absent with `features.solitaireAgile` off whatever the deck flag says
 (`scenarios.test.tsx`, "the played standup follows Team Agile's flag"). What it plays is held by
-`stage/standupDeck.test.tsx` and `stage/StandupPlay.test.tsx`.
+`stage/standupDeck.test.tsx` and `stage/StandupPlay.test.tsx`. On the joined source the stage reads an
+item as the page does: an issue is `#<n>` (spoken `issue <n>`), linked; a card of its own is its id
+(spoken `card <id>`), with no link (`scenarios.test.tsx`, "the played standup names an issue").
 
 The text is the shared fixture's golden (`Tests/fixtures/rituals/`), the same bytes the CLI's
 `Standup` and `Tests/test_rituals.py` assert.

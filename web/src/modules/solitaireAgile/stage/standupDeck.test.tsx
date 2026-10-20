@@ -269,6 +269,42 @@ describe("the standup deck, from Friday's fixture", () => {
     }
   });
 
+  it("a worker's slot holding an issue and a card: #143 and 2HNU in the bubble, issue 143 and card 2HNU in the voice, one link and one card popover (never #null)", () => {
+    const issue: RitualItem = {
+      number: 143,
+      title: "Verify the Studio tab",
+      url: "https://github.com/o/r/issues/143",
+    };
+    const card: RitualItem = {
+      number: null,
+      id: "2HNU",
+      title: "Joined source",
+      url: "",
+      path: "current/Task2HNU-joined.prompt.md",
+    };
+    const mixed = {
+      ...friday,
+      workers: friday.workers.map((w) =>
+        w.label === "fable" ? { ...w, yesterday: [issue, card], today: [], blockers: [] } : w,
+      ),
+    };
+    const s = buildStandupDeck(mixed).slides()[2];
+    const spoken = extractSayText(s.notes);
+    expect(spoken).toContain("issue 143, Verify the Studio tab; card 2HNU, Joined source.");
+    expect(spoken).not.toContain("null");
+    render(<>{s.content}</>);
+    const speech = screen.getByTestId("stage-speech-text").textContent ?? "";
+    expect(speech).toContain("#143 Verify the Studio tab; 2HNU Joined source");
+    expect(speech).not.toContain("null");
+    fireEvent.click(screen.getByTestId("stage-thought-trigger"));
+    const items = screen.getByTestId("stage-thought-items");
+    const links = items.querySelectorAll("a[href]");
+    expect(links).toHaveLength(1);
+    expect(links[0].textContent).toBe("#143");
+    expect(within(items).getByText("2HNU").closest("a")).toBeNull();
+    expect(items.textContent).not.toContain("null");
+  });
+
   it("every slide is the same nine tiles, with every seat's plate, the ritual's plate and the register (D-TA13, D-TA17)", () => {
     for (let i = 0; i < slides.length; i++) {
       const { view, tile } = drawStage(i);
