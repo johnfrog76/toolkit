@@ -22,6 +22,7 @@ release.
 ### Fixed
 
 - The played standup now names a card by its id (and reads it as "card 2HNU") instead of `#null`, and its overflow list no longer links cards.
+- The docs now say plainly that the Docker image only reaches the agent on Docker Desktop (macOS, Windows); on native Linux Docker Engine the container cannot reach a loopback-bound agent, and `tkWeb -Dev` is the way to run there instead.
 
 ## [1.1.0] - 2026-10-18
 
