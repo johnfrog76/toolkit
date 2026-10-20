@@ -284,6 +284,13 @@ def re_docs_segment() -> re.Pattern:
     return re.compile(consts()["docs"]["segment"])
 
 
+def docs_landing_url() -> str:
+    """The public landing page's deployed address (GitHub Pages) -- not a Docs-tab
+    file. The README's Documentation table links it as a literal; this is the
+    same address the web app's Home foot reads."""
+    return consts()["docs"]["landingUrl"]
+
+
 def visibility_public() -> str:
     """A GitHub Space's repository is public: ``public``."""
     return consts()["visibility"]["public"]

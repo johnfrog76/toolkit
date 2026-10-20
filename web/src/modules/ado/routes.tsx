@@ -3,6 +3,7 @@ import {
   Body1,
   Button,
   Caption1,
+  Link,
   Spinner,
   Tab,
   TabList,
@@ -13,6 +14,7 @@ import { AddRegular } from "@fluentui/react-icons";
 import { Navigate, useLocation, useNavigate } from "react-router";
 import { Tips, tipsReady } from "../../shared/Tips";
 import type { Tip } from "../../shared/Tips";
+import { DOCS } from "../../shell/consts";
 import { Board } from "./Board";
 import { useLaneLabel } from "./laneNames";
 import {
@@ -97,6 +99,16 @@ const useStyles = makeStyles({
     justifyContent: "center",
     minHeight: "60vh",
     gap: tokens.spacingVerticalL,
+  },
+  // One quiet line under the tips, always there: what ToolKit is, in one
+  // sentence, with its own public page one click away (issue #10). No icon,
+  // no row background -- the same muted caption the explain line and the
+  // page's chrome already use, so it reads as part of the shell rather than
+  // a new piece of furniture.
+  homeFoot: {
+    marginTop: tokens.spacingVerticalS,
+    padding: `0 ${tokens.spacingHorizontalS}`,
+    color: tokens.colorNeutralForeground3,
   },
 });
 
@@ -336,6 +348,15 @@ export function AdoHome() {
           {banner.length === 0 && tipsReady(envFetching || surfacesFetching) ? (
             <Tips tips={tips} />
           ) : null}
+          {/* The landing page, one click from Home's foot (issue #10): the
+              same address consts.json's docs.landingUrl holds, which the
+              README's Documentation table links too, so the two never drift
+              apart. Always there -- it is not a tip and is never retired. */}
+          <Caption1 className={styles.homeFoot}>
+            <Link href={DOCS.landingUrl} target="_blank" rel="noopener noreferrer">
+              What is ToolKit?
+            </Link>
+          </Caption1>
           {/* The plain plus: create lives at the module's
               bottom right on every tab and both views, opening the SAME
               dialog -- local card, pickup, or (on gh) a new issue. An
