@@ -1,0 +1,9 @@
+{
+  "_": "The Space the fixture block is assembled in: a GitHub Space whose howIWork answer is agents, so Team Agile is on and section one is the agents sentence. Tests/Test-StartWork.ps1 and Tests/test_bridge.py write it into a scratch hub.json.",
+  "slug": "widgets",
+  "name": "Widgets",
+  "status": "active",
+  "promptsFolder": "widgets",
+  "org": "https://github.com/acme/widgets",
+  "howIWork": "agents"
+}

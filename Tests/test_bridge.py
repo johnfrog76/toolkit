@@ -344,6 +344,98 @@ class ARepoVerbDoesNotActOnTheToolkit(unittest.TestCase):
         self.assertNotIn("toolkit-branch", body["output"])
 
 
+class StartWorkThroughTheBridge(unittest.TestCase):
+    """Team Agile's hand-off block (AR-1 of the agent in the room): the web's one
+    call is ``POST /api/cmd/StartWork`` and no native route builds the block
+    (D-AR6). So the verb is in the table exactly when Team Agile is on -- the
+    flag AND the Space's ``howIWork`` answer -- refused (``rejected``) when it is
+    off, and through the bridge it prints the shared fixture's block byte for
+    byte (``Tests/fixtures/start-work/``, the same file ``tkTestToolkit -StartWork``
+    compares). A refusal reaches the page as ``status: error`` with the verb's
+    own sentence. Run for real in a scratch package over a scratch hub; the
+    card path never asks ``gh``.
+    """
+
+    FIXTURES = PKG_ROOT / "Tests" / "fixtures" / "start-work"
+    CARD = "Task23A3-route-the-remaining-raw-git-calls.prompt.md"
+
+    def setUp(self):
+        if not HAVE_PWSH:
+            self.skipTest("needs pwsh to run StartWork for real")
+        self._tmp = tempfile.TemporaryDirectory()
+        root = Path(self._tmp.name)
+        self.pkg = root / "pkg"
+        self.pkg.mkdir()
+        for name in ("utilities.psm1", "config.default.json", "consts.json"):
+            shutil.copy(PKG_ROOT / name, self.pkg / name)
+        for folder in ("Scripts", "Config", "Prompt20Toolkit", "templates"):
+            shutil.copytree(PKG_ROOT / folder, self.pkg / folder)
+        (self.pkg / "agent" / "ado").mkdir(parents=True)
+        shutil.copy(bridge.BRIDGE_PS1, self.pkg / "agent" / "ado" / "bridge.ps1")
+        (self.pkg / "agentic").mkdir()
+        shutil.copy(self.FIXTURES / "build.prompt.md", self.pkg / "agentic" / "build.prompt.md")
+
+        self.hub = root / "hub"
+        current = self.hub / "widgets" / "current"
+        current.mkdir(parents=True)
+        (self.hub / "widgets" / "archive").mkdir()
+        shutil.copy(self.FIXTURES / self.CARD, current / self.CARD)
+        space = {k: v for k, v in json.loads((self.FIXTURES / "space.json").read_text("utf-8")).items() if k != "_"}
+        (self.hub / "hub.json").write_text(json.dumps({"hub": 1, "spaces": [space]}), encoding="utf-8")
+
+        self._saved = (bridge._map_cache, bridge._map_key)
+        env = {k: v for k, v in os.environ.items() if not k.startswith("TEAMS_WEBHOOK_")}
+        env.pop("PROMPTS_ROOT", None)
+        self._patches = [
+            mock.patch.dict(os.environ, env, clear=True),
+            mock.patch.object(bridge, "REPO_ROOT", self.pkg),
+            mock.patch.object(bridge, "UTILITIES", self.pkg / "utilities.psm1"),
+            mock.patch.object(bridge, "BRIDGE_PS1", self.pkg / "agent" / "ado" / "bridge.ps1"),
+            mock.patch.object(bridge, "MODULE_COMMANDS_DIR", self.pkg / "Config"),
+            mock.patch.object(config, "DEFAULT_CONFIG_PATH", self.pkg / "config.default.json"),
+            mock.patch.object(config, "LOCAL_CONFIG_PATH", self.pkg / "config.local.json"),
+            mock.patch.object(bridge, "_map_cache", {}),
+            mock.patch.object(bridge, "_map_key", None),
+        ]
+        for p in self._patches:
+            p.start()
+
+    def tearDown(self):
+        for p in reversed(self._patches):
+            p.stop()
+        bridge._map_cache, bridge._map_key = self._saved
+        self._tmp.cleanup()
+
+    def _config(self, on: bool):
+        local = {
+            "promptsRoot": str(self.hub),
+            "activeSpace": "widgets",
+            "features": {"solitaireAgile": on},
+            "startWork": {"prompts": {"Task": "agentic/build.prompt.md"}},
+        }
+        (self.pkg / "config.local.json").write_text(json.dumps(local), encoding="utf-8")
+
+    def test_off_the_verb_is_not_in_the_table_and_is_refused(self):
+        self._config(False)
+        self.assertNotIn("StartWork", bridge.command_map(force=True))
+        body = client.post("/api/cmd/StartWork", json={"params": ["23A3"]}).json()
+        self.assertEqual(body["status"], "rejected", body)
+
+    def test_on_the_block_is_the_fixture_byte_for_byte(self):
+        self._config(True)
+        self.assertEqual(bridge.command_map(force=True).get("StartWork"), "Get-P20StartWork")
+        body = client.post("/api/cmd/StartWork", json={"params": ["23A3"]}).json()
+        self.assertEqual(body["status"], "success", body.get("error") or body["output"])
+        want = (self.FIXTURES / "expected-card.md").read_text("utf-8").replace("\r\n", "\n").rstrip("\n")
+        self.assertEqual(body["output"].replace("\r\n", "\n").strip("\n"), want)
+
+    def test_a_refusal_is_an_error_with_the_verbs_sentence(self):
+        self._config(True)
+        body = client.post("/api/cmd/StartWork", json={"params": ["X9X9"]}).json()
+        self.assertEqual(body["status"], "error", body)
+        self.assertIn("No card with id 'X9X9' in current/.", body.get("error") or "")
+
+
 class ParametersTravelAsArgv(unittest.TestCase):
     """(b) -- no command string is built, so quoting is not a category here."""
 

@@ -20,6 +20,12 @@ size **is** the worker label (D-TA3: `sonnet` small, `opus` medium, `fable` with
 every answer is one `Route` -- a real label or milestone written on the tracker through `gh`, never a
 file here.
 
+Its third move is the **hand-off** (AR-1 of the agent in the room): `StartWork <id>` prints ONE
+markdown block -- how we work in this Space, the card (or the issue) and the prompt for its kind -- so a
+fresh agent in your editor starts the work with no further briefing. The Team Agile page shows the
+same block in a copy box. It reads three things that already exist and writes none of them
+([StartWork: the hand-off block](#startwork-the-hand-off-block)).
+
 This document stands alone: everything a person or an agent needs to work on Team Agile is here or
 one link away. It follows the standard every add-on's document follows
 ([the modules guide](README.md#what-an-add-ons-document-must-contain)).
@@ -38,9 +44,10 @@ says why its slots are empty.
 4. [The verbs](#the-verbs)
 5. [The routes](#the-routes)
 6. [The web UI](#the-web-ui)
-7. [The file shape, and how a standup is read](#the-file-shape-and-how-a-standup-is-read)
-8. [The tests](#the-tests)
-9. [Known gaps](#known-gaps)
+7. [StartWork: the hand-off block](#startwork-the-hand-off-block)
+8. [The file shape, and how a standup is read](#the-file-shape-and-how-a-standup-is-read)
+9. [The tests](#the-tests)
+10. [Known gaps](#known-gaps)
 
 ## The switch, and its scope
 
@@ -85,12 +92,13 @@ its one worker, and an active GitHub Space reads its cards beside its issues, jo
 
 | Half | Team Agile's | Not Team Agile's, though it sits beside it |
 | --- | --- | --- |
-| CLI | `Config/solitaireAgile.commands.psd1` + `.ps1` (three wrappers); `Scripts/Get-Standup.ps1` (the verb: which Space, which source, the two `gh` reads or the card read, the printing); `Scripts/Standup-Rules.ps1` (the issues, cards and joined fills and the rendering, pure; the source rule; the card reader); `Scripts/Get-Triage.ps1` and `Scripts/Triage-Rules.ps1` (triage's read, and its grouping and text, pure); `Scripts/Set-Route.ps1` (the one write: one `gh issue edit` per switch); `Scripts/Ritual-Common.ps1` (the skeleton the three verb scripts share -- which Space, and the two-reads-to-`@{ ok; value }` gh layer Standup and Triage call; Route keeps its own gh-call shape but shares the Space resolution); the inventory row (from the psd1) and its question in `Config/settings-workflows.json`; the menu heading `Team Agile` (category `rituals`) | `Scripts/Resolve-Tracker.ps1` -- which repo a GitHub Space means, shared with every GitHub verb; the card rules a standup reads cards through -- `Resolve-CardName.ps1` (the id), `Get-PromptFileStatus.ps1` (the state, and `Test-P20CardBillable`) |
+| CLI | `Config/solitaireAgile.commands.psd1` + `.ps1` (four wrappers); `Scripts/Start-Work.ps1` (the hand-off block: the id through `Resolve-P20CardArgument`, else the Space's issue; the Space's note or its `howIWork` sentence, `Get-P20HowIWorkSentence` in `Scripts/Resolve-HowIWork.ps1`; the kind's prompt); `Scripts/Get-Standup.ps1` (the verb: which Space, which source, the two `gh` reads or the card read, the printing); `Scripts/Standup-Rules.ps1` (the issues, cards and joined fills and the rendering, pure; the source rule; the card reader); `Scripts/Get-Triage.ps1` and `Scripts/Triage-Rules.ps1` (triage's read, and its grouping and text, pure); `Scripts/Set-Route.ps1` (the one write: one `gh issue edit` per switch); `Scripts/Ritual-Common.ps1` (the skeleton the three verb scripts share -- which Space, and the two-reads-to-`@{ ok; value }` gh layer Standup and Triage call; Route keeps its own gh-call shape but shares the Space resolution); the inventory row (from the psd1) and its question in `Config/settings-workflows.json`; the menu heading `Team Agile` (category `rituals`) | `Scripts/Resolve-Tracker.ps1` -- which repo a GitHub Space means, shared with every GitHub verb; the card rules a standup reads cards through -- `Resolve-CardName.ps1` (the id), `Get-PromptFileStatus.ps1` (the state, and `Test-P20CardBillable`) |
 | Agent | `agent/solitaire/standup.py` and `triage.py` -- one gated router, `GET /api/ritual/standup` and `GET /api/ritual/triage`, **reads only**; a triage answer reaches the tracker only as `POST /api/cmd/Route`, the bridge | `space_scope` in `agent/ado/accounting.py`, the `?space=` rule `/issue-report` uses; `card_id` and the state rule in `agent/core/parsers.py` |
-| Web | `web/src/modules/solitaireAgile/` -- the descriptor, the Standup \| Triage strip (`RitualPage.tsx`), the standup page, the Triage page, and `stage/`: the cast atoms (by copy), the seats, the generated deck and the played route | the shell; the deck engine (`web/src/modules/deck/engine/`) and its second resolver `GeneratedDeckHost.tsx`, which the played view borrows |
+| Web | `web/src/modules/solitaireAgile/` -- the descriptor, the Standup \| Triage strip (`RitualPage.tsx`), the standup page, the Triage page, the hand-off's copy box (`StartWorkBox.tsx`, a `lazyPart`), and `stage/`: the cast atoms (by copy), the seats, the generated deck and the played route | the shell; the deck engine (`web/src/modules/deck/engine/`) and its second resolver `GeneratedDeckHost.tsx`, which the played view borrows |
 | Data | `Config/ceremonies.json` (the standup's slots, queue kinds, registers and `kinds` -- the bug and feature kinds a dressed sentence may count by; triage's three question slots, its severities `sev1`-`sev3`, its `deepWaterLabel` and the words of its text) and `Config/standup-vocabulary.json` (`phrasebook`, `nothing`, `excuses`, `fakeWork`, and `verbs`, the standup register's words offered to the model), read by both halves, never typed in code (D-SA2) | the model profile, `agent/core/model.py` (`ai.model`, `ANTHROPIC_API_KEY`), which the dress calls through and the PR review and the notes tidy-up share |
-| Contract | `consts.json` `rituals`: the route, `triageRoute`, the two data files, `workerLabelPrefix`, `walkLabel`, `labelWidth`, every fixed word of the text | -- |
-| Hub | nothing -- no verb writes to the hub; `Route` writes to the TRACKER; a local Space's standup READS its `current/` and `archive/` | the cards, which are the card verbs' |
+| Contract | `consts.json` `rituals`: the route, `triageRoute`, the two data files, `workerLabelPrefix`, `walkLabel`, `labelWidth`, every fixed word of the text; `consts.json` `startWork.text`: the hand-off block's head line and three section headings | -- |
+| Configuration | `config.default.json` `startWork.prompts`: which `agentic/` prompt the hand-off carries for each kind, set with `Config -Set startWork.prompts.<kind>=<path>` | the prompts themselves, `agentic/`, which are the package's |
+| Hub | nothing -- no verb writes to the hub; `Route` writes to the TRACKER; a local Space's standup READS its `current/` and `archive/`; `StartWork` READS a card in `current/` and the Space's `how-we-work.md` when it has one | the cards, which are the card verbs' |
 
 The cast is the tracker's labels, not a list in code: **a worker is a label whose description starts
 `Routed to`** (`rituals.workerLabelPrefix`), and the worker's name is the text after it up to ` -- `.
@@ -137,6 +145,7 @@ every module is off), so it answers once any `tk*` command has loaded the module
 | `Standup [-Space <slug>] [-AsJson] [-Brief] [-Grain <detail\|work\|brief>] [-Since <yyyy-MM-dd>] [-Remind <HH:mm>] [-Days <Mon,Tue,...>] [-Walk]` | prints today's standup for the Space you are in, or the declared Space `-Space` names, read without switching into it. `-AsJson` prints the response the agent serves, `text`, `work` and `brief` included -- the bridge's shape and the parity test's. `-Brief` prints only the chair's reading (below) and, being a read, does not re-arm the reminder. `-Grain` picks the register of detail ([the work grain](#the-work-grain)): `detail`, the default, is the text as it always printed; `work` is the ritual's grain, spoken as standup prose ([the prose](#the-prose)); `brief` is `-Brief`. A word that is not a grain, or `-Brief` with another grain, is a stated refusal (exit 2). `-Since <yyyy-MM-dd>` widens yesterday back to that day ([what moved](#what-moved-and-the-window)) -- not `-Days`, which is the reminder's cadence; a day that is not one, or is after today, or `-Since` with `-Remind`, is a stated refusal | none |
 | `Triage [-Space <slug>] [-AsJson]` | prints the Space's open issues grouped by milestone -- no milestone first, then most open first -- each milestone under its context line, each issue one line: number, title, worker (its size) or `--`, severity or `--`, `deep-water` marked. `-AsJson` is the route's shape | none |
 | `Route <n> [-Size <label>] [-Milestone <title>] [-Severity <sev>] [-DeepWater] [-Space <slug>] [-WhatIf]` | answers triage's questions for issue `<n>`: **one `gh issue edit` per switch given**, in that order. `-WhatIf` prints every write and makes none | none -- it writes the tracker |
+| `StartWork <id> [-Clip] [-Prompt <path>] [-Space <slug>]` | prints the hand-off block for a card in `current/`, or for the Space's GitHub issue `<id>` when no card carries it ([below](#startwork-the-hand-off-block)). `-Clip` puts it on the clipboard and says so in one line; `-Prompt` carries another prompt for this call | none -- it reads |
 
 **The walk list** (`Standup -Walk`). The PC's morning as one printout: the standup's title line, then
 one block per open `verify-close` issue by number, each the line the standup prints (`  Walk       #<n> <title>`) <!-- markdownlint-disable-line MD038 -- the span shows the printed line with its indent, which is the point -->
@@ -208,6 +217,10 @@ The one stated refusal (`Error:`, `Hint:`, exit 2) is a `-Space` nobody declared
 | `GET /api/ritual/standup?space=<slug>&since=<yyyy-MM-dd>` | `features.solitaireAgile` per request, with the active Space's answer applied (**404** unless the switch is on and the Space you are in works with agents; the detail names which is off); `space` scoped like `/api/issue-report` (an undeclared slug 404); `since` widens yesterday's window as `Standup -Since` does, and a `since` that is not a day, or is after today, is a **422** naming it | the same two `gh` reads (the issues with `milestone` and `body`), through the same data files -- or, for a local Space, its cards | nothing |
 | `GET /api/ritual/triage?space=<slug>` | the same | `gh label list`, and `gh issue list --state open` with `milestone` | nothing |
 | `POST /api/cmd/Route` | the bridge: `Route` is in the CLI's command table only while the flag resolves on -- the switch on and the Space answered `agents` | -- | what `Route` writes, and nothing else |
+| `POST /api/cmd/StartWork` | the bridge, the same way: off, the call is `rejected`; a stated refusal is `status: error` with the verb's sentence | the card (or `gh issue view`), the Space's note or answer, the prompt | nothing |
+
+No route of this module's builds the hand-off block (D-AR6): the CLI is its one implementation, and the
+bridge is how the page asks for it.
 
 The response is the spec's ("The M0 build contract"): `ceremony`, `register` (`real`), `asOf`, `since`, `space`,
 `source` (`issues`, `cards`, or `none` when `tracker.ok` is false), `tracker` (`ok`, `reason`), `chair`
@@ -246,7 +259,7 @@ Header, a line break and body are `text` byte for byte, and the page test says s
 small **Detail | Work | Brief** tab strip picks the grain ([the work grain](#the-work-grain)),
 remembered per browser (`usePersistedValue`, key `p20.solitaireAgile.grain`), `Detail` the default: Work
 shows `work.text`, Brief shows `brief` as the body (and drops the small brief above it), each verbatim; a
-response from an agent that predates `work` shows Detail for it. Beside Play, **Copy** (Daily's pattern: `copyText`, "Copied!" for a moment) puts the grain on screen -- `text` at Detail -- on the clipboard exactly as the response gives it. Under the prose a quiet **Show as list** / **Hide list** toggle (collapsed by default, constant box) opens the same items as rows read from the response's structured fields, nothing re-fetched: the queue's items first (kind, number linked to `url`, title, worker), then each worker's (slot, number, title, worker); a card shows its id and no link. The other thing
+response from an agent that predates `work` shows Detail for it. Beside Play, **Copy** (Daily's pattern: `copyText`, "Copied!" for a moment) puts the grain on screen -- `text` at Detail -- on the clipboard exactly as the response gives it. Under the prose a quiet **Show as list** / **Hide list** toggle (collapsed by default, constant box) opens the same items as rows read from the response's structured fields, nothing re-fetched: the queue's items first (kind, number linked to `url`, title, worker), then each worker's (slot, number, title, worker); a card shows its id and no link. Each row ends in a quiet **Start work**, which opens the hand-off block's copy box for that item ([StartWork: the hand-off block](#startwork-the-hand-off-block)). The other thing
 to click is **Play**, quiet, in the header (V1, below). With `tracker.ok` false the page still draws the ritual -- the chair's lines and the
 `Tracker` reason -- and when the agent does not answer it says so as an error, never as an empty standup.
 `StandupPage.test.tsx` builds the response from `Tests/fixtures/rituals/standup.json` and asserts the
@@ -397,6 +410,86 @@ on "you", and say neither "all on the PC" nor "none in flight". A joined GitHub 
 GitHub Space, except that a card on its walk puts the walks on "you" (and drops "all on the PC"), its
 card tile says no "none in flight", and its `Check` lines follow the workers. With the tracker not
 answering, the brief is the one `Tracker` line.
+
+## StartWork: the hand-off block
+
+Three moves make the loop: triage the backlog, make the issues, start the work. The first two are
+`Triage`/`Route` and `NewItem`; the third is `StartWork`. It prints **one markdown block** a fresh agent
+in your editor can start from without a question -- how we work in this Space, the work, and the prompt
+for its kind -- each under a heading that names the file it came from, so the agent can re-read the
+original:
+
+```markdown
+# Start work: Task 23A3 -- Route the remaining raw git calls
+
+## How we work in Widgets (hub.json: spaces[widgets].howIWork = agents)
+You work with agents here: the repository's GitHub issues are the backlog, ...
+
+## The work: Task 23A3 (widgets/current/Task23A3-route-the-remaining-raw-git-calls.prompt.md)
+<the card's text, whole>
+
+## The prompt (agentic/pr-ship.prompt.md)
+<the prompt's text, whole>
+```
+
+**Nothing before it and nothing after it** on stdout, LF-joined, so `tkStartWork 23A3 | pbcopy` (or
+`| clip` on Windows) and `> file` carry exactly the block; `-Clip` does the copy itself and prints one
+line. The head line and the three heading shapes are the contract's, `consts.json` `startWork.text`
+(`head`, `howWeWork`, `work`, `prompt`) -- the CLI types them, the copy box finds the block's title by
+the head line's shape. It writes nothing anywhere.
+
+**The input** is resolved the one way every verb resolves one, `Resolve-P20CardArgument`
+(`Scripts/Resolve-CardName.ps1`): a card in the Space's `current/`, an id matching that id only
+(`StartWork 39` never assembles `Task139-...`), a filename, or -- in a terminal -- a partial name, which
+is named on a line of its own before the block. Then, for a work-item number no card in `current/`
+carries, the Space's GitHub issue of that number (`gh issue view <n> --json
+number,title,state,labels,milestone,body,url` on the Space's one repo). Refused, each with `Error:`,
+`Hint:` and exit 2: no id; an id or a name that matches nothing; a card in `archive/` (it is Done -- a
+fresh `NewPrompt` brings the work back); a closed issue; a number that is a pull request; an Azure DevOps
+Space (its board holds the rituals); a local Space or one with no tracker, asked for a number no card
+carries; an undeclared `-Space`; and, for a non-interactive caller such as the bridge, a partial name.
+
+**Section one, how we work.** The Space's own note, `<promptsFolder>/how-we-work.md` in the hub, when it
+has one -- the heading then names that path (`widgets/how-we-work.md`). Until a Space has one (none does
+yet: the first-run work that writes the team's files is a later milestone), it is ONE sentence derived
+from `spaces[].howIWork` through the same table that gates the module (`Scripts/Resolve-HowIWork.ps1`,
+`Get-P20HowIWorkSentence`), and the heading names the key and its answer,
+`hub.json: spaces[<slug>].howIWork = <answer>`. A section that said "not written yet" would be a block
+that fails its own purpose, so it always assembles.
+
+**Section two, the work.** A card goes in **whole, as written** -- read the way `Status` reads it, never
+from a parsed model -- so its commit bullets, its `PR URL:` line and its footer stamps (`**Sprint:**`
+uncut, however long the milestone's title) travel with it. The one transform is the terminator rule:
+CRLF reads as LF, so a card written on Windows gives the same block as one written on a Mac. Its heading
+names the card's path relative to the hub. An issue's heading names its URL, and its text is rendered as a
+card renders what came from the tracker: `# Issue #<n>: <title>`, `Tags:` (the labels, joined by a semicolon and a space),
+`**Sprint:**` (the milestone), then the body.
+
+**Section three, the prompt**, chosen by the item's kind from `config.default.json` `startWork.prompts`
+-- configuration, not contract, because a team's prompts are its own (D-AR4). The kind is the card's
+type, read from its filename by the `workItemTypes` table (its key with the spaces removed: `Bug`, `Task`,
+`UserStory`, `Feature`, `Spike`), or `issue`. A path is relative to the Toolkit package, or absolute; an
+`agentic/<name>` row goes through the one prompt lookup, so a tuned copy in `agenticExtensionPath` wins
+here as everywhere. The shipped rows hand every kind to `agentic/pr-ship.prompt.md`, the prompt that
+carries a card that already exists to its pull request: `new-bug` and `new-user-story` create an item and
+a card, which the item being started already has. A team changes a row with
+`tkConfig -Set startWork.prompts.Bug=agentic/<name>.prompt.md`, and adds a kind the same way
+(`startWork.prompts.Meeting=...`); `-Prompt <path>` carries another prompt for one call. A kind with no
+row, or a row whose file is not there, is a stated refusal naming `startWork.prompts.<kind>`.
+
+**The page.** On the standup's **Show as list**, every row -- an issue or a card -- ends in a quiet
+**Start work**. It opens the copy box (`StartWorkBox.tsx`, a `lazyPart`: its chunk is fetched the first
+time a row asks), which makes **one** `POST /api/cmd/StartWork` with the item's number or id and shows the
+block verbatim in a monospace region, the block's own head as the dialog's title, and one button,
+**Copy**. A refusal shows the sentence the verb stated and nothing else; an agent that does not answer
+says so. No agent runs in the browser (D-AR1): the block is text you carry to your editor.
+
+**Proving it.** `Tests/fixtures/start-work/` holds a Space's answer, a card (with commit bullets, a
+`PR URL:` line and footer stamps), a prompt, an issue's `gh` answer and the two expected blocks byte for
+byte. `tkTestToolkit -StartWork` types the verb in a fresh shell against them -- the card in LF and again
+in CRLF -- and `Tests/test_bridge.py` runs it through `POST /api/cmd/StartWork` and compares the same
+file. Whether a cold agent really starts without a question is a person's judgement, so it is a gate row
+in `VERIFY.md`, "The cold-agent walk".
 
 ## The reminder to attend
 
@@ -864,15 +957,18 @@ standup is complete and correct; nothing on screen says a dress was skipped.
 | `Tests/test_rituals.py` | the agent's issues, cards and joined fills and the rendering over the same three tables and goldens (the joined goldens also against `Tests/regenerate_joined_goldens.py`'s output); the work grain over `standup-work.json` -- every group of the queue and of each worker's slots, the `heads`, `keys`, `types` and `counts` tables, `standup-work-<case>.txt` byte for byte, the JSON round trip, the work grain's own phrases; the prose over `standup-prose.json` -- every `sentences` row, each case's queue and worker sentences, `standup-prose-<case>.txt` byte for byte, the JSON round trip, the prose's own sentences, no word that is not the contract's or the tracker's; the dress over `standup-dress.json` -- every row, every guard with a row, the rows its issue asked for (a ref the group lacks refused, "20g of protein" kept), the reply that names one, and around it with the model STUBBED: the facts are the workers' group sentences and nothing else, the kinds counted from labels and a card's type, the prompt offering the `verbs` and no other family, a model that answers dressed and guarded, the same groups dressed once, no key / a failing model / a reply that is not JSON all the prose, nothing to dress asking nothing; the route with no key answering `spoken: null` and `work` unchanged, and with a stubbed model `spoken` beside `work` with `text`, `brief` and the register untouched; the route asking `gh` for `milestone` and `body` and answering `work`; `read_cards` over real folders (with each card's type, body and billable, and its `begun` day and commit hashes); what moved over `standup-joined.json` -- each item's motion and commits, the counts, the counts line opening the brief, the window rule, the hash rule; the route's `?since=` widening the window and a `since` that is not a day before today a 422 naming it; a local Space's route filling from its cards with no `gh` call; a GitHub Space's route joining its cards to its issues (`checks`, `links`, a card of its own on the Space's tile, a not-billable card nowhere, the hub unwritten); an ADO Space's `adoTracker` reason; 404 off |
 | `tkTestToolkit -Triage` | every case of `Tests/fixtures/rituals/triage.json` -- the groups in order, each group's counts, context and numbers, each issue's worker, size, severity and deep-water, the sizes -- and the text against `triage-<name>.txt` byte for byte, again after a JSON round trip; off is no `Triage`, no `Route`, no bridge entry; `Triage` typed with `gh` stubbed; **`Route` typed with `gh` stubbed as a function that writes down every call**: the exact `gh issue edit` argv for each switch, alone and all four in order, `-WhatIf` writing nothing, the two moves printed, every refusal exit 2 with one `Error:` block and no write, the hub untouched |
 | `Tests/test_triage.py` | the agent's grouping and text over the same table and goldens; the route's `gh` calls; ADO and tier below 1 a `Tracker` line; 404 off |
-| `tkTestToolkit -Consts`, `Tests/test_consts.py`, `web/src/shell/consts.test.ts` | the `rituals` values (`triageRoute`, `grains`, `numberWords`, the four `work*Regex` patterns, the `work*` phrases and the `prose*` words among them, the dress's `dressGuards` and four `dress*Regex` patterns, and what moved's `motions`, the `itemMotion`, `motion*`, `commit*` and `counts*` words), stated from all three halves; `{n} to walk`, `Nothing blocked.` and `Yesterday I closed` never retyped in the CLI's scripts or the agent; `Waiting on you`, `nothing in flight` and `Routed to` never retyped in the CLI's scripts |
-| `web/src/modules/solitaireAgile/StandupPage.test.tsx` | the page over the shared fixture and goldens (above); the counts line the first line at the top of the page, and an item's motion in the text; the grain: three tabs from `rituals.grains`, Detail by default, Work showing `work.text` (`standup-prose-friday.txt`, the prose) verbatim and Copy copying it, Brief the brief as the body once, the choice remembered by the browser, a stored word that is not a grain read as Detail |
+| `tkTestToolkit -StartWork` | the hand-off block, typed in a fresh shell over a scratch hub built from `Tests/fixtures/start-work/`: off is no verb and no bridge entry; `StartWork 23A3` is `expected-card.md` byte for byte, and so is the card in CRLF, the id in lower case and the full filename; `39` never assembles `Task139`; a `how-we-work.md` switches section one's heading to its path; issue 41, which no card carries, is `expected-issue.md` with one `gh issue view`; `-Prompt` absolute and package-relative; a partial name named in a terminal and refused for a non-interactive caller; and every refusal exit 2 with one `Error:` block and the hub untouched -- no row for the kind (naming `startWork.prompts.Meeting`), a row whose file is missing, a `-Prompt` that is no file, no id, nothing matching, an archived card, a closed issue, a pull request, an Azure DevOps Space, an undeclared `-Space` |
+| `Tests/test_bridge.py`, "StartWorkThroughTheBridge" | `StartWork` in the bridge's table with Team Agile on and `rejected` with it off; through the bridge, `expected-card.md` byte for byte; a refusal `status: error` with the verb's sentence |
+| `web/src/modules/solitaireAgile/StartWorkBox.test.tsx` | the copy box: one `StartWork` call, `expected-card.md` shown verbatim with its head as the title, Copy copying exactly the block, a refusal shown as the verb's sentence with no Copy, the agent away said so |
+| `tkTestToolkit -Consts`, `Tests/test_consts.py`, `web/src/shell/consts.test.ts` | the `startWork.text` headings; the `rituals` values (`triageRoute`, `grains`, `numberWords`, the four `work*Regex` patterns, the `work*` phrases and the `prose*` words among them, the dress's `dressGuards` and four `dress*Regex` patterns, and what moved's `motions`, the `itemMotion`, `motion*`, `commit*` and `counts*` words), stated from all three halves; `{n} to walk`, `Nothing blocked.` and `Yesterday I closed` never retyped in the CLI's scripts or the agent; `Waiting on you`, `nothing in flight` and `Routed to` never retyped in the CLI's scripts |
+| `web/src/modules/solitaireAgile/StandupPage.test.tsx` | the page over the shared fixture and goldens (above); a list row's **Start work** making one `StartWork` call with the issue's number (a card's row by its id), and none before a row asks; the counts line the first line at the top of the page, and an item's motion in the text; the grain: three tabs from `rituals.grains`, Detail by default, Work showing `work.text` (`standup-prose-friday.txt`, the prose) verbatim and Copy copying it, Brief the brief as the body once, the choice remembered by the browser, a stored word that is not a grain read as Detail |
 | `web/src/modules/solitaireAgile/stage/standupDeck.test.tsx` | at the work grain, spoken as prose over `standup-prose.json`'s `friday`: the queue's sentences as one Say line each, Opus's and Fable's sentences as the agent wrote them with nothing for an empty slot, an empty queue the contract's sentence, the mug unchanged, the tracker's line whatever `work` says; dressed, from `standup-dress.json`'s reply: a worker in `spoken` speaking and showing its spoken sentences, a worker not in it its prose, `spoken: null` the prose, the queue and the mug never dressed, the slide ids unchanged; and the played deck built from the shared fixture's `friday` and `no-tracker` cases: the slides in order with their ids, the plates, the Say lines, the mug on Sonnet, nine tiles and the register on every slide, reduced motion; the deal of workers onto seats |
 | `web/src/modules/solitaireAgile/stage/StandupPlay.test.tsx`, `web/src/modules/deck/engine/DeckPlayer.audiobook.test.tsx`, `web/src/modules/deck/GeneratedDeckHost.mute.test.tsx` | the mute, the played route's loading, error and Suitcase states; the audiobook hint at desktop width with prev and next, the browser voice, and a deck without the hint untouched |
 | `tkTestToolkit -Environment`, `Tests/test_surfaces.py` | its inventory row has its question; the Space's answer over `Tests/fixtures/how-i-work/table.json` -- every row and every gate row -- and, typed in a fresh shell with the switch on, a GitHub Space answered with agents (`on`, `Standup` a verb), one nobody answered (`not configured`), an Azure DevOps Space and one with no tracker (`off`, derived, no verb), each with the line that changes it, and the question naming the Space |
 | `Tests/test_how_i_work.py` | the agent's half of the same table; `load_config` serving the gated flag and `howIWork` with the switch as set, Space by Space, a local patch answering too, and the routes' 404 naming the answer or the switch |
 | `tkTestToolkit -Config` | `spaces.<slug>.howIWork=agents -Hub` lands on the Space's hub entry and nowhere else; `team` and an unknown answer are stated refusals naming `alone` and `agents`; `-Unset` takes it off |
 | `web/src/shell/HowDoI.test.tsx`, `registry.solitaireAgile.test.tsx`, `web/src/shell/scenarios.test.tsx` | How do you want to work in \<Space>?: the three radios in their words, by tracker -- GitHub two live and Azure disabled with its reason, Azure DevOps and no tracker selected and locked with theirs; a pick writing `spaces.<slug>.howIWork` with `-Hub` through the one writer; the Saving state -- the pick at once, `Saving…`, `aria-busy`, the others locked, all gone on success; a refusal reverting; the line when the switch is off; only `With agents` mounts the tab |
-| `tkTestToolkit -Menu` | each verb's description, category and three-places switch parity |
+| `tkTestToolkit -Menu` | each verb's description, category and three-places switch parity -- the module's verbs held by the same script / wrapper / usage check as the core's, whether or not the flag is on |
 
 **By hand**, in a GitHub Space answered with agents whose repo has worker labels: `tkStandup` lists every open `verify-close`
 issue under `Waiting on you`, each worker label as a block, and an issue closed this morning under

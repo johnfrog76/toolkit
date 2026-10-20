@@ -304,3 +304,21 @@ export const triageEndpoints = triageApi.injectEndpoints({
 });
 
 export const { useGetTriageQuery, useRunRouteMutation } = triageEndpoints;
+
+// -- StartWork (AR-1 of the agent in the room) ------------------------------
+//
+// The hand-off block: how we work in the Space, the card or issue, and its
+// prompt, as ONE markdown block. The CLI's `StartWork` builds it, and this half
+// asks for it through the bridge (POST /api/cmd/StartWork) -- no route of this
+// module's assembles it (D-AR6). It writes nothing, so it invalidates nothing.
+
+export const startWorkEndpoints = api.injectEndpoints({
+  endpoints: (builder) => ({
+    // POST /api/cmd/StartWork -- argv is [<id>]: a card id, or an issue number
+    runStartWork: builder.mutation<CommandResponse, { id: string }>({
+      query: ({ id }) => ({ url: "cmd/StartWork", method: "POST", body: { params: [id] } }),
+    }),
+  }),
+});
+
+export const { useRunStartWorkMutation } = startWorkEndpoints;

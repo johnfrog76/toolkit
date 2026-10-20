@@ -129,6 +129,12 @@ function Get-P20AliasFieldSchema {
     return $fields
 }
 
+function Get-P20StartWorkPromptHelp {
+    # One help line for a startWork.prompts row, named or the pattern.
+    param([string]$Kind)
+    return "The agentic prompt StartWork's hand-off block carries for a $Kind (a card type with its spaces removed, or issue): a path relative to the Toolkit package, or absolute. StartWork -Prompt <path> overrides it for one call."
+}
+
 function Get-P20SpaceStatusValues {
     # MUST mirror $validStatuses in utilities.psm1 and _VALID_STATUSES in
     # agent/core/config.py. Fail-closed to 'local' happens there; refusing an
@@ -222,6 +228,17 @@ function Get-P20ConfigSchema {
     foreach ($field in (Get-P20AliasFieldSchema)) {
         $rows += New-P20SchemaRow -Key "aliases.<name>.$($field.key)" -Scope 'machine' -Type $field.type -Help $field.help
     }
+
+    # StartWork's prompt table (the Team Agile add-on): one row per kind the
+    # shipped config names, read from it rather than listed here, and a pattern
+    # row for a kind it does not -- a team's prompts are its own (D-AR4).
+    if ($DefaultConfig -and $DefaultConfig.PSObject.Properties['startWork'] -and $DefaultConfig.startWork.prompts) {
+        foreach ($kind in $DefaultConfig.startWork.prompts.PSObject.Properties) {
+            if ($kind.Name.StartsWith('_')) { continue }
+            $rows += New-P20SchemaRow -Key "startWork.prompts.$($kind.Name)" -Scope 'machine' -Type 'string' -Help (Get-P20StartWorkPromptHelp $kind.Name)
+        }
+    }
+    $rows += New-P20SchemaRow -Key 'startWork.prompts.<kind>' -Scope 'machine' -Type 'string' -Help (Get-P20StartWorkPromptHelp '<kind>')
 
     foreach ($flag in (Get-P20EngineerFeatureKeys)) {
         $rows += New-P20SchemaRow -Key "features.$flag" -Scope 'machine' -Type 'bool' `
@@ -396,6 +413,18 @@ function Resolve-P20SchemaKey {
         }
         $f = $match[0]
         $result.Row = New-P20SchemaRow -Key $key -Scope 'machine' -Type $f.type -Help $f.help
+        return $result
+    }
+
+    # StartWork's prompt table: a kind the shipped rows do not name is still a
+    # row -- a team adds its own kinds -- matched against the pattern row.
+    if ($key -like 'startWork.prompts.*' -and -not @($Schema | Where-Object { $_.key -eq $key }).Count) {
+        $kind = $key.Substring('startWork.prompts.'.Length)
+        if (-not $kind -or $kind.Contains('.')) {
+            $result.Reason = "'$key' is not a prompt row. The shape is startWork.prompts.<kind> -- for example startWork.prompts.Bug."
+            return $result
+        }
+        $result.Row = New-P20SchemaRow -Key $key -Scope 'machine' -Type 'string' -Help (Get-P20StartWorkPromptHelp $kind)
         return $result
     }
 

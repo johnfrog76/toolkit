@@ -119,6 +119,18 @@ jest.mock("./api.solitaireAgile", () => ({
   },
   useGetTriageQuery: () => ({ isLoading: false, ...triageAnswer }),
   useAttendStandupMutation: () => [attend, { isLoading: false }],
+  useRunStartWorkMutation: () => [startWork, { isLoading: false }],
+}));
+const startWork = jest.fn((_arg: { id: string }) => ({
+  unwrap: () =>
+    Promise.resolve({
+      command: "StartWork",
+      status: "success",
+      exit_code: 0,
+      output: "# Start work: Issue #104 -- a title\n\n## How we work in Toolkit (x)\nA sentence.\n",
+      error: null,
+      duration: 1,
+    }),
 }));
 const copyMock = jest.fn((_t: string) => Promise.resolve());
 jest.mock("../../shared/copyText", () => ({ copyText: (t: string) => copyMock(t) }));
@@ -321,6 +333,20 @@ describe("copy and the list", () => {
     expect(screen.queryByTestId("standup-list")).toBeNull();
   });
 
+  it("opens the hand-off block from a row's Start work: one StartWork call, the issue's number", async () => {
+    startWork.mockClear();
+    answer = { data: responseFor("friday") };
+    render(<StandupPage />);
+    // Nothing is asked before a row asks for it.
+    expect(startWork).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Show as list" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Start work on #104" })[0]);
+    const block = await screen.findByTestId("start-work-block");
+    expect(block.textContent).toContain("## How we work in Toolkit (x)");
+    expect(startWork).toHaveBeenCalledTimes(1);
+    expect(startWork).toHaveBeenCalledWith({ id: "104" });
+  });
+
   it("shows a GitHub Space's joined standup verbatim: issues linked, a card by its id, the Check lines as text", () => {
     // The shared joined fixture (Tests/fixtures/rituals/standup-joined.json) and its golden.
     const joined = JSON.parse(
@@ -400,6 +426,8 @@ describe("copy and the list", () => {
     expect(li.textContent).toContain("K7M2");
     expect(li.textContent).toContain("A card");
     expect(li.querySelector("a")).toBeNull();
+    // A card's row starts the work by its id.
+    expect(screen.getByRole("button", { name: "Start work on K7M2" })).toBeTruthy();
   });
 });
 

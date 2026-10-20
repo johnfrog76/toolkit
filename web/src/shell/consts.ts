@@ -281,6 +281,21 @@ export const RITUALS = consts.rituals as {
   };
 };
 
+/**
+ * Team Agile's hand-off block (docs/modules/solitaire-agile.md, "StartWork: the
+ * hand-off block"): the head line and the three section headings the CLI's
+ * `StartWork` types. The copy box shows the block verbatim and finds its title
+ * by the head line's shape (D-AR5); it builds none of it.
+ */
+export const STARTWORK = consts.startWork as {
+  text: {
+    head: string;
+    howWeWork: string;
+    work: string;
+    prompt: string;
+  };
+};
+
 /** A card's derived state, as a union built from the contract's own values. */
 export type PromptStatus = string;
 

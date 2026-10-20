@@ -1468,9 +1468,34 @@ function Get-ParameterNames {
 }
 
 $parityMap = Get-P20CommandMap | ConvertFrom-Json
-$parityChecked = 0
+# The rows the loop holds: every core verb's, from config.default.json, and every
+# MODULE verb's, from its Config/<module>.commands.psd1 -- whether or not its flag
+# is on here, because the committed config has every module off and a module verb
+# has the same three places (script, wrapper, usage) as a core one. A module's
+# wrappers are defined by dot-sourcing its own .ps1, exactly as the loader does.
+$parityFns = @{}
+$parityEntries = @{}
 foreach ($cmdName in $commandNames) {
-    $fnName = $parityMap.$cmdName
+    $parityFns[$cmdName] = [string]$parityMap.$cmdName
+    $parityEntries[$cmdName] = $config.commands.$cmdName
+}
+$parityNames = @($commandNames)
+foreach ($psd1 in @(Get-ChildItem (Join-Path $toolkitRoot 'Config') -Filter '*.commands.psd1' -File)) {
+    try { $moduleData = Import-PowerShellDataFile -Path $psd1.FullName } catch { continue }
+    $modulePs1 = [System.IO.Path]::ChangeExtension($psd1.FullName, '.ps1')
+    if (-not (Test-Path -LiteralPath $modulePs1)) { continue }
+    $needsDefine = @($moduleData.Commands.Values | Where-Object { -not (Get-Command $_ -ErrorAction SilentlyContinue) }).Count -gt 0
+    if ($needsDefine) { . $modulePs1 }
+    foreach ($verb in @($moduleData.Commands.Keys)) {
+        if ($parityFns.ContainsKey($verb)) { continue }
+        $parityFns[$verb] = [string]$moduleData.Commands[$verb]
+        $parityEntries[$verb] = $moduleData.Help[$verb]
+        $parityNames += $verb
+    }
+}
+$parityChecked = 0
+foreach ($cmdName in $parityNames) {
+    $fnName = $parityFns[$cmdName]
     if (-not $fnName) { continue }
     $wrapper = Get-Command $fnName -ErrorAction SilentlyContinue
     if (-not $wrapper) { continue }
@@ -1501,8 +1526,10 @@ foreach ($cmdName in $commandNames) {
     $scriptNames  = Get-ParameterNames $scriptCmd
     $wrapperNames = Get-ParameterNames $wrapper
 
-    $usage = [string]$config.commands.$cmdName.usage
-    $usageNames = @([regex]::Matches($usage, '-([A-Za-z][A-Za-z0-9]*)') |
+    $usage = [string]$parityEntries[$cmdName].usage
+    # A switch starts after a space or a bracket: the -MM and -dd inside a
+    # `<yyyy-MM-dd>` placeholder are not switches.
+    $usageNames = @([regex]::Matches($usage, '(?<![\w-])-([A-Za-z][A-Za-z0-9]*)') |
         ForEach-Object { $_.Groups[1].Value } |
         Where-Object { $parityCommon -notcontains $_ } |
         Select-Object -Unique)
@@ -1518,8 +1545,11 @@ foreach ($cmdName in $commandNames) {
 
     # Reverse: the wrapper must not take what the script cannot. -Help is the
     # one exception by design -- the wrapper renders help from the shared table
-    # and returns, so the script is never reached.
-    $orphan = @($wrapperNames | Where-Object { $scriptNames -notcontains $_ -and $_ -ne 'Help' })
+    # and returns, so the script is never reached. A wrapper-side guard is the
+    # other: MeetingAgenda's -Extra catches stray positional text and refuses
+    # it in the wrapper, so it never reaches the script either.
+    $wrapperGuards = @{ MeetingAgenda = @('Extra') }
+    $orphan = @($wrapperNames | Where-Object { $scriptNames -notcontains $_ -and $_ -ne 'Help' -and @($wrapperGuards[$cmdName]) -notcontains $_ })
     Assert-True "$cmdName : the wrapper declares nothing the script lacks$(if ($orphan.Count) { ' -- ' + ($orphan -join ', ') })" ($orphan.Count -eq 0)
 
     # Third direction: every parameter the SCRIPT has is named by the usage line
@@ -1562,7 +1592,7 @@ foreach ($cmdName in $commandNames) {
     }
 
     # Where a verb has a `switches` block, it describes exactly the usage set.
-    $entry = $config.commands.$cmdName
+    $entry = $parityEntries[$cmdName]
     if ($null -ne $entry.switches) {
         $switchBare = @($entry.switches.PSObject.Properties.Name | Where-Object { $_ -ne '(none)' -and $_ -match '^-' } |
             ForEach-Object { ($_ -replace '^-', '') -replace '\s.*$', '' } |

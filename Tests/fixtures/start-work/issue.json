@@ -1,0 +1,9 @@
+{
+  "number": 41,
+  "title": "Triage shows who holds each item",
+  "state": "OPEN",
+  "labels": [{ "name": "sonnet" }, { "name": "sev2" }],
+  "milestone": { "title": "Team Agile V2" },
+  "body": "## Problem\r\n\r\nTriage does not say who has an item.\r\n",
+  "url": "https://github.com/acme/widgets/issues/41"
+}

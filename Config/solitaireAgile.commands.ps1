@@ -1,4 +1,5 @@
-# The Solitaire Agile add-on's wrappers: Standup (M0), Triage and Route (V1).
+# The Solitaire Agile add-on's wrappers: Standup (M0), Triage and Route (V1),
+# StartWork (AR-1).
 #
 # Dot-sourced by the module-command loader, and only when the top-level
 # features.solitaireAgile is true -- so a switched-off module defines no
@@ -66,4 +67,23 @@ function global:Set-P20Route {
     if ($Help) { Show-CommandHelp 'Route'; return }
     Invoke-ToolkitScript -Path (Join-Path $global:P20SolitaireAgileRoot 'Scripts/Set-Route.ps1') `
         -Parameters $PSBoundParameters -Name "$(Get-CliPrefix)Route" -Prefix (Get-CliPrefix)
+}
+
+# AR-1 of the agent in the room: StartWork, the hand-off. A read like Triage --
+# three files in, one block out, nothing written anywhere.
+
+function global:Get-P20StartWork {
+    <# StartWork -- how we work here, the card (or issue) and its prompt, as one block. Writes nothing. #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0)]
+        [string]$Id,
+        [switch]$Clip,
+        [string]$Prompt,
+        [string]$Space,
+        [switch]$Help
+    )
+    if ($Help) { Show-CommandHelp 'StartWork'; return }
+    Invoke-ToolkitScript -Path (Join-Path $global:P20SolitaireAgileRoot 'Scripts/Start-Work.ps1') `
+        -Parameters $PSBoundParameters -Name "$(Get-CliPrefix)StartWork" -Prefix (Get-CliPrefix)
 }

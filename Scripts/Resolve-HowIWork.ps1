@@ -60,6 +60,23 @@ function Resolve-P20HowIWork {
     return [PSCustomObject]@{ answer = 'alone'; source = 'default'; tracker = $tracker; locked = $false }
 }
 
+function Get-P20HowIWorkSentence {
+    <#
+      The answer said to an agent: section one of StartWork's hand-off block
+      (D-AR3 of the agent-in-the-room spec), until the Space has a
+      how-we-work.md of its own. One sentence per row of the table above --
+      the answer, and the tracker it was derived from -- so the block always
+      assembles. Only the CLI types it (the web shows the block verbatim), so
+      it lives beside the table rather than in consts.json.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Answer)
+    switch ("$Answer") {
+        'agents' { return 'You work with agents here: the repository''s GitHub issues are the backlog, a worker label on an issue (its size) says which agent takes it, and the item below is the record -- write what you find, what you decide and each commit into it as you go.' }
+        'team' { return 'You work on a team in Azure DevOps here: their board and their people hold the rituals, and the item below is the record -- write what you find, what you decide and each commit into it as you go.' }
+        default { return 'You work alone here: no rituals and no crew -- the item below is your own record; write what you find, what you decide and each commit into it as you go.' }
+    }
+}
+
 function Get-P20HowIWorkGatedFeature {
     <# The one module the answer gates: Team Agile, whose answer is 'agents'. #>
     return 'solitaireAgile'
