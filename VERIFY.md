@@ -1014,10 +1014,9 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   PowerShell 5.1 `tkTestToolkit -StartWork` is green with its CRLF row passing; on the Team Agile page, a list
   row's **Start work** shows the same block and **Copy** copies it. Walked on macOS against two Feature cards in
   the Toolkit Space: the block assembled whole (section one the `agents` sentence, the card with its footer, the
-  `pr-ship` prompt) and read as self-sufficient; two things to watch on the second walk -- the card's path is
-  relative to the hub, so an agent that has to write into the card finds the hub through `tkEnv`, and `pr-ship`
-  opens at "when the code is ready", which an agent handed an unstarted card should read as where the work ends,
-  not as a reason to ask. Closes Feature J2GV (AR-1, the hand-off block).
+  `build` prompt, which starts the work and hands over to `pr-ship` when the code is ready) and read as
+  self-sufficient; one thing to watch on the second walk -- the card's path is relative to the hub, so an agent
+  that has to write into the card finds the hub through `tkEnv`. Closes Feature J2GV (AR-1, the hand-off block).
 
 ## Recording a run
 

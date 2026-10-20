@@ -9,11 +9,14 @@
         space.json          a GitHub Space whose howIWork answer is agents
         Task23A3-...md      a card with commit bullets, a PR URL: line and
                             footer stamps -- all of which must travel
-        build.prompt.md     the prompt, installed as agentic/build.prompt.md and
-                            named by startWork.prompts.Task and .issue
         issue.json          gh issue view --json for an issue no card carries
-        expected-card.md    the block StartWork 23A3 prints
-        expected-issue.md   the block StartWork 41 prints
+        expected-card.md    the block StartWork 23A3 prints, up to and
+                            including the prompt's heading
+        expected-issue.md   the same for StartWork 41
+
+    The prompt section is the SHIPPED agentic/build.prompt.md, which the
+    shipped startWork.prompts rows name: each expected block is its golden,
+    LF, then that file's own text -- so the golden and the prompt cannot drift.
 
     1. Off      with features.solitaireAgile unset there is no StartWork and
                 nothing for the bridge to call; on, both.
@@ -74,8 +77,10 @@ function Read-Fixture {
     param([string]$Name)
     return [System.IO.File]::ReadAllText((Join-Path $fixtureDir $Name)).Replace("`r`n", "`n")
 }
-$wantCard = (Read-Fixture 'expected-card.md').TrimEnd([char]10)
-$wantIssue = (Read-Fixture 'expected-issue.md').TrimEnd([char]10)
+# The prompt is the shipped file itself, read the way the verb reads it.
+$promptText = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'agentic/build.prompt.md')).Replace("`r`n", "`n").TrimEnd([char]10)
+$wantCard = (Read-Fixture 'expected-card.md').TrimEnd([char]10) + "`n" + $promptText
+$wantIssue = (Read-Fixture 'expected-issue.md').TrimEnd([char]10) + "`n" + $promptText
 $spaceFixture = (Read-Fixture 'space.json') | ConvertFrom-Json
 
 $scratch = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-startwork-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -91,7 +96,8 @@ function Invoke-Verb {
     # answers issue view from the scratch files, then the package's own manifest
     # and nothing else (AGENTS.md, "One toolkit per shell"). -Quiet sets
     # TOOLKIT_QUIET_STARTUP, the mark of a non-interactive caller (the bridge).
-    param([string]$Snippet, [bool]$On = $true, [string]$Prompts = '{ "Task": "agentic/build.prompt.md", "issue": "agentic/build.prompt.md" }', [switch]$Quiet)
+    # -Prompts is this machine's startWork.prompts patch; '{}' leaves the shipped rows.
+    param([string]$Snippet, [bool]$On = $true, [string]$Prompts = '{}', [switch]$Quiet)
     $features = '{}'
     if ($On) { $features = '{ "solitaireAgile": true }' }
     [System.IO.File]::WriteAllText((Join-Path $pkg 'config.local.json'),
@@ -154,10 +160,10 @@ function Get-HubSnapshot {
 }
 
 try {
-    New-Item -ItemType Directory -Path $pkg, $logDir, $current, $archive, (Join-Path $hub 'board/current'), (Join-Path $pkg 'agentic') -Force | Out-Null
+    New-Item -ItemType Directory -Path $pkg, $logDir, $current, $archive, (Join-Path $hub 'board/current') -Force | Out-Null
     foreach ($item in @('utilities.psm1', 'config.default.json', 'consts.json')) { Copy-Item (Join-Path $pkgRoot $item) $pkg -Force }
-    foreach ($folder in @('Scripts', 'Config', 'Prompt20Toolkit', 'templates')) { Copy-Item (Join-Path $pkgRoot $folder) $pkg -Recurse -Force }
-    Copy-Item (Join-Path $fixtureDir 'build.prompt.md') (Join-Path $pkg 'agentic/build.prompt.md') -Force
+    # agentic/ too: the shipped rows name agentic/build.prompt.md, and the block carries it.
+    foreach ($folder in @('Scripts', 'Config', 'Prompt20Toolkit', 'templates', 'agentic')) { Copy-Item (Join-Path $pkgRoot $folder) $pkg -Recurse -Force }
     $spaceJson = ConvertTo-Json -InputObject ([ordered]@{
             slug = [string]$spaceFixture.slug; name = [string]$spaceFixture.name; status = [string]$spaceFixture.status
             promptsFolder = [string]$spaceFixture.promptsFolder; org = [string]$spaceFixture.org; howIWork = [string]$spaceFixture.howIWork
@@ -196,7 +202,8 @@ try {
     $before = Get-HubSnapshot
     $r = Invoke-Verb 'tkStartWork 23A3'
     Assert-True 'StartWork 23A3 exits 0 and prints expected-card.md, byte for byte' ($r.Exit -eq '0' -and $r.Inner -ceq $wantCard) ("`n--- got ---`n$($r.Inner)`n--- want ---`n$wantCard")
-    Assert-True 'nothing before the block and nothing after it' ($r.Inner.StartsWith('# Start work: Task 23A3') -and $r.Inner.EndsWith('`tkThreadHash`.'))
+    Assert-True 'nothing before the block and nothing after it' ($r.Inner.StartsWith('# Start work: Task 23A3') -and $r.Inner.EndsWith($promptText))
+    Assert-True 'the shipped rows carry agentic/build.prompt.md, whole' ($r.Inner.Contains("## The prompt (agentic/build.prompt.md)`n---`n") -and $r.Inner -notmatch '## The prompt \(agentic/pr-ship')
     Assert-True 'the card''s commit bullets, PR URL: and footer travel whole' ($r.Inner.Contains('- 80e2168 Route') -and $r.Inner.Contains('PR URL: https://github.com/acme/widgets/pull/57') -and $r.Inner.Contains('**Sprint:** Phase 6: the long milestone title that is longer than twenty characters'))
     Assert-True 'gh is not asked for a card' ($r.Calls.Count -eq 0) ($r.Calls -join ' / ')
     Assert-True 'and the hub is untouched' ((Get-HubSnapshot) -ceq $before)
@@ -241,7 +248,8 @@ try {
     [System.IO.File]::WriteAllText($alt, "# Other`r`n", $utf8)
     $o = Invoke-Verb "tkStartWork 23A3 -Prompt '$($alt -replace "'", "''")'"
     Assert-True '-Prompt carries another prompt for this call, LF' ($o.Exit -eq '0' -and $o.Inner.EndsWith("other.prompt.md)`n# Other")) $o.Inner
-    $o = Invoke-Verb 'tkStartWork 23A3 -Prompt agentic/build.prompt.md'
+    # From a folder with no agentic/ of its own, so the path is read against the package.
+    $o = Invoke-Verb "Set-Location '$($scratch -replace "'", "''")'; tkStartWork 23A3 -Prompt agentic/build.prompt.md"
     Assert-True '-Prompt relative to the package' ($o.Exit -eq '0' -and $o.Inner -ceq $wantCard) $o.All
 
     $refusals = [ordered]@{

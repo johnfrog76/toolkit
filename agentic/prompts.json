@@ -19,6 +19,17 @@
       "drives": "ReplyPR",
       "category": "review"
     },
+    "build": {
+      "workflows": [
+        "alone",
+        "team",
+        "agents"
+      ],
+      "sender": "by hand",
+      "module": "core",
+      "drives": "ThreadHash, then pr-ship",
+      "category": "ship"
+    },
     "pr-ship": {
       "workflows": [
         "team"

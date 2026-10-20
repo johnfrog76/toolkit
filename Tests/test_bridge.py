@@ -372,8 +372,8 @@ class StartWorkThroughTheBridge(unittest.TestCase):
             shutil.copytree(PKG_ROOT / folder, self.pkg / folder)
         (self.pkg / "agent" / "ado").mkdir(parents=True)
         shutil.copy(bridge.BRIDGE_PS1, self.pkg / "agent" / "ado" / "bridge.ps1")
-        (self.pkg / "agentic").mkdir()
-        shutil.copy(self.FIXTURES / "build.prompt.md", self.pkg / "agentic" / "build.prompt.md")
+        # The shipped startWork.prompts rows name agentic/build.prompt.md, and the block carries it.
+        shutil.copytree(PKG_ROOT / "agentic", self.pkg / "agentic")
 
         self.hub = root / "hub"
         current = self.hub / "widgets" / "current"
@@ -411,7 +411,6 @@ class StartWorkThroughTheBridge(unittest.TestCase):
             "promptsRoot": str(self.hub),
             "activeSpace": "widgets",
             "features": {"solitaireAgile": on},
-            "startWork": {"prompts": {"Task": "agentic/build.prompt.md"}},
         }
         (self.pkg / "config.local.json").write_text(json.dumps(local), encoding="utf-8")
 
@@ -426,7 +425,10 @@ class StartWorkThroughTheBridge(unittest.TestCase):
         self.assertEqual(bridge.command_map(force=True).get("StartWork"), "Get-P20StartWork")
         body = client.post("/api/cmd/StartWork", json={"params": ["23A3"]}).json()
         self.assertEqual(body["status"], "success", body.get("error") or body["output"])
-        want = (self.FIXTURES / "expected-card.md").read_text("utf-8").replace("\r\n", "\n").rstrip("\n")
+        # The golden runs to the prompt's heading; the prompt is the shipped file's own text.
+        golden = (self.FIXTURES / "expected-card.md").read_text("utf-8").replace("\r\n", "\n").rstrip("\n")
+        prompt = (PKG_ROOT / "agentic" / "build.prompt.md").read_text("utf-8").replace("\r\n", "\n").rstrip("\n")
+        want = f"{golden}\n{prompt}"
         self.assertEqual(body["output"].replace("\r\n", "\n").strip("\n"), want)
 
     def test_a_refusal_is_an_error_with_the_verbs_sentence(self):

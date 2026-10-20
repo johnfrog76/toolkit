@@ -336,7 +336,8 @@ Which prompt is **configuration, not contract** -- a team's prompts are its own 
 `config.default.json`, one row per kind: a card's type with the spaces removed (`Bug`, `Task`,
 `UserStory`, `Feature`, `Spike`) or `issue`, for a GitHub issue no card carries. A value is a path
 relative to the Toolkit package, or absolute; an `agentic/<name>` row goes through the one prompt lookup,
-so a tuned copy in `agenticExtensionPath` wins. The shipped rows all name `agentic/pr-ship.prompt.md`.
+so a tuned copy in `agenticExtensionPath` wins. The shipped rows all name `agentic/build.prompt.md`, which starts the work on a card that already exists
+and hands over to `pr-ship` when the code is ready; no `design` row ships, because no design prompt does.
 
 ```powershell
 tkConfig -Set startWork.prompts.Bug=agentic/my-bug-fix.prompt.md     # one row, in config.local.json

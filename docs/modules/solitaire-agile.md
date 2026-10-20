@@ -428,7 +428,7 @@ You work with agents here: the repository's GitHub issues are the backlog, ...
 ## The work: Task 23A3 (widgets/current/Task23A3-route-the-remaining-raw-git-calls.prompt.md)
 <the card's text, whole>
 
-## The prompt (agentic/pr-ship.prompt.md)
+## The prompt (agentic/build.prompt.md)
 <the prompt's text, whole>
 ```
 
@@ -470,9 +470,12 @@ card renders what came from the tracker: `# Issue #<n>: <title>`, `Tags:` (the l
 type, read from its filename by the `workItemTypes` table (its key with the spaces removed: `Bug`, `Task`,
 `UserStory`, `Feature`, `Spike`), or `issue`. A path is relative to the Toolkit package, or absolute; an
 `agentic/<name>` row goes through the one prompt lookup, so a tuned copy in `agenticExtensionPath` wins
-here as everywhere. The shipped rows hand every kind to `agentic/pr-ship.prompt.md`, the prompt that
-carries a card that already exists to its pull request: `new-bug` and `new-user-story` create an item and
-a card, which the item being started already has. A team changes a row with
+here as everywhere. The shipped rows hand every kind to `agentic/build.prompt.md`: read the card under
+**The work**, take its branch from current main, do what it says, thread each commit with `tkThreadHash`,
+fill Summary, Described Changes and Implementation Details as you go, and when the code is ready run
+`pr-ship`. Not `new-bug` or `new-user-story`, which create an item and a card the item being started
+already has; not `pr-ship` itself, which assumes the code is done. No `design` row ships, because no
+design prompt does. A team changes a row with
 `tkConfig -Set startWork.prompts.Bug=agentic/<name>.prompt.md`, and adds a kind the same way
 (`startWork.prompts.Meeting=...`); `-Prompt <path>` carries another prompt for one call. A kind with no
 row, or a row whose file is not there, is a stated refusal naming `startWork.prompts.<kind>`.
@@ -485,8 +488,9 @@ block verbatim in a monospace region, the block's own head as the dialog's title
 says so. No agent runs in the browser (D-AR1): the block is text you carry to your editor.
 
 **Proving it.** `Tests/fixtures/start-work/` holds a Space's answer, a card (with commit bullets, a
-`PR URL:` line and footer stamps), a prompt, an issue's `gh` answer and the two expected blocks byte for
-byte. `tkTestToolkit -StartWork` types the verb in a fresh shell against them -- the card in LF and again
+`PR URL:` line and footer stamps), an issue's `gh` answer and the two expected blocks byte for byte, each
+up to the prompt's heading: the prompt section is the shipped `agentic/build.prompt.md` itself, appended by
+every reader, so the golden and the prompt cannot drift. `tkTestToolkit -StartWork` types the verb in a fresh shell against them -- the card in LF and again
 in CRLF -- and `Tests/test_bridge.py` runs it through `POST /api/cmd/StartWork` and compares the same
 file. Whether a cold agent really starts without a question is a person's judgement, so it is a gate row
 in `VERIFY.md`, "The cold-agent walk".

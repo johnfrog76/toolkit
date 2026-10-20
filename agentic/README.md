@@ -22,14 +22,17 @@ gap a prompt has to work around, the prompt says what to do in one line and link
 
 | Prompt | What it carries |
 |---|---|
+| `build` | Safety Contract. Build a card that already exists: its branch from current main, the work, each commit threaded in, its sections written as you go, then `pr-ship`. The prompt `tkStartWork`'s hand-off block carries for every kind. |
 | `ado-comments` | Safety Contract. Two-pass PR comment triage. |
 | `pr-ship` | Safety Contract. Stage 1: context check, commit, draft PR. |
 | `pr-publish` | Safety Contract. Stage 2: draft → ready, comms. |
 | `new-bug` | Creating a Bug: the item with `tkNewItem`, the card with `tkNewPrompt`, the repro filled in. |
 | `new-user-story` | Creating a User Story the same way, with scope, implementation details and acceptance criteria. |
 
-`new-bug` and `new-user-story` are the front door of the workflow the other three continue, and
+`new-bug` and `new-user-story` are the front door of the workflow the others continue, and
 they drive the two commands that create an item and its card rather than writing a card by hand.
+`build` is the step after: the card exists, and the work on it starts -- it is what Team Agile's
+`tkStartWork` hands a fresh agent, and it ends by handing over to `pr-ship`.
 
 **The prompts the tools send** -- frontmatter and prose for a person above a `---` line, the
 instruction below it; only the instruction is sent:
@@ -91,7 +94,7 @@ ones it belongs with:
 | `rituals` | runs a team's ritual -- a standup, a triage |
 | `design` | works a design note or a spec |
 
-The shipped ones carry theirs in the index, not in their frontmatter: `pr-ship` and `pr-publish`
+The shipped ones carry theirs in the index, not in their frontmatter: `build`, `pr-ship` and `pr-publish`
 are `ship`; `ado-comments`, `pr-review` and `pr-suggest` are `review`; `new-bug`, `new-user-story`
 and `new-issue` are `tracker`; `generate-review`, `growth-create-training` and
 `growth-create-presentation` are `growth`; `manager1on1` is `meetings`.

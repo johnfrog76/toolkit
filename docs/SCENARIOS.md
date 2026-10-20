@@ -180,9 +180,9 @@ ships are absent while it is off (`Tests/test_studio_prompts.py`); the rows belo
 
 | The Space | `howIWork` | ToolKit shows | Counted in the info tip |
 | --- | --- | --- | --- |
-| a GitHub Space nobody has answered for, or answered **Alone**; your own cards | `alone` | `new-issue`, `pr-review`, `pr-suggest` | 5 more, for working on a team in Azure |
-| a GitHub Space answered **With agents** | `agents` | `new-issue`, `pr-review`, `pr-suggest` | 5 more, for working on a team in Azure |
-| an Azure DevOps Space, connected or not | `team` | `ado-comments`, `new-bug`, `new-user-story`, `pr-publish`, `pr-review`, `pr-ship`, `pr-suggest` | 1 more (`new-issue`), for working with agents and alone |
+| a GitHub Space nobody has answered for, or answered **Alone**; your own cards | `alone` | `build`, `new-issue`, `pr-review`, `pr-suggest` | 5 more, for working on a team in Azure |
+| a GitHub Space answered **With agents** | `agents` | `build`, `new-issue`, `pr-review`, `pr-suggest` | 5 more, for working on a team in Azure |
+| an Azure DevOps Space, connected or not | `team` | `ado-comments`, `build`, `new-bug`, `new-user-story`, `pr-publish`, `pr-review`, `pr-ship`, `pr-suggest` | 1 more (`new-issue`), for working with agents and alone |
 
 Team Agile's switch does not change the set: a GitHub Space answered **Alone** with the switch on still shows
 the `alone` set. The ways of working and their words are the question's answers in

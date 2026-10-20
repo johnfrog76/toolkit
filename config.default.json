@@ -769,14 +769,14 @@
     }
   },
   "startWork": {
-    "_comment": "Which agentic prompt StartWork's hand-off block carries, by the item's kind: a card's type (its workItemTypes key, spaces removed -- UserStory) or issue, for a GitHub issue with no card. A path relative to this package (an agentic/ prompt's tuned copy in agenticExtensionPath wins, as everywhere), or absolute. CONFIGURATION, not contract: a team's prompts are its own, so a row changes with Config -Set startWork.prompts.<kind>=<path>, and StartWork -Prompt <path> overrides it for one call. A kind with no row, or a row whose file is missing, is a stated refusal naming the key. The shipped rows hand every kind to pr-ship, the prompt that carries a card that already exists to its pull request; new-bug and new-user-story create an item and a card, which StartWork's item already has.",
+    "_comment": "Which agentic prompt StartWork's hand-off block carries, by the item's kind: a card's type (its workItemTypes key, spaces removed -- UserStory) or issue, for a GitHub issue with no card. A path relative to this package (an agentic/ prompt's tuned copy in agenticExtensionPath wins, as everywhere), or absolute. CONFIGURATION, not contract: a team's prompts are its own, so a row changes with Config -Set startWork.prompts.<kind>=<path>, and StartWork -Prompt <path> overrides it for one call. A kind with no row, or a row whose file is missing, is a stated refusal naming the key. The shipped rows hand every kind to build, the prompt that starts the work on a card that already exists and hands over to pr-ship when the code is ready; new-bug and new-user-story create an item and a card, which StartWork's item already has, and pr-ship assumes the code is done. No design row ships: there is no design prompt, so a design kind is the stated refusal.",
     "prompts": {
-      "Bug": "agentic/pr-ship.prompt.md",
-      "Task": "agentic/pr-ship.prompt.md",
-      "UserStory": "agentic/pr-ship.prompt.md",
-      "Feature": "agentic/pr-ship.prompt.md",
-      "Spike": "agentic/pr-ship.prompt.md",
-      "issue": "agentic/pr-ship.prompt.md"
+      "Bug": "agentic/build.prompt.md",
+      "Task": "agentic/build.prompt.md",
+      "UserStory": "agentic/build.prompt.md",
+      "Feature": "agentic/build.prompt.md",
+      "Spike": "agentic/build.prompt.md",
+      "issue": "agentic/build.prompt.md"
     }
   }
 }
