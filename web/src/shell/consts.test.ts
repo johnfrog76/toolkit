@@ -23,6 +23,7 @@ import {
   REMINDERS,
   RITUALS,
   STAMPS,
+  STARTWORK,
   STATUS,
   STUDIO,
   TESTS,
@@ -302,6 +303,18 @@ describe("consts.json", () => {
         countsInProgress: "{n} in progress",
       },
     });
+    // StartWork's hand-off block (D-AR5): the CLI types the four headings and the
+    // copy box finds the block's title by the head line's shape.
+    const { _: startWorkDoc, ...startWork } = STARTWORK as typeof STARTWORK & { _: string };
+    expect(startWorkDoc).toMatch(/hand-off block/);
+    expect(startWork).toEqual({
+      text: {
+        head: "# Start work: {kind} {id} -- {title}",
+        howWeWork: "## How we work in {space} ({source})",
+        work: "## The work: {kind} {id} ({source})",
+        prompt: "## The prompt ({source})",
+      },
+    });
   });
 
   // Every key of the contract is stated by this half, so a key added to
@@ -325,6 +338,7 @@ describe("consts.json", () => {
         "rituals",
         "spaces",
         "stamps",
+        "startWork",
         "status",
         "studio",
         "tests",
@@ -457,6 +471,9 @@ describe("no half retypes a contract literal", () => {
     ["rituals.text.queueEmpty", RITUALS.text.queueEmpty],
     ["rituals.text.todayEmpty", RITUALS.text.todayEmpty],
     ["rituals.text.noWorkers", RITUALS.text.noWorkers],
+    // The hand-off block: the CLI builds it; the copy box shows it verbatim.
+    ["startWork.text.head", STARTWORK.text.head],
+    ["startWork.text.howWeWork", STARTWORK.text.howWeWork],
     // stamps.due is not guarded on this side: the web never parses a due line
     // (GET /api/reminders serves it parsed), and "**Due:**" is ordinary sample
     // markdown in the reading-room tests.

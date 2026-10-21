@@ -275,5 +275,15 @@
       "countsStarted": "{n} started",
       "countsInProgress": "{n} in progress"
     }
+  },
+
+  "startWork": {
+    "_": "Team Agile's hand-off block (StartWork; docs/modules/solitaire-agile.md, \"StartWork: the hand-off block\"). The CLI builds the block and the web's copy box shows it verbatim, finding the block's title by the head line's shape, so the four heading templates live here (D-AR5): head is the block's first line, then howWeWork, work and prompt open its three sections, each naming the file it came from in {source} so an agent can re-read the original. {kind} is the card's type (Task, Feature, User Story) or Issue; {id} is the card's id or #<n>; {space} is the Space's display name. Which prompt a kind gets is configuration, not contract: config.default.json startWork.prompts. Tests/fixtures/start-work/ holds the block byte for byte.",
+    "text": {
+      "head": "# Start work: {kind} {id} -- {title}",
+      "howWeWork": "## How we work in {space} ({source})",
+      "work": "## The work: {kind} {id} ({source})",
+      "prompt": "## The prompt ({source})"
+    }
   }
 }

@@ -56,7 +56,7 @@
             category    = 'org'
             description = 'Plan, prep, retro or close a meeting'
             notes       = @('No switch: every open meeting with its stage and next command. -Plan, -Prep, -Retro, -Close drive one through its stages; -Type names the series (default 1on1).')
-            usage       = '{cliPrefix}MeetingAgenda [-Plan] [-Prep] [-Retro] [-Close] [-Date <YYYY-MM-DD>] [-Type <t>] [-Help]'
+            usage       = '{cliPrefix}MeetingAgenda [-Plan] [-Prep] [-Retro] [-Close] [-Date <YYYY-MM-DD>] [-Type <t>] [-DryRun] [-Help]'
             examples    = @(
                 '{cliPrefix}MeetingAgenda',
                 '{cliPrefix}MeetingAgenda -Plan',

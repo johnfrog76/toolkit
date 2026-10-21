@@ -15,6 +15,11 @@
     is the module's first WRITE -- each answer a real label or milestone on the
     tracker through gh, never anything in the hub.
 
+    AR-1 (the agent in the room) adds StartWork: the hand-off block, one
+    read of three files that already exist -- how we work in the Space, the
+    card or issue, the kind's agentic prompt -- printed for a cold agent.
+    It writes nothing; the web's copy box runs it through the bridge.
+
     Commands is a PLAIN hashtable: Import-PowerShellDataFile, the only reader
     the loader uses, refuses a type cast such as [ordered].
 #>
@@ -25,8 +30,9 @@
         'Standup' = 'Get-P20Standup'
         'Triage'  = 'Get-P20Triage'
         'Route'   = 'Set-P20Route'
+        'StartWork' = 'Get-P20StartWork'
     }
-    Order = @('Standup', 'Triage', 'Route')
+    Order = @('Standup', 'Triage', 'Route', 'StartWork')
 
     Help     = @{
         'Standup' = @{
@@ -85,6 +91,22 @@
                 '{cliPrefix}Route 132 -Size opus -Severity sev3',
                 '{cliPrefix}Route 132 -Milestone "Team Agile V1" -WhatIf',
                 '{cliPrefix}Route 140 -DeepWater'
+            )
+        }
+        'StartWork' = @{
+            category    = 'rituals'
+            description = 'One block a cold agent can start the work from'
+            notes       = @(
+                'Prints one markdown block and nothing else: how we work in this Space, the card (or the issue) and its prompt, each under a heading that names the file it came from. Pipe it to the clipboard or a file, or paste it into a fresh editor chat.',
+                'How we work is the Space''s how-we-work.md when it has one, else one sentence derived from spaces[].howIWork. The card goes in whole, as written -- its commits, PR URL: and footer lines with it. A number no card in current/ carries is the Space''s GitHub issue of that number: its title, labels, milestone and body.',
+                'The prompt is the kind''s row in startWork.prompts (Config -Set startWork.prompts.<kind>=<path>); -Prompt <path> carries another one for this call. A kind with no row, or a row whose file is missing, is refused naming the key.',
+                'Refused, with nothing written: no id, an id that matches nothing (an id is never a partial name), an archived card or a closed issue, an Azure DevOps Space, a partial name from the bridge, an undeclared -Space. -Clip puts the block on the clipboard and says so in one line.'
+            )
+            usage       = '{cliPrefix}StartWork <id> [-Clip] [-Prompt <path>] [-Space <slug>] [-Help]'
+            examples    = @(
+                '{cliPrefix}StartWork 23A3',
+                '{cliPrefix}StartWork 23A3 -Clip',
+                '{cliPrefix}StartWork 4 -Prompt agentic/new-issue.prompt.md'
             )
         }
     }

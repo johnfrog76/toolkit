@@ -80,6 +80,7 @@ param(
     [switch]$Rituals,
     [switch]$StandupRemind,
     [switch]$Triage,
+    [switch]$StartWork,
     [switch]$SendTeams,
     [switch]$NewMeeting,
     [switch]$MeetingAgenda,

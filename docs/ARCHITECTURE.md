@@ -111,7 +111,9 @@ with no reachable GitHub tracker still answers 200 with the ritual and the reaso
 ([Team Agile](modules/solitaire-agile.md), "The file shape, and how a standup is read").
 `GET /api/ritual/triage` (V1) is the same shape for triage, against `Tests/fixtures/rituals/triage.json`;
 its answers are the CLI's `Route`, which the web runs only as `POST /api/cmd/Route` -- the module's
-first write is a tracker label, through the bridge like every other.
+first write is a tracker label, through the bridge like every other. The hand-off block (`StartWork`)
+has no route at all: the page's copy box asks for it as `POST /api/cmd/StartWork`, so the CLI is its one
+implementation.
 
 ### A card's pictures
 

@@ -328,6 +328,28 @@ to it. The words it prints are `consts.json`
 `rituals.text`; its slots and vocabulary are `Config/ceremonies.json` and `Config/standup-vocabulary.json`.
 [`docs/modules/solitaire-agile.md`](modules/solitaire-agile.md) is the add-on end to end.
 
+## `startWork.prompts` -- which prompt the hand-off carries
+
+Team Agile's `StartWork <id>` prints a hand-off block that ends with an `agentic/` prompt
+([`docs/modules/solitaire-agile.md`](modules/solitaire-agile.md), "StartWork: the hand-off block").
+Which prompt is **configuration, not contract** -- a team's prompts are its own -- so it is a table in
+`config.default.json`, one row per kind: a card's type with the spaces removed (`Bug`, `Task`,
+`UserStory`, `Feature`, `Spike`) or `issue`, for a GitHub issue no card carries. A value is a path
+relative to the Toolkit package, or absolute; an `agentic/<name>` row goes through the one prompt lookup,
+so a tuned copy in `agenticExtensionPath` wins. The shipped rows all name `agentic/build.prompt.md`, which starts the work on a card that already exists
+and hands over to `pr-ship` when the code is ready; no `design` row ships, because no design prompt does.
+
+```powershell
+tkConfig -Set startWork.prompts.Bug=agentic/my-bug-fix.prompt.md     # one row, in config.local.json
+tkConfig -Set startWork.prompts.Meeting=agentic/meeting.prompt.md    # a kind the shipped table lacks
+tkStartWork 23A3 -Prompt agentic/new-issue.prompt.md                # another prompt, for one call
+```
+
+`Config` writes the one row to `config.local.json` and the other rows stay the shipped ones (rows merge
+one by one). A kind with no row, or a row whose file is not there, makes `StartWork` refuse with the key
+named (`startWork.prompts.<kind>`). The block's WORDS -- its head line and three headings -- are the
+contract instead, `consts.json` `startWork.text`, because the web shows what the CLI typed.
+
 ## `spaces[].howIWork` -- how you work in this Space
 
 **How do you want to work in `<Space>`?** is the Space's answer, not the person's: nobody works one

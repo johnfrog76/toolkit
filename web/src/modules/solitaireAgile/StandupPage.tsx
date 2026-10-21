@@ -23,6 +23,7 @@ import { PageCard } from "../../shared/PageCard";
 import { usePersistedValue } from "../../shared/usePersistedState";
 import { useGetEnvQuery } from "../../shell/api";
 import { RITUALS } from "../../shell/consts";
+import { lazyPart } from "../../shell/lazy";
 import {
   useAttendStandupMutation,
   useGetStandupQuery,
@@ -34,6 +35,17 @@ import type { IssueFacts } from "./IssuePopover";
 import { isIssue, itemFacts, itemRef } from "./itemRef";
 import { ROUTES } from "./paths";
 import { SEATS, plateFor } from "./stage/seats";
+
+// The hand-off block's copy box (AR-1): a chunk fetched the first time a row's
+// Start work is pressed, so the page's first draw carries none of it.
+const StartWorkBox = lazyPart(
+  () => import("./StartWorkBox"),
+  (m) => m.StartWorkBox,
+);
+
+/** What `StartWork` is given for a row's item: the issue's number, else the card's id. */
+export const startWorkArg = (i: RitualItem): string =>
+  isIssue(i) ? String(i.number) : (i.id ?? "");
 
 // Today's standup, `/solitaire-agile` (docs/modules/solitaire-agile.md,
 // "The web UI"): the agent's `text`, VERBATIM -- the same string the CLI's Standup
@@ -290,6 +302,8 @@ export function StandupPage() {
   }, [readable, attend]);
   const [copied, setCopied] = useState(false);
   const [showList, setShowList] = useState(false);
+  // The item whose hand-off block is open: the box is mounted only while it is.
+  const [startFor, setStartFor] = useState<string | null>(null);
   const { value: grain, setValue: setGrain } = usePersistedValue(GRAIN_KEY, DETAIL, isGrain);
   const parts = useMemo(
     () => (readable ? grainParts(data, grain) : { header: "", body: "", copy: "" }),
@@ -416,6 +430,16 @@ export function StandupPage() {
                     </span>
                     <span className={styles.title}>{r.item.title}</span>
                     {r.worker && <span className={styles.who}>{r.worker}</span>}
+                    {startWorkArg(r.item) && (
+                      <Button
+                        appearance="subtle"
+                        size="small"
+                        aria-label={`Start work on ${itemRef(r.item)}`}
+                        onClick={() => setStartFor(startWorkArg(r.item))}
+                      >
+                        Start work
+                      </Button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -423,6 +447,7 @@ export function StandupPage() {
           </>
         )}
       </PageCard>
+      {startFor !== null && <StartWorkBox id={startFor} onClose={() => setStartFor(null)} />}
     </div>
   );
 }

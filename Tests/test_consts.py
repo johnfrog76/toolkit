@@ -249,6 +249,15 @@ EXPECTED = {
         "countsStarted": "{n} started",
         "countsInProgress": "{n} in progress",
     },
+    # StartWork's hand-off block (D-AR5): the CLI types these four, the web's copy
+    # box finds the block's title by the first; Tests/fixtures/start-work/ holds
+    # the block they make, which Tests/test_bridge.py reads back through the bridge.
+    ("startWork", "text"): {
+        "head": "# Start work: {kind} {id} -- {title}",
+        "howWeWork": "## How we work in {space} ({source})",
+        "work": "## The work: {kind} {id} ({source})",
+        "prompt": "## The prompt ({source})",
+    },
 }
 
 
@@ -272,6 +281,7 @@ class TheFileParses(unittest.TestCase):
             "studio",
             "design",
             "rituals",
+            "startWork",
             "assets",
             "tests",
             "agent",

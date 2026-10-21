@@ -39,8 +39,8 @@ halves talking to each other, and the flag that makes a whole module appear and 
 three halves at once. A check that can be automated belongs in a suite; one that cannot is a gate here,
 or it is not verified.
 
-Every verb `config.default.json` defines is in the table below -- 42 always-on, and the 13 the modules
-contribute through `Config/*.commands.psd1` (55 in all; `docs/CLI.md` prints both counts) -- with the
+Every verb `config.default.json` defines is in the table below -- 42 always-on, and the 14 the modules
+contribute through `Config/*.commands.psd1` (56 in all; `docs/CLI.md` prints both counts) -- with the
 suite that types it and the gate that walks it. `Tests/Test-DocCounts.ps1` reads the table back, so a
 verb added without a row fails a suite. **A row that says "neither" is a verb nothing verifies**; it is
 left in the table rather than dropped, because a verb the reader cannot see in it is indistinguishable
@@ -108,6 +108,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `Standup` | `Rituals` (typed, with `gh` stubbed) | neither |
 | `Triage` | `Triage` (typed, with `gh` stubbed) | neither |
 | `Route` | `Triage` (typed, with `gh` stubbed -- the exact argv per switch, never a real write) | 12 (one real write against a GitHub Space) |
+| `StartWork` | `StartWork` (typed, the block byte for byte; `gh` stubbed for an issue) | 12 (the cold-agent walk) |
 
 Gate numbers are this file's `## Gate N` headings (8c is gate 8c). The four `Test*` verbs after
 `Test` are the CLI runner itself, so their rows say what covers the runner.
@@ -283,7 +284,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **43 suites, 7385 assertions** with a `config.local.json`, every one
+findings. On this commit that is **44 suites, 7421 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -1004,6 +1005,18 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   card in `current/` that has commit bullets, `tkStandup`: its line reads `(<n> commits)` or
   `(started, ...)`, and `tkStandup -Brief` opens on `Since <day>: ...`. Closes Feature RC6D (the standup says
   what moved).
+- [ ] **The cold-agent walk: the hand-off block starts the work without a question.** With
+  `features.solitaireAgile` on in a GitHub Space answered `agents`, run `tkStartWork <id>` for a real card in
+  `current/`, and once for an open issue no card carries; paste each output, whole, into a fresh editor chat
+  with no other briefing. You should see the agent start the work -- read the card, take its branch, begin the
+  change -- without asking which prompt to follow or what the context is. Then, on Windows, `tkStartWork <id> | clip`
+  pastes exactly the block (nothing before the `# Start work:` line, nothing after the prompt), and under Windows
+  PowerShell 5.1 `tkTestToolkit -StartWork` is green with its CRLF row passing; on the Team Agile page, a list
+  row's **Start work** shows the same block and **Copy** copies it. Walked on macOS against two Feature cards in
+  the Toolkit Space: the block assembled whole (section one the `agents` sentence, the card with its footer, the
+  `build` prompt, which starts the work and hands over to `pr-ship` when the code is ready) and read as
+  self-sufficient; one thing to watch on the second walk -- the card's path is relative to the hub, so an agent
+  that has to write into the card finds the hub through `tkEnv`. Closes Feature J2GV (AR-1, the hand-off block).
 
 ## Recording a run
 

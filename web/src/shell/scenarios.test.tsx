@@ -760,9 +760,10 @@ describe("the scenario grid: the Studio's Prompts card, by how you work", () => 
     ...env({ status: "active", tier: 1, tracker, features }),
     howIWork: { answer, source, tracker, locked: tracker !== "github" },
   });
-  const ALONE = ["new-issue", "pr-review", "pr-suggest"];
+  const ALONE = ["build", "new-issue", "pr-review", "pr-suggest"];
   const TEAM = [
     "ado-comments",
+    "build",
     "new-bug",
     "new-user-story",
     "pr-publish",

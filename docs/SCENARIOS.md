@@ -180,9 +180,9 @@ ships are absent while it is off (`Tests/test_studio_prompts.py`); the rows belo
 
 | The Space | `howIWork` | ToolKit shows | Counted in the info tip |
 | --- | --- | --- | --- |
-| a GitHub Space nobody has answered for, or answered **Alone**; your own cards | `alone` | `new-issue`, `pr-review`, `pr-suggest` | 5 more, for working on a team in Azure |
-| a GitHub Space answered **With agents** | `agents` | `new-issue`, `pr-review`, `pr-suggest` | 5 more, for working on a team in Azure |
-| an Azure DevOps Space, connected or not | `team` | `ado-comments`, `new-bug`, `new-user-story`, `pr-publish`, `pr-review`, `pr-ship`, `pr-suggest` | 1 more (`new-issue`), for working with agents and alone |
+| a GitHub Space nobody has answered for, or answered **Alone**; your own cards | `alone` | `build`, `new-issue`, `pr-review`, `pr-suggest` | 5 more, for working on a team in Azure |
+| a GitHub Space answered **With agents** | `agents` | `build`, `new-issue`, `pr-review`, `pr-suggest` | 5 more, for working on a team in Azure |
+| an Azure DevOps Space, connected or not | `team` | `ado-comments`, `build`, `new-bug`, `new-user-story`, `pr-publish`, `pr-review`, `pr-ship`, `pr-suggest` | 1 more (`new-issue`), for working with agents and alone |
 
 Team Agile's switch does not change the set: a GitHub Space answered **Alone** with the switch on still shows
 the `alone` set. The ways of working and their words are the question's answers in
@@ -307,7 +307,7 @@ Team Agile section (the reminder: a time and the days), saved through `POST /api
 
 | The route answers | The page shows |
 | --- | --- |
-| the tracker read (`tracker.ok` true) | the standup's first line as the card's header, every line after it verbatim in a monospace block; each `#<n>` the response names links to its issue, and each item says what moved after its number where it adds to the slot (`(started)`, `(started, 2 commits)`, `(2 commits)`). Above it, the chair's reading -- the `brief`, one small line each -- opens on the counts line, `Since <day>: ...`, so the velocity is at the top of the page. Besides the numbers: **Copy** (the `text`, exactly; "Copied!" for a moment) and **Play**, quiet, in the header, and a quiet **Show as list** under the prose that opens the same items as linked rows (a card shows its id, no link) |
+| the tracker read (`tracker.ok` true) | the standup's first line as the card's header, every line after it verbatim in a monospace block; each `#<n>` the response names links to its issue, and each item says what moved after its number where it adds to the slot (`(started)`, `(started, 2 commits)`, `(2 commits)`). Above it, the chair's reading -- the `brief`, one small line each -- opens on the counts line, `Since <day>: ...`, so the velocity is at the top of the page. Besides the numbers: **Copy** (the `text`, exactly; "Copied!" for a moment) and **Play**, quiet, in the header, and a quiet **Show as list** under the prose that opens the same items as linked rows (a card shows its id, no link), each row ending in a quiet **Start work** that opens the hand-off block in a copy box -- one `POST /api/cmd/StartWork`, the block verbatim, one **Copy**; a refusal shows the verb's sentence |
 | the tracker and the cards read, joined (`source: both`, a GitHub Space) | the same page: each `#<n>` links to its issue, a card of its own shows its id with no link, and a `Check` line (a card and its issue disagreeing) is text like any other line |
 | no tracker (`tracker.ok` false) | the same page: the chair's two lines and the `Tracker` line with the reason -- the ritual happens anyway; no links; Play |
 | nothing (the agent is away) | `Could not read today's standup` -- an error, never an empty standup; no Play |

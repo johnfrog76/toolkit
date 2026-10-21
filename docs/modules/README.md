@@ -221,9 +221,9 @@ writes nothing to the hub.
 | | |
 | --- | --- |
 | Flag | `features.solitaireAgile` -- top-level, engineer-scoped; on only where the Space you are in answers `agents` to "How do you want to work in \<Space>?" (`spaces[].howIWork` -- asked on a GitHub Space, derived elsewhere) |
-| Verbs | `Standup` (`-Space`, `-AsJson`); `Triage` (`-Space`, `-AsJson`), the open issues by milestone; `Route` (`-Size`, `-Milestone`, `-Severity`, `-DeepWater`, `-Space`, `-WhatIf`), the module's one write -- labels and a milestone on the tracker, never the hub. Each answers `-Help`; flags are in [the command reference](../CLI.md#the-opt-in-modules-verbs) |
+| Verbs | `Standup` (`-Space`, `-AsJson`); `Triage` (`-Space`, `-AsJson`), the open issues by milestone; `Route` (`-Size`, `-Milestone`, `-Severity`, `-DeepWater`, `-Space`, `-WhatIf`), the module's one write -- labels and a milestone on the tracker, never the hub; `StartWork <id>` (`-Clip`, `-Prompt`, `-Space`), the hand-off block a cold agent starts from, writing nothing. Each answers `-Help`; flags are in [the command reference](../CLI.md#the-opt-in-modules-verbs) |
 | Agent | `agent/solitaire/` -- `standup.py` and `triage.py`, one gated router, `GET /api/ritual/standup` and `GET /api/ritual/triage`, **reads only**; `Route` runs through the bridge |
-| Web UI | `web/src/modules/solitaireAgile/` -- the Team Agile tab, after the Studio's and before the Lounge's: the standup's text, its issue numbers linked |
+| Web UI | `web/src/modules/solitaireAgile/` -- the Team Agile tab, after the Studio's and before the Lounge's: the standup's text, its issue numbers linked; each list row's **Start work** opens the hand-off block in a copy box, through `POST /api/cmd/StartWork` |
 | Data | `Config/ceremonies.json` and `Config/standup-vocabulary.json`, read by both halves; `consts.json` `rituals` |
 | Everything else | [`docs/modules/solitaire-agile.md`](solitaire-agile.md) |
 
