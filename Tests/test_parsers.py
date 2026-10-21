@@ -145,6 +145,25 @@ class StatusMetadataTests(unittest.TestCase):
                 # The model carries it as the card's `design`.
                 self.assertEqual(_parse_status_metadata(text)["design"], row["expected"])
 
+    def test_who_takes_a_card_by_the_shared_table(self):
+        """The `**Assigned:**` footer line (docs/hub/cards.md, consts.json
+        stamps.assigned; D-AR10). The CLI reads it with Get-P20CardAssigned;
+        tkTestToolkit -Triage asserts the SAME table,
+        Tests/fixtures/parsers/assigned-lines.json, so the two readers cannot drift."""
+        import json
+
+        from agent.core.parsers import card_assigned
+
+        table = json.loads((FIXTURES / "assigned-lines.json").read_text(encoding="utf-8"))
+        self.assertGreaterEqual(len(table["rows"]), 9)
+        for row in table["rows"]:
+            with self.subTest(row=row["name"]):
+                eol = "\r\n" if row["crlf"] else "\n"
+                text = eol.join(row["lines"]) + eol
+                self.assertEqual(card_assigned(text), row["expected"])
+                # The model carries it as the card's `assigned`.
+                self.assertEqual(_parse_status_metadata(text)["assigned"], row["expected"])
+
     def test_in_progress_status(self):
         meta = _parse_status_metadata(_read("in-progress.md"))
         self.assertEqual(meta["status"], "In Progress")

@@ -35,7 +35,7 @@ These documents are what a new contributor is handed, so a gap in one is a defec
 | Deck | [`deck.md`](deck.md) -- short: it is web-only and points at Connected Deck | none -- it writes nothing to the hub |
 | Organize | [`organize.md`](organize.md) -- reminders, its first surface | [`../hub/reminders.md`](../hub/reminders.md) |
 | Studio (core, no switch) | [`studio.md`](studio.md) -- the foyer, one row per Space, and the hub's design notes | [`../hub/design.md`](../hub/design.md) |
-| Team Agile | [`solitaire-agile.md`](solitaire-agile.md) -- the Ritual Engine's standup, filled from the tracker's worker labels, and triage, answered with `Route` | none -- it writes nothing to the hub; the ceremonies keep no state |
+| Team Agile | [`solitaire-agile.md`](solitaire-agile.md) -- the Ritual Engine's standup, filled from the tracker's worker labels, and triage, answered with `Route` | none of its own; `Route -Assign` writes a card's `**Assigned:**` line ([`../hub/cards.md`](../hub/cards.md)); the ceremonies keep no state |
 | Lounge | [`lounge.md`](lounge.md) -- web-only: a tab in the GUI's clothes with two small games, and the Skins dialog that dresses the whole product | none -- it writes nothing to the hub; its state (a Go board, a word ring, the worn skin) is per browser |
 
 The core -- cards, the board, Daily and the Studio -- is not an add-on and has no switch; its data model is
@@ -215,13 +215,14 @@ A row is the switch into its Space, the same one the avatar menu makes.
 A team's own rituals, with the real tracker as the board and a cast that is not people
 (M0). Its first ritual is the standup: what is waiting on you,
 then one block per worker label. Its second is triage (V1): the open issues by milestone, and
-`Route`, its one write -- a label or a milestone on the tracker through `gh`. Both halves or neither; it
-writes nothing to the hub.
+`Route`, its one write -- a label, an assignee or a milestone on the tracker through `gh`, or who takes a
+card with no issue behind it, as that card's one `**Assigned:**` line. Both halves or neither; it keeps
+no file of its own in the hub.
 
 | | |
 | --- | --- |
 | Flag | `features.solitaireAgile` -- top-level, engineer-scoped; on only where the Space you are in answers `agents` to "How do you want to work in \<Space>?" (`spaces[].howIWork` -- asked on a GitHub Space, derived elsewhere) |
-| Verbs | `Standup` (`-Space`, `-AsJson`); `Triage` (`-Space`, `-AsJson`), the open issues by milestone; `Route` (`-Size`, `-Milestone`, `-Severity`, `-DeepWater`, `-Space`, `-WhatIf`), the module's one write -- labels and a milestone on the tracker, never the hub; `StartWork <id>` (`-Clip`, `-Prompt`, `-Space`), the hand-off block a cold agent starts from, writing nothing. Each answers `-Help`; flags are in [the command reference](../CLI.md#the-opt-in-modules-verbs) |
+| Verbs | `Standup` (`-Space`, `-AsJson`); `Triage` (`-Space`, `-AsJson`), the open issues by milestone; `Route` (`-Size`, `-Assign`, `-Milestone`, `-Severity`, `-DeepWater`, `-Space`, `-WhatIf`), the module's one write -- labels, an assignee and a milestone on the tracker, or a card's `**Assigned:**` line; `StartWork <id>` (`-Clip`, `-Prompt`, `-Space`), the hand-off block a cold agent starts from, writing nothing. Each answers `-Help`; flags are in [the command reference](../CLI.md#the-opt-in-modules-verbs) |
 | Agent | `agent/solitaire/` -- `standup.py` and `triage.py`, one gated router, `GET /api/ritual/standup` and `GET /api/ritual/triage`, **reads only**; `Route` runs through the bridge |
 | Web UI | `web/src/modules/solitaireAgile/` -- the Team Agile tab, after the Studio's and before the Lounge's: the standup's text, its issue numbers linked; each list row's **Start work** opens the hand-off block in a copy box, through `POST /api/cmd/StartWork` |
 | Data | `Config/ceremonies.json` and `Config/standup-vocabulary.json`, read by both halves; `consts.json` `rituals` |

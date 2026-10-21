@@ -323,7 +323,7 @@ The engineer's switch for Team Agile ([`docs/modules/solitaire-agile.md`](module
 Space's, off until set -- and the module is on only where this switch is on **and** the Space
 you are in answers **With agents** (`spaces[].howIWork`, the next section). There, `tkStandup` prints today's standup for the Space you are in -- what is
 waiting on you, then one block per worker label -- the agent serves it at `GET /api/ritual/standup`, and
-the web UI has its tab; `tkTriage` lists the open issues by milestone (`GET /api/ritual/triage`, and a Triage page under the tab), and `tkRoute` is its one write -- a label or a milestone on the tracker, never the hub. Anywhere else it is absent in every half: no verb, a 404, no tab. `tkConfig -Set
+the web UI has its tab; `tkTriage` lists the open issues by milestone (`GET /api/ritual/triage`, and a Triage page under the tab), and `tkRoute` is its one write -- a label, an assignee or a milestone on the tracker, or, for a card with no issue behind it, the card's one `**Assigned:**` line (`tkRoute <id> -Assign me`). Anywhere else it is absent in every half: no verb, a 404, no tab. `tkConfig -Set
 features.solitaireAgile=true`, or the module's switch in Settings; the "How do I…" question's **Change** goes
 to it. The words it prints are `consts.json`
 `rituals.text`; its slots and vocabulary are `Config/ceremonies.json` and `Config/standup-vocabulary.json`.

@@ -727,6 +727,8 @@ describe("buildRouteParams", () => {
       "sev2",
     ]);
     expect(buildRouteParams({ number: 132, deepWater: true })).toEqual(["132", "-DeepWater"]);
+    // Who takes it (D-AR10): me, or a size.
+    expect(buildRouteParams({ number: 4, assign: "me" })).toEqual(["4", "-Assign", "me"]);
   });
 
   it("keeps a milestone title with spaces as ONE argv element", () => {

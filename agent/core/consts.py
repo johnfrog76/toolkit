@@ -195,6 +195,11 @@ def stamp_billable() -> str:
     return consts()["stamps"]["billable"]
 
 
+def stamp_assigned() -> str:
+    """``**Assigned:**`` -- who takes a card with no issue behind it: ``me``, or a size."""
+    return consts()["stamps"]["assigned"]
+
+
 def card_id_shape() -> str:
     """The shape of a card's id, WITHOUT anchors: a work item number, or the
     four-character id of a card with no work item. A string, not a pattern --
@@ -413,6 +418,13 @@ def rituals_route() -> str:
 def rituals_triage_route() -> str:
     """Triage's route, with the /api prefix: ``/api/ritual/triage``."""
     return consts()["rituals"]["triageRoute"]
+
+
+def rituals_assign_me() -> str:
+    """``me`` -- the one answer to who takes an item that is not a size (D-AR10):
+    ``Route -Assign me``, a card's ``**Assigned:** me``, and a triage item's
+    ``who`` when its assignee is the signed-in gh user."""
+    return consts()["rituals"]["assignMe"]
 
 
 def rituals_ceremonies_file() -> str:

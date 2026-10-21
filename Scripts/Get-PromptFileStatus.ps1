@@ -78,3 +78,19 @@ function Test-P20CardBillable {
     $stamp = [string](Get-P20Consts).stamps.billable
     return -not ([regex]::IsMatch("$Content", '(?mi)^' + [regex]::Escape($stamp) + '\s*no\b'))
 }
+
+function Get-P20CardAssigned {
+    <#
+      Who takes the card: the value of its first `**Assigned:**` line
+      (stamps.assigned), trimmed -- `me`, or a size -- and '' when it has none
+      (nobody). Route -Assign writes it on a card with no issue behind it
+      (D-AR10). The CLI's one reader of the stamp; agent/core/parsers.py's
+      card_assigned is the same rule, and Tests/fixtures/parsers/assigned-lines.json
+      holds the two to one table.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Content)
+    $stamp = [string](Get-P20Consts).stamps.assigned
+    $m = [regex]::Match("$Content", '(?m)^' + [regex]::Escape($stamp) + '[ \t]*([^\r\n]*?)[ \t]*\r?$')
+    if ($m.Success) { return $m.Groups[1].Value }
+    return ''
+}

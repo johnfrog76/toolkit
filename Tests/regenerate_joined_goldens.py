@@ -1,4 +1,5 @@
-"""Regenerate the standup's goldens: standup-joined.json's, standup.json's and standup-cards.json's.
+"""Regenerate the rituals' goldens: the standup's -- standup-joined.json's, standup.json's and
+standup-cards.json's -- and triage's, triage.json's triage-<name>.txt.
 
 Goldens are generated, never typed: every case that names a ``text``, ``work``
 or ``brief`` file is filled by the agent's fill for its table (the joined fill,
@@ -7,7 +8,10 @@ The CLI's half (tkTestToolkit -Rituals) then holds its own rendering to the
 same files, so a disagreement between the halves is a red suite, not a quietly
 rewritten golden. The work grain of standup.json and standup-cards.json is
 held by standup-work.json and standup-prose.json, whose goldens this does not
-write: those two tables name only ``text``, and it is the work text.
+write: those two tables name only ``text``, and it is the work text. Triage's
+goldens are filled by agent/solitaire/triage.py's fill over triage.json (each
+case's labels, issues, tracker and viewer) and rendered; tkTestToolkit -Triage
+holds the CLI's rendering to the same files.
 
 Run:  python3 Tests/regenerate_joined_goldens.py          (writes)
       python3 Tests/regenerate_joined_goldens.py --check  (exit 1 if any differs)
@@ -21,12 +25,22 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from agent.solitaire import standup  # noqa: E402
+from agent.solitaire import standup, triage  # noqa: E402
 
 FIXTURES = REPO_ROOT / "Tests" / "fixtures" / "rituals"
 TABLE_FILE = "standup-joined.json"
 ISSUES_TABLE_FILE = "standup.json"
 CARDS_TABLE_FILE = "standup-cards.json"
+TRIAGE_TABLE_FILE = "triage.json"
+
+
+def filled_triage_case(table: dict, case: dict) -> "triage.Triage":
+    """A triage.json case, filled and rendered."""
+    filled = triage.fill_triage(
+        table["labels"], case["issues"], case["tracker"], space=case["space"], viewer=case.get("viewer", "")
+    )
+    filled.text = triage.render_triage(filled)
+    return filled
 
 
 def _rendered(filled: "standup.Standup") -> "standup.Standup":
@@ -89,6 +103,9 @@ def goldens() -> dict[str, str]:
     cards = json.loads((FIXTURES / CARDS_TABLE_FILE).read_text(encoding="utf-8"))
     for case in cards["cases"]:
         take(case["expected"], filled_cards_case(case), ("text", "brief"))
+    tri = json.loads((FIXTURES / TRIAGE_TABLE_FILE).read_text(encoding="utf-8"))
+    for case in tri["cases"]:
+        out[case["expected"]["text"]] = filled_triage_case(tri, case).text
     return out
 
 

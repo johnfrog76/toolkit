@@ -22,6 +22,7 @@
       "group": "{milestone} -- {context}",
       "issue": "  #{number} {title}  ({tags})",
       "none": "--",
+      "nobody": "nobody",
       "nothingOpen": "Nothing is open."
     }
   }

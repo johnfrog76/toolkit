@@ -49,7 +49,9 @@ ACME = "https://dev.azure.com/acme"
 
 
 def _fill(case: dict) -> "triage.Triage":
-    filled = triage.fill_triage(TABLE["labels"], case["issues"], case["tracker"], space=case["space"])
+    filled = triage.fill_triage(
+        TABLE["labels"], case["issues"], case["tracker"], space=case["space"], viewer=case.get("viewer", "")
+    )
     filled.text = triage.render_triage(filled)
     return filled
 
@@ -88,13 +90,14 @@ class TheTable(unittest.TestCase):
                 ]
                 self.assertEqual(got, case["expected"]["groups"])
 
-    def test_each_issues_worker_size_severity_and_deep_water(self):
+    def test_each_issues_worker_size_who_severity_and_deep_water(self):
         for name, case in CASES.items():
             with self.subTest(case=name):
                 got = {
                     str(i.number): {
                         "worker": i.worker,
                         "size": i.size,
+                        "who": i.who,
                         "severity": i.severity,
                         "deepWater": i.deepWater,
                     }
@@ -125,6 +128,23 @@ class TheTable(unittest.TestCase):
     def test_a_closed_issue_is_read_past(self):
         groups = _fill(CASES["mixed"]).groups
         self.assertNotIn(139, [i.number for g in groups for i in g.issues])
+
+    def test_who_is_one_rule_assignee_then_size_then_nobody(self):
+        """D-AR10: an assignee wins over a size; "me" only when it is the viewer."""
+        self.assertEqual(triage.who("johnfrog76", "opus", "JOHNFROG76"), C.rituals_assign_me())
+        self.assertEqual(triage.who("octo-crew", "opus", "johnfrog76"), "@octo-crew")
+        self.assertEqual(triage.who("johnfrog76", "", ""), "@johnfrog76")
+        self.assertEqual(triage.who("", "sonnet", "johnfrog76"), "sonnet")
+        self.assertEqual(triage.who("", "", "johnfrog76"), "")
+
+    def test_the_goldens_are_the_scripts(self):
+        """Generated, never typed: the regeneration script finds nothing to change."""
+        import regenerate_joined_goldens as regen
+
+        for case in TABLE["cases"]:
+            name = case["expected"]["text"]
+            with self.subTest(golden=name):
+                self.assertEqual(_golden(name), regen.goldens()[name])
 
 
 class TheRoute(unittest.TestCase):
@@ -193,9 +213,15 @@ class TheRoute(unittest.TestCase):
                 raise subprocess.TimeoutExpired(argv, 30)
             if argv[:3] == ["gh", "label", "list"]:
                 return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(TABLE["labels"]), stderr="")
-            # gh's own shape: label objects; only the open ones, as --state open asks.
+            if argv[:3] == ["gh", "api", "user"]:
+                return subprocess.CompletedProcess(argv, 0, stdout=fx.get("viewer", "") + "\n", stderr="")
+            # gh's own shape: label and assignee objects; only the open ones, as --state open asks.
             issues = [
-                dict(i, labels=[lab if isinstance(lab, dict) else {"name": lab} for lab in i["labels"]])
+                dict(
+                    i,
+                    labels=[lab if isinstance(lab, dict) else {"name": lab} for lab in i["labels"]],
+                    assignees=[a if isinstance(a, dict) else {"login": a} for a in i.get("assignees", [])],
+                )
                 for i in fx["issues"]
                 if i["state"] == "OPEN"
             ]
@@ -226,10 +252,37 @@ class TheRoute(unittest.TestCase):
                 {"label": "sonnet", "name": "Sonnet"},
             ],
         )
-        self.assertEqual([c[:3] for c in calls], [["gh", "label", "list"], ["gh", "issue", "list"]])
+        self.assertEqual(
+            [c[:3] for c in calls], [["gh", "label", "list"], ["gh", "issue", "list"], ["gh", "api", "user"]]
+        )
         self.assertIn("johnfrog76/toolkit", calls[1])
         self.assertEqual(calls[1][calls[1].index("--state") + 1], "open")
         self.assertIn("milestone", calls[1][calls[1].index("--json") + 1].split(","))
+        self.assertIn("assignees", calls[1][calls[1].index("--json") + 1].split(","))
+        # Who has each issue: "me" is the viewer gh named (D-AR10).
+        whos = {i["number"]: i["who"] for g in body["groups"] for i in g["issues"]}
+        self.assertEqual((whos[140], whos[143], whos[147]), ("me", "@octo-crew", ""))
+
+    def test_a_viewer_gh_cannot_name_is_nobody_being_me(self):
+        """Best effort: `gh api user` failing leaves the assignee as @<login>; triage still answers."""
+        fx = CASES["mixed"]
+
+        def fake_run(argv, **_kw):
+            if argv[:3] == ["gh", "api", "user"]:
+                return subprocess.CompletedProcess(argv, 1, stdout="", stderr="HTTP 401")
+            if argv[:3] == ["gh", "label", "list"]:
+                return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(TABLE["labels"]), stderr="")
+            issues = [i for i in fx["issues"] if i["state"] == "OPEN"]
+            return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(issues), stderr="")
+
+        with (
+            mock.patch.object(solitaire_tracker, "_resolve_tier", return_value=(1, True)),
+            mock.patch.object(accounting.subprocess, "run", side_effect=fake_run),
+        ):
+            body = self.client.get("/api/ritual/triage?space=toolkit").json()
+        self.assertTrue(body["tracker"]["ok"])
+        whos = {i["number"]: i["who"] for g in body["groups"] for i in g["issues"]}
+        self.assertEqual(whos[140], "@johnfrog76")
 
     def test_the_response_field_names(self):
         body = self._get("/api/ritual/triage")[0].json()
@@ -239,7 +292,8 @@ class TheRoute(unittest.TestCase):
         )
         self.assertEqual(set(body["groups"][0]), {"milestone", "open", "routed", "unrouted", "context", "issues"})
         self.assertEqual(
-            set(body["groups"][0]["issues"][0]), {"number", "title", "url", "worker", "size", "severity", "deepWater"}
+            set(body["groups"][0]["issues"][0]),
+            {"number", "title", "url", "worker", "size", "assignee", "who", "severity", "deepWater"},
         )
 
     def test_no_space_is_the_active_one(self):
@@ -299,6 +353,7 @@ class TheRouteWithTheFlagOff(TheRoute):
     test_an_ado_space_answers_with_the_tracker_line_and_gh_is_never_asked = None
     test_below_tier_1_is_a_tracker_line = None
     test_gh_not_answering_is_the_no_tracker_golden = None
+    test_a_viewer_gh_cannot_name_is_nobody_being_me = None
     test_an_unknown_space_is_404_naming_it = None
 
 

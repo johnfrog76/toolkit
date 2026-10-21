@@ -17,6 +17,7 @@ release.
 - A new `StartWork <id>` command (Team Agile) assembles everything a fresh agent needs to pick up a card or an issue -- how you work in the Space, the card whole, and the prompt for its kind -- in one paste-ready block, and each row of the standup's list on the Team Agile page opens it in a copy box.
 - The app's Home now links the published landing page from its foot.
 - A backlog of cards: plan a card for later. A Space now has a `backlog/` folder beside `current/` and `archive/`, its cards read as **Backlog**, `Status` lists them after the cards in play as a count and their names, and the board draws Backlog as its first column. `Move <id> -To Active` pulls a planned card into play, `Move <id> -To Backlog` parks a card with nothing threaded, and `Archive` retires one from either folder.
+- Triage now shows who has each item -- you, another assignee, a crew size, or nobody -- and `Route -Assign me` takes an issue yourself (or `Route -Assign <size>` routes it to the crew); a card with no issue behind it records who takes it as an `**Assigned:**` line, and the Triage page offers **me** beside the sizes.
 
 ### Changed
 

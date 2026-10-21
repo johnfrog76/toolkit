@@ -1,18 +1,18 @@
 Triage -- toolkit
 
-No milestone -- 2 open, 1 routed, 1 unrouted
-  #140 Split the drawer  (--, sev2)
+No milestone -- 2 open, 2 routed, 0 unrouted
+  #140 Split the drawer  (me, sev2)
   #141 Port the cast atoms  (Opus, sev3)
 
-Phase 6: ledgers -- 3 open, 2 routed, 1 unrouted
+Phase 6: ledgers -- 3 open, 3 routed, 0 unrouted
   #142 Re-plumb the bridge  (Fable, sev1, deep-water)
-  #143 Ledger counts  (--, --)
+  #143 Ledger counts  (@octo-crew, --)
   #144 Ledger tests  (Sonnet, --)
 
 Going public -- 2 open, 0 routed, 2 unrouted
-  #146 Gate the IP question  (--, --, deep-water)
-  #148 Write the licence note  (--, sev3)
+  #146 Gate the IP question  (nobody, --, deep-water)
+  #148 Write the licence note  (nobody, sev3)
 
 Next three: the Lounge -- 2 open, 1 routed, 1 unrouted
-  #145 Lounge skins  (Sonnet, sev3)
-  #147 Lounge bells  (--, sev2)
+  #145 Lounge skins  (me, sev3)
+  #147 Lounge bells  (nobody, sev2)

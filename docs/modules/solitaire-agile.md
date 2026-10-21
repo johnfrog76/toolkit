@@ -143,8 +143,8 @@ every module is off), so it answers once any `tk*` command has loaded the module
 | Verb | Does | Touches a file |
 | --- | --- | --- |
 | `Standup [-Space <slug>] [-AsJson] [-Brief] [-Grain <detail\|work\|brief>] [-Since <yyyy-MM-dd>] [-Remind <HH:mm>] [-Days <Mon,Tue,...>] [-Walk]` | prints today's standup for the Space you are in, or the declared Space `-Space` names, read without switching into it. `-AsJson` prints the response the agent serves, `text`, `work` and `brief` included -- the bridge's shape and the parity test's. `-Brief` prints only the chair's reading (below) and, being a read, does not re-arm the reminder. `-Grain` picks the register of detail ([the work grain](#the-work-grain)): `detail`, the default, is the text as it always printed; `work` is the ritual's grain, spoken as standup prose ([the prose](#the-prose)); `brief` is `-Brief`. A word that is not a grain, or `-Brief` with another grain, is a stated refusal (exit 2). `-Since <yyyy-MM-dd>` widens yesterday back to that day ([what moved](#what-moved-and-the-window)) -- not `-Days`, which is the reminder's cadence; a day that is not one, or is after today, or `-Since` with `-Remind`, is a stated refusal | none |
-| `Triage [-Space <slug>] [-AsJson]` | prints the Space's open issues grouped by milestone -- no milestone first, then most open first -- each milestone under its context line, each issue one line: number, title, worker (its size) or `--`, severity or `--`, `deep-water` marked. `-AsJson` is the route's shape | none |
-| `Route <n> [-Size <label>] [-Milestone <title>] [-Severity <sev>] [-DeepWater] [-Space <slug>] [-WhatIf]` | answers triage's questions for issue `<n>`: **one `gh issue edit` per switch given**, in that order. `-WhatIf` prints every write and makes none | none -- it writes the tracker |
+| `Triage [-Space <slug>] [-AsJson]` | prints the Space's open issues grouped by milestone -- no milestone first, then most open first -- each milestone under its context line, each issue one line: number, title, who has it ([who](#who-takes-it)) -- `me`, `@<login>`, its worker (its size), or `nobody` -- severity or `--`, `deep-water` marked. `-AsJson` is the route's shape | none |
+| `Route <n\|id> [-Size <label>] [-Assign <me\|size>] [-Milestone <title>] [-Severity <sev>] [-DeepWater] [-Space <slug>] [-WhatIf]` | answers triage's questions for issue `<n>`: **one `gh issue edit` per switch given**, in that order. `-Assign` says who takes it ([who](#who-takes-it)); on a card with no issue behind it, `-Assign` is the one switch and writes the card's `**Assigned:**` line. `-WhatIf` prints every write and makes none | none for an issue -- it writes the tracker; a card's `**Assigned:**` line |
 | `StartWork <id> [-Clip] [-Prompt <path>] [-Space <slug>]` | prints the hand-off block for a card in `current/`, or for the Space's GitHub issue `<id>` when no card carries it ([below](#startwork-the-hand-off-block)). `-Clip` puts it on the clipboard and says so in one line; `-Prompt` carries another prompt for this call | none -- it reads |
 
 **The walk list** (`Standup -Walk`). The PC's morning as one printout: the standup's title line, then
@@ -168,10 +168,13 @@ gh issue list --repo <repo> --state all --limit 500 --json number,title,state,la
 its body names.
 
 **Triage's reads**: `gh label list` as above, then `gh issue list --repo <repo> --state open --limit 500
---json number,title,state,labels,milestone,url`. **Route's writes**, each its own call, nothing else:
+--json number,title,state,labels,assignees,milestone,url`, then `gh api user -q .login` -- who "me" is,
+best effort: when `gh` cannot say, an issue assigned to you reads `@<login>` and the triage still answers.
+**Route's writes**, each its own call, nothing else:
 
 ```text
 -Size opus          gh issue edit <n> --repo <repo> --add-label opus --remove-label fable,sonnet
+-Assign me          gh issue edit <n> --repo <repo> --add-assignee @me
 -Milestone "<t>"    gh issue edit <n> --repo <repo> --milestone "<t>"
 -Severity sev2      gh issue edit <n> --repo <repo> --add-label sev2 --remove-label sev1,sev3
 -DeepWater          gh issue edit <n> --repo <repo> --add-label deep-water
@@ -189,12 +192,43 @@ by the new issue's id); where GitHub refuses that route on the repository, it ap
 task-list line to the parent's body instead, and says which it did. The parent is read first, so a wrong
 number creates nothing ([`NewItem`](../CLI.md#command-reference)).
 
-**Route refuses** (`Error:`, `Hint:`, exit 2, nothing written): no number; no switch; a severity that is
-not `sev1`-`sev3`; an undeclared `-Space`; a Space that is not GitHub, or is `local` or `archive`; a repo
-that is ambiguous; `gh` missing; a size that is not a worker label on the repo (the hint lists them); a
-milestone that is not open there (the hint lists them); a `gh` write that fails (the hint names the
-writes before it). The reads that check an answer run under `-WhatIf` too, so a refusal is the same
-with or without it.
+### Who takes it
+
+Who takes an item is the tracker's own field where it has one (D-AR10). On a GitHub issue a **person** is
+the assignee -- `Route <n> -Assign me` runs `gh issue edit <n> --add-assignee @me` -- and the **crew** is
+the worker label `-Size` already writes, so `-Assign <size>` IS the `-Size` write, byte for byte (D-TA3:
+the label is the size). `fable` is the owner's own seat, never a crew builder; it is a size like the others
+here. `-Assign` and `-Size` that name different sizes are a stated refusal.
+
+On a **card** -- a card with an id of its own (`K7M2`), or any card in a Space with no tracker or a
+`local` one -- there is no issue to write, so `Route <id> -Assign me|<size>` writes ONE footer line,
+`**Assigned:** me` or `**Assigned:** <size>` (`consts.json` `stamps.assigned`), through `Set-P20CardLine`
+and `Write-CardText` -- above `**Created:**`, the card's own line endings kept, an unchanged card not
+written -- and nothing else. The card is found the way every verb finds one (`Resolve-P20CardArgument`:
+an id is never a partial name; a partial name from the bridge is refused). Its sizes are the repo's worker
+labels on a connected GitHub Space (the list `-Size` reads), and there is no second list (D-AR10): in a
+Space with no connected GitHub repository there are no worker labels to read, so a card there takes
+`-Assign me` alone and `-Assign <size>` is a stated refusal saying so. A card takes `-Assign` alone; any other switch
+is a stated refusal. `-WhatIf` prints the line it would write. Both halves read the line back --
+`card_assigned`, `Get-P20CardAssigned` -- as the card model's `assigned`
+([cards](../hub/cards.md)).
+
+Triage says who has each issue, one rule a half (`Get-P20TriageWho`, `who()`): its first assignee --
+`me` (`consts.json` `rituals.assignMe`) when that is the signed-in `gh` user, `@<login>` otherwise -- else
+its size, else nobody. A group's `routed` counts the items someone has: an assignee or a worker label.
+
+An Azure DevOps Space is untouched: `Route -Assign` there is the same "not GitHub" refusal as every other
+switch, card or issue.
+
+**Route refuses** (`Error:`, `Hint:`, exit 2, nothing written): no number (or, with `-Assign`, no card
+id); no switch; a severity that is not `sev1`-`sev3`; an undeclared `-Space`; a Space that is not GitHub,
+or is `local` or `archive` (for an issue); a repo that is ambiguous; `gh` missing; a size that is not a
+worker label on the repo (the hint lists them); `-Assign` and `-Size` that disagree; a milestone that is
+not open there (the hint lists them); a `gh` write that fails (the hint names the writes before it); on a
+card, any switch but `-Assign`, a value that is neither `me` nor a size (the hint lists them), a size where there is no connected GitHub
+repository to read worker labels from, or an id no
+card in `current/` carries. The reads that check an answer run under `-WhatIf` too, so a refusal is the
+same with or without it.
 
 After those reads and before the first write -- `-WhatIf` included -- Route asks the repository's
 visibility once (`gh api repos/<owner>/<name>`) and, when it is public, prints `[!] This repository is
@@ -215,7 +249,7 @@ The one stated refusal (`Error:`, `Hint:`, exit 2) is a `-Space` nobody declared
 | Route | Gate | Reads | Writes |
 | --- | --- | --- | --- |
 | `GET /api/ritual/standup?space=<slug>&since=<yyyy-MM-dd>` | `features.solitaireAgile` per request, with the active Space's answer applied (**404** unless the switch is on and the Space you are in works with agents; the detail names which is off); `space` scoped like `/api/issue-report` (an undeclared slug 404); `since` widens yesterday's window as `Standup -Since` does, and a `since` that is not a day, or is after today, is a **422** naming it | the same two `gh` reads (the issues with `milestone` and `body`), through the same data files -- or, for a local Space, its cards | nothing |
-| `GET /api/ritual/triage?space=<slug>` | the same | `gh label list`, and `gh issue list --state open` with `milestone` | nothing |
+| `GET /api/ritual/triage?space=<slug>` | the same | `gh label list`, `gh issue list --state open` with `milestone` and `assignees`, and `gh api user` (who "me" is, best effort) | nothing |
 | `POST /api/cmd/Route` | the bridge: `Route` is in the CLI's command table only while the flag resolves on -- the switch on and the Space answered `agents` | -- | what `Route` writes, and nothing else |
 | `POST /api/cmd/StartWork` | the bridge, the same way: off, the call is `rejected`; a stated refusal is `status: error` with the verb's sentence | the card (or `gh issue view`), the Space's note or answer, the prompt | nothing |
 
@@ -242,8 +276,9 @@ prints the same shape.
 Triage's response: `ceremony` (`triage`), `space`, `tracker` (`ok`, `reason`), `slots` (the three
 questions, from `ceremonies.json`), `severities`, `deepWaterLabel`, `sizes` (each `label` and `name` --
 the repo's worker labels), `groups` (each `milestone` -- `""` for none -- `open`, `routed`, `unrouted`,
-`context`, `issues`, each issue `number`, `title`, `url`, `worker`, `size`, `severity`, `deepWater`) and
-`text`. `Triage -AsJson` prints the same shape.
+`context`, `issues`, each issue `number`, `title`, `url`, `worker`, `size`, `assignee` (the first
+assignee's login, `""` for none), `who` (`me`, `@<login>`, the size, or `""` -- nobody), `severity`,
+`deepWater`) and `text`. `Triage -AsJson` prints the same shape.
 
 ## The web UI
 
@@ -272,12 +307,15 @@ lit on both pages, and carries a **Standup | Triage** strip of in-page tabs, eac
 `GET /api/ritual/triage?space=<active Space>` (`rituals.triageRoute`) and asks about **one issue at a
 time**, in the read's order -- the group with no milestone first. The order is taken once, from the first
 read, so an answer that moves an issue to another milestone does not change which issue is in front of
-you. Above the issue, its milestone's context line ("No milestone -- 2 open, 1 routed, 1 unrouted");
-the issue's number and title link to it; under them, what it already carries, and the three questions:
+you. Above the issue, its milestone's context line ("No milestone -- 2 open, 2 routed, 0 unrouted");
+the issue's number and title link to it; under them, what it already carries -- who has it first (`me`,
+`@<login>`, the worker's name, or `nobody`; [who](#who-takes-it)), then its severity -- and the three
+questions:
 
 - **Milestone** -- a picker of the Space's OPEN milestones, from `GET /api/milestones`.
 - **Severity** -- `sev1`, `sev2`, `sev3` (the read's `severities`).
-- **Size** -- the repo's worker labels by name (the read's `sizes`), then `deep-water`. Choosing
+- **Size** -- **me** first (`Route <n> -Assign me`: you become the assignee; pressed when the issue is
+  already yours), then the repo's worker labels by name (the read's `sizes`), then `deep-water`. Choosing
   deep water shows its two moves (D-TA4): **Assign Fable** (`Route <n> -Size fable -DeepWater`) and
   **Split**, which opens the new-issue dialog (the same door as **New GitHub Issue**) with this issue
   filled in as its **Parent issue**. Each create there is one `POST /api/cmd/NewItem` with `-Parent <n>`,
@@ -517,7 +555,8 @@ reads the reminder's state for the drawer. `docs/modules/organize.md` names the 
 
 ## The file shape, and how a standup is read
 
-Team Agile writes nothing to the hub, so it has no file shape of its own; a standup reads the cards'
+Team Agile keeps no file of its own in the hub, so it has no file shape of its own -- its one hub write is
+a card's `**Assigned:**` footer line ([who](#who-takes-it); [cards](../hub/cards.md)); a standup reads the cards'
 ([the two sources, joined](#the-two-sources-joined)). What regresses is the **slot rule**, and it is
 read the same in both halves (`Scripts/Standup-Rules.ps1`, `agent/solitaire/standup.py`), held by one table:
 
@@ -960,8 +999,8 @@ standup is complete and correct; nothing on screen says a dress was skipped.
 | --- | --- |
 | `tkTestToolkit -Rituals` | every case of `Tests/fixtures/rituals/standup.json` and of `standup-cards.json` (the cards alone: the one worker's slots and the walk queue by card id, the source and title tables, the card reader over real folders, a not-billable card nowhere) and of `standup-joined.json` (the two sources joined: every shape's walk, each worker's slots by ref, the `Check` lines and the links, the together case's detail, work and brief goldens and their JSON round trip, no card in play reading as the issues alone, the tracker down, rounds of one id; what moved: each item's motion and commits, the counts per worker and in total, the counts and window cases' goldens, the window rule and the hash rule in words) -- `since`, the day of the year, the chair's two lines, the queue, each worker's slots by number, `empty` and the status sentence -- and the rendered text against `standup-<name>.txt` and the chair's reading against `standup-<name>.brief.txt`, byte for byte, with `Standup -Brief` typed in a fresh shell printing that reading alone and `-AsJson` carrying it; the same object read back from JSON rendering the same text; no `fakeWork` line in any case; off is no verb, no function, no bridge entry and no `Menu -All` line; **`Standup` typed in a fresh shell** with only this package's manifest and `gh` stubbed as a function answering the friday case: the text the rule renders for now, the queue, the blocks, the window, `-AsJson` round-tripping to the same text, `gh` failing and an ADO Space each a `Tracker` line with exit 0 (ADO's the contract's sentence), a local Space filling from its scratch cards line for line with `source: cards` in `-AsJson`, the GitHub Space with `source: both` and, with scratch cards in its folder, the joined standup line for line (a card of its own under the Space's tile, a `Check` line for a card whose issue is closed, a not-billable card nowhere, the hub untouched), an undeclared `-Space` a stated refusal, `-Since` widening yesterday (an issue closed a month ago said, closed; the brief's counts line naming the day) and a day after today, a word that is not a day and `-Since -Remind` each a stated refusal, `-Help`, and the hub untouched; the work grain over `standup-work.json`, the same rows `Tests/test_rituals.py` asserts -- every group (name, `by`, count, refs, phrase) of the queue and of each worker's slots, the `heads`, `keys`, `types` and `counts` tables, `standup-work-<case>.txt` byte for byte and again after a JSON round trip, `Get-P20StandupGrainText`; the prose over `standup-prose.json`, the same rows the agent asserts -- every `sentences` row, each case's queue sentences and each worker's in order, `standup-prose-<case>.txt` byte for byte and again after a JSON round trip; the dress guard over `standup-dress.json`, the same rows the agent asserts -- every row's reason, every group's prose sentence passing its own guard, every guard of `rituals.dressGuards` with a row, the `verbs` family and the two `kinds`, and the reply that names a ref the group lacks keeping the prose for that group; and typed, `Standup -Grain work` printing the rule's work text for now and `-AsJson` carrying it, `-Grain detail` the standup as it always printed, `-Grain brief` the same as `-Brief`, and a word that is not a grain or `-Brief -Grain work` a stated refusal |
 | `Tests/test_rituals.py` | the agent's issues, cards and joined fills and the rendering over the same three tables and goldens (the joined goldens also against `Tests/regenerate_joined_goldens.py`'s output); the work grain over `standup-work.json` -- every group of the queue and of each worker's slots, the `heads`, `keys`, `types` and `counts` tables, `standup-work-<case>.txt` byte for byte, the JSON round trip, the work grain's own phrases; the prose over `standup-prose.json` -- every `sentences` row, each case's queue and worker sentences, `standup-prose-<case>.txt` byte for byte, the JSON round trip, the prose's own sentences, no word that is not the contract's or the tracker's; the dress over `standup-dress.json` -- every row, every guard with a row, the rows its issue asked for (a ref the group lacks refused, "20g of protein" kept), the reply that names one, and around it with the model STUBBED: the facts are the workers' group sentences and nothing else, the kinds counted from labels and a card's type, the prompt offering the `verbs` and no other family, a model that answers dressed and guarded, the same groups dressed once, no key / a failing model / a reply that is not JSON all the prose, nothing to dress asking nothing; the route with no key answering `spoken: null` and `work` unchanged, and with a stubbed model `spoken` beside `work` with `text`, `brief` and the register untouched; the route asking `gh` for `milestone` and `body` and answering `work`; `read_cards` over real folders (with each card's type, body and billable, and its `begun` day and commit hashes); what moved over `standup-joined.json` -- each item's motion and commits, the counts, the counts line opening the brief, the window rule, the hash rule; the route's `?since=` widening the window and a `since` that is not a day before today a 422 naming it; a local Space's route filling from its cards with no `gh` call; a GitHub Space's route joining its cards to its issues (`checks`, `links`, a card of its own on the Space's tile, a not-billable card nowhere, the hub unwritten); an ADO Space's `adoTracker` reason; 404 off |
-| `tkTestToolkit -Triage` | every case of `Tests/fixtures/rituals/triage.json` -- the groups in order, each group's counts, context and numbers, each issue's worker, size, severity and deep-water, the sizes -- and the text against `triage-<name>.txt` byte for byte, again after a JSON round trip; off is no `Triage`, no `Route`, no bridge entry; `Triage` typed with `gh` stubbed; **`Route` typed with `gh` stubbed as a function that writes down every call**: the exact `gh issue edit` argv for each switch, alone and all four in order, `-WhatIf` writing nothing, the two moves printed, every refusal exit 2 with one `Error:` block and no write, the hub untouched |
-| `Tests/test_triage.py` | the agent's grouping and text over the same table and goldens; the route's `gh` calls; ADO and tier below 1 a `Tracker` line; 404 off |
+| `tkTestToolkit -Triage` | every case of `Tests/fixtures/rituals/triage.json` -- the groups in order, each group's counts, context and numbers, each issue's worker, size, who, severity and deep-water, the sizes -- and the text against `triage-<name>.txt` byte for byte, again after a JSON round trip; the who rule; `Tests/fixtures/parsers/assigned-lines.json` through `Get-P20CardAssigned`; off is no `Triage`, no `Route`, no `-Assign`, no bridge entry; `Triage` typed with `gh` stubbed (who: `me`, `@<login>`, `nobody`); **`Route` typed with `gh` stubbed as a function that writes down every call**: the exact `gh issue edit` argv for each switch, alone and all four in order, `-Assign me` (`--add-assignee @me`, and under `-WhatIf` printed and not made), `-Assign <size>` the `-Size` write byte for byte, `-WhatIf` writing nothing, the two moves printed, every refusal exit 2 with one `Error:` block and no write, the hub untouched; `-Assign` on a card -- the `**Assigned:**` line above `**Created:**`, LF and CRLF kept, no BOM, an unchanged card not written, the sizes from the repo, a local Space's card taking `-Assign me` alone, and its refusals (a size with no repository to read labels from among them) |
+| `Tests/test_triage.py` | the agent's grouping, who and text over the same table and goldens, the goldens the regeneration script's; the route's `gh` calls (with `assignees`, then `gh api user`); a viewer `gh` cannot name; ADO and tier below 1 a `Tracker` line; 404 off |
 | `tkTestToolkit -StartWork` | the hand-off block, typed in a fresh shell over a scratch hub built from `Tests/fixtures/start-work/`: off is no verb and no bridge entry; `StartWork 23A3` is `expected-card.md` byte for byte, and so is the card in CRLF, the id in lower case and the full filename; `39` never assembles `Task139`; a `how-we-work.md` switches section one's heading to its path; issue 41, which no card carries, is `expected-issue.md` with one `gh issue view`; `-Prompt` absolute and package-relative; a partial name named in a terminal and refused for a non-interactive caller; and every refusal exit 2 with one `Error:` block and the hub untouched -- no row for the kind (naming `startWork.prompts.Meeting`), a row whose file is missing, a `-Prompt` that is no file, no id, nothing matching, an archived card, a closed issue, a pull request, an Azure DevOps Space, an undeclared `-Space` |
 | `Tests/test_bridge.py`, "StartWorkThroughTheBridge" | `StartWork` in the bridge's table with Team Agile on and `rejected` with it off; through the bridge, `expected-card.md` byte for byte; a refusal `status: error` with the verb's sentence |
 | `web/src/modules/solitaireAgile/StartWorkBox.test.tsx` | the copy box: one `StartWork` call, `expected-card.md` shown verbatim with its head as the title, Copy copying exactly the block, a refusal shown as the verb's sentence with no Copy, the agent away said so |

@@ -1,0 +1,59 @@
+{
+  "_": "ONE table, read by both readers of a card's **Assigned:** footer line (consts.json stamps.assigned; docs/hub/cards.md, \"The footer\"; D-AR10): Scripts/Get-PromptFileStatus.ps1 Get-P20CardAssigned (tkTestToolkit -Triage) and agent/core/parsers.py card_assigned() (Tests/test_parsers.py). Each row's lines are joined with LF, or CRLF when crlf is true, into a card's text, and both readers are asked who takes it. expected is the value of the FIRST line that starts with the stamp, trimmed -- 'me' or a size, as Route -Assign writes it -- and '' when no line starts with it (nobody). If the two halves ever disagree about a row, one of them is wrong.",
+  "rows": [
+    {
+      "name": "no line: nobody",
+      "crlf": false,
+      "lines": ["# Task K7M2: Bench notes", "", "**Sprint:** (Not set)", "**Created:** 2026-10-17"],
+      "expected": ""
+    },
+    {
+      "name": "the line Route -Assign me writes, above Created",
+      "crlf": false,
+      "lines": ["# Task K7M2: Bench notes", "", "**Sprint:** (Not set)", "**Assigned:** me", "**Created:** 2026-10-17"],
+      "expected": "me"
+    },
+    {
+      "name": "a size",
+      "crlf": false,
+      "lines": ["# Task K7M2: Bench notes", "", "**Assigned:** sonnet", "**Created:** 2026-10-17"],
+      "expected": "sonnet"
+    },
+    {
+      "name": "the same line in a CRLF card",
+      "crlf": true,
+      "lines": ["# Task K7M2: Bench notes", "", "**Assigned:** opus", "**Created:** 2026-10-17"],
+      "expected": "opus"
+    },
+    {
+      "name": "the owner's seat is a size like the others",
+      "crlf": false,
+      "lines": ["**Assigned:** fable"],
+      "expected": "fable"
+    },
+    {
+      "name": "spaces around the value are not part of it",
+      "crlf": true,
+      "lines": ["**Assigned:**    me   ", "**Created:** 2026-10-17"],
+      "expected": "me"
+    },
+    {
+      "name": "the first line wins",
+      "crlf": false,
+      "lines": ["**Assigned:** opus", "**Assigned:** me"],
+      "expected": "opus"
+    },
+    {
+      "name": "an empty line names nobody",
+      "crlf": false,
+      "lines": ["**Assigned:**", "**Created:** 2026-10-17"],
+      "expected": ""
+    },
+    {
+      "name": "the stamp inside a sentence is not the line",
+      "crlf": false,
+      "lines": ["Nobody wrote **Assigned:** me here at the start of a line.", "  **Assigned:** opus"],
+      "expected": ""
+    }
+  ]
+}

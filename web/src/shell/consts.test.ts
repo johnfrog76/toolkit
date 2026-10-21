@@ -174,6 +174,7 @@ describe("consts.json", () => {
     expect(rituals).toEqual({
       route: "/api/ritual/standup",
       triageRoute: "/api/ritual/triage",
+      assignMe: "me",
       ceremoniesFile: "Config/ceremonies.json",
       vocabularyFile: "Config/standup-vocabulary.json",
       workerLabelPrefix: "Routed to",
@@ -448,6 +449,7 @@ describe("no half retypes a contract literal", () => {
     ["stamps.closed", STAMPS.closed],
     ["stamps.created", consts.stamps.created],
     ["stamps.billable", STAMPS.billable],
+    ["stamps.assigned", STAMPS.assigned],
     ["stamps.started", STAMPS.started],
     ["stamps.review", STAMPS.review],
     ["stamps.cover", STAMPS.cover],
