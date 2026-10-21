@@ -52,6 +52,7 @@
         'tkNewPR',
         'tkNewPrompt',
         'tkNewSpace',
+        'tkPlan',
         'tkPrompt',
         'tkPublishPR',
         'tkRemoveSpace',
