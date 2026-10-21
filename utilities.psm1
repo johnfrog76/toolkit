@@ -2054,6 +2054,20 @@ function global:Set-P20CardCover {
         -Name $inv.Name -Prefix $inv.Prefix
 }
 
+function global:Set-P20CardSprint {
+    <# Plan -- the write side of the Sprint token: -Milestone stamps **Sprint:**, -Remove clears it. Never touches the tracker. #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0)][string]$Card,
+        [string]$Milestone,
+        [switch]$Remove,
+        [switch]$Help
+    )
+    $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'Plan'
+    Invoke-ToolkitScript -Path "$toolkitRoot\Scripts\Plan-Card.ps1" -Parameters $PSBoundParameters `
+        -Name $inv.Name -Prefix $inv.Prefix
+}
+
 # The Studio's two verbs. The Studio is core, from day one (D-S13): there is no features.studio, so these are registered like every
 # other core verb -- in the command table below, the autoload manifest and the
 # bridge -- rather than contributed by a module data file under a flag.
@@ -2389,6 +2403,7 @@ $script:ModuleState.CommandMap = [ordered]@{
     'Billable'         = 'Set-P20CardBillable'
     'Cover'            = 'Set-P20CardCover'
     'Move'             = 'Move-P20CardLane'
+    'Plan'             = 'Set-P20CardSprint'
     'GetPRComments'    = 'Get-P20PRComments'
     'ReplyPR'          = 'Send-P20PRReply'
     'Env'              = 'Get-P20Environment'
