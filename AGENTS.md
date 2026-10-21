@@ -80,7 +80,7 @@ is refused), its verbs `NewDesign`, `StampDesign`, `MoveDesign`, `NewSpace`, `Re
 autoload manifest, its agent routes ungated, its web descriptor with no `feature` (its pages still lazy);
 `docs/modules/studio.md`. **solitaireAgile** (Team Agile in the web UI) is a
 team's rituals with the tracker as the board -- the standup, `Standup` and its route, both halves,
-writing nothing; triage -- `Triage`, `GET /api/ritual/triage` and a Triage page; and `Route`, its one write, a real label or milestone through `gh` and nothing in the hub; and `StartWork`, the hand-off block a cold agent starts from, which the Team Agile page copies through the bridge; `docs/modules/solitaire-agile.md`.
+writing nothing; triage -- `Triage`, `GET /api/ritual/triage` and a Triage page; and `Route`, its one write, a real label, assignee or milestone on the tracker through `gh`, and on a card one `**Assigned:**` line; and `StartWork`, the hand-off block a cold agent starts from, which the Team Agile page copies through the bridge; `docs/modules/solitaire-agile.md`.
 
 One flag switches a whole module, in all three halves at once:
 
@@ -163,7 +163,7 @@ module and you add a mock line to every one of these files.
 **Four test runners**, one per half plus one for the two together. Run the ones your change touches:
 
 ```powershell
-tkTestToolkit                 # the CLI -- 44 suites, 7577 assertions on this commit
+tkTestToolkit                 # the CLI -- 44 suites, 7578 assertions on this commit
 ```
 
 ```bash
@@ -205,7 +205,7 @@ anywhere).
 | deck module | `features.deck` | `config.local.json`, top-level -- web UI only, it adds no verbs |
 | lounge module | `features.lounge` | `config.local.json`, top-level -- web UI only, the ambient room; while NOT CONFIGURED, Home's foot carries its discovery tip |
 | organize module | `features.organize` | `config.local.json`, top-level -- both halves: `NewReminder`, `Reminders` and the Organize tab |
-| Team Agile module | `features.solitaireAgile`, and the Space's `howIWork` | the switch in `config.local.json`, top-level; the answer in `hub.json` -- on only where both say so: `on`, `off` (derived or chosen) or `not configured` (a GitHub Space nobody has answered). Both halves: `Standup`, `Triage`, `Route` and `StartWork`, `GET /api/ritual/standup` and `/triage`, and its tab; writes only what `Route` writes -- labels and a milestone on the tracker, nothing in the hub |
+| Team Agile module | `features.solitaireAgile`, and the Space's `howIWork` | the switch in `config.local.json`, top-level; the answer in `hub.json` -- on only where both say so: `on`, `off` (derived or chosen) or `not configured` (a GitHub Space nobody has answered). Both halves: `Standup`, `Triage`, `Route` and `StartWork`, `GET /api/ritual/standup` and `/triage`, and its tab; writes only what `Route` writes -- a label, an assignee or a milestone on the tracker, and on a card one `**Assigned:**` line |
 | Design lifecycle | `design` | DERIVED (`Scripts/Read-DesignTree.ps1`, through `Get-OptionalSurfaces.ps1`): `on` when the repository you stand in has `design/` and every file in the four folders carries an `id:`, `off` with the count when some do not, `not configured` with no `design/` to read, or none with a note in it; the hub's own count in the note. `docs/hub/design.md`, "The CLI names it" |
 | Sprint awareness | `spaces[].features.sprintAwareness` | `hub.json` -- a Space-scoped flag (the other Space-scoped switch is `howIWork`, above) |
 | Prompt store git sync | `storeSync` | `hub.json`, overridable per machine |

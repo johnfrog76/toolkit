@@ -425,13 +425,14 @@ try {
     Assert-True 'a size on a connected GitHub Space: the repo''s worker label, in its own spelling, replacing me' ($r.Exit -eq '0' -and [System.IO.File]::ReadAllText($cardLf) -ceq $cardText.Replace("**Created:**", "**Assigned:** sonnet`n**Created:**")) ($r.All + "`n" + [System.IO.File]::ReadAllText($cardLf))
     Assert-True 'and the sizes were read from the repo''s labels' (@($r.Calls | Where-Object { $_.StartsWith("label${sep}list${sep}--repo${sep}acme/widgets") }).Count -eq 1 -and (Get-Edits $r).Count -eq 0) ($r.Calls -join ' / ')
 
-    $r = Invoke-Verb 'tkRoute 141 -Assign opus -Space sandbox'
-    Assert-True 'a local Space: a numbered card, the triage row''s sizes, no gh asked' ($r.Exit -eq '0' -and $r.Calls.Count -eq 0 -and [System.IO.File]::ReadAllText($cardCrlf).Contains("**Assigned:** opus`r`n**Created:**")) ($r.All + "`n" + ($r.Calls -join ' / '))
+    $r = Invoke-Verb 'tkRoute 141 -Assign me -Space sandbox'
+    Assert-True 'a local Space: a numbered card takes -Assign me, no gh asked' ($r.Exit -eq '0' -and $r.Calls.Count -eq 0 -and [System.IO.File]::ReadAllText($cardCrlf).Contains("**Assigned:** me`r`n**Created:**")) ($r.All + "`n" + ($r.Calls -join ' / '))
     Assert-True 'and the CRLF card stays CRLF, every line' (-not ([regex]::IsMatch([System.IO.File]::ReadAllText($cardCrlf), "(?<!`r)`n")))
 
     $before = Get-HubSnapshot
     $cardRefusals = [ordered]@{
-        'a value that is neither me nor a size'    = @{ Snippet = 'tkRoute 141 -Assign haiku -Space sandbox'; Says = "'haiku' is neither me nor a size"; Hint = 'me, fable, opus, sonnet' }
+        'a value that is neither me nor a size'    = @{ Snippet = 'tkRoute K7M2 -Assign haiku'; Says = "'haiku' is neither me nor a size"; Hint = 'me, fable, opus, sonnet (the worker labels on acme/widgets)' }
+        'a size with no repository to read labels from' = @{ Snippet = 'tkRoute 141 -Assign opus -Space sandbox'; Says = 'no connected GitHub repository, so there are no worker labels to read'; Hint = '-Assign takes me alone' }
         'a card given another switch'              = @{ Snippet = 'tkRoute K7M2 -Assign me -Size opus'; Says = 'A card takes only -Assign' }
         'an id no card carries'                    = @{ Snippet = 'tkRoute Q4TN -Assign me'; Says = "No card with id 'Q4TN' in current/" }
         'a card id with no -Assign'                = @{ Snippet = 'tkRoute K7M2 -Size opus'; Says = "'K7M2' is not an issue number" }

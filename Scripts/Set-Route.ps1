@@ -32,8 +32,9 @@
     -- it writes one footer line through Set-P20CardLine (Write-CardText's
     bytes): `**Assigned:** me` or `**Assigned:** <size>` (consts.json
     stamps.assigned), and nothing else. A card's sizes are the repo's worker
-    labels on a connected GitHub Space, else Config/ceremonies.json's
-    triage.cardSizes. fable is the owner's own seat, a size like the others.
+    labels on a connected GitHub Space; a Space with no connected GitHub
+    repository has none to read, so there -Assign <size> is refused and a card
+    takes -Assign me alone. fable is the owner's own seat, a size like the others.
 
     -WhatIf runs the reads (so every refusal still happens) and prints every gh
     write it would make -- or the card line -- and makes none.
@@ -45,7 +46,8 @@
     that is not a worker label on the repo; -Assign and -Size that disagree; a
     milestone that is not one of its open milestones (the hint lists them); a gh
     write that fails; on a card, any switch but -Assign, a value that is neither
-    me nor a size, or an id no card in current/ carries.
+    me nor a size, a size in a Space with no connected GitHub repository (no
+    worker labels to read), or an id no card in current/ carries.
 
 .PARAMETER Number
     The issue's number on the Space's repo (a leading # is allowed), or with
@@ -238,12 +240,17 @@ if ($cardMode) {
     }
     $file = $found[0]
 
-    # The sizes: the repo's worker labels where the Space's tracker is a
-    # connected GitHub repo -- the list -Size reads -- else the triage row's
-    # cardSizes, for a Space with no repository to ask.
-    $sizeSource = 'Config/ceremonies.json triage.cardSizes'
-    $sizes = @($row.cardSizes | ForEach-Object { [string]$_ })
-    if (-not $assignMe -and $trackerKind -eq 'github' -and $status -ne 'local' -and $status -ne 'archive') {
+    # The sizes are the repo's worker labels -- the list -Size reads -- and
+    # nothing else (D-AR10: no second list). A Space with no connected GitHub
+    # repository has no labels to read, so there a card takes -Assign me alone.
+    $sizes = @()
+    $sizeSource = ''
+    if (-not $assignMe) {
+        if ($trackerKind -ne 'github' -or $status -eq 'local' -or $status -eq 'archive') {
+            Write-CliError -Message "'$Assign' cannot be checked as a size: this Space has no connected GitHub repository, so there are no worker labels to read." `
+                -Hint "On a card here -Assign takes $meWord alone. A size is a worker label on a connected GitHub Space's repository."
+            exit 2
+        }
         $target = Resolve-P20TrackerRepo -OrgUrl $org -Projects $projects -CliPrefix $p
         if ($target.Reason) {
             Write-CliError -Message $target.Reason -Hint $target.Hint
