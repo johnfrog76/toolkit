@@ -590,7 +590,7 @@ that row together.
 | --- | --- | --- | --- | --- |
 | `alone`, or `agents` with it yours: `me`, or sized `fable` -- the owner's own seat, never the crew (D-AR10; `rituals.suggestOwnerSeat`) | -- | start | `23A3 is the last open card in milestone B -- start it?` | `StartWork 23A3` |
 | `agents` | a crew size, and the item has a milestone | delegate | `#4 is sonnet-sized and well defined -- send it to the crew?` | `StartWork 4` |
-| `agents` | a crew size, and no milestone | place | `#5 is sonnet-sized but has no milestone -- place it?` | `Route 5 -Milestone <title>` |
+| `agents` | a crew size, and no milestone | place | `#5 is sonnet-sized but has no milestone -- place it?` | `Route 5 -Milestone <title>` on an issue; `Plan K7M2 -Milestone <title>` on a card, whose milestone is its `**Sprint:**` line |
 | `agents` | nobody | route | `#4 is the oldest open sev2 in milestone B and nobody has it -- route it?` | `Route 4 -Assign <me\|size>` |
 | any | nothing left after the exclusions | -- | `Next: nothing is waiting on you.` (today's line) | -- |
 

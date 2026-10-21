@@ -282,6 +282,7 @@ describe("consts.json", () => {
         suggestCommandStart: "StartWork {arg}",
         suggestCommandRoute: "Route {arg} -Assign <me|size>",
         suggestCommandPlace: "Route {arg} -Milestone <title>",
+        suggestCommandPlaceCard: "Plan {arg} -Milestone <title>",
         workYesterday: "{name}, {n} closed",
         workToday: "{name}, {n}",
         workBlockers: "{name}, {n} to walk",

@@ -181,11 +181,14 @@ function Get-P20SuggestionSentence {
             # Well defined is not a judgement: a size label and a milestone.
             return @{ shape = $shapes[1]; sentence = (Format-P20SuggestTemplate ([string]$t.suggestDelegate) @{ ref = $ref; size = $size }); command = $startCommand }
         }
-        # Sized, but no destination: route it to a milestone.
+        # Sized, but no destination: route it to a milestone -- Route's write on an
+        # issue, Plan's **Sprint:** line on a card (Route takes only -Assign there).
+        $placeTemplate = [string]$t.suggestCommandPlace
+        if ([string](Get-P20SuggestField $Item 'kind') -ceq 'card') { $placeTemplate = [string]$t.suggestCommandPlaceCard }
         return @{
             shape    = $shapes[3]
             sentence = (Format-P20SuggestTemplate ([string]$t.suggestPlace) @{ ref = $ref; size = $size })
-            command  = (Format-P20SuggestTemplate ([string]$t.suggestCommandPlace) @{ arg = $arg })
+            command  = (Format-P20SuggestTemplate $placeTemplate @{ arg = $arg })
         }
     }
     return @{

@@ -133,8 +133,10 @@ def _sentence(item: dict, how: str) -> tuple[str, str, str]:
                 _fill(t["suggestDelegate"], {"ref": ref, "size": size}),
                 _command("suggestCommandStart", ref),
             )
-        # Sized, but no destination: route it to a milestone.
-        return place, _fill(t["suggestPlace"], {"ref": ref, "size": size}), _command("suggestCommandPlace", ref)
+        # Sized, but no destination: route it to a milestone -- Route's write on an
+        # issue, Plan's **Sprint:** line on a card (Route takes only -Assign there).
+        key = "suggestCommandPlaceCard" if item.get("kind") == "card" else "suggestCommandPlace"
+        return place, _fill(t["suggestPlace"], {"ref": ref, "size": size}), _command(key, ref)
     return (
         route,
         _fill(t["suggestRoute"], {"ref": ref, "why": why, "nobody": t["suggestNobody"]}),

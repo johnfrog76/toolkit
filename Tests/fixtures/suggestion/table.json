@@ -222,6 +222,22 @@
       }
     },
     {
+      "name": "a-sized-card-with-no-milestone-is-planned-into-one",
+      "howIWork": "agents",
+      "dismissed": [],
+      "items": [
+        { "ref": "K7M2", "kind": "card", "severity": "", "milestone": null, "created": "2026-09-10", "size": "opus", "who": "opus", "lane": "Active", "billable": true, "waiting": false }
+      ],
+      "expected": {
+        "order": ["K7M2"],
+        "pick": "K7M2",
+        "shape": "place",
+        "sentence": "K7M2 is opus-sized but has no milestone -- place it?",
+        "command": "Plan K7M2 -Milestone <title>",
+        "excluded": {}
+      }
+    },
+    {
       "name": "yours-on-agents-is-a-start",
       "howIWork": "agents",
       "dismissed": [],

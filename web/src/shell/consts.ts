@@ -270,6 +270,7 @@ export const RITUALS = consts.rituals as {
     suggestNobody: string;
     suggestPlace: string;
     suggestCommandPlace: string;
+    suggestCommandPlaceCard: string;
     suggestWhyLast: string;
     suggestWhyMilestone: string;
     suggestWhyOldest: string;
