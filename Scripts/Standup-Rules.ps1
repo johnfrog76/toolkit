@@ -501,7 +501,7 @@ function Get-P20StandupCards {
     <#
       The impure half: a Space's current/ and archive/ read into the rows the
       cards fill takes -- @{ file; folder; status; closed; title; id; path; type;
-      body; billable; begun; commits }. billable is Test-P20CardBillable's
+      body; billable; begun; commits; sprint; created; tags; assigned }. billable is Test-P20CardBillable's
       answer; begun the day its **Started:** stamp, else its **Created:** stamp,
       carries; commits the hash of every `- <hash>` bullet (regex.commitBullet, group 1 -- the lane rule's own pattern).
       A file the one id rule finds no id in is not a card and is skipped (a
@@ -530,6 +530,9 @@ function Get-P20StandupCards {
             if (-not $bm.Success) { $bm = [regex]::Match($content, $createdRx) }
             if ($bm.Success) { $begun = $bm.Groups[1].Value }
             $hashes = @([regex]::Matches($content, $hashRx) | ForEach-Object { $_.Groups[1].Value })
+            $created = $null
+            $cr = [regex]::Match($content, $createdRx)
+            if ($cr.Success) { $created = $cr.Groups[1].Value }
             $status = [string]$c.status.done
             if ($folder -eq [string]$c.folders.current) { $status = Get-PromptFileStatus $content }
             else {
@@ -550,6 +553,13 @@ function Get-P20StandupCards {
                     billable = (Test-P20CardBillable $content)
                     begun    = $begun
                     commits  = [object[]]$hashes
+                    # What the suggestion reads (Suggest-Rules.ps1): the milestone its
+                    # **Sprint:** line names, whole; its **Created:** day; its Tags
+                    # (a severity, a size); and who takes it.
+                    sprint   = (Get-P20CardMilestone $content)
+                    created  = $created
+                    tags     = [object[]]@(Get-P20CardTags $content)
+                    assigned = (Get-P20CardAssigned $content)
                 })
         }
     }
@@ -1680,7 +1690,10 @@ function Format-P20StandupBrief {
         Waiting on you: 7 walks, all on <who>.     one line per queue kind with items
         <worker>: 4 closed yesterday, 6 open, none in flight, 1 blocker.
         In flight is not yet known: ...            one sentence, while it is unbuilt
-        Next: the walks -- 7 on <who>.             the kind with the most items
+        Next: the walks -- 7 on <who>.             the kind with the most items; with
+                                                   nothing waiting, the suggestion's line
+                                                   when one is attached (Suggest-Rules.ps1,
+                                                   D-AR7), else briefNextNone
 
       An issues Space says its walks are all on one machine (every walk there is a verify-close) and
       "none in flight"; a cards Space says neither, and its walks wait on "you". A
@@ -1761,7 +1774,15 @@ function Format-P20StandupBrief {
     elseif ($issues) { $lines.Add([string]$t.briefInFlightUnknown) }
     foreach ($check in @($Standup.checks | Where-Object { $null -ne $_ })) { $lines.Add([string]$t.check + ': ' + [string]$check) }
 
-    if ($bestCount -eq 0) { $lines.Add([string]$t.briefNextNone) }
-    else { $lines.Add(([string]$t.briefNext).Replace('{kind}', $bestKind).Replace('{n}', [string]$bestCount).Replace('{who}', $who)) }
+    # D-AR7: the suggestion replaces only "nothing is waiting on you", and only
+    # when nothing waits -- the queue's line above always wins.
+    $suggested = ''
+    $sugg = $null
+    if ($Standup -is [System.Collections.IDictionary]) { if ($Standup.Contains('suggestion')) { $sugg = $Standup['suggestion'] } }
+    elseif ($Standup.PSObject.Properties['suggestion']) { $sugg = $Standup.suggestion }
+    if ($null -ne $sugg -and $sugg.line) { $suggested = [string]$sugg.line }
+    if ($bestCount -gt 0) { $lines.Add(([string]$t.briefNext).Replace('{kind}', $bestKind).Replace('{n}', [string]$bestCount).Replace('{who}', $who)) }
+    elseif ($suggested) { $lines.Add($suggested) }
+    else { $lines.Add([string]$t.briefNextNone) }
     return (($lines -join "`n") + "`n")
 }

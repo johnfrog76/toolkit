@@ -218,6 +218,13 @@ export const RITUALS = consts.rituals as {
   /** What moved: a slot item's motion -- closed, started, inProgress --
    *  and the card bullet whose hash it counts. The agent and the CLI read them. */
   motions: string[];
+  /** The suggestion's shapes (start, delegate, route, place): what its action is --
+   *  the Team Agile page opens the hand-off box for the first two and Triage for the rest. */
+  suggestShapes: string[];
+  /** The worker label that is the owner's own seat (D-AR10): a start, never the crew. */
+  suggestOwnerSeat: string;
+  /** The suggestion's exclusions, in the order an item meets them. */
+  suggestExclusions: string[];
   text: {
     title: string;
     dateFormat: string;
@@ -254,6 +261,23 @@ export const RITUALS = consts.rituals as {
     briefInFlightUnknown: string;
     briefNext: string;
     briefNextNone: string;
+    /** The chair's Next line when the suggestion stands; the web shows each
+     *  suggestion's `line` verbatim and falls back to briefNextNone once dismissed. */
+    suggestNext: string;
+    suggestStart: string;
+    suggestDelegate: string;
+    suggestRoute: string;
+    suggestNobody: string;
+    suggestPlace: string;
+    suggestCommandPlace: string;
+    suggestCommandPlaceCard: string;
+    suggestWhyLast: string;
+    suggestWhyMilestone: string;
+    suggestWhyOldest: string;
+    suggestNounCard: string;
+    suggestNounIssue: string;
+    suggestCommandStart: string;
+    suggestCommandRoute: string;
     /** The work grain's phrases: a slot's first group, then the rest. */
     workYesterday: string;
     workToday: string;

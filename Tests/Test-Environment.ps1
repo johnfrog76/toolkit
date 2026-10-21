@@ -473,7 +473,7 @@ $noAnchor = @($json.entries | Where-Object { $_.door -eq 'change' -and -not $_.a
 "KEYS=$($keys.Count) ENTRIES=$(@($json.entries).Count) NOQUESTION=$($noQuestion -join ',') STALE=$($stale -join ',') BADDOOR=$($doors -join ',') NOANCHOR=$($noAnchor -join ',') FIRST=$($keys[0]) ACTIVE=$($json.activeSpace)"
 '@
 $parityLine = ($parityOut -split "`n" | Where-Object { $_ -match '^KEYS=' } | Select-Object -Last 1)
-Assert-True 'the inventory JSON answers with keys and entries' ($parityLine -match 'KEYS=1[0-9] ENTRIES=1[0-9]') $parityOut
+Assert-True 'the inventory JSON answers with keys and entries' ($parityLine -match 'KEYS=[12][0-9] ENTRIES=[12][0-9]') $parityOut
 Assert-True 'every inventory key has a question (a surface with no entry is the drift this guards)' ($parityLine -match 'NOQUESTION= ') $parityLine
 Assert-True 'every entry names a key the inventory has (an entry with no surface is stale)' ($parityLine -match 'STALE= ') $parityLine
 Assert-True 'every door is one of change / walk / sentence' ($parityLine -match 'BADDOOR= ') $parityLine
@@ -508,6 +508,21 @@ foreach ($row in @($howTable.gate)) {
     if ("$on" -ne "$($row.on)") { $gateWrong += "switch=$($row.switch) answer=$($row.answer) -> $on" }
 }
 Assert-True 'every gate row of the shared table' ($gateWrong.Count -eq 0) ($gateWrong -join '; ')
+
+# The suggestion's switch (spaces[].features.suggestions): its inventory row's
+# three states, read off the active Space and Team Agile's resolved switch.
+. (Join-Path $pkgRoot 'Scripts/Get-OptionalSurfaces.ps1')
+$sugCases = @(
+    @{ Name = 'Team Agile on, nothing set'; Features = @{ solitaireAgile = $true }; Space = [pscustomobject]@{ slug = 'gh' }; State = 'not configured'; Line = 'spaces.gh.features.suggestions=false -Hub' },
+    @{ Name = 'Team Agile on, set true'; Features = @{ solitaireAgile = $true }; Space = [pscustomobject]@{ slug = 'gh'; features = [pscustomobject]@{ suggestions = $true } }; State = 'on'; Line = 'spaces.gh.features.suggestions=false -Hub' },
+    @{ Name = 'Team Agile on, set false'; Features = @{ solitaireAgile = $true }; Space = [pscustomobject]@{ slug = 'gh'; features = [pscustomobject]@{ suggestions = $false } }; State = 'off'; Line = 'spaces.gh.features.suggestions=true -Hub' },
+    @{ Name = 'Team Agile off'; Features = @{ solitaireAgile = $false }; Space = [pscustomobject]@{ slug = 'gh'; features = [pscustomobject]@{ suggestions = $true } }; State = 'off'; Line = 'spaces.gh.features.suggestions=true -Hub' }
+)
+foreach ($case in $sugCases) {
+    $rowsNow = @(Get-P20OptionalSurfaces -Config @{ ActiveSpace = 'gh'; Spaces = @($case.Space) } -Features $case.Features -Prefix 'tk' -PackageRoot $pkgRoot)
+    $sugRow = @($rowsNow | Where-Object { $_.key -eq 'suggestions' })[0]
+    Assert-True "the Suggestions row, $($case.Name): $($case.State), and the line that changes it" ($sugRow -and $sugRow.state -ceq $case.State -and ([string]$sugRow.config).EndsWith($case.Line)) "$($sugRow.state) | $($sugRow.config) | $($sugRow.note)"
+}
 
 $howCases = @(
     @{ Space = 'envgh';    On = 'True';  Row = 'Team Agile module\s+on \(chosen: with agents in envgh\)'; Line = 'spaces\.envgh\.howIWork=alone -Hub' },

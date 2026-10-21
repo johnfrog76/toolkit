@@ -365,6 +365,42 @@ function Get-P20OptionalSurfaces {
         -Config "$($Prefix)Config -Set spaces.$slug.features.sprintAwareness=true -Hub" `
         -Note "this org's board, not the engineer's"
 
+    # -- The suggestion: Team Agile's next move, a Space-scoped switch ----------
+    # spaces[].features.suggestions (Scripts/Suggest-Rules.ps1, Test-P20SuggestionsOn):
+    # it rides Team Agile, so where Team Agile is off here the row says so and is
+    # off; where it is on, unset is `not configured` -- on by default, nobody has
+    # answered -- and a stored true or false is on or off.
+    $sugSlug = '<slug>'
+    $sugStored = $null
+    if ($Config -and $Config.ActiveSpace) {
+        $sugSlug = [string]$Config.ActiveSpace
+        foreach ($sp in @($Config.Spaces)) {
+            if ($sp -and [string]$sp.slug -eq $sugSlug -and $sp.features -and $sp.features.PSObject.Properties['suggestions'] -and $sp.features.suggestions -is [bool]) {
+                $sugStored = [bool]$sp.features.suggestions
+            }
+        }
+    }
+    $sugTeamAgile = ($Features -and $Features.ContainsKey('solitaireAgile') -and $Features['solitaireAgile'])
+    $sugState = $states.Off
+    $sugNote = "rides Team Agile, which is off in $sugSlug"
+    $sugLine = "$($Prefix)Config -Set spaces.$sugSlug.features.suggestions=true -Hub"
+    if ($sugTeamAgile) {
+        if ($null -eq $sugStored) {
+            $sugState = $states.Unset
+            $sugNote = "on by default where Team Agile is on; the chair's Next line in $sugSlug"
+            $sugLine = "$($Prefix)Config -Set spaces.$sugSlug.features.suggestions=false -Hub"
+        }
+        elseif ($sugStored) {
+            $sugState = $states.On
+            $sugNote = "the chair's Next line in $sugSlug"
+            $sugLine = "$($Prefix)Config -Set spaces.$sugSlug.features.suggestions=false -Hub"
+        }
+        else {
+            $sugNote = "switched off in ${sugSlug}: the Next line is today's"
+        }
+    }
+    $rows += New-P20SurfaceRow -Key 'suggestions' -Title 'Suggestions' -State $sugState -Config $sugLine -Note $sugNote
+
     # -- Training hours per quarter: a Space's requirement ---------------------
     # A NUMBER the Space states, not a flag, so its state is on (a requirement is
     # set) or not configured (none is) -- there is no answered "no" to respect.

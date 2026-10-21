@@ -94,3 +94,35 @@ function Get-P20CardAssigned {
     if ($m.Success) { return $m.Groups[1].Value }
     return ''
 }
+
+function Get-P20CardMilestone {
+    <#
+      The milestone a card names: its first `**Sprint:**` line's value, WHOLE and
+      trimmed -- never the board's shortened sprint column -- and '' for none or a
+      template's parenthesised placeholder (`(not linked)`). D-AR11: the
+      milestone is the destination, and a card names it here. agent/core/parsers.py's
+      card_milestone is the same rule; Tests/fixtures/parsers/card-milestone.json
+      holds the two to one table.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Content)
+    $m = [regex]::Match("$Content", '(?m)^\*\*Sprint:\*\*[ \t]*([^\r\n]*?)[ \t]*\r?$')
+    $value = ''
+    if ($m.Success) { $value = $m.Groups[1].Value }
+    if ($value.StartsWith('(')) { return '' }
+    return $value
+}
+
+function Get-P20CardTags {
+    <#
+      The card's `Tags:` line, split on commas and trimmed, empties dropped; none
+      for no line or a parenthesised placeholder. The suggestion reads a card's
+      severity and size from it. card_tags in the agent; the same table.
+      Returns an array -- callers wrap it in @().
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Content)
+    $m = [regex]::Match("$Content", '(?m)^Tags:[ \t]*([^\r\n]*?)[ \t]*\r?$')
+    $value = ''
+    if ($m.Success) { $value = $m.Groups[1].Value }
+    if ($value.StartsWith('(')) { return @() }
+    return @($value -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+}

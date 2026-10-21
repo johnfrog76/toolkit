@@ -19,6 +19,23 @@
 # PowerShell 5.1 compatible (ASCII dashes only); reads no module state.
 #
 
+function Get-P20RitualViewer {
+    # Who you are on GitHub: the signed-in gh user's login, so an item assigned
+    # to you reads "me" (D-AR10). ONE read, `gh api user -q .login`, made once per
+    # ritual call by the caller -- Triage, and the standup's suggestion. Best
+    # effort: '' when gh cannot say, and nothing fails.
+    if (-not (Get-Command Invoke-P20TrackerRead -ErrorAction SilentlyContinue)) {
+        . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
+    }
+    try {
+        $me = Invoke-P20TrackerRead 'gh' @('api', 'user', '-q', '.login')
+        $login = ((@($me.Out) -join "`n").Trim())
+        if ($me.Code -eq 0 -and $login -match '^[A-Za-z0-9-]+$') { return $login }
+    }
+    catch { $null = $_ }
+    return ''
+}
+
 function Resolve-P20RitualSpace {
     # Which Space: no -Space is the one you are in; a slug is that Space's
     # own entry, read without switching into it -- the same three things the

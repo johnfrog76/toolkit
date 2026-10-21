@@ -321,6 +321,21 @@ title from the heading (`K7M2 (started, 2 commits) Wire the board`, `139 (1 comm
 hold it to one table, `Tests/fixtures/rituals/standup-cards.json`; the add-on's document has the rest
 ([Team Agile](../modules/solitaire-agile.md#the-two-sources-joined)).
 
+### What the suggestion reads
+
+The standup's suggestion -- one derived next move ([Team Agile](../modules/solitaire-agile.md#the-suggestion-one-next-move-derived))
+-- reads four things from a card in `current/` and writes none. No card gains a line for it.
+
+| What | Read from | Rule |
+| --- | --- | --- |
+| its milestone | the first `**Sprint:**` line | the value WHOLE and trimmed -- `M2 -- 1.2.0, the standup sees the work`, `RecipesApp\Sprint 2` -- never the model's `sprint`, which keeps the last segment and cuts it at eighteen characters for the board; a parenthesised placeholder (`(not linked)`) is none |
+| its severity and size | the `Tags:` line | split on commas and trimmed; the first tag that is one of the triage ceremony's severities, and the first that is one of the repo's worker labels |
+| who takes it | the `**Assigned:**` line | `me`, or a size; with none, its size |
+| its age | the `**Created:**` day | the oldest first; a card with none after every one with one |
+
+`card_milestone` and `card_tags` (`agent/core/parsers.py`) and `Get-P20CardMilestone` and `Get-P20CardTags`
+(`Scripts/Get-PromptFileStatus.ps1`) are the readers, held to one table, `Tests/fixtures/parsers/card-milestone.json`.
+
 ## The model, as the agent serves it
 
 `GET /api/status` lists `current/` and then `backlog/` (a card from `backlog/` is served as `Backlog`, and the

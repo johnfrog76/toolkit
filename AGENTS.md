@@ -91,12 +91,15 @@ One flag switches a whole module, in all three halves at once:
 
 **A feature flag has a scope, and the default scope is the engineer.** A training you took does not
 stop having happened when you switch org, so these hold steady across `activeSpace` and an org cannot
-override them. There are two Space-scoped switches. `sprintAwareness`, the ADO core's own flag, describes
+override them. There are three Space-scoped switches. `sprintAwareness`, the ADO core's own flag, describes
 one org's board and is read from `spaces[].features` (the older `orgs[]` is still read). And
 `spaces[].howIWork` is the Space's answer to "How do you want to work in `<Space>`?" -- asked on a
 GitHub Space, derived elsewhere (`team` on Azure DevOps, `alone` with no tracker) -- and it gates one
 module: Team Agile is on only where `features.solitaireAgile` is on AND the answer is `agents`, applied once
-where the flags are resolved (`Scripts/Resolve-HowIWork.ps1`, `how_i_work()`, one shared table).
+where the flags are resolved (`Scripts/Resolve-HowIWork.ps1`, `how_i_work()`, one shared table). And
+`spaces[].features.suggestions` turns off Team Agile's suggestion -- the chair's one derived next move --
+in that Space; unset is on wherever Team Agile is on (`docs/modules/solitaire-agile.md`, "The suggestion:
+one next move, derived").
 
 **Off means absent.** No verb, no line in `Menu`, no `-Help`, nothing for the bridge to call, no
 agent route (**404, not 403**), no nav entry, no page, no card, and nothing fetches the module's
@@ -207,7 +210,8 @@ anywhere).
 | organize module | `features.organize` | `config.local.json`, top-level -- both halves: `NewReminder`, `Reminders` and the Organize tab |
 | Team Agile module | `features.solitaireAgile`, and the Space's `howIWork` | the switch in `config.local.json`, top-level; the answer in `hub.json` -- on only where both say so: `on`, `off` (derived or chosen) or `not configured` (a GitHub Space nobody has answered). Both halves: `Standup`, `Triage`, `Route` and `StartWork`, `GET /api/ritual/standup` and `/triage`, and its tab; writes only what `Route` writes -- a label, an assignee or a milestone on the tracker, and on a card one `**Assigned:**` line |
 | Design lifecycle | `design` | DERIVED (`Scripts/Read-DesignTree.ps1`, through `Get-OptionalSurfaces.ps1`): `on` when the repository you stand in has `design/` and every file in the four folders carries an `id:`, `off` with the count when some do not, `not configured` with no `design/` to read, or none with a note in it; the hub's own count in the note. `docs/hub/design.md`, "The CLI names it" |
-| Sprint awareness | `spaces[].features.sprintAwareness` | `hub.json` -- a Space-scoped flag (the other Space-scoped switch is `howIWork`, above) |
+| Sprint awareness | `spaces[].features.sprintAwareness` | `hub.json` -- a Space-scoped flag (the other Space-scoped switches are `howIWork`, above, and `suggestions`, below) |
+| Suggestions | `spaces[].features.suggestions` | `hub.json` -- a Space-scoped switch riding Team Agile: `not configured` (on, by default, where Team Agile is on), `on`, or `off` (set false, or Team Agile off in that Space); `false` turns the chair's Next line back to `Next: nothing is waiting on you.` |
 | Prompt store git sync | `storeSync` | `hub.json`, overridable per machine |
 | ADO identity | `email` | `config.local.json`, else `az login` |
 | Web UI and agent | `web.agentPort` | `config.local.json`; started with `{prefix}Web -Dev` |

@@ -120,12 +120,7 @@ else {
             # Who you are on GitHub, so an issue assigned to you reads "me"
             # (D-AR10). Best effort: a viewer gh cannot name leaves every
             # assignee as @<login>, and the triage still answers.
-            try {
-                $me = Invoke-P20TrackerRead 'gh' @('api', 'user', '-q', '.login')
-                $login = ((@($me.Out) -join "`n").Trim())
-                if ($me.Code -eq 0 -and $login -match '^[A-Za-z0-9-]+$') { $viewer = $login }
-            }
-            catch { $viewer = '' }
+            $viewer = Get-P20RitualViewer
         }
         else {
             $tracker.reason = $got.reason

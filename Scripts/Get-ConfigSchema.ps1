@@ -325,6 +325,7 @@ function Get-P20SpaceFieldSchema {
     }
     $fields += [PSCustomObject]@{ key = 'howIWork';      scope = 'org'; type = 'enum';   allowed = @(Get-P20HowIWorkStored);    required = $false; help = 'How you work in this Space, on a GitHub Space: agents turns Team Agile on here (its switch, features.solitaireAgile, still has to be on); alone, the default, keeps it off. On an Azure DevOps Space the answer is on a team and on one with no tracker it is alone -- both derived, so a value here is ignored.' }
     $fields += [PSCustomObject]@{ key = 'features.sprintAwareness'; scope = 'org'; type = 'bool'; allowed = @();             required = $false; help = 'A SPACE-scoped feature flag -- it describes this Space''s board. Every other flag is the engineer''s and lives in the top-level features block.' }
+    $fields += [PSCustomObject]@{ key = 'features.suggestions'; scope = 'org'; type = 'bool'; allowed = @();                 required = $false; help = 'A SPACE-scoped switch: whether Team Agile suggests your next move here -- the chair''s Next line in Standup -Brief and on the Team Agile page. Unset is on wherever Team Agile is on; false turns the line back to "Next: nothing is waiting on you."' }
     $fields += [PSCustomObject]@{ key = 'features.trainingHoursPerQuarter'; scope = 'org'; type = 'int'; allowed = @(); required = $false; help = 'Training hours this Space''s engagement requires each calendar quarter, whole hours. Unset means no requirement and the Growth page says nothing about one.' }
     return $fields
 }

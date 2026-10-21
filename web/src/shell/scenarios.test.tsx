@@ -60,6 +60,8 @@ import type { SpaceBucket, SpaceLifecycleAction } from "../modules/studio/foyer"
 import { promptSets, spaceWorkflow } from "../modules/studio/prompts";
 import type { PromptRow, PromptWorkflow } from "../modules/studio/api.studio";
 import { itemFacts, itemRef, itemSpoken } from "../modules/solitaireAgile/itemRef";
+import { chairSuggestion } from "../modules/solitaireAgile/suggestion";
+import type { StandupResponse } from "../modules/solitaireAgile/api.solitaireAgile";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -522,6 +524,42 @@ describe("the scenario grid: what each configuration shows", () => {
       nav: ["Team Agile"],
     });
     expect(at({ solitaireAgile: false })).toEqual({ route: false, chromeless: false, nav: [] });
+  });
+
+  // The chair's suggestion (docs/SCENARIOS.md, "Team Agile's standup"): the
+  // agent attaches it only where the Space's switch is on (spaces[].features.
+  // suggestions, unset is on), and the brief's Next line is it only when nothing
+  // waits. The page draws a suggestion row exactly when the brief's last line IS
+  // the first candidate's line -- over the suggestion table's three generated goldens.
+  it("the chair's suggestion: a row where the switch is on and nothing waits; today's line otherwise", () => {
+    const dir = path.resolve(__dirname, "../../../Tests/fixtures/suggestion");
+    const brief = (name: string) => fs.readFileSync(path.join(dir, `suggestion-${name}.brief.txt`), "utf8");
+    const last = (text: string) => text.split("\n").filter(Boolean).pop() ?? "";
+    const first = {
+      ref: "#141",
+      number: 141,
+      id: null,
+      kind: "issue" as const,
+      shape: "delegate",
+      sentence: "",
+      command: "StartWork 141",
+      line: last(brief("suggested")),
+    };
+    const at = (name: string, on: boolean) =>
+      chairSuggestion(
+        {
+          brief: brief(name),
+          suggestions: on ? [first] : [],
+          suggestion: on ? first : null,
+        } as unknown as StandupResponse,
+        [],
+      ).standing;
+    expect([at("suggested", true), at("waiting", true), at("switched-off", false)]).toEqual([
+      true,
+      false,
+      false,
+    ]);
+    expect(last(brief("switched-off"))).toBe("Next: nothing is waiting on you.");
   });
 
   // "How do you want to work in <Space>?" (docs/SCENARIOS.md, the "How do

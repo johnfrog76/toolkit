@@ -61,7 +61,7 @@ describe("consts.json", () => {
     expect(FOLDERS.backlog).toBe("backlog");
     // The org-scoped flags: the same list the CLI's OrgScopedFeatures and the
     // agent's ORG_FEATURES read, so a second one cannot be added to two halves only.
-    expect(FEATURES.spaceScoped).toEqual(["sprintAwareness", "trainingHoursPerQuarter"]);
+    expect(FEATURES.spaceScoped).toEqual(["sprintAwareness", "trainingHoursPerQuarter", "suggestions"]);
     // Read by vite.config.ts (outside src/), not by the bundle: the name of the
     // variable Start-Web.ps1 sets and the dev proxy reads.
     expect(consts.env.agentPort).toBe("P20_AGENT_PORT");
@@ -224,6 +224,9 @@ describe("consts.json", () => {
       dressNameRegex: "(?<![\\w'-])[A-Z][A-Za-z0-9'-]*",
       dressPronounRegex: "^I(?:'[a-z]+)?$",
       motions: ["closed", "started", "inProgress"],
+      suggestShapes: ["start", "delegate", "route", "place"],
+      suggestOwnerSeat: "fable",
+      suggestExclusions: ["notBillable", "waiting", "inFlight", "theirs", "dismissed"],
       text: {
         title: "Standup -- {date}",
         dateFormat: "dddd d MMMM yyyy",
@@ -265,6 +268,21 @@ describe("consts.json", () => {
         briefInFlightUnknown: "In flight is not yet known: every routed issue reads as open.",
         briefNext: "Next: the {kind} -- {n} on {who}.",
         briefNextNone: "Next: nothing is waiting on you.",
+        suggestNext: "Next: {sentence} ({command})",
+        suggestStart: "{ref} is {why} -- start it?",
+        suggestDelegate: "{ref} is {size}-sized and well defined -- send it to the crew?",
+        suggestRoute: "{ref} is {why}{nobody} -- route it?",
+        suggestNobody: " and nobody has it",
+        suggestPlace: "{ref} is {size}-sized but has no milestone -- place it?",
+        suggestWhyLast: "the last open {noun} in milestone {milestone}",
+        suggestWhyMilestone: "the oldest open {kind} in milestone {milestone}",
+        suggestWhyOldest: "the oldest open {kind}",
+        suggestNounCard: "card",
+        suggestNounIssue: "issue",
+        suggestCommandStart: "StartWork {arg}",
+        suggestCommandRoute: "Route {arg} -Assign <me|size>",
+        suggestCommandPlace: "Route {arg} -Milestone <title>",
+        suggestCommandPlaceCard: "Plan {arg} -Milestone <title>",
         workYesterday: "{name}, {n} closed",
         workToday: "{name}, {n}",
         workBlockers: "{name}, {n} to walk",
