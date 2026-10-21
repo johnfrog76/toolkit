@@ -727,6 +727,17 @@ foreach ($case in @($sb.cases)) {
     $back.since = $s.since
     Assert-True "brief $($case.name): the JSON round trip renders the same brief" ((Format-P20StandupBrief -Standup $back -PackageRoot $pkgRoot) -ceq $brief)
 }
+# Who "me" is: an assignee who is the signed-in gh user reads me (triage's rule) and
+# is a candidate; another is @<login>, excluded theirs; no viewer, every assignee theirs.
+$viewIssues = @(
+    [pscustomobject]@{ number = 7; title = 'Mine'; state = 'OPEN'; labels = @(); assignees = @([pscustomobject]@{ login = 'Me-Dev' }) },
+    [pscustomobject]@{ number = 8; title = 'Theirs'; state = 'OPEN'; labels = @(); assignees = @('octocat') }
+)
+$viewItems = @(Get-P20SuggestionItems -Labels @($sb.workerLabels) -Issues $viewIssues -Cards @() -Viewer 'me-dev' -PackageRoot $pkgRoot)
+$viewPick = Select-P20Suggestion -Items $viewItems -HowIWork 'agents' -PackageRoot $pkgRoot
+$blindPick = Select-P20Suggestion -Items @(Get-P20SuggestionItems -Labels @($sb.workerLabels) -Issues $viewIssues -Cards @() -PackageRoot $pkgRoot) -HowIWork 'agents' -PackageRoot $pkgRoot
+$viewWho = (@($viewItems | ForEach-Object { $_.who })) -join ','
+Assert-True 'who "me" is: the viewer''s issue reads me and is the pick; another''s is excluded theirs; no viewer, both theirs' ($viewWho -ceq "$([string]$consts.rituals.assignMe),@octocat" -and (@($viewPick.picked | ForEach-Object { $_.ref }) -join ',') -ceq '#7' -and $viewPick.excluded['#8'] -ceq 'theirs' -and @($blindPick.picked).Count -eq 0 -and $blindPick.excluded['#7'] -ceq 'theirs') "who [$viewWho]"
 $cardTable = [System.IO.File]::ReadAllText((Join-Path $scriptDir 'fixtures/parsers/card-milestone.json')) | ConvertFrom-Json
 foreach ($row in @($cardTable.rows)) {
     $eol = "`n"

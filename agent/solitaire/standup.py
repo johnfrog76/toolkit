@@ -1764,6 +1764,11 @@ def standup_for(space: str = "", as_of: datetime | None = None, since: str = "")
     on = suggestions_on(solitaire_enabled(), (entry.get("features") or {}).get("suggestions"))
     how = how_i_work(entry.get("org", ""), entry.get("howIWork"))["answer"]
     if on and source in ("cards", "both"):
+        # Who "me" is: triage's one read (gh api user), once per standup, and only
+        # where an issue read happened -- a cards Space has no assignee to compare.
+        from .triage import _viewer
+
+        viewer = _viewer() if source == "both" and filled.tracker.ok else ""
         attach_suggestions(
             filled,
             labels if source == "both" else [],
@@ -1772,6 +1777,7 @@ def standup_for(space: str = "", as_of: datetime | None = None, since: str = "")
             how,
             True,
             str(cfg.get("commandPrefix") or ""),
+            viewer,
         )
     filled.text = render_standup(filled)
     filled.work.text = render_work(filled)

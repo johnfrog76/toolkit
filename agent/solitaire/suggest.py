@@ -39,6 +39,7 @@ from ..core.consts import (
     folder_current,
     rituals_assign_me,
     rituals_suggest_exclusions,
+    rituals_suggest_owner_seat,
     rituals_suggest_shapes,
     rituals_text,
     rituals_worker_label_prefix,
@@ -47,6 +48,7 @@ from ..core.consts import (
     status_in_progress,
 )
 from .standup import Standup, Suggestion, _label_names, ceremonies, worker_name
+from .triage import who
 
 # A due date or a created day that is not there sorts after every one that is.
 _LAST_DAY = "9999-99-99"
@@ -90,9 +92,14 @@ def nearest_milestones(milestones: list[dict]) -> list[str]:
 # -- The rule ------------------------------------------------------------------
 
 
-def _is_person(who: str) -> bool:
-    """Whether ``who`` is a person rather than a size: you, or another assignee."""
-    return who == rituals_assign_me() or who.startswith("@")
+def _is_theirs(who: str) -> bool:
+    """Whether ``who`` is another person: an assignee who is not you (``@<login>``)."""
+    return who.startswith("@")
+
+
+def _is_yours(who: str) -> bool:
+    """Whether the item is yours to start: you (``me``), or the owner's own seat (D-AR10)."""
+    return who in (rituals_assign_me(), rituals_suggest_owner_seat())
 
 
 def _command(template_key: str, ref: str) -> str:
@@ -102,7 +109,7 @@ def _command(template_key: str, ref: str) -> str:
 def _sentence(item: dict, how: str) -> tuple[str, str, str]:
     """(shape, sentence, command) for one candidate. Pure."""
     t = rituals_text()
-    start, delegate, route = rituals_suggest_shapes()
+    start, delegate, route, place = rituals_suggest_shapes()
     ref = str(item.get("ref") or "")
     noun = t["suggestNounCard"] if item.get("kind") == "card" else t["suggestNounIssue"]
     kind = str(item.get("severity") or "") or noun
@@ -115,29 +122,37 @@ def _sentence(item: dict, how: str) -> tuple[str, str, str]:
     else:
         why = _fill(t["suggestWhyOldest"], {"kind": kind})
     who = str(item.get("who") or "")
-    if how != "agents" or _is_person(who):
+    if how != "agents" or _is_yours(who):
         return start, _fill(t["suggestStart"], {"ref": ref, "why": why}), _command("suggestCommandStart", ref)
-    if who and title:
-        # Well defined is not a judgement: a size label and a milestone.
+    if who:
         size = str(item.get("size") or who)
-        return delegate, _fill(t["suggestDelegate"], {"ref": ref, "size": size}), _command("suggestCommandStart", ref)
-    nobody = "" if who else t["suggestNobody"]
+        if title:
+            # Well defined is not a judgement: a size label and a milestone.
+            return (
+                delegate,
+                _fill(t["suggestDelegate"], {"ref": ref, "size": size}),
+                _command("suggestCommandStart", ref),
+            )
+        # Sized, but no destination: route it to a milestone.
+        return place, _fill(t["suggestPlace"], {"ref": ref, "size": size}), _command("suggestCommandPlace", ref)
     return (
         route,
-        _fill(t["suggestRoute"], {"ref": ref, "why": why, "nobody": nobody}),
+        _fill(t["suggestRoute"], {"ref": ref, "why": why, "nobody": t["suggestNobody"]}),
         _command("suggestCommandRoute", ref),
     )
 
 
 def excluded_by(item: dict, dismissed: set[str]) -> str:
     """The first exclusion an item meets, in rituals.suggestExclusions' order; "" for none."""
-    not_billable, waiting, in_flight, was_dismissed = rituals_suggest_exclusions()
+    not_billable, waiting, in_flight, theirs, was_dismissed = rituals_suggest_exclusions()
     if item.get("billable", True) is False:
         return not_billable
     if item.get("waiting"):
         return waiting
     if item.get("lane") in (status_in_progress(), status_code_review()):
         return in_flight
+    if _is_theirs(str(item.get("who") or "")):
+        return theirs
     if str(item.get("ref") or "") in dismissed:
         return was_dismissed
     return ""
@@ -200,12 +215,15 @@ def _assignee(issue: dict) -> str:
     return ""
 
 
-def suggest_items(labels: list[dict], issues: list[dict], cards: list[dict], waiting: set[str]) -> list[dict]:
+def suggest_items(
+    labels: list[dict], issues: list[dict], cards: list[dict], waiting: set[str], viewer: str = ""
+) -> list[dict]:
     """The joined list as the rule's items. Pure; the mirror of ``Get-P20SuggestionItems``.
 
     An OPEN issue is one item: its severity and size from its labels (the triage
     ceremony's severities, the worker labels), who has it by the triage rule (its
-    first assignee as ``@<login>``, else its size), its milestone and due date, its
+    first assignee -- ``me`` when it is ``viewer``, the signed-in gh user, else
+    ``@<login>`` -- else its size), its milestone and due date, its
     createdAt, and its lane from the card in ``current/`` whose id is its number
     (Active without one). A card in ``current/`` whose id is no issue in the read
     is its own item: severity and size from its Tags line, who from its
@@ -249,7 +267,7 @@ def suggest_items(labels: list[dict], issues: list[dict], cards: list[dict], wai
                 "milestone": {"title": title, "open": 0, "due": due or None} if title else None,
                 "created": _day(issue.get("createdAt")) or None,
                 "size": size,
-                "who": ("@" + assignee) if assignee else size,
+                "who": who(assignee, size, viewer),
                 "lane": lane_of.get(n, status_active()),
                 "billable": True,
                 "waiting": f"#{n}" in waiting,
@@ -306,16 +324,21 @@ def attach_suggestions(
     how: str,
     on: bool,
     prefix: str,
+    viewer: str = "",
 ) -> Standup:
     """The suggestion attached to a filled standup, in place: every candidate in
     order and the first. Nothing with the switch off, or with the tracker not
     answering (a ritual with no read has no list to choose from). ``prefix`` is the
-    CLI's, for the command the chair's line names."""
+    CLI's, for the command the chair's line names; ``viewer`` the signed-in gh user's
+    login (triage's one read), "" when gh cannot say -- then every assignee is
+    someone else's, and a suggestion is never someone else's work."""
     filled.suggestions = []
     filled.suggestion = None
     if not on or not filled.tracker.ok:
         return filled
-    items = suggest_items(labels, issues if filled.source in ("issues", "both") else [], cards, queue_refs(filled))
+    items = suggest_items(
+        labels, issues if filled.source in ("issues", "both") else [], cards, queue_refs(filled), viewer
+    )
     picked, _excluded = suggest(items, how)
     t = rituals_text()
     filled.suggestions = [

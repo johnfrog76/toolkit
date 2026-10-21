@@ -325,8 +325,13 @@ if ($choice.source -eq 'cards' -or $choice.source -eq 'both') {
     if ($spaceEntry -and $spaceEntry.PSObject.Properties['howIWork']) { $howStored = [string]$spaceEntry.howIWork }
     if (-not (Get-Command Resolve-P20HowIWork -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Resolve-HowIWork.ps1') }
     $how = Resolve-P20HowIWork -OrgUrl $org -Stored $howStored
+    $suggestOn = Test-P20SuggestionsOn -TeamAgile $teamAgile -Stored $storedSwitch
+    # Who "me" is: triage's one read (Ritual-Common.ps1), once per standup, and only
+    # where an issue read happened -- a cards Space has no assignee to compare.
+    $viewer = ''
+    if ($suggestOn -and $choice.source -eq 'both' -and $tracker.ok) { $viewer = Get-P20RitualViewer }
     $null = Add-P20StandupSuggestion -Standup $standup -Labels $labels -Issues $issues -Cards $cards -HowIWork ([string]$how.answer) `
-        -On (Test-P20SuggestionsOn -TeamAgile $teamAgile -Stored $storedSwitch) -Prefix (Get-CliPrefix) -PackageRoot $repoRoot
+        -On $suggestOn -Prefix (Get-CliPrefix) -Viewer $viewer -PackageRoot $repoRoot
 }
 $standup.text = Format-P20StandupText -Standup $standup -PackageRoot $repoRoot
 $standup.work.text = Format-P20StandupWork -Standup $standup -PackageRoot $repoRoot

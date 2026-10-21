@@ -81,7 +81,7 @@ export const startWorkArg = (i: RitualItem): string =>
 // "The suggestion: one next move, derived"): when nothing waits, the brief's last
 // line is the first candidate's `line`. The page draws that line as a row of its
 // own -- the line verbatim, the action (Start work opens the hand-off box for a
-// start or a delegation; a route opens Triage) and a dismiss. A dismiss is per
+// start or a delegation; a route, or a place in a milestone, opens Triage) and a dismiss. A dismiss is per
 // surface, per item, per session (suggestDismiss.ts): the next candidate's line
 // takes its place, and with none left the line is today's briefNextNone. The
 // brief's text is otherwise untouched, and Copy still copies it as the agent
@@ -359,7 +359,7 @@ export function StandupPage() {
   const suggestionRow = chair.standing ? (
     <div className={styles.suggestion} data-testid="standup-suggestion">
       <Caption1>{current ? current.line : RITUALS.text.briefNextNone}</Caption1>
-      {current && current.shape !== RITUALS.suggestShapes[2] && (
+      {current && RITUALS.suggestShapes.slice(0, 2).includes(current.shape) && (
         <Button
           appearance="subtle"
           size="small"
@@ -369,7 +369,7 @@ export function StandupPage() {
           Start work
         </Button>
       )}
-      {current && current.shape === RITUALS.suggestShapes[2] && (
+      {current && !RITUALS.suggestShapes.slice(0, 2).includes(current.shape) && (
         <Button appearance="subtle" size="small" onClick={() => navigate(ROUTES.triage)}>
           Open Triage
         </Button>

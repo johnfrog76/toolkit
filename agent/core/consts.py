@@ -544,9 +544,15 @@ def rituals_suggest_shapes() -> tuple[str, ...]:
 
 
 def rituals_suggest_exclusions() -> tuple[str, ...]:
-    """The suggestion's exclusions, IN ORDER: notBillable, waiting, inFlight, dismissed --
-    an item is excluded by the first it meets."""
+    """The suggestion's exclusions, IN ORDER: notBillable, waiting, inFlight, theirs,
+    dismissed -- an item is excluded by the first it meets."""
     return tuple(consts()["rituals"]["suggestExclusions"])
+
+
+def rituals_suggest_owner_seat() -> str:
+    """``fable`` -- the worker label that is the owner's own seat (D-AR10): a size, never
+    a crew delegation, so an item it sizes is the owner's to start."""
+    return consts()["rituals"]["suggestOwnerSeat"]
 
 
 # -- The dress (D-SA11) ---------------------------------------------------

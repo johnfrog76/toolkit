@@ -1217,6 +1217,22 @@ class TheSuggestionTable(unittest.TestCase):
         self.assertEqual(filled.brief.rstrip("\n").split("\n")[-1], filled.suggestion.line)
         self.assertTrue(filled.suggestion.line.startswith("Next: #141 is opus-sized"))
 
+    def test_who_me_is_triages_read_and_someone_elses_item_is_theirs(self):
+        """An assignee who is the signed-in gh user reads `me` (triage's rule) and is a
+        candidate; another assignee is `@<login>` and excluded `theirs`. With no viewer
+        every assignee is someone else's."""
+        labels = SUGGEST["briefs"]["workerLabels"]
+        issues = [
+            {"number": 7, "title": "Mine", "state": "OPEN", "labels": [], "assignees": [{"login": "Me-Dev"}]},
+            {"number": 8, "title": "Theirs", "state": "OPEN", "labels": [], "assignees": ["octocat"]},
+        ]
+        items = self.suggest.suggest_items(labels, issues, [], set(), viewer="me-dev")
+        self.assertEqual([i["who"] for i in items], [C.rituals_assign_me(), "@octocat"])
+        picked, excluded = self.suggest.suggest(items, "agents")
+        self.assertEqual(([p["ref"] for p in picked], excluded), (["#7"], {"#8": "theirs"}))
+        blind = self.suggest.suggest_items(labels, issues, [], set())
+        self.assertEqual(self.suggest.suggest(blind, "agents")[1], {"#7": "theirs", "#8": "theirs"})
+
     def test_the_items_count_a_milestone_once_per_id(self):
         """The joined list as items: a card that tracks an issue is that issue's row,
         and the milestone's open count is its billable rows, once each."""
@@ -1296,6 +1312,8 @@ class TheRoute(unittest.TestCase):
     features = {"solitaireAgile": True}
     # The toolkit Space's own features block (spaces[].features): the suggestion's switch lives there.
     space_features: dict | None = None
+    # With the suggestion on, the standup asks who "me" is once (triage's gh api user).
+    viewer_reads: list = [["gh", "api", "user"]]
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -1420,7 +1438,8 @@ class TheRoute(unittest.TestCase):
         # An active GitHub Space reads both; with no card in its folders the text is the issues' alone.
         self.assertEqual(body["source"], "both")
         self.assertEqual((body["checks"], body["links"]), ([], []))
-        self.assertEqual([c[:3] for c in calls], [["gh", "label", "list"], ["gh", "issue", "list"]])
+        # The two reads, then who "me" is -- once, for the suggestion (triage's gh api user).
+        self.assertEqual([c[:3] for c in calls], [["gh", "label", "list"], ["gh", "issue", "list"], *self.viewer_reads])
         self.assertIn("johnfrog76/toolkit", calls[0])
         self.assertIn("all", calls[1])
         # The work grain reads the milestone and the body.
@@ -1550,7 +1569,8 @@ class TheRoute(unittest.TestCase):
         self.assertEqual(res.status_code, 200, res.text)
         body = res.json()
         self.assertEqual(body["source"], "both")
-        self.assertEqual([c[:3] for c in calls], [["gh", "label", "list"], ["gh", "issue", "list"]])
+        # The two reads, then who "me" is -- once, for the suggestion (triage's gh api user).
+        self.assertEqual([c[:3] for c in calls], [["gh", "label", "list"], ["gh", "issue", "list"], *self.viewer_reads])
         self.assertEqual(body["workers"][-1]["label"], "toolkit")
         self.assertEqual([i["id"] for i in body["workers"][-1]["today"]], ["K7M2"])
         self.assertNotIn("C4D7", body["text"])
@@ -1685,6 +1705,7 @@ class TheRouteWithSuggestionsOff(TheRoute):
     """spaces.toolkit.features.suggestions=false: the standup is the same, with no suggestion."""
 
     space_features = {"suggestions": False}
+    viewer_reads: list = []
 
     def test_the_suggestion_rides_the_same_read(self):
         body = self._get("/api/ritual/standup?space=toolkit")[0].json()

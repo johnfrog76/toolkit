@@ -172,8 +172,9 @@ EXPECTED = {
     ("rituals", "dressPronounRegex"): r"^I(?:'[a-z]+)?$",
     # What moved: a slot item's motion, and the hash its card's bullet threads.
     ("rituals", "motions"): ["closed", "started", "inProgress"],
-    ("rituals", "suggestShapes"): ["start", "delegate", "route"],
-    ("rituals", "suggestExclusions"): ["notBillable", "waiting", "inFlight", "dismissed"],
+    ("rituals", "suggestShapes"): ["start", "delegate", "route", "place"],
+    ("rituals", "suggestOwnerSeat"): "fable",
+    ("rituals", "suggestExclusions"): ["notBillable", "waiting", "inFlight", "theirs", "dismissed"],
     ("rituals", "text"): {
         "title": "Standup -- {date}",
         "dateFormat": "dddd d MMMM yyyy",
@@ -220,6 +221,7 @@ EXPECTED = {
         "suggestDelegate": "{ref} is {size}-sized and well defined -- send it to the crew?",
         "suggestRoute": "{ref} is {why}{nobody} -- route it?",
         "suggestNobody": " and nobody has it",
+        "suggestPlace": "{ref} is {size}-sized but has no milestone -- place it?",
         "suggestWhyLast": "the last open {noun} in milestone {milestone}",
         "suggestWhyMilestone": "the oldest open {kind} in milestone {milestone}",
         "suggestWhyOldest": "the oldest open {kind}",
@@ -227,6 +229,7 @@ EXPECTED = {
         "suggestNounIssue": "issue",
         "suggestCommandStart": "StartWork {arg}",
         "suggestCommandRoute": "Route {arg} -Assign <me|size>",
+        "suggestCommandPlace": "Route {arg} -Milestone <title>",
         "workYesterday": "{name}, {n} closed",
         "workToday": "{name}, {n}",
         "workBlockers": "{name}, {n} to walk",
@@ -443,6 +446,7 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.rituals_motions(), tuple(EXPECTED[("rituals", "motions")]))
         self.assertEqual(C.rituals_suggest_shapes(), tuple(EXPECTED[("rituals", "suggestShapes")]))
         self.assertEqual(C.rituals_suggest_exclusions(), tuple(EXPECTED[("rituals", "suggestExclusions")]))
+        self.assertEqual(C.rituals_suggest_owner_seat(), EXPECTED[("rituals", "suggestOwnerSeat")])
 
     def test_the_worker_rule_reads_the_contract(self):
         """The pane's worker chips and the standup read one prefix, not two."""

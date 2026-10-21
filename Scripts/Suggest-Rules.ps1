@@ -38,6 +38,10 @@ if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) {
 if (-not (Get-Command Get-P20IssueLabelNames -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Standup-Rules.ps1')
 }
+# Who has an issue: triage's one rule (me, @<login>, the size, or nobody).
+if (-not (Get-Command Get-P20TriageWho -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Triage-Rules.ps1')
+}
 
 function Get-P20SuggestField {
     <# One field of an item, a card row or an issue: a hashtable's key or an object's property; $null when absent. #>
@@ -135,7 +139,9 @@ function Get-P20SuggestionExcludedBy {
     if ([bool](Get-P20SuggestField $Item 'waiting')) { return $why[1] }
     $lane = [string](Get-P20SuggestField $Item 'lane')
     if ($lane -ceq [string]$c.status.inProgress -or $lane -ceq [string]$c.status.codeReview) { return $why[2] }
-    if (@($Dismissed) -ccontains [string](Get-P20SuggestField $Item 'ref')) { return $why[3] }
+    # Someone else's: an assignee who is not you (@<login>).
+    if (([string](Get-P20SuggestField $Item 'who')).StartsWith('@')) { return $why[3] }
+    if (@($Dismissed) -ccontains [string](Get-P20SuggestField $Item 'ref')) { return $why[4] }
     return ''
 }
 
@@ -162,22 +168,29 @@ function Get-P20SuggestionSentence {
     elseif ($title) { $why = Format-P20SuggestTemplate ([string]$t.suggestWhyMilestone) @{ kind = $kind; milestone = $title } }
     else { $why = Format-P20SuggestTemplate ([string]$t.suggestWhyOldest) @{ kind = $kind } }
     $who = [string](Get-P20SuggestField $Item 'who')
-    $isPerson = ($who -ceq [string]$c.rituals.assignMe -or $who.StartsWith('@'))
+    # Yours to start: you, or the owner's own seat (D-AR10) -- never the crew.
+    $isYours = ($who -ceq [string]$c.rituals.assignMe -or $who -ceq [string]$c.rituals.suggestOwnerSeat)
     $startCommand = Format-P20SuggestTemplate ([string]$t.suggestCommandStart) @{ arg = $arg }
-    if ($HowIWork -cne 'agents' -or $isPerson) {
+    if ($HowIWork -cne 'agents' -or $isYours) {
         return @{ shape = $shapes[0]; sentence = (Format-P20SuggestTemplate ([string]$t.suggestStart) @{ ref = $ref; why = $why }); command = $startCommand }
     }
-    if ($who -and $title) {
-        # Well defined is not a judgement: a size label and a milestone.
+    if ($who) {
         $size = [string](Get-P20SuggestField $Item 'size')
         if (-not $size) { $size = $who }
-        return @{ shape = $shapes[1]; sentence = (Format-P20SuggestTemplate ([string]$t.suggestDelegate) @{ ref = $ref; size = $size }); command = $startCommand }
+        if ($title) {
+            # Well defined is not a judgement: a size label and a milestone.
+            return @{ shape = $shapes[1]; sentence = (Format-P20SuggestTemplate ([string]$t.suggestDelegate) @{ ref = $ref; size = $size }); command = $startCommand }
+        }
+        # Sized, but no destination: route it to a milestone.
+        return @{
+            shape    = $shapes[3]
+            sentence = (Format-P20SuggestTemplate ([string]$t.suggestPlace) @{ ref = $ref; size = $size })
+            command  = (Format-P20SuggestTemplate ([string]$t.suggestCommandPlace) @{ arg = $arg })
+        }
     }
-    $nobody = ''
-    if (-not $who) { $nobody = [string]$t.suggestNobody }
     return @{
         shape    = $shapes[2]
-        sentence = (Format-P20SuggestTemplate ([string]$t.suggestRoute) @{ ref = $ref; why = $why; nobody = $nobody })
+        sentence = (Format-P20SuggestTemplate ([string]$t.suggestRoute) @{ ref = $ref; why = $why; nobody = [string]$t.suggestNobody })
         command  = (Format-P20SuggestTemplate ([string]$t.suggestCommandRoute) @{ arg = $arg })
     }
 }
@@ -253,7 +266,8 @@ function Get-P20SuggestionItems {
     <#
       The joined list as the rule's items. suggest_items in the agent, the same
       rule: an OPEN issue is one item -- severity and size from its labels, who
-      by the triage rule (its first assignee as @<login>, else its size), its
+      by the triage rule (Get-P20TriageWho: its first assignee -- me when it is
+      -Viewer, the signed-in gh user, else @<login> -- else its size), its
       milestone and due date, its createdAt, its lane from the card in current/
       whose id is its number (Active without one). A card in current/ whose id is
       no issue in the read is its own item -- severity and size from its Tags,
@@ -262,7 +276,7 @@ function Get-P20SuggestionItems {
       item with billable false and adds nothing to an issue. -Waiting is every ref
       on the queue. A milestone's open counts its billable items, once per id.
     #>
-    param($Labels, $Issues, $Cards, [string[]]$Waiting = @(), [string]$PackageRoot)
+    param($Labels, $Issues, $Cards, [string[]]$Waiting = @(), [string]$Viewer = '', [string]$PackageRoot)
     $c = Get-P20Consts
     $prefix = [string]$c.rituals.workerLabelPrefix
     $sizes = @{}
@@ -299,8 +313,7 @@ function Get-P20SuggestionItems {
             if (-not ($a -is [string])) { $login = Get-P20SuggestField $a 'login' }
             if ($login) { $assignee = [string]$login; break }
         }
-        $who = $size
-        if ($assignee) { $who = '@' + $assignee }
+        $who = Get-P20TriageWho -Assignee $assignee -Size $size -Viewer $Viewer
         $m = Get-P20SuggestField $issue 'milestone'
         $milestone = $null
         if ($null -ne $m) {
@@ -368,9 +381,11 @@ function Add-P20StandupSuggestion {
       The suggestion attached to a filled standup, in place: suggestions (every
       candidate in order) and suggestion (the first, or $null). Nothing with the
       switch off, or with the tracker not answering. -Prefix is the CLI's, for
-      the command the chair's line names. attach_suggestions in the agent.
+      the command the chair's line names; -Viewer the signed-in gh user's login
+      (Get-P20RitualViewer, triage's one read), '' when gh cannot say -- then every
+      assignee is someone else's. attach_suggestions in the agent.
     #>
-    param([Parameter(Mandatory)]$Standup, $Labels, $Issues, $Cards, [string]$HowIWork, [bool]$On, [string]$Prefix, [string]$PackageRoot)
+    param([Parameter(Mandatory)]$Standup, $Labels, $Issues, $Cards, [string]$HowIWork, [bool]$On, [string]$Prefix, [string]$Viewer = '', [string]$PackageRoot)
     $Standup['suggestions'] = [object[]]@()
     $Standup['suggestion'] = $null
     if (-not $On -or -not $Standup.tracker.ok) { return $Standup }
@@ -381,7 +396,7 @@ function Add-P20StandupSuggestion {
     }
     $useIssues = @()
     if ([string]$Standup.source -ceq 'issues' -or [string]$Standup.source -ceq 'both') { $useIssues = @($Issues) }
-    $items = @(Get-P20SuggestionItems -Labels $Labels -Issues $useIssues -Cards $Cards -Waiting ([string[]]$waiting.ToArray()) -PackageRoot $PackageRoot)
+    $items = @(Get-P20SuggestionItems -Labels $Labels -Issues $useIssues -Cards $Cards -Waiting ([string[]]$waiting.ToArray()) -Viewer $Viewer -PackageRoot $PackageRoot)
     $chosen = Select-P20Suggestion -Items $items -HowIWork $HowIWork -PackageRoot $PackageRoot
     $t = (Get-P20Consts).rituals.text
     $out = New-Object System.Collections.ArrayList
