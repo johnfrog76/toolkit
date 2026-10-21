@@ -64,6 +64,7 @@ $promptsRoot = $cfg.PromptsRoot
 . (Join-Path $PSScriptRoot 'Write-CardText.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-CardForBranch.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-CardName.ps1')
+. (Join-Path $PSScriptRoot 'Move-CardFolder.ps1')
 . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 # The bullet shape this writes is what Get-PromptStatus.ps1 and
 # agent/core/parsers.py both read to call a card In Progress -- one pattern, in
@@ -188,11 +189,13 @@ else {
 if (-not $File) {
     $folders = Get-PromptFolders
     $currentDir = $folders.Current
+    # backlog/ too: the first ThreadHash into a planned card is what pulls it into play.
+    $cardDirs = @($currentDir, (Get-P20BacklogFolder -Folders $folders))
     $branchForCard = ''
     if ($codeRepoRoot) {
         $branchForCard = "$((Invoke-P20TrackerRead 'git' @('-C', $codeRepoRoot, 'rev-parse', '--abbrev-ref', 'HEAD')).Out)".Trim()
     }
-    $found = Resolve-P20CardForBranch -Branch $branchForCard -CurrentDir $currentDir -Detailed
+    $found = Resolve-P20CardForBranch -Branch $branchForCard -CurrentDir $cardDirs -Detailed
     $File = $found.Path
     if (-not $File -and $found.Candidates.Count -gt 1) {
         # Ambiguity is never guessed at (docs/CLI.md, Errors).
@@ -202,7 +205,7 @@ if (-not $File) {
     }
     if (-not $File) {
         Write-CliError -Message "No prompt file matches branch '$branchForCard'." `
-            -Hint "Looked in $currentDir. Pass the card explicitly: $(Get-CliPrefix)ThreadHash <file>."
+            -Hint "Looked in $($cardDirs -join ' and '). Pass the card explicitly: $(Get-CliPrefix)ThreadHash <file>."
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
     Write-Host "  Card: $(Split-Path $File -Leaf)" -ForegroundColor DarkGray
@@ -221,17 +224,17 @@ if ($asPath) {
 }
 else {
     $typed = $File
-    $currentDir = (Get-PromptFolders).Current
-    $resolved = Resolve-P20CardArgument -Argument $typed -Folder $currentDir `
+    $typedFolders = Get-PromptFolders
+    $resolved = Resolve-P20CardArgument -Argument $typed -Folder @($typedFolders.Current, (Get-P20BacklogFolder -Folders $typedFolders)) `
         -WorkItemTypes (Get-P20WorkItemTypes -Config $cfg)
     $match = @($resolved.Match | Where-Object { $_.Name -like '*.md' })
     if ($match.Count -eq 0) {
         if ($resolved.IsId) {
-            Write-CliError -Message "No card with id '$typed' in current/." `
+            Write-CliError -Message "No card with id '$typed' in current/ or backlog/." `
                 -Hint "'$typed' has the shape of an ID, and an ID is not a partial name. Run '$(Get-CliPrefix)Status' to see the cards."
         }
         else {
-            Write-CliError -Message "No card matching '$typed' found in current/." `
+            Write-CliError -Message "No card matching '$typed' found in current/ or backlog/." `
                 -Hint "Pass the card's ID, its filename, or a path. Run '$(Get-CliPrefix)Status' to see the cards."
         }
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
@@ -239,7 +242,7 @@ else {
     if ($match.Count -gt 1) {
         Write-Host "Matches for '$typed':" -ForegroundColor Yellow
         $match | ForEach-Object { Write-Host "  $($_.Name)" }
-        Write-CliError -Message "'$typed' matches $($match.Count) files in current/." `
+        Write-CliError -Message "'$typed' matches $($match.Count) files in current/ or backlog/." `
             -Hint "Be more specific, or pass the card's ID."
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
@@ -247,7 +250,7 @@ else {
     # (the bridge) it refuses rather than guessing.
     if ($resolved.Fuzzy) {
         if ($env:TOOLKIT_QUIET_STARTUP) {
-            Write-CliError -Message "'$typed' is not a card in current/; it matches '$($match[0].Name)' only by partial name." `
+            Write-CliError -Message "'$typed' is not a card in current/ or backlog/; it matches '$($match[0].Name)' only by partial name." `
                 -Hint "Pass the card's ID or its full filename."
             exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
         }
@@ -335,6 +338,17 @@ $content = ($lines -join "`n")
 if ($wasCrlf) { $content = $content -replace "`n", "`r`n" }
 
 if ($content -ne $original) {
+    # The pull on first write: a planned card in backlog/ moves to current/
+    # BEFORE its first commit bullet is written, so it arrives in play with the
+    # commit on it and a backlog card never carries one (Scripts/Move-CardFolder.ps1).
+    # After every refusal above, so a card this run cannot thread is not moved.
+    $pull = Invoke-P20PullIntoPlay -Path $File
+    if (-not $pull.Ok) {
+        Write-CliError -Message "$($pull.Message) Nothing was threaded." `
+            -Hint "Look in $((Get-P20Consts).folders.current)/ -- a person moves or deletes the file there, on purpose."
+        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+    }
+    $File = $pull.Path
     Write-CardText -Path $File -Content $content
 }
 

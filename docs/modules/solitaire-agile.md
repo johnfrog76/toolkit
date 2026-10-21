@@ -483,7 +483,8 @@ is named on a line of its own before the block. Then, for a work-item number no 
 carries, the Space's GitHub issue of that number (`gh issue view <n> --json
 number,title,state,labels,milestone,body,url` on the Space's one repo). Refused, each with `Error:`,
 `Hint:` and exit 2: no id; an id or a name that matches nothing; a card in `archive/` (it is Done -- a
-fresh `NewPrompt` brings the work back); a closed issue; a number that is a pull request; an Azure DevOps
+fresh `NewPrompt` brings the work back); a card in `backlog/` (it is planned, not in play -- the hint
+names `Move <id> -To Active`, because starting is the person's decision); a closed issue; a number that is a pull request; an Azure DevOps
 Space (its board holds the rituals); a local Space or one with no tracker, asked for a number no card
 carries; an undeclared `-Space`; and, for a non-interactive caller such as the bridge, a partial name.
 

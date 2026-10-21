@@ -423,7 +423,7 @@ try {
     $output = Invoke-Archive @{ File = 'does-not-exist-card' }
     $afterCommits = (Get-CommitSubjects $sandbox).Count
 
-    Assert-Contains "No match states the reason" $output "No file matching 'does-not-exist-card' found in current/."
+    Assert-Contains "No match states the reason" $output "No file matching 'does-not-exist-card' found in current/ or backlog/."
     Assert-Contains "No match gives a hint" $output '-List'
     Assert-True "No match writes no raw error record" ($output -notmatch 'Write-Error')
     Assert-Equal "No match exits 2 (a stated refusal)" 2 $script:LastArchiveExit
@@ -458,7 +458,7 @@ try {
     $output = Invoke-Archive @{ File = '39' }
     $afterCommits = (Get-CommitSubjects $sandbox).Count
 
-    Assert-Contains "'39' states that no card carries that id" $output "No card with id '39' in current/."
+    Assert-Contains "'39' states that no card carries that id" $output "No card with id '39' in current/ or backlog/."
     Assert-Contains "'39' says an all-digit argument is an ID" $output 'not a partial name'
     Assert-Equal "'39' exits 2 (a stated refusal)" 2 $script:LastArchiveExit
     Assert-True "'39' leaves Task139 in current/" (Test-Path (Join-Path $sandbox 'current/Task139-extract-scoring-rules.prompt.md'))
@@ -508,7 +508,7 @@ try {
 
     # An id nobody has is a refusal -- never a guess by partial name.
     $output = Invoke-Archive @{ File = 'M2T7' }
-    Assert-Contains "'M2T7' states that no card carries that id" $output "No card with id 'M2T7' in current/."
+    Assert-Contains "'M2T7' states that no card carries that id" $output "No card with id 'M2T7' in current/ or backlog/."
     Assert-Equal "'M2T7' exits 2 (a stated refusal)" 2 $script:LastArchiveExit
     Assert-True "'M2T7' leaves everything where it was" (Test-Path (Join-Path $sandbox 'current/Task150-mentions-K7M2-in-its-name.prompt.md'))
 }
@@ -536,7 +536,7 @@ try {
     $verbPrefix = (Get-Content (Join-Path $pkgRoot 'config.default.json') -Raw | ConvertFrom-Json).commandPrefix
     $verbScript = "`$env:PSModulePath = '$pkgRoot'; `$env:PROMPTS_ROOT = '$verbHub'; `$env:P20_USAGE_LOG_DIR = '$verbLog'; " +
         "Import-Module '$pkgRoot/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; " +
-        "${verbPrefix}NewPrompt -Title 'Made to be archived' -Type Task -Id K7M2 | Out-Null; " +
+        "${verbPrefix}NewPrompt -Title 'Made to be archived' -Type Task -Id K7M2 -Now | Out-Null; " +
         "'LIST-BEGIN'; ${verbPrefix}Archive -List; 'LIST-END'; " +
         "${verbPrefix}Archive k7m2; 'ARCHIVE-EXIT=' + `$LASTEXITCODE; " +
         "${verbPrefix}Archive k7m2; 'AGAIN-EXIT=' + `$LASTEXITCODE"
@@ -594,7 +594,7 @@ try {
 
     $output = Invoke-Archive @{ File = '404' }
     Assert-Equal "an id in neither folder is still a refusal" 2 $script:LastArchiveExit
-    Assert-Contains "with the same sentence" $output "No card with id '404' in current/."
+    Assert-Contains "with the same sentence" $output "No card with id '404' in current/ or backlog/."
 
     Assert-Equal "none of it created a commit" 0 ((Get-CommitSubjects $sandbox).Count - $beforeCommits)
     Assert-True "and the card in current/ was not touched" (Test-Path (Join-Path $sandbox 'current/Task141-still-here.prompt.md'))

@@ -6,6 +6,9 @@ which is exactly the arrangement `promptsRoot` exists to support.
 
 - `test/current/Task401-...` -- an **Active** card (no commits, no PR URL)
 - `test/current/402-...` -- a **Code Review** card (has `PR URL:`)
+- `test/backlog/Task403-...` -- a **Backlog** card: planned, not in play, so `/api/status` serves it with
+  status `Backlog` and the board draws it in its first lane (`web/tests/smoke.mjs`). It is in no
+  reader that means "in play" -- the health count, the standup, Daily
 
 `test` is the `promptsFolder` of the `test` org in `config.default.json`. The
 names, ids and URLs here are placeholders and belong to nobody.

@@ -8,7 +8,7 @@ own checkout -- and it need not be a git repository (`storeSync`, [Configuration
 <promptsRoot>/
   hub.json                  the hub's own orgs, folder names and storeSync   (optional)
   <promptsFolder>/          ONE PER ORG -- its cards
-    current/  archive/
+    current/  backlog/  archive/   in play, planned, done
     assets/<card key>/      a card's pictures -- cover.png, before.png (Cover)
   growth/                   trainings, presentations, goals        -- the engineer's, not an org's
     current/  archive/
@@ -27,7 +27,7 @@ own checkout -- and it need not be a git repository (`storeSync`, [Configuration
 
 | Folder | What one file is | Scope | The shape's owner | Example |
 | --- | --- | --- | --- | --- |
-| `<org>/current`, `<org>/archive` | **a card** -- one piece of work; the product's core | the org | [`cards.md`](cards.md) | `samples/hub/demo/` |
+| `<org>/current`, `<org>/backlog`, `<org>/archive` | **a card** -- one piece of work; the product's core. `backlog/` holds the planned ones, not yet in play | the org | [`cards.md`](cards.md) | `samples/hub/demo/` |
 | `<org>/assets/<card key>/` | a card's picture -- its cover, or the before of a before/after -- named by the card's `**Cover:**` / `**Before:**` line | the org, beside its cards | [`cards.md`](cards.md#a-cards-pictures----spaceassets) | `Tests/fixtures/parsers/covers.json` |
 | `growth/` | a training, a presentation or a goal | the engineer | [`growth.md`](growth.md) | `samples/hub/growth/`, `Tests/fixtures/hub/growth/` |
 | `manager/` | one 1:1 session, through plan, prep and retro | the engineer | [`manager.md`](manager.md) | `Tests/fixtures/hub/manager/` |

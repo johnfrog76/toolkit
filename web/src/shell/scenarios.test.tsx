@@ -39,11 +39,14 @@ import type { CardContext } from "./registry";
 import type { EnvStatus, HowIWork, SpaceInfo } from "./api";
 import { drawerSections } from "../modules/ado/homeTabs";
 import { cardActions } from "../modules/ado/cardActions";
+import { LANES, legalMoves, whyNotAMove } from "../modules/ado/legalMoves";
+import type { StatusResponse } from "../modules/ado/api.ado";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { AvatarMenu } from "./AvatarMenu";
 import { SPACE_QUICK_MENU_THRESHOLD } from "./SpaceQuickMenu";
 import {
   SPACES_FILTERS,
+  cardsPhrase,
   filterSpaces,
   githubRowLine,
   readsVisibility,
@@ -838,5 +841,48 @@ describe("the scenario grid: a card's menu, by the Organize flag", () => {
     expect(menu.filter((l) => l === "Remind me about this")).toHaveLength(
       e.features?.organize ? 1 : 0,
     );
+  });
+});
+
+// The board's lanes, by a card's status (docs/SCENARIOS.md, "The board's lanes,
+// by a card's status"): five lanes, Backlog first, and what a drop may do from
+// each -- the one rule the drop targets and the "Move to" menu both read.
+describe("the scenario grid: the board's lanes, by a card's status", () => {
+  it("five lanes, Backlog first, Done last", () => {
+    expect([...LANES]).toEqual(["Backlog", "Active", "In Progress", "Code Review", "Done"]);
+  });
+  it.each<[string, string[], Array<[string, string]>]>([
+    ["Backlog", ["Active", "In Progress", "Code Review", "Done"], []],
+    ["Active", ["Backlog", "In Progress", "Code Review", "Done"], []],
+    [
+      "In Progress",
+      ["Code Review", "Done"],
+      [
+        ["Backlog", "Threaded work is in play, not backlog."],
+        ["Active", "A card travels one way."],
+      ],
+    ],
+    [
+      "Code Review",
+      ["Done"],
+      [
+        ["Backlog", "Threaded work is in play, not backlog."],
+        ["Active", "A card travels one way."],
+        ["In Progress", "A card travels one way."],
+      ],
+    ],
+    ["Done", [], [["Backlog", "A card travels one way."]]],
+  ])("a %s card", (status, moves, refused) => {
+    expect(legalMoves(status)).toEqual(moves);
+    for (const [lane, why] of refused) {
+      expect(whyNotAMove(status, lane as (typeof LANES)[number])).toBe(why);
+    }
+  });
+  it("the foyer counts the cards in play, and says the planned ones after the count", () => {
+    const st = {
+      count: 3,
+      prompts: [{ status: "Backlog" }, { status: "Active" }, { status: "Backlog" }],
+    } as unknown as StatusResponse;
+    expect(cardsPhrase(st)).toBe("1 card in play: 1 Active; 2 in Backlog");
   });
 });

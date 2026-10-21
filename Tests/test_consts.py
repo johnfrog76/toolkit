@@ -58,12 +58,14 @@ EXPECTED = {
     ("regex", "reviewLine"): r"(?m)^\*\*Review:\*\*",
     ("regex", "sessionName"): r"^(?:([a-z0-9]+(?:-[a-z0-9]+)*)-)?(\d{4}-\d{2}-\d{2})\.md$",
     ("regex", "cardId"): r"(?:\d+|(?=[A-Z0-9]{0,3}[0-9])(?=[A-Z0-9]{0,3}[A-Z])[ACDEFGHJKMNPQRTUVWXY234679]{4})",
+    ("status", "backlog"): "Backlog",
     ("status", "active"): "Active",
     ("status", "inProgress"): "In Progress",
     ("status", "codeReview"): "Code Review",
     ("status", "done"): "Done",
     ("folders", "current"): "current",
     ("folders", "archive"): "archive",
+    ("folders", "backlog"): "backlog",
     ("reviews", "fileName"): "review.md",
     ("reviews", "slugSetSeparator"): "+",
     ("features", "spaceScoped"): ["sprintAwareness", "trainingHoursPerQuarter"],
@@ -355,6 +357,8 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.status_done(), EXPECTED[("status", "done")])
         self.assertEqual(C.folder_current(), EXPECTED[("folders", "current")])
         self.assertEqual(C.folder_archive(), EXPECTED[("folders", "archive")])
+        self.assertEqual(C.folder_backlog(), EXPECTED[("folders", "backlog")])
+        self.assertEqual(C.status_backlog(), EXPECTED[("status", "backlog")])
         self.assertEqual(C.folder_assets(), EXPECTED[("folders", "assets")])
         self.assertEqual(C.stamp_cover(), EXPECTED[("stamps", "cover")])
         self.assertEqual(C.stamp_before(), EXPECTED[("stamps", "before")])
@@ -457,7 +461,7 @@ class ThisHalfReadsIt(unittest.TestCase):
 
         self.assertEqual(
             set(parsers._STATUS_ORDER),
-            {C.status_active(), C.status_in_progress(), C.status_code_review()},
+            {C.status_active(), C.status_in_progress(), C.status_code_review(), C.status_backlog()},
         )
 
 

@@ -112,12 +112,14 @@ $expected = [ordered]@{
     'regex.reviewLine'        = '(?m)^\*\*Review:\*\*'
     'regex.sessionName'       = '^(?:([a-z0-9]+(?:-[a-z0-9]+)*)-)?(\d{4}-\d{2}-\d{2})\.md$'
     'regex.cardId'            = '(?:\d+|(?=[A-Z0-9]{0,3}[0-9])(?=[A-Z0-9]{0,3}[A-Z])[ACDEFGHJKMNPQRTUVWXY234679]{4})'
+    'status.backlog'          = 'Backlog'
     'status.active'           = 'Active'
     'status.inProgress'       = 'In Progress'
     'status.codeReview'       = 'Code Review'
     'status.done'             = 'Done'
     'folders.current'         = 'current'
     'folders.archive'         = 'archive'
+    'folders.backlog'         = 'backlog'
     'reviews.fileName'        = 'review.md'
     'reviews.slugSetSeparator' = '+'
     # A list travels as its elements joined with a comma, so the table stays flat.
@@ -377,6 +379,8 @@ Assert-True "Get-PromptFileStatus was found" ([bool](Get-Command Get-PromptFileS
 Assert-Equal "a card with a PR URL reads codeReview" $c.status.codeReview (Get-PromptFileStatus -Content "PR URL: https://x")
 Assert-Equal "a card with a commit bullet reads inProgress" $c.status.inProgress (Get-PromptFileStatus -Content "Commits:`n- 80e2168 add grid")
 Assert-Equal "an empty card reads active" $c.status.active (Get-PromptFileStatus -Content "")
+Assert-Equal "a card in backlog/ reads backlog, whatever its text says" $c.status.backlog (Get-PromptFileStatus -Content "PR URL: https://x" -Folder $c.folders.backlog)
+Assert-Equal "a card in archive/ reads done" $c.status.done (Get-PromptFileStatus -Content "" -Folder $c.folders.archive)
 Assert-Equal "a person's Started line reads inProgress" $c.status.inProgress (Get-PromptFileStatus -Content "$($c.stamps.started) 2026-09-22")
 Assert-Equal "a person's Review line reads codeReview, over a commit" $c.status.codeReview (Get-PromptFileStatus -Content "- 80e2168 x`n$($c.stamps.review) 2026-09-22")
 

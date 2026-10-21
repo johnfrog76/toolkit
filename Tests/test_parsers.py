@@ -26,7 +26,7 @@ try:
     from agent.ado.reporting import _closed_dates
     from agent.core import log as agent_log
     from agent.core.log import _parse_test_log, _scope_entries_to_org
-    from agent.core.parsers import _parse_status_metadata, status_sort_key
+    from agent.core.parsers import _parse_status_metadata, card_status, status_sort_key
 except Exception as e:
     skip_module(f"cannot import agent ({type(e).__name__}: {e})")
 
@@ -35,6 +35,39 @@ FIXTURES = Path(__file__).parent / "fixtures" / "parsers"
 
 def _read(name: str) -> str:
     return (FIXTURES / name).read_text(encoding="utf-8")
+
+
+class FolderStateTests(unittest.TestCase):
+    """The folder states, read FIRST: a card in backlog/ is Backlog and one in
+    archive/ is Done whatever the text says. One shared table,
+    Tests/fixtures/parsers/states.json, which Tests/Test-Status.ps1 asserts
+    against Get-PromptFileStatus -- so the two halves cannot read a folder
+    differently."""
+
+    def test_every_row_of_the_shared_table(self):
+        import json
+
+        table = json.loads((FIXTURES / "states.json").read_text(encoding="utf-8"))
+        self.assertGreater(len(table["rows"]), 10)
+        for row in table["rows"]:
+            with self.subTest(row=row["name"]):
+                self.assertEqual(card_status(row["content"], row["folder"]), row["status"])
+
+    def test_the_card_model_carries_the_folder_state(self):
+        """_parse_status_metadata is card_status plus the fields: a card read from
+        backlog/ is served as Backlog, its commit count still counted."""
+        meta = _parse_status_metadata("Commits:\n- 80e2168 x\n", folder="backlog")
+        self.assertEqual(meta["status"], "Backlog")
+        self.assertEqual(meta["commits"], 1)
+        self.assertEqual(_parse_status_metadata("", folder="backlog")["status"], "Backlog")
+
+    def test_backlog_sorts_after_the_cards_in_play(self):
+        """The ledger's order: Status folds Backlog under the active cards."""
+        order = sorted(
+            [("Backlog", "a.md"), ("Code Review", "b.md"), ("Active", "c.md"), ("In Progress", "d.md")],
+            key=lambda r: status_sort_key(*r),
+        )
+        self.assertEqual([s for s, _ in order], ["Active", "In Progress", "Code Review", "Backlog"])
 
 
 class StatusMetadataTests(unittest.TestCase):

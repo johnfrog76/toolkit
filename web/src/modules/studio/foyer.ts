@@ -194,21 +194,27 @@ export function githubRowLine(visibility: string | null, facts: string | null): 
 }
 
 // The lanes a card in current/ can be in, in board order. Done lives in
-// archive/, which /api/status does not read.
+// archive/, which /api/status does not read; Backlog is backlog/, which it does
+// -- planned, not in play, so it is said after the count, never in it.
 const OPEN_LANES = [STATUS.active, STATUS.inProgress, STATUS.codeReview];
 
 /** The cards half of a row's line, from /api/status: how many cards are in
- *  play, and how many sit in each lane -- under the Space's own lane names. */
+ *  play, and how many sit in each lane -- under the Space's own lane names --
+ *  then how many are planned in the backlog, when any are. */
 export function cardsPhrase(status: StatusResponse, laneNames?: Record<string, string>): string {
-  const cards = status.prompts ?? [];
-  if (cards.length === 0) return "no cards in play";
+  const all = status.prompts ?? [];
+  const planned = all.filter((c) => c.status === STATUS.backlog).length;
+  const plannedTail =
+    planned > 0 ? `; ${planned} in ${laneNames?.[STATUS.backlog] ?? STATUS.backlog}` : "";
+  const cards = all.filter((c) => c.status !== STATUS.backlog);
+  if (cards.length === 0) return `no cards in play${plannedTail}`;
   const counts = OPEN_LANES.map(
     (lane) => [lane, cards.filter((c) => c.status === lane).length] as const,
   )
     .filter(([, n]) => n > 0)
     .map(([lane, n]) => `${n} ${laneNames?.[lane] ?? lane}`);
   const total = `${cards.length} ${cards.length === 1 ? "card" : "cards"} in play`;
-  return counts.length > 0 ? `${total}: ${counts.join(", ")}` : total;
+  return (counts.length > 0 ? `${total}: ${counts.join(", ")}` : total) + plannedTail;
 }
 
 /** Whether a non-GitHub row asks /api/status for its cards: the Space you are

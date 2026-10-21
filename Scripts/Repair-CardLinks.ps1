@@ -310,9 +310,9 @@ function Repair-P20CardLinks {
 
 function Get-P20CardFolders {
     <#
-        Every card folder the hub declares: each org's current/ and archive/,
-        plus any folder passed in -Also (the active Space's, from Get-PromptFolders).
-        Only folders that exist, each once.
+        Every card folder the hub declares: each org's current/, archive/ and
+        backlog/, plus any folder passed in -Also (the active Space's, from
+        Get-PromptFolders). Only folders that exist, each once.
 
         Sync and Archive -Relink walked the ACTIVE org's two folders only, so an
         org nobody switches to -- an archived one, with every card it ever had -- kept
@@ -324,6 +324,9 @@ function Get-P20CardFolders {
         $Spaces,
         [string]$CurrentName = 'current',
         [string]$ArchiveName = 'archive',
+        # The third card folder (consts.json folders.backlog): planned cards
+        # carry the same package links as the other two.
+        [string]$BacklogName = 'backlog',
         [string[]]$Also = @()
     )
     $candidates = New-Object System.Collections.Generic.List[string]
@@ -336,6 +339,7 @@ function Get-P20CardFolders {
             if (-not $folder) { continue }
             $candidates.Add((Join-Path (Join-Path $Root $folder) $CurrentName))
             $candidates.Add((Join-Path (Join-Path $Root $folder) $ArchiveName))
+            if ($BacklogName) { $candidates.Add((Join-Path (Join-Path $Root $folder) $BacklogName)) }
         }
     }
     $seen = @{}

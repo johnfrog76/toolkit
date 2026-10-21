@@ -41,6 +41,13 @@ param(
     [Parameter(Mandatory = $false)]
     [string]$OutputFolder,
 
+    # A new card is PLANNED: it lands in the Space's backlog/ and is pulled into
+    # play by Move -To Active, or by its first commit (ThreadHash) or PR (NewPR).
+    # -Now writes it straight to current/, in play from the moment it is made --
+    # exactly what NewPrompt did before backlog/ existed (docs/hub/cards.md).
+    [Parameter(Mandatory = $false)]
+    [switch]$Now,
+
     # A card born with its picture (docs/hub/cards.md, "A card's pictures"): for a
     # GUI issue the snap IS the report. Attached after the card is written, by the
     # same code the Cover verb runs (Scripts/Add-CardImage.ps1); checked before
@@ -117,7 +124,13 @@ function Resolve-TargetFolder {
     return (Join-Path $promptsRoot $Folder)
 }
 
-# Default OutputFolder to <promptsFolder>/current based on active org
+# Default OutputFolder to <promptsFolder>/backlog -- a new card is planned, not
+# yet in play -- or <promptsFolder>/current with -Now. The names are consts.json's.
+# $script:SpaceCardFolders: the Space's two folders a card can be "already here"
+# in, asked below; only when the folder was not given, because a given one is
+# the only one the caller named.
+$script:SpaceCardFolders = @()
+$folderNames = (Get-P20Consts).folders
 if (-not $OutputFolder) {
     $pf = $cfg.PromptsFolder
     if (-not $pf) {
@@ -125,7 +138,8 @@ if (-not $OutputFolder) {
             -Hint 'Set activeSpace in config.local.json, or pass -OutputFolder.'
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
-    $OutputFolder = "$pf/current"
+    $OutputFolder = if ($Now) { "$pf/$($folderNames.current)" } else { "$pf/$($folderNames.backlog)" }
+    $script:SpaceCardFolders = @("$pf/$($folderNames.current)", "$pf/$($folderNames.backlog)")
 }
 
 # Terminal escape sequences for clickable links (OSC 8)
@@ -148,7 +162,11 @@ PARAMETERS:
     -AssignTo <email>      Assign to specific user (default: config email, else the az identity)
     -ReadOnly              Skip assignment and state changes
     -Force                 Allow reassigning work items from other users
-    -OutputFolder <name>   Target folder (default: <activeOrg>/current)
+    -Now                   Put the card in play at once: <activeOrg>/current, not
+                           the backlog. Without it a new card is planned, in
+                           <activeOrg>/backlog, until Move -To Active, its first
+                           ThreadHash or its NewPR pulls it into current/
+    -OutputFolder <name>   Target folder (default: <activeOrg>/backlog)
     -Cover <image>         Attach a cover picture as the card is made (as Cover does)
     -Before <image>        Attach the 'before' picture of a before/after proof
     -Design <name|id>      Bind the card to the design it is worked against: a
@@ -158,7 +176,8 @@ PARAMETERS:
     -Help                  Show this help message
 
 EXAMPLES:
-    $(Get-CliPrefix)NewPrompt 123456                                  # Assign to you if unassigned
+    $(Get-CliPrefix)NewPrompt 123456                                  # Assign to you if unassigned; lands in backlog/
+    $(Get-CliPrefix)NewPrompt 123456 -Now                             # ...in current/, in play at once
     $(Get-CliPrefix)NewPrompt 123456 -ReadOnly                        # Don't modify ADO
     $(Get-CliPrefix)NewPrompt 123456 -Force                           # Reassign from someone else
     $(Get-CliPrefix)NewPrompt 123456 -AssignTo "other@contoso.com"    # Assign to specific user
@@ -170,8 +189,9 @@ EXAMPLES:
     $(Get-CliPrefix)NewPrompt -Title "Import flow" -Type UserStory -Id 144
     $(Get-CliPrefix)NewPrompt -Title "Lanes, part one" -Design board-ideas   # bound to its design
 
-  An offline card is an ordinary prompt file: {cliPrefix}Status reads it as
-  Active, {cliPrefix}ThreadHash and {cliPrefix}Archive work on it unchanged.
+  An offline card is an ordinary prompt file: {cliPrefix}Status lists it under
+  Backlog (Active with -Now), {cliPrefix}ThreadHash and {cliPrefix}Archive work
+  on it unchanged -- the first ThreadHash pulls it into current/.
   The board fields read "(not linked)" until someone fills them in.
 
 "@ -ForegroundColor Cyan
@@ -229,7 +249,7 @@ function Add-BirthPictures {
     $cardDir = Split-Path -Parent $CardPath
     $spaceDir = Split-Path -Parent $cardDir
     $consts = Get-P20Consts
-    $roundFolders = @((Join-Path $spaceDir $consts.folders.current), (Join-Path $spaceDir $consts.folders.archive))
+    $roundFolders = @((Join-Path $spaceDir $consts.folders.current), (Join-Path $spaceDir $consts.folders.backlog), (Join-Path $spaceDir $consts.folders.archive))
     foreach ($pic in $script:BirthPictures) {
         $outcome = Add-P20CardImage -CardFile $cardFile -Source $pic.Path -Kind $pic.Kind -Folders $roundFolders -WorkItemTypes $script:WorkItemTypes
         if ($outcome.Ok) {
@@ -707,7 +727,7 @@ function Get-NextLocalId {
     $pattern = Get-P20CardIdPattern -WorkItemTypes $script:WorkItemTypes
     $roots = @($Folder)
     $parent = Split-Path $Folder -Parent
-    if ($parent) { $roots += (Join-Path $parent 'archive'), (Join-Path $parent 'current') }
+    if ($parent) { $roots += (Join-Path $parent $folderNames.archive), (Join-Path $parent $folderNames.current), (Join-Path $parent $folderNames.backlog) }
     foreach ($r in ($roots | Select-Object -Unique)) {
         if (-not (Test-Path $r)) { continue }
         foreach ($f in (Get-ChildItem -Path $r -Filter '*.prompt.md' -File -ErrorAction SilentlyContinue)) {
@@ -741,18 +761,30 @@ function Get-NextLocalId {
 #
 # By ID, through the one card-name rule (Resolve-CardName.ps1), not by the name
 # this run would have generated: the title on the board may have changed since,
-# and "Task140-old-title" is still card 140. Only the TARGET folder is searched.
-# A card with this id in archive/ is one that came back, and scaffolding it into
-# current/ again is the reopen flow, not an overwrite.
-$existingFolder = Resolve-TargetFolder $OutputFolder
-if ($WorkItemId -and (Test-Path $existingFolder)) {
+# and "Task140-old-title" is still card 140. The TARGET folder is searched -- and,
+# when the folder was not named, BOTH of the Space's open folders, current/ and
+# backlog/: a card is in exactly one of them, planned or in play, and either way
+# it is the card that already exists. A card with this id in archive/ is one that
+# came back, and scaffolding it again is the reopen flow, not an overwrite.
+$existingFolders = @($OutputFolder) + @($script:SpaceCardFolders) | Select-Object -Unique
+if ($WorkItemId) {
     $idPattern = Get-P20CardIdPattern -WorkItemTypes $script:WorkItemTypes
-    $existingCards = @(Get-ChildItem -Path $existingFolder -Filter '*.prompt.md' -File -ErrorAction SilentlyContinue |
-        Where-Object { (Get-P20CardId -Name $_.Name -Pattern $idPattern) -eq [string]$WorkItemId } |
-        Sort-Object Name)
+    $existingCards = @()
+    $existingIn = $OutputFolder
+    foreach ($relFolder in $existingFolders) {
+        $existingFolder = Resolve-TargetFolder $relFolder
+        if (-not (Test-Path $existingFolder)) { continue }
+        $existingCards = @(Get-ChildItem -Path $existingFolder -Filter '*.prompt.md' -File -ErrorAction SilentlyContinue |
+            Where-Object { (Get-P20CardId -Name $_.Name -Pattern $idPattern) -eq [string]$WorkItemId } |
+            Sort-Object Name)
+        if ($existingCards.Count -gt 0) { $existingIn = $relFolder; break }
+    }
     if ($existingCards.Count -gt 0) {
         Write-Host ""
-        Write-Host "[=] Card $WorkItemId is already in $OutputFolder/ -- nothing was written, and ADO was not contacted." -ForegroundColor Green
+        Write-Host "[=] Card $WorkItemId is already in $existingIn/ -- nothing was written, and ADO was not contacted." -ForegroundColor Green
+        if ($Now -and ((Split-Path $existingIn -Leaf) -eq $folderNames.backlog)) {
+            Write-Host "    It is planned, not in play: '$(Get-CliPrefix)Move $WorkItemId -To Active' pulls it into $($folderNames.current)/." -ForegroundColor DarkGray
+        }
         foreach ($card in $existingCards) {
             # "file://" + an absolute POSIX path already gives three slashes;
             # a drive-letter path needs the third added.
@@ -794,7 +826,7 @@ if ($script:LocalMode) {
     if (-not $localId) {
         $idFolders = @($targetFolder)
         $idParent = Split-Path $targetFolder -Parent
-        if ($idParent) { $idFolders += (Join-Path $idParent 'archive'), (Join-Path $idParent 'current') }
+        if ($idParent) { $idFolders += (Join-Path $idParent $folderNames.archive), (Join-Path $idParent $folderNames.current), (Join-Path $idParent $folderNames.backlog) }
         $localId = New-P20CardId -Folders $idFolders -WorkItemTypes $script:WorkItemTypes
         if (-not $localId) {
             Write-CliError -Message 'Could not find a free card id after 50 tries.' `

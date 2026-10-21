@@ -69,6 +69,11 @@ def token_previous_round() -> str:
     return consts()["tokens"]["previousRound"]
 
 
+def status_backlog() -> str:
+    """``Backlog`` -- a card in ``backlog/``: planned, not in play (a folder state)."""
+    return consts()["status"]["backlog"]
+
+
 def status_active() -> str:
     return consts()["status"]["active"]
 
@@ -91,6 +96,11 @@ def folder_current() -> str:
 
 def folder_archive() -> str:
     return consts()["folders"]["archive"]
+
+
+def folder_backlog() -> str:
+    """A Space's third card folder: cards planned, not yet in play."""
+    return consts()["folders"]["backlog"]
 
 
 def folder_assets() -> str:

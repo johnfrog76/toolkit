@@ -55,6 +55,10 @@ $currentDir = $folders.Current
 . (Join-Path $PSScriptRoot 'Add-ClosedStamp.ps1')
 
 $archiveDir = $folders.Archive
+# A card is archived from current/ OR backlog/: a planned card can be retired
+# without ever being in play, and the Closed stamp is written the same way.
+. (Join-Path $PSScriptRoot 'Move-CardFolder.ps1')
+$backlogDir = Get-P20BacklogFolder -Folders $folders
 
 # The one card-filename rule -- what counts as an id, and which prefixes may sit
 # in front of it. Shared with NewPrompt's next-id scan so the two cannot
@@ -89,7 +93,7 @@ PARAMETERS:
                       other), or a filename. A name that is not an exact
                       filename may still match one card by partial name;
                       the match is named before anything moves.
-    -List             Show files in current/ that can be archived
+    -List             Show files in current/ and backlog/ that can be archived
     -Relink           Rewrite every card's package links in current/ and
                       archive/ from where the hub and the package are now,
                       and archive nothing
@@ -125,15 +129,21 @@ ROUND HISTORY:
 
 if ($Help) { Show-Help; return }
 
-# List mode
+# List mode: the cards in play, then the planned ones -- both can be archived.
 if ($List) {
-    $files = Get-ChildItem -Path $currentDir -File | Select-Object -ExpandProperty Name
-    if ($files.Count -eq 0) {
-        Write-Host "No files in current/." -ForegroundColor Yellow
-    }
-    else {
-        Write-Host "Files in current/ ($($files.Count)):" -ForegroundColor Cyan
-        $files | ForEach-Object { Write-Host "  $_" }
+    foreach ($pair in @(@('current', $currentDir), @('backlog', $backlogDir))) {
+        $listed = @()
+        if ($pair[1] -and (Test-Path -LiteralPath $pair[1])) {
+            $listed = @(Get-ChildItem -LiteralPath $pair[1] -File | Select-Object -ExpandProperty Name)
+        }
+        $folderLabel = Split-Path $pair[1] -Leaf
+        if ($listed.Count -eq 0) {
+            Write-Host "No files in $folderLabel/." -ForegroundColor Yellow
+        }
+        else {
+            Write-Host "Files in $folderLabel/ ($($listed.Count)):" -ForegroundColor Cyan
+            $listed | ForEach-Object { Write-Host "  $_" }
+        }
     }
     return
 }
@@ -150,7 +160,7 @@ if ($Relink) {
     # Every org the hub declares, not only the active one (Get-P20CardFolders).
     $cardFolders = Get-P20CardFolders -Root $promptsRoot -Spaces $cfg.Spaces `
         -CurrentName (Split-Path $currentDir -Leaf) -ArchiveName (Split-Path $archiveDir -Leaf) `
-        -Also @($currentDir, $archiveDir)
+        -BacklogName (Split-Path $backlogDir -Leaf) -Also @($currentDir, $archiveDir, $backlogDir)
     foreach ($folder in $cardFolders) {
         $total += Repair-P20FolderLinks -Folder $folder
     }
@@ -188,7 +198,8 @@ if (-not $File) {
 # Resolve-P20CardArgument. An id -- a work item number, or the four-character id
 # of a card with no work item, typed in any case -- matches that id and NEVER
 # falls to a partial name. It used to be '^\d+$' here.
-$resolved = Resolve-P20CardArgument -Argument $File -Folder $currentDir `
+# current/ and backlog/, named on purpose: a planned card is archived as one in play is.
+$resolved = Resolve-P20CardArgument -Argument $File -Folder @($currentDir, $backlogDir) `
     -WorkItemTypes (Get-P20WorkItemTypes -Config $cfg)
 $isId = $resolved.IsId
 $fuzzy = $resolved.Fuzzy
@@ -219,7 +230,7 @@ if (-not $match) {
 }
 
 if ($isId -and -not $match) {
-    Write-CliError -Message "No card with id '$File' in current/." `
+    Write-CliError -Message "No card with id '$File' in current/ or backlog/." `
         -Hint "'$File' has the shape of an ID, and an ID is not a partial name. Run '$(Get-CliPrefix)Archive -List' to see the candidates."
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
@@ -229,14 +240,14 @@ if ($isId -and -not $match) {
 # untouched, so `$LASTEXITCODE` stayed 0 and the bridge told the browser the card
 # had been archived.
 if (-not $match) {
-    Write-CliError -Message "No file matching '$File' found in current/." `
+    Write-CliError -Message "No file matching '$File' found in current/ or backlog/." `
         -Hint "Run '$(Get-CliPrefix)Archive -List' to see the candidates."
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
 if (@($match).Count -gt 1) {
     Write-Host "Matches for '$File':" -ForegroundColor Yellow
     @($match) | ForEach-Object { Write-Host "  $($_.Name)" }
-    Write-CliError -Message "'$File' matches $(@($match).Count) files in current/." `
+    Write-CliError -Message "'$File' matches $(@($match).Count) files in current/ and backlog/." `
         -Hint "Be more specific, or run '$(Get-CliPrefix)Archive -List' to see the candidates."
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
@@ -249,7 +260,7 @@ if (@($match).Count -gt 1) {
 # rather than guessing on the browser's behalf.
 if ($fuzzy) {
     if ($env:TOOLKIT_QUIET_STARTUP) {
-        Write-CliError -Message "'$File' is not a card in current/; it matches '$(@($match)[0].Name)' only by partial name." `
+        Write-CliError -Message "'$File' is not a card in current/ or backlog/; it matches '$(@($match)[0].Name)' only by partial name." `
             -Hint "Pass the card's ID or its full filename."
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
@@ -268,11 +279,12 @@ $destPath = Join-Path $archiveDir $fileName
 $currentRel = $sourcePath.Replace('\', '/')
 $archiveRel = $destPath.Replace('\', '/')
 $rootNorm = $promptsRoot.Replace('\', '/').TrimEnd('/')
-# The two folders a move touches, relative to the hub root. git is staged with
+# The two folders a move touches -- the one the card leaves (current/ or
+# backlog/) and archive/ -- relative to the hub root. git is staged with
 # these (directory pathspecs), never with the card's own paths: a card that was
 # never committed has no tracked path in current/, and an exact pathspec that
 # matches nothing makes the whole `git add` abort.
-$currentDirRel = $currentDir.Replace('\', '/')
+$currentDirRel = (Split-Path $sourcePath -Parent).Replace('\', '/')
 $archiveDirRel = $archiveDir.Replace('\', '/')
 if ($currentDirRel.StartsWith($rootNorm, [System.StringComparison]::OrdinalIgnoreCase)) {
     $currentDirRel = $currentDirRel.Substring($rootNorm.Length).TrimStart('/')

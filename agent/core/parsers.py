@@ -16,6 +16,8 @@ import re
 from .config import tracker
 from .consts import (
     card_id_shape,
+    folder_archive,
+    folder_backlog,
     re_card_design_line,
     re_commit_bullet,
     re_design_id,
@@ -25,7 +27,9 @@ from .consts import (
     stamp_assigned,
     stamp_billable,
     status_active,
+    status_backlog,
     status_code_review,
+    status_done,
     status_in_progress,
     token_pr_url,
     token_previous_round,
@@ -97,7 +101,10 @@ def card_design(content: str) -> dict | None:
     return found.get("design") or found.get("spec")
 
 
-_STATUS_ORDER = {status_active(): 0, status_in_progress(): 1, status_code_review(): 2}
+# The ledger's order: the cards in play first, Backlog after them -- Status
+# folds it under the active cards (docs/CLI.md, "Status"). The board draws
+# Backlog as its FIRST column; that is a picture's choice, not this sort's.
+_STATUS_ORDER = {status_active(): 0, status_in_progress(): 1, status_code_review(): 2, status_backlog(): 3}
 
 
 def status_sort_key(status: str, file_name: str) -> tuple[int, str]:
@@ -148,6 +155,33 @@ def card_billable(content: str) -> bool:
     return not re.search(r"(?mi)^" + re.escape(stamp_billable()) + r"\s*no\b", content or "")
 
 
+def card_status(content: str, folder: str = "") -> str:
+    """A card's derived state: where the file is, then what it says.
+
+    The mirror of ``Get-PromptFileStatus`` in ``Scripts/Get-PromptFileStatus.ps1``,
+    held to it by ``Tests/fixtures/parsers/states.json``. The first that holds wins:
+
+    - the file is in ``backlog/``  -> Backlog (a folder state, whatever the text says)
+    - the file is in ``archive/``  -> Done    (the same)
+    - a ``PR URL:`` line or a ``**Review:**`` line -> Code Review
+    - a commit bullet or a ``**Started:**`` line -> In Progress
+    - otherwise -> Active
+
+    ``folder`` is the folder's name or path (its last segment is read); empty is
+    ``current/``, which is what every caller meant before backlog/ existed.
+    """
+    leaf = re.split(r"[/\\]", (folder or "").rstrip("/\\"))[-1] if folder else ""
+    if leaf == folder_backlog():
+        return status_backlog()
+    if leaf == folder_archive():
+        return status_done()
+    if re_pr_url_line().search(content) or re_review_line().search(content):
+        return status_code_review()
+    if re_commit_bullet().search(content) or re_started_line().search(content):
+        return status_in_progress()
+    return status_active()
+
+
 def card_assigned(content: str) -> str:
     """Who takes the card: the value of its first ``**Assigned:**`` line, trimmed;
     "" when it has none (nobody).
@@ -160,7 +194,7 @@ def card_assigned(content: str) -> str:
     return m.group(1) if m else ""
 
 
-def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES) -> dict:
+def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES, folder: str = "") -> dict:
     """Extract the file-content-derived fields of PromptInfo.
 
     Returns a dict with keys: title, type, name, linked, tracker, billable, assigned, sprint, progress,
@@ -213,29 +247,18 @@ def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES) -> dict
         if len(sprint) > 20:
             sprint = sprint[:18] + ".."
 
-    # Code Review wins over In Progress wins over Active. Every pattern and every
-    # state name here is read from consts.json -- see the import block.
-    # Two writers per lane: git's token, or a person's -- the
-    # `**Review:**` and `**Started:**` footer lines, for a card with no pull
-    # request or nothing checked in. The rule does not care who wrote the line.
-    has_pr_url = bool(re_pr_url_line().search(content)) or bool(re_review_line().search(content))
     # How many commit bullets the RECORD carries -- the git token only, not a
     # person's **Started:** line. A card In Progress by a Started line has none,
     # and the web's action model reads this to decide whether Create PR has
     # anything to open a pull request from (web/src/modules/ado/cardActions.ts).
     commits = len(re_commit_bullet().findall(content))
-    has_commits = commits > 0 or bool(re_started_line().search(content))
-    # The PR URL LINE is the gate, and only the line -- the CLI's rule, word for word
-    # (Scripts/Get-PromptStatus.ps1: "the URL's presence is the gate, not the presence
-    # of reviewer comments"). This used to be `has_pr_comments or has_pr_url`, so a
-    # card with a review heading and no URL was Code Review here and In Progress in
-    # the terminal.
-    if has_pr_url:
-        prompt_status = status_code_review()
-    elif has_commits:
-        prompt_status = status_in_progress()
-    else:
-        prompt_status = status_active()
+    # The state: the folder first (backlog/, archive/), then Code Review over In
+    # Progress over Active -- card_status, the one rule, every pattern and name
+    # from consts.json. The PR URL LINE is the gate, not a review heading (the
+    # CLI's rule, word for word: "the URL's presence is the gate, not the presence
+    # of reviewer comments"), and every lane has two writers: git's token or a
+    # person's **Review:** / **Started:** line.
+    prompt_status = card_status(content, folder)
 
     return {
         "title": title,

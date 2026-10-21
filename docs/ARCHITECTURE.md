@@ -77,7 +77,7 @@ what is deliberately absent (a route named but not built, or retired outright) i
 `/api/issue/{n}` and `GET /api/status` take an optional `?space=<slug>`: absent, the active Space as
 always; present, that Space's own entry in `spaces[]` (one lookup, `space_entry()` behind `space_scope()`
 in `agent/ado/accounting.py`), an undeclared slug a 404 naming it. `/api/visibility` also takes `?refresh=1`, past its per-repository cache, as `/api/env?refresh=1` goes past the probe's -- the Spaces card's Refresh. The tracker reads probe that Space's
-tier; `/api/status` reads that Space's `current/` and asks no tracker. The Studio's Spaces card
+tier; `/api/status` reads that Space's `current/` and `backlog/` and asks no tracker. The Studio's Spaces card
 is the caller -- one row per Space, none switched into ([`modules/studio.md`](modules/studio.md#the-routes)).
 
 **A route may read through a verb.** `GET /api/spaces/candidates` -- the repositories the Spaces card's

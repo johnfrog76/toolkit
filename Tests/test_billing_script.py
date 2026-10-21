@@ -524,6 +524,18 @@ class TheCardsDecide(unittest.TestCase):
         self.assertEqual(ids, {"141"})
         self.assertEqual(data["nonBillable"], 1)
 
+    def test_a_planned_card_in_backlog_is_never_billed(self):
+        """Daily reads current/ and archive/ only: a card in backlog/ is planned,
+        not in play (docs/hub/cards.md), so its Created day bills nothing --
+        a NEGATIVE requirement, shown with the card on disk."""
+        (self.hub / "test" / "backlog").mkdir()
+        self._put("backlog", "Task9QHT-planned.prompt.md", _card("Task 9QHT: Planned", "2026-09-14"))
+        self._put("current", "141-search.prompt.md", _card("Bug 141: Search", "2026-09-14"))
+        data = _run(self.script, self.hub)
+        ids = {i for d in self._days(data).values() for i in d}
+        self.assertEqual(ids, {"141"})
+        self.assertNotIn("9QHT", data["raw"])
+
     def test_no_billable_line_means_billable(self):
         self._put("current", "141-search.prompt.md", _card("Bug 141: Search", "2026-09-14"))
         self.assertEqual(_run(self.script, self.hub)["nonBillable"], 0)

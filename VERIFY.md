@@ -1017,6 +1017,14 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `build` prompt, which starts the work and hands over to `pr-ship` when the code is ready) and read as
   self-sufficient; one thing to watch on the second walk -- the card's path is relative to the hub, so an agent
   that has to write into the card finds the hub through `tkEnv`. Closes Feature J2GV (AR-1, the hand-off block).
+- [ ] **A card's move between backlog/ and current/ keeps its bytes under Windows PowerShell 5.1.** In `powershell`
+  (5.1), with `core.autocrlf=true` in a git hub, `tkNewPrompt -Title 'Plan it' -Type Task` (it lands in the Space's
+  `backlog/`), then hash it -- `Get-FileHash <backlog path>` -- and run `tkMove <id> -To Active`, `tkMove <id> -To Backlog`
+  and `tkMove <id> -To Active` again, hashing after each. You should see the same hash every time: a folder move is a
+  rename, never a rewrite -- no BOM gained, no CRLF introduced into an LF card, no CRLF card turned LF. Then save the
+  card in Notepad as CRLF and repeat the round trip: still one hash. Then `tkThreadHash <id> -Hash abc1234` on a card
+  moved back to `backlog/`: it lands in `current/` with the bullet, still CRLF, no lone LF. Finally
+  `tkTestToolkit -Move -ThreadHash -Status -Consts` on that host: green. Closes Feature 2A6G (a backlog of cards).
 
 ## Recording a run
 

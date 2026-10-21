@@ -87,21 +87,27 @@ function Get-P20SpaceLifecycleState {
 }
 
 function Get-P20SpaceFolderCount {
-    <# @{ Folder; Exists; Current; Archive; Total } for one Space's cards folder. #>
+    <# @{ Folder; Exists; Current; Archive; Backlog; Total; Breakdown } for one Space's cards folder. #>
     param([string]$HubRoot, $Space)
     $folderName = [string]$Space.promptsFolder
     if (-not $folderName) { $folderName = [string]$Space.slug }
     $folder = Join-Path $HubRoot $folderName
     $current = 0
     $archive = 0
+    $backlog = 0
     $exists = Test-Path -LiteralPath $folder -PathType Container
     if ($exists) {
         $cur = Join-Path $folder 'current'
         $arc = Join-Path $folder 'archive'
         if (Test-Path -LiteralPath $cur) { $current = @(Get-ChildItem -LiteralPath $cur -File -Filter '*.md' -ErrorAction SilentlyContinue).Count }
         if (Test-Path -LiteralPath $arc) { $archive = @(Get-ChildItem -LiteralPath $arc -File -Filter '*.md' -ErrorAction SilentlyContinue).Count }
+        $blg = Join-Path $folder 'backlog'
+        if (Test-Path -LiteralPath $blg) { $backlog = @(Get-ChildItem -LiteralPath $blg -File -Filter '*.md' -ErrorAction SilentlyContinue).Count }
     }
-    return @{ Folder = $folder; FolderName = $folderName; Exists = $exists; Current = $current; Archive = $archive; Total = ($current + $archive) }
+    # backlog/ is said only when it holds a card, so a Space without one reads as it always did.
+    $breakdown = "$current current, $archive archive"
+    if ($backlog -gt 0) { $breakdown += ", $backlog backlog" }
+    return @{ Folder = $folder; FolderName = $folderName; Exists = $exists; Current = $current; Archive = $archive; Backlog = $backlog; Total = ($current + $archive + $backlog); Breakdown = $breakdown }
 }
 
 function Get-P20SpaceLabel {

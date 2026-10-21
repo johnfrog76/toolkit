@@ -1,4 +1,4 @@
-# `<org>/current/` and `<org>/archive/` — the card
+# `<org>/current/`, `<org>/backlog/` and `<org>/archive/` — the card
 
 One file per piece of work, and the file is the record. This document is the shape's owner. It is the
 **data model of the product**: every verb writes or reads this file, the agent serves it as fields, the
@@ -20,6 +20,8 @@ did not come from Azure DevOps is a card with no link on it, and nothing else ab
     current/                       cards in flight
       214-search-returns-duplicates.prompt.md
       Spike-K7M2-photo-import.prompt.md
+    backlog/                       cards planned, not yet in play -- where NewPrompt writes unless -Now
+      Task9QHT-cache-the-thumbnails.prompt.md
     archive/                       cards that are done
       198-fix-the-export.prompt.md
       198-fix-the-export-r1.prompt.md      an earlier round of the same card
@@ -27,12 +29,20 @@ did not come from Azure DevOps is a card with no link on it, and nothing else ab
       214/before.png  214/cover.png
 ```
 
-- `current` and `archive` are `consts.json` `folders` -- a contract, not configuration.
-- **A card travels one way**: `current/` -> `archive/`, through `Archive`, and nothing ever overwrites a
-  card in either folder. Work that comes back is a NEW card; `Archive` keeps every round as `-r1`, `-r2`
+- `current`, `archive` and `backlog` are `consts.json` `folders` -- a contract, not configuration.
+  `backlog/` is a SPACE's folder only: a hub-root sibling (`growth/`, `manager/`) has none.
+- **A card travels one way**: `backlog/` -> `current/` -> `archive/`, and nothing ever overwrites a card
+  in any folder. A planned card is pulled into `current/` by `Move -To Active` or by its first commit or
+  pull request; a card leaves for `archive/` through `Archive`, from `current/` or `backlog/`. The one way
+  back is an Active card with nothing threaded, `Move -To Backlog` ("State is derived, never stored",
+  below). Work that comes back is a NEW card; `Archive` keeps every round as `-r1`, `-r2`
   (matched by the card's ID, so a retitled card is still the same card and each round keeps its own slug)
   (AGENTS.md, "`current/` is protected").
-- **Where the file is decides whether it is open.** A card in `archive/` is Done whatever it says inside.
+- **Where the file is decides whether it is open.** A card in `archive/` is Done whatever it says inside,
+  and a card in `backlog/` is Backlog -- planned, not in play -- whatever it says inside.
+- **`Sync` and the links treat `backlog/` as a card folder like the other two**: `Archive -Relink` and
+  `Sync`'s link repair walk it (`Get-P20CardFolders`), and a card's `**Cover:**` resolves from it, because
+  `assets/` is the card folder's sibling whichever folder that is.
 
 ## The filename
 
@@ -201,12 +211,18 @@ holds wins:
 
 | # | Condition | State |
 | --- | --- | --- |
-| 1 | the file is in `archive/` | **Done** |
-| 2 | a `PR URL: https://` line, **or** a `**Review:**` line | **Code Review** |
-| 3 | a commit bullet, **or** a `**Started:**` line | **In Progress** |
-| 4 | none of the above | **Active** |
+| 1 | the file is in `backlog/` | **Backlog** |
+| 2 | the file is in `archive/` | **Done** |
+| 3 | a `PR URL: https://` line, **or** a `**Review:**` line | **Code Review** |
+| 4 | a commit bullet, **or** a `**Started:**` line | **In Progress** |
+| 5 | none of the above | **Active** |
 
-The four words are `consts.json` `status` -- the vocabulary the web sorts and colours by, and the board's
+Rows 1 and 2 are FOLDER states, read before the text and whatever it says: a card in `backlog/` is
+planned and not in play, a card in `archive/` is done. A file is in exactly one folder, so the two never
+meet. Both halves read the folder by its last path segment -- `Get-PromptFileStatus -Content -Folder` and
+`card_status(content, folder)` -- held to one table, `Tests/fixtures/parsers/states.json`.
+
+The five words are `consts.json` `status` -- the vocabulary the web sorts and colours by, and the board's
 lanes. **Writing the token IS the transition**, and **every lane has two writers**: git's
 token, and a person's. `ThreadHash` moves a card to In Progress and so does `Move -To InProgress` (a
 `**Started:**` line); `NewPR` moves it to Code Review and so does `Move -To CodeReview` (a `**Review:**`
@@ -214,10 +230,29 @@ line); `Archive` moves it to Done and so does `Move -To Done`, which IS `Archive
 lane of the board runs `Move`. The rule does not care who wrote the line, and editing the file by hand is
 still a legitimate way to correct a state. A card travels one way: `Move` refuses a lane behind the card.
 
-**What a lane is called is the org's.** The four words above are what is stored, compared and served as
-`status` and never change; an org may name each lane for display -- `spaces[].laneNames.{active,
+**A new card is planned, and pulled into play.** `NewPrompt <id>`, `NewPrompt -Title` and the web's New
+card dialog (`POST /api/cmd/NewPrompt`, the same script) write the card to `backlog/`; `NewPrompt -Now`
+writes it to `current/` as before. A card leaves `backlog/` two ways, because the state is derived:
+
+- **Explicitly**: `Move <id> -To Active` moves the file to `current/` -- a rename, not a rewrite: the
+  card's bytes do not change.
+- **On its first write**: the first `ThreadHash` into it, its `NewPR`, or `Move -To InProgress` /
+  `-To CodeReview` MOVES the file to `current/` and then writes the line (`Scripts/Move-CardFolder.ps1`,
+  `Invoke-P20PullIntoPlay`). What a person types for the ADO flow -- make the card, branch, commit,
+  thread -- is unchanged; the card arrives in play with its first commit on it.
+
+So **a card in `backlog/` never carries a commit bullet, a `PR URL:`, `**Started:**` or `**Review:**`**:
+the writer that would add one moves the file first. The one way back is `Move <id> -To Backlog`, from
+Active only -- it refuses a card that has any of those four lines (threaded work is in play, not
+backlog). `Archive` takes a card from either folder, with the same `**Closed:**` stamp: a planned card
+can be retired without ever being in play. `StartWork` on a planned card is a stated refusal naming
+`Move <id> -To Active`: starting is the decision. The bucket a planned card is planned INTO is its
+milestone, the `**Sprint:**` line, read as on any other card.
+
+**What a lane is called is the org's.** The five words above are what is stored, compared and served as
+`status` and never change; an org may name each lane for display -- `spaces[].laneNames.{backlog, active,
 inProgress, codeReview, done}` in `hub.json` -- and the sample hub's Demo does: To do, Doing, Waiting,
-Done, for someone with no team and no tracker. An org that says nothing is called by the four words, so an
+Done, for someone with no team and no tracker. An org that says nothing is called by the five words, so an
 Azure DevOps user sees no change. `/env` serves `config.laneNames` keyed by the contract word; the CLI's
 `Status` prints the contract words, because it is the ledger.
 
@@ -246,9 +281,11 @@ fails on that side. It only holds for shapes a fixture HAS: `review-heading-no-u
 `## PR Review Comments` heading with no `PR URL:` line is not Code Review, on either side.
 **Add a rule, add a fixture -- and assert it from both suites.**
 
-Not a state: **Planned**, or a backlog of any kind. A card is in play the moment it is made
-(D-C12). A card with no pull request enters Code Review only by a
-person's `**Review:**` line, and need not enter it at all: a Spike may go from In Progress to Done.
+Not a state: **a status field**, of any kind. Planned is now a FOLDER -- `backlog/`, whose cards read as
+Backlog because of where they are -- and not a word a card carries: there is no `Status: Planned` line,
+no priority and no order within the backlog, and nothing a reader should look for. A card with no pull
+request enters Code Review only by a person's `**Review:**` line, and need not enter it at all: a Spike
+may go from In Progress to Done.
 
 ### A card in a standup
 
@@ -275,6 +312,7 @@ counted once by its first seven characters, however many cards thread it
 | `current/`, In Progress | **today** |
 | `current/`, Code Review | **today**, and the walk queue ("what waits on you") |
 | `current/`, Active; `archive/` closed earlier or never stamped | nowhere |
+| `backlog/`, any | nowhere -- the standup and Daily do not read `backlog/`: a planned card is not in play |
 
 The line names the card by its id, what moved where it adds to the slot -- `started`, its commits -- and its
 title from the heading (`K7M2 (started, 2 commits) Wire the board`, `139 (1 commit) Write the docs`). Both halves
@@ -283,7 +321,9 @@ hold it to one table, `Tests/fixtures/rituals/standup-cards.json`; the add-on's 
 
 ## The model, as the agent serves it
 
-`GET /api/status` lists `current/`; `GET /api/status/{file}` is one card with its text. The same facts, as
+`GET /api/status` lists `current/` and then `backlog/` (a card from `backlog/` is served as `Backlog`, and the
+ledger's order puts it after the cards in play); `GET /api/status/{file}` is one card with its text, found
+in either. The same facts, as
 fields, so nothing downstream parses a heading or a filename (`PromptInfo`, `agent/ado/status.py`):
 
 | Field | From | Notes |
@@ -297,7 +337,7 @@ fields, so nothing downstream parses a heading or a filename (`PromptInfo`, `age
 | `pinned` | NOT read from the file -- asked of the tracker: the card's `tracker` is `github`, its `**ADO Link:**` is an issue of the Space's own repository, and that number is in the repository's pinned set (one `gh api graphql` `pinnedIssues` call per repo, held 60 seconds and dropped when `EditItem` runs) | `false` unless all three hold **and** the Space is GitHub at Tier 1; at Tier 2, on Azure DevOps and on no tracker `gh` is not asked. The board's card face wears the pin and "Pinned on GitHub" in its meta line and sorts pinned cards first within a lane; the list and the detail route do not carry it |
 | `billable` | no `**Billable:** no` line | default `true` |
 | `assigned` | the first `**Assigned:**` line's value, trimmed | `me`, a size, or `""` -- nobody; on the list and the detail route |
-| `status` | derived, above | `Active`, `In Progress`, `Code Review` (and `Done` for archive readers) |
+| `status` | derived, above | `Backlog`, `Active`, `In Progress`, `Code Review` (and `Done` for archive readers) |
 | `progress`, `checked`, `total` | the checkboxes | `--` when there are none |
 | `sprint` | `**Sprint:**`, last segment, cut to 20 | `--` when absent |
 | `ado_url`, `pr_url` | the footer; the `PR URL:` line | `null` when absent |
@@ -320,17 +360,17 @@ keeps the same edit rule -- the card's own line ending, no BOM.
 
 | Verb | Does to the file |
 | --- | --- |
-| `NewPrompt <id>` / `-Title` | creates it from the type's template. For a card already in `current/` it RETURNS that card and writes nothing. `-Design <name\|id>` adds the `> Design:` header line |
-| `ThreadHash` | adds commit bullets under `Commits:`; fills `[commit]` placeholders in PR replies |
-| `NewPR` | writes `PR URL:` |
+| `NewPrompt <id>` / `-Title` | creates it from the type's template, in `backlog/`; `-Now` in `current/`. For a card already in `current/` or `backlog/` it RETURNS that card and writes nothing. `-Design <name\|id>` adds the `> Design:` header line |
+| `ThreadHash` | adds commit bullets under `Commits:`; fills `[commit]` placeholders in PR replies. A card in `backlog/` is moved to `current/` first |
+| `NewPR` | writes `PR URL:`. A card in `backlog/` is moved to `current/` first |
 | `PublishPR` | writes `PR published: <url>` on the line under `PR URL:`, once -- a record, not state |
 | `GetPRComments` | writes `PR URL:` if absent; appends review rounds under `## PR Review Comments`. Append-only, safe to re-run. It also writes a side record, `pr-comments/<date>-PR<id>.md` in the Space (read at archive time for `prsReviewed`), except with `-OutputFile`, which writes only the file it names ([CLI](../CLI.md)) |
 | `Billable` | adds or removes `**Billable:** no` |
 | `Route <id> -Assign` | writes `**Assigned:** me` or `**Assigned:** <size>` on a card with no issue behind it -- a card with an id of its own, or any card in a Space with no tracker or a local one; nothing else in the file moves (Team Agile) |
 | `NewItem -FromCard` | files the card as a GitHub issue -- its name and Summary, the body ending `Toolkit card: <id>` -- and writes the issue's URL into `**ADO Link:**`; refuses a card that is already linked |
 | `Cover` | copies a picture into `<space>/assets/<card key>/` and writes `**Cover:**` (or `**Before:**`); `-Remove` deletes both. `NewPrompt -Cover` / `-Before` attach the same way at birth |
-| `Move` | adds `**Started:**` or `**Review:**` with today's date; `-To Done` is `Archive` |
-| `Archive` | moves it to `archive/`, stamps `**Closed:**`, refreshes its package links. Already in `archive/` (by id or exact name): says so, exit 0 |
+| `Move` | adds `**Started:**` or `**Review:**` with today's date (a `backlog/` card moved to `current/` first); `-To Done` is `Archive`; `-To Active` / `-To Backlog` move the file between `backlog/` and `current/` and write nothing |
+| `Archive` | moves it from `current/` or `backlog/` to `archive/`, stamps `**Closed:**`, refreshes its package links. Already in `archive/` (by id or exact name): says so, exit 0 |
 
 ## A whole card
 
@@ -341,5 +381,6 @@ no work item, and `demo/archive/` holds two that are Done. The parser fixtures
 
 ## What is NOT in the model
 
-Hours. An assignee. A priority. A parent or a child. A due date. A status field. Planned / backlog. Any of
-them may come; none is here, and a reader should not look for one.
+Hours. An assignee. A priority. An order within the backlog. A parent or a child. A due date. A status
+field -- Backlog is a folder, not a field. Any of them may come (a priority and an order, by design,
+will not); none is here, and a reader should not look for one.

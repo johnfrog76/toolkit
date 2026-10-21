@@ -67,6 +67,10 @@ OUTPUT COLUMNS:
     Status        Active | In Progress | Code Review
     Board         With -Board: the work item's System.State, for a card linked to one
 
+After the cards in play, the backlog/ -- cards planned, not yet in play -- is
+folded to one line: how many, and their names. Move <id> -To Active, a card's
+first ThreadHash or its NewPR pulls it into current/.
+
 -Board asks Azure DevOps once per linked card and writes nothing -- not to the
 board, not to a card. It flags only definite mismatches, with "(differs)": a card
 in archive/ whose item is still open, or a card in current/ whose item is Closed,
@@ -132,7 +136,36 @@ if ($Board) {
 
 $folders = Get-PromptFolders
 $currentDir = $folders.Current
+
+# -- The backlog: planned, not in play -----------------------------------------
+# Listed AFTER the cards in play, folded to a count and the names -- the ledger is
+# still the cards in play, and a planned card is a footnote to it until Move
+# -To Active, its first ThreadHash or its NewPR pulls it into current/.
+. (Join-Path $PSScriptRoot 'Move-CardFolder.ps1')
+$backlogDir = Get-P20BacklogFolder -Folders $folders
+$backlogNames = @()
+if ($backlogDir -and (Test-Path -LiteralPath $backlogDir)) {
+    $backlogList = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($b in @(Get-ChildItem -LiteralPath $backlogDir -File | Where-Object { $_.Name -notlike '.*' })) { $backlogList.Add($b.Name) }
+    # Ordinal, for the same reason the ledger's sort is: one order on every host.
+    $backlogList.Sort([System.StringComparer]::Ordinal)
+    $backlogNames = $backlogList.ToArray()
+}
+$writeBacklog = {
+    if ($backlogNames.Count -eq 0) { return }
+    Write-Host "$($script:Consts.status.backlog) ($($backlogNames.Count)), planned -- not in play:" -ForegroundColor Cyan
+    Write-Host "  $($backlogNames -join ', ')" -ForegroundColor DarkGray
+    Write-Host "  $(Get-CliPrefix)Move <id> -To Active pulls one into play; so does its first commit (ThreadHash) or PR (NewPR)." -ForegroundColor DarkGray
+    Write-Host ""
+}
+
 if (-not (Test-Path $currentDir)) {
+    if ($backlogNames.Count -gt 0) {
+        Write-Host "`nNo active prompts in current/." -ForegroundColor Yellow
+        Write-Host ""
+        & $writeBacklog
+        return
+    }
     Write-Warning "prompt folder not found at $currentDir"
     return
 }
@@ -143,6 +176,7 @@ $files = Get-ChildItem -Path $currentDir -File |
 Where-Object { $_.Name -notlike '.*' }
 if ($files.Count -eq 0) {
     Write-Host "No active prompts in current/." -ForegroundColor Yellow
+    if ($backlogNames.Count -gt 0) { Write-Host ""; & $writeBacklog }
     return
 }
 
@@ -349,6 +383,8 @@ foreach ($row in $rows) {
     }
     Write-Host ""
 }
+
+& $writeBacklog
 
 # -Board's one-line summary. It says what was NOT read, too: Status lists current/
 # only, so the other definite mismatch -- an archived card whose item is still

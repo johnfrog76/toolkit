@@ -70,7 +70,8 @@
   },
 
   "status": {
-    "_": "The derived state of a card. There is no status field anywhere -- these strings ARE the vocabulary, and the web sorts and colours by them.",
+    "_": "The derived state of a card. There is no status field anywhere -- these strings ARE the vocabulary, and the web sorts and colours by them. backlog and done are FOLDER states, read first and whatever the card's text says: a card in backlog/ is Backlog (planned, not in play), a card in archive/ is Done. Tests/fixtures/parsers/states.json holds both halves' readers to one table (docs/hub/cards.md, \"State is derived, never stored\").",
+    "backlog": "Backlog",
     "active": "Active",
     "inProgress": "In Progress",
     "codeReview": "Code Review",
@@ -78,9 +79,10 @@
   },
 
   "folders": {
-    "_": "The two folders a card lives in, under an org's promptsFolder and under each hub-root sibling -- and assets, the Space's sibling of the two, where a card keeps what is not text: assets/<card key>/cover.png (docs/hub/cards.md, \"A card's pictures\").",
+    "_": "The folders a card lives in, under an org's promptsFolder: current/ (in play), archive/ (done) and backlog/ (planned, not yet in play -- where NewPrompt writes unless told -Now; a Space's folder only, a hub-root sibling such as growth/ or manager/ has none). Under each hub-root sibling, current/ and archive/. And assets, the Space's sibling of the three, where a card keeps what is not text: assets/<card key>/cover.png (docs/hub/cards.md, \"A card's pictures\").",
     "current": "current",
     "archive": "archive",
+    "backlog": "backlog",
     "assets": "assets"
   },
 

@@ -314,7 +314,7 @@ function Get-P20SpaceFieldSchema {
     $fields += [PSCustomObject]@{ key = 'tenant';        scope = 'org'; type = 'string'; allowed = @();                      required = $false; help = 'The Azure AD tenant id this Space authenticates against. Per Space, so a second tenant is a config edit rather than a code change.' }
     $fields += [PSCustomObject]@{ key = 'promptsFolder'; scope = 'org'; type = 'string'; allowed = @();                      required = $true;  help = 'The folder under the hub root where this Space''s cards live. Required: a Space without it is skipped by both loaders.' }
     $fields += [PSCustomObject]@{ key = 'projects';      scope = 'org'; type = 'projects'; allowed = @();                    required = $false; help = 'The projects (Azure DevOps) or repos (GitHub) this Space works in: Name/repo; Other/repo2 -- or a JSON array of { name, repo, defaultBranch }. Connect''s discovery step writes it.' }
-    foreach ($lane in @(@('active', 'Active'), @('inProgress', 'In Progress'), @('codeReview', 'Code Review'), @('done', 'Done'))) {
+    foreach ($lane in @(@('backlog', 'Backlog'), @('active', 'Active'), @('inProgress', 'In Progress'), @('codeReview', 'Code Review'), @('done', 'Done'))) {
         $fields += [PSCustomObject]@{ key = "laneNames.$($lane[0])"; scope = 'org'; type = 'string'; allowed = @(); required = $false; help = "What the board and the list call the '$($lane[1])' lane for this Space. Display only: the state stored in a card, compared by every verb and served as status is always '$($lane[1])'. Unset, the lane is called '$($lane[1])'." }
     }
     # How do you want to work in this Space? -- the second Space-scoped

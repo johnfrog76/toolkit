@@ -169,9 +169,10 @@ if (-not $Remove -and -not $Image) {
 
 $folders = Get-PromptFolders
 $types = Get-P20WorkItemTypes -Config $cfg
-$cardFolders = @($folders.Current, $folders.Archive)
+. (Join-Path $PSScriptRoot 'Move-CardFolder.ps1')
+$cardFolders = @($folders.Current, (Get-P20BacklogFolder -Folders $folders), $folders.Archive)
 
-# current/ first, then archive/. The one rule for "what did they mean?" is
+# current/ first, then backlog/, then archive/. The one rule for "what did they mean?" is
 # Resolve-P20CardArgument: an id is never a partial name.
 $found = @()
 $isId = $false
@@ -184,11 +185,11 @@ foreach ($folder in $cardFolders) {
 
 if ($found.Count -eq 0) {
     if ($isId) {
-        Write-CliError -Message "No card with id '$Card' in current/ or archive/." `
+        Write-CliError -Message "No card with id '$Card' in current/, backlog/ or archive/." `
             -Hint "'$Card' has the shape of an ID, and an ID is not a partial name. Run '${p}Status' to see the cards."
     }
     else {
-        Write-CliError -Message "No card matching '$Card' in current/ or archive/." `
+        Write-CliError -Message "No card matching '$Card' in current/, backlog/ or archive/." `
             -Hint "Run '${p}Status' to see the cards."
     }
     exit 2  # stated refusal

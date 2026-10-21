@@ -305,8 +305,10 @@ Write-Host "-- The card reader, over real folders --" -ForegroundColor Cyan
 $readerDir = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-standup-cards-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
 try {
     $utf8r = New-Object System.Text.UTF8Encoding($false)
-    New-Item -ItemType Directory -Path (Join-Path $readerDir 'current'), (Join-Path $readerDir 'archive') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $readerDir 'current'), (Join-Path $readerDir 'archive'), (Join-Path $readerDir 'backlog') -Force | Out-Null
     $readerFiles = [ordered]@{
+        # A planned card: backlog/ is beside current/, and the standup never reads it.
+        'backlog/Task9QHT-a-planned-card.prompt.md'  = "# Task 9QHT: A planned card`n`n**Created:** 2026-10-01`n"
         'current/K7M2-wire-the-board.prompt.md'      = "# Task K7M2: Wire the board`n`n- [x] a`n"
         'current/Task139-write-the-docs.prompt.md'   = "# Task 139: Write the docs`n`n- a41c2e9 first`n"
         'current/US-144-read-the-board.prompt.md'    = "# User Story 144: Read the board`r`n`r`nPR URL: https://example.com/pr/1`r`n"
@@ -332,6 +334,7 @@ try {
             'US-144-read-the-board.prompt.md|current|Code Review||Read the board|144'
         ) | Sort-Object) -join "`n"
     Assert-True 'Get-P20StandupCards: state by the status rule, the Closed day, the title, the id; a file with no id is not a card' ($seen -ceq $want) ("`n--- got ---`n$seen`n--- want ---`n$want")
+    Assert-True 'a card in backlog/ beside them is not read: planned is not in play (agent: read_cards, the same)' (@($rows | Where-Object { $_.id -eq '9QHT' -or $_.folder -eq 'backlog' }).Count -eq 0) $seen
     $none = @(Get-P20StandupCards -CurrentDir (Join-Path $readerDir 'nope') -ArchiveDir (Join-Path $readerDir 'nada') -Pattern $pattern)
     Assert-True 'a Space with no folders is no cards' ($none.Count -eq 0)
 

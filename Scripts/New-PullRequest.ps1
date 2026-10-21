@@ -135,6 +135,8 @@ if ($Help) { Show-Help }
 
 # The one byte contract for a card this script writes into.
 . (Join-Path $PSScriptRoot 'Write-CardText.ps1')
+# The pull on first write (step 4): a card in backlog/ moves to current/ as its PR URL is written.
+. (Join-Path $PSScriptRoot 'Move-CardFolder.ps1')
 
 # -- Config -------------------------------------------------------------------
 $cfg = $global:P20Config
@@ -154,18 +156,19 @@ $org = $cfg.Org
 . (Join-Path $PSScriptRoot 'Resolve-CardName.ps1')
 if ($File -and -not (Test-Path -LiteralPath $File)) {
     $cardFolders = Get-PromptFolders
-    $cardHit = Resolve-P20CardArgument -Argument $File -Folder $cardFolders.Current `
+    # current/ and backlog/: NewPR into a planned card pulls it into play (step 4).
+    $cardHit = Resolve-P20CardArgument -Argument $File -Folder @($cardFolders.Current, (Get-P20BacklogFolder -Folders $cardFolders)) `
         -WorkItemTypes (Get-P20WorkItemTypes -Config $cfg)
     if ($cardHit.IsId) {
         $cardMatches = @($cardHit.Match | Where-Object { $_.Name -like '*.prompt.md' })
         if ($cardMatches.Count -eq 1) { $File = $cardMatches[0].FullName }
         elseif ($cardMatches.Count -gt 1) {
-            Write-CliError -Message "'$File' matches $($cardMatches.Count) cards in current/: $(($cardMatches | ForEach-Object { $_.Name }) -join ', ')" `
+            Write-CliError -Message "'$File' matches $($cardMatches.Count) cards in current/ and backlog/: $(($cardMatches | ForEach-Object { $_.Name }) -join ', ')" `
                 -Hint 'Name the card by its filename.'
             exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
         }
         else {
-            Write-CliError -Message "No card with id '$File' in current/." `
+            Write-CliError -Message "No card with id '$File' in current/ or backlog/." `
                 -Hint "Scaffold it first ($(Get-CliPrefix)NewPrompt $File), or pass the card's path."
             exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
         }
@@ -369,7 +372,7 @@ if ($File) {
     # is how a commit landed on the wrong card.
     #
     . (Join-Path $PSScriptRoot 'Resolve-CardForBranch.ps1')
-    $found = Resolve-P20CardForBranch -Branch $currentBranch -CurrentDir $currentDir -Detailed
+    $found = Resolve-P20CardForBranch -Branch $currentBranch -CurrentDir @($currentDir, (Get-P20BacklogFolder -Folders $folders)) -Detailed
     $promptFile = $found.Path
     if (-not $promptFile -and $found.Candidates.Count -gt 1) {
         # Ambiguity is never guessed at (docs/CLI.md, Errors).
@@ -814,7 +817,15 @@ if (-not $SkipWorkItem -and $workItemId) {
 # == STEP 4: Write PR URL into prompt file ====================================
 Write-Host "[4/4] Writing PR URL to prompt file..." -ForegroundColor Cyan
 
+# A planned card is pulled into play as its PR URL is written: moved from
+# backlog/ to current/ FIRST, so a backlog card never carries a PR URL line
+# (Scripts/Move-CardFolder.ps1). The pull request already exists by now, so a
+# card that cannot move is said, left as it is, and handed the line to add.
+$pull = Invoke-P20PullIntoPlay -Path $promptFile
+if ($pull.Ok) { $promptFile = $pull.Path }
+
 try {
+    if (-not $pull.Ok) { throw $pull.Message }
     $lines = Get-Content -Path $promptFile
     $insertIndex = -1
 

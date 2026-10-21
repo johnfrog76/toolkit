@@ -19,8 +19,13 @@
 
 import consts from "@consts";
 
-/** The derived state of a card. There is no status field -- these strings are it. */
+/**
+ * The derived state of a card. There is no status field -- these strings are it.
+ * `backlog` and `done` are FOLDER states: a card in `backlog/` is planned, not in
+ * play; one in `archive/` is done (docs/hub/cards.md, "State is derived, never stored").
+ */
 export const STATUS = consts.status as {
+  backlog: string;
   active: string;
   inProgress: string;
   codeReview: string;
@@ -80,8 +85,13 @@ export const TOKENS = consts.tokens as {
   spec: string;
 };
 
-/** The two folders a card lives in, and the Space's folder for its pictures. */
-export const FOLDERS = consts.folders as { current: string; archive: string; assets: string };
+/** The folders a card lives in -- in play, done, planned -- and the Space's folder for its pictures. */
+export const FOLDERS = consts.folders as {
+  current: string;
+  archive: string;
+  backlog: string;
+  assets: string;
+};
 
 /**
  * A card's pictures (docs/hub/cards.md, "A card's pictures"): the image types the

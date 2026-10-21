@@ -2,14 +2,20 @@
 .SYNOPSIS
     The state of a card, read from its text. The CLI's half of the one rule.
 .DESCRIPTION
-    There is no status field. A card's state is derived from what the file says,
-    in this order, and the first that holds wins:
+    There is no status field. A card's state is derived from WHERE the file is
+    and then what it says, in this order, and the first that holds wins:
 
+        the file is in backlog/                   -> Backlog   (-Folder)
+        the file is in archive/                   -> Done      (-Folder)
         a PR URL: line, or a **Review:** line     -> Code Review
         a commit bullet, or a **Started:** line   -> In Progress
         otherwise                                 -> Active
 
-    (Done is a card in archive/, which is where the file IS, not what it says.)
+    The two folder states are read FIRST and whatever the text says: a card in
+    backlog/ is planned, not in play, and one in archive/ is done. A caller that
+    passes no -Folder is asking about a card in current/ -- every caller did
+    before backlog/ existed, so the text rule reads exactly as it always did.
+    Tests/fixtures/parsers/states.json is the table both halves assert.
 
     The rule exists once per half on purpose -- this file and
     agent/core/parsers.py -- and the two are held together by shared fixtures
@@ -27,7 +33,12 @@ if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) {
 }
 
 function Get-PromptFileStatus {
-    param([string]$Content)
+    param(
+        [string]$Content,
+        # The folder the card is in: its name (backlog, archive, current) or its
+        # path -- the last segment is what is read. Empty means current/.
+        [string]$Folder = ''
+    )
     # PR URL: line is the state gate between In Progress and Code Review.
     # {cliPrefix}GetPRComments writes it whenever a PR exists -- the URL's presence is the
     # gate, not the presence of reviewer comments (it is written even with none).
@@ -43,6 +54,11 @@ function Get-PromptFileStatus {
     # `**Started:**` line. Both are written by {cliPrefix}Move, or by hand -- the
     # rule does not care who wrote the line (docs/hub/cards.md).
     $c = Get-P20Consts
+    if ($Folder) {
+        $leaf = Split-Path -Leaf ($Folder.TrimEnd('/', '\'))
+        if ($leaf -eq [string]$c.folders.backlog) { return $c.status.backlog }
+        if ($leaf -eq [string]$c.folders.archive) { return $c.status.done }
+    }
     if ($Content -match $c.regex.prUrlLine) { return $c.status.codeReview }
     if ($Content -match $c.regex.reviewLine) { return $c.status.codeReview }
     if ($Content -match $c.regex.commitBullet) { return $c.status.inProgress }

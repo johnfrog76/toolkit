@@ -1513,5 +1513,29 @@ class TheAppMountsIt(unittest.TestCase):
         self.assertIn(C.rituals_route(), paths)
 
 
+class TheBacklogIsNotInPlay(unittest.TestCase):
+    """A NEGATIVE requirement (docs/hub/cards.md, "Where it lives"): a card in a
+    Space's backlog/ is planned, not in play, so the standup never mentions it.
+    Not "no code was added for it" -- a card is put there and shown absent.
+    Tests/Test-Rituals.ps1 holds the CLI's Get-P20StandupCards to the same."""
+
+    def test_read_cards_reads_current_and_archive_and_never_backlog(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            space = Path(tmp)
+            for folder, name in (
+                (C.folder_current(), "TaskK7M2-in-play.prompt.md"),
+                (C.folder_backlog(), "TaskR9PX-planned.prompt.md"),
+                (C.folder_archive(), "TaskW3X7-done.prompt.md"),
+            ):
+                (space / folder).mkdir()
+                (space / folder / name).write_text(
+                    "# Task X: a card\n\n## Git\nCommits:\n- (pending)\n\n**Created:** 2026-10-19\n", encoding="utf-8"
+                )
+            rows = standup.read_cards(space, ["Task"], ["Task"])
+            self.assertEqual(sorted(r["id"] for r in rows), ["K7M2", "W3X7"])
+            self.assertNotIn(C.folder_backlog(), {r["folder"] for r in rows})
+            self.assertNotIn("R9PX", {c["id"] for c in standup.cards_in_play(rows)})
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

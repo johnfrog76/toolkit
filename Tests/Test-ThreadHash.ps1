@@ -427,6 +427,41 @@ finally { Remove-ThreadSandbox $sb }
 
 Write-Host ""
 
+# -- A planned card is pulled into play by its first thread --------------------
+# A card in backlog/ never carries a commit bullet: the first ThreadHash MOVES
+# the file to current/ as it writes, so the flow a person types is unchanged and
+# the card arrives in play with its commits on it (Scripts/Move-CardFolder.ps1).
+
+Write-Host "-- A planned card, pulled by its first thread ----------" -ForegroundColor Cyan
+
+$sb = New-ThreadSandbox
+try {
+    $backlogDir = Join-Path $sb.Hub 'backlog'
+    New-Item -ItemType Directory -Path $backlogDir -Force | Out-Null
+    $planned = Join-Path $backlogDir (Split-Path $sb.Card -Leaf)
+    Move-Item -LiteralPath $sb.Card -Destination $planned
+
+    # From the branch, with no card named: backlog/ is searched beside current/.
+    $r = Invoke-ThreadHash -From $sb.Code
+    Assert-Equal "ThreadHash with no card, on the branch of a planned card, exits 0" 0 $r.Exit
+    Assert-True "the card left backlog/" (-not (Test-Path -LiteralPath $planned))
+    Assert-True "and is in current/, with every commit on it" ((Test-Path -LiteralPath $sb.Card) -and ((Get-CardText $sb.Card) -match [regex]::Escape($sb.CodeHashes[2])))
+    Assert-True "the pull is said" ($r.Text -match 'pulled from backlog/ into current/') $r.Text
+
+    # By id, and a refusal before the write leaves the planned card where it is.
+    Move-Item -LiteralPath $sb.Card -Destination $planned
+    [System.IO.File]::WriteAllText($planned, "# Bug 137: Something is wrong`n`n## Summary`n`nNothing.`n", (New-Object System.Text.UTF8Encoding($false)))
+    $r = Invoke-ThreadHash -From $sb.Code -BoundArgs @{ File = '137' }
+    Assert-Equal "a planned card ThreadHash cannot thread is refused (exit 2)" 2 $r.Exit
+    Assert-True "and stays in backlog/: nothing moved, nothing written" ((Test-Path -LiteralPath $planned) -and -not (Test-Path -LiteralPath $sb.Card))
+}
+catch {
+    Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally { Remove-ThreadSandbox $sb }
+
+Write-Host ""
+
 # -- The configured defaultBranch is what the branch is measured against -------
 
 Write-Host "-- defaultBranch comes from config --------------------" -ForegroundColor Cyan
@@ -492,18 +527,24 @@ try {
         return (& pwsh -NoProfile -NonInteractive -Command ($preamble + $Commands) 2>&1 | ForEach-Object { "$_" }) -join "`n"
     }
 
-    # The verb looks in its own current/, so the card is made by the verb.
+    # The verb looks in its own Space's folders, so the card is made by the verb --
+    # and a new card is PLANNED: it lands in backlog/.
     $null = Invoke-ThreadVerb "${prefix}NewPrompt -Title 'Thread by id' -Type Task -Id K7M2 | Out-Null"
     $card = @(Get-ChildItem $sb.Hub -Recurse -Filter 'TaskK7M2-*.prompt.md')
     Assert-Equal 'the verb made the card to thread into' 1 $card.Count
+    Assert-Equal 'in backlog/: planned, not in play' 'backlog' (Split-Path $card[0].DirectoryName -Leaf)
     $cardPath = $card[0].FullName
     $before = Get-CardText $cardPath
     $out = Invoke-ThreadVerb "${prefix}ThreadHash W3X7 -Hash $($sb.CodeHashes[0]); 'ID-NONE-EXIT=' + `$LASTEXITCODE"
     Assert-True 'an id that matches nothing is refused naming the id, exit 2' ($out -match "No card with id 'W3X7'" -and $out -match 'ID-NONE-EXIT=2') $out
     Assert-Equal 'and the refusal wrote nothing' $before (Get-CardText $cardPath)
 
+    # The id form finds the planned card, and its first thread PULLS it into current/.
     $out = Invoke-ThreadVerb "${prefix}ThreadHash k7m2 -Hash $($sb.CodeHashes[0]); 'ID-EXIT=' + `$LASTEXITCODE"
     Assert-True 'the id form exits 0' ($out -match 'ID-EXIT=0') $out
+    $card = @(Get-ChildItem $sb.Hub -Recurse -Filter 'TaskK7M2-*.prompt.md')
+    Assert-True 'the first thread pulled the card from backlog/ into current/' ($card.Count -eq 1 -and (Split-Path $card[0].DirectoryName -Leaf) -eq 'current' -and $out -match 'pulled from backlog/ into current/') $out
+    $cardPath = $card[0].FullName
     Assert-True 'the id form threads the hash' ((Get-CardText $cardPath) -match "(?m)^- $($sb.CodeHashes[0])\b") $out
 
     $out = Invoke-ThreadVerb "${prefix}ThreadHash thread-by -Hash $($sb.CodeHashes[1]); 'PART-EXIT=' + `$LASTEXITCODE"

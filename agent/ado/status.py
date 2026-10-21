@@ -18,7 +18,16 @@ from pydantic import BaseModel
 
 from ..core.assets import card_images
 from ..core.clock import local_day
-from ..core.config import card_types, hub_root, load_config, org_folder, resolve_dirs, tracker, tracker_repos
+from ..core.config import (
+    backlog_dir,
+    card_types,
+    hub_root,
+    load_config,
+    org_folder,
+    resolve_dirs,
+    tracker,
+    tracker_repos,
+)
 from ..core.consts import folder_current
 from ..core.parsers import _parse_status_metadata, card_id, status_sort_key
 from ..core.tier import _resolve_tier
@@ -86,8 +95,9 @@ class PromptInfo(BaseModel):
     before: str | None = None
     # The design the card was worked against, as its line says (toolkit card C3).
     design: CardDesign | None = None
-    # Derived, never stored: consts.json `status` -- Active | In Progress | Code Review
-    # (Done is a card in archive/, which this route does not list). docs/hub/cards.md.
+    # Derived, never stored: consts.json `status` -- Backlog (a card in backlog/,
+    # planned and not in play) | Active | In Progress | Code Review. Done is a card
+    # in archive/, which this route does not list. docs/hub/cards.md.
     status: str = "New"
     # The tracker's own pin on the card's ISSUE: true only on a GitHub
     # Space at Tier 1, for a card whose link is an issue in that Space's
@@ -197,7 +207,11 @@ def _pinned_cards(prompts: list["PromptInfo"]) -> None:
 
 @api.get("/status", response_model=StatusResponse)
 async def get_status(space: str = ""):
-    """The cards in play in a Space's ``current/``.
+    """The cards in a Space's ``current/`` (in play) and ``backlog/`` (planned).
+
+    A card read from ``backlog/`` is served with status Backlog whatever its
+    text says (card_status, the folder read first); the board draws it in its
+    first column, and a reader that means "in play" filters it out by status.
 
     No ``space``: the active Space, exactly as it always read. A slug: that
     Space's own folder, so the Studio's Spaces card counts a row's cards without
@@ -216,10 +230,12 @@ async def get_status(space: str = ""):
         current_dir = org_folder(space_entry(cfg, space)) / folder_current()
     else:
         current_dir, _ = resolve_dirs()
-    if not current_dir.exists():
+    planned_dir = backlog_dir(current_dir)
+    folders = [d for d in (current_dir, planned_dir) if d.exists()]
+    if not folders:
         return StatusResponse(count=0, prompts=[])
 
-    files = sorted(current_dir.iterdir())
+    files = [f for d in folders for f in sorted(d.iterdir())]
     type_names, prefixes = card_types()
     space = space or active
     prompts: list[PromptInfo] = []
@@ -247,7 +263,7 @@ async def get_status(space: str = ""):
         if not f.is_file() or f.name.startswith("."):
             continue
         content = f.read_text(encoding="utf-8-sig", errors="replace")
-        meta = _parse_status_metadata(content, type_names)
+        meta = _parse_status_metadata(content, type_names, folder=f.parent.name)
         if meta["design"]:
             meta["design"] = {**meta["design"], "short": meta["design"]["id"][:8]}
 
@@ -294,12 +310,16 @@ async def get_status_detail(filename: str):
     if "/" in filename or "\\" in filename or ".." in filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
     current_dir, _ = resolve_dirs()
-    path = current_dir / filename
+    # current/ first, then backlog/: a card is in one of them, planned or in play.
+    path = next(
+        (p for p in (current_dir / filename, backlog_dir(current_dir) / filename) if p.is_file()),
+        current_dir / filename,
+    )
     if not path.exists() or not path.is_file():
         raise HTTPException(status_code=404, detail=f"{filename} not found")
     content = path.read_text(encoding="utf-8-sig", errors="replace")
     type_names, prefixes = card_types()
-    meta = _parse_status_metadata(content, type_names)
+    meta = _parse_status_metadata(content, type_names, folder=path.parent.name)
     images = card_images(content, path, load_config().get("activeSpace", ""))
     meta["design"] = await resolve_card_design(meta["design"])
     return PromptDetailResponse(

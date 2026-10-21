@@ -347,6 +347,13 @@ describe("the cards half (an Azure DevOps row, or one with no tracker)", () => {
       undefined,
       "1 card in play",
     ],
+    [
+      "a planned card is not in play: said after the count, never in it",
+      status(["Backlog", "Active", "Backlog"]),
+      undefined,
+      "1 card in play: 1 Active; 2 in Backlog",
+    ],
+    ["only planned cards", status(["Backlog"]), undefined, "no cards in play; 1 in Backlog"],
   ])("%s", (_why, st, names, want) => {
     expect(cardsPhrase(st, names)).toBe(want);
   });

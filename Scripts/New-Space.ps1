@@ -554,13 +554,19 @@ if ((Test-Path -LiteralPath $folder) -and -not (Test-Path -LiteralPath $folder -
 $adopted = Test-Path -LiteralPath $folder -PathType Container
 $cardsCurrent = 0
 $cardsArchive = 0
+$cardsBacklog = 0
 if ($adopted) {
     $cur = Join-Path $folder 'current'
     $arc = Join-Path $folder 'archive'
+    $blg = Join-Path $folder 'backlog'
+    if (Test-Path -LiteralPath $blg) { $cardsBacklog = @(Get-ChildItem -LiteralPath $blg -File -Filter '*.md' -ErrorAction SilentlyContinue).Count }
     if (Test-Path -LiteralPath $cur) { $cardsCurrent = @(Get-ChildItem -LiteralPath $cur -File -Filter '*.md' -ErrorAction SilentlyContinue).Count }
     if (Test-Path -LiteralPath $arc) { $cardsArchive = @(Get-ChildItem -LiteralPath $arc -File -Filter '*.md' -ErrorAction SilentlyContinue).Count }
 }
-$cards = $cardsCurrent + $cardsArchive
+$cards = $cardsCurrent + $cardsArchive + $cardsBacklog
+# backlog/ is said only when it holds a card, so a Space without one reads as it always did.
+$cardsBreakdown = "$cardsCurrent current, $cardsArchive archive"
+if ($cardsBacklog -gt 0) { $cardsBreakdown += ", $cardsBacklog backlog" }
 
 # -- Is the repository there? Asked, never required ------------------------------------
 $visibility = ''
@@ -599,7 +605,7 @@ if ($WhatIf) {
     if (-not $AsJson) {
         Write-Host ""
         foreach ($pair in $pairs) { Write-Host "  [WhatIf] ${prefix}Config -Set $pair -Hub" -ForegroundColor Yellow }
-        if ($adopted) { Write-Host "  [WhatIf] adopt $folder as it is -- $cards cards ($cardsCurrent current, $cardsArchive archive)" -ForegroundColor Yellow }
+        if ($adopted) { Write-Host "  [WhatIf] adopt $folder as it is -- $cards cards ($cardsBreakdown)" -ForegroundColor Yellow }
         else { Write-Host "  [WhatIf] make $(Join-Path $folder 'current') and $(Join-Path $folder 'archive')" -ForegroundColor Yellow }
     }
 }
@@ -664,7 +670,7 @@ if ($repoFull) {
 }
 elseif ($spaceAddress) { Write-Host "      $spaceAddress -- an Azure DevOps organisation" }
 else { Write-Host "      your own cards, no tracker (local)" }
-if ($adopted) { Write-Host "      cards: $folder -- an existing folder, adopted as it is: $cards cards ($cardsCurrent current, $cardsArchive archive)" }
+if ($adopted) { Write-Host "      cards: $folder -- an existing folder, adopted as it is: $cards cards ($cardsBreakdown)" }
 else { Write-Host "      cards: $folder -- new, with current/ and archive/" }
 if ($tracker -eq 'ado') {
     Write-Host "      Its projects are not discovered here; that is the next step: ${prefix}Connect $newSlug -Discover" -ForegroundColor DarkGray

@@ -43,6 +43,7 @@ describe("consts.json", () => {
   });
 
   it("exposes the values this half reads", () => {
+    expect(STATUS.backlog).toBe("Backlog");
     expect(STATUS.active).toBe("Active");
     expect(STATUS.inProgress).toBe("In Progress");
     expect(STATUS.codeReview).toBe("Code Review");
@@ -57,6 +58,7 @@ describe("consts.json", () => {
     expect(TOKENS.spec).toBe("> Spec:");
     expect(FOLDERS.current).toBe("current");
     expect(FOLDERS.archive).toBe("archive");
+    expect(FOLDERS.backlog).toBe("backlog");
     // The org-scoped flags: the same list the CLI's OrgScopedFeatures and the
     // agent's ORG_FEATURES read, so a second one cannot be added to two halves only.
     expect(FEATURES.spaceScoped).toEqual(["sprintAwareness", "trainingHoursPerQuarter"]);
