@@ -126,7 +126,7 @@ After a `---` rule, bold-label lines. **This is the part of the model that is st
 
 | Line | Means | Written by | Read by |
 | --- | --- | --- | --- |
-| `**Sprint:**` | The iteration path. Only the LAST segment is shown (`Sprint 8`) | `NewPrompt`, from the work item; `(not linked)` text offline | the board's Sprint filter; the card's tag |
+| `**Sprint:**` | The iteration path, or any title at all once planned by hand. Only the LAST segment is shown (`Sprint 8`), cut to 20 characters for the board -- the card itself keeps the title whole | `NewPrompt`, from the work item; `(not linked)` text offline; `Plan <id> -Milestone "<title>"` for a card already made, through `Set-P20CardLine` -- never the tracker (that is `NewItem`/`EditItem`'s own, tracker-bound `-Sprint`); `Plan <id> -Remove` deletes the line | the board's Sprint filter; the card's tag |
 | `**Story Points:**` | As the work item had it | `NewPrompt` | people |
 | `**ADO Link:**` | The work item's address. **An `https://` value here is what makes a card `linked`**; offline it reads `(not linked -- created offline with -Title)` | `NewPrompt`; and `NewItem -FromCard`, which publishes a card made offline as a GitHub issue and writes the issue's URL here, through `Set-P20CardLine` (the card keeps its id) | `linked`, `ado_url`, the repo filter (a card with no ADO link is never hidden by it), *Open in ADO* |
 | `**Billable:**` | `no` takes the card off Daily and the standup. **No line means billable** -- "billable again" removes the line | `Billable -No`, through `Set-P20CardLine` | Daily and Team Agile's standup (one reader a half: `card_billable`, `Test-P20CardBillable`); the *Not billable* tag. `stamps.billable` |
@@ -247,7 +247,9 @@ Active only -- it refuses a card that has any of those four lines (threaded work
 backlog). `Archive` takes a card from either folder, with the same `**Closed:**` stamp: a planned card
 can be retired without ever being in play. `StartWork` on a planned card is a stated refusal naming
 `Move <id> -To Active`: starting is the decision. The bucket a planned card is planned INTO is its
-milestone, the `**Sprint:**` line, read as on any other card.
+milestone, the `**Sprint:**` line, read as on any other card and written the same way, through
+`Plan <id> -Milestone "<title>"` ([CLI](../CLI.md)) -- which never pulls the card into `current/` first,
+since being planned before being pulled into play is exactly the point.
 
 **What a lane is called is the org's.** The five words above are what is stored, compared and served as
 `status` and never change; an org may name each lane for display -- `spaces[].laneNames.{backlog, active,

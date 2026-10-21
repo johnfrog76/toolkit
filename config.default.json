@@ -225,6 +225,19 @@
         "-Samples dresses a Demo copied out before the covers shipped: each sample card in this hub with no **Cover:** line gets the picture the package ships for it, through the same writer. Never a card that has a cover, never a card the sample does not ship, never a Space that is not a sample's. {cliPrefix}Update says when it is worth running; -WhatIf lists and writes nothing."
       ]
     },
+    "Plan": {
+      "category": "prompt",
+      "description": "Plan a card into a sprint or milestone",
+      "usage": "{cliPrefix}Plan <id|file> -Milestone <title> [-Help] | {cliPrefix}Plan <id|file> -Remove [-Help]",
+      "examples": [
+        "{cliPrefix}Plan K7M2 -Milestone \"M2 -- 1.2.0\"",
+        "{cliPrefix}Plan K7M2 -Remove"
+      ],
+      "notes": [
+        "Writes the card's **Sprint:** footer line, through Set-P20CardLine -- never a tracker call. The different, tracker-bound -Sprint on NewItem / EditItem sets a milestone on the work item itself, through gh / az; this verb touches nothing but the file. The title is written WHOLE, never truncated -- a card's own tile shortens it for display.",
+        "Found in current/ or backlog/, and never pulled into play: a backlog card is planned into a milestone before it is ever pulled into play, which is the point of planning one. Sprints are opt-in at every grain -- no verb here ever requires a card to carry one."
+      ]
+    },
     "GetPRComments": {
       "category": "pr",
       "description": "Fetch PR review comments into the card",

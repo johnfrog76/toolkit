@@ -114,11 +114,14 @@ describe("Remind me about this, on a board card", () => {
     await menuItems();
     fireEvent.click(screen.getByRole("menuitem", { name: "Remind me about this" }));
     const dialog = await screen.findByRole("dialog");
-    const what = within(dialog).getByRole("textbox", { name: /What/ }) as HTMLInputElement;
-    const ref = within(dialog).getByRole("textbox", { name: /Ref/ }) as HTMLInputElement;
+    // The dialog is a lazyPart -- its chunk, and the dialog's own content,
+    // can still be mounting after the "dialog" role itself appears, so every
+    // query inside it is awaited rather than a synchronous getBy*.
+    const what = (await within(dialog).findByRole("textbox", { name: /What/ })) as HTMLInputElement;
+    const ref = (await within(dialog).findByRole("textbox", { name: /Ref/ })) as HTMLInputElement;
     expect(what.value).toBe("Add retry to the upload client");
     expect(ref.value).toBe("401");
-    fireEvent.click(within(dialog).getByRole("button", { name: "Submit" }));
+    fireEvent.click(await within(dialog).findByRole("button", { name: "Submit" }));
     await waitFor(() =>
       expect(runNewReminder).toHaveBeenCalledWith({
         params: ["-Title", "Add retry to the upload client", "-Ref", "401"],

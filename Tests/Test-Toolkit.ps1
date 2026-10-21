@@ -47,6 +47,7 @@ param(
     [switch]$PromptStatus,
     [switch]$ThreadHash,
     [switch]$Billable,
+    [switch]$Plan,
     [switch]$Cover,
     [switch]$Design,
     [switch]$Move,
