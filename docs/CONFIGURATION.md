@@ -284,14 +284,15 @@ rules of the sum are in [`docs/modules/growth.md`](modules/growth.md#the-quarter
 
 ## `spaces[].laneNames` -- what this org calls its lanes
 
-Four org fields, display only: `laneNames.active`, `.inProgress`, `.codeReview`, `.done`. The board and
+Five org fields, display only: `laneNames.backlog`, `.active`, `.inProgress`, `.codeReview`, `.done`. The board and
 the list print them; the state stored in a card, compared by every verb and served as `status` is always
 the contract's word (`consts.json` `status`), and the CLI's `Status` prints those. Org-scoped like
 `sprintAwareness`, because which words fit is a fact about the org: a client's ADO board wants "Code
 Review", and the sample hub's Demo ships `To do / Doing / Waiting / Done` for someone with no team and
-no tracker. An org that says nothing is called by the four contract words, so an existing ADO org is
+no tracker. An org that says nothing is called by the five contract words, so an existing ADO org is
 untouched. `tkConfig -Set spaces.<slug>.laneNames.codeReview=Waiting -Hub`, or the org's section in
-Settings; a lane that is not one of the four is refused.
+Settings; a lane that is not one of the five is refused (`planned` among them: the planned lane is
+`backlog`, the folder's own word).
 
 ## `firstRun.welcome` -- the first-run banner
 
@@ -405,8 +406,9 @@ There is a **third** committed file beside those two, and it is not configuratio
 **`consts.json`** at the package root. It holds the literals that cross a half boundary -- the
 strings and patterns the CLI, the agent and the web UI must agree on to the character:
 `**Closed:**` and `**Created:**`, the `PR URL:` line, the `## PR Review Comments` heading, the
-three state names `Active` / `In Progress` / `Code Review`, the `current` and `archive` folder
-names, the `reviews/` file name and its `+` slug-set separator, the two regexes that derive a
+state names `Backlog` / `Active` / `In Progress` / `Code Review` / `Done`, the `current`, `archive` and
+`backlog` folder names (`backlog/` is a Space's third card folder: cards planned, not yet in play -- [the
+card](hub/cards.md), "State is derived, never stored"), the `reviews/` file name and its `+` slug-set separator, the two regexes that derive a
 card's state, **the shape of a card's id** (`regex.cardId`: a work item number, or the
 four-character id of a card with no work item -- at least one letter and one digit, no look-alike
 characters, uppercase; see [The workflow](CLI.md#the-workflow) and [the card](hub/cards.md), "The filename"),

@@ -139,6 +139,25 @@ The board's card and the list's row draw one action model (`cardActions.ts`), so
 | off, or not configured | **Open the card** -- no reminder item, and nothing of Organize is fetched |
 | on | **Remind me about this**: Organize's New Reminder dialog, the card's title as what and its id as the ref (`docs/modules/organize.md`, "The web UI") |
 
+### The board's lanes, by a card's status (`scenarios.test.tsx`; the rule is `legalMoves.ts`)
+
+Five lanes, in this order, and a card is drawn in the lane its served `status` names. Backlog is first:
+a new card is planned there (`NewPrompt` writes `backlog/` unless told `-Now`), and `/api/status` reads
+`backlog/` beside `current/`. Done is a drop target, not a list. A drop, or the card's **Move to** item,
+runs `Move` through the bridge -- the same verb for every lane (`docs/hub/cards.md`, "State is derived,
+never stored"):
+
+| A card's status | Its lane | It may be moved to | Refused, and why |
+| --- | --- | --- | --- |
+| Backlog | **Backlog**, first | Active, In Progress, Code Review, Done -- each pulls it into `current/` first | -- |
+| Active | Active | **Backlog** (nothing is threaded), In Progress, Code Review, Done | -- |
+| In Progress | In Progress | Code Review, Done | Backlog: *Threaded work is in play, not backlog.* Active: *A card travels one way.* |
+| Code Review | Code Review | Done | Backlog: *Threaded work is in play, not backlog.* Active, In Progress: one way |
+| Done | not drawn (Done is `archive/`) | nothing | every lane: one way |
+
+The Studio's foyer counts a row's cards **in play** and says the planned ones after the count, never in
+it: `1 card in play: 1 Active; 2 in Backlog`.
+
 ### The settings drawer's "How do I…" (settings by workflow; `HowDoI.test.tsx`)
 
 | Opened | What the section shows |

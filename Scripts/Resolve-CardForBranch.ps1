@@ -34,12 +34,16 @@ function Resolve-P20CardForBranch {
         Returns the full path of the card for $Branch in $CurrentDir, or $null.
         Never writes, never throws on a missing folder -- the caller states the
         refusal, because NewPR and ThreadHash word it differently.
+
+        $CurrentDir takes one folder or several, searched together: NewPR and
+        ThreadHash pass current/ AND backlog/, because their first write into a
+        backlog card is what pulls it into play (Scripts/Move-CardFolder.ps1).
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', 'Detailed', Justification = 'Read inside the $answer scriptblock, which the rule does not follow.')]
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Branch,
-        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$CurrentDir,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][AllowEmptyCollection()][AllowNull()][string[]]$CurrentDir,
         [switch]$Detailed
     )
 
@@ -50,7 +54,9 @@ function Resolve-P20CardForBranch {
         return $Path
     }
 
-    if (-not $Branch -or -not $CurrentDir -or -not (Test-Path $CurrentDir)) { return (& $answer $null @()) }
+    $dirs = @(@($CurrentDir) | Where-Object { $_ -and (Test-Path -LiteralPath $_) })
+    if (-not $Branch -or $dirs.Count -eq 0) { return (& $answer $null @()) }
+    $cardFiles = @(foreach ($d in $dirs) { Get-ChildItem -LiteralPath $d -Filter "*.prompt.md" -File -ErrorAction SilentlyContinue })
 
     # Match branch name to prompt filename
     # Branch: v-someone/223086-ms-teams-search-progress-...
@@ -60,7 +66,7 @@ function Resolve-P20CardForBranch {
     # -cmatch: an id with letters is UPPERCASE, so a lowercase branch word ("cat7-fix") is not one.
     if ($Branch -cmatch ('/((?:' + $idShape + ')-.+)$')) {
         $branchSuffix = $Matches[1]
-        $candidates = @(Get-ChildItem -Path $CurrentDir -Filter "*.prompt.md" -ErrorAction SilentlyContinue |
+        $candidates = @($cardFiles |
             Where-Object { ($_.BaseName -replace '\.prompt$', '') -eq $branchSuffix -or
                            $branchSuffix.StartsWith(($_.BaseName -replace '\.prompt$', '')) })
         if ($candidates.Count -eq 1) {
@@ -88,7 +94,7 @@ function Resolve-P20CardForBranch {
     if ($workItemId) {
         if (Test-P20IsWorkItemId $workItemId) { $workItemId = [string]([long]$workItemId) }
         $idPattern = Get-P20CardIdPattern -WorkItemTypes (Get-P20WorkItemTypes -Config $global:P20Config)
-        $candidates = @(Get-ChildItem -Path $CurrentDir -Filter "*.prompt.md" -ErrorAction SilentlyContinue |
+        $candidates = @($cardFiles |
             Where-Object { (Get-P20CardId -Name $_.Name -Pattern $idPattern) -eq $workItemId })
         if ($candidates.Count -eq 1) {
             return (& $answer $candidates[0].FullName @($candidates[0].Name))

@@ -40,11 +40,20 @@ the first one does, `-Commands` registers exactly what it lists, and a collision
 The loop, end to end. Everything accumulates in one file.
 
 ```powershell
-tkNewPrompt 113        # ADO card 113 -> prompt file in {promptsRoot}/{org}/current/
+tkNewPrompt 113        # ADO card 113 -> prompt file in {promptsRoot}/{org}/backlog/ -- planned
+tkNewPrompt 113 -Now   # ...or in {promptsRoot}/{org}/current/ -- in play at once
 ```
 
 Creates the file in the shape matching the work item type, seeded with the card's title,
 repro, acceptance criteria, sprint and link -- plus a suggested branch name.
+
+**A new card is planned, not in play.** It lands in the Space's `backlog/`, and `Status` lists it after
+the cards in play. It is pulled into `current/` when you decide -- `tkMove 113 -To Active` -- or by its
+first write: the first `tkThreadHash` into it, its `tkNewPR`, or `tkMove 113 -To InProgress`. Each of
+those MOVES the file to `current/` before it writes, so the flow below is typed exactly as it always was
+and the card arrives in play with its first commit on it. `-Now` skips the backlog. `tkMove <id> -To
+Backlog` parks an Active card again -- one with nothing threaded; anything threaded is in play and the
+verb refuses ([the card](hub/cards.md), "State is derived, never stored").
 
 **With no `az`, the same verb takes a title instead of an id**, makes no ADO call, and produces the
 same file with the board's fields marked not linked:
@@ -57,8 +66,9 @@ That is the Tier-2 entry point to everything below -- see
 [Creating a card with no ADO](#creating-a-card-with-no-ado).
 
 **`current/` is protected: a card travels one way.** Run `tkNewPrompt 113` again while card 113 is
-still in `current/` and you get *that card back* -- its path, exit 0, nothing written, and no ADO
-call, so the board card is not reassigned or moved either. A day's notes, commits and review rounds
+still in `current/` or `backlog/` and you get *that card back* -- its path, exit 0, nothing written, and no ADO
+call, so the board card is not reassigned or moved either (with `-Now` on a planned card, it also names
+`tkMove 113 -To Active`). A day's notes, commits and review rounds
 are never scaffolded over. The card is found by **id**, through the same rule `Archive` uses, so `Task113-an-older-title` is
 still card 113. There is no switch that overwrites; to start a card over, move or delete the file.
 
@@ -126,7 +136,7 @@ scratch file leaves nothing behind in the hub.
 And when it ships:
 
 ```powershell
-tkArchive <ID>         # move current/ -> archive/, and commit if storeSync is 'git'
+tkArchive <ID>         # move current/ (or backlog/) -> archive/, and commit if storeSync is 'git'
 tkArchive <filename>   # the long form; a partial name is named before it moves
 tkArchive -Relink      # rewrite every card's package links from where things are now
 ```
@@ -135,9 +145,9 @@ tkArchive -Relink      # rewrite every card's package links from where things ar
 
 ```powershell
 tkMyWork                     # Coffee in hand -- what's assigned to you
-tkNewPrompt 12345            # Work item 12345 blooms into current/ -- yours, Active
+tkNewPrompt 12345            # Work item 12345 blooms into backlog/ -- yours, planned
 # ... code, commit, push ...
-tkThreadHash                 # From the CODE repo: this branch's commits thread in; it now reads In Progress
+tkThreadHash                 # From the CODE repo: the card moves to current/, its commits thread in; In Progress
 tkNewPR                      # Open the PR; the card walks itself to Code Review
 tkGetPRComments              # Pull every review thread into the prompt file
 tkReplyPR 140123 1342185 -Reply "Fixed in abc1234." -Status fixed
@@ -193,6 +203,7 @@ never stored"):
 
 | Check | State |
 | --- | --- |
+| File is in `backlog/` | **Backlog** -- planned, not in play |
 | File is in `archive/` | **Done** |
 | A line starts `PR URL: https://`, or a footer line `**Review:**` | **Code Review** |
 | A line is a bullet with a 7+ character hex hash -- `- 80e2168 message` -- or a footer line `**Started:**` | **In Progress** |
@@ -215,7 +226,19 @@ into the footer, `-To CodeReview` writes `**Review:** <today>` ("look at this th
 a commit bullet as `PR URL:` does. A card travels one way: `Move` refuses a lane behind the card, and the
 way back is to remove the line by hand. Dropping a card on the board runs this verb through the bridge.
 The org may CALL its lanes what it likes (`spaces[].laneNames`, [Configuration](CONFIGURATION.md)); `Status`
-prints the contract's four words, because it is the ledger.
+prints the contract's five words, because it is the ledger.
+
+**Two lanes are folders.** `Move -To Active` moves a planned card from `backlog/` to `current/`, and
+`Move -To Backlog` moves an Active card back -- refused, exit 2, for a card with a commit bullet, a
+`PR URL:`, `**Started:**` or `**Review:**` (threaded work is in play, not backlog). Either move is a
+rename: the card's bytes are not touched. `-To InProgress` and `-To CodeReview` on a planned card pull it
+into `current/` first and then write their line, as `ThreadHash` and `NewPR` do -- one helper,
+`Scripts/Move-CardFolder.ps1` (`Invoke-P20PullIntoPlay`), so a card in `backlog/` never carries an
+in-play token.
+
+**`Status` lists the cards in play, then the backlog folded.** The numbered list is `current/`; after it,
+one block names `backlog/`: `Backlog (3), planned -- not in play:`, the file names on one line, and the
+`Move <id> -To Active` hint. A planned card is never a numbered row.
 
 #### The two dates a card carries, and the cards that never got them
 
@@ -401,7 +424,7 @@ As `{prefix}Command`. `tkMenu` lists them live; `tkMenu -All` shows everything;
 
 | Command | Does |
 | --- | --- |
-| `NewPrompt <id>` | Create a prompt file from the board's tracker: an ADO work item, or on a GitHub board an issue (`gh issue view`; the repo comes from a repo-grained address or the board's one `projects[]` entry -- several repos refuse, because issue numbers are per-repo; a label naming a card type sets the type, else Task; assignment and a closed issue's reopen prompt mirror the ADO flow). If card `<id>` is already in `current/` it is **returned, not overwritten** -- found by id, before any tracker call. On an Azure DevOps board it also reads the work item's comments, which needs an `az` token: with none (`az login` has not been run, or `az` printed nothing) it is a stated refusal (exit 2, naming `az login`) before any card is written or the work item assigned or moved |
+| `NewPrompt <id>` | Create a prompt file from the board's tracker: an ADO work item, or on a GitHub board an issue (`gh issue view`; the repo comes from a repo-grained address or the board's one `projects[]` entry -- several repos refuse, because issue numbers are per-repo; a label naming a card type sets the type, else Task; assignment and a closed issue's reopen prompt mirror the ADO flow). The card is written to the Space's `backlog/` -- planned, not in play -- and with **`-Now`** to `current/`. If card `<id>` is already in `current/` or `backlog/` it is **returned, not overwritten** -- found by id, before any tracker call. On an Azure DevOps board it also reads the work item's comments, which needs an `az` token: with none (`az login` has not been run, or `az` printed nothing) it is a stated refusal (exit 2, naming `az login`) before any card is written or the work item assigned or moved |
 | `NewPrompt -Title "..." [-Type <t>] [-Id <n>]` | The same file with **no ADO call** -- the Tier-2 way to start a card ([Tiers](#creating-a-card-with-no-ado)) |
 | `NewPrompt ... -Cover <image>` / `-Before <image>` | Make the card **with its picture**, attached by the same code `Cover` runs -- for a GUI issue the snap is the report. The picture is checked first, so a refused one writes no card; on a card that is already in `current/` (returned, not overwritten) nothing is attached and the line says to use `Cover` ([A card's picture](#a-cards-picture-cover)) |
 | `NewPrompt ... -Design <name\|id>` | Make the card **bound to the design it is worked against**: one header line under `> Template:` (after `> Previous round:` when there is one), `> Design: [<title>](<link>) <id>` -- the design's own title (a square bracket in it written round) and its whole id, the link relative to the card for a hub design and its page on GitHub (`/blob/HEAD/<path>`) for a repo design; a design with a spec links the spec. Resolved before anything is written or fetched, against the hub's `design/`, `spec/` and their archives, and the repository you stand in when its `origin` is one of the active Space's GitHub repos and it has `design/` -- one id in both is one design, and the repo's copy is named. What you type is read by the lifecycle's one rule (`Select-P20Design`, which `MoveDesign` asks too): a file name, its stem, or an id prefix of four or more. Nothing, or more than one, is a stated refusal (exit 2) and no card is written; on a card already in `current/` (returned, not overwritten) no line is written either. The corpus's hand-written `> Spec:` lines are read as written and never rewritten ([the card](hub/cards.md#2-the-sections----by-type-from-the-template)) |
@@ -410,9 +433,9 @@ As `{prefix}Command`. `tkMenu` lists them live; `tkMenu -All` shows everything;
 | `MyWork` | List work items assigned to you -- from the board's own tracker: WIQL through `az` on an ADO board, your assigned issues through `gh search issues` on a GitHub one (`-State open\|closed\|all` there, default open) |
 | `MyPRs` | List your active pull requests across the org -- on a GitHub board, PRs you authored and PRs awaiting your review (`gh search prs`), owner-wide |
 | `Dashboard` | Morning view -- PRs across projects, assigned items with staleness, recent pipeline runs. On a GitHub board the pipeline rows are Actions runs per repo (`gh run list`) |
-| `Status [-Board]` | Active prompts with progress and last-modified. `-Board` is an opt-in, read-only join against the board: each linked card's work item state, `(differs)` on a `current/` card whose item is closed ([the two can disagree](#3-the-two-can-disagree-and-nothing-notices)); refused with ADO off, no `az` or no sign-in |
-| `Archive <name>` | Move a prompt to `archive/`, and commit if the store is a git repo (`storeSync`). The commit stages the two folders the move touched (`current/` and `archive/`, nothing else in the hub), so a card created and archived before it was ever committed commits cleanly, and a tracked one is a rename. If git refuses the commit (a hook, say), the file has still moved: `Archive` states git's own sentence, exits 2 and says to commit it yourself or run `Sync`. A card that comes back for a second round first commits a rename of the earlier archived copy to `-r1`; if git refuses that commit, `Archive` stops before moving the card, names the rename, states git's own sentence and exits 2. A card that is already there answers `[=] Already archived: <path>` and exit 0: Archive touches no tracker, so twice is harmless. `CloseItem` and `NewPR` act on Azure DevOps and are not idempotent in this way |
-| `Move <id\|file> -To InProgress\|CodeReview\|Done` | Move a card to a lane **by hand**, for a card with nothing checked in or no pull request: In Progress writes `**Started:**`, Code Review writes `**Review:**`, Done is `Archive` exactly. A card travels one way; moving back is refused ([State](#state-three-machines-not-one)) |
+| `Status [-Board]` | Active prompts with progress and last-modified, then the backlog folded to a count and its names (`Backlog (N), planned -- not in play:`). `-Board` is an opt-in, read-only join against the board: each linked card's work item state, `(differs)` on a `current/` card whose item is closed ([the two can disagree](#3-the-two-can-disagree-and-nothing-notices)); refused with ADO off, no `az` or no sign-in |
+| `Archive <name>` | Move a prompt to `archive/` -- from `current/`, or from `backlog/` for a planned card retired without being in play -- and commit if the store is a git repo (`storeSync`). The commit stages the two folders the move touched (the one it left and `archive/`, nothing else in the hub), so a card created and archived before it was ever committed commits cleanly, and a tracked one is a rename. If git refuses the commit (a hook, say), the file has still moved: `Archive` states git's own sentence, exits 2 and says to commit it yourself or run `Sync`. A card that comes back for a second round first commits a rename of the earlier archived copy to `-r1`; if git refuses that commit, `Archive` stops before moving the card, names the rename, states git's own sentence and exits 2. A card that is already there answers `[=] Already archived: <path>` and exit 0: Archive touches no tracker, so twice is harmless. `CloseItem` and `NewPR` act on Azure DevOps and are not idempotent in this way |
+| `Move <id\|file> -To Backlog\|Active\|InProgress\|CodeReview\|Done` | Move a card to a lane **by hand**, for a card with nothing checked in or no pull request: In Progress writes `**Started:**`, Code Review writes `**Review:**`, Done is `Archive` exactly. Active and Backlog move the FILE: `-To Active` pulls a planned card from `backlog/` into `current/`, `-To Backlog` parks an Active card -- refused, exit 2, when anything is threaded. A planned card moved to In Progress or Code Review is pulled into `current/` first. Found in `current/` or `backlog/`. A card travels one way; moving back is refused ([State](#state-three-machines-not-one)) |
 | `Billable <id\|file> [-No]` | `-No` keeps a card **off Daily** and off Team Agile's standup; without it the card is billable again. A card is billable unless it says otherwise ([below](#the-third-line-billable)) |
 | `Cover <id\|file> <image> [-Before] [-Remove] [-WhatIf]` / `Cover -Samples [-WhatIf]` | Give a card a picture: copied into the Space's `assets/<card key>/`, named by a `**Cover:**` line (or `**Before:**`). Found in `current/` or `archive/`; attaching again replaces the card's own picture; a card that came back takes `cover-r2`; `-Remove` deletes the picture and the line; with `storeSync: git` the two are one commit, and a commit git refuses is a stated refusal (exit 2) that says the picture and the line are already written; `-Samples` dresses the sample cards of an older Demo that have no cover ([below](#a-cards-picture-cover)) |
 | `CloseItem <id> -Comment "..."` (formerly `CloseWorkItem`; `NewItem` was `NewAdoItem`, `EditItem` was `EditWorkItem` -- the old names still answer, with a one-time hint) | Close or resolve the tracker's card (`-Reason`, `-WhatIf`). On a GitHub board: `gh issue close`, where GitHub knows exactly two reasons -- the default and `Completed`/`Fixed` close as **completed**, the not-doing-it shorthands (`WontFix`, `Obsolete`, `Duplicate`, ...) close as **not planned**, and a word mapping to neither is refused with both named. The comment stays markdown there; GitHub renders it |
@@ -473,11 +496,11 @@ is LF like everything else, whatever `templates/ManagerSession.template.md` chec
 
 | Command | Does |
 | --- | --- |
-| `NewPR [<card>]` | PR + move card to Code Review + comment + write PR URL back to the file. `-WhatIf` resolves everything and calls nothing. On a GitHub board: `gh pr create` (repo from the checkout's github remote, else the board's one repo; `-Draft` and `-AutoComplete` map to draft and auto-merge), the PR body references the issue PLAINLY -- never `Closes #n`, because closing is `CloseItem`'s job -- and the ledger entry is a markdown comment on the issue; GitHub has no Code Review state to move, and the card's lane comes from the `PR URL:` line as ever |
+| `NewPR [<card>]` | PR + move card to Code Review + comment + write PR URL back to the file. `-WhatIf` resolves everything and calls nothing. On a GitHub board: `gh pr create` (repo from the checkout's github remote, else the board's one repo; `-Draft` and `-AutoComplete` map to draft and auto-merge), the PR body references the issue PLAINLY -- never `Closes #n`, because closing is `CloseItem`'s job -- and the ledger entry is a markdown comment on the issue; GitHub has no Code Review state to move, and the card's lane comes from the `PR URL:` line as ever. A card in `backlog/` is found too, and is moved to `current/` before its `PR URL:` is written |
 | `PublishPR [<card>]` | Stage 2 of the ship flow: flip the card's draft pull request on Azure DevOps to ready. Reads the card's `PR URL:` line (the card by id or filename, else the one for this branch from the code repository), takes the token `NewPR` takes, confirms the pull request is an active draft, sends `PATCH .../pullrequests/{id}?api-version=7.1` with `{"isDraft":false}`, and writes one line under `PR URL:` -- `PR published: <url>`, once, not a dated stamp and not state. `-WhatIf` prints the exact call and sends nothing. Refused, exit 2 and nothing written: no `PR URL:` line, a pull request already ready or not active, and a GitHub pull request, whose hint is `gh pr ready <url>` |
 | `GetPRComments [<id>]` | Fetch PR review comments and append to the prompt file -- every comment of every thread, a reviewer's follow-ups included; append-only and idempotent |
 | `ReplyPR <pr> <thread> -Reply "..."` | Post a reply to a PR thread (`-Status` to set its state) and fill that thread's `Reply:` slot in the card -- the card in `current/` whose `PR URL:` names the PR, else the branch's |
-| `ThreadHash [<id\|file>] [-Hash <h>]` | Thread **this repo's** branch commits into the Git section and PR replies. Run it from the code repo |
+| `ThreadHash [<id\|file>] [-Hash <h>]` | Thread **this repo's** branch commits into the Git section and PR replies. Run it from the code repo. A card in `backlog/` is found too, and its first thread moves it to `current/` before writing |
 | `AddPRReview <pr>` | Post an AI code review to a PR as inline comments (`-DryRun` to preview) |
 | `Sync` | Pull with rebase, then push, on the prompt store -- when `storeSync` is `git` (the hub's `hub.json`, or `config.local.json` per machine). The hub must be the **root** of its own repository: a hub sitting inside some other repository is refused before anything is committed, because `git add -A` from a subfolder stages that whole repository |
 
@@ -803,7 +826,7 @@ is off, and `SwitchSpace` brings them back in one that works with agents.
 | `Standup [-Space <slug>] [-AsJson] [-Brief] [-Grain <detail\|work\|brief>] [-Since <yyyy-MM-dd>] [-Remind <HH:mm>] [-Days <Mon,Tue,...>] [-Walk]` | `features.solitaireAgile` | Today's standup for the Space you are in; each item says what moved after its number where that adds to its slot -- `started` (its card began in the window) and its card's commits (`#141 (started, 2 commits) Count the commits`, `#143 (2 commits) Rename the slug`); closed under Yesterday and in progress under Today are the slot's own word and not repeated -- and the brief opens on the counts line (`Since <day>: 3 closed, 1 started, 2 in progress, 7 commits.`, a hash counted once however many cards thread it); `-Since <yyyy-MM-dd>` widens yesterday back to that day, so everything closed or archived since then is said and counted -- today and the blockers stay what is open now, and it is not `-Days`, which is the reminder's cadence (a day that is not one, one after today, or `-Since` with `-Remind` is a stated refusal); `-Grain` picks the register of detail: `detail`, the default, every item with its number; `work`, the ritual's grain -- each worker's items grouped by milestone, else the design card the issue names, else the titles' common stem, spoken as standup prose, one sentence a group, no model (`Opus: Yesterday I closed two in Team Agile (#<n>, #<n>). Nothing blocked.`); `brief`, the same as `-Brief` -- a word that is not a grain, or `-Brief` with another, is a stated refusal; `-Walk` prints only the walk list -- each open `verify-close` issue by number with the VERIFY.md Gate 12 row that names it under it, or `no VERIFY row -- close on the issue's own words` (`-AsJson`: `walk[]` of `number`, `title`, `url`, `verifyRow`; not with `-Remind`; a read, it does not re-arm the reminder); `-Remind <HH:mm> [-Days ...]` writes the Organize reminder that wakes the bell before it (source `standup`, needs `features.organize`), and opening the standup re-arms it for the next day in the cadence -- archive the reminder in Organize to stop it. Also: (or the declared Space `-Space` names): what is waiting on you -- every open `verify-close` issue -- then one block per worker label ("Routed to \<Name> -- ..."), yesterday, today and blockers from the Space's GitHub issues. A local Space (no tracker address, or status `local`) fills from its own cards instead -- one tile named for the Space, Code Review waiting on you. An Azure DevOps Space, or a tracker that does not answer, still prints, the reason on its `Tracker` line, exit 0. `-AsJson` prints the agent's response shape, `text`, `work` and `brief` included -- all but `spoken`, the agent's model dress: the CLI calls no model, and `-Grain work` prints the prose. `-Brief` prints only the chair's reading: a few lines, each a count or a derived fact -- what waits on you by kind, each worker as closed / open / in flight / blockers, the one thing next -- with no model, and it does not re-arm the reminder. Writes nothing ([Team Agile](modules/solitaire-agile.md)) |
 | `Triage [-Space <slug>] [-AsJson]` | `features.solitaireAgile` | The Space's open GitHub issues grouped by milestone: the ones in **no** milestone first, then each milestone with most open first, under its context line "N open, M routed, K unrouted". One line an issue -- number, title, worker (its size: the worker label is the size) or `--`, severity or `--`, `deep-water` marked. An Azure DevOps or local Space, or `gh` not answering, prints a `Tracker` line and exits 0. `-AsJson` is `GET /api/ritual/triage`'s shape. Writes nothing ([Team Agile](modules/solitaire-agile.md)) |
 | `Route <n> [-Size <label>] [-Milestone <title>] [-Severity <sev>] [-DeepWater] [-Space <slug>] [-WhatIf]` | `features.solitaireAgile` | Answer triage's three questions for issue `<n>`, **one `gh issue edit` per switch**: `-Size` adds that worker label and removes the other sizes, `-Milestone` sets an open milestone by title, `-Severity` adds `sev1`/`sev2`/`sev3` and removes the other two, `-DeepWater` adds `deep-water` and prints deep water's two moves -- Fable (`Route <n> -Size fable`) or split (`NewItem -Parent <n> -Title <text>`, each piece a sub-issue). `-WhatIf` prints every write and makes none. Refused with exit 2 and nothing written: no number, no switch, an unknown severity, a size that is no worker label on the repo, a milestone that is not open there (the hint lists them), an undeclared or non-GitHub Space. Writes nothing to the hub ([Team Agile](modules/solitaire-agile.md)) |
-| `StartWork <id> [-Clip] [-Prompt <path>] [-Space <slug>]` | `features.solitaireAgile` | Print **one markdown block** a cold agent can start the work from, and nothing else: `# Start work: <Kind> <id> -- <title>`, then how we work in this Space (its `how-we-work.md`, else one sentence from `spaces[].howIWork`), the card whole -- commit bullets, `PR URL:` and footer included, CRLF read as LF -- and the kind's prompt from `startWork.prompts`, each heading naming the file it came from. `<id>` is a card in `current/` (an id is never a substring), else the Space's GitHub issue of that number. `-Clip` copies it and says so in one line; `-Prompt` carries another prompt for this call. Refused with exit 2: no id, nothing matching, an archived card, a closed issue or a pull request, an Azure DevOps Space, a partial name from the bridge, a kind with no prompt row or a row whose file is missing (naming `startWork.prompts.<kind>`). Writes nothing ([Team Agile](modules/solitaire-agile.md)) |
+| `StartWork <id> [-Clip] [-Prompt <path>] [-Space <slug>]` | `features.solitaireAgile` | Print **one markdown block** a cold agent can start the work from, and nothing else: `# Start work: <Kind> <id> -- <title>`, then how we work in this Space (its `how-we-work.md`, else one sentence from `spaces[].howIWork`), the card whole -- commit bullets, `PR URL:` and footer included, CRLF read as LF -- and the kind's prompt from `startWork.prompts`, each heading naming the file it came from. `<id>` is a card in `current/` (an id is never a substring), else the Space's GitHub issue of that number. `-Clip` copies it and says so in one line; `-Prompt` carries another prompt for this call. Refused with exit 2: no id, nothing matching, an archived card, a card in `backlog/` (naming `Move <id> -To Active`), a closed issue or a pull request, an Azure DevOps Space, a partial name from the bridge, a kind with no prompt row or a row whose file is missing (naming `startWork.prompts.<kind>`). Writes nothing ([Team Agile](modules/solitaire-agile.md)) |
 
 > **`SendTeams` posts to a real webhook.** Use `-WhatIf` first: every gate runs, the markdown is
 > formatted, and the would-be payload comes back unsent. See
@@ -866,8 +889,9 @@ tkNewPrompt -Title "Timeout on large files" -Type Bug  # Tier 2: scaffold from n
 
 `-Title` is what makes it offline. Nothing about the resulting file is second class: it is built by
 the same code, in the same shape, with the same house-style filename and branch
-(`K7M2-timeout-on-large-files.prompt.md`, `you/K7M2-timeout-on-large-files`), and `Status` reads it as
-**Active** the moment it lands. `ThreadHash`, `Archive` and the rest work on it unchanged.
+(`K7M2-timeout-on-large-files.prompt.md`, `you/K7M2-timeout-on-large-files`), and `Status` lists it under
+**Backlog** the moment it lands (**Active** with `-Now`). `ThreadHash`, `Archive` and the rest work on it
+unchanged -- the first `ThreadHash` pulls it into `current/`.
 
 - **`-Type`** is `Task` (the default), `Bug`, `User Story` (or `UserStory`), `Feature`, **`Spike`**,
   **`Meeting`**, or any key a team has added to `workItemTypes`. An unknown one is refused by name

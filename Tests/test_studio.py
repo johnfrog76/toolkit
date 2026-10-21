@@ -244,7 +244,13 @@ class TheEnv(ThreeSpaceHub):
         self.assertEqual(spaces["ado"]["laneNames"]["Code Review"], "Code Review")
         self.assertEqual(
             spaces["a"]["laneNames"],
-            {"Active": "Active", "In Progress": "In Progress", "Code Review": "Code Review", "Done": "Done"},
+            {
+                "Backlog": "Backlog",
+                "Active": "Active",
+                "In Progress": "In Progress",
+                "Code Review": "Code Review",
+                "Done": "Done",
+            },
         )
 
 

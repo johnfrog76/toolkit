@@ -25,6 +25,7 @@ describe("laneLabel", () => {
 // between the two rather than each caller carrying its own copy.
 describe("laneConfigKey", () => {
   it("builds the dotted config key for each contract word, camelCase", () => {
+    expect(laneConfigKey("demo", "Backlog")).toBe("spaces.demo.laneNames.backlog");
     expect(laneConfigKey("demo", "Active")).toBe("spaces.demo.laneNames.active");
     expect(laneConfigKey("demo", "In Progress")).toBe("spaces.demo.laneNames.inProgress");
     expect(laneConfigKey("demo", "Code Review")).toBe("spaces.demo.laneNames.codeReview");

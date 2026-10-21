@@ -158,7 +158,8 @@
       ],
       "notes": [
         "An all-digit argument is an ID and matches only the card whose id is exactly that number -- '{cliPrefix}Archive 39' never reaches Task139.",
-        "-Relink rewrites every card's Template and workflow links in current/ and archive/ from where the hub and the package are now, and archives nothing."
+        "Archives a card from current/ or backlog/: a planned card can be retired without being in play, with the same Closed stamp.",
+        "-Relink rewrites every card's Template and workflow links in current/, backlog/ and archive/ from where the hub and the package are now, and archives nothing."
       ]
     },
     "Status": {
@@ -173,19 +174,25 @@
       "switches": {
         "-Board": "Also read each linked card's work item state from the board and flag a card in current/ whose item is closed. Read-only; needs Azure DevOps on and az signed in",
         "-Help": "This"
-      }
+      },
+      "notes": [
+        "The cards in play (current/), numbered; then the backlog (backlog/) folded to a count and its names -- planned, not in play."
+      ]
     },
     "Move": {
       "category": "prompt",
       "description": "Move a card to a lane by hand",
-      "usage": "{cliPrefix}Move <id|file> -To InProgress|CodeReview|Done [-Help]",
+      "usage": "{cliPrefix}Move <id|file> -To Backlog|Active|InProgress|CodeReview|Done [-Help]",
       "examples": [
+        "{cliPrefix}Move K7M2 -To Active",
+        "{cliPrefix}Move K7M2 -To Backlog",
         "{cliPrefix}Move K7M2 -To InProgress",
         "{cliPrefix}Move K7M2 -To CodeReview",
         "{cliPrefix}Move K7M2 -To Done"
       ],
       "notes": [
         "In Progress writes **Started:**, Code Review writes **Review:**, Done is Archive. A card travels one way.",
+        "Backlog and Active are folders: -To Active moves a planned card from backlog/ into current/, -To Backlog parks a card with nothing threaded (no commit, PR URL, Started or Review line) -- anything threaded is refused. A backlog card moved to InProgress or CodeReview is pulled into current/ first.",
         "For a card with nothing checked in, or no pull request -- the tokens git or NewPR would have written."
       ]
     },
@@ -483,9 +490,10 @@
       "category": "work",
       "description": "Create a prompt file from an ADO work item",
       "descriptionWithoutAdo": "Make a card: -Title names it, -Type its kind",
-      "usage": "{cliPrefix}NewPrompt <WorkItemId> | -Title <text> [-Type <name>] [-Id <id>] [-Date <date>] [-AssignTo <email>] [-ReadOnly] [-Force] [-OutputFolder <name>] [-Cover <image>] [-Before <image>] [-Design <name|id>] [-Help]",
+      "usage": "{cliPrefix}NewPrompt <WorkItemId> | -Title <text> [-Type <name>] [-Id <id>] [-Date <date>] [-AssignTo <email>] [-ReadOnly] [-Force] [-Now] [-OutputFolder <name>] [-Cover <image>] [-Before <image>] [-Design <name|id>] [-Help]",
       "examples": [
         "{cliPrefix}NewPrompt 12345",
+        "{cliPrefix}NewPrompt 12345 -Now   # in play at once: current/, not the backlog",
         "{cliPrefix}NewPrompt -Title \"Timeout on large files\" -Type Bug",
         "{cliPrefix}NewPrompt -Title \"Wallet ticket from a QR code\" -Type Spike   # a card with no work item gets a short id: Spike-K7M2-...",
         "{cliPrefix}NewPrompt -Title \"Import flow\" -Type UserStory -Id 144",
@@ -494,6 +502,7 @@
         "{cliPrefix}NewPrompt -Title \"Lanes, part one\" -Design board-ideas   # bound to the design it is worked against"
       ],
       "notes": [
+        "A new card is planned: it lands in the Space's backlog/, and Move <id> -To Active, its first ThreadHash or its NewPR pulls it into current/. -Now puts it in current/ at once.",
         "Offline: -Title makes the same card with no ADO (Tier 2); it gets a short id of its own. -Type picks the kind of thing it is.",
         "-Date YYYY-MM-DD sets **Created:** to the day the work was -- a meeting attended yesterday -- so Daily lands the card on that day.",
         "-Cover / -Before <image> attach a picture as the card is made, through the same code as Cover. The picture is checked first, so a refused one writes no card.",

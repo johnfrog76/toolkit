@@ -190,17 +190,27 @@ function Resolve-P20CardArgument {
         Returns @{ Match = <FileInfo[]>; IsId = <bool>; Fuzzy = <bool> }. An id
         is compared ignoring case: macOS and Windows file systems do, and the
         person at the keyboard does.
+
+        -Folder takes ONE folder or SEVERAL, searched together, in the order
+        given. A verb names the folders it means on purpose: the ones that act
+        on a card in play or planned pass current/ AND backlog/ (a card is in
+        exactly one of them), so `Move K7M2 -To Active` finds a backlog card by
+        the same rule `Move K7M2 -To InProgress` finds a current one. A match in
+        more than one folder is returned as more than one match -- the caller's
+        "matches N cards" refusal, never a guess.
     #>
     param(
         [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Argument,
-        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Folder,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][AllowEmptyCollection()][AllowNull()][string[]]$Folder,
         [hashtable]$WorkItemTypes
     )
 
     $result = @{ Match = @(); IsId = $false; Fuzzy = $false }
     $candidates = @()
-    if ($Folder -and (Test-Path -LiteralPath $Folder)) {
-        $candidates = @(Get-ChildItem -LiteralPath $Folder -File -ErrorAction SilentlyContinue)
+    foreach ($one in @($Folder)) {
+        if ($one -and (Test-Path -LiteralPath $one)) {
+            $candidates += @(Get-ChildItem -LiteralPath $one -File -ErrorAction SilentlyContinue)
+        }
     }
     if (Test-P20IsCardId $Argument) {
         $result.IsId = $true

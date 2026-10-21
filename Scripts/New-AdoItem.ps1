@@ -228,15 +228,16 @@ if ($PSBoundParameters.ContainsKey('FromCard')) {
     $cardFolders = Get-PromptFolders
     $found = @()
     $isId = $false
-    foreach ($folder in @($cardFolders.Current, $cardFolders.Archive)) {
+    . (Join-Path $PSScriptRoot 'Move-CardFolder.ps1')
+    foreach ($folder in @($cardFolders.Current, (Get-P20BacklogFolder -Folders $cardFolders), $cardFolders.Archive)) {
         $resolved = Resolve-P20CardArgument -Argument $FromCard -Folder $folder -WorkItemTypes $cardTypes
         $isId = $resolved.IsId
         $found = @($resolved.Match | Where-Object { $_.Name -like '*.md' })
         if ($found.Count -gt 0) { break }
     }
     if ($found.Count -eq 0) {
-        $said = "No card matching '$FromCard' in current/ or archive/."
-        if ($isId) { $said = "No card with id '$FromCard' in current/ or archive/." }
+        $said = "No card matching '$FromCard' in current/, backlog/ or archive/."
+        if ($isId) { $said = "No card with id '$FromCard' in current/, backlog/ or archive/." }
         Write-CliError -Message $said -Hint "Run '$(Get-CliPrefix)Status' to see the cards; -FromCard takes a card's id or its file name."
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }

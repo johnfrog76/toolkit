@@ -519,7 +519,7 @@ try {
     }
 
     # A hub design, by its file's stem, from a folder that is no repository.
-    $out = Invoke-DesignVerb 'solo' $dBase "${prefix}NewPrompt -Title 'Lanes, part one' -Type Task -Design board-ideas"
+    $out = Invoke-DesignVerb 'solo' $dBase "${prefix}NewPrompt -Now -Title 'Lanes, part one' -Type Task -Design board-ideas"
     $card = Get-NewCard 'solo' 'Task*-lanes-part-one.prompt.md'
     Assert-True '-Design writes the card (exit 0)' ($card.Count -eq 1 -and $out -match 'EXIT=0') $out
     $text = ''
@@ -534,7 +534,7 @@ try {
     Assert-True 'the verb says which design, its state and where' ($out -match ('Worked against the design ' + $boardId.Substring(0, 8) + ' Board ideas: the \[next\] lane \(Design, the hub''s design/board-ideas\.md\)')) $out
 
     # By an id prefix; a design with a spec links its spec.
-    $out = Invoke-DesignVerb 'solo' $dBase "${prefix}NewPrompt -Title 'Lanes, part two' -Design 53913fc8"
+    $out = Invoke-DesignVerb 'solo' $dBase "${prefix}NewPrompt -Now -Title 'Lanes, part two' -Design 53913fc8"
     $card = Get-NewCard 'solo' 'Task*-lanes-part-two.prompt.md'
     $text = ''
     if ($card.Count -eq 1) { $text = [System.IO.File]::ReadAllText($card[0].FullName) }
@@ -542,28 +542,28 @@ try {
 
     # Two, and none: stated refusals, and no card.
     $before = @(Get-ChildItem (Join-Path $dHub 'solo/current') -File).Count
-    $out = Invoke-DesignVerb 'solo' $dBase "${prefix}NewPrompt -Title 'Which twin' -Design ab12"
+    $out = Invoke-DesignVerb 'solo' $dBase "${prefix}NewPrompt -Now -Title 'Which twin' -Design ab12"
     Assert-True 'a prefix that names two designs is refused, naming both (exit 2)' ($out -match "'ab12' names 2 designs" -and $out -match 'Twin A' -and $out -match 'Twin B' -and $out -match 'EXIT=2') $out
-    $out2 = Invoke-DesignVerb 'solo' $dBase "${prefix}NewPrompt -Title 'Nowhere' -Design no-such-design"
+    $out2 = Invoke-DesignVerb 'solo' $dBase "${prefix}NewPrompt -Now -Title 'Nowhere' -Design no-such-design"
     Assert-True 'a name that resolves to nothing is refused (exit 2)' ($out2 -match "No design named 'no-such-design'" -and $out2 -match 'EXIT=2') $out2
     Assert-True 'and neither refusal writes a card' ((@(Get-ChildItem (Join-Path $dHub 'solo/current') -File).Count) -eq $before)
     Assert-True 'and each says it once, not wrapped in a generic error' (-not ($out -match 'exit code 2') -and -not ($out2 -match 'exit code 2')) ($out + $out2)
 
     # The repository you stand in, when it is the Space's: its design's GitHub page,
     # and one id in both trees is the repo's.
-    $out = Invoke-DesignVerb 'widgets' $dRepo "${prefix}NewPrompt -Title 'From the repo' -Design repo-note"
+    $out = Invoke-DesignVerb 'widgets' $dRepo "${prefix}NewPrompt -Now -Title 'From the repo' -Design repo-note"
     $card = Get-NewCard 'widgets' 'Task*-from-the-repo.prompt.md'
     $text = ''
     if ($card.Count -eq 1) { $text = [System.IO.File]::ReadAllText($card[0].FullName) }
     Assert-True 'a repo design is linked by its page on the Space''s GitHub repo' ($text -match ('(?m)^> Design: \[Repo note\]\(https://github\.com/acme/widgets/blob/HEAD/design/repo-note\.md\) ' + $repoOnly + '$')) ($out + "`n" + $text)
-    $out = Invoke-DesignVerb 'widgets' $dRepo "${prefix}NewPrompt -Title 'Promoted one' -Design $($boardId.Substring(0, 6))"
+    $out = Invoke-DesignVerb 'widgets' $dRepo "${prefix}NewPrompt -Now -Title 'Promoted one' -Design $($boardId.Substring(0, 6))"
     $card = Get-NewCard 'widgets' 'Task*-promoted-one.prompt.md'
     $text = ''
     if ($card.Count -eq 1) { $text = [System.IO.File]::ReadAllText($card[0].FullName) }
     Assert-True 'an id in the hub and in the repo is one design, and the repo''s copy is named' ($text -match '(?m)^> Design: \[Board ideas, in the product\]\(https://github\.com/acme/widgets/blob/HEAD/design/board-ideas\.md\) ') ($out + "`n" + $text)
 
     # A repository that is not the Space's is not read.
-    $out = Invoke-DesignVerb 'widgets' $elsewhere "${prefix}NewPrompt -Title 'Not ours' -Design stranger"
+    $out = Invoke-DesignVerb 'widgets' $elsewhere "${prefix}NewPrompt -Now -Title 'Not ours' -Design stranger"
     Assert-True 'a repository whose origin is not the Space''s is not read for designs' ($out -match "No design named 'stranger'" -and $out -match 'EXIT=2') $out
 
     $out = Invoke-DesignVerb 'solo' $dBase "${prefix}NewPrompt -Help"

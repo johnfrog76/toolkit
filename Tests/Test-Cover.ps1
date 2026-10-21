@@ -188,8 +188,8 @@ try {
     [void](New-Png (Join-Path $srcDir 'before.png') 3)
     [System.IO.File]::WriteAllBytes((Join-Path $srcDir 'snap.jpg'), [byte[]](0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3))
 
-    $out = Invoke-Verbs ("${prefix}NewPrompt -Title 'Import from a photo' -Type Spike -Id K7M2 | Out-Null; " +
-        "${prefix}NewPrompt -Title 'Extract unit conversion' -Type Task -Id Q4R9 | Out-Null; " +
+    $out = Invoke-Verbs ("${prefix}NewPrompt -Now -Title 'Import from a photo' -Type Spike -Id K7M2 | Out-Null; " +
+        "${prefix}NewPrompt -Now -Title 'Extract unit conversion' -Type Task -Id Q4R9 | Out-Null; " +
         "'HELP-BEGIN'; ${prefix}Cover -Help; 'HELP-END'")
     $usage = [regex]::Match($out, '(?s)HELP-BEGIN(.*)HELP-END').Groups[1].Value
     Assert-True '-Help names the verb with the registered prefix' ($usage -match [regex]::Escape("${prefix}Cover <id|file> <image>")) $usage
@@ -252,7 +252,7 @@ try {
     Write-Host "-- Rounds share a folder: a second round takes cover-r2" -ForegroundColor Cyan
 
     $out = Invoke-Verbs ("${prefix}Archive K7M2 | Out-Null; " +
-        "${prefix}NewPrompt -Title 'Import from a photo' -Type Spike -Id K7M2 | Out-Null; " +
+        "${prefix}NewPrompt -Now -Title 'Import from a photo' -Type Spike -Id K7M2 | Out-Null; " +
         "${prefix}Cover K7M2 ./after.png; 'ROUND-EXIT=' + `$LASTEXITCODE")
     $archived = Find-Card 'Spike-K7M2-*.prompt.md' 'archive'
     $round2 = Find-Card 'Spike-K7M2-*.prompt.md' 'current'
@@ -274,8 +274,8 @@ try {
     Write-Host ""
     Write-Host "-- NewPrompt -Cover / -Before: born with the picture --" -ForegroundColor Cyan
 
-    $out = Invoke-Verbs ("${prefix}NewPrompt -Title 'Tags overlap in search' -Type Bug -Id 214 -Before ./before.png -Cover ./snap.jpg; 'BORN-EXIT=' + `$LASTEXITCODE; " +
-        "${prefix}NewPrompt -Title 'Refused at birth' -Type Task -Id V9TA -Before ./notes.txt; 'BADBIRTH-EXIT=' + `$LASTEXITCODE")
+    $out = Invoke-Verbs ("${prefix}NewPrompt -Now -Title 'Tags overlap in search' -Type Bug -Id 214 -Before ./before.png -Cover ./snap.jpg; 'BORN-EXIT=' + `$LASTEXITCODE; " +
+        "${prefix}NewPrompt -Now -Title 'Refused at birth' -Type Task -Id V9TA -Before ./notes.txt; 'BADBIRTH-EXIT=' + `$LASTEXITCODE")
     $born = Find-Card '214-*.prompt.md' 'current'
     Assert-True 'NewPrompt -Before -Cover makes the card and exits 0' ($out -match 'BORN-EXIT=0' -and $born.Count -eq 1) $out
     if ($born.Count -eq 1) {

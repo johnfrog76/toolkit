@@ -133,6 +133,14 @@ Assert-Status "review-heading-no-url.md -> In Progress (the line is the gate, no
 Assert-Status "started-line.md      -> In Progress (a person said so, nothing committed)" 'In Progress' (Get-PromptFileStatus $startedContent)
 Assert-Status "review-line.md       -> Code Review (a person said look at this, no PR)" 'Code Review' (Get-PromptFileStatus $reviewLineContent)
 
+# -- The folder states, read first: one shared table ---------------------------
+# Tests/fixtures/parsers/states.json -- Tests/test_parsers.py asserts the SAME
+# rows against card_status, so the two halves cannot read a folder differently.
+$stateTable = Get-Content (Join-Path $fixtureDir 'states.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+foreach ($row in @($stateTable.rows)) {
+    Assert-Status "states.json: $($row.name)" ([string]$row.status) (Get-PromptFileStatus -Content ([string]$row.content) -Folder ([string]$row.folder))
+}
+
 # -- Edge case: empty file is Active ------------------------------------------
 
 Assert-Status "empty content        -> Active"      'Active'      (Get-PromptFileStatus '')
@@ -304,6 +312,7 @@ exit `$LASTEXITCODE
 
 try {
     New-Item -ItemType Directory -Path (Join-Path $scratchHub 'test/current') -Force | Out-Null
+    # A new card is PLANNED: with no -Now it lands in the Space's backlog/.
 
     $r = Invoke-OfflineNewPrompt -ArgLine "-Title 'Timeout on large files' -Type Bug"
     Assert-True "offline -Title exits 0" ($r.ExitCode -eq 0) $r.Output
@@ -311,14 +320,14 @@ try {
 
     # A card with no work item gets a short lettered id, not "1" (see
     # docs/hub/cards.md, "The filename"): find the file by its shape.
-    $bugFile = @(Get-ChildItem (Join-Path $scratchHub 'test/current') -Filter '*-timeout-on-large-files.prompt.md' |
+    $bugFile = @(Get-ChildItem (Join-Path $scratchHub 'test/backlog') -Filter '*-timeout-on-large-files.prompt.md' |
         Where-Object { $_.Name -cmatch '^[A-Z0-9]{4}-timeout-on-large-files\.prompt\.md$' -and $_.Name -cmatch '^[A-Z0-9]*[A-Z]' })
-    $bug = if ($bugFile.Count -eq 1) { $bugFile[0].FullName } else { Join-Path $scratchHub 'test/current/(none)' }
+    $bug = if ($bugFile.Count -eq 1) { $bugFile[0].FullName } else { Join-Path $scratchHub 'test/backlog/(none)' }
     $bugId = if ($bugFile.Count -eq 1) { $bugFile[0].Name.Substring(0, 4) } else { '' }
     Assert-True "a Bug files bare, house style: {id}-{slug}" (Test-Path $bug) $r.Output
     if (Test-Path $bug) {
         $text = Get-Content $bug -Raw
-        Assert-Status "Status reads the scaffolded card as Active" 'Active' (Get-PromptFileStatus $text)
+        Assert-Status "Status reads the scaffolded card as Backlog -- a new card is planned" 'Backlog' (Get-PromptFileStatus $text -Folder (Split-Path $bug -Parent))
         Assert-True "the header carries type, id and title" ($text -cmatch ('(?m)^# Bug ' + $bugId + ': Timeout on large files')) $text
         Assert-True "the ADO Link says it is not linked" ($text -match '(?m)^\*\*ADO Link:\*\* \(not linked') $text
         Assert-True "the Sprint says it is not linked" ($text -match '(?m)^\*\*Sprint:\*\* \(not linked\)') $text
@@ -330,7 +339,7 @@ try {
     # A User Story takes the US- prefix and the three-segment branch, so the
     # offline path really is going through the same house-style table.
     $r = Invoke-OfflineNewPrompt -ArgLine "-Title 'Import flow' -Type UserStory -Id 144"
-    $story = Join-Path $scratchHub 'test/current/US-144-import-flow.prompt.md'
+    $story = Join-Path $scratchHub 'test/backlog/US-144-import-flow.prompt.md'
     Assert-True "'UserStory' resolves to the 'User Story' shape" (Test-Path $story) $r.Output
     if (Test-Path $story) {
         Assert-True "a story branch carries the third segment" ((Get-Content $story -Raw) -match '(?m)^someone/144/import-flow') ''
@@ -339,7 +348,7 @@ try {
     # No -Id: a short lettered id that no card carries -- never "the next number",
     # which would sooner or later be a real work item's.
     $r = Invoke-OfflineNewPrompt -ArgLine "-Title 'Spike the cache layer'"
-    $made = @(Get-ChildItem (Join-Path $scratchHub 'test/current') -Filter 'Task*-spike-the-cache-layer.prompt.md')
+    $made = @(Get-ChildItem (Join-Path $scratchHub 'test/backlog') -Filter 'Task*-spike-the-cache-layer.prompt.md')
     Assert-True "no -Id takes a lettered id, not the next number" `
         ($made.Count -eq 1 -and $made[0].Name -cmatch '^Task[A-Z0-9]{4}-' -and $made[0].Name -notmatch '^Task\d+-') $r.Output
 
@@ -354,7 +363,13 @@ try {
     Assert-True "and the file was not touched" ((Get-Item $story).LastWriteTimeUtc -eq $before) ''
     $r = Invoke-OfflineNewPrompt -ArgLine "-Title 'A different title for the same id' -Type UserStory -Id 144"
     Assert-True "the same id under ANOTHER title is returned too, not written beside it" `
-        ($r.ExitCode -eq 0 -and @(Get-ChildItem (Join-Path $scratchHub 'test/current') -Filter 'US-144-*').Count -eq 1) $r.Output
+        ($r.ExitCode -eq 0 -and @(Get-ChildItem (Join-Path $scratchHub 'test/backlog') -Filter 'US-144-*').Count -eq 1) $r.Output
+
+    # -Now: in play at once, in current/ -- exactly what the verb did before backlog/ existed.
+    $r = Invoke-OfflineNewPrompt -ArgLine "-Title 'Right now' -Type Task -Id 145 -Now"
+    Assert-True "-Now writes the card to current/, not backlog/" ((Test-Path (Join-Path $scratchHub 'test/current/Task145-right-now.prompt.md')) -and -not (Test-Path (Join-Path $scratchHub 'test/backlog/Task145-right-now.prompt.md'))) $r.Output
+    $r = Invoke-OfflineNewPrompt -ArgLine "-Title 'Right now, again' -Type Task -Id 145"
+    Assert-True "an id already in current/ is returned by a call with no -Now too: both open folders are asked" ($r.ExitCode -eq 0 -and $r.Output -match 'already in test/current/' -and @(Get-ChildItem (Join-Path $scratchHub 'test') -Recurse -Filter 'Task145-*').Count -eq 1) $r.Output
 
     # Refusals, stated.
 

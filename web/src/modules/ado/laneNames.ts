@@ -9,6 +9,7 @@ import { STATUS } from "../../shell/consts";
  * editor that writes a lane's label never has to know both spellings itself.
  */
 export const LANE_FIELD_KEY: Record<string, string> = {
+  [STATUS.backlog]: "backlog",
   [STATUS.active]: "active",
   [STATUS.inProgress]: "inProgress",
   [STATUS.codeReview]: "codeReview",

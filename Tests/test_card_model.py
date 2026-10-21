@@ -167,6 +167,27 @@ class TheRouteServesTheModel(unittest.TestCase):
         self.assertEqual(card["status"], "In Progress")
         self.assertEqual(card["progress"], "1/2")
 
+    def test_a_card_in_backlog_is_served_as_backlog_and_listed_after_the_cards_in_play(self):
+        """backlog/ is the Space's third card folder (docs/hub/cards.md): the route
+        reads it beside current/, the folder state is read FIRST -- a commit bullet
+        there is still Backlog -- and the ledger's order puts it after the cards in
+        play. The card's own page finds it too."""
+        backlog = Path(self.hub.name) / "test" / "backlog"
+        backlog.mkdir()
+        (backlog / "TaskR9PX-plan-it.prompt.md").write_text(
+            CARD.format(heading="Task R9PX: Plan it", id="R9PX", commit="a41c2e9 by hand", link="(not linked)"),
+            encoding="utf-8",
+        )
+        body = self.client.get("/api/status").json()
+        files = [p["file"] for p in body["prompts"]]
+        card = {p["file"]: p for p in body["prompts"]}["TaskR9PX-plan-it.prompt.md"]
+        self.assertEqual((card["id"], card["type"], card["status"]), ("R9PX", "Task", "Backlog"))
+        self.assertEqual(files[-1], "TaskR9PX-plan-it.prompt.md")
+        self.assertEqual(body["count"], len(files))
+        detail = self.client.get("/api/status/TaskR9PX-plan-it.prompt.md").json()
+        self.assertEqual((detail["status"], detail["name"]), ("Backlog", "Plan it"))
+        self.assertTrue(detail["path"].endswith(str(Path("test") / "backlog" / "TaskR9PX-plan-it.prompt.md")))
+
     def test_a_teams_own_type_from_the_machines_config(self):
         card = self._by_file()["Chore-Q4TN-rotate-the-keys.prompt.md"]
         self.assertEqual((card["id"], card["type"]), ("Q4TN", "Chore"))
@@ -235,7 +256,13 @@ class TheRouteServesTheModel(unittest.TestCase):
 
         self.assertEqual(
             lane_names(None),
-            {"Active": "Active", "In Progress": "In Progress", "Code Review": "Code Review", "Done": "Done"},
+            {
+                "Backlog": "Backlog",
+                "Active": "Active",
+                "In Progress": "In Progress",
+                "Code Review": "Code Review",
+                "Done": "Done",
+            },
         )
         demo = lane_names(
             {
@@ -248,7 +275,10 @@ class TheRouteServesTheModel(unittest.TestCase):
                 }
             }
         )
-        self.assertEqual(demo, {"Active": "To do", "In Progress": "Doing", "Code Review": "Waiting", "Done": "Done"})
+        self.assertEqual(
+            demo,
+            {"Backlog": "Backlog", "Active": "To do", "In Progress": "Doing", "Code Review": "Waiting", "Done": "Done"},
+        )
         self.assertEqual(lane_names({"laneNames": {"active": "  "}})["Active"], "Active")
         self.assertEqual(lane_names({"laneNames": "nonsense"})["Done"], "Done")
         body = self.client.get("/api/env").json()

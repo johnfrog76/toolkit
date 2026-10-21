@@ -36,6 +36,7 @@ from .consts import (
     env_active_space,
     env_features,
     folder_archive,
+    folder_backlog,
     folder_current,
     renamed_spaces,
     space_scoped_features,
@@ -343,13 +344,19 @@ def tracker_repos(org_url: str | None, projects: list[dict] | None) -> list[str]
     return [f"{owner}/{p['repo']}" for p in (projects or []) if p.get("repo")]
 
 
-# The four lanes' display names -- ORG-scoped, like sprintAwareness, because which
+# The five lanes' display names -- ORG-scoped, like sprintAwareness, because which
 # words fit is a fact about the org: a client's ADO board wants "Code Review", the
 # sample hub's Demo wants "Waiting". The CONTRACT's words (consts.json `status`)
 # are what is stored, compared and served as `status`; these only change what the
 # board and the list print. Served keyed by the contract word, so the web never
 # has to know the config's camelCase keys (docs/hub/cards.md).
-LANE_KEYS = {"active": "Active", "inProgress": "In Progress", "codeReview": "Code Review", "done": "Done"}
+LANE_KEYS = {
+    "backlog": "Backlog",
+    "active": "Active",
+    "inProgress": "In Progress",
+    "codeReview": "Code Review",
+    "done": "Done",
+}
 
 
 def offered_spaces(spaces: list[dict], active_slug: str, dismissed: bool) -> list[dict]:
@@ -821,6 +828,15 @@ def resolve_dirs() -> tuple[Path, Path]:
     if folder:
         return (root / folder / current, root / folder / archive)
     return (root / current, root / archive)
+
+
+def backlog_dir(current_dir: Path) -> Path:
+    """The Space's ``backlog/`` -- cards planned, not yet in play -- beside its
+    ``current/``. A sibling, as ``archive/`` is; kept out of ``resolve_dirs``'s
+    pair so every reader that means "the cards in play" (health, the standup,
+    Daily's counts) keeps meaning exactly that. The CLI's Get-PromptFolders
+    carries the same third path as ``Backlog``."""
+    return current_dir.parent / folder_backlog()
 
 
 def org_folder(org_config: dict) -> Path:

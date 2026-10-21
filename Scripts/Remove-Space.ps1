@@ -96,7 +96,7 @@ if ($state.ShippedSlugs -contains $target) {
 $inHub = $state.HubSlugs -contains $target
 $inLocal = [bool]($state.LocalPatches -and $state.LocalPatches.PSObject.Properties[$target])
 $cards = Get-P20SpaceFolderCount -HubRoot $state.HubRoot -Space $space
-$cardsLine = "$($cards.Folder) -- $($cards.Total) cards ($($cards.Current) current, $($cards.Archive) archive)"
+$cardsLine = "$($cards.Folder) -- $($cards.Total) cards ($($cards.Breakdown))"
 if (-not $cards.Exists) { $cardsLine = "$($cards.Folder) -- not there on this machine" }
 
 # The line that brings the cards back: NewSpace with the folder as its slug adopts

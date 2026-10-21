@@ -130,11 +130,13 @@ export function PromptStatus({
 
   // The state vocabulary is the contract file's, not this card's -- the CLI's
   // Get-PromptStatus.ps1 and agent/core/parsers.py sort by the same three, in
-  // the same order (see web/src/shell/consts.ts).
+  // the same order (see web/src/shell/consts.ts): the cards in play, then the
+  // backlog -- the ledger is still the cards in play.
   const STATUS_ORDER: Record<string, number> = {
     [STATUS.active]: 0,
     [STATUS.inProgress]: 1,
     [STATUS.codeReview]: 2,
+    [STATUS.backlog]: 3,
   };
   const prompts = [...(data?.prompts ?? [])].sort(
     (a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99),

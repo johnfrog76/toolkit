@@ -29,7 +29,8 @@
     never a substring. Then, for a work-item number no card in current/
     carries, the Space's GitHub issue of that number. Refused, each a stated
     refusal: an Azure DevOps Space (its board holds the rituals), an archived
-    card or a closed issue (the work is done), an id that matches nothing, a
+    card or a closed issue (the work is done), a card in backlog/ (planned, not
+    in play: Move <id> -To Active is the decision), an id that matches nothing, a
     partial name for a non-interactive caller, a kind with no prompt row, a
     prompt file that is not there.
 
@@ -254,7 +255,20 @@ if ($found.Count -eq 1) {
     }
 }
 else {
-    # Nothing in current/. An archived card is Done -- said as such, not as "no card".
+    # Nothing in current/. A planned card is in backlog/, and starting it is a
+    # decision a person makes -- Move <id> -To Active -- not one StartWork makes
+    # for them. An id, or a whole file name; never a partial one.
+    $backlogDir = Join-Path $spaceRoot ([string]$c.folders.backlog)
+    $plannedHit = Resolve-P20CardArgument -Argument $wanted -Folder $backlogDir -WorkItemTypes $types
+    $planned = @($plannedHit.Match | Where-Object { $_.Name -like '*.md' })
+    if ($planned.Count -gt 0 -and -not $plannedHit.Fuzzy) {
+        $plannedId = Get-P20CardId -Name $planned[0].Name -Pattern $pattern
+        if (-not $plannedId) { $plannedId = $wanted }
+        Write-CliError -Message "Card $plannedId is in the backlog: $(Get-P20RelativeTo -Path $planned[0].FullName -Root $hubRoot) is planned, not in play." `
+            -Hint "Starting it is the decision: '${p}Move $plannedId -To Active' pulls it into play, then '${p}StartWork $plannedId'."
+        exit 2  # stated refusal
+    }
+    # An archived card is Done -- said as such, not as "no card".
     if ($resolved.IsId) {
         $archivedHit = Resolve-P20CardArgument -Argument $wanted -Folder $archiveDir -WorkItemTypes $types
         $archived = @($archivedHit.Match | Where-Object { $_.Name -like '*.md' })

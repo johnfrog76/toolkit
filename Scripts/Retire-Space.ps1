@@ -77,7 +77,7 @@ if (-not $space) {
 
 $label = Get-P20SpaceLabel $space
 $cards = Get-P20SpaceFolderCount -HubRoot $state.HubRoot -Space $space
-$cardsLine = "$($cards.Folder) -- $($cards.Total) cards ($($cards.Current) current, $($cards.Archive) archive)"
+$cardsLine = "$($cards.Folder) -- $($cards.Total) cards ($($cards.Breakdown))"
 if (-not $cards.Exists) { $cardsLine = "$($cards.Folder) -- not there on this machine" }
 
 $oldStatus = [string]$space.status

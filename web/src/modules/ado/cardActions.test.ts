@@ -13,6 +13,7 @@ const PR = "https://dev.azure.com/o/p/_git/r/pullrequest/7";
 const NO_COMMITS = "No commits recorded on the card -- thread them with tkThreadHash first.";
 const HAS_PR = "It already has a pull request -- its review is the next step.";
 const ONE_WAY = "A card travels one way.";
+const THREADED = "Threaded work is in play, not backlog.";
 
 type Kind = "ado" | "local";
 const card = (kind: Kind, status: string, extra: Partial<ActionCard> = {}): ActionCard => ({
@@ -49,6 +50,7 @@ const rows: Array<{
     adoEnabled: true,
     primary: "Open in ADO",
     menu: [
+      "Move to Backlog",
       "Move to In Progress",
       "Move to Code Review",
       "Move to Done (archive)",
@@ -62,6 +64,7 @@ const rows: Array<{
     adoEnabled: true,
     primary: "Open in ADO",
     menu: [
+      `Backlog [x: ${THREADED}]`,
       `Active [x: ${ONE_WAY}]`,
       "Move to Code Review",
       "Move to Done (archive)",
@@ -75,6 +78,7 @@ const rows: Array<{
     adoEnabled: true,
     primary: "Open in ADO",
     menu: [
+      `Backlog [x: ${THREADED}]`,
       `Active [x: ${ONE_WAY}]`,
       "Move to Code Review",
       "Move to Done (archive)",
@@ -88,6 +92,7 @@ const rows: Array<{
     adoEnabled: true,
     primary: "Open in ADO",
     menu: [
+      `Backlog [x: ${THREADED}]`,
       `Active [x: ${ONE_WAY}]`,
       `In Progress [x: ${ONE_WAY}]`,
       "Move to Done (archive)",
@@ -101,6 +106,7 @@ const rows: Array<{
     adoEnabled: true,
     primary: "Open in ADO",
     menu: [
+      `Backlog [x: ${THREADED}]`,
       `Active [x: ${ONE_WAY}]`,
       `In Progress [x: ${ONE_WAY}]`,
       "Move to Done (archive)",
@@ -114,9 +120,24 @@ const rows: Array<{
     adoEnabled: true,
     primary: "Open in ADO",
     menu: [
+      `Backlog [x: ${ONE_WAY}]`,
       `Active [x: ${ONE_WAY}]`,
       `In Progress [x: ${ONE_WAY}]`,
       `Code Review [x: ${ONE_WAY}]`,
+      ...CARD_ONLY,
+    ],
+  },
+  {
+    name: "ADO card, Backlog (planned): every lane ahead pulls it into play",
+    card: card("ado", "Backlog"),
+    adoEnabled: true,
+    primary: "Open in ADO",
+    menu: [
+      "Move to Active",
+      "Move to In Progress",
+      "Move to Code Review",
+      "Move to Done (archive)",
+      `Create PR [x: ${NO_COMMITS}]`,
       ...CARD_ONLY,
     ],
   },
@@ -126,14 +147,26 @@ const rows: Array<{
     card: card("local", "Active"),
     adoEnabled: true,
     primary: null,
-    menu: ["Move to In Progress", "Move to Code Review", "Move to Done (archive)", ...CARD_ONLY],
+    menu: [
+      "Move to Backlog",
+      "Move to In Progress",
+      "Move to Code Review",
+      "Move to Done (archive)",
+      ...CARD_ONLY,
+    ],
   },
   {
     name: "non-ADO card, In Progress with a commit",
     card: card("local", "In Progress", { commits: 1 }),
     adoEnabled: true,
     primary: null,
-    menu: [`Active [x: ${ONE_WAY}]`, "Move to Code Review", "Move to Done (archive)", ...CARD_ONLY],
+    menu: [
+      `Backlog [x: ${THREADED}]`,
+      `Active [x: ${ONE_WAY}]`,
+      "Move to Code Review",
+      "Move to Done (archive)",
+      ...CARD_ONLY,
+    ],
   },
   {
     name: "non-ADO card, Code Review",
@@ -141,6 +174,7 @@ const rows: Array<{
     adoEnabled: true,
     primary: null,
     menu: [
+      `Backlog [x: ${THREADED}]`,
       `Active [x: ${ONE_WAY}]`,
       `In Progress [x: ${ONE_WAY}]`,
       "Move to Done (archive)",
@@ -153,9 +187,23 @@ const rows: Array<{
     adoEnabled: true,
     primary: null,
     menu: [
+      `Backlog [x: ${ONE_WAY}]`,
       `Active [x: ${ONE_WAY}]`,
       `In Progress [x: ${ONE_WAY}]`,
       `Code Review [x: ${ONE_WAY}]`,
+      ...CARD_ONLY,
+    ],
+  },
+  {
+    name: "non-ADO card, Backlog",
+    card: card("local", "Backlog"),
+    adoEnabled: true,
+    primary: null,
+    menu: [
+      "Move to Active",
+      "Move to In Progress",
+      "Move to Code Review",
+      "Move to Done (archive)",
       ...CARD_ONLY,
     ],
   },
@@ -165,14 +213,26 @@ const rows: Array<{
     card: card("ado", "Active"),
     adoEnabled: false,
     primary: null,
-    menu: ["Move to In Progress", "Move to Code Review", "Move to Done (archive)", ...CARD_ONLY],
+    menu: [
+      "Move to Backlog",
+      "Move to In Progress",
+      "Move to Code Review",
+      "Move to Done (archive)",
+      ...CARD_ONLY,
+    ],
   },
   {
     name: "ADO card, In Progress with commits, ADO off",
     card: card("ado", "In Progress", { commits: 2 }),
     adoEnabled: false,
     primary: null,
-    menu: [`Active [x: ${ONE_WAY}]`, "Move to Code Review", "Move to Done (archive)", ...CARD_ONLY],
+    menu: [
+      `Backlog [x: ${THREADED}]`,
+      `Active [x: ${ONE_WAY}]`,
+      "Move to Code Review",
+      "Move to Done (archive)",
+      ...CARD_ONLY,
+    ],
   },
   {
     name: "ADO card, Code Review with a PR, ADO off",
@@ -180,6 +240,7 @@ const rows: Array<{
     adoEnabled: false,
     primary: null,
     menu: [
+      `Backlog [x: ${THREADED}]`,
       `Active [x: ${ONE_WAY}]`,
       `In Progress [x: ${ONE_WAY}]`,
       "Move to Done (archive)",
@@ -192,6 +253,7 @@ const rows: Array<{
     adoEnabled: false,
     primary: null,
     menu: [
+      `Backlog [x: ${ONE_WAY}]`,
       `Active [x: ${ONE_WAY}]`,
       `In Progress [x: ${ONE_WAY}]`,
       `Code Review [x: ${ONE_WAY}]`,
@@ -203,14 +265,26 @@ const rows: Array<{
     card: card("local", "Active"),
     adoEnabled: false,
     primary: null,
-    menu: ["Move to In Progress", "Move to Code Review", "Move to Done (archive)", ...CARD_ONLY],
+    menu: [
+      "Move to Backlog",
+      "Move to In Progress",
+      "Move to Code Review",
+      "Move to Done (archive)",
+      ...CARD_ONLY,
+    ],
   },
   {
     name: "non-ADO card, In Progress, ADO off",
     card: card("local", "In Progress", { commits: 1 }),
     adoEnabled: false,
     primary: null,
-    menu: [`Active [x: ${ONE_WAY}]`, "Move to Code Review", "Move to Done (archive)", ...CARD_ONLY],
+    menu: [
+      `Backlog [x: ${THREADED}]`,
+      `Active [x: ${ONE_WAY}]`,
+      "Move to Code Review",
+      "Move to Done (archive)",
+      ...CARD_ONLY,
+    ],
   },
   {
     name: "non-ADO card, Code Review, ADO off",
@@ -218,6 +292,7 @@ const rows: Array<{
     adoEnabled: false,
     primary: null,
     menu: [
+      `Backlog [x: ${THREADED}]`,
       `Active [x: ${ONE_WAY}]`,
       `In Progress [x: ${ONE_WAY}]`,
       "Move to Done (archive)",
@@ -254,7 +329,7 @@ describe("cardActions -- one action model for a card, in every view", () => {
       cliPrefix: "tk",
       laneLabel: (s) => ({ "In Progress": "Doing" })[s] ?? s,
     });
-    expect(plan.secondary[0]).toMatchObject({
+    expect(plan.secondary[1]).toMatchObject({
       id: "move",
       to: "In Progress",
       label: "Move to Doing",

@@ -183,6 +183,10 @@ try {
     [System.IO.File]::WriteAllText((Join-Path $current 'Task139-write-the-docs.prompt.md'), "# Task 139: Write the docs`n", $utf8)
     [System.IO.File]::WriteAllText((Join-Path $current 'Meeting-K7M2-the-planning-meeting.prompt.md'), "# Meeting K7M2: The planning meeting`n", $utf8)
     [System.IO.File]::WriteAllText((Join-Path $archive 'Task4D9K-an-old-card.prompt.md'), "# Task 4D9K: An old card`n", $utf8)
+    # A planned card: StartWork does not start it -- that is a person's decision.
+    $backlogDir = Join-Path $hub 'widgets/backlog'
+    New-Item -ItemType Directory -Path $backlogDir -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $backlogDir 'Task9QHT-a-planned-card.prompt.md'), "# Task 9QHT: A planned card`n", $utf8)
     [System.IO.File]::WriteAllText((Join-Path $scratch 'issue-41.json'), (Read-Fixture 'issue.json'), $utf8)
     [System.IO.File]::WriteAllText((Join-Path $scratch 'issue-43.json'), '{ "number": 43, "title": "Done already", "state": "CLOSED", "labels": [], "milestone": null, "body": "", "url": "https://github.com/acme/widgets/issues/43" }', $utf8)
     [System.IO.File]::WriteAllText((Join-Path $scratch 'issue-57.json'), '{ "number": 57, "title": "Route the git calls", "state": "OPEN", "labels": [], "milestone": null, "body": "", "url": "https://github.com/acme/widgets/pull/57" }', $utf8)
@@ -262,6 +266,7 @@ try {
         'a card id that matches nothing'        = @{ Snippet = 'tkStartWork X9X9'; Says = "No card with id 'X9X9' in current/" }
         'a name that matches nothing'           = @{ Snippet = 'tkStartWork nothing-like-it'; Says = "No card matching 'nothing-like-it' in current/" }
         'an archived card is Done'              = @{ Snippet = 'tkStartWork 4D9K'; Says = 'Card 4D9K is archived: widgets/archive/Task4D9K-an-old-card.prompt.md is Done' }
+        'a planned card is not started for you' = @{ Snippet = 'tkStartWork 9qht'; Says = 'Card 9QHT is in the backlog: widgets/backlog/Task9QHT-a-planned-card.prompt.md is planned, not in play'; Hint = 'tkMove 9QHT -To Active' }
         'a closed issue'                        = @{ Snippet = 'tkStartWork 43'; Says = 'Issue #43 on acme/widgets is closed' }
         'a pull request is not an issue'        = @{ Snippet = 'tkStartWork 57'; Says = '#57 on acme/widgets is a pull request, not an issue' }
         'an Azure DevOps Space'                 = @{ Snippet = 'tkStartWork 23A3 -Space board'; Says = 'Board is an Azure DevOps Space' }

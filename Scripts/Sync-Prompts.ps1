@@ -164,10 +164,13 @@ try {
     # EVERY org's folders, not only the active one's: an org nobody switches to
     # would otherwise keep stale links forever.
     $folders = Get-PromptFolders
+    # backlog/ is a card folder like the other two: its cards carry the same links.
+    $syncBacklog = $folders.Backlog
+    if (-not $syncBacklog) { $syncBacklog = Join-Path (Split-Path $folders.Current -Parent) (Get-P20Consts).folders.backlog }
     $relinked = 0
     $cardFolders = Get-P20CardFolders -Root $promptsRoot -Spaces $global:P20Config.Spaces `
         -CurrentName (Split-Path $folders.Current -Leaf) -ArchiveName (Split-Path $folders.Archive -Leaf) `
-        -Also @($folders.Current, $folders.Archive)
+        -BacklogName (Split-Path $syncBacklog -Leaf) -Also @($folders.Current, $folders.Archive, $syncBacklog)
     foreach ($folder in $cardFolders) {
         $relinked += Repair-P20FolderLinks -Folder $folder
     }

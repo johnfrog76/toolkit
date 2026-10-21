@@ -16,9 +16,12 @@ release.
 - `Standup -Since <yyyy-MM-dd>` (and `?since=` on the standup route) reports over a window of days instead of only yesterday, and counts everything that closed in it.
 - A new `StartWork <id>` command (Team Agile) assembles everything a fresh agent needs to pick up a card or an issue -- how you work in the Space, the card whole, and the prompt for its kind -- in one paste-ready block, and each row of the standup's list on the Team Agile page opens it in a copy box.
 - The app's Home now links the published landing page from its foot.
+- A backlog of cards: plan a card for later. A Space now has a `backlog/` folder beside `current/` and `archive/`, its cards read as **Backlog**, `Status` lists them after the cards in play as a count and their names, and the board draws Backlog as its first column. `Move <id> -To Active` pulls a planned card into play, `Move <id> -To Backlog` parks a card with nothing threaded, and `Archive` retires one from either folder.
 
 ### Changed
 
+- A new card is planned, not in play: `NewPrompt` (and the web's New card) writes it to the Space's `backlog/`, and its first `ThreadHash`, its `NewPR` or `Move -To Active` pulls it into `current/` -- so the make-branch-commit-thread flow is typed exactly as before. `NewPrompt -Now` writes straight to `current/`, as it used to.
+- `StartWork` on a planned card says it is in the backlog and names `Move <id> -To Active`, rather than starting it for you.
 - A card marked not billable (`Billable -No`) is now left off the standup as well as off Daily.
 
 ### Fixed

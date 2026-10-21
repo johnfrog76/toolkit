@@ -550,7 +550,7 @@ function Get-PromptFolders {
     $cfg = $global:P20Config
     $root = $cfg.PromptsRoot
     $folder = $cfg.PromptsFolder
-    # The two names are a contract, not this function's choice: agent/core/config.py's
+    # The names are a contract, not this function's choice: agent/core/config.py's
     # resolve_dirs and the communication module's session folders spell them too.
     #
     # Through the FUNCTION, not `$script:Consts`. This function is reached from
@@ -563,17 +563,14 @@ function Get-PromptFolders {
     $consts = Get-P20Consts
     $current = $consts.folders.current
     $archive = $consts.folders.archive
-    if ($folder) {
-        @{
-            Current = Join-Path (Join-Path $root $folder) $current
-            Archive = Join-Path (Join-Path $root $folder) $archive
-        }
-    }
-    else {
-        @{
-            Current = Join-Path $root $current
-            Archive = Join-Path $root $archive
-        }
+    # The third card folder: planned, not yet in play (docs/hub/cards.md).
+    $backlog = $consts.folders.backlog
+    $base = $root
+    if ($folder) { $base = Join-Path $root $folder }
+    @{
+        Current = Join-Path $base $current
+        Archive = Join-Path $base $archive
+        Backlog = Join-Path $base $backlog
     }
 }
 
@@ -1696,6 +1693,7 @@ function global:Get-P20PromptFromWorkItem {
         [switch]$ReadOnly,
         [switch]$Force,
         [string]$OutputFolder,
+        [switch]$Now,
         [string]$Cover,
         [string]$Before,
         [string]$Design,

@@ -143,8 +143,8 @@ try {
         return @(Get-ChildItem $hub -Recurse -Filter $Filter | Where-Object { $_.DirectoryName -match "[\\/]$FolderName`$" })
     }
 
-    $out = Invoke-Verbs ("${prefix}NewPrompt -Title 'Bench reading' -Type Spike -Id K7M2 | Out-Null; " +
-        "${prefix}NewPrompt -Title 'Bench writing' -Type Task -Id Q4R9 | Out-Null; " +
+    $out = Invoke-Verbs ("${prefix}NewPrompt -Now -Title 'Bench reading' -Type Spike -Id K7M2 | Out-Null; " +
+        "${prefix}NewPrompt -Now -Title 'Bench writing' -Type Task -Id Q4R9 | Out-Null; " +
         "'HELP-BEGIN'; ${prefix}Billable -Help; 'HELP-END'; " +
         "${prefix}Billable; 'BARE-EXIT=' + `$LASTEXITCODE; " +
         "${prefix}Billable W3X7 -No; 'UNKNOWN-EXIT=' + `$LASTEXITCODE; " +

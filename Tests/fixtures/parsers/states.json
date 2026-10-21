@@ -1,0 +1,20 @@
+{
+  "_": "The derived state of a card, one row per input the rule distinguishes: the folder the file is in, then what its text says. Read FIRST, the two folder states (backlog/ -> Backlog, archive/ -> Done) win whatever the text says. Scripts/Get-PromptFileStatus.ps1 (Get-PromptFileStatus -Content -Folder) and agent/core/parsers.py (card_status) are held to this one table by Tests/Test-Status.ps1 and Tests/test_parsers.py. folder is what the caller passes: a name, a path (its last segment is read), or empty for current/.",
+  "rows": [
+    { "name": "an empty card in current/ is Active", "folder": "current", "content": "# Task K7M2: x\n", "status": "Active" },
+    { "name": "no folder means current/: the text rule as it always read", "folder": "", "content": "# Task K7M2: x\n", "status": "Active" },
+    { "name": "a commit bullet in current/ is In Progress", "folder": "current", "content": "Commits:\n- 80e2168 add grid\n", "status": "In Progress" },
+    { "name": "a Started line in current/ is In Progress", "folder": "current", "content": "**Started:** 2026-10-20\n", "status": "In Progress" },
+    { "name": "a PR URL line in current/ is Code Review", "folder": "current", "content": "- 80e2168 x\nPR URL: https://example.test/pr/1\n", "status": "Code Review" },
+    { "name": "a Review line in current/ is Code Review", "folder": "current", "content": "**Review:** 2026-10-20\n", "status": "Code Review" },
+    { "name": "an empty card in backlog/ is Backlog", "folder": "backlog", "content": "# Task K7M2: x\n", "status": "Backlog" },
+    { "name": "backlog/ is read first: a commit bullet there is still Backlog", "folder": "backlog", "content": "Commits:\n- 80e2168 add grid\n", "status": "Backlog" },
+    { "name": "backlog/ is read first: a PR URL there is still Backlog", "folder": "backlog", "content": "PR URL: https://example.test/pr/1\n", "status": "Backlog" },
+    { "name": "a path ending in backlog/ is Backlog", "folder": "/hub/demo/backlog/", "content": "**Started:** 2026-10-20\n", "status": "Backlog" },
+    { "name": "a Windows path ending in backlog is Backlog", "folder": "C:\\hub\\demo\\backlog", "content": "", "status": "Backlog" },
+    { "name": "an empty card in archive/ is Done", "folder": "archive", "content": "# Task K7M2: x\n", "status": "Done" },
+    { "name": "archive/ is read first: a PR URL there is Done", "folder": "archive", "content": "PR URL: https://example.test/pr/1\n", "status": "Done" },
+    { "name": "a path ending in archive is Done", "folder": "/hub/demo/archive", "content": "- 80e2168 x\n", "status": "Done" },
+    { "name": "a folder that only CONTAINS the word is not that folder", "folder": "/hub/backlog-notes/current", "content": "", "status": "Active" }
+  ]
+}

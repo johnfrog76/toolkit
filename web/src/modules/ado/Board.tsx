@@ -86,7 +86,7 @@ const useStyles = makeStyles({
     minWidth: 0,
     padding: `${tokens.spacingVerticalL} ${tokens.spacingHorizontalS}`,
   },
-  // Four lanes side by side; below that they scroll sideways INSIDE the board,
+  // Five lanes side by side, Backlog first; below that they scroll sideways INSIDE the board,
   // so the page itself never overflows (the UX audit's rule).
   //
   // The BOARD owns the height and every lane fills it -- the owner's rule: "they
@@ -437,9 +437,10 @@ export function Board() {
     <section className={styles.root} aria-label="Board">
       <div className={styles.bar}>
         <Body1 className={mergeClasses(styles.quiet, styles.barText)}>
-          ToolKit cards move by themselves: a commit is {laneLabel(STATUS.inProgress)}, a pull
-          request is {laneLabel(STATUS.codeReview)}. Drop a card on a lane to move it yourself; on{" "}
-          {laneLabel(STATUS.done)}, to archive it.{cardFrom ? ` ${cardFrom}` : ""}
+          ToolKit cards move by themselves: a new card is {laneLabel(STATUS.backlog)}, a commit is{" "}
+          {laneLabel(STATUS.inProgress)}, a pull request is {laneLabel(STATUS.codeReview)}. Drop a
+          card on a lane to move it yourself; on {laneLabel(STATUS.done)}, to archive it.
+          {cardFrom ? ` ${cardFrom}` : ""}
         </Body1>
         <span className={styles.barSpacer} />
         {sprints.length > 0 ? (
@@ -518,18 +519,18 @@ export function Board() {
                 isDone && styles.laneTarget,
                 over === lane && styles.laneOver,
               )}
-              onDragOver={
-                lane === STATUS.active
-                  ? undefined
-                  : (e) => {
-                      if (e.dataTransfer.types.includes(DRAG_TYPE)) {
-                        e.preventDefault();
-                        setOver(lane);
-                      }
-                    }
-              }
-              onDragLeave={lane === STATUS.active ? undefined : () => setOver(null)}
-              onDrop={lane === STATUS.active ? undefined : onDropOn(lane)}
+              // Every lane is a target now: Backlog takes an Active card back, Active
+              // takes a planned one into play. What a drop may do is legalMoves'
+              // answer for the card, checked in onDropOn -- a drag cannot be read
+              // until it lands.
+              onDragOver={(e) => {
+                if (e.dataTransfer.types.includes(DRAG_TYPE)) {
+                  e.preventDefault();
+                  setOver(lane);
+                }
+              }}
+              onDragLeave={() => setOver(null)}
+              onDrop={onDropOn(lane)}
             >
               <div className={styles.laneHead}>
                 <LaneLabelEditor

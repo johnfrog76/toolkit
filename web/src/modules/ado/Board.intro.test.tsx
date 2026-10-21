@@ -38,7 +38,7 @@ jest.mock("./api.ado", () => {
   };
 });
 
-const OPENING = "ToolKit cards move by themselves: a commit is";
+const OPENING = "ToolKit cards move by themselves: a new card is Backlog, a commit is";
 
 function intro(): string {
   const { container } = render(
