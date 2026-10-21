@@ -54,7 +54,7 @@ want one. Every count below was
 observed on this commit, on one host with pwsh 7.6, Python 3.12 and Node 24.
 
 ```powershell
-tkTestToolkit            # 45 suites, 7718 assertions
+tkTestToolkit            # 45 suites, 7803 assertions
 tkTestToolkit -List      # enumerate suites without running any
 tkTestToolkit -Autoload  # run one suite; any suite name from -List works this way
 tkTestToolkit -GitRoot   # a folder inside someone else's repository is not a checkout of its own
@@ -84,8 +84,8 @@ two lines under the summary box:
 
 ```text
   Counts for docs/TESTING.md's combined row, from this run:
-  Consts 180, Compat 1496, Menu 1859, Environment 58, Archive 200, PRComments 109, BackfillStamps 50, Update 58, Start 67, PullRequest 10, CloseWorkItem 36, PromptStatus 98, ThreadHash 76, Setup 82, Move 36, Billable 36, Plan 33, Cover 106, Design 135, NewPrompt 90, ExitCodes 118, Autoload 86, GitRoot 17, Sync 19, Connect 62, NewSpace 149, EditItem 69, PublishPR 31, Config 232, HubJson 184, Portability 89, Web 165, Agent 129, TestAll 154, ModuleCommands 74, Reminders 71, Rituals 560, StandupRemind 85, Triage 121, StartWork 38, Review 69, SendTeams 43, NewMeeting 63, MeetingAgenda 175, DocCounts 100
-  45 suites, 7718 assertions
+  Consts 183, Compat 1509, Menu 1868, Environment 62, Archive 200, PRComments 109, BackfillStamps 50, Update 58, Start 67, PullRequest 10, CloseWorkItem 36, PromptStatus 98, ThreadHash 76, Setup 82, Move 36, Billable 36, Plan 33, Cover 106, Design 135, NewPrompt 90, ExitCodes 118, Autoload 86, GitRoot 17, Sync 19, Connect 62, NewSpace 149, EditItem 69, PublishPR 31, Config 235, HubJson 184, Portability 89, Web 165, Agent 129, TestAll 154, ModuleCommands 74, Reminders 71, Rituals 613, StandupRemind 85, Triage 121, StartWork 38, Review 69, SendTeams 43, NewMeeting 63, MeetingAgenda 175, DocCounts 100
+  45 suites, 7803 assertions
 ```
 
 The first is the `tkTestToolkit` row's list in the table below, the second the total that AGENTS.md
