@@ -16,6 +16,7 @@ import { EmptyState } from "../../shared/EmptyState";
 import { PageCard } from "../../shared/PageCard";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { useGetEnvQuery } from "../../shell/api";
+import { RITUALS } from "../../shell/consts";
 import { useGetMilestonesQuery } from "../ado/api.ado";
 import { ActionDialog } from "../ado/ActionDialog";
 import { buildRouteParams, commandResultMessage } from "../ado/cliBridge";
@@ -26,8 +27,10 @@ import type { TriageGroup, TriageIssue, TriageResponse } from "./api.solitaireAg
 // Triage, `/solitaire-agile/triage` (docs/modules/solitaire-agile.md, "The web UI"):
 // the open issues ONE AT A TIME, the ones in no milestone first because nobody
 // has placed them, then each milestone as the agent orders them. Above the
-// issue, its milestone's context line ("N open, M routed, K unrouted"); under
-// it, the three questions -- which milestone, how severe, which size.
+// issue, its milestone's context line ("N open, M routed, K unrouted") and who
+// has it (D-AR10: me, @<login>, a size, or nobody); under it, the three
+// questions -- which milestone, how severe, which size. The third question's
+// first answer is **me**: `Route -Assign me`, you become the issue's assignee.
 //
 // Every answer is ONE write, and a write is the CLI's `Route` through the bridge
 // (POST /api/cmd/Route, argv from buildRouteParams) -- a real label or milestone
@@ -49,6 +52,8 @@ import type { TriageGroup, TriageIssue, TriageResponse } from "./api.solitaireAg
 const NO_MILESTONE = "No milestone";
 /** The worker deep water's first move assigns (D-TA4): that worker's label. */
 const FABLE = "fable";
+/** The third question's own answer beside the sizes (D-AR10): `Route -Assign me`. */
+const ME = RITUALS.assignMe;
 /** What Split does, said on its button: the precedent is GitHub's own "Create sub-issue". */
 const SPLIT_TITLE = "Create sub-issues of this one, one at a time";
 
@@ -114,9 +119,21 @@ export function contextLine(group: TriageGroup): string {
   return `${group.milestone || NO_MILESTONE} -- ${group.context}`;
 }
 
-/** The answers an issue carries, said in one line. */
+/** What the page calls an item nobody has. */
+const NOBODY = "nobody";
+
+/** Who has an issue, said (D-AR10): "me", "@<login>", its size's worker name,
+ *  or nobody. The agent's `who` decides; a read from an older agent, with no
+ *  `who`, falls back to the size it always sent. */
+export function whoLabel(issue: TriageIssue): string {
+  const who = issue.who ?? issue.size;
+  if (issue.size && who === issue.size) return issue.worker || issue.size;
+  return who || NOBODY;
+}
+
+/** The answers an issue carries, said in one line: who has it, its severity, deep water. */
 export function answersLine(issue: TriageIssue, deepWaterLabel: string): string {
-  const parts = [issue.worker || "unrouted", issue.severity || "no severity"];
+  const parts = [whoLabel(issue), issue.severity || "no severity"];
   if (issue.deepWater) parts.push(deepWaterLabel);
   return parts.join(" · ");
 }
@@ -313,6 +330,20 @@ export function TriagePage() {
             <div className={styles.question}>
               <Body1 className={styles.label}>Size</Body1>
               <div className={styles.choices}>
+                {/* "me" first: you take it yourself, as its GitHub assignee (D-AR10).
+                    The sizes after it are the crew's; fable is the owner's own seat. */}
+                <ToggleButton
+                  size="small"
+                  checked={issue.who === ME && !deepOpen}
+                  disabled={busy}
+                  title="Take it yourself: you become its assignee"
+                  onClick={() => {
+                    setDeepOpen(false);
+                    void answer({ assign: ME }, "You have it.");
+                  }}
+                >
+                  {ME}
+                </ToggleButton>
                 {sizes.map((s) => (
                   <ToggleButton
                     key={s.label}

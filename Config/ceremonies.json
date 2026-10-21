@@ -1,5 +1,5 @@
 {
-  "_": "The ceremonies of Solitaire Agile (D-SA2; docs/modules/solitaire-agile.md, \"The file shape, and how a standup is read\"): a ceremony is a named slot list, declared here and filled from the tracker by the Ritual Engine. Both halves read this file; a slot list is never typed in code. M0 declared the standup; V1 adds triage: its slots are the three questions asked of each open issue, severities the labels a severity answer may write (one at a time), deepWaterLabel the label that marks the top size (D-TA3, D-TA4), and text the words both halves render -- {placeholders} filled by each half, tags joined with ', '. The standup's kinds are what a dressed sentence may count by kind ('smashed two bugs'): an issue is of a kind when it carries the kind's label, a card when its type is the kind's type (ignoring case); one and many are the nouns the dress guard reads. Retro and planning join as rows.",
+  "_": "The ceremonies of Solitaire Agile (D-SA2; docs/modules/solitaire-agile.md, \"The file shape, and how a standup is read\"): a ceremony is a named slot list, declared here and filled from the tracker by the Ritual Engine. Both halves read this file; a slot list is never typed in code. M0 declared the standup; V1 adds triage: its slots are the three questions asked of each open issue, severities the labels a severity answer may write (one at a time), deepWaterLabel the label that marks the top size (D-TA3, D-TA4), cardSizes the sizes Route -Assign may write on a CARD when the Space has no GitHub repository to read its worker labels from (a connected GitHub Space reads the repo's own labels instead, as -Size does; D-AR10), and text the words both halves render -- {placeholders} filled by each half, tags joined with ', '. The standup's kinds are what a dressed sentence may count by kind ('smashed two bugs'): an issue is of a kind when it carries the kind's label, a card when its type is the kind's type (ignoring case); one and many are the nouns the dress guard reads. Retro and planning join as rows.",
   "standup": {
     "title": "Standup",
     "slots": ["yesterday", "today", "blockers"],
@@ -15,6 +15,7 @@
     "slots": ["milestone", "severity", "size"],
     "severities": ["sev1", "sev2", "sev3"],
     "deepWaterLabel": "deep-water",
+    "cardSizes": ["fable", "opus", "sonnet"],
     "text": {
       "title": "Triage -- {space}",
       "noMilestone": "No milestone",
@@ -22,6 +23,7 @@
       "group": "{milestone} -- {context}",
       "issue": "  #{number} {title}  ({tags})",
       "none": "--",
+      "nobody": "nobody",
       "nothingOpen": "Nothing is open."
     }
   }

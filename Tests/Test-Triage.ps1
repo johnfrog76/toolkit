@@ -64,7 +64,7 @@ $row = (Get-P20TriageRow -PackageRoot $pkgRoot).Row
 $fixtureDir = Join-Path $scriptDir 'fixtures/rituals'
 $fixture = [System.IO.File]::ReadAllText((Join-Path $fixtureDir 'triage.json')) | ConvertFrom-Json
 $cases = @($fixture.cases)
-Assert-True 'the table is read: four cases' ($cases.Count -eq 4) "$($cases.Count) cases"
+Assert-True 'the table is read: five cases' ($cases.Count -eq 5) "$($cases.Count) cases"
 Assert-True 'ceremonies.json declares triage''s three questions' ((@($row.slots) -join ',') -eq 'milestone,severity,size')
 Assert-True 'and its severities and the deep-water label' ((@($row.severities) -join ',') -eq 'sev1,sev2,sev3' -and [string]$row.deepWaterLabel -eq 'deep-water')
 
@@ -74,7 +74,7 @@ foreach ($case in $cases) {
     $exp = $case.expected
     Write-Host ""
     Write-Host "-- $name --" -ForegroundColor Cyan
-    $t = Invoke-P20TriageFill -Labels @($fixture.labels) -Issues @($case.issues) -Tracker $case.tracker -Space ([string]$case.space) -PackageRoot $pkgRoot
+    $t = Invoke-P20TriageFill -Labels @($fixture.labels) -Issues @($case.issues) -Tracker $case.tracker -Space ([string]$case.space) -Viewer ([string]$case.viewer) -PackageRoot $pkgRoot
 
     $wantGroups = @($exp.groups)
     $gotGroups = @($t.groups)
@@ -102,14 +102,14 @@ foreach ($case in $cases) {
         foreach ($iss in @($g.issues)) {
             $seen++
             $w = $exp.issues.([string]$iss.number)
-            if ($null -eq $w -or $iss.worker -cne [string]$w.worker -or $iss.size -cne [string]$w.size -or $iss.severity -cne [string]$w.severity -or [bool]$iss.deepWater -ne [bool]$w.deepWater) {
+            if ($null -eq $w -or $iss.worker -cne [string]$w.worker -or $iss.size -cne [string]$w.size -or $iss.who -cne [string]$w.who -or $iss.severity -cne [string]$w.severity -or [bool]$iss.deepWater -ne [bool]$w.deepWater) {
                 $issuesMatch = $false
-                $detail += "[#$($iss.number): $($iss.worker)/$($iss.size)/$($iss.severity)/$($iss.deepWater)] "
+                $detail += "[#$($iss.number): $($iss.worker)/$($iss.size)/$($iss.who)/$($iss.severity)/$($iss.deepWater)] "
             }
         }
     }
     $wantSeen = @($exp.issues.PSObject.Properties).Count
-    Assert-True "${name}: each issue's worker, size, severity and deep-water ($wantSeen issues)" ($issuesMatch -and $seen -eq $wantSeen) "$detail seen $seen"
+    Assert-True "${name}: each issue's worker, size, who, severity and deep-water ($wantSeen issues)" ($issuesMatch -and $seen -eq $wantSeen) "$detail seen $seen"
     Assert-True "${name}: the sizes are the repo's worker labels" (((@($t.sizes | ForEach-Object { $_.label })) -join ',') -ceq ((@($exp.sizes)) -join ','))
 
     $text = Format-P20TriageText -Triage $t -PackageRoot $pkgRoot
@@ -118,6 +118,23 @@ foreach ($case in $cases) {
     $back = ($t | ConvertTo-Json -Depth 8) | ConvertFrom-Json
     $again = Format-P20TriageText -Triage $back -PackageRoot $pkgRoot
     Assert-True "${name}: the JSON round trip renders the same text" ($again -ceq $text) $again
+}
+
+# -- Who has it: the rule, and a card's **Assigned:** line (D-AR10) ---------------
+Write-Host ""
+Write-Host "-- Who: the rule, and the card's line by the shared table" -ForegroundColor Cyan
+Assert-True 'an assignee who is the viewer is me, ignoring case' ((Get-P20TriageWho -Assignee 'johnfrog76' -Size 'opus' -Viewer 'JOHNFROG76') -ceq 'me')
+Assert-True 'another assignee is @login, over a size' ((Get-P20TriageWho -Assignee 'octo-crew' -Size 'opus' -Viewer 'johnfrog76') -ceq '@octo-crew')
+Assert-True 'no assignee: the size; neither: nobody' ((Get-P20TriageWho -Assignee '' -Size 'sonnet' -Viewer 'x') -ceq 'sonnet' -and (Get-P20TriageWho -Assignee '' -Size '' -Viewer 'x') -ceq '')
+. (Join-Path $pkgRoot 'Scripts/Get-PromptFileStatus.ps1')
+$assignedTable = [System.IO.File]::ReadAllText((Join-Path $scriptDir 'fixtures/parsers/assigned-lines.json')) | ConvertFrom-Json
+Assert-True 'the **Assigned:** table has its rows' (@($assignedTable.rows).Count -ge 9)
+foreach ($arow in @($assignedTable.rows)) {
+    $eol = "`n"
+    if ($arow.crlf) { $eol = "`r`n" }
+    $text = (@($arow.lines) -join $eol) + $eol
+    $got = Get-P20CardAssigned -Content $text
+    Assert-True "Get-P20CardAssigned: $($arow.name)" ($got -ceq [string]$arow.expected) "got '$got'"
 }
 
 # -- The scratch package and hub -------------------------------------------------
@@ -156,6 +173,7 @@ function global:gh {
     `$global:LASTEXITCODE = 0
     if (`$args[0] -eq 'label' -and `$args[1] -eq 'list') { return (Get-Content -Raw -LiteralPath '$(& $q (Join-Path $scratch 'labels.json'))') }
     if (`$args[0] -eq 'issue' -and `$args[1] -eq 'list') { return (Get-Content -Raw -LiteralPath '$(& $q (Join-Path $scratch 'issues.json'))') }
+    if (`$args[0] -eq 'api' -and `$args[1] -eq 'user') { return 'johnfrog76' }
     if (`$args[0] -eq 'api' -and `$args.Count -eq 2 -and `$args[1] -eq 'repos/acme/widgets') { if (`$env:P20_TEST_GH_PUBLIC) { return '{"visibility":"PUBLIC"}' }; return '{"visibility":"PRIVATE"}' }
     if (`$args[0] -eq 'api') { return (Get-Content -Raw -LiteralPath '$(& $q (Join-Path $scratch 'milestones.json'))') }
     return ''
@@ -226,6 +244,7 @@ try {
                 title     = [string]$iss.title
                 state     = 'OPEN'
                 labels    = [object[]]@(@($iss.labels) | ForEach-Object { [ordered]@{ name = [string]$_ } })
+                assignees = [object[]]@(@($iss.assignees) | Where-Object { $null -ne $_ } | ForEach-Object { if ($_ -is [string]) { [ordered]@{ login = $_ } } else { [ordered]@{ login = [string]$_.login } } })
                 milestone = $iss.milestone
                 url       = [string]$iss.url
             }
@@ -244,6 +263,8 @@ try {
     Write-Host "-- Off: no verbs ---------------------------------------" -ForegroundColor Cyan
     $off = Invoke-Verb "'TRIAGE=' + [bool](Get-Command tkTriage -ErrorAction SilentlyContinue); 'ROUTE=' + [bool](Get-Command tkRoute -ErrorAction SilentlyContinue); 'MAP=' + (Get-P20CommandMap)" -On $false
     Assert-True 'with the flag off Triage and Route do not exist' ($off.Inner -match 'TRIAGE=False' -and $off.Inner -match 'ROUTE=False') $off.All
+    $offAssign = Invoke-Verb "'FN=' + [bool](Get-Command Set-P20Route -ErrorAction SilentlyContinue); try { tkRoute 4 -Assign me -WhatIf } catch { 'REFUSED=' + `$_.FullyQualifiedErrorId }" -On $false
+    Assert-True 'and there is no -Assign to call: no Route function, the verb not recognised' ($offAssign.Inner -match 'FN=False' -and $offAssign.Inner -match 'REFUSED=CommandNotFoundException' -and $offAssign.All -notmatch 'add-assignee') $offAssign.All
     Assert-True 'and the bridge has neither to call' ($off.Inner -notmatch '"Triage"' -and $off.Inner -notmatch '"Route"') $off.Inner
 
     $on = Invoke-Verb "'MAP=' + (Get-P20CommandMap); tkMenu -All"
@@ -258,7 +279,8 @@ try {
     $golden = [System.IO.File]::ReadAllText((Join-Path $fixtureDir 'triage-mixed.txt'))
     $want = $golden.Replace('Triage -- toolkit', 'Triage -- widgets').TrimEnd([char]10)
     Assert-True 'Triage exits 0 and prints the mixed golden, for this Space' ($r.Exit -eq '0' -and $r.Inner -ceq $want) ("`n--- got ---`n$($r.Inner)`n--- want ---`n$want")
-    Assert-True 'it reads the labels, then the OPEN issues with their milestones' ($r.Calls.Count -eq 2 -and $r.Calls[0].StartsWith("label${sep}list${sep}--repo${sep}acme/widgets") -and $r.Calls[1] -match "state${sep}open" -and $r.Calls[1] -match 'milestone') ($r.Calls -join ' / ')
+    Assert-True 'it reads the labels, then the OPEN issues with their milestones and assignees' ($r.Calls.Count -eq 2 -and $r.Calls[0].StartsWith("label${sep}list${sep}--repo${sep}acme/widgets") -and $r.Calls[1] -match "state${sep}open" -and $r.Calls[1] -match 'milestone' -and $r.Calls[1] -match 'assignees') ($r.Calls -join ' / ')
+    Assert-True 'who has each issue: me for the viewer gh names, @login for another, nobody' ($r.Inner -match '#140 Split the drawer  \(me, sev2\)' -and $r.Inner -match '#143 Ledger counts  \(@octo-crew, --\)' -and $r.Inner -match '#147 Lounge bells  \(nobody, sev2\)') $r.Inner
     Assert-True 'and writes nothing to the hub' ((Get-HubSnapshot) -ceq $before)
 
     $j = Invoke-Verb 'tkTriage -AsJson'
@@ -348,10 +370,83 @@ try {
     Assert-True 'a gh write that fails is a stated refusal naming it' ($r.Exit -eq '2' -and $r.All -match 'gh did not write the size opus on #132' -and (@([regex]::Matches($r.All, '(?m)^Error: ')).Count -eq 1) -and $r.All -notmatch 'exit code') $r.All
     Assert-True 'and the writes after it are not tried' ((Get-Edits $r).Count -eq 1) ($r.Calls -join ' / ')
 
+    # -- -Assign on an issue (D-AR10) -------------------------------------------------
+    Write-Host ""
+    Write-Host "-- Route -Assign: who takes an issue --------------------" -ForegroundColor Cyan
+    $r = Invoke-Verb 'tkRoute 132 -Assign me'
+    Assert-True '-Assign me: you become the assignee, one write' ($r.Exit -eq '0' -and ((Get-Edits $r) -join '/') -ceq "$base --add-assignee @me") (((Get-Edits $r) -join ' / ') + "`n" + $r.All)
+    Assert-True 'and it reads no labels and no milestones to do it' (@($r.Calls | Where-Object { $_.StartsWith("label${sep}") -or $_.Contains('milestones') }).Count -eq 0) ($r.Calls -join ' / ')
+    Assert-True 'and says what it wrote' ($r.Inner -match 'Routed #132 on acme/widgets: assignee @me\.') $r.Inner
+    $r = Invoke-Verb 'tkRoute 132 -Assign me -WhatIf'
+    Assert-True '-Assign me -WhatIf prints the gh issue edit --add-assignee @me and makes no write' ($r.Exit -eq '0' -and (Get-Edits $r).Count -eq 0 -and $r.Inner.Contains("[WhatIf] gh $base --add-assignee @me")) (($r.Calls -join ' / ') + "`n" + $r.All)
+    $sized = Invoke-Verb 'tkRoute 132 -Size sonnet'
+    $r = Invoke-Verb 'tkRoute 132 -Assign Sonnet'
+    Assert-True '-Assign <size> is the -Size write, byte for byte' ($r.Exit -eq '0' -and ((Get-Edits $r) -join '/') -ceq ((Get-Edits $sized) -join '/') -and ((Get-Edits $r) -join '/') -ceq "$base --add-label sonnet --remove-label fable,opus") (((Get-Edits $r) -join ' / ') + "`n" + $r.All)
+    $r = Invoke-Verb 'tkRoute 132 -Assign fable'
+    Assert-True '-Assign fable is a size like the others (the owner''s own seat)' ($r.Exit -eq '0' -and ((Get-Edits $r) -join '/') -ceq "$base --add-label fable --remove-label opus,sonnet") (((Get-Edits $r) -join ' / ') + "`n" + $r.All)
+    $r = Invoke-Verb 'tkRoute 132 -Assign me -Size opus -Severity sev2'
+    Assert-True '-Assign me with other answers: each its own write, size then assignee' ($r.Exit -eq '0' -and ((Get-Edits $r) -join '/') -ceq "$base --add-label opus --remove-label fable,sonnet/$base --add-assignee @me/$base --add-label sev2 --remove-label sev1,sev3") (((Get-Edits $r) -join ' / ') + "`n" + $r.All)
+
+    $assignRefusals = [ordered]@{
+        '-Assign and -Size that disagree'          = @{ Snippet = 'tkRoute 132 -Assign opus -Size sonnet'; Says = '-Assign opus and -Size sonnet disagree' }
+        '-Assign a size that is not a worker label' = @{ Snippet = 'tkRoute 132 -Assign haiku'; Says = "'haiku' is not a worker label on acme/widgets" }
+        '-Assign on an Azure DevOps Space'         = @{ Snippet = 'tkRoute 132 -Assign me -Space board'; Says = 'tracker is not GitHub' }
+        '-Assign a card id on an Azure DevOps Space' = @{ Snippet = 'tkRoute K7M2 -Assign me -Space board'; Says = 'tracker is not GitHub' }
+        '-Size on a local Space is still refused'  = @{ Snippet = 'tkRoute 132 -Size opus -Space sandbox'; Says = 'This Space is local' }
+    }
+    foreach ($k in $assignRefusals.Keys) {
+        $case = $assignRefusals[$k]
+        $r = Invoke-Verb $case.Snippet
+        Assert-True "refused, nothing written: $k" ((Test-OneRefusal $r) -and $r.All.Contains([string]$case.Says)) (($r.Calls -join ' / ') + "`n" + $r.All)
+    }
     Assert-True 'Route wrote nothing to the hub through all of it' ((Get-HubSnapshot) -ceq $before)
 
+    # -- -Assign on a card: one **Assigned:** line ---------------------------------------
+    Write-Host ""
+    Write-Host "-- Route -Assign: who takes a card ----------------------" -ForegroundColor Cyan
+    $cardLf = Join-Path $hub 'widgets/current/TaskK7M2-bench-notes.prompt.md'
+    $cardText = "# Task K7M2: Bench notes`n`n## Summary`nRead the bench.`n`n---`n`n**Sprint:** (Not set)`n**Created:** 2026-10-17`n"
+    [System.IO.File]::WriteAllText($cardLf, $cardText, $utf8)
+    New-Item -ItemType Directory -Path (Join-Path $hub 'sandbox/current') -Force | Out-Null
+    $cardCrlf = Join-Path $hub 'sandbox/current/141-sandbox-thing.prompt.md'
+    [System.IO.File]::WriteAllText($cardCrlf, "# Bug 141: Sandbox thing`r`n`r`n---`r`n`r`n**Sprint:** (Not set)`r`n**Created:** 2026-10-17`r`n", $utf8)
+
+    $r = Invoke-Verb 'tkRoute K7M2 -Assign me -WhatIf'
+    Assert-True 'a card id: -WhatIf names the line and writes nothing' ($r.Exit -eq '0' -and $r.Inner.Contains('[WhatIf] TaskK7M2-bench-notes.prompt.md: **Assigned:** me') -and [System.IO.File]::ReadAllText($cardLf) -ceq $cardText) $r.All
+    $r = Invoke-Verb 'tkRoute K7M2 -Assign me'
+    $want = $cardText.Replace("**Created:**", "**Assigned:** me`n**Created:**")
+    Assert-True 'a card id: -Assign me writes **Assigned:** me above Created, and nothing else' ($r.Exit -eq '0' -and [System.IO.File]::ReadAllText($cardLf) -ceq $want) ($r.All + "`n" + [System.IO.File]::ReadAllText($cardLf))
+    Assert-True 'and no gh call, no issue edit' ((Get-Edits $r).Count -eq 0 -and @($r.Calls | Where-Object { $_.StartsWith("issue${sep}") }).Count -eq 0) ($r.Calls -join ' / ')
+    Assert-True 'the card''s bytes: UTF-8 with no BOM, LF kept' ((([System.IO.File]::ReadAllBytes($cardLf))[0] -ne 0xEF) -and -not ([System.IO.File]::ReadAllText($cardLf)).Contains("`r"))
+    Assert-True 'and the reader reads what Route wrote' ((Get-P20CardAssigned -Content ([System.IO.File]::ReadAllText($cardLf))) -ceq 'me')
+    $r = Invoke-Verb 'tkRoute K7M2 -Assign me'
+    Assert-True 'again: nothing written, said once' ($r.Exit -eq '0' -and $r.Inner -match 'already says' -and [System.IO.File]::ReadAllText($cardLf) -ceq $want) $r.All
+    $r = Invoke-Verb 'tkRoute K7M2 -Assign SONNET'
+    Assert-True 'a size on a connected GitHub Space: the repo''s worker label, in its own spelling, replacing me' ($r.Exit -eq '0' -and [System.IO.File]::ReadAllText($cardLf) -ceq $cardText.Replace("**Created:**", "**Assigned:** sonnet`n**Created:**")) ($r.All + "`n" + [System.IO.File]::ReadAllText($cardLf))
+    Assert-True 'and the sizes were read from the repo''s labels' (@($r.Calls | Where-Object { $_.StartsWith("label${sep}list${sep}--repo${sep}acme/widgets") }).Count -eq 1 -and (Get-Edits $r).Count -eq 0) ($r.Calls -join ' / ')
+
+    $r = Invoke-Verb 'tkRoute 141 -Assign opus -Space sandbox'
+    Assert-True 'a local Space: a numbered card, the triage row''s sizes, no gh asked' ($r.Exit -eq '0' -and $r.Calls.Count -eq 0 -and [System.IO.File]::ReadAllText($cardCrlf).Contains("**Assigned:** opus`r`n**Created:**")) ($r.All + "`n" + ($r.Calls -join ' / '))
+    Assert-True 'and the CRLF card stays CRLF, every line' (-not ([regex]::IsMatch([System.IO.File]::ReadAllText($cardCrlf), "(?<!`r)`n")))
+
+    $before = Get-HubSnapshot
+    $cardRefusals = [ordered]@{
+        'a value that is neither me nor a size'    = @{ Snippet = 'tkRoute 141 -Assign haiku -Space sandbox'; Says = "'haiku' is neither me nor a size"; Hint = 'me, fable, opus, sonnet' }
+        'a card given another switch'              = @{ Snippet = 'tkRoute K7M2 -Assign me -Size opus'; Says = 'A card takes only -Assign' }
+        'an id no card carries'                    = @{ Snippet = 'tkRoute Q4TN -Assign me'; Says = "No card with id 'Q4TN' in current/" }
+        'a card id with no -Assign'                = @{ Snippet = 'tkRoute K7M2 -Size opus'; Says = "'K7M2' is not an issue number" }
+    }
+    foreach ($k in $cardRefusals.Keys) {
+        $case = $cardRefusals[$k]
+        $r = Invoke-Verb $case.Snippet
+        $ok = (Test-OneRefusal $r) -and $r.All.Contains([string]$case.Says)
+        if ($case.Hint) { $ok = $ok -and $r.All.Contains([string]$case.Hint) }
+        Assert-True "refused, nothing written: $k" $ok (($r.Calls -join ' / ') + "`n" + $r.All)
+    }
+    Assert-True 'the refused cards were not touched' ((Get-HubSnapshot) -ceq $before)
+
     $usage = Invoke-Verb 'tkRoute -Help'
-    Assert-True 'Route -Help renders the usage' ($usage.Inner -match [regex]::Escape('Route <n> [-Size <label>] [-Milestone <title>] [-Severity <sev>] [-DeepWater] [-Space <slug>] [-WhatIf]')) $usage.Inner
+    Assert-True 'Route -Help renders the usage' ($usage.Inner -match [regex]::Escape('Route <n|id> [-Size <label>] [-Assign <me|size>] [-Milestone <title>] [-Severity <sev>] [-DeepWater] [-Space <slug>] [-WhatIf]')) $usage.Inner
     $usage = Invoke-Verb 'tkTriage -Help'
     Assert-True 'Triage -Help renders the usage' ($usage.Inner -match [regex]::Escape('Triage [-Space <slug>] [-AsJson]')) $usage.Inner
 }

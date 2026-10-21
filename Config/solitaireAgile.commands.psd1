@@ -68,8 +68,8 @@
             category    = 'rituals'
             description = 'The open issues by milestone, unplaced first'
             notes       = @(
-                'The issues in no milestone first, because nobody has placed them; then each milestone, most open first, with its context line: N open, M routed, K unrouted.',
-                'Each issue is one line: its number and title, then its worker (the size -- the worker label IS the size), its severity label and the deep-water mark, -- where it has none.',
+                'The issues in no milestone first, because nobody has placed them; then each milestone, most open first, with its context line: N open, M routed, K unrouted -- routed meaning someone has it.',
+                'Each issue is one line: its number and title, then who has it -- me (assigned to you), @<login> (assigned to someone else), its worker (the size -- the worker label IS the size), or nobody -- its severity label, -- where it has none, and the deep-water mark.',
                 'GitHub Spaces only. An Azure DevOps or local Space, or gh not answering, prints a Tracker line saying why and exits 0. -AsJson prints what the agent''s GET /api/ritual/triage serves. Nothing is written; Route answers.'
             )
             usage       = '{cliPrefix}Triage [-Space <slug>] [-AsJson] [-Help]'
@@ -80,17 +80,20 @@
         }
         'Route' = @{
             category    = 'rituals'
-            description = 'Answer triage''s questions on one issue'
+            description = 'Answer triage''s questions, or say who takes it'
             notes       = @(
-                'One gh write per switch on the Space''s repo: -Size adds that worker label and removes the other sizes; -Milestone sets an OPEN milestone by title; -Severity adds that label and removes the other two; -DeepWater adds deep-water.',
-                'A size is a worker label on the repo (sonnet, opus, fable here). Deep water gets two moves -- assign Fable or split -- and Route prints them; it makes neither.',
-                'Refused, with nothing written: no number, no switch, an unknown severity, size or milestone (the hint lists the known ones), an undeclared -Space, a Space that is not GitHub. -WhatIf prints every gh write and makes none. Nothing is written to the hub.'
+                'One gh write per switch on the Space''s repo: -Size adds that worker label and removes the other sizes; -Assign me makes you the assignee (gh issue edit --add-assignee @me), and -Assign <size> is the -Size write; -Milestone sets an OPEN milestone by title; -Severity adds that label and removes the other two; -DeepWater adds deep-water.',
+                'A size is a worker label on the repo (sonnet, opus, fable here; fable is the owner''s own seat). Deep water gets two moves -- assign Fable or split -- and Route prints them; it makes neither.',
+                'On a card -- an id of its own (K7M2), or any card in a Space with no tracker or a local one -- -Assign me or -Assign <size> writes one **Assigned:** line in the card''s footer and nothing else. A card''s sizes are the repo''s worker labels on a connected GitHub Space, else ceremonies.json triage.cardSizes.',
+                'Refused, with nothing written: no number, no switch, an unknown severity, size or milestone (the hint lists the known ones), -Assign and -Size that disagree, an undeclared -Space, a Space that is not GitHub (an Azure DevOps Space refuses -Assign too), a card given any switch but -Assign. -WhatIf prints every write and makes none. Nothing is written to the hub but a card''s **Assigned:** line.'
             )
-            usage       = '{cliPrefix}Route <n> [-Size <label>] [-Milestone <title>] [-Severity <sev>] [-DeepWater] [-Space <slug>] [-WhatIf] [-Help]'
+            usage       = '{cliPrefix}Route <n|id> [-Size <label>] [-Assign <me|size>] [-Milestone <title>] [-Severity <sev>] [-DeepWater] [-Space <slug>] [-WhatIf] [-Help]'
             examples    = @(
                 '{cliPrefix}Route 132 -Size opus -Severity sev3',
                 '{cliPrefix}Route 132 -Milestone "Team Agile V1" -WhatIf',
-                '{cliPrefix}Route 140 -DeepWater'
+                '{cliPrefix}Route 140 -DeepWater',
+                '{cliPrefix}Route 4 -Assign me -WhatIf',
+                '{cliPrefix}Route K7M2 -Assign sonnet'
             )
         }
         'StartWork' = @{

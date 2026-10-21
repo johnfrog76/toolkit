@@ -83,6 +83,9 @@ export interface PromptInfo {
   tracker?: "github" | "ado" | "none";
   /** False only when the card says `**Billable:** no`. No line means billable. */
   billable: boolean;
+  /** Who takes it: the card's `**Assigned:**` line -- "me", or a size -- "" for
+   *  nobody (D-AR10; `Route -Assign` writes it). Absent from an older agent. */
+  assigned?: string;
   title: string;
   sprint: string;
   progress: string;

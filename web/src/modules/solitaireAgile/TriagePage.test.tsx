@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { TriagePage, answersLine, contextLine, triageQueue } from "./TriagePage";
+import { TriagePage, answersLine, contextLine, triageQueue, whoLabel } from "./TriagePage";
 import type { TriageResponse } from "./api.solitaireAgile";
 
 // The Triage page: one open issue at a time, the unmilestoned group
@@ -16,6 +16,7 @@ interface FixtureIssue {
   number: number;
   title: string;
   url: string;
+  assignees?: (string | { login: string })[];
 }
 interface FixtureCase {
   name: string;
@@ -32,7 +33,10 @@ interface FixtureCase {
       context: string;
       issues: number[];
     }[];
-    issues: Record<string, { worker: string; size: string; severity: string; deepWater: boolean }>;
+    issues: Record<
+      string,
+      { worker: string; size: string; who: string; severity: string; deepWater: boolean }
+    >;
     text: string;
   };
 }
@@ -63,7 +67,9 @@ function responseFor(name: string): TriageResponse {
       issues: g.issues.map((n) => {
         const i = byNumber.get(n);
         if (!i) throw new Error(`fixture ${name}: no issue #${n}`);
-        return { number: n, title: i.title, url: i.url, ...c.expected.issues[String(n)] };
+        const first = (i.assignees ?? [])[0];
+        const assignee = typeof first === "string" ? first : (first?.login ?? "");
+        return { number: n, title: i.title, url: i.url, assignee, ...c.expected.issues[String(n)] };
       }),
     })),
     text: fs.readFileSync(path.join(FIXTURES, c.expected.text), "utf8"),
@@ -144,14 +150,25 @@ describe("the rules the page reads", () => {
 
   it("the context line names the milestone, or says there is none", () => {
     const [none, phase] = responseFor("mixed").groups;
-    expect(contextLine(none)).toBe("No milestone -- 2 open, 1 routed, 1 unrouted");
-    expect(contextLine(phase)).toBe("Phase 6: ledgers -- 3 open, 2 routed, 1 unrouted");
+    expect(contextLine(none)).toBe("No milestone -- 2 open, 2 routed, 0 unrouted");
+    expect(contextLine(phase)).toBe("Phase 6: ledgers -- 3 open, 3 routed, 0 unrouted");
   });
 
-  it("the answers an issue carries, in one line", () => {
-    const [, phase] = responseFor("mixed").groups;
+  it("the answers an issue carries, in one line: who has it first", () => {
+    const [none, phase, publicGroup] = responseFor("mixed").groups;
     expect(answersLine(phase.issues[0], "deep-water")).toBe("Fable · sev1 · deep-water");
-    expect(answersLine(phase.issues[1], "deep-water")).toBe("unrouted · no severity");
+    expect(answersLine(phase.issues[1], "deep-water")).toBe("@octo-crew · no severity");
+    expect(answersLine(none.issues[0], "deep-water")).toBe("me · sev2");
+    expect(answersLine(publicGroup.issues[1], "deep-water")).toBe("nobody · sev3");
+  });
+
+  it("who: the agent's who decides, and an older read with none falls back to the size", () => {
+    const [, phase] = responseFor("mixed").groups;
+    expect(whoLabel(phase.issues[2])).toBe("Sonnet");
+    expect(whoLabel({ ...phase.issues[2], who: undefined })).toBe("Sonnet");
+    expect(whoLabel({ ...phase.issues[1], who: undefined })).toBe("nobody");
+    const [noViewer] = responseFor("no-viewer").groups;
+    expect(noViewer.issues.map(whoLabel)).toEqual(["@johnfrog76", "Fable", "nobody"]);
   });
 });
 
@@ -166,9 +183,32 @@ describe("the Triage page", () => {
       "https://github.com/johnfrog76/toolkit/issues/140",
     );
     expect(screen.getByTestId("triage-context").textContent).toBe(
-      "No milestone -- 2 open, 1 routed, 1 unrouted",
+      "No milestone -- 2 open, 2 routed, 0 unrouted",
     );
     expect(screen.getByText("1 of 9")).toBeTruthy();
+    // Who has it is said under the title: the first issue is yours.
+    expect(screen.getByTestId("triage-answers").textContent).toBe("me · sev2");
+  });
+
+  it("the third question offers me first, and me is one Route -Assign me", async () => {
+    answer = { data: responseFor("mixed") };
+    render(<TriagePage />);
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(shownNumber()).toBe("#143 Ledger counts");
+    expect(screen.getByTestId("triage-answers").textContent).toBe("@octo-crew · no severity");
+    const me = screen.getByRole("button", { name: "me" });
+    expect(me.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(me);
+    expect(posted).toEqual([["143", "-Assign", "me"]]);
+    expect(await screen.findByText("Routed.")).toBeTruthy();
+  });
+
+  it("me shows as the answer when the issue is already yours", () => {
+    answer = { data: responseFor("mixed") };
+    render(<TriagePage />);
+    expect(screen.getByRole("button", { name: "me" }).getAttribute("aria-pressed")).toBe("true");
   });
 
   it("Next skips, and the context line follows the issue into its milestone", () => {
@@ -179,7 +219,7 @@ describe("the Triage page", () => {
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(shownNumber()).toBe("#142 Re-plumb the bridge");
     expect(screen.getByTestId("triage-context").textContent).toBe(
-      "Phase 6: ledgers -- 3 open, 2 routed, 1 unrouted",
+      "Phase 6: ledgers -- 3 open, 3 routed, 0 unrouted",
     );
     expect(posted).toEqual([]);
   });

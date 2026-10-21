@@ -93,6 +93,8 @@ $expected = [ordered]@{
     'stamps.closed'           = '**Closed:**'
     'stamps.created'          = '**Created:**'
     'stamps.billable'         = '**Billable:**'
+    # Who takes a card with no issue behind it (D-AR10): Route -Assign writes it.
+    'stamps.assigned'         = '**Assigned:**'
     'stamps.started'          = '**Started:**'
     'stamps.outcome'          = '**Outcome:**'
     'stamps.review'           = '**Review:**'
@@ -187,6 +189,7 @@ $expected = [ordered]@{
     # stays flat; Tests/fixtures/rituals/ holds the goldens the words make.
     'rituals.route'             = '/api/ritual/standup'
     'rituals.triageRoute'       = '/api/ritual/triage'
+    'rituals.assignMe'          = 'me'
     'rituals.ceremoniesFile'    = 'Config/ceremonies.json'
     'rituals.vocabularyFile'    = 'Config/standup-vocabulary.json'
     'rituals.workerLabelPrefix' = 'Routed to'
