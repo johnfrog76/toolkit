@@ -670,7 +670,7 @@ issues. Null with the switch off, on an Azure DevOps Space, or with the tracker 
 above the standup's card: the line verbatim, and, when it names a pick, the chevron (`>`,
 `rituals.text.cornerChevron`), which opens [the hand-off box](#startwork-the-hand-off-block) -- the same
 `POST /api/cmd/StartWork` every **Start work** makes. Where the launch exists (`/env`'s
-`startWorkLaunch`, true), the box offers a second button, **Launch**, which sends the same verb with
+`startWorkLaunch`, true -- the name is `consts.json` `startWork.launchEnvFlag`), the box offers a second button, **Launch**, which sends the same verb with
 `-Launch`; absent or false -- every agent today -- the box has one button. The brief below stops above the
 Corner's line, because the Corner is drawn at the head; **Copy** still copies the brief exactly as the agent
 rendered it.

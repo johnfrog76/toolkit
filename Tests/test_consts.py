@@ -286,6 +286,8 @@ EXPECTED = {
     # StartWork's hand-off block (D-AR5): the CLI types these four, the web's copy
     # box finds the block's title by the first; Tests/fixtures/start-work/ holds
     # the block they make, which Tests/test_bridge.py reads back through the bridge.
+    # The name of /env's boolean for StartWork's launch (D-AR13): served and read by it.
+    ("startWork", "launchEnvFlag"): "startWorkLaunch",
     ("startWork", "text"): {
         "head": "# Start work: {kind} {id} -- {title}",
         "howWeWork": "## How we work in {space} ({source})",
@@ -460,6 +462,7 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.rituals_suggest_exclusions(), tuple(EXPECTED[("rituals", "suggestExclusions")]))
         self.assertEqual(C.rituals_suggest_owner_seat(), EXPECTED[("rituals", "suggestOwnerSeat")])
         self.assertEqual(C.rituals_corner_shapes(), tuple(EXPECTED[("rituals", "cornerShapes")]))
+        self.assertEqual(C.startwork_launch_env_flag(), EXPECTED[("startWork", "launchEnvFlag")])
 
     def test_the_worker_rule_reads_the_contract(self):
         """The pane's worker chips and the standup read one prefix, not two."""
@@ -538,6 +541,8 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("rituals.text.proseBlockersNone", "Nothing blocked."),
         ("rituals.text.proseYesterday", "Yesterday I closed"),
         ("visibility.publicLine", "This repository is public"),
+        # The /env field for StartWork's launch: served through startwork_launch_env_flag().
+        ("startWork.launchEnvFlag", "startWorkLaunch"),
     ]
 
     # The allowlist, and why each entry is on it:

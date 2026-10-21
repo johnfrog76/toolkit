@@ -26,7 +26,7 @@ import { useRunStartWorkMutation } from "./api.solitaireAgile";
 // sentence the verb stated and nothing else. No agent runs here (D-AR1): the
 // block is text the person carries to their editor.
 //
-// Where the launch exists -- /env's `startWorkLaunch`, the derived surface D-AR13
+// Where the launch exists -- /env's launch flag (consts.json startWork.launchEnvFlag), the derived surface D-AR13
 // names -- the box offers a second button, Launch: the same verb with `-Launch`, one
 // more POST /api/cmd/StartWork, and what it printed (the PID and the log) or the
 // sentence it refused with, shown under the block. Absent or false, one button.
@@ -64,7 +64,8 @@ export function StartWorkBox({ id, onClose }: { id: string; onClose: () => void 
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [copied, setCopied] = useState(false);
   const { data: env } = useGetEnvQuery();
-  const launchOn = env?.startWorkLaunch === true;
+  // Read by the contract's name: the agent serves it under the same one.
+  const launchOn = (env as Record<string, unknown> | undefined)?.[STARTWORK.launchEnvFlag] === true;
   const [launching, setLaunching] = useState(false);
   const [launched, setLaunched] = useState<Outcome | null>(null);
   // ONE call per box: React's strict mode mounts twice in development, and the

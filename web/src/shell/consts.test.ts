@@ -340,6 +340,7 @@ describe("consts.json", () => {
     const { _: startWorkDoc, ...startWork } = STARTWORK as typeof STARTWORK & { _: string };
     expect(startWorkDoc).toMatch(/hand-off block/);
     expect(startWork).toEqual({
+      launchEnvFlag: "startWorkLaunch",
       text: {
         head: "# Start work: {kind} {id} -- {title}",
         howWeWork: "## How we work in {space} ({source})",
@@ -536,6 +537,27 @@ describe("no half retypes a contract literal", () => {
     }
     return out;
   }
+
+  // The /env field for StartWork's launch (startWork.launchEnvFlag): the page reads it
+  // as env[STARTWORK.launchEnvFlag]. An interface cannot take a computed name, so the
+  // EnvStatus field in shell/api.ts spells it -- that one line, and no other.
+  it("startWork.launchEnvFlag is read, not retyped -- but for EnvStatus's one field", () => {
+    const value = STARTWORK.launchEnvFlag;
+    expect(value).toBe("startWorkLaunch");
+    const found: string[] = [];
+    for (const file of walk(SRC_DIR)) {
+      const rel = path.relative(SRC_DIR, file).split(path.sep).join("/");
+      if (ALLOWED.has(rel)) continue;
+      fs.readFileSync(file, "utf8")
+        .split("\n")
+        .forEach((line) => {
+          const code = line.trim();
+          if (code.startsWith("//") || code.startsWith("*") || code.startsWith("/*")) return;
+          if (line.includes(value)) found.push(`${rel}:${code}`);
+        });
+    }
+    expect(found).toEqual([`shell/api.ts:${value}?: boolean;`]);
+  });
 
   it.each(GUARDED)("%s is read, not retyped", (key, value) => {
     const offenders: string[] = [];

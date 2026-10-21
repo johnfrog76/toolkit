@@ -349,7 +349,10 @@ tkStartWork 23A3 -Prompt agentic/new-issue.prompt.md                # another pr
 `Config` writes the one row to `config.local.json` and the other rows stay the shipped ones (rows merge
 one by one). A kind with no row, or a row whose file is not there, makes `StartWork` refuse with the key
 named (`startWork.prompts.<kind>`). The block's WORDS -- its head line and three headings -- are the
-contract instead, `consts.json` `startWork.text`, because the web shows what the CLI typed.
+contract instead, `consts.json` `startWork.text`, because the web shows what the CLI typed. So is
+`startWork.launchEnvFlag` (`startWorkLaunch`): the name of the top-level boolean `GET /api/env` carries for
+`StartWork <id> -Launch`, which the agent serves and the copy box reads before it draws its second button,
+**Launch** -- absent reads as off.
 
 ## `spaces[].howIWork` -- how you work in this Space
 

@@ -372,7 +372,7 @@ export const startWorkEndpoints = api.injectEndpoints({
   endpoints: (builder) => ({
     // POST /api/cmd/StartWork -- argv is [<id>]: a card id, or an issue number;
     // [<id>, "-Launch"] for the copy box's second button, which is drawn only where
-    // /env says the launch is on (startWorkLaunch).
+    // /env says the launch is on (consts.json startWork.launchEnvFlag).
     runStartWork: builder.mutation<CommandResponse, { id: string; launch?: boolean }>({
       query: ({ id, launch }) => ({
         url: "cmd/StartWork",

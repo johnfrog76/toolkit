@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { STARTWORK } from "../../shell/consts";
 import { StartWorkBox, blockTitle } from "./StartWorkBox";
 
 // The hand-off block's copy box (AR-1): one bridge call, the block shown
@@ -103,7 +104,7 @@ describe("StartWorkBox", () => {
 
   it("offers no second button while /env does not say the launch is on", async () => {
     reply = () => Promise.resolve(ok(`${BLOCK}\n`));
-    for (const e of [{}, { startWorkLaunch: false }]) {
+    for (const e of [{}, { [STARTWORK.launchEnvFlag]: false }]) {
       env = e;
       const { unmount } = render(<StartWorkBox id="23A3" onClose={() => undefined} />);
       await screen.findByTestId("start-work-block");
@@ -113,7 +114,7 @@ describe("StartWorkBox", () => {
   });
 
   it("where /env says the launch is on, Launch runs the same verb with -Launch and shows what it said", async () => {
-    env = { startWorkLaunch: true };
+    env = { [STARTWORK.launchEnvFlag]: true };
     reply = () => Promise.resolve(ok(`${BLOCK}\n`));
     launchReply = () => Promise.resolve(ok("Started PID 4242. Log: crew-23A3.log\n"));
     render(<StartWorkBox id="23A3" onClose={() => undefined} />);
@@ -127,7 +128,7 @@ describe("StartWorkBox", () => {
   });
 
   it("a launch refused shows the verb's sentence", async () => {
-    env = { startWorkLaunch: true };
+    env = { [STARTWORK.launchEnvFlag]: true };
     reply = () => Promise.resolve(ok(`${BLOCK}\n`));
     const sentence = "claude is not on the PATH.";
     launchReply = () =>

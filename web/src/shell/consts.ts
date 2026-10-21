@@ -350,6 +350,9 @@ export const RITUALS = consts.rituals as {
  * by the head line's shape (D-AR5); it builds none of it.
  */
 export const STARTWORK = consts.startWork as {
+  /** The name of /env's top-level boolean for StartWork's launch (D-AR13): the copy
+   *  box draws its Launch button only when `env[launchEnvFlag] === true`. */
+  launchEnvFlag: string;
   text: {
     head: string;
     howWeWork: string;
