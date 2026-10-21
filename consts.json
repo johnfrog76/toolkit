@@ -140,10 +140,11 @@
   },
 
   "docs": {
-    "_": "The Docs tab of a GitHub Space (D-S12): which of a repo's files are the product's documentation. readme is the landing page at the repo root; root is the folder whose markdown tree sits beside it; segment is what one path segment may look like (so '..', '.', an empty segment, a backslash or a space never is one). The agent's /api/docs routes refuse any path that is neither (and anything with '..' in it); the web's link resolver opens exactly those paths in the reading room and sends every other relative link to github.com -- one rule, so the two cannot disagree about what is a doc.",
+    "_": "The Docs tab of a GitHub Space (D-S12): which of a repo's files are the product's documentation. readme is the landing page at the repo root; root is the folder whose markdown tree sits beside it; segment is what one path segment may look like (so '..', '.', an empty segment, a backslash or a space never is one). The agent's /api/docs routes refuse any path that is neither (and anything with '..' in it); the web's link resolver opens exactly those paths in the reading room and sends every other relative link to github.com -- one rule, so the two cannot disagree about what is a doc. landingUrl is a different thing with a similar name: the PUBLIC marketing page (web/landing.html, built by `npm run build:landing`), deployed to GitHub Pages on every push to main -- not a Docs-tab file at all. The README's Documentation table links it as a literal, and this is the one address the app's Home foot reads so the two never drift apart.",
     "readme": "README.md",
     "root": "docs",
-    "segment": "^[A-Za-z0-9_][A-Za-z0-9._-]*$"
+    "segment": "^[A-Za-z0-9_][A-Za-z0-9._-]*$",
+    "landingUrl": "https://johnfrog76.github.io/toolkit/"
   },
 
   "studio": {

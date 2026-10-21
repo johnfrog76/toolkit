@@ -150,6 +150,9 @@ $expected = [ordered]@{
     'docs.readme'             = 'README.md'
     'docs.root'               = 'docs'
     'docs.segment'            = '^[A-Za-z0-9_][A-Za-z0-9._-]*$'
+    # The public landing page's deployed address (GitHub Pages) -- a different
+    # thing with a similar name: not a Docs-tab file. The app's Home foot reads it.
+    'docs.landingUrl'         = 'https://johnfrog76.github.io/toolkit/'
     # A shipped Space's old slug -> its new one. A map travels as its
     # old=new pairs joined with a comma, so the table stays flat.
     'spaces.renamed'          = 'test=azure-demo'

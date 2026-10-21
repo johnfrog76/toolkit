@@ -251,11 +251,20 @@ Vite's development server is given no `host`, so it listens on localhost: `web/v
 interface of the machine. The image's nginx proxies `/api/` to the agent on the host through
 `host.docker.internal`, so the container and the agent are two processes on one machine.
 
-A note on Docker. On Docker Desktop, `host.docker.internal` reaches a listener bound to the host's
-loopback, which is the combination the image is checked against. On a Linux Docker Engine,
-`host-gateway` resolves to the bridge network's gateway address, which a loopback-only listener does
-not answer, and this repository has not run that combination (an open issue tracks it). If the container cannot connect, run
-the web UI with `tkWeb -Dev` instead; do not rebind the agent to a wider address to make it work.
+A note on Docker, and where it works. Docker Desktop (macOS, Windows) runs containers inside a
+lightweight VM whose networking layer gives `host.docker.internal` a special resolution that reaches
+a listener bound to the host's loopback -- the combination both runs below are checked against.
+Native Linux Docker Engine has no such VM, so `host-gateway` resolves `host.docker.internal` to the
+container's real bridge-network gateway address instead, a different network namespace from the
+host's loopback interface: a listener bound only to `127.0.0.1` is not reachable from the container
+through that route. This follows from Docker's own documented bridge-network model, not from a run
+on a real Linux host -- nobody has run this combination on one, but the reason it will not connect is
+already known. **The Docker path in this repository is for Docker Desktop.** On native Linux, skip
+Docker and run the agent and the web UI directly on the host instead -- `tkWeb -Dev`, which already
+works there ([Quickstart](QUICKSTART.md), "Supported platforms"). An opt-in, non-default bind
+address that would let the Docker path work on native Linux too is a known gap, not built
+([Known gaps](KNOWN-GAPS.md)). Do not rebind the agent to a wider address to make the container reach
+it.
 
 ### CORS
 

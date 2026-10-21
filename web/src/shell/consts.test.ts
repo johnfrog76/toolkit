@@ -99,6 +99,9 @@ describe("consts.json", () => {
     expect(DOCS.readme).toBe("README.md");
     expect(DOCS.root).toBe("docs");
     expect(DOCS.segment).toBe(String.raw`^[A-Za-z0-9_][A-Za-z0-9._-]*$`);
+    // The public landing page's deployed address -- a different thing with a
+    // similar name: not a Docs-tab file. Home's foot reads this same address.
+    expect(DOCS.landingUrl).toBe("https://johnfrog76.github.io/toolkit/");
     // A shipped Space's old slug -> its new one. Both loaders read it;
     // the web reads /api/env, where the old slug has already become the new.
     expect(consts.spaces.renamed).toEqual({ test: "azure-demo" });

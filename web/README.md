@@ -1665,6 +1665,18 @@ restarted.
 
 **The build stage runs Node 24** (`node:24-alpine`), the same major the repository states everywhere else (`.nvmrc`, `web/package.json` `engines`, `docs/QUICKSTART.md`); the serving stage is `nginx:alpine`, which carries no Node. A bump of the repository's Node line moves the first `FROM` in `web/Dockerfile` with it. Built and smoked on Windows with Docker 29 and Compose v5: the image builds (105 MB) and `npm run smoke -- --port=5174` reads clean against the running container.
 
+**This Docker path is for Docker Desktop (macOS, Windows), not for native Linux Docker Engine.**
+Docker Desktop runs containers inside a VM whose networking gives `host.docker.internal` a special
+resolution that reaches a listener bound to the host's loopback -- which is why the two runs below
+work. A native Linux Docker Engine has no such VM: `host-gateway` resolves `host.docker.internal` to
+the container's real bridge-network gateway address, a different network namespace from the host's
+loopback interface, so the agent's loopback-only bind (`docs/ARCHITECTURE.md`, "Trust model") is not
+reachable from the container through that route. This is how Docker's own bridge-network model works,
+not something that needed a Linux host to discover -- nobody has run this image on one. On native
+Linux, run the agent and the web UI directly on the host instead: `tkWeb -Dev`, which already works
+there (`docs/QUICKSTART.md`, "Supported platforms"). An opt-in, non-default bind address that would
+let the Docker path work on native Linux too is a known gap, not built (`docs/KNOWN-GAPS.md`).
+
 **Verified by a run (2026-09-16).** On a Mac with Docker Desktop 28.3.0 and Compose 2.38.1: the image builds (104 MB),
 `http://localhost:5174/` serves the built `index.html` with the hashed asset the build emitted, the
 deep link `/system` returns the app rather than an nginx 404, and `/api/env` through the container

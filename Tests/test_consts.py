@@ -94,6 +94,7 @@ EXPECTED = {
     ("docs", "readme"): "README.md",
     ("docs", "root"): "docs",
     ("docs", "segment"): r"^[A-Za-z0-9_][A-Za-z0-9._-]*$",
+    ("docs", "landingUrl"): "https://johnfrog76.github.io/toolkit/",
     ("spaces", "renamed"): {"test": "azure-demo"},
     ("studio", "noteName"): r"^[A-Za-z0-9][A-Za-z0-9._-]*\.md$",
     ("studio", "threadLine"): "> GitHub:",
@@ -365,6 +366,7 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.docs_root(), EXPECTED[("docs", "root")])
         self.assertTrue(C.re_docs_segment().match("CLI.md"))
         self.assertFalse(C.re_docs_segment().match(".."))
+        self.assertEqual(C.docs_landing_url(), EXPECTED[("docs", "landingUrl")])
         self.assertEqual(C.renamed_spaces(), EXPECTED[("spaces", "renamed")])
         self.assertEqual(C.visibility_public(), EXPECTED[("visibility", "public")])
         self.assertEqual(C.visibility_private(), EXPECTED[("visibility", "private")])
