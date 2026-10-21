@@ -3,9 +3,10 @@
 The ritual the owner asked for (D-TA5): the open issues grouped by
 milestone, the group with no milestone FIRST because nobody has placed them,
 then the milestones by open count, most first (a tie by title, ordinal). Each
-issue carries its worker (the size, D-TA3: the worker label IS the size), its
-severity label and the deep-water mark; each group its context line,
-"N open, M routed, K unrouted".
+issue carries its worker (the size, D-TA3: the worker label IS the size), who
+has it (D-AR10: its GitHub assignee -- "me" when that is you -- else its size,
+else nobody), its severity label and the deep-water mark; each group its
+context line, "N open, M routed, K unrouted", routed meaning someone has it.
 
 Two halves implement it -- this file and the CLI's ``Scripts/Get-Triage.ps1``
 (over ``Scripts/Triage-Rules.ps1``) -- and one table holds them to each other:
@@ -25,13 +26,21 @@ about who an issue is routed to.
 from __future__ import annotations
 
 import asyncio
+import re
 
 from pydantic import BaseModel
 
 from ..ado import accounting
 from ..core import log_writer
+from ..core.child import run_read
 from ..core.config import API_PREFIX, load_config
-from ..core.consts import rituals_label_width, rituals_text, rituals_triage_route, rituals_worker_label_prefix
+from ..core.consts import (
+    rituals_assign_me,
+    rituals_label_width,
+    rituals_text,
+    rituals_triage_route,
+    rituals_worker_label_prefix,
+)
 from .standup import _label_names, api, ceremonies, worker_name
 from .tracker import read_tracker
 
@@ -57,6 +66,8 @@ class TriageIssue(BaseModel):
     url: str = ""
     worker: str = ""  # the worker's NAME, "" when no label routes it
     size: str = ""  # the worker LABEL, "" when none
+    assignee: str = ""  # the first GitHub assignee's login, "" when none
+    who: str = ""  # D-AR10: "me", "@<login>", the size, or "" -- nobody (who())
     severity: str = ""  # the first severity label it carries, "" when none
     deepWater: bool = False
 
@@ -96,6 +107,28 @@ def _milestone_title(issue: dict) -> str:
     return str(m or "")
 
 
+def _assignees(issue: dict) -> list[str]:
+    """An issue's assignee logins: gh gives ``{"login": ...}`` objects, the fixture strings."""
+    out = []
+    for a in issue.get("assignees") or []:
+        login = a.get("login") if isinstance(a, dict) else a
+        if login:
+            out.append(str(login))
+    return out
+
+
+def who(assignee: str, size: str, viewer: str = "") -> str:
+    """Who has an item (D-AR10), one rule: the first assignee -- ``rituals.assignMe``
+    ("me") when it is the viewer (ignoring case, as GitHub's logins are),
+    ``@<login>`` otherwise -- else the size, else "" (nobody). The CLI's
+    ``Get-P20TriageWho`` is the same rule over the same table."""
+    if assignee:
+        if viewer and assignee.lower() == viewer.lower():
+            return rituals_assign_me()
+        return "@" + assignee
+    return size
+
+
 def _context(n_open: int, routed: int) -> str:
     return (
         _row()["text"]["context"]
@@ -105,11 +138,15 @@ def _context(n_open: int, routed: int) -> str:
     )
 
 
-def fill_triage(labels: list[dict], issues: list[dict], tracker_state: dict, space: str = "") -> Triage:
+def fill_triage(
+    labels: list[dict], issues: list[dict], tracker_state: dict, space: str = "", viewer: str = ""
+) -> Triage:
     """The groups from labels and issues. Pure.
 
     ``tracker_state`` is ``{"ok": bool, "reason": str}``; when it is not ok the
     labels and issues are not read -- the ceremony is its title and the reason.
+    ``viewer`` is the signed-in gh user's login ("" when unknown): an issue
+    assigned to them reads "me".
     """
     row = _row()
     severities = list(row["severities"])
@@ -137,12 +174,15 @@ def fill_triage(labels: list[dict], issues: list[dict], tracker_state: dict, spa
             continue
         tags = _label_names(issue.get("labels"))
         size = next((t for t in tags if t in names), "")
+        assignee = next(iter(_assignees(issue)), "")
         item = TriageIssue(
             number=int(issue.get("number", 0)),
             title=issue.get("title", "") or "",
             url=issue.get("url", "") or "",
             worker=names.get(size, ""),
             size=size,
+            assignee=assignee,
+            who=who(assignee, size, viewer),
             severity=next((t for t in tags if t in severities), ""),
             deepWater=deep in tags,
         )
@@ -154,7 +194,8 @@ def fill_triage(labels: list[dict], issues: list[dict], tracker_state: dict, spa
 
     for title in sorted(groups, key=order):
         members = groups[title]
-        routed = sum(1 for i in members if i.size)
+        # Routed: someone has it -- a worker label or an assignee (D-AR10).
+        routed = sum(1 for i in members if i.who)
         out.groups.append(
             TriageGroup(
                 milestone=title,
@@ -184,7 +225,9 @@ def render_triage(filled: Triage) -> str:
             heading = g.milestone or t["noMilestone"]
             lines.append(t["group"].replace("{milestone}", heading).replace("{context}", g.context))
             for i in g.issues:
-                tags = [i.worker or t["none"], i.severity or t["none"]]
+                # Who: "me", "@<login>", the size's worker name, or nobody.
+                shown = i.worker if i.size and i.who == i.size else i.who
+                tags = [shown or t["nobody"], i.severity or t["none"]]
                 if i.deepWater:
                     tags.append(filled.deepWaterLabel)
                 lines.append(
@@ -199,12 +242,29 @@ def render_triage(filled: Triage) -> str:
 # -- The gh layer -------------------------------------------------------------
 
 
+_LOGIN = re.compile(r"^[A-Za-z0-9-]+$")
+
+
+def _viewer() -> str:
+    """The signed-in gh user's login (``gh api user -q .login``), "" when gh cannot say.
+
+    Best effort: without it every assignee reads ``@<login>`` and the triage
+    still answers. The CLI's Get-Triage.ps1 makes the same read."""
+    try:
+        result = run_read(["gh", "api", "user", "-q", ".login"], 15)
+    except Exception:  # noqa: BLE001 -- gh missing or slow: nobody is "me", nothing fails
+        return ""
+    login = (result.stdout or "").strip() if result.returncode == 0 else ""
+    return login if _LOGIN.match(login) else ""
+
+
 def triage_for(space: str = "") -> Triage:
     """The whole triage for a Space -- the active one when ``space`` is ""."""
     cfg = load_config()
     org, status, projects = accounting.space_scope(cfg, space)
     labels, issues, state = read_tracker(org, status, projects, state="open", ritual="triage")
-    filled = fill_triage(labels, issues, state, space=space or cfg.get("activeSpace", ""))
+    viewer = _viewer() if state.get("ok") else ""
+    filled = fill_triage(labels, issues, state, space=space or cfg.get("activeSpace", ""), viewer=viewer)
     filled.text = render_triage(filled)
     log_writer.write_log(
         "CMD",

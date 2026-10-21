@@ -20,9 +20,11 @@
     worker is its first worker label (the standup's rule, Get-P20StandupWorkers:
     a label whose description starts "Routed to"), and that label IS its size
     (D-TA3). Its severity is the first of its labels that ceremonies.json names a
-    severity; deep-water is the label ceremonies.json names. Each group's
-    context line is "N open, M routed, K unrouted", routed meaning it carries a
-    worker label.
+    severity; deep-water is the label ceremonies.json names. Who has it (D-AR10)
+    is its GitHub assignee -- consts.json rituals.assignMe ("me") when that is the
+    signed-in gh user (the viewer), else "@<login>" -- else its size (the worker
+    label), else "" (nobody). Each group's context line is "N open, M routed,
+    K unrouted", routed meaning it has a who: a worker label or an assignee.
 
     The agent's agent/solitaire/triage.py implements the same rule over the same
     file; Tests/fixtures/rituals/triage.json and the golden triage-<name>.txt
@@ -59,6 +61,38 @@ function Get-P20TriageMilestone {
     return ''
 }
 
+function Get-P20IssueAssignees {
+    <# An issue's assignee logins: gh gives objects with .login, the fixture gives strings. #>
+    param($Issue)
+    $logins = New-Object System.Collections.ArrayList
+    if ($null -eq $Issue) { return $logins.ToArray() }
+    $raw = $null
+    if ($Issue -is [System.Collections.IDictionary]) { if ($Issue.Contains('assignees')) { $raw = $Issue['assignees'] } }
+    elseif ($Issue.PSObject.Properties['assignees']) { $raw = $Issue.assignees }
+    foreach ($a in @($raw)) {
+        if ($null -eq $a) { continue }
+        if ($a -is [string]) { if ($a) { [void]$logins.Add($a) }; continue }
+        if ($a -is [System.Collections.IDictionary]) { if ($a.Contains('login') -and $a['login']) { [void]$logins.Add([string]$a['login']) }; continue }
+        if ($a.PSObject.Properties['login'] -and $a.login) { [void]$logins.Add([string]$a.login) }
+    }
+    return $logins.ToArray()
+}
+
+function Get-P20TriageWho {
+    <#
+      Who has an item (D-AR10), one rule: the first assignee -- "me" when it is
+      the viewer (compared ignoring case, as GitHub's logins are), "@<login>"
+      otherwise -- else the size, else "" (nobody). agent/solitaire/triage.py's
+      who() is the same rule over the same table.
+    #>
+    param([string]$Assignee, [string]$Size, [string]$Viewer)
+    if ($Assignee) {
+        if ($Viewer -and $Assignee -ieq $Viewer) { return [string](Get-P20Consts).rituals.assignMe }
+        return '@' + $Assignee
+    }
+    return [string]$Size
+}
+
 function Invoke-P20TriageFill {
     <#
       The fill. Pure over its inputs: no gh, no clock, no file but ceremonies.json.
@@ -71,6 +105,9 @@ function Invoke-P20TriageFill {
         $Issues,
         $Tracker,
         [string]$Space = '',
+        # The signed-in gh user's login, '' when unknown: an assignee who is the
+        # viewer reads as "me".
+        [string]$Viewer = '',
         [string]$PackageRoot
     )
     $data = Get-P20TriageRow -PackageRoot $PackageRoot
@@ -109,12 +146,15 @@ function Invoke-P20TriageFill {
             foreach ($n in $names) { if ($severities -contains $n) { $severity = $n; break } }
             $worker = ''
             if ($size) { $worker = [string]$byLabel[$size].name }
+            $assignee = [string](@(Get-P20IssueAssignees $issue) | Select-Object -First 1)
             $item = [ordered]@{
                 number    = [int]$issue.number
                 title     = [string]$issue.title
                 url       = [string]$issue.url
                 worker    = $worker
                 size      = $size
+                assignee  = $assignee
+                who       = (Get-P20TriageWho -Assignee $assignee -Size $size -Viewer $Viewer)
                 severity  = $severity
                 deepWater = [bool]($names -contains $deep)
             }
@@ -141,7 +181,8 @@ function Invoke-P20TriageFill {
 
         foreach ($t in $order) {
             $members = [object[]]$groups[$t].ToArray()
-            $routed = @($members | Where-Object { $_.size }).Count
+            # Routed: someone has it -- a worker label or an assignee (D-AR10).
+            $routed = @($members | Where-Object { $_.who }).Count
             $open = $members.Count
             $context = ([string]$row.text.context).Replace('{open}', [string]$open).Replace('{routed}', [string]$routed).Replace('{unrouted}', [string]($open - $routed))
             [void]$groupsOut.Add([ordered]@{
@@ -198,8 +239,10 @@ function Format-P20TriageText {
             if (-not $heading) { $heading = [string]$t.noMilestone }
             [void]$lines.Add(([string]$t.group).Replace('{milestone}', $heading).Replace('{context}', [string]$g.context))
             foreach ($i in @($g.issues | Where-Object { $null -ne $_ })) {
-                $who = [string]$i.worker
-                if (-not $who) { $who = [string]$t.none }
+                # Who: "me", "@<login>", the size's worker name, or nobody.
+                $who = [string]$i.who
+                if ($i.size -and $who -ceq [string]$i.size) { $who = [string]$i.worker }
+                if (-not $who) { $who = [string]$t.nobody }
                 $sev = [string]$i.severity
                 if (-not $sev) { $sev = [string]$t.none }
                 $tags = @($who, $sev)

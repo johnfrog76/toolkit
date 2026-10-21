@@ -32,6 +32,8 @@ export const STAMPS = consts.stamps as {
   closed: string;
   created: string;
   billable: string;
+  /** Who takes a card with no issue behind it: `**Assigned:** me`, or a size (D-AR10). */
+  assigned: string;
   /** A person's In Progress and Code Review -- for a card with nothing checked in, or no pull request. */
   started: string;
   review: string;
@@ -167,6 +169,9 @@ export const RITUALS = consts.rituals as {
   route: string;
   /** Triage's read: the open issues by milestone. */
   triageRoute: string;
+  /** "me": the one answer to who takes an item that is not a size (D-AR10) --
+   *  what the Triage page sends as `Route -Assign`, and an item's `who` when it is yours. */
+  assignMe: string;
   ceremoniesFile: string;
   vocabularyFile: string;
   workerLabelPrefix: string;

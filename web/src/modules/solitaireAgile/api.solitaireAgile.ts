@@ -245,6 +245,11 @@ export interface TriageIssue {
   worker: string;
   /** The worker LABEL -- the size (D-TA3) -- "" when none. */
   size: string;
+  /** The first GitHub assignee's login, "" when none. Absent from an older agent. */
+  assignee?: string;
+  /** Who has it (D-AR10): "me" (RITUALS.assignMe -- the signed-in gh user),
+   *  "@<login>", the size, or "" for nobody. Absent from an older agent. */
+  who?: string;
   /** The severity label it carries, "" when none. */
   severity: string;
   deepWater: boolean;

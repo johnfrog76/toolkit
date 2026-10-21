@@ -6,15 +6,17 @@
     Team Agile V1's first ceremony with a write (D-TA5; docs/modules/solitaire-agile.md,
     "The verbs"). This verb is the READ: the open issues grouped by
     milestone, the group with no milestone first, then the milestones by open
-    count; each issue one line -- number, title, worker (the size, D-TA3) or
-    --, severity or --, and deep-water marked; each milestone a context line,
-    "N open, M routed, K unrouted". The answers are Route's.
+    count; each issue one line -- number, title, who has it (me, @<login>, its
+    worker -- the size, D-TA3 -- or nobody; D-AR10), severity or --, and
+    deep-water marked; each milestone a context line, "N open, M routed,
+    K unrouted". The answers are Route's.
 
     The rule is Scripts/Triage-Rules.ps1's, shared with the suite; this script
-    is the thin layer: which Space, which repo, the two gh reads, the printing.
+    is the thin layer: which Space, which repo, the gh reads, the printing.
 
         gh label list --repo <repo> --limit 500 --json name,description
-        gh issue list --repo <repo> --state open --limit 500 --json number,title,state,labels,milestone,url
+        gh issue list --repo <repo> --state open --limit 500 --json number,title,state,labels,assignees,milestone,url
+        gh api user -q .login     (best effort: who "me" is)
 
     A GitHub Space only. An Azure DevOps or local Space, a Space whose repo is
     ambiguous, gh missing or not answering -- each prints the ceremony's title
@@ -58,7 +60,7 @@ if ($Help) {
     Write-Host "  Usage:" -ForegroundColor Yellow
     Write-Host "    ${p}Triage [-Space <slug>] [-AsJson]"
     Write-Host ""
-    Write-Host "  Each issue's worker (its size), severity and deep-water mark. Writes nothing; ${p}Route answers."
+    Write-Host "  Who has each issue (me, @<login>, a size, or nobody), its severity and deep-water mark. Writes nothing; ${p}Route answers."
     Write-Host ""
     return
 }
@@ -84,6 +86,7 @@ $status = $resolvedSpace.status
 $projects = $resolvedSpace.projects
 
 $tracker = @{ ok = $false; reason = '' }
+$viewer = ''
 $labels = @()
 $issues = @()
 $kind = Resolve-P20Tracker -OrgUrl $org
@@ -109,11 +112,20 @@ else {
         if ($got.ok) {
             $labels = $got.value
             $got = Invoke-P20RitualGh -Repo $repo -Arguments @('issue', 'list', '--repo', $repo, '--state', 'open', '--limit', '500',
-                '--json', 'number,title,state,labels,milestone,url')
+                '--json', 'number,title,state,labels,assignees,milestone,url')
         }
         if ($got.ok) {
             $issues = $got.value
             $tracker.ok = $true
+            # Who you are on GitHub, so an issue assigned to you reads "me"
+            # (D-AR10). Best effort: a viewer gh cannot name leaves every
+            # assignee as @<login>, and the triage still answers.
+            try {
+                $me = Invoke-P20TrackerRead 'gh' @('api', 'user', '-q', '.login')
+                $login = ((@($me.Out) -join "`n").Trim())
+                if ($me.Code -eq 0 -and $login -match '^[A-Za-z0-9-]+$') { $viewer = $login }
+            }
+            catch { $viewer = '' }
         }
         else {
             $tracker.reason = $got.reason
@@ -123,7 +135,7 @@ else {
 }
 
 # -- The fill, the rendering, the printing --------------------------------------
-$triage = Invoke-P20TriageFill -Labels $labels -Issues $issues -Tracker $tracker -Space $slug -PackageRoot $repoRoot
+$triage = Invoke-P20TriageFill -Labels $labels -Issues $issues -Tracker $tracker -Space $slug -Viewer $viewer -PackageRoot $repoRoot
 $triage.text = Format-P20TriageText -Triage $triage -PackageRoot $repoRoot
 
 if ($AsJson) {

@@ -35,7 +35,8 @@ function global:Get-P20Standup {
 }
 
 # V1: triage, the first ceremony with a write. Triage reads; Route writes
-# -- one gh write per switch, never the hub (D-TA2).
+# -- one gh write per switch, never the hub (D-TA2); the one exception is
+# -Assign on a card with no issue behind it, one **Assigned:** line (D-AR10).
 
 function global:Get-P20Triage {
     <# Triage -- the open issues by milestone, the ones nobody placed first. Writes nothing. #>
@@ -51,12 +52,13 @@ function global:Get-P20Triage {
 }
 
 function global:Set-P20Route {
-    <# Route -- one issue's triage answers, each one gh write: size, milestone, severity, deep-water. #>
+    <# Route -- one issue's triage answers, each one gh write: size, assignee, milestone, severity, deep-water; or who takes a card. #>
     [CmdletBinding()]
     param(
         [Parameter(Position = 0)]
         [string]$Number,
         [string]$Size,
+        [string]$Assign,
         [string]$Milestone,
         [string]$Severity,
         [switch]$DeepWater,

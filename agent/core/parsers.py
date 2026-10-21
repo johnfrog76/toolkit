@@ -22,6 +22,7 @@ from .consts import (
     re_pr_url_line,
     re_review_line,
     re_started_line,
+    stamp_assigned,
     stamp_billable,
     status_active,
     status_code_review,
@@ -147,10 +148,22 @@ def card_billable(content: str) -> bool:
     return not re.search(r"(?mi)^" + re.escape(stamp_billable()) + r"\s*no\b", content or "")
 
 
+def card_assigned(content: str) -> str:
+    """Who takes the card: the value of its first ``**Assigned:**`` line, trimmed;
+    "" when it has none (nobody).
+
+    ``Route -Assign`` writes it on a card with no issue behind it -- ``me``, or
+    a size (D-AR10). The one reader of ``stamps.assigned`` in this half; the CLI's
+    mirror is ``Get-P20CardAssigned`` in ``Scripts/Get-PromptFileStatus.ps1``,
+    and ``Tests/fixtures/parsers/assigned-lines.json`` holds the two to one table."""
+    m = re.search(r"(?m)^" + re.escape(stamp_assigned()) + r"[ \t]*([^\r\n]*?)[ \t]*\r?$", content or "")
+    return m.group(1) if m else ""
+
+
 def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES) -> dict:
     """Extract the file-content-derived fields of PromptInfo.
 
-    Returns a dict with keys: title, type, name, linked, tracker, sprint, progress,
+    Returns a dict with keys: title, type, name, linked, tracker, billable, assigned, sprint, progress,
     checked, total, ado_url, pr_url, previous_round, design, commits, status -- the content half of the Card
     model (docs/hub/cards.md, "The model, as the agent serves it"). ``id`` comes from the FILENAME
     (``card_id``), so the caller adds it. Fields that need filesystem access (file
@@ -236,6 +249,8 @@ def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES) -> dict
         "tracker": tracker(ado_url),
         # No line means billable: the whole existing corpus needs no migration.
         "billable": card_billable(content),
+        # Who takes it: the **Assigned:** line's value (me, or a size), "" for nobody.
+        "assigned": card_assigned(content),
         "sprint": sprint,
         "progress": progress,
         "checked": checked,

@@ -39,7 +39,8 @@ const StandupRemindSettings = lazyPart(
  *
  * Triage is the tab's second page, under a Standup | Triage strip: the
  * open issues one at a time, unplaced first, each answer the CLI's `Route`
- * through the bridge -- the module's first write, to the tracker, never the hub.
+ * through the bridge -- the module's first write, to the tracker (a card with no
+ * issue behind it takes one **Assigned:** line, through the same verb).
  *
  * Its settings section is the reminder to attend (D-TA15): a time and
  * the days, saved as `Standup -Remind` through the bridge. The reminder is

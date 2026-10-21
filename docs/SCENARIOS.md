@@ -331,7 +331,7 @@ is a page under Team Agile's one nav entry"; `RitualPage.test.tsx`).
 
 | `GET /api/ritual/triage` answers | The page shows |
 | --- | --- |
-| open issues (`tracker.ok` true) | ONE issue, the group with no milestone first; above it its milestone's context line ("No milestone -- 2 open, 1 routed, 1 unrouted"); under it the three questions -- Milestone (the OPEN milestones from `/api/milestones`), Severity (`sev1`-`sev3`), Size (the repo's worker labels, then `deep-water`). Each answer is one `POST /api/cmd/Route`; **Next** skips; "n of N" in the header |
+| open issues (`tracker.ok` true) | ONE issue, the group with no milestone first; above it its milestone's context line ("No milestone -- 2 open, 2 routed, 0 unrouted" -- routed is someone has it); under its title who has it, then its severity ("me · sev2", "@octo-crew · no severity", "Sonnet · no severity", "nobody · sev3"); under it the three questions -- Milestone (the OPEN milestones from `/api/milestones`), Severity (`sev1`-`sev3`), Size (**me** first -- `Route <n> -Assign me`, pressed when the issue is yours -- then the repo's worker labels, then `deep-water`). Each answer is one `POST /api/cmd/Route`; **Next** skips; "n of N" in the header |
 | `deep-water` chosen | its two moves, in a row that was always there: **Assign Fable** (`Route <n> -Size fable -DeepWater`) and **Split**, which opens the new-issue dialog with the issue as its parent (`NewItem -Parent <n>`: each piece a sub-issue) |
 | the verb refuses | its sentence, in the status line under the questions; nothing moved |
 | past the last issue | `That was every open issue`, with Start again |

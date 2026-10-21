@@ -107,6 +107,7 @@ After a `---` rule, bold-label lines. **This is the part of the model that is st
 **Story Points:** 2
 **ADO Link:** https://dev.azure.com/YOUR-ADO-ORG/RecipeBox/_workitems/edit/214
 **Billable:** no
+**Assigned:** me
 **Before:** ../assets/214/before.png
 **Cover:** ../assets/214/cover.png
 **Created:** 2026-09-14
@@ -119,6 +120,7 @@ After a `---` rule, bold-label lines. **This is the part of the model that is st
 | `**Story Points:**` | As the work item had it | `NewPrompt` | people |
 | `**ADO Link:**` | The work item's address. **An `https://` value here is what makes a card `linked`**; offline it reads `(not linked -- created offline with -Title)` | `NewPrompt`; and `NewItem -FromCard`, which publishes a card made offline as a GitHub issue and writes the issue's URL here, through `Set-P20CardLine` (the card keeps its id) | `linked`, `ado_url`, the repo filter (a card with no ADO link is never hidden by it), *Open in ADO* |
 | `**Billable:**` | `no` takes the card off Daily and the standup. **No line means billable** -- "billable again" removes the line | `Billable -No`, through `Set-P20CardLine` | Daily and Team Agile's standup (one reader a half: `card_billable`, `Test-P20CardBillable`); the *Not billable* tag. `stamps.billable` |
+| `**Assigned:**` | Who takes the card: `me`, or a size -- a worker label (`sonnet`, `opus`, `fable`; `fable` is the owner's own seat). **No line means nobody.** The value is the first such line's, trimmed. On a GitHub issue the tracker's own fields say who -- the assignee, or the worker label -- so the line is for a card with no issue behind it | `Route <id> -Assign me\|<size>` (Team Agile, D-AR10), through `Set-P20CardLine` | the model's `assigned` (one reader a half: `card_assigned`, `Get-P20CardAssigned`, held to `Tests/fixtures/parsers/assigned-lines.json` from both suites). `stamps.assigned` |
 | `**Cover:**` | The card's picture: a path relative to the card's folder, `../assets/<card key>/cover.<ext>`. **No line means no picture**; a line whose file is missing, or that resolves outside the Space's `assets/`, reads as none too | `Cover`, or `NewPrompt -Cover`, through `Set-P20CardLine` | the board's card face, the list's thumbnail, the card page; the model's `cover`. `stamps.cover` |
 | `**Before:**` | The other half of a before/after proof, the same way: `../assets/<card key>/before.<ext>` | `Cover -Before`, or `NewPrompt -Before` | the card page, side by side with the cover; the model's `before`. `stamps.before` |
 | `**Created:**` | `yyyy-MM-dd`, the day the card was made -- or the day the work was, with `NewPrompt -Date` | `NewPrompt` | Daily, reviews, the engagement timeline. `stamps.created` |
@@ -294,6 +296,7 @@ fields, so nothing downstream parses a heading or a filename (`PromptInfo`, `age
 | `tracker` | the tracker rule (`tracker()`, D-G2) over the card's OWN `**ADO Link:**`, never the Space's address | `github`, `ado`, or `none` -- `none` exactly when not `linked`. The card's **gh** / **ado** badge, first in the list row's meta line and on the board's card face; a custom card wears none |
 | `pinned` | NOT read from the file -- asked of the tracker: the card's `tracker` is `github`, its `**ADO Link:**` is an issue of the Space's own repository, and that number is in the repository's pinned set (one `gh api graphql` `pinnedIssues` call per repo, held 60 seconds and dropped when `EditItem` runs) | `false` unless all three hold **and** the Space is GitHub at Tier 1; at Tier 2, on Azure DevOps and on no tracker `gh` is not asked. The board's card face wears the pin and "Pinned on GitHub" in its meta line and sorts pinned cards first within a lane; the list and the detail route do not carry it |
 | `billable` | no `**Billable:** no` line | default `true` |
+| `assigned` | the first `**Assigned:**` line's value, trimmed | `me`, a size, or `""` -- nobody; on the list and the detail route |
 | `status` | derived, above | `Active`, `In Progress`, `Code Review` (and `Done` for archive readers) |
 | `progress`, `checked`, `total` | the checkboxes | `--` when there are none |
 | `sprint` | `**Sprint:**`, last segment, cut to 20 | `--` when absent |
@@ -323,6 +326,7 @@ keeps the same edit rule -- the card's own line ending, no BOM.
 | `PublishPR` | writes `PR published: <url>` on the line under `PR URL:`, once -- a record, not state |
 | `GetPRComments` | writes `PR URL:` if absent; appends review rounds under `## PR Review Comments`. Append-only, safe to re-run. It also writes a side record, `pr-comments/<date>-PR<id>.md` in the Space (read at archive time for `prsReviewed`), except with `-OutputFile`, which writes only the file it names ([CLI](../CLI.md)) |
 | `Billable` | adds or removes `**Billable:** no` |
+| `Route <id> -Assign` | writes `**Assigned:** me` or `**Assigned:** <size>` on a card with no issue behind it -- a card with an id of its own, or any card in a Space with no tracker or a local one; nothing else in the file moves (Team Agile) |
 | `NewItem -FromCard` | files the card as a GitHub issue -- its name and Summary, the body ending `Toolkit card: <id>` -- and writes the issue's URL into `**ADO Link:**`; refuses a card that is already linked |
 | `Cover` | copies a picture into `<space>/assets/<card key>/` and writes `**Cover:**` (or `**Before:**`); `-Remove` deletes both. `NewPrompt -Cover` / `-Before` attach the same way at birth |
 | `Move` | adds `**Started:**` or `**Review:**` with today's date; `-To Done` is `Archive` |

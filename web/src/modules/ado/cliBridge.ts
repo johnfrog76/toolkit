@@ -339,14 +339,16 @@ export function buildStandupRemindParams(fields: { time: string; days: string[] 
   return params;
 }
 
-/** `Route <n> [-Size <label>] [-Milestone <title>] [-Severity <sev>] [-DeepWater]
- *  [-Space <slug>]` (Team Agile triage; Scripts/Set-Route.ps1). The issue
+/** `Route <n|id> [-Size <label>] [-Assign <me|size>] [-Milestone <title>] [-Severity <sev>]
+ *  [-DeepWater] [-Space <slug>]` (Team Agile triage; Scripts/Set-Route.ps1). The issue
  *  number is the positional argument; each answer given is its own switch, and
  *  the verb makes one `gh issue edit` per switch. A milestone title with spaces
- *  is ONE element. Only what was answered goes on the line. */
+ *  is ONE element. Only what was answered goes on the line. `assign` is who takes
+ *  it (D-AR10): `me` makes you the assignee; a size is the -Size write. */
 export interface RouteFields {
   number: number;
   size?: string;
+  assign?: string;
   milestone?: string;
   severity?: string;
   deepWater?: boolean;
@@ -355,6 +357,7 @@ export interface RouteFields {
 export function buildRouteParams(fields: RouteFields): string[] {
   const params = [String(fields.number)];
   if (fields.size?.trim()) params.push("-Size", fields.size.trim());
+  if (fields.assign?.trim()) params.push("-Assign", fields.assign.trim());
   if (fields.milestone?.trim()) params.push("-Milestone", fields.milestone.trim());
   if (fields.severity?.trim()) params.push("-Severity", fields.severity.trim());
   if (fields.deepWater) params.push("-DeepWater");
