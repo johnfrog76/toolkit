@@ -14,6 +14,7 @@ import {
 import {
   CheckmarkRegular,
   CopyRegular,
+  DismissRegular,
   PeopleTeamRegular,
   PlayRegular,
 } from "@fluentui/react-icons";
@@ -35,6 +36,8 @@ import type { IssueFacts } from "./IssuePopover";
 import { isIssue, itemFacts, itemRef } from "./itemRef";
 import { ROUTES } from "./paths";
 import { SEATS, plateFor } from "./stage/seats";
+import { SURFACE_CHAIR, dismissRef, dismissedRefs } from "./suggestDismiss";
+import { chairSuggestion, suggestionArg } from "./suggestion";
 
 // The hand-off block's copy box (AR-1): a chunk fetched the first time a row's
 // Start work is pressed, so the page's first draw carries none of it.
@@ -74,6 +77,16 @@ export const startWorkArg = (i: RitualItem): string =>
 // (rituals.grains), the same words `Standup -Grain` takes. Each is shown
 // verbatim, as the agent rendered it; Copy copies the grain on screen.
 //
+// The chair's Next line may be the SUGGESTION (AR-3; docs/modules/solitaire-agile.md,
+// "The suggestion: one next move, derived"): when nothing waits, the brief's last
+// line is the first candidate's `line`. The page draws that line as a row of its
+// own -- the line verbatim, the action (Start work opens the hand-off box for a
+// start or a delegation; a route opens Triage) and a dismiss. A dismiss is per
+// surface, per item, per session (suggestDismiss.ts): the next candidate's line
+// takes its place, and with none left the line is today's briefNextNone. The
+// brief's text is otherwise untouched, and Copy still copies it as the agent
+// rendered it.
+//
 // Showing the standup IS attending it (D-TA15): the first time it draws,
 // the page posts once to the attend route, which re-arms the standup's Organize
 // reminder through Organize's own verbs -- once a day, and nothing at all with
@@ -101,6 +114,13 @@ const useStyles = makeStyles({
   },
   // The toggle's box is constant: the label changes, the width does not.
   toggle: { alignSelf: "flex-start", minWidth: "120px", marginTop: tokens.spacingVerticalS },
+  // The suggestion: the line, its action and its dismiss, on one wrapping row.
+  suggestion: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: tokens.spacingHorizontalS,
+  },
   list: { listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column" },
   row: {
     display: "flex",
@@ -305,10 +325,22 @@ export function StandupPage() {
   // The item whose hand-off block is open: the box is mounted only while it is.
   const [startFor, setStartFor] = useState<string | null>(null);
   const { value: grain, setValue: setGrain } = usePersistedValue(GRAIN_KEY, DETAIL, isGrain);
-  const parts = useMemo(
-    () => (readable ? grainParts(data, grain) : { header: "", body: "", copy: "" }),
-    [readable, data, grain],
+  // The refs dismissed on the chair's line this session (never throws).
+  const [dismissed, setDismissed] = useState<string[]>(() => dismissedRefs(SURFACE_CHAIR));
+  const chair = useMemo(
+    () => (readable ? chairSuggestion(data, dismissed) : { standing: false, current: null }),
+    [readable, data, dismissed],
   );
+  const parts = useMemo(() => {
+    if (!readable) return { header: "", body: "", copy: "" };
+    const p = grainParts(data, grain);
+    // The brief grain draws the suggestion as its own row: the body stops above it.
+    if (grain === BRIEF && chair.standing) {
+      const lines = p.body.replace(/\n$/, "").split("\n");
+      return { ...p, body: lines.slice(0, -1).join("\n") + "\n" };
+    }
+    return p;
+  }, [readable, data, grain, chair.standing]);
   const copy = useCallback(async () => {
     if (!parts.copy) return;
     await copyText(parts.copy);
@@ -317,10 +349,42 @@ export function StandupPage() {
   }, [parts]);
   const rows = useMemo(() => (readable ? listRows(data) : []), [readable, data]);
   // The chair's reading sits above the prose -- unless it IS the prose.
-  const briefLines = useMemo(
-    () => (readable && data.brief && grain !== BRIEF ? data.brief.split("\n").filter(Boolean) : []),
-    [readable, data, grain],
-  );
+  const briefLines = useMemo(() => {
+    if (!readable || !data.brief || grain === BRIEF) return [];
+    const lines = data.brief.split("\n").filter(Boolean);
+    return chair.standing ? lines.slice(0, -1) : lines;
+  }, [readable, data, grain, chair.standing]);
+  const dismiss = useCallback((ref: string) => setDismissed(dismissRef(SURFACE_CHAIR, ref)), []);
+  const current = chair.current;
+  const suggestionRow = chair.standing ? (
+    <div className={styles.suggestion} data-testid="standup-suggestion">
+      <Caption1>{current ? current.line : RITUALS.text.briefNextNone}</Caption1>
+      {current && current.shape !== RITUALS.suggestShapes[2] && (
+        <Button
+          appearance="subtle"
+          size="small"
+          aria-label={`Start work on ${current.ref}`}
+          onClick={() => setStartFor(suggestionArg(current))}
+        >
+          Start work
+        </Button>
+      )}
+      {current && current.shape === RITUALS.suggestShapes[2] && (
+        <Button appearance="subtle" size="small" onClick={() => navigate(ROUTES.triage)}>
+          Open Triage
+        </Button>
+      )}
+      {current && (
+        <Button
+          appearance="subtle"
+          size="small"
+          icon={<DismissRegular />}
+          aria-label={`Dismiss the suggestion ${current.ref}`}
+          onClick={() => dismiss(current.ref)}
+        />
+      )}
+    </div>
+  ) : null;
   const facts = useMemo(
     () => (readable ? issueFacts(data, triage) : undefined),
     [readable, data, triage],
@@ -386,6 +450,7 @@ export function StandupPage() {
                 {briefLines.map((line, i) => (
                   <Caption1 key={i}>{line}</Caption1>
                 ))}
+                {suggestionRow}
               </div>
             )}
             {/* The text keeps its columns (white-space: pre), so a long line
@@ -401,6 +466,7 @@ export function StandupPage() {
             >
               {linked}
             </pre>
+            {grain === BRIEF && suggestionRow}
             <Button
               appearance="transparent"
               size="small"

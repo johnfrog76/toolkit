@@ -351,6 +351,17 @@ try {
     $seenMoved = (@($moved | Sort-Object { $_.id } | ForEach-Object { "$($_.id)|$($_.begun)|$((@($_.commits)) -join ',')" })) -join "`n"
     $wantMoved = "139|2026-10-01|a41c2e9,b52d3f0aa`n140||`nK7M2|2026-09-30|"
     Assert-True 'Get-P20StandupCards: begun is the Started day, else the Created day; commits every bullet''s hash' ($seenMoved -ceq $wantMoved) ("`n--- got ---`n$seenMoved`n--- want ---`n$wantMoved")
+
+    # What the suggestion reads: the **Sprint:** line whole, the Created day, the Tags, who takes it.
+    $sugDir = Join-Path $readerDir 'suggest'
+    New-Item -ItemType Directory -Path (Join-Path $sugDir 'current') -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $sugDir 'current/Task23A3-route-the-git-calls.prompt.md'),
+        "# Task 23A3: Route the git calls`r`nTags: spec, sev2, sonnet`r`n`r`n---`r`n`r`n**Sprint:** M2 -- 1.2.0, the standup sees the work`r`n**Assigned:** me`r`n**Created:** 2026-09-20`r`n", $utf8r)
+    [System.IO.File]::WriteAllText((Join-Path $sugDir 'current/TaskK7M2-bare.prompt.md'), "# Task K7M2: Bare`n", $utf8r)
+    $sugRows = @(Get-P20StandupCards -CurrentDir (Join-Path $sugDir 'current') -ArchiveDir (Join-Path $sugDir 'archive') -Pattern $pattern)
+    $seenSug = (@($sugRows | Sort-Object { $_.id } | ForEach-Object { "$($_.id)|$($_.sprint)|$($_.created)|$((@($_.tags)) -join ',')|$($_.assigned)" })) -join "`n"
+    $wantSug = "23A3|M2 -- 1.2.0, the standup sees the work|2026-09-20|spec,sev2,sonnet|me`nK7M2||||"
+    Assert-True 'Get-P20StandupCards: the milestone a card names (whole), its Created day, its Tags, who takes it (agent: the same)' ($seenSug -ceq $wantSug) ("`n--- got ---`n$seenSug`n--- want ---`n$wantSug")
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
@@ -648,6 +659,84 @@ foreach ($g in $dressGroups) {
 }
 Assert-True 'dress: a reply that names an issue the facts do not hold keeps the prose sentence for that group and the model''s words for the rest' ((($said.ToArray()) -join ' | ') -ceq ((@($dressTable.reply.said | ForEach-Object { [string]$_ })) -join ' | ') -and $dressed -eq [int]$dressTable.reply.dressed -and $refused -eq [int]$dressTable.reply.refused) (($said.ToArray()) -join ' | ')
 
+# -- 1f. The suggestion (AR-3) -------------------------------------------------
+# Tests/fixtures/suggestion/table.json, every section, the SAME rows
+# Tests/test_rituals.py asserts against agent/solitaire/suggest.py: the nearest
+# milestone, the rule (order, pick, shape, sentence, command, exclusions), the
+# switch, and the chair's reading end to end against its generated golden.
+Write-Host ""
+Write-Host "-- The suggestion --" -ForegroundColor Cyan
+. (Join-Path $pkgRoot 'Scripts/Suggest-Rules.ps1')
+$suggestDir = Join-Path $scriptDir 'fixtures/suggestion'
+$suggestTable = [System.IO.File]::ReadAllText((Join-Path $suggestDir 'table.json')) | ConvertFrom-Json
+$suggestRows = @($suggestTable.rows)
+$suggestNames = @($suggestRows | ForEach-Object { [string]$_.name })
+$wantShapes = @('sev1-beats-a-nearer-milestone', 'two-in-one-milestone-pick-the-older', 'one-left-beats-three-left', 'no-milestone-sorts-last',
+    'crew-sized-on-agents-is-a-delegation', 'unrouted-on-agents-is-a-route', 'in-flight-is-excluded', 'not-billable-is-excluded-first',
+    'waiting-on-you-is-excluded-before-in-flight', 'the-empty-space', 'a-dismissed-item-yields-the-next')
+Assert-True 'the suggestion table has every shape the rule distinguishes' (@($wantShapes | Where-Object { $suggestNames -cnotcontains $_ }).Count -eq 0) ($suggestNames -join ',')
+$rowShapes = @($suggestRows | ForEach-Object { [string]$_.expected.shape } | Where-Object { $_ } | Sort-Object -Unique)
+$met = @($suggestRows | ForEach-Object { @($_.expected.excluded.PSObject.Properties | ForEach-Object { [string]$_.Value }) } | Sort-Object -Unique)
+Assert-True 'every shape and every exclusion of the contract has a row that reaches it' ((($rowShapes) -join ',') -ceq ((@($consts.rituals.suggestShapes | ForEach-Object { [string]$_ } | Sort-Object)) -join ',') -and (($met) -join ',') -ceq ((@($consts.rituals.suggestExclusions | ForEach-Object { [string]$_ } | Sort-Object)) -join ',')) "shapes [$($rowShapes -join ',')] exclusions [$($met -join ',')]"
+foreach ($row in @($suggestTable.nearest)) {
+    $order = @(Get-P20NearestMilestones -Milestones @($row.milestones))
+    $want = (@($row.order | ForEach-Object { [string]$_ })) -join ' | '
+    $first = ''
+    if ($order.Count -gt 0) { $first = $order[0] }
+    Assert-True "nearest: $($row.name)" ((($order) -join ' | ') -ceq $want -and $first -ceq [string]$row.nearest) "got [$($order -join ' | ')]"
+}
+foreach ($row in $suggestRows) {
+    $dismissed = [string[]]@($row.dismissed | ForEach-Object { [string]$_ })
+    $chosen = Select-P20Suggestion -Items @($row.items) -HowIWork ([string]$row.howIWork) -Dismissed $dismissed -PackageRoot $pkgRoot
+    $exp = $row.expected
+    $gotOrder = (@($chosen.picked | ForEach-Object { $_.ref })) -join ','
+    $wantOrder = (@($exp.order | ForEach-Object { [string]$_ })) -join ','
+    $gotEx = (@($chosen.excluded.Keys | ForEach-Object { "$_=$($chosen.excluded[$_])" } | Sort-Object)) -join ','
+    $wantEx = (@($exp.excluded.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" } | Sort-Object)) -join ','
+    $ok = ($gotOrder -ceq $wantOrder -and $gotEx -ceq $wantEx)
+    $detail = "order [$gotOrder] excluded [$gotEx]"
+    if ($null -eq $exp.pick) { $ok = $ok -and @($chosen.picked).Count -eq 0 }
+    else {
+        $p = @($chosen.picked)[0]
+        $ok = $ok -and $p.ref -ceq [string]$exp.pick -and $p.shape -ceq [string]$exp.shape -and $p.sentence -ceq [string]$exp.sentence -and $p.command -ceq [string]$exp.command
+        $detail += " pick $($p.ref)/$($p.shape) '$($p.sentence)' '$($p.command)'"
+    }
+    Assert-True "suggest: $($row.name)" $ok $detail
+}
+foreach ($row in @($suggestTable.switch)) {
+    $got = Test-P20SuggestionsOn -TeamAgile $row.solitaireAgile -Stored $row.suggestions
+    Assert-True "switch: Team Agile $($row.solitaireAgile), suggestions $($row.suggestions) -> $($row.on)" ($got -eq [bool]$row.on) "got $got"
+}
+$sb = $suggestTable.briefs
+$sbAsOf = ([regex]::Match([System.IO.File]::ReadAllText((Join-Path $suggestDir 'table.json')), '"briefs"\s*:\s*\{\s*"asOf"\s*:\s*"([^"]+)"')).Groups[1].Value
+foreach ($case in @($sb.cases)) {
+    $s = Invoke-P20StandupJoinedFill -AsOf $sbAsOf -Labels @($sb.workerLabels) -Issues @($case.issues) -Tracker @{ ok = $true; reason = '' } `
+        -Cards @($case.cards) -Space ([string]$sb.space) -SpaceName ([string]$sb.spaceName) -PackageRoot $pkgRoot
+    $on = Test-P20SuggestionsOn -TeamAgile $true -Stored $case.suggestions
+    $null = Add-P20StandupSuggestion -Standup $s -Labels @($sb.workerLabels) -Issues @($case.issues) -Cards @($case.cards) -HowIWork ([string]$case.howIWork) -On $on -Prefix ([string]$sb.prefix) -PackageRoot $pkgRoot
+    $gotOrder = (@($s.suggestions | ForEach-Object { $_.ref })) -join ','
+    $wantOrder = (@($case.expected.order | ForEach-Object { [string]$_ })) -join ','
+    $pick = $null
+    if ($null -ne $s.suggestion) { $pick = $s.suggestion.ref }
+    Assert-True "brief $($case.name): the candidates [$wantOrder] and the pick" ($gotOrder -ceq $wantOrder -and "$pick" -ceq "$($case.expected.pick)") "got [$gotOrder] pick $pick"
+    $brief = Format-P20StandupBrief -Standup $s -PackageRoot $pkgRoot
+    $golden = [System.IO.File]::ReadAllText((Join-Path $suggestDir ([string]$case.expected.brief)))
+    Assert-True "brief $($case.name): $($case.expected.brief), byte for byte" ($brief -ceq $golden) ("`n--- got ---`n$brief--- want ---`n$golden")
+    $back = ($s | ConvertTo-Json -Depth 10) | ConvertFrom-Json
+    $back.asOf = $s.asOf
+    $back.since = $s.since
+    Assert-True "brief $($case.name): the JSON round trip renders the same brief" ((Format-P20StandupBrief -Standup $back -PackageRoot $pkgRoot) -ceq $brief)
+}
+$cardTable = [System.IO.File]::ReadAllText((Join-Path $scriptDir 'fixtures/parsers/card-milestone.json')) | ConvertFrom-Json
+foreach ($row in @($cardTable.rows)) {
+    $eol = "`n"
+    if ($row.crlf) { $eol = "`r`n" }
+    $text = ((@($row.lines | ForEach-Object { [string]$_ })) -join $eol) + $eol
+    $gotM = Get-P20CardMilestone $text
+    $gotT = (@(Get-P20CardTags $text)) -join '|'
+    Assert-True "a card's milestone and tags: $($row.name)" ($gotM -ceq [string]$row.milestone -and $gotT -ceq ((@($row.tags | ForEach-Object { [string]$_ })) -join '|')) "got '$gotM' [$gotT]"
+}
+
 # -- The scratch package and hub -------------------------------------------------
 $scratch = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-rituals-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
 $pkg = Join-Path $scratch 'pkg'
@@ -889,6 +978,28 @@ try {
     Assert-True 'a card linked to a closed issue, still in current/: one Check line' ($jv.Inner -match ('(?m)^  Check {6}' + [regex]::Escape($check102) + '$')) $jv.Inner
     Assert-True 'a not-billable card is not a row' ($jv.Inner -notmatch 'C4D7') $jv.Inner
     Assert-True 'and reading both wrote nothing' ($beforeJoined -ceq $afterJoined)
+
+    # The suggestion, typed: the same read, the rule's candidates in order on
+    # -AsJson, each line naming the command with the registered prefix.
+    $sj = Invoke-Standup 'tkStandup -AsJson'
+    $sjParsed = $null
+    try { $sjParsed = $sj.Inner | ConvertFrom-Json } catch { $sjParsed = $null }
+    $null = Add-P20StandupSuggestion -Standup $joinedNow -Labels $ghLabels -Issues $ghIssues -Cards $widgetCards -HowIWork 'agents' -On $true -Prefix 'tk' -PackageRoot $pkgRoot
+    $wantRefs = (@($joinedNow.suggestions | ForEach-Object { $_.ref })) -join ','
+    $gotRefs = ''
+    if ($sjParsed) { $gotRefs = (@($sjParsed.suggestions | ForEach-Object { [string]$_.ref })) -join ',' }
+    Assert-True 'typed: -AsJson carries the suggestion -- the rule''s candidates in order, the first as suggestion' ($sjParsed -and $wantRefs -and $gotRefs -ceq $wantRefs -and [string]$sjParsed.suggestion.ref -ceq @($joinedNow.suggestions)[0].ref) "got [$gotRefs] want [$wantRefs]"
+    Assert-True 'typed: each line is Next:, the sentence, and the command with the CLI prefix' ($sjParsed -and @($sjParsed.suggestions | Where-Object { -not ([string]$_.line).StartsWith('Next: ' + [string]$_.sentence + ' (tk') }).Count -eq 0) $sj.Inner
+    Assert-True 'typed: with walks waiting, the brief''s Next line is the queue''s, not the suggestion (D-AR7)' ($sjParsed -and -not ([string]$sjParsed.brief).Contains([string]$sjParsed.suggestion.line)) $sj.Inner
+    # The switch: spaces.widgets.features.suggestions=false in the hub -- no suggestion.
+    $hubJsonPath = Join-Path $hub 'hub.json'
+    $savedHub = [System.IO.File]::ReadAllText($hubJsonPath)
+    [System.IO.File]::WriteAllText($hubJsonPath, $savedHub.Replace('"howIWork": "agents" }', '"howIWork": "agents", "features": { "suggestions": false } }'), $utf8)
+    $soff = Invoke-Standup 'tkStandup -AsJson'
+    [System.IO.File]::WriteAllText($hubJsonPath, $savedHub, $utf8)
+    $soffParsed = $null
+    try { $soffParsed = $soff.Inner | ConvertFrom-Json } catch { $soffParsed = $null }
+    Assert-True 'typed: spaces.<slug>.features.suggestions=false -- no candidate, no suggestion, the standup unchanged' ($soffParsed -and @($soffParsed.suggestions).Count -eq 0 -and $null -eq $soffParsed.suggestion -and ([string]$soffParsed.text) -ceq ([string]$sjParsed.text)) $soff.All
     foreach ($k in $joinedFiles.Keys) { Remove-Item -LiteralPath (Join-Path $widgetsCurrent $k) -Force }
 
     # A local Space: its cards, not gh. The scratch hub's solo/ has a card

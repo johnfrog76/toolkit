@@ -1,0 +1,6 @@
+Since Thursday 1 October 2026: 1 in progress.
+Nothing is waiting on you.
+Fable: nothing today.
+Opus: nothing yesterday, 1 open, none in flight, no blockers.
+In flight is not yet known: every routed issue reads as open.
+Next: #141 is opus-sized and well defined -- send it to the crew? (tkStartWork 141)

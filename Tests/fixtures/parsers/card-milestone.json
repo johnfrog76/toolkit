@@ -1,0 +1,33 @@
+{
+  "_": "ONE table, read by both readers of the two card lines the suggestion takes from a card (docs/hub/cards.md, \"What the suggestion reads\"; D-AR11): the milestone -- the first **Sprint:** line's value, WHOLE and trimmed, '' for none or a parenthesised template placeholder, never the card model's shortened sprint -- and the tags, the Tags: line split on commas and trimmed. Scripts/Get-PromptFileStatus.ps1 Get-P20CardMilestone and Get-P20CardTags (tkTestToolkit -Rituals) and agent/core/parsers.py card_milestone() and card_tags() (Tests/test_parsers.py). Each row's lines are joined with LF, or CRLF when crlf is true.",
+  "rows": [
+    {
+      "name": "no lines",
+      "crlf": false,
+      "lines": ["# Task K7M2: Bench notes", "", "**Created:** 2026-10-17"],
+      "milestone": "",
+      "tags": []
+    },
+    {
+      "name": "placeholders are none",
+      "crlf": false,
+      "lines": ["# Task K7M2: Bench notes", "Tags: (none)", "", "**Sprint:** (not linked)", "**Created:** 2026-10-17"],
+      "milestone": "",
+      "tags": []
+    },
+    {
+      "name": "a milestone longer than twenty characters is read whole",
+      "crlf": false,
+      "lines": ["# Feature 4V3A: The suggestion rule", "Tags: spec, sev2, sonnet", "", "**Sprint:** M2 -- 1.2.0, the standup sees the work  ", "**Created:** 2026-10-17"],
+      "milestone": "M2 -- 1.2.0, the standup sees the work",
+      "tags": ["spec", "sev2", "sonnet"]
+    },
+    {
+      "name": "an iteration path is read whole, not its last segment",
+      "crlf": true,
+      "lines": ["# Task 139: Write the docs", "Tags: ui,  ,docs ", "", "**Sprint:** RecipesApp\\Sprint 2", "**Created:** 2026-10-17"],
+      "milestone": "RecipesApp\\Sprint 2",
+      "tags": ["ui", "docs"]
+    }
+  ]
+}

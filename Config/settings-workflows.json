@@ -78,6 +78,16 @@
       "anchor": "spaces.{slug}.features.sprintAwareness"
     },
     {
+      "id": "suggestions",
+      "question": "Can it tell me what to do next?",
+      "sentence": "Where Team Agile is on, the chair's reading ends on one suggested next move when nothing is waiting on you: the item, the rule that chose it, and the command that acts on it. It is this Space's switch; turn it off and the line goes back to saying nothing is waiting.",
+      "surfaces": [
+        "suggestions"
+      ],
+      "door": "change",
+      "anchor": "spaces.{slug}.features.suggestions"
+    },
+    {
       "id": "training-hours",
       "question": "How many training hours does my quarter require?",
       "sentence": "If this Space's engagement requires training each quarter, say how many hours. The Growth page then adds up the trainings dated this quarter and says where you stand. Leave it unset and nothing is shown.",

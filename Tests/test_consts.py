@@ -68,7 +68,7 @@ EXPECTED = {
     ("folders", "backlog"): "backlog",
     ("reviews", "fileName"): "review.md",
     ("reviews", "slugSetSeparator"): "+",
-    ("features", "spaceScoped"): ["sprintAwareness", "trainingHoursPerQuarter"],
+    ("features", "spaceScoped"): ["sprintAwareness", "trainingHoursPerQuarter", "suggestions"],
     ("env", "activeSpace"): "P20_ACTIVE_SPACE",
     ("env", "features"): "P20_FEATURES",
     ("env", "agentPort"): "P20_AGENT_PORT",
@@ -172,6 +172,8 @@ EXPECTED = {
     ("rituals", "dressPronounRegex"): r"^I(?:'[a-z]+)?$",
     # What moved: a slot item's motion, and the hash its card's bullet threads.
     ("rituals", "motions"): ["closed", "started", "inProgress"],
+    ("rituals", "suggestShapes"): ["start", "delegate", "route"],
+    ("rituals", "suggestExclusions"): ["notBillable", "waiting", "inFlight", "dismissed"],
     ("rituals", "text"): {
         "title": "Standup -- {date}",
         "dateFormat": "dddd d MMMM yyyy",
@@ -213,6 +215,18 @@ EXPECTED = {
         "briefInFlightUnknown": "In flight is not yet known: every routed issue reads as open.",
         "briefNext": "Next: the {kind} -- {n} on {who}.",
         "briefNextNone": "Next: nothing is waiting on you.",
+        "suggestNext": "Next: {sentence} ({command})",
+        "suggestStart": "{ref} is {why} -- start it?",
+        "suggestDelegate": "{ref} is {size}-sized and well defined -- send it to the crew?",
+        "suggestRoute": "{ref} is {why}{nobody} -- route it?",
+        "suggestNobody": " and nobody has it",
+        "suggestWhyLast": "the last open {noun} in milestone {milestone}",
+        "suggestWhyMilestone": "the oldest open {kind} in milestone {milestone}",
+        "suggestWhyOldest": "the oldest open {kind}",
+        "suggestNounCard": "card",
+        "suggestNounIssue": "issue",
+        "suggestCommandStart": "StartWork {arg}",
+        "suggestCommandRoute": "Route {arg} -Assign <me|size>",
         "workYesterday": "{name}, {n} closed",
         "workToday": "{name}, {n}",
         "workBlockers": "{name}, {n} to walk",
@@ -427,6 +441,8 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.rituals_dress_name_regex(), EXPECTED[("rituals", "dressNameRegex")])
         self.assertEqual(C.rituals_dress_pronoun_regex(), EXPECTED[("rituals", "dressPronounRegex")])
         self.assertEqual(C.rituals_motions(), tuple(EXPECTED[("rituals", "motions")]))
+        self.assertEqual(C.rituals_suggest_shapes(), tuple(EXPECTED[("rituals", "suggestShapes")]))
+        self.assertEqual(C.rituals_suggest_exclusions(), tuple(EXPECTED[("rituals", "suggestExclusions")]))
 
     def test_the_worker_rule_reads_the_contract(self):
         """The pane's worker chips and the standup read one prefix, not two."""

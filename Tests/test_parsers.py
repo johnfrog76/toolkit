@@ -164,6 +164,25 @@ class StatusMetadataTests(unittest.TestCase):
                 # The model carries it as the card's `assigned`.
                 self.assertEqual(_parse_status_metadata(text)["assigned"], row["expected"])
 
+    def test_a_cards_milestone_and_tags_by_the_shared_table(self):
+        """The whole `**Sprint:**` line and the `Tags:` line, the two things the
+        suggestion reads from a card (docs/hub/cards.md, "What the suggestion
+        reads"; D-AR11). The CLI reads them with Get-P20CardMilestone and
+        Get-P20CardTags; tkTestToolkit -Rituals asserts the SAME table,
+        Tests/fixtures/parsers/card-milestone.json."""
+        import json
+
+        from agent.core.parsers import card_milestone, card_tags
+
+        table = json.loads((FIXTURES / "card-milestone.json").read_text(encoding="utf-8"))
+        self.assertGreaterEqual(len(table["rows"]), 4)
+        for row in table["rows"]:
+            with self.subTest(row=row["name"]):
+                eol = "\r\n" if row["crlf"] else "\n"
+                text = eol.join(row["lines"]) + eol
+                self.assertEqual(card_milestone(text), row["milestone"])
+                self.assertEqual(card_tags(text), row["tags"])
+
     def test_in_progress_status(self):
         meta = _parse_status_metadata(_read("in-progress.md"))
         self.assertEqual(meta["status"], "In Progress")

@@ -83,7 +83,7 @@ table; this is the shape of it:
 | Scope | Keys | Goes to |
 | --- | --- | --- |
 | **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `web.agentPort`, `web.corsOrigins`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display` | `config.local.json`, created as a sparse patch if it is not there |
-| **org** | `spaces.<slug>.name` / `.status` / `.orgType` / `.org` / `.tenant` / `.promptsFolder` / `.projects` / `.howIWork` / `.features.sprintAwareness` / `.features.trainingHoursPerQuarter` | the hub's `hub.json` -- or `config.local.json`'s `spaces.<slug>` patch with **`-Local`** |
+| **org** | `spaces.<slug>.name` / `.status` / `.orgType` / `.org` / `.tenant` / `.promptsFolder` / `.projects` / `.howIWork` / `.features.sprintAwareness` / `.features.suggestions` / `.features.trainingHoursPerQuarter` | the hub's `hub.json` -- or `config.local.json`'s `spaces.<slug>` patch with **`-Local`** |
 | **hub** | `storeSync`, `folders.<name>` | the hub's `hub.json`, and only with **`-Hub`** |
 | **default** | `commands`, `workItemTypes`, `cliVersion`, `managerWorkflow` | nowhere. These are the team's, and a `-Set` on one is refused by name |
 
@@ -381,6 +381,27 @@ re-import `SwitchSpace` does in a shell. The inventory row reads `on (chosen: wi
 `off (derived: ...)` or `off (chosen: alone in <slug>)`, and `not configured` for a GitHub Space nobody
 has answered.
 
+## `spaces[].features.suggestions` -- whether Team Agile suggests your next move
+
+A boolean, and the third Space-scoped switch (with `sprintAwareness` and `howIWork`): whether the chair's
+reading ends on one derived next move -- the item, the rule that chose it and the command that acts on it
+-- in place of `Next: nothing is waiting on you.` It rides Team Agile, so it means something only where
+Team Agile is on, and there **unset is on**; `false` turns the line back to today's
+([the suggestion](modules/solitaire-agile.md#the-suggestion-one-next-move-derived)). It is declared in
+`consts.json` `features.spaceScoped`, so a top-level `features.suggestions` is ignored and the merged map
+`/env` serves carries the Space's value when it sets one.
+
+```powershell
+tkConfig -Set spaces.<slug>.features.suggestions=false -Hub   # no suggestion in this Space
+tkConfig -Unset spaces.<slug>.features.suggestions -Hub       # back to the default: on where Team Agile is on
+```
+
+One rule per half -- `Test-P20SuggestionsOn` (`Scripts/Suggest-Rules.ps1`) and `suggestions_on()`
+(`agent/solitaire/suggest.py`), the `switch` rows of `Tests/fixtures/suggestion/table.json`. The inventory
+row, `Suggestions`, reads `not configured` where Team Agile is on and nothing is set (on, by default),
+`on` where it is set true, and `off` where it is set false or Team Agile is off in that Space -- each
+with the line that changes it, under the question "Can it tell me what to do next?".
+
 ## `features.ado` is not like the other flags
 
 Every other flag under `features` is a module's on / off switch, off until someone sets it. **`features.ado`
@@ -412,7 +433,7 @@ card](hub/cards.md), "State is derived, never stored"), the `reviews/` file name
 card's state, **the shape of a card's id** (`regex.cardId`: a work item number, or the
 four-character id of a card with no work item -- at least one letter and one digit, no look-alike
 characters, uppercase; see [The workflow](CLI.md#the-workflow) and [the card](hub/cards.md), "The filename"),
-and **which feature flags are the org's** (`features.spaceScoped`, today `["sprintAwareness"]`: the
+and **which feature flags are the org's** (`features.spaceScoped`, today `["sprintAwareness", "trainingHoursPerQuarter", "suggestions"]`: the
 flags read from `spaces[].features` rather than the top-level block -- `SpaceScopedFeatures` in
 `utilities.psm1`, `SPACE_FEATURES` in `agent/core/config.py` and `FEATURES.spaceScoped` in
 `web/src/shell/consts.ts` all read this list, so the second org-scoped flag is added in one place

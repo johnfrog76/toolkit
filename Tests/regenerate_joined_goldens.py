@@ -13,6 +13,10 @@ goldens are filled by agent/solitaire/triage.py's fill over triage.json (each
 case's labels, issues, tracker and viewer) and rendered; tkTestToolkit -Triage
 holds the CLI's rendering to the same files.
 
+The suggestion table's chair readings (Tests/fixtures/suggestion/table.json,
+its ``briefs`` cases) are written beside it the same way: the joined fill, the
+suggestion attached (agent/solitaire/suggest.py), the brief rendered.
+
 Run:  python3 Tests/regenerate_joined_goldens.py          (writes)
       python3 Tests/regenerate_joined_goldens.py --check  (exit 1 if any differs)
 """
@@ -32,6 +36,7 @@ TABLE_FILE = "standup-joined.json"
 ISSUES_TABLE_FILE = "standup.json"
 CARDS_TABLE_FILE = "standup-cards.json"
 TRIAGE_TABLE_FILE = "triage.json"
+SUGGEST_DIR = REPO_ROOT / "Tests" / "fixtures" / "suggestion"
 
 
 def filled_triage_case(table: dict, case: dict) -> "triage.Triage":
@@ -85,7 +90,31 @@ def filled_cards_case(case: dict) -> "standup.Standup":
     )
 
 
+def filled_suggest_case(table: dict, case: dict) -> "standup.Standup":
+    """A briefs case of Tests/fixtures/suggestion/table.json: the joined fill, the
+    suggestion attached, rendered."""
+    from agent.solitaire import suggest
+
+    b = table["briefs"]
+    filled = standup.fill_joined_standup(
+        datetime.fromisoformat(b["asOf"]),
+        b["workerLabels"],
+        case["issues"],
+        {"ok": True, "reason": ""},
+        case["cards"],
+        space=b["space"],
+        space_name=b["spaceName"],
+    )
+    on = suggest.suggestions_on(True, case["suggestions"])
+    suggest.attach_suggestions(
+        filled, b["workerLabels"], case["issues"], case["cards"], case["howIWork"], on, b["prefix"]
+    )
+    return _rendered(filled)
+
+
 def goldens() -> dict[str, str]:
+    """Every golden by its path relative to Tests/fixtures/rituals/ -- a rituals golden is its
+    file name; the suggestion table's are ``../suggestion/<file>``."""
     out: dict[str, str] = {}
 
     def take(exp: dict, filled: "standup.Standup", keys: tuple[str, ...]) -> None:
@@ -106,14 +135,18 @@ def goldens() -> dict[str, str]:
     tri = json.loads((FIXTURES / TRIAGE_TABLE_FILE).read_text(encoding="utf-8"))
     for case in tri["cases"]:
         out[case["expected"]["text"]] = filled_triage_case(tri, case).text
+    sug = json.loads((SUGGEST_DIR / "table.json").read_text(encoding="utf-8"))
+    for case in sug["briefs"]["cases"]:
+        out["../" + SUGGEST_DIR.name + "/" + case["expected"]["brief"]] = filled_suggest_case(sug, case).brief
     return out
 
 
 def main(argv: list[str]) -> int:
     check = "--check" in argv
     stale = []
-    for name, text in goldens().items():
-        path = FIXTURES / name
+    for key, text in goldens().items():
+        path = (FIXTURES / key).resolve()
+        name = str(path.relative_to(REPO_ROOT))
         if check:
             if not path.exists() or path.read_bytes().decode("utf-8") != text:
                 stale.append(name)

@@ -3,6 +3,8 @@ import path from "node:path";
 import { act, fireEvent, render as rtlRender, screen, waitFor } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
+import { RITUALS } from "../../shell/consts";
+import { chairSuggestion } from "./suggestion";
 import {
   GRAIN_KEY,
   StandupPage,
@@ -14,7 +16,13 @@ import {
   listRows,
   splitHeader,
 } from "./StandupPage";
-import type { RitualItem, StandupResponse, TriageResponse } from "./api.solitaireAgile";
+import type {
+  RitualItem,
+  StandupResponse,
+  Suggestion,
+  TriageResponse,
+} from "./api.solitaireAgile";
+import { DISMISS_KEY, SURFACE_CHAIR, resetDismissMemory } from "./suggestDismiss";
 
 // Today's standup page (docs/modules/solitaire-agile.md, "The web UI"): the agent's
 // `text` shown VERBATIM, the first line as the header and the rest in a
@@ -680,5 +688,145 @@ describe("the issue popover", () => {
     expect(surface().textContent).toContain("A card");
     expect(surface().textContent).toContain("current/K7M2-a.md");
     expect(surface().querySelector("a")).toBeNull();
+  });
+});
+
+// The chair's suggestion (AR-3; docs/modules/solitaire-agile.md, "The suggestion:
+// one next move, derived"): the brief's last line, drawn as its own row with its
+// action and a dismiss -- per surface, per item, per session, in localStorage.
+// The brief is the suggestion table's generated golden, read from disk.
+describe("the chair's suggestion", () => {
+  const SUGGEST = path.resolve(__dirname, "../../../../Tests/fixtures/suggestion");
+  const golden = fs.readFileSync(path.join(SUGGEST, "suggestion-suggested.brief.txt"), "utf8");
+  const lines = golden.split("\n").filter(Boolean);
+  const first: Suggestion = {
+    ref: "#141",
+    number: 141,
+    id: null,
+    kind: "issue",
+    shape: "delegate",
+    sentence: "#141 is opus-sized and well defined -- send it to the crew?",
+    command: "StartWork 141",
+    line: lines[lines.length - 1],
+  };
+  const second: Suggestion = {
+    ref: "#150",
+    number: 150,
+    id: null,
+    kind: "issue",
+    shape: "route",
+    sentence: "#150 is the oldest open sev2 in milestone B and nobody has it -- route it?",
+    command: "Route 150 -Assign <me|size>",
+    line: "Next: #150 is the oldest open sev2 in milestone B and nobody has it -- route it? (tkRoute 150 -Assign <me|size>)",
+  };
+  const suggested = (): StandupResponse => ({
+    ...responseFor("friday"),
+    queue: { walk: [], decide: [], look: [] },
+    brief: golden,
+    suggestions: [first, second],
+    suggestion: first,
+  });
+
+  beforeEach(() => {
+    sessionStorage.clear();
+    resetDismissMemory();
+    startWork.mockClear();
+  });
+
+  it("draws the Next line as its own row, verbatim, under the rest of the brief", () => {
+    answer = { data: suggested() };
+    render(<StandupPage />);
+    const brief = screen.getByTestId("standup-brief");
+    const row = screen.getByTestId("standup-suggestion");
+    expect(row.parentElement).toBe(brief);
+    // Every other line of the brief, as it came; the last is the row's.
+    const drawn = Array.from(brief.children)
+      .filter((c) => c !== row)
+      .map((c) => c.textContent);
+    expect(drawn).toEqual(lines.slice(0, -1));
+    expect(row.textContent).toContain(first.line);
+    expect(first.line).toBe(
+      "Next: #141 is opus-sized and well defined -- send it to the crew? (tkStartWork 141)",
+    );
+  });
+
+  it("Start work opens the hand-off box for the suggestion: one StartWork call, the number", async () => {
+    answer = { data: suggested() };
+    render(<StandupPage />);
+    fireEvent.click(screen.getByRole("button", { name: "Start work on #141" }));
+    await screen.findByTestId("start-work-block");
+    expect(startWork).toHaveBeenCalledTimes(1);
+    expect(startWork).toHaveBeenCalledWith({ id: "141" });
+  });
+
+  it("a dismiss yields the next, holds for the session, and with none left the line is today's", () => {
+    answer = { data: suggested() };
+    const { unmount } = render(<StandupPage />);
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss the suggestion #141" }));
+    expect(screen.getByTestId("standup-suggestion").textContent).toContain(second.line);
+    // A route's action is Triage, not the hand-off box.
+    expect(screen.getByRole("button", { name: "Open Triage" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Start work on #150" })).toBeNull();
+    expect(JSON.parse(localStorage.getItem(DISMISS_KEY) ?? "{}").surfaces).toEqual({
+      [SURFACE_CHAIR]: ["#141"],
+    });
+    // The same session, a fresh draw: still dismissed.
+    unmount();
+    render(<StandupPage />);
+    expect(screen.getByTestId("standup-suggestion").textContent).toContain(second.line);
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss the suggestion #150" }));
+    expect(screen.getByTestId("standup-suggestion").textContent).toBe(RITUALS.text.briefNextNone);
+    expect(screen.queryByRole("button", { name: /Dismiss the suggestion/ })).toBeNull();
+  });
+
+  it("another session starts with nothing dismissed", () => {
+    answer = { data: suggested() };
+    const { unmount } = render(<StandupPage />);
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss the suggestion #141" }));
+    unmount();
+    sessionStorage.clear();
+    resetDismissMemory();
+    render(<StandupPage />);
+    expect(screen.getByTestId("standup-suggestion").textContent).toContain(first.line);
+  });
+
+  it("a browser that refuses storage still draws the line, and a dismiss holds on the page", () => {
+    const get = jest.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("SecurityError");
+    });
+    const set = jest.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("SecurityError");
+    });
+    try {
+      answer = { data: suggested() };
+      render(<StandupPage />);
+      expect(screen.getByTestId("standup-suggestion").textContent).toContain(first.line);
+      fireEvent.click(screen.getByRole("button", { name: "Dismiss the suggestion #141" }));
+      expect(screen.getByTestId("standup-suggestion").textContent).toContain(second.line);
+    } finally {
+      get.mockRestore();
+      set.mockRestore();
+    }
+  });
+
+  it("the brief grain shows the brief as its body and the suggestion row under it, once", () => {
+    localStorage.setItem(GRAIN_KEY, "brief");
+    answer = { data: suggested() };
+    render(<StandupPage />);
+    expect(screen.getByTestId("standup-text").textContent).toBe(lines.slice(0, -1).join("\n") + "\n");
+    expect(screen.getAllByTestId("standup-suggestion")).toHaveLength(1);
+  });
+
+  it("with something waiting, or the switch off, there is no row: the brief is drawn as it came", () => {
+    // Friday has walks: the Next line is the queue's, so the suggestion is not standing.
+    answer = { data: { ...responseFor("friday"), suggestions: [first], suggestion: first } };
+    const { unmount } = render(<StandupPage />);
+    expect(screen.queryByTestId("standup-suggestion")).toBeNull();
+    unmount();
+    const off = fs.readFileSync(path.join(SUGGEST, "suggestion-switched-off.brief.txt"), "utf8");
+    answer = { data: { ...suggested(), brief: off, suggestions: [], suggestion: null } };
+    render(<StandupPage />);
+    expect(screen.queryByTestId("standup-suggestion")).toBeNull();
+    expect(chairSuggestion(suggested(), ["#141", "#150"])).toEqual({ standing: true, current: null });
   });
 });

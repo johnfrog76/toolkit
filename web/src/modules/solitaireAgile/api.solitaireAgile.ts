@@ -145,6 +145,27 @@ export interface StandupResponse {
    *  however many cards thread it. The brief's first line says the total.
    *  Absent from an agent that predates it. */
   counts?: { workers: MotionCount[]; total: MotionCount };
+  /** The suggestion (docs/modules/solitaire-agile.md, "The suggestion: one next
+   *  move, derived"): every candidate in the rule's order -- dismiss one and the
+   *  page shows the next -- and the first. Empty and null with the Space's switch
+   *  off; absent from an agent that predates it. */
+  suggestions?: Suggestion[];
+  suggestion?: Suggestion | null;
+}
+
+/** One derived next move. `line` is the chair's Next line, shown verbatim. */
+export interface Suggestion {
+  /** How the standup names it: `#<n>` for an issue, the card's id. */
+  ref: string;
+  number: number | null;
+  id: string | null;
+  kind: "issue" | "card";
+  /** One of consts.json rituals.suggestShapes: start, delegate, route. */
+  shape: string;
+  sentence: string;
+  /** The verb and its argument, unprefixed: `StartWork 141`, or Route's for a route. */
+  command: string;
+  line: string;
 }
 
 /** The standup reminder, as `GET /api/ritual/standup/remind` reads it. */

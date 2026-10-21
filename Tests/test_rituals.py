@@ -1079,6 +1079,161 @@ class TheCardReader(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertEqual(standup.read_cards(Path(tmp) / "missing", [], []), [])
 
+    def test_what_the_suggestion_reads(self):
+        """The milestone a card's **Sprint:** line names (whole), its **Created:**
+        day, its Tags and who takes it -- the suggestion's four card fields."""
+        with tempfile.TemporaryDirectory() as tmp:
+            space = Path(tmp)
+            (space / "current").mkdir()
+            (space / "current" / "Task23A3-route-the-git-calls.prompt.md").write_bytes(
+                b"# Task 23A3: Route the git calls\r\nTags: spec, sev2, sonnet\r\n\r\n---\r\n\r\n"
+                b"**Sprint:** M2 -- 1.2.0, the standup sees the work\r\n**Assigned:** me\r\n"
+                b"**Created:** 2026-09-20\r\n"
+            )
+            (space / "current" / "TaskK7M2-bare.prompt.md").write_bytes(b"# Task K7M2: Bare\n")
+            rows = {r["id"]: r for r in standup.read_cards(space, ["Task"], ["Task"])}
+        got = {k: (r["sprint"], r["created"], r["tags"], r["assigned"]) for k, r in rows.items()}
+        self.assertEqual(
+            got,
+            {
+                "23A3": ("M2 -- 1.2.0, the standup sees the work", "2026-09-20", ["spec", "sev2", "sonnet"], "me"),
+                "K7M2": ("", None, [], ""),
+            },
+        )
+
+
+SUGGEST = json.loads((REPO_ROOT / "Tests" / "fixtures" / "suggestion" / "table.json").read_text(encoding="utf-8"))
+
+
+def _suggest_brief(case: dict) -> "standup.Standup":
+    """A briefs case of the suggestion table: the joined fill, the suggestion
+    attached, the three texts rendered -- exactly what the regenerator writes."""
+    from agent.solitaire import suggest
+
+    b = SUGGEST["briefs"]
+    filled = standup.fill_joined_standup(
+        datetime.fromisoformat(b["asOf"]),
+        b["workerLabels"],
+        case["issues"],
+        {"ok": True, "reason": ""},
+        case["cards"],
+        space=b["space"],
+        space_name=b["spaceName"],
+    )
+    on = suggest.suggestions_on(True, case["suggestions"])
+    suggest.attach_suggestions(
+        filled, b["workerLabels"], case["issues"], case["cards"], case["howIWork"], on, b["prefix"]
+    )
+    filled.text = standup.render_standup(filled)
+    filled.work.text = standup.render_work(filled)
+    filled.brief = standup.render_brief(filled)
+    return filled
+
+
+class TheSuggestionTable(unittest.TestCase):
+    """Tests/fixtures/suggestion/table.json -- the rule, the nearest milestone, the
+    switch and the chair's line -- the SAME rows tkTestToolkit -Rituals asserts
+    against Scripts/Suggest-Rules.ps1 (docs/modules/solitaire-agile.md, "The
+    suggestion: one next move, derived")."""
+
+    def setUp(self):
+        from agent.solitaire import suggest
+
+        self.suggest = suggest
+
+    def test_the_table_has_every_shape_the_rule_distinguishes(self):
+        names = [r["name"] for r in SUGGEST["rows"]]
+        for shape in (
+            "sev1-beats-a-nearer-milestone",
+            "two-in-one-milestone-pick-the-older",
+            "one-left-beats-three-left",
+            "no-milestone-sorts-last",
+            "crew-sized-on-agents-is-a-delegation",
+            "unrouted-on-agents-is-a-route",
+            "in-flight-is-excluded",
+            "not-billable-is-excluded-first",
+            "waiting-on-you-is-excluded-before-in-flight",
+            "the-empty-space",
+            "a-dismissed-item-yields-the-next",
+        ):
+            self.assertIn(shape, names)
+        # Every shape and every exclusion the contract names has a row that reaches it.
+        shapes = {r["expected"].get("shape") for r in SUGGEST["rows"]}
+        self.assertTrue(set(C.rituals_suggest_shapes()) <= shapes)
+        met = {why for r in SUGGEST["rows"] for why in r["expected"]["excluded"].values()}
+        self.assertEqual(met, set(C.rituals_suggest_exclusions()))
+
+    def test_the_nearest_milestone(self):
+        for row in SUGGEST["nearest"]:
+            with self.subTest(row=row["name"]):
+                order = self.suggest.nearest_milestones(row["milestones"])
+                self.assertEqual(order, row["order"])
+                self.assertEqual(order[0] if order else "", row["nearest"])
+
+    def test_every_row(self):
+        for row in SUGGEST["rows"]:
+            with self.subTest(row=row["name"]):
+                picked, excluded = self.suggest.suggest(row["items"], row["howIWork"], row["dismissed"])
+                exp = row["expected"]
+                self.assertEqual([p["ref"] for p in picked], exp["order"])
+                self.assertEqual(excluded, exp["excluded"])
+                if exp["pick"] is None:
+                    self.assertEqual(picked, [])
+                    continue
+                first = picked[0]
+                self.assertEqual(
+                    (first["ref"], first["shape"], first["sentence"], first["command"]),
+                    (exp["pick"], exp["shape"], exp["sentence"], exp["command"]),
+                )
+
+    def test_the_switch(self):
+        for row in SUGGEST["switch"]:
+            with self.subTest(row=row):
+                self.assertEqual(self.suggest.suggestions_on(row["solitaireAgile"], row["suggestions"]), row["on"])
+
+    def test_the_briefs_end_to_end_byte_for_byte(self):
+        for case in SUGGEST["briefs"]["cases"]:
+            with self.subTest(case=case["name"]):
+                filled = _suggest_brief(case)
+                exp = case["expected"]
+                self.assertEqual([s.ref for s in filled.suggestions], exp["order"])
+                self.assertEqual(filled.suggestion.ref if filled.suggestion else None, exp["pick"])
+                self.assertEqual(
+                    filled.brief,
+                    (REPO_ROOT / "Tests" / "fixtures" / "suggestion" / exp["brief"]).read_bytes().decode("utf-8"),
+                )
+
+    def test_the_waiting_line_stays_first_and_the_next_line_is_todays(self):
+        """D-AR7: with something waiting the suggestion is computed but the Next line is the queue's."""
+        t = C.rituals_text()
+        case = next(c for c in SUGGEST["briefs"]["cases"] if c["name"] == "waiting")
+        lines = _suggest_brief(case).brief.rstrip("\n").split("\n")
+        self.assertTrue(lines[1].startswith(t["queueHeading"] + ": "))
+        self.assertTrue(lines[-1].startswith(t["briefNext"].split("{")[0]))
+        off = next(c for c in SUGGEST["briefs"]["cases"] if c["name"] == "switched-off")
+        self.assertEqual(_suggest_brief(off).brief.rstrip("\n").split("\n")[-1], t["briefNextNone"])
+        on = next(c for c in SUGGEST["briefs"]["cases"] if c["name"] == "suggested")
+        filled = _suggest_brief(on)
+        self.assertEqual(filled.brief.rstrip("\n").split("\n")[-1], filled.suggestion.line)
+        self.assertTrue(filled.suggestion.line.startswith("Next: #141 is opus-sized"))
+
+    def test_the_items_count_a_milestone_once_per_id(self):
+        """The joined list as items: a card that tracks an issue is that issue's row,
+        and the milestone's open count is its billable rows, once each."""
+        case = next(c for c in SUGGEST["briefs"]["cases"] if c["name"] == "suggested")
+        tracking = dict(case["cards"][0], id="150", file="150-fix-the-header.prompt.md", status="In Progress")
+        items = self.suggest.suggest_items(
+            SUGGEST["briefs"]["workerLabels"], case["issues"], case["cards"] + [tracking], set()
+        )
+        by_ref = {i["ref"]: i for i in items}
+        self.assertEqual(sorted(by_ref), ["#141", "#150", "23A3"])
+        self.assertEqual(by_ref["#150"]["lane"], "In Progress")
+        self.assertEqual(by_ref["#150"]["milestone"]["open"], 2)
+        self.assertEqual(by_ref["#141"]["milestone"]["open"], 1)
+        self.assertEqual(
+            (by_ref["#141"]["severity"], by_ref["#141"]["size"], by_ref["#141"]["who"]), ("sev2", "opus", "opus")
+        )
+
 
 # The response's field names, exactly as the contract's JSON spells them.
 TOP_FIELDS = {
@@ -1099,7 +1254,10 @@ TOP_FIELDS = {
     "checks",
     "links",
     "counts",
+    "suggestions",
+    "suggestion",
 }
+SUGGESTION_FIELDS = {"ref", "number", "id", "kind", "shape", "sentence", "command", "line"}
 WORK_FIELDS = {"queue", "workers", "queueProse", "text"}
 GROUP_FIELDS = {"name", "by", "count", "refs", "phrase"}
 WORKER_FIELDS = {"label", "name", "yesterday", "today", "blockers", "empty", "excuse"}
@@ -1136,6 +1294,8 @@ def _cp1252_console(payload):
 
 class TheRoute(unittest.TestCase):
     features = {"solitaireAgile": True}
+    # The toolkit Space's own features block (spaces[].features): the suggestion's switch lives there.
+    space_features: dict | None = None
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -1159,6 +1319,7 @@ class TheRoute(unittest.TestCase):
                             "promptsFolder": "toolkit",
                             "org": TOOLKIT,
                             "howIWork": "agents",
+                            **({"features": self.space_features} if self.space_features is not None else {}),
                         },
                         {"slug": "solo", "name": "Solo Work", "status": "local", "promptsFolder": "solo", "org": ""},
                         {
@@ -1293,6 +1454,22 @@ class TheRoute(unittest.TestCase):
             for slot in ("yesterday", "today", "blockers"):
                 for item in w[slot]:
                     self.assertEqual(set(item), ITEM_FIELDS)
+        for sug in body["suggestions"]:
+            self.assertEqual(set(sug), SUGGESTION_FIELDS)
+
+    def test_the_suggestion_rides_the_same_read(self):
+        """Team Agile on and the Space's switch unset: every open candidate in the
+        rule's order, the first is the suggestion, each line names its command.
+        The friday case has walks, so the brief's Next line stays the queue's (D-AR7)."""
+        body = self._get("/api/ritual/standup?space=toolkit")[0].json()
+        self.assertGreater(len(body["suggestions"]), 0)
+        self.assertEqual(body["suggestion"], body["suggestions"][0])
+        for sug in body["suggestions"]:
+            self.assertIn(sug["shape"], C.rituals_suggest_shapes())
+            self.assertTrue(sug["line"].startswith("Next: " + sug["sentence"]))
+            self.assertTrue(sug["line"].endswith(sug["command"] + ")"))
+        self.assertNotIn(body["suggestion"]["line"], body["brief"])
+        self.assertIn(C.rituals_text()["briefNext"].split("{")[0], body["brief"].splitlines()[-1])
 
     def test_no_space_is_the_active_one(self):
         body = self._get("/api/ritual/standup")[0].json()
@@ -1501,6 +1678,17 @@ class TheRouteWithTheFlagOff(TheRoute):
     test_an_answer_that_could_not_be_read_is_not_an_empty_success = None
     test_a_reader_that_raises_is_a_tracker_that_did_not_answer = None
     test_a_github_space_joins_its_cards_to_its_issues = None
+    test_the_suggestion_rides_the_same_read = None
+
+
+class TheRouteWithSuggestionsOff(TheRoute):
+    """spaces.toolkit.features.suggestions=false: the standup is the same, with no suggestion."""
+
+    space_features = {"suggestions": False}
+
+    def test_the_suggestion_rides_the_same_read(self):
+        body = self._get("/api/ritual/standup?space=toolkit")[0].json()
+        self.assertEqual((body["suggestions"], body["suggestion"]), ([], None))
 
 
 class TheAppMountsIt(unittest.TestCase):

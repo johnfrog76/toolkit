@@ -98,7 +98,7 @@ from ..core.consts import (
     status_done,
     status_in_progress,
 )
-from ..core.parsers import _parse_status_metadata, card_billable, card_id
+from ..core.parsers import _parse_status_metadata, card_assigned, card_billable, card_id, card_milestone, card_tags
 from .tracker import read_tracker
 
 FEATURE = "solitaireAgile"
@@ -287,6 +287,22 @@ class Spoken(BaseModel):
     refused: int = 0
 
 
+class Suggestion(BaseModel):
+    # One derived next move (suggest.py; docs/modules/solitaire-agile.md, "The
+    # suggestion: one next move, derived"). ``ref`` is how the standup names it
+    # (#<n>, or the card's id); ``shape`` one of rituals.suggestShapes; ``command``
+    # the verb and its argument, unprefixed; ``line`` the chair's Next line as the
+    # brief prints it -- the web shows it verbatim.
+    ref: str = ""
+    number: int | None = None
+    id: str | None = None
+    kind: str = ""
+    shape: str = ""
+    sentence: str = ""
+    command: str = ""
+    line: str = ""
+
+
 class Standup(BaseModel):
     # ``register`` is a BaseModel attribute, so the field is held under another
     # name and SERVED as "register" -- FastAPI serialises by alias. A caller
@@ -323,6 +339,11 @@ class Standup(BaseModel):
     links: list[CardLink] = []
     # What moved in the window, per worker and in total; the brief's first line.
     counts: Counts = Counts()
+    # The suggestion: every candidate in the rule's order (the web dismisses one
+    # and shows the next), and the first -- the chair's Next line when nothing
+    # waits. Empty and null with the Space's switch off (features.suggestions).
+    suggestions: list[Suggestion] = []
+    suggestion: Suggestion | None = None
     # What kind each item is: ref -> its label names (an issue) or its
     # type (a card), read against the ceremony's kinds. Not served.
     _marks: dict[str, list[str]] = PrivateAttr(default_factory=dict)
@@ -560,7 +581,8 @@ def _stamp_day(content: str, stamp: str) -> str | None:
 
 def read_cards(space_dir: Path, type_names: list[str], prefixes: list[str]) -> list[dict]:
     """The thin layer: a Space's ``current/`` and ``archive/`` as card rows --
-    ``{file, folder, status, closed, title, id, path, type, body, billable, begun, commits}``. A file with no id by the
+    ``{file, folder, status, closed, title, id, path, type, body, billable, begun, commits,
+    sprint, created, tags, assigned}``. A file with no id by the
     one id rule is not a card and is skipped. State is the parser's rule; a card
     in ``archive/`` is Done and carries its Closed stamp's day."""
     rows: list[dict] = []
@@ -599,6 +621,13 @@ def read_cards(space_dir: Path, type_names: list[str], prefixes: list[str]) -> l
                     # What moved: the day its work began, and its commit bullets.
                     "begun": _stamp_day(content, stamp_started()) or _stamp_day(content, stamp_created()),
                     "commits": re_commit_bullet().findall(content),
+                    # What the suggestion reads (suggest.py): the milestone its
+                    # **Sprint:** line names, whole; its **Created:** day; its
+                    # Tags (a severity, a size); and who takes it.
+                    "sprint": card_milestone(content),
+                    "created": _stamp_day(content, stamp_created()),
+                    "tags": card_tags(content),
+                    "assigned": card_assigned(content),
                 }
             )
     return rows
@@ -1607,7 +1636,9 @@ def render_brief(filled: Standup) -> str:
     say "none in flight"; its Check lines follow the workers.
     It opens on the counts line (``render_counts``), and a worker's line adds its
     own started and commits; under a window wider than yesterday a worker's
-    closes are ``countsClosed``, not "closed yesterday".
+    closes are ``countsClosed``, not "closed yesterday". With nothing waiting, the Next
+    line is the suggestion's ``line`` when one is attached (suggest.py; D-AR7), else
+    ``briefNextNone``.
     With the tracker not ok the brief is the Tracker line and nothing else."""
     t = rituals_text()
     if not filled.tracker.ok:
@@ -1669,6 +1700,10 @@ def render_brief(filled: Standup) -> str:
     lines += [f"{t['check']}: {c}" for c in filled.checks]
     if best_count:
         lines.append(t["briefNext"].replace("{kind}", best_noun).replace("{n}", str(best_count)).replace("{who}", who))
+    elif filled.suggestion is not None and filled.suggestion.line:
+        # D-AR7: the suggestion replaces only "nothing is waiting on you", and
+        # only when nothing waits -- the queue's line above always wins.
+        lines.append(filled.suggestion.line)
     else:
         lines.append(t["briefNextNone"])
     return "\n".join(lines) + "\n"
@@ -1721,6 +1756,23 @@ def standup_for(space: str = "", as_of: datetime | None = None, since: str = "")
         else:
             labels, issues, state = read_tracker(org, status, projects, state="all", body=True)
         filled = fill_standup(now, labels, issues, state, space=slug, window=since)
+    # The suggestion (suggest.py): over the same read, before the brief renders it.
+    from ..core.config import how_i_work
+    from .suggest import attach_suggestions, suggestions_on
+
+    entry = _space_entry(cfg, space)
+    on = suggestions_on(solitaire_enabled(), (entry.get("features") or {}).get("suggestions"))
+    how = how_i_work(entry.get("org", ""), entry.get("howIWork"))["answer"]
+    if on and source in ("cards", "both"):
+        attach_suggestions(
+            filled,
+            labels if source == "both" else [],
+            issues if source == "both" else [],
+            cards,
+            how,
+            True,
+            str(cfg.get("commandPrefix") or ""),
+        )
     filled.text = render_standup(filled)
     filled.work.text = render_work(filled)
     filled.brief = render_brief(filled)

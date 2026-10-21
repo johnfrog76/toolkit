@@ -13,10 +13,19 @@
     rule every GitHub verb uses):
 
         gh label list --repo <repo> --limit 500 --json name,description
-        gh issue list --repo <repo> --state all --limit 500 --json number,title,state,labels,closedAt,url,milestone,body
+        gh issue list --repo <repo> --state all --limit 500 --json number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees
 
     milestone and body are the work grain's: an item groups by its
-    milestone, else by the design card its body names.
+    milestone, else by the design card its body names. createdAt and
+    assignees are the suggestion's (Scripts/Suggest-Rules.ps1): its age, and who
+    has it.
+
+    The suggestion: over the same read, one derived next move (the joined list,
+    Select-P20Suggestion). With nothing waiting on you, the brief's last line is
+    its sentence and the command that acts on it, in place of "Next: nothing is
+    waiting on you." -- never above the queue's own line (D-AR7). Off where the
+    Space says spaces.<slug>.features.suggestions=false. -AsJson carries every
+    candidate as suggestions[] and the first as suggestion.
 
     The same Space's CARDS are read too (Get-P20StandupCards) and joined to the
     issues on the id by Invoke-P20StandupJoinedFill: a card whose id is an
@@ -260,7 +269,7 @@ elseif ($choice.source -eq 'both') {
         if ($got.ok) {
             $labels = $got.value
             $got = Invoke-P20RitualGh -Repo $repo -Arguments @('issue', 'list', '--repo', $repo, '--state', 'all', '--limit', '500',
-                '--json', 'number,title,state,labels,closedAt,url,milestone,body')
+                '--json', 'number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees')
         }
         if ($got.ok) {
             $issues = $got.value
@@ -299,6 +308,25 @@ elseif ($choice.source -eq 'both') {
 else {
     $standup = Invoke-P20StandupFill -AsOf $asOf -Labels $labels -Issues $issues -Tracker $tracker `
         -Space $slug -Window $window -PackageRoot $repoRoot
+}
+# -- The suggestion ---------------------------------------------------------
+# One derived next move over the same read (Scripts/Suggest-Rules.ps1), before
+# the brief renders it. On where Team Agile is on -- it is, or this verb would
+# not be registered -- and the Space has not said features.suggestions=false.
+if ($choice.source -eq 'cards' -or $choice.source -eq 'both') {
+    . (Join-Path $PSScriptRoot 'Suggest-Rules.ps1')
+    $spaceEntry = $null
+    if ($cfg -and $cfg.Spaces) { $spaceEntry = @($cfg.Spaces | Where-Object { $_ -and [string]$_.slug -eq $slug }) | Select-Object -First 1 }
+    $storedSwitch = $null
+    if ($spaceEntry -and $spaceEntry.features -and $spaceEntry.features.PSObject.Properties['suggestions']) { $storedSwitch = $spaceEntry.features.suggestions }
+    $teamAgile = $true
+    if (Get-Command Get-P20Features -ErrorAction SilentlyContinue) { $teamAgile = [bool]((Get-P20Features)['solitaireAgile']) }
+    $howStored = ''
+    if ($spaceEntry -and $spaceEntry.PSObject.Properties['howIWork']) { $howStored = [string]$spaceEntry.howIWork }
+    if (-not (Get-Command Resolve-P20HowIWork -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Resolve-HowIWork.ps1') }
+    $how = Resolve-P20HowIWork -OrgUrl $org -Stored $howStored
+    $null = Add-P20StandupSuggestion -Standup $standup -Labels $labels -Issues $issues -Cards $cards -HowIWork ([string]$how.answer) `
+        -On (Test-P20SuggestionsOn -TeamAgile $teamAgile -Stored $storedSwitch) -Prefix (Get-CliPrefix) -PackageRoot $repoRoot
 }
 $standup.text = Format-P20StandupText -Standup $standup -PackageRoot $repoRoot
 $standup.work.text = Format-P20StandupWork -Standup $standup -PackageRoot $repoRoot

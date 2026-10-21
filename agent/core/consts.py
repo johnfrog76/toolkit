@@ -538,6 +538,17 @@ def rituals_motions() -> tuple[str, ...]:
     return tuple(consts()["rituals"]["motions"])
 
 
+def rituals_suggest_shapes() -> tuple[str, ...]:
+    """The suggestion's shapes, by index: start, delegate, route -- what its action is."""
+    return tuple(consts()["rituals"]["suggestShapes"])
+
+
+def rituals_suggest_exclusions() -> tuple[str, ...]:
+    """The suggestion's exclusions, IN ORDER: notBillable, waiting, inFlight, dismissed --
+    an item is excluded by the first it meets."""
+    return tuple(consts()["rituals"]["suggestExclusions"])
+
+
 # -- The dress (D-SA11) ---------------------------------------------------
 
 

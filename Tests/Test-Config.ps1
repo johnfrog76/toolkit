@@ -401,6 +401,15 @@ try {
     [void](Invoke-Config $box @('-Unset', 'spaces.acme.howIWork', '-Hub'))
     Assert-True '#424: -Unset takes the answer off the Space again' (-not (Get-HubSpace $box 'acme').PSObject.Properties['howIWork']) (Get-HubText $box)
 
+    # The suggestion's switch: a Space-scoped feature flag (consts.json
+    # features.spaceScoped), written onto the Space's hub entry as a boolean.
+    $sugOff = Invoke-Config $box @('-Set', 'spaces.acme.features.suggestions=false', '-Hub')
+    Assert-Equal 'spaces.<slug>.features.suggestions=false -Hub exits 0' 0 $sugOff.ExitCode
+    $sugSpace = Get-HubSpace $box 'acme'
+    Assert-True 'the switch lands on the Space''s features as a boolean false' ($sugSpace.features -and $sugSpace.features.suggestions -is [bool] -and -not $sugSpace.features.suggestions) (Get-HubText $box)
+    Assert-True 'and nothing of it reached config.local.json' ((Get-LocalConfigText $box) -notlike '*suggestions*') (Get-LocalConfigText $box)
+    [void](Invoke-Config $box @('-Unset', 'spaces.acme.features.suggestions', '-Hub'))
+
     # The first write of the Azure on-ramp. Setting a field on the
     # SHIPPED org must patch it -- not add an org called "test" (its slug then) with status
     # local, which merged over Example and switched ADO off.

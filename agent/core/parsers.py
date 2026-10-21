@@ -194,6 +194,31 @@ def card_assigned(content: str) -> str:
     return m.group(1) if m else ""
 
 
+def card_milestone(content: str) -> str:
+    """The milestone a card names: its first ``**Sprint:**`` line's value, WHOLE and
+    trimmed -- never the card model's ``sprint``, which keeps the last path segment
+    and cuts it at eighteen characters for the board. "" when it has none, or when
+    the value is a template's parenthesised placeholder (``(not linked)``).
+
+    D-AR11: the milestone is the destination, and a card names it here. The CLI's
+    mirror is ``Get-P20CardMilestone`` in ``Scripts/Get-PromptFileStatus.ps1``;
+    ``Tests/fixtures/parsers/card-milestone.json`` holds the two to one table."""
+    m = re.search(r"(?m)^\*\*Sprint:\*\*[ \t]*([^\r\n]*?)[ \t]*\r?$", content or "")
+    value = m.group(1) if m else ""
+    return "" if value.startswith("(") else value
+
+
+def card_tags(content: str) -> list[str]:
+    """The card's ``Tags:`` line, split on commas and trimmed, empties dropped;
+    [] when it has none or a parenthesised placeholder. The suggestion reads a
+    card's severity and size from it. Mirror: ``Get-P20CardTags``, same table."""
+    m = re.search(r"(?m)^Tags:[ \t]*([^\r\n]*?)[ \t]*\r?$", content or "")
+    value = m.group(1) if m else ""
+    if value.startswith("("):
+        return []
+    return [t.strip() for t in value.split(",") if t.strip()]
+
+
 def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES, folder: str = "") -> dict:
     """Extract the file-content-derived fields of PromptInfo.
 
