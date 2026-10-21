@@ -5,8 +5,9 @@
 .DESCRIPTION
     Not a command -- there is no alias, no menu row and no help entry for this
     file. It exists so that "start a server, write its output to a log, and
-    RETURN" has exactly one implementation, shared by Start-Agent.ps1 and
-    Start-Web.ps1.
+    RETURN" has exactly one implementation, shared by Start-Agent.ps1,
+    Start-Web.ps1 and Start-Work.ps1 (StartWork -Launch, which starts an agent
+    session in a worktree and returns its PID).
 
     The promise is the return. `{prefix}Agent` and `{prefix}Web -Dev` are launchers: they
     hand back a PID and a URL and the caller carries on. docs/QUICKSTART.md names
@@ -131,7 +132,17 @@ function Resolve-SessionLeader {
     # STDIN: a child that asks whether stdin is a terminal hears no. exec in
     # place: the PID stays the launcher's answer. exit 127 is only reached if
     # exec itself failed.
-    $program = 'use POSIX; POSIX::setsid(); open(STDIN, q{<}, q{/dev/null}); exec { $ARGV[0] } @ARGV; exit 127'
+    # STDIN is /dev/null unless the launch named a file for it: then
+    # P20_DETACHED_STDIN carries the path (Start-DetachedProcess -StdInFile).
+    # STDOUT and STDERR are the two LOG FILES, opened here and appended to:
+    # Start-Process's redirection on macOS and Linux is a pipe that pwsh copies
+    # into the file while pwsh lives, so everything a child wrote after the
+    # launcher returned was lost -- the agent's log stopped at its startup
+    # lines, and a session would have had no transcript at all. Opened in the
+    # child, the files are the child's own. Start-DetachedProcess sets all three
+    # variables for every launch, or removes them, so a child never inherits a
+    # stale one into a launch of its own.
+    $program = 'use POSIX; POSIX::setsid(); open(STDIN, q{<}, $ENV{P20_DETACHED_STDIN} // q{/dev/null}); open(STDOUT, q{>>}, $ENV{P20_DETACHED_STDOUT}) if defined $ENV{P20_DETACHED_STDOUT}; open(STDERR, q{>>}, $ENV{P20_DETACHED_STDERR}) if defined $ENV{P20_DETACHED_STDERR}; exec { $ARGV[0] } @ARGV; exit 127'
     return @{ FilePath = $perl.Source; ArgumentList = @('-e', ('"' + $program + '"'), '--') }
 }
 
@@ -431,6 +442,13 @@ function Start-DetachedProcess {
         which works on 5.1 as well as 7 (Start-Process -Environment is 7.4+).
         A $null value keeps the variable OUT of the child (Push-ProcessEnvironment).
 
+        -StdInFile gives the child a FILE as its stdin instead of nothing --
+        how StartWork -Launch hands a session its prompt, which is many lines
+        and cannot cross a joined command line whole. On Windows it is
+        Start-Process's own -RedirectStandardInput (a file handle, not a pipe,
+        so nothing of the caller's is held); on macOS and Linux the session
+        leader opens it in place of /dev/null, through P20_DETACHED_STDIN.
+
         Returns the process object, so the caller still writes its own PID file
         and does its own liveness check -- this owns the launch and nothing else.
         Throws what Start-Process throws; both callers already catch it and turn
@@ -443,7 +461,8 @@ function Start-DetachedProcess {
         [Parameter(Mandatory = $true)][string]$WorkingDirectory,
         [Parameter(Mandatory = $true)][string]$StdOutLog,
         [Parameter(Mandatory = $true)][string]$StdErrLog,
-        [hashtable]$Environment
+        [hashtable]$Environment,
+        [string]$StdInFile = ''
     )
 
     $isWin = ($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows
@@ -463,8 +482,21 @@ function Start-DetachedProcess {
     if ($launch.ArgumentList -and @($launch.ArgumentList).Count -gt 0) { $startArgs['ArgumentList'] = $launch.ArgumentList }
     if ($isWin) { $startArgs['WindowStyle'] = 'Hidden' }
 
+    # The child's stdin: a file when one was named, else the leader's /dev/null.
+    $childEnv = @{}
+    if ($Environment) { foreach ($k in $Environment.Keys) { $childEnv[$k] = $Environment[$k] } }
+    if ($leader) {
+        $childEnv['P20_DETACHED_STDIN'] = $null
+        if ($StdInFile) { $childEnv['P20_DETACHED_STDIN'] = $StdInFile }
+        # The leader opens the logs itself (see Resolve-SessionLeader); the
+        # redirection below still truncates them first and is never written to.
+        $childEnv['P20_DETACHED_STDOUT'] = $StdOutLog
+        $childEnv['P20_DETACHED_STDERR'] = $StdErrLog
+    }
+    elseif ($StdInFile) { $startArgs['RedirectStandardInput'] = $StdInFile }
+
     # The child's environment is this process's at the moment of the launch.
-    $savedEnv = Push-ProcessEnvironment -Environment $Environment
+    $savedEnv = Push-ProcessEnvironment -Environment $childEnv
     $saved = Disable-CallerHandleInheritance
     try {
         return Start-Process @startArgs

@@ -536,7 +536,7 @@ Assert-Equal 'the three states are on/off/not configured' 'on|off|not configured
 $surfaceRows = @(Get-P20OptionalSurfaces -Prefix $cfgPrefix -PackageRoot $toolkitRoot)
 $surfaceKeys = @($surfaceRows | ForEach-Object { $_.key })
 foreach ($expected in @('aliases', 'features.growth', 'features.communication', 'features.deck', 'tracker.github',
-        'sprintAwareness', 'storeSync', 'email', 'web', 'design', 'ANTHROPIC_API_KEY', 'TEAMS_WEBHOOK_*')) {
+        'sprintAwareness', 'storeSync', 'email', 'web', 'design', 'ANTHROPIC_API_KEY', 'TEAMS_WEBHOOK_*', 'startWorkLaunch')) {
     Assert-True "the inventory names $expected" ($surfaceKeys -contains $expected) ($surfaceKeys -join ', ')
 }
 foreach ($row in $surfaceRows) {

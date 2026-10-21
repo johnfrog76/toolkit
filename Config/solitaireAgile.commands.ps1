@@ -83,6 +83,8 @@ function global:Get-P20StartWork {
         [switch]$Clip,
         [string]$Prompt,
         [string]$Space,
+        [switch]$Launch,
+        [switch]$WhatIf,
         [switch]$Help
     )
     if ($Help) { Show-CommandHelp 'StartWork'; return }

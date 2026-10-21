@@ -1026,6 +1026,30 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   card in Notepad as CRLF and repeat the round trip: still one hash. Then `tkThreadHash <id> -Hash abc1234` on a card
   moved back to `backlog/`: it lands in `current/` with the bullet, still CRLF, no lone LF. Finally
   `tkTestToolkit -Move -ThreadHash -Status -Consts` on that host: green. Closes Feature 2A6G (a backlog of cards).
+- [ ] **StartWork -Launch returns through a pipe under Windows PowerShell 5.1.** With Claude Code installed
+  (`claude` on the PATH -- `tkEnv` shows **StartWork launch** `on`), `features.solitaireAgile` on in a GitHub
+  Space answered `agents`, and a card in `current/` whose `**Assigned:**` line says `sonnet`, `cd` into your clone
+  of the Space's repository and run `powershell -NoProfile -Command "tkStartWork <id> -Launch" | findstr /n "^"`,
+  then the same with `pwsh -NoProfile -c`. You should see each return within a second or two with
+  `Launched ... on sonnet: PID <n>.`, the worktree under `.claude\worktrees\startwork-...` and the log at the
+  repository root -- never a wait for the session to end -- and `Get-Process -Id <n>` still running afterwards.
+  Repeat with an npm-installed `claude.cmd` first on the PATH if you have one: it starts the same way (the prompt
+  is the session's stdin, never an argument cmd.exe would cut at a newline). Then `tkTestToolkit -StartWork` on
+  that host: green, its launch half named as a skip. Closes Feature MA6P (StartWork -Launch).
+- [ ] **StartWork -Launch starts the model the size names, and the session's first message is the block.** On
+  either host with a real `claude`: `tkStartWork <id> -Launch -WhatIf` for a card sized `sonnet` says
+  `model sonnet` and prints `claude --print --model sonnet --output-format stream-json --verbose < "...block.log"`;
+  route the card to `opus` (`tkRoute <id> -Assign opus`) and it says `model opus`; `tkRoute <id> -Assign fable` and
+  `-Launch` refuses, naming the owner's own seat. Then launch the `sonnet` card for real and open the log once
+  the session has written: its `system`/`init` event names a Sonnet model, and the first user message in the
+  stream is the hand-off block `tkStartWork <id>` prints, whole (compare it with the `.block.log` beside the
+  log). If `stream-json` does not echo the prompt, record what the log does open with and file it -- the
+  `.block.log` is then the record of what the session was handed. Closes Feature MA6P (StartWork -Launch).
+- [ ] **A server's log keeps filling after the launcher returns, on macOS and Linux.** `tkAgent` (or
+  `tkWeb -Dev`), then load a page that makes the agent log a request, then read `agent.log` at the package root:
+  you should see request lines written after `tkAgent` returned, not only its startup lines. Proved on macOS
+  by the probe that found it (a child writing after its launcher exited); Linux is the other host.
+  Closes the launcher half of Feature MA6P.
 
 ## Recording a run
 

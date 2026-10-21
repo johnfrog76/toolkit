@@ -20,6 +20,7 @@ release.
 - Triage now shows who has each item -- you, another assignee, a crew size, or nobody -- and `Route -Assign me` takes an issue yourself (or `Route -Assign <size>` routes it to the crew); a card with no issue behind it records who takes it as an `**Assigned:**` line, and the Triage page offers **me** beside the sizes.
 - When nothing is waiting on you, the standup's chair's reading (`Standup -Brief`, and the Team Agile page) now ends on one suggested next move -- the item, the rule that chose it, and the command that acts on it -- instead of "nothing is waiting on you"; the page lets you dismiss it for the session, and `Config -Set spaces.<slug>.features.suggestions=false -Hub` turns it off for a Space.
 - A new `Plan <id> -Milestone "<title>"` command writes the write side of a card's `**Sprint:**` line -- the board's sprint filter already read it, but only a hand edit could set one; `Plan <id> -Remove` takes a card out of its sprint. Works on a card in `current/` or `backlog/`, never touches the tracker, and never pulls a planned card into play.
+- `StartWork <id> -Launch` (Team Agile) starts the work for you: from a clone of the Space's repository, with Claude Code installed, it opens a fresh worktree and starts a session on the hand-off block there with the model the item's size names (sonnet or opus -- never fable, the owner's own seat), prints its PID and log, and returns at once; `-WhatIf` shows what it would run, and `tkEnv` names it as **StartWork launch**.
 
 ### Changed
 
@@ -30,6 +31,7 @@ release.
 ### Fixed
 
 - The played standup now names a card by its id (and reads it as "card 2HNU") instead of `#null`, and its overflow list no longer links cards.
+- On macOS and Linux, the agent's and the web server's logs now keep filling after `tkAgent` or `tkWeb -Dev` returns; they used to stop at the startup lines.
 - The docs now say plainly that the Docker image only reaches the agent on Docker Desktop (macOS, Windows); on native Linux Docker Engine the container cannot reach a loopback-bound agent, and `tkWeb -Dev` is the way to run there instead.
 
 ## [1.1.0] - 2026-10-18

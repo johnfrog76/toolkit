@@ -216,5 +216,42 @@ class EnvSaysWhichBuild(unittest.TestCase):
         self.assertEqual(body["version"], consts.version())
 
 
+class EnvSaysWhetherALaunchCanStart(unittest.TestCase):
+    """/env's startWorkLaunch (D-AR13): claude on the agent's PATH, the inventory
+    row startWorkLaunch's rule -- the Team Agile page's second button reads it."""
+
+    def setUp(self):
+        tier.probe_cache_clear()
+
+    def tearDown(self):
+        tier.probe_cache_clear()
+
+    def _env_with_claude_at(self, where):
+        from agent.core import config as config_mod
+
+        asked = []
+
+        def which(name):
+            asked.append(name)
+            return where
+
+        with (
+            _ProbedOrg(),
+            mock.patch.object(tier, "_probe_ado", return_value=True),
+            mock.patch.object(config_mod, "shutil", mock.Mock(which=which)),
+        ):
+            body = client.get("/api/env").json()
+        return body, asked
+
+    def test_on_where_claude_is_found(self):
+        body, asked = self._env_with_claude_at("/usr/local/bin/claude")
+        self.assertIs(body["startWorkLaunch"], True)
+        self.assertIn("claude", asked)
+
+    def test_off_where_it_is_not(self):
+        body, _ = self._env_with_claude_at(None)
+        self.assertIs(body["startWorkLaunch"], False)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -113,7 +113,8 @@ with no reachable GitHub tracker still answers 200 with the ritual and the reaso
 its answers are the CLI's `Route`, which the web runs only as `POST /api/cmd/Route` -- the module's
 first write is a tracker label, through the bridge like every other. The hand-off block (`StartWork`)
 has no route at all: the page's copy box asks for it as `POST /api/cmd/StartWork`, so the CLI is its one
-implementation.
+implementation -- and so is the launch (`StartWork -Launch`, a session in a worktree), whose availability
+`/api/env` reports as the top-level `startWorkLaunch` (`claude` on the agent's PATH).
 
 ### A card's pictures
 

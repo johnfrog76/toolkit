@@ -351,6 +351,20 @@ one by one). A kind with no row, or a row whose file is not there, makes `StartW
 named (`startWork.prompts.<kind>`). The block's WORDS -- its head line and three headings -- are the
 contract instead, `consts.json` `startWork.text`, because the web shows what the CLI typed.
 
+## `startWorkLaunch` -- whether `StartWork -Launch` can start a session
+
+`StartWork <id> -Launch` hands the block to a session in a new worktree
+([`docs/modules/solitaire-agile.md`](modules/solitaire-agile.md), "The launch: the block, handed to
+a session"). Whether it can is an optional surface with **no key to set**: it is DERIVED, the way the
+Teams webhook's row is -- `on` where `claude` is on the PATH, `not configured` where it is not, never
+`off`, because nothing was answered. `tkEnv` and `tkMenu -All` name it as **StartWork launch**
+(`Scripts/Get-OptionalSurfaces.ps1`), with its question, "Can it start the work in a session for me?",
+and `GET /api/env` carries the same answer at the top level as `startWorkLaunch` (a boolean, asked of
+the agent's own PATH, which the bridge's child inherits) so the Team Agile page can offer the second
+button only where it would work. The block itself works either way. Which model a size starts is not a
+setting either: the size label is the model's name, `sonnet` or `opus`, and `fable` -- the owner's own
+seat -- never launches.
+
 ## `spaces[].howIWork` -- how you work in this Space
 
 **How do you want to work in `<Space>`?** is the Space's answer, not the person's: nobody works one

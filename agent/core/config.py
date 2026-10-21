@@ -26,6 +26,7 @@ private org therefore never has to be written into the committed file.
 
 import json
 import os
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -921,3 +922,13 @@ def anthropic_api_key() -> str:
 def anthropic_configured() -> bool:
     """Whether the model-assisted routes have a credential to work with."""
     return bool(anthropic_api_key())
+
+
+def start_work_launch() -> bool:
+    """Whether ``StartWork <id> -Launch`` has a session to start: ``claude`` on the
+    PATH (D-AR13). The inventory row ``startWorkLaunch`` in
+    ``Scripts/Get-OptionalSurfaces.ps1`` is the same rule -- on where the tool is
+    found, not configured otherwise. Asked of THIS process's PATH on purpose: the
+    page's button runs the verb through the bridge, whose child pwsh inherits it.
+    """
+    return shutil.which("claude") is not None

@@ -521,6 +521,18 @@ function Get-P20OptionalSurfaces {
     $rows += New-P20SurfaceRow -Key 'TEAMS_WEBHOOK_*' -Title 'Teams delivery' -State $hookState `
         -Config 'TEAMS_WEBHOOK_<RECIPIENT> in .env in the package root (copy .env.example)' -Note $hookNote
 
+    # -- StartWork -Launch (D-AR13; docs/modules/solitaire-agile.md) -----------
+    # DERIVED, like the webhook row: `on` where the tool is found on the PATH,
+    # `not configured` otherwise -- never `off`, because nothing was answered.
+    # The block works either way; the Team Agile page shows its second button
+    # only when /env's startWorkLaunch says the same (agent/core/config.py,
+    # start_work_launch -- the agent's PATH, which is the bridge's).
+    $launchState = $states.Unset
+    $launchNote = $Prefix + 'StartWork <id> -Launch: a session in a worktree; the block works without it'
+    if (Get-Command claude -CommandType Application -ErrorAction SilentlyContinue) { $launchState = $states.On }
+    $rows += New-P20SurfaceRow -Key 'startWorkLaunch' -Title 'StartWork launch' -State $launchState `
+        -Config 'claude on the PATH (install Claude Code)' -Note $launchNote
+
     # The question on every row, from the one list (D-W1). A row with no entry
     # carries '' and tkTestToolkit -Environment fails naming the key.
     # A question may name the Space you are in -- {space} -- ("How do you

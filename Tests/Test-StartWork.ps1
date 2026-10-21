@@ -33,6 +33,19 @@
                 that matches nothing, an archived card, a closed issue, a pull
                 request, an Azure DevOps Space, an undeclared -Space, a partial
                 name for a non-interactive caller.
+    7. -Launch      from a scratch clone whose origin is the Space's address,
+                with a stub claude first on PATH: -WhatIf prints the worktree
+                add, the exact claude command and the log, and leaves nothing;
+                the model from each place a size is read (the **Assigned:**
+                line, the Tags, an issue's label, the issue behind a numbered
+                card); never a launch on the owner's seat -- fable on a card and on an issue
+                refused, and no size refused, as are me, a size with no model,
+                -Clip with -Launch, -WhatIf alone, no git repository, another
+                repository's origin, a failed worktree add and no claude. Off Windows the launch itself: read
+                through a pipe it returns while the stub session lives on, the
+                worktree is under .claude/worktrees/, the log at the root, and
+                the log's first message is the block StartWork prints, whole.
+                Windows walks the launch from VERIFY.md, Gate 12.
 
     Run:  pwsh -File Tests/Test-StartWork.ps1
 #>
@@ -97,7 +110,9 @@ function Invoke-Verb {
     # and nothing else (AGENTS.md, "One toolkit per shell"). -Quiet sets
     # TOOLKIT_QUIET_STARTUP, the mark of a non-interactive caller (the bridge).
     # -Prompts is this machine's startWork.prompts patch; '{}' leaves the shipped rows.
-    param([string]$Snippet, [bool]$On = $true, [string]$Prompts = '{}', [switch]$Quiet)
+    # -PathPrefix puts a folder (the stub claude's) first on PATH; -PathOnly
+    # replaces PATH outright (the no-claude case: git's folder and nothing else).
+    param([string]$Snippet, [bool]$On = $true, [string]$Prompts = '{}', [switch]$Quiet, [string]$PathPrefix = '', [string]$PathOnly = '')
     $features = '{}'
     if ($On) { $features = '{ "solitaireAgile": true }' }
     [System.IO.File]::WriteAllText((Join-Path $pkg 'config.local.json'),
@@ -106,6 +121,8 @@ function Invoke-Verb {
     $q = { param($p) $p -replace "'", "''" }
     $quietLine = ''
     if ($Quiet) { $quietLine = "`$env:TOOLKIT_QUIET_STARTUP = '1'`n" }
+    if ($PathOnly) { $quietLine += "`$env:PATH = '$(& $q $PathOnly)'`n" }
+    elseif ($PathPrefix) { $quietLine += "`$env:PATH = '$(& $q $PathPrefix)' + [System.IO.Path]::PathSeparator + `$env:PATH`n" }
     $body = @"
 `$env:PSModulePath = '$(& $q $pkg)'
 `$env:PROMPTS_ROOT = ''
@@ -131,7 +148,11 @@ $Snippet
 "@
     $runner = Join-Path $scratch ("run-" + [guid]::NewGuid().ToString('N').Substring(0, 8) + '.ps1')
     [System.IO.File]::WriteAllText($runner, $body, $utf8)
+    # Read through a PIPE, as an agent's tool call reads it: a launched child that
+    # held this pipe would hold this line until it exited (Seconds says so).
+    $clock = [System.Diagnostics.Stopwatch]::StartNew()
     $out = (& pwsh -NoProfile -NonInteractive -File $runner 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    $clock.Stop()
     $inner = ''
     $m = [regex]::Match($out, '(?s)<<<\n(.*?)\n?>>>')
     if ($m.Success) { $inner = $m.Groups[1].Value }
@@ -145,7 +166,7 @@ $Snippet
     # The module's own startup probe is not the verb's: keep the verb's reads.
     $sep = [string][char]0x1F
     $calls = @($calls | Where-Object { -not ($_.StartsWith('auth') -or $_.StartsWith("api${sep}user")) })
-    return [pscustomobject]@{ All = $out; Inner = $inner; Exit = $code; Calls = $calls }
+    return [pscustomobject]@{ All = $out; Inner = $inner; Exit = $code; Calls = $calls; Seconds = $clock.Elapsed.TotalSeconds }
 }
 
 function Test-OneRefusal {
@@ -288,7 +309,187 @@ try {
     Assert-True 'a partial name for a non-interactive caller is refused, naming the card' ($partialQuiet.All -match "'remaining-raw' is not a card in current/; it matches '$([regex]::Escape($cardName))' only by partial name" -and $partialQuiet.Inner -notmatch '(?m)^# Start work:') $partialQuiet.All
 
     $usage = Invoke-Verb 'tkStartWork -Help'
-    Assert-True 'StartWork -Help renders the usage' ($usage.Inner -match [regex]::Escape('StartWork <id> [-Clip] [-Prompt <path>] [-Space <slug>]')) $usage.Inner
+    Assert-True 'StartWork -Help renders the usage' ($usage.Inner -match [regex]::Escape('StartWork <id> [-Clip] [-Prompt <path>] [-Space <slug>] [-Launch] [-WhatIf]')) $usage.Inner
+
+    # -- 7. -Launch: the same block, handed to a session (D-AR12) ---------------
+    Write-Host ""
+    Write-Host "-- -Launch: a session in a worktree --------------------" -ForegroundColor Cyan
+    $onWindows = ($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows
+    function Invoke-Git {
+        # A scratch repository's git, its stderr swallowed whatever the host
+        # (5.1 under Stop turns a redirected native stderr into a throw).
+        param([string[]]$GitArgs)
+        $ErrorActionPreference = 'Continue'
+        $null = (& git @GitArgs 2>&1)
+        return $LASTEXITCODE
+    }
+    $esc = { param($s) $s -replace "'", "''" }
+    # Three clones: the Space's (origin is its address, one commit), another
+    # repository's, and the Space's with no commit -- worktree add fails there.
+    # The empty one's origin is the ssh form of the same address.
+    $clone = Join-Path $scratch 'widgets-clone'
+    $otherClone = Join-Path $scratch 'other-clone'
+    $emptyClone = Join-Path $scratch 'empty-clone'
+    foreach ($dir in @($clone, $otherClone, $emptyClone)) {
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        $null = Invoke-Git @('-C', $dir, 'init', '-q')
+    }
+    $null = Invoke-Git @('-C', $clone, 'remote', 'add', 'origin', 'https://github.com/acme/widgets.git')
+    $null = Invoke-Git @('-C', $emptyClone, 'remote', 'add', 'origin', 'git@github.com:acme/widgets.git')
+    $null = Invoke-Git @('-C', $otherClone, 'remote', 'add', 'origin', 'https://github.com/acme/other.git')
+    [System.IO.File]::WriteAllText((Join-Path $clone 'README.md'), "widgets`n", $utf8)
+    $null = Invoke-Git @('-C', $clone, 'add', 'README.md')
+    $committed = Invoke-Git @('-C', $clone, '-c', 'user.name=StartWork Test', '-c', 'user.email=startwork@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'init')
+    Assert-True 'the scratch clone has a commit to check out' ($committed -eq 0) "git commit exited $committed"
+
+    # The stub session. On macOS and Linux a shell script: its prompt (its
+    # stdin, as claude --print reads it) is the first thing it writes -- so the
+    # log's first message is what it was handed -- its flags go to stderr, and then it lives on like a
+    # real session. On Windows a process image named claude.exe, so every check
+    # runs; the launch itself is a VERIFY.md row there.
+    $bin = Join-Path $scratch 'bin'
+    New-Item -ItemType Directory -Path $bin -Force | Out-Null
+    if ($onWindows) {
+        Copy-Item (Join-Path $env:SystemRoot 'System32\whoami.exe') (Join-Path $bin 'claude.exe')
+    }
+    else {
+        $stubText = @'
+#!/bin/sh
+cat
+echo "$1 $2 $3 $4 $5 $6" >&2
+exec sleep 30
+'@
+        $stub = Join-Path $bin 'claude'
+        [System.IO.File]::WriteAllText($stub, $stubText.Replace("`r`n", "`n"), $utf8)
+        & chmod +x $stub
+    }
+    $inClone = "Set-Location '$(& $esc $clone)'; "
+
+    # Cards and issues, one per way an item is sized.
+    $launchCards = [ordered]@{
+        'Task-K2N4-launch-me.prompt.md'             = "# Task K2N4: Launch me`n`n**Assigned:** sonnet`n"
+        'Task-F3AE-the-owners-seat.prompt.md'       = "# Task F3AE: The owner's seat`n`n**Assigned:** fable`n"
+        'Task-N7QX-nobody-has-it.prompt.md'         = "# Task N7QX: Nobody has it`n"
+        'Task-P9TC-sized-in-its-tags.prompt.md'     = "# Task P9TC: Sized in its tags`n`nTags: cli, opus`n"
+        'Task-M6YD-mine.prompt.md'                  = "# Task M6YD: Mine`n`n**Assigned:** me`n"
+        'Task-H4KU-a-size-with-no-model.prompt.md'  = "# Task H4KU: A size with no model`n`n**Assigned:** haiku`n"
+        'Task45-sized-on-the-tracker.prompt.md'     = "# Task 45: Sized on the tracker`n"
+    }
+    foreach ($k in $launchCards.Keys) { [System.IO.File]::WriteAllText((Join-Path $current ($k -replace '^Task-', 'Task')), $launchCards[$k], $utf8) }
+    [System.IO.File]::WriteAllText((Join-Path $scratch 'issue-44.json'), '{ "number": 44, "title": "Sized opus", "state": "OPEN", "labels": [{ "name": "opus" }], "milestone": null, "body": "", "url": "https://github.com/acme/widgets/issues/44" }', $utf8)
+    [System.IO.File]::WriteAllText((Join-Path $scratch 'issue-45.json'), '{ "number": 45, "labels": [{ "name": "bug" }, { "name": "sonnet" }] }', $utf8)
+    [System.IO.File]::WriteAllText((Join-Path $scratch 'issue-46.json'), '{ "number": 46, "title": "Sized fable", "state": "OPEN", "labels": [{ "name": "Fable" }], "milestone": null, "body": "", "url": "https://github.com/acme/widgets/issues/46" }', $utf8)
+    $worktreeShape = '[\\/]\.claude[\\/]worktrees[\\/]startwork-k2n4-\d{8}-\d{6}'
+    function Get-LaunchLeftovers {
+        # What a launch would leave in a clone: a worktree, a log.
+        param([string]$Dir)
+        $found = @()
+        if (Test-Path -LiteralPath (Join-Path $Dir '.claude')) { $found += '.claude' }
+        $found += @(Get-ChildItem -LiteralPath $Dir -Filter '*.log' -File -ErrorAction SilentlyContinue | ForEach-Object { $_.Name })
+        return ($found -join ', ')
+    }
+
+    # -WhatIf: every check, the commands, nothing added or started.
+    $w = Invoke-Verb ($inClone + 'tkStartWork K2N4 -Launch -WhatIf') -PathPrefix $bin
+    Assert-True '-Launch -WhatIf exits 0 and names the size, where it read it and the model' ($w.Exit -eq '0' -and $w.Inner.Contains('[WhatIf] Task K2N4 is sized sonnet (its **Assigned:** line): model sonnet.')) $w.All
+    Assert-True 'it prints the worktree add it would run, under the clone''s .claude/worktrees/' ($w.Inner -match ('worktree add --detach "[^"]*' + $worktreeShape + '"')) $w.Inner
+    Assert-True 'it prints where the block would be written, at the repository root' ($w.Inner -match 'Would write the block \(\d+ lines, as ''tkStartWork K2N4'' prints it\) to [^\n]*[\\/]startwork-k2n4-\d{8}-\d{6}\.block\.log') $w.Inner
+    Assert-True 'it prints the exact claude command, the block as its stdin' ($w.Inner -match 'Would start, in that worktree: claude --print --model sonnet --output-format stream-json --verbose < "[^"]*startwork-k2n4-\d{8}-\d{6}\.block\.log"') $w.Inner
+    Assert-True 'and the log at the repository root' ($w.Inner -match 'output would go to [^\n]*[\\/]startwork-k2n4-\d{8}-\d{6}\.log') $w.Inner
+    Assert-True '-WhatIf adds no worktree and writes no log' ((Get-LaunchLeftovers $clone) -eq '') (Get-LaunchLeftovers $clone)
+
+    $tags = Invoke-Verb ($inClone + 'tkStartWork P9TC -Launch -WhatIf') -PathPrefix $bin
+    Assert-True 'a size in the card''s Tags picks the model' ($tags.Exit -eq '0' -and $tags.Inner.Contains('Task P9TC is sized opus (its Tags): model opus.') -and $tags.Inner.Contains('--model opus')) $tags.All
+    $iss = Invoke-Verb ($inClone + 'tkStartWork 44 -Launch -WhatIf') -PathPrefix $bin
+    Assert-True 'an issue''s label picks the model' ($iss.Exit -eq '0' -and $iss.Inner.Contains('Issue #44 is sized opus (a label on issue #44): model opus.')) $iss.All
+    $tracked = Invoke-Verb ($inClone + 'tkStartWork 45 -Launch -WhatIf') -PathPrefix $bin
+    Assert-True 'a card whose id is an issue number reads the issue''s label' ($tracked.Exit -eq '0' -and $tracked.Inner.Contains('Task 45 is sized sonnet (a label on issue #45): model sonnet.')) $tracked.All
+    Assert-True 'with one gh read of that issue''s labels' (@($tracked.Calls | Where-Object { $_.StartsWith("issue${sep}view${sep}45${sep}--repo${sep}acme/widgets${sep}--json${sep}labels") }).Count -eq 1) ($tracked.Calls -join ' / ')
+
+    # Never a launch on the owner's seat, and never a crew on nobody's item.
+    $launchRefusals = [ordered]@{
+        'sized fable on the card: the owner''s own seat' = @{ Snippet = 'tkStartWork F3AE -Launch'; Says = "Task F3AE is sized fable (its **Assigned:** line): the owner's own seat, never a crew builder"; Hint = 'tkStartWork F3AE' }
+        'sized fable on the issue: the owner''s own seat' = @{ Snippet = 'tkStartWork 46 -Launch'; Says = "Issue #46 is sized fable (a label on issue #46): the owner's own seat, never a crew builder" }
+        'no size at all'                                 = @{ Snippet = 'tkStartWork N7QX -Launch'; Says = 'Task N7QX has no size, so there is no crew to launch (a launch takes sonnet or opus)'; Hint = 'tkRoute N7QX -Assign sonnet' }
+        'assigned to you'                                = @{ Snippet = 'tkStartWork M6YD -Launch'; Says = 'Task M6YD is assigned to you (its **Assigned:** line says me), not to a crew size' }
+        'a size with no model'                           = @{ Snippet = 'tkStartWork H4KU -Launch'; Says = 'Task H4KU is sized haiku (its **Assigned:** line), and a launch has a model only for sonnet or opus' }
+        '-Clip with -Launch'                             = @{ Snippet = 'tkStartWork K2N4 -Launch -Clip'; Says = '-Clip and -Launch are two ways to hand the block on; pass one.' }
+        '-WhatIf without -Launch'                        = @{ Snippet = 'tkStartWork K2N4 -WhatIf'; Says = '-WhatIf previews -Launch' }
+    }
+    $before = Get-HubSnapshot
+    foreach ($k in $launchRefusals.Keys) {
+        $case = $launchRefusals[$k]
+        $run = Invoke-Verb ($inClone + $case.Snippet) -PathPrefix $bin
+        $ok = (Test-OneRefusal $run) -and $run.All.Contains([string]$case.Says)
+        if ($case.Hint) { $ok = $ok -and $run.All.Contains([string]$case.Hint) }
+        Assert-True "-Launch refused, nothing started: $k" $ok $run.All
+    }
+
+    $run = Invoke-Verb ("Set-Location '$(& $esc $scratch)'; tkStartWork K2N4 -Launch") -PathPrefix $bin
+    Assert-True '-Launch refused, nothing started: not in a git repository' ((Test-OneRefusal $run) -and $run.All.Contains('This folder is not in a git repository, and -Launch starts from a clone of acme/widgets')) $run.All
+    $run = Invoke-Verb ("Set-Location '$(& $esc $otherClone)'; tkStartWork K2N4 -Launch") -PathPrefix $bin
+    Assert-True '-Launch refused, nothing started: a repository whose origin is not the Space''s' ((Test-OneRefusal $run) -and $run.All.Contains("has origin https://github.com/acme/other.git, not Widgets's address (https://github.com/acme/widgets)")) $run.All
+    $run = Invoke-Verb ("Set-Location '$(& $esc $emptyClone)'; tkStartWork K2N4 -Launch") -PathPrefix $bin
+    Assert-True '-Launch refused, nothing started: worktree add failed (the ssh origin is the same address)' ((Test-OneRefusal $run) -and $run.All.Contains('git worktree add failed in')) $run.All
+    Assert-True 'and the empty clone has no worktree and no log' ((Get-LaunchLeftovers $emptyClone) -eq '') (Get-LaunchLeftovers $emptyClone)
+
+    $gitDir = Split-Path -Parent (Get-Command git -CommandType Application | Select-Object -First 1).Source
+    if (@(Get-ChildItem -LiteralPath $gitDir -Filter 'claude*' -File -ErrorAction SilentlyContinue).Count -gt 0) {
+        Write-Host "  SKIP  no claude on the PATH: git and claude share $gitDir here, so a PATH with git has claude" -ForegroundColor Yellow
+    }
+    else {
+        $run = Invoke-Verb ($inClone + 'tkStartWork K2N4 -Launch') -PathOnly $gitDir
+        Assert-True '-Launch refused, nothing started: claude is not on the PATH, and the hint names the surface' ((Test-OneRefusal $run) -and $run.All.Contains('claude is not on the PATH, so there is no session to start.') -and $run.All.Contains('startWorkLaunch')) $run.All
+    }
+    Assert-True 'the hub is untouched through every launch refusal' ((Get-HubSnapshot) -ceq $before)
+    Assert-True 'and the clone has no worktree and no log' ((Get-LaunchLeftovers $clone) -eq '') (Get-LaunchLeftovers $clone)
+
+    # The launch: through a pipe, back at once, the session alive, its first
+    # message the block. The proof the Windows host repeats is VERIFY.md's.
+    if ($onWindows) {
+        Write-Host "  SKIP  the launch itself: Windows walks it from VERIFY.md, Gate 12 (StartWork -Launch rows)" -ForegroundColor Yellow
+    }
+    else {
+        $plain = Invoke-Verb 'tkStartWork K2N4'
+        $launched = Invoke-Verb ($inClone + 'tkStartWork K2N4 -Launch') -PathPrefix $bin
+        $pidMatch = [regex]::Match($launched.Inner, 'Launched Task K2N4 on sonnet: PID (\d+)\.')
+        $childPid = 0
+        if ($pidMatch.Success) { $childPid = [int]$pidMatch.Groups[1].Value }
+        try {
+            Assert-True '-Launch exits 0 and prints the PID' ($launched.Exit -eq '0' -and $childPid -gt 0) $launched.All
+            Assert-True ("through a pipe it returns while the session lives on ({0:N1}s; the stub lives 30s)" -f $launched.Seconds) ($launched.Seconds -lt 20) $launched.All
+            Assert-True 'the session is still running after the verb returned' ($childPid -gt 0 -and $null -ne (Get-Process -Id $childPid -ErrorAction SilentlyContinue))
+            $wtMatch = [regex]::Match($launched.Inner, '(?m)^\s+worktree:\s+(.+?)\s*$')
+            $logMatch = [regex]::Match($launched.Inner, '(?m)^\s+log:\s+(.+?)\s*$')
+            Assert-True 'it prints the worktree, under the clone''s .claude/worktrees/' ($wtMatch.Success -and $wtMatch.Groups[1].Value -match $worktreeShape -and (Test-Path -LiteralPath (Join-Path $wtMatch.Groups[1].Value 'README.md'))) $launched.Inner
+            $logPath = ''
+            if ($logMatch.Success) { $logPath = $logMatch.Groups[1].Value }
+            Assert-True 'and the log, at the repository root' ($logPath -match '[\\/]widgets-clone[\\/]startwork-k2n4-\d{8}-\d{6}\.log$') $launched.Inner
+            $logText = ''
+            $deadline = (Get-Date).AddSeconds(10)
+            while ((Get-Date) -lt $deadline) {
+                if ($logPath -and (Test-Path -LiteralPath $logPath)) {
+                    $logText = [System.IO.File]::ReadAllText($logPath)
+                    if ($logText.Length -ge $plain.Inner.Length) { break }
+                }
+                Start-Sleep -Milliseconds 200
+            }
+            Assert-True 'the session''s first message is the block, whole -- the one StartWork prints' ($plain.Exit -eq '0' -and $logText -ceq $plain.Inner) ("log $($logText.Length) chars, block $($plain.Inner.Length)")
+            $errText = ''
+            if ($logPath) {
+                $errPath = $logPath -replace '\.log$', '.err.log'
+                $deadline = (Get-Date).AddSeconds(5)
+                while ((Get-Date) -lt $deadline -and -not $errText) {
+                    if (Test-Path -LiteralPath $errPath) { $errText = [System.IO.File]::ReadAllText($errPath).Trim() }
+                    if (-not $errText) { Start-Sleep -Milliseconds 200 }
+                }
+            }
+            Assert-True 'the model is the size''s, on the claude command line' ($errText -ceq '--print --model sonnet --output-format stream-json --verbose') $errText
+        }
+        finally {
+            if ($childPid -gt 0) { Stop-Process -Id $childPid -Force -ErrorAction SilentlyContinue }
+        }
+    }
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message

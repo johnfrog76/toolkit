@@ -41,6 +41,28 @@
 
     Writes nothing: not the hub, not the tracker.
 
+    -LAUNCH (D-AR12) is the secondary action: the same block, handed to a
+    session that starts the work where it gets done. Refused, each a stated
+    refusal, unless the repository you stand in has the Space's GitHub address
+    as its origin, claude is on the PATH, and the item has a crew size this
+    launch has a model for: sonnet or opus. fable -- the owner's own seat --
+    and an item with no size are refused with the hint to route it. Then it
+    adds a detached worktree of that repository under its .claude/worktrees/,
+    writes the block to <repo>/startwork-<ref>-<stamp>.block.log, and starts
+    `claude --print --model <size> --output-format stream-json --verbose` in
+    the worktree with that file as its stdin (claude --print reads its prompt
+    there; a prompt of many lines does not cross a joined command line whole),
+    through Start-Detached.ps1's Start-DetachedProcess -- the one launcher
+    that keeps the caller's pipes from crossing, so
+    `pwsh -c 'StartWork <id> -Launch' | cat` returns at once -- with its output
+    to <repo>/startwork-<ref>-<stamp>.log (and .err.log), all three under the
+    *.log ignore pattern. Prints the PID, the worktree and the log,
+    and returns without waiting. -WhatIf runs every check and prints the
+    commands it would run, and adds and starts nothing. The size is read the
+    way the rituals read it: a card's **Assigned:** line, else a size in its
+    Tags, else -- for a card whose id is an issue number -- the issue's labels;
+    an issue's labels.
+
 .PARAMETER Id
     The card's id (or its filename), or a GitHub issue number.
 .PARAMETER Clip
@@ -50,6 +72,11 @@
     or relative to the current folder, else to the package.
 .PARAMETER Space
     A declared Space's slug, to read instead of the one you are in.
+.PARAMETER Launch
+    Start a session on the block in a new worktree of the Space's repository,
+    with the model the item's size names; print its PID and log, and return.
+.PARAMETER WhatIf
+    With -Launch: run every check, print the commands, start nothing.
 
 .EXAMPLE
     {cliPrefix}StartWork 23A3
@@ -57,6 +84,8 @@
     {cliPrefix}StartWork 23A3 -Clip
 .EXAMPLE
     {cliPrefix}StartWork 4 -Prompt agentic/new-issue.prompt.md
+.EXAMPLE
+    {cliPrefix}StartWork 23A3 -Launch -WhatIf
 
 .NOTES
     PowerShell 5.1 compatible (ASCII dashes only).
@@ -72,6 +101,10 @@ param(
     [Parameter(Mandatory = $false)]
     [string]$Space,
     [Parameter(Mandatory = $false)]
+    [switch]$Launch,
+    [Parameter(Mandatory = $false)]
+    [switch]$WhatIf,
+    [Parameter(Mandatory = $false)]
     [switch]$Help
 )
 
@@ -85,9 +118,10 @@ if ($Help) {
     Write-Host "  ${p}StartWork -- one block a cold agent can start the work from" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "  Usage:" -ForegroundColor Yellow
-    Write-Host "    ${p}StartWork <id> [-Clip] [-Prompt <path>] [-Space <slug>]"
+    Write-Host "    ${p}StartWork <id> [-Clip] [-Prompt <path>] [-Space <slug>] [-Launch] [-WhatIf]"
     Write-Host ""
     Write-Host "  How we work in this Space, the card (or the issue) and the prompt, each heading naming its file. Writes nothing."
+    Write-Host "  -Launch starts a session on the block in a worktree of the Space's repository, the model from the item's size; -WhatIf prints it."
     Write-Host ""
     return
 }
@@ -199,6 +233,17 @@ $tracker = Resolve-P20Tracker -OrgUrl $org
 if ($tracker -eq 'ado') {
     Write-CliError -Message "$spaceName is an Azure DevOps Space; StartWork hands off a card or an issue on a GitHub or local Space." `
         -Hint "Their board holds the rituals there. The card is still yours to open: '${p}Status' lists it."
+    exit 2  # stated refusal
+}
+
+if ($Launch -and $Clip) {
+    Write-CliError -Message '-Clip and -Launch are two ways to hand the block on; pass one.' `
+        -Hint "'${p}StartWork <id> -Clip' copies it; '${p}StartWork <id> -Launch' starts a session on it."
+    exit 2  # stated refusal
+}
+if ($WhatIf -and -not $Launch) {
+    Write-CliError -Message '-WhatIf previews -Launch; StartWork alone writes nothing to preview.' `
+        -Hint "'${p}StartWork <id> -Launch -WhatIf' prints the commands a launch would run."
     exit 2  # stated refusal
 }
 
@@ -425,6 +470,176 @@ $sections = @(
     ((Format-P20StartWorkText $t.prompt @{ source = $promptSource }) + "`n" + $promptText)
 )
 $block = $sections -join "`n`n"
+
+# -- -Launch: the same block, handed to a session (D-AR12) ---------------------
+if ($Launch) {
+    # The one launcher (AGENTS.md: a long-lived child on Windows inherits every
+    # pipe its launcher holds unless it starts through this file).
+    . (Join-Path $PSScriptRoot 'Start-Detached.ps1')
+    $ownerSeat = [string]$c.rituals.suggestOwnerSeat
+    $meWord = [string]$c.rituals.assignMe
+    # The crew sizes a launch has a model for: the size label IS the model's
+    # name on the claude command line. One half types these, so they live here.
+    $launchModels = [ordered]@{ sonnet = 'sonnet'; opus = 'opus' }
+    $sizeWords = @($launchModels.Keys) -join ' or '
+    $routeHint = "Route it to a crew size first: '${p}Route $wanted -Assign sonnet' (or opus)."
+    $selfHint = "Work it yourself from the block ('${p}StartWork $wanted'), or route it to a crew size: '${p}Route $wanted -Assign sonnet' (or opus)."
+
+    # 1. The repository you stand in is the Space's: its origin is the address.
+    $spaceRepo = ''
+    if ($tracker -eq 'github') {
+        $repoTarget = Resolve-P20TrackerRepo -OrgUrl $org -Projects $resolvedSpace.projects -CliPrefix $p
+        $spaceRepo = [string]$repoTarget.Repo
+    }
+    if (-not $spaceRepo) {
+        Write-CliError -Message "$spaceName has no GitHub repository address, so -Launch has nowhere to start the session." `
+            -Hint "A launch starts in a worktree of the Space's own repository: '${p}Config -Set spaces.$slug.org=https://github.com/<owner>/<repo>'. The block works without it: '${p}StartWork $wanted'."
+        exit 2  # stated refusal
+    }
+    $topRead = Invoke-P20TrackerRead 'git' @('rev-parse', '--show-toplevel')
+    $repoTop = ''
+    if ($topRead.Code -eq 0) { $repoTop = [string](@($topRead.Out | Where-Object { "$_".Trim() }) | Select-Object -First 1) }
+    $repoTop = $repoTop.Trim()
+    if (-not $repoTop) {
+        Write-CliError -Message "This folder is not in a git repository, and -Launch starts from a clone of $spaceRepo." `
+            -Hint "cd into your clone of https://github.com/$spaceRepo and run '${p}StartWork $wanted -Launch' there."
+        exit 2  # stated refusal
+    }
+    $repoTop = [System.IO.Path]::GetFullPath($repoTop)
+    $originRead = Invoke-P20TrackerRead 'git' @('-C', $repoTop, 'remote', 'get-url', 'origin')
+    $originUrl = ''
+    if ($originRead.Code -eq 0) { $originUrl = ([string](@($originRead.Out) | Select-Object -First 1)).Trim() }
+    # https://github.com/o/r(.git), git@github.com:o/r(.git), ssh://git@github.com/o/r -- the owner/repo after the host.
+    $originRepo = ''
+    $om = [regex]::Match($originUrl, '(?i)github\.com[:/]+([^/\s]+)/([^/\s]+?)(?:\.git)?/?$')
+    if ($om.Success) { $originRepo = $om.Groups[1].Value + '/' + $om.Groups[2].Value }
+    if (-not $originRepo -or $originRepo -ine $spaceRepo) {
+        $originWords = 'no origin'
+        if ($originUrl) { $originWords = "origin $originUrl" }
+        Write-CliError -Message "The repository you stand in ($repoTop) has $originWords, not $spaceName's address (https://github.com/$spaceRepo)." `
+            -Hint "cd into your clone of https://github.com/$spaceRepo and run '${p}StartWork $wanted -Launch' there."
+        exit 2  # stated refusal
+    }
+
+    # 2. claude on the PATH -- the optional surface startWorkLaunch (D-AR13).
+    $claude = Resolve-LaunchExecutable -Name 'claude'
+    if (-not $claude) {
+        Write-CliError -Message 'claude is not on the PATH, so there is no session to start.' `
+            -Hint "Install Claude Code and open a new shell ('${p}Env' names it: startWorkLaunch). The block works without it: '${p}StartWork $wanted', and paste it."
+        exit 2  # stated refusal
+    }
+
+    # 3. The size: who the rituals say has it, read the rituals' way -- an
+    # issue's labels; a card's **Assigned:** line, else a size in its Tags, else
+    # (a card whose id is an issue number, which Route sizes on the tracker)
+    # that issue's labels.
+    $size = ''
+    $sizeFrom = ''
+    $knownSizes = @($launchModels.Keys) + @($ownerSeat)
+    if ($item.Kind -eq 'Issue') {
+        foreach ($labelName in @(Get-P20IssueLabelNames $issue)) {
+            $hit = @($knownSizes | Where-Object { $_ -ieq [string]$labelName }) | Select-Object -First 1
+            if ($hit) { $size = [string]$hit; $sizeFrom = "a label on issue $($item.Ref)"; break }
+        }
+    }
+    else {
+        $assigned = Get-P20CardAssigned $content
+        if ($assigned) { $size = $assigned; $sizeFrom = 'its **Assigned:** line' }
+        if (-not $size) {
+            foreach ($tag in @(Get-P20CardTags $content)) {
+                $hit = @($knownSizes | Where-Object { $_ -ieq [string]$tag }) | Select-Object -First 1
+                if ($hit) { $size = [string]$hit; $sizeFrom = 'its Tags'; break }
+            }
+        }
+        if (-not $size -and (Test-P20IsWorkItemId ([string]$item.Ref)) -and $resolvedSpace.status -eq 'active' -and (Get-Command gh -ErrorAction SilentlyContinue)) {
+            $labelRead = Invoke-P20TrackerRead 'gh' @('issue', 'view', [string]$item.Ref, '--repo', $spaceRepo, '--json', 'labels')
+            $labelIssue = $null
+            if ($labelRead.Code -eq 0) {
+                try { $labelIssue = ((@($labelRead.Out) -join "`n") | ConvertFrom-Json) } catch { $labelIssue = $null }
+            }
+            if ($labelIssue) {
+                foreach ($labelName in @(Get-P20IssueLabelNames $labelIssue)) {
+                    $hit = @($knownSizes | Where-Object { $_ -ieq [string]$labelName }) | Select-Object -First 1
+                    if ($hit) { $size = [string]$hit; $sizeFrom = "a label on issue #$($item.Ref)"; break }
+                }
+            }
+        }
+    }
+    $what = "$($item.Kind) $($item.Ref)"
+    if (-not $size) {
+        Write-CliError -Message "$what has no size, so there is no crew to launch (a launch takes $sizeWords)." -Hint $routeHint
+        exit 2  # stated refusal
+    }
+    if ($size -ieq $ownerSeat) {
+        Write-CliError -Message "$what is sized $ownerSeat ($sizeFrom): the owner's own seat, never a crew builder." -Hint $selfHint
+        exit 2  # stated refusal
+    }
+    if ($size -ieq $meWord) {
+        Write-CliError -Message "$what is assigned to you ($sizeFrom says $meWord), not to a crew size." -Hint $selfHint
+        exit 2  # stated refusal
+    }
+    $model = ''
+    foreach ($k in $launchModels.Keys) { if ($k -ieq $size) { $model = [string]$launchModels[$k] } }
+    if (-not $model) {
+        Write-CliError -Message "$what is sized $size ($sizeFrom), and a launch has a model only for $sizeWords." -Hint $routeHint
+        exit 2  # stated refusal
+    }
+
+    # 4. Where: a detached worktree under the repository's .claude/worktrees/;
+    # the block, the log and the stderr log at the repository root, all three
+    # *.log, which is ignored. The block is the session's STDIN -- claude
+    # --print reads its prompt there -- because a prompt of many lines does
+    # not cross a joined command line whole on any host.
+    $refWord = (([string]$item.Ref).TrimStart('#').ToLowerInvariant() -replace '[^a-z0-9]+', '-').Trim('-')
+    $runName = "startwork-$refWord-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+    $worktree = Join-Path (Join-Path (Join-Path $repoTop '.claude') 'worktrees') $runName
+    $blockPath = Join-Path $repoTop "$runName.block.log"
+    $logPath = Join-Path $repoTop "$runName.log"
+    $errPath = Join-Path $repoTop "$runName.err.log"
+    $claudeArgs = @('--print', '--model', $model, '--output-format', 'stream-json', '--verbose')
+    $blockLines = @($block -split "`n").Count
+    $shownCommand = "claude $($claudeArgs -join ' ') < `"$blockPath`""
+
+    if ($WhatIf) {
+        Write-Output "  [WhatIf] $what is sized $size ($sizeFrom): model $model."
+        Write-Output "  [WhatIf] Would run: git -C `"$repoTop`" worktree add --detach `"$worktree`""
+        Write-Output "  [WhatIf] Would write the block ($blockLines lines, as '${p}StartWork $wanted' prints it) to $blockPath"
+        Write-Output "  [WhatIf] Would start, in that worktree: $shownCommand"
+        Write-Output "  [WhatIf] Its output would go to $logPath (stderr: $errPath)."
+        Write-Output '  [WhatIf] Nothing was added or started.'
+        exit 0
+    }
+
+    $add = Invoke-P20TrackerRead 'git' @('-C', $repoTop, 'worktree', 'add', '--detach', $worktree)
+    if ($add.Code -ne 0) {
+        $why = @($add.Err | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ }) | Select-Object -First 1
+        if (-not $why) { $why = "git exited $($add.Code)" }
+        Write-CliError -Message "git worktree add failed in ${repoTop}: $why" `
+            -Hint 'Nothing was started. git worktree list shows what is there; a repository with no commit yet has nothing to check out.'
+        exit 2  # stated refusal
+    }
+
+    # The child's environment is this one's, without a Teams webhook: a session
+    # never sends (AGENTS.md, "The webhook variables").
+    $childEnv = @{}
+    $hookPrefix = [string]$c.env.teamsWebhookPrefix
+    foreach ($var in @(Get-ChildItem Env: -ErrorAction SilentlyContinue | Where-Object { $hookPrefix -and $_.Name.StartsWith($hookPrefix) })) { $childEnv[$var.Name] = $null }
+    try {
+        # UTF-8 with no BOM, LF: the bytes StartWork prints.
+        [System.IO.File]::WriteAllText($blockPath, $block, (New-Object System.Text.UTF8Encoding($false)))
+        $proc = Start-DetachedProcess -FilePath $claude -ArgumentList $claudeArgs -WorkingDirectory $worktree `
+            -StdOutLog $logPath -StdErrLog $errPath -Environment $childEnv -StdInFile $blockPath
+    }
+    catch {
+        Write-CliError -Message "claude did not start: $($_.Exception.Message)" `
+            -Hint "The worktree is at $worktree; 'git worktree remove `"$worktree`"' takes it away."
+        exit 2  # stated refusal
+    }
+    Write-Output "Launched $what on ${model}: PID $($proc.Id)."
+    Write-Output "  worktree: $worktree"
+    Write-Output "  log:      $logPath"
+    exit 0
+}
 
 if ($Clip) {
     try { Set-Clipboard -Value $block -ErrorAction Stop }

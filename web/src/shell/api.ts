@@ -98,6 +98,11 @@ export interface EnvStatus {
    *  unset. Absent from an older agent. */
   howIWork?: HowIWork;
   anthropicConfigured: boolean;
+  /** Whether `StartWork <id> -Launch` has a session to start: `claude` on the
+   *  agent's PATH (D-AR13), the inventory row `startWorkLaunch`'s rule. The
+   *  Team Agile page shows its second button only when true. Absent from an
+   *  older agent. */
+  startWorkLaunch?: boolean;
   // The provider profile's model id, ai.model in config.
   aiModel?: string;
   bridgeHost?: BridgeHost;
