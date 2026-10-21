@@ -28,19 +28,20 @@ lockfile does not mark as development-only.
 <!-- markdownlint-disable MD001 -- the generator below names each license group a level-four heading under this level-two one -->
 <!-- notices:npm begin -->
 
-What ships in the browser bundle: 248 packages, besides the web package itself (`toolkit-web`, MIT). Every one is under a permissive license.
+What ships in the browser bundle: 250 packages, besides the web package itself (`toolkit-web`, MIT). Every one is under a permissive license.
 
 | License | Packages |
 | --- | --- |
-| MIT | 231 |
+| MIT | 232 |
 | ISC | 12 |
 | 0BSD | 1 |
 | Apache-2.0 | 1 |
+| BSD | 1 |
 | BSD-2-Clause | 1 |
 | BSD-3-Clause | 1 |
 | MIT AND ISC | 1 |
 
-#### MIT (231)
+#### MIT (232)
 
 | Package | Version |
 | --- | --- |
@@ -237,6 +238,7 @@ What ships in the browser bundle: 248 packages, besides the web package itself (
 | `parse5` | 7.3.0 |
 | `property-information` | 7.1.0 |
 | `react` | 19.3.0 |
+| `react-confetti` | 6.4.0 |
 | `react-dom` | 19.3.0 |
 | `react-is` | 19.2.6 |
 | `react-markdown` | 10.1.0 |
@@ -304,6 +306,12 @@ What ships in the browser bundle: 248 packages, besides the web package itself (
 | Package | Version |
 | --- | --- |
 | `@swc/helpers` | 0.5.21 |
+
+#### BSD (1)
+
+| Package | Version |
+| --- | --- |
+| `tween-functions` | 1.2.0 |
 
 #### BSD-2-Clause (1)
 

@@ -225,6 +225,9 @@ export const RITUALS = consts.rituals as {
   suggestOwnerSeat: string;
   /** The suggestion's exclusions, in the order an item meets them. */
   suggestExclusions: string[];
+  /** The PM Corner's shapes (oneLeft, manyLeft, reached, nothingInReach): which line
+   *  it reads -- the first two carry the chevron, reached throws the confetti. */
+  cornerShapes: string[];
   text: {
     title: string;
     dateFormat: string;
@@ -278,6 +281,19 @@ export const RITUALS = consts.rituals as {
     suggestNounIssue: string;
     suggestCommandStart: string;
     suggestCommandRoute: string;
+    /** The PM Corner's lines; the page shows the served `line` verbatim, and the
+     *  chevron is cornerChevron. cornerBrief / cornerBriefCommand are the brief's
+     *  last line, which the page sets aside because it draws the Corner itself. */
+    cornerOneLeft: string;
+    cornerManyLeft: string;
+    cornerReached: string;
+    cornerNothingInReach: string;
+    cornerNounCards: string;
+    cornerNounIssues: string;
+    cornerNounItems: string;
+    cornerChevron: string;
+    cornerBrief: string;
+    cornerBriefCommand: string;
     /** The work grain's phrases: a slot's first group, then the rest. */
     workYesterday: string;
     workToday: string;

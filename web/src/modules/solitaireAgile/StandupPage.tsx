@@ -38,12 +38,20 @@ import { ROUTES } from "./paths";
 import { SEATS, plateFor } from "./stage/seats";
 import { SURFACE_CHAIR, dismissRef, dismissedRefs } from "./suggestDismiss";
 import { chairSuggestion, suggestionArg } from "./suggestion";
+import { briefSansCorner, cornerOf } from "./corner";
 
 // The hand-off block's copy box (AR-1): a chunk fetched the first time a row's
 // Start work is pressed, so the page's first draw carries none of it.
 const StartWorkBox = lazyPart(
   () => import("./StartWorkBox"),
   (m) => m.StartWorkBox,
+);
+// The PM Corner (AR-4): the line at the head of the page, its chevron and the
+// confetti -- a chunk of its own, with react-confetti in it, fetched when the
+// response first carries a Corner.
+const PmCorner = lazyPart(
+  () => import("./PmCorner"),
+  (m) => m.PmCorner,
 );
 
 /** What `StartWork` is given for a row's item: the issue's number, else the card's id. */
@@ -86,6 +94,13 @@ export const startWorkArg = (i: RitualItem): string =>
 // takes its place, and with none left the line is today's briefNextNone. The
 // brief's text is otherwise untouched, and Copy still copies it as the agent
 // rendered it.
+//
+// The PM Corner (AR-4; docs/modules/solitaire-agile.md, "The PM Corner: the line,
+// the chevron, the confetti") sits at the head of the page: the response's `corner.line`
+// verbatim, its chevron -- the same hand-off box every Start work opens -- and, when it
+// reads reached, the confetti once per milestone per viewer (PmCorner.tsx). The agent puts
+// the same line last in the brief; the page draws it at the head instead, so the brief
+// below stops above it, and Copy still copies the brief as the agent rendered it.
 //
 // Showing the standup IS attending it (D-TA15): the first time it draws,
 // the page posts once to the attend route, which re-arms the standup's Organize
@@ -334,12 +349,14 @@ export function StandupPage() {
   const parts = useMemo(() => {
     if (!readable) return { header: "", body: "", copy: "" };
     const p = grainParts(data, grain);
-    // The brief grain draws the suggestion as its own row: the body stops above it.
+    // The brief grain: the Corner is drawn at the head, so the body stops above its line.
+    const body = grain === BRIEF && data.brief ? briefSansCorner(data) : p.body;
+    // ...and the suggestion is drawn as its own row: the body stops above it too.
     if (grain === BRIEF && chair.standing) {
-      const lines = p.body.replace(/\n$/, "").split("\n");
+      const lines = body.replace(/\n$/, "").split("\n");
       return { ...p, body: lines.slice(0, -1).join("\n") + "\n" };
     }
-    return p;
+    return { ...p, body };
   }, [readable, data, grain, chair.standing]);
   const copy = useCallback(async () => {
     if (!parts.copy) return;
@@ -351,7 +368,7 @@ export function StandupPage() {
   // The chair's reading sits above the prose -- unless it IS the prose.
   const briefLines = useMemo(() => {
     if (!readable || !data.brief || grain === BRIEF) return [];
-    const lines = data.brief.split("\n").filter(Boolean);
+    const lines = briefSansCorner(data).split("\n").filter(Boolean);
     return chair.standing ? lines.slice(0, -1) : lines;
   }, [readable, data, grain, chair.standing]);
   const dismiss = useCallback((ref: string) => setDismissed(dismissRef(SURFACE_CHAIR, ref)), []);
@@ -394,6 +411,8 @@ export function StandupPage() {
     [readable, data, parts, facts],
   );
 
+  const corner = readable ? cornerOf(data) : null;
+
   const empty = readable ? undefined : (
     <EmptyState
       icon={<PeopleTeamRegular />}
@@ -405,6 +424,9 @@ export function StandupPage() {
 
   return (
     <div className={styles.page}>
+      {corner && (
+        <PmCorner corner={corner} space={data?.space ?? space} onStart={(arg) => setStartFor(arg)} />
+      )}
       <PageCard
         loading={envLoading || isLoading}
         loadingLabel="Checking the tracker..."

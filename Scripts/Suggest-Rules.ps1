@@ -85,7 +85,7 @@ function Format-P20SuggestTemplate {
         if ($Values.ContainsKey($k)) { return [string]$Values[$k] }
         return $m.Value
     }
-    return [regex]::Replace([string]$Template, '\{(ref|why|size|nobody|noun|milestone|kind|sentence|command|arg)\}', $evaluator)
+    return [regex]::Replace([string]$Template, '\{(ref|why|size|nobody|noun|milestone|kind|sentence|command|arg|n|line|chevron)\}', $evaluator)
 }
 
 function Get-P20SuggestSeverities {

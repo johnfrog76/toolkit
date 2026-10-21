@@ -303,6 +303,28 @@ class Suggestion(BaseModel):
     line: str = ""
 
 
+class Corner(BaseModel):
+    # The PM Corner's line (corner.py; docs/modules/solitaire-agile.md, "The PM
+    # Corner: the line, the chevron, the confetti"). ``shape`` one of
+    # rituals.cornerShapes; ``milestone`` its title, whole ("" with nothing in
+    # reach); ``remaining`` the open items that name it, once per id;
+    # ``ref``/``number``/``id``/``kind`` the pick the chevron starts ("" and null
+    # for reached and nothing in reach); ``noun`` the word the line counts in;
+    # ``line`` the sentence the page shows; ``command`` the verb and its argument,
+    # unprefixed ("" with no pick); ``brief`` the brief's last line, prefixed.
+    shape: str = ""
+    milestone: str = ""
+    remaining: int = 0
+    ref: str = ""
+    number: int | None = None
+    id: str | None = None
+    kind: str = ""
+    noun: str = ""
+    line: str = ""
+    command: str = ""
+    brief: str = ""
+
+
 class Standup(BaseModel):
     # ``register`` is a BaseModel attribute, so the field is held under another
     # name and SERVED as "register" -- FastAPI serialises by alias. A caller
@@ -344,6 +366,10 @@ class Standup(BaseModel):
     # waits. Empty and null with the Space's switch off (features.suggestions).
     suggestions: list[Suggestion] = []
     suggestion: Suggestion | None = None
+    # The PM Corner (corner.py): one derived line -- the nearest milestone, what is
+    # left in it and the suggestion's pick inside it, or a milestone reached in the
+    # window. Null wherever the suggestion is off, or the tracker did not answer.
+    corner: Corner | None = None
     # What kind each item is: ref -> its label names (an issue) or its
     # type (a card), read against the ceremony's kinds. Not served.
     _marks: dict[str, list[str]] = PrivateAttr(default_factory=dict)
@@ -1638,7 +1664,8 @@ def render_brief(filled: Standup) -> str:
     own started and commits; under a window wider than yesterday a worker's
     closes are ``countsClosed``, not "closed yesterday". With nothing waiting, the Next
     line is the suggestion's ``line`` when one is attached (suggest.py; D-AR7), else
-    ``briefNextNone``.
+    ``briefNextNone``. Its last line is the PM Corner's ``brief`` when one is attached
+    (corner.py), after the Next line.
     With the tracker not ok the brief is the Tracker line and nothing else."""
     t = rituals_text()
     if not filled.tracker.ok:
@@ -1706,6 +1733,10 @@ def render_brief(filled: Standup) -> str:
         lines.append(filled.suggestion.line)
     else:
         lines.append(t["briefNextNone"])
+    # The PM Corner (corner.py): the brief's last line, after the Next line,
+    # wherever it is attached -- its own line, never in place of another.
+    if filled.corner is not None and filled.corner.brief:
+        lines.append(filled.corner.brief)
     return "\n".join(lines) + "\n"
 
 
@@ -1775,6 +1806,19 @@ def standup_for(space: str = "", as_of: datetime | None = None, since: str = "")
             issues if source == "both" else [],
             cards,
             how,
+            True,
+            str(cfg.get("commandPrefix") or ""),
+            viewer,
+        )
+        # The PM Corner (corner.py): the suggestion's second surface, the same
+        # switch, the same read and the same pick.
+        from .corner import attach_corner
+
+        attach_corner(
+            filled,
+            labels if source == "both" else [],
+            issues if source == "both" else [],
+            cards,
             True,
             str(cfg.get("commandPrefix") or ""),
             viewer,

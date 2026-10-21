@@ -174,6 +174,7 @@ EXPECTED = {
     ("rituals", "motions"): ["closed", "started", "inProgress"],
     ("rituals", "suggestShapes"): ["start", "delegate", "route", "place"],
     ("rituals", "suggestOwnerSeat"): "fable",
+    ("rituals", "cornerShapes"): ["oneLeft", "manyLeft", "reached", "nothingInReach"],
     ("rituals", "suggestExclusions"): ["notBillable", "waiting", "inFlight", "theirs", "dismissed"],
     ("rituals", "text"): {
         "title": "Standup -- {date}",
@@ -231,6 +232,16 @@ EXPECTED = {
         "suggestCommandRoute": "Route {arg} -Assign <me|size>",
         "suggestCommandPlace": "Route {arg} -Milestone <title>",
         "suggestCommandPlaceCard": "Plan {arg} -Milestone <title>",
+        "cornerOneLeft": "one more {noun} {ref} to get milestone {milestone} - start it now",
+        "cornerManyLeft": "{n} more {noun} to get milestone {milestone} - start {ref} now",
+        "cornerReached": "milestone {milestone} reached",
+        "cornerNothingInReach": "no milestone in reach - place a card with Route or on its Sprint line",
+        "cornerNounCards": "cards",
+        "cornerNounIssues": "issues",
+        "cornerNounItems": "items",
+        "cornerChevron": ">",
+        "cornerBrief": "Corner: {line}",
+        "cornerBriefCommand": "Corner: {line} {chevron} ({command})",
         "workYesterday": "{name}, {n} closed",
         "workToday": "{name}, {n}",
         "workBlockers": "{name}, {n} to walk",
@@ -448,6 +459,7 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.rituals_suggest_shapes(), tuple(EXPECTED[("rituals", "suggestShapes")]))
         self.assertEqual(C.rituals_suggest_exclusions(), tuple(EXPECTED[("rituals", "suggestExclusions")]))
         self.assertEqual(C.rituals_suggest_owner_seat(), EXPECTED[("rituals", "suggestOwnerSeat")])
+        self.assertEqual(C.rituals_corner_shapes(), tuple(EXPECTED[("rituals", "cornerShapes")]))
 
     def test_the_worker_rule_reads_the_contract(self):
         """The pane's worker chips and the standup read one prefix, not two."""

@@ -24,7 +24,7 @@
     "smoke:studio": "node tests/smoke.mjs --studio",
     "smoke:matrix": "node tests/smoke.mjs --matrix",
     "smoke:a11y": "node tests/smoke.mjs --a11y",
-    "license:check": "npx --yes license-checker@25.0.1 --production --onlyAllow \"MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;MIT AND ISC\" --excludePrivatePackages --summary",
+    "license:check": "npx --yes license-checker@25.0.1 --production --onlyAllow \"MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;MIT AND ISC\" --excludePrivatePackages --excludePackages \"tween-functions@1.2.0\" --summary",
     "test:watch": "jest --watch"
   },
   "dependencies": {
@@ -34,6 +34,7 @@
     "@reduxjs/toolkit": "^2.13.0",
     "luxon": "^3.7.2",
     "react": "^19.3.0",
+    "react-confetti": "^6.4.0",
     "react-dom": "^19.3.0",
     "react-markdown": "^10.1.0",
     "react-redux": "^9.3.0",

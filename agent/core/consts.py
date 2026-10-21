@@ -555,6 +555,12 @@ def rituals_suggest_owner_seat() -> str:
     return consts()["rituals"]["suggestOwnerSeat"]
 
 
+def rituals_corner_shapes() -> tuple[str, ...]:
+    """The PM Corner's shapes, by index: oneLeft, manyLeft, reached, nothingInReach --
+    which line it reads (docs/modules/solitaire-agile.md, "The PM Corner")."""
+    return tuple(consts()["rituals"]["cornerShapes"])
+
+
 # -- The dress (D-SA11) ---------------------------------------------------
 
 

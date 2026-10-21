@@ -151,6 +151,32 @@ export interface StandupResponse {
    *  off; absent from an agent that predates it. */
   suggestions?: Suggestion[];
   suggestion?: Suggestion | null;
+  /** The PM Corner (docs/modules/solitaire-agile.md, "The PM Corner: the line, the
+   *  chevron, the confetti"): one derived line for the head of the page. Null where
+   *  the suggestion is off or the tracker did not answer; absent from an older agent. */
+  corner?: Corner | null;
+}
+
+/** The PM Corner's line, derived by the agent and never re-derived here. */
+export interface Corner {
+  /** One of consts.json rituals.cornerShapes: oneLeft, manyLeft, reached, nothingInReach. */
+  shape: string;
+  /** The milestone's title, whole; "" with nothing in reach. */
+  milestone: string;
+  /** The open items that name it, once per id. */
+  remaining: number;
+  /** The pick the chevron starts: `#<n>` or the card's id; "" with no pick. */
+  ref: string;
+  number: number | null;
+  id: string | null;
+  kind: string;
+  noun: string;
+  /** The sentence, shown verbatim. */
+  line: string;
+  /** `StartWork <arg>`, unprefixed; "" with no pick. */
+  command: string;
+  /** The brief's last line -- the page sets it aside, because it draws the Corner. */
+  brief: string;
 }
 
 /** One derived next move. `line` is the chair's Next line, shown verbatim. */
@@ -338,11 +364,21 @@ export const { useGetTriageQuery, useRunRouteMutation } = triageEndpoints;
 // asks for it through the bridge (POST /api/cmd/StartWork) -- no route of this
 // module's assembles it (D-AR6). It writes nothing, so it invalidates nothing.
 
+/** StartWork's launch switch (D-AR12): a session in a worktree. The CLI's own
+ *  parameter name, sent through the bridge like any other argument. */
+export const STARTWORK_LAUNCH_SWITCH = "-Launch";
+
 export const startWorkEndpoints = api.injectEndpoints({
   endpoints: (builder) => ({
-    // POST /api/cmd/StartWork -- argv is [<id>]: a card id, or an issue number
-    runStartWork: builder.mutation<CommandResponse, { id: string }>({
-      query: ({ id }) => ({ url: "cmd/StartWork", method: "POST", body: { params: [id] } }),
+    // POST /api/cmd/StartWork -- argv is [<id>]: a card id, or an issue number;
+    // [<id>, "-Launch"] for the copy box's second button, which is drawn only where
+    // /env says the launch is on (startWorkLaunch).
+    runStartWork: builder.mutation<CommandResponse, { id: string; launch?: boolean }>({
+      query: ({ id, launch }) => ({
+        url: "cmd/StartWork",
+        method: "POST",
+        body: { params: launch ? [id, STARTWORK_LAUNCH_SWITCH] : [id] },
+      }),
     }),
   }),
 });

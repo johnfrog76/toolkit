@@ -97,6 +97,10 @@ export interface EnvStatus {
    *  nobody has said. `switch` is Team Agile's own flag as set -- null when
    *  unset. Absent from an older agent. */
   howIWork?: HowIWork;
+  /** Whether `StartWork <id> -Launch` can start a session on this machine -- the
+   *  derived `startWorkLaunch` surface (D-AR13). The hand-off box draws its second
+   *  button only when this is true; absent (an agent without the launch) reads off. */
+  startWorkLaunch?: boolean;
   anthropicConfigured: boolean;
   // The provider profile's model id, ai.model in config.
   aiModel?: string;

@@ -748,6 +748,77 @@ foreach ($row in @($cardTable.rows)) {
     Assert-True "a card's milestone and tags: $($row.name)" ($gotM -ceq [string]$row.milestone -and $gotT -ceq ((@($row.tags | ForEach-Object { [string]$_ })) -join '|')) "got '$gotM' [$gotT]"
 }
 
+# -- 1g. The PM Corner (AR-4) ----------------------------------------------------
+# Tests/fixtures/rituals/corner.json, both sections, the SAME rows
+# Tests/test_rituals.py asserts against agent/solitaire/corner.py: the line from
+# the raw read (each card given as its file's lines, read through the one card
+# reader -- its **Sprint:** line WHOLE), and the chair's reading end to end
+# against its generated golden.
+Write-Host ""
+Write-Host "-- The PM Corner --" -ForegroundColor Cyan
+. (Join-Path $pkgRoot 'Scripts/Corner-Rules.ps1')
+$cornerText = [System.IO.File]::ReadAllText((Join-Path $fixtureDir 'corner.json'))
+$cornerTable = $cornerText | ConvertFrom-Json
+# The table's two instants, as their text: 7's ConvertFrom-Json may hand back a [datetime].
+$cornerAsOf = ([regex]::Match($cornerText, '"asOf"\s*:\s*"([^"]+)"')).Groups[1].Value
+$cornerSince = ([regex]::Match($cornerText, '"since"\s*:\s*"([^"]+)"')).Groups[1].Value
+function ConvertTo-CornerCardRows {
+    # corner.json's cards, each given as its file's lines, as the card rows
+    # Get-P20StandupCards makes -- through the one card reader each field has.
+    param($Cards)
+    $rows = New-Object System.Collections.ArrayList
+    foreach ($card in @($Cards)) {
+        if ($null -eq $card) { continue }
+        $text = ((@($card.lines | ForEach-Object { [string]$_ })) -join "`n") + "`n"
+        [void]$rows.Add([ordered]@{
+                file = [string]$card.file; folder = [string]$card.folder; status = [string]$card.status
+                closed = $card.closed; id = [string]$card.id; title = [string]$card.title; created = $card.created
+                sprint = (Get-P20CardMilestone $text); tags = [object[]]@(Get-P20CardTags $text)
+                assigned = (Get-P20CardAssigned $text); billable = (Test-P20CardBillable $text)
+            })
+    }
+    return $rows.ToArray()
+}
+$cornerRows = @($cornerTable.rows)
+$cornerNames = @($cornerRows | ForEach-Object { [string]$_.name })
+$wantCorner = @('one-left', 'several-left', 'reached', 'nothing-in-reach', 'a-card-and-its-issue-counted-once',
+    'a-card-and-an-issue-are-items-and-a-long-title-is-read-whole')
+Assert-True 'the Corner table has every shape the card names' (@($wantCorner | Where-Object { $cornerNames -cnotcontains $_ }).Count -eq 0) ($cornerNames -join ',')
+$cornerShapesMet = @($cornerRows | ForEach-Object { [string]$_.expected.shape } | Sort-Object -Unique)
+Assert-True 'every Corner shape of the contract has a row that reaches it' ((($cornerShapesMet) -join ',') -ceq ((@($consts.rituals.cornerShapes | ForEach-Object { [string]$_ } | Sort-Object)) -join ',')) ($cornerShapesMet -join ',')
+foreach ($row in $cornerRows) {
+    $cards = @(ConvertTo-CornerCardRows $row.cards)
+    $items = @(Get-P20SuggestionItems -Labels @($cornerTable.workerLabels) -Issues @($row.issues) -Cards $cards -PackageRoot $pkgRoot)
+    $closed = @(Get-P20CornerClosed -Issues @($row.issues) -Cards $cards -Since $cornerSince -AsOf $cornerAsOf)
+    $got = Get-P20CornerLine -Items $items -Closed $closed -PackageRoot $pkgRoot
+    $exp = $row.expected
+    $ok = ($got.shape -ceq [string]$exp.shape -and $got.milestone -ceq [string]$exp.milestone -and [int]$got.remaining -eq [int]$exp.remaining -and
+        $got.ref -ceq [string]$exp.ref -and $got.kind -ceq [string]$exp.kind -and $got.noun -ceq [string]$exp.noun -and
+        $got.line -ceq [string]$exp.line -and $got.command -ceq [string]$exp.command)
+    Assert-True "corner: $($row.name)" $ok "got $($got.shape) '$($got.milestone)' $($got.remaining) $($got.ref)/$($got.kind) '$($got.noun)' '$($got.line)' '$($got.command)'"
+}
+$longRow = @($cornerRows | Where-Object { ([string]$_.name).EndsWith('long-title-is-read-whole') })[0]
+Assert-True 'corner: the long milestone is longer than twenty characters and its card counts toward it -- the Sprint line is read whole' (([string]$longRow.expected.milestone).Length -gt 20 -and [int]$longRow.expected.remaining -eq 2)
+$cb = $cornerTable.briefs
+foreach ($case in @($cb.cases)) {
+    $cards = @(ConvertTo-CornerCardRows $case.cards)
+    $s = Invoke-P20StandupJoinedFill -AsOf $cornerAsOf -Labels @($cornerTable.workerLabels) -Issues @($case.issues) -Tracker @{ ok = $true; reason = '' } `
+        -Cards $cards -Space ([string]$cb.space) -SpaceName ([string]$cb.spaceName) -PackageRoot $pkgRoot
+    $on = Test-P20SuggestionsOn -TeamAgile $true -Stored $case.suggestions
+    $null = Add-P20StandupSuggestion -Standup $s -Labels @($cornerTable.workerLabels) -Issues @($case.issues) -Cards $cards -HowIWork ([string]$case.howIWork) -On $on -Prefix ([string]$cb.prefix) -PackageRoot $pkgRoot
+    $null = Add-P20StandupCorner -Standup $s -Labels @($cornerTable.workerLabels) -Issues @($case.issues) -Cards $cards -On $on -Prefix ([string]$cb.prefix) -PackageRoot $pkgRoot
+    $gotShape = $null
+    if ($null -ne $s.corner) { $gotShape = $s.corner.shape }
+    Assert-True "corner brief $($case.name): the shape" ("$gotShape" -ceq "$($case.expected.shape)") "got $gotShape"
+    $brief = Format-P20StandupBrief -Standup $s -PackageRoot $pkgRoot
+    $golden = [System.IO.File]::ReadAllText((Join-Path $fixtureDir ([string]$case.expected.brief)))
+    Assert-True "corner brief $($case.name): $($case.expected.brief), byte for byte" ($brief -ceq $golden) ("`n--- got ---`n$brief--- want ---`n$golden")
+    $back = ($s | ConvertTo-Json -Depth 10) | ConvertFrom-Json
+    $back.asOf = $s.asOf
+    $back.since = $s.since
+    Assert-True "corner brief $($case.name): the JSON round trip renders the same brief" ((Format-P20StandupBrief -Standup $back -PackageRoot $pkgRoot) -ceq $brief)
+}
+
 # -- The scratch package and hub -------------------------------------------------
 $scratch = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-rituals-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
 $pkg = Join-Path $scratch 'pkg'
@@ -911,7 +982,12 @@ try {
 
     # -Brief: the chair's reading alone -- the rule's own bytes, and nothing of the long form.
     $br = Invoke-Standup 'tkStandup -Brief'
-    $expectBrief = (Format-P20StandupBrief -Standup $expectNow -PackageRoot $pkgRoot).TrimEnd([char]10)
+    # The verb attaches the suggestion and the PM Corner (its last line); so does the expectation.
+    $briefNow = Invoke-P20StandupJoinedFill -AsOf ([DateTimeOffset]::Now) -Labels $ghLabels -Issues $ghIssues -Tracker @{ ok = $true; reason = '' } -Cards @() -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
+    $null = Add-P20StandupSuggestion -Standup $briefNow -Labels $ghLabels -Issues $ghIssues -Cards @() -HowIWork 'agents' -On $true -Prefix 'tk' -PackageRoot $pkgRoot
+    $null = Add-P20StandupCorner -Standup $briefNow -Labels $ghLabels -Issues $ghIssues -Cards @() -On $true -Prefix 'tk' -PackageRoot $pkgRoot
+    $expectBrief = (Format-P20StandupBrief -Standup $briefNow -PackageRoot $pkgRoot).TrimEnd([char]10)
+    Assert-True '-Brief: the PM Corner is its last line' ($null -ne $briefNow.corner -and $br.Inner.EndsWith([string]$briefNow.corner.brief)) $br.Inner
     Assert-True '-Brief exits 0 and prints the brief the rule renders for now, and only that' ($br.Exit -eq '0' -and $br.Inner -ceq $expectBrief) ("`n--- got ---`n$($br.Inner)`n--- want ---`n$expectBrief")
     Assert-True '-Brief has no title, no chair and no slot labels' ($br.Inner -notmatch '^Standup -- ' -and $br.Inner -notmatch '(?m)^  (Walk|Yesterday|Blockers)\b') $br.Inner
     if ($parsed) {
@@ -946,6 +1022,8 @@ try {
     Assert-True '-Since widens yesterday: exit 0, the text the rule renders for that window, line for line' ($sw.Exit -eq '0' -and $sw.Inner -ceq $expectSinceText) ("`n--- got ---`n$($sw.Inner)`n--- want ---`n$expectSinceText")
     Assert-True '-Since: the issue closed a month ago is said, under yesterday' ($sw.Inner -match '(?m)^  Yesterday  #103 ' -and $r.Inner -notmatch '#103') $sw.Inner
     $sb = Invoke-Standup "tkStandup -Since $sinceDay -Brief"
+    $null = Add-P20StandupSuggestion -Standup $expectSince -Labels $ghLabels -Issues $ghIssues -Cards @() -HowIWork 'agents' -On $true -Prefix 'tk' -PackageRoot $pkgRoot
+    $null = Add-P20StandupCorner -Standup $expectSince -Labels $ghLabels -Issues $ghIssues -Cards @() -On $true -Prefix 'tk' -PackageRoot $pkgRoot
     $expectSinceBrief = (Format-P20StandupBrief -Standup $expectSince -PackageRoot $pkgRoot).TrimEnd([char]10)
     Assert-True '-Since -Brief: the counts line names the window''s first day' ($sb.Exit -eq '0' -and $sb.Inner -ceq $expectSinceBrief -and $sb.Inner -match '^Since \w+ ') ("`n--- got ---`n$($sb.Inner)`n--- want ---`n$expectSinceBrief")
     $tomorrow = [DateTimeOffset]::Now.AddDays(2).ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
