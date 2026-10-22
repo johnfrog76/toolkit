@@ -9,7 +9,7 @@
 #
 @{
     RootModule        = 'Prompt20Toolkit.psm1'
-    ModuleVersion     = '1.2.0'
+    ModuleVersion     = '1.3.0'
     GUID              = '4c1d7e2a-3b6f-4a9e-9d21-7f0c5e8b2a61'
     Author            = 'Toolkit'
     Description       = 'Auto-loading shim for the Toolkit Toolkit (utilities.psm1 at the package root).'
