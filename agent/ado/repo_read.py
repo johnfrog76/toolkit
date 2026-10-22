@@ -185,6 +185,7 @@ def file_text(repo: str, path: str, sha: str = "") -> tuple[str | None, dict | N
     if is_sha(sha):
         cached = disk_cache.get_text(BODIES_DIR, sha)
         if cached is not None:
+            disk_cache.touch(BODIES_DIR, sha)  # seen now: what the prune ranks by
             return cached, None, None
     row, why = _gh([f"repos/{repo}/contents/{path}"])
     if why:
@@ -196,8 +197,8 @@ def file_text(repo: str, path: str, sha: str = "") -> tuple[str | None, dict | N
         text = base64.b64decode(raw).decode("utf-8") if row.get("encoding", "base64") == "base64" else str(raw)
     except (ValueError, UnicodeDecodeError):
         return None, None, f"{path} is not UTF-8 text"
-    if is_sha(row.get("sha", "")):
-        disk_cache.put_text(text, BODIES_DIR, row["sha"])
+    if is_sha(row.get("sha", "")) and disk_cache.put_text(text, BODIES_DIR, row["sha"]):
+        disk_cache.prune_folder(BODIES_DIR)
     return text, row, None
 
 

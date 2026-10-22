@@ -123,6 +123,40 @@ class TheRowsCache(unittest.TestCase):
         self.assertEqual(sorted(rows), [sha(1), sha(2)])
 
 
+class TheBodiesFolder(unittest.TestCase):
+    def _body(self, n: int, age_days: float) -> None:
+        self.assertTrue(disk_cache.put_text(f"body {n}", repo_read.BODIES_DIR, sha(n)))
+        path = disk_cache.cache_path(repo_read.BODIES_DIR, sha(n))
+        stamp = time.time() - age_days * DAY
+        os.utime(path, (stamp, stamp))
+
+    def _names(self) -> list[str]:
+        return sorted(p.name for p in disk_cache.cache_path(repo_read.BODIES_DIR).iterdir())
+
+    def test_bodies_past_the_age_go_and_a_touched_one_survives(self):
+        self._body(1, 40)
+        self._body(2, 40)
+        self._body(3, 1)
+        with mock.patch.object(repo_read, "_gh", return_value=(None, "no network")):
+            repo_read.file_text("o/r", "a.md", sha(1))  # a disk hit: touches
+        disk_cache.prune_folder(repo_read.BODIES_DIR)
+        self.assertEqual(self._names(), [sha(1), sha(3)])
+
+    def test_bodies_past_the_count_go_oldest_unseen_first(self):
+        for n in range(6):
+            self._body(n, n)  # sha(0) newest
+        disk_cache.prune_folder(repo_read.BODIES_DIR, max_records=4)
+        self.assertEqual(self._names(), [sha(n) for n in range(4)])
+
+    def test_saving_a_body_prunes_the_folder(self):
+        self._body(1, 90)
+        row = {"type": "file", "content": "aGk=", "encoding": "base64", "sha": sha(9)}
+        with mock.patch.object(repo_read, "_gh", return_value=(row, None)):
+            text, _row, why = repo_read.file_text("o/r", "a.md")
+        self.assertEqual((text, why), ("hi", None))
+        self.assertEqual(self._names(), [sha(9)])
+
+
 class TheDressFolder(unittest.TestCase):
     FOLDER = "standup-dress-1"
 

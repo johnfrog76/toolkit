@@ -64,7 +64,7 @@ agent/
 │   ├── identity.py           who "me" is: config email, else branchUser-as-address, else az. Cached 45s
 │   ├── log.py                POST /log, GET /log-entries, GET /test-history
 │   ├── log_writer.py         the tab-separated writer, beside the CLI's own log (P20_USAGE_LOG_DIR moves both)
-│   ├── disk_cache.py         the agent's on-disk cache: the user cache folder, or P20_AGENT_CACHE_DIR; never the hub or the package; the rows cache and the dress cache are capped (30 days unseen, 3000 records, `config.AGENT_CACHE_*`), pruned on write
+│   ├── disk_cache.py         the agent's on-disk cache: the user cache folder, or P20_AGENT_CACHE_DIR; never the hub or the package; `rows/`, `bodies/` and `standup-dress-1/` are capped (30 days unseen, 3000 records, `config.AGENT_CACHE_*`) and `ledger-1/` keeps only declared Spaces, all pruned on write
 │   ├── parsers.py            the canonical prompt-file parsers -- pure, content-only
 │   ├── assets.py             a card's pictures: card_image(), GET /assets/{space}/{key}/{file}, POST /assets/upload
 │   └── tier.py               the tier decision, parity-pinned against PowerShell
