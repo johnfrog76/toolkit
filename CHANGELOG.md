@@ -11,6 +11,7 @@ release.
 ### Changed
 
 - Opening the Design tab on a repository with a large design archive takes seconds, not minutes: the notes are listed in one request instead of one per file, and what was read is kept between restarts so an unchanged note is never fetched again. The design search box also finds a design by its file name.
+- The Docs tab opens in a second: a repository's README and `docs/` folders are listed in one request, however deeply they nest, instead of one per folder.
 
 ## [1.2.0] - 2026-10-22
 
