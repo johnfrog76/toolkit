@@ -339,6 +339,25 @@ def _keep(slug: str, repos: list[str], status: str, ledger: SpaceLedger, records
     )
 
 
+def _forget_removed(cfg: dict) -> None:
+    """Drop the ledger file of any Space no longer declared, read the way
+    ``_read_ledger`` reads the Spaces. Rides a write; never fails it."""
+    try:
+        declared = {
+            f"{space.get('slug')}.json"
+            for space in cfg.get("spaces", []) or []
+            if space.get("slug") and tracker(str(space.get("org") or "")) == "github"
+        }
+        folder = disk_cache.cache_path(LEDGER_DIR)
+        if folder is None:
+            return
+        for entry in list(folder.iterdir()):
+            if entry.is_file() and not entry.name.startswith(".") and entry.name not in declared:
+                entry.unlink(missing_ok=True)
+    except Exception:  # noqa: BLE001, S110 -- a prune never fails a write
+        pass
+
+
 # -- The read ---------------------------------------------------------------------
 
 
@@ -412,6 +431,7 @@ def _read_ledger(cfg: dict, refresh: bool) -> StudioLedger:
             )
             _keep(slug, repos, status, ledger, records)
             out[slug] = ledger
+        _forget_removed(cfg)
     log_writer.write_log(
         "CMD",
         "agent/studio/ledger",
