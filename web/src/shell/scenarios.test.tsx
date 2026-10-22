@@ -536,7 +536,8 @@ describe("the scenario grid: what each configuration shows", () => {
   // the first candidate's line -- over the suggestion table's three generated goldens.
   it("the chair's suggestion: a row where the switch is on and nothing waits; today's line otherwise", () => {
     const dir = path.resolve(__dirname, "../../../Tests/fixtures/suggestion");
-    const brief = (name: string) => fs.readFileSync(path.join(dir, `suggestion-${name}.brief.txt`), "utf8");
+    const brief = (name: string) =>
+      fs.readFileSync(path.join(dir, `suggestion-${name}.brief.txt`), "utf8");
     const last = (text: string) => text.split("\n").filter(Boolean).pop() ?? "";
     const first = {
       ref: "#141",
@@ -572,7 +573,8 @@ describe("the scenario grid: what each configuration shows", () => {
   // set. Over corner.json's generated goldens and celebrate.ts's rule.
   it("the PM Corner: reached is the line and one burst; a reload is the line and no burst; no Corner off GitHub", () => {
     const dir = path.resolve(__dirname, "../../../Tests/fixtures/rituals");
-    const brief = (name: string) => fs.readFileSync(path.join(dir, `corner-${name}.brief.txt`), "utf8");
+    const brief = (name: string) =>
+      fs.readFileSync(path.join(dir, `corner-${name}.brief.txt`), "utf8");
     const last = (text: string) => text.split("\n").filter(Boolean).pop() ?? "";
     const reachedCorner = {
       shape: "reached",
@@ -597,10 +599,14 @@ describe("the scenario grid: what each configuration shows", () => {
     expect(shouldCelebrate({ active: true, wasActive: null, seen: false })).toBe(true);
     expect(shouldCelebrate({ active: true, wasActive: null, seen: true })).toBe(false);
     // Several left: the line and its chevron, no burst.
-    expect(last(brief("many-left"))).toBe("Corner: 3 more issues to get milestone B - start #5 now > (tkStartWork 5)");
+    expect(last(brief("many-left"))).toBe(
+      "Corner: 3 more issues to get milestone B - start #5 now > (tkStartWork 5)",
+    );
     // The switch off -- or an Azure DevOps Space, where the agent attaches nothing --
     // no Corner, and the brief is today's.
-    expect(cornerOf({ brief: brief("switched-off"), corner: null } as unknown as StandupResponse)).toBeNull();
+    expect(
+      cornerOf({ brief: brief("switched-off"), corner: null } as unknown as StandupResponse),
+    ).toBeNull();
     expect(brief("switched-off").includes("Corner:")).toBe(false);
   });
 
@@ -972,7 +978,9 @@ describe("the scenario grid: the board's lanes, by a card's status", () => {
 // the board says, never a gate. The render is Board.inPlay.test.tsx's.
 describe("the scenario grid: the Active column's WIP line, by the limit", () => {
   const inPlay = (n: number) =>
-    Array.from({ length: n }, (_v, i) => ({ status: ["Active", "In Progress", "Code Review"][i % 3] }));
+    Array.from({ length: n }, (_v, i) => ({
+      status: ["Active", "In Progress", "Code Review"][i % 3],
+    }));
   it.each<[string, number, number | null | undefined, string | null, boolean]>([
     ["no limit set", 7, undefined, null, false],
     ["under the limit", 4, 5, "in play 4", false],
