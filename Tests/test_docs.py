@@ -12,6 +12,7 @@ Run:  python3 -m pytest Tests/test_docs.py
 import base64
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import unittest
@@ -82,6 +83,7 @@ class FakeRepo:
         self.size = size  # the size the contents route reports for `big`
         self.has_issues = has_issues  # None: the repository read fails
         self.calls: list[list[str]] = []
+        self.queries: list[str] = []  # each GraphQL query's text
 
     def _blob_sha(self, path: str) -> str:
         return hashlib.sha1(path.encode()).hexdigest()
@@ -93,6 +95,8 @@ class FakeRepo:
         if self.fail:
             return subprocess.CompletedProcess(argv, 1, stdout="", stderr=self.fail)
         assert argv[:2] == ["gh", "api"], argv
+        if argv[2] == "graphql":
+            return self.graphql(argv)
         if argv[2] == f"repos/{REPO}":
             if self.has_issues is None:
                 return subprocess.CompletedProcess(argv, 1, stdout="", stderr="gh: Server Error (HTTP 502)")
@@ -130,6 +134,55 @@ class FakeRepo:
             listing = [{k: v for k, v in r.items() if k not in ("content", "encoding")} for r in children.values()]
             return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(listing), stderr="")
         return subprocess.CompletedProcess(argv, 1, stdout="", stderr="gh: Not Found (HTTP 404)")
+
+
+def _graphql(self, argv):
+    """The shape query the listing asks: ``f<i>: object(expression: $f<i>)`` per
+    folder, ``entries`` nested as deep as the query nests them. The query must
+    arrive as ``-F query=@<file>`` and ask for NO text -- the listing never
+    needs one, and naming a blob's text makes GitHub load every blob."""
+    assert argv[3] == "-F" and argv[4].startswith("query=@"), argv
+    query = Path(argv[4][len("query=@") :]).read_text(encoding="utf-8")
+    self.queries.append(query)
+    assert "Blob" not in query and "text" not in query, query
+    fields = {
+        argv[i + 1].split("=", 1)[0]: argv[i + 1].split("=", 1)[1]
+        for i in range(3, len(argv) - 1)
+        if argv[i] in ("-f", "-F")
+    }
+    assert f"{fields['owner']}/{fields['name']}" == REPO, fields
+
+    def level(folder: str, depth: int) -> list[dict]:
+        prefix = f"{folder}/" if folder else ""
+        names = {f[len(prefix) :].split("/")[0] for f in self.files if f.startswith(prefix)}
+        rows = []
+        for name in sorted(names):
+            full = prefix + name
+            if full in self.files:
+                rows.append({"name": name, "type": "blob", "oid": self._blob_sha(full)})
+            else:
+                row = {"name": name, "type": "tree", "oid": "0" * 40}
+                if depth > 1:
+                    row["object"] = {"entries": level(full, depth - 1)}
+                rows.append(row)
+        return rows
+
+    repo: dict = {"url": ORG, "defaultBranchRef": {"name": "main"}}
+    if self.has_issues is not None:
+        repo["hasIssuesEnabled"] = self.has_issues
+    for line in query.splitlines():
+        m = re.match(r"\s+(f\d+): object\(expression: \$f\d+\)", line)
+        if not m:
+            continue
+        folder = fields[m.group(1)].removeprefix("HEAD:")
+        if folder and not any(f.startswith(folder + "/") for f in self.files):
+            repo[m.group(1)] = None
+            continue
+        repo[m.group(1)] = {"entries": level(folder, line.count("entries {"))}
+    return subprocess.CompletedProcess(argv, 0, stdout=json.dumps({"data": {"repository": repo}}), stderr="")
+
+
+FakeRepo.graphql = _graphql
 
 
 class ThePathRule(unittest.TestCase):
@@ -178,6 +231,75 @@ class TheListing(unittest.TestCase):
         docs.clear_cache()
         self._list(fake)
         self.assertEqual(len(fake.calls), 2 * n)
+
+    def test_the_list_is_one_call_however_the_docs_nest(self):
+        """A flat docs/, a handful of folders and a tree four levels deep with
+        many folders all cost the same one gh call -- not one per folder."""
+        deep = {
+            "README.md": b"# R\n",
+            "docs/a.md": b"# a\n",
+            "docs/hub/b.md": b"# b\n",
+            "docs/hub/cards/c.md": b"# c\n",
+            "docs/hub/cards/old/d.md": b"# d\n",  # the fourth level: listed
+            "docs/hub/cards/old/older/e.md": b"# e\n",  # the fifth: not
+            **{f"docs/m{i}/n{i}/f{i}.md": b"# x\n" for i in range(12)},
+        }
+        counts = []
+        for files in ({"README.md": b"# R\n", "docs/a.md": b"# a\n"}, FILES, deep):
+            docs.clear_cache()
+            fake = FakeRepo(files)
+            resp = self._list(fake)
+            self.assertIsNone(resp.reason)
+            self.assertEqual([c[2] for c in fake.calls], ["graphql"], list(files)[:3])
+            counts.append(len(fake.calls))
+        self.assertEqual(counts, [1, 1, 1])
+        paths = [d.path for d in resp.items]
+        self.assertIn("docs/hub/cards/old/d.md", paths)
+        self.assertNotIn("docs/hub/cards/old/older/e.md", paths)
+        self.assertEqual(len(paths), 4 + 12)
+        self.assertEqual(resp.items[2].folder, "docs/hub/cards")
+
+    def test_a_row_is_what_the_contents_walk_made_it(self):
+        resp = self._list(FakeRepo())
+        self.assertEqual(
+            resp.readme.model_dump(),
+            {"path": "README.md", "name": "README.md", "folder": "", "url": f"{ORG}/blob/main/README.md"},
+        )
+        self.assertEqual(
+            resp.items[1].model_dump(),
+            {
+                "path": "docs/modules/ado.md",
+                "name": "ado.md",
+                "folder": "docs/modules",
+                "url": f"{ORG}/blob/main/docs/modules/ado.md",
+            },
+        )
+
+    def test_nothing_is_asked_again_for_a_listing_read_before(self):
+        """After the in-memory state is cleared (a restart, in effect) the next
+        list is the same one shape call: no text, no blob, no contents call."""
+        fake = FakeRepo()
+        first = self._list(fake)
+        docs.clear_cache()
+        second = self._list(fake)
+        self.assertEqual(second.model_dump(), first.model_dump())
+        self.assertEqual([c[2] for c in fake.calls], ["graphql", "graphql"])
+        self.assertTrue(all("&" not in " ".join(c) for c in fake.calls))
+        self.assertTrue(all(c[3] == "-F" and c[4].startswith("query=@") for c in fake.calls))
+        self.assertFalse(any("/blobs/" in " ".join(c) or "/contents/" in " ".join(c) for c in fake.calls))
+
+    def test_the_list_carries_the_issues_switch_so_a_document_read_needs_no_call_for_it(self):
+        fake = FakeRepo()
+        with mock.patch.object(design.subprocess, "run", side_effect=fake):
+            docs.list_docs(REPO)
+            self.assertEqual(docs.issues_url(REPO), f"{ORG}/issues")
+        self.assertEqual([c[2] for c in fake.calls], ["graphql"])
+        off = FakeRepo(has_issues=False)
+        docs.clear_cache()
+        with mock.patch.object(design.subprocess, "run", side_effect=off):
+            docs.list_docs(REPO)
+            self.assertEqual(docs.issues_url(REPO), "")
+        self.assertEqual([c[2] for c in off.calls], ["graphql"])
 
     def test_gh_not_answering_is_a_reason(self):
         resp = self._list(FakeRepo(fail="gh: To get started with GitHub CLI, please run:  gh auth login"))
