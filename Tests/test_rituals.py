@@ -1991,9 +1991,12 @@ class TheOneTrackerRead(unittest.TestCase):
         self.assertEqual(self._reads(), (2, 2, 2), "a Route may have moved a label: the next triage reads again")
 
     def test_the_kept_limits_are_the_readers(self):
-        """ISSUE_LIMIT_OPEN and ISSUE_LIMIT_ALL mirror accounting._gh_issues' --limit:
-        the completeness rule is only as right as they are."""
-        for state, limit in (("open", solitaire_tracker.ISSUE_LIMIT_OPEN), ("all", solitaire_tracker.ISSUE_LIMIT_ALL)):
+        """The completeness rule reads the limits ``_gh_issues`` builds its --limit
+        from: one pair of constants in core/config.py, imported by both, so the
+        argv the reader builds IS the number the rule tests against."""
+        self.assertIs(solitaire_tracker.ISSUE_LIMIT_OPEN, config.ISSUE_LIMIT_OPEN)
+        self.assertIs(solitaire_tracker.ISSUE_LIMIT_ALL, config.ISSUE_LIMIT_ALL)
+        for state, limit in (("open", config.ISSUE_LIMIT_OPEN), ("all", config.ISSUE_LIMIT_ALL)):
             self.calls.clear()
             accounting._gh_issues("johnfrog76/toolkit", True, state, body=True)
             argv = self.calls[0]

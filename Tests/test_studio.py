@@ -105,13 +105,9 @@ class TheRoutes(unittest.TestCase):
             res = self.client.get(path)
         return res, gh_calls, tier_calls
 
-    def test_the_issue_report_reads_the_named_spaces_repo(self):
-        res, calls, tiers = self._get("/api/issue-report?space=toolkit")
-        self.assertEqual(res.status_code, 200)
-        self.assertTrue(res.json()["supported"])
-        self.assertEqual(tiers, [(TOOLKIT, "active")])
-        self.assertEqual(len(calls), 1)
-        self.assertIn("johnfrog76/toolkit", calls[0])
+    # /issue-report reads the Studio ledger's entry for the Space and makes no gh
+    # call of its own; its warm/cold call counts and parity are Tests/test_ledger.py's
+    # (TheIssueReportRoute).
 
     def test_deploys_read_the_named_spaces_repos(self):
         res, calls, tiers = self._get("/api/deploys?space=toolkit")
@@ -121,10 +117,10 @@ class TheRoutes(unittest.TestCase):
         self.assertEqual(calls[0][:3], ["gh", "run", "list"])
         self.assertIn("johnfrog76/toolkit", calls[0])
 
-    def test_an_owner_grained_space_spans_its_projects(self):
-        _res, calls, tiers = self._get("/api/issue-report?space=wasteland")
-        self.assertEqual(tiers, [(WASTELAND, "local")])
-        self.assertIn("johnfrog76/wasteland", calls[0])
+    def test_a_local_space_is_unsupported_and_gh_is_never_asked(self):
+        res, calls, tiers = self._get("/api/issue-report?space=wasteland")
+        self.assertEqual(res.json()["supported"], False)
+        self.assertEqual((calls, tiers), ([], []))
 
     def test_an_ado_space_is_unsupported_and_gh_is_never_asked(self):
         for path in ("/api/issue-report?space=acme", "/api/deploys?space=acme"):

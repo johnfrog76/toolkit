@@ -273,7 +273,7 @@ kept in the agent's memory for 60 seconds (`READ_TTL_SECONDS` in `agent/solitair
 list's `LIST_TTL_SECONDS`), and the standup and triage share them. A second GET inside the minute -- the
 standup re-mounted after attending, the Triage page opened after the standup -- starts no subprocess.
 Triage's open issues are served from the standup's all-states read while that read is fresh and complete
-(fewer rows than its limit, so every issue is in it): the open ones, in `gh`'s order, to the open read's
+(fewer rows than its limit, so every issue is in it; the limits are `ISSUE_LIMIT_OPEN` and `ISSUE_LIMIT_ALL` in `agent/core/config.py`, which `_gh_issues` builds its `--limit` from and `tracker.py` imports): the open ones, in `gh`'s order, to the open read's
 limit, without the bodies triage does not ask for -- the rows `gh issue list --state open` would answer.
 A failed read is never kept.
 
