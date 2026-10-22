@@ -141,6 +141,15 @@
       "tip": "Teams delivery needs a webhook URL in .env (copy .env.example), then a restart of the agent."
     },
     {
+      "id": "launch",
+      "question": "Can it start the work in a session for me?",
+      "sentence": "With Claude Code installed (claude on the PATH), StartWork <id> -Launch, run from a clone of the Space's repository, adds a worktree and starts a session on the hand-off block there, with the model the item's size names -- sonnet or opus; never fable, the owner's own seat. It prints the PID and the log and returns. Without it, StartWork still prints the block to paste.",
+      "surfaces": [
+        "startWorkLaunch"
+      ],
+      "door": "sentence"
+    },
+    {
       "id": "review",
       "question": "Can it review my pull request?",
       "sentence": "With ANTHROPIC_API_KEY in your environment, AddPRReview reads the diff and writes a review into the card. The key never goes in a file this tool writes.",

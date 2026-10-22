@@ -154,7 +154,7 @@ every module is off), so it answers once any `tk*` command has loaded the module
 | `Standup [-Space <slug>] [-AsJson] [-Brief] [-Grain <detail\|work\|brief>] [-Since <yyyy-MM-dd>] [-Remind <HH:mm>] [-Days <Mon,Tue,...>] [-Walk]` | prints today's standup for the Space you are in, or the declared Space `-Space` names, read without switching into it. `-AsJson` prints the response the agent serves, `text`, `work` and `brief` included -- the bridge's shape and the parity test's. `-Brief` prints only the chair's reading (below) and, being a read, does not re-arm the reminder. `-Grain` picks the register of detail ([the work grain](#the-work-grain)): `detail`, the default, is the text as it always printed; `work` is the ritual's grain, spoken as standup prose ([the prose](#the-prose)); `brief` is `-Brief`. A word that is not a grain, or `-Brief` with another grain, is a stated refusal (exit 2). `-Since <yyyy-MM-dd>` widens yesterday back to that day ([what moved](#what-moved-and-the-window)) -- not `-Days`, which is the reminder's cadence; a day that is not one, or is after today, or `-Since` with `-Remind`, is a stated refusal. With nothing waiting on you, the brief's last line is [the suggestion](#the-suggestion-one-next-move-derived), and `-AsJson` carries every candidate as `suggestions` and the first as `suggestion` | none |
 | `Triage [-Space <slug>] [-AsJson]` | prints the Space's open issues grouped by milestone -- no milestone first, then most open first -- each milestone under its context line, each issue one line: number, title, who has it ([who](#who-takes-it)) -- `me`, `@<login>`, its worker (its size), or `nobody` -- severity or `--`, `deep-water` marked. `-AsJson` is the route's shape | none |
 | `Route <n\|id> [-Size <label>] [-Assign <me\|size>] [-Milestone <title>] [-Severity <sev>] [-DeepWater] [-Space <slug>] [-WhatIf]` | answers triage's questions for issue `<n>`: **one `gh issue edit` per switch given**, in that order. `-Assign` says who takes it ([who](#who-takes-it)); on a card with no issue behind it, `-Assign` is the one switch and writes the card's `**Assigned:**` line. `-WhatIf` prints every write and makes none | none for an issue -- it writes the tracker; a card's `**Assigned:**` line |
-| `StartWork <id> [-Clip] [-Prompt <path>] [-Space <slug>]` | prints the hand-off block for a card in `current/`, or for the Space's GitHub issue `<id>` when no card carries it ([below](#startwork-the-hand-off-block)). `-Clip` puts it on the clipboard and says so in one line; `-Prompt` carries another prompt for this call | none -- it reads |
+| `StartWork <id> [-Clip] [-Prompt <path>] [-Space <slug>] [-Launch] [-WhatIf]` | prints the hand-off block for a card in `current/`, or for the Space's GitHub issue `<id>` when no card carries it ([below](#startwork-the-hand-off-block)). `-Clip` puts it on the clipboard and says so in one line; `-Prompt` carries another prompt for this call. `-Launch` hands the same block to a session in a new worktree of the Space's repository, the model from the item's size, and returns with its PID and log ([-Launch](#the-launch-the-block-handed-to-a-session)); `-WhatIf` prints what a launch would run | none -- it reads. With `-Launch`, in the repository you stand in: a worktree under `.claude/worktrees/` and three `*.log` files at its root |
 
 **The walk list** (`Standup -Walk`). The PC's morning as one printout: the standup's title line, then
 one block per open `verify-close` issue by number, each the line the standup prints (`  Walk       #<n> <title>`) <!-- markdownlint-disable-line MD038 -- the span shows the printed line with its indent, which is the point -->
@@ -260,7 +260,8 @@ The one stated refusal (`Error:`, `Hint:`, exit 2) is a `-Space` nobody declared
 | `GET /api/ritual/standup?space=<slug>&since=<yyyy-MM-dd>` | `features.solitaireAgile` per request, with the active Space's answer applied (**404** unless the switch is on and the Space you are in works with agents; the detail names which is off); `space` scoped like `/api/issue-report` (an undeclared slug 404); `since` widens yesterday's window as `Standup -Since` does, and a `since` that is not a day, or is after today, is a **422** naming it | the same two `gh` reads (the issues with `milestone` and `body`), through the same data files -- or, for a local Space, its cards | nothing |
 | `GET /api/ritual/triage?space=<slug>` | the same | `gh label list`, `gh issue list --state open` with `milestone` and `assignees`, and `gh api user` (who "me" is, best effort) | nothing |
 | `POST /api/cmd/Route` | the bridge: `Route` is in the CLI's command table only while the flag resolves on -- the switch on and the Space answered `agents` | -- | what `Route` writes, and nothing else |
-| `POST /api/cmd/StartWork` | the bridge, the same way: off, the call is `rejected`; a stated refusal is `status: error` with the verb's sentence | the card (or `gh issue view`), the Space's note or answer, the prompt | nothing |
+| `POST /api/cmd/StartWork` | the bridge, the same way: off, the call is `rejected`; a stated refusal is `status: error` with the verb's sentence | the card (or `gh issue view`), the Space's note or answer, the prompt | nothing -- with `-Launch`, what the launch writes, in the repository the agent runs in |
+| `GET /api/env`, `startWorkLaunch` | none -- a top-level boolean of the shell's one round trip | whether `claude` is on the agent's PATH (D-AR13) | nothing |
 
 No route of this module's builds the hand-off block (D-AR6): the CLI is its one implementation, and the
 bridge is how the page asks for it.
@@ -548,6 +549,67 @@ every reader, so the golden and the prompt cannot drift. `tkTestToolkit -StartWo
 in CRLF -- and `Tests/test_bridge.py` runs it through `POST /api/cmd/StartWork` and compares the same
 file. Whether a cold agent really starts without a question is a person's judgement, so it is a gate row
 in `VERIFY.md`, "The cold-agent walk".
+
+### The launch: the block, handed to a session
+
+`StartWork <id> -Launch` is the secondary action (D-AR12): the same block, handed to a session that
+starts the work where it gets done -- a worktree of the Space's own repository, which is the shape a
+crew builder is given. Run it from a clone of that repository:
+
+```text
+> tkStartWork 4 -Launch
+Launched Issue #4 on sonnet: PID 48213.
+  worktree: /src/widgets/.claude/worktrees/startwork-4-20261021-142807
+  log:      /src/widgets/startwork-4-20261021-142807.log
+```
+
+It checks, in this order, and each check that fails is a stated refusal (`Error:`, `Hint:`, exit 2) that
+starts nothing:
+
+1. **The repository you stand in is the Space's**: `git rev-parse --show-toplevel` answers, and its
+   `origin` (https or ssh) names the same `owner/repo` as the Space's GitHub address. A Space with no
+   GitHub address has nowhere to launch.
+2. **`claude` is on the PATH** -- the optional surface `startWorkLaunch` below. The hint says the block
+   works without it.
+3. **The item has a crew size**, read the way the rituals read who has it ([who](#who-takes-it)): an
+   issue's labels; a card's `**Assigned:**` line, else a size in its `Tags:`, else -- for a card whose id
+   is an issue number, which `Route` sizes on the tracker -- that issue's labels. The size label IS the
+   model on the command line: `sonnet` or `opus`. **Never a Fable builder**: `fable` is the owner's own
+   seat (D-AR10, `rituals.suggestOwnerSeat`) and is refused, as are an item assigned to you (`me`), an item
+   with no size, and a size with no model; the hint is to route it (`Route <id> -Assign sonnet`) or work
+   it yourself from the block.
+4. **`git worktree add --detach .claude/worktrees/startwork-<ref>-<stamp>`** succeeds (a repository with no
+   commit has nothing to check out).
+
+Then it writes the block to `startwork-<ref>-<stamp>.block.log` at the repository root and starts
+`claude --print --model <size> --output-format stream-json --verbose` in the worktree **with that file as
+its stdin** -- `claude --print` reads its prompt there, and a prompt of many lines does not cross a joined
+command line whole on any host. Its output goes to `startwork-<ref>-<stamp>.log` and its stderr to
+`.err.log` beside it: three files, all under the `*.log` ignore pattern. It prints the PID, the worktree
+and the log, and **returns without waiting**. `-WhatIf` runs every check and prints the worktree add, the
+block file, the exact `claude` command and the log, and adds and starts nothing. `-Clip` with `-Launch`,
+and `-WhatIf` without it, are refused. The session's environment is the shell's, minus any
+`TEAMS_WEBHOOK_*`: a session never sends.
+
+**The launcher is `Scripts/Start-Detached.ps1`'s `Start-DetachedProcess`, and nothing else**, because a
+session is a long-lived child: started any other way on Windows it inherits the caller's pipes, and
+`pwsh -c 'tkStartWork <id> -Launch' | cat` would wait for the session to end ([the command reference,
+"Both launchers return, including through a pipe"](../CLI.md#the-other-two-halves)). Through it, the
+call returns as soon as the session has started -- on every host.
+
+**`startWorkLaunch`, the optional surface** (D-AR13). DERIVED, like the Teams webhook's row: `on` where
+`claude` is on the PATH, `not configured` otherwise, named by `tkEnv` and `tkMenu -All` as **StartWork
+launch** with its question, "Can it start the work in a session for me?". `GET /api/env` carries the
+same answer as a top-level boolean, `startWorkLaunch`, so the page offers a launch only where it would
+work; the copy box works either way.
+
+**Proving it.** `tkTestToolkit -StartWork` builds scratch clones (the Space's, with a commit; another
+repository's; the Space's with no commit) and puts a stub `claude` first on the PATH: `-WhatIf` and its
+output; the model from each place a size is read; every refusal above, `fable` on a card and on an issue
+and no size among them, each leaving no worktree and no log. Off Windows it launches for real: read
+through a pipe, the verb returns while the stub session lives on, and the log's first message is the
+block `StartWork` prints, whole. What only Windows or a real `claude` can show is in `VERIFY.md`, Gate 12
+("StartWork -Launch").
 
 ## The suggestion: one next move, derived
 
@@ -1165,7 +1227,7 @@ standup is complete and correct; nothing on screen says a dress was skipped.
 | `tkTestToolkit -Triage` | every case of `Tests/fixtures/rituals/triage.json` -- the groups in order, each group's counts, context and numbers, each issue's worker, size, who, severity and deep-water, the sizes -- and the text against `triage-<name>.txt` byte for byte, again after a JSON round trip; the who rule; `Tests/fixtures/parsers/assigned-lines.json` through `Get-P20CardAssigned`; off is no `Triage`, no `Route`, no `-Assign`, no bridge entry; `Triage` typed with `gh` stubbed (who: `me`, `@<login>`, `nobody`); **`Route` typed with `gh` stubbed as a function that writes down every call**: the exact `gh issue edit` argv for each switch, alone and all four in order, `-Assign me` (`--add-assignee @me`, and under `-WhatIf` printed and not made), `-Assign <size>` the `-Size` write byte for byte, `-WhatIf` writing nothing, the two moves printed, every refusal exit 2 with one `Error:` block and no write, the hub untouched; `-Assign` on a card -- the `**Assigned:**` line above `**Created:**`, LF and CRLF kept, no BOM, an unchanged card not written, the sizes from the repo, a local Space's card taking `-Assign me` alone, and its refusals (a size with no repository to read labels from among them) |
 | `tkTestToolkit -Rituals`, `Tests/test_rituals.py` -- the suggestion | who "me" is (the viewer's assignee `me` and a candidate, another's `@<login>` excluded `theirs`, no viewer every assignee theirs; the route asking `gh api user` once with the suggestion on, never with it off); `Tests/fixtures/suggestion/table.json` from both halves: every `nearest` row (the order and the nearest), every `rows` row (the candidates in order, the pick, its shape, sentence and command, each excluded ref with the first exclusion it met), every shape and every exclusion of the contract reached by a row, every `switch` row, and the three `briefs` cases end to end -- the joined fill, the suggestion attached, the candidates, the pick and `suggestion-<case>.brief.txt` byte for byte (with something waiting the Next line is the queue's; switched off it is today's), again after a JSON round trip; the card reader's milestone (whole), Created day, Tags and Assigned, and `Tests/fixtures/parsers/card-milestone.json` through both halves' readers; typed, `Standup -AsJson` carrying the rule's candidates with each line naming the prefixed command, the brief's Next line staying the queue's while walks wait, and `spaces.<slug>.features.suggestions=false` in the hub leaving no candidate; the agent's route carrying `suggestions` (the fields, the order, the line) and none with the Space's switch off |
 | `Tests/test_triage.py` | the agent's grouping, who and text over the same table and goldens, the goldens the regeneration script's; the route's `gh` calls (with `assignees`, then `gh api user`); a viewer `gh` cannot name; ADO and tier below 1 a `Tracker` line; 404 off |
-| `tkTestToolkit -StartWork` | the hand-off block, typed in a fresh shell over a scratch hub built from `Tests/fixtures/start-work/`: off is no verb and no bridge entry; `StartWork 23A3` is `expected-card.md` byte for byte, and so is the card in CRLF, the id in lower case and the full filename; `39` never assembles `Task139`; a `how-we-work.md` switches section one's heading to its path; issue 41, which no card carries, is `expected-issue.md` with one `gh issue view`; `-Prompt` absolute and package-relative; a partial name named in a terminal and refused for a non-interactive caller; and every refusal exit 2 with one `Error:` block and the hub untouched -- no row for the kind (naming `startWork.prompts.Meeting`), a row whose file is missing, a `-Prompt` that is no file, no id, nothing matching, an archived card, a closed issue, a pull request, an Azure DevOps Space, an undeclared `-Space` |
+| `tkTestToolkit -StartWork` | the hand-off block, typed in a fresh shell over a scratch hub built from `Tests/fixtures/start-work/`: off is no verb and no bridge entry; `StartWork 23A3` is `expected-card.md` byte for byte, and so is the card in CRLF, the id in lower case and the full filename; `39` never assembles `Task139`; a `how-we-work.md` switches section one's heading to its path; issue 41, which no card carries, is `expected-issue.md` with one `gh issue view`; `-Prompt` absolute and package-relative; a partial name named in a terminal and refused for a non-interactive caller; and every refusal exit 2 with one `Error:` block and the hub untouched -- no row for the kind (naming `startWork.prompts.Meeting`), a row whose file is missing, a `-Prompt` that is no file, no id, nothing matching, an archived card, a closed issue, a pull request, an Azure DevOps Space, an undeclared `-Space`. And `-Launch`, from scratch clones with a stub `claude` first on the PATH: `-WhatIf` prints the worktree add, the block file, the exact command and the log and leaves nothing; the model from the `**Assigned:**` line, the Tags, an issue's label and the issue behind a numbered card; `fable` on a card and on an issue, no size, `me`, a size with no model, no git repository, another repository's origin, a failed worktree add, no `claude`, `-Clip` with `-Launch` and `-WhatIf` alone each refused with nothing started; off Windows the launch itself, read through a pipe -- back while the stub lives on, and the log's first message the block, whole |
 | `Tests/test_bridge.py`, "StartWorkThroughTheBridge" | `StartWork` in the bridge's table with Team Agile on and `rejected` with it off; through the bridge, `expected-card.md` byte for byte; a refusal `status: error` with the verb's sentence |
 | `web/src/modules/solitaireAgile/StartWorkBox.test.tsx` | the copy box: one `StartWork` call, `expected-card.md` shown verbatim with its head as the title, Copy copying exactly the block, a refusal shown as the verb's sentence with no Copy, the agent away said so; no **Launch** while `/env` does not say `startWorkLaunch` is true, and with it, one more `StartWork` call with `-Launch` and what it printed or refused with |
 | `tkTestToolkit -Consts`, `Tests/test_consts.py`, `web/src/shell/consts.test.ts` | the `startWork.text` headings; the `rituals` values (`triageRoute`, `grains`, `numberWords`, the four `work*Regex` patterns, the `work*` phrases and the `prose*` words among them, the dress's `dressGuards` and four `dress*Regex` patterns, and what moved's `motions`, the `itemMotion`, `motion*`, `commit*` and `counts*` words), stated from all three halves; `{n} to walk`, `Nothing blocked.` and `Yesterday I closed` never retyped in the CLI's scripts or the agent; `Waiting on you`, `nothing in flight` and `Routed to` never retyped in the CLI's scripts |
@@ -1192,9 +1254,13 @@ repository", is the real write).
 
 ## Known gaps
 
-- **The suggestion's delegation does not launch.** A crew-sized item's command is `StartWork <n>`: the
-  launch (`StartWork -Launch`, a session in a worktree) is its own card, and the command gains `-Launch`
-  where the launch exists. Until then a delegation is the hand-off block, carried by hand.
+- **The suggestion's delegation does not launch.** The launch exists (`StartWork <n> -Launch`, [a
+  session in a worktree](#the-launch-the-block-handed-to-a-session)), and the copy box offers it where `/env`
+  says so, but the chair's Next line still names `StartWork <n>`, the block carried by hand; the command
+  gaining `-Launch` where the launch is on is not built.
+- **A launch is proved on macOS here, and walked on Windows.** The pipe returning on Windows PowerShell
+  5.1, the model a real `claude` runs, and a real session's first message being the block are `VERIFY.md`
+  rows (Gate 12, "StartWork -Launch"); the suite's launch half runs off Windows only.
 - **The bell and Home's tips do not suggest yet.** They are the suggestion's later surfaces, behind the
   same switch; the chair's line and [the PM Corner](#the-pm-corner-the-line-the-chevron-the-confetti) are the two built.
 - **The Corner's milestones in reach are the suggestion's candidates.** A milestone whose every open item is
@@ -1202,8 +1268,6 @@ repository", is the real write).
   milestone with something to start, or reads `no milestone in reach`.
 - **Reached lasts the standup's window.** `milestone B reached` reads while the last close is inside
   yesterday's window (or the one `-Since` widens); after it, the line moves on to the next milestone.
-- **The copy box's Launch waits for the launch.** The second button reads `/env`'s `startWorkLaunch`, which
-  no agent serves until `StartWork -Launch` lands; until then the box has one button, Copy.
 - **The celebration's mark is per browser.** Another browser, or one whose site data was cleared, celebrates a
   reached milestone once more on first sight.
 - **Only the issue read's 500 are candidates.** The suggestion reads the standup's read, capped like it.

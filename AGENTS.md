@@ -217,6 +217,7 @@ anywhere).
 | Web UI and agent | `web.agentPort` | `config.local.json`; started with `{prefix}Web -Dev` |
 | AI code review | `ANTHROPIC_API_KEY` | the environment -- a secret never goes in a file this tool writes |
 | Teams delivery | `TEAMS_WEBHOOK_<RECIPIENT>` | the environment, gate 2 of a send |
+| StartWork launch | `startWorkLaunch` | DERIVED, like the webhook row: `on` where `claude` is on the PATH, `not configured` otherwise; `/env` carries it as a top-level boolean so the Team Agile page offers a launch only where it would work. `StartWork <id> -Launch` starts a session on the block in a worktree through `Start-DetachedProcess`; the block works either way. `docs/modules/solitaire-agile.md`, "The launch: the block, handed to a session" |
 
 **This refines "off means absent", it does not contradict it.** The two rules answer different
 questions, and the boundary is exact:
