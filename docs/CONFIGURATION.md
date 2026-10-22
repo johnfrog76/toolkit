@@ -82,7 +82,7 @@ table; this is the shape of it:
 
 | Scope | Keys | Goes to |
 | --- | --- | --- |
-| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `web.agentPort`, `web.corsOrigins`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display` | `config.local.json`, created as a sparse patch if it is not there |
+| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `web.agentPort`, `web.corsOrigins`, `limits.inPlay`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display` | `config.local.json`, created as a sparse patch if it is not there |
 | **org** | `spaces.<slug>.name` / `.status` / `.orgType` / `.org` / `.tenant` / `.promptsFolder` / `.projects` / `.howIWork` / `.features.sprintAwareness` / `.features.suggestions` / `.features.trainingHoursPerQuarter` | the hub's `hub.json` -- or `config.local.json`'s `spaces.<slug>` patch with **`-Local`** |
 | **hub** | `storeSync`, `folders.<name>` | the hub's `hub.json`, and only with **`-Hub`** |
 | **default** | `commands`, `workItemTypes`, `cliVersion`, `managerWorkflow` | nowhere. These are the team's, and a `-Set` on one is refused by name |
@@ -281,6 +281,20 @@ two weeks left": the hours of complete trainings dated in the current calendar q
 number. `tkConfig -Set spaces.<slug>.features.trainingHoursPerQuarter=8 -Hub`, or the Space's section in
 Settings. A number is read off the Space; the merged `features` map (`/api/env`) holds flags only. The
 rules of the sum are in [`docs/modules/growth.md`](modules/growth.md#the-quarter-line).
+
+## `limits.inPlay` -- the WIP line
+
+One whole number of 1 or more, per machine (`config.local.json`; `tkConfig -Set limits.inPlay=5`). **Unset
+means no line at all** -- the opt-in rule -- and so does zero, a negative or anything that is not a whole
+number. Set, `Status` opens with `in play: 4` at or under the number and `in play: 7 of 5` past it, and the
+web board's Active column head carries the same count and goes amber past it. The count is the cards in
+`current/` in every lane (Active, In Progress, Code Review); `backlog/` and `archive/` are not counted.
+
+**It is a line the product says, never a gate.** Nothing refuses, nothing blocks a pull or a move, nothing
+hides a card -- "limit doesn't mean slow it down, it means more focus." The web reads the number from
+`GET /api/env` (`config.inPlayLimit`, `null` when unset) and keeps no reader of its own. `tkEnv` lists it
+under "Optional surfaces" as `WIP limit`: `on` with the number, `not configured` while it is unset. The
+shipped file carries an empty `limits` block and nothing in it.
 
 ## `spaces[].laneNames` -- what this org calls its lanes
 

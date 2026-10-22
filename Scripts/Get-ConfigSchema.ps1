@@ -220,6 +220,7 @@ function Get-P20ConfigSchema {
     $rows += New-P20SchemaRow -Key 'firstRun.welcome' -Scope 'machine' -Type 'bool' -Help "The Home banner that offers the deck Introducing ToolKit. Start sets it true; Get Started or Dismiss sets it false, and then it is gone for good. Shown only while the deck module is on."
     $rows += New-P20SchemaRow -Key 'web.agentPort' -Scope 'machine' -Type 'int' -Help 'The port the agent listens on and the web half proxies to.'
     $rows += New-P20SchemaRow -Key 'web.corsOrigins' -Scope 'machine' -Type 'array' -Help 'Dev-server origins allowed to call the agent, as a JSON array. Empty accepts the two defaults (5173, 5174).'
+    $rows += New-P20SchemaRow -Key 'limits.inPlay' -Scope 'machine' -Type 'int' -Help 'How many cards in play (current/, every lane) before Status and the board say so: a whole number of 1 or more. A line the product says, never a gate -- nothing refuses and nothing is hidden. Unset: no line.'
     $rows += New-P20SchemaRow -Key 'ai.model' -Scope 'machine' -Type 'string' -Help 'The model id every model call sends: AddPRReview, and the agent''s suggest and rewrite routes. The key stays in the environment (ANTHROPIC_API_KEY), never in a file this tool writes.'
 
     # A navigation shortcut's fields, as a PATTERN: the name is whatever the

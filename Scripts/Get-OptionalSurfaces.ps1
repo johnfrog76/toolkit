@@ -423,6 +423,20 @@ function Get-P20OptionalSurfaces {
     $rows += New-P20SurfaceRow -Key 'trainingHoursPerQuarter' -Title 'Training hours per quarter' -State $trainingState `
         -Config "$($Prefix)Config -Set spaces.$slug.features.trainingHoursPerQuarter=<hours> -Hub" -Note $trainingNote
 
+    # -- The WIP limit: a number the machine states, never a gate ---------------
+    # limits.inPlay: on with the number once set, `not configured` while it is
+    # not -- nobody has answered "how many at once", and there is no answered no.
+    # Status and the board's Active column SAY when the count passes it; nothing
+    # refuses and nothing is hidden. Read off the merged config (InPlayLimit).
+    $limitState = $states.Unset
+    $limitNote = 'a line Status and the board say past the number; never a gate'
+    if ($Config -and $null -ne $Config.InPlayLimit) {
+        $limitState = $states.On
+        $limitNote = "$($Config.InPlayLimit) cards in play; said past it, never enforced"
+    }
+    $rows += New-P20SurfaceRow -Key 'limits.inPlay' -Title 'WIP limit' -State $limitState `
+        -Config "$($Prefix)Config -Set limits.inPlay=<number>" -Note $limitNote
+
     # -- The prompt store's git sync -------------------------------------------
     $syncState = $states.Off
     if ($Config -and [string]$Config.StoreSync -eq 'git') { $syncState = $states.On }

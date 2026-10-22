@@ -302,6 +302,29 @@ class TheRouteServesTheModel(unittest.TestCase):
         local.write_text(json.dumps({**patch, "firstRun": {"welcome": True}}), encoding="utf-8")
         self.assertIs(self.client.get("/api/env").json()["config"]["firstRunWelcome"], True)
 
+    def test_env_carries_the_wip_limit_and_only_a_real_one(self):
+        """limits.inPlay: unset is null (no line, the opt-in rule); a whole number of 1
+        or more is served as is; zero, negative, text and a bool are no limit. A line
+        the board says, never a gate (docs/CONFIGURATION.md, `limits.inPlay`)."""
+        local = Path(self.cfg.name) / "config.local.json"
+        patch = json.loads(local.read_text(encoding="utf-8"))
+        table = [
+            (None, None),
+            (5, 5),
+            ("5", 5),
+            (1, 1),
+            (0, None),
+            (-2, None),
+            ("lots", None),
+            (True, None),
+            (2.5, None),
+        ]
+        for stored, served in table:
+            limits = {} if stored is None else {"limits": {"inPlay": stored}}
+            local.write_text(json.dumps({**patch, **limits}), encoding="utf-8")
+            with self.subTest(stored=stored):
+                self.assertEqual(self.client.get("/api/env").json()["config"]["inPlayLimit"], served)
+
     def test_env_tells_the_web_which_card_types_exist(self):
         """What the "New card" dialog offers: config's types, in config's order,
         a team's own included, the comment key not."""

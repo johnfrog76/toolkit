@@ -130,6 +130,8 @@ export interface EnvStatus {
     isDemoDismissed?: boolean;
     /** `firstRun.welcome`: the first-run banner is on. Set by tkStart, cleared by the banner. */
     firstRunWelcome?: boolean;
+    /** `limits.inPlay`: the WIP number the Active column goes amber past; null when none is set. */
+    inPlayLimit?: number | null;
   };
 }
 

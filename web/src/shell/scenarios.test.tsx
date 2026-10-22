@@ -40,6 +40,7 @@ import type { EnvStatus, HowIWork, SpaceInfo } from "./api";
 import { drawerSections } from "../modules/ado/homeTabs";
 import { cardActions } from "../modules/ado/cardActions";
 import { LANES, legalMoves, whyNotAMove } from "../modules/ado/legalMoves";
+import { countInPlay, inPlayLine } from "../modules/ado/inPlay";
 import type { StatusResponse } from "../modules/ado/api.ado";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { AvatarMenu } from "./AvatarMenu";
@@ -963,5 +964,26 @@ describe("the scenario grid: the board's lanes, by a card's status", () => {
       prompts: [{ status: "Backlog" }, { status: "Active" }, { status: "Backlog" }],
     } as unknown as StatusResponse;
     expect(cardsPhrase(st)).toBe("1 card in play: 1 Active; 2 in Backlog");
+  });
+});
+
+// The WIP line on the board's Active column, by `limits.inPlay` and the cards in
+// play (docs/SCENARIOS.md, "The board's Active column, by the WIP limit"): a line
+// the board says, never a gate. The render is Board.inPlay.test.tsx's.
+describe("the scenario grid: the Active column's WIP line, by the limit", () => {
+  const inPlay = (n: number) =>
+    Array.from({ length: n }, (_v, i) => ({ status: ["Active", "In Progress", "Code Review"][i % 3] }));
+  it.each<[string, number, number | null | undefined, string | null, boolean]>([
+    ["no limit set", 7, undefined, null, false],
+    ["under the limit", 4, 5, "in play 4", false],
+    ["at the limit", 5, 5, "in play 5", false],
+    ["past the limit", 7, 5, "in play 7 of 5", true],
+  ])("%s", (_name, cards, limit, text, past) => {
+    const line = inPlayLine(countInPlay(inPlay(cards)), limit);
+    expect(line?.text ?? null).toBe(text);
+    expect(line?.past ?? false).toBe(past);
+  });
+  it("the backlog and Done are not in play", () => {
+    expect(countInPlay([{ status: "Backlog" }, { status: "Done" }, { status: "Active" }])).toBe(1);
   });
 });

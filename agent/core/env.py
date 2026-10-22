@@ -28,6 +28,7 @@ from .config import (
     hub_detail,
     hub_manifest_detail,
     hub_root,
+    in_play_limit,
     lane_names,
     load_config,
     offered_spaces,
@@ -349,6 +350,10 @@ def _config_block(cfg: dict) -> dict:
         # The first-run banner's switch. The web renders it only when this
         # is true AND the deck module is on.
         "firstRunWelcome": bool((cfg.get("firstRun") or {}).get("welcome", False)),
+        # limits.inPlay: the WIP number the board's Active column warns past, or
+        # null when there is none. The web reads it here and keeps no reader of
+        # its own; the CLI's Status line is the other half (Get-InPlayLine.ps1).
+        "inPlayLimit": in_play_limit(cfg),
     }
 
 

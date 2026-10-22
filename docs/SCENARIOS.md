@@ -159,6 +159,21 @@ never stored"):
 The Studio's foyer counts a row's cards **in play** and says the planned ones after the count, never in
 it: `1 card in play: 1 Active; 2 in Backlog`.
 
+### The board's Active column, by the WIP limit (`scenarios.test.tsx`; the render is `Board.inPlay.test.tsx`)
+
+`limits.inPlay` is one number on this machine (`Config -Set limits.inPlay=5`), served once by `/api/env`
+as `config.inPlayLimit`. The Active column's head carries the count of cards **in play** -- every lane of
+`current/`, never the Backlog and never Done -- and goes amber (Fluent's warning badge) past the number.
+It is a line the board says and never a gate: nothing is refused, no drop is blocked, no card is hidden,
+and the count ignores the board's filters. `Status` opens with the same line (`docs/CLI.md`).
+
+| `limits.inPlay` | Cards in play | The Active column's head |
+| --- | --- | --- |
+| unset (or below 1) | any | no line at all |
+| 5 | 4 | `in play 4`, quiet |
+| 5 | 5 | `in play 5`, quiet |
+| 5 | 7 | `in play 7 of 5`, **amber** |
+
 ### The settings drawer's "How do I…" (settings by workflow; `HowDoI.test.tsx`)
 
 | Opened | What the section shows |
