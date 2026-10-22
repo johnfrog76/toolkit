@@ -54,7 +54,7 @@ to F4 are there too, by their cards.
 ```text
 M1  1.1.0  The bar, held            done 2026-10-18: the defect queue dry, two refactors in, verify green
         |
-M2  1.2.0  The standup sees the work    Team Agile reads the cards; what moved, and the agent in the room
+M2  1.2.0  The standup sees the work    done 2026-10-22: both records joined, what moved, the agent in the room, the backlog
         |
 M3  1.3.0  The Studio opens in a second   the gh reads: one call per Space, per repository, per tab
         |
@@ -92,7 +92,7 @@ versioning rule this is a minor release; the quality batch was first planned as 
 picks the number when the section is renamed. After the first post-flip release, a tag ruleset (`v*`,
 no deletion or update) is the natural next protection beside main's.
 
-### M2 -- 1.2.0, the standup sees the work
+### M2 -- 1.2.0, the standup sees the work -- done 2026-10-22
 
 Now that the team's own work runs on cards and the issues are the public's, Team Agile is blind to the
 work that actually happens. **Done when:** on a GitHub Space the standup says the cards being worked as
@@ -107,6 +107,9 @@ well as the issues, says what moved and how many commits it took, and can answer
    with the chevron that sends the work, and the launch through the bridge. The spec is written from the hub's
    `design/the-agent-in-the-room.md` before its cards build.
 4. One skeleton for the rituals comes first, so the three above are built on it, not copied again.
+
+**Met 2026-10-22**, the day 1.2.0 was cut: all four items on main, and beside them the backlog folder, `Plan`
+and the in-play count, which the milestone did not name and the work demanded.
 
 ### M3 -- 1.3.0, the Studio opens in a second
 

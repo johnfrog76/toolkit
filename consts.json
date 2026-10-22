@@ -24,7 +24,7 @@
     "naming the file when one of them does not say the same."
   ],
 
-  "version": "1.1.0",
+  "version": "1.2.0",
 
   "repository": {
     "_": "The package's own repository, as an address. What the agent compares a Space's repository with when the package has no git origin to read -- a copy installed without .git -- so the Space that is this package itself still reads as itself (the Prompts card's isToolkit, docs/modules/studio.md). A checkout's origin wins when it is there, so a fork that makes itself a Space reads as the fork. The public export's repo-name rule renames it in the public tree.",
