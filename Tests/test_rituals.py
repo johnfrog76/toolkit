@@ -35,7 +35,7 @@ try:
     from fastapi.testclient import TestClient
 
     from agent.ado import accounting
-    from agent.core import config
+    from agent.core import config, disk_cache
     from agent.core import consts as C
     from agent.solitaire import standup
     from agent.solitaire import tracker as solitaire_tracker
@@ -1865,6 +1865,212 @@ class TheBacklogIsNotInPlay(unittest.TestCase):
             self.assertEqual(sorted(r["id"] for r in rows), ["K7M2", "W3X7"])
             self.assertNotIn(C.folder_backlog(), {r["folder"] for r in rows})
             self.assertNotIn("R9PX", {c["id"] for c in standup.cards_in_play(rows)})
+
+
+# -- One tracker read, one dress per fact (toolkit card QP33) --------------------
+
+
+class TheOneTrackerRead(unittest.TestCase):
+    """Each gh answer is kept for READ_TTL_SECONDS (tracker.py), shared by the
+    standup and triage: a second GET inside the TTL starts no subprocess, triage
+    after the standup is served from the standup's all-states read, and Refresh
+    (``?refresh=1``) or a verb through the bridge reads again. Output is unchanged."""
+
+    features = {"solitaireAgile": True}
+    space_features = None
+
+    def setUp(self):
+        TheRoute.setUp(self)
+        fx = CASES["friday"]
+        self.calls: list[list[str]] = []
+        self.fail_next = False
+        self.issues = [dict(i, labels=[{"name": n} for n in i["labels"]]) for i in fx["issues"]]
+
+        def fake_run(argv, **_kw):
+            self.calls.append(list(argv))
+            if self.fail_next:
+                self.fail_next = False
+                raise subprocess.TimeoutExpired(argv, 30)
+            if argv[:3] == ["gh", "label", "list"]:
+                return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(_labels(fx)), stderr="")
+            if argv[:3] == ["gh", "api", "user"]:
+                return subprocess.CompletedProcess(argv, 0, stdout="johnfrog76\n", stderr="")
+            state = argv[argv.index("--state") + 1]
+            rows = [i for i in self.issues if state == "all" or i["state"].lower() == state]
+            return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(rows), stderr="")
+
+        self.more = [
+            mock.patch.object(solitaire_tracker, "_resolve_tier", return_value=(1, True)),
+            mock.patch.object(standup, "_now", return_value=datetime.fromisoformat(fx["asOf"])),
+            mock.patch.object(accounting.subprocess, "run", side_effect=fake_run),
+            mock.patch.object(standup.model, "complete", _unavailable),
+        ]
+        for p in self.more:
+            p.start()
+
+    def tearDown(self):
+        for p in reversed(self.more):
+            p.stop()
+        TheRoute.tearDown(self)
+
+    def _gh(self, *head: str) -> int:
+        return sum(1 for c in self.calls if c[1 : 1 + len(head)] == list(head))
+
+    def _reads(self) -> tuple[int, int, int]:
+        """(label reads, issue reads, viewer reads) since the last reset."""
+        return self._gh("label", "list"), self._gh("issue", "list"), self._gh("api", "user")
+
+    def test_two_standups_inside_the_ttl_read_the_tracker_once(self):
+        first = self.client.get("/api/ritual/standup?space=toolkit").json()
+        second = self.client.get("/api/ritual/standup?space=toolkit").json()
+        self.assertEqual(self._reads(), (1, 1, 1))
+        self.assertEqual(first, second, "the same facts, the same words")
+        self.assertEqual(first["text"], _golden("standup-friday.txt"))
+
+    def test_two_triages_inside_the_ttl_read_the_tracker_once(self):
+        first = self.client.get("/api/ritual/triage?space=toolkit").json()
+        second = self.client.get("/api/ritual/triage?space=toolkit").json()
+        self.assertEqual(self._reads(), (1, 1, 1))
+        self.assertEqual(first, second)
+
+    def test_triage_after_the_standup_starts_no_subprocess_and_says_the_same(self):
+        self.client.get("/api/ritual/standup?space=toolkit")
+        self.calls.clear()
+        served = self.client.get("/api/ritual/triage?space=toolkit").json()
+        self.assertEqual(self.calls, [], "the open issues come from the standup's all-states read")
+        read = self.client.get("/api/ritual/triage?space=toolkit&refresh=1").json()
+        self.assertEqual(self._reads(), (1, 1, 1))
+        self.assertIn(
+            ["--state", "open"], [c[c.index("--state") : c.index("--state") + 2] for c in self.calls if "--state" in c]
+        )
+        self.assertEqual(served, read, "served from the standup's read, triage says what its own read says")
+        self.assertGreater(sum(g["open"] for g in read["groups"]), 0)
+
+    def test_an_all_states_read_at_its_limit_does_not_answer_for_triage(self):
+        # At the limit the read may not hold every open issue: triage reads its own.
+        with mock.patch.object(solitaire_tracker, "ISSUE_LIMIT_ALL", len(self.issues)):
+            self.client.get("/api/ritual/standup?space=toolkit")
+            self.calls.clear()
+            self.client.get("/api/ritual/triage?space=toolkit")
+        self.assertEqual(self._reads(), (0, 1, 0))
+
+    def test_refresh_reads_again(self):
+        self.client.get("/api/ritual/standup?space=toolkit")
+        self.client.get("/api/ritual/standup?space=toolkit&refresh=1")
+        self.assertEqual(self._reads(), (2, 2, 2))
+        self.calls.clear()
+        self.client.get("/api/ritual/standup?space=toolkit")
+        self.assertEqual(self.calls, [], "the refreshed read is kept like any other")
+        self.client.get("/api/ritual/triage?space=toolkit&refresh=1")
+        self.assertEqual(self._reads(), (1, 1, 1))
+
+    def test_past_the_ttl_it_reads_again(self):
+        with mock.patch.object(solitaire_tracker, "READ_TTL_SECONDS", 0):
+            self.client.get("/api/ritual/standup?space=toolkit")
+            self.client.get("/api/ritual/standup?space=toolkit")
+        self.assertEqual(self._reads(), (2, 2, 2))
+
+    def test_a_failed_read_is_never_kept(self):
+        self.fail_next = True
+        failed = self.client.get("/api/ritual/standup?space=toolkit").json()
+        self.assertFalse(failed["tracker"]["ok"])
+        answered = self.client.get("/api/ritual/standup?space=toolkit").json()
+        self.assertTrue(answered["tracker"]["ok"])
+        self.assertEqual(self._gh("label", "list"), 2)
+
+    def test_a_verb_through_the_bridge_forgets_every_read(self):
+        from agent.ado import bridge
+
+        async def ran(name, req=None):
+            return None
+
+        self.client.get("/api/ritual/triage?space=toolkit")
+        with mock.patch.object(bridge, "_run_command", ran):
+            asyncio.run(bridge.run_command("Route", None))
+        self.client.get("/api/ritual/triage?space=toolkit")
+        self.assertEqual(self._reads(), (2, 2, 2), "a Route may have moved a label: the next triage reads again")
+
+    def test_the_kept_limits_are_the_readers(self):
+        """ISSUE_LIMIT_OPEN and ISSUE_LIMIT_ALL mirror accounting._gh_issues' --limit:
+        the completeness rule is only as right as they are."""
+        for state, limit in (("open", solitaire_tracker.ISSUE_LIMIT_OPEN), ("all", solitaire_tracker.ISSUE_LIMIT_ALL)):
+            self.calls.clear()
+            accounting._gh_issues("johnfrog76/toolkit", True, state, body=True)
+            argv = self.calls[0]
+            with self.subTest(state=state):
+                self.assertEqual(argv[argv.index("--limit") + 1], str(limit))
+
+
+class TheDressIsKeptByItsFacts(unittest.TestCase):
+    """A dressed reply is kept by a hash of the model, the register and the facts,
+    in memory and on disk (core/disk_cache.py): the same facts are dressed once,
+    across a restart; a changed fact or model is asked again; and the guard runs on
+    every kept reply as on a fresh one. The model is stubbed: no test calls one."""
+
+    REPLY = {"opus/0": "Smashed two in Team Agile (#501, #502)."}
+
+    def _dress(self, filled, complete):
+        with mock.patch.object(standup.model, "complete", complete):
+            return asyncio.run(standup.dress_standup(filled))
+
+    def test_identical_facts_are_served_with_no_model_call(self):
+        complete, calls = _answering(self.REPLY)
+        first = self._dress(_fill_prose(PROSE_CASES["friday"]), complete)
+        second = self._dress(_fill_prose(PROSE_CASES["friday"]), complete)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(first, second)
+        self.assertEqual(first.dressed, 1)
+
+    def test_a_restart_keeps_the_dress_on_disk(self):
+        complete, calls = _answering(self.REPLY)
+        first = self._dress(_fill_prose(PROSE_CASES["friday"]), complete)
+        standup.clear_dressed()  # what an agent restart forgets
+        second = self._dress(_fill_prose(PROSE_CASES["friday"]), complete)
+        self.assertEqual(len(calls), 1, "the disk kept the reply")
+        self.assertEqual(first, second)
+
+    def test_a_changed_fact_is_asked_again(self):
+        complete, calls = _answering(self.REPLY)
+        self._dress(_fill_prose(PROSE_CASES["friday"]), complete)
+        changed = _fill_prose(PROSE_CASES["friday"])
+        changed.work.workers[0].prose[0] += " Also on a new one."
+        self._dress(changed, complete)
+        self.assertEqual(len(calls), 2)
+
+    def test_a_changed_model_is_asked_again(self):
+        complete, calls = _answering(self.REPLY)
+        self._dress(_fill_prose(PROSE_CASES["friday"]), complete)
+        with mock.patch.object(standup.model, "model_id", return_value="another-model"):
+            self._dress(_fill_prose(PROSE_CASES["friday"]), complete)
+        self.assertEqual(len(calls), 2)
+
+    def test_the_guard_runs_on_a_kept_reply(self):
+        filled = _fill_prose(PROSE_CASES["friday"])
+        facts = standup.dress_facts(filled)
+        key = standup.dress_key(standup.model.model_id(), filled.register_, facts)
+        # Kept before the guard learned better: one sentence it refuses, one it passes.
+        kept = {
+            "opus/0": "Smashed two in Team Agile (#501, #502) and #999.",
+            "opus/2": "Plumbing for two in Team Agile (#504, #505).",
+        }
+        self.assertTrue(disk_cache.put_json({"reply": kept}, standup.DRESS_CACHE, f"{key}.json"))
+        complete, calls = _answering({})
+        spoken = self._dress(filled, complete)
+        self.assertEqual(calls, [], "a kept reply is not asked again")
+        opus = next(w for w in spoken.workers if w.label == "opus")
+        work = next(w for w in filled.work.workers if w.label == "opus")
+        self.assertEqual(opus.prose[0], work.prose[0], "the refused sentence is the prose")
+        self.assertEqual(standup.dress_guard(next(f for f in facts if f["id"] == "opus/2"), kept["opus/2"]), "")
+        self.assertEqual(opus.prose[2], kept["opus/2"])
+        self.assertEqual((spoken.dressed, spoken.refused), (1, len(facts) - 1))
+
+    def test_a_kept_file_that_is_not_a_reply_is_a_miss(self):
+        filled = _fill_prose(PROSE_CASES["friday"])
+        key = standup.dress_key(standup.model.model_id(), filled.register_, standup.dress_facts(filled))
+        disk_cache.put_json({"reply": "not an object"}, standup.DRESS_CACHE, f"{key}.json")
+        complete, calls = _answering(self.REPLY)
+        self._dress(filled, complete)
+        self.assertEqual(len(calls), 1)
 
 
 if __name__ == "__main__":

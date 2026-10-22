@@ -1050,6 +1050,14 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   you should see request lines written after `tkAgent` returned, not only its startup lines. Proved on macOS
   by the probe that found it (a child writing after its launcher exited); Linux is the other host.
   Closes the launcher half of Feature MA6P.
+- [ ] **Status reads every card's day from one git log under Windows PowerShell 5.1.** From
+  `powershell.exe` (not `pwsh`), in a hub that is a git repository, run `tkStatus` and then open Home in the
+  web UI (or `GET /api/status`): every card in `current/` shows the same Modified day in both, the day of the
+  newest commit naming it, and a card never committed shows today's file date. Then rename one card's file by
+  hand to a name with a letter outside ASCII (`Task1-café.prompt.md`), commit it, and run `tkStatus` again from
+  `powershell.exe`: that card shows the commit's day, not its file time. `tkTestToolkit -PromptStatus` proves
+  the table under pwsh on both hosts; this row is the 5.1 parse of git's quoted names in
+  `Scripts/Get-PromptStatus.ps1`. Closes Task 4EF6.
 
 ## Recording a run
 

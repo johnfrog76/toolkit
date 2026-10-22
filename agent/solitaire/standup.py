@@ -67,7 +67,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from ..ado import accounting
-from ..core import log_writer, model
+from ..core import disk_cache, log_writer, model
 from ..core.config import API_PREFIX, REPO_ROOT, load_config, org_folder, tracker
 from ..core.consts import (
     folder_archive,
@@ -1197,9 +1197,14 @@ def prose_close(said: list[str], slots: dict[str, list[WorkGroup]]) -> list[str]
 
 # A page load waits on the model at most this long, then the prose stands.
 DRESS_TIMEOUT_SECONDS = 30
-# Dressed replies kept in memory, by a hash of the facts: the same day is dressed once.
+# Dressed replies, by a hash of the model, the register and the facts (each
+# sentence's prose floor among them): the same facts are dressed once. Kept in
+# memory, and on disk (core/disk_cache.py) so an agent restart keeps them. The
+# namespace's number is the reply's version: change what a kept reply means and
+# bump it, so every sentence is dressed again rather than read as the old rule left it.
 _DRESS_CACHE_SIZE = 64
 _DRESSED: OrderedDict[str, dict] = OrderedDict()
+DRESS_CACHE = "standup-dress-1"
 
 _WORD = re.compile(r"[A-Za-z0-9#'-]+")
 _NAME_WORD = re.compile(r"[A-Za-z0-9'-]+")
@@ -1436,6 +1441,35 @@ def spoken_from(filled: Standup, facts: list[dict], reply: dict[str, str], model
     return out
 
 
+def dress_key(model_name: str, register: str, facts: list[dict]) -> str:
+    """What a dressed reply is kept by: a hash of the model, the register and the
+    facts. A changed fact, or a changed model, is a new key and is asked again. Pure."""
+    data = {"model": model_name, "register": register, "facts": facts}
+    return hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
+def _keep_dressed(key: str, reply: dict) -> None:
+    _DRESSED[key] = reply
+    _DRESSED.move_to_end(key)
+    while len(_DRESSED) > _DRESS_CACHE_SIZE:
+        _DRESSED.popitem(last=False)
+
+
+def _dressed_on_disk(key: str) -> dict[str, str] | None:
+    """The reply kept on disk for ``key``, or None (a miss, or a file that is not one)."""
+    kept = disk_cache.get_json(DRESS_CACHE, f"{key}.json")
+    reply = (kept or {}).get("reply")
+    if not isinstance(reply, dict):
+        return None
+    return {str(k): v for k, v in reply.items() if isinstance(v, str)}
+
+
+def clear_dressed() -> None:
+    """Forget the replies kept in memory (what an agent restart forgets). The disk
+    keeps its own: that is what survives the restart."""
+    _DRESSED.clear()
+
+
 async def dress_standup(filled: Standup) -> Spoken | None:
     """The dress, or None when there is nothing to dress or no model answered --
     then the stage speaks ``work``, the prose. A machine with no model key gets
@@ -1446,8 +1480,12 @@ async def dress_standup(filled: Standup) -> Spoken | None:
     if not facts:
         return None
     model_name = model.model_id()
-    key = hashlib.sha256(json.dumps({"model": model_name, "facts": facts}, sort_keys=True).encode("utf-8")).hexdigest()
+    key = dress_key(model_name, filled.register_, facts)
     reply = _DRESSED.get(key)
+    if reply is None:
+        reply = _dressed_on_disk(key)
+        if reply is not None:
+            _keep_dressed(key, reply)
     if reply is None:
         system, prompt = dress_prompt(facts)
         try:
@@ -1464,9 +1502,10 @@ async def dress_standup(filled: Standup) -> Spoken | None:
             )
             return None
         reply = _dress_reply(raw)
-        _DRESSED[key] = reply
-        while len(_DRESSED) > _DRESS_CACHE_SIZE:
-            _DRESSED.popitem(last=False)
+        _keep_dressed(key, reply)
+        disk_cache.put_json({"reply": reply}, DRESS_CACHE, f"{key}.json")
+    # The guard runs on a kept reply as on a fresh one (spoken_from): a kept
+    # sentence the guard now refuses is the prose again.
     spoken = spoken_from(filled, facts, reply, model_name)
     log_writer.write_log("CMD", f"agent{ROUTE}", f"dressed={spoken.dressed} refused={spoken.refused}")
     return spoken
@@ -1754,10 +1793,11 @@ def _space_entry(cfg: dict, space: str) -> dict:
     return next((s for s in cfg.get("spaces", []) or [] if s.get("slug") == slug), {}) or {}
 
 
-def standup_for(space: str = "", as_of: datetime | None = None, since: str = "") -> Standup:
+def standup_for(space: str = "", as_of: datetime | None = None, since: str = "", refresh: bool = False) -> Standup:
     """The whole standup for a Space -- the active one when ``space`` is "".
     ``since`` (yyyy-MM-dd) widens yesterday's window back to that day; a day that
-    is not one, or is after today, is a 422 with ``since_refusal``'s reason."""
+    is not one, or is after today, is a 422 with ``since_refusal``'s reason.
+    ``refresh`` reads the tracker again past the kept read (tracker.py)."""
     cfg = load_config()
     org, status, projects = accounting.space_scope(cfg, space)
     now = as_of or _now()
@@ -1779,13 +1819,13 @@ def standup_for(space: str = "", as_of: datetime | None = None, since: str = "")
     if source == "cards":
         filled = fill_cards_standup(now, cards, space=slug, space_name=name, window=since)
     elif source == "both":
-        labels, issues, state = read_tracker(org, status, projects, state="all", body=True)
+        labels, issues, state = read_tracker(org, status, projects, state="all", body=True, refresh=refresh)
         filled = fill_joined_standup(now, labels, issues, state, cards, space=slug, space_name=name, window=since)
     else:
         if source == "none":
             labels, issues, state = [], [], {"ok": False, "reason": reason}
         else:
-            labels, issues, state = read_tracker(org, status, projects, state="all", body=True)
+            labels, issues, state = read_tracker(org, status, projects, state="all", body=True, refresh=refresh)
         filled = fill_standup(now, labels, issues, state, space=slug, window=since)
     # The suggestion (suggest.py): over the same read, before the brief renders it.
     from ..core.config import how_i_work
@@ -1799,7 +1839,7 @@ def standup_for(space: str = "", as_of: datetime | None = None, since: str = "")
         # where an issue read happened -- a cards Space has no assignee to compare.
         from .triage import _viewer
 
-        viewer = _viewer() if source == "both" and filled.tracker.ok else ""
+        viewer = _viewer(refresh) if source == "both" and filled.tracker.ok else ""
         attach_suggestions(
             filled,
             labels if source == "both" else [],
@@ -1839,11 +1879,12 @@ ROUTE = rituals_route().removeprefix(API_PREFIX)
 
 
 @api.get(ROUTE, response_model=Standup)
-async def get_standup(space: str = "", since: str = ""):
+async def get_standup(space: str = "", since: str = "", refresh: int = 0):
     # space_scope raises the 404 for an unknown slug, exactly as /issue-report does;
     # a since that is not a day, or is after today, is a 422 (standup_for).
     # The tier probe and gh both block, so the whole read runs off the event loop.
-    filled = await asyncio.to_thread(standup_for, space, None, since)
+    # ?refresh=1 reads the tracker again past the TTL (tracker.py).
+    filled = await asyncio.to_thread(standup_for, space, None, since, bool(refresh))
     # The dress: after the read, on the loop -- the model call is async.
     filled.spoken = await dress_standup(filled)
     return filled

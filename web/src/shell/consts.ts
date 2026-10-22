@@ -139,7 +139,8 @@ export const VISIBILITY = consts.visibility as {
  * /api/studio/design/{name} refuses any other, and the reading room opens exactly
  * these -- the `> GitHub:` line that names a note's thread, which the CLI
  * writes on Promote and the agent reads back, and the label Promote applies.
- * The Prompts card: the agent's read it asks.
+ * The Prompts card: the agent's read it asks; the Spaces card's one read of
+ * every GitHub Space's ledger.
  */
 export const STUDIO = consts.studio as {
   noteName: string;
@@ -147,6 +148,7 @@ export const STUDIO = consts.studio as {
   threadRegex: string;
   promoteLabel: string;
   promptsRoute: string;
+  ledgerRoute: string;
 };
 
 /**

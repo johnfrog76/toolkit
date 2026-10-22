@@ -12,6 +12,8 @@ release.
 
 - Opening the Design tab on a repository with a large design archive takes seconds, not minutes: the notes are listed in one request instead of one per file, and what was read is kept between restarts so an unchanged note is never fetched again. The design search box also finds a design by its file name.
 - The Docs tab opens in a second: a repository's README and `docs/` folders are listed in one request, however deeply they nest, instead of one per folder.
+- The Studio's Spaces card opens in about a second with many GitHub Spaces instead of starting several `gh` calls per Space on every visit: every Space's issues, last deploy and visibility are read in one request, and kept for ten minutes so opening the card again, or after restarting the agent, asks GitHub nothing until you press Refresh.
+- The Team Agile standup and Triage pages open at once the second time: the tracker is read once a minute for both, and the standup's sentences are re-worded by the model only when what they say changes, even across an agent restart. Refresh on the Triage page still reads the tracker again.
 
 ## [1.2.0] - 2026-10-22
 

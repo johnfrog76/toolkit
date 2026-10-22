@@ -37,4 +37,9 @@ describe("the triage query", () => {
     expect(triageQuery("toolkit")).toBe(`${TRIAGE_QUERY}?space=toolkit`);
     expect(triageQuery("")).toBe(TRIAGE_QUERY);
   });
+
+  it("asks past the agent's kept read when it is the page's Refresh", () => {
+    expect(triageQuery("toolkit", true)).toBe(`${TRIAGE_QUERY}?space=toolkit&refresh=1`);
+    expect(triageQuery("", true)).toBe(`${TRIAGE_QUERY}?refresh=1`);
+  });
 });

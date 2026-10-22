@@ -43,8 +43,22 @@ let onSuccess: (() => void) | null = null;
 jest.mock("./api.studio", () => ({
   // Answered, so the card draws (it holds its loading state, and its
   // foot, until every row's reads settle).
-  useGetSpaceIssueReportQuery: () => ({ data: { supported: false } }),
-  useGetSpaceDeploysQuery: () => ({ data: { supported: false, runs: [] } }),
+  // Every GitHub Space's slot in the one ledger read: not connected.
+  useGetStudioLedgerQuery: () => ({
+    data: {
+      spaces: new Proxy(
+        {},
+        {
+          get: () => ({
+            report: { supported: false },
+            deploys: { supported: false, runs: [] },
+            visibility: { supported: true, visibility: "unknown", repos: [] },
+          }),
+        },
+      ),
+    },
+  }),
+  useRefreshStudioLedgerMutation: () => [jest.fn(), { isLoading: false }],
   useGetSpaceStatusQuery: () => ({ data: { count: 0, prompts: [] } }),
   useGetSpaceCandidatesQuery: (arg: unknown, opts: { skip?: boolean }) => {
     candidatesAsked.push({ ...opts, arg });

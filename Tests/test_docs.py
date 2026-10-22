@@ -27,7 +27,7 @@ from _skipguard import skip_module
 try:
     from fastapi.testclient import TestClient
 
-    from agent.ado import design, docs
+    from agent.ado import accounting, design, docs
     from agent.app import app
 except Exception as exc:  # pragma: no cover
     skip_module(f"the agent's dependencies are not installed: {exc}")
@@ -100,7 +100,8 @@ class FakeRepo:
         if argv[2] == f"repos/{REPO}":
             if self.has_issues is None:
                 return subprocess.CompletedProcess(argv, 1, stdout="", stderr="gh: Server Error (HTTP 502)")
-            row = {"html_url": f"https://github.com/{REPO}", "has_issues": self.has_issues}
+            # As GitHub answers it: the visibility rides in the same row.
+            row = {"html_url": f"https://github.com/{REPO}", "has_issues": self.has_issues, "visibility": "public"}
             return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(row), stderr="")
         if argv[2].startswith(f"repos/{REPO}/git/blobs/"):
             sha = argv[2].rsplit("/", 1)[1]
@@ -167,7 +168,7 @@ def _graphql(self, argv):
                 rows.append(row)
         return rows
 
-    repo: dict = {"url": ORG, "defaultBranchRef": {"name": "main"}}
+    repo: dict = {"url": ORG, "visibility": "PUBLIC", "defaultBranchRef": {"name": "main"}}
     if self.has_issues is not None:
         repo["hasIssuesEnabled"] = self.has_issues
     for line in query.splitlines():
@@ -461,6 +462,51 @@ class TheIssuesLink(unittest.TestCase):
         docs.design.clear_cache()
         self._read(fake)
         self.assertEqual(sum(1 for c in fake.calls if c[2] == f"repos/{REPO}"), 1)
+
+    # One source: the repository's record in the visibility cache
+    # (accounting.py) -- visibility, has_issues, url -- which the Spaces card's
+    # ledger, the listing and this cold read all fill and read.
+
+    def test_a_cold_read_with_the_record_warm_makes_no_repos_call(self):
+        accounting.remember_repo_record(REPO, accounting.repo_record("public", True, ORG))
+        fake = FakeRepo()
+        self.assertEqual(self._read(fake).issues, f"{ORG}/issues")
+        self.assertFalse(any(c[2] == f"repos/{REPO}" for c in fake.calls), fake.calls)
+        accounting.remember_repo_record(REPO, accounting.repo_record("private", False, ORG))
+        off = FakeRepo()
+        self.assertEqual(self._read(off).issues, "")
+        self.assertFalse(any(c[2] == f"repos/{REPO}" for c in off.calls), off.calls)
+
+    def test_a_record_the_spaces_ledger_read_serves_a_cold_document(self):
+        # The ledger fills the same record from its GraphQL answer.
+        accounting.remember_repo_record(
+            REPO, accounting.repo_record(accounting.visibility_word("PUBLIC"), True, f"https://github.com/{REPO}")
+        )
+        fake = FakeRepo()
+        self.assertEqual(self._read(fake).issues, f"https://github.com/{REPO}/issues")
+        self.assertEqual(
+            [c[2] for c in fake.calls if c[2].startswith(f"repos/{REPO}") and "/contents/" not in c[2]], []
+        )
+
+    def test_a_cold_read_with_the_record_cold_still_asks_once_and_holds_it_for_everyone(self):
+        fake = FakeRepo()
+        self.assertIsNone(accounting.cached_repo_record(REPO))
+        self.assertEqual(self._read(fake).issues, f"https://github.com/{REPO}/issues")
+        self.assertEqual(sum(1 for c in fake.calls if c[2] == f"repos/{REPO}"), 1)
+        held = accounting.cached_repo_record(REPO)
+        self.assertEqual(held, {"visibility": "public", "has_issues": True, "url": f"https://github.com/{REPO}"})
+        # The visibility read is answered by the same record, with no call.
+        with mock.patch.object(design.subprocess, "run", side_effect=fake):
+            self.assertEqual(accounting._gh_repo_visibility(REPO), "public")
+        self.assertEqual(sum(1 for c in fake.calls if c[2] == f"repos/{REPO}"), 1)
+
+    def test_the_listing_holds_the_record_a_document_read_then_uses(self):
+        fake = FakeRepo()
+        with mock.patch.object(design.subprocess, "run", side_effect=fake):
+            docs.list_docs(REPO)
+        self.assertEqual(accounting.cached_repo_record(REPO), {"visibility": "public", "has_issues": True, "url": ORG})
+        self.assertEqual(self._read(fake).issues, f"{ORG}/issues")
+        self.assertFalse(any(c[2] == f"repos/{REPO}" for c in fake.calls))
 
 
 if __name__ == "__main__":

@@ -2,7 +2,8 @@
 
 M0 is one ceremony, the standup (``standup.py``); V1 adds triage (``triage.py``,
 the open issues by milestone). Each is derived on every request from
-what the Space's GitHub tracker says now -- nothing is stored
+what the Space's GitHub tracker says -- read at most once a minute
+(``tracker.py``) -- and nothing is stored in the hub
 (docs/modules/solitaire-agile.md, "What it owns"). ``api`` is what
 ``agent/app.py`` mounts; it is gated per request on the engineer-scoped
 ``features.solitaireAgile`` and answers 404 when that is off -- the status a
