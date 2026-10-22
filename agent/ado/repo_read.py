@@ -222,6 +222,7 @@ class FolderRows:
     url: str = ""
     repo_url: str = ""  # https://github.com/<owner>/<repo>
     has_issues: bool | None = None  # the repository's issues switch; None when GitHub did not say
+    visibility: str = ""  # GitHub's word (PUBLIC | PRIVATE | INTERNAL), "" when it did not say
     reason: str | None = None
     calls: int = 0  # gh calls this read made (the tests', and the log's)
 
@@ -260,7 +261,7 @@ def _shape_query(n: int, with_text: bool, depths: list[int] | None = None) -> st
     return (
         f"query($owner: String!, $name: String!{params}) {{\n"
         f"  repository(owner: $owner, name: $name) {{\n"
-        f"    url\n    hasIssuesEnabled\n    defaultBranchRef {{ name }}\n{parts}\n  }}\n}}\n"
+        f"    url\n    hasIssuesEnabled\n    visibility\n    defaultBranchRef {{ name }}\n{parts}\n  }}\n}}\n"
     )
 
 
@@ -380,6 +381,7 @@ def read_folder_rows(
     out.repo_url = str(repository.get("url") or "")
     flag = repository.get("hasIssuesEnabled")
     out.has_issues = flag if isinstance(flag, bool) else None
+    out.visibility = str(repository.get("visibility") or "")
     inline: dict[str, str] = {}
     for i, folder in enumerate(folders):
         tree = repository.get(f"f{i}")
