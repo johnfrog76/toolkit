@@ -42,6 +42,7 @@ $promptsRoot = $cfg.PromptsRoot
 . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
 . (Join-Path $PSScriptRoot 'ConvertTo-LocalDay.ps1')
 . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
+. (Join-Path $PSScriptRoot 'Get-InPlayLine.ps1')
 $script:Consts = Get-P20Consts
 if (-not (Test-P20HubRoot $promptsRoot)) {
     Write-CliError -Message (Get-P20HubMissingMessage $promptsRoot)
@@ -66,6 +67,11 @@ OUTPUT COLUMNS:
     Modified      Last modified date (git commit date, or filesystem fallback)
     Status        Active | In Progress | Code Review
     Board         With -Board: the work item's System.State, for a card linked to one
+
+With limits.inPlay set ({cliPrefix}Config -Set limits.inPlay=5), the list opens with one line: "in play: 4" at or
+under the number, "in play: 7 of 5" past it. The count is every card in current/ -- Active, In Progress and Code
+Review -- and never the backlog/. It is a line the product says, not a gate: nothing refuses and nothing is hidden.
+Unset, there is no line.
 
 After the cards in play, the backlog/ -- cards planned, not yet in play -- is
 folded to one line: how many, and their names. Move <id> -To Active, a card's
@@ -159,7 +165,21 @@ $writeBacklog = {
     Write-Host ""
 }
 
+# -- The WIP line: opens the list when limits.inPlay is set -------------------------
+# Said, never enforced (Scripts/Get-InPlayLine.ps1). Past the number it is amber.
+$inPlayLimit = $null
+if ($cfg) { $inPlayLimit = $cfg.InPlayLimit }   # the config is a hashtable: a missing key reads $null
+$writeInPlay = {
+    param([int]$Count)
+    $inPlay = Get-P20InPlayLine -Count $Count -Limit $inPlayLimit
+    if (-not $inPlay.Line) { return }
+    $colour = 'Cyan'
+    if ($inPlay.Past) { $colour = 'Yellow' }
+    Write-Host "`n$($inPlay.Line)" -ForegroundColor $colour
+}
+
 if (-not (Test-Path $currentDir)) {
+    & $writeInPlay 0
     if ($backlogNames.Count -gt 0) {
         Write-Host "`nNo active prompts in current/." -ForegroundColor Yellow
         Write-Host ""
@@ -175,6 +195,7 @@ if (-not (Test-Path $currentDir)) {
 $files = Get-ChildItem -Path $currentDir -File |
 Where-Object { $_.Name -notlike '.*' }
 if ($files.Count -eq 0) {
+    & $writeInPlay 0
     Write-Host "No active prompts in current/." -ForegroundColor Yellow
     if ($backlogNames.Count -gt 0) { Write-Host ""; & $writeBacklog }
     return
@@ -361,6 +382,7 @@ $ordered.Sort([System.Comparison[object]] {
 # subexpression operator throws "Argument types do not match" here.
 $rows = $ordered.ToArray()
 
+& $writeInPlay $rows.Count
 Write-Host "`nActive prompts ($($rows.Count)):" -ForegroundColor Cyan
 Write-Host ""
 $i = 0

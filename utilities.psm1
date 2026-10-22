@@ -469,6 +469,11 @@ $script:ModuleState.Config = @{
     AgentPort = if ($localConfig.web -and $localConfig.web.agentPort) { [int]$localConfig.web.agentPort }
     elseif ($defaultConfig.web -and $defaultConfig.web.agentPort) { [int]$defaultConfig.web.agentPort }
     else { 4100 }
+    # The WIP limit: how many cards in play before Status and the board say so
+    # (limits.inPlay, machine-scoped, unset = no line). A line, never a gate.
+    InPlayLimit = if ($localConfig.limits -and $localConfig.limits.inPlay -and ([string]$localConfig.limits.inPlay -match '^\s*[1-9]\d*\s*$')) { [int]$localConfig.limits.inPlay }
+    elseif ($defaultConfig.limits -and $defaultConfig.limits.inPlay -and ([string]$defaultConfig.limits.inPlay -match '^\s*[1-9]\d*\s*$')) { [int]$defaultConfig.limits.inPlay }
+    else { $null }
     # The provider profile: the model id every model call sends --
     # AddPRReview here, suggest and rewrite in the agent, which reads the same
     # key through its own config loader. The key itself stays in the environment.

@@ -98,6 +98,16 @@
       "anchor": "spaces.{slug}.features.trainingHoursPerQuarter"
     },
     {
+      "id": "wip-limit",
+      "question": "How do I stay focused on fewer cards at once?",
+      "sentence": "Say how many cards you want in play at once. Status then opens with the count, and says 'of N' once you pass it; the board's Active column goes amber. It is a line, never a gate: nothing refuses, nothing blocks a pull, nothing is hidden. Leave it unset and nothing is said.",
+      "surfaces": [
+        "limits.inPlay"
+      ],
+      "door": "change",
+      "anchor": "limits.inPlay"
+    },
+    {
       "id": "sync",
       "question": "Does my hub follow me between machines?",
       "sentence": "With store sync on, the hub is a git repository and Sync pulls and pushes it, so a second machine sees the same cards.",

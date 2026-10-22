@@ -43,6 +43,7 @@ import { useGetEnvQuery } from "../../shell/api";
 import type { Lane } from "./legalMoves";
 import { filterPrompts, sprintsOf } from "./promptFilters";
 import { cardPath } from "./paths";
+import { countInPlay, inPlayLine } from "./inPlay";
 import { useRemindAbout } from "./useRemindAbout";
 
 // The board: the same cards as the list, arranged by where they ARE.
@@ -326,6 +327,12 @@ export function Board() {
   const [outcome, setOutcome] = useState<{ file: string; result: CommandResponse } | null>(null);
 
   const all = useMemo(() => data?.prompts ?? [], [data]);
+  // The WIP line counts every card in play, filters or no: a filtered view is
+  // not fewer cards in play. The limit comes from /env, once.
+  const inPlay = useMemo(
+    () => inPlayLine(countInPlay(all), env?.config?.inPlayLimit),
+    [all, env?.config?.inPlayLimit],
+  );
   const sprints = useMemo(() => sprintsOf(all), [all]);
   const shown = useMemo(
     () =>
@@ -542,6 +549,19 @@ export function Board() {
                 {!isDone ? (
                   <Badge appearance="filled" color="informative" size="small">
                     {cards.length}
+                  </Badge>
+                ) : null}
+                {/* The WIP line rides the Active column's head: every lane of
+                    current/ counted, amber (the warning tokens) past the number.
+                    A line the board says, never a gate -- no drop is refused. */}
+                {lane === STATUS.active && inPlay ? (
+                  <Badge
+                    appearance={inPlay.past ? "filled" : "tint"}
+                    color={inPlay.past ? "warning" : "subtle"}
+                    size="small"
+                    data-in-play={inPlay.past ? "past" : "within"}
+                  >
+                    {inPlay.text}
                   </Badge>
                 ) : null}
               </div>

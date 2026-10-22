@@ -748,6 +748,8 @@ def load_config() -> dict:
         # turns on and its Dismiss turns off, through Config.
         # Hide the shipped Example org from what is offered (offered_spaces).
         "isDemoDismissed": bool(local.get("isDemoDismissed", defaults.get("isDemoDismissed", False))),
+        # The WIP limit (limits.inPlay): a line Status and the board say, never a gate.
+        "limits": _deep_merge(dict(defaults.get("limits", {}) or {}), local.get("limits", {}) or {}),
         "firstRun": _deep_merge(dict(defaults.get("firstRun", {}) or {}), local.get("firstRun", {}) or {}),
         # The verb table's own metadata. The bridge reads one key off it --
         # bridgeTimeoutSeconds -- and a per-machine config may patch an entry,
@@ -922,6 +924,23 @@ def anthropic_api_key() -> str:
 def anthropic_configured() -> bool:
     """Whether the model-assisted routes have a credential to work with."""
     return bool(anthropic_api_key())
+
+
+def in_play_limit(cfg: dict | None = None) -> int | None:
+    """The WIP limit, ``limits.inPlay``: a whole number of 1 or more, else ``None``.
+
+    Unset, zero, negative, a bool or anything that is not a whole number reads as no
+    limit (the opt-in rule), exactly as ``Scripts/Get-InPlayLine.ps1`` reads it. It is
+    a line the board and ``Status`` SAY, never a gate: nothing here refuses a card.
+    """
+    raw = ((cfg if cfg is not None else load_config()).get("limits") or {}).get("inPlay")
+    if isinstance(raw, bool):
+        return None
+    try:
+        n = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return None
+    return n if n >= 1 else None
 
 
 def start_work_launch() -> bool:

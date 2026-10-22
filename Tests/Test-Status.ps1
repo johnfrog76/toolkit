@@ -583,6 +583,28 @@ foreach ($row in $mismatchTable) {
 }
 
 # -- Typed as the verb ----------------------------------------------------------
+# -- The WIP line (limits.inPlay): a table, one row per input the rule tells apart ----
+# A line the product says, never a gate. Scripts/Get-InPlayLine.ps1 is the rule; the
+# web board's twin is Board.inPlay.test.tsx and the agent's is test_card_model.py.
+. (Join-Path $pkgRoot 'Scripts/Get-InPlayLine.ps1')
+Write-Host "In play line (limits.inPlay)" -ForegroundColor Cyan
+$inPlayTable = @(
+    @{ N = 'unset';                Count = 7; Limit = $null;  Line = '';                Past = $false },
+    @{ N = 'zero is no limit';     Count = 7; Limit = 0;      Line = '';                Past = $false },
+    @{ N = 'negative is no limit'; Count = 7; Limit = -3;     Line = '';                Past = $false },
+    @{ N = 'not a number';         Count = 7; Limit = 'lots'; Line = '';                Past = $false },
+    @{ N = 'under';                Count = 4; Limit = 5;      Line = 'in play: 4';      Past = $false },
+    @{ N = 'at';                   Count = 5; Limit = 5;      Line = 'in play: 5';      Past = $false },
+    @{ N = 'past';                 Count = 7; Limit = 5;      Line = 'in play: 7 of 5'; Past = $true },
+    @{ N = 'past, limit as text';  Count = 7; Limit = '5';    Line = 'in play: 7 of 5'; Past = $true },
+    @{ N = 'nothing in play';      Count = 0; Limit = 5;      Line = 'in play: 0';      Past = $false }
+)
+foreach ($row in $inPlayTable) {
+    $got = Get-P20InPlayLine -Count $row.Count -Limit $row.Limit
+    Assert-True "in play line: $($row.N)" ($got.Line -eq $row.Line -and $got.Past -eq $row.Past) "got '$($got.Line)' past=$($got.Past)"
+}
+Write-Host ""
+
 # A suite that runs a script directly does not test the verb (AGENTS.md): a fresh
 # shell, the package alone on PSModulePath, `az` stubbed, `tkStatus -Board` typed.
 $verbRoot = Join-Path ([System.IO.Path]::GetTempPath()) "p20-status-verb-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
@@ -592,15 +614,25 @@ try {
     foreach ($file in @('utilities.psm1', 'config.default.json', 'consts.json')) { Copy-Item (Join-Path $pkgRoot $file) $vPkg -Force }
     Copy-Item (Join-Path $pkgRoot 'Scripts') $vPkg -Recurse -Force
     Copy-Item (Join-Path $pkgRoot 'Config') $vPkg -Recurse -Force
-    $hubJson = '{ "hub": 1, "spaces": [ { "slug": "board", "name": "Board", "status": "active", "promptsFolder": "board", "org": "https://dev.azure.com/acme-org" }, { "slug": "mine", "name": "Mine", "status": "local", "promptsFolder": "mine" } ] }'
+    $hubJson = '{ "hub": 1, "spaces": [ { "slug": "board", "name": "Board", "status": "active", "promptsFolder": "board", "org": "https://dev.azure.com/acme-org" }, { "slug": "mine", "name": "Mine", "status": "local", "promptsFolder": "mine" }, { "slug": "wip", "name": "Wip", "status": "local", "promptsFolder": "wip" } ] }'
     [System.IO.File]::WriteAllText((Join-Path $vHub 'hub.json'), $hubJson, (New-Object System.Text.UTF8Encoding($false)))
     foreach ($f in @('board', 'mine')) { New-Item -ItemType Directory -Path (Join-Path $vHub "$f/current") -Force | Out-Null }
     $card = "# Task 142: Already closed`n`n---`n`n**ADO Link:** https://dev.azure.com/acme-org/Proj/_workitems/edit/142"
     [System.IO.File]::WriteAllText((Join-Path $vHub 'board/current/Task142-already-closed.prompt.md'), $card, (New-Object System.Text.UTF8Encoding($false)))
     [System.IO.File]::WriteAllText((Join-Path $vHub 'mine/current/Task142-already-closed.prompt.md'), $card, (New-Object System.Text.UTF8Encoding($false)))
 
-    function Invoke-StatusVerb([string]$Space, [string]$Snippet) {
+    # The WIP space: three cards in current/ (every lane counts), two in backlog/ (not counted).
+    foreach ($f in @('wip/current', 'wip/backlog')) { New-Item -ItemType Directory -Path (Join-Path $vHub $f) -Force | Out-Null }
+    foreach ($n in @('K7M2', 'P4R9', 'T6V3')) {
+        [System.IO.File]::WriteAllText((Join-Path $vHub "wip/current/Task$n-in-play.prompt.md"), "# Task ${n}: In play`n", (New-Object System.Text.UTF8Encoding($false)))
+    }
+    foreach ($n in @('C3D4', 'E5F6')) {
+        [System.IO.File]::WriteAllText((Join-Path $vHub "wip/backlog/Task$n-planned.prompt.md"), "# Task ${n}: Planned`n", (New-Object System.Text.UTF8Encoding($false)))
+    }
+
+    function Invoke-StatusVerb([string]$Space, [string]$Snippet, $Limit = $null) {
         $local = [ordered]@{ quietStart = $true; promptsRoot = $vHub; activeSpace = $Space }
+        if ($null -ne $Limit) { $local['limits'] = [ordered]@{ inPlay = $Limit } }
         [System.IO.File]::WriteAllText((Join-Path $vPkg 'config.local.json'), ($local | ConvertTo-Json -Depth 4), (New-Object System.Text.UTF8Encoding($false)))
         $pkg = $vPkg -replace "'", "''"; $hub = $vHub -replace "'", "''"; $log = $vLog -replace "'", "''"
         $pre = @"
@@ -628,6 +660,17 @@ Import-Module '$pkg/utilities.psm1' -Force -DisableNameChecking *>`$null
         ($text -match 'EXIT=2' -and $text -match 'Azure DevOps is off for this Space' -and $text -notmatch 'exit code 2') $text
     $text = Invoke-StatusVerb 'mine' 'tkStatus'
     Assert-True "typed as the verb, plain tkStatus in that Space still lists the card" ($text -match 'Already closed' -and $text -notmatch 'Board:' -and $text -match 'EXIT=0') $text
+    # The WIP line, typed as the verb: three cards in current/, two in backlog/.
+    $text = Invoke-StatusVerb 'wip' 'tkStatus'
+    Assert-True "typed as the verb, with no limit set there is no in play line" ($text -notmatch '(?m)^in play:' -and $text -match 'EXIT=0') $text
+    $text = Invoke-StatusVerb 'wip' 'tkStatus' 5
+    Assert-True "typed as the verb, under the limit the list opens with the bare count (backlog not counted)" `
+        ($text -match '(?s)in play: 3\s.*Active prompts \(3\)' -and $text -notmatch 'in play: 3 of' -and $text -match 'EXIT=0') $text
+    $text = Invoke-StatusVerb 'wip' 'tkStatus' 3
+    Assert-True "typed as the verb, at the limit it is still the bare count" ($text -match 'in play: 3\s' -and $text -notmatch 'in play: 3 of') $text
+    $text = Invoke-StatusVerb 'wip' 'tkStatus' 2
+    Assert-True "typed as the verb, past the limit it says 'of N' and still lists every card (no gate)" `
+        ($text -match 'in play: 3 of 2' -and $text -match 'Active prompts \(3\)' -and $text -match 'EXIT=0') $text
     $text = Invoke-StatusVerb 'board' 'tkStatus -Help'
     Assert-True "-Help names -Board" ($text -match '-Board') $text
 }
