@@ -9,7 +9,6 @@ test is what keeps the two derivations honest.
 
 import asyncio
 import re
-import subprocess
 import threading
 import time
 
@@ -17,11 +16,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ..core.assets import card_images
-from ..core.clock import local_day
 from ..core.config import (
     backlog_dir,
     card_types,
-    hub_root,
     load_config,
     org_folder,
     resolve_dirs,
@@ -29,6 +26,7 @@ from ..core.config import (
     tracker_repos,
 )
 from ..core.consts import folder_current
+from ..core.git_history import folder_changes
 from ..core.parsers import _parse_status_metadata, card_id, status_sort_key
 from ..core.tier import _resolve_tier
 from .accounting import _gh_json, space_entry
@@ -221,7 +219,6 @@ async def get_status(space: str = ""):
     (``space_entry``, behind ``space_scope``), so an undeclared one is the same
     404 naming it.
     """
-    root = hub_root()
     cfg = load_config()
     active = cfg.get("activeSpace", "")
     # Another Space's cards: its own folder, and its pins are not asked for.
@@ -240,24 +237,14 @@ async def get_status(space: str = ""):
     space = space or active
     prompts: list[PromptInfo] = []
 
-    # Asked ONCE, not once per card. The hub need not be a git repository
-    # (docs/CONFIGURATION.md), and outside one every ``git log`` below is a process
-    # start that can only fail. The CLI's Get-PromptStatus.ps1 asks the same
-    # question the same way, and for the same two reasons -- one of them was a
-    # stray exit 128 there.
-    hub_is_repo = False
-    try:
-        probe = await asyncio.to_thread(
-            subprocess.run,
-            ["git", "rev-parse", "--is-inside-work-tree"],
-            capture_output=True,
-            text=True,
-            cwd=str(root),
-            timeout=5,
-        )
-        hub_is_repo = probe.returncode == 0
-    except (subprocess.TimeoutExpired, OSError):
-        hub_is_repo = False
+    # The day each card last changed: ONE ``git log`` for the Space's folders,
+    # not one per card (agent/core/git_history.py). The hub need not be a git
+    # repository (docs/CONFIGURATION.md); outside one there is no map, and every
+    # card reads its mtime below. The CLI's Get-PromptStatus.ps1 makes the same
+    # one read of current/, and Tests/fixtures/status-modified/ holds the two to
+    # one day.
+    space_dir = current_dir.parent
+    days = await asyncio.to_thread(folder_changes, space_dir, [d.name for d in folders]) or {}
 
     for f in files:
         if not f.is_file() or f.name.startswith("."):
@@ -267,25 +254,9 @@ async def get_status(space: str = ""):
         if meta["design"]:
             meta["design"] = {**meta["design"], "short": meta["design"]["id"][:8]}
 
-        # Last modified -- git log when the hub is a repository, the mtime
-        # below when it is not. Nothing raises either way.
-        modified = ""
-        if hub_is_repo:
-            try:
-                result = await asyncio.to_thread(
-                    subprocess.run,
-                    ["git", "log", "-1", "--format=%at", "--", str(f.relative_to(root))],
-                    capture_output=True,
-                    text=True,
-                    cwd=str(root),
-                    timeout=5,
-                )
-                if result.returncode == 0 and result.stdout.strip():
-                    # %at read as the LOCAL day, the same rule as
-                    # Get-PromptStatus.ps1. %ai[:10] was the AUTHOR's day.
-                    modified = local_day(result.stdout.strip()) or ""
-            except (subprocess.TimeoutExpired, ValueError, OSError):
-                pass
+        # Last modified -- the folder's git log when the hub is a repository, the
+        # mtime below when it is not, or when the log never named this card.
+        modified = days.get(f"{f.parent.name}/{f.name}", ("", ""))[0]
         if not modified:
             mtime = f.stat().st_mtime
             modified = time.strftime("%Y-%m-%d", time.localtime(mtime))
@@ -321,29 +292,27 @@ async def get_status_detail(filename: str):
     type_names, prefixes = card_types()
     meta = _parse_status_metadata(content, type_names, folder=path.parent.name)
     images = card_images(content, path, load_config().get("activeSpace", ""))
-    meta["design"] = await resolve_card_design(meta["design"])
+    # The design listings are read ONCE for the request and handed to the lookup,
+    # and not at all for a card whose line names no id.
+    line = meta["design"]
+    rows = await design_listings(line["link"]) if line and line.get("id") else []
+    meta["design"] = resolve_card_design(line, rows)
     return PromptDetailResponse(
         filename=filename, path=str(path.resolve()), id=card_id(filename, prefixes), content=content, **images, **meta
     )
 
 
-async def resolve_card_design(line: dict | None) -> CardDesign | None:
-    """The card's design line, and -- when it carries an id -- what that id is
-    now: its state and the document to open (docs/hub/cards.md,
-    "Inside the file"). The hub's designs are read from disk; a repo's only when the line's
-    link is a GitHub URL and the Design tab's gate passes (a GitHub Space at
-    Tier 1, its listing cached as the tab's is). A design that cannot be read
-    leaves the line as it was written -- "the short id and the title last seen"."""
-    if not line:
-        return None
-    found = CardDesign(**line, short=line.get("id", "")[:8])
-    if not found.id:
-        return found
+async def design_listings(link: str) -> list[tuple[str, object]]:
+    """Every design a card's id may name, as (where, design) rows, read once per
+    request: the active Space's repo through the Design tab's own (cached)
+    listing when the line's link is a GitHub URL and the tab's gate passes (a
+    GitHub Space at Tier 1), then the hub's designs from disk. One call to each
+    listing at most, whatever the caller then looks up in them."""
     from ..studio.notes import list_hub_designs  # notes.py imports design.py, not this
     from .design import list_design, repo_gate
 
     rows: list[tuple[str, object]] = []
-    if found.link.startswith("https://github.com/"):
+    if link.startswith("https://github.com/"):
         try:
             repo = await repo_gate()
         except HTTPException:
@@ -353,6 +322,20 @@ async def resolve_card_design(line: dict | None) -> CardDesign | None:
             rows += [("repo", d) for d in listed.designs]
     hub = await asyncio.to_thread(list_hub_designs, load_config().get("spaces", []) or [], False)
     rows += [("hub", d) for d in hub.designs]
+    return rows
+
+
+def resolve_card_design(line: dict | None, rows: list[tuple[str, object]]) -> CardDesign | None:
+    """The card's design line, and -- when it carries an id -- what that id is
+    now: its state and the document to open (docs/hub/cards.md,
+    "Inside the file"), looked up in ``rows`` (``design_listings``, read by the
+    caller once per request). A design that cannot be found leaves the line as
+    it was written -- "the short id and the title last seen"."""
+    if not line:
+        return None
+    found = CardDesign(**line, short=line.get("id", "")[:8])
+    if not found.id:
+        return found
     for where, d in rows:
         if d.id == found.id:
             doc = d.spec or d.note
