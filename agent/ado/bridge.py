@@ -335,12 +335,19 @@ async def run_command(name: str, req: CommandRequest | None = None):
     among its parameters: a picture the browser staged for ``Cover`` or
     ``NewPrompt -Cover`` is a temp file the verb only copies, so whatever the
     outcome, the folder is finished with. ``remove_upload`` touches nothing that
-    is not a ``p20-upload-`` folder directly under the system temp."""
+    is not a ``p20-upload-`` folder directly under the system temp.
+
+    A verb may have written to the tracker (``Route`` moves a label), so the
+    rituals' kept tracker reads are forgotten either way: the next standup or
+    triage reads again rather than serve what the write changed."""
     try:
         return await _run_command(name, req)
     finally:
         for p in req.params if req else []:
             remove_upload(p)
+        from ..solitaire import tracker as ritual_tracker  # here: solitaire imports ado
+
+        ritual_tracker.forget()
 
 
 async def _run_command(name: str, req: CommandRequest | None = None):

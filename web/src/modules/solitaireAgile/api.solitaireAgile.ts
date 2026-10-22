@@ -331,9 +331,14 @@ export interface TriageResponse {
 
 export const TRIAGE_QUERY = underBase(RITUALS.triageRoute);
 
-/** The query for one Space's triage; "" asks for the Space you are in. */
-export function triageQuery(space: string): string {
-  return space ? `${TRIAGE_QUERY}?space=${encodeURIComponent(space)}` : TRIAGE_QUERY;
+/** The query for one Space's triage; "" asks for the Space you are in.
+ *  `refresh` asks the agent to read the tracker again past its kept read. */
+export function triageQuery(space: string, refresh = false): string {
+  const params = [
+    ...(space ? [`space=${encodeURIComponent(space)}`] : []),
+    ...(refresh ? ["refresh=1"] : []),
+  ];
+  return params.length ? `${TRIAGE_QUERY}?${params.join("&")}` : TRIAGE_QUERY;
 }
 
 const triageApi = api.enhanceEndpoints({ addTagTypes: ["Triage"] });
@@ -347,6 +352,16 @@ export const triageEndpoints = triageApi.injectEndpoints({
       keepUnusedDataFor: CACHE_TTL,
     }),
 
+    // GET /api/ritual/triage?space=<slug>&refresh=1 -- the page's Refresh. The
+    // agent keeps each tracker read for 60 seconds, so a plain refetch would be
+    // that read again, which is exactly what pressing Refresh does not want. A
+    // mutation for the reason refreshEnv is one; it invalidates getTriage, whose
+    // refetch is then served the read this one just made.
+    refreshTriage: builder.mutation<TriageResponse, string>({
+      query: (space) => ({ url: triageQuery(space, true), method: "GET" }),
+      invalidatesTags: ["Triage"],
+    }),
+
     // POST /api/cmd/Route -- one answer; the argv is buildRouteParams
     runRoute: builder.mutation<CommandResponse, { params: string[] }>({
       query: ({ params }) => ({ url: "cmd/Route", method: "POST", body: { params } }),
@@ -355,7 +370,7 @@ export const triageEndpoints = triageApi.injectEndpoints({
   }),
 });
 
-export const { useGetTriageQuery, useRunRouteMutation } = triageEndpoints;
+export const { useGetTriageQuery, useRefreshTriageMutation, useRunRouteMutation } = triageEndpoints;
 
 // -- StartWork (AR-1 of the agent in the room) ------------------------------
 //

@@ -21,7 +21,11 @@ import { useGetMilestonesQuery } from "../ado/api.ado";
 import { ActionDialog } from "../ado/ActionDialog";
 import { buildRouteParams, commandResultMessage } from "../ado/cliBridge";
 import type { RouteFields } from "../ado/cliBridge";
-import { useGetTriageQuery, useRunRouteMutation } from "./api.solitaireAgile";
+import {
+  useGetTriageQuery,
+  useRefreshTriageMutation,
+  useRunRouteMutation,
+} from "./api.solitaireAgile";
 import type { TriageGroup, TriageIssue, TriageResponse } from "./api.solitaireAgile";
 
 // Triage, `/solitaire-agile/triage` (docs/modules/solitaire-agile.md, "The web UI"):
@@ -147,9 +151,11 @@ export function TriagePage() {
   const styles = useStyles();
   const { data: env, isLoading: envLoading } = useGetEnvQuery();
   const space = env?.config?.activeSpace ?? "";
-  const { data, isLoading, isFetching, error, refetch } = useGetTriageQuery(space, {
+  const { data, isLoading, isFetching, error } = useGetTriageQuery(space, {
     skip: envLoading,
   });
+  // Refresh reads the tracker again past the agent's 60-second read.
+  const [refreshTriage, { isLoading: refreshing }] = useRefreshTriageMutation();
   const { data: milestoneData } = useGetMilestonesQuery();
   const [runRoute, { isLoading: busy }] = useRunRouteMutation();
 
@@ -194,7 +200,7 @@ export function TriagePage() {
     setIndex(0);
     setDeepOpen(false);
     setOutcome(null);
-    void refetch();
+    void refreshTriage(space);
   };
 
   const answer = async (fields: Omit<RouteFields, "number">, done: string) => {
@@ -261,7 +267,7 @@ export function TriagePage() {
               </Caption1>
               <RefreshButton
                 onClick={startOver}
-                isFetching={isFetching}
+                isFetching={isFetching || refreshing}
                 title="Read the issues again"
               />
             </>

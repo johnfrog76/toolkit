@@ -78,6 +78,7 @@ function responseFor(name: string): TriageResponse {
 
 let answer: { data?: unknown; error?: unknown; isLoading?: boolean } = {};
 let askedSpace: string | null = null;
+const refreshed: string[] = [];
 const posted: string[][] = [];
 let routeResult: { status: string; output: string; error: string | null } = {
   status: "success",
@@ -90,6 +91,13 @@ jest.mock("./api.solitaireAgile", () => ({
     askedSpace = space;
     return { isLoading: false, isFetching: false, refetch: jest.fn(), ...answer };
   },
+  useRefreshTriageMutation: () => [
+    (space: string) => {
+      refreshed.push(space);
+      return { unwrap: () => Promise.resolve({}) };
+    },
+    { isLoading: false },
+  ],
   useRunRouteMutation: () => [
     ({ params }: { params: string[] }) => {
       posted.push(params);
@@ -134,6 +142,7 @@ jest.mock("../../shell/api", () => ({
 beforeEach(() => {
   answer = {};
   askedSpace = null;
+  refreshed.length = 0;
   posted.length = 0;
   dialogOpens.length = 0;
   routeResult = { status: "success", output: "Routed.", error: null };
@@ -306,6 +315,13 @@ describe("the Triage page", () => {
     // The status line is always in the layout, so finding it is not waiting for the answer.
     const status = screen.getByTestId("triage-status");
     await waitFor(() => expect(status.textContent).toMatch(/No open milestone 'X'/));
+  });
+
+  it("Refresh asks past the agent's kept read, for the Space you are in", () => {
+    answer = { data: responseFor("mixed") };
+    render(<TriagePage />);
+    fireEvent.click(screen.getByTitle("Read the issues again"));
+    expect(refreshed).toEqual(["toolkit"]);
   });
 
   it("past the last issue it says so, and offers to start again", () => {

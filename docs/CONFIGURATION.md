@@ -731,14 +731,16 @@ the contract file and is typed where it is read.
 ## The agent's cache
 
 The agent keeps one thing on disk that is not a setting and not the hub's: what it has already read
-through the tracker and can prove has not changed, or that it holds for a stated time. Two readers write
+through the tracker and can prove has not changed, or that it holds for a stated time. Three readers write
 there. The Design tab's: each design or spec file's parsed row (id, title, description, its stamps, its Docs
 and thread lines; never the body), and the body of a note once it has been opened -- each keyed by the file's
 **blob sha**, a hash of its bytes, so nothing in it can go stale: a note that changes has a new sha and is
-read again ([the design lifecycle](hub/design.md)). And the Studio's Spaces card's: each GitHub Space's
+read again ([the design lifecycle](hub/design.md)). The Studio's Spaces card's: each GitHub Space's
 ledger -- its issue counts, newest runs and repository visibility -- held for 600 seconds and keyed by the
 Space's repositories and status, so a foyer opened twice in ten minutes, or after an agent restart, reads
-GitHub once ([the Studio](modules/studio.md#the-routes)). `agent/core/disk_cache.py` owns the place:
+GitHub once ([the Studio](modules/studio.md#the-routes)). And the standup's dressed sentences, keyed by a hash
+of the model, the register and the facts the model was given, so a sentence is re-dressed only when its facts
+change ([Team Agile](modules/solitaire-agile.md), "The agentic layer"). `agent/core/disk_cache.py` owns the place:
 
 | Where | When |
 | --- | --- |
@@ -751,7 +753,7 @@ Never the hub -- it is your record, and it may be synced between machines -- and
 tree `Update` refuses to move while it is dirty. Under it, `rows/<reader>.json` holds the parsed rows (the
 reader's name carries a version, bumped when what it parses changes), `bodies/<sha>` the opened bodies, and
 `ledger-1/<slug>.json` each GitHub Space's ledger with the time it was read (the folder's version is bumped
-when the ledger's shape changes).
+when the ledger's shape changes), and `standup-dress-1/<hash>.json` the dressed replies.
 Delete the folder whenever you like: the next read fetches what it needs again. `Config` does not know the
 variable; like the other overrides it is a launcher's, not a setting.
 
