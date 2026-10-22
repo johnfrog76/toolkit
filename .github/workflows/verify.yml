@@ -116,6 +116,13 @@ jobs:
           code=${PIPESTATUS[0]}
           pwsh -NoProfile -File ../Scripts/Test-CiHalf.ps1 -Half web -Path "$RUNNER_TEMP/web.log" -ExitCode "$code"
 
+      # The web lint: eslint, then prettier --check (both in `npm run lint`), the
+      # first row of the web half of docs/CONTRIBUTING.md, "Lint".
+      - name: The web lint -- npm run lint
+        if: ${{ !cancelled() && steps.npm.outcome == 'success' }}
+        working-directory: web
+        run: npm run lint
+
       # The documentation lints: markdownlint over the root README.md and the other
       # root documents, docs/, web/README.md and agent/README.md, with the tree's
       # own settings (.markdownlint-cli2.jsonc).

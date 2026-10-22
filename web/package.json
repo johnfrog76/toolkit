@@ -10,7 +10,7 @@
     "build": "vite build",
     "build:landing": "vite build --mode landing",
     "preview": "vite preview",
-    "lint": "eslint src",
+    "lint": "eslint src && prettier --check src",
     "lint:fix": "eslint src --fix",
     "lint:md": "cd .. && markdownlint-cli2 \"README.md\" \"*.md\" \"docs/**/*.md\" \"design/*.md\" \"spec/*.md\" \"web/README.md\" \"agent/README.md\"",
     "format": "prettier --write src",

@@ -211,12 +211,13 @@ is a finding like an error: the bar is zero of either.
 
 | Half | From | Command | Settings |
 | --- | --- | --- | --- |
-| web | `web/` | `npx eslint src` (`npm run lint`) | `web/eslint.config.js` |
-| web | `web/` | `npx prettier --check src` (`npm run format:check`); `--write` to apply | `web/.prettierrc.json`, `web/.prettierignore` |
+| web | `web/` | `npm run lint`: `eslint src`, then `prettier --check src` (CI runs it) | `web/eslint.config.js`, `web/.prettierrc.json`, `web/.prettierignore` |
 | agent | the repository root | `ruff check` | `ruff.toml` |
 | agent | the repository root | `ruff format --check`; without `--check` to apply | `ruff.toml` |
 | CLI | the repository root, in `pwsh` | the PSScriptAnalyzer command below | `PSScriptAnalyzerSettings.psd1` |
 | documentation | `web/` | `npm run lint:md` (markdownlint-cli2 over every document in the repository: the root `README.md` and other root documents, `docs/`, the `design/` and `spec/` READMEs, `web/README.md`, `agent/README.md`) | `.markdownlint-cli2.jsonc` |
+
+A Prettier failure names the files: fix them with `npx prettier --write <file>` (`npm run format` for all of `web/src`), then run `npm run lint` again.
 
 `.gitattributes` pins `web/src` to LF on disk, which is what Prettier's `endOfLine` expects, so a Windows checkout with `core.autocrlf` true passes `--check`. A clone that predates that line keeps its CRLF files until they are checked out again.
 
