@@ -121,6 +121,49 @@ def _graphql(query: str, fields: list[str]):
     return data, None
 
 
+def graphql_aliases(query: str, fields: list[str]) -> tuple[dict | None, dict[str, str], str | None]:
+    """``gh api graphql`` for a query of aliased lookups, one of which may fail
+    alone: (the ``data`` object, {alias: GitHub's message}, None), or (None, {},
+    why) when the call itself did not answer.
+
+    GitHub answers a query whose one ``repository(...)`` cannot be resolved with
+    the other aliases' data AND an ``errors`` entry whose ``path`` names the
+    failed alias; ``gh`` then exits 1 with that whole answer on stdout. So the
+    answer is read from stdout whatever the exit code, and only an answer with no
+    ``data`` is a failure of the call. The query travels in a file and every
+    value as a field, as ``_graphql``'s does."""
+    fd, path = tempfile.mkstemp(prefix="p20-gql-", suffix=".graphql")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(query)
+        cmd = ["gh", "api", "graphql", "-F", f"query=@{path}", *fields]
+        try:
+            result = run_read(cmd, GH_TIMEOUT_SECONDS)
+        except Exception as exc:  # noqa: BLE001 -- gh missing, the clock ran out, or its output unreadable: a reason, never a raise
+            return None, {}, did_not_answer("gh", exc)
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+    try:
+        out = json.loads(result.stdout or "null")
+    except ValueError:
+        out = None
+    data = out.get("data") if isinstance(out, dict) else None
+    if not isinstance(data, dict):
+        if result.returncode == 0:
+            return None, {}, "gh answered with no data"
+        lines = (result.stderr or "").strip().splitlines()
+        return None, {}, lines[0] if lines else "gh returned an error"
+    errors: dict[str, str] = {}
+    for err in out.get("errors") or []:
+        where = (err or {}).get("path") or []
+        if where and isinstance(where[0], str):
+            errors.setdefault(where[0], str(err.get("message") or "gh returned an error"))
+    return data, errors, None
+
+
 def is_sha(value: str) -> bool:
     return bool(_SHA.match(value or ""))
 
@@ -179,6 +222,7 @@ class FolderRows:
     url: str = ""
     repo_url: str = ""  # https://github.com/<owner>/<repo>
     has_issues: bool | None = None  # the repository's issues switch; None when GitHub did not say
+    visibility: str = ""  # GitHub's word (PUBLIC | PRIVATE | INTERNAL), "" when it did not say
     reason: str | None = None
     calls: int = 0  # gh calls this read made (the tests', and the log's)
 
@@ -217,7 +261,7 @@ def _shape_query(n: int, with_text: bool, depths: list[int] | None = None) -> st
     return (
         f"query($owner: String!, $name: String!{params}) {{\n"
         f"  repository(owner: $owner, name: $name) {{\n"
-        f"    url\n    hasIssuesEnabled\n    defaultBranchRef {{ name }}\n{parts}\n  }}\n}}\n"
+        f"    url\n    hasIssuesEnabled\n    visibility\n    defaultBranchRef {{ name }}\n{parts}\n  }}\n}}\n"
     )
 
 
@@ -337,6 +381,7 @@ def read_folder_rows(
     out.repo_url = str(repository.get("url") or "")
     flag = repository.get("hasIssuesEnabled")
     out.has_issues = flag if isinstance(flag, bool) else None
+    out.visibility = str(repository.get("visibility") or "")
     inline: dict[str, str] = {}
     for i, folder in enumerate(folders):
         tree = repository.get(f"f{i}")

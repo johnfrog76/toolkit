@@ -1,11 +1,13 @@
 /**
  * The Studio's data.
  *
- * The foyer reads the routes the pane already has -- GET /api/issue-report and
- * GET /api/deploys -- once per GitHub Space, through their `space` argument
- * (the one new seam, docs/modules/studio.md, "The routes"), so it never switches
- * into a Space to read it; every other Space's row reads the core's own
- * GET /api/status, through the same `space` argument for a Space you are
+ * The foyer reads every GitHub Space's facts in ONE read, GET /api/studio/ledger
+ * (consts.json studio.ledgerRoute): each Space's issue report, newest runs and
+ * repository visibility, in the shapes /api/issue-report, /api/deploys and
+ * /api/visibility answer -- one gh call for all of them on the agent, kept on
+ * its disk for ten minutes (docs/modules/studio.md, "The routes") -- so it never
+ * switches into a Space to read it; every other Space's row reads the core's own
+ * GET /api/status, through its `space` argument for a Space you are
  * not in (FoyerCard). The seed drawer reads the hub's design/ notes
  * (GET /api/studio/design, /api/studio/design/{name}); the Prompts card reads
  * the agentic prompts (GET /api/studio/prompts, /api/studio/prompts/{ref}).
@@ -18,16 +20,16 @@
  * dialog's picker reads GET /api/spaces/candidates, which is the same verb's
  * -Discover through the bridge.
  *
- * The Spaces card's three reads, and the shell's visibility read, are kept for
+ * The Spaces card's reads, and the shell's visibility read, are kept for
  * the session (SESSION_CACHE): nothing re-reads them on a remount, a
  * focus or a timer -- only the card's Refresh, or a write that invalidates
- * Status.
+ * Status (the cards) or Env (the Spaces, and so the ledger).
  *
  * The module owns these endpoints. The Studio is core (D-S13) but its pages are
  * still lazy parts, so this file arrives with the first Studio page drawn.
  */
 import { api, API_BASE, CACHE_TTL, SESSION_CACHE } from "../../shell/api";
-import type { HowIWork } from "../../shell/api";
+import type { HowIWork, SpaceVisibility } from "../../shell/api";
 import { STUDIO } from "../../shell/consts";
 import type {
   CommandResponse,
@@ -163,6 +165,24 @@ export interface PromptsResponse {
   categories?: string[];
 }
 
+/** One GitHub Space's row facts, in the shapes the three per-Space routes answer. */
+export interface SpaceLedger {
+  report: IssueReport;
+  deploys: DeploysResponse;
+  visibility: SpaceVisibility;
+}
+
+/** GET /api/studio/ledger -- every declared GitHub Space's facts, by slug. A
+ *  Space that is not GitHub has no entry. */
+export interface StudioLedger {
+  spaces: Record<string, SpaceLedger>;
+}
+
+/** The Spaces card's one ledger read, under the api's base (consts.json studio.ledgerRoute). */
+export const LEDGER_QUERY = STUDIO.ledgerRoute.startsWith(`${API_BASE}/`)
+  ? STUDIO.ledgerRoute.slice(API_BASE.length + 1)
+  : STUDIO.ledgerRoute;
+
 /** The Prompts card's read, under the api's base (consts.json studio.promptsRoute). */
 export const PROMPTS_QUERY = STUDIO.promptsRoute.startsWith(`${API_BASE}/`)
   ? STUDIO.promptsRoute.slice(API_BASE.length + 1)
@@ -237,15 +257,31 @@ const studioApi = api.enhanceEndpoints({
 
 export const studioEndpoints = studioApi.injectEndpoints({
   endpoints: (builder) => ({
-    // GET /api/issue-report?space=<slug> -- one product's ledger, counted
-    getSpaceIssueReport: builder.query<IssueReport, string>({
-      query: (space) => `issue-report?${spaceArg(space)}`,
+    // GET /api/studio/ledger -- every GitHub Space's report, runs and
+    // visibility at once. Tagged Env: a Space added, retired or removed is a
+    // changed /env, and the agent then reads only the Space it has not kept.
+    getStudioLedger: builder.query<StudioLedger, void>({
+      query: () => LEDGER_QUERY,
       keepUnusedDataFor: SESSION_CACHE,
+      providesTags: ["Env"],
     }),
-    // GET /api/deploys?space=<slug> -- one product's newest runs
-    getSpaceDeploys: builder.query<DeploysResponse, string>({
-      query: (space) => `deploys?${spaceArg(space)}`,
-      keepUnusedDataFor: SESSION_CACHE,
+    // GET /api/studio/ledger?refresh=1 -- the card's Refresh, past the agent's
+    // disk cache. A mutation as refreshSpaceVisibility is one: never cached
+    // itself, its answer belongs in getStudioLedger's entry -- and each Space's
+    // visibility in the shell's getSpaceVisibility entry for that Space.
+    refreshStudioLedger: builder.mutation<StudioLedger, void>({
+      query: () => ({ url: `${LEDGER_QUERY}?refresh=1`, method: "GET" }),
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(studioEndpoints.util.upsertQueryData("getStudioLedger", undefined, data));
+          for (const [slug, entry] of Object.entries(data.spaces)) {
+            dispatch(api.util.upsertQueryData("getSpaceVisibility", slug, entry.visibility));
+          }
+        } catch {
+          // An agent that did not answer leaves the last answer in place.
+        }
+      },
     }),
     // GET /api/status?space=<slug> -- another Space's cards in play, read from
     // its own folder without switching in. Tagged Status, so a card
@@ -355,8 +391,8 @@ export const studioEndpoints = studioApi.injectEndpoints({
 });
 
 export const {
-  useGetSpaceIssueReportQuery,
-  useGetSpaceDeploysQuery,
+  useGetStudioLedgerQuery,
+  useRefreshStudioLedgerMutation,
   useGetSpaceStatusQuery,
   useGetDesignNotesQuery,
   useGetDesignNoteQuery,
