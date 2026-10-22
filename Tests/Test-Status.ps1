@@ -440,6 +440,126 @@ finally {
 
 Write-Host ""
 
+# -- Modified: the shared table, and ONE git call ------------------------------
+# A card's Modified day is derived, so it must keep reading what the files
+# already say. It used to be one `git log -1 -- <card>` per card; it is one log
+# for current/. Tests/fixtures/status-modified/history.json pins the day for
+# every shape that matters -- renamed, moved between folders, changed since its
+# last commit, never committed, a name outside ASCII, no repository at all --
+# and Tests/test_status.py asserts the same table against the agent's route.
+# Status lists current/ alone, so the rows under backlog/ are the agent's.
+
+Write-Host "-- Modified: the shared table -------------------------" -ForegroundColor Cyan
+
+. (Join-Path $pkgRoot 'Scripts/Invoke-TrackerRead.ps1')
+$historyTable = Get-Content -Path (Join-Path $scriptDir 'fixtures/status-modified/history.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$noonUtc = {
+    param([string]$Day)
+    [DateTime]::SpecifyKind([DateTime]::ParseExact($Day, 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture).AddHours(12), [DateTimeKind]::Utc)
+}
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
+foreach ($scenario in $historyTable.scenarios) {
+    $tableHub = Join-Path ([System.IO.Path]::GetTempPath()) "p20-status-modified-$([guid]::NewGuid())"
+    try {
+        $space = Join-Path $tableHub 'test'
+        foreach ($d in 'current', 'backlog', 'archive') { New-Item -ItemType Directory -Path (Join-Path $space $d) -Force | Out-Null }
+        $writeCard = {
+            param([string]$Rel, [string]$Note)
+            $path = Join-Path $space $Rel
+            New-Item -ItemType Directory -Path (Split-Path $path -Parent) -Force | Out-Null
+            [System.IO.File]::WriteAllText($path, "# $([System.IO.Path]::GetFileNameWithoutExtension($Rel))`n`n$Note`n", $utf8NoBom)
+        }
+        $gitIn = {
+            param([string[]]$GitArgs)
+            Push-Location $tableHub
+            try {
+                $r = Invoke-P20TrackerRead 'git' (@('-c', 'user.name=t', '-c', 'user.email=t@example.com', '-c', 'commit.gpgsign=false') + $GitArgs)
+                if ($r.Code -ne 0) { throw "git $($GitArgs -join ' '): $($r.Lines -join ' ')" }
+            }
+            finally { Pop-Location }
+        }
+        $committed = @{}
+        if ($scenario.repository) {
+            & $gitIn -GitArgs @('init', '-q')
+            foreach ($commit in $scenario.commits) {
+                foreach ($rel in @($commit.write)) { if ($rel) { & $writeCard $rel "written $($commit.day)"; $committed[$rel] = $true } }
+                if ($commit.move) {
+                    foreach ($prop in $commit.move.PSObject.Properties) {
+                        New-Item -ItemType Directory -Path (Split-Path (Join-Path $space $prop.Value) -Parent) -Force | Out-Null
+                        & $gitIn -GitArgs @('mv', "test/$($prop.Name)", "test/$($prop.Value)")
+                        $committed.Remove($prop.Name); $committed[$prop.Value] = $true
+                    }
+                }
+                $epoch = [DateTimeOffset]::new((& $noonUtc $commit.day)).ToUnixTimeSeconds()
+                $env:GIT_AUTHOR_DATE = "$epoch +0000"; $env:GIT_COMMITTER_DATE = "$epoch +0000"
+                try { & $gitIn -GitArgs @('add', '-A'); & $gitIn -GitArgs @('commit', '-q', '-m', $commit.day) }
+                finally { Remove-Item Env:GIT_AUTHOR_DATE, Env:GIT_COMMITTER_DATE -ErrorAction SilentlyContinue }
+            }
+            foreach ($rel in @($committed.Keys)) { [System.IO.File]::SetLastWriteTimeUtc((Join-Path $space $rel), (& $noonUtc $scenario.staleMtime)) }
+        }
+        foreach ($item in @($scenario.uncommitted)) {
+            & $writeCard $item.write 'on disk'
+            [System.IO.File]::SetLastWriteTimeUtc((Join-Path $space $item.write), (& $noonUtc $item.mtime))
+        }
+
+        # The script in a child, with a git that records every call and then runs the
+        # real one. Its output is written to a UTF-8 file inside the child, so a name
+        # outside ASCII never passes through a console code page on its way here.
+        $gitCalls = Join-Path $tableHub 'git-calls.log'
+        $outFile = Join-Path $tableHub 'status-out.txt'
+        $runner = Join-Path $tableHub 'run.ps1'
+        $q = { param([string]$s) $s -replace "'", "''" }
+        $body = @"
+`$global:P20Config = @{ PromptsRoot = '$(& $q $tableHub)'; PromptsFolder = 'test'; CommandPrefix = 'zz'; StoreSync = 'none' }
+function global:Get-PromptFolders {
+    `$root = Join-Path `$global:P20Config.PromptsRoot 'test'
+    @{ Current = (Join-Path `$root 'current'); Archive = (Join-Path `$root 'archive'); Backlog = (Join-Path `$root 'backlog') }
+}
+`$global:RealGit = (Get-Command git -CommandType Application | Select-Object -First 1).Source
+function global:git { [System.IO.File]::AppendAllText('$(& $q $gitCalls)', "git `$(`$args -join ' ')``n"); & `$global:RealGit @args }
+`$out = & '$(& $q $targetScript)' 6>&1 | Out-String
+[System.IO.File]::WriteAllText('$(& $q $outFile)', `$out, (New-Object System.Text.UTF8Encoding(`$false)))
+exit `$LASTEXITCODE
+"@
+        Write-ScratchRunner -Path $runner -Value $body
+        $null = & pwsh -NoProfile -File $runner 2>&1
+        $code = $LASTEXITCODE
+        $output = ''
+        if (Test-Path $outFile) { $output = [System.IO.File]::ReadAllText($outFile, $utf8NoBom) }
+
+        $read = @{}
+        $file = $null
+        foreach ($line in ($output -split "`r?`n")) {
+            if ($line -match '^\s*File:\s+(.+?)\s*$') { $file = Split-Path $Matches[1] -Leaf }
+            elseif ($file -and $line -match 'Modified:\s+(\S+)') { $read[$file] = $Matches[1]; $file = $null }
+        }
+        $rows = @($scenario.expect | Where-Object { $_.card -like 'current/*' })
+        $expectedNames = @($rows | ForEach-Object { Split-Path $_.card -Leaf } | Sort-Object)
+        $listedNames = @($read.Keys | Sort-Object)
+
+        Assert-True "$($scenario.name): Status exits 0" ($code -eq 0) "exit $code -- $output"
+        Assert-True "$($scenario.name): every card in current/ is a row, and nothing else is listed (archive/, a subfolder)" `
+            (($listedNames -join '|') -ceq ($expectedNames -join '|')) "listed: $($listedNames -join ', ')"
+        foreach ($row in $rows) {
+            $name = Split-Path $row.card -Leaf
+            Assert-Status "$($scenario.name): $name -- $($row.why)" ([string]$row.day) ([string]$read[$name])
+        }
+        $calls = @()
+        if (Test-Path $gitCalls) { $calls = @(Get-Content $gitCalls | Where-Object { $_ }) }
+        Assert-True "$($scenario.name): ONE git call for $($rows.Count) cards, and no probe before it" `
+            ($calls.Count -eq 1 -and $calls[0] -match ' log ' -and $calls[0] -notmatch 'rev-parse') ($calls -join ' / ')
+    }
+    catch {
+        Assert-True "$($scenario.name): the cases ran to the end without a terminating error" $false $_.Exception.Message
+    }
+    finally {
+        Remove-Item -Path $tableHub -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Write-Host ""
+
 # -- Status -Board: the board's state beside the card's ----------------
 # OPT-IN and READ-ONLY. Plain Status never contacts ADO; -Board asks `az boards
 # work-item show` once per card linked to a work item and flags only the definite

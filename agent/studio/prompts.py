@@ -57,7 +57,6 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-import subprocess
 import time
 from pathlib import Path
 
@@ -67,8 +66,6 @@ from pydantic import BaseModel
 from ..ado.design import LIST_TTL_SECONDS, _front, parse_doc, repo_gate
 from ..ado.repo_read import file_text, read_folder_rows
 from ..core import log_writer
-from ..core.child import ChildReadError, run_read
-from ..core.clock import local_day
 from ..core.config import (
     AGENTIC_DIR,
     AGENTIC_INDEX,
@@ -81,6 +78,9 @@ from ..core.config import (
     load_config,
 )
 from ..core.consts import repository_url, studio_prompts_route
+from ..core.git_history import GITHUB_REMOTE as _GITHUB_REMOTE
+from ..core.git_history import folder_history
+from ..core.git_history import git_read as _git
 
 api = APIRouter()
 
@@ -99,7 +99,6 @@ UNCATEGORIZED = "uncategorized"
 
 # One prompt's name: the file's name before .prompt.md, no path.
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
-_GITHUB_REMOTE = re.compile(r"github\.com[:/]+([^/\s]+)/([^/\s]+?)(?:\.git)?/?$")
 
 # The Space's folder, listed once per repo for the Design tab's TTL: its rows,
 # and each row's blob sha by path (the one-prompt read's key to the body cache).
@@ -180,46 +179,6 @@ def read_categories() -> list[str]:
     except (OSError, ValueError):
         return []
     return [str(c) for c in found]
-
-
-def _git(args: list[str], cwd: Path) -> str | None:
-    """stdout of one git read in ``cwd``, or None when git cannot answer."""
-    try:
-        result = run_read(["git", *args], 10, shell=False, cwd=str(cwd))
-    except (OSError, subprocess.SubprocessError, ValueError, ChildReadError):
-        return None
-    return result.stdout if result.returncode == 0 else None
-
-
-def folder_history(folder: Path) -> tuple[dict[str, tuple[str, str]], str]:
-    """({file name: (local day, sha)}, history URL base) for one folder.
-
-    One ``git log`` for the whole folder, newest first, so the first time a
-    file is named is its last change. The base is
-    ``https://github.com/<owner>/<repo>/commits/{sha}/<prefix>`` when the clone's
-    origin is on GitHub, "" otherwise -- and nothing at all outside a clone.
-    """
-    log = _git(
-        ["-c", "core.quotepath=off", "log", "--format=%x00%H %at", "--name-only", "--relative", "--", "."], folder
-    )
-    if log is None:
-        return {}, ""
-    changes: dict[str, tuple[str, str]] = {}
-    for record in log.split("\x00"):
-        lines = [ln.strip() for ln in record.strip().splitlines() if ln.strip()]
-        if not lines:
-            continue
-        sha, _, at = lines[0].partition(" ")
-        for name in lines[1:]:
-            if "/" not in name and name not in changes:
-                changes[name] = (local_day(at) or "", sha)
-    base = ""
-    origin = (_git(["remote", "get-url", "origin"], folder) or "").strip()
-    m = _GITHUB_REMOTE.search(origin)
-    prefix = _git(["rev-parse", "--show-prefix"], folder)
-    if m and prefix is not None:
-        base = f"https://github.com/{m.group(1)}/{m.group(2)}/commits/{{sha}}/{prefix.strip()}"
-    return changes, base
 
 
 def _modified(path: Path) -> str:
