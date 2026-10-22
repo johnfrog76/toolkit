@@ -441,6 +441,10 @@ if ($ranEverySuite) {
         Write-Host "  Counts for docs/TESTING.md's combined row, from this run:" -ForegroundColor Cyan
         Write-Host "  $($countParts -join ', ')"
         Write-Host "  $($suites.Count) suites, $grandTotal assertions" -ForegroundColor Cyan
+        # The paste block holds two more lines this runner cannot know; say so in
+        # their place rather than leave a number to copy from an older paste.
+        Write-Host "  pytest: not run by tkTestToolkit -- tkTest prints it" -ForegroundColor DarkGray
+        Write-Host "  web: not run by tkTestToolkit -- tkTest prints it" -ForegroundColor DarkGray
     }
     Write-Host ""
 }

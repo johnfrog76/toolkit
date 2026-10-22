@@ -166,7 +166,7 @@ module and you add a mock line to every one of these files.
 **Four test runners**, one per half plus one for the two together. Run the ones your change touches:
 
 ```powershell
-tkTestToolkit                 # the CLI -- 45 suites, 7921 assertions on this commit
+tkTestToolkit                 # the CLI -- 45 suites, 7932 assertions on this commit
 ```
 
 ```bash
@@ -178,6 +178,10 @@ cd web && npm run smoke       # both, in a browser -- needs the agent and the de
 `tkWeb -Dev` is what brings those last two servers up, and `tkWeb -Stop` ends them.
 
 A skip is not a pass. Read the summary line, not the total.
+
+The counts in `docs/TESTING.md` come from one paste block of three lines (the CLI's, `pytest:` and `web:`),
+which `tkTest` prints; `tkTestToolkit -DocCounts` holds the table row and the command block's totals to it.
+Paste all three, never type one.
 
 ## Opt in by configuration
 
