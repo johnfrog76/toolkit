@@ -56,7 +56,7 @@ M1  1.1.0  The bar, held            done 2026-10-18: the defect queue dry, two r
         |
 M2  1.2.0  The standup sees the work    done 2026-10-22: both records joined, what moved, the agent in the room, the backlog
         |
-M3  1.3.0  The Studio opens in a second   the gh reads: one call per Space, per repository, per tab
+M3  1.3.0  The Studio opens in a second   done 2026-10-22: one gh call cold and none warm, per Space, repository and tab
         |
 M4  1.4.0  Ten minutes to your own board   the first run, the tour, the word for a Space
         |
@@ -111,7 +111,7 @@ well as the issues, says what moved and how many commits it took, and can answer
 **Met 2026-10-22**, the day 1.2.0 was cut: all four items on main, and beside them the backlog folder, `Plan`
 and the in-play count, which the milestone did not name and the work demanded.
 
-### M3 -- 1.3.0, the Studio opens in a second
+### M3 -- 1.3.0, the Studio opens in a second -- done 2026-10-22
 
 Every GitHub Space costs the same on every machine: the foyer fires three `gh` reads per Space on
 every mount, a repository's design notes are read one `gh` call per note, the Docs tab one call per
@@ -123,6 +123,14 @@ updated-at), with the GUI untouched; the browser's own cache already holds a ses
 because it is new scope since the flip and should not be judged as part of the quality batch; it follows the
 standup release because the cards are small and independent and can be interleaved, while the standup is the
 product's edge.
+
+**Met 2026-10-22**, the day 1.3.0 was cut, measured on the Mac mini's real hub: the Design tab lists the Wasteland
+Space's 190 design files in 2 s cold with one `gh` call, down from 91 s and 194 calls, and in 0.6 s after a restart;
+the Studio's foyer reads every GitHub Space in 11 processes cold, down from 60, and in none warm; the status route
+reads every card's day from one `git log`, down from 46 calls; and the standup and triage, re-opened within the
+minute, make no tracker call and no model call. One cache on disk (`agent/core/disk_cache.py`), keyed by what GitHub
+hands back, serves them all, capped by one rule; and the tier probe, the issue report, the counts paste and the web
+lint were tightened on the way.
 
 ### M4 -- 1.4.0, ten minutes to your own board
 
