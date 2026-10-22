@@ -654,6 +654,16 @@ describe("the Designs card's search (L2b)", () => {
     );
   });
 
+  it("a search by file name finds the design, by the Design tab's one rule", () => {
+    mount();
+    // "a-second-room" is the note's file name: in no title, description or id.
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search the hub's designs" }), {
+      target: { value: "a-second-room" },
+    });
+    expect(screen.getByText("A second room")).toBeTruthy();
+    expect(screen.queryByText("Board ideas")).toBeNull();
+  });
+
   it("Search inside asks the hub route with the words, and a hit opens by its hub path", () => {
     hubSearchAnswer = {
       data: {

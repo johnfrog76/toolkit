@@ -1,18 +1,25 @@
 """The Design tab's agent half -- /design on a GitHub Space (Studio S2, D-S11).
 
 Two routes: ``GET /api/design`` lists the product repo's ``design/`` and
-``spec/`` through ``gh api repos/{owner}/{repo}/contents/{path}``, and
-``GET /api/design/{folder}/{name}`` reads one file. No network: subprocess is
-stubbed with a fake repo, and the assertions are about the listing, the
-frontmatter, the thread line, an empty folder, and the gate.
+``spec/`` through ``agent/ado/repo_read.py`` -- one ``gh api graphql`` call for
+the four folders' shape, one more for the texts of blobs never parsed, the
+parsed rows kept on disk by blob sha -- and ``GET /api/design/{folder}/{name}``
+reads one file through ``gh api repos/{owner}/{repo}/contents/{path}``, or from
+the disk by its sha. No network: subprocess is stubbed with a fake repo that
+answers both, and the assertions are about the listing, the frontmatter, the
+thread line, an empty folder, the gate, and how many times gh is asked.
 
 Run:  python3 -m pytest Tests/test_design.py
 """
 
 import base64
+import hashlib
 import json
+import os
+import re
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -27,6 +34,7 @@ try:
 
     from agent.ado import design
     from agent.app import app
+    from agent.core.consts import env_agent_cache_dir
 except Exception as exc:  # pragma: no cover
     skip_module(f"the agent's dependencies are not installed: {exc}")
 
@@ -56,6 +64,12 @@ EXPORTED_NOTE = (
 BINARY_NAME = "diagram.png"
 
 
+def blob_sha(text: str) -> str:
+    """The sha git gives these bytes, as GitHub answers it."""
+    data = text.encode()
+    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+
+
 def _file(path: str, text: str, sha: str) -> dict:
     return {
         "type": "file",
@@ -73,30 +87,95 @@ def _entry(path: str, sha: str) -> dict:
 
 
 class FakeRepo:
-    """gh api over a dict of folders; a folder that is absent answers 404."""
+    """gh api over a dict of folders: the GraphQL shape and blob queries the
+    listing asks, the contents call the detail asks, and code search. A folder
+    that is absent is a null object (GraphQL) or a 404 (contents). A name in
+    ``null_text`` is a blob GitHub will not inline: its GraphQL text is null.
 
-    def __init__(self, folders: dict[str, dict[str, str]], fail: str = ""):
+    Every call is asserted free of ``&`` (cmd's on Windows), and a GraphQL query
+    must arrive as ``-F query=@<file>``, never as argv text."""
+
+    def __init__(self, folders: dict[str, dict[str, str]], fail: str = "", null_text: tuple[str, ...] = ()):
         self.folders = folders
         self.fail = fail
+        self.null_text = set(null_text)
         self.calls: list[list[str]] = []
+        self.queries: list[str] = []  # each GraphQL query's text
+        self.query_files: list[str] = []  # and the file it arrived in
+
+    def kinds(self) -> list[str]:
+        """Each call by what it asked: shape, blobs, contents or search."""
+        out = []
+        for c in self.calls:
+            if c[2] == "graphql":
+                out.append(c[-1])
+            elif c[2] == "-X":
+                out.append("search")
+            else:
+                out.append("contents")
+        return out
+
+    def _ok(self, argv, body):
+        return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(body), stderr="")
 
     def __call__(self, argv, **_kw):
-        self.calls.append(list(argv))
+        assert "&" not in " ".join(argv), argv
         if self.fail:
+            self.calls.append([*argv, "failed"])
             return subprocess.CompletedProcess(argv, 1, stdout="", stderr=self.fail)
         assert argv[:2] == ["gh", "api"], argv
+        if argv[2] == "graphql":
+            return self.graphql(argv)
+        self.calls.append(list(argv))
         if argv[2] == "-X":
             return self.search(argv)
         path = argv[2].split(f"repos/{REPO}/contents/", 1)[1]
         if path in self.folders:
-            listing = [_entry(f"{path}/{n}", f"sha-{n}") for n in self.folders[path]]
+            listing = [_entry(f"{path}/{n}", blob_sha(t)) for n, t in self.folders[path].items()]
             listing.append({"type": "dir", "name": "old", "path": f"{path}/old"})
-            return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(listing), stderr="")
+            return self._ok(argv, listing)
         folder, _, name = path.rpartition("/")
         if folder in self.folders and name in self.folders[folder]:
-            out = json.dumps(_file(path, self.folders[folder][name], f"sha-{name}"))
-            return subprocess.CompletedProcess(argv, 0, stdout=out, stderr="")
+            text = self.folders[folder][name]
+            return self._ok(argv, _file(path, text, blob_sha(text)))
         return subprocess.CompletedProcess(argv, 1, stdout="", stderr="gh: Not Found (HTTP 404)")
+
+    def graphql(self, argv):
+        assert argv[3] == "-F" and argv[4].startswith("query=@"), argv
+        query = Path(argv[4][len("query=@") :]).read_text(encoding="utf-8")
+        self.queries.append(query)
+        self.query_files.append(argv[4][len("query=@") :])
+        fields = {
+            argv[i + 1].split("=", 1)[0]: argv[i + 1].split("=", 1)[1]
+            for i in range(3, len(argv) - 1)
+            if argv[i] in ("-f", "-F")
+        }
+        assert f"{fields['owner']}/{fields['name']}" == REPO, fields
+        by_sha = {blob_sha(t): (n, t) for files in self.folders.values() for n, t in files.items()}
+        if "object(expression:" in query:
+            self.calls.append([*argv, "shape"])
+            with_text = "... on Blob" in query
+            repo: dict = {"url": f"https://github.com/{REPO}", "defaultBranchRef": {"name": "main"}}
+            for key, value in fields.items():
+                if not re.fullmatch(r"f\d+", key):
+                    continue
+                folder = value.removeprefix("HEAD:")
+                if folder not in self.folders:
+                    repo[key] = None
+                    continue
+                entries = []
+                for n, t in self.folders[folder].items():
+                    obj = {"text": None if n in self.null_text else t} if with_text else {}
+                    entries.append({"name": n, "type": "blob", "oid": blob_sha(t), "object": obj})
+                entries.append({"name": "old", "type": "tree", "oid": "0" * 40, "object": {}})
+                repo[key] = {"entries": entries}
+            return self._ok(argv, {"data": {"repository": repo}})
+        self.calls.append([*argv, "blobs"])
+        repo = {}
+        for alias, sha in re.findall(r'(b\d+): object\(oid: "([0-9a-f]+)"\)', query):
+            name, text = by_sha.get(sha, ("", None))
+            repo[alias] = None if text is None else {"text": None if name in self.null_text else text}
+        return self._ok(argv, {"data": {"repository": repo}})
 
     def search(self, argv):
         """``gh api -X GET -H <accept> search/code -f q=<words> repo:<r> path:<root>
@@ -222,25 +301,139 @@ class TheListing(unittest.TestCase):
         self.assertEqual(resp.items, [])
         self.assertIsNone(resp.reason)
 
-    def test_the_reads_go_through_gh_api_contents(self):
-        # The four folders (L2), in reading order: each root, then its archive.
+    def test_a_cold_listing_is_one_graphql_call_for_the_four_folders(self):
+        # The four folders (L2), in reading order: each root, then its archive --
+        # asked as fields, the query in a file, and every text inline because
+        # nothing has been parsed yet.
         fake = FakeRepo({"spec": {"toolkit-studio.spec.md": STUDIO_SPEC}})
         self._list(fake)
-        self.assertEqual(fake.calls[0], ["gh", "api", f"repos/{REPO}/contents/design"])
-        self.assertEqual(fake.calls[1], ["gh", "api", f"repos/{REPO}/contents/design/archive"])
-        self.assertEqual(fake.calls[2], ["gh", "api", f"repos/{REPO}/contents/spec"])
-        self.assertEqual(fake.calls[3], ["gh", "api", f"repos/{REPO}/contents/spec/toolkit-studio.spec.md"])
-        self.assertEqual(fake.calls[4], ["gh", "api", f"repos/{REPO}/contents/spec/archive"])
+        self.assertEqual(fake.kinds(), ["shape"])
+        call = fake.calls[0]
+        self.assertEqual(call[:4], ["gh", "api", "graphql", "-F"])
+        self.assertTrue(call[4].startswith("query=@"))
+        fields = [call[i + 1] for i in range(4, len(call) - 1) if call[i] in ("-f", "-F")]
+        self.assertEqual(
+            fields,
+            [
+                "owner=johnfrog76",
+                "name=toolkit",
+                "f0=HEAD:design",
+                "f1=HEAD:design/archive",
+                "f2=HEAD:spec",
+                "f3=HEAD:spec/archive",
+            ],
+        )
+        # The query lived in a temporary file, gone once gh answered.
+        self.assertFalse(Path(fake.query_files[0]).exists())
+        self.assertIn("... on Blob { text }", fake.queries[0])
 
-    def test_the_listing_is_cached_and_a_file_by_its_sha(self):
+    def test_the_listing_is_cached_for_its_ttl_and_its_rows_on_disk(self):
         fake = FakeRepo({"spec": {"toolkit-studio.spec.md": STUDIO_SPEC}})
+        first = self._list(fake)
         self._list(fake)
-        n = len(fake.calls)
-        self._list(fake)
-        self.assertEqual(len(fake.calls), n)  # within the TTL: no gh at all
+        self.assertEqual(fake.kinds(), ["shape"])  # within the TTL: no gh at all
         design._list_cache.clear()
-        self._list(fake)
-        self.assertEqual(len(fake.calls), n + 4)  # the four folders again, the file from its sha
+        again = self._list(fake)
+        # Past it: the shape again, and the text from nowhere -- its row is on disk.
+        self.assertEqual(fake.kinds(), ["shape", "shape"])
+        self.assertEqual(again.model_dump(), first.model_dump())
+
+    @staticmethod
+    def _notes(n: int, prefix: str = "n") -> dict[str, dict[str, str]]:
+        half = n // 2
+        return {
+            "design": {f"{prefix}{i:03}.md": f"# Note {prefix}{i}\n" for i in range(half)},
+            "design/archive": {f"{prefix}{i:03}.md": f"# Old note {prefix}{i}\n" for i in range(half, n)},
+        }
+
+    def _own_cache(self):
+        """A cache of its own for one subtest: the fixture's is per test."""
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        return mock.patch.dict(os.environ, {env_agent_cache_dir(): tmp.name})
+
+    def test_the_number_of_gh_calls_does_not_grow_with_the_number_of_notes(self):
+        for n in (3, 60, 190):
+            with self.subTest(n=n), self._own_cache():
+                design.clear_cache()
+                folders = self._notes(n)
+                cold = FakeRepo(folders)
+                resp = self._list(cold)
+                self.assertEqual(len(resp.items), n)
+                self.assertEqual(cold.kinds(), ["shape"])  # cold: one call, every text inline
+                design.clear_cache()  # a restart: the memory is gone, the disk is not
+                warm = FakeRepo(folders)
+                self.assertEqual(self._list(warm).model_dump(), resp.model_dump())
+                self.assertEqual(warm.kinds(), ["shape"])
+                # One note changed: the shape, and one ask for that one text.
+                design.clear_cache()
+                folders["design"]["n000.md"] = "# Note n0, edited\n"
+                edited = FakeRepo(folders)
+                self.assertEqual(self._list(edited).items[0].title, "Note n0, edited")
+                self.assertEqual(edited.kinds(), ["shape", "blobs"])
+
+    def test_new_texts_are_asked_for_together_a_hundred_at_a_time(self):
+        # The cache holds rows already, so the shape is asked without text and
+        # the new blobs come in one aliased query per hundred.
+        self._list(FakeRepo({"spec": {"toolkit-studio.spec.md": STUDIO_SPEC}}))
+        for n, asks in ((3, 1), (100, 1), (101, 2), (190, 2)):
+            with self.subTest(n=n):
+                design.clear_cache()
+                fake = FakeRepo(self._notes(n, prefix=f"c{n}-"))
+                self.assertEqual(len(self._list(fake).items), n)
+                self.assertEqual(fake.kinds(), ["shape"] + ["blobs"] * asks)
+                self.assertNotIn("... on Blob", fake.queries[0])  # names and shas alone
+
+    def test_an_unchanged_sha_is_never_fetched_again_by_a_new_process(self):
+        folders = {
+            "design": {"pair.md": _front(ID_A, "The pair") + "# Feature: the pair\n"},
+            "spec": {"pair.spec.md": _front(ID_A) + "# Pair (spec)\n"},
+        }
+        self._list(FakeRepo(folders))
+        root = Path(__file__).resolve().parent.parent
+        code = (
+            "import json, sys\n"
+            "from unittest import mock\n"
+            "from test_design import FakeRepo, REPO\n"
+            "from agent.ado import design\n"
+            "fake = FakeRepo(json.loads(sys.argv[1]))\n"
+            "with mock.patch.object(design.subprocess, 'run', side_effect=fake):\n"
+            "    resp = design.list_design(REPO)\n"
+            "print(json.dumps({'kinds': fake.kinds(), 'titles': [d.title for d in resp.designs]}))\n"
+        )
+        env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(root), str(root / "Tests")]))
+        child = subprocess.run(
+            [sys.executable, "-c", code, json.dumps(folders)],
+            capture_output=True,
+            text=True,
+            env=env,
+            cwd=str(root),
+            timeout=120,
+            check=False,
+        )
+        self.assertEqual(child.returncode, 0, child.stderr)
+        answer = json.loads(child.stdout.strip().splitlines()[-1])
+        self.assertEqual(answer, {"kinds": ["shape"], "titles": ["Feature: the pair"]})
+
+    def test_a_blob_with_no_inline_text_is_read_by_the_contents_call_alone(self):
+        folders = {"design": {"big.md": "# Too big to inline\n", "small.md": "# Small\n"}}
+        cold = FakeRepo(folders, null_text=("big.md",))
+        resp = self._list(cold)
+        self.assertEqual([d.title for d in resp.items], ["Too big to inline", "Small"])
+        # Cold: the shape carried every text it could; the null one is the contents call, once.
+        self.assertEqual(cold.kinds(), ["shape", "contents"])
+        self.assertEqual(cold.calls[1], ["gh", "api", f"repos/{REPO}/contents/design/big.md"])
+        # Kept like any other row: the next read asks for nothing.
+        design.clear_cache()
+        warm = FakeRepo(folders, null_text=("big.md",))
+        self._list(warm)
+        self.assertEqual(warm.kinds(), ["shape"])
+        # Warm with a new big note: the batch first, then the contents call for it.
+        design.clear_cache()
+        folders["design"]["bigger.md"] = "# Bigger still\n"
+        newer = FakeRepo(folders, null_text=("big.md", "bigger.md"))
+        self.assertEqual({d.name: d.title for d in self._list(newer).items}["bigger.md"], "Bigger still")
+        self.assertEqual(newer.kinds(), ["shape", "blobs", "contents"])
 
     def test_the_structure_says_which_roots_exist(self):
         self.assertEqual(
@@ -264,6 +457,54 @@ class TheListing(unittest.TestCase):
         self.assertEqual(resp.items, [])
         self.assertIn("gh auth login", resp.reason)
         self.assertIn(REPO, resp.reason)
+
+
+class TheAgentCache(unittest.TestCase):
+    """Where the rows and bodies go (docs/CONFIGURATION.md, "The agent's
+    cache"): the override when it is set, else the platform's user cache folder
+    -- never the hub, never the package."""
+
+    def test_the_override_wins_and_each_platform_has_its_folder(self):
+        from agent.core import disk_cache
+
+        self.assertEqual(disk_cache.cache_root(), Path(os.environ[env_agent_cache_dir()]))
+        home = Path("/home/someone")
+        rows = [
+            (
+                "Windows",
+                {"LOCALAPPDATA": "C:/Users/someone/AppData/Local"},
+                Path("C:/Users/someone/AppData/Local/ToolKit/Cache"),
+            ),
+            ("Darwin", {}, home / "Library" / "Caches" / "ToolKit"),
+            ("Linux", {"XDG_CACHE_HOME": "/xdg"}, Path("/xdg/toolkit")),
+            ("Linux", {}, home / ".cache" / "toolkit"),
+        ]
+        for system, env, expected in rows:
+            with self.subTest(system=system, env=env):
+                clean = {
+                    k: v
+                    for k, v in os.environ.items()
+                    if k not in (env_agent_cache_dir(), "LOCALAPPDATA", "XDG_CACHE_HOME")
+                }
+                with (
+                    mock.patch.dict(os.environ, {**clean, **env}, clear=True),
+                    mock.patch.object(disk_cache.platform, "system", return_value=system),
+                    mock.patch.object(disk_cache.Path, "home", return_value=home),
+                ):
+                    root = disk_cache.cache_root()
+                self.assertEqual(root, expected)
+                self.assertNotIn(Path(__file__).resolve().parent.parent, root.parents)
+
+    def test_a_key_is_a_plain_name_and_a_miss_is_none(self):
+        from agent.core import disk_cache
+
+        self.assertIsNone(disk_cache.cache_path("rows", "../escape.json"))
+        self.assertIsNone(disk_cache.cache_path("bodies", ""))
+        self.assertIsNone(disk_cache.get_text("bodies", "0" * 40))
+        self.assertTrue(disk_cache.put_text("a\r\nb\n", "bodies", "0" * 40))
+        self.assertEqual(disk_cache.get_text("bodies", "0" * 40), "a\r\nb\n")  # the bytes, endings kept
+        self.assertTrue(disk_cache.put_json({"rows": {}}, "rows", "x-1.json"))
+        self.assertEqual(disk_cache.get_json("rows", "x-1.json"), {"rows": {}})
 
 
 class TheParser(unittest.TestCase):
@@ -645,6 +886,39 @@ class TheRoutes(unittest.TestCase):
         )
         # The listing came from the cache; the cards did not.
         self.assertEqual([c["id"] for c in second["designs"][0]["cards"]], ["157", "158", "155"])
+
+    def test_an_opened_note_is_served_from_the_disk_while_the_listing_is_fresh(self):
+        text = _front(ID_A) + "# A\n\nBody.\n"
+        fake = FakeRepo({"design": {"a.md": text}})
+        self._get("/api/design", ORG, fake=fake)
+        first = self._get("/api/design/design/a.md", ORG, fake=fake).json()
+        self.assertEqual(fake.kinds(), ["shape", "contents"])  # the first open reads it
+        again = self._get("/api/design/design/a.md", ORG, fake=fake).json()
+        self.assertEqual(fake.kinds(), ["shape", "contents"])  # the second does not
+        self.assertEqual(again, first)
+        self.assertEqual(again["body"], text)
+        self.assertEqual(again["url"], f"https://github.com/{REPO}/blob/main/design/a.md")
+        # A restart: the listing's one call, and the body still from the disk.
+        design.clear_cache()
+        self._get("/api/design", ORG, fake=fake)
+        self.assertEqual(self._get("/api/design/design/a.md", ORG, fake=fake).json()["body"], text)
+        self.assertEqual(fake.kinds(), ["shape", "contents", "shape"])
+        # A listing past its TTL is not trusted for the sha: the open asks gh.
+        when, listed, shas = design._list_cache[REPO]
+        design._list_cache[REPO] = (when - design.LIST_TTL_SECONDS - 1, listed, shas)
+        self._get("/api/design/design/a.md", ORG, fake=fake)
+        self.assertEqual(fake.kinds()[-1], "contents")
+
+    def test_a_changed_note_opens_with_its_new_text(self):
+        folders = {"design": {"a.md": _front(ID_A) + "# A\n\nOld.\n"}}
+        fake = FakeRepo(folders)
+        self._get("/api/design", ORG, fake=fake)
+        self._get("/api/design/design/a.md", ORG, fake=fake)
+        design.clear_cache()
+        folders["design"]["a.md"] = _front(ID_A) + "# A\n\nNew.\n"
+        self._get("/api/design", ORG, fake=fake)
+        body = self._get("/api/design/design/a.md", ORG, fake=fake).json()["body"]
+        self.assertTrue(body.endswith("New.\n"))
 
 
 if __name__ == "__main__":

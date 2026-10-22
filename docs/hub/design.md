@@ -128,7 +128,11 @@ web decides nothing. A hub row carries two more words, `space` and `thread_space
 `> Design:` line names the design's id -- `current/` first, then `archive/` read as Done. For a repo they are
 the active Space's cards; for the hub, every declared Space's, because a design that belongs to no product
 can be worked from any of them. Derived by reading the cards on every request (the repo's listing stays
-cached; its cards do not), stored nowhere. A hand-written `> Spec:` line carries no id, so it binds nothing
+cached; its cards do not), stored nowhere. How a repo's listing is cached: for 60 seconds per agent, and
+under that each file's parsed row -- its id, title, description, stamps, Docs and thread line, never its
+body -- on disk by the blob's sha, so a restart asks GitHub for the folders' names and shas alone and fetches
+the text of only a note that changed; a note's body is kept the same way once it has been opened
+([the agent's cache](../CONFIGURATION.md#the-agents-cache)). A hand-written `> Spec:` line carries no id, so it binds nothing
 here ([the card](cards.md)).
 Only a live note names its Space: a row whose note is archived (Complete, Archived) has `space` empty even when the note's frontmatter still says `space: demo`, because the chip belongs to the list a person is still working from; `thread_space` is read for every row. The hub's answer keeps
 `items` and `count` as before: the live notes in `design/`, which the + and Promote read. One document is

@@ -242,6 +242,11 @@ def env_features() -> str:
     return consts()["env"]["features"]
 
 
+def env_agent_cache_dir() -> str:
+    """Moves the agent's on-disk cache off the user cache folder (the test runners' scratch)."""
+    return consts()["env"]["agentCacheDir"]
+
+
 def stamp_sent() -> str:
     """The line a send writes under ``## Sent``: "Sent to <recipient>: <date>"."""
     return consts()["stamps"]["sent"]

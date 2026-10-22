@@ -150,6 +150,15 @@ foreach ($v in @(Get-ChildItem Env: | Where-Object { $_.Name.StartsWith($webhook
 $previousMarker = [System.Environment]::GetEnvironmentVariable($runMarker)
 [System.Environment]::SetEnvironmentVariable($runMarker, '1')
 
+# The agent's on-disk cache (agent/core/disk_cache.py: the Design tab's parsed
+# rows and note bodies, by blob sha) lives in the user's cache folder. A suite
+# that starts the agent must not fill it with a fixture's rows, so the run points
+# consts.json env.agentCacheDir at a scratch folder, restored in the finally.
+$agentCacheEnv = $runnerConsts.env.agentCacheDir
+$previousAgentCache = [System.Environment]::GetEnvironmentVariable($agentCacheEnv)
+$scratchAgentCache = Join-Path ([System.IO.Path]::GetTempPath()) "p20-test-cache-$([guid]::NewGuid())"
+[System.Environment]::SetEnvironmentVariable($agentCacheEnv, $scratchAgentCache)
+
 # The bridge's quiet marker. The web UI's Test Health card runs this verb through
 # POST /api/cmd/Test, and the bridge sets TOOLKIT_QUIET_STARTUP=1 for that child
 # to mark it non-interactive -- which this runner and every pwsh a suite starts
@@ -503,5 +512,7 @@ finally {
     foreach ($name in $savedWebhooks.Keys) { [System.Environment]::SetEnvironmentVariable($name, $savedWebhooks[$name]) }
     if ($null -eq $previousMarker) { [System.Environment]::SetEnvironmentVariable($runMarker, $null) }
     else { [System.Environment]::SetEnvironmentVariable($runMarker, $previousMarker) }
+    [System.Environment]::SetEnvironmentVariable($agentCacheEnv, $previousAgentCache)
+    Remove-Item -Path $scratchAgentCache -Recurse -Force -ErrorAction SilentlyContinue
     [System.Environment]::SetEnvironmentVariable('TOOLKIT_QUIET_STARTUP', $previousQuiet)
 }
