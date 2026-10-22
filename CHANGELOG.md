@@ -8,6 +8,8 @@ release.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-22
+
 ### Added
 
 - A WIP limit: `Config -Set limits.inPlay=5` makes `Status` open with how many cards are in play (`in play: 4`, or `in play: 7 of 5` past the number) and turns the board's Active column amber past it. It is a line, never a gate -- nothing refuses and nothing is hidden -- and unset means no line.
