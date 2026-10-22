@@ -3,44 +3,35 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { FoyerCard, SPACES_FILTER_KEY } from "./FoyerCard";
 
 // The foyer (Studio S2b, D-S2 as amended by D-S13): one row per Space -- every
-// Space, whatever its tracker. A GitHub row is read for THAT Space
-// through the `space` argument; any other row reads its cards from the core's
-// /api/status, for the Space you are in only. A row is the switch into it. The
-// words are foyer.test.ts's; here the rows, the reads and the door.
-const askedReport: string[] = [];
-const askedDeploys: string[] = [];
+// Space, whatever its tracker. Every GitHub row is read from ONE ledger read
+// for all of them (GET /api/studio/ledger); any other row reads its cards from
+// the core's /api/status, for the Space you are in only. A row is the switch
+// into it. The words are foyer.test.ts's; here the rows, the reads and the door.
+// Each render's ledger hook call: whether it was skipped.
+const askedLedger: boolean[] = [];
 const askedStatus: boolean[] = [];
 const askedSpaceStatus: string[] = [];
 let failingSpaceStatus: string[] = [];
 const switched: string[] = [];
 let switchFails = false;
-// The repository's visibility per Space: an answer, or a failed read.
-const askedVisibility: string[] = [];
+// The repository's visibility per Space, as the ledger says it; a Space in
+// failingVisibility is one whose repository gh did not answer for (unknown).
 let visibilityOf: Record<string, string> = {};
 let failingVisibility: string[] = [];
+// The whole ledger read failed: the agent did not answer.
+let ledgerFails = false;
 
 // One clean load: a read named here has not answered yet.
 let pending: string[] = [];
 // Refresh: what was asked again.
 const refetched: string[] = [];
-const refreshedVisibility: string[] = [];
+let refreshedLedger = 0;
 // A GitHub Space whose tracker has nothing to say (not connected yet).
 let unsupportedReport: string[] = [];
 
 let envAnswer: unknown;
 jest.mock("../../shell/api", () => ({
   useGetEnvQuery: () => ({ data: envAnswer, isLoading: false }),
-  useGetSpaceVisibilityQuery: (space: string, opts?: { skip?: boolean }) => {
-    if (opts?.skip) return { data: undefined };
-    askedVisibility.push(space);
-    if (pending.includes(`visibility:${space}`)) return { data: undefined, isFetching: true };
-    if (failingVisibility.includes(space)) return { data: undefined, error: { status: 500 } };
-    return { data: { supported: true, visibility: visibilityOf[space] ?? "unknown", repos: [] } };
-  },
-  useRefreshSpaceVisibilityMutation: () => [
-    (space: string) => refreshedVisibility.push(space),
-    { isLoading: false },
-  ],
   useSwitchModeMutation: () => [
     ({ mode }: { mode: string }) => {
       switched.push(mode);
@@ -51,34 +42,50 @@ jest.mock("../../shell/api", () => ({
     { isLoading: false },
   ],
 }));
+/** One GitHub Space's slot in the ledger, from the knobs above. */
+function mockLedgerEntry(slug: string) {
+  return {
+    report: unsupportedReport.includes(slug)
+      ? { supported: false, open: 0, closed: 0, closed_recent: 0, sev: {}, kind: {}, milestones: [] }
+      : {
+          supported: true,
+          open: slug === "toolkit" ? 4 : 0,
+          closed: 0,
+          closed_recent: 0,
+          sev: {},
+          kind: {},
+          milestones: [],
+        },
+    deploys: { supported: true, runs: [] },
+    visibility: {
+      supported: true,
+      visibility: failingVisibility.includes(slug) ? "unknown" : (visibilityOf[slug] ?? "unknown"),
+      repos: [],
+    },
+  };
+}
 jest.mock("./api.studio", () => ({
-  useGetSpaceIssueReportQuery: (space: string) => {
-    askedReport.push(space);
-    const refetch = () => refetched.push(`report:${space}`);
-    if (pending.includes(`report:${space}`)) return { data: undefined, isFetching: true, refetch };
-    if (unsupportedReport.includes(space)) return { data: { supported: false }, refetch };
-    return {
-      data: {
-        supported: true,
-        open: space === "toolkit" ? 4 : 0,
-        closed: 0,
-        closed_recent: 0,
-        sev: {},
-        kind: {},
-        milestones: [],
-      },
-      // A refetch in flight keeps the answer it had, as RTK Query does.
-      isFetching: pending.includes(`refetching:report:${space}`),
-      refetch,
-    };
+  useGetStudioLedgerQuery: (_arg: unknown, opts?: { skip?: boolean }) => {
+    askedLedger.push(Boolean(opts?.skip));
+    if (opts?.skip) return { data: undefined };
+    if (pending.includes("ledger")) return { data: undefined, isFetching: true };
+    if (ledgerFails) return { data: undefined, error: { status: 500 } };
+    const config = (envAnswer as { config?: { spaces?: Array<{ slug: string; tracker?: string }> } })
+      ?.config;
+    const spaces = Object.fromEntries(
+      (config?.spaces ?? [])
+        .filter((s) => s.tracker === "github")
+        .map((s) => [s.slug, mockLedgerEntry(s.slug)]),
+    );
+    // A refetch in flight keeps the answer it had, as RTK Query does.
+    return { data: { spaces }, isFetching: pending.includes("refetching:ledger") };
   },
-  useGetSpaceDeploysQuery: (space: string) => {
-    askedDeploys.push(space);
-    return {
-      data: { supported: true, runs: [] },
-      refetch: () => refetched.push(`deploys:${space}`),
-    };
-  },
+  useRefreshStudioLedgerMutation: () => [
+    () => {
+      refreshedLedger += 1;
+    },
+    { isLoading: false },
+  ],
   useGetSpaceStatusQuery: (space: string, opts: { skip?: boolean }) => {
     if (opts?.skip) return { data: undefined };
     askedSpaceStatus.push(space);
@@ -192,19 +199,18 @@ const DEMO = [
 
 describe("the foyer", () => {
   beforeEach(() => {
-    askedReport.length = 0;
-    askedDeploys.length = 0;
+    askedLedger.length = 0;
+    ledgerFails = false;
     askedStatus.length = 0;
     askedSpaceStatus.length = 0;
     failingSpaceStatus = [];
     switched.length = 0;
     switchFails = false;
-    askedVisibility.length = 0;
     visibilityOf = { toolkit: "public", wasteland: "private" };
     failingVisibility = [];
     pending = [];
     refetched.length = 0;
-    refreshedVisibility.length = 0;
+    refreshedLedger = 0;
     unsupportedReport = [];
     window.localStorage.clear();
     envAnswer = { config: { activeSpace: "acme", spaces: SPACES } };
@@ -215,8 +221,8 @@ describe("the foyer", () => {
     expect(screen.getByText("Toolkit")).toBeTruthy();
     expect(screen.getByText("Wasteland")).toBeTruthy();
     expect(screen.getByText("Acme")).toBeTruthy();
-    expect(new Set(askedReport)).toEqual(new Set(["toolkit", "wasteland"]));
-    expect(new Set(askedDeploys)).toEqual(new Set(["toolkit", "wasteland"]));
+    // Both GitHub rows from the one ledger read, which was asked.
+    expect(askedLedger).toContain(false);
     expect(screen.getByText("Public; 4 open; no deploys yet")).toBeTruthy();
     expect(screen.getByText("Private; no open issues; no deploys yet")).toBeTruthy();
     // Acme is the Space you are in: its cards, from /api/status.
@@ -228,7 +234,6 @@ describe("the foyer", () => {
 
   it("a GitHub row's line leads with its repository's visibility; no other row has one", () => {
     mount();
-    expect(new Set(askedVisibility)).toEqual(new Set(["toolkit", "wasteland"]));
     // The word is in the meta line, not a pill beside the name.
     expect(screen.queryByText("Public")).toBeNull();
     expect(screen.queryByText("Private")).toBeNull();
@@ -242,6 +247,28 @@ describe("the foyer", () => {
     mount();
     expect(screen.getByText("Visibility unknown; 4 open; no deploys yet")).toBeTruthy();
     expect(screen.getByText("Visibility unknown; no open issues; no deploys yet")).toBeTruthy();
+  });
+
+  it("a ledger read the agent did not answer settles every GitHub row, saying so", () => {
+    ledgerFails = true;
+    mount();
+    expect(screen.queryByText("Reading the Spaces...")).toBeNull();
+    expect(
+      screen.getAllByText(
+        "Visibility unknown; Could not read this Space's issues -- the agent did not answer.",
+      ),
+    ).toHaveLength(2);
+    // The other rows are unharmed: their cards are on disk.
+    expect(screen.getByText("2 cards in play: 1 Active, 1 In Progress")).toBeTruthy();
+  });
+
+  it("with no GitHub Space, the ledger is not asked at all", () => {
+    envAnswer = { config: { activeSpace: "acme", spaces: [SPACES[1]] } };
+    mount();
+    expect(askedLedger.length).toBeGreaterThan(0);
+    expect(askedLedger.every((skipped) => skipped)).toBe(true);
+    fireEvent.click(screen.getByTitle("Refresh"));
+    expect(refreshedLedger).toBe(0);
   });
 
   it("another Space's row counts its cards in place, by its slug, under ITS lane names", () => {
@@ -562,8 +589,9 @@ describe("the Spaces card's load, Refresh and pager", () => {
     window.localStorage.clear();
     pending = [];
     refetched.length = 0;
-    refreshedVisibility.length = 0;
-    askedVisibility.length = 0;
+    refreshedLedger = 0;
+    askedLedger.length = 0;
+    ledgerFails = false;
     unsupportedReport = [];
     failingSpaceStatus = [];
     failingVisibility = [];
@@ -572,7 +600,7 @@ describe("the Spaces card's load, Refresh and pager", () => {
   });
 
   it("holds its loading state until every row's reads settle, then draws the list once", () => {
-    pending = ["report:wasteland"];
+    pending = ["ledger"];
     const view = mount();
     expect(screen.getByText("Reading the Spaces...")).toBeTruthy();
     // Not one row, not even the ones whose reads are in.
@@ -586,9 +614,9 @@ describe("the Spaces card's load, Refresh and pager", () => {
     expect(screen.getByText("2 cards in play: 1 Active, 1 In Progress")).toBeTruthy();
   });
 
-  it("waits on a visibility read and another Space's cards read too", () => {
+  it("waits on the ledger read and another Space's cards read too", () => {
     envAnswer = { config: { activeSpace: "toolkit", spaces: SPACES } };
-    pending = ["visibility:wasteland", "status:acme"];
+    pending = ["ledger", "status:acme"];
     const view = mount();
     expect(screen.getByText("Reading the Spaces...")).toBeTruthy();
     expect(screen.queryByText("Toolkit")).toBeNull();
@@ -609,7 +637,7 @@ describe("the Spaces card's load, Refresh and pager", () => {
   });
 
   it("no row ever shows a placeholder line", () => {
-    pending = ["report:toolkit"];
+    pending = ["ledger"];
     const view = mount();
     expect(screen.queryByText(/^Reading the (issues|cards)/)).toBeNull();
     pending = [];
@@ -625,21 +653,14 @@ describe("the Spaces card's load, Refresh and pager", () => {
     expect(refresh.compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("Refresh reads every row again -- issues, deploys, cards, and visibility past the agent's cache", () => {
+  it("Refresh reads every row again -- the ledger once, past the agent's cache, and the cards", () => {
     mount();
     expect(refetched).toEqual([]);
-    expect(refreshedVisibility).toEqual([]);
+    expect(refreshedLedger).toBe(0);
     fireEvent.click(screen.getByTitle("Refresh"));
-    expect(new Set(refetched)).toEqual(
-      new Set([
-        "report:toolkit",
-        "deploys:toolkit",
-        "report:wasteland",
-        "deploys:wasteland",
-        "status:here",
-      ]),
-    );
-    expect(new Set(refreshedVisibility)).toEqual(new Set(["toolkit", "wasteland"]));
+    expect(new Set(refetched)).toEqual(new Set(["status:here"]));
+    // One read for every GitHub row -- issues, deploys and visibility together.
+    expect(refreshedLedger).toBe(1);
     expect(screen.queryByText("Reading the Spaces...")).toBeNull();
     expect(screen.getByText("Toolkit")).toBeTruthy();
   });
@@ -647,7 +668,7 @@ describe("the Spaces card's load, Refresh and pager", () => {
   it("while a read is fetching again, the list stays drawn and the button shows it", () => {
     const view = mount();
     expect((screen.getByTitle("Refresh") as HTMLButtonElement).disabled).toBe(false);
-    pending = ["refetching:report:toolkit"];
+    pending = ["refetching:ledger"];
     view.rerender(tree());
     expect(screen.queryByText("Reading the Spaces...")).toBeNull();
     expect(screen.getByText("Public; 4 open; no deploys yet")).toBeTruthy();
@@ -697,19 +718,16 @@ describe("the Spaces card's load, Refresh and pager", () => {
     expect(screen.queryByText("1 / 1")).toBeNull();
   });
 
-  it("a GitHub Space not connected says nothing about visibility, and is not asked", () => {
+  it("a GitHub Space not connected says nothing about visibility", () => {
     envAnswer = { config: { activeSpace: "demo", spaces: DEMO } };
     unsupportedReport = ["github-demo"];
     mount();
-    expect(askedVisibility).not.toContain("github-demo");
     expect(
       screen.getByText(
         "not connected yet -- connect it, and this row shows its open issues and last deploy",
       ),
     ).toBeTruthy();
     expect(screen.queryByText(/Visibility unknown/)).toBeNull();
-    fireEvent.click(screen.getByTitle("Refresh"));
-    expect(refreshedVisibility).toEqual([]);
   });
 
   it("a connected one whose read did not answer still says Visibility unknown", () => {

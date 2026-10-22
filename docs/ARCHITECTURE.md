@@ -78,7 +78,10 @@ what is deliberately absent (a route named but not built, or retired outright) i
 always; present, that Space's own entry in `spaces[]` (one lookup, `space_entry()` behind `space_scope()`
 in `agent/ado/accounting.py`), an undeclared slug a 404 naming it. `/api/visibility` also takes `?refresh=1`, past its per-repository cache, as `/api/env?refresh=1` goes past the probe's -- the Spaces card's Refresh. The tracker reads probe that Space's
 tier; `/api/status` reads that Space's `current/` and `backlog/` and asks no tracker. The Studio's Spaces card
-is the caller -- one row per Space, none switched into ([`modules/studio.md`](modules/studio.md#the-routes)).
+reads its non-GitHub rows through `/api/status?space=` -- one row per Space, none switched into -- and every
+GitHub row through ONE read, `GET /api/studio/ledger` (`consts.json` `studio.ledgerRoute`): the three answers
+above for every GitHub Space, from one `gh api graphql` call plus a `gh run list` per repository, kept on the
+agent's disk for 600 s ([`modules/studio.md`](modules/studio.md#the-routes)).
 
 **A route may read through a verb.** `GET /api/spaces/candidates` -- the repositories the Spaces card's
 **+** offers, an owner's with `?owner=`, one typed repository with `?repo=` -- runs `NewSpace -Discover -AsJson` through the bridge's own `run_command`, as

@@ -105,6 +105,7 @@ EXPECTED = {
     ("studio", "threadLine"): "> GitHub:",
     ("studio", "promoteLabel"): "design",
     ("studio", "promptsRoute"): "/api/studio/prompts",
+    ("studio", "ledgerRoute"): "/api/studio/ledger",
     ("design", "idKey"): "id",
     ("design", "idRegex"): r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
     ("design", "states"): ["Design", "Spec", "Complete", "Archived"],
@@ -414,6 +415,7 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.studio_thread_line(), EXPECTED[("studio", "threadLine")])
         self.assertTrue(C.re_studio_note_name().match("board-ideas.md"))
         self.assertEqual(C.studio_prompts_route(), EXPECTED[("studio", "promptsRoute")])
+        self.assertEqual(C.studio_ledger_route(), EXPECTED[("studio", "ledgerRoute")])
         self.assertFalse(C.re_studio_note_name().match("../hub.json"))
         self.assertEqual(C.re_studio_thread().search("x\n> GitHub: https://github.com/o/r/issues/7\n").group(4), "7")
         self.assertEqual(C.design_id_key(), EXPECTED[("design", "idKey")])
@@ -538,6 +540,7 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("rituals.text.noWorkers", "No worker labels in this Space."),
         ("rituals.route", "/api/ritual/standup"),
         ("studio.promptsRoute", "/api/studio/prompts"),
+        ("studio.ledgerRoute", "/api/studio/ledger"),
         ("rituals.text.workBlockers", "{n} to walk"),
         ("rituals.text.proseBlockersNone", "Nothing blocked."),
         ("rituals.text.proseYesterday", "Yesterday I closed"),

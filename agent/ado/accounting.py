@@ -896,6 +896,16 @@ def _gh_repo_visibility(repo: str, refresh: bool = False) -> str:
     return word
 
 
+def remember_visibility(repo: str, word: str) -> None:
+    """Hold an answer another read already had -- the Studio's ledger asks a
+    repository's visibility in its one GraphQL call -- under the same rule as
+    ``_gh_repo_visibility``: an unknown is never held, and it is good for
+    ``VISIBILITY_TTL_SECONDS`` from now."""
+    if word != visibility_unknown():
+        with _visibility_lock:
+            _visibility_cache[repo] = (time.monotonic(), word)
+
+
 def fold_visibility(words: list[str]) -> str:
     """One Space's visibility from its repositories': public when ANY is (a
     write may land there), private when ALL are, unknown otherwise -- and
