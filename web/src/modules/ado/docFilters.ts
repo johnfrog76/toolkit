@@ -31,17 +31,22 @@ export function fuzzyMatch(haystack: string, text: string): boolean {
   return words.every((w) => hay.includes(w));
 }
 
-/** Design: text over the TITLE, the description and the id (one box, the
- *  three at once), and the kind -- "spec" is a design that has one, "design"
- *  one that is a note alone. */
+/** Design: text over the TITLE, the description, the id and the FILE NAMES
+ *  of its note and spec (one box, all at once -- the row prints the name, so a
+ *  reader who remembers `toolkit-getting-started.md` finds it), and the kind --
+ *  "spec" is a design that has one, "design" one that is a note alone. The
+ *  repo's Design tab and the hub's Designs card both filter by this one rule. */
 export function designMatches(
-  d: Pick<Design, "title" | "description" | "id" | "spec">,
+  d: Pick<Design, "title" | "description" | "id" | "note" | "spec">,
   text: string,
   kind: string,
 ): boolean {
   if (kind === "spec" && !d.spec) return false;
   if (kind === "design" && d.spec) return false;
-  return fuzzyMatch(`${d.title} ${d.description} ${d.id}`, text);
+  return fuzzyMatch(
+    `${d.title} ${d.description} ${d.id} ${d.note?.name ?? ""} ${d.spec?.name ?? ""}`,
+    text,
+  );
 }
 
 /** Docs: text over the row's path, and the folder, exactly. The tree has not

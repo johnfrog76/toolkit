@@ -727,6 +727,28 @@ effect in that process -- the override wins, which is what it is for. Without it
 contract's (`env.activeSpace`, `env.features`) because both halves type them; `PROMPTS_ROOT` predates
 the contract file and is typed where it is read.
 
+## The agent's cache
+
+The agent keeps one thing on disk that is not a setting and not the hub's: what it has already read
+through the tracker and can prove has not changed. Today that is the Design tab's -- each design or spec
+file's parsed row (id, title, description, its stamps, its Docs and thread lines; never the body), and the
+body of a note once it has been opened -- each keyed by the file's **blob sha**, a hash of its bytes, so
+nothing in it can go stale: a note that changes has a new sha and is read again
+([the design lifecycle](hub/design.md)). `agent/core/disk_cache.py` owns the place:
+
+| Where | When |
+| --- | --- |
+| `P20_AGENT_CACHE_DIR` (`consts.json` `env.agentCacheDir`) | when it is set -- the test runners (`Tests/Test-Toolkit.ps1`, `Tests/conftest.py`) point it at a scratch folder, so no suite writes the real one |
+| `%LOCALAPPDATA%\ToolKit\Cache` | Windows |
+| `~/Library/Caches/ToolKit` | macOS |
+| `$XDG_CACHE_HOME/toolkit`, else `~/.cache/toolkit` | elsewhere |
+
+Never the hub -- it is your record, and it may be synced between machines -- and never the package, whose
+tree `Update` refuses to move while it is dirty. Under it, `rows/<reader>.json` holds the parsed rows (the
+reader's name carries a version, bumped when what it parses changes) and `bodies/<sha>` the opened bodies.
+Delete the folder whenever you like: the next read fetches what it needs again. `Config` does not know the
+variable; like the other overrides it is a launcher's, not a setting.
+
 ## Settings by workflow: the questions, and the one list behind them
 
 Every optional surface carries a QUESTION in the person's words -- "Can it post to Teams for me?", "Where do my cards live?" -- and the

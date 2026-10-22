@@ -11,7 +11,15 @@ engineer's own machine state.
    ``P20_USAGE_LOG_DIR`` is the one override both halves read; here it points at
    a temp directory for the whole session.
 
-2. **The webhook variables.** ``SendTeams`` and ``POST /api/comms/send`` take
+2. **The agent's cache.** ``agent/core/disk_cache.py`` keeps what the agent read
+   through the tracker (the Design tab's parsed rows and note bodies, by blob
+   sha) under the user's cache folder. ``P20_AGENT_CACHE_DIR`` (``consts.json``
+   ``env.agentCacheDir``) moves it: here to a temp directory at import, and to a
+   fresh one for EVERY test, because a fixture's blob sha is whatever the test
+   says it is -- two tests may give different text one sha, and a row one test
+   parsed must never answer for another.
+
+3. **The webhook variables.** ``SendTeams`` and ``POST /api/comms/send`` take
    whatever is in the environment at face value, and a machine that has ever
    sent a real message may still have one exported. Every ``TEAMS_WEBHOOK_*``
    is removed here by pattern for the run and put back afterwards, and the
@@ -47,12 +55,16 @@ from _rmtree import remove_tree
 # reads the JSON itself.
 _CONSTS = json.loads((Path(__file__).resolve().parent.parent / "consts.json").read_text(encoding="utf-8-sig"))
 WEBHOOK_PREFIX = _CONSTS["env"]["teamsWebhookPrefix"]
+AGENT_CACHE_ENV = _CONSTS["env"]["agentCacheDir"]
 TEST_RUN_MARKER = _CONSTS["env"]["testRunMarker"]
 
 # See the module docstring: at import, because collection logs.
 USAGE_LOG_DIR = tempfile.mkdtemp(prefix="p20-test-logs-")
 os.environ["P20_USAGE_LOG_DIR"] = USAGE_LOG_DIR
 atexit.register(remove_tree, USAGE_LOG_DIR)
+AGENT_CACHE_DIR = tempfile.mkdtemp(prefix="p20-test-cache-")
+os.environ[AGENT_CACHE_ENV] = AGENT_CACHE_DIR
+atexit.register(remove_tree, AGENT_CACHE_DIR)
 
 
 def scrub_webhooks(environ) -> dict:
@@ -78,3 +90,10 @@ def _no_live_webhooks():
     finally:
         os.environ.update(_SAVED_WEBHOOKS)
         os.environ.pop(TEST_RUN_MARKER, None)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_agent_cache(tmp_path, monkeypatch):
+    """Every test reads and writes its own empty agent cache (see the docstring)."""
+    monkeypatch.setenv(AGENT_CACHE_ENV, str(tmp_path / "agent-cache"))
+    yield

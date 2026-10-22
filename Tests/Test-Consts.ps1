@@ -125,6 +125,7 @@ $expected = [ordered]@{
     # A list travels as its elements joined with a comma, so the table stays flat.
     'features.spaceScoped'      = 'sprintAwareness,trainingHoursPerQuarter,suggestions'
     'env.activeSpace'         = 'P20_ACTIVE_SPACE'
+    'env.agentCacheDir'       = 'P20_AGENT_CACHE_DIR'
     'env.features'            = 'P20_FEATURES'
     'env.agentPort'           = 'P20_AGENT_PORT'
     'env.teamsWebhookPrefix'  = 'TEAMS_WEBHOOK_'

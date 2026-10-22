@@ -7,11 +7,12 @@ grouped by id: one row per id, with its state read from where its files are
 (4.3), its note and its spec, plus ``notShown`` (the files that are not designs:
 no ``id:``, or an id two notes share) and ``structure`` (which of the two folders
 exist), so the web decides nothing. ``GET /design/{path}`` returns one markdown
-file by its repo path. Both read THROUGH THE TRACKER -- ``gh api
-repos/{owner}/{repo}/contents/{path}`` -- the way every GitHub read in
-``accounting.py`` does: a subprocess, JSON back, one sentence when gh does not
-answer. A design is owned by the product it is for (D-S10), so it is read where
-the product keeps it, never copied into the hub.
+file by its repo path. Both read THROUGH THE TRACKER, through
+``agent/ado/repo_read.py``: the listing is one GraphQL call for the four
+folders' shape (names and blob shas) plus one for the texts of the blobs it has
+never parsed, and the detail is one ``gh api repos/{owner}/{repo}/contents/{path}``
+when its body is not already on disk. A design is owned by the product it is for
+(D-S10), so it is read where the product keeps it, never copied into the hub.
 
 The state rule lives here ONCE, ``design_state``, and the hub's seed drawer
 (``agent/studio/notes.py``) groups its own folders through the same
@@ -27,13 +28,15 @@ is refused with a stated 400, because a design folder is one repo's.
 
 A folder that does not exist is an empty list, not an error -- most repos have
 no ``design/`` yet, and the tab then teaches the structure rather than going
-blank (D-DL11). The listing is cached per process for a short TTL; a file's
-text is cached by its blob sha, which never changes for the same bytes.
+blank (D-DL11). The listing is cached per process for a short TTL. Under it,
+two things are kept ON DISK by blob sha, which never changes for the same bytes
+(``agent/core/disk_cache.py``; docs/CONFIGURATION.md, "The agent's cache"): a
+note's parsed row fields (``design_fields`` -- no body), so a restart refetches
+nothing unchanged, and a note's body once it has been opened, so the detail
+route serves an unchanged note without asking gh.
 """
 
 import asyncio
-import base64
-import json
 import re
 import subprocess  # noqa: F401 -- the suites patch design.subprocess.run; run_read calls the same module
 import time
@@ -43,7 +46,6 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ..core import log_writer
-from ..core.child import did_not_answer, run_read
 from ..core.config import card_types, load_config, org_folder, resolve_dirs, tracker, tracker_owner
 from ..core.consts import (
     design_id_key,
@@ -60,6 +62,10 @@ from ..core.consts import (
 )
 from ..core.parsers import _parse_status_metadata, card_design, card_id
 from ..core.tier import _resolve_tier
+from .repo_read import GH_TIMEOUT_SECONDS, _gh, read_folder_rows
+from .repo_read import file_text as _file_text
+
+__all__ = ["GH_TIMEOUT_SECONDS", "_file_text", "_gh"]  # docs.py and studio/prompts.py read through these
 
 api = APIRouter()
 
@@ -68,7 +74,10 @@ api = APIRouter()
 # own archive folder (consts.json folders.archive).
 DESIGN_FOLDERS = ("design", "spec")
 LIST_TTL_SECONDS = 60
-GH_TIMEOUT_SECONDS = 30
+# The disk cache of parsed rows (repo_read.read_folder_rows). The number is the
+# parse's version: change what design_fields reads and bump it, so every row is
+# parsed again rather than read as the old rule left it.
+DESIGN_ROWS = "design-rows-1"
 
 # A document's name: one markdown file, no path. What the route accepts is
 # exactly what the listing can produce -- nothing else reaches gh.
@@ -79,17 +88,18 @@ _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*\.md$")
 # a hub note and a repo's design/ are read by this one rule.
 _THREAD = re_studio_thread()
 
-_list_cache: dict[str, tuple[float, "DesignListResponse"]] = {}
-_text_cache: dict[str, str] = {}
+# repo -> (when, the listing, {path: blob sha}); the shas are what the detail
+# route looks a body up by while the listing is fresh.
+_list_cache: dict[str, tuple[float, "DesignListResponse", dict[str, str]]] = {}
 
 NOTE, SPEC = "note", "spec"
 LIVE, ARCHIVE = "live", "archive"
 
 
 def clear_cache() -> None:
-    """Forget every cached listing and file (the tests' reset)."""
+    """Forget every cached listing (the tests' reset). The disk cache is not
+    touched: it is keyed by content, so nothing in it can be stale."""
     _list_cache.clear()
-    _text_cache.clear()
 
 
 def design_folders() -> tuple[tuple[str, str, str], ...]:
@@ -338,26 +348,6 @@ def search_design(repo: str, q: str) -> DesignSearchResponse:
     return DesignSearchResponse(repo=repo, query=q, hits=hits, note=CODE_SEARCH_NOTE)
 
 
-def _gh(args: list[str]):
-    """One ``gh api`` call: (parsed JSON, None), or (None, why). A 404 is
-    reported as the literal "not found" so a missing folder can read as empty."""
-    cmd = ["gh", "api", *args]
-    try:
-        result = run_read(cmd, GH_TIMEOUT_SECONDS)
-    except Exception as exc:  # noqa: BLE001 -- gh missing, the clock ran out, or its output unreadable: a reason, never a raise
-        return None, did_not_answer("gh", exc)
-    if result.returncode != 0:
-        err = (result.stderr or "").strip()
-        if "404" in err or "Not Found" in err:
-            return None, "not found"
-        lines = err.splitlines()
-        return None, lines[0] if lines else "gh returned an error"
-    try:
-        return json.loads(result.stdout or "null"), None
-    except ValueError:
-        return None, "gh answered with something that is not JSON"
-
-
 def space_repo(org_url: str) -> str | None:
     """``owner/name`` when the address names a repository, else None."""
     owner = tracker_owner(org_url)
@@ -408,48 +398,69 @@ def _stamp(text: str, stamp: str) -> str:
     return m.group(1).strip() if m else ""
 
 
-def parse_design_doc(
-    text: str, path: str, url: str = "", kind: str | None = None, archived: bool | None = None
+def design_fields(text: str) -> dict:
+    """What a row needs from a file, read from its TEXT ALONE -- the dict the
+    disk cache keeps by blob sha, so it may not depend on the file's name or
+    folder: ``heading`` is the first ``# `` heading or "" (the name stands in at
+    build time), and ``docs`` is read on every file (only a spec's is shown)."""
+    heading, description, thread, number, thread_repo = parse_doc(text, "")
+    front, _ = _front(text)
+    raw_id = front.get(design_id_key(), "")
+    closed = _stamp(text, stamp_closed())
+    m = re.match(r"^\d{4}-\d{2}-\d{2}", closed)
+    outcome = _stamp(text, stamp_outcome()).lower()
+    d = re_design_docs().search(text or "")
+    return {
+        "heading": heading,
+        "description": description,
+        "thread": thread,
+        "thread_number": number,
+        "thread_repo": thread_repo,
+        "id": raw_id if re_design_id().match(raw_id) else "",
+        "closed": m.group(0) if m else "",
+        "outcome": outcome if outcome in design_outcomes() else "",
+        "docs": d.group(1).strip() if d else "",
+    }
+
+
+def design_doc(
+    fields: dict, path: str, url: str = "", kind: str | None = None, archived: bool | None = None
 ) -> DesignDoc:
-    """One file of the four folders, every field read -- the lifecycle's reader
-    of a document. ``path`` is the repo (or hub) path, ``folder/name``; in a
-    repo the folder says what the file is, and a hub -- whose folders may be
-    renamed through hub.json -- says so itself with ``kind`` and ``archived``."""
+    """A DesignDoc from ``design_fields``' dict and where the file is. ``path`` is
+    the repo (or hub) path, ``folder/name``; in a repo the folder says what the
+    file is, and a hub -- whose folders may be renamed through hub.json -- says
+    so itself with ``kind`` and ``archived``."""
     folder, _, name = path.rpartition("/")
     row = folder_of(path)
     if kind is None:
         kind, where = (row[1], row[2]) if row else ("", LIVE)
     else:
         where = ARCHIVE if archived else LIVE
-    title, description, thread, number, thread_repo = parse_doc(text, name)
-    front, _ = _front(text)
-    raw_id = front.get(design_id_key(), "")
-    doc_id = raw_id if re_design_id().match(raw_id) else ""
-    closed = _stamp(text, stamp_closed())
-    m = re.match(r"^\d{4}-\d{2}-\d{2}", closed)
-    closed = m.group(0) if m else ""
-    outcome = _stamp(text, stamp_outcome()).lower()
-    docs = ""
-    if kind == SPEC:
-        d = re_design_docs().search(text or "")
-        docs = d.group(1).strip() if d else ""
     return DesignDoc(
         folder=folder,
         name=name,
         path=path,
-        title=title,
-        description=description,
-        thread=thread,
-        thread_number=number,
-        thread_repo=thread_repo,
+        title=fields.get("heading") or name,
+        description=fields.get("description", ""),
+        thread=fields.get("thread", ""),
+        thread_number=fields.get("thread_number"),
+        thread_repo=fields.get("thread_repo", ""),
         url=url,
-        id=doc_id,
+        id=fields.get("id", ""),
         kind=kind,
         archived=(where == ARCHIVE),
-        closed=closed,
-        outcome=outcome if outcome in design_outcomes() else "",
-        docs=docs,
+        closed=fields.get("closed", ""),
+        outcome=fields.get("outcome", ""),
+        docs=fields.get("docs", "") if kind == SPEC else "",
     )
+
+
+def parse_design_doc(
+    text: str, path: str, url: str = "", kind: str | None = None, archived: bool | None = None
+) -> DesignDoc:
+    """One file of the four folders, every field read -- the lifecycle's reader
+    of a document: ``design_fields`` over the text, ``design_doc`` over where it is."""
+    return design_doc(design_fields(text), path, url, kind, archived)
 
 
 def design_state(note: str | None, spec: str | None, note_text: str = "", spec_text: str = "") -> dict:
@@ -561,75 +572,63 @@ def _lines_for(doc: DesignDoc | None) -> str:
     return "\n".join(out)
 
 
-def _file_text(repo: str, path: str, sha: str = "") -> tuple[str | None, dict | None, str | None]:
-    """(text, the contents entry, why-not). Cached by the blob's sha."""
-    if sha and sha in _text_cache:
-        return _text_cache[sha], None, None
-    row, why = _gh([f"repos/{repo}/contents/{path}"])
-    if why:
-        return None, None, why
-    if not isinstance(row, dict) or row.get("type") != "file":
-        return None, None, "not found"
-    raw = row.get("content") or ""
-    try:
-        text = base64.b64decode(raw).decode("utf-8") if row.get("encoding", "base64") == "base64" else str(raw)
-    except (ValueError, UnicodeDecodeError):
-        return None, None, f"{path} is not UTF-8 text"
-    if row.get("sha"):
-        _text_cache[row["sha"]] = text
-    return text, row, None
-
-
-def _doc(folder: str, entry: dict, text: str) -> DesignDoc:
-    name = entry.get("name", "")
-    return parse_design_doc(text, entry.get("path", f"{folder}/{name}"), entry.get("html_url", ""))
+def _is_design_file(name: str) -> bool:
+    """A markdown file of the four folders, other than the folder's README."""
+    return bool(_NAME.match(name)) and name.lower() != "readme.md"
 
 
 def list_design(repo: str) -> DesignListResponse:
     hit = _list_cache.get(repo)
     if hit and time.monotonic() - hit[0] < LIST_TTL_SECONDS:
         return hit[1]
+    folders = design_folders()
+    read = read_folder_rows(
+        repo, [f for f, _k, _w in folders], namespace=DESIGN_ROWS, parse=design_fields, keep=_is_design_file
+    )
+    if read.reason:
+        return DesignListResponse(repo=repo, reason=f"{repo}: {read.reason}")
     items: list[DesignDoc] = []
     structure = Structure()
-    for folder, _kind, where in design_folders():
-        rows, why = _gh([f"repos/{repo}/contents/{folder}"])
-        if why == "not found":
+    for folder, _kind, where in folders:
+        entries = read.folders.get(folder)
+        if entries is None:
             continue  # no such folder: an empty list, not an error
-        if why:
-            return DesignListResponse(repo=repo, reason=f"{repo}: {why}")
         if where == LIVE:
             setattr(structure, folder, True)
-        entries = sorted(
-            (
-                r
-                for r in (rows if isinstance(rows, list) else [])
-                if r.get("type") == "file"
-                and _NAME.match(r.get("name", ""))
-                and r.get("name", "").lower() != "readme.md"
-            ),
-            key=lambda r: r.get("name", "").lower(),
-        )
-        for entry in entries:
-            text, _row, why = _file_text(
-                repo, entry.get("path", f"{folder}/{entry.get('name', '')}"), entry.get("sha", "")
-            )
-            items.append(_doc(folder, entry, text or ""))
+        items.extend(design_doc(read.rows[e.path], e.path, read.file_url(e.path)) for e in entries)
     designs, not_shown = group_designs(items)
     resp = DesignListResponse(repo=repo, items=items, designs=designs, notShown=not_shown, structure=structure)
-    _list_cache[repo] = (time.monotonic(), resp)
-    log_writer.write_log("CMD", "agent/design", f"{len(designs)} designs, {len(not_shown)} not shown ({repo})")
+    _list_cache[repo] = (time.monotonic(), resp, read.shas)
+    log_writer.write_log(
+        "CMD",
+        "agent/design",
+        f"{len(designs)} designs, {len(not_shown)} not shown ({repo}; {read.calls} gh calls)",
+    )
     return resp
 
 
+def _listed(repo: str, path: str) -> tuple[str, str]:
+    """(blob sha, file url) of ``path`` from a listing still inside its TTL, else
+    ("", ""). A sha older than the TTL is not trusted: the note may have changed."""
+    hit = _list_cache.get(repo)
+    if not hit or time.monotonic() - hit[0] >= LIST_TTL_SECONDS:
+        return "", ""
+    doc = next((d for d in hit[1].items if d.path == path), None)
+    return hit[2].get(path, ""), doc.url if doc else ""
+
+
 def read_design_doc(repo: str, path: str) -> DesignDocDetail:
-    text, row, why = _file_text(repo, path)
+    # The listing's sha, while it is fresh, finds the body on disk: an unchanged
+    # note opens with no gh call. Otherwise one contents call, kept by its sha.
+    sha, url = _listed(repo, path)
+    text, row, why = _file_text(repo, path, sha)
     if why == "not found":
         raise HTTPException(status_code=404, detail=f"No {path} in {repo}.")
     folder, _, name = path.rpartition("/")
     if why:
         return DesignDocDetail(repo=repo, folder=folder, name=name, path=path, reason=f"{repo}: {why}")
-    doc = _doc(folder, row or {"name": name, "path": path}, text or "")
-    log_writer.write_log("CMD", "agent/design", f"{path} ({repo})")
+    doc = parse_design_doc(text or "", path, url or (row or {}).get("html_url", ""))
+    log_writer.write_log("CMD", "agent/design", f"{path} ({repo}{'' if row else '; from the cache'})")
     return DesignDocDetail(**doc.model_dump(), repo=repo, body=text or "")
 
 

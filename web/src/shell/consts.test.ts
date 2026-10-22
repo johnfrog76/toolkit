@@ -76,6 +76,9 @@ describe("consts.json", () => {
     // the contract is stated on all three sides.
     expect(consts.env.activeSpace).toBe("P20_ACTIVE_SPACE");
     expect(consts.env.features).toBe("P20_FEATURES");
+    // Where the agent's on-disk cache goes instead of the user cache folder: the
+    // test runners set it, the agent reads it. Stated here for the same reason.
+    expect(consts.env.agentCacheDir).toBe("P20_AGENT_CACHE_DIR");
     // The line a send writes under ## Sent, from the web button and from SendTeams -Session.
     expect(STAMPS.sent).toBe("Sent to");
     // Organize's reminders: the footer lines, the due pattern, and the two word lists.
