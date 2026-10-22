@@ -201,20 +201,68 @@ if ($files.Count -eq 0) {
     return
 }
 
-# -- Is the hub a repository at all? -------------------------------------------
-# Asked ONCE, not once per card. The README says a hub need not be a git
-# repository, and the Modified column already falls back to the filesystem when
-# there is no git date -- but outside a repository `git log` exits 128, and the
-# LAST card's 128 was what the command left behind, so `tkStatus; if
-# ($LASTEXITCODE) { ... }` saw a failure that did not happen.
-#Asking once also
-# saves one process start per card, which is worth having on Windows.
-$hubIsRepo = $false
-Push-Location $promptsRoot
-try {
-    $hubIsRepo = ((Invoke-P20TrackerRead 'git' @('rev-parse', '--is-inside-work-tree')).Code -eq 0)
+# -- The day each card last changed: ONE git log for current/ ------------------
+# Not one `git log -1` per card: git log is newest first, so the first time a
+# file is named is its last change, and one call answers every card. The agent's
+# twin is agent/core/git_history.py (folder_changes), and
+# Tests/fixtures/status-modified/ holds the two halves to one day per card.
+#
+# The hub need not be a git repository: outside one the log exits 128 and there
+# is no map, so every card reads its filesystem date below -- one failed process,
+# where there used to be a probe, and before that one 128 per card (the LAST of
+# which was what the command left behind; see the reset after the loop).
+#
+# Each commit opens with a marker line, '@@<epoch>' (%at, read as the LOCAL day,
+# the same rule as the agent): a card's file name cannot take that shape, and
+# no NUL has to travel through a Windows PowerShell 5.1 pipe.
+#
+# A name outside ASCII comes back in git's own quoted spelling --
+# "caf\303\251.md", octal UTF-8 bytes -- and is unquoted here. That keeps the
+# whole read ASCII, so it does not depend on the console code page a native
+# command's output is decoded with (an OEM page on Windows would turn a raw
+# UTF-8 name into another name, and the card would silently read its mtime).
+# The agent decodes UTF-8 itself and asks for the raw name; the fixture's
+# non-ASCII row holds the two to one answer. The map is ordinal, as the
+# agent's dict is: two names that differ only in case are two cards.
+$unquoteGitPath = {
+    param([string]$Name)
+    if ($Name.Length -lt 2 -or -not ($Name.StartsWith('"') -and $Name.EndsWith('"'))) { return $Name }
+    $inner = $Name.Substring(1, $Name.Length - 2)
+    $bytes = New-Object 'System.Collections.Generic.List[byte]'
+    $utf8 = New-Object System.Text.UTF8Encoding($false)
+    $escapes = @{ 'a' = 7; 'b' = 8; 't' = 9; 'n' = 10; 'v' = 11; 'f' = 12; 'r' = 13; '"' = 34; '\' = 92 }
+    $i = 0
+    while ($i -lt $inner.Length) {
+        $c = $inner[$i]
+        if ($c -eq '\' -and ($i + 3) -lt $inner.Length -and $inner.Substring($i + 1, 3) -match '^[0-7]{3}$') {
+            $bytes.Add([Convert]::ToByte($inner.Substring($i + 1, 3), 8)); $i += 4; continue
+        }
+        if ($c -eq '\' -and ($i + 1) -lt $inner.Length -and $escapes.ContainsKey([string]$inner[$i + 1])) {
+            $bytes.Add([byte]$escapes[[string]$inner[$i + 1]]); $i += 2; continue
+        }
+        $bytes.AddRange([byte[]]$utf8.GetBytes([string]$c)); $i++
+    }
+    return $utf8.GetString($bytes.ToArray())
 }
-catch { $hubIsRepo = $false }
+$cardDays = New-Object 'System.Collections.Generic.Dictionary[string,string]' ([System.StringComparer]::Ordinal)
+Push-Location $currentDir
+try {
+    $gitLog = Invoke-P20TrackerRead 'git' @('-c', 'core.quotepath=on', 'log', '--format=@@%at', '--name-only', '--relative', '--', '.')
+    if ($gitLog.Code -eq 0) {
+        $logDay = $null
+        foreach ($logLine in $gitLog.Out) {
+            $logLine = "$logLine".Trim()
+            if (-not $logLine) { continue }
+            if ($logLine -match '^@@(\d+)$') { $logDay = ConvertTo-P20LocalDay $Matches[1]; continue }
+            $logLine = & $unquoteGitPath $logLine
+            # A file directly in current/ only, and its FIRST naming is its last change.
+            if ($logDay -and $logLine -notmatch '/' -and -not $cardDays.ContainsKey($logLine)) {
+                $cardDays[$logLine] = $logDay
+            }
+        }
+    }
+}
+catch { $cardDays.Clear() }
 finally { Pop-Location }
 
 $rows = @()
@@ -263,30 +311,10 @@ foreach ($file in $files) {
         if ($sprint.Length -gt 20) { $sprint = $sprint.Substring(0, 18) + '..' }
     }
 
-    # Last modified - try git log first, fall back to filesystem
-    # Avoid [System.IO.Path]::GetRelativePath -- .NET Core only, breaks PS 5.1
-    $relPath = $file.FullName.Replace('\', '/')
-    $rootNorm = $promptsRoot.Replace('\', '/').TrimEnd('/')
-    if ($relPath.StartsWith($rootNorm, [System.StringComparison]::OrdinalIgnoreCase)) {
-        $relPath = $relPath.Substring($rootNorm.Length + 1)
-    }
-    # %at, read as the LOCAL day -- the same rule as agent/ado/status.py, so
-    # tkStatus and the web list cannot show a card two different days
-    $gitDay = $null
-    if ($hubIsRepo) {
-        Push-Location $promptsRoot
-        try {
-            $gitLog = Invoke-P20TrackerRead 'git' @('log', '-1', '--format=%at', '--', $relPath)
-            $gitEpoch = $gitLog.Out
-            if ($gitLog.Code -eq 0 -and $gitEpoch) {
-                $gitDay = ConvertTo-P20LocalDay "$gitEpoch"
-            }
-        }
-        finally { Pop-Location }
-    }
-
-    if ($gitDay) {
-        $modified = $gitDay
+    # Last modified -- the folder's git log, else the filesystem: a hub that is
+    # not a repository, or a card the log never named (new, not yet committed).
+    if ($cardDays.ContainsKey($file.Name)) {
+        $modified = $cardDays[$file.Name]
     }
     else {
         $modified = $file.LastWriteTime.ToString('yyyy-MM-dd')
@@ -334,7 +362,7 @@ foreach ($file in $files) {
 
 # A card with no git history is a HANDLED case, not a failure: git's exit code
 # has been read and answered, and what this command leaves behind must describe
-# THIS command. Reset unconditionally -- the probe above is a native call too,
+# THIS command. Reset unconditionally -- the one log above is a native call,
 # and on a hub that is not a repository it leaves 128 by itself.
 $global:LASTEXITCODE = 0
 

@@ -332,7 +332,7 @@ foyer, **Hub Designs**: the hub's `design/` notes, a note that names a Space car
 opens as the note and then its thread, in one viewer, whichever Space you are in
 (`DesignsCard.test.tsx`). A hub with no `design/` folder -- one an older `Start` copied out; the sample hub
 now carries the four folders -- says `No design/ folder yet`, not an error, and its + makes the folder.
-`Tests/test_studio.py` holds the agent's half: the `space` argument on `/issue-report` and `/deploys`.
+`Tests/test_studio.py` holds the agent's half: the `space` argument on `/issue-report` and `/deploys`; `Tests/test_ledger.py` the one read every GitHub row now comes from, `GET /api/studio/ledger`.
 
 ### Team Agile's standup (on; `web/src/modules/solitaireAgile/StandupPage.test.tsx`)
 

@@ -51,16 +51,18 @@ from pydantic import BaseModel
 from ..core import log_writer
 from ..core.config import DOCS_ASSET_ROUTE, DOCS_README, DOCS_ROOT, DOCS_ROUTE
 from ..core.consts import re_docs_segment
-from . import design
+from . import accounting, design
 from .design import _file_text, _gh, parse_doc
 from .repo_read import read_folder_rows
 
 api = APIRouter()
 
 LIST_TTL_SECONDS = design.LIST_TTL_SECONDS
-# A repository's issues switch changes about as often as its visibility, which
-# the foyer holds for 600 s (accounting.VISIBILITY_TTL_SECONDS).
-ISSUES_TTL_SECONDS = 600
+# A repository's issues switch is held in the ONE record per repository the
+# visibility cache keeps -- visibility, has_issues, url (accounting.py) -- for
+# its 600 s: the Spaces card's ledger, this listing and a cold document read all
+# fill and read the same record.
+ISSUES_TTL_SECONDS = accounting.VISIBILITY_TTL_SECONDS
 # How many levels of docs/ the listing reads (docs/ itself is the first).
 # docs/hub/ and docs/modules/ are one level down; a fifth is a tree nobody is
 # browsing from a list. The depth is a nesting of one query, not a call per level.
@@ -104,14 +106,13 @@ OWNER_GRAINED_REASON = (
 PATH_RULE = f"the Docs tab reads {DOCS_README}, the markdown under {DOCS_ROOT}/ and the repository's images"
 
 _list_cache: dict[str, tuple[float, "DocsListResponse"]] = {}
-_issues_cache: dict[str, tuple[float, str]] = {}
 
 
 def clear_cache() -> None:
-    """Forget every cached listing and file -- the Docs tab's AND the shared
-    text cache (the tests' reset)."""
+    """Forget every cached listing and file -- the Docs tab's, the shared text
+    cache and the shared repository records (the tests' reset)."""
     _list_cache.clear()
-    _issues_cache.clear()
+    accounting.visibility_cache_clear()
     design.clear_cache()
 
 
@@ -190,28 +191,31 @@ def list_docs(repo: str) -> DocsListResponse:
     resp = DocsListResponse(repo=repo, readme=readme, items=items)
     _list_cache[repo] = (time.monotonic(), resp)
     if read.repo_url and read.has_issues is not None:
-        # The same answer carries the issues switch: a document read right after
-        # the list needs no call of its own to link its `#N`.
-        _issues_cache[repo] = (time.monotonic(), f"{read.repo_url}/issues" if read.has_issues else "")
+        # The same answer carries the issues switch and the visibility: held as
+        # the repository's one record, so a document read right after the list
+        # -- and the Spaces card -- needs no call of its own for them.
+        accounting.remember_repo_record(
+            repo,
+            accounting.repo_record(accounting.visibility_word(read.visibility), read.has_issues, read.repo_url),
+        )
     log_writer.write_log("CMD", "agent/docs", f"{len(items)} documents ({repo}; {read.calls} gh call)")
     return resp
 
 
 def issues_url(repo: str) -> str:
     """The repository's issues on github.com, or "" when it has issues turned
-    off -- or GitHub did not say, which is not cached, so the next read asks.
-    Filled by the listing's own call when the list was read first; asked for
-    (``gh api repos/<repo>``) only on a cold document read."""
-    hit = _issues_cache.get(repo)
-    if hit and time.monotonic() - hit[0] < ISSUES_TTL_SECONDS:
-        return hit[1]
-    row, why = _gh([f"repos/{repo}"])
-    if why or not isinstance(row, dict):
-        return ""
-    html = str(row.get("html_url") or "")
-    url = f"{html}/issues" if row.get("has_issues") and html else ""
-    _issues_cache[repo] = (time.monotonic(), url)
-    return url
+    off -- or GitHub did not say, which is not held, so the next read asks.
+
+    Read from the repository's one record (``accounting.cached_repo_record``),
+    which the listing, the Spaces card's ledger and the visibility read all
+    fill; only when none of them has it -- a cold deep link to one document --
+    is it asked for, once, through ``accounting.gh_repo_record``
+    (``gh api repos/<repo>``), and then held for the others too."""
+    record = accounting.cached_repo_record(repo)
+    if record is None or record.get("has_issues") is None:
+        record = accounting.gh_repo_record(repo, refresh=record is not None)
+    url = record.get("url") or ""
+    return f"{url}/issues" if record.get("has_issues") and url else ""
 
 
 def read_doc(repo: str, path: str) -> DocDetail:

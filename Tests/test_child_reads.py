@@ -36,11 +36,12 @@ except Exception as e:  # pragma: no cover - environment without the deps
 # that killed the standup's read on Windows.
 TITLE = "Build the foyer counts — Chloé’s “Ïle” row"
 
-# Calls in agent/ allowed to use text=True without an encoding, and why. Neither
-# reads gh or az: status.py's git prints a probe exit code and %at digits, and
-# reporting.py's child is the billing script under PowerShell.
+# Calls in agent/ allowed to use text=True without an encoding, and why. It
+# reads neither gh nor az: reporting.py's child is the billing script under
+# PowerShell. (status.py's two git calls left this list when its per-card log
+# became one read through run_read -- it now reads file NAMES, which a code page
+# would mangle.)
 NOT_GH_OR_AZ = {
-    "agent/ado/status.py": 2,
     "agent/ado/reporting.py": 1,
 }
 

@@ -175,6 +175,8 @@ $expected = [ordered]@{
     'studio.promoteLabel'     = 'design'
     # The Studio's Prompts card: the agent's read the web asks.
     'studio.promptsRoute'     = '/api/studio/prompts'
+    # The Spaces card's one read of every GitHub Space's ledger.
+    'studio.ledgerRoute'      = '/api/studio/ledger'
     'studio.threadRegex'      = '(?m)^>\s*GitHub:\s*(https://github\.com/([^/\s]+)/([^/\s]+)/issues/(\d+))\s*$'
     # The design lifecycle's identity (L1): the frontmatter key, the id's shape and
     # the state and outcome words. NewDesign and StampDesign write them; lists

@@ -1,0 +1,59 @@
+{
+  "_": "ONE table, read by both readers of a card's Modified day (docs/hub/cards.md, \"The model, as the agent serves it\", the modified row): Scripts/Get-PromptStatus.ps1 (tkTestToolkit -PromptStatus) and agent/ado/status.py through agent/core/git_history.py folder_changes (Tests/test_status.py). Each scenario is built in a scratch hub whose Space folder is 'test': when repository is true the hub root is a git repository and commits are made in order, each on its day (noon UTC, author and committer alike, so the local day is the same day on any clock within eleven hours of UTC); write creates or rewrites a file, move renames one (content unchanged). After the commits every committed file's mtime is set to staleMtime, so a reader that fell back to the filesystem for a committed card reads the wrong day and fails. Then uncommitted writes each file and sets its mtime (noon UTC of that day). expect is every card a reader lists, by path under the Space folder: the agent lists current/ and backlog/, the CLI lists current/ alone, and neither lists archive/ or a file in a subfolder. If the two halves ever disagree about a row, one of them is wrong.",
+  "scenarios": [
+    {
+      "name": "a hub that is a git repository",
+      "repository": true,
+      "staleMtime": "2025-12-31",
+      "commits": [
+        {
+          "day": "2026-03-02",
+          "write": [
+            "current/Task1-committed-once.prompt.md",
+            "current/Task2-edited-later.prompt.md",
+            "current/Task3-old-name.prompt.md",
+            "backlog/Task4-planned-then-pulled.prompt.md",
+            "backlog/Task6-still-planned.prompt.md"
+          ]
+        },
+        { "day": "2026-03-05", "write": ["current/Task2-edited-later.prompt.md"] },
+        { "day": "2026-03-09", "move": { "current/Task3-old-name.prompt.md": "current/Task3-new-name.prompt.md" } },
+        {
+          "day": "2026-03-12",
+          "move": { "backlog/Task4-planned-then-pulled.prompt.md": "current/Task4-planned-then-pulled.prompt.md" }
+        },
+        {
+          "day": "2026-03-14",
+          "write": ["current/Task5-café-crème.prompt.md", "current/Task7-edited-not-committed.prompt.md"]
+        },
+        { "day": "2026-03-20", "write": ["archive/Task8-done.prompt.md", "current/notes/scratch.md"] }
+      ],
+      "uncommitted": [
+        { "write": "current/Task7-edited-not-committed.prompt.md", "mtime": "2026-03-25" },
+        { "write": "current/Task9-never-committed.prompt.md", "mtime": "2026-03-23" }
+      ],
+      "expect": [
+        { "card": "current/Task1-committed-once.prompt.md", "day": "2026-03-02", "why": "committed once: that commit's day" },
+        { "card": "current/Task2-edited-later.prompt.md", "day": "2026-03-05", "why": "edited in a later commit: the newest commit naming it" },
+        { "card": "current/Task3-new-name.prompt.md", "day": "2026-03-09", "why": "renamed: the commit that renamed it, which is what git log -1 -- <new name> answered" },
+        { "card": "current/Task4-planned-then-pulled.prompt.md", "day": "2026-03-12", "why": "moved from backlog/ to current/: the commit that moved it" },
+        { "card": "current/Task5-café-crème.prompt.md", "day": "2026-03-14", "why": "a name outside ASCII: git's own spelling of it is read back as the same name" },
+        { "card": "current/Task7-edited-not-committed.prompt.md", "day": "2026-03-14", "why": "changed on disk since its last commit: the commit's day, not the mtime" },
+        { "card": "current/Task9-never-committed.prompt.md", "day": "2026-03-23", "why": "never committed: the log never names it, so its mtime" },
+        { "card": "backlog/Task6-still-planned.prompt.md", "day": "2026-03-02", "why": "a planned card: the same one log covers backlog/ (the agent lists it; the CLI names backlog/ cards without a day)" }
+      ]
+    },
+    {
+      "name": "a hub that is not a git repository",
+      "repository": false,
+      "uncommitted": [
+        { "write": "current/Task1-plain.prompt.md", "mtime": "2026-02-11" },
+        { "write": "backlog/Task2-plain-planned.prompt.md", "mtime": "2026-02-12" }
+      ],
+      "expect": [
+        { "card": "current/Task1-plain.prompt.md", "day": "2026-02-11", "why": "no repository: every card's mtime" },
+        { "card": "backlog/Task2-plain-planned.prompt.md", "day": "2026-02-12", "why": "no repository: every card's mtime" }
+      ]
+    }
+  ]
+}
