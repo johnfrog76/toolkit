@@ -14,7 +14,7 @@
  */
 import type { EnvStatus } from "../../shell/api";
 import { WORKFLOW_ENTRIES } from "../../shell/settingsWorkflows";
-import type { PromptRow, PromptWorkflow } from "./api.studio";
+import type { PromptListRow, PromptWorkflow } from "./api.studio";
 
 /** The question's answers, in the drawer's order: each value and its words. */
 const ANSWERS = WORKFLOW_ENTRIES.find((e) => e.answerKey?.endsWith(".howIWork"))?.answers ?? [];
@@ -37,24 +37,27 @@ export function spaceWorkflow(env: EnvStatus | undefined): PromptWorkflow {
 }
 
 /** Whether a prompt belongs to a way of working: one of yours (no index entry) always does. */
-export function belongsTo(row: Pick<PromptRow, "workflows">, workflow: PromptWorkflow): boolean {
+export function belongsTo(
+  row: Pick<PromptListRow, "workflows">,
+  workflow: PromptWorkflow,
+): boolean {
   return row.workflows.length === 0 || row.workflows.includes(workflow);
 }
 
 export interface PromptSets {
   /** ToolKit's prompts for this way of working, in the agent's order. */
-  toolkit: PromptRow[];
+  toolkit: PromptListRow[];
   /** Yours, every one. */
-  yours: PromptRow[];
+  yours: PromptListRow[];
   /** The active Space's own, every one -- its repository's agentic/, as the agent read it. */
-  space: PromptRow[];
+  space: PromptListRow[];
   /** How many of ToolKit's are left out. */
   others: number;
   /** For each other way of working, how many of the left-out ones belong to it. */
   elsewhere: { workflow: PromptWorkflow; count: number }[];
 }
 
-export function promptSets(rows: PromptRow[], workflow: PromptWorkflow): PromptSets {
+export function promptSets(rows: PromptListRow[], workflow: PromptWorkflow): PromptSets {
   const toolkit = rows.filter((r) => r.group === "toolkit");
   const shown = toolkit.filter((r) => belongsTo(r, workflow));
   const hidden = toolkit.filter((r) => !belongsTo(r, workflow));
@@ -82,7 +85,7 @@ export function othersLine(sets: PromptSets): string | null {
 }
 
 /** Who sends a prompt, in a few words: by hand, or the verb or route that sends it. */
-export function senderLabel(row: Pick<PromptRow, "group" | "by_hand" | "sender">): string {
+export function senderLabel(row: Pick<PromptListRow, "group" | "by_hand" | "sender">): string {
   if (row.group !== "toolkit") return "by hand";
   return row.by_hand ? "by hand" : `sent by ToolKit: ${row.sender}`;
 }
@@ -90,7 +93,7 @@ export function senderLabel(row: Pick<PromptRow, "group" | "by_hand" | "sender">
 /** Whose a prompt is, in the filter row's own words: ToolKit, Your hub, or the
  *  Space's name (the agent's `space` block; the row's owner, its slug, without one). */
 export function ownerLabel(
-  row: Pick<PromptRow, "group" | "owner">,
+  row: Pick<PromptListRow, "group" | "owner">,
   space: { name: string } | undefined,
 ): string {
   if (row.group === "toolkit") return "ToolKit";
@@ -99,7 +102,7 @@ export function ownerLabel(
 }
 
 /** Whose a prompt is, as the reading room's badge says it. */
-export function groupLabel(group: PromptRow["group"]): string {
+export function groupLabel(group: PromptListRow["group"]): string {
   return group === "toolkit" ? "ToolKit's" : group === "space" ? "the Space's" : "yours";
 }
 
@@ -125,7 +128,7 @@ export interface CategoryTab {
  * not a tab.
  */
 export function categoryTabs(
-  rows: Pick<PromptRow, "category">[],
+  rows: Pick<PromptListRow, "category">[],
   vocabulary: string[],
 ): CategoryTab[] {
   const counts = new Map<string, number>();

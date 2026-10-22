@@ -94,8 +94,9 @@ export interface DesignNoteDetail extends DesignNote {
  *  to work?, in the words /env's `howIWork` answers in. */
 export type PromptWorkflow = HowIWork["answer"];
 
-/** One agentic prompt, as GET /api/studio/prompts serves it. */
-export interface PromptRow {
+/** One agentic prompt's record, as GET /api/studio/prompts serves each row:
+ *  everything but its text, which the one-prompt read carries (PromptRow). */
+export interface PromptListRow {
   /** pr-ship -- the file's name before .prompt.md. */
   name: string;
   /** The reading room's address after /studio/prompts/: the name, yours/<name>, or space/<name>. */
@@ -134,6 +135,10 @@ export interface PromptRow {
   changed: string;
   /** Its history on GitHub, "" when the folder is not a GitHub clone. */
   history: string;
+}
+
+/** One prompt, as GET /api/studio/prompts/{ref} serves it: the record and its text. */
+export interface PromptRow extends PromptListRow {
   /** The whole file -- what Copy prompt copies. */
   body: string;
 }
@@ -151,7 +156,7 @@ export interface PromptSpace {
 
 export interface PromptsResponse {
   count: number;
-  prompts: PromptRow[];
+  prompts: PromptListRow[];
   /** Absent from an older agent, which reads as no Space filter. */
   space?: PromptSpace;
   /** agentic/prompts.json's category vocabulary, in its order -- the card's
@@ -306,8 +311,8 @@ export const studioEndpoints = studioApi.injectEndpoints({
       query: (q) => `studio/design/search?q=${encodeURIComponent(q)}`,
       providesTags: ["DesignNotes"],
     }),
-    // GET /api/studio/prompts -- the Prompts card: ToolKit's and yours,
-    // each with its text, so Copy prompt needs no second read.
+    // GET /api/studio/prompts -- the Prompts card: ToolKit's, yours and the
+    // Space's records, without their text (Copy prompt reads it: getPrompt).
     getPrompts: builder.query<PromptsResponse, void>({
       query: () => PROMPTS_QUERY,
       keepUnusedDataFor: CACHE_TTL,
@@ -393,6 +398,7 @@ export const {
   useGetDesignNoteQuery,
   useGetPromptsQuery,
   useGetPromptQuery,
+  useLazyGetPromptQuery,
   useLazySearchHubDesignsQuery,
   useRunNewDesignMutation,
   useRunPromoteDesignMutation,

@@ -8,8 +8,9 @@ when gh does not answer:
 - ``GET /docs`` -- the repo's ``README.md`` and its ``docs/`` tree (recursive,
   ``.md`` only, sorted by path). Names and paths, no file text: the README's
   own Documentation table is the index, and this list is the fallback for a
-  repo whose README does not link everything -- so it costs one gh call per
-  folder, not one per document.
+  repo whose README does not link everything -- so it costs ONE gh call
+  (``repo_read.read_folder_rows``: the root and ``docs/`` to ``MAX_DEPTH``
+  levels, one GraphQL query), however the folders nest.
 - ``GET /docs/{path}`` -- one document's text, ``path`` relative to the repo
   root (``README.md``, ``docs/CLI.md``, ``docs/modules/ado.md``).
 - ``GET /docs/asset/{path}`` -- the bytes of an image a document references
@@ -52,13 +53,20 @@ from ..core.config import DOCS_ASSET_ROUTE, DOCS_README, DOCS_ROOT, DOCS_ROUTE
 from ..core.consts import re_docs_segment
 from . import design
 from .design import _file_text, _gh, parse_doc
+from .repo_read import read_folder_rows
 
 api = APIRouter()
 
 LIST_TTL_SECONDS = design.LIST_TTL_SECONDS
-# How deep the docs/ walk goes. docs/hub/ and docs/modules/ are one level
-# down; a fourth level is a tree nobody is browsing from a list.
+# A repository's issues switch changes about as often as its visibility, which
+# the foyer holds for 600 s (accounting.VISIBILITY_TTL_SECONDS).
+ISSUES_TTL_SECONDS = 600
+# How many levels of docs/ the listing reads (docs/ itself is the first).
+# docs/hub/ and docs/modules/ are one level down; a fifth is a tree nobody is
+# browsing from a list. The depth is a nesting of one query, not a call per level.
 MAX_DEPTH = 4
+# The repository root, as the shared reader names it: HEAD:<"">.
+REPO_ROOT = ""
 
 # One path segment: what a repo's file and folder names look like here -- the
 # contract's (consts.json docs.segment), because the web's resolver applies
@@ -156,49 +164,46 @@ def _entry(row: dict) -> DocEntry:
     return DocEntry(path=path, name=row.get("name", ""), folder=path.rpartition("/")[0], url=row.get("html_url", ""))
 
 
-def _walk(repo: str, folder: str, depth: int, out: list[DocEntry]) -> str | None:
-    """Every ``.md`` under ``folder``, depth first; the reason when gh did not
-    answer. A folder that is not there is nothing, not an error."""
-    rows, why = _gh([f"repos/{repo}/contents/{folder}"])
-    if why == "not found":
-        return None
-    if why:
-        return why
-    for row in rows if isinstance(rows, list) else []:
-        path = row.get("path", "")
-        if row.get("type") == "file" and doc_path(path):
-            out.append(_entry(row))
-        elif row.get("type") == "dir" and depth < MAX_DEPTH and _SEGMENT.match(row.get("name", "")):
-            why = _walk(repo, path, depth + 1, out)
-            if why:
-                return why
-    return None
-
-
 def list_docs(repo: str) -> DocsListResponse:
+    """The README and the markdown under ``docs/``, in ONE gh call whatever the
+    nesting: the repository root (its files) and ``docs/`` (``MAX_DEPTH`` levels
+    of it) through the shared reader, names and shas only -- no file's text is
+    asked for, because the room opens a document on its own."""
     hit = _list_cache.get(repo)
     if hit and time.monotonic() - hit[0] < LIST_TTL_SECONDS:
         return hit[1]
-    readme_row, why = _gh([f"repos/{repo}/contents/{DOCS_README}"])
-    if why and why != "not found":
-        return DocsListResponse(repo=repo, reason=f"{repo}: {why}")
-    readme = _entry(readme_row) if isinstance(readme_row, dict) and readme_row.get("type") == "file" else None
-    items: list[DocEntry] = []
-    why = _walk(repo, DOCS_ROOT, 1, items)
-    if why:
-        return DocsListResponse(repo=repo, readme=readme, reason=f"{repo}: {why}")
-    items.sort(key=lambda d: d.path.lower())
+    read = read_folder_rows(
+        repo, [REPO_ROOT, DOCS_ROOT], keep=lambda name: name.endswith(".md"), depth={DOCS_ROOT: MAX_DEPTH}
+    )
+    if read.reason:
+        return DocsListResponse(repo=repo, reason=f"{repo}: {read.reason}")
+    # Whatever the walk found, the path rule decides: it is the one place that
+    # says which paths the routes will read, so the list can never offer one
+    # they refuse. (It also drops a file under a folder whose name is not a
+    # plain segment, as the contents walk did.)
+    entries = [e for folder in (REPO_ROOT, DOCS_ROOT) for e in read.folders.get(folder, []) if doc_path(e.path)]
+    rows = [
+        DocEntry(path=e.path, name=e.name, folder=e.path.rpartition("/")[0], url=read.file_url(e.path)) for e in entries
+    ]
+    readme = next((r for r in rows if r.path == DOCS_README), None)
+    items = sorted((r for r in rows if r is not readme), key=lambda d: d.path.lower())
     resp = DocsListResponse(repo=repo, readme=readme, items=items)
     _list_cache[repo] = (time.monotonic(), resp)
-    log_writer.write_log("CMD", "agent/docs", f"{len(items)} documents ({repo})")
+    if read.repo_url and read.has_issues is not None:
+        # The same answer carries the issues switch: a document read right after
+        # the list needs no call of its own to link its `#N`.
+        _issues_cache[repo] = (time.monotonic(), f"{read.repo_url}/issues" if read.has_issues else "")
+    log_writer.write_log("CMD", "agent/docs", f"{len(items)} documents ({repo}; {read.calls} gh call)")
     return resp
 
 
 def issues_url(repo: str) -> str:
     """The repository's issues on github.com, or "" when it has issues turned
-    off -- or GitHub did not say, which is not cached, so the next read asks."""
+    off -- or GitHub did not say, which is not cached, so the next read asks.
+    Filled by the listing's own call when the list was read first; asked for
+    (``gh api repos/<repo>``) only on a cold document read."""
     hit = _issues_cache.get(repo)
-    if hit and time.monotonic() - hit[0] < LIST_TTL_SECONDS:
+    if hit and time.monotonic() - hit[0] < ISSUES_TTL_SECONDS:
         return hit[1]
     row, why = _gh([f"repos/{repo}"])
     if why or not isinstance(row, dict):

@@ -128,14 +128,33 @@ const LOCAL: PromptSpace = { slug: "mine", name: "Mine", repo: "", isToolkit: fa
 
 let listAnswer: { data?: unknown; error?: unknown } = {};
 let oneAnswer: { data?: unknown; error?: unknown } = {};
+function withoutBodies(data: unknown) {
+  const d = data as { prompts?: PromptRow[] };
+  return { ...d, prompts: (d.prompts ?? []).map(({ body: _body, ...rest }) => rest) };
+}
 let askedFor: string | null = null;
+// The lazy read Copy prompt makes: which refs it asked for, whether it fails, what it answers.
+const lazyAsked: string[] = [];
+let lazyFails = false;
+const lazyBody = (ref: string) => ({ body: ref === "pr-ship" ? PR_SHIP.body : `# ${ref}\n` });
 jest.mock("./api.studio", () => ({
   useGetPromptsQuery: () => ({
     isLoading: false,
     isFetching: false,
     refetch: jest.fn(),
     ...listAnswer,
+    // The agent's list carries no text: whatever a test lists, the card sees none.
+    ...(listAnswer.data ? { data: withoutBodies(listAnswer.data) } : {}),
   }),
+  useLazyGetPromptQuery: () => [
+    (ref: string) => {
+      lazyAsked.push(ref);
+      return {
+        unwrap: () =>
+          lazyFails ? Promise.reject(new Error("down")) : Promise.resolve(lazyBody(ref)),
+      };
+    },
+  ],
   useGetPromptQuery: (ref: string) => {
     askedFor = ref;
     return { isLoading: false, isFetching: false, refetch: jest.fn(), ...oneAnswer };
@@ -701,7 +720,26 @@ describe("the Prompts card's rows", () => {
     expect(BENCH.file_path.startsWith("/")).toBe(true);
   });
 
-  it("Copy prompt stays, in the row's menu, and copies the whole file", async () => {
+  it("Copy prompt reads the body when clicked, then copies the whole file", async () => {
+    lazyAsked.length = 0;
+    lazyFails = false;
+    mount();
+    const ship = screen.getByText("pr-ship").closest(".fui-Card") as HTMLElement;
+    await act(async () => {
+      fireEvent.click(within(ship).getByRole("button", { name: "Actions for pr-ship" }));
+    });
+    expect(lazyAsked).toEqual([]); // opening the card and its menu reads no text
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("menuitem", { name: "Copy prompt" }));
+    });
+    expect(lazyAsked).toEqual(["pr-ship"]);
+    expect(copiedText).toEqual([PR_SHIP.body]);
+    expect(screen.getByText(/Copied pr-ship/)).toBeTruthy();
+  });
+
+  it("a Copy prompt whose read fails copies nothing and says so", async () => {
+    lazyAsked.length = 0;
+    lazyFails = true;
     mount();
     const ship = screen.getByText("pr-ship").closest(".fui-Card") as HTMLElement;
     await act(async () => {
@@ -710,8 +748,10 @@ describe("the Prompts card's rows", () => {
     await act(async () => {
       fireEvent.click(await screen.findByRole("menuitem", { name: "Copy prompt" }));
     });
-    expect(copiedText).toEqual([PR_SHIP.body]);
-    expect(screen.getByText(/Copied pr-ship/)).toBeTruthy();
+    lazyFails = false;
+    expect(copiedText).toEqual([]);
+    expect(screen.getByRole("alert").textContent).toContain("Could not read pr-ship");
+    expect(screen.queryByText(/Copied pr-ship/)).toBeNull();
   });
 
   it("the name opens the reading room", () => {

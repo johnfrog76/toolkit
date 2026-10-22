@@ -92,7 +92,7 @@ Space" exist once, in the CLI. It writes nothing, and it never refuses: with no 
 **A route may read the package itself.** `GET /api/studio/prompts` (`consts.json` `studio.promptsRoute`)
 lists the agentic prompts the package ships in `agentic/` -- with `agentic/prompts.json`'s marks, which way
 of working each belongs to and who sends it -- beside the hub's own (its `agentic/` and
-`agenticExtensionPath`), each with its whole text and its last change from git, and beside the active
+`agenticExtensionPath`), each with its last change from git (the list carries no text: the one-prompt read, `GET /api/studio/prompts/{ref}`, does, and Copy prompt asks for it on click), and beside the active
 Space's own `agentic/`, read from its repository through `gh` behind the Design tab's gate (`group:
 space`, `ref: space/<name>`); the response's `space` says which Space that was and whether its repository
 is this package's own origin (`isToolkit`), so the web never works that out. It is the Studio's, so

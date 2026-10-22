@@ -33,6 +33,20 @@ agent runs ``gh`` through the shell on Windows, where an ``&`` is cmd's and a
 newline ends the command (AGENTS.md, "On Windows the agent runs gh through the
 shell").
 
+Two options serve the Docs tab (``agent/ado/docs.py``), which lists a repository's
+``README.md`` and the markdown under ``docs/`` and never needs a file's text:
+
+- ``depth`` -- how many levels of subfolders to read, in the SAME call. The
+  shape query nests ``entries`` to that depth (``object { ... on Tree {
+  entries ... } }``), so a nested tree costs one call whatever its folders,
+  where the contents route costs one per folder and the tree route walks the
+  whole repository and truncates on a big one. A folder's entries then include
+  every blob beneath it, by path. An int for every folder, or a mapping from
+  folder to its depth; 1, the default, is the folder alone.
+- ``parse=None`` -- names and shas only: no text is asked for, nothing is
+  parsed, nothing is written to the disk cache. ``""`` as a folder is the
+  repository root.
+
 ``file_text(repo, path, sha)`` is the detail read: one file's text, served from
 the disk cache by its sha when the caller knows the sha and the body was read
 before, fetched (and kept) otherwise.
@@ -46,7 +60,7 @@ import os
 import re
 import tempfile
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
 from ..core import disk_cache
@@ -206,6 +220,8 @@ class FolderRows:
     rows: dict[str, dict] = field(default_factory=dict)
     shas: dict[str, str] = field(default_factory=dict)  # path -> sha
     url: str = ""
+    repo_url: str = ""  # https://github.com/<owner>/<repo>
+    has_issues: bool | None = None  # the repository's issues switch; None when GitHub did not say
     reason: str | None = None
     calls: int = 0  # gh calls this read made (the tests', and the log's)
 
@@ -213,22 +229,38 @@ class FolderRows:
         return f"{self.url}/{path}" if self.url else ""
 
 
-def _shape_query(n: int, with_text: bool) -> str:
+def _entries_block(depth: int, with_text: bool) -> str:
+    """``entries { name type oid ... }`` nested ``depth`` levels. At depth 1 a
+    blob's text rides in ``object`` when ``with_text``; deeper, ``object`` is a
+    tree's next level and (with text) a blob's text, side by side."""
+    blob = "... on Blob { text }"
+    if depth <= 1:
+        return "entries { name type oid" + (f" object {{ {blob} }}" if with_text else "") + " }"
+    deeper = _entries_block(depth - 1, with_text)
+    text = f" {blob}" if with_text else ""
+    return f"entries {{ name type oid object {{{text} ... on Tree {{ {deeper} }} }} }}"
+
+
+def _shape_query(n: int, with_text: bool, depths: list[int] | None = None) -> str:
     """The shape of ``n`` folders: entries by name, type and sha, and -- with
-    ``with_text`` -- each blob's text. Two queries rather than one with an
-    ``@include``: asking for a blob's ``object`` at all makes GitHub load every
-    blob, text or not -- measured on 190 notes, 1.5 to 4 s against 0.55 s for
-    names and shas alone -- so a warm read must not name it."""
+    ``with_text`` -- each blob's text; ``depths[i]`` levels of folder ``i``.
+    Two queries rather than one with an ``@include``: asking for a blob's
+    ``object`` at all makes GitHub load every blob, text or not -- measured on
+    190 notes, 1.5 to 4 s against 0.55 s for names and shas alone -- so a warm
+    read must not name it. (A nested read names ``object`` on every entry to
+    reach the subfolders, and so pays some of that: 0.65 to 1.3 s for a
+    four-level ``docs/`` against 0.4 to 0.6 s flat, in ONE call where the
+    contents route made one per folder.)"""
     params = "".join(f", $f{i}: String!" for i in range(n))
-    blob = " object { ... on Blob { text } }" if with_text else ""
+    levels = depths or [1] * n
     parts = "\n".join(
-        f"    f{i}: object(expression: $f{i}) {{ ... on Tree {{ entries {{ name type oid{blob} }} }} }}"
+        f"    f{i}: object(expression: $f{i}) {{ ... on Tree {{ {_entries_block(levels[i], with_text)} }} }}"
         for i in range(n)
     )
     return (
         f"query($owner: String!, $name: String!{params}) {{\n"
         f"  repository(owner: $owner, name: $name) {{\n"
-        f"    url\n    defaultBranchRef {{ name }}\n{parts}\n  }}\n}}\n"
+        f"    url\n    hasIssuesEnabled\n    defaultBranchRef {{ name }}\n{parts}\n  }}\n}}\n"
     )
 
 
@@ -287,13 +319,35 @@ def blob_texts(repo: str, entries: list[Entry], *, batch: bool = True) -> tuple[
     return texts, calls
 
 
+def _collect(
+    rows: list, prefix: str, keep: Callable[[str], bool] | None, entries: list[Entry], inline: dict[str, str]
+) -> None:
+    """The blobs of one level of the shape answer, and -- where a row's
+    ``object`` is a tree because ``depth`` asked for it -- the levels beneath."""
+    for row in rows:
+        name = str(row.get("name") or "")
+        obj = row.get("object") or {}
+        path = f"{prefix}/{name}" if prefix else name
+        if row.get("type") == "tree":
+            if isinstance(obj.get("entries"), list):
+                _collect(obj["entries"], path, keep, entries, inline)
+            continue
+        if row.get("type") != "blob" or (keep is not None and not keep(name)):
+            continue
+        entry = Entry(name=name, path=path, sha=str(row.get("oid") or ""))
+        entries.append(entry)
+        if isinstance(obj.get("text"), str) and entry.sha:
+            inline[entry.sha] = obj["text"]
+
+
 def read_folder_rows(
     repo: str,
     folders: list[str],
     *,
-    namespace: str,
-    parse: Callable[[str], dict],
+    namespace: str = "",
+    parse: Callable[[str], dict] | None = None,
     keep: Callable[[str], bool] | None = None,
+    depth: int | Mapping[str, int] = 1,
 ) -> FolderRows:
     """Every file of ``folders`` in ``repo``'s default branch, parsed.
 
@@ -301,14 +355,21 @@ def read_folder_rows(
     version in it: bump it when ``parse`` changes, and every row is parsed
     again); ``parse(text) -> dict`` must depend on the text alone, because a row
     is shared by every path whose blob has that sha; ``keep(name)`` picks the
-    files of a folder (every blob when omitted). A blob whose text could not be
-    read is parsed as "" and not kept, so the next read asks again."""
-    cached = _load_rows(namespace)
-    with_text = not cached
+    files (every blob when omitted). A blob whose text could not be read is
+    parsed as "" and not kept, so the next read asks again.
+
+    ``depth`` reads that many levels of subfolders in the same call (see the
+    module doc): an int for every folder, or a mapping from folder to its depth
+    (a folder not in it reads 1). ``parse=None`` reads names and shas only --
+    ``rows`` stays empty and the disk cache is not touched."""
+    names_only = parse is None
+    cached = {} if names_only else _load_rows(namespace)
+    with_text = not names_only and not cached
     fields = _owner_fields(repo)
     for i, folder in enumerate(folders):
         fields += ["-f", f"f{i}=HEAD:{folder}"]
-    data, why = _graphql(_shape_query(len(folders), with_text), fields)
+    depths = [max(1, int(depth if isinstance(depth, int) else depth.get(f, 1))) for f in folders]
+    data, why = _graphql(_shape_query(len(folders), with_text, depths), fields)
     out = FolderRows(calls=1)
     if why:
         out.reason = why
@@ -316,25 +377,23 @@ def read_folder_rows(
     repository = data.get("repository") or {}
     branch = (repository.get("defaultBranchRef") or {}).get("name") or "HEAD"
     out.url = f"{repository['url']}/blob/{branch}" if repository.get("url") else ""
+    out.repo_url = str(repository.get("url") or "")
+    flag = repository.get("hasIssuesEnabled")
+    out.has_issues = flag if isinstance(flag, bool) else None
     inline: dict[str, str] = {}
     for i, folder in enumerate(folders):
         tree = repository.get(f"f{i}")
         if not isinstance(tree, dict) or not isinstance(tree.get("entries"), list):
             continue  # no such folder (or a file by that name): absent, not an error
         entries: list[Entry] = []
-        for row in tree["entries"]:
-            name = str(row.get("name") or "")
-            if row.get("type") != "blob" or (keep is not None and not keep(name)):
-                continue
-            entry = Entry(name=name, path=f"{folder}/{name}", sha=str(row.get("oid") or ""))
-            entries.append(entry)
-            text = (row.get("object") or {}).get("text")
-            if isinstance(text, str) and entry.sha:
-                inline[entry.sha] = text
-        entries.sort(key=lambda e: e.name.lower())
+        _collect(tree["entries"], folder, keep, entries, inline)
+        entries.sort(key=lambda e: e.path.lower())
         out.folders[folder] = entries
 
     every = [e for entries in out.folders.values() for e in entries]
+    if parse is None:
+        out.shas = {e.path: e.sha for e in every}
+        return out
     missing = [e for e in every if e.sha not in cached and e.sha not in inline]
     texts = dict(inline)
     if missing:

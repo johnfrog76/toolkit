@@ -30,8 +30,8 @@ import { StatusMessage } from "../../shared/StatusMessage";
 import { useGetEnvQuery } from "../../shell/api";
 import { usePagination } from "../../hooks/usePagination";
 import { Pagination } from "../../shared/Pagination";
-import { useGetPromptsQuery } from "./api.studio";
-import type { PromptRow, PromptSpace } from "./api.studio";
+import { useGetPromptsQuery, useLazyGetPromptQuery } from "./api.studio";
+import type { PromptListRow, PromptSpace } from "./api.studio";
 import { STUDIO_PAGE_SIZE, promptPath } from "./paths";
 import {
   categoryTabs,
@@ -106,30 +106,41 @@ export function hasSpaceFilter(space: PromptSpace | undefined): space is PromptS
 // ToolKit prompt is relative to the checkout the chat is open in, the Space's
 // relative to a checkout of its repository, one of the hub's (never inside
 // either tree) is its absolute path.
-export function promptReference(row: PromptRow): string {
+export function promptReference(row: PromptListRow): string {
   return `@${row.group === "yours" ? row.file_path : row.path}`;
 }
 
-type Copied = { name: string; what: "reference" | "prompt" };
+type Copied = { name: string; what: "reference" | "prompt" | "failed" };
 
 function PromptCardRow({
   row,
   space,
   onCopied,
+  onReading,
 }: {
-  row: PromptRow;
+  row: PromptListRow;
   space: PromptSpace | undefined;
   onCopied: (c: Copied) => void;
+  onReading: (name: string | null) => void;
 }) {
   const styles = useStyles();
   const navigate = useNavigate();
+  const [readPrompt] = useLazyGetPromptQuery();
   const open = () => navigate(promptPath(row.ref));
   const secondary: CardAction[] = [
     {
       icon: <CopyRegular />,
       label: "Copy prompt",
+      // The list carries no text: the body is read now, by the one-prompt
+      // route, and copied when it arrives.
       onClick: () => {
-        void copyText(row.body).then(() => onCopied({ name: row.name, what: "prompt" }));
+        onReading(row.name);
+        readPrompt(row.ref, true)
+          .unwrap()
+          .then((one) => copyText(one.body))
+          .then(() => onCopied({ name: row.name, what: "prompt" }))
+          .catch(() => onCopied({ name: row.name, what: "failed" }))
+          .finally(() => onReading(null));
       },
     },
     { icon: <DocumentTextRegular />, label: "Open the prompt", onClick: open },
@@ -216,6 +227,8 @@ export function PromptsCard() {
   const { data, isLoading, isFetching, error, refetch } = useGetPromptsQuery();
   const { data: env } = useGetEnvQuery();
   const [copied, setCopied] = useState<Copied | null>(null);
+  // The prompt whose text is being read for Copy prompt, null when none is.
+  const [reading, setReading] = useState<string | null>(null);
   const [chosen, setChosen] = useState<PromptFilter>("toolkit");
   // null is All: a category is free text, so no word can stand for it.
   const [chosenCategory, setChosenCategory] = useState<string | null>(null);
@@ -319,11 +332,17 @@ export function PromptsCard() {
         ) : undefined
       }
     >
+      {reading ? <Caption1>{`Reading ${reading}...`}</Caption1> : null}
       {copied ? (
-        <StatusMessage status="success" onDismiss={() => setCopied(null)}>
+        <StatusMessage
+          status={copied.what === "failed" ? "error" : "success"}
+          onDismiss={() => setCopied(null)}
+        >
           {copied.what === "reference"
             ? `Copied the reference to ${copied.name}. Paste it into your assistant's chat.`
-            : `Copied ${copied.name}. Paste it into a chat that cannot read your files.`}
+            : copied.what === "failed"
+              ? `Could not read ${copied.name}, so nothing was copied. Try again.`
+              : `Copied ${copied.name}. Paste it into a chat that cannot read your files.`}
         </StatusMessage>
       ) : null}
       {isLoading || isFetching ? (
@@ -362,7 +381,13 @@ export function PromptsCard() {
           </div>
           {filteredEmpty}
           {pageItems.map((row) => (
-            <PromptCardRow key={row.ref} row={row} space={space} onCopied={setCopied} />
+            <PromptCardRow
+              key={row.ref}
+              row={row}
+              space={space}
+              onCopied={setCopied}
+              onReading={setReading}
+            />
           ))}
         </>
       )}
