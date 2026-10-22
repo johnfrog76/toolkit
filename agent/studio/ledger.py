@@ -31,6 +31,13 @@ declared GitHub Space:
    not kept, so the next mount asks again, as the visibility cache never holds
    an unknown.
 
+**The pane reads it too.** ``GET /api/issue-report`` is ``read_space_report``: this
+same disk entry for one Space, no ``gh`` call of its own when it is warm, one
+ledger read of that Space alone when it is not. ``mark_written`` is how a verb
+that wrote an issue (the bridge's ``TRACKER_WRITE_VERBS``) makes the active
+Space's entry stale, so the pane's refetch after a close is not served the count
+from before it.
+
 **No tier probe on the way.** The old routes resolved the tier per request,
 and a GitHub probe is itself a ``gh`` call. Here the tier's inputs are the
 hub, git, the Space's status and whether the tracker answers -- and the
@@ -88,6 +95,9 @@ DEPLOY_WORKERS = 8
 SEV_LABELS = ("sev1", "sev2", "sev3")
 
 _fetch_lock = threading.Lock()
+# slug -> when a verb last wrote an issue in that Space (this process): an entry
+# read before it is not served. See ``mark_written``.
+_written: dict[str, float] = {}
 
 api = APIRouter()
 ROUTE = studio_ledger_route().removeprefix(API_PREFIX)
@@ -301,14 +311,25 @@ def _unsupported(org: str, projects: list[dict]) -> SpaceLedger:
 # -- The disk cache ---------------------------------------------------------------
 
 
+def mark_written(slug: str) -> None:
+    """A verb wrote an issue in this Space: the entry kept before now is stale.
+    Only that Space is read again, the next time anything asks for it -- the
+    pane's report refetching after a close, or the foyer."""
+    if slug:
+        _written[slug] = time.time()
+
+
 def _cached(slug: str, repos: list[str], status: str) -> SpaceLedger | None:
     entry = disk_cache.get_json(LEDGER_DIR, f"{slug}.json")
     if not entry or entry.get("repos") != repos or entry.get("status") != status:
         return None
     try:
-        age = time.time() - float(entry.get("fetchedAt") or 0)
+        fetched = float(entry.get("fetchedAt") or 0)
     except (TypeError, ValueError):
         return None
+    if fetched <= _written.get(slug, 0.0):
+        return None
+    age = time.time() - fetched
     if not (0 <= age < LEDGER_TTL_SECONDS):
         return None
     try:
@@ -345,16 +366,28 @@ def _keep(slug: str, repos: list[str], status: str, ledger: SpaceLedger, records
 def read_ledger(cfg: dict, refresh: bool = False) -> StudioLedger:
     """Every declared GitHub Space's ledger. Blocking: gh runs here."""
     with _fetch_lock:  # two tabs at once read GitHub once; the second finds the disk warm
-        return _read_ledger(cfg, refresh)
+        return _read_ledger(cfg.get("spaces", []) or [], refresh)
 
 
-def _read_ledger(cfg: dict, refresh: bool) -> StudioLedger:
+def read_space_report(space: dict, refresh: bool = False) -> IssueReport:
+    """One Space's ``IssueReport`` from its ledger entry: the disk entry when it is
+    warm (no ``gh`` call at all), else one read of THAT Space -- the same read
+    the foyer makes, for this Space alone, kept for the foyer to find. ``space``
+    is a ``spaces[]`` entry (``slug``, ``org``, ``status``, ``projects``); the
+    pane's ``/issue-report`` is the caller. Blocking."""
+    with _fetch_lock:
+        out = _read_ledger([space], refresh)
+    got = out.spaces.get(str(space.get("slug") or ""))
+    return got.report if got is not None else IssueReport(supported=False)
+
+
+def _read_ledger(spaces: list[dict], refresh: bool) -> StudioLedger:
     started = time.monotonic()
     out: dict[str, SpaceLedger] = {}
     can_reach = hub_root().exists() and shutil.which("git") is not None
     stale: list[tuple[str, str, str, list[dict], list[str]]] = []
     fresh = 0
-    for space in cfg.get("spaces", []) or []:
+    for space in spaces:
         slug, org = str(space.get("slug") or ""), str(space.get("org") or "")
         if not slug or tracker(org) != "github":
             continue

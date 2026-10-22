@@ -147,6 +147,23 @@ DEFAULT_CORS_ORIGINS = [
 # for a route that does not exist answers 404 rather than 200 HTML.
 API_PREFIX = "/api"
 
+# How far one ``gh issue list`` reads, per state: an open backlog is short, a
+# closed history longer, so the ``all`` read goes further. ``accounting._gh_issues``
+# builds its ``--limit`` from these, and ``solitaire/tracker.py`` reads the same
+# two to tell whether a kept all-states read is complete (fewer rows than the
+# limit means every issue is in it).
+ISSUE_LIMIT_OPEN = 100
+ISSUE_LIMIT_ALL = 300
+
+# The verbs that write an issue on the tracker. A kept read of the active Space's
+# issues (the Studio ledger's entry, which ``/issue-report`` serves) is dropped
+# when the bridge runs one, so the count the pane refetches after a close or an
+# edit has moved.
+TRACKER_WRITE_VERBS = ("NewItem", "EditItem", "CloseItem", "Route")
+
+# The ledger's disk key for the active Space when ``activeSpace`` names none.
+ACTIVE_LEDGER_KEY = "active-space"
+
 # The Docs tab's routes and the two roots they read (D-S12). The roots
 # are the contract's (consts.json ``docs``) because the web's link resolver
 # applies the same rule; the routes are this half's, mounted under API_PREFIX.

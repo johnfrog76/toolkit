@@ -55,7 +55,7 @@ from pydantic import BaseModel, Field
 
 from ..core import config as _config
 from ..core.assets import remove_upload
-from ..core.config import REPO_ROOT, load_config
+from ..core.config import ACTIVE_LEDGER_KEY, REPO_ROOT, TRACKER_WRITE_VERBS, load_config
 from ..core.hosts import NO_HOST_ERROR, host_argv, resolve_host
 from ..core.log_writer import write_log
 from .status import pinned_cache_clear
@@ -339,7 +339,9 @@ async def run_command(name: str, req: CommandRequest | None = None):
 
     A verb may have written to the tracker (``Route`` moves a label), so the
     rituals' kept tracker reads are forgotten either way: the next standup or
-    triage reads again rather than serve what the write changed."""
+    triage reads again rather than serve what the write changed. A verb that
+    writes an issue (``TRACKER_WRITE_VERBS``) also drops the active Space's
+    Studio ledger entry, which the pane's ``/issue-report`` serves."""
     try:
         return await _run_command(name, req)
     finally:
@@ -348,6 +350,10 @@ async def run_command(name: str, req: CommandRequest | None = None):
         from ..solitaire import tracker as ritual_tracker  # here: solitaire imports ado
 
         ritual_tracker.forget()
+        if name.lower() in {v.lower() for v in TRACKER_WRITE_VERBS}:
+            from ..studio import ledger  # here: studio imports ado
+
+            ledger.mark_written(str(load_config().get("activeSpace") or ACTIVE_LEDGER_KEY))
 
 
 async def _run_command(name: str, req: CommandRequest | None = None):

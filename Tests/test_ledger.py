@@ -176,6 +176,7 @@ class LedgerCase(unittest.TestCase):
     def setUp(self):
         self.hub = tempfile.mkdtemp()
         accounting.visibility_cache_clear()
+        ledger._written.clear()
         patches = [
             mock.patch.object(ledger, "hub_root", return_value=Path(self.hub)),
             mock.patch.object(ledger.shutil, "which", return_value="/usr/bin/git"),
@@ -488,6 +489,118 @@ class TheRoute(LedgerCase):
         self.assertEqual(first.json(), second.json())
         self.assertEqual(first.json()["spaces"]["toolkit"]["report"]["open"], 5)
         self.assertEqual(gh.kinds().count("api graphql"), 2)
+
+
+class TheIssueReportRoute(LedgerCase):
+    """``GET /api/issue-report``: the pane's report, from the ledger's entry for the
+    Space, with no ``gh`` call of its own (WEC7)."""
+
+    def get(self, cfg, gh, path):
+        with (
+            mock.patch.object(accounting, "load_config", return_value=cfg),
+            mock.patch.object(accounting.subprocess, "run", side_effect=gh),
+            mock.patch.object(accounting, "_resolve_tier", return_value=(1, True)) as probe,
+        ):
+            res = TestClient(app).get(path)
+        self.probe = probe
+        return res
+
+    def test_a_warm_entry_answers_with_no_gh_call_at_all(self):
+        cfg = self.cfg(space("toolkit"))
+        gh = FakeGh({"johnfrog76/toolkit": repo_node(ISSUES)})
+        foyer = self.read(cfg, gh)
+        gh.calls.clear()
+        res = self.get(cfg, gh, "/api/issue-report?space=toolkit")
+        self.assertEqual(gh.calls, [])
+        self.probe.assert_not_called()
+        self.assertEqual(res.json(), foyer.spaces["toolkit"].report.model_dump())
+
+    def test_a_cold_entry_is_one_ledger_read_of_that_space_and_then_warm(self):
+        cfg = self.cfg(space("toolkit"), space("other"))
+        gh = FakeGh({"johnfrog76/toolkit": repo_node(ISSUES), "johnfrog76/other": repo_node(ISSUES)})
+        first = self.get(cfg, gh, "/api/issue-report?space=toolkit")
+        self.assertEqual(gh.kinds(), ["api graphql", "run list"])
+        self.assertEqual(len(gh.queries), 1)
+        self.assertEqual(gh.queries[0].count("repository("), 1)
+        self.assertEqual(gh.calls[0].count("o0=johnfrog76"), 1)
+        self.assertNotIn("o1=johnfrog76", gh.calls[0])
+        self.assertEqual(first.json()["open"], 5)
+        gh.calls.clear()
+        second = self.get(cfg, gh, "/api/issue-report?space=toolkit")
+        self.assertEqual(gh.calls, [])
+        self.assertEqual(second.json(), first.json())
+        # The foyer then finds that Space kept: only the other one is read.
+        out = self.read(cfg, gh)
+        self.assertEqual(out.spaces["toolkit"].report.model_dump(), first.json())
+        self.assertEqual(gh.calls[0].count("o0=johnfrog76"), 1)
+        self.assertEqual(len(gh.queries), 2)
+        self.assertEqual(gh.queries[1].count("repository("), 1)
+
+    def test_refresh_reads_past_the_kept_entry(self):
+        cfg = self.cfg(space("toolkit"))
+        gh = FakeGh({"johnfrog76/toolkit": repo_node(ISSUES)})
+        self.get(cfg, gh, "/api/issue-report?space=toolkit")
+        n = len(gh.calls)
+        self.get(cfg, gh, "/api/issue-report?space=toolkit")
+        self.assertEqual(len(gh.calls), n)
+        self.get(cfg, gh, "/api/issue-report?space=toolkit&refresh=1")
+        self.assertEqual(len(gh.calls), 2 * n)
+
+    def test_the_report_is_the_one_the_old_route_answered_over_the_same_backlog(self):
+        def old_gh(argv, **_kw):
+            return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(gh_issue_list_rows(ISSUES)), stderr="")
+
+        with mock.patch.object(accounting.subprocess, "run", side_effect=old_gh):
+            old = accounting._github_issue_report("https://github.com/johnfrog76/toolkit", [])
+        cfg = {
+            **self.cfg(space("toolkit")),
+            "activeSpace": "toolkit",
+            "org": space("toolkit")["org"],
+            "status": "active",
+        }
+        gh = FakeGh({"johnfrog76/toolkit": repo_node(ISSUES)})
+        res = self.get(cfg, gh, "/api/issue-report")
+        self.assertEqual(res.json(), old.model_dump())
+
+    def test_no_space_argument_is_the_active_spaces_entry(self):
+        cfg = {**self.cfg(space("a"), space("b")), "activeSpace": "b", "org": space("b")["org"], "status": "active"}
+        gh = FakeGh({"johnfrog76/a": repo_node(ISSUES), "johnfrog76/b": repo_node(ISSUES[:2])})
+        res = self.get(cfg, gh, "/api/issue-report")
+        self.assertEqual(res.json()["open"], 2)
+        self.assertIsNotNone(disk_cache.get_json(ledger.LEDGER_DIR, "b.json"))
+        self.assertIsNone(disk_cache.get_json(ledger.LEDGER_DIR, "a.json"))
+
+    def test_a_verb_that_writes_an_issue_drops_the_active_spaces_entry_and_no_other_does(self):
+        import asyncio
+
+        from agent.ado import bridge
+
+        async def ran(name, req=None):
+            return None
+
+        cfg = {**self.cfg(space("toolkit"), space("other")), "activeSpace": "toolkit"}
+        gh = FakeGh({"johnfrog76/toolkit": repo_node(ISSUES), "johnfrog76/other": repo_node(ISSUES)})
+        self.read(cfg, gh)
+        gh.calls.clear()
+        with (
+            mock.patch.object(bridge, "_run_command", ran),
+            mock.patch.object(bridge, "load_config", return_value=cfg),
+        ):
+            asyncio.run(bridge.run_command("NewPrompt", None))
+            self.get(cfg, gh, "/api/issue-report?space=toolkit")
+            self.assertEqual(gh.calls, [], "a verb that writes no issue leaves the kept report")
+            asyncio.run(bridge.run_command("CloseItem", None))
+            self.get(cfg, gh, "/api/issue-report?space=other")
+            self.assertEqual(gh.calls, [], "the Space the verb was not in keeps its entry")
+            self.get(cfg, gh, "/api/issue-report?space=toolkit")
+        self.assertEqual(gh.kinds(), ["api graphql", "run list"])
+
+    def test_a_local_space_is_unsupported_with_gh_not_asked(self):
+        cfg = self.cfg(space("toolkit", status="local"))
+        gh = FakeGh({"johnfrog76/toolkit": repo_node(ISSUES)})
+        res = self.get(cfg, gh, "/api/issue-report?space=toolkit")
+        self.assertEqual(res.json()["supported"], False)
+        self.assertEqual(gh.calls, [])
 
 
 if __name__ == "__main__":
