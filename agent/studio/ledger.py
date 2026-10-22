@@ -37,8 +37,10 @@ hub, git, the Space's status and whether the tracker answers -- and the
 GraphQL call IS the tracker answering. Only when that call does not answer at
 all is the tier resolved the old way (``accounting._resolve_tier``), so a
 signed-out ``gh`` still reads as "not connected" and a timeout as its reason.
-The answer seeds ``accounting``'s visibility cache too, so the shell's
-``/visibility`` read for the same Space asks nothing.
+The answer seeds ``accounting``'s visibility cache too -- each repository's
+whole record: visibility, ``has_issues`` and ``url`` -- and a disk hit seeds it
+again after a restart, so the shell's ``/visibility`` read and the Docs tab ask
+nothing for the same repositories.
 """
 
 from __future__ import annotations
@@ -134,7 +136,7 @@ def _ledger_query(n: int) -> str:
     return (
         f"query({params}) {{\n{parts}\n}}\n"
         "fragment ledger on Repository {\n"
-        "  visibility\n"
+        "  visibility hasIssuesEnabled url\n"
         "  open: issues(states: OPEN) { totalCount }\n"
         "  closed: issues(states: CLOSED) { totalCount }\n"
         f"  openRows: {_rows('openRows')}\n"
@@ -269,13 +271,19 @@ def issue_report(repos: list[str], answers: dict[str, dict], errors: dict[str, s
     return rep
 
 
-def _visibility(repos: list[str], answers: dict[str, dict]) -> SpaceVisibility:
+def _visibility(repos: list[str], answers: dict[str, dict]) -> tuple[SpaceVisibility, dict[str, dict]]:
+    """The Space's visibility, and each repository's whole record -- visibility,
+    has_issues, url -- held in the visibility cache, so the Docs tab and the
+    shell's /visibility read ask nothing for these repositories."""
     rows = []
+    records: dict[str, dict] = {}
     for repo in repos:
-        word = visibility_word((answers.get(repo) or {}).get("visibility"))
-        accounting.remember_visibility(repo, word)
+        node = answers.get(repo) or {}
+        word = visibility_word(node.get("visibility"))
+        records[repo] = accounting.repo_record(word, node.get("hasIssuesEnabled"), node.get("url"))
+        accounting.remember_repo_record(repo, records[repo])
         rows.append(RepoVisibility(repo=repo, visibility=word))
-    return SpaceVisibility(visibility=fold_visibility([r.visibility for r in rows]), repos=rows)
+    return SpaceVisibility(visibility=fold_visibility([r.visibility for r in rows]), repos=rows), records
 
 
 def _unsupported(org: str, projects: list[dict]) -> SpaceLedger:
@@ -304,16 +312,28 @@ def _cached(slug: str, repos: list[str], status: str) -> SpaceLedger | None:
     if not (0 <= age < LEDGER_TTL_SECONDS):
         return None
     try:
-        return SpaceLedger.model_validate(entry.get("ledger") or {})
+        ledger = SpaceLedger.model_validate(entry.get("ledger") or {})
     except ValueError:
         return None
+    # An agent restart forgot the visibility cache; the records come back from
+    # here, as old as the entry, so the 600 s still counts from the read.
+    for repo, record in (entry.get("records") or {}).items():
+        if repo in repos and isinstance(record, dict):
+            accounting.remember_repo_record(repo, record, age)
+    return ledger
 
 
-def _keep(slug: str, repos: list[str], status: str, ledger: SpaceLedger) -> None:
+def _keep(slug: str, repos: list[str], status: str, ledger: SpaceLedger, records: dict[str, dict]) -> None:
     if ledger.report.reason or ledger.deploys.reason:
         return  # not fully answered: the next mount asks again
     disk_cache.put_json(
-        {"repos": repos, "status": status, "fetchedAt": time.time(), "ledger": ledger.model_dump()},
+        {
+            "repos": repos,
+            "status": status,
+            "fetchedAt": time.time(),
+            "ledger": ledger.model_dump(),
+            "records": records,
+        },
         LEDGER_DIR,
         f"{slug}.json",
     )
@@ -384,12 +404,13 @@ def _read_ledger(cfg: dict, refresh: bool) -> StudioLedger:
             )
         calls += sum(len(repos) for *_, repos in live)
         for slug, _org, status, _projects, repos in live:
+            visibility, records = _visibility(repos, answers)
             ledger = SpaceLedger(
                 report=issue_report(repos, answers, errors),
                 deploys=runs[slug],
-                visibility=_visibility(repos, answers),
+                visibility=visibility,
             )
-            _keep(slug, repos, status, ledger)
+            _keep(slug, repos, status, ledger, records)
             out[slug] = ledger
     log_writer.write_log(
         "CMD",

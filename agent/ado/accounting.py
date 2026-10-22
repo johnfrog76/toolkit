@@ -856,9 +856,25 @@ def space_entry(cfg: dict, space: str) -> dict:
 # (supported: false): a tenant is not public, and the rule is not asked there.
 # ``?refresh=1`` (the Spaces card's Refresh) goes past the cache for the
 # Space's repositories -- and past the tier probe's -- the way /env?refresh=1 does.
+#
+# What is held per repository is one RECORD, not only the word: its
+# `visibility`, `has_issues` (whether the repository takes issues -- True,
+# False, or None when gh did not say) and `url` (its page on GitHub, "" when
+# not said). The same `repos/{repo}` answer carries all three, and so does the
+# Studio's ledger query (`hasIssuesEnabled`, `url`), so the Spaces card and the
+# Docs tab read them from one place.
 VISIBILITY_TTL_SECONDS = 600
-_visibility_cache: dict[str, tuple[float, str]] = {}
+_visibility_cache: dict[str, tuple[float, dict]] = {}
 _visibility_lock = threading.Lock()
+
+
+def repo_record(visibility: str, has_issues: object = None, url: object = "") -> dict:
+    """The record the visibility cache holds for one repository."""
+    return {
+        "visibility": visibility,
+        "has_issues": has_issues if isinstance(has_issues, bool) else None,
+        "url": str(url or ""),
+    }
 
 
 def visibility_cache_clear() -> None:
@@ -879,31 +895,49 @@ def visibility_word(raw: object) -> str:
     return visibility_unknown()
 
 
+def cached_repo_record(repo: str) -> dict | None:
+    """``owner/name``'s held record while it is inside the TTL, else None. Asks
+    nothing: a reader that only wants what is already known calls this."""
+    with _visibility_lock:
+        hit = _visibility_cache.get(repo)
+    if hit is not None and (time.monotonic() - hit[0]) < VISIBILITY_TTL_SECONDS:
+        return dict(hit[1])
+    return None
+
+
+def gh_repo_record(repo: str, refresh: bool = False) -> dict:
+    """``owner/name``'s record -- visibility, has_issues, url. Blocking: one
+    ``gh api repos/{repo}`` when nothing is held. ``refresh`` drops this
+    repository's held record and asks gh again. A record whose visibility is
+    unknown is answered but never held."""
+    if refresh:
+        with _visibility_lock:
+            _visibility_cache.pop(repo, None)
+    hit = cached_repo_record(repo)
+    if hit is not None:
+        return hit
+    data, why = _gh_json(["gh", "api", f"repos/{repo}"])
+    row = data if (not why and isinstance(data, dict)) else {}
+    record = repo_record(visibility_word(row.get("visibility")), row.get("has_issues"), row.get("html_url"))
+    remember_repo_record(repo, record)
+    return record
+
+
 def _gh_repo_visibility(repo: str, refresh: bool = False) -> str:
     """``owner/name``'s visibility, as the contract's word. Blocking. ``refresh``
     drops this repository's cached answer and asks gh again."""
-    with _visibility_lock:
-        if refresh:
-            _visibility_cache.pop(repo, None)
-        hit = _visibility_cache.get(repo)
-    if hit is not None and (time.monotonic() - hit[0]) < VISIBILITY_TTL_SECONDS:
-        return hit[1]
-    data, why = _gh_json(["gh", "api", f"repos/{repo}"])
-    word = visibility_word(data.get("visibility") if (not why and isinstance(data, dict)) else "")
-    if word != visibility_unknown():
-        with _visibility_lock:
-            _visibility_cache[repo] = (time.monotonic(), word)
-    return word
+    return gh_repo_record(repo, refresh)["visibility"]
 
 
-def remember_visibility(repo: str, word: str) -> None:
-    """Hold an answer another read already had -- the Studio's ledger asks a
-    repository's visibility in its one GraphQL call -- under the same rule as
-    ``_gh_repo_visibility``: an unknown is never held, and it is good for
-    ``VISIBILITY_TTL_SECONDS`` from now."""
-    if word != visibility_unknown():
+def remember_repo_record(repo: str, record: dict, age: float = 0.0) -> None:
+    """Hold a record -- from ``repos/{repo}``, or one another read already had
+    (the Studio's ledger asks visibility, ``hasIssuesEnabled`` and ``url`` in
+    its one GraphQL call) -- under one rule: an unknown visibility is never
+    held, and a held record is good for ``VISIBILITY_TTL_SECONDS`` from when it
+    was read: ``age`` seconds ago (a record the ledger kept on disk)."""
+    if record.get("visibility") != visibility_unknown() and 0 <= age < VISIBILITY_TTL_SECONDS:
         with _visibility_lock:
-            _visibility_cache[repo] = (time.monotonic(), word)
+            _visibility_cache[repo] = (time.monotonic() - age, dict(record))
 
 
 def fold_visibility(words: list[str]) -> str:

@@ -79,12 +79,14 @@ def gh_issue_list_rows(issues):
     ]
 
 
-def repo_node(issues, visibility="PUBLIC", open_total=None, has_next=False):
+def repo_node(issues, visibility="PUBLIC", open_total=None, has_next=False, has_issues=True, url=""):
     """One alias's answer to the ledger query, from the same issues."""
     opened = [i for i in issues if i["state"] == "OPEN"]
     closed = [i for i in issues if i["state"] == "CLOSED"]
     return {
         "visibility": visibility,
+        "hasIssuesEnabled": has_issues,
+        "url": url,
         "open": {"totalCount": len(opened) if open_total is None else open_total},
         "closed": {"totalCount": len(closed)},
         "openRows": {
@@ -386,6 +388,70 @@ class TheVisibility(LedgerCase):
         out = self.read(self.cfg(space("ghost")), FakeGh())
         self.assertEqual(out.spaces["ghost"].visibility.visibility, "unknown")
         self.assertNotIn("johnfrog76/ghost", accounting._visibility_cache)
+
+
+class TheRepoRecord(LedgerCase):
+    """One cached record per repository -- visibility, has_issues, url -- that
+    the Spaces card and the Docs tab both read."""
+
+    URL = "https://github.com/johnfrog76/toolkit"
+
+    def test_the_ledger_holds_has_issues_and_the_url_beside_the_visibility(self):
+        gh = FakeGh(
+            {
+                "johnfrog76/toolkit": repo_node([], "PUBLIC", url=self.URL),
+                "johnfrog76/katie-site": repo_node([], "PRIVATE", has_issues=False, url="https://github.com/x/k"),
+            }
+        )
+        self.read(self.cfg(space("toolkit"), space("katie-site")), gh)
+        self.assertEqual(
+            accounting.cached_repo_record("johnfrog76/toolkit"),
+            {"visibility": "public", "has_issues": True, "url": self.URL},
+        )
+        self.assertFalse(accounting.cached_repo_record("johnfrog76/katie-site")["has_issues"])
+        later = FakeGh()
+        with mock.patch.object(accounting.subprocess, "run", side_effect=later):
+            self.assertEqual(accounting.gh_repo_record("johnfrog76/toolkit")["url"], self.URL)
+        self.assertEqual(later.calls, [])
+
+    def test_an_agent_restart_seeds_the_record_again_from_the_disk(self):
+        gh = FakeGh({"johnfrog76/toolkit": repo_node([], url=self.URL)})
+        self.read(self.cfg(space("toolkit")), gh)
+        accounting.visibility_cache_clear()
+        self.assertIsNone(accounting.cached_repo_record("johnfrog76/toolkit"))
+        again = FakeGh()
+        self.read(self.cfg(space("toolkit")), again)
+        self.assertEqual(again.calls, [])
+        self.assertEqual(accounting.cached_repo_record("johnfrog76/toolkit")["url"], self.URL)
+
+    def test_a_record_seeded_from_disk_keeps_the_age_it_was_read_at(self):
+        record = accounting.repo_record("public", True, self.URL)
+        accounting.remember_repo_record("o/old", record, age=accounting.VISIBILITY_TTL_SECONDS - 1)
+        self.assertIsNotNone(accounting.cached_repo_record("o/old"))
+        accounting.remember_repo_record("o/stale", record, age=accounting.VISIBILITY_TTL_SECONDS + 1)
+        self.assertIsNone(accounting.cached_repo_record("o/stale"))
+
+    def test_the_rest_read_fills_the_same_record(self):
+        def rest(argv, **_kw):
+            body = {"visibility": "private", "has_issues": False, "html_url": "https://github.com/o/r"}
+            return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(body), stderr="")
+
+        with mock.patch.object(accounting.subprocess, "run", side_effect=rest) as run:
+            self.assertEqual(accounting._gh_repo_visibility("o/r"), "private")
+            self.assertEqual(
+                accounting.gh_repo_record("o/r"),
+                {"visibility": "private", "has_issues": False, "url": "https://github.com/o/r"},
+            )
+        self.assertEqual(run.call_count, 1)
+
+    def test_an_unknown_visibility_is_answered_and_never_held(self):
+        def silent(argv, **_kw):
+            return subprocess.CompletedProcess(argv, 1, stdout="", stderr="HTTP 404")
+
+        with mock.patch.object(accounting.subprocess, "run", side_effect=silent):
+            rec = accounting.gh_repo_record("o/none")
+        self.assertEqual(rec, {"visibility": "unknown", "has_issues": None, "url": ""})
+        self.assertIsNone(accounting.cached_repo_record("o/none"))
 
 
 class TheArgv(LedgerCase):
