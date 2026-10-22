@@ -26,18 +26,13 @@ from collections.abc import Callable
 
 from ..ado import accounting
 from ..ado.design import LIST_TTL_SECONDS
-from ..core.config import tracker, tracker_repos
+from ..core.config import ISSUE_LIMIT_ALL, ISSUE_LIMIT_OPEN, tracker, tracker_repos
 from ..core.tier import _resolve_tier
 
 NO_REPO_REASON = "This GitHub space names no repository."
 
 # How long one gh answer is served again: the design list's TTL.
 READ_TTL_SECONDS = LIST_TTL_SECONDS
-# ``accounting._gh_issues``' --limit per state, mirrored so a cached all-states
-# read can tell whether it is complete. Tests/test_rituals.py reads the argv the
-# reader builds and fails when these stop agreeing with it.
-ISSUE_LIMIT_OPEN = 100
-ISSUE_LIMIT_ALL = 300
 _OPEN = "OPEN"
 
 # key -> (when, the answer). A key is ("labels", repo), ("issues", repo, state,
