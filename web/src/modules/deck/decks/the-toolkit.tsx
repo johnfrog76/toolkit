@@ -2888,21 +2888,20 @@ export const theToolkitDeck: Deck = {
           </Say>
           <Context>
             A Space is one board and at most one tracker, and the tracker is derived from the
-            Space&apos;s address (D-G11: a space per product).
-            Issues are read in place, on the Issues tab, and never enter the cabinet on their own
-            (D-G10: the card is optional at pickup, by the work&apos;s weight); create, edit and
-            close run through the same verbs the CLI types. The crew through the glass is the
-            product&apos;s Team Agile stage as it ships (docs/modules/solitaire-agile.md): the
-            standup is played on the Remote Standup&apos;s nine tiles, one lit tile a worker, the
-            sentence in a four-line bubble over the face, the rest of the seats ghosted; the queue
-            it opens and closes on is what only the person can do, which is the whole of &quot;you
-            decide&quot;. The standup is built from the tracker&apos;s own issues, pull requests and
-            labels, so the loop in the Say is the loop in the product. The three numbers on the sill
-            are real issues of the toolkit&apos;s own tracker, picked because they are closed. No
-            butler: GitHub answers through its own CLI, which is the visual argument for
-            &quot;another counter, nothing more&quot;. Never a model&apos;s name, and
-            &quot;orchestrating agents&quot;, not a formation of them. Equilibrium, and the first of
-            the two windows.
+            Space&apos;s address (D-G11: a space per product). Issues are read in place, on the
+            Issues tab, and never enter the cabinet on their own (D-G10: the card is optional at
+            pickup, by the work&apos;s weight); create, edit and close run through the same verbs
+            the CLI types. The crew through the glass is the product&apos;s Team Agile stage as it
+            ships (docs/modules/solitaire-agile.md): the standup is played on the Remote
+            Standup&apos;s nine tiles, one lit tile a worker, the sentence in a four-line bubble
+            over the face, the rest of the seats ghosted; the queue it opens and closes on is what
+            only the person can do, which is the whole of &quot;you decide&quot;. The standup is
+            built from the tracker&apos;s own issues, pull requests and labels, so the loop in the
+            Say is the loop in the product. The three numbers on the sill are real issues of the
+            toolkit&apos;s own tracker, picked because they are closed. No butler: GitHub answers
+            through its own CLI, which is the visual argument for &quot;another counter, nothing
+            more&quot;. Never a model&apos;s name, and &quot;orchestrating agents&quot;, not a
+            formation of them. Equilibrium, and the first of the two windows.
           </Context>
         </>
       ),

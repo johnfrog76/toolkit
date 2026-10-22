@@ -37,7 +37,13 @@ function viewport(): { width: number; height: number } {
 
 /** One burst over the whole viewport, then `onDone`. Under reduced motion it draws
  *  nothing and calls `onDone` at once. */
-export function Confetti({ onDone, pieces = CONFETTI_PIECES }: { onDone?: () => void; pieces?: number }) {
+export function Confetti({
+  onDone,
+  pieces = CONFETTI_PIECES,
+}: {
+  onDone?: () => void;
+  pieces?: number;
+}) {
   const [size, setSize] = useState(viewport);
   const [reduced] = useState(prefersReducedMotion);
   // The latest onDone, kept outside render (a burst may end after a re-render).

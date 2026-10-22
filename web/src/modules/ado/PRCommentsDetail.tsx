@@ -652,7 +652,13 @@ export function PRCommentsDetail({
                     {modelReady ? (
                       <Button
                         size="small"
-                        icon={suggesting ? <Spinner size="tiny" aria-label="Suggesting a reply..." /> : <SparkleRegular />}
+                        icon={
+                          suggesting ? (
+                            <Spinner size="tiny" aria-label="Suggesting a reply..." />
+                          ) : (
+                            <SparkleRegular />
+                          )
+                        }
                         disabled={suggesting}
                         onClick={() => suggestFor(comment)}
                       >
@@ -666,7 +672,13 @@ export function PRCommentsDetail({
                     <Button
                       appearance="primary"
                       size="small"
-                      icon={resolving ? <Spinner size="tiny" aria-label="Posting the reply..." /> : <SendRegular />}
+                      icon={
+                        resolving ? (
+                          <Spinner size="tiny" aria-label="Posting the reply..." />
+                        ) : (
+                          <SendRegular />
+                        )
+                      }
                       disabled={resolving || !draftFor(comment.thread_id).reply.trim()}
                       onClick={() => postReply(comment)}
                     >
@@ -683,7 +695,13 @@ export function PRCommentsDetail({
                 <Button
                   appearance="primary"
                   size="small"
-                  icon={resolving ? <Spinner size="tiny" aria-label="Resolving..." /> : <CheckmarkRegular />}
+                  icon={
+                    resolving ? (
+                      <Spinner size="tiny" aria-label="Resolving..." />
+                    ) : (
+                      <CheckmarkRegular />
+                    )
+                  }
                   disabled={resolving}
                   onClick={() => resolveComment(comment)}
                 >

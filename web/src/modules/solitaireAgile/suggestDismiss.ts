@@ -52,7 +52,12 @@ function read(): Stored {
   } catch {
     parsed = memory;
   }
-  if (!parsed || parsed.session !== session || typeof parsed.surfaces !== "object" || !parsed.surfaces)
+  if (
+    !parsed ||
+    parsed.session !== session ||
+    typeof parsed.surfaces !== "object" ||
+    !parsed.surfaces
+  )
     return { session, surfaces: {} };
   return parsed;
 }
@@ -67,7 +72,10 @@ export function dismissedRefs(surface: string): string[] {
 export function dismissRef(surface: string, ref: string): string[] {
   const stored = read();
   const list = Array.from(new Set([...(stored.surfaces[surface] ?? []), ref]));
-  const next: Stored = { session: stored.session, surfaces: { ...stored.surfaces, [surface]: list } };
+  const next: Stored = {
+    session: stored.session,
+    surfaces: { ...stored.surfaces, [surface]: list },
+  };
   memory = next;
   try {
     window.localStorage?.setItem(DISMISS_KEY, JSON.stringify(next));

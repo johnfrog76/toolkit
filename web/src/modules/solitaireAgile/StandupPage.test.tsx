@@ -1,6 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
-import { act, fireEvent, render as rtlRender, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render as rtlRender,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import type { ReactElement } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { RITUALS } from "../../shell/consts";
@@ -820,7 +827,9 @@ describe("the chair's suggestion", () => {
     localStorage.setItem(GRAIN_KEY, "brief");
     answer = { data: suggested() };
     render(<StandupPage />);
-    expect(screen.getByTestId("standup-text").textContent).toBe(lines.slice(0, -1).join("\n") + "\n");
+    expect(screen.getByTestId("standup-text").textContent).toBe(
+      lines.slice(0, -1).join("\n") + "\n",
+    );
     expect(screen.getAllByTestId("standup-suggestion")).toHaveLength(1);
   });
 
@@ -834,14 +843,18 @@ describe("the chair's suggestion", () => {
     answer = { data: { ...suggested(), brief: off, suggestions: [], suggestion: null } };
     render(<StandupPage />);
     expect(screen.queryByTestId("standup-suggestion")).toBeNull();
-    expect(chairSuggestion(suggested(), ["#141", "#150"])).toEqual({ standing: true, current: null });
+    expect(chairSuggestion(suggested(), ["#141", "#150"])).toEqual({
+      standing: true,
+      current: null,
+    });
   });
 });
 
 describe("the PM Corner", () => {
   // The joined fill, the suggestion and the Corner, as the agent rendered them
   // (Tests/fixtures/rituals/corner.json's many-left and reached briefs, generated).
-  const brief = (name: string) => fs.readFileSync(path.join(FIXTURES, `corner-${name}.brief.txt`), "utf8");
+  const brief = (name: string) =>
+    fs.readFileSync(path.join(FIXTURES, `corner-${name}.brief.txt`), "utf8");
   const lastTwo = (text: string) => text.split("\n").filter(Boolean).slice(-2);
   const withCorner = (name: string, corner: Corner): StandupResponse => {
     const [next] = lastTwo(brief(name));
@@ -903,11 +916,16 @@ describe("the PM Corner", () => {
     const corner = await screen.findByTestId("pm-corner");
     expect(corner.textContent).toContain("3 more issues to get milestone B - start #5 now");
     // It comes before the standup's card.
-    expect(corner.compareDocumentPosition(screen.getByTestId("standup-text")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      corner.compareDocumentPosition(screen.getByTestId("standup-text")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     const drawn = screen.getByTestId("standup-brief").textContent ?? "";
     expect(drawn).not.toContain("Corner:");
     // The suggestion still stands: the Next line is the one above the Corner's.
-    expect(screen.getByTestId("standup-suggestion").textContent).toContain("Next: #5 is opus-sized");
+    expect(screen.getByTestId("standup-suggestion").textContent).toContain(
+      "Next: #5 is opus-sized",
+    );
   });
 
   it("the chevron opens the same hand-off box: one StartWork call for the pick", async () => {

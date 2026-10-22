@@ -387,7 +387,11 @@ export function ConfigSettings() {
               Discard
             </Button>
             <Button appearance="primary" onClick={saveDirty} disabled={isSaving}>
-              {isSaving ? <Spinner size="tiny" aria-label="Saving..." /> : `Save ${dirtyKeys.length}`}
+              {isSaving ? (
+                <Spinner size="tiny" aria-label="Saving..." />
+              ) : (
+                `Save ${dirtyKeys.length}`
+              )}
             </Button>
           </div>
         ) : null}

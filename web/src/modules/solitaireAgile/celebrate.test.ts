@@ -8,10 +8,26 @@ describe("shouldCelebrate", () => {
     ["not reached: never", { active: false, wasActive: null, seen: false }, false],
     ["not reached, was reached: never", { active: false, wasActive: true, seen: false }, false],
     ["first sight, reached, no mark: once", { active: true, wasActive: null, seen: false }, true],
-    ["first sight, reached, the mark set (a reload): never", { active: true, wasActive: null, seen: true }, false],
-    ["the transition while watching, no mark: once", { active: true, wasActive: false, seen: false }, true],
-    ["the transition while watching, the mark set: once", { active: true, wasActive: false, seen: true }, true],
-    ["already reached and still reached: never again", { active: true, wasActive: true, seen: false }, false],
+    [
+      "first sight, reached, the mark set (a reload): never",
+      { active: true, wasActive: null, seen: true },
+      false,
+    ],
+    [
+      "the transition while watching, no mark: once",
+      { active: true, wasActive: false, seen: false },
+      true,
+    ],
+    [
+      "the transition while watching, the mark set: once",
+      { active: true, wasActive: false, seen: true },
+      true,
+    ],
+    [
+      "already reached and still reached: never again",
+      { active: true, wasActive: true, seen: false },
+      false,
+    ],
   ];
   it.each(rows)("%s", (_name, state, want) => {
     expect(shouldCelebrate(state)).toBe(want);

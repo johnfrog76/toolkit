@@ -82,7 +82,8 @@ describe("StartWorkBox", () => {
   });
 
   it("shows a refusal as the sentence the verb stated, and offers no Copy", async () => {
-    const sentence = "Card 4D9K is archived: widgets/archive/Task4D9K-an-old-card.prompt.md is Done.";
+    const sentence =
+      "Card 4D9K is archived: widgets/archive/Task4D9K-an-old-card.prompt.md is Done.";
     reply = () =>
       Promise.resolve({ ...ok(""), status: "error", exit_code: 1, output: null, error: sentence });
     render(<StartWorkBox id="4D9K" onClose={() => undefined} />);
@@ -124,7 +125,9 @@ describe("StartWorkBox", () => {
     });
     expect(runStartWork).toHaveBeenLastCalledWith({ id: "23A3", launch: true });
     expect(runStartWork).toHaveBeenCalledTimes(2);
-    expect(screen.getByTestId("start-work-launched").textContent).toBe("Started PID 4242. Log: crew-23A3.log");
+    expect(screen.getByTestId("start-work-launched").textContent).toBe(
+      "Started PID 4242. Log: crew-23A3.log",
+    );
   });
 
   it("a launch refused shows the verb's sentence", async () => {
