@@ -8,6 +8,10 @@ release.
 
 ## [Unreleased]
 
+### Changed
+
+- Opening the Design tab on a repository with a large design archive takes seconds, not minutes: the notes are listed in one request instead of one per file, and what was read is kept between restarts so an unchanged note is never fetched again. The design search box also finds a design by its file name.
+
 ## [1.2.0] - 2026-10-22
 
 ### Added
@@ -28,7 +32,6 @@ release.
 
 ### Changed
 
-- Opening the Design tab on a repository with a large design archive takes seconds, not minutes: the notes are listed in one request instead of one per file, and what was read is kept between restarts so an unchanged note is never fetched again. The design search box also finds a design by its file name.
 - A new card is planned, not in play: `NewPrompt` (and the web's New card) writes it to the Space's `backlog/`, and its first `ThreadHash`, its `NewPR` or `Move -To Active` pulls it into `current/` -- so the make-branch-commit-thread flow is typed exactly as before. `NewPrompt -Now` writes straight to `current/`, as it used to.
 - `StartWork` on a planned card says it is in the backlog and names `Move <id> -To Active`, rather than starting it for you.
 - A card marked not billable (`Billable -No`) is now left off the standup as well as off Daily.
