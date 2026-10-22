@@ -15,8 +15,10 @@ Run:  python -m pytest Tests/test_studio_prompts.py
 """
 
 import base64
+import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -235,47 +237,76 @@ TRAPS = "# Traps\n\nNo frontmatter.\n"
 REAL_RUN = subprocess.run
 
 
+def blob_sha(text: str) -> str:
+    """The sha the tracker gives these bytes, as GitHub answers it."""
+    data = text.encode()
+    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+
+
 class FakeFolder:
-    """``gh api repos/<repo>/contents/<path>`` over one ``agentic/`` folder, the
-    shape ``Tests/test_design.py``'s FakeRepo has: ``None`` is a repository with
-    no such folder (404); ``fail`` makes every call gh's error. ``git`` (the
-    shipped set's history) runs for real: the patch is on ``subprocess.run``."""
+    """``gh api graphql`` (and the contents read) over one ``agentic/`` folder,
+    the shape ``Tests/test_design.py``'s FakeRepo has: ``None`` is a repository
+    with no such folder; ``fail`` makes every call gh's error. The shipped set's
+    history read runs for real: the patch is on ``subprocess.run``. ``kinds``
+    names each gh call: shape, blobs or contents."""
 
     def __init__(self, files: dict[str, str] | None, fail: str = ""):
         self.files = files
         self.fail = fail
         self.calls: list[list[str]] = []
-
-    def _entry(self, name: str) -> dict:
-        return {
-            "type": "file",
-            "name": name,
-            "path": f"agentic/{name}",
-            "sha": f"sha-{name}",
-            "html_url": f"https://github.com/{SPACE_REPO}/blob/main/agentic/{name}",
-        }
+        self.kinds: list[str] = []
 
     def __call__(self, argv, **kw):
         if not argv or argv[0] != "gh":
             return REAL_RUN(argv, **kw)
+        assert "&" not in " ".join(argv), argv
         self.calls.append(list(argv))
         if self.fail:
+            self.kinds.append("failed")
             return subprocess.CompletedProcess(argv, 1, stdout="", stderr=self.fail)
         assert argv[:2] == ["gh", "api"], argv
+        if argv[2] == "graphql":
+            return self.graphql(argv)
+        self.kinds.append("contents")
         path = argv[2].split(f"repos/{SPACE_REPO}/contents/", 1)[1]
-        if self.files is not None and path == "agentic":
-            listing = [self._entry(n) for n in self.files]
-            listing.append({"type": "dir", "name": "drafts", "path": "agentic/drafts"})
-            return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(listing), stderr="")
         folder, _, name = path.rpartition("/")
         if self.files is not None and folder == "agentic" and name in self.files:
+            text = self.files[name]
             row = {
-                **self._entry(name),
+                "type": "file",
+                "name": name,
+                "path": path,
+                "sha": blob_sha(text),
                 "encoding": "base64",
-                "content": base64.b64encode(self.files[name].encode()).decode(),
+                "content": base64.b64encode(text.encode()).decode(),
             }
             return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(row), stderr="")
         return subprocess.CompletedProcess(argv, 1, stdout="", stderr="gh: Not Found (HTTP 404)")
+
+    def graphql(self, argv):
+        assert argv[3] == "-F" and argv[4].startswith("query=@"), argv
+        query = Path(argv[4][len("query=@") :]).read_text(encoding="utf-8")
+        files = self.files or {}
+        if "object(expression:" in query:
+            self.kinds.append("shape")
+            with_text = "... on Blob" in query
+            repo: dict = {"url": f"https://github.com/{SPACE_REPO}", "defaultBranchRef": {"name": "main"}}
+            if self.files is None:
+                repo["f0"] = None
+            else:
+                entries = [
+                    {"name": n, "type": "blob", "oid": blob_sha(t), "object": {"text": t} if with_text else {}}
+                    for n, t in files.items()
+                ]
+                entries.append({"name": "drafts", "type": "tree", "oid": "0" * 40, "object": {}})
+                repo["f0"] = {"entries": entries}
+            return subprocess.CompletedProcess(argv, 0, stdout=json.dumps({"data": {"repository": repo}}), stderr="")
+        self.kinds.append("blobs")
+        by_sha = {blob_sha(t): t for t in files.values()}
+        repo = {}
+        for alias, sha in re.findall(r'(b\d+): object\(oid: "([0-9a-f]+)"\)', query):
+            repo[alias] = {"text": by_sha[sha]} if sha in by_sha else None
+        return subprocess.CompletedProcess(argv, 0, stdout=json.dumps({"data": {"repository": repo}}), stderr="")
 
 
 class TheSpacesFolder(PromptsCase):
@@ -322,9 +353,50 @@ class TheSpacesFolder(PromptsCase):
         # ToolKit's and yours are listed as before, beside them.
         self.assertEqual(rows["pr-ship"]["group"], "toolkit")
         self.assertEqual(body["count"], len(rows))
-        # The reads go through gh api contents: the folder, then each file.
-        self.assertEqual(fake.calls[0], ["gh", "api", f"repos/{SPACE_REPO}/contents/agentic"])
-        self.assertEqual(fake.calls[1], ["gh", "api", f"repos/{SPACE_REPO}/contents/agentic/deck-contract.prompt.md"])
+        # One GraphQL call for the whole folder, texts included on a cold read.
+        self.assertEqual(fake.kinds, ["shape"])
+        self.assertEqual(fake.calls[0][:5], ["gh", "api", "graphql", "-F", fake.calls[0][4]])
+
+    def test_the_listing_costs_one_call_however_many_prompts_and_nothing_after_a_restart(self):
+        for n in (2, 12):
+            with self.subTest(prompts=n):
+                prompts.clear_cache()
+                # A fresh disk cache per size: a cold read is the one-call case.
+                with mock.patch.dict(os.environ, {"P20_AGENT_CACHE_DIR": tempfile.mkdtemp(prefix="p20-g9dd-")}):
+                    fake = FakeFolder({f"p{i}.prompt.md": f"# Prompt {i}\n" for i in range(n)})
+                    rows = [p for p in self.read(fake).json()["prompts"] if p["group"] == "space"]
+                    self.assertEqual(len(rows), n)
+                    self.assertEqual(fake.kinds, ["shape"])  # constant: not one call per prompt
+                    # A restart: the memory is gone, the disk is not. The shape is asked
+                    # again (names and shas, no texts); no prompt is fetched again.
+                    prompts.clear_cache()
+                    again = FakeFolder({f"p{i}.prompt.md": f"# Prompt {i}\n" for i in range(n)})
+                    rows = [p for p in self.read(again).json()["prompts"] if p["group"] == "space"]
+                    self.assertEqual(len(rows), n)
+                    self.assertEqual(again.kinds, ["shape"])
+                    self.assertEqual(rows[0]["title"], "Prompt 0")
+
+    def test_a_changed_prompt_is_the_only_one_fetched_again(self):
+        files = {f"p{i}.prompt.md": f"# Prompt {i}\n" for i in range(5)}
+        with mock.patch.dict(os.environ, {"P20_AGENT_CACHE_DIR": tempfile.mkdtemp(prefix="p20-g9dd-")}):
+            self.read(FakeFolder(files))
+            prompts.clear_cache()
+            files["p3.prompt.md"] = "# Prompt three, edited\n"
+            fake = FakeFolder(files)
+            rows = {p["ref"]: p for p in self.read(fake).json()["prompts"]}
+            self.assertEqual(fake.kinds, ["shape", "blobs"])  # one batch for the one new sha
+            self.assertEqual(rows["space/p3"]["title"], "Prompt three, edited")
+
+    def test_the_one_prompt_read_serves_the_body_from_disk_once_read(self):
+        with mock.patch.dict(os.environ, {"P20_AGENT_CACHE_DIR": tempfile.mkdtemp(prefix="p20-g9dd-")}):
+            fake = FakeFolder({"deck-contract.prompt.md": DECK})
+            first = self.read(fake, f"{ROUTE}/space/deck-contract")
+            self.assertEqual(first.json()["body"], DECK)
+            self.assertEqual(fake.kinds, ["shape", "contents"])  # the listing, then the one body
+            prompts.clear_cache()
+            second = FakeFolder({"deck-contract.prompt.md": DECK})
+            self.assertEqual(self.read(second, f"{ROUTE}/space/deck-contract").json()["body"], DECK)
+            self.assertEqual(second.kinds, ["shape"])  # the body came from disk by its sha
 
     def test_one_of_the_spaces_reads_by_its_ref(self):
         fake = FakeFolder({"deck-contract.prompt.md": DECK})

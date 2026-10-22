@@ -18,10 +18,14 @@ index entry, so they belong to every way of working.
 
 And the SPACE'S: the active Space names a repository by its address, not a
 folder on this machine, so its own ``agentic/*.prompt.md`` is read the way the
-Design tab reads ``design/`` -- ``gh api repos/<owner>/<repo>/contents/agentic``
-through ``agent/ado/design.py``'s ``_gh`` and ``_file_text``, behind the same
-``repo_gate`` (GitHub, Tier 1, an address that names one repo), cached for the
-same short TTL. The response says which Space it read (``space``) and whether
+Design tab reads ``design/`` -- through ``agent/ado/repo_read.py``'s
+``read_folder_rows`` (one GraphQL call for the folder, the parsed rows kept on
+disk by blob sha so an unchanged prompt is never fetched again), behind the same
+``repo_gate`` (GitHub, Tier 1, an address that names one repo), cached in memory
+for the same short TTL. Its text is read only by the one-prompt route, through
+``repo_read.file_text`` (a body served from disk by its sha when read before).
+
+The response says which Space it read (``space``) and whether
 that Space is this package itself (``isToolkit``: its repository is the
 package's own origin, so its folder is already the shipped set) -- the web
 draws a third filter from that one answer and works out nothing. A Space with
@@ -60,7 +64,8 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from ..ado.design import LIST_TTL_SECONDS, _file_text, _front, _gh, parse_doc, repo_gate
+from ..ado.design import LIST_TTL_SECONDS, _front, parse_doc, repo_gate
+from ..ado.repo_read import file_text, read_folder_rows
 from ..core import log_writer
 from ..core.child import ChildReadError, run_read
 from ..core.clock import local_day
@@ -96,8 +101,12 @@ UNCATEGORIZED = "uncategorized"
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _GITHUB_REMOTE = re.compile(r"github\.com[:/]+([^/\s]+)/([^/\s]+?)(?:\.git)?/?$")
 
-# The Space's folder, listed once per repo for the Design tab's TTL.
-_space_cache: dict[str, tuple[float, list[PromptRow]]] = {}
+# The Space's folder, listed once per repo for the Design tab's TTL: its rows,
+# and each row's blob sha by path (the one-prompt read's key to the body cache).
+_space_cache: dict[str, tuple[float, list[PromptRow], dict[str, str]]] = {}
+
+# The disk cache of parsed Space rows. Bump the number when ``_space_fields`` changes.
+SPACE_ROWS_NAMESPACE = "prompts-rows-1"
 
 
 def clear_cache() -> None:
@@ -356,57 +365,61 @@ def space_info(cfg: dict, repo: str | None) -> SpaceInfo:
     )
 
 
-def _space_row(entry: dict, text: str) -> PromptRow:
-    name = stem(entry.get("name", ""))
-    title, purpose, category = record(text, name)
+def _space_fields(text: str) -> dict:
+    """What a Space row needs from a prompt's TEXT ALONE (the disk cache keeps
+    this by blob sha, so it may not depend on the file's name): the heading or
+    frontmatter title ("" when there is none -- the name stands in at build
+    time), the purpose and the category."""
+    title, purpose, category = record(text, "")
+    return {"title": title, "purpose": purpose, "category": category}
+
+
+def _space_row(name: str, path: str, url: str, fields: dict) -> PromptRow:
     return PromptRow(
         name=name,
         ref=f"{SPACE}/{name}",
         group=SPACE,
-        path=f"{AGENTIC_DIR.name}/{entry.get('name', '')}",
-        file_path=str(entry.get("html_url") or ""),
-        title=title,
-        description=purpose,
-        purpose=purpose,
+        path=path,
+        file_path=url,
+        title=fields.get("title") or name,
+        description=fields.get("purpose", ""),
+        purpose=fields.get("purpose", ""),
         owner=SPACE,
-        category=category or UNCATEGORIZED,
+        category=fields.get("category") or UNCATEGORIZED,
         sender="",
         by_hand=True,
-        body=text,
     )
+
+
+def _space_folder(repo: str) -> tuple[list[PromptRow], dict[str, str]]:
+    """(the Space's rows, each path's blob sha), cached per repo. No such folder
+    is empty, cached; a repo gh cannot read is empty too, said in the log and not
+    cached -- never a refused card."""
+    hit = _space_cache.get(repo)
+    if hit and time.monotonic() - hit[0] < LIST_TTL_SECONDS:
+        return hit[1], hit[2]
+    folder = AGENTIC_DIR.name
+    read = read_folder_rows(
+        repo,
+        [folder],
+        namespace=SPACE_ROWS_NAMESPACE,
+        parse=_space_fields,
+        keep=lambda n: n.endswith(PROMPT_SUFFIX) and bool(_NAME.match(stem(n))),
+    )
+    if read.reason:
+        log_writer.write_log("ERR", "agent/studio", f"{repo}/{folder}: {read.reason}")
+        return [], {}  # not cached: the next read asks again
+    rows = [
+        _space_row(stem(e.name), e.path, read.file_url(e.path), read.rows.get(e.path) or {})
+        for e in read.folders.get(folder, [])
+    ]
+    _space_cache[repo] = (time.monotonic(), rows, read.shas)
+    return rows, read.shas
 
 
 def space_rows(repo: str) -> list[PromptRow]:
-    """The Space's own ``agentic/*.prompt.md``, read through gh and cached per
-    repo. No such folder is an empty list, cached; a repo gh cannot read is an
-    empty list too, said in the log and not cached -- never a refused card."""
-    hit = _space_cache.get(repo)
-    if hit and time.monotonic() - hit[0] < LIST_TTL_SECONDS:
-        return hit[1]
-    rows: list[PromptRow] = []
-    listing, why = _gh([f"repos/{repo}/contents/{AGENTIC_DIR.name}"])
-    if why and why != "not found":
-        log_writer.write_log("ERR", "agent/studio", f"{repo}/{AGENTIC_DIR.name}: {why}")
-        return rows  # not cached: the next read asks again
-    entries = sorted(
-        (
-            r
-            for r in (listing if isinstance(listing, list) else [])
-            if r.get("type") == "file"
-            and r.get("name", "").endswith(PROMPT_SUFFIX)
-            and _NAME.match(stem(r.get("name", "")))
-        ),
-        key=lambda r: r.get("name", "").lower(),
-    )
-    for entry in entries:
-        path = entry.get("path", f"{AGENTIC_DIR.name}/{entry.get('name', '')}")
-        text, _row, why = _file_text(repo, path, entry.get("sha", ""))
-        if why:
-            log_writer.write_log("ERR", "agent/studio", f"{repo}/{path}: {why}")
-            continue
-        rows.append(_space_row(entry, text or ""))
-    _space_cache[repo] = (time.monotonic(), rows)
-    return rows
+    """The Space's own ``agentic/*.prompt.md`` -- records without their text."""
+    return _space_folder(repo)[0]
 
 
 async def gated_space_repo() -> str | None:
@@ -452,7 +465,17 @@ def read_prompt(ref: str, repo: str | None = None) -> PromptRow:
         raise _absent(ref)
     if group == SPACE:
         space = space_info(load_config(), repo)
-        rows = owned_by(space_rows(space.repo), space.slug) if space.repo and not space.isToolkit else []
+        rows = []
+        if space.repo and not space.isToolkit:
+            found_rows, shas = _space_folder(space.repo)
+            rows = owned_by(found_rows, space.slug)
+            row = next((r for r in rows if r.name == name), None)
+            if row is not None:
+                text, _entry, why = file_text(space.repo, row.path, shas.get(row.path, ""))
+                if why:
+                    log_writer.write_log("ERR", "agent/studio", f"{space.repo}/{row.path}: {why}")
+                    raise _absent(ref)
+                rows = [row.model_copy(update={"body": text or ""})]
     elif group == YOURS:
         rows = yours_rows({stem(p.name) for p in _files(AGENTIC_DIR)})
     else:

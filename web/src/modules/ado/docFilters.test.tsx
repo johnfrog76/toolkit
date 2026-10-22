@@ -153,17 +153,27 @@ describe("the rules", () => {
     expect(fuzzyMatch("anything", "   ")).toBe(true);
   });
 
-  it("Design: the kind is what the design has (a spec, or a note alone); the text is title, description and id", () => {
+  it("Design: the kind is what the design has (a spec, or a note alone); the text is title, description, id and file name", () => {
     const [note, lounge, spec] = DESIGNS;
     expect(designMatches(note, "", "all")).toBe(true);
     expect(designMatches(spec, "", "design")).toBe(false);
     expect(designMatches(spec, "", "spec")).toBe(true);
     expect(designMatches(lounge, "lounge", "design")).toBe(true);
     expect(designMatches(lounge, "studio", "all")).toBe(false);
-    // the description and the id are searched too; the file's name is not
+    // the description and the id are searched too
     expect(designMatches(lounge, "asks nothing", "all")).toBe(true);
     expect(designMatches(spec, "33333333", "all")).toBe(true);
-    expect(designMatches(note, "board-note", "all")).toBe(false);
+  });
+
+  it("a search by file name finds the design", () => {
+    const [note, lounge, spec] = DESIGNS;
+    // the note's name, which is in no title, description or id
+    expect(designMatches(note, "board-note", "all")).toBe(true);
+    expect(designMatches(note, "board-note.md", "all")).toBe(true);
+    expect(designMatches(lounge, "board-note", "all")).toBe(false);
+    // and the spec's, beside its note's
+    expect(designMatches(spec, "studio.spec", "all")).toBe(true);
+    expect(designMatches(spec, "studio.spec", "design")).toBe(false);
   });
 
   it("Docs: the text is the path, the folder is exact", () => {
