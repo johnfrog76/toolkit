@@ -356,6 +356,11 @@ def studio_prompts_route() -> str:
     return consts()["studio"]["promptsRoute"]
 
 
+def studio_ledger_route() -> str:
+    """The Spaces card's one read of every GitHub Space's ledger: ``/api/studio/ledger``."""
+    return consts()["studio"]["ledgerRoute"]
+
+
 # -- The design lifecycle's identity (L1; docs/hub/design.md) --
 
 

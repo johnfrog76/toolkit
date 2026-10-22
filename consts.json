@@ -152,12 +152,13 @@
   },
 
   "studio": {
-    "_": "The Studio's design notes (docs/modules/studio.md, \"The file shape, and how a note is read\"). noteName is what one note's file name may be -- one markdown file, no path: NewDesign writes only names that match it, the agent's /api/studio/design/{name} refuses any other, and the web opens exactly those in the reading room. threadLine is the line that names a document's thread, `> GitHub: <issue url>` -- the same line a card and an issue file carry; the CLI writes it (Promote, through Write-CardText) and threadRegex is how the agent reads it back, from a hub note and from a repo's design/ and spec/ alike: group 1 the URL, 2 the owner, 3 the repo, 4 the number. promoteLabel is the label Promote (NewItem -FromDesign) puts on the issue it opens, and the web's Promote dialog names it -- review happens in the tracker's thread (D-S5). promptsRoute is the Studio's Prompts card's read: the agent mounts it, the web asks it -- the list of agentic/'s shipped prompts and your hub's, and one prompt's text below it.",
+    "_": "The Studio's design notes (docs/modules/studio.md, \"The file shape, and how a note is read\"). noteName is what one note's file name may be -- one markdown file, no path: NewDesign writes only names that match it, the agent's /api/studio/design/{name} refuses any other, and the web opens exactly those in the reading room. threadLine is the line that names a document's thread, `> GitHub: <issue url>` -- the same line a card and an issue file carry; the CLI writes it (Promote, through Write-CardText) and threadRegex is how the agent reads it back, from a hub note and from a repo's design/ and spec/ alike: group 1 the URL, 2 the owner, 3 the repo, 4 the number. promoteLabel is the label Promote (NewItem -FromDesign) puts on the issue it opens, and the web's Promote dialog names it -- review happens in the tracker's thread (D-S5). promptsRoute is the Studio's Prompts card's read: the agent mounts it, the web asks it -- the list of agentic/'s shipped prompts and your hub's, and one prompt's text below it. ledgerRoute is the Spaces card's one read of every GitHub Space's ledger -- open and closed issues, the newest runs and the repository's visibility, one gh call for all of them and kept on disk -- the agent mounts it, the web asks it.",
     "noteName": "^[A-Za-z0-9][A-Za-z0-9._-]*\\.md$",
     "threadLine": "> GitHub:",
     "threadRegex": "(?m)^>\\s*GitHub:\\s*(https://github\\.com/([^/\\s]+)/([^/\\s]+)/issues/(\\d+))\\s*$",
     "promoteLabel": "design",
-    "promptsRoute": "/api/studio/prompts"
+    "promptsRoute": "/api/studio/prompts",
+    "ledgerRoute": "/api/studio/ledger"
   },
 
   "design": {

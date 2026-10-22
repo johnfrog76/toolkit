@@ -31,19 +31,16 @@ import { usePagination } from "../../hooks/usePagination";
 import { StatusMessage } from "../../shared/StatusMessage";
 import { usePersistedValue } from "../../shared/usePersistedState";
 import { visibilityLabel } from "../../shared/visibility";
-import {
-  useGetEnvQuery,
-  useGetSpaceVisibilityQuery,
-  useRefreshSpaceVisibilityMutation,
-} from "../../shell/api";
+import { useGetEnvQuery } from "../../shell/api";
 import type { SpaceInfo } from "../../shell/api";
 import { VISIBILITY } from "../../shell/consts";
 import { useGetStatusQuery } from "../ado/api.ado";
 import {
-  useGetSpaceDeploysQuery,
-  useGetSpaceIssueReportQuery,
   useGetSpaceStatusQuery,
+  useGetStudioLedgerQuery,
+  useRefreshStudioLedgerMutation,
 } from "./api.studio";
+import type { SpaceLedger } from "./api.studio";
 import {
   SPACES_FILTERS,
   cardsLine,
@@ -67,8 +64,10 @@ import { STUDIO_PAGE_SIZE } from "./paths";
 import { useEnterSpace } from "./useEnterSpace";
 
 // The foyer (Studio S2b, D-S2 as amended by D-S13): one row per Space -- every
-// Space, whatever its tracker -- each read from the routes the core already
-// has, for THAT Space, without switching into it. Never a merged backlog
+// Space, whatever its tracker -- each read for THAT Space without switching
+// into it: every GitHub row from one ledger read for all of them (one gh call
+// on the agent, kept on its disk), every other row from its cards on disk
+// through the core's /api/status. Never a merged backlog
 // (D-G11): a row says how the Space stands in one line, and the row is the door
 // into it. The foyer asks nothing; the one thing it keeps is the filter's
 // choice, in this browser -- a convenience, never a setting. Its + adds
@@ -206,11 +205,6 @@ interface RowRead {
 }
 type OnRead = (slug: string, read: RowRead) => void;
 
-/** A read has settled when it answered or failed; a skipped one never asks. */
-function settled(q: { data?: unknown; error?: unknown }): boolean {
-  return q.data !== undefined || q.error != null;
-}
-
 /** Reports a Space's read up to the card whenever it changes. */
 function useReport(slug: string, line: string | null, fetching: boolean, onRead: OnRead) {
   useEffect(() => {
@@ -218,48 +212,42 @@ function useReport(slug: string, line: string | null, fetching: boolean, onRead:
   }, [slug, line, fetching, onRead]);
 }
 
-/** A GitHub Space's reads: its repository's visibility -- only when it is
- *  connected -- then its issues and deploys, each read for that Space by
- *  its `space` argument. A visibility read that fails is `Visibility unknown`
- *  on the line, never a guess. Draws nothing: the card draws the row
+/** What the card's one ledger read came to, for every GitHub row. */
+interface LedgerRead {
+  spaces?: Record<string, SpaceLedger>;
+  failed: boolean;
+  fetching: boolean;
+}
+
+/** A GitHub Space's line, from its slot in the card's ledger read
+ *  (GET /api/studio/ledger: every GitHub Space's issues, deploys and
+ *  repository visibility in one read). Visibility is said only for a
+ *  connected Space; a ledger that did not answer is `Visibility unknown` on
+ *  the line, never a guess. Draws nothing: the card draws the row
  *  once every row has its line. */
 function GithubReads({
   space,
-  generation,
+  ledger,
   onRead,
 }: {
   space: SpaceInfo;
-  generation: number;
+  ledger: LedgerRead;
   onRead: OnRead;
 }) {
   const asks = readsVisibility(space);
-  const report = useGetSpaceIssueReportQuery(space.slug);
-  const deploys = useGetSpaceDeploysQuery(space.slug);
-  const vis = useGetSpaceVisibilityQuery(space.slug, { skip: !asks });
-  const [refreshVisibility, refreshing] = useRefreshSpaceVisibilityMutation();
-  useEffect(() => {
-    if (generation === 0) return;
-    void report.refetch();
-    void deploys.refetch();
-    if (asks) void refreshVisibility(space.slug);
-    // Refresh is the only thing that asks again.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [generation]);
+  const entry = ledger.spaces?.[space.slug];
   const visibility = !asks
     ? ""
-    : vis.error
+    : ledger.failed
       ? visibilityLabel(VISIBILITY.unknown)
-      : vis.data
-        ? visibilityLabel(vis.data.visibility)
+      : entry
+        ? visibilityLabel(entry.visibility.visibility)
         : null;
-  const facts = report.error
+  const facts = ledger.failed
     ? "Could not read this Space's issues -- the agent did not answer."
-    : foyerLine(report.data, deploys.data);
-  const line = settled(deploys) ? githubRowLine(visibility, facts) : null;
-  const fetching = Boolean(
-    report.isFetching || deploys.isFetching || vis.isFetching || refreshing.isLoading,
-  );
-  useReport(space.slug, line, fetching, onRead);
+    : foyerLine(entry?.report, entry?.deploys);
+  const line = ledger.failed || entry ? githubRowLine(visibility, facts) : null;
+  useReport(space.slug, line, ledger.fetching, onRead);
   return null;
 }
 
@@ -340,6 +328,21 @@ export function FoyerCard() {
   const refreshing = Object.values(reads).some((r) => r.fetching);
   // Refresh: each reader reads its Space again when this moves.
   const [generation, setGeneration] = useState(0);
+  // Every GitHub row's facts come from ONE read, asked once a GitHub Space is
+  // declared; Refresh asks it again past the agent's disk cache.
+  const ledgerQuery = useGetStudioLedgerQuery(undefined, { skip: !spaces.some(isGithubRow) });
+  const [refreshLedger, refreshingLedger] = useRefreshStudioLedgerMutation();
+  useEffect(() => {
+    if (generation === 0 || !spaces.some(isGithubRow)) return;
+    void refreshLedger();
+    // Refresh is the only thing that asks again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generation]);
+  const ledger: LedgerRead = {
+    spaces: ledgerQuery.data?.spaces,
+    failed: ledgerQuery.data === undefined && ledgerQuery.error != null,
+    fetching: Boolean(ledgerQuery.isFetching || refreshingLedger.isLoading),
+  };
   const listed = shown.filter((s) => reads[s.slug]?.line != null);
   const { page, totalPages, pageItems, setPage } = usePagination(listed, STUDIO_PAGE_SIZE);
   const choose = (next: SpacesFilter) => {
@@ -440,7 +443,7 @@ export function FoyerCard() {
           draws no children while it loads, and these are what it waits on. */}
       {spaces.map((s) =>
         isGithubRow(s) ? (
-          <GithubReads key={s.slug} space={s} generation={generation} onRead={onRead} />
+          <GithubReads key={s.slug} space={s} ledger={ledger} onRead={onRead} />
         ) : (
           <CardsReads
             key={s.slug}

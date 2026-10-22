@@ -127,6 +127,8 @@ describe("consts.json", () => {
     expect(STUDIO.promoteLabel).toBe("design");
     // The Prompts card: the agent's read.
     expect(STUDIO.promptsRoute).toBe("/api/studio/prompts");
+    // The Spaces card: every GitHub Space's ledger in one read.
+    expect(STUDIO.ledgerRoute).toBe("/api/studio/ledger");
     expect(STUDIO.threadRegex).toBe(
       String.raw`(?m)^>\s*GitHub:\s*(https://github\.com/([^/\s]+)/([^/\s]+)/issues/(\d+))\s*$`,
     );
@@ -502,6 +504,7 @@ describe("no half retypes a contract literal", () => {
     // the page shows the agent's text and must never assemble its own.
     ["rituals.route", RITUALS.route],
     ["studio.promptsRoute", STUDIO.promptsRoute],
+    ["studio.ledgerRoute", STUDIO.ledgerRoute],
     ["visibility.publicLine", VISIBILITY.publicLine],
     ["rituals.text.title", RITUALS.text.title],
     ["rituals.text.queueHeading", RITUALS.text.queueHeading],
