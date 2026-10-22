@@ -166,7 +166,7 @@ module and you add a mock line to every one of these files.
 **Four test runners**, one per half plus one for the two together. Run the ones your change touches:
 
 ```powershell
-tkTestToolkit                 # the CLI -- 45 suites, 7803 assertions on this commit
+tkTestToolkit                 # the CLI -- 45 suites, 7885 assertions on this commit
 ```
 
 ```bash
