@@ -61,7 +61,11 @@ describe("consts.json", () => {
     expect(FOLDERS.backlog).toBe("backlog");
     // The org-scoped flags: the same list the CLI's OrgScopedFeatures and the
     // agent's ORG_FEATURES read, so a second one cannot be added to two halves only.
-    expect(FEATURES.spaceScoped).toEqual(["sprintAwareness", "trainingHoursPerQuarter", "suggestions"]);
+    expect(FEATURES.spaceScoped).toEqual([
+      "sprintAwareness",
+      "trainingHoursPerQuarter",
+      "suggestions",
+    ]);
     // Read by vite.config.ts (outside src/), not by the bundle: the name of the
     // variable Start-Web.ps1 sets and the dev proxy reads.
     expect(consts.env.agentPort).toBe("P20_AGENT_PORT");
@@ -292,7 +296,8 @@ describe("consts.json", () => {
         cornerOneLeft: "one more {noun} {ref} to get milestone {milestone} - start it now",
         cornerManyLeft: "{n} more {noun} to get milestone {milestone} - start {ref} now",
         cornerReached: "milestone {milestone} reached",
-        cornerNothingInReach: "no milestone in reach - place a card with Route or on its Sprint line",
+        cornerNothingInReach:
+          "no milestone in reach - place a card with Route or on its Sprint line",
         cornerNounCards: "cards",
         cornerNounIssues: "issues",
         cornerNounItems: "items",

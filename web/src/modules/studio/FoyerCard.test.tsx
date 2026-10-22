@@ -46,7 +46,15 @@ jest.mock("../../shell/api", () => ({
 function mockLedgerEntry(slug: string) {
   return {
     report: unsupportedReport.includes(slug)
-      ? { supported: false, open: 0, closed: 0, closed_recent: 0, sev: {}, kind: {}, milestones: [] }
+      ? {
+          supported: false,
+          open: 0,
+          closed: 0,
+          closed_recent: 0,
+          sev: {},
+          kind: {},
+          milestones: [],
+        }
       : {
           supported: true,
           open: slug === "toolkit" ? 4 : 0,
@@ -70,8 +78,9 @@ jest.mock("./api.studio", () => ({
     if (opts?.skip) return { data: undefined };
     if (pending.includes("ledger")) return { data: undefined, isFetching: true };
     if (ledgerFails) return { data: undefined, error: { status: 500 } };
-    const config = (envAnswer as { config?: { spaces?: Array<{ slug: string; tracker?: string }> } })
-      ?.config;
+    const config = (
+      envAnswer as { config?: { spaces?: Array<{ slug: string; tracker?: string }> } }
+    )?.config;
     const spaces = Object.fromEntries(
       (config?.spaces ?? [])
         .filter((s) => s.tracker === "github")

@@ -72,21 +72,38 @@ describe("PmCorner", () => {
     expect(screen.getByTestId("pm-corner").textContent).toContain(many.line);
     fireEvent.click(screen.getByRole("button", { name: "Start work on #5" }));
     expect(onStart).toHaveBeenCalledWith("5");
-    expect(screen.getByRole("button", { name: "Start work on #5" }).textContent).toBe(RITUALS.text.cornerChevron);
+    expect(screen.getByRole("button", { name: "Start work on #5" }).textContent).toBe(
+      RITUALS.text.cornerChevron,
+    );
     expect(screen.queryByTestId("confetti")).toBeNull();
   });
 
   it("a card's pick is its id; one left carries the chevron too", () => {
     const onStart = jest.fn();
-    const card: Corner = { ...many, shape: ONE_LEFT, remaining: 1, ref: "23A3", number: null, id: "23A3", kind: "card" };
+    const card: Corner = {
+      ...many,
+      shape: ONE_LEFT,
+      remaining: 1,
+      ref: "23A3",
+      number: null,
+      id: "23A3",
+      kind: "card",
+    };
     render(<PmCorner corner={card} space="widgets" onStart={onStart} />);
     fireEvent.click(screen.getByRole("button", { name: "Start work on 23A3" }));
     expect(onStart).toHaveBeenCalledWith("23A3");
   });
 
   it("nothing in reach and reached have no chevron", () => {
-    const nothing: Corner = { ...reached, shape: NOTHING, milestone: "", line: RITUALS.text.cornerNothingInReach };
-    const { rerender } = render(<PmCorner corner={nothing} space="widgets" onStart={() => undefined} />);
+    const nothing: Corner = {
+      ...reached,
+      shape: NOTHING,
+      milestone: "",
+      line: RITUALS.text.cornerNothingInReach,
+    };
+    const { rerender } = render(
+      <PmCorner corner={nothing} space="widgets" onStart={() => undefined} />,
+    );
     expect(screen.queryByRole("button", { name: /Start work/ })).toBeNull();
     rerender(<PmCorner corner={reached} space="widgets" onStart={() => undefined} />);
     expect(screen.queryByRole("button", { name: /Start work/ })).toBeNull();
@@ -118,7 +135,9 @@ describe("PmCorner", () => {
 
   it("the transition to reached while the page watches: one burst, even with the mark set", () => {
     localStorage.setItem(CORNER_SEEN_KEY, JSON.stringify(["widgets:B"]));
-    const { rerender } = render(<PmCorner corner={many} space="widgets" onStart={() => undefined} />);
+    const { rerender } = render(
+      <PmCorner corner={many} space="widgets" onStart={() => undefined} />,
+    );
     expect(screen.queryByTestId("confetti")).toBeNull();
     act(() => {
       rerender(<PmCorner corner={reached} space="widgets" onStart={() => undefined} />);

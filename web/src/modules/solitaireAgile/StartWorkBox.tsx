@@ -106,7 +106,10 @@ export function StartWorkBox({ id, onClose }: { id: string; onClose: () => void 
       setLaunched(
         result.status === "success"
           ? { ok: true, block: (result.output ?? "").trim() }
-          : { ok: false, sentence: result.error?.trim() || result.output?.trim() || "StartWork said nothing." },
+          : {
+              ok: false,
+              sentence: result.error?.trim() || result.output?.trim() || "StartWork said nothing.",
+            },
       );
     } catch {
       setLaunched({ ok: false, sentence: "The agent did not answer. Nothing was started." });
@@ -115,7 +118,9 @@ export function StartWorkBox({ id, onClose }: { id: string; onClose: () => void 
     }
   };
 
-  const title = outcome?.ok ? (blockTitle(outcome.block) ?? `Start work: ${id}`) : `Start work: ${id}`;
+  const title = outcome?.ok
+    ? (blockTitle(outcome.block) ?? `Start work: ${id}`)
+    : `Start work: ${id}`;
 
   return (
     <Dialog open onOpenChange={(_e, d) => !d.open && onClose()}>

@@ -425,7 +425,11 @@ export function StandupPage() {
   return (
     <div className={styles.page}>
       {corner && (
-        <PmCorner corner={corner} space={data?.space ?? space} onStart={(arg) => setStartFor(arg)} />
+        <PmCorner
+          corner={corner}
+          space={data?.space ?? space}
+          onStart={(arg) => setStartFor(arg)}
+        />
       )}
       <PageCard
         loading={envLoading || isLoading}

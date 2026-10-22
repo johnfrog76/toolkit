@@ -19,7 +19,11 @@
  * - a first sight of something already reached fires only when the mark is absent;
  * - never otherwise -- so a reload of a finished milestone does not celebrate again.
  */
-export function shouldCelebrate(state: { active: boolean; wasActive: boolean | null; seen: boolean }): boolean {
+export function shouldCelebrate(state: {
+  active: boolean;
+  wasActive: boolean | null;
+  seen: boolean;
+}): boolean {
   if (!state.active) return false;
   if (state.wasActive === false) return true;
   if (state.wasActive === true) return false;
@@ -34,7 +38,8 @@ function read(key: string): Set<string> {
     const raw = window.localStorage?.getItem(key);
     if (raw) {
       const list = JSON.parse(raw) as unknown;
-      if (Array.isArray(list)) return new Set(list.filter((x): x is string => typeof x === "string"));
+      if (Array.isArray(list))
+        return new Set(list.filter((x): x is string => typeof x === "string"));
     }
   } catch {
     // Unreadable or refused: fall through to this page's memory.

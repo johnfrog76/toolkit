@@ -24,7 +24,8 @@ export const hasChevron = (c: Corner): boolean =>
 export const isReached = (c: Corner): boolean => c.shape === REACHED;
 
 /** What `StartWork` is given for the chevron: the issue's number, else the card's id. */
-export const cornerArg = (c: Corner): string => (c.number != null ? String(c.number) : (c.id ?? ""));
+export const cornerArg = (c: Corner): string =>
+  c.number != null ? String(c.number) : (c.id ?? "");
 
 /** The id a milestone is remembered by in this browser: the Space slug (never a colon in it), a colon and its title, whole
  *  -- the same title the tracker and a card's **Sprint:** line both carry. */
