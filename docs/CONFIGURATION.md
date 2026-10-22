@@ -754,6 +754,14 @@ tree `Update` refuses to move while it is dirty. Under it, `rows/<reader>.json` 
 reader's name carries a version, bumped when what it parses changes), `bodies/<sha>` the opened bodies, and
 `ledger-1/<slug>.json` each GitHub Space's ledger with the time it was read (the folder's version is bumped
 when the ledger's shape changes), and `standup-dress-1/<hash>.json` the dressed replies.
+Two of these grow one record per thing ever read -- the rows (one per blob sha) and the dressed replies
+(one file each) -- so both are **capped by one rule**, applied when they are written: a record or file
+unseen for 30 days goes, and past 3000 records the oldest-unseen go first (`AGENT_CACHE_MAX_AGE_DAYS` and
+`AGENT_CACHE_MAX_RECORDS` in `agent/core/config.py`; not settings -- nothing to configure). "Seen" is when a
+row or reply was last written or served: a row carries a stamp in its file's `seen` map, refreshed by a
+warm read at most once a day, and a reply is its file's modification time, touched on a disk hit. A prune
+that cannot run leaves the cache as it was. `bodies/<sha>` and `ledger-1/` are not pruned: the ledger is one
+file per declared Space, and an opened body is kept until you delete the folder.
 Delete the folder whenever you like: the next read fetches what it needs again. `Config` does not know the
 variable; like the other overrides it is a launcher's, not a setting.
 

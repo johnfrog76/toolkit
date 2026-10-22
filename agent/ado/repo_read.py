@@ -60,6 +60,7 @@ import os
 import re
 import tempfile
 import threading
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
@@ -77,6 +78,9 @@ _SHA = re.compile(r"^[0-9a-f]{40}(?:[0-9a-f]{24})?$")
 ROWS_DIR = "rows"
 BODIES_DIR = "bodies"
 
+# A hit refreshes its last-seen stamp only when the stamp is this old, so a warm
+# listing does not rewrite the rows file every time.
+SEEN_REFRESH_SECONDS = 86400
 _rows_lock = threading.Lock()
 
 
@@ -277,19 +281,39 @@ def _owner_fields(repo: str) -> list[str]:
     return ["-f", f"owner={owner}", "-f", f"name={name}"]
 
 
+def _load_file(namespace: str) -> tuple[dict[str, dict], dict[str, float]]:
+    """(rows by blob sha, last-seen time by blob sha) from the namespace's file."""
+    data = disk_cache.get_json(ROWS_DIR, f"{namespace}.json") or {}
+    rows, seen = data.get("rows"), data.get("seen")
+    return (rows if isinstance(rows, dict) else {}), (seen if isinstance(seen, dict) else {})
+
+
 def _load_rows(namespace: str) -> dict[str, dict]:
-    data = disk_cache.get_json(ROWS_DIR, f"{namespace}.json")
-    rows = (data or {}).get("rows")
-    return rows if isinstance(rows, dict) else {}
+    return _load_file(namespace)[0]
 
 
-def _save_rows(namespace: str, new: dict[str, dict]) -> None:
-    if not new:
-        return
+def _save_rows(namespace: str, new: dict[str, dict], hits: set[str] | frozenset[str] = frozenset()) -> None:
+    """Keep ``new`` rows, stamp ``new`` and ``hits`` as seen now, and prune
+    (``disk_cache.prune_seen``: unseen for the age, or past the count,
+    oldest-unseen first). Last-seen is a field of the file rather than the file's
+    mtime because one file holds every record. A hit rewrites the file only when
+    its stamp is ``SEEN_REFRESH_SECONDS`` old (or missing), so a warm read stays
+    a read."""
+    now = time.time()
     with _rows_lock:
-        rows = _load_rows(namespace)
+        rows, seen = _load_file(namespace)
+        stale = [
+            sha
+            for sha in hits
+            if sha in rows and (not isinstance(seen.get(sha), (int, float)) or now - seen[sha] >= SEEN_REFRESH_SECONDS)
+        ]
+        if not new and not stale:
+            return
         rows.update(new)
-        disk_cache.put_json({"rows": rows}, ROWS_DIR, f"{namespace}.json")
+        for sha in (*new, *stale):
+            seen[sha] = now
+        rows, seen = disk_cache.prune_seen(rows, seen, now=now)
+        disk_cache.put_json({"rows": rows, "seen": seen}, ROWS_DIR, f"{namespace}.json")
 
 
 def blob_texts(repo: str, entries: list[Entry], *, batch: bool = True) -> tuple[dict[str, str], int]:
@@ -405,9 +429,11 @@ def read_folder_rows(
         texts.update(fetched)
         out.calls += calls
     new: dict[str, dict] = {}
+    hits: set[str] = set()
     for e in every:
         out.shas[e.path] = e.sha
         if e.sha in cached:
+            hits.add(e.sha)
             out.rows[e.path] = cached[e.sha]
         elif e.sha in texts:
             row = new.get(e.sha) or parse(texts[e.sha])
@@ -415,5 +441,5 @@ def read_folder_rows(
             out.rows[e.path] = row
         else:
             out.rows[e.path] = parse("")
-    _save_rows(namespace, {sha: row for sha, row in new.items() if is_sha(sha)})
+    _save_rows(namespace, {sha: row for sha, row in new.items() if is_sha(sha)}, hits)
     return out

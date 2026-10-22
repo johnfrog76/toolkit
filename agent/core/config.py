@@ -51,6 +51,13 @@ REPO_ROOT = AGENT_DIR.parent
 DEFAULT_CONFIG_PATH = REPO_ROOT / "config.default.json"
 LOCAL_CONFIG_PATH = REPO_ROOT / "config.local.json"
 
+# The agent's on-disk cache is capped by one rule (core/disk_cache.py, prune_seen
+# and prune_folder): a record or file unseen for this many days goes, and past
+# this many records the oldest-unseen go first. It covers the rows cache (one
+# record per blob sha) and the standup's dress cache (one file per dressed reply).
+AGENT_CACHE_MAX_RECORDS = 3000
+AGENT_CACHE_MAX_AGE_DAYS = 30
+
 # The shipped agentic prompts: the package's ``agentic/`` folder, each prompt a
 # ``<name>.prompt.md``, and the index of which way of working each belongs to.
 # The CLI's Scripts/Resolve-AgenticPrompt.ps1 names the same folder; the agent

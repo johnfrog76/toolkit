@@ -1461,6 +1461,7 @@ def _dressed_on_disk(key: str) -> dict[str, str] | None:
     reply = (kept or {}).get("reply")
     if not isinstance(reply, dict):
         return None
+    disk_cache.touch(DRESS_CACHE, f"{key}.json")  # seen now: what the prune ranks by
     return {str(k): v for k, v in reply.items() if isinstance(v, str)}
 
 
@@ -1503,7 +1504,8 @@ async def dress_standup(filled: Standup) -> Spoken | None:
             return None
         reply = _dress_reply(raw)
         _keep_dressed(key, reply)
-        disk_cache.put_json({"reply": reply}, DRESS_CACHE, f"{key}.json")
+        if disk_cache.put_json({"reply": reply}, DRESS_CACHE, f"{key}.json"):
+            disk_cache.prune_folder(DRESS_CACHE)
     # The guard runs on a kept reply as on a fresh one (spoken_from): a kept
     # sentence the guard now refuses is the prose again.
     spoken = spoken_from(filled, facts, reply, model_name)
