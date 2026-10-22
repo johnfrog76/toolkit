@@ -29,36 +29,102 @@ from .config import hub_root, tracker, tracker_owner
 # outright.
 ADO_PROBE_TTL_SECONDS = 45
 
-# org URL -> (monotonic timestamp, reachable). Keyed by org because switching
-# org asks a different question, and answered under a lock because the probe
-# runs in the threadpool -- /env, /dashboard and the accounting routes all
-# resolve tier off the event loop.
+# probe key -> (monotonic timestamp, reachable). The key is what the probe
+# ASKS, not which Space asked (``_probe_key``): the owner for a GitHub address,
+# the org URL for Azure DevOps. Answered under a lock because the probe runs in
+# the threadpool -- /env, /dashboard and the accounting routes all resolve tier
+# off the event loop.
 _probe_cache: dict[str, tuple[float, bool]] = {}
 _probe_lock = threading.Lock()
+
+
+class _Flight:
+    """One probe in flight, shared by every caller that missed on its key.
+
+    The first caller to miss makes the probe (the leader); the rest wait on
+    ``done`` and read what it left. A probe that RAISED leaves ``error``, and
+    every caller sharing that flight re-raises it -- nothing is cached, so the
+    next ask makes a fresh probe.
+    """
+
+    __slots__ = ("done", "error", "reachable")
+
+    def __init__(self) -> None:
+        self.done = threading.Event()
+        self.reachable = False
+        self.error: BaseException | None = None
+
+
+# probe key -> the flight a miss is waiting on; guarded by ``_probe_lock``.
+_probe_flights: dict[str, _Flight] = {}
 
 
 def probe_cache_clear() -> None:
     """Forget every cached reachability answer.
 
     Called by /switch-mode, and by the tests -- a cache that survived between
-    cases would make the second one depend on the first.
+    cases would make the second one depend on the first. A probe already in
+    flight finishes and answers its waiters, but is not written back.
     """
     with _probe_lock:
         _probe_cache.clear()
+        _probe_flights.clear()
+
+
+def _probe_key(org_url: str) -> str:
+    """What one reachability answer is good FOR.
+
+    GitHub: the OWNER. The probe is ``gh api users/<owner>``, which does not
+    depend on the repository, so one answer serves every Space under that
+    owner (a developer's ten Spaces are one probe, not ten). Case-folded,
+    because GitHub logins are. Azure DevOps: the org URL as given -- the probe
+    is ``az devops project list --org <url>``, one answer per organisation,
+    and two Spaces on one org already share a URL.
+    """
+    if tracker(org_url) == "github":
+        owner = tracker_owner(org_url)
+        if owner:
+            return "github:" + owner.lower()
+    return org_url or ""
 
 
 def _probe_tracker_cached(org_url: str, refresh: bool = False) -> bool:
-    """`_probe_tracker` behind the TTL. Never called from the event loop."""
-    key = org_url or ""
-    if not refresh:
-        with _probe_lock:
-            hit = _probe_cache.get(key)
-        if hit is not None and (time.monotonic() - hit[0]) < ADO_PROBE_TTL_SECONDS:
-            return hit[1]
-    reachable = _probe_tracker(org_url)
+    """`_probe_tracker` behind the TTL, and merged. Never called from the event loop.
+
+    Concurrent misses on one key join ONE probe. ``refresh`` goes past the
+    cached answer but still joins a probe that is already running -- that
+    answer is as fresh as the one it would have made.
+    """
+    key = _probe_key(org_url)
     with _probe_lock:
-        _probe_cache[key] = (time.monotonic(), reachable)
-    return reachable
+        if not refresh:
+            hit = _probe_cache.get(key)
+            if hit is not None and (time.monotonic() - hit[0]) < ADO_PROBE_TTL_SECONDS:
+                return hit[1]
+        flight = _probe_flights.get(key)
+        leader = flight is None
+        if leader:
+            flight = _probe_flights[key] = _Flight()
+    if not leader:
+        flight.done.wait()
+        if flight.error is not None:
+            raise flight.error
+        return flight.reachable
+    try:
+        flight.reachable = _probe_tracker(org_url)
+    except BaseException as e:
+        flight.error = e
+        raise
+    else:
+        with _probe_lock:
+            if _probe_flights.get(key) is flight:  # not cleared while it ran
+                _probe_cache[key] = (time.monotonic(), flight.reachable)
+        return flight.reachable
+    finally:
+        with _probe_lock:
+            if _probe_flights.get(key) is flight:
+                del _probe_flights[key]
+        flight.done.set()
 
 
 def _probe_tracker(org_url: str) -> bool:

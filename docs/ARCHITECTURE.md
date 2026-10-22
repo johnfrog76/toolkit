@@ -63,7 +63,7 @@ active Space's answer to "How do you want to work here?", `answer`, `source`, `t
 Team Agile's `switch` as set -- `features` already carries the gate), `identity`
 (`{email, source}`, who the ADO routes filter by), nine named checks, and the active Space's config
 including the full `spaces` list -- each Space with its `tracker` and its own `laneNames`. `agent/README.md`'s Tier and identity sections have each field's
-fallback chain and why the tier probe runs off the event loop, cached 45 seconds.
+fallback chain and why the tier probe runs off the event loop, cached 45 seconds, keyed by the owner for a GitHub address, with concurrent misses merged into one probe.
 
 **Every route is under `/api`**: the ADO core's and the shell's, the GitHub tracker's, and each
 module's own. The module routes are mounted unconditionally and
