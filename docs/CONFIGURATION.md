@@ -734,7 +734,9 @@ through the tracker and can prove has not changed. Today that is the Design tab'
 file's parsed row (id, title, description, its stamps, its Docs and thread lines; never the body), and the
 body of a note once it has been opened -- each keyed by the file's **blob sha**, a hash of its bytes, so
 nothing in it can go stale: a note that changes has a new sha and is read again
-([the design lifecycle](hub/design.md)). `agent/core/disk_cache.py` owns the place:
+([the design lifecycle](hub/design.md)). And the standup's dressed sentences, keyed by a hash of the model,
+the register and the facts the model was given, so a sentence is re-dressed only when its facts change
+([Team Agile](modules/solitaire-agile.md), "The agentic layer"). `agent/core/disk_cache.py` owns the place:
 
 | Where | When |
 | --- | --- |
@@ -745,7 +747,8 @@ nothing in it can go stale: a note that changes has a new sha and is read again
 
 Never the hub -- it is your record, and it may be synced between machines -- and never the package, whose
 tree `Update` refuses to move while it is dirty. Under it, `rows/<reader>.json` holds the parsed rows (the
-reader's name carries a version, bumped when what it parses changes) and `bodies/<sha>` the opened bodies.
+reader's name carries a version, bumped when what it parses changes), `bodies/<sha>` the opened bodies, and
+`standup-dress-1/<hash>.json` the dressed replies.
 Delete the folder whenever you like: the next read fetches what it needs again. `Config` does not know the
 variable; like the other overrides it is a launcher's, not a setting.
 

@@ -17,7 +17,8 @@ engineer's own machine state.
    ``env.agentCacheDir``) moves it: here to a temp directory at import, and to a
    fresh one for EVERY test, because a fixture's blob sha is whatever the test
    says it is -- two tests may give different text one sha, and a row one test
-   parsed must never answer for another.
+   parsed must never answer for another. The rituals' in-memory reads (the
+   tracker's 60-second answers, the dressed replies) are forgotten per test too.
 
 3. **The webhook variables.** ``SendTeams`` and ``POST /api/comms/send`` take
    whatever is in the environment at face value, and a machine that has ever
@@ -94,6 +95,13 @@ def _no_live_webhooks():
 
 @pytest.fixture(autouse=True)
 def _fresh_agent_cache(tmp_path, monkeypatch):
-    """Every test reads and writes its own empty agent cache (see the docstring)."""
+    """Every test reads and writes its own empty agent cache (see the docstring),
+    and starts with no kept tracker read and no dressed reply in memory
+    (agent/solitaire/tracker.py, standup.py): a fixture's repo is whatever the
+    test says it holds, and a read one test kept must never answer for another."""
     monkeypatch.setenv(AGENT_CACHE_ENV, str(tmp_path / "agent-cache"))
+    from agent.solitaire import standup, tracker
+
+    tracker.forget()
+    standup.clear_dressed()
     yield

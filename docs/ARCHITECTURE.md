@@ -106,7 +106,8 @@ bytes the CLI's `Standup` prints, held to one fixture (`Tests/fixtures/rituals/`
 so the web shows `text` verbatim and parity is one string comparison. The one part only the agent
 has is `spoken`: with a model key, each worker's sentences re-said by the model and held by a
 guard both halves implement over one fixture (`standup-dress.json`), the prose kept wherever a fact
-was added, dropped or changed; the played view reads it. It stores nothing, and a Space
+was added, dropped or changed; the played view reads it. It writes nothing to the hub -- it keeps each
+`gh` answer a minute, shared with triage, and a dressed reply by its facts in the agent's cache -- and a Space
 with no reachable GitHub tracker still answers 200 with the ritual and the reason
 ([Team Agile](modules/solitaire-agile.md), "The file shape, and how a standup is read").
 `GET /api/ritual/triage` (V1) is the same shape for triage, against `Tests/fixtures/rituals/triage.json`;

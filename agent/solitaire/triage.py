@@ -42,7 +42,7 @@ from ..core.consts import (
     rituals_worker_label_prefix,
 )
 from .standup import _label_names, api, ceremonies, worker_name
-from .tracker import read_tracker
+from .tracker import read_tracker, remember
 
 CEREMONY = "triage"
 
@@ -245,25 +245,32 @@ def render_triage(filled: Triage) -> str:
 _LOGIN = re.compile(r"^[A-Za-z0-9-]+$")
 
 
-def _viewer() -> str:
-    """The signed-in gh user's login (``gh api user -q .login``), "" when gh cannot say.
-
-    Best effort: without it every assignee reads ``@<login>`` and the triage
-    still answers. The CLI's Get-Triage.ps1 makes the same read."""
+def _read_viewer() -> tuple[str, str | None]:
     try:
         result = run_read(["gh", "api", "user", "-q", ".login"], 15)
     except Exception:  # noqa: BLE001 -- gh missing or slow: nobody is "me", nothing fails
-        return ""
+        return "", "gh did not answer"
     login = (result.stdout or "").strip() if result.returncode == 0 else ""
-    return login if _LOGIN.match(login) else ""
+    return (login, None) if _LOGIN.match(login) else ("", "gh named nobody")
 
 
-def triage_for(space: str = "") -> Triage:
-    """The whole triage for a Space -- the active one when ``space`` is ""."""
+def _viewer(refresh: bool = False) -> str:
+    """The signed-in gh user's login (``gh api user -q .login``), "" when gh cannot say.
+
+    Best effort: without it every assignee reads ``@<login>`` and the triage
+    still answers. The CLI's Get-Triage.ps1 makes the same read. Kept for the
+    tracker read's TTL (tracker.py); a login gh could not give is not kept."""
+    login, _why = remember(("viewer",), refresh, _read_viewer)
+    return str(login or "")
+
+
+def triage_for(space: str = "", refresh: bool = False) -> Triage:
+    """The whole triage for a Space -- the active one when ``space`` is "".
+    ``refresh`` reads the tracker again past the kept read (tracker.py)."""
     cfg = load_config()
     org, status, projects = accounting.space_scope(cfg, space)
-    labels, issues, state = read_tracker(org, status, projects, state="open", ritual="triage")
-    viewer = _viewer() if state.get("ok") else ""
+    labels, issues, state = read_tracker(org, status, projects, state="open", ritual="triage", refresh=refresh)
+    viewer = _viewer(refresh) if state.get("ok") else ""
     filled = fill_triage(labels, issues, state, space=space or cfg.get("activeSpace", ""), viewer=viewer)
     filled.text = render_triage(filled)
     log_writer.write_log(
@@ -279,6 +286,7 @@ ROUTE = rituals_triage_route().removeprefix(API_PREFIX)
 
 
 @api.get(ROUTE, response_model=Triage)
-async def get_triage(space: str = ""):
+async def get_triage(space: str = "", refresh: int = 0):
     # space_scope raises the 404 for an unknown slug, as the standup's does.
-    return await asyncio.to_thread(triage_for, space)
+    # ?refresh=1 (the page's Refresh) reads the tracker again past the TTL.
+    return await asyncio.to_thread(triage_for, space, bool(refresh))
