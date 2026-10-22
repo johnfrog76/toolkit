@@ -29,7 +29,17 @@ from pydantic import BaseModel
 from ..core import log_writer
 from ..core.child import ChildReadError, did_not_answer, run_read
 from ..core.clock import local_stamp
-from ..core.config import REPO_ROOT, hub_root, load_config, resolve_dirs, tracker, tracker_repos
+from ..core.config import (
+    ACTIVE_LEDGER_KEY,
+    ISSUE_LIMIT_ALL,
+    ISSUE_LIMIT_OPEN,
+    REPO_ROOT,
+    hub_root,
+    load_config,
+    resolve_dirs,
+    tracker,
+    tracker_repos,
+)
 from ..core.consts import (
     rituals_worker_label_prefix,
     visibility_private,
@@ -312,7 +322,7 @@ def gh_repo_reason(repo: str, why: str) -> str:
 
 def _gh_issues(repo: str, all_items: bool, state: str = "open", body: bool = False) -> tuple[list[dict], str | None]:
     # A closed history is longer than an open backlog, so the opt-in reads further.
-    limit = "100" if state == "open" else "300"
+    limit = str(ISSUE_LIMIT_OPEN if state == "open" else ISSUE_LIMIT_ALL)
     fields = "number,title,state,labels,assignees,milestone,updatedAt,closedAt,url,isPinned"
     # The standup's work grain reads the design card an issue's body names.
     if body:
@@ -439,6 +449,10 @@ class IssueReport(BaseModel):
 
 
 def _github_issue_report(org: str, projects: list[dict]) -> IssueReport:
+    """The report as ``gh issue list --state all`` counts it, one call per repo.
+    No route calls it any more -- ``/issue-report`` reads the Studio ledger's
+    entry -- it stays as the rule the ledger's GraphQL counting is held to
+    (``Tests/test_ledger.py`` feeds both the same backlog and asserts one report)."""
     repos = tracker_repos(org, projects)
     if not repos:
         return IssueReport(reason="This GitHub space names no repository.")
@@ -998,14 +1012,21 @@ async def get_deploys(space: str = ""):
 
 
 @api.get("/issue-report", response_model=IssueReport)
-async def get_issue_report(space: str = ""):
-    org, status, projects = space_scope(load_config(), space)
+async def get_issue_report(space: str = "", refresh: int = 0):
+    """The pane's issue report, read from the Studio ledger's entry for the Space
+    and not from ``gh`` here: warm, no ``gh`` call at all; cold (nothing kept, or
+    the entry past ``VISIBILITY_TTL_SECONDS``), one ledger read of this Space.
+    ``?refresh=1`` reads past the kept entry, as the ledger's own ``?refresh=1``
+    does. The ledger resolves the tier itself (``supported: false`` below it)."""
+    cfg = load_config()
+    org, status, projects = space_scope(cfg, space)
     if tracker(org) != "github":
         return IssueReport(supported=False)
-    tier, _ = await asyncio.to_thread(_resolve_tier, org, status)
-    if tier != 1:
-        return IssueReport(supported=False)
-    return await asyncio.to_thread(_github_issue_report, org, projects)
+    from ..studio import ledger  # here: the ledger imports this module
+
+    slug = space or str(cfg.get("activeSpace") or "")
+    entry = {"slug": slug or ACTIVE_LEDGER_KEY, "org": org, "status": status, "projects": projects}
+    return await asyncio.to_thread(ledger.read_space_report, entry, bool(refresh))
 
 
 @api.get("/milestones", response_model=MilestonesResponse)

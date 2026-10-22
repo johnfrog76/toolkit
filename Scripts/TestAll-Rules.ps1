@@ -64,7 +64,7 @@ function Get-P20TestSummaryPath {
 }
 
 function New-P20Counts {
-    return @{ Found = $false; Passed = 0; Failed = 0; Skipped = 0; Total = 0; Suites = 0; SuitesFailed = 0; Line = '' }
+    return @{ Found = $false; Passed = 0; Failed = 0; Skipped = 0; Total = 0; Suites = 0; SuitesFailed = 0; Subtests = 0; Line = '' }
 }
 
 function ConvertFrom-P20PytestOutput {
@@ -90,6 +90,7 @@ function ConvertFrom-P20PytestOutput {
     foreach ($m in [regex]::Matches($line, '(\d+) (subtests passed|subtests failed|passed|failed|errors|error|skipped)\b')) {
         $n = [int]$m.Groups[1].Value
         switch ($m.Groups[2].Value) {
+            'subtests passed' { $c.Subtests += $n }
             'passed' { $c.Passed += $n }
             'failed' { $c.Failed += $n }
             'error' { $c.Failed += $n }
@@ -290,6 +291,48 @@ function Read-P20ExpectedCounts {
     }
     $m = [regex]::Match($text, '(?m)npm test\s+#[^\r\n]*?(\d+) suites, (\d+) tests')
     if ($m.Success) { $out.web = @{ Suites = [int]$m.Groups[1].Value; Total = [int]$m.Groups[2].Value } }
+    return $out
+}
+
+function Get-P20PasteLines {
+    <#
+      The lines docs/TESTING.md's paste block holds, built from one tkTest run: the
+      CLI's per-suite line and total (as the CLI runner printed them, passed in
+      -CliLines), then `pytest: ...` and `web: ...`. A half that did not run, or
+      did not pass, prints a line that SAYS so in that line's place -- never a
+      number to copy. Tests/Get-TestingDocDrift.ps1 holds the same shapes.
+    #>
+    param(
+        [Parameter(Mandatory)][System.Collections.IDictionary]$Records,
+        [string[]]$CliLines = @()
+    )
+    $out = @()
+    if (@($CliLines).Count -eq 2) { $out += @($CliLines) }
+    else { $out += 'CLI: not printed -- the CLI half did not run every suite and pass' }
+
+    $a = $null
+    if ($Records.Contains('agent')) { $a = $Records['agent'] }
+    if ($null -eq $a) { $out += 'pytest: not run -- this run did not include the agent half' }
+    elseif ($a.result -eq 'skip') { $out += "pytest: not run -- skipped: $($a.reason)" }
+    elseif ($a.result -ne 'pass') { $out += 'pytest: not printed -- the agent half did not pass' }
+    else {
+        $pc = ConvertFrom-P20PytestOutput -Text ([string]$a.line)
+        $s = "$($pc.Passed) passed"
+        if ($pc.Skipped -gt 0) { $s += ", $($pc.Skipped) skipped" }
+        if ($pc.Subtests -gt 0) { $s += ", $($pc.Subtests) subtests" }
+        $out += "pytest: $s"
+    }
+
+    $w = $null
+    if ($Records.Contains('web')) { $w = $Records['web'] }
+    if ($null -eq $w) { $out += 'web: not run -- this run did not include the web half' }
+    elseif ($w.result -eq 'skip') { $out += "web: not run -- skipped: $($w.reason)" }
+    elseif ($w.result -ne 'pass') { $out += 'web: not printed -- the web half did not pass' }
+    else {
+        $suitesRan = 0
+        if ($w.Contains('suites')) { $suitesRan = $w.suites }
+        $out += "web: $suitesRan suites, $($w.total) tests"
+    }
     return $out
 }
 

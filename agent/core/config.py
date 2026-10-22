@@ -51,6 +51,13 @@ REPO_ROOT = AGENT_DIR.parent
 DEFAULT_CONFIG_PATH = REPO_ROOT / "config.default.json"
 LOCAL_CONFIG_PATH = REPO_ROOT / "config.local.json"
 
+# The agent's on-disk cache is capped by one rule (core/disk_cache.py, prune_seen
+# and prune_folder): a record or file unseen for this many days goes, and past
+# this many records the oldest-unseen go first. It covers the rows cache (one
+# record per blob sha) and the standup's dress cache (one file per dressed reply).
+AGENT_CACHE_MAX_RECORDS = 3000
+AGENT_CACHE_MAX_AGE_DAYS = 30
+
 # The shipped agentic prompts: the package's ``agentic/`` folder, each prompt a
 # ``<name>.prompt.md``, and the index of which way of working each belongs to.
 # The CLI's Scripts/Resolve-AgenticPrompt.ps1 names the same folder; the agent
@@ -146,6 +153,23 @@ DEFAULT_CORS_ORIGINS = [
 # it, and the SPA fallback refuses a path that starts with it, so a request
 # for a route that does not exist answers 404 rather than 200 HTML.
 API_PREFIX = "/api"
+
+# How far one ``gh issue list`` reads, per state: an open backlog is short, a
+# closed history longer, so the ``all`` read goes further. ``accounting._gh_issues``
+# builds its ``--limit`` from these, and ``solitaire/tracker.py`` reads the same
+# two to tell whether a kept all-states read is complete (fewer rows than the
+# limit means every issue is in it).
+ISSUE_LIMIT_OPEN = 100
+ISSUE_LIMIT_ALL = 300
+
+# The verbs that write an issue on the tracker. A kept read of the active Space's
+# issues (the Studio ledger's entry, which ``/issue-report`` serves) is dropped
+# when the bridge runs one, so the count the pane refetches after a close or an
+# edit has moved.
+TRACKER_WRITE_VERBS = ("NewItem", "EditItem", "CloseItem", "Route")
+
+# The ledger's disk key for the active Space when ``activeSpace`` names none.
+ACTIVE_LEDGER_KEY = "active-space"
 
 # The Docs tab's routes and the two roots they read (D-S12). The roots
 # are the contract's (consts.json ``docs``) because the web's link resolver

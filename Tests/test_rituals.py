@@ -1991,9 +1991,12 @@ class TheOneTrackerRead(unittest.TestCase):
         self.assertEqual(self._reads(), (2, 2, 2), "a Route may have moved a label: the next triage reads again")
 
     def test_the_kept_limits_are_the_readers(self):
-        """ISSUE_LIMIT_OPEN and ISSUE_LIMIT_ALL mirror accounting._gh_issues' --limit:
-        the completeness rule is only as right as they are."""
-        for state, limit in (("open", solitaire_tracker.ISSUE_LIMIT_OPEN), ("all", solitaire_tracker.ISSUE_LIMIT_ALL)):
+        """The completeness rule reads the limits ``_gh_issues`` builds its --limit
+        from: one pair of constants in core/config.py, imported by both, so the
+        argv the reader builds IS the number the rule tests against."""
+        self.assertIs(solitaire_tracker.ISSUE_LIMIT_OPEN, config.ISSUE_LIMIT_OPEN)
+        self.assertIs(solitaire_tracker.ISSUE_LIMIT_ALL, config.ISSUE_LIMIT_ALL)
+        for state, limit in (("open", config.ISSUE_LIMIT_OPEN), ("all", config.ISSUE_LIMIT_ALL)):
             self.calls.clear()
             accounting._gh_issues("johnfrog76/toolkit", True, state, body=True)
             argv = self.calls[0]
@@ -2020,6 +2023,17 @@ class TheDressIsKeptByItsFacts(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         self.assertEqual(first, second)
         self.assertEqual(first.dressed, 1)
+
+    def test_a_fresh_dress_prunes_the_folder_past_the_cap(self):
+        complete, _calls = _answering(self.REPLY)
+        folder = disk_cache.cache_path(standup.DRESS_CACHE)
+        folder.mkdir(parents=True)
+        for n in range(4):  # older replies, none seen for longer than the age
+            stale = folder / f"old{n}.json"
+            stale.write_text("{}")
+            os.utime(stale, (1.0, 1.0))
+        self._dress(_fill_prose(PROSE_CASES["friday"]), complete)
+        self.assertEqual(len(list(folder.iterdir())), 1, "only the reply just kept remains")
 
     def test_a_restart_keeps_the_dress_on_disk(self):
         complete, calls = _answering(self.REPLY)

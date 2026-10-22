@@ -175,6 +175,51 @@ foreach ($row in $suiteRows) {
     Assert-True "docs/TESTING.md's -$suiteName row carries no count of its own" (-not $bare) $row.Substring(0, [Math]::Min(120, $row.Length))
 }
 
+# -- The paste owns every count in docs/TESTING.md ----------------------------
+# The paste block is the one record: the CLI's per-suite line and total, a pytest
+# line and a web line (tkTest prints all three). The table row's list and the
+# command block's three totals are held to it, from the text alone -- no run and
+# no machine-local file is read, so it holds in CI as it does anywhere.
+Write-Host ""
+Write-Host "  The paste block owns the table row and the command block's totals" -ForegroundColor Cyan
+. (Join-Path $scriptDir 'Get-TestingDocDrift.ps1')
+$driftFindings = @(Get-P20TestingDocDrift -Text $testingText)
+Assert-True 'docs/TESTING.md: the table row and the command block agree with the paste block' ($driftFindings.Count -eq 0) ($driftFindings -join ' | ')
+
+# One fixture per drift shape: the clause must name the stale line, and for a
+# stale row the first suite whose number differs.
+$driftDir = Join-Path $scriptDir 'fixtures/doc-counts'
+$driftTable = @(
+    # file, expected finding count, a fragment the finding must contain
+    @('agree.md', 0, ''),
+    @('stale-row.md', 1, "first difference is suite 2, row says 'Compat 19', paste says 'Compat 20'"),
+    @('stale-pytest.md', 1, "the command block's pytest line is stale: it says '11 passed"),
+    @('stale-web.md', 1, "the command block's web line is stale: it says '7 suites, 54 tests'"),
+    @('stale-cli-line.md', 1, "the command block's tkTestToolkit line is stale: it says '3 suites, 59 assertions'"),
+    @('pytest-not-run.md', 1, "the paste block's pytest line is not a count")
+)
+foreach ($case in $driftTable) {
+    $fx = Get-Content -LiteralPath (Join-Path $driftDir $case[0]) -Raw -Encoding UTF8
+    $got = @(Get-P20TestingDocDrift -Text $fx)
+    $okCase = ($got.Count -eq $case[1]) -and (($case[1] -eq 0) -or ($got[0] -like "*$($case[2])*"))
+    Assert-True "drift fixture $($case[0]): $($case[1]) finding(s)" $okCase ($got -join ' | ')
+}
+
+# What tkTest prints for the paste: a half that did not run says so in its line's place.
+. (Join-Path $pkgRoot 'Scripts/TestAll-Rules.ps1')
+$recAgent = [ordered]@{ result = 'pass'; line = '12 passed, 1 skipped, 40 subtests passed in 3.0s' }
+$recWeb = [ordered]@{ result = 'pass'; suites = 7; total = 55 }
+$cliTwo = @('Consts 10, Compat 20, Menu 30', '3 suites, 60 assertions')
+$pasteTable = @(
+    @('all three ran', [ordered]@{ agent = $recAgent; web = $recWeb }, $cliTwo, 'Consts 10, Compat 20, Menu 30|3 suites, 60 assertions|pytest: 12 passed, 1 skipped, 40 subtests|web: 7 suites, 55 tests'),
+    @('agent skipped', [ordered]@{ agent = [ordered]@{ result = 'skip'; reason = 'no Python 3 on the PATH' }; web = $recWeb }, $cliTwo, 'Consts 10, Compat 20, Menu 30|3 suites, 60 assertions|pytest: not run -- skipped: no Python 3 on the PATH|web: 7 suites, 55 tests'),
+    @('web failed, CLI partial', [ordered]@{ agent = $recAgent; web = [ordered]@{ result = 'fail' } }, @(), 'CLI: not printed -- the CLI half did not run every suite and pass|pytest: 12 passed, 1 skipped, 40 subtests|web: not printed -- the web half did not pass')
+)
+foreach ($pc in $pasteTable) {
+    $pasted = @(Get-P20PasteLines -Records $pc[1] -CliLines $pc[2])
+    Assert-Equal "tkTest's paste block, $($pc[0])" $pc[3] ($pasted -join '|')
+}
+
 # -- The front door stays the commercial ------------------------------------
 # The root README is what every cold reader, and every cold model, reads first:
 # what the product is, the three halves, the five verbs, the quick start and the
