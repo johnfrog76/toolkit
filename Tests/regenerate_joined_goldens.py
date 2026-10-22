@@ -17,6 +17,12 @@ The suggestion table's chair readings (Tests/fixtures/suggestion/table.json,
 its ``briefs`` cases) are written beside it the same way: the joined fill, the
 suggestion attached (agent/solitaire/suggest.py), the brief rendered.
 
+The PM Corner's chair readings (Tests/fixtures/rituals/corner.json, its ``briefs``
+cases) are written beside the rituals' goldens: the joined fill, the suggestion
+and the Corner attached (agent/solitaire/corner.py), the brief rendered. A card in
+corner.json is given as its file's LINES; ``corner_card_rows`` reads each through
+the agent's one card reader, as ``read_cards`` does.
+
 Run:  python3 Tests/regenerate_joined_goldens.py          (writes)
       python3 Tests/regenerate_joined_goldens.py --check  (exit 1 if any differs)
 """
@@ -37,6 +43,7 @@ ISSUES_TABLE_FILE = "standup.json"
 CARDS_TABLE_FILE = "standup-cards.json"
 TRIAGE_TABLE_FILE = "triage.json"
 SUGGEST_DIR = REPO_ROOT / "Tests" / "fixtures" / "suggestion"
+CORNER_TABLE_FILE = "corner.json"
 
 
 def filled_triage_case(table: dict, case: dict) -> "triage.Triage":
@@ -112,6 +119,49 @@ def filled_suggest_case(table: dict, case: dict) -> "standup.Standup":
     return _rendered(filled)
 
 
+def corner_card_rows(cards: list[dict]) -> list[dict]:
+    """corner.json's cards, each given as its file's ``lines``, as the card rows
+    ``read_cards`` makes: the **Sprint:** line WHOLE (card_milestone), the Tags,
+    who takes it and whether it is billable, through the agent's one card reader."""
+    from agent.core.parsers import card_assigned, card_billable, card_milestone, card_tags
+
+    rows = []
+    for c in cards:
+        text = "\n".join(c["lines"]) + "\n"
+        rows.append(
+            {
+                **{k: v for k, v in c.items() if k != "lines"},
+                "sprint": card_milestone(text),
+                "tags": card_tags(text),
+                "assigned": card_assigned(text),
+                "billable": card_billable(text),
+            }
+        )
+    return rows
+
+
+def filled_corner_case(table: dict, case: dict) -> "standup.Standup":
+    """A briefs case of Tests/fixtures/rituals/corner.json: the joined fill, the
+    suggestion and the Corner attached, rendered."""
+    from agent.solitaire import corner, suggest
+
+    b = table["briefs"]
+    cards = corner_card_rows(case["cards"])
+    filled = standup.fill_joined_standup(
+        datetime.fromisoformat(table["asOf"]),
+        table["workerLabels"],
+        case["issues"],
+        {"ok": True, "reason": ""},
+        cards,
+        space=b["space"],
+        space_name=b["spaceName"],
+    )
+    on = suggest.suggestions_on(True, case["suggestions"])
+    suggest.attach_suggestions(filled, table["workerLabels"], case["issues"], cards, case["howIWork"], on, b["prefix"])
+    corner.attach_corner(filled, table["workerLabels"], case["issues"], cards, on, b["prefix"])
+    return _rendered(filled)
+
+
 def goldens() -> dict[str, str]:
     """Every golden by its path relative to Tests/fixtures/rituals/ -- a rituals golden is its
     file name; the suggestion table's are ``../suggestion/<file>``."""
@@ -138,6 +188,9 @@ def goldens() -> dict[str, str]:
     sug = json.loads((SUGGEST_DIR / "table.json").read_text(encoding="utf-8"))
     for case in sug["briefs"]["cases"]:
         out["../" + SUGGEST_DIR.name + "/" + case["expected"]["brief"]] = filled_suggest_case(sug, case).brief
+    cor = json.loads((FIXTURES / CORNER_TABLE_FILE).read_text(encoding="utf-8"))
+    for case in cor["briefs"]["cases"]:
+        out[case["expected"]["brief"]] = filled_corner_case(cor, case).brief
     return out
 
 

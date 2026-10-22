@@ -12,9 +12,10 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
-import { CheckmarkRegular, CopyRegular } from "@fluentui/react-icons";
+import { CheckmarkRegular, CopyRegular, RocketRegular } from "@fluentui/react-icons";
 import { DialogDismiss } from "../../shared/DialogDismiss";
 import { copyText } from "../../shared/copyText";
+import { useGetEnvQuery } from "../../shell/api";
 import { STARTWORK } from "../../shell/consts";
 import { useRunStartWorkMutation } from "./api.solitaireAgile";
 
@@ -24,6 +25,11 @@ import { useRunStartWorkMutation } from "./api.solitaireAgile";
 // shows what came back verbatim, with one button: Copy. A refusal shows the
 // sentence the verb stated and nothing else. No agent runs here (D-AR1): the
 // block is text the person carries to their editor.
+//
+// Where the launch exists -- /env's launch flag (consts.json startWork.launchEnvFlag), the derived surface D-AR13
+// names -- the box offers a second button, Launch: the same verb with `-Launch`, one
+// more POST /api/cmd/StartWork, and what it printed (the PID and the log) or the
+// sentence it refused with, shown under the block. Absent or false, one button.
 
 const useStyles = makeStyles({
   surface: { maxWidth: "min(960px, calc(100vw - 32px))", width: "100%" },
@@ -40,6 +46,7 @@ const useStyles = makeStyles({
     borderRadius: tokens.borderRadiusMedium,
   },
   error: { color: tokens.colorPaletteRedForeground1, whiteSpace: "pre-wrap" },
+  launched: { display: "block", marginTop: tokens.spacingVerticalS, whiteSpace: "pre-wrap" },
 });
 
 /** The block's title: its first line, when it has the head line's shape. */
@@ -56,6 +63,11 @@ export function StartWorkBox({ id, onClose }: { id: string; onClose: () => void 
   const [runStartWork] = useRunStartWorkMutation();
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [copied, setCopied] = useState(false);
+  const { data: env } = useGetEnvQuery();
+  // Read by the contract's name: the agent serves it under the same one.
+  const launchOn = (env as Record<string, unknown> | undefined)?.[STARTWORK.launchEnvFlag] === true;
+  const [launching, setLaunching] = useState(false);
+  const [launched, setLaunched] = useState<Outcome | null>(null);
   // ONE call per box: React's strict mode mounts twice in development, and the
   // block is the same either way.
   const asked = useRef(false);
@@ -87,6 +99,22 @@ export function StartWorkBox({ id, onClose }: { id: string; onClose: () => void 
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const launch = async () => {
+    setLaunching(true);
+    try {
+      const result = await runStartWork({ id, launch: true }).unwrap();
+      setLaunched(
+        result.status === "success"
+          ? { ok: true, block: (result.output ?? "").trim() }
+          : { ok: false, sentence: result.error?.trim() || result.output?.trim() || "StartWork said nothing." },
+      );
+    } catch {
+      setLaunched({ ok: false, sentence: "The agent did not answer. Nothing was started." });
+    } finally {
+      setLaunching(false);
+    }
+  };
+
   const title = outcome?.ok ? (blockTitle(outcome.block) ?? `Start work: ${id}`) : `Start work: ${id}`;
 
   return (
@@ -112,6 +140,15 @@ export function StartWorkBox({ id, onClose }: { id: string; onClose: () => void 
                 {outcome.sentence}
               </Caption1>
             )}
+            {launched && (
+              <Caption1
+                className={launched.ok ? styles.launched : `${styles.launched} ${styles.error}`}
+                role={launched.ok ? "status" : "alert"}
+                data-testid="start-work-launched"
+              >
+                {launched.ok ? launched.block : launched.sentence}
+              </Caption1>
+            )}
           </DialogContent>
           <DialogActions>
             {outcome?.ok && (
@@ -121,6 +158,11 @@ export function StartWorkBox({ id, onClose }: { id: string; onClose: () => void 
                 onClick={() => void copy()}
               >
                 {copied ? "Copied!" : "Copy"}
+              </Button>
+            )}
+            {outcome?.ok && launchOn && (
+              <Button icon={<RocketRegular />} disabled={launching} onClick={() => void launch()}>
+                {launching ? "Launching..." : "Launch"}
               </Button>
             )}
           </DialogActions>

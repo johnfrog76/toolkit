@@ -226,6 +226,7 @@ describe("consts.json", () => {
       motions: ["closed", "started", "inProgress"],
       suggestShapes: ["start", "delegate", "route", "place"],
       suggestOwnerSeat: "fable",
+      cornerShapes: ["oneLeft", "manyLeft", "reached", "nothingInReach"],
       suggestExclusions: ["notBillable", "waiting", "inFlight", "theirs", "dismissed"],
       text: {
         title: "Standup -- {date}",
@@ -283,6 +284,16 @@ describe("consts.json", () => {
         suggestCommandRoute: "Route {arg} -Assign <me|size>",
         suggestCommandPlace: "Route {arg} -Milestone <title>",
         suggestCommandPlaceCard: "Plan {arg} -Milestone <title>",
+        cornerOneLeft: "one more {noun} {ref} to get milestone {milestone} - start it now",
+        cornerManyLeft: "{n} more {noun} to get milestone {milestone} - start {ref} now",
+        cornerReached: "milestone {milestone} reached",
+        cornerNothingInReach: "no milestone in reach - place a card with Route or on its Sprint line",
+        cornerNounCards: "cards",
+        cornerNounIssues: "issues",
+        cornerNounItems: "items",
+        cornerChevron: ">",
+        cornerBrief: "Corner: {line}",
+        cornerBriefCommand: "Corner: {line} {chevron} ({command})",
         workYesterday: "{name}, {n} closed",
         workToday: "{name}, {n}",
         workBlockers: "{name}, {n} to walk",
@@ -329,6 +340,7 @@ describe("consts.json", () => {
     const { _: startWorkDoc, ...startWork } = STARTWORK as typeof STARTWORK & { _: string };
     expect(startWorkDoc).toMatch(/hand-off block/);
     expect(startWork).toEqual({
+      launchEnvFlag: "startWorkLaunch",
       text: {
         head: "# Start work: {kind} {id} -- {title}",
         howWeWork: "## How we work in {space} ({source})",
@@ -525,6 +537,27 @@ describe("no half retypes a contract literal", () => {
     }
     return out;
   }
+
+  // The /env field for StartWork's launch (startWork.launchEnvFlag): the page reads it
+  // as env[STARTWORK.launchEnvFlag]. An interface cannot take a computed name, so the
+  // EnvStatus field in shell/api.ts spells it -- that one line, and no other.
+  it("startWork.launchEnvFlag is read, not retyped -- but for EnvStatus's one field", () => {
+    const value = STARTWORK.launchEnvFlag;
+    expect(value).toBe("startWorkLaunch");
+    const found: string[] = [];
+    for (const file of walk(SRC_DIR)) {
+      const rel = path.relative(SRC_DIR, file).split(path.sep).join("/");
+      if (ALLOWED.has(rel)) continue;
+      fs.readFileSync(file, "utf8")
+        .split("\n")
+        .forEach((line) => {
+          const code = line.trim();
+          if (code.startsWith("//") || code.startsWith("*") || code.startsWith("/*")) return;
+          if (line.includes(value)) found.push(`${rel}:${code}`);
+        });
+    }
+    expect(found).toEqual([`shell/api.ts:${value}?: boolean;`]);
+  });
 
   it.each(GUARDED)("%s is read, not retyped", (key, value) => {
     const offenders: string[] = [];

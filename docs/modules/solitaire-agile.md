@@ -46,9 +46,10 @@ says why its slots are empty.
 6. [The web UI](#the-web-ui)
 7. [StartWork: the hand-off block](#startwork-the-hand-off-block)
 8. [The suggestion: one next move, derived](#the-suggestion-one-next-move-derived)
-9. [The file shape, and how a standup is read](#the-file-shape-and-how-a-standup-is-read)
-10. [The tests](#the-tests)
-11. [Known gaps](#known-gaps)
+9. [The PM Corner: the line, the chevron, the confetti](#the-pm-corner-the-line-the-chevron-the-confetti)
+10. [The file shape, and how a standup is read](#the-file-shape-and-how-a-standup-is-read)
+11. [The tests](#the-tests)
+12. [Known gaps](#known-gaps)
 
 ## The switch, and its scope
 
@@ -278,7 +279,8 @@ model), `text` and `brief` (the chair's reading), and `counts` -- what moved in 
 `commits`, and `total`, the same with `label` and `name` `""`; `suggestions` and `suggestion`
 ([the suggestion](#the-suggestion-one-next-move-derived)) -- every candidate in the rule's order and the
 first, each `ref`, `number`, `id`, `kind` (`issue` or `card`), `shape`, `sentence`, `command` and `line`;
-`[]` and null with the Space's switch off. Every item has seven keys -- `number`, `id`,
+`[]` and null with the Space's switch off; `corner` ([the PM Corner](#the-pm-corner-the-line-the-chevron-the-confetti)),
+null with it off. Every item has seven keys -- `number`, `id`,
 `title`, `url`, `path`, `motion` (`closed`, `started` or `inProgress`, `consts.json` `rituals.motions`) and
 `commits` (a walk item also `worker`): an issue's `id` is null and its `path` `""`; a card's `number`
 is null and its `url` `""`. `tracker.ok` false still answers 200 with the ritual. `Standup -AsJson`
@@ -305,7 +307,7 @@ Header, a line break and body are `text` byte for byte, and the page test says s
 small **Detail | Work | Brief** tab strip picks the grain ([the work grain](#the-work-grain)),
 remembered per browser (`usePersistedValue`, key `p20.solitaireAgile.grain`), `Detail` the default: Work
 shows `work.text`, Brief shows `brief` as the body (and drops the small brief above it), each verbatim; a
-response from an agent that predates `work` shows Detail for it. Beside Play, **Copy** (Daily's pattern: `copyText`, "Copied!" for a moment) puts the grain on screen -- `text` at Detail -- on the clipboard exactly as the response gives it. Under the prose a quiet **Show as list** / **Hide list** toggle (collapsed by default, constant box) opens the same items as rows read from the response's structured fields, nothing re-fetched: the queue's items first (kind, number linked to `url`, title, worker), then each worker's (slot, number, title, worker); a card shows its id and no link. Each row ends in a quiet **Start work**, which opens the hand-off block's copy box for that item ([StartWork: the hand-off block](#startwork-the-hand-off-block)). When nothing waits and the Space's switch is on, the brief's last line is [the suggestion](#the-suggestion-one-next-move-derived), drawn as a row of its own with its action and a dismiss. The other thing
+response from an agent that predates `work` shows Detail for it. Beside Play, **Copy** (Daily's pattern: `copyText`, "Copied!" for a moment) puts the grain on screen -- `text` at Detail -- on the clipboard exactly as the response gives it. Under the prose a quiet **Show as list** / **Hide list** toggle (collapsed by default, constant box) opens the same items as rows read from the response's structured fields, nothing re-fetched: the queue's items first (kind, number linked to `url`, title, worker), then each worker's (slot, number, title, worker); a card shows its id and no link. Each row ends in a quiet **Start work**, which opens the hand-off block's copy box for that item ([StartWork: the hand-off block](#startwork-the-hand-off-block)). When nothing waits and the Space's switch is on, the brief's last line is [the suggestion](#the-suggestion-one-next-move-derived), drawn as a row of its own with its action and a dismiss. At the head of the page, above the card, sits [the PM Corner](#the-pm-corner-the-line-the-chevron-the-confetti): one line, its chevron, and the confetti when a milestone is reached. The other thing
 to click is **Play**, quiet, in the header (V1, below). With `tracker.ok` false the page still draws the ritual -- the chair's lines and the
 `Tracker` reason -- and when the agent does not answer it says so as an error, never as an empty standup.
 `StandupPage.test.tsx` builds the response from `Tests/fixtures/rituals/standup.json` and asserts the
@@ -608,6 +610,8 @@ the dismissed refs in `localStorage` (`p20.solitaireAgile.suggest.dismissed`, un
 `sessionStorage`), every read and write wrapped so a browser that refuses storage still draws the line
 and holds a dismiss for the page's life; the next candidate's line takes the dismissed one's place, and
 with none left the line is today's. The CLI has no dismiss -- a line in a terminal is already gone.
+[The PM Corner](#the-pm-corner-the-line-the-chevron-the-confetti) is the second surface, and reads the same
+pick inside the nearest milestone.
 
 **The switch** is `spaces[].features.suggestions` ([the switch](#the-switch-and-its-scope)). Off, or on
 an Azure DevOps Space, or with the tracker not answering, the standup carries no suggestion and the
@@ -620,6 +624,76 @@ milestone pick the older; one left beats three left; no milestone sorts last; a 
 `agents` Space is a delegation and a `fable`-sized one a start; a sized item with no milestone is placed in
 one; an unrouted item is a route; in flight, not billable, waiting-on-you and someone else's excluded; the empty Space; a dismissed item yields the next), the switch, and three chair's readings
 end to end whose goldens (`suggestion-<case>.brief.txt`) `Tests/regenerate_joined_goldens.py` writes.
+
+## The PM Corner: the line, the chevron, the confetti
+
+One derived line at the head of the Team Agile page, and the last line of `Standup -Brief`: where the
+Space is going, how much is left, and the one item to start (AR-4 of the agent-in-the-room spec; D-AR11,
+D-AR14). It is the suggestion's second surface -- the same switch, the same read and the same pick -- so
+nothing in it is a second rule.
+
+```text
+Corner: 3 more issues to get milestone B - start #5 now > (tkStartWork 5)
+```
+
+**The milestone is the destination** (D-AR11). An issue names it on the tracker; a card names it on its
+`**Sprint:**` line, read WHOLE through the one card reader each half has -- never the card model's
+`sprint`, which cuts the value to eighteen characters for the board, so a long title would split one
+milestone into two ([cards](../hub/cards.md#what-the-suggestion-reads)).
+
+**The line**, in order (`consts.json` `rituals.text.corner*`, shapes `rituals.cornerShapes`):
+
+| Shape | When | Line |
+| --- | --- | --- |
+| `reached` | an item that names a milestone closed in the standup's window -- an issue's `closedAt`, an archived card's `**Closed:**` day, the window `Standup -Since` widens -- and nothing open names it any more; the latest close first, then the title | `milestone B reached` -- and the confetti |
+| `oneLeft` | the nearest milestone among the suggestion's candidates has one open item | `one more card 23A3 to get milestone B - start it now` -- `card` or `issue` by the pick |
+| `manyLeft` | it has more | `3 more cards to get milestone B - start 23A3 now` -- `cards`, `issues`, or `items` for a mix |
+| `nothingInReach` | no candidate names a milestone | `no milestone in reach - place a card with Route or on its Sprint line` |
+
+The nearest milestone is the suggestion's own (`Get-P20NearestMilestones`, `nearest_milestones` -- fewest
+open, then the earlier due date, then the title), taken over the suggestion's candidates, and the id is the
+suggestion's first candidate inside it. The remaining count is the joined list's open count for that
+milestone: its open issues plus the open cards whose `**Sprint:**` line names it, **once per id** -- a card
+that tracks an issue is that issue's row. An item in flight still counts toward what is left; it is never
+the pick, because the suggestion excludes it.
+
+**The brief** prints `Corner: <line> > (<prefix>StartWork <arg>)` when the line has a pick, else
+`Corner: <line>`, as its LAST line, after the Next line -- its own line, never in place of another.
+
+**The route** is the standup's own: `GET /api/ritual/standup` carries `corner` -- `shape`, `milestone`,
+`remaining`, `ref`, `number`, `id`, `kind`, `noun`, `line`, `command` (unprefixed, `""` with no pick) and
+`brief` (the brief's line) -- and `Standup -AsJson` the same. There is no `/api/ritual/corner`: the line is
+derived from the read the standup already makes, so a second route would be a second read of the same
+issues. Null with the switch off, on an Azure DevOps Space, or with the tracker not answering.
+
+**On the page** the Corner is a `lazyPart` (`PmCorner.tsx`) drawn at the head of the Team Agile page,
+above the standup's card: the line verbatim, and, when it names a pick, the chevron (`>`,
+`rituals.text.cornerChevron`), which opens [the hand-off box](#startwork-the-hand-off-block) -- the same
+`POST /api/cmd/StartWork` every **Start work** makes. Where the launch exists (`/env`'s
+`startWorkLaunch`, true -- the name is `consts.json` `startWork.launchEnvFlag`), the box offers a second button, **Launch**, which sends the same verb with
+`-Launch`; absent or false -- every agent today -- the box has one button. The brief below stops above the
+Corner's line, because the Corner is drawn at the head; **Copy** still copies the brief exactly as the agent
+rendered it.
+
+**The confetti** (D-AR14) is the whole celebration: in the page, no backend, no sound, no push, no message
+to anyone. `Confetti.tsx` is one wrapper over the `react-confetti` package, mounted at the viewport's size,
+`recycle` off and a piece count that rains out in a few seconds. It fires once per milestone per viewer:
+on the transition to `reached` while the page watched, or on first sight of a reached line when the
+browser's mark for that milestone is absent -- never on a reload with the mark set. The mark is
+`localStorage` `p20.solitaireAgile.corner.reached`, keyed `<space>:<milestone title>`; every read and write
+is wrapped, so a browser that refuses storage still draws the line and celebrates once for the page's
+life. Under `prefers-reduced-motion` nothing rains, and the line still says reached. The once-rule is
+`celebrate.ts` and the wrapper takes its own storage key, so any later surface that celebrates calls the
+same two.
+
+`Tests/fixtures/rituals/corner.json` is the one table, asserted from `tkTestToolkit -Rituals` against
+`Scripts/Corner-Rules.ps1` and from `Tests/test_rituals.py` against `agent/solitaire/corner.py`: its rows
+start from the raw read (gh's issues, and each card as its file's lines), so the join, the window and the
+whole `**Sprint:**` line are exercised -- one left, several left, reached by an issue and by a card, closed
+before the window, closed in it with one still open, nothing in reach, a card and its issue counted once, a
+card and an issue in one milestone whose title is longer than twenty characters, in flight counted but not
+picked, and the pick inside the nearest milestone rather than the suggestion's own; and three chair's
+readings end to end, whose goldens (`corner-<case>.brief.txt`) `Tests/regenerate_joined_goldens.py` writes.
 
 ## The reminder to attend
 
@@ -1086,14 +1160,16 @@ standup is complete and correct; nothing on screen says a dress was skipped.
 | --- | --- |
 | `tkTestToolkit -Rituals` | every case of `Tests/fixtures/rituals/standup.json` and of `standup-cards.json` (the cards alone: the one worker's slots and the walk queue by card id, the source and title tables, the card reader over real folders, a not-billable card nowhere) and of `standup-joined.json` (the two sources joined: every shape's walk, each worker's slots by ref, the `Check` lines and the links, the together case's detail, work and brief goldens and their JSON round trip, no card in play reading as the issues alone, the tracker down, rounds of one id; what moved: each item's motion and commits, the counts per worker and in total, the counts and window cases' goldens, the window rule and the hash rule in words) -- `since`, the day of the year, the chair's two lines, the queue, each worker's slots by number, `empty` and the status sentence -- and the rendered text against `standup-<name>.txt` and the chair's reading against `standup-<name>.brief.txt`, byte for byte, with `Standup -Brief` typed in a fresh shell printing that reading alone and `-AsJson` carrying it; the same object read back from JSON rendering the same text; no `fakeWork` line in any case; off is no verb, no function, no bridge entry and no `Menu -All` line; **`Standup` typed in a fresh shell** with only this package's manifest and `gh` stubbed as a function answering the friday case: the text the rule renders for now, the queue, the blocks, the window, `-AsJson` round-tripping to the same text, `gh` failing and an ADO Space each a `Tracker` line with exit 0 (ADO's the contract's sentence), a local Space filling from its scratch cards line for line with `source: cards` in `-AsJson`, the GitHub Space with `source: both` and, with scratch cards in its folder, the joined standup line for line (a card of its own under the Space's tile, a `Check` line for a card whose issue is closed, a not-billable card nowhere, the hub untouched), an undeclared `-Space` a stated refusal, `-Since` widening yesterday (an issue closed a month ago said, closed; the brief's counts line naming the day) and a day after today, a word that is not a day and `-Since -Remind` each a stated refusal, `-Help`, and the hub untouched; the work grain over `standup-work.json`, the same rows `Tests/test_rituals.py` asserts -- every group (name, `by`, count, refs, phrase) of the queue and of each worker's slots, the `heads`, `keys`, `types` and `counts` tables, `standup-work-<case>.txt` byte for byte and again after a JSON round trip, `Get-P20StandupGrainText`; the prose over `standup-prose.json`, the same rows the agent asserts -- every `sentences` row, each case's queue sentences and each worker's in order, `standup-prose-<case>.txt` byte for byte and again after a JSON round trip; the dress guard over `standup-dress.json`, the same rows the agent asserts -- every row's reason, every group's prose sentence passing its own guard, every guard of `rituals.dressGuards` with a row, the `verbs` family and the two `kinds`, and the reply that names a ref the group lacks keeping the prose for that group; and typed, `Standup -Grain work` printing the rule's work text for now and `-AsJson` carrying it, `-Grain detail` the standup as it always printed, `-Grain brief` the same as `-Brief`, and a word that is not a grain or `-Brief -Grain work` a stated refusal |
 | `Tests/test_rituals.py` | the agent's issues, cards and joined fills and the rendering over the same three tables and goldens (the joined goldens also against `Tests/regenerate_joined_goldens.py`'s output); the work grain over `standup-work.json` -- every group of the queue and of each worker's slots, the `heads`, `keys`, `types` and `counts` tables, `standup-work-<case>.txt` byte for byte, the JSON round trip, the work grain's own phrases; the prose over `standup-prose.json` -- every `sentences` row, each case's queue and worker sentences, `standup-prose-<case>.txt` byte for byte, the JSON round trip, the prose's own sentences, no word that is not the contract's or the tracker's; the dress over `standup-dress.json` -- every row, every guard with a row, the rows its issue asked for (a ref the group lacks refused, "20g of protein" kept), the reply that names one, and around it with the model STUBBED: the facts are the workers' group sentences and nothing else, the kinds counted from labels and a card's type, the prompt offering the `verbs` and no other family, a model that answers dressed and guarded, the same groups dressed once, no key / a failing model / a reply that is not JSON all the prose, nothing to dress asking nothing; the route with no key answering `spoken: null` and `work` unchanged, and with a stubbed model `spoken` beside `work` with `text`, `brief` and the register untouched; the route asking `gh` for `milestone` and `body` and answering `work`; `read_cards` over real folders (with each card's type, body and billable, and its `begun` day and commit hashes); what moved over `standup-joined.json` -- each item's motion and commits, the counts, the counts line opening the brief, the window rule, the hash rule; the route's `?since=` widening the window and a `since` that is not a day before today a 422 naming it; a local Space's route filling from its cards with no `gh` call; a GitHub Space's route joining its cards to its issues (`checks`, `links`, a card of its own on the Space's tile, a not-billable card nowhere, the hub unwritten); an ADO Space's `adoTracker` reason; 404 off |
+| `tkTestToolkit -Rituals`, `Tests/test_rituals.py` -- the PM Corner | `Tests/fixtures/rituals/corner.json` from both halves: every row from the raw read through each half's card reader, the join and the window (shape, milestone, remaining, pick, noun, line, command), every shape of `rituals.cornerShapes` reached by a row, the long milestone read whole (and the card model's `sprint` not it), and the three `briefs` cases end to end -- `corner-<case>.brief.txt` byte for byte, the Corner the last line, again after a JSON round trip; typed, `Standup -Brief` ending on the Corner's line; the agent's route carrying `corner` (its fields, a shape of the contract, the brief's last line), none with the Space's switch off and none on an Azure DevOps Space |
+| `web/src/modules/solitaireAgile/PmCorner.test.tsx`, `celebrate.test.ts` | the Corner: the line verbatim, the chevron opening the hand-off for the pick (a card by its id), no chevron for reached or nothing in reach; the confetti: one burst over the viewport with recycle off and the mark set, a reload with the mark set no burst, the transition while watching one burst even with the mark set and never twice, another Space's milestone of the same title its own, reduced motion the line and nothing; the once-rule as a table, and the mark held in memory when storage throws |
 | `tkTestToolkit -Triage` | every case of `Tests/fixtures/rituals/triage.json` -- the groups in order, each group's counts, context and numbers, each issue's worker, size, who, severity and deep-water, the sizes -- and the text against `triage-<name>.txt` byte for byte, again after a JSON round trip; the who rule; `Tests/fixtures/parsers/assigned-lines.json` through `Get-P20CardAssigned`; off is no `Triage`, no `Route`, no `-Assign`, no bridge entry; `Triage` typed with `gh` stubbed (who: `me`, `@<login>`, `nobody`); **`Route` typed with `gh` stubbed as a function that writes down every call**: the exact `gh issue edit` argv for each switch, alone and all four in order, `-Assign me` (`--add-assignee @me`, and under `-WhatIf` printed and not made), `-Assign <size>` the `-Size` write byte for byte, `-WhatIf` writing nothing, the two moves printed, every refusal exit 2 with one `Error:` block and no write, the hub untouched; `-Assign` on a card -- the `**Assigned:**` line above `**Created:**`, LF and CRLF kept, no BOM, an unchanged card not written, the sizes from the repo, a local Space's card taking `-Assign me` alone, and its refusals (a size with no repository to read labels from among them) |
 | `tkTestToolkit -Rituals`, `Tests/test_rituals.py` -- the suggestion | who "me" is (the viewer's assignee `me` and a candidate, another's `@<login>` excluded `theirs`, no viewer every assignee theirs; the route asking `gh api user` once with the suggestion on, never with it off); `Tests/fixtures/suggestion/table.json` from both halves: every `nearest` row (the order and the nearest), every `rows` row (the candidates in order, the pick, its shape, sentence and command, each excluded ref with the first exclusion it met), every shape and every exclusion of the contract reached by a row, every `switch` row, and the three `briefs` cases end to end -- the joined fill, the suggestion attached, the candidates, the pick and `suggestion-<case>.brief.txt` byte for byte (with something waiting the Next line is the queue's; switched off it is today's), again after a JSON round trip; the card reader's milestone (whole), Created day, Tags and Assigned, and `Tests/fixtures/parsers/card-milestone.json` through both halves' readers; typed, `Standup -AsJson` carrying the rule's candidates with each line naming the prefixed command, the brief's Next line staying the queue's while walks wait, and `spaces.<slug>.features.suggestions=false` in the hub leaving no candidate; the agent's route carrying `suggestions` (the fields, the order, the line) and none with the Space's switch off |
 | `Tests/test_triage.py` | the agent's grouping, who and text over the same table and goldens, the goldens the regeneration script's; the route's `gh` calls (with `assignees`, then `gh api user`); a viewer `gh` cannot name; ADO and tier below 1 a `Tracker` line; 404 off |
 | `tkTestToolkit -StartWork` | the hand-off block, typed in a fresh shell over a scratch hub built from `Tests/fixtures/start-work/`: off is no verb and no bridge entry; `StartWork 23A3` is `expected-card.md` byte for byte, and so is the card in CRLF, the id in lower case and the full filename; `39` never assembles `Task139`; a `how-we-work.md` switches section one's heading to its path; issue 41, which no card carries, is `expected-issue.md` with one `gh issue view`; `-Prompt` absolute and package-relative; a partial name named in a terminal and refused for a non-interactive caller; and every refusal exit 2 with one `Error:` block and the hub untouched -- no row for the kind (naming `startWork.prompts.Meeting`), a row whose file is missing, a `-Prompt` that is no file, no id, nothing matching, an archived card, a closed issue, a pull request, an Azure DevOps Space, an undeclared `-Space` |
 | `Tests/test_bridge.py`, "StartWorkThroughTheBridge" | `StartWork` in the bridge's table with Team Agile on and `rejected` with it off; through the bridge, `expected-card.md` byte for byte; a refusal `status: error` with the verb's sentence |
-| `web/src/modules/solitaireAgile/StartWorkBox.test.tsx` | the copy box: one `StartWork` call, `expected-card.md` shown verbatim with its head as the title, Copy copying exactly the block, a refusal shown as the verb's sentence with no Copy, the agent away said so |
+| `web/src/modules/solitaireAgile/StartWorkBox.test.tsx` | the copy box: one `StartWork` call, `expected-card.md` shown verbatim with its head as the title, Copy copying exactly the block, a refusal shown as the verb's sentence with no Copy, the agent away said so; no **Launch** while `/env` does not say `startWorkLaunch` is true, and with it, one more `StartWork` call with `-Launch` and what it printed or refused with |
 | `tkTestToolkit -Consts`, `Tests/test_consts.py`, `web/src/shell/consts.test.ts` | the `startWork.text` headings; the `rituals` values (`triageRoute`, `grains`, `numberWords`, the four `work*Regex` patterns, the `work*` phrases and the `prose*` words among them, the dress's `dressGuards` and four `dress*Regex` patterns, and what moved's `motions`, the `itemMotion`, `motion*`, `commit*` and `counts*` words), stated from all three halves; `{n} to walk`, `Nothing blocked.` and `Yesterday I closed` never retyped in the CLI's scripts or the agent; `Waiting on you`, `nothing in flight` and `Routed to` never retyped in the CLI's scripts |
-| `web/src/modules/solitaireAgile/StandupPage.test.tsx` | the page over the shared fixture and goldens (above); a list row's **Start work** making one `StartWork` call with the issue's number (a card's row by its id), and none before a row asks; the counts line the first line at the top of the page, and an item's motion in the text; the grain: three tabs from `rituals.grains`, Detail by default, Work showing `work.text` (`standup-prose-friday.txt`, the prose) verbatim and Copy copying it, Brief the brief as the body once, the choice remembered by the browser, a stored word that is not a grain read as Detail; the chair's suggestion over `suggestion-suggested.brief.txt` -- the Next line as its own row, Start work making one `StartWork` call with the number, a dismiss yielding the next (a route's action Open Triage) and holding for the session, none left the line today's, another session nothing dismissed, a browser that refuses storage still drawing it, the Brief grain showing it once, no row while something waits or with the switch off |
+| `web/src/modules/solitaireAgile/StandupPage.test.tsx` | the page over the shared fixture and goldens (above); a list row's **Start work** making one `StartWork` call with the issue's number (a card's row by its id), and none before a row asks; the counts line the first line at the top of the page, and an item's motion in the text; the grain: three tabs from `rituals.grains`, Detail by default, Work showing `work.text` (`standup-prose-friday.txt`, the prose) verbatim and Copy copying it, Brief the brief as the body once, the choice remembered by the browser, a stored word that is not a grain read as Detail; the chair's suggestion over `suggestion-suggested.brief.txt` -- the Next line as its own row, Start work making one `StartWork` call with the number, a dismiss yielding the next (a route's action Open Triage) and holding for the session, none left the line today's, another session nothing dismissed, a browser that refuses storage still drawing it, the Brief grain showing it once, no row while something waits or with the switch off; the PM Corner over `corner-many-left.brief.txt` and `corner-reached.brief.txt` -- at the head of the page, the brief below stopping above its line while the suggestion still stands, the chevron one `StartWork` call, the Brief grain without the Corner's line and Copy the brief as it came, reached one burst and a fresh draw none, no Corner when the response has none |
 | `web/src/modules/solitaireAgile/stage/standupDeck.test.tsx` | at the work grain, spoken as prose over `standup-prose.json`'s `friday`: the queue's sentences as one Say line each, Opus's and Fable's sentences as the agent wrote them with nothing for an empty slot, an empty queue the contract's sentence, the mug unchanged, the tracker's line whatever `work` says; dressed, from `standup-dress.json`'s reply: a worker in `spoken` speaking and showing its spoken sentences, a worker not in it its prose, `spoken: null` the prose, the queue and the mug never dressed, the slide ids unchanged; and the played deck built from the shared fixture's `friday` and `no-tracker` cases: the slides in order with their ids, the plates, the Say lines, the mug on Sonnet, nine tiles and the register on every slide, reduced motion; the deal of workers onto seats |
 | `web/src/modules/solitaireAgile/stage/StandupPlay.test.tsx`, `web/src/modules/deck/engine/DeckPlayer.audiobook.test.tsx`, `web/src/modules/deck/GeneratedDeckHost.mute.test.tsx` | the mute, the played route's loading, error and Suitcase states; the audiobook hint at desktop width with prev and next, the browser voice, and a deck without the hint untouched |
 | `tkTestToolkit -Environment`, `Tests/test_surfaces.py` | its inventory row has its question; the Space's answer over `Tests/fixtures/how-i-work/table.json` -- every row and every gate row -- and, typed in a fresh shell with the switch on, a GitHub Space answered with agents (`on`, `Standup` a verb), one nobody answered (`not configured`), an Azure DevOps Space and one with no tracker (`off`, derived, no verb), each with the line that changes it, and the question naming the Space |
@@ -1119,9 +1195,17 @@ repository", is the real write).
 - **The suggestion's delegation does not launch.** A crew-sized item's command is `StartWork <n>`: the
   launch (`StartWork -Launch`, a session in a worktree) is its own card, and the command gains `-Launch`
   where the launch exists. Until then a delegation is the hand-off block, carried by hand.
-- **The PM Corner is not drawn yet.** The suggestion's second surface -- the line at the head of the Team
-  Agile page, its chevron and the confetti -- is its own card and reads this rule's nearest milestone.
-  The bell and Home's tips come after it, behind the same switch.
+- **The bell and Home's tips do not suggest yet.** They are the suggestion's later surfaces, behind the
+  same switch; the chair's line and [the PM Corner](#the-pm-corner-the-line-the-chevron-the-confetti) are the two built.
+- **The Corner's milestones in reach are the suggestion's candidates.** A milestone whose every open item is
+  in flight, waiting on you or someone else's has nothing to start, and the Corner moves on to the next
+  milestone with something to start, or reads `no milestone in reach`.
+- **Reached lasts the standup's window.** `milestone B reached` reads while the last close is inside
+  yesterday's window (or the one `-Since` widens); after it, the line moves on to the next milestone.
+- **The copy box's Launch waits for the launch.** The second button reads `/env`'s `startWorkLaunch`, which
+  no agent serves until `StartWork -Launch` lands; until then the box has one button, Copy.
+- **The celebration's mark is per browser.** Another browser, or one whose site data was cleared, celebrates a
+  reached milestone once more on first sight.
 - **Only the issue read's 500 are candidates.** The suggestion reads the standup's read, capped like it.
 - **Only the played view is dressed** (why, and what the reader sees when it is off, under
   [the agentic layer](#the-agentic-layer), "Where the dressed text shows"). `spoken` is the agent's and the stage's: `Standup -Grain work`

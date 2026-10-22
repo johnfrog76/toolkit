@@ -61,6 +61,8 @@ import { promptSets, spaceWorkflow } from "../modules/studio/prompts";
 import type { PromptRow, PromptWorkflow } from "../modules/studio/api.studio";
 import { itemFacts, itemRef, itemSpoken } from "../modules/solitaireAgile/itemRef";
 import { chairSuggestion } from "../modules/solitaireAgile/suggestion";
+import { briefSansCorner, cornerOf, hasChevron, isReached } from "../modules/solitaireAgile/corner";
+import { shouldCelebrate } from "../modules/solitaireAgile/celebrate";
 import type { StandupResponse } from "../modules/solitaireAgile/api.solitaireAgile";
 import fs from "node:fs";
 import path from "node:path";
@@ -560,6 +562,45 @@ describe("the scenario grid: what each configuration shows", () => {
       false,
     ]);
     expect(last(brief("switched-off"))).toBe("Next: nothing is waiting on you.");
+  });
+
+  // The PM Corner (docs/SCENARIOS.md, "Team Agile's standup"): the agent attaches it
+  // where the suggestion is on, as the brief's LAST line; the page draws it at the
+  // head instead. Reached throws the confetti once per milestone per viewer: on the
+  // page that sees it first with no mark, and never again on a reload with the mark
+  // set. Over corner.json's generated goldens and celebrate.ts's rule.
+  it("the PM Corner: reached is the line and one burst; a reload is the line and no burst; no Corner off GitHub", () => {
+    const dir = path.resolve(__dirname, "../../../Tests/fixtures/rituals");
+    const brief = (name: string) => fs.readFileSync(path.join(dir, `corner-${name}.brief.txt`), "utf8");
+    const last = (text: string) => text.split("\n").filter(Boolean).pop() ?? "";
+    const reachedCorner = {
+      shape: "reached",
+      milestone: "B",
+      remaining: 0,
+      ref: "",
+      number: null,
+      id: null,
+      kind: "",
+      noun: "",
+      line: "milestone B reached",
+      command: "",
+      brief: last(brief("reached")),
+    };
+    const data = { brief: brief("reached"), corner: reachedCorner } as unknown as StandupResponse;
+    const corner = cornerOf(data)!;
+    expect(corner.brief).toBe("Corner: milestone B reached");
+    expect([isReached(corner), hasChevron(corner)]).toEqual([true, false]);
+    // The brief the page draws below the Corner stops above its line.
+    expect(briefSansCorner(data).includes("Corner:")).toBe(false);
+    // Reached, first seen, no mark: one burst. A reload, the mark set: none.
+    expect(shouldCelebrate({ active: true, wasActive: null, seen: false })).toBe(true);
+    expect(shouldCelebrate({ active: true, wasActive: null, seen: true })).toBe(false);
+    // Several left: the line and its chevron, no burst.
+    expect(last(brief("many-left"))).toBe("Corner: 3 more issues to get milestone B - start #5 now > (tkStartWork 5)");
+    // The switch off -- or an Azure DevOps Space, where the agent attaches nothing --
+    // no Corner, and the brief is today's.
+    expect(cornerOf({ brief: brief("switched-off"), corner: null } as unknown as StandupResponse)).toBeNull();
+    expect(brief("switched-off").includes("Corner:")).toBe(false);
   });
 
   // "How do you want to work in <Space>?" (docs/SCENARIOS.md, the "How do

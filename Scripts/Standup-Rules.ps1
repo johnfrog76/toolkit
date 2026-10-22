@@ -1694,6 +1694,8 @@ function Format-P20StandupBrief {
                                                    nothing waiting, the suggestion's line
                                                    when one is attached (Suggest-Rules.ps1,
                                                    D-AR7), else briefNextNone
+        Corner: 3 more issues to get milestone B ...  the PM Corner's line, last, when one is
+                                                   attached (Corner-Rules.ps1)
 
       An issues Space says its walks are all on one machine (every walk there is a verify-close) and
       "none in flight"; a cards Space says neither, and its walks wait on "you". A
@@ -1784,5 +1786,11 @@ function Format-P20StandupBrief {
     if ($bestCount -gt 0) { $lines.Add(([string]$t.briefNext).Replace('{kind}', $bestKind).Replace('{n}', [string]$bestCount).Replace('{who}', $who)) }
     elseif ($suggested) { $lines.Add($suggested) }
     else { $lines.Add([string]$t.briefNextNone) }
+    # The PM Corner (Corner-Rules.ps1): the brief's last line, after the Next
+    # line, wherever it is attached -- its own line, never in place of another.
+    $corner = $null
+    if ($Standup -is [System.Collections.IDictionary]) { if ($Standup.Contains('corner')) { $corner = $Standup['corner'] } }
+    elseif ($Standup.PSObject.Properties['corner']) { $corner = $Standup.corner }
+    if ($null -ne $corner -and $corner.brief) { $lines.Add([string]$corner.brief) }
     return (($lines -join "`n") + "`n")
 }

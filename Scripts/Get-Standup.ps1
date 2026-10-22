@@ -332,6 +332,11 @@ if ($choice.source -eq 'cards' -or $choice.source -eq 'both') {
     if ($suggestOn -and $choice.source -eq 'both' -and $tracker.ok) { $viewer = Get-P20RitualViewer }
     $null = Add-P20StandupSuggestion -Standup $standup -Labels $labels -Issues $issues -Cards $cards -HowIWork ([string]$how.answer) `
         -On $suggestOn -Prefix (Get-CliPrefix) -Viewer $viewer -PackageRoot $repoRoot
+    # The PM Corner (Scripts/Corner-Rules.ps1): the suggestion's second surface --
+    # the same switch, the same read, the same pick -- and the brief's last line.
+    . (Join-Path $PSScriptRoot 'Corner-Rules.ps1')
+    $null = Add-P20StandupCorner -Standup $standup -Labels $labels -Issues $issues -Cards $cards `
+        -On $suggestOn -Prefix (Get-CliPrefix) -Viewer $viewer -PackageRoot $repoRoot
 }
 $standup.text = Format-P20StandupText -Standup $standup -PackageRoot $repoRoot
 $standup.work.text = Format-P20StandupWork -Standup $standup -PackageRoot $repoRoot

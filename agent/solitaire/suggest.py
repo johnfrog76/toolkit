@@ -52,7 +52,7 @@ from .triage import who
 
 # A due date or a created day that is not there sorts after every one that is.
 _LAST_DAY = "9999-99-99"
-_PLACEHOLDER = re.compile(r"\{(ref|why|size|nobody|noun|milestone|kind|sentence|command|arg)\}")
+_PLACEHOLDER = re.compile(r"\{(ref|why|size|nobody|noun|milestone|kind|sentence|command|arg|n|line|chevron)\}")
 
 
 def _fill(template: str, values: dict[str, str]) -> str:
