@@ -360,13 +360,34 @@ def _keep(slug: str, repos: list[str], status: str, ledger: SpaceLedger, records
     )
 
 
+def _forget_removed(declared_spaces: list[dict]) -> None:
+    """Drop the ledger file of any Space no longer declared, read the way
+    ``_read_ledger`` reads the Spaces. Rides a write; never fails it. Takes
+    EVERY declared Space: given a subset, it would drop the others' files."""
+    try:
+        declared = {
+            f"{space.get('slug')}.json"
+            for space in declared_spaces
+            if space.get("slug") and tracker(str(space.get("org") or "")) == "github"
+        }
+        folder = disk_cache.cache_path(LEDGER_DIR)
+        if folder is None:
+            return
+        for entry in list(folder.iterdir()):
+            if entry.is_file() and not entry.name.startswith(".") and entry.name not in declared:
+                entry.unlink(missing_ok=True)
+    except Exception:  # noqa: BLE001, S110 -- a prune never fails a write
+        pass
+
+
 # -- The read ---------------------------------------------------------------------
 
 
 def read_ledger(cfg: dict, refresh: bool = False) -> StudioLedger:
     """Every declared GitHub Space's ledger. Blocking: gh runs here."""
     with _fetch_lock:  # two tabs at once read GitHub once; the second finds the disk warm
-        return _read_ledger(cfg.get("spaces", []) or [], refresh)
+        spaces = cfg.get("spaces", []) or []
+        return _read_ledger(spaces, refresh, declared=spaces)
 
 
 def read_space_report(space: dict, refresh: bool = False) -> IssueReport:
@@ -381,7 +402,10 @@ def read_space_report(space: dict, refresh: bool = False) -> IssueReport:
     return got.report if got is not None else IssueReport(supported=False)
 
 
-def _read_ledger(spaces: list[dict], refresh: bool) -> StudioLedger:
+def _read_ledger(spaces: list[dict], refresh: bool, declared: list[dict] | None = None) -> StudioLedger:
+    """Read ``spaces``. ``declared`` is every Space in the config, for the prune of a
+    removed Space's file; a one-Space read (``read_space_report``) passes none and
+    prunes nothing, so the drop rides the next full ledger write."""
     started = time.monotonic()
     out: dict[str, SpaceLedger] = {}
     can_reach = hub_root().exists() and shutil.which("git") is not None
@@ -445,6 +469,8 @@ def _read_ledger(spaces: list[dict], refresh: bool) -> StudioLedger:
             )
             _keep(slug, repos, status, ledger, records)
             out[slug] = ledger
+        if declared is not None:
+            _forget_removed(declared)
     log_writer.write_log(
         "CMD",
         "agent/studio/ledger",

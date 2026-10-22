@@ -303,6 +303,16 @@ class TheDiskCache(LedgerCase):
         self.assertIn("n0=deck-two", gh.calls[0])
         self.assertEqual(gh.kinds().count("run list"), 1)
 
+    def test_a_removed_spaces_file_is_dropped_on_the_next_write_and_a_present_one_stays(self):
+        self.read(self.spaces, FakeGh(self.nodes))
+        self.assertIsNotNone(disk_cache.get_json(ledger.LEDGER_DIR, "deck.json"))
+        only_toolkit = self.cfg(space("toolkit"))
+        self.read(only_toolkit, FakeGh(self.nodes))  # all warm: no write, nothing dropped yet
+        self.assertIsNotNone(disk_cache.get_json(ledger.LEDGER_DIR, "deck.json"))
+        self.read(only_toolkit, FakeGh(self.nodes), refresh=True)  # a write
+        self.assertIsNone(disk_cache.get_json(ledger.LEDGER_DIR, "deck.json"))
+        self.assertIsNotNone(disk_cache.get_json(ledger.LEDGER_DIR, "toolkit.json"))
+
     def test_a_read_that_did_not_answer_is_not_kept(self):
         gh = FakeGh({"johnfrog76/toolkit": repo_node(ISSUES)})  # connected-deck: not found
         out = self.read(self.spaces, gh)
@@ -504,6 +514,17 @@ class TheIssueReportRoute(LedgerCase):
             res = TestClient(app).get(path)
         self.probe = probe
         return res
+
+    def test_a_one_space_read_leaves_every_other_spaces_file_alone(self):
+        # The prune of a removed Space's file needs EVERY declared Space; a one-Space
+        # read handed only its own Space would drop the rest. It prunes nothing.
+        cfg = self.cfg(space("toolkit"), space("other"))
+        gh = FakeGh({"johnfrog76/toolkit": repo_node(ISSUES), "johnfrog76/other": repo_node(ISSUES)})
+        self.read(cfg, gh)
+        self.assertIsNotNone(disk_cache.get_json(ledger.LEDGER_DIR, "other.json"))
+        self.get(cfg, gh, "/api/issue-report?space=toolkit&refresh=1")  # a write, of toolkit alone
+        self.assertIsNotNone(disk_cache.get_json(ledger.LEDGER_DIR, "other.json"))
+        self.assertIsNotNone(disk_cache.get_json(ledger.LEDGER_DIR, "toolkit.json"))
 
     def test_a_warm_entry_answers_with_no_gh_call_at_all(self):
         cfg = self.cfg(space("toolkit"))

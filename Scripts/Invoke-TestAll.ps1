@@ -181,6 +181,11 @@ $runCli = {
     }
     $rec.seconds = [math]::Round(((Get-Date) - $start).TotalSeconds, 1)
     $c = ConvertFrom-P20ToolkitOutput -Text $run.Text
+    # The CLI runner's own paste lines (a full, green run prints them): kept for
+    # the paste block at the foot of this run's summary.
+    $script:cliPasteLines = @()
+    $pm = [regex]::Match($run.Text, '(?m)^\s*Counts for docs/TESTING\.md''s combined row, from this run:\s*\r?\n\s*(\S[^\r\n]*?)\s*\r?\n\s*(\d+ suites, \d+ assertions)\s*$')
+    if ($pm.Success) { $script:cliPasteLines = @($pm.Groups[1].Value, $pm.Groups[2].Value) }
     $v = Get-P20HalfVerdict -Counts $c -ExitCode $run.ExitCode
     $rec.result = $v.Result; $rec.detail = $v.Detail
     $rec.passed = $c.Passed; $rec.failed = $c.Failed; $rec.total = $c.Total
@@ -250,6 +255,7 @@ $descriptions = @{
 $suiteKeys = @{ agent = 'pytest'; web = 'jest' }
 
 # -- Run -------------------------------------------------------------------------
+$script:cliPasteLines = @()
 $records = [ordered]@{}
 $overallStart = Get-Date
 foreach ($h in $halves) {
@@ -382,6 +388,19 @@ foreach ($h in @($records.Keys)) {
 }
 if ($differs.Count -gt 0) {
     Write-Host "  Note: $($differs -join ', ') differs from docs/TESTING.md. Information, not a failure: the merger pastes those counts from the Mac's run after a merge, and a branch or another platform reads differently." -ForegroundColor DarkGray
+}
+
+# -- The paste block ----------------------------------------------------------
+# docs/TESTING.md's "The counts, after a merge" holds three figures: the CLI's
+# per-suite line and total, the pytest totals and the web totals. This is the
+# runner that has all three. A half that did not run says so in its line's place.
+Write-Host ""
+if ($halves.Count -eq 3 -and -not $Fast) {
+    Write-Host "  Counts for docs/TESTING.md's paste block, from this run:" -ForegroundColor Cyan
+    foreach ($pl in @(Get-P20PasteLines -Records $records -CliLines $script:cliPasteLines)) { Write-Host "  $pl" }
+}
+else {
+    Write-Host "  No paste block: it needs all three halves and no -Fast." -ForegroundColor DarkGray
 }
 
 # -- One verdict -----------------------------------------------------------------

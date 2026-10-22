@@ -2024,6 +2024,17 @@ class TheDressIsKeptByItsFacts(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(first.dressed, 1)
 
+    def test_a_fresh_dress_prunes_the_folder_past_the_cap(self):
+        complete, _calls = _answering(self.REPLY)
+        folder = disk_cache.cache_path(standup.DRESS_CACHE)
+        folder.mkdir(parents=True)
+        for n in range(4):  # older replies, none seen for longer than the age
+            stale = folder / f"old{n}.json"
+            stale.write_text("{}")
+            os.utime(stale, (1.0, 1.0))
+        self._dress(_fill_prose(PROSE_CASES["friday"]), complete)
+        self.assertEqual(len(list(folder.iterdir())), 1, "only the reply just kept remains")
+
     def test_a_restart_keeps_the_dress_on_disk(self):
         complete, calls = _answering(self.REPLY)
         first = self._dress(_fill_prose(PROSE_CASES["friday"]), complete)
