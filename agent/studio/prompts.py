@@ -41,6 +41,10 @@ shipped prompt that belongs to an add-on (``module`` in the index) follows that
 add-on's flag -- off means absent, so it is not listed and its read is a 404 --
 because it drives the add-on's verbs.
 
+The list carries each prompt's record but not its text: ``body`` is served by
+the one-prompt read alone (the list's route with a ``/{ref}`` after it), which
+Copy prompt and the reading room call when asked.
+
 Every route here is a READ. A prompt is changed in its file, by a person.
 """
 
@@ -120,7 +124,7 @@ class PromptRow(BaseModel):
     overrides: bool = False  # yours, in agenticExtensionPath, under a shipped name: it runs instead
     changed: str = ""  # the local day it last changed (git, else the file's time)
     history: str = ""  # its history on GitHub, "" when the folder is not a GitHub clone
-    body: str = ""  # the whole file: what Copy prompt copies
+    body: str = ""  # the whole file: what Copy prompt copies -- the one-prompt read serves it, never the list
 
 
 class SpaceInfo(BaseModel):
@@ -471,7 +475,13 @@ def read_prompt(ref: str, repo: str | None = None) -> PromptRow:
     return found
 
 
-@api.get(ROUTE, response_model=PromptsResponse)
+# The list is the card's rows; the text of every prompt is not in it. A row's
+# body is read on demand (GET .../{ref}) when Copy prompt or the reading room
+# asks, so the list stays a few KB however long the prompts are.
+LIST_EXCLUDES = {"prompts": {"__all__": {"body"}}}
+
+
+@api.get(ROUTE, response_model=PromptsResponse, response_model_exclude=LIST_EXCLUDES)
 async def get_prompts():
     # The gate is asked first, so a Space that is not GitHub, not Tier 1 or not
     # one repo never reaches gh; the folders on disk are read as before.

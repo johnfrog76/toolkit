@@ -125,11 +125,18 @@ class TheShippedSet(PromptsCase):
         self.assertFalse(rows["pr-suggest"]["by_hand"])
         self.assertTrue(rows["pr-ship"]["by_hand"])
 
-    def test_a_row_carries_the_whole_file_to_copy_and_its_description(self):
+    def test_a_list_row_carries_its_description_but_no_text(self):
         rows = self.rows()
-        text = (PKG_ROOT / "agentic" / "pr-ship.prompt.md").read_text(encoding="utf-8-sig")
-        self.assertEqual(rows["pr-ship"]["body"], text)
         self.assertTrue(rows["pr-ship"]["description"].startswith("Ship-it flow, stage 1"))
+        for ref, row in rows.items():
+            with self.subTest(ref=ref):
+                self.assertNotIn("body", row)
+
+    def test_the_one_prompt_read_carries_the_whole_file_to_copy(self):
+        text = (PKG_ROOT / "agentic" / "pr-ship.prompt.md").read_text(encoding="utf-8-sig")
+        res = self.client.get(f"{ROUTE}/pr-ship")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["body"], text)
 
     def test_every_shipped_row_reads_its_title_and_purpose_from_the_header(self):
         # One header shape (Tests/test_agentic_index.py holds it): the row's purpose line is
@@ -309,7 +316,7 @@ class TheSpacesFolder(PromptsCase):
         )
         self.assertEqual(row["file_path"], f"https://github.com/{SPACE_REPO}/blob/main/agentic/deck-contract.prompt.md")
         self.assertEqual((row["title"], row["description"]), ("Deck contract", "What a deck must carry"))
-        self.assertEqual(row["body"], DECK)
+        self.assertNotIn("body", row)  # the text is the one-prompt read's, below
         # The contents read carries no commit: blank, never a guess.
         self.assertEqual((row["changed"], row["history"]), ("", ""))
         # ToolKit's and yours are listed as before, beside them.
