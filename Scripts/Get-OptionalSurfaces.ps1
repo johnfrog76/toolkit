@@ -37,6 +37,9 @@ if (-not (Get-Command Get-P20ConfiguredHub -ErrorAction SilentlyContinue)) {
 if (-not (Get-Command Get-P20EngineerFeatureKeys -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Get-ConfigSchema.ps1')
 }
+if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
+}
 # How do you want to work in this Space? -- the answer that gates Team Agile.
 if (-not (Get-Command Resolve-P20HowIWork -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Resolve-HowIWork.ps1')
@@ -525,12 +528,13 @@ function Get-P20OptionalSurfaces {
     # DERIVED, like the webhook row: `on` where the tool is found on the PATH,
     # `not configured` otherwise -- never `off`, because nothing was answered.
     # The block works either way; the Team Agile page shows its second button
-    # only when /env's startWorkLaunch says the same (agent/core/config.py,
-    # start_work_launch -- the agent's PATH, which is the bridge's).
+    # only when /env's launch flag says the same (agent/core/config.py,
+    # start_work_launch -- the agent's PATH, which is the bridge's). The row's
+    # key IS that flag's name: consts.json startWork.launchEnvFlag.
     $launchState = $states.Unset
     $launchNote = $Prefix + 'StartWork <id> -Launch: a session in a worktree; the block works without it'
     if (Get-Command claude -CommandType Application -ErrorAction SilentlyContinue) { $launchState = $states.On }
-    $rows += New-P20SurfaceRow -Key 'startWorkLaunch' -Title 'StartWork launch' -State $launchState `
+    $rows += New-P20SurfaceRow -Key (Get-P20Consts).startWork.launchEnvFlag -Title 'StartWork launch' -State $launchState `
         -Config 'claude on the PATH (install Claude Code)' -Note $launchNote
 
     # The question on every row, from the one list (D-W1). A row with no entry

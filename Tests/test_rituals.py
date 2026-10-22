@@ -1251,6 +1251,90 @@ class TheSuggestionTable(unittest.TestCase):
         )
 
 
+CORNER = json.loads((FIXTURES / "corner.json").read_text(encoding="utf-8"))
+
+
+class TheCornerTable(unittest.TestCase):
+    """Tests/fixtures/rituals/corner.json -- the PM Corner's line (docs/modules/
+    solitaire-agile.md, "The PM Corner: the line, the chevron, the confetti"), the SAME
+    rows tkTestToolkit -Rituals asserts against Scripts/Corner-Rules.ps1."""
+
+    def setUp(self):
+        sys.path.insert(0, str(REPO_ROOT / "Tests"))
+        import regenerate_joined_goldens as regen
+
+        from agent.solitaire import corner, suggest
+
+        self.regen = regen
+        self.corner = corner
+        self.suggest = suggest
+
+    def _line(self, row: dict) -> dict:
+        cards = self.regen.corner_card_rows(row["cards"])
+        items = self.suggest.suggest_items(CORNER["workerLabels"], row["issues"], cards, set())
+        since = datetime.fromisoformat(CORNER["since"])
+        as_of = datetime.fromisoformat(CORNER["asOf"])
+        return self.corner.corner(items, self.corner.corner_closed(row["issues"], cards, since, as_of))
+
+    def test_every_shape_has_a_row(self):
+        names = {r["name"] for r in CORNER["rows"]}
+        for want in (
+            "one-left",
+            "several-left",
+            "reached",
+            "nothing-in-reach",
+            "a-card-and-its-issue-counted-once",
+            "a-card-and-an-issue-are-items-and-a-long-title-is-read-whole",
+        ):
+            self.assertIn(want, names)
+        self.assertEqual({r["expected"]["shape"] for r in CORNER["rows"]}, set(C.rituals_corner_shapes()))
+
+    def test_the_rows(self):
+        for row in CORNER["rows"]:
+            with self.subTest(row["name"]):
+                got = self._line(row)
+                self.assertEqual({k: got[k] for k in row["expected"]}, row["expected"])
+
+    def test_a_long_milestone_is_read_whole_never_the_models_shortened_sprint(self):
+        """Section 11's trap: the card model cuts sprint at eighteen characters. The
+        row's milestone is longer than twenty, and the card counts toward it."""
+        row = next(r for r in CORNER["rows"] if r["name"].endswith("long-title-is-read-whole"))
+        self.assertGreater(len(row["expected"]["milestone"]), 20)
+        self.assertEqual(row["expected"]["remaining"], 2)
+        # The card model's sprint for the same file is NOT the milestone: reading it
+        # would have split one milestone into two of one left each.
+        from agent.core.parsers import _parse_status_metadata
+
+        text = "\n".join(row["cards"][0]["lines"]) + "\n"
+        self.assertNotEqual(_parse_status_metadata(text).get("sprint"), row["expected"]["milestone"])
+
+    def test_the_words_are_the_contracts(self):
+        t = C.rituals_text()
+        for row in CORNER["rows"]:
+            exp = row["expected"]
+            key = {
+                "oneLeft": "cornerOneLeft",
+                "manyLeft": "cornerManyLeft",
+                "reached": "cornerReached",
+                "nothingInReach": "cornerNothingInReach",
+            }[exp["shape"]]
+            head = t[key].split("{")[0]
+            with self.subTest(row["name"]):
+                self.assertTrue(exp["line"].startswith(head), (exp["line"], head))
+                self.assertEqual(bool(exp["command"]), exp["shape"] in ("oneLeft", "manyLeft"))
+
+    def test_the_briefs_byte_for_byte(self):
+        for case in CORNER["briefs"]["cases"]:
+            with self.subTest(case["name"]):
+                filled = self.regen.filled_corner_case(CORNER, case)
+                exp = case["expected"]
+                self.assertEqual(filled.corner.shape if filled.corner else None, exp["shape"])
+                self.assertEqual(filled.brief, _golden(exp["brief"]))
+                if filled.corner:
+                    # The Corner is the brief's LAST line, after the Next line.
+                    self.assertEqual(filled.brief.rstrip("\n").split("\n")[-1], filled.corner.brief)
+
+
 # The response's field names, exactly as the contract's JSON spells them.
 TOP_FIELDS = {
     "ceremony",
@@ -1272,8 +1356,25 @@ TOP_FIELDS = {
     "counts",
     "suggestions",
     "suggestion",
+    "corner",
 }
 SUGGESTION_FIELDS = {"ref", "number", "id", "kind", "shape", "sentence", "command", "line"}
+CORNER_FIELDS = {"shape", "milestone", "remaining", "ref", "number", "id", "kind", "noun", "line", "command", "brief"}
+
+
+def _brief_less_corner(body: dict) -> str:
+    """The served brief with the PM Corner's last line set aside: the chair's reading
+    the goldens hold. The Corner rides the route wherever the suggestion does
+    (corner.py) and is always the brief's LAST line when it is there."""
+    brief = body["brief"]
+    corner = body.get("corner")
+    if corner and corner.get("brief"):
+        tail = corner["brief"] + "\n"
+        assert brief.endswith(tail), (brief, tail)
+        return brief[: -len(tail)]
+    return brief
+
+
 WORK_FIELDS = {"queue", "workers", "queueProse", "text"}
 GROUP_FIELDS = {"name", "by", "count", "refs", "phrase"}
 WORKER_FIELDS = {"label", "name", "yesterday", "today", "blockers", "empty", "excuse"}
@@ -1421,7 +1522,7 @@ class TheRoute(unittest.TestCase):
         said = [s for w in body["spoken"]["workers"] for s in w["prose"]]
         self.assertNotIn("#999", " ".join(said))
         self.assertEqual(body["text"], _golden("standup-friday.txt"))
-        self.assertEqual(body["brief"], _golden("standup-friday.brief.txt"))
+        self.assertEqual(_brief_less_corner(body), _golden("standup-friday.brief.txt"))
         self.assertEqual(body["register"], "real", "dressed facts are still facts")
 
     def test_the_route_is_the_contracts(self):
@@ -1432,7 +1533,7 @@ class TheRoute(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         body = res.json()
         self.assertEqual(body["text"], _golden("standup-friday.txt"))
-        self.assertEqual(body["brief"], _golden("standup-friday.brief.txt"))
+        self.assertEqual(_brief_less_corner(body), _golden("standup-friday.brief.txt"))
         self.assertEqual((body["ceremony"], body["register"], body["space"]), ("standup", "real", "toolkit"))
         self.assertEqual(body["tracker"], {"ok": True, "reason": ""})
         # An active GitHub Space reads both; with no card in its folders the text is the issues' alone.
@@ -1475,6 +1576,8 @@ class TheRoute(unittest.TestCase):
                     self.assertEqual(set(item), ITEM_FIELDS)
         for sug in body["suggestions"]:
             self.assertEqual(set(sug), SUGGESTION_FIELDS)
+        if body["corner"] is not None:
+            self.assertEqual(set(body["corner"]), CORNER_FIELDS)
 
     def test_the_suggestion_rides_the_same_read(self):
         """Team Agile on and the Space's switch unset: every open candidate in the
@@ -1488,7 +1591,15 @@ class TheRoute(unittest.TestCase):
             self.assertTrue(sug["line"].startswith("Next: " + sug["sentence"]))
             self.assertTrue(sug["line"].endswith(sug["command"] + ")"))
         self.assertNotIn(body["suggestion"]["line"], body["brief"])
-        self.assertIn(C.rituals_text()["briefNext"].split("{")[0], body["brief"].splitlines()[-1])
+        self.assertIn(C.rituals_text()["briefNext"].split("{")[0], _brief_less_corner(body).splitlines()[-1])
+
+    def test_the_corner_rides_the_same_read(self):
+        """Team Agile on, the suggestion on: the Corner is on the response, a shape of
+        the contract, and the brief's last line is its brief line."""
+        body = self._get("/api/ritual/standup?space=toolkit")[0].json()
+        self.assertIsNotNone(body["corner"])
+        self.assertIn(body["corner"]["shape"], C.rituals_corner_shapes())
+        self.assertEqual(body["brief"].rstrip("\n").split("\n")[-1], body["corner"]["brief"])
 
     def test_no_space_is_the_active_one(self):
         body = self._get("/api/ritual/standup")[0].json()
@@ -1524,6 +1635,9 @@ class TheRoute(unittest.TestCase):
         # D-TA19: the reason is the contract's sentence, and no card is read for it.
         self.assertEqual(body["tracker"]["reason"], C.rituals_text()["adoTracker"])
         self.assertEqual(body["source"], "none")
+        # The Azure path is untouched: no suggestion and no PM Corner, and no Corner line in the brief.
+        self.assertEqual((body["suggestions"], body["suggestion"], body["corner"]), ([], None, None))
+        self.assertNotIn(C.rituals_text()["cornerBrief"].split("{")[0], body["brief"])
 
     def test_a_local_space_fills_from_its_cards_and_gh_is_never_asked(self):
         hub = Path(self.tmp.name) / "hub" / "solo"
@@ -1699,6 +1813,7 @@ class TheRouteWithTheFlagOff(TheRoute):
     test_a_reader_that_raises_is_a_tracker_that_did_not_answer = None
     test_a_github_space_joins_its_cards_to_its_issues = None
     test_the_suggestion_rides_the_same_read = None
+    test_the_corner_rides_the_same_read = None
 
 
 class TheRouteWithSuggestionsOff(TheRoute):
@@ -1710,6 +1825,12 @@ class TheRouteWithSuggestionsOff(TheRoute):
     def test_the_suggestion_rides_the_same_read(self):
         body = self._get("/api/ritual/standup?space=toolkit")[0].json()
         self.assertEqual((body["suggestions"], body["suggestion"]), ([], None))
+
+    def test_the_corner_rides_the_same_read(self):
+        """The switch that removes the suggestion removes the Corner (D-AR8, D-AR9)."""
+        body = self._get("/api/ritual/standup?space=toolkit")[0].json()
+        self.assertIsNone(body["corner"])
+        self.assertNotIn(C.rituals_text()["cornerBrief"].split("{")[0], body["brief"])
 
 
 class TheAppMountsIt(unittest.TestCase):

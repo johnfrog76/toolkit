@@ -926,8 +926,8 @@ def anthropic_configured() -> bool:
 
 def start_work_launch() -> bool:
     """Whether ``StartWork <id> -Launch`` has a session to start: ``claude`` on the
-    PATH (D-AR13). The inventory row ``startWorkLaunch`` in
-    ``Scripts/Get-OptionalSurfaces.ps1`` is the same rule -- on where the tool is
+    PATH (D-AR13). The launch row in ``Scripts/Get-OptionalSurfaces.ps1`` (keyed by
+    consts.json ``startWork.launchEnvFlag``) is the same rule -- on where the tool is
     found, not configured otherwise. Asked of THIS process's PATH on purpose: the
     page's button runs the verb through the bridge, whose child pwsh inherits it.
     """

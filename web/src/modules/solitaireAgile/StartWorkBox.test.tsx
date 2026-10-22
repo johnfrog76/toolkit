@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { STARTWORK } from "../../shell/consts";
 import { StartWorkBox, blockTitle } from "./StartWorkBox";
 
 // The hand-off block's copy box (AR-1): one bridge call, the block shown
@@ -15,9 +16,18 @@ const lf = (p: string) => fs.readFileSync(p, "utf8").replace(/\r\n/g, "\n").repl
 const BLOCK = `${lf(FIXTURE)}\n${lf(PROMPT)}`;
 
 let reply: () => Promise<unknown> = () => Promise.resolve({});
-const runStartWork = jest.fn((_arg: { id: string }) => ({ unwrap: () => reply() }));
+let launchReply: () => Promise<unknown> = () => Promise.resolve({});
+const runStartWork = jest.fn((arg: { id: string; launch?: boolean }) => ({
+  unwrap: () => (arg.launch ? launchReply() : reply()),
+}));
 jest.mock("./api.solitaireAgile", () => ({
   useRunStartWorkMutation: () => [runStartWork, { isLoading: false }],
+}));
+// /env: whether the launch exists (D-AR13). Absent is off -- what every agent
+// without the launch serves.
+let env: Record<string, unknown> = {};
+jest.mock("../../shell/api", () => ({
+  useGetEnvQuery: () => ({ isLoading: false, data: env }),
 }));
 const copyMock = jest.fn((_t: string) => Promise.resolve());
 jest.mock("../../shared/copyText", () => ({ copyText: (t: string) => copyMock(t) }));
@@ -34,6 +44,7 @@ const ok = (output: string) => ({
 beforeEach(() => {
   runStartWork.mockClear();
   copyMock.mockClear();
+  env = {};
 });
 
 describe("blockTitle", () => {
@@ -89,5 +100,45 @@ describe("StartWorkBox", () => {
         "The agent did not answer. Nothing was read.",
       ),
     );
+  });
+
+  it("offers no second button while /env does not say the launch is on", async () => {
+    reply = () => Promise.resolve(ok(`${BLOCK}\n`));
+    for (const e of [{}, { [STARTWORK.launchEnvFlag]: false }]) {
+      env = e;
+      const { unmount } = render(<StartWorkBox id="23A3" onClose={() => undefined} />);
+      await screen.findByTestId("start-work-block");
+      expect(screen.queryByRole("button", { name: "Launch" })).toBeNull();
+      unmount();
+    }
+  });
+
+  it("where /env says the launch is on, Launch runs the same verb with -Launch and shows what it said", async () => {
+    env = { [STARTWORK.launchEnvFlag]: true };
+    reply = () => Promise.resolve(ok(`${BLOCK}\n`));
+    launchReply = () => Promise.resolve(ok("Started PID 4242. Log: crew-23A3.log\n"));
+    render(<StartWorkBox id="23A3" onClose={() => undefined} />);
+    await screen.findByTestId("start-work-block");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Launch" }));
+    });
+    expect(runStartWork).toHaveBeenLastCalledWith({ id: "23A3", launch: true });
+    expect(runStartWork).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId("start-work-launched").textContent).toBe("Started PID 4242. Log: crew-23A3.log");
+  });
+
+  it("a launch refused shows the verb's sentence", async () => {
+    env = { [STARTWORK.launchEnvFlag]: true };
+    reply = () => Promise.resolve(ok(`${BLOCK}\n`));
+    const sentence = "claude is not on the PATH.";
+    launchReply = () =>
+      Promise.resolve({ ...ok(""), status: "error", exit_code: 1, output: null, error: sentence });
+    render(<StartWorkBox id="23A3" onClose={() => undefined} />);
+    await screen.findByTestId("start-work-block");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Launch" }));
+    });
+    expect(screen.getByTestId("start-work-launched").textContent).toBe(sentence);
+    expect(screen.getByTestId("start-work-launched").getAttribute("role")).toBe("alert");
   });
 });

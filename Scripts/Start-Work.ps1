@@ -521,11 +521,12 @@ if ($Launch) {
         exit 2  # stated refusal
     }
 
-    # 2. claude on the PATH -- the optional surface startWorkLaunch (D-AR13).
+    # 2. claude on the PATH -- the optional surface named by consts.json startWork.launchEnvFlag (D-AR13).
     $claude = Resolve-LaunchExecutable -Name 'claude'
     if (-not $claude) {
+        $launchFlag = $c.startWork.launchEnvFlag
         Write-CliError -Message 'claude is not on the PATH, so there is no session to start.' `
-            -Hint "Install Claude Code and open a new shell ('${p}Env' names it: startWorkLaunch). The block works without it: '${p}StartWork $wanted', and paste it."
+            -Hint "Install Claude Code and open a new shell ('${p}Env' names it: $launchFlag). The block works without it: '${p}StartWork $wanted', and paste it."
         exit 2  # stated refusal
     }
 

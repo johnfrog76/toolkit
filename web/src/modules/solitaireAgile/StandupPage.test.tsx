@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { act, fireEvent, render as rtlRender, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render as rtlRender, screen, waitFor, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { RITUALS } from "../../shell/consts";
@@ -17,12 +17,14 @@ import {
   splitHeader,
 } from "./StandupPage";
 import type {
+  Corner,
   RitualItem,
   StandupResponse,
   Suggestion,
   TriageResponse,
 } from "./api.solitaireAgile";
 import { DISMISS_KEY, SURFACE_CHAIR, resetDismissMemory } from "./suggestDismiss";
+import { resetCelebrateMemory } from "./celebrate";
 
 // Today's standup page (docs/modules/solitaire-agile.md, "The web UI"): the agent's
 // `text` shown VERBATIM, the first line as the header and the rest in a
@@ -142,6 +144,11 @@ const startWork = jest.fn((_arg: { id: string }) => ({
 }));
 const copyMock = jest.fn((_t: string) => Promise.resolve());
 jest.mock("../../shared/copyText", () => ({ copyText: (t: string) => copyMock(t) }));
+// The PM Corner's confetti draws on a canvas jsdom does not have: a marker stands in.
+jest.mock("react-confetti", () => ({
+  __esModule: true,
+  default: () => <div data-testid="confetti" />,
+}));
 jest.mock("../../shell/api", () => ({
   useGetEnvQuery: () => ({ isLoading: false, data: { config: { activeSpace: "toolkit" } } }),
 }));
@@ -828,5 +835,121 @@ describe("the chair's suggestion", () => {
     render(<StandupPage />);
     expect(screen.queryByTestId("standup-suggestion")).toBeNull();
     expect(chairSuggestion(suggested(), ["#141", "#150"])).toEqual({ standing: true, current: null });
+  });
+});
+
+describe("the PM Corner", () => {
+  // The joined fill, the suggestion and the Corner, as the agent rendered them
+  // (Tests/fixtures/rituals/corner.json's many-left and reached briefs, generated).
+  const brief = (name: string) => fs.readFileSync(path.join(FIXTURES, `corner-${name}.brief.txt`), "utf8");
+  const lastTwo = (text: string) => text.split("\n").filter(Boolean).slice(-2);
+  const withCorner = (name: string, corner: Corner): StandupResponse => {
+    const [next] = lastTwo(brief(name));
+    const sug: Suggestion = {
+      ref: "#5",
+      number: 5,
+      id: null,
+      kind: "issue",
+      shape: "delegate",
+      sentence: "",
+      command: "StartWork 5",
+      line: next,
+    };
+    return {
+      ...responseFor("friday"),
+      queue: { walk: [], decide: [], look: [] },
+      space: "widgets",
+      brief: brief(name),
+      suggestions: [sug],
+      suggestion: sug,
+      corner,
+    };
+  };
+  const many: Corner = {
+    shape: "manyLeft",
+    milestone: "B",
+    remaining: 3,
+    ref: "#5",
+    number: 5,
+    id: null,
+    kind: "issue",
+    noun: "issues",
+    line: "3 more issues to get milestone B - start #5 now",
+    command: "StartWork 5",
+    brief: lastTwo(brief("many-left"))[1],
+  };
+  const reached: Corner = {
+    ...many,
+    shape: "reached",
+    remaining: 0,
+    ref: "",
+    number: null,
+    noun: "",
+    line: "milestone B reached",
+    command: "",
+    brief: lastTwo(brief("reached"))[1],
+  };
+
+  beforeEach(() => {
+    sessionStorage.clear();
+    resetDismissMemory();
+    resetCelebrateMemory();
+    startWork.mockClear();
+  });
+
+  it("sits at the head of the page, the line verbatim, and the brief below stops above its line", async () => {
+    answer = { data: withCorner("many-left", many) };
+    render(<StandupPage />);
+    const corner = await screen.findByTestId("pm-corner");
+    expect(corner.textContent).toContain("3 more issues to get milestone B - start #5 now");
+    // It comes before the standup's card.
+    expect(corner.compareDocumentPosition(screen.getByTestId("standup-text")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const drawn = screen.getByTestId("standup-brief").textContent ?? "";
+    expect(drawn).not.toContain("Corner:");
+    // The suggestion still stands: the Next line is the one above the Corner's.
+    expect(screen.getByTestId("standup-suggestion").textContent).toContain("Next: #5 is opus-sized");
+  });
+
+  it("the chevron opens the same hand-off box: one StartWork call for the pick", async () => {
+    answer = { data: withCorner("many-left", many) };
+    render(<StandupPage />);
+    const corner = await screen.findByTestId("pm-corner");
+    fireEvent.click(within(corner).getByRole("button", { name: "Start work on #5" }));
+    await screen.findByTestId("start-work-block");
+    expect(startWork).toHaveBeenCalledTimes(1);
+    expect(startWork).toHaveBeenCalledWith({ id: "5" });
+  });
+
+  it("the brief grain's body stops above the Corner's line too; Copy copies the brief as it came", async () => {
+    localStorage.setItem(GRAIN_KEY, "brief");
+    const data = withCorner("many-left", many);
+    answer = { data };
+    render(<StandupPage />);
+    await screen.findByTestId("pm-corner");
+    expect(screen.getByTestId("standup-text").textContent).not.toContain("Corner:");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    });
+    expect(copyMock).toHaveBeenCalledWith(data.brief);
+  });
+
+  it("reached: the line, one burst, and a fresh draw (a reload) is the line with no burst", async () => {
+    answer = { data: withCorner("reached", reached) };
+    const { unmount } = render(<StandupPage />);
+    const corner = await screen.findByTestId("pm-corner");
+    expect(corner.textContent).toContain("milestone B reached");
+    expect(screen.getAllByTestId("confetti")).toHaveLength(1);
+    // Reached has no chevron: nothing left to start in B.
+    expect(within(corner).queryByRole("button")).toBeNull();
+    unmount();
+    render(<StandupPage />);
+    expect((await screen.findByTestId("pm-corner")).textContent).toContain("milestone B reached");
+    expect(screen.queryByTestId("confetti")).toBeNull();
+  });
+
+  it("no Corner on the response -- the switch off, an Azure DevOps Space, an older agent -- draws none", () => {
+    answer = { data: responseFor("friday") };
+    render(<StandupPage />);
+    expect(screen.queryByTestId("pm-corner")).toBeNull();
   });
 });

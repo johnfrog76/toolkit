@@ -336,6 +336,11 @@ The standup's suggestion -- one derived next move ([Team Agile](../modules/solit
 `card_milestone` and `card_tags` (`agent/core/parsers.py`) and `Get-P20CardMilestone` and `Get-P20CardTags`
 (`Scripts/Get-PromptFileStatus.ps1`) are the readers, held to one table, `Tests/fixtures/parsers/card-milestone.json`.
 
+The PM Corner ([Team Agile](../modules/solitaire-agile.md#the-pm-corner-the-line-the-chevron-the-confetti))
+reads the same `**Sprint:**` line through the same readers, and one more thing: an archived card's
+`**Closed:**` day, so a milestone whose last card was archived in the standup's window reads reached. It
+writes nothing either.
+
 ## The model, as the agent serves it
 
 `GET /api/status` lists `current/` and then `backlog/` (a card from `backlog/` is served as `Backlog`, and the

@@ -97,12 +97,13 @@ export interface EnvStatus {
    *  nobody has said. `switch` is Team Agile's own flag as set -- null when
    *  unset. Absent from an older agent. */
   howIWork?: HowIWork;
-  anthropicConfigured: boolean;
-  /** Whether `StartWork <id> -Launch` has a session to start: `claude` on the
-   *  agent's PATH (D-AR13), the inventory row `startWorkLaunch`'s rule. The
-   *  Team Agile page shows its second button only when true. Absent from an
-   *  older agent. */
+  /** Whether `StartWork <id> -Launch` can start a session on this machine -- the
+   *  derived launch surface (D-AR13). The field's name is consts.json
+   *  startWork.launchEnvFlag; an interface cannot take a computed name, so it is
+   *  spelled here, and consts.test.ts holds this to be the one place it is. The hand-off box draws its second
+   *  button only when this is true; absent (an agent without the launch) reads off. */
   startWorkLaunch?: boolean;
+  anthropicConfigured: boolean;
   // The provider profile's model id, ai.model in config.
   aiModel?: string;
   bridgeHost?: BridgeHost;

@@ -411,9 +411,9 @@ async def get_env(refresh: int = 0):
         "howIWork": cfg.get("howIWork") or how_i_work(org_url),
         "anthropicConfigured": anthropic_configured(),
         # Whether StartWork -Launch has a session to start -- claude on the PATH
-        # (D-AR13), the inventory row startWorkLaunch's rule. The Team Agile
-        # page shows its second button only when this is true.
-        "startWorkLaunch": start_work_launch(),
+        # (D-AR13), the launch inventory row's rule. The key is the contract's
+        # (consts.json startWork.launchEnvFlag); the copy box reads it by that name.
+        consts.startwork_launch_env_flag(): start_work_launch(),
         # The provider profile: what every model call sends, from ai.model.
         "aiModel": model.model_id(),
         "bridgeHost": bridge_host,

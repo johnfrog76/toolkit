@@ -555,6 +555,12 @@ def rituals_suggest_owner_seat() -> str:
     return consts()["rituals"]["suggestOwnerSeat"]
 
 
+def rituals_corner_shapes() -> tuple[str, ...]:
+    """The PM Corner's shapes, by index: oneLeft, manyLeft, reached, nothingInReach --
+    which line it reads (docs/modules/solitaire-agile.md, "The PM Corner")."""
+    return tuple(consts()["rituals"]["cornerShapes"])
+
+
 # -- The dress (D-SA11) ---------------------------------------------------
 
 
@@ -581,3 +587,9 @@ def rituals_dress_name_regex() -> str:
 def rituals_dress_pronoun_regex() -> str:
     """The first person's capital I (``I``, ``I'm``, ``I've``), which is no name."""
     return consts()["rituals"]["dressPronounRegex"]
+
+
+def startwork_launch_env_flag() -> str:
+    """``startWorkLaunch`` -- the name of the top-level boolean ``GET /api/env`` carries for
+    StartWork's launch (D-AR13); the web's copy box reads it by the same name."""
+    return consts()["startWork"]["launchEnvFlag"]

@@ -1,4 +1,5 @@
 import type { StandupResponse, Suggestion } from "./api.solitaireAgile";
+import { briefSansCorner } from "./corner";
 
 // The chair's suggestion as the Team Agile page reads it (AR-3; docs/modules/
 // solitaire-agile.md, "The suggestion: one next move, derived"). Pure, and kept
@@ -16,7 +17,9 @@ export function chairSuggestion(
   data: StandupResponse,
   dismissed: string[],
 ): { standing: boolean; current: Suggestion | null } {
-  const lines = (data.brief ?? "").split("\n").filter(Boolean);
+  // The PM Corner, when attached, is the brief's LAST line (corner.ts): the Next line
+  // is the one above it, so the Corner's line is set aside before reading it.
+  const lines = briefSansCorner(data).split("\n").filter(Boolean);
   const first = data.suggestion ?? null;
   const standing = !!first && !!first.line && lines[lines.length - 1] === first.line;
   if (!first || !standing) return { standing: false, current: null };
