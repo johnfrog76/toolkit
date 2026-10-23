@@ -55,6 +55,7 @@ What each `npm run` script does:
 | `npm run smoke` | `node tests/smoke.mjs` | Playwright, flags off. Needs `npx playwright install chromium` once, and two servers -- see below |
 | `npm run smoke:modules` | `node tests/smoke.mjs --modules=on` | The same, with both module flags on |
 | `npm run smoke:mobile` | `node tests/smoke.mjs --viewport=mobile` | The same at 430x932 -- see "A second axis" below |
+| `npm run smoke:landing` | `node tests/smokeLanding.mjs` | The built landing page: its links, the banner at 390 px and at 1280x640. Builds the page and serves it itself; no agent, no dev server, no network |
 | `npm run smoke:studio` | `node tests/smoke.mjs --studio` | The Studio's contract, on servers it starts and stops itself -- see "A mode with its own servers" below |
 | `npm run smoke:matrix` | `node tests/smoke.mjs --matrix` | Each module flag alone, the flip, fresh and storage-refusing contexts, on its own servers too |
 | `npm run smoke:a11y` | `node tests/smoke.mjs --a11y` | axe on every page the registry mounts, flags off and on, `seaglass` and `aurora`, on its own servers; lists findings by impact and fails on any serious or critical one |

@@ -409,6 +409,7 @@ Released under the same MIT License as the code.
 | `docs/images/board.jpg`, `docs/images/board-mobile.jpg`, `docs/images/board-in-action.gif` | The board in the README and the guides | Screenshots of this product running on the sample hub (`docs/images/README.md`) |
 | `docs/images/lounge-zen-temple-skin.png`, `docs/images/team-agile-stage-reference.png` | Two design references | Screenshots of a zen-temple scene and of the Remote Standup grid, from the project owner's CSS Wasteland studio; kept in the docs and not part of the web build |
 | `docs/images/stage.png` | The cast's nine-seat stage, for the README | Rendered from the project's own cast source by `web/tests/render-cast.mjs` (`docs/images/README.md`) |
+| `docs/images/social-preview.png` | The repository's social preview, 1280x640 | Rendered from the project's own landing page by `web/tests/render-cast.mjs --preview` (`docs/images/README.md`) |
 | `docs/logo.txt`, `docs/logo-faces-preview.html` | The ToolKit mark, as ASCII, and a page that draws its faces | Drawn for the project |
 | `web/index.html` | The browser-tab icon, three bars inline as an SVG | Drawn for the project |
 | `web/src/modules/solitaireAgile/stage/cast.tsx` | The Team Agile stage's cast: the nine tiles, tints and webcam scenes | Quoted by copy from the Remote Standup in the project owner's CSS Wasteland studio, which the file's header states; the studio's bios and lines are not carried over |

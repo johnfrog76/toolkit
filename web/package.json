@@ -21,6 +21,7 @@
     "smoke": "node tests/smoke.mjs",
     "smoke:modules": "node tests/smoke.mjs --modules=on",
     "smoke:mobile": "node tests/smoke.mjs --viewport=mobile",
+    "smoke:landing": "node tests/smokeLanding.mjs",
     "smoke:studio": "node tests/smoke.mjs --studio",
     "smoke:matrix": "node tests/smoke.mjs --matrix",
     "smoke:a11y": "node tests/smoke.mjs --a11y",

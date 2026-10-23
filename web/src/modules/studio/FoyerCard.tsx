@@ -63,6 +63,10 @@ import { SpaceLifecycleDialog } from "./SpaceLifecycleDialog";
 import { STUDIO_PAGE_SIZE } from "./paths";
 import { useEnterSpace } from "./useEnterSpace";
 
+// The one sentence that says what a Space is. Written here and in docs/modules/studio.md.
+const SPACE_DEFINITION =
+  "A Space is where you work on one piece of software: your cards on a board, and the tracker's issues, designs and stats beside them once it is connected.";
+
 // The foyer (Studio S2b, D-S2 as amended by D-S13): one row per Space -- every
 // Space, whatever its tracker -- each read for THAT Space without switching
 // into it: every GitHub row from one ledger read for all of them (one gh call
@@ -353,7 +357,7 @@ export function FoyerCard() {
   // filter, so it takes the body's place), and a filter that matches none --
   // that one sits UNDER the tag row, which has to stay reachable.
   const empty = !drawn ? undefined : spaces.length === 0 ? (
-    <EmptyState icon={<BuildingFactoryRegular />} title="No Spaces yet" />
+    <EmptyState icon={<BuildingFactoryRegular />} title="No Spaces yet" detail={SPACE_DEFINITION} />
   ) : undefined;
   const filteredEmpty =
     spaces.length > 0 && shown.length === 0 ? (

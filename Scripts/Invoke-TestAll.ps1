@@ -108,22 +108,21 @@ function New-P20HalfRecord {
 # -- The three halves ----------------------------------------------------------
 $runAgent = {
     $rec = New-P20HalfRecord 'agent'
-    $python = Resolve-P20Python
+    # The test venv first, then the PATH's Python: the first that imports pytest
+    # and httpx (Scripts/Resolve-Python.ps1; docs/TESTING.md, "Which Python runs pytest").
+    $pick = Resolve-P20TestPython -PackageRoot $packageRoot
+    $python = $pick.Python
     if ($null -eq $python) {
         $tried = 'python3, python'
         if ($onWindows) { $tried = 'python, py -3, python3' }
         $rec.reason = "no Python 3 on the PATH (tried $tried)"
         return $rec
     }
-    foreach ($mod in @('pytest', 'httpx')) {
-        $probeArgs = @($python.Prefix) + @('-c', "import $mod")
-        $global:LASTEXITCODE = 0
-        $null = & $python.Exe @probeArgs 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            $rec.reason = "$mod is not installed for $($python.Display) -- $($python.Display) -m pip install -r agent/requirements-dev.txt"
-            return $rec
-        }
+    if ($pick.Missing) {
+        $rec.reason = "$($pick.Missing) is not installed for $($python.Display) -- $($python.Display) -m pip install -r agent/requirements-dev.txt"
+        return $rec
     }
+    $rec.python = $pick.Via
     $savedIo = $env:PYTHONIOENCODING
     $env:PYTHONIOENCODING = 'utf-8'
     $start = Get-Date
@@ -341,6 +340,7 @@ foreach ($h in @($records.Keys)) {
         if ($r.Contains('suites')) { $what += " ($($r.suites) suites)" }
         if ($r.result -eq 'fail' -and $r.detail -like 'no summary line*') { $what += " -- $($r.detail)" }
         if ($r.Contains('fast') -and $r.fast) { $what += ' [-Fast]' }
+        if ($r.Contains('python') -and $r.python) { $what += " [via $($r.python)]" }
         $time = ('{0:N1}s' -f [double]$r.seconds)
     }
     $rowText = ('  {0,-6} {1,-5} {2}' -f $h, $label, $what).PadRight(60)

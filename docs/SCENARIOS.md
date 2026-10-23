@@ -293,7 +293,7 @@ kind -- `GitHub`, `Azure DevOps`, `Your own cards`.
 
 | Spaces offered | The foyer shows |
 | --- | --- |
-| none at all | `No Spaces yet`, and the **+** at the foot; no sentence |
+| none at all | `No Spaces yet`, "A Space is where you work on one piece of software: your cards on a board, and the tracker's issues, designs and stats beside them once it is connected." under it, and the **+** at the foot |
 | a cold `Start` (the three demo Spaces, no `gh`, no `az`) | Azure demo, Demo and GitHub demo, each with a line that teaches; nothing reads as an error |
 | GitHub Spaces, connected, `gh` signed in | one row each: `Public; 4 open, 2 closed this week, 1 sev1 open; last deploy 3 days ago, green`; the Space you are in marked `you are here` |
 | ...its repository public | the line leads `Public;` |

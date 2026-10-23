@@ -1058,6 +1058,13 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `powershell.exe`: that card shows the commit's day, not its file time. `tkTestToolkit -PromptStatus` proves
   the table under pwsh on both hosts; this row is the 5.1 parse of git's quoted names in
   `Scripts/Get-PromptStatus.ps1`. Closes Task 4EF6.
+- [ ] **`tkTest` finds the test venv's pytest on Windows.** With a venv at `%USERPROFILE%\.venv-toolkit` (or
+  `.venv` in the package) that has `pytest` and `httpx` (`agent\requirements-dev.txt`), and a PATH `python` that
+  lacks pytest, run `tkTest -Half agent` from a shell without the venv on PATH. It runs pytest, and its summary
+  row ends `[via ~/.venv-toolkit/Scripts/python.exe]` (`.venv/Scripts/python.exe` for a package venv; the code
+  prints forward slashes and a leading `~`, never the machine's path). Rename the venv away and it falls back to
+  `[via python (PATH)]`, or skips with the reason when that python lacks pytest. `tkTestToolkit -TestAll` stubs
+  the venv case on POSIX only. Closes the pull request that added the venv search (#116).
 - [ ] **Ten minutes to your own board, on a machine that has never seen the product.** The row the 1.4.0
   milestone is judged by (`docs/ROADMAP.md`, M4). On a machine with no ToolKit, no hub and no
   `config.local.json` -- never a clone of the builder's -- with a stopwatch running from the clone: clone the

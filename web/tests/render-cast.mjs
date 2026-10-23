@@ -1,4 +1,4 @@
-// `node tests/render-cast.mjs` -- draws the cast's nine-seat stage to
+// `node tests/render-cast.mjs [--preview]` -- draws the cast's nine-seat stage to
 // docs/images/stage.png, the picture the README's first screen shows.
 //
 // Run by hand when the cast (web/src/modules/solitaireAgile/stage/cast.tsx) or
@@ -95,6 +95,52 @@ window.__ready = Promise.all([
   new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
 ]).then(() => true);
 `;
+
+// `--preview`: the landing page's banner at 1280x640, GitHub's social preview,
+// to docs/images/social-preview.png. It builds the page (`npm run build:landing`),
+// serves dist/landing on a throwaway port and shoots the first screen with
+// everything under the banner hidden, so nothing is cut off at the bottom edge.
+if (process.argv.includes("--preview")) {
+  const { spawnSync } = await import("node:child_process");
+  const http = await import("node:http");
+  const built = spawnSync("npm", ["run", "build:landing"], {
+    cwd: WEB_ROOT,
+    stdio: "ignore",
+    shell: process.platform === "win32",
+  });
+  if (built.status !== 0) throw new Error("npm run build:landing failed");
+  const site = path.join(WEB_ROOT, "dist", "landing");
+  const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
+  const static_ = http.createServer((req, res) => {
+    const file = path.join(site, req.url === "/" ? "index.html" : req.url.split("?")[0]);
+    if (!file.startsWith(site) || !fs.existsSync(file)) return void res.writeHead(404).end();
+    res
+      .writeHead(200, { "Content-Type": types[path.extname(file)] ?? "application/octet-stream" })
+      .end(fs.readFileSync(file));
+  });
+  await new Promise((r) => static_.listen(0, "127.0.0.1", r));
+  const out = path.join(PACKAGE_ROOT, "docs", "images", "social-preview.png");
+  const b = await chromium.launch();
+  try {
+    const ctx = await b.newContext({
+      viewport: { width: 1280, height: 640 },
+      deviceScaleFactor: 1,
+      reducedMotion: "reduce",
+    });
+    const pg = await ctx.newPage();
+    await pg.goto(`http://127.0.0.1:${static_.address().port}/`);
+    await pg.waitForSelector(".lp-banner");
+    await pg.addStyleTag({ content: ".lp main, .lp footer { display: none !important; }" });
+    await pg.evaluate(() => document.fonts.ready);
+    const png = await pg.screenshot({ type: "png", animations: "disabled" });
+    fs.writeFileSync(out, png);
+    console.log(`wrote ${path.relative(process.cwd(), out)} (${png.length} bytes)`);
+  } finally {
+    await b.close();
+    static_.close();
+  }
+  process.exit(0);
+}
 
 const server = await createServer({
   root: WEB_ROOT,
