@@ -1058,6 +1058,18 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `powershell.exe`: that card shows the commit's day, not its file time. `tkTestToolkit -PromptStatus` proves
   the table under pwsh on both hosts; this row is the 5.1 parse of git's quoted names in
   `Scripts/Get-PromptStatus.ps1`. Closes Task 4EF6.
+- [ ] **Ten minutes to your own board, on a machine that has never seen the product.** The row the 1.4.0
+  milestone is judged by (`docs/ROADMAP.md`, M4). On a machine with no ToolKit, no hub and no
+  `config.local.json` -- never a clone of the builder's -- with a stopwatch running from the clone: clone the
+  repository, and in the clone type the README's first three lines, `Import-Module ./utilities.psm1 -Force`,
+  `tkInstallAutoload`, `tkStart`, and nothing else. No account is asked for anywhere. The browser opens on the
+  Demo board: *Start here: pull me onto the board* alone in **Backlog**, and four tutorial cards in **To do**.
+  Walk them in order, by the cards' own words and nothing else: drag the first to To do; tick every box on
+  *Open me and tick my boxes*; write a finding on *Find out one thing and write it down* and tick its box;
+  drag *Say "look at this"* to Waiting; drop *Drop me on Done* on Done, then the three finished ones. You
+  should see the **To do** lane empty, and the last card's closing line pointing at the **+** -- inside ten
+  minutes of the clone. Any step where the card's words were not enough is a defect, filed. The walker writes
+  the time here: stopwatch, clone to empty To do: `____` min `____` s, on `________` (host and date).
 
 ## Recording a run
 

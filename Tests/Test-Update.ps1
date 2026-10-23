@@ -277,15 +277,17 @@ try {
         New-OlderHub $oldHub
         [System.IO.File]::WriteAllText((Join-Path $oldHub 'demo/current/Task9ABC-mine.prompt.md'), "# Task 9ABC: mine`n", (New-Object System.Text.UTF8Encoding($false)))
         $snap = Get-HubSnapshot $oldHub
+        # Every sample card that ships a cover, in any card folder (the Demo's backlog/ included).
+        $coverCount = @(Get-ChildItem (Join-Path $pkgRoot 'samples/hub') -Recurse -Filter '*.prompt.md' | Where-Object { [System.IO.File]::ReadAllText($_.FullName) -match '(?m)^\*\*Cover:\*\*' }).Count
         $env:PROMPTS_ROOT = $oldHub
         $r = Invoke-Update $c
         Assert-Equal 'an older Demo: Update still exits 0' 0 $r.ExitCode
-        Assert-True 'it names the count and the verb, in the Also-needed block' ($r.Output -match '10 sample cards in this hub have no cover\s+->\s+\S*Cover -Samples') $r.Output
+        Assert-True 'it names the count and the verb, in the Also-needed block' ($coverCount -gt 1 -and $r.Output -match "$coverCount sample cards in this hub have no cover\s+->\s+\S*Cover -Samples") $r.Output
         Assert-Equal 'and says it once' 1 ([regex]::Matches($r.Output, 'Cover -Samples')).Count
         Assert-Equal 'and writes nothing into the hub' $snap (Get-HubSnapshot $oldHub)
 
         $r = Invoke-Update $c @('-WhatIf')
-        Assert-True 'the hint is the same under -WhatIf' ($r.Output -match '10 sample cards in this hub have no cover') $r.Output
+        Assert-True 'the hint is the same under -WhatIf' ($r.Output -match "$coverCount sample cards in this hub have no cover") $r.Output
 
         # One card dressed by hand: the count drops by one, and singular reads right at one.
         $env:PROMPTS_ROOT = (Join-Path $base 'hub-one')

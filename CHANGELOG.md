@@ -8,6 +8,10 @@ release.
 
 ## [Unreleased]
 
+### Added
+
+- A fresh `tkStart` now teaches the board by using it: five tutorial cards on the Demo board -- pull one out of Backlog, tick a card's boxes, write down a finding, ask for a review, drop a card on Done -- each finished by doing what it says, until the To do lane is empty and the last card points you at the **+** for your first real card. They replace the single Welcome card; a hub you already have is not changed.
+
 ## [1.3.0] - 2026-10-22
 
 ### Changed

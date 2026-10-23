@@ -40,6 +40,7 @@ import type { EnvStatus, HowIWork, SpaceInfo } from "./api";
 import { drawerSections } from "../modules/ado/homeTabs";
 import { cardActions } from "../modules/ado/cardActions";
 import { LANES, legalMoves, whyNotAMove } from "../modules/ado/legalMoves";
+import { LANE_FIELD_KEY, laneLabel } from "../modules/ado/laneNames";
 import { countInPlay, inPlayLine } from "../modules/ado/inPlay";
 import type { StatusResponse } from "../modules/ado/api.ado";
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -971,6 +972,39 @@ describe("the scenario grid: the board's lanes, by a card's status", () => {
     } as unknown as StatusResponse;
     expect(cardsPhrase(st)).toBe("1 card in play: 1 Active; 2 in Backlog");
   });
+});
+
+// The Demo board on a fresh Start (docs/SCENARIOS.md, "The Demo board on a fresh
+// Start"): five tutorial cards, the first in Backlog and four in To do, each
+// finished by a move the board already allows. The lanes' names are the sample
+// hub's own (samples/hub/hub.json); the statuses are what the agent serves for
+// an untouched copy (Tests/test_first_run.py) and the CLI derives
+// (Tests/Test-Start.ps1, which also walks each act).
+describe("the scenario grid: the Demo board on a fresh Start", () => {
+  const sampleHub = JSON.parse(
+    fs.readFileSync(path.resolve(__dirname, "../../../samples/hub/hub.json"), "utf8"),
+  ) as { spaces: Array<{ slug: string; laneNames?: Record<string, string> }> };
+  const field = sampleHub.spaces.find((sp) => sp.slug === "demo")?.laneNames ?? {};
+  // /env serves laneNames keyed by the contract's word; the hub writes the field's.
+  const names = Object.fromEntries(
+    Object.entries(LANE_FIELD_KEY)
+      .filter(([, key]) => field[key] !== undefined)
+      .map(([word, key]) => [word, field[key]]),
+  );
+  it.each<[string, string, string, string, string]>([
+    ["Start here: pull me onto the board", "Backlog", "Backlog", "Active", "To do"],
+    ["Open me and tick my boxes", "Active", "To do", "Done", "Done"],
+    ["Find out one thing and write it down", "Active", "To do", "Done", "Done"],
+    ['Say "look at this"', "Active", "To do", "Code Review", "Waiting"],
+    ["Drop me on Done", "Active", "To do", "Done", "Done"],
+  ])(
+    "%s: a fresh Start draws it in %s (%s); its move to %s (%s) is one the board allows",
+    (_card, status, shown, to, toShown) => {
+      expect(laneLabel(names, status)).toBe(shown);
+      expect(legalMoves(status)).toContain(to);
+      expect(laneLabel(names, to)).toBe(toShown);
+    },
+  );
 });
 
 // The WIP line on the board's Active column, by `limits.inPlay` and the cards in

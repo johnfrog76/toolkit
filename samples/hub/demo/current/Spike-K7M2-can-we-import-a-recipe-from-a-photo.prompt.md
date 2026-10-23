@@ -33,4 +33,5 @@ it cost per photo?
 **Story Points:** (Not estimated)
 **ADO Link:** (not linked -- created offline with -Title)
 **Cover:** ../assets/Spike-K7M2/cover.webp
+**Started:** 2026-09-19
 **Created:** 2026-09-18

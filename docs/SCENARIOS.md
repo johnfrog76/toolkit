@@ -159,6 +159,24 @@ never stored"):
 The Studio's foyer counts a row's cards **in play** and says the planned ones after the count, never in
 it: `1 card in play: 1 Active; 2 in Backlog`.
 
+### The Demo board on a fresh Start (`scenarios.test.tsx`; the agent's half is `Tests/test_first_run.py`, the CLI's `Tests/Test-Start.ps1`)
+
+A fresh `Start` lands on Demo's Board. Its lanes carry Demo's own names (`laneNames` in
+`samples/hub/hub.json`: To do, Doing, Waiting, Done -- none for Backlog, so it keeps the contract's word),
+and five tutorial cards are the first run's *do*, each finished by a move the board already allows. The
+RecipeBox samples sit in the other lanes, so the To do lane holds the tutorial and nothing else, and
+empties as it is walked (`docs/QUICKSTART.md`, "The first run: one command"):
+
+| Card | A fresh Start draws it in | It is done when | The move |
+| --- | --- | --- | --- |
+| *Start here: pull me onto the board* (`Task H3RE`) | **Backlog** (`demo/backlog/`), alone | it is in To do | drag to To do -- `Move -To Active`, the file to `current/` |
+| *Open me and tick my boxes* (`Task T6CK`) | **To do** | its bar is full (every box ticked) | then Done |
+| *Find out one thing and write it down* (`Spike F7ND`) | **To do** | its one box, "I wrote what I found under Findings", is ticked | then Done |
+| *Say "look at this"* (`User Story R3VU`) | **To do** | it is in **Waiting** | drag to Waiting -- `Move -To CodeReview`, a `**Review:**` line |
+| *Drop me on Done* (`Bug D9NE`) | **To do** | it is in `archive/` | drop on Done -- `Archive` |
+
+Walked to the end, Backlog and To do are empty; the last card ends at the **+**.
+
 ### The board's Active column, by the WIP limit (`scenarios.test.tsx`; the render is `Board.inPlay.test.tsx`)
 
 `limits.inPlay` is one number on this machine (`Config -Set limits.inPlay=5`), served once by `/api/env`

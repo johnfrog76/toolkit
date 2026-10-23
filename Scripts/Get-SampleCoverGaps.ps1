@@ -12,7 +12,9 @@
 
     A gap is a card that passes ALL of these:
       - it sits in a sample Space's folder: <hub>/<name>/ where <name> is also a
-        folder under samples/hub;
+        folder under samples/hub -- current/, backlog/ or archive/, the three
+        folders Cover itself looks in (the Demo's first tutorial card ships in
+        backlog/);
       - the sample ships a card of the very same filename, so it is the sample's
         card and not one the person added (a card the sample does not know is
         never listed);
@@ -23,7 +25,7 @@
         the line is the person's.
 
     Read-only. Returns objects with Space, Card (the hub's FileInfo), Image (the
-    package's picture), Folders (the Space's current/ and archive/).
+    package's picture), Folders (the Space's current/, backlog/ and archive/).
 
 .NOTES
     PowerShell 5.1 compatible (ASCII only, no ternary, no null-coalescing).
@@ -46,20 +48,21 @@ function Get-P20SampleCoverGaps {
     $consts = Get-P20Consts
     $currentName = [string]$consts.folders.current
     $archiveName = [string]$consts.folders.archive
+    $backlogName = [string]$consts.folders.backlog
     $stamp = Get-P20CardImageStamp -Kind 'cover'
 
     foreach ($sampleSpace in @(Get-ChildItem -LiteralPath $sampleRoot -Directory -ErrorAction SilentlyContinue)) {
         $hubSpace = Join-Path $PromptsRoot $sampleSpace.Name
         if (-not (Test-Path -LiteralPath $hubSpace -PathType Container)) { continue }
-        $folders = @((Join-Path $hubSpace $currentName), (Join-Path $hubSpace $archiveName))
-        foreach ($folderName in @($currentName, $archiveName)) {
+        $folders = @((Join-Path $hubSpace $currentName), (Join-Path $hubSpace $backlogName), (Join-Path $hubSpace $archiveName))
+        foreach ($folderName in @($currentName, $backlogName, $archiveName)) {
             $sampleFolder = Join-Path $sampleSpace.FullName $folderName
             if (-not (Test-Path -LiteralPath $sampleFolder -PathType Container)) { continue }
             foreach ($sampleCard in @(Get-ChildItem -LiteralPath $sampleFolder -File -Filter '*.md' -ErrorAction SilentlyContinue)) {
                 $rel = Resolve-P20CardImage -CardPath $sampleCard.FullName -Stamp $stamp
                 if (-not $rel) { continue }
                 $image = Join-Path (Get-P20SpaceAssetsDir -CardPath $sampleCard.FullName) $rel
-                # The card may have moved lanes since: look in both folders of the person's Space.
+                # The card may have moved lanes since: look in every card folder of the person's Space.
                 foreach ($f in $folders) {
                     $candidate = Join-Path $f $sampleCard.Name
                     if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { continue }

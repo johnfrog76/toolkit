@@ -174,11 +174,12 @@ A card can carry a picture: a screen snap of what was wrong (`**Before:**`) and 
   cards: `current/` is a person's list of files.
 - **The card key** is the filename's type prefix as written and its id as the one id rule reads it --
   `US-467`, `Task211`, `Spike-K7M2`, `214`. An existing folder that differs only in case is used as it is.
-- **The sample cards ship with covers**: every card in `samples/hub/demo/current/` and
-  `samples/hub/github-demo/current/` has one, drawn as SVG and sliced to a 800x500 WebP (6-11 KB each),
+- **The sample cards ship with covers**: every card in `samples/hub/demo/current/` and `demo/backlog/`, and
+  in `samples/hub/github-demo/current/`, has one, drawn as SVG and sliced to a 800x500 WebP (6-11 KB each),
   attached through `Cover` so the line and the folder are exactly what the verb writes. `Start` copies
   them out with the cards, and from then on they are the person's files. A Demo copied out before this
-  has no covers; `Cover -Samples` dresses each sample card that has no `**Cover:**` line, and no other. The twenty drawn covers, their
+  has no covers; `Cover -Samples` dresses each sample card that has no `**Cover:**` line, and no other, in
+  whichever of `current/`, `backlog/` or `archive/` it now sits. The twenty drawn covers, their
   SVG sources and the generator are `samples/covers/`.
 - **Types and size**: png, jpg, jpeg, webp, gif (`assets.coverExtensions`), at most 5 MB
   (`assets.coverMaxBytes`); `Cover` refuses anything else, naming the limit.

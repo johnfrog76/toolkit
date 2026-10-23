@@ -138,7 +138,8 @@ A stranger clones the repository, runs three lines, and ten minutes later has us
 their own board, without being asked for an account. **Done when:** that sentence is tested on a machine
 that has never seen the product, and the tour is narrated.
 
-- The first run: watch, do, make your own -- the tutorial cards, the Welcome page. This is the old phase 5.
+- The first run: watch, do, make your own -- the tutorial cards on the Demo board, with no Welcome page
+  (the board is the progress). This is the old phase 5.
 - Kit's guided tour, built and baked in the Wasteland studio and shipped into the deck module.
 - The word for a Space and its one-sentence definition, now that a Space is a connection to software.
 - New Space asks how you want to work, and the orchestrating answer writes the team's files. The old F4.
@@ -174,6 +175,11 @@ go into this file:
 1. **Who is the user now?** The front door says a studio developer orchestrating agents, and the owner
    is also the engineer who will work the Azure way again. Both are first-class (above); the question
    left is only which of them the first run walks first, since a ten-minute tour cannot do both.
+   **Answered 2026-10-23: the studio developer walks first.** The ten minutes are cards on a board with
+   no account anywhere -- five tutorial cards on the Demo board, each finished by doing what it teaches,
+   ending at the **+** ([the first run](QUICKSTART.md#the-first-run-one-command)). The engineer on Azure
+   DevOps finds the Connect card on Home and the Azure demo Space exactly as before, and the first run
+   never asks how you work; the three demo Spaces show all three answers.
 2. **What does "installs itself" mean?** An Electron shell around the three halves, a single binary, or
    a better three-line install. This decides whether M5 exists.
 3. **Is the ritual engine a feature or a product?** Its own repository with ToolKit as one consumer
