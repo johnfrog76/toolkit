@@ -100,3 +100,74 @@ function Resolve-P20Python {
     }
     return $null
 }
+
+function Get-P20TestVenvPythons {
+    <#
+      The test environments to try before the PATH, in order: a `.venv` inside the
+      package, then `.venv-toolkit` in the home folder -- where docs/TESTING.md says
+      to put the agent's dev requirements when the system Python is not the one
+      that should hold them. Each is
+      @{ Exe = <the venv's python>; Prefix = @(); Display = '~/.venv-toolkit/bin/python' };
+      one that is not on disk is left out.
+
+      Display is written with a leading `~` or the package-relative path, never the
+      machine's own path, so it can be pasted.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$PackageRoot,
+        [bool]$Windows = (($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows)
+    )
+    $rel = 'bin/python'
+    if ($Windows) { $rel = 'Scripts/python.exe' }
+    $homeDir = [System.Environment]::GetFolderPath('UserProfile')
+    $roots = @(@{ Path = (Join-Path $PackageRoot '.venv'); Label = '.venv' })
+    if ($homeDir) { $roots += @{ Path = (Join-Path $homeDir '.venv-toolkit'); Label = '~/.venv-toolkit' } }
+    $found = @()
+    foreach ($r in $roots) {
+        $exe = Join-Path $r.Path $rel
+        if (Test-Path -LiteralPath $exe -PathType Leaf) {
+            $found += @{ Exe = $exe; Prefix = @(); Display = "$($r.Label)/$rel" }
+        }
+    }
+    return $found
+}
+
+function Resolve-P20TestPython {
+    <#
+      The interpreter `tkTest` runs the agent half with: the first of the test
+      venvs (Get-P20TestVenvPythons), then the PATH's (Resolve-P20Python's order),
+      that imports BOTH pytest and httpx.
+
+      Returns @{ Python = <candidate or $null>; Missing = <'' | 'pytest' | 'httpx'>;
+                 Via = <what to call it: '~/.venv-toolkit/bin/python', 'python3 (PATH)'> }.
+      With none that has both, Python is the PATH interpreter (or $null when there
+      is none) and Missing names the module it lacked, so the caller's stated reason
+      is the one it always was.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$PackageRoot,
+        [bool]$Windows = (($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows)
+    )
+    $pathPython = Resolve-P20Python -Windows $Windows
+    $candidates = @(Get-P20TestVenvPythons -PackageRoot $PackageRoot -Windows $Windows)
+    if ($null -ne $pathPython) { $candidates += $pathPython }
+    $result = @{ Python = $pathPython; Missing = ''; Via = '' }
+    foreach ($c in $candidates) {
+        $lacks = ''
+        foreach ($mod in @('pytest', 'httpx')) {
+            $probeArgs = @($c.Prefix) + @('-c', "import $mod")
+            $global:LASTEXITCODE = 0
+            $null = & $c.Exe @probeArgs 2>&1
+            if ($LASTEXITCODE -ne 0) { $lacks = $mod; break }
+        }
+        $isPath = ($null -ne $pathPython -and $c.Exe -eq $pathPython.Exe)
+        if (-not $lacks) {
+            $result.Python = $c; $result.Missing = ''
+            $result.Via = $c.Display
+            if ($isPath) { $result.Via = "$($c.Display) (PATH)" }
+            return $result
+        }
+        if ($isPath) { $result.Missing = $lacks }
+    }
+    return $result
+}

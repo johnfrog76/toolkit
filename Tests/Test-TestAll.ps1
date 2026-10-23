@@ -368,19 +368,28 @@ exit 0
         if ($pw) { $pathParts += (Split-Path $pw.Source -Parent) }
     }
     $stubPath = $pathParts -join [System.IO.Path]::PathSeparator
-    $verb = Join-Path $pkg 'Scripts/Invoke-TestAll.ps1'
+    $fakeHome = Join-Path $base 'home'
+    New-Item -ItemType Directory -Path $fakeHome -Force | Out-Null
+    $verb =Join-Path $pkg 'Scripts/Invoke-TestAll.ps1'
     $summaryFile = Get-P20TestSummaryPath -PackageRoot $pkg
     [System.Environment]::SetEnvironmentVariable('TEAMS_WEBHOOK_TESTALL43', 'not-a-url')
 
     function Invoke-TestVerb {
         param([string[]]$Arguments = @(), [string]$PathValue = $stubPath, [string]$HostExe = $hostExe)
         $env:PATH = $PathValue
+        # The home folder is the scratch one: a real ~/.venv-toolkit on the machine
+        # running this suite must not answer for the stub PATH.
+        $savedHome = $env:HOME; $savedProfile = $env:USERPROFILE
+        $env:HOME = $fakeHome; $env:USERPROFILE = $fakeHome
         try {
             $global:LASTEXITCODE = 0
             $out = & $HostExe -NoProfile -ExecutionPolicy Bypass -File $verb @Arguments 2>&1
             $code = $LASTEXITCODE
         }
-        finally { $env:PATH = $savedPath }
+        finally {
+            $env:PATH = $savedPath
+            $env:HOME = $savedHome; $env:USERPROFILE = $savedProfile
+        }
         return @{ Text = (@($out | ForEach-Object { [string]$_ }) -join "`n"); Exit = $code }
     }
     function Get-Line {
@@ -473,6 +482,29 @@ exit 0
     Assert-True 'nothing ran: exit 2' ($r.Exit -eq 2) "exit $($r.Exit)"
     Assert-True 'and the verdict says NOTHING RAN, stated once' ($r.Text -match 'Verdict: NOTHING RAN' -and @($r.Text -split "`n" | Where-Object { $_ -match '^Error: No half ran' }).Count -eq 1)
     Set-Stub 'python' $pytestGreen 0
+
+    # The test venv answers before the PATH. The PATH's python lacks httpx; the home
+    # folder's .venv-toolkit has everything and prints its own count.
+    $r = Invoke-TestVerb @('-Half', 'agent')
+    Assert-True 'no venv: the PATH python runs, and the line names it' ((Get-Line $r.Text 'agent') -match 'PASS.*\[via python \(PATH\)\]') (Get-Line $r.Text 'agent')
+    if ($isWin) {
+        Write-Host "  SKIP  the venv cases stub a POSIX python; the Windows layout (Scripts/python.exe) needs a real one" -ForegroundColor DarkYellow
+    }
+    else {
+        $venvBin = Join-Path $fakeHome '.venv-toolkit/bin'
+        New-Item -ItemType Directory -Path $venvBin -Force | Out-Null
+        $venvBody = "#!/bin/sh`nif [ `"`$1`" = `"-m`" ]; then echo '===== 7 passed in 1.0s ====='; exit 0; fi`nexit 0`n"
+        [System.IO.File]::WriteAllText((Join-Path $venvBin 'python'), $venvBody, $enc)
+        & chmod +x (Join-Path $venvBin 'python')
+        New-Item -ItemType File -Path (Join-Path $bin 'nohttpx') -Force | Out-Null
+        $r = Invoke-TestVerb @('-Half', 'agent')
+        Remove-Item (Join-Path $bin 'nohttpx') -Force
+        Assert-True 'a venv with pytest is used though the PATH python lacks httpx' ((Get-Line $r.Text 'agent') -match 'PASS\s+7 passed') (Get-Line $r.Text 'agent')
+        Assert-True 'and the line names the venv, not the machine path' ((Get-Line $r.Text 'agent') -match [regex]::Escape('[via ~/.venv-toolkit/bin/python]') -and $r.Text -notmatch [regex]::Escape($fakeHome)) (Get-Line $r.Text 'agent')
+        $s = Read-P20TestSummary -Path $summaryFile
+        Assert-True 'and the summary file records the python' ($s['halves']['agent']['python'] -eq '~/.venv-toolkit/bin/python') "$($s['halves']['agent']['python'])"
+        Remove-Item (Join-Path $fakeHome '.venv-toolkit') -Recurse -Force
+    }
 
     Remove-Stub 'npm'
     $r = Invoke-TestVerb @('-Half', 'web')

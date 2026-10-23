@@ -8,6 +8,10 @@ release.
 
 ## [Unreleased]
 
+### Fixed
+
+- `tkTest` finds the test venv's pytest by itself (a `.venv` in the package, then `~/.venv-toolkit`, then the PATH's Python), names the Python it used, and says `NOT AVAILABLE` rather than `not run` when none has pytest.
+
 ## [1.3.0] - 2026-10-22
 
 ### Changed
