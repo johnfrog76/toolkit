@@ -14,6 +14,7 @@ release.
 
 ### Fixed
 
+- A test run is no longer thrown off by a shell's active-Space or prompts-root override: `tkTest`, `tkTestToolkit` and the agent's pytest run take `P20_ACTIVE_SPACE` and `PROMPTS_ROOT` out of the run and put them back after.
 - `tkTest` finds the test venv's pytest by itself (a `.venv` in the package, then `~/.venv-toolkit`, then the PATH's Python), names the Python it used, and says `NOT AVAILABLE` rather than `not run` when none has pytest.
 
 ## [1.3.0] - 2026-10-22

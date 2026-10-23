@@ -79,6 +79,7 @@ describe("consts.json", () => {
     // hands the agent. The web never reads them -- it reads /api/env -- but
     // the contract is stated on all three sides.
     expect(consts.env.activeSpace).toBe("P20_ACTIVE_SPACE");
+    expect(consts.env.promptsRoot).toBe("PROMPTS_ROOT");
     expect(consts.env.features).toBe("P20_FEATURES");
     // Where the agent's on-disk cache goes instead of the user cache folder: the
     // test runners set it, the agent reads it. Stated here for the same reason.
