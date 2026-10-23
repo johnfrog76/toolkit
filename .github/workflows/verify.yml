@@ -9,9 +9,15 @@
 # Windows runs against main once each weekday evening, so a change that only 5.1 or
 # the browser would show is caught the same day. A pull request that is heavy on
 # PowerShell and wants the proof before it merges asks for it with the `ci` label.
+# The label takes effect on the pull request's next push (or reopen); to run Windows
+# on a branch right away, use the Actions tab's button on that branch
+# (`gh workflow run verify.yml --ref <branch>`). A label added to an open pull
+# request starts nothing by itself, on purpose: `labeled` is not a trigger, because
+# any label would then open a run in the pull request's concurrency group and
+# cancel the checks already running there.
 # A local run on each host remains the proof for a change.
 #
-# A scheduled failure is filed as a card carrying the run's URL, and the run is not
+# A scheduled failure is filed as an issue carrying the run's URL, and the run is not
 # re-run: the next morning's first merge carries the fix.
 #
 # Each runner's output is teed to a transcript and read by Scripts/Test-CiHalf.ps1,
@@ -28,9 +34,6 @@ name: verify
 on:
   workflow_dispatch:
   pull_request:
-    # `labeled` is what lets the `ci` label start the Windows job on a pull request
-    # that is already open; the other three are the defaults.
-    types: [opened, synchronize, reopened, labeled]
   push:
     branches: [main]
   schedule:
@@ -54,10 +57,8 @@ concurrency:
 jobs:
   ubuntu:
     name: Three halves on Ubuntu
-    # Not the schedule: that is Windows's. Adding a label fires `labeled`, and only
-    # the `ci` label means anything here, so another label (a triage label,
-    # Dependabot's) does not rerun the whole job.
-    if: ${{ github.event_name != 'schedule' && (github.event.action != 'labeled' || github.event.label.name == 'ci') }}
+    # Not the schedule: that is Windows's.
+    if: ${{ github.event_name != 'schedule' }}
     runs-on: ubuntu-latest
     # The CLI half spawns a child pwsh per case and a slow two-core runner has taken
     # four times what a quick one does for the same tree (33 minutes against a
