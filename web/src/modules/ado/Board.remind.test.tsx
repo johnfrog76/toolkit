@@ -113,15 +113,25 @@ describe("Remind me about this, on a board card", () => {
     draw();
     await menuItems();
     fireEvent.click(screen.getByRole("menuitem", { name: "Remind me about this" }));
-    const dialog = await screen.findByRole("dialog");
-    // The dialog is a lazyPart -- its chunk, and the dialog's own content,
-    // can still be mounting after the "dialog" role itself appears, so every
-    // query inside it is awaited rather than a synchronous getBy*.
-    const what = (await within(dialog).findByRole("textbox", { name: /What/ })) as HTMLInputElement;
-    const ref = (await within(dialog).findByRole("textbox", { name: /Ref/ })) as HTMLInputElement;
+    // The dialog is a lazyPart, so its chunk and content can still be mounting
+    // after the "dialog" role appears; every query is awaited. And Fluent's
+    // focus manager (tabster) marks the dialog surface aria-hidden on a 250 ms
+    // timer until focus has moved into it, so on a slow host a role query that
+    // skips hidden nodes can miss a field that is on screen. The fields are
+    // found by role and name with `hidden: true`: the same elements, whatever
+    // the focus manager's bookkeeping says at that moment.
+    const dialog = await screen.findByRole("dialog", { hidden: true });
+    const what = (await within(dialog).findByRole("textbox", {
+      name: /What/,
+      hidden: true,
+    })) as HTMLInputElement;
+    const ref = (await within(dialog).findByRole("textbox", {
+      name: /Ref/,
+      hidden: true,
+    })) as HTMLInputElement;
     expect(what.value).toBe("Add retry to the upload client");
     expect(ref.value).toBe("401");
-    fireEvent.click(await within(dialog).findByRole("button", { name: "Submit" }));
+    fireEvent.click(await within(dialog).findByRole("button", { name: "Submit", hidden: true }));
     await waitFor(() =>
       expect(runNewReminder).toHaveBeenCalledWith({
         params: ["-Title", "Add retry to the upload client", "-Ref", "401"],
