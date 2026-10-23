@@ -11,7 +11,7 @@ release.
 ### Added
 
 - A fresh `tkStart` now teaches the board by using it: five tutorial cards on the Demo board -- pull one out of Backlog, tick a card's boxes, write down a finding, ask for a review, drop a card on Done -- each finished by doing what it says, until the To do lane is empty and the last card points you at the **+** for your first real card. They replace the single Welcome card; a hub you already have is not changed.
-- `tkHowWeWork <slug>` writes a page for a Space you work with agents -- the seats, the loop, and the hand-off, relay and stand-in rules, as roles rather than models or machines -- into that Space's `agentic/how-we-work.md` in your hub, once and never over your edits. `tkStartWork` hands it to every session as "How we work", the Studio's Prompts card lists it, and the verb prints the one line to paste into your repository's `AGENTS.md`.
+- `tkHowWeWork <slug>` writes a page for a Space you work with agents -- the seats, the loop, and the hand-off, relay and stand-in rules, as roles rather than models or machines -- into that Space's `agentic/how-we-work.md` in your hub, once and never over your edits. `tkStartWork` hands it to every session as "How we work", the Studio's Prompts card lists it, and the verb prints the one line to paste into your repository's `AGENTS.md`. Choosing **With agents** in Settings writes it for you when the Space has none yet.
 
 ### Fixed
 

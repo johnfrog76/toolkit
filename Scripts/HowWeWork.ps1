@@ -119,7 +119,7 @@ if ($m.Success -and $m.Groups[2].Success) { $tracker = "GitHub, ``$($m.Groups[1]
 elseif ($m.Success) { $tracker = "GitHub, ``$($m.Groups[1].Value)``" }
 
 $text = [System.IO.File]::ReadAllText($templatePath).Replace('{space}', $spaceName).Replace('{tracker}', $tracker)
-$pasteLine = "How we work here: $notePath"
+$pasteLine = ([string]$c.startWork.howWeWorkLine).Replace('{path}', $notePath)
 
 if ($WhatIf) {
     Write-Host ""

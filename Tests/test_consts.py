@@ -293,6 +293,8 @@ EXPECTED = {
     # The Space's own note, relative to its folder: HowWeWork writes it, StartWork
     # quotes it, the Studio's Prompts card lists it.
     ("startWork", "howWeWorkNote"): "agentic/how-we-work.md",
+    # The line HowWeWork prints for a repository's AGENTS.md; the web finds it by this shape.
+    ("startWork", "howWeWorkLine"): "How we work here: {path}",
     ("startWork", "text"): {
         "head": "# Start work: {kind} {id} -- {title}",
         "howWeWork": "## How we work in {space} ({source})",

@@ -1,4 +1,6 @@
+import { useCallback } from "react";
 import type { ReactElement } from "react";
+import { useDispatch } from "react-redux";
 import { matchPath } from "react-router";
 import type { RouteObject } from "react-router";
 import type { EnvStatus } from "./api";
@@ -26,6 +28,24 @@ export {
   useGetStatusQuery,
   useWriteConfigMutation,
 } from "../modules/ado/api.ado";
+
+/**
+ * The orchestrating answer's follow-up (docs/modules/studio.md, "HowWeWork"):
+ * after "With agents" is set, the Space's how-we-work note is written through
+ * the bridge unless the Prompts listing already carries it. The Studio's file
+ * that does it is imported when this is called, never with the shell, so the
+ * Studio's endpoints still arrive only when they are needed.
+ */
+export function useWriteHowWeWork() {
+  const dispatch = useDispatch();
+  return useCallback(
+    async (slug: string) => {
+      const { writeHowWeWorkWith } = await import("../modules/studio/howWeWork");
+      return writeHowWeWorkWith(dispatch as Parameters<typeof writeHowWeWorkWith>[0], slug);
+    },
+    [dispatch],
+  );
+}
 
 /**
  * The tuple the home/system card builders close over. It is exactly what

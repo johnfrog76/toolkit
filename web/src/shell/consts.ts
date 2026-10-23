@@ -356,8 +356,12 @@ export const STARTWORK = consts.startWork as {
    *  box draws its Launch button only when `env[launchEnvFlag] === true`. */
   launchEnvFlag: string;
   /** The Space's own how-we-work note, relative to its folder in the hub: the CLI
-   *  writes and quotes it, the agent lists it. The web types no path of it. */
+   *  writes and quotes it, the agent lists it, and the How do you want to work?
+   *  answer asks whether the Prompts listing already carries it. */
   howWeWorkNote: string;
+  /** The line HowWeWork prints for the repository's AGENTS.md ({path} the note's
+   *  path); the answer shows it after the verb runs through the bridge. */
+  howWeWorkLine: string;
   text: {
     head: string;
     howWeWork: string;
