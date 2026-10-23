@@ -439,11 +439,15 @@ describe("the foyer", () => {
     expect(screen.queryByText("No Spaces yet")).toBeNull();
   });
 
-  it("with no Space at all, says so and nothing more", () => {
+  it("with no Space at all, says so and says what a Space is", () => {
     envAnswer = { config: { activeSpace: "", spaces: [] } };
     mount();
     expect(screen.getByText("No Spaces yet")).toBeTruthy();
-    expect(screen.queryByText(/A Space is/)).toBeNull();
+    expect(
+      screen.getByText(
+        "A Space is where you work on one piece of software: your cards on a board, and the tracker's issues, designs and stats beside them once it is connected.",
+      ),
+    ).toBeTruthy();
   });
 });
 
