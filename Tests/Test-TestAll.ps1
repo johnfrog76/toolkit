@@ -192,9 +192,13 @@ Assert-True 'verify.yml has a Windows job' ($workflow -match '(?m)^\s+runs-on: w
 Assert-True 'the Windows job runs the CLI from Windows PowerShell 5.1, the module path set inside that shell' `
     ($workflow -match "powershell\.exe -NoProfile -Command '\`$env:PSModulePath = \(Resolve-Path \.\); Import-Module \./Prompt20Toolkit/Prompt20Toolkit\.psd1 -Force; tkTest -Half cli; exit \`$LASTEXITCODE'")
 $jobCount = [regex]::Matches($workflow, '(?m)^\s+runs-on:').Count
-Assert-True 'verify.yml runs on every pull request, every push to main, and the button' `
-    (($workflow -match '(?ms)^on:\s*\r?\n\s+workflow_dispatch:\s*\r?\n\s+pull_request:\s*\r?\n\s+push:\s*\r?\n\s+branches: \[main\]\s*$') -and ($workflow -notmatch '(?m)^\s+types: \['))
-Assert-True 'no job in verify.yml sits behind a label switch any more' ($jobCount -ge 2 -and $workflow -notmatch "(?m)^\s+if: github\.event_name == 'workflow_dispatch'")
+Assert-True 'verify.yml runs on pull requests (default types: labeled is NOT a trigger), pushes to main, the button, and a weekday schedule' `
+    (($workflow -match '(?m)^\s+workflow_dispatch:') -and ($workflow -notmatch '(?m)^\s+types:') -and ($workflow -notmatch '(?m)^\s+if: .*labeled') -and ($workflow -match '(?ms)^\s+push:\s*\r?\n\s+branches: \[main\]') -and ($workflow -match '(?m)^\s+- cron: "[^"]+"'))
+$windowsJob = $workflow.Substring($workflow.IndexOf('  windows:'))
+Assert-True 'the Windows job runs on the schedule, the button and the ci label, and not on a push to main' `
+    (($windowsJob -match "(?m)^\s+if: .*github\.event_name == 'schedule'") -and ($windowsJob -match "(?m)^\s+if: .*github\.event_name == 'workflow_dispatch'") -and ($windowsJob -match "(?m)^\s+if: .*labels\.\*\.name, 'ci'") -and ($windowsJob -notmatch "(?m)^\s+if: .*'push'"))
+Assert-True 'a scheduled run has a concurrency group of its own and cancel-in-progress is only for pull requests' `
+    (($workflow -match "group: verify-\$\{\{ github\.event_name == 'schedule'") -and ($workflow -match "cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}"))
 Assert-True 'every job in verify.yml has a timeout' ([regex]::Matches($workflow, '(?m)^\s+timeout-minutes: \d+').Count -eq $jobCount)
 
 # The landing page's workflow: every push to main and the button, no secret, the

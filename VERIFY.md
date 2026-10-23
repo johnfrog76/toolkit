@@ -285,7 +285,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **45 suites, 7951 assertions** with a `config.local.json`, every one
+findings. On this commit that is **45 suites, 7952 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -309,10 +309,10 @@ cd web && npm test           # the shell; the current counts are in docs/TESTING
 
 A skip is not a pass. Read the summary line, not just the total.
 
-**What CI covers of this gate.** A pull request's check (`.github/workflows/verify.yml`) runs these three
+**What CI covers of this gate.** A pull request's check (`.github/workflows/verify.yml`, the Ubuntu job) runs these three
 runners on Ubuntu, reads each one's summary line and fails a step on a failure, a skipped half or a run
 that counted nothing ([docs/TESTING.md](docs/TESTING.md), "In CI"). That is this gate on Linux under
-`pwsh` 7. Its Windows job adds the CLI half on Windows: `tkTest -Half cli` typed in Windows PowerShell 5.1
+`pwsh` 7. Its Windows job, which runs on a weekday-evening schedule against `main`, from the Actions tab's button and on a pull request labelled `ci` (the label takes effect on the next push or reopen, and a label alone starts nothing, so it never cancels running checks; for a branch right away, `gh workflow run verify.yml --ref <branch>`), not on an ordinary pull request or a push to `main`, adds the CLI half on Windows: `tkTest -Half cli` typed in Windows PowerShell 5.1
 after the one-manifest import, read the same way, with the runner starting each suite in `pwsh` 7. Nothing
 more: each suite run as a file under 5.1, and the agent's and the web UI's runners on Windows, are still
 walked here and in Gate 12.
