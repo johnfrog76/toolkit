@@ -636,6 +636,20 @@
         "Refused: the Space you are in (switch first), a Space config.default.json ships (hide or retire it), a slug that is not declared. A Space with cards in current/ asks first, naming the count; a caller that cannot answer needs -Force. -WhatIf prints the keys that would go and the folder that would stay."
       ]
     },
+    "HowWeWork": {
+      "category": "studio",
+      "description": "Write a Space's how-we-work note, once, when it is worked with agents",
+      "usage": "{cliPrefix}HowWeWork <slug> [-WhatIf] [-Help]",
+      "examples": [
+        "{cliPrefix}HowWeWork github-demo -WhatIf",
+        "{cliPrefix}HowWeWork github-demo"
+      ],
+      "notes": [
+        "For a Space whose answer to How do you want to work? is agents: writes <space folder>/agentic/how-we-work.md in the hub from the package's agentic/how-we-work.template.md, with the Space's name and tracker filled in -- the seats, the loop, and the hand-off, relay and stand-in rules, named as roles and never as models or machines. StartWork quotes it as how we work in the Space.",
+        "Never over a file that is there: that is refused with exit 2, naming the path -- the note is the team's to edit. For a Space worked alone or on a team it says so and writes nothing. -WhatIf prints the path and the text, and writes nothing.",
+        "It prints one line to paste into the repository's AGENTS.md, How we work here: <path>. ToolKit never writes into a product's repository."
+      ]
+    },
     "AddPRReview": {
       "bridgeTimeoutSeconds": 300,
       "category": "work",

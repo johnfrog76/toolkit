@@ -603,3 +603,9 @@ def startwork_launch_env_flag() -> str:
     """``startWorkLaunch`` -- the name of the top-level boolean ``GET /api/env`` carries for
     StartWork's launch (D-AR13); the web's copy box reads it by the same name."""
     return consts()["startWork"]["launchEnvFlag"]
+
+
+def startwork_how_we_work_note() -> str:
+    """``agentic/how-we-work.md`` -- the Space's own note, relative to its folder in the
+    hub: HowWeWork writes it, StartWork quotes it, the Studio's Prompts card lists it."""
+    return consts()["startWork"]["howWeWorkNote"]

@@ -38,6 +38,7 @@
         'tkEnv',
         'tkGetPRComments',
         'tkHome',
+        'tkHowWeWork',
         'tkHub',
         'tkInstallAutoload',
         'tkLog',

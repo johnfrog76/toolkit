@@ -769,6 +769,51 @@ describe("the Prompts card's rows", () => {
   });
 });
 
+// The note HowWeWork writes for a Space worked with agents: the agent lists it as
+// one of yours (Tests/test_studio_prompts.py, TheSpacesHowWeWorkNote), and the card
+// draws it beside the package's prompts like any other row -- nothing here keys on it.
+describe("the Space's how-we-work note", () => {
+  const NOTE = row({
+    name: "how-we-work",
+    ref: "yours/how-we-work",
+    group: "yours",
+    path: "github-demo/agentic/how-we-work.md",
+    file_path: "/hub/github-demo/agentic/how-we-work.md",
+    title: "How we work in GitHub demo",
+    description: "How we work in GitHub demo: the seats, the loop and the rules.",
+    category: "rituals",
+    workflows: ["agents"],
+    sender: "",
+  });
+  beforeEach(() => {
+    copiedText.length = 0;
+    listAnswer = {
+      data: { count: 4, prompts: [PR_SHIP, NEW_ISSUE, BENCH, NOTE], space: LOCAL },
+    };
+    envAnswer = how("agents");
+  });
+
+  it("is listed under Your hub, by its title, beside the package's prompts", () => {
+    mount();
+    expect(radios()).toEqual(["ToolKit1", "Your hub2"]);
+    fireEvent.click(radio("Your hub"));
+    expect(screen.getByText("How we work in GitHub demo")).toBeTruthy();
+    expect(screen.getByText("bench-billing")).toBeTruthy();
+  });
+
+  it("Copy reference copies its path in the hub, and its name opens the reading room", async () => {
+    mount();
+    fireEvent.click(radio("Your hub"));
+    const card = screen.getByText("How we work in GitHub demo").closest(".fui-Card") as HTMLElement;
+    await act(async () => {
+      fireEvent.click(within(card).getByRole("button", { name: "Copy reference" }));
+    });
+    expect(copiedText).toEqual([`@${NOTE.file_path}`]);
+    fireEvent.click(screen.getByText("How we work in GitHub demo"));
+    expect(screen.getByTestId("where").textContent).toBe("/studio/prompts/yours/how-we-work");
+  });
+});
+
 describe("the Prompts card's pager", () => {
   const toolkit = (n: number) =>
     Array.from({ length: n }, (_, i) => row({ name: `tk-${i + 1}`, workflows: ["team"] }));

@@ -355,6 +355,9 @@ export const STARTWORK = consts.startWork as {
   /** The name of /env's top-level boolean for StartWork's launch (D-AR13): the copy
    *  box draws its Launch button only when `env[launchEnvFlag] === true`. */
   launchEnvFlag: string;
+  /** The Space's own how-we-work note, relative to its folder in the hub: the CLI
+   *  writes and quotes it, the agent lists it. The web types no path of it. */
+  howWeWorkNote: string;
   text: {
     head: string;
     howWeWork: string;

@@ -23,8 +23,10 @@
     2. The card the block, byte for byte; the same card in CRLF gives the
                 same block; the id in any case; an id is never a substring;
                 nothing written to the hub.
-    3. Section one  the Space's how-we-work.md, when it has one, replaces the
-                derived sentence and the heading names its path.
+    3. Section one  the Space's agentic/how-we-work.md (HowWeWork's), when it
+                has one, replaces the derived sentence and the heading names
+                its path; a note at the folder's root is read when that one
+                is not there, and loses to it when both are.
     4. The issue    a number no card carries reads the Space's issue (gh
                 stubbed): the block byte for byte, one read.
     5. The prompt   -Prompt overrides the row; a kind with no row and a row
@@ -249,12 +251,23 @@ try {
     # -- 3. Section one: the Space's note --------------------------------------
     Write-Host ""
     Write-Host "-- Section one: how we work ----------------------------" -ForegroundColor Cyan
-    $note = Join-Path $hub 'widgets/how-we-work.md'
+    # The note HowWeWork writes: <space folder>/agentic/how-we-work.md (consts.json startWork.howWeWorkNote).
+    New-Item -ItemType Directory -Path (Join-Path $hub 'widgets/agentic') -Force | Out-Null
+    $note = Join-Path $hub 'widgets/agentic/how-we-work.md'
     [System.IO.File]::WriteAllText($note, "We work in small pull requests.`r`nOne card, one branch.`r`n", $utf8)
     $n = Invoke-Verb 'tkStartWork 23A3'
-    Assert-True 'a how-we-work.md: the heading names its path' ($n.Inner -match '(?m)^## How we work in Widgets \(widgets/how-we-work\.md\)$') $n.Inner
-    Assert-True 'and its text stands in for the derived sentence, LF' ($n.Inner.Contains("(widgets/how-we-work.md)`nWe work in small pull requests.`nOne card, one branch.`n`n## The work:") -and $n.Inner -notmatch 'You work with agents here') $n.Inner
+    Assert-True 'a how-we-work.md: the heading names its path' ($n.Inner -match '(?m)^## How we work in Widgets \(widgets/agentic/how-we-work\.md\)$') $n.Inner
+    Assert-True 'and its text stands in for the derived sentence, LF' ($n.Inner.Contains("(widgets/agentic/how-we-work.md)`nWe work in small pull requests.`nOne card, one branch.`n`n## The work:") -and $n.Inner -notmatch 'You work with agents here') $n.Inner
+    # A note at the Space's folder root -- where this verb looked before HowWeWork wrote one -- is still read
+    # when the written one is not there, and the written one wins when both are.
+    $rootNote = Join-Path $hub 'widgets/how-we-work.md'
+    [System.IO.File]::WriteAllText($rootNote, "An older note at the root.`n", $utf8)
+    $both = Invoke-Verb 'tkStartWork 23A3'
+    Assert-True 'both there: the agentic/ note is the one quoted' ($both.Inner -match '(?m)^## How we work in Widgets \(widgets/agentic/how-we-work\.md\)$' -and $both.Inner -notmatch 'An older note') $both.Inner
     Remove-Item -LiteralPath $note -Force
+    $old = Invoke-Verb 'tkStartWork 23A3'
+    Assert-True 'the root note alone is still read, its path named' ($old.Inner -match '(?m)^## How we work in Widgets \(widgets/how-we-work\.md\)$' -and $old.Inner.Contains("(widgets/how-we-work.md)`nAn older note at the root.`n`n## The work:")) $old.Inner
+    Remove-Item -LiteralPath $rootNote -Force
 
     # -- 4. The issue -------------------------------------------------------------
     Write-Host ""
