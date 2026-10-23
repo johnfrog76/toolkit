@@ -108,9 +108,17 @@ if (-not (Test-Path $testDir)) {
     $testDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'Tests'
 }
 
+# The shell's own overrides (P20_ACTIVE_SPACE, PROMPTS_ROOT) are taken out for
+# the run and put back in the finally, like the webhooks below: a suite that
+# copies samples/hub must not be steered by a Space or hub the caller chose. A
+# suite that means to test an override sets it itself.
+. (Join-Path $PSScriptRoot '../Scripts/Get-Consts.ps1')
+. (Join-Path $PSScriptRoot '../Scripts/Hide-RunOverrides.ps1')
+$savedOverrides = Hide-P20RunOverrides
+
 # Ensure PROMPTS_ROOT is set for child suites (standalone / -NoProfile runs)
 $repoRoot = (git -C $testDir rev-parse --show-toplevel 2>$null)
-if ($repoRoot -and -not $env:PROMPTS_ROOT) { $env:PROMPTS_ROOT = $repoRoot }
+if ($repoRoot) { $env:PROMPTS_ROOT = $repoRoot }
 
 # ── The usage log this run writes to ─────────────────────────────────────────
 # A test run is not an event. Every suite that loads utilities.psm1 -- and every
@@ -519,4 +527,5 @@ finally {
     [System.Environment]::SetEnvironmentVariable($agentCacheEnv, $previousAgentCache)
     Remove-Item -Path $scratchAgentCache -Recurse -Force -ErrorAction SilentlyContinue
     [System.Environment]::SetEnvironmentVariable('TOOLKIT_QUIET_STARTUP', $previousQuiet)
+    Restore-P20RunOverrides $savedOverrides
 }

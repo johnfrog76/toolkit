@@ -28,6 +28,13 @@ engineer's own machine state.
    engine's one POST refuses on. ``Tests/Test-Toolkit.ps1`` does the same for
    the CLI suites.
 
+4. **The per-shell overrides.** ``P20_ACTIVE_SPACE`` and ``PROMPTS_ROOT``
+   (``consts.json`` ``env.activeSpace`` and ``env.promptsRoot``) beat the config
+   files, so a shell that holds them points every test that copies
+   ``samples/hub`` at a Space or folder that hub lacks. They are removed here for
+   the run and put back afterwards, exactly as the webhooks are; a test that means
+   to exercise an override sets it itself.
+
 **The log redirect happens at IMPORT time, not in a fixture.** conftest is
 imported before test modules are collected, and collection runs module-level
 code: ``test_bridge.py`` calls ``bridge.command_map()`` there, which starts a
@@ -58,6 +65,7 @@ _CONSTS = json.loads((Path(__file__).resolve().parent.parent / "consts.json").re
 WEBHOOK_PREFIX = _CONSTS["env"]["teamsWebhookPrefix"]
 AGENT_CACHE_ENV = _CONSTS["env"]["agentCacheDir"]
 TEST_RUN_MARKER = _CONSTS["env"]["testRunMarker"]
+RUN_OVERRIDES = (_CONSTS["env"]["activeSpace"], _CONSTS["env"]["promptsRoot"])
 
 # See the module docstring: at import, because collection logs.
 USAGE_LOG_DIR = tempfile.mkdtemp(prefix="p20-test-logs-")
@@ -84,12 +92,22 @@ os.environ[TEST_RUN_MARKER] = "1"
 _SAVED_WEBHOOKS = scrub_webhooks(os.environ)
 
 
+def scrub_overrides(environ) -> dict:
+    """Remove the per-shell overrides (``RUN_OVERRIDES``) from ``environ`` and
+    hand back what was removed, so the caller can put it back."""
+    return {name: environ.pop(name) for name in RUN_OVERRIDES if name in environ}
+
+
+_SAVED_OVERRIDES = scrub_overrides(os.environ)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _no_live_webhooks():
     try:
         yield
     finally:
         os.environ.update(_SAVED_WEBHOOKS)
+        os.environ.update(_SAVED_OVERRIDES)
         os.environ.pop(TEST_RUN_MARKER, None)
 
 

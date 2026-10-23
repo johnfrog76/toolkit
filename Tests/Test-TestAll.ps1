@@ -72,6 +72,8 @@ Write-Host "  Test -- the three halves in one run" -ForegroundColor Cyan
 Write-Host "  -----------------------------------------------------" -ForegroundColor DarkGray
 
 . (Join-Path $pkgRoot 'Scripts/TestAll-Rules.ps1')
+. (Join-Path $pkgRoot 'Scripts/Get-Consts.ps1')
+$consts = Get-P20Consts
 $isWin = ($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows
 
 # -- 1. The parsers ---------------------------------------------------------------
@@ -337,7 +339,7 @@ exit 0
                 $body = "@echo off`r`nif `"%1`"==`"-m`" goto run`r`necho %2 | findstr /c:`"import sys`" >nul && (echo 3.12.0& exit /b 0)`r`necho %2 | findstr /c:`"import httpx`" >nul && if exist `"%~dp0nohttpx`" exit /b 1`r`nexit /b 0`r`n:run`r`ntype `"%~dp0python-out.txt`"`r`nset /p CODE=<`"%~dp0python-exit.txt`"`r`nexit /b %CODE%`r`n"
             }
             else {
-                $body = "@echo off`r`necho NPM-ARGS: %*`r`necho HOOK=[%TEAMS_WEBHOOK_TESTALL43%] MARKER=[%P20_TEST_RUN%]`r`ntype `"%~dp0npm-out.txt`"`r`nset /p CODE=<`"%~dp0npm-exit.txt`"`r`nexit /b %CODE%`r`n"
+                $body = "@echo off`r`necho NPM-ARGS: %*`r`necho HOOK=[%TEAMS_WEBHOOK_TESTALL43%] MARKER=[%P20_TEST_RUN%]`r`necho OVERRIDES=[%P20_ACTIVE_SPACE%][%PROMPTS_ROOT%]`r`ntype `"%~dp0npm-out.txt`"`r`nset /p CODE=<`"%~dp0npm-exit.txt`"`r`nexit /b %CODE%`r`n"
             }
             [System.IO.File]::WriteAllText((Join-Path $bin "$Name.cmd"), $body, $enc)
         }
@@ -346,7 +348,7 @@ exit 0
                 $body = "#!/bin/sh`nd=`"`${0%/*}`"`nif [ `"`$1`" = `"-m`" ]; then`n  while IFS= read -r l || [ -n `"`$l`" ]; do printf '%s\n' `"`$l`"; done < `"`$d/python-out.txt`"`n  read code < `"`$d/python-exit.txt`"; exit `$code`nfi`ncase `"`$2`" in`n  *'import sys'*) echo 3.12.0; exit 0;;`n  *'import httpx'*) if [ -f `"`$d/nohttpx`" ]; then exit 1; fi; exit 0;;`nesac`nexit 0`n"
             }
             else {
-                $body = "#!/bin/sh`nd=`"`${0%/*}`"`necho `"NPM-ARGS: `$*`"`necho `"HOOK=[`$TEAMS_WEBHOOK_TESTALL43] MARKER=[`$P20_TEST_RUN]`"`nwhile IFS= read -r l || [ -n `"`$l`" ]; do printf '%s\n' `"`$l`"; done < `"`$d/npm-out.txt`"`nread code < `"`$d/npm-exit.txt`"; exit `$code`n"
+                $body = "#!/bin/sh`nd=`"`${0%/*}`"`necho `"NPM-ARGS: `$*`"`necho `"HOOK=[`$TEAMS_WEBHOOK_TESTALL43] MARKER=[`$P20_TEST_RUN]`"`necho `"OVERRIDES=[`$P20_ACTIVE_SPACE][`$PROMPTS_ROOT]`"`nwhile IFS= read -r l || [ -n `"`$l`" ]; do printf '%s\n' `"`$l`"; done < `"`$d/npm-out.txt`"`nread code < `"`$d/npm-exit.txt`"; exit `$code`n"
             }
             $stubPath = Join-Path $bin $Name
             [System.IO.File]::WriteAllText($stubPath, $body, $enc)
@@ -401,8 +403,23 @@ exit 0
         return (@($Text -split "`n" | Where-Object { $_ -match ('^\s+' + $Half + '\s+(PASS|FAIL|SKIP)\b') }) | Select-Object -First 1)
     }
 
-    # All three green.
-    $r = Invoke-TestVerb
+    # All three green -- from a shell that holds both per-shell overrides (the
+    # names come from the contract, which the verb reads too).
+    $overrideNames = @($consts.env.activeSpace, $consts.env.promptsRoot)
+    $heldOverrides = @{}
+    foreach ($n in $overrideNames) { $heldOverrides[$n] = [System.Environment]::GetEnvironmentVariable($n) }
+    [System.Environment]::SetEnvironmentVariable($overrideNames[0], 'nonexistent-space')
+    [System.Environment]::SetEnvironmentVariable($overrideNames[1], '/nonexistent')
+    try { $r = Invoke-TestVerb }
+    finally {
+        foreach ($n in $overrideNames) {
+            if ($null -eq $heldOverrides[$n]) { Remove-Item "Env:\$n" -ErrorAction SilentlyContinue }
+            else { [System.Environment]::SetEnvironmentVariable($n, [string]$heldOverrides[$n]) }
+        }
+    }
+    Assert-True 'the web child saw neither the active-Space nor the prompts-root override a shell held' ($r.Text -match 'OVERRIDES=\[\]\[\]') (@($r.Text -split "`n" | Where-Object { $_ -match 'OVERRIDES=' }) -join ' ')
+    $testAllRunSource = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'Scripts/Invoke-TestAll.ps1'))
+    Assert-True 'Invoke-TestAll hides the overrides around every half and restores them in a finally' ($testAllRunSource -match '(?s)Hide-P20RunOverrides.*foreach \(\$h in \$halves\).*finally \{ Restore-P20RunOverrides')
     Assert-True 'all green: exit 0' ($r.Exit -eq 0) "exit $($r.Exit)`n$($r.Text)"
     $ia = $r.Text.IndexOf('the agent half'); $ic = $r.Text.IndexOf('the cli half'); $iw = $r.Text.IndexOf('the web half')
     Assert-True 'the halves run in order: agent, cli, web' ($ia -ge 0 -and $ia -lt $ic -and $ic -lt $iw) "$ia $ic $iw"
@@ -770,6 +787,57 @@ catch {
 }
 finally {
     Remove-Item $quietBase -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# -- 3e. The per-shell overrides do not reach a suite, and come back ---------
+Write-Host ""
+Write-Host "-- A run started with P20_ACTIVE_SPACE and PROMPTS_ROOT set: no suite sees them, and the shell has them after --" -ForegroundColor Cyan
+$ovBase = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-testall-ovr-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+New-Item -ItemType Directory -Path (Join-Path $ovBase 'Tests') -Force | Out-Null
+try {
+    # The REAL CLI runner and registry in a scratch package, with a one-file suite
+    # (registered as Consts) that reports what its environment holds. The runner is
+    # called in-process from a child shell that set both overrides, so the line the
+    # child prints last is the caller's own shell after the run.
+    Copy-Item (Join-Path $pkgRoot 'utilities.psm1'), (Join-Path $pkgRoot 'consts.json'), (Join-Path $pkgRoot 'config.default.json') $ovBase
+    Copy-Item (Join-Path $pkgRoot 'Scripts') (Join-Path $ovBase 'Scripts') -Recurse
+    if (Test-Path (Join-Path $pkgRoot 'Config')) { Copy-Item (Join-Path $pkgRoot 'Config') (Join-Path $ovBase 'Config') -Recurse }
+    Copy-Item (Join-Path $scriptDir 'Test-Toolkit.ps1'), (Join-Path $scriptDir 'Get-ToolkitSuiteRegistry.ps1') (Join-Path $ovBase 'Tests')
+    $ovProbe = Join-Path $ovBase 'probe.txt'
+    $ovSpaceName = $consts.env.activeSpace
+    $ovRootName = $consts.env.promptsRoot
+    $ovSuite = "[System.IO.File]::WriteAllText('$($ovProbe -replace "'", "''")', ""SPACE=[`$env:$ovSpaceName] ROOT=[`$env:$ovRootName]"")`nexit 0`n"
+    [System.IO.File]::WriteAllText((Join-Path $ovBase 'Tests/Test-Consts.ps1'), $ovSuite)
+    $ovHost = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+    $ovRunner = (Join-Path $ovBase 'Tests/Test-Toolkit.ps1') -replace "'", "''"
+    $ovCommand = "`$env:$ovSpaceName = 'nonexistent-space'; `$env:$ovRootName = '/nonexistent'; & '$ovRunner' -Consts *>`$null; 'AFTER=[' + `$env:$ovSpaceName + '][' + `$env:$ovRootName + ']'"
+    $ovOut = (& $ovHost -NoProfile -ExecutionPolicy Bypass -Command $ovCommand 2>&1 | ForEach-Object { [string]$_ }) -join "`n"
+    $ovSeen = ''
+    if (Test-Path $ovProbe) { $ovSeen = [System.IO.File]::ReadAllText($ovProbe) }
+    Assert-True 'the suite ran and wrote its probe' ($ovSeen -ne '') 'no probe file'
+    Assert-True 'the suite saw no active-Space override' ($ovSeen -match 'SPACE=\[\]') $ovSeen
+    Assert-True 'the suite saw no prompts-root override from the shell' ($ovSeen -notmatch [regex]::Escape('/nonexistent')) $ovSeen
+    Assert-True 'the shell that started the run has both back afterwards' ($ovOut -match [regex]::Escape('AFTER=[nonexistent-space][/nonexistent]')) $ovOut
+    # The helper on its own: hide, then restore; a name that held nothing stays unset.
+    . (Join-Path $pkgRoot 'Scripts/Hide-RunOverrides.ps1')
+    $ovHeld = @{}
+    foreach ($n in @($ovSpaceName, $ovRootName)) { $ovHeld[$n] = [System.Environment]::GetEnvironmentVariable($n) }
+    # (read before the cases below set anything, so Restore puts the suite's own back)
+    try {
+        [System.Environment]::SetEnvironmentVariable($ovSpaceName, 'x')
+        Remove-Item "Env:\$ovRootName" -ErrorAction SilentlyContinue
+        $ovSaved = Hide-P20RunOverrides
+        Assert-True 'Hide-P20RunOverrides leaves neither variable set' (-not [System.Environment]::GetEnvironmentVariable($ovSpaceName) -and -not [System.Environment]::GetEnvironmentVariable($ovRootName))
+        Restore-P20RunOverrides $ovSaved
+        Assert-True 'Restore-P20RunOverrides puts back the one that was set and leaves the other unset' (([System.Environment]::GetEnvironmentVariable($ovSpaceName) -eq 'x') -and ($null -eq [System.Environment]::GetEnvironmentVariable($ovRootName)))
+    }
+    finally { Restore-P20RunOverrides $ovHeld }
+}
+catch {
+    Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally {
+    Remove-Item $ovBase -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # -- 4. The wiring -----------------------------------------------------------------

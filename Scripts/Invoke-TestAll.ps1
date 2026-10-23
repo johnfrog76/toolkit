@@ -257,6 +257,11 @@ $suiteKeys = @{ agent = 'pytest'; web = 'jest' }
 $script:cliPasteLines = @()
 $records = [ordered]@{}
 $overallStart = Get-Date
+# The shell's own overrides (P20_ACTIVE_SPACE, PROMPTS_ROOT) are out of every
+# half's environment for the run and back in the finally, as the webhooks are.
+. (Join-Path $scriptsDir 'Hide-RunOverrides.ps1')
+$savedOverrides = Hide-P20RunOverrides
+try {
 foreach ($h in $halves) {
     Write-Host ""
     Write-Host "  == ${prefix}Test: the $h half ==" -ForegroundColor Cyan
@@ -267,6 +272,8 @@ foreach ($h in $halves) {
     }
     $records[$h] = $rec
 }
+}
+finally { Restore-P20RunOverrides $savedOverrides }
 $overallSeconds = [math]::Round(((Get-Date) - $overallStart).TotalSeconds, 1)
 
 # -- The summary file ------------------------------------------------------------

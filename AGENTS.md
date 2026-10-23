@@ -162,11 +162,14 @@ module and you add a mock line to every one of these files.
 > for themselves: every `TEAMS_WEBHOOK_*` is removed by pattern for the run and put back after, and
 > the run marker (`consts.json` `env.testRunMarker`) makes the engine's POST and `SendTeams` refuse
 > while a suite runs -- in the runner's own process tree only, so your shell can still send.
+> The same goes for the per-shell overrides `P20_ACTIVE_SPACE` and `PROMPTS_ROOT` (`consts.json`
+> `env.activeSpace`, `env.promptsRoot`): the runners remove them for the run and put them back, so a
+> shell that holds them reads the same as one that does not; a suite that tests an override sets it itself.
 
 **Four test runners**, one per half plus one for the two together. Run the ones your change touches:
 
 ```powershell
-tkTestToolkit                 # the CLI -- 45 suites, 7952 assertions on this commit
+tkTestToolkit                 # the CLI -- 45 suites, 7961 assertions on this commit
 ```
 
 ```bash
