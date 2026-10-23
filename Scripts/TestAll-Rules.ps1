@@ -313,13 +313,14 @@ function Get-P20PasteLines {
     $a = $null
     if ($Records.Contains('agent')) { $a = $Records['agent'] }
     if ($null -eq $a) { $out += 'pytest: not run -- this run did not include the agent half' }
-    elseif ($a.result -eq 'skip') { $out += "pytest: not run -- skipped: $($a.reason)" }
+    elseif ($a.result -eq 'skip') { $out += "pytest: NOT AVAILABLE -- no python with pytest was found: $($a.reason)" }
     elseif ($a.result -ne 'pass') { $out += 'pytest: not printed -- the agent half did not pass' }
     else {
         $pc = ConvertFrom-P20PytestOutput -Text ([string]$a.line)
         $s = "$($pc.Passed) passed"
         if ($pc.Skipped -gt 0) { $s += ", $($pc.Skipped) skipped" }
         if ($pc.Subtests -gt 0) { $s += ", $($pc.Subtests) subtests" }
+        if ($a.Contains('python') -and $a.python) { $s += " (via $($a.python))" }
         $out += "pytest: $s"
     }
 

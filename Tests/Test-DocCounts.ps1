@@ -196,7 +196,9 @@ $driftTable = @(
     @('stale-pytest.md', 1, "the command block's pytest line is stale: it says '11 passed"),
     @('stale-web.md', 1, "the command block's web line is stale: it says '7 suites, 54 tests'"),
     @('stale-cli-line.md', 1, "the command block's tkTestToolkit line is stale: it says '3 suites, 59 assertions'"),
-    @('pytest-not-run.md', 1, "the paste block's pytest line is not a count")
+    @('pytest-not-run.md', 1, "the paste block's pytest line is not a count"),
+    @('pytest-not-available.md', 1, "the paste block's pytest line is not a count"),
+    @('agree-via.md', 0, '')
 )
 foreach ($case in $driftTable) {
     $fx = Get-Content -LiteralPath (Join-Path $driftDir $case[0]) -Raw -Encoding UTF8
@@ -212,7 +214,8 @@ $recWeb = [ordered]@{ result = 'pass'; suites = 7; total = 55 }
 $cliTwo = @('Consts 10, Compat 20, Menu 30', '3 suites, 60 assertions')
 $pasteTable = @(
     @('all three ran', [ordered]@{ agent = $recAgent; web = $recWeb }, $cliTwo, 'Consts 10, Compat 20, Menu 30|3 suites, 60 assertions|pytest: 12 passed, 1 skipped, 40 subtests|web: 7 suites, 55 tests'),
-    @('agent skipped', [ordered]@{ agent = [ordered]@{ result = 'skip'; reason = 'no Python 3 on the PATH' }; web = $recWeb }, $cliTwo, 'Consts 10, Compat 20, Menu 30|3 suites, 60 assertions|pytest: not run -- skipped: no Python 3 on the PATH|web: 7 suites, 55 tests'),
+    @('agent skipped', [ordered]@{ agent = [ordered]@{ result = 'skip'; reason = 'no Python 3 on the PATH' }; web = $recWeb }, $cliTwo, 'Consts 10, Compat 20, Menu 30|3 suites, 60 assertions|pytest: NOT AVAILABLE -- no python with pytest was found: no Python 3 on the PATH|web: 7 suites, 55 tests'),
+    @('agent ran through a venv', [ordered]@{ agent = [ordered]@{ result = 'pass'; line = $recAgent.line; python = '~/.venv-toolkit/bin/python' }; web = $recWeb }, $cliTwo, 'Consts 10, Compat 20, Menu 30|3 suites, 60 assertions|pytest: 12 passed, 1 skipped, 40 subtests (via ~/.venv-toolkit/bin/python)|web: 7 suites, 55 tests'),
     @('web failed, CLI partial', [ordered]@{ agent = $recAgent; web = [ordered]@{ result = 'fail' } }, @(), 'CLI: not printed -- the CLI half did not run every suite and pass|pytest: 12 passed, 1 skipped, 40 subtests|web: not printed -- the web half did not pass')
 )
 foreach ($pc in $pasteTable) {

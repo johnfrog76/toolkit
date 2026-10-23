@@ -15,7 +15,8 @@
       3. the command block's pytest totals == the paste block's `pytest:` line
       4. the command block's web totals == the paste block's `web:` line
 
-    A paste line that says "not run" (a half the run lacked) is not a count and is a
+    A paste line that says "not run" (a half the run lacked) or "NOT AVAILABLE" (no python
+    with pytest) is not a count and is a
     finding of its own: it is information for the person pasting, never a figure to keep.
 
     Returns an array of findings (empty when everything agrees); each names the stale line,
@@ -34,7 +35,9 @@ function Get-P20TestingDocDrift {
     $pasteTotal = $null; $pastePytest = $null; $pasteWeb = $null
     foreach ($l in $lines) {
         if ($l -match '^(\d+ suites, \d+ assertions)$') { $pasteTotal = $Matches[1]; continue }
-        if ($l -match '^pytest: (.+)$') { $pastePytest = $Matches[1]; continue }
+        # `pytest: 12 passed (via ~/.venv-toolkit/bin/python)`: which python ran it is
+        # information for the person pasting, not part of the count.
+        if ($l -match '^pytest: (.+)$') { $pastePytest = ($Matches[1] -replace '\s+\(via [^)]*\)$', ''); continue }
         if ($l -match '^web: (.+)$') { $pasteWeb = $Matches[1]; continue }
         foreach ($pm in [regex]::Matches($l, '(?<=^|,\s)([A-Z][A-Za-z]+) (\d+)(?=,|$)')) { $pasteSuites += , @($pm.Groups[1].Value, $pm.Groups[2].Value) }
     }
