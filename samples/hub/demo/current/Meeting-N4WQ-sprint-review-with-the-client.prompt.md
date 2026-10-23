@@ -40,4 +40,5 @@ the photo import spike and the tag-search duplicates.
 **Story Points:** 0
 **ADO Link:** (not linked -- Demo works from its cards)
 **Cover:** ../assets/Meeting-N4WQ/cover.webp
+**Started:** 2026-09-18
 **Created:** 2026-09-18

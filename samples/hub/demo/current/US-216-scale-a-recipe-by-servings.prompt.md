@@ -20,4 +20,5 @@ Depends on Task 211: scaling is conversion plus rounding, and it should not be t
 **Sprint:** RecipeBox\Sprint 9
 **Story Points:** 5
 **Cover:** ../assets/US-216/cover.webp
+**Started:** 2026-09-22
 **Created:** 2026-09-17

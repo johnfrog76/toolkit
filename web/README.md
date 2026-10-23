@@ -59,6 +59,7 @@ What each `npm run` script does:
 | `npm run smoke:studio` | `node tests/smoke.mjs --studio` | The Studio's contract, on servers it starts and stops itself -- see "A mode with its own servers" below |
 | `npm run smoke:matrix` | `node tests/smoke.mjs --matrix` | Each module flag alone, the flip, fresh and storage-refusing contexts, on its own servers too |
 | `npm run smoke:a11y` | `node tests/smoke.mjs --a11y` | axe on every page the registry mounts, flags off and on, `seaglass` and `aurora`, on its own servers; lists findings by impact and fails on any serious or critical one |
+| `npm run smoke:first-run` | `node tests/smoke.mjs --first-run` | The first run's first move: on a copy of `samples/hub`, the first tutorial card dragged from Backlog to To do and the moved file read back, on its own servers |
 | (flag) `--shots=<dir>` | | One PNG per route per viewport, under the gitignored `web/shots/` |
 
 `npm run build` does **not** run the tests or the type-check. Run `npm run type-check && npm run
@@ -83,6 +84,7 @@ web/
 ├── tests/smokeStudio.mjs   its --studio cases; smokeStack.mjs starts the servers that mode owns
 ├── tests/smokeMatrix.mjs   its --matrix cases, on the same kind of servers
 ├── tests/smokeA11y.mjs     its --a11y audit, on the same kind of servers
+├── tests/smokeFirstRun.mjs  its --first-run drag, on the same kind of servers and a copy of samples/hub
 ├── tests/jest.setup.cjs   jest setupFiles: Node's TextEncoder/TextDecoder for jsdom, which React Router 8 needs
 ├── tests/routeModules.jest.cjs  jest only: a stub for react-router's one file that reads import.meta
 └── src/
@@ -1547,6 +1549,10 @@ runs), axe-core (`@axe-core/playwright`) on every page the registry mounts in th
 findings grouped by impact -- page, theme, mode, rule, selector, help URL -- and a one-line count, and
 exits 1 on any serious or critical finding: a gate, separate from the default smoke because a run
 takes about ten minutes. `docs/TESTING.md` has the detail.
+
+**`--first-run`** (`npm run smoke:first-run`) is the first tutorial card's move, on the same kind of
+servers with a COPY of `samples/hub` as the hub (the way `Start` makes one): Demo's board shows the card
+alone in Backlog, the drag lands it in To do, and the file is read back from `demo/current/`.
 
 **A second axis: the viewport.**
 

@@ -358,8 +358,9 @@ agentic/                Six card-workflow prompts, pr-suggest, new-issue, four m
                         prompts, and prompts.json -- which way of working each belongs to,
                         who sends it and its category (the Studio's Prompts card reads it)
 spec/                   Where a product may keep its specs; this tree keeps only the README ([spec/README.md](../spec/README.md))
-samples/hub/            The sample hub `tkStart` copies out on a first run: one `local` org, Demo, with cards,
-                        meetings, a goal and a review. Read-only here -- it is never used in place
+samples/hub/            The sample hub `tkStart` copies out on a first run: one `local` org, Demo, with five
+                        tutorial cards, sample cards, meetings, a goal and a review. Read-only here -- it is
+                        never used in place
 design/                 Where a product may keep its design notes; this tree keeps only the README ([design/README.md](../design/README.md))
 .github/workflows/      verify.yml, the suites in CI; pages.yml, the landing page's deploy (docs/TESTING.md, "In CI")
 AGENTS.md  CHANGELOG.md  VERIFY.md  the agent guide, the change log, the verification gates
@@ -413,6 +414,7 @@ web/                    The React shell + modules -- see web/README.md
   tests/smokeStack.mjs    the servers a smoke mode owns: a scratch package, its agent, a Vite
   tests/smokeStudio.mjs   --studio: the Studio's contract on those servers
   tests/smokeMatrix.mjs   --matrix: each module flag alone, the flip, fresh and hostile storage
+  tests/smokeFirstRun.mjs --first-run: the first tutorial card dragged to To do, on a copy of samples/hub
 Tests/                  Suites -- Test-*.ps1 (PowerShell) and test_*.py (the agent)
   fixtures/parsers/       Four prompt files both parsers are pinned against
   fixtures/hub/           A prompt store with no toolkit in it and no .git: two cards under

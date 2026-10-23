@@ -64,7 +64,37 @@ Assert-True 'a card in Code Review: one has a pull request' (@($sampleTexts | Wh
 Assert-True 'a card In Progress: one has a commit and no pull request' (@($sampleTexts | Where-Object { $_ -match '(?m)^\s*-\s+[0-9a-f]{7,}\s' -and $_ -notmatch '(?m)^PR URL:\s*https://' }).Count -ge 1)
 Assert-True 'a card that is Active: neither' (@($sampleTexts | Where-Object { $_ -notmatch '(?m)^\s*-\s+[0-9a-f]{7,}\s' -and $_ -notmatch '(?m)^PR URL:\s*https://' }).Count -ge 1)
 Assert-True 'a Spike with an id of its own, and no work item' (@($sampleCards | Where-Object { $_.Name -cmatch '^Spike-[A-Z0-9]{4}-' }).Count -ge 1 -and (@($sampleTexts | Where-Object { $_ -match '(?m)^# Spike ' -and $_ -match 'not linked' }).Count -ge 1))
-Assert-True 'a Welcome card in To do: no work item, no commit, and its tour is checkboxes' (@($sampleCards | Where-Object { $_.Name -ceq 'TaskW3KC-welcome-to-the-toolkit.prompt.md' -and ($t = Get-Content $_.FullName -Raw) -match '(?m)^# Task W3KC: Welcome to the Toolkit' -and $t -match 'not linked' -and $t -notmatch '(?m)^\s*-\s+[0-9a-f]{7,}\s' -and $t -notmatch '(?m)^PR URL:' -and ([regex]::Matches($t, '(?m)^- \[ \] ')).Count -ge 5 }).Count -eq 1)
+# The first run is five tutorial cards on the Demo board, walked in order, each finished by the act
+# it teaches -- and the act is one the product already reads (docs/QUICKSTART.md, "The first run: one
+# command"). The set, in order: folder, filename, heading. The first is planned (backlog/), the
+# other four are in play.
+$tutorial = @(
+    [pscustomobject]@{ Id = 'H3RE'; Folder = 'backlog'; File = 'TaskH3RE-start-here-pull-me-onto-the-board.prompt.md'; Heading = 'Task H3RE: Start here: pull me onto the board' }
+    [pscustomobject]@{ Id = 'T6CK'; Folder = 'current'; File = 'TaskT6CK-open-me-and-tick-my-boxes.prompt.md'; Heading = 'Task T6CK: Open me and tick my boxes' }
+    [pscustomobject]@{ Id = 'F7ND'; Folder = 'current'; File = 'Spike-F7ND-find-out-one-thing-and-write-it-down.prompt.md'; Heading = 'Spike F7ND: Find out one thing and write it down' }
+    [pscustomobject]@{ Id = 'R3VU'; Folder = 'current'; File = 'US-R3VU-say-look-at-this.prompt.md'; Heading = 'User Story R3VU: Say "look at this"' }
+    [pscustomobject]@{ Id = 'D9NE'; Folder = 'current'; File = 'D9NE-drop-me-on-done.prompt.md'; Heading = 'Bug D9NE: Drop me on Done' }
+)
+$tutorialMissing = @($tutorial | Where-Object {
+        $p = Join-Path (Join-Path (Join-Path $samples 'demo') $_.Folder) $_.File
+        -not (Test-Path -LiteralPath $p) -or ([System.IO.File]::ReadAllText($p) -notmatch ('(?m)^# ' + [regex]::Escape($_.Heading) + '\r?$'))
+    } | ForEach-Object { $_.File })
+Assert-True 'the Demo ships the five tutorial cards, each in its folder under its heading' ($tutorialMissing.Count -eq 0) ($tutorialMissing -join ', ')
+$tutorialTexts = @($tutorial | ForEach-Object { $p = Join-Path (Join-Path (Join-Path $samples 'demo') $_.Folder) $_.File; if (Test-Path -LiteralPath $p) { [System.IO.File]::ReadAllText($p) } else { '' } })
+Assert-True 'each is a card of its own: no work item, no commit, no pull request, no lane line' (@($tutorialTexts | Where-Object { $_ -notmatch 'not linked' -or $_ -match '(?m)^\s*-\s+[0-9a-f]{7,}\s' -or $_ -match '(?m)^PR URL:' -or $_ -match '(?m)^\*\*(Started|Review):\*\*' }).Count -eq 0)
+Assert-True 'the backlog holds the first card and nothing else, so "Start here" is the one card to pull' ((@(Get-ChildItem (Join-Path $samples 'demo/backlog') -Filter '*.prompt.md' | ForEach-Object { $_.Name }) -join ',') -eq $tutorial[0].File)
+Assert-True "the first card carries the Context a card's first reader needs: what a card is, and that the lane is derived" ($tutorialTexts[0] -match '(?m)^## Context' -and $tutorialTexts[0] -match 'one Markdown file for one piece of work' -and $tutorialTexts[0] -match 'There is no status field')
+Assert-True 'the Spike is done by one box, and the box is about the Findings' (([regex]::Matches($tutorialTexts[2], '(?m)^\s*-\s*\[[x ]\]')).Count -eq 1 -and $tutorialTexts[2] -match '(?m)^- \[ \] I wrote what I found under Findings\r?$')
+$lastBody = ($tutorialTexts[4] -split '(?m)^---\r?$')[0].TrimEnd()
+Assert-True 'the last card ends at the +, and names the Connect card for Azure DevOps' ($lastBody -match 'press \*\*\+\*\* and make your first real card; if Azure DevOps is your world, the Connect card on Home is\s+where it starts\.$') ($lastBody.Substring([Math]::Max(0, $lastBody.Length - 160)))
+Assert-True 'the Welcome card it replaced is gone, and its cover with it' (-not (Test-Path (Join-Path $samples 'demo/current/TaskW3KC-welcome-to-the-toolkit.prompt.md')) -and -not (Test-Path (Join-Path $samples 'demo/assets/TaskW3KC')))
+# The To do lane is the first run's progress: it holds the tutorial cards and nothing else, so it can
+# empty. Every other card in demo/current is in a lane of its own, by the product's own rule.
+. (Join-Path $pkgRoot 'Scripts/Get-Consts.ps1')
+. (Join-Path $pkgRoot 'Scripts/Get-PromptFileStatus.ps1')
+$activeName = (Get-P20Consts).status.active
+$othersInToDo = @($sampleCards | Where-Object { $tutorial.File -notcontains $_.Name -and (Get-PromptFileStatus -Content (Get-Content $_.FullName -Raw) -Folder 'current') -eq $activeName } | ForEach-Object { $_.Name })
+Assert-True 'no other sample card is in To do, so the lane can empty' ($othersInToDo.Count -eq 0) ($othersInToDo -join ', ')
 # Every sample card IS a card: its filename carries an id by the one rule,
 # Resolve-CardName.ps1. The Welcome card was typed by hand as W3LC -- L is a look-alike
 # the short id's alphabet leaves out -- so the first card a new user met had no id, and
@@ -72,7 +102,7 @@ Assert-True 'a Welcome card in To do: no work item, no commit, and its tour is c
 . (Join-Path (Split-Path -Parent $samples | Split-Path -Parent) 'Scripts/Resolve-CardName.ps1')
 $sampleTypes = Get-P20WorkItemTypes -Config (Get-Content (Join-Path (Split-Path -Parent $samples | Split-Path -Parent) 'config.default.json') -Raw | ConvertFrom-Json)
 $samplePattern = Get-P20CardIdPattern -WorkItemTypes $sampleTypes
-$allSampleCards = @(Get-ChildItem $samples -Recurse -Filter '*.prompt.md' | Where-Object { $_.Directory.Name -in @('current', 'archive') -and $_.Directory.Parent.Name -in @('demo', 'github-demo', 'azure-demo') })
+$allSampleCards = @(Get-ChildItem $samples -Recurse -Filter '*.prompt.md' | Where-Object { $_.Directory.Name -in @('current', 'backlog', 'archive') -and $_.Directory.Parent.Name -in @('demo', 'github-demo', 'azure-demo') })
 $noId = @($allSampleCards | Where-Object { -not (Get-P20CardId -Name $_.Name -Pattern $samplePattern) } | ForEach-Object { $_.Name })
 Assert-True 'every sample card carries an id by the one rule' ($allSampleCards.Count -ge 10 -and $noId.Count -eq 0) "$($allSampleCards.Count) cards; no id: $($noId -join ', ')"
 Assert-True 'and finished ones, stamped closed' (@(Get-ChildItem (Join-Path $samples 'demo/archive') -Filter '*.prompt.md' | Where-Object { (Get-Content $_.FullName -Raw) -match '\*\*Closed:\*\* \d{4}-\d{2}-\d{2}' }).Count -ge 2)
@@ -85,13 +115,15 @@ Assert-True "it ships 'local', so nothing is contacted before Connect" ($ghDemo.
 Assert-True 'and its address is the public demo repo, repo-grained' ($ghDemo.org -eq 'https://github.com/johnfrog76/recipe-box-demo') "$($ghDemo.org)"
 $ghCards = @(Get-ChildItem (Join-Path $samples 'github-demo/current') -Filter '*.prompt.md')
 
-# Every current sample card ships wearing a cover, and the file the line names is there.
+# Every current sample card -- and the planned one in the Demo's backlog/ -- ships wearing a cover, and
+# the file the line names is there.
+$backlogCards = @(Get-ChildItem (Join-Path $samples 'demo/backlog') -Filter '*.prompt.md')
 $coverLines = @()
-foreach ($c in @($sampleCards) + @($ghCards)) {
+foreach ($c in @($sampleCards) + @($backlogCards) + @($ghCards)) {
     $m = [regex]::Match((Get-Content -LiteralPath $c.FullName -Raw), '(?m)^\*\*Cover:\*\* (\S+)')
     if ($m.Success) { $coverLines += (Join-Path $c.Directory.FullName $m.Groups[1].Value) }
 }
-Assert-True 'every current sample card wears a cover' ((@($sampleCards).Count + @($ghCards).Count) -eq $coverLines.Count) "$(@($sampleCards).Count + @($ghCards).Count) cards, $($coverLines.Count) cover lines"
+Assert-True 'every current and planned sample card wears a cover' ((@($sampleCards).Count + @($backlogCards).Count + @($ghCards).Count) -eq $coverLines.Count) "$(@($sampleCards).Count + @($backlogCards).Count + @($ghCards).Count) cards, $($coverLines.Count) cover lines"
 Assert-True 'and each cover file ships beside the cards' (@($coverLines | Where-Object { -not (Test-Path -LiteralPath $_) }).Count -eq 0)
 Assert-True 'it has cards, each linked to an issue of that repo' ($ghCards.Count -ge 3 -and @($ghCards | Where-Object { (Get-Content $_.FullName -Raw) -match '(?m)^\*\*ADO Link:\*\* https://github\.com/johnfrog76/recipe-box-demo/issues/\d+' }).Count -eq $ghCards.Count) "$($ghCards.Count) found"
 $seed = Get-Content (Join-Path (Join-Path $pkgRoot 'samples') 'recipe-box.seed.json') -Raw | ConvertFrom-Json
@@ -220,6 +252,95 @@ try {
     Assert-True 'every shipped sample -- Demo, the GitHub demo and the Azure demo -- carries example: true after the merge' ($examples -match 'EXAMPLES azure-demo,demo,github-demo') $examples
     Assert-True 'Status lists the sample cards' ($status -match "Active prompts \($($sampleCards.Count)\)") $status
     Assert-True 'and derives state from the file: a card with commits is In Progress' ($status -match 'In Progress') $status
+
+    Write-Host ""
+    Write-Host "-- the first run's board: five lessons, each done by the product's own reading --" -ForegroundColor Cyan
+    # What a fresh Start SHOWS: the first tutorial card in Backlog, the other four in To do. The
+    # lane is the product's rule (Get-PromptFileStatus, the folder first), and its name is the
+    # Demo's own (laneNames; Backlog has none there, so it keeps the contract's word).
+    $copiedManifest = Get-Content (Join-Path $hub 'hub.json') -Raw | ConvertFrom-Json
+    $copiedLanes = @($copiedManifest.spaces | Where-Object { $_.slug -eq 'demo' })[0].laneNames
+    $c = Get-P20Consts
+    $laneOf = @{}
+    foreach ($t in $tutorial) {
+        $found = $null
+        foreach ($folderName in @('backlog', 'current', 'archive')) {
+            $p = Join-Path (Join-Path (Join-Path $hub 'demo') $folderName) $t.File
+            if (Test-Path -LiteralPath $p) { $found = Get-PromptFileStatus -Content ([System.IO.File]::ReadAllText($p)) -Folder $folderName; break }
+        }
+        $laneOf[$t.Id] = if ($found -eq $c.status.active -and $copiedLanes.active) { $copiedLanes.active } else { $found }
+    }
+    $firstLane = $laneOf[$tutorial[0].Id]
+    $restLanes = @($tutorial | Select-Object -Skip 1 | ForEach-Object { $laneOf[$_.Id] })
+    Assert-True 'a fresh Start shows the first tutorial card in Backlog' ($firstLane -eq $c.status.backlog) "it reads '$firstLane'"
+    Assert-True "and the other four in To do (the Demo's name for Active)" ($copiedLanes.active -eq 'To do' -and @($restLanes | Where-Object { $_ -ne 'To do' }).Count -eq 0) ($restLanes -join ', ')
+
+    # Each lesson's "done when", done on a COPY of that hub by the verb or the edit a person makes,
+    # then read back the way the product reads it: the lane by Get-PromptFileStatus and by Status,
+    # the boxes by Status's own Progress count. So a lesson cannot promise a state the rules do not
+    # derive -- change the rule, and this is where the tutorial says so.
+    $lessons = Join-Path $base 'lessons-hub'
+    Copy-Item $hub $lessons -Recurse
+    function Invoke-InLessons {
+        param([string]$Commands)
+        $pre = "`$env:PSModulePath = '$pkg'; `$env:PROMPTS_ROOT = '$lessons'; `$env:P20_USAGE_LOG_DIR = '$logDir'; " +
+            "Import-Module '$pkg/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; "
+        Push-Location $base
+        try { return (& pwsh -NoProfile -NonInteractive -Command ($pre + $Commands) 2>&1 | ForEach-Object { "$_" }) -join "`n" }
+        finally { Pop-Location }
+    }
+    function Get-LessonRows {
+        # Status's own reading, per card in current/: its Progress and its Status.
+        $rows = @{}
+        $name = $null
+        foreach ($line in ((Invoke-InLessons "${prefix}Status") -split "`r?`n")) {
+            if ($line -match '^\s*File:\s+(.+?)\s*$') { $name = Split-Path -Leaf $Matches[1]; continue }
+            if ($name -and $line -match 'Progress:\s+(\S+).*Status:\s+(.+?)\s*$') {
+                $rows[$name] = [pscustomobject]@{ Progress = $Matches[1]; Status = $Matches[2] }
+                $name = $null
+            }
+        }
+        return $rows
+    }
+    $full = { param($p) $p -match '^(\d+)/(\d+)$' -and [int]$Matches[1] -eq [int]$Matches[2] -and [int]$Matches[2] -gt 0 }
+    $lessonFile = { param($t, $folderName) Join-Path (Join-Path (Join-Path $lessons 'demo') $folderName) $t.File }
+
+    # 1. Start here: done when it is in current/ -- the drag from Backlog to To do runs Move -To Active.
+    $out = Invoke-InLessons "${prefix}Move $($tutorial[0].Id) -To Active"
+    Assert-True 'lesson 1: Move -To Active pulls the first card out of backlog/ into current/' ((Test-Path -LiteralPath (& $lessonFile $tutorial[0] 'current')) -and -not (Test-Path -LiteralPath (& $lessonFile $tutorial[0] 'backlog'))) $out
+
+    # 2. Tick my boxes: done when every box is ticked -- the card page's checkbox writes "- [x]".
+    $before = Get-LessonRows
+    $p2 = & $lessonFile $tutorial[1] 'current'
+    [System.IO.File]::WriteAllText($p2, ([System.IO.File]::ReadAllText($p2) -replace '(?m)^- \[ \]', '- [x]'), (New-Object System.Text.UTF8Encoding($false)))
+    # 3. Find out one thing: done when its one box is ticked, with the finding written under Findings.
+    $p3 = & $lessonFile $tutorial[2] 'current'
+    $t3 = [System.IO.File]::ReadAllText($p3) -replace '(?m)^- \(write what you found here\)', "- It lives at $p3" -replace '(?m)^- \[ \] I wrote', '- [x] I wrote'
+    [System.IO.File]::WriteAllText($p3, $t3, (New-Object System.Text.UTF8Encoding($false)))
+    # 4. Say "look at this": done when it reads Code Review -- the drag to Waiting runs Move -To CodeReview.
+    $out = Invoke-InLessons "${prefix}Move $($tutorial[3].Id) -To CodeReview"
+    $after = Get-LessonRows
+    $row = { param($rows, $t) $rows[$t.File] }
+    Assert-True 'lesson 1, read back: Status lists the pulled card, and reads it Active (To do)' ((& $row $after $tutorial[0]) -and (& $row $after $tutorial[0]).Status -eq $c.status.active) ((& $row $after $tutorial[0]) | Out-String)
+    Assert-True 'lesson 2: before, the bar is not full' ((& $row $before $tutorial[1]) -and -not (& $full (& $row $before $tutorial[1]).Progress)) ((& $row $before $tutorial[1]) | Out-String)
+    Assert-True "lesson 2: every box ticked, Status's Progress count is full" ((& $row $after $tutorial[1]) -and (& $full (& $row $after $tutorial[1]).Progress)) ((& $row $after $tutorial[1]) | Out-String)
+    Assert-True "lesson 3: before, its one box is open (0/1)" ((& $row $before $tutorial[2]) -and (& $row $before $tutorial[2]).Progress -eq '0/1') ((& $row $before $tutorial[2]) | Out-String)
+    Assert-True "lesson 3: the finding written and the box ticked, the count is full (1/1)" ((& $row $after $tutorial[2]) -and (& $row $after $tutorial[2]).Progress -eq '1/1') ((& $row $after $tutorial[2]) | Out-String)
+    $t4 = [System.IO.File]::ReadAllText((& $lessonFile $tutorial[3] 'current'))
+    Assert-True 'lesson 4: Move -To CodeReview writes the **Review:** line' ($t4 -match '(?m)^\*\*Review:\*\*') $out
+    Assert-True 'lesson 4, read back: Get-PromptFileStatus and Status both read it Code Review (Waiting)' ((Get-PromptFileStatus -Content $t4 -Folder 'current') -eq $c.status.codeReview -and (& $row $after $tutorial[3]).Status -eq $c.status.codeReview) ((& $row $after $tutorial[3]) | Out-String)
+
+    # 5. Drop me on Done: done when it is in archive/ -- the drop on Done runs Archive.
+    $out = Invoke-InLessons "${prefix}Archive $($tutorial[4].Id)"
+    $p5 = & $lessonFile $tutorial[4] 'archive'
+    Assert-True 'lesson 5: Archive moves the last card to archive/, with the day it closed' ((Test-Path -LiteralPath $p5) -and -not (Test-Path -LiteralPath (& $lessonFile $tutorial[4] 'current')) -and ([System.IO.File]::ReadAllText($p5) -match '(?m)^\*\*Closed:\*\* \d{4}-\d{2}-\d{2}')) $out
+    Assert-True 'lesson 5, read back: Get-PromptFileStatus reads it Done' ((Test-Path -LiteralPath $p5) -and (Get-PromptFileStatus -Content ([System.IO.File]::ReadAllText($p5)) -Folder 'archive') -eq $c.status.done)
+
+    # And the first run's measure: the three finished cards dropped on Done too, and To do is empty.
+    $out = Invoke-InLessons (@($tutorial[0], $tutorial[1], $tutorial[2] | ForEach-Object { "${prefix}Archive $($_.Id)" }) -join '; ')
+    $end = Get-LessonRows
+    $stillToDo = @($end.Keys | Where-Object { $end[$_].Status -eq $c.status.active })
+    Assert-True 'walked to the end, the To do lane is empty' ($stillToDo.Count -eq 0 -and $end.Count -ge 1) "still in To do: $($stillToDo -join ', ') | $out"
 
     Write-Host ""
     Write-Host "-- a second run keeps what is there -----------------------" -ForegroundColor Cyan

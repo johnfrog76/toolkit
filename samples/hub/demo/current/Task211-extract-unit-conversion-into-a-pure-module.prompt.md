@@ -20,4 +20,5 @@ Conversion is copied into three components, and two of them disagree about how m
 **Sprint:** RecipeBox\Sprint 8
 **Story Points:** 3
 **Cover:** ../assets/Task211/cover.webp
+**Started:** 2026-09-16
 **Created:** 2026-09-16

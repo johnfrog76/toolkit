@@ -6,12 +6,13 @@
 //
 //   node tests/smoke.mjs [--port=<n>] [--modules=off|on]
 //                        [--viewport=desktop|mobile|both] [--shots=<dir>]
-//   node tests/smoke.mjs --studio|--matrix|--a11y [--port=<n>] [--agent-port=<n>] [--python=<exe>]
+//   node tests/smoke.mjs --studio|--matrix|--a11y|--first-run [--port=<n>] [--agent-port=<n>] [--python=<exe>]
 //
-// (`--studio`, `--matrix` and `--a11y` are modes that start and stop their OWN
+// (`--studio`, `--matrix`, `--a11y` and `--first-run` are modes that start and stop their OWN
 // servers -- the Studio's contract, each module flag alone plus fresh and
-// hostile browser storage, and axe on every page; see "A mode that
-// owns its servers" below, smokeStudio.mjs, smokeMatrix.mjs and smokeA11y.mjs. Everything else in this header is about
+// hostile browser storage, axe on every page, and the first run's first drag on
+// a copy of samples/hub; see "A mode that owns its servers" below,
+// smokeStudio.mjs, smokeMatrix.mjs, smokeA11y.mjs and smokeFirstRun.mjs. Everything else in this header is about
 // the first two.)
 //
 // TWO MODES, because "off means absent" has two halves and only one of them
@@ -52,6 +53,7 @@ import { defaultPython, launchChromium, moduleSourceUrl } from "./smokeStack.mjs
 import { runA11y } from "./smokeA11y.mjs";
 import { runMatrix } from "./smokeMatrix.mjs";
 import { runStudio } from "./smokeStudio.mjs";
+import { runFirstRun } from "./smokeFirstRun.mjs";
 
 const arg = (name, fallback) => {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -70,13 +72,18 @@ const arg = (name, fallback) => {
 // `--a11y` is the third: axe on every page the registry mounts, every
 // module flag off and then on, in the first light theme and aurora
 // (smokeA11y.mjs). It lists every finding and fails on a serious or critical one.
+// `--first-run` is the fourth: a COPY of samples/hub, as Start makes, and the
+// first tutorial card dragged from Backlog to To do with the moved file read
+// back (smokeFirstRun.mjs).
 const ownStackMode = process.argv.includes("--studio")
   ? runStudio
   : process.argv.includes("--matrix")
     ? runMatrix
     : process.argv.includes("--a11y")
       ? runA11y
-      : null;
+      : process.argv.includes("--first-run")
+        ? runFirstRun
+        : null;
 if (ownStackMode) {
   const ownRepoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
   process.exit(

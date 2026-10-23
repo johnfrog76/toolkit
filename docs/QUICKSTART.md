@@ -108,14 +108,37 @@ has run, or points it at a repo of your own. The **Azure demo** is ready for YOU
 organisation: give it the address (its tip, or `tkConnect azure-demo -Address https://dev.azure.com/<org>`)
 and sign in with `az login` ([the demo Spaces](modules/ado.md#the-demo-spaces-one-per-grain)).
 
-The first thing on the board is a card in **To do**, *Welcome to the Toolkit* (`Task W3KC`), whose
-checkboxes are the tour: drag it, tick it, snooze a reminder, make a card of your own, and drop it on
-Done. Its progress bar counts the boxes as you go. Above the tabs, a banner offers **Introducing
-ToolKit**, a nine-slide narrated deck; watch it or dismiss it, and the banner does not come back
-(`firstRun.welcome`, in `docs/CONFIGURATION.md`). Organize has a reminder due today. The Studio is
-dressed too: **Hub Designs** lists four designs about RecipeBox, one in each state of the lifecycle --
-a note still being thought about, one that graduated to a spec, a completed pair whose spec points at
-a document in the hub's `docs/`, and a dropped one with its reason.
+Above the tabs, a banner offers **Introducing ToolKit**, a nine-slide narrated deck: that is the
+*watch*. Watch it or dismiss it, and the banner does not come back (`firstRun.welcome`, in
+`docs/CONFIGURATION.md`).
+
+Then the *do*, about ten minutes on the Demo board, with no account anywhere. Five tutorial cards wait
+on it, and each is finished by doing the thing it teaches -- a thing the board already reads, so there
+is nothing to dismiss and no progress kept anywhere but the cards themselves:
+
+1. **Start here: pull me onto the board** (`Task H3RE`) is the one card in **Backlog**. A card is
+   planned until you pull it, and the board reads the folder: drag it to **To do**, and the file moves
+   from `demo/backlog/` to `demo/current/` (`tkMove H3RE -To Active` from a terminal). It also says what
+   a card is -- one Markdown file, the record of the work -- and that its lane is worked out from the file.
+2. **Open me and tick my boxes** (`Task T6CK`): a card is a document, and the bar on it counts every
+   checkbox in the file. Done when every box is ticked.
+3. **Find out one thing and write it down** (`Spike F7ND`): a Spike ends in a finding, not code. Find
+   where the card lives on your disk, write it under **Findings**, and tick its one box.
+4. **Say "look at this"** (`User Story R3VU`): review is a moment you record. Drag it to **Waiting**;
+   that writes a `**Review:**` line into the card (`tkMove R3VU -To CodeReview`). On a project with a
+   repository, a pull request does the same by itself.
+5. **Drop me on Done** (`Bug D9NE`): a card travels one way. Dropping it on **Done** moves the file to
+   `demo/archive/` and stamps the day it closed (`tkArchive D9NE`). Then drop the three finished ones
+   on Done too, and the **To do** lane is empty: the first run, walked.
+
+The rest of Demo is there to look at: RecipeBox's cards in the other lanes, a reminder due today in
+Organize, and the Studio's **Hub Designs**, four designs about RecipeBox, one in each state of the
+lifecycle -- a note still being thought about, one that graduated to a spec, a completed pair whose spec
+points at a document in the hub's `docs/`, and a dropped one with its reason.
+
+The last card ends at the *make your own*: press **+** and make your first real card. It lands in
+Backlog, where the first card started. If Azure DevOps is your world, the Connect card on Home is where
+it starts.
 
 It never overwrites: a machine that already has a hub keeps it (`tkStart` just opens the UI), and a
 folder with anything in it is refused. `tkStart -WhatIf` says what it would do.

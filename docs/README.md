@@ -6,7 +6,7 @@ the same commit (`AGENTS.md`, "Documentation is part of the change").
 
 | File | Owns |
 | --- | --- |
-| [`QUICKSTART.md`](QUICKSTART.md) | Requirements, install, the first run (`tkStart`: the sample hub, the Welcome card, the tour banner), a first card, the web UI up |
+| [`QUICKSTART.md`](QUICKSTART.md) | Requirements, install, the first run (`tkStart`: the sample hub, the five tutorial cards, the tour banner), a first card, the web UI up |
 | [`CONFIGURATION.md`](CONFIGURATION.md) | `tkConfig`, the three config files, `consts.json`, the hub's `hub.json` |
 | [`CLI.md`](CLI.md) | The prefix, the workflow and its state, the command reference, tiers, errors, the log, AI review, the agentic workflows |
 | [`TESTING.md`](TESTING.md) | The four runners, the suites and their counts, and the counts line a full run prints |
