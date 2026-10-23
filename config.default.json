@@ -638,7 +638,7 @@
     },
     "HowWeWork": {
       "category": "studio",
-      "description": "Write a Space's how-we-work note, once, when it is worked with agents",
+      "description": "Write a Space's how-we-work note, once",
       "usage": "{cliPrefix}HowWeWork <slug> [-WhatIf] [-Help]",
       "examples": [
         "{cliPrefix}HowWeWork github-demo -WhatIf",

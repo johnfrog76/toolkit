@@ -76,7 +76,7 @@ A second web-only module, **lounge**, is the ambient room -- the zen temple scen
 room that asks nothing, nav entry deliberately last; `docs/modules/lounge.md`. **The Studio** is the view across a studio developer's
 products -- the foyer, one row per Space, its tab before Team Agile's and the Lounge's -- and it is
 **core, not a module** (D-S13): no `features.studio` (a leftover line is ignored, `Config -Set` of it
-is refused), its verbs `NewDesign`, `StampDesign`, `MoveDesign`, `NewSpace`, `RetireSpace` and `RemoveSpace` in `config.default.json` `commands` and the
+is refused), its verbs `NewDesign`, `StampDesign`, `MoveDesign`, `NewSpace`, `RetireSpace`, `RemoveSpace` and `HowWeWork` in `config.default.json` `commands` and the
 autoload manifest, its agent routes ungated, its web descriptor with no `feature` (its pages still lazy);
 `docs/modules/studio.md`. **solitaireAgile** (Team Agile in the web UI) is a
 team's rituals with the tracker as the board -- the standup, `Standup` and its route, both halves,
@@ -116,7 +116,7 @@ registered at import (`docs/CONFIGURATION.md`, "A module flag and an open shell"
 The fourteen verbs the modules contribute: `NewGrowth`, `NewWorkReview`, `PublishWorkReview`,
 `LogPeerReview`, `UpdateResume` (growth); `SendTeams`, `NewMeeting`, `MeetingAgenda`
 (communication); `NewReminder`, `Reminders` (organize); `Standup`, `Triage`, `Route`, `StartWork` (solitaireAgile).
-(`NewDesign`, `StampDesign`, `MoveDesign`, `NewSpace`, `RetireSpace` and `RemoveSpace` are the Studio's, and core.) **A module closes its own data.** `Archive` is org-scoped and cannot see a hub-root
+(`NewDesign`, `StampDesign`, `MoveDesign`, `NewSpace`, `RetireSpace`, `RemoveSpace` and `HowWeWork` are the Studio's, and core.) **A module closes its own data.** `Archive` is org-scoped and cannot see a hub-root
 sibling like `manager/` or `growth/`, and the answer is not to teach it: it is
 `MeetingAgenda -Close`, which moves the session to `manager/archive/` and stamps `**Closed:**` from
 the one shared writer, `Scripts/Add-ClosedStamp.ps1` (whose bytes come from

@@ -10,6 +10,7 @@ own checkout -- and it need not be a git repository (`storeSync`, [Configuration
   <promptsFolder>/          ONE PER ORG -- its cards
     current/  backlog/  archive/   in play, planned, done
     assets/<card key>/      a card's pictures -- cover.png, before.png (Cover)
+    agentic/how-we-work.md  how the Space is worked, when it is worked with agents (HowWeWork)
   growth/                   trainings, presentations, goals        -- the engineer's, not an org's
     current/  archive/
   manager/                  1:1 sessions                           -- the engineer's
@@ -29,6 +30,7 @@ own checkout -- and it need not be a git repository (`storeSync`, [Configuration
 | --- | --- | --- | --- | --- |
 | `<org>/current`, `<org>/backlog`, `<org>/archive` | **a card** -- one piece of work; the product's core. `backlog/` holds the planned ones, not yet in play | the org | [`cards.md`](cards.md) | `samples/hub/demo/` |
 | `<org>/assets/<card key>/` | a card's picture -- its cover, or the before of a before/after -- named by the card's `**Cover:**` / `**Before:**` line | the org, beside its cards | [`cards.md`](cards.md#a-cards-pictures----spaceassets) | `Tests/fixtures/parsers/covers.json` |
+| `<org>/agentic/how-we-work.md` | **the team's page** for a Space worked with agents -- the seats, the loop, the hand-off, relay and stand-in rules -- written once by `HowWeWork`, then the team's to edit; quoted by `StartWork`, listed on the Studio's Prompts card under **Your hub** | the org | [How we work -- a Space's `agentic/`](#how-we-work----a-spaces-agentic) below | `agentic/how-we-work.template.md` in the package |
 | `growth/` | a training, a presentation or a goal | the engineer | [`growth.md`](growth.md) | `samples/hub/growth/`, `Tests/fixtures/hub/growth/` |
 | `manager/` | one 1:1 session, through plan, prep and retro | the engineer | [`manager.md`](manager.md) | `Tests/fixtures/hub/manager/` |
 | `reviews/` | `reviews/<slug-set>/<year>/<start>_<end>/review.md` -- a generated work review; `<slug-set>` is org slugs joined by `+`, and membership is SET membership, never a substring | the engineer | [the growth module](../modules/growth.md) (`NewWorkReview`); `consts.json` `reviews` | `samples/hub/reviews/` |
@@ -88,3 +90,26 @@ category: growth
 Nothing else is required. A prompt here has no index entry, so it is listed for every way of working, and
 a copy under a shipped prompt's name in `agenticExtensionPath` runs instead of the shipped one
 ([`agentic/README.md`](../../agentic/README.md), "Tuning a prompt for one machine").
+
+## How we work -- a Space's `agentic/`
+
+A Space's own folder can hold one more file beside its cards: `agentic/how-we-work.md`
+(`consts.json` `startWork.howWeWorkNote`), the page a session on that Space reads first. Only a Space whose
+answer to **How do you want to work in `<Space>`?** is `agents` has one
+([`spaces[].howIWork`](../CONFIGURATION.md#spaceshowiwork----how-you-work-in-this-space)) -- alone or on a
+team there is no crew to write down.
+
+- **Who writes it:** `tkHowWeWork <slug>`, once, from the package's `agentic/how-we-work.template.md` with
+  the Space's name and tracker filled in, through `Write-CardText -New`. It is never written over: a second
+  run is refused naming the path, so the page is the team's to edit from then on. To start it over, move or
+  delete the file on purpose.
+- **What it says:** roles and loops, never a model, a machine or a plan -- the seats (product,
+  engineering, crew), the loop (card, branch, pull request with proof lines, merge on green, archive with
+  the hash), and the hand-off, relay and stand-in rules. Frontmatter `description` and `category: rituals`,
+  so the Prompts card reads it like a prompt of yours.
+- **Who reads it:** `tkStartWork` quotes it whole as section one of the hand-off block, under
+  `## How we work in <Space> (<space folder>/agentic/how-we-work.md)`; a `how-we-work.md` at the Space's
+  folder root is still read when this one is not there. The Studio's Prompts card lists it under
+  **Your hub** as `how-we-work`, for the Space you are in.
+- **The repository's side:** `HowWeWork` prints one line to paste into the product repository's
+  `AGENTS.md`, `How we work here: <path>`. ToolKit never writes into a product's repository.
