@@ -1,7 +1,18 @@
 # The three halves' suites on Ubuntu, and what only Windows proves -- the CLI from
-# Windows PowerShell 5.1 and the browser smoke -- on Windows. Both jobs run on
-# every pull request and every push to main, and from the Actions tab's button
-# (workflow_dispatch); a local run on each host remains the proof.
+# Windows PowerShell 5.1 and the browser smoke -- on Windows. They run on
+# different triggers, because Windows is slow and the Ubuntu job is the merge gate:
+#
+#   ubuntu   every pull request, every push to main, and the Actions tab's button.
+#   windows  a schedule, the button, and a pull request that carries the `ci` label.
+#            A push to main does not run it, nor does an ordinary pull request.
+#
+# Windows runs against main once each weekday evening, so a change that only 5.1 or
+# the browser would show is caught the same day. A pull request that is heavy on
+# PowerShell and wants the proof before it merges asks for it with the `ci` label.
+# A local run on each host remains the proof for a change.
+#
+# A scheduled failure is filed as a card carrying the run's URL, and the run is not
+# re-run: the next morning's first merge carries the fix.
 #
 # Each runner's output is teed to a transcript and read by Scripts/Test-CiHalf.ps1,
 # which parses the summary line the runner prints last -- the rule tkTest reads it
@@ -17,8 +28,16 @@ name: verify
 on:
   workflow_dispatch:
   pull_request:
+    # `labeled` is what lets the `ci` label start the Windows job on a pull request
+    # that is already open; the other three are the defaults.
+    types: [opened, synchronize, reopened, labeled]
   push:
     branches: [main]
+  schedule:
+    # 02:00 UTC, Tuesday to Saturday, which is the evening before in US Pacific:
+    # 7 pm PDT (UTC-7) and 6 pm PST (UTC-8), so Monday to Friday evenings in both.
+    # GitHub runs a schedule against the default branch, which is main.
+    - cron: "0 2 * * 2-6"
 
 permissions:
   contents: read
@@ -26,13 +45,19 @@ permissions:
 # A newer push to the same pull request replaces the run in progress. A push to
 # main never cancels the run before it: at merge cadence a cancelled run is a
 # run that never reports, and main's checks have to complete to mean anything.
+# A scheduled run has a group of its own, so a push to main cannot take its place
+# in the queue: a scheduled run is never cancelled.
 concurrency:
-  group: verify-${{ github.ref }}
+  group: verify-${{ github.event_name == 'schedule' && 'schedule' || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   ubuntu:
     name: Three halves on Ubuntu
+    # Not the schedule: that is Windows's. Adding a label fires `labeled`, and only
+    # the `ci` label means anything here, so another label (a triage label,
+    # Dependabot's) does not rerun the whole job.
+    if: ${{ github.event_name != 'schedule' && (github.event.action != 'labeled' || github.event.label.name == 'ci') }}
     runs-on: ubuntu-latest
     # The CLI half spawns a child pwsh per case and a slow two-core runner has taken
     # four times what a quick one does for the same tree (33 minutes against a
@@ -149,6 +174,9 @@ jobs:
 
   windows:
     name: Windows PowerShell 5.1 and the browser smoke
+    # The schedule, the button, or a pull request that carries the `ci` label. A push
+    # to main and an ordinary pull request skip it.
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci')) }}
     runs-on: windows-latest
     # The CLI runner starts a shell per case, which Windows does more slowly.
     timeout-minutes: 120
