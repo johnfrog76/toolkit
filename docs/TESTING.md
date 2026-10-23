@@ -13,8 +13,7 @@ tkTest -Half agent       # one half: cli, agent or web
 tkTest -Fast             # the CLI runner's -Fast; the agent and the web run in full
 ```
 
-`tkTest` runs `pytest` (the interpreter from `Scripts/Resolve-Python.ps1`, so never the Store's `python3`
-stub), the CLI runner and `npm test`, in that order, each in its own child with the environment its runner
+`tkTest` runs `pytest` (through the Python that has it, below), the CLI runner and `npm test`, in that order, each in its own child with the environment its runner
 sets for itself ("The runners own their environment", below; `npm test` sets none, so its child alone gets
 the webhooks removed and the run marker set). Then one summary -- per half the passed, failed and skipped
 counts and its time -- and one verdict. A half that cannot run is **skipped with its reason** (no Python,
@@ -22,6 +21,15 @@ no `pytest` or `httpx`, no `pwsh`, no `npm`, no `web/node_modules`) and the verd
 not passed. Exit 0 when every half that ran passed; exit 2, after the summary and one `Error:` line, when
 a half failed or none ran. Each half is read from the line it prints last -- pytest's closing line, jest's
 `Tests:` and `Test Suites:`, the CLI runner's `Total:` -- not from the runners' internals.
+
+**Which Python runs pytest.** The first of these that imports both `pytest` and `httpx`: a `.venv` in the
+package, then `~/.venv-toolkit` (create it with `python3 -m venv ~/.venv-toolkit` and install
+`agent/requirements-dev.txt` into it, for a machine whose system Python should stay clean), then the
+PATH's Python, which `Scripts/Resolve-Python.ps1` chooses (so never the Store's `python3` stub). The
+half's line in the summary ends `[via ~/.venv-toolkit/bin/python]` or `[via python3 (PATH)]`, so a
+count always says which interpreter produced it. With none that has both, the half is skipped with
+the reason, and the paste block's `pytest:` line says `NOT AVAILABLE`, which `tkTestToolkit
+-DocCounts` refuses like any line that is not a count.
 
 It also prints **expected vs actual** per half, the expected side read from this page's own lines below
 (the `tkTestToolkit` line, the `pytest` line, the `npm test` line). That is information, never the verdict:
@@ -84,7 +92,8 @@ figures: the CLI's per-suite line and total, a `pytest:` line and a `web:` line.
 all-halves runner, every half and no `-Fast`) prints all three under its summary. `tkTestToolkit`
 alone -- a full run, every suite, none named, each one passing -- prints the CLI pair and says in the
 other two lines' place that it did not run them. A half skipped or failed in a `tkTest` run is named in
-its line's place (`pytest: not run -- skipped: ...`), never a stale number to copy. The block, as
+its line's place (`pytest: NOT AVAILABLE -- ...`, `web: not run -- ...`), never a stale number to copy;
+a passing `pytest:` line may end `(via <python>)`, which is information and not part of the count. The block, as
 `tkTest` prints it:
 
 ```text
@@ -104,7 +113,7 @@ others, and a full run with a suite that did not pass names it and prints no cou
 holds every one of those places to the paste block, from this page's text alone (no run, no
 machine-local file, so it holds in CI): the row's list equal to the per-suite line, and the three totals
 equal to their paste lines. A stale place fails naming the line and, for the row, the first suite whose
-number differs; a paste line that says `not run` is not a count and fails too, so a paste from a run that
+number differs; a paste line that says `not run` or `NOT AVAILABLE` is not a count and fails too, so a paste from a run that
 lacked a half cannot land. `Tests/fixtures/doc-counts/` has one file per drift shape. It also holds
 the shape they are pasted into: the suite count in the three documents, the combined row naming every
 suite once in the runner's order, and no single suite's row carrying a count of its own; it also holds that `VERIFY.md`'s coverage table has a row for every verb in `config.default.json` and the modules' data files, and that the verb counts its opening sentence states (always-on, module, total) are those same counts. It also holds the agent row below to the tree: its "in N files" is the number of `Tests/test_*.py` files, and each plain `(N)` after a file's name is that file's `def test_` count (an entry written another way, or with no count, is not checked).
