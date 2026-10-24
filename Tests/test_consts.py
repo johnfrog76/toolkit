@@ -70,6 +70,7 @@ EXPECTED = {
     ("reviews", "slugSetSeparator"): "+",
     ("features", "spaceScoped"): ["sprintAwareness", "trainingHoursPerQuarter", "suggestions"],
     ("env", "activeSpace"): "P20_ACTIVE_SPACE",
+    ("env", "promptsRoot"): "PROMPTS_ROOT",
     ("env", "agentCacheDir"): "P20_AGENT_CACHE_DIR",
     ("env", "features"): "P20_FEATURES",
     ("env", "agentPort"): "P20_AGENT_PORT",
