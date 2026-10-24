@@ -208,6 +208,47 @@ class Yours(PromptsCase):
         self.assertEqual({p["group"] for p in self.rows().values()}, {"toolkit"})
 
 
+class TheSpacesHowWeWorkNote(PromptsCase):
+    """The note HowWeWork writes for a Space worked with agents, listed beside the
+    package's prompts as one of yours -- the shipped template, filled the way the
+    verb fills it (Tests/Test-HowWeWork.ps1 holds the verb itself)."""
+
+    def setUp(self):
+        super().setUp()
+        template = (PKG_ROOT / "agentic" / "how-we-work.template.md").read_text(encoding="utf-8")
+        self.text = template.replace("{space}", "Example").replace("{tracker}", "GitHub, `acme/widgets`")
+        self.note = self.hub / "test" / CONSTS["startWork"]["howWeWorkNote"]
+        self.note.parent.mkdir(parents=True)
+        self.note.write_text(self.text, encoding="utf-8")
+
+    def test_it_is_listed_as_yours_for_the_orchestrating_answer(self):
+        row = self.rows()["yours/how-we-work"]
+        self.assertEqual(
+            (row["group"], row["owner"], row["name"], row["path"], row["workflows"], row["by_hand"]),
+            ("yours", "yours", "how-we-work", "test/agentic/how-we-work.md", ["agents"], True),
+        )
+        self.assertEqual(row["title"], "How we work in Example")
+        self.assertTrue(row["description"].startswith("How we work in Example:"))
+        self.assertEqual(row["category"], "rituals")
+        self.assertTrue(row["changed"])
+
+    def test_it_reads_by_its_ref_whole(self):
+        res = self.client.get(f"{ROUTE}/yours/how-we-work")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["body"], self.text)
+
+    def test_no_note_no_row(self):
+        self.note.unlink()
+        self.assertNotIn("yours/how-we-work", self.rows())
+        self.assertEqual(self.client.get(f"{ROUTE}/yours/how-we-work").status_code, 404)
+
+    def test_another_spaces_note_is_not_this_spaces(self):
+        other = self.hub / "elsewhere" / CONSTS["startWork"]["howWeWorkNote"]
+        other.parent.mkdir(parents=True)
+        self.note.replace(other)
+        self.assertNotIn("yours/how-we-work", self.rows())
+
+
 class AnExtensionFolder(PromptsCase):
     extension = "tuned"
 

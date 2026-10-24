@@ -39,8 +39,8 @@ halves talking to each other, and the flag that makes a whole module appear and 
 three halves at once. A check that can be automated belongs in a suite; one that cannot is a gate here,
 or it is not verified.
 
-Every verb `config.default.json` defines is in the table below -- 43 always-on, and the 14 the modules
-contribute through `Config/*.commands.psd1` (57 in all; `docs/CLI.md` prints both counts) -- with the
+Every verb `config.default.json` defines is in the table below -- 44 always-on, and the 14 the modules
+contribute through `Config/*.commands.psd1` (58 in all; `docs/CLI.md` prints both counts) -- with the
 suite that types it and the gate that walks it. `Tests/Test-DocCounts.ps1` reads the table back, so a
 verb added without a row fails a suite. **A row that says "neither" is a verb nothing verifies**; it is
 left in the table rather than dropped, because a verb the reader cannot see in it is indistinguishable
@@ -83,6 +83,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `Connect` | `Connect` (typed, with both CLIs stubbed) | 12 (real sign-in) |
 | `NewSpace` | `NewSpace` (typed, with `gh` stubbed or off the PATH); `Tests/test_new_space.py` (typed in a fresh shell against a scratch hub, and `GET /api/spaces/candidates`); `Menu` (usage, wrapper and script agree) | 12 (under 5.1, with a real `gh`; a person adding a Space from the + and from the terminal) |
 | `RetireSpace` | `NewSpace` (typed: `-WhatIf`, status `archive` through `Config`, a local status override unset, already retired, the refusals); `Menu` (usage, wrapper and script agree) | 12 (under 5.1, and from the Spaces card's row menu) |
+| `HowWeWork` | `HowWeWork` (typed: alone and team write nothing, `-WhatIf` writes nothing, the write once in LF with no BOM, the second run refused naming the path, `StartWork` quoting the note); `Menu` (usage, wrapper and script agree) | 12 (under 5.1) |
 | `RemoveSpace` | `NewSpace` (typed: `-WhatIf`, the `-Force` rule, the folder and its cards untouched, the line that adopts them back, every refusal); `Config` (the whole-Space `-Unset`); `Menu` (usage, wrapper and script agree) | 12 (under 5.1, and from the Spaces card's row menu) |
 | `Log` | `ExitCodes` (`Log -Days` leaves no stale exit code) | 7 |
 | `InstallAutoload` | `Autoload` (typed) | 1 |
@@ -285,7 +286,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **45 suites, 7952 assertions** with a `config.local.json`, every one
+findings. On this commit that is **46 suites, 8089 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few

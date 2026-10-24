@@ -16,6 +16,14 @@ folder (``hub.json`` ``folders.agentic``) and in this machine's
 instead of the shipped one (Scripts/Resolve-AgenticPrompt.ps1). They have no
 index entry, so they belong to every way of working.
 
+Among yours, the active Space's HOW-WE-WORK NOTE when it has one: the file
+``HowWeWork`` writes into the Space's folder in the hub (consts.json
+``startWork.howWeWorkNote``) for a Space worked with agents, which ``StartWork``
+quotes as how we work there. It is not a ``*.prompt.md`` -- it is the team's
+own page, not a prompt -- so it is listed by that one path, under the name
+``how-we-work``, beside the package's prompts, with ``agents`` as its way of
+working. Absent, there is no row.
+
 And the SPACE'S: the active Space names a repository by its address, not a
 folder on this machine, so its own ``agentic/*.prompt.md`` is read the way the
 Design tab reads ``design/`` -- through ``agent/ado/repo_read.py``'s
@@ -77,7 +85,7 @@ from ..core.config import (
     hub_root,
     load_config,
 )
-from ..core.consts import repository_url, studio_prompts_route
+from ..core.consts import repository_url, startwork_how_we_work_note, studio_prompts_route
 from ..core.git_history import GITHUB_REMOTE as _GITHUB_REMOTE
 from ..core.git_history import folder_history
 from ..core.git_history import git_read as _git
@@ -228,9 +236,9 @@ def module_on(module: str, features: dict) -> bool:
     return module == CORE or bool(features.get(module, False))
 
 
-def _row(path: Path, group: str, where: str, history: tuple[dict, str], **extra) -> PromptRow:
+def _row(path: Path, group: str, where: str, history: tuple[dict, str], name: str = "", **extra) -> PromptRow:
     text = path.read_text(encoding="utf-8-sig")
-    name = stem(path.name)
+    name = name or stem(path.name)
     title, purpose, category = record(text, name)
     extra.setdefault("category", category or UNCATEGORIZED)
     changes, base = history
@@ -279,6 +287,41 @@ def shipped_rows(features: dict) -> list[PromptRow]:
     return rows
 
 
+# The how-we-work note's row name: its file's name before .md, and the reading
+# room's address after yours/.
+HOW_WE_WORK = "how-we-work"
+# The one way of working the note belongs to: only the orchestrating answer has one.
+HOW_WE_WORK_WORKFLOW = "agents"
+
+
+def how_we_work_note() -> Path | None:
+    """The active Space's how-we-work note -- ``startWork.howWeWorkNote`` under the
+    Space's folder in the hub -- or None when no hub is configured or the file
+    is not there. The verb that writes it is ``HowWeWork``; nothing here writes."""
+    if not hub_configured():
+        return None
+    root = hub_root()
+    folder = str(load_config().get("promptsFolder") or "")
+    note = (root / folder if folder else root) / startwork_how_we_work_note()
+    return note if note.is_file() else None
+
+
+def how_we_work_row() -> PromptRow | None:
+    note = how_we_work_note()
+    if note is None:
+        return None
+    return _row(
+        note,
+        YOURS,
+        _label(note.parent),
+        folder_history(note.parent),
+        name=HOW_WE_WORK,
+        workflows=[HOW_WE_WORK_WORKFLOW],
+        sender="",
+        by_hand=True,
+    )
+
+
 def yours_rows(shipped: set[str]) -> list[PromptRow]:
     rows: list[PromptRow] = []
     seen: set[str] = set()
@@ -293,6 +336,9 @@ def yours_rows(shipped: set[str]) -> list[PromptRow]:
             rows.append(
                 _row(path, YOURS, where, history, sender="", by_hand=True, overrides=is_extension and name in shipped)
             )
+    note = how_we_work_row()
+    if note is not None and note.name not in seen:
+        rows.append(note)
     return rows
 
 

@@ -39,7 +39,8 @@ import { useNavigate } from "react-router";
 import { useGetEnvQuery, useGetSurfacesQuery } from "./api";
 import type { HowIWork } from "./api";
 import { useOpenSettings } from "./cards";
-import { useWriteConfigMutation } from "./registry";
+import { useWriteConfigMutation, useWriteHowWeWork } from "./registry";
+import type { HowWeWorkOutcome } from "../modules/studio/howWeWork";
 import {
   WORKFLOW_ENTRIES,
   answerLive,
@@ -142,21 +143,30 @@ const useStyles = makeStyles({
  * config writer and shows at once: the radio is checked, the others are
  * locked, a tiny "Saving…" spinner stands beside the group and the group is
  * announced busy. A refusal puts the pick back and shows the CLI's sentence.
+ *
+ * With agents set, the Space's how-we-work note follows (docs/modules/studio.md,
+ * "HowWeWork"): no call when the Prompts listing already carries it, else the
+ * verb through the bridge, and under the radios its AGENTS.md line -- or, refused,
+ * the verb's own sentence.
  */
 function Answers({
   entry,
   question,
   target,
+  slug,
   how,
 }: {
   entry: WorkflowEntry;
   question: string;
   target: string;
+  slug: string;
   how: HowIWork | undefined;
 }) {
   const styles = useStyles();
   const baseId = useId("how-answer");
   const [writeConfig] = useWriteConfigMutation();
+  const writeHowWeWork = useWriteHowWeWork();
+  const [note, setNote] = useState<HowWeWorkOutcome | null>(null);
   const [picked, setPicked] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
@@ -173,12 +183,15 @@ function Answers({
     if (!answer || saving || !answerLive(answer, tracker, locked)) return;
     setPicked(next);
     setRefused(null);
+    setNote(null);
     setSaving(true);
     try {
       const reply = await writeConfig({ set: { [target]: next }, unset: [], hub: true }).unwrap();
       if (reply.result.status !== "success") {
         setPicked(undefined);
         setRefused(reply.result.error || reply.result.output || "Config -Set refused.");
+      } else if (next === "agents" && slug) {
+        setNote(await writeHowWeWork(slug));
       }
     } catch {
       setPicked(undefined);
@@ -224,6 +237,16 @@ function Answers({
         </Caption1>
       ) : null}
       {refused ? <Caption1 className={styles.refused}>{refused}</Caption1> : null}
+      {note?.kind === "written" && note.line ? (
+        <Caption1 className={styles.why} data-how-we-work="written">
+          {note.line}
+        </Caption1>
+      ) : null}
+      {note?.kind === "refused" ? (
+        <Caption1 className={styles.refused} data-how-we-work="refused">
+          {note.sentence}
+        </Caption1>
+      ) : null}
     </div>
   );
 }
@@ -322,6 +345,7 @@ export function HowDoI({ anchor }: { anchor?: string }) {
                     entry={entry}
                     question={question}
                     target={answerKey}
+                    slug={activeSpace}
                     how={env?.howIWork}
                   />
                 ) : null}

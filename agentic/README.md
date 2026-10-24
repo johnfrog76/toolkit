@@ -121,6 +121,13 @@ line in its frontmatter is its category; the index describes the shipped set. Ea
 reference** puts an `@` reference to the file on the clipboard for an assistant that can read your files;
 **Copy prompt**, in the row's menu, puts the whole file there for a chat that cannot.
 
+**One file here is not a prompt**: `how-we-work.template.md`, the team's page for a Space worked with
+agents -- the seats, the loop, and the hand-off, relay and stand-in rules, named as roles and never as
+models, machines or plans. `tkHowWeWork <slug>` fills in the Space's name and tracker and writes it once
+into that Space's folder in your hub, as `agentic/how-we-work.md`; from then it is the team's to edit,
+`tkStartWork` quotes it, and the Prompts card lists it under **Your hub**. It has no index entry because
+it is not a `*.prompt.md`.
+
 ## Conventions
 
 Commands appear with the default `tk` prefix; substitute yours if you changed it. Every backticked

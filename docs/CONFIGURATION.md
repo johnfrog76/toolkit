@@ -412,6 +412,16 @@ re-import `SwitchSpace` does in a shell. The inventory row reads `on (chosen: wi
 `off (derived: ...)` or `off (chosen: alone in <slug>)`, and `not configured` for a GitHub Space nobody
 has answered.
 
+**The orchestrating answer has a file.** A Space answered `agents` can have its team written down:
+`tkHowWeWork <slug>` writes `<space folder>/agentic/how-we-work.md` in the hub from the shipped template --
+the seats, the loop, and the hand-off, relay and stand-in rules, as roles and never as models or machines --
+once, and never over a file that is there; `tkStartWork` quotes it as how we work in that Space, and the
+Studio's Prompts card lists it under **Your hub**. For `alone` and `team` there is no file to write, and the
+verb says so ([the command reference](CLI.md#the-studio-spaces-and-design-notes)). Picking **With agents** in
+the Settings drawer runs the verb through the bridge once the answer is set, unless the Prompts listing already
+carries the note, and shows its `How we work here: <path>` line or its refusal
+([Studio](modules/studio.md#the-verbs)).
+
 ## `spaces[].features.suggestions` -- whether Team Agile suggests your next move
 
 A boolean, and the third Space-scoped switch (with `sprintAwareness` and `howIWork`): whether the chair's

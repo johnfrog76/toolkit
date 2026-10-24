@@ -202,10 +202,10 @@ others. The foyer is one row per Space -- every Space, whatever its tracker -- a
 | | |
 | --- | --- |
 | Flag | none. A `features.studio` left in `config.local.json` is ignored; `Config -Set features.studio=...` is refused, exit 2, "The Studio is part of the core and has no switch" |
-| Verbs | `NewDesign`, `StampDesign`, `MoveDesign`, `NewSpace`, `RetireSpace` and `RemoveSpace` -- core verbs in `config.default.json` `commands`, wrappers in `utilities.psm1`, in the autoload manifest. Flags are in [the command reference](../CLI.md#the-studio-spaces-and-design-notes). Promote is the core `NewItem -FromDesign <note>` |
+| Verbs | `NewDesign`, `StampDesign`, `MoveDesign`, `NewSpace`, `RetireSpace`, `RemoveSpace` and `HowWeWork` -- core verbs in `config.default.json` `commands`, wrappers in `utilities.psm1`, in the autoload manifest. Flags are in [the command reference](../CLI.md#the-studio-spaces-and-design-notes). Promote is the core `NewItem -FromDesign <note>` |
 | Agent | `agent/studio/` -- `notes.py` and `spaces.py`, one router mounted with no gate, `GET /api/studio/design` (the hub's four folders grouped by id and state, L2) and `/api/studio/design/{path}`, and `GET /api/spaces/candidates` (the + dialog's picker: `NewSpace -Discover -AsJson` through the bridge), **reads only**. The foyer reads `GET /api/issue-report` and `GET /api/deploys` (which take a `space` argument for it) and `GET /api/status` |
 | Web UI | `web/src/modules/studio/index.tsx`, export `studioModule`, no `feature` -- the `Studio` tab at `/studio`, after Growth's and Organize's places and before Team Agile's and the Lounge's: the foyer, then the Designs. Its pages are still lazy parts |
-| Hub folder | `design/` and `spec/`, hub-root siblings, each with an `archive/` -- the same four folders a product's repo keeps (design lifecycle L2, D-DL12); [`docs/hub/design.md`](../hub/design.md) is the file contract and the state rule. A hub with none is told so, not refused |
+| Hub folder | `design/` and `spec/`, hub-root siblings, each with an `archive/` -- the same four folders a product's repo keeps (design lifecycle L2, D-DL12); [`docs/hub/design.md`](../hub/design.md) is the file contract and the state rule. A hub with none is told so, not refused. And in a Space's own folder, `agentic/how-we-work.md`, which `HowWeWork` writes once for a Space worked with agents ([the hub's map](../hub/README.md#how-we-work----a-spaces-agentic)) |
 | Everything else | [`docs/modules/studio.md`](studio.md) |
 
 A row is the switch into its Space, the same one the avatar menu makes.

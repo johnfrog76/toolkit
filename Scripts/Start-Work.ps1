@@ -398,11 +398,15 @@ else {
 }
 
 # -- Section one: how we work in this Space ------------------------------------
-# The Space's own note once it has one (M4 writes it; this verb only reads it),
-# else ONE derived sentence from the howIWork table (D-AR3). The heading names
-# whichever was read, so the agent always knows where to re-read.
-$noteName = 'how-we-work.md'
-$notePath = Join-Path $spaceRoot $noteName
+# The Space's own note once it has one (HowWeWork writes it, at
+# startWork.howWeWorkNote under the Space's folder; this verb only reads it),
+# else ONE derived sentence from the howIWork table (D-AR3). A note a person put
+# at the Space's folder root, where this verb looked before HowWeWork existed,
+# is still read when the written one is not there. The heading names whichever
+# was read, so the agent always knows where to re-read.
+$notePath = Join-Path $spaceRoot ([string]$c.startWork.howWeWorkNote)
+$rootNote = Join-Path $spaceRoot (Split-Path -Leaf ([string]$c.startWork.howWeWorkNote))
+if (-not (Test-Path -LiteralPath $notePath -PathType Leaf) -and (Test-Path -LiteralPath $rootNote -PathType Leaf)) { $notePath = $rootNote }
 if (Test-Path -LiteralPath $notePath -PathType Leaf) {
     $howSource = Get-P20RelativeTo -Path $notePath -Root $hubRoot
     $howText = ConvertTo-P20BlockText ([System.IO.File]::ReadAllText($notePath))

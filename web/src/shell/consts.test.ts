@@ -352,6 +352,8 @@ describe("consts.json", () => {
     expect(startWorkDoc).toMatch(/hand-off block/);
     expect(startWork).toEqual({
       launchEnvFlag: "startWorkLaunch",
+      howWeWorkNote: "agentic/how-we-work.md",
+      howWeWorkLine: "How we work here: {path}",
       text: {
         head: "# Start work: {kind} {id} -- {title}",
         howWeWork: "## How we work in {space} ({source})",

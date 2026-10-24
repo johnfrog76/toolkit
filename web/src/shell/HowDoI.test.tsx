@@ -122,7 +122,16 @@ inventory.surfaces.push(teamAgile);
 const writeSpy = jest.fn();
 const SUCCESS = { result: { status: "success", error: null, output: "" }, config: {} };
 let writeReply: () => Promise<unknown> = () => Promise.resolve(SUCCESS);
+// The orchestrating answer's follow-up (registry.ts useWriteHowWeWork): what it
+// decides is modules/studio/howWeWork.test.ts's; here, when the answer calls it
+// and what the row shows of its outcome.
+const howWeWorkSpy = jest.fn();
+let howWeWorkReply: unknown = { kind: "listed" };
 jest.mock("./registry", () => ({
+  useWriteHowWeWork: () => (slug: string) => {
+    howWeWorkSpy(slug);
+    return Promise.resolve(howWeWorkReply);
+  },
   useWriteConfigMutation: () => [
     (body: unknown) => {
       writeSpy(body);
@@ -248,6 +257,67 @@ describe("HowDoI", () => {
       howIWork = undefined;
       writeSpy.mockClear();
       writeReply = () => Promise.resolve(SUCCESS);
+      howWeWorkSpy.mockClear();
+      howWeWorkReply = { kind: "listed" };
+    });
+
+    it("With agents, once set, asks for the Space's how-we-work note; a note already listed shows nothing", async () => {
+      renderWith();
+      await act(async () => {
+        fireEvent.click(radio("With agents"));
+      });
+      expect(howWeWorkSpy).toHaveBeenCalledWith("toolkit");
+      expect(row().querySelector("[data-how-we-work]")).toBeNull();
+    });
+
+    it("the note written: the verb's AGENTS.md line under the radios", async () => {
+      howWeWorkReply = {
+        kind: "written",
+        line: "How we work here: /hub/toolkit/agentic/how-we-work.md",
+      };
+      renderWith();
+      await act(async () => {
+        fireEvent.click(radio("With agents"));
+      });
+      expect(
+        await within(row()).findByText("How we work here: /hub/toolkit/agentic/how-we-work.md"),
+      ).toBeTruthy();
+    });
+
+    it("the verb refused: its own sentence, and the answer stays set", async () => {
+      howWeWorkReply = {
+        kind: "refused",
+        sentence:
+          "/hub/toolkit/agentic/how-we-work.md is already there; tkHowWeWork never writes over it.",
+      };
+      renderWith();
+      await act(async () => {
+        fireEvent.click(radio("With agents"));
+      });
+      expect(
+        await within(row()).findByText(/is already there; tkHowWeWork never writes over it\./),
+      ).toBeTruthy();
+      expect(radio("With agents").checked).toBe(true);
+    });
+
+    it("Alone, and a refused answer, ask for no note", async () => {
+      howIWork = github("agents", "chosen");
+      renderWith();
+      await act(async () => {
+        fireEvent.click(radio("Alone"));
+      });
+      cleanup();
+      howIWork = github();
+      writeReply = () =>
+        Promise.resolve({
+          result: { status: "error", error: "Unknown setting", output: "" },
+          config: {},
+        });
+      renderWith();
+      await act(async () => {
+        fireEvent.click(radio("With agents"));
+      });
+      expect(howWeWorkSpy).not.toHaveBeenCalled();
     });
 
     it("asks in the Space's name, with three radios in exactly these words", () => {

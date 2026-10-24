@@ -75,6 +75,12 @@ class AllowlistIsTheCommandTable(unittest.TestCase):
                 self.assertRegex(function, r"^[A-Za-z]+-[A-Za-z0-9]+$")
 
     @unittest.skipUnless(HAVE_PWSH, "needs pwsh to read the command table")
+    def test_the_studios_how_we_work_verb_is_in_the_table(self):
+        """HowWeWork is core, like the Studio's other verbs: the bridge carries it
+        with no flag on, so the web can run it after the orchestrating answer."""
+        self.assertEqual(LIVE_MAP.get("HowWeWork"), "New-P20HowWeWork")
+
+    @unittest.skipUnless(HAVE_PWSH, "needs pwsh to read the command table")
     def test_every_name_in_the_map_is_accepted(self):
         """Accepted means "not refused" -- these are not run, only admitted.
 

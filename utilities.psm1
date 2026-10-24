@@ -2160,6 +2160,20 @@ function global:Invoke-P20RetireSpace {
         -Name $inv.Name -Prefix $inv.Prefix
 }
 
+function global:New-P20HowWeWork {
+    <# HowWeWork -- a Space worked with agents gets its how-we-work note, once, from the shipped template. #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0)][string]$Slug,
+        [switch]$WhatIf,
+        [switch]$Help
+    )
+    if ($Help) { Show-CommandHelp 'HowWeWork'; return }
+    $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'HowWeWork'
+    Invoke-ToolkitScript -Path "$toolkitRoot\Scripts\HowWeWork.ps1" -Parameters $PSBoundParameters `
+        -Name $inv.Name -Prefix $inv.Prefix
+}
+
 function global:Remove-P20Space {
     <# RemoveSpace -- un-declare a Space through Config; its folder and cards stay. #>
     [CmdletBinding()]
@@ -2434,6 +2448,7 @@ $script:ModuleState.CommandMap = [ordered]@{
     'NewSpace'         = 'New-P20Space'           # the Spaces card's +, core
     'RetireSpace'      = 'Invoke-P20RetireSpace'  # a Space's row menu, core
     'RemoveSpace'      = 'Remove-P20Space'        # a Space's row menu, core
+    'HowWeWork'        = 'New-P20HowWeWork'       # the orchestrating answer's note, core
     # Deprecated names, dual-mapped (see $script:ModuleState.DeprecatedAliases): the alias
     # still answers and the bridge still accepts it; the menu shows only the
     # canonical row because config.default.json names only that.
