@@ -58,7 +58,9 @@ M2  1.2.0  The standup sees the work    done 2026-10-22: both records joined, wh
         |
 M3  1.3.0  The Studio opens in a second   done 2026-10-22: one gh call cold and none warm, per Space, repository and tab
         |
-M4  1.4.0  Ten minutes to your own board   the first run, the tour, the word for a Space
+M4  1.4.0  Ten minutes to your own board   cut 2026-10-24: the first run, the word, how we work, the landing page
+        |
+M4b 1.5.0  The tour                    Kit's narrated tour, and the ten-minute walk on a machine that has never seen the product
         |
 M5         The rename                 a cards core and an ado module; no version
         :
@@ -132,11 +134,14 @@ minute, make no tracker call and no model call. One cache on disk (`agent/core/d
 hands back, serves them all, capped by one rule; and the tier probe, the issue report, the counts paste and the web
 lint were tightened on the way.
 
-### M4 -- 1.4.0, ten minutes to your own board
+### M4 -- 1.4.0, ten minutes to your own board -- cut 2026-10-24
 
 A stranger clones the repository, runs three lines, and ten minutes later has used the whole system on
 their own board, without being asked for an account. **Done when:** that sentence is tested on a machine
-that has never seen the product, and the tour is narrated.
+that has never seen the product, and the tour is narrated. **Cut 2026-10-24** with the first run, the word,
+how we work and the landing page on main and the nightly Windows run green; the two things that make the
+sentence true for a stranger, the narrated tour and the ten-minute walk on a cold machine, carry to M4b so
+the release is not held on a deck.
 
 - The first run: watch, do, make your own -- the tutorial cards on the Demo board, with no Welcome page
   (the board is the progress). This is the old phase 5.
@@ -144,6 +149,15 @@ that has never seen the product, and the tour is narrated.
 - The word for a Space and its one-sentence definition, now that a Space is a connection to software.
 - New Space asks how you want to work, and the orchestrating answer writes the team's files. The old F4.
 - The landing page's links back and forth, and its look at banner size.
+
+### M4b -- 1.5.0, the tour
+
+**Done when:** Kit's guided tour is narrated and in the launcher, and the ten-minute walk has been timed on a
+machine that has never seen the product (the `VERIFY.md` Gate 12 row 4D77 added, with the time on it).
+
+- Kit's guided tour, built and baked in the Wasteland studio by the owner and the VP of product, shipped into
+  the deck module by a crew card (X7V9).
+- The walk: a fresh clone, three lines, the Demo board's To do lane empty, the stopwatch time on the row.
 
 ### M5 -- the rename, no version
 
