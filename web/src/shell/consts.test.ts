@@ -400,7 +400,7 @@ describe("consts.json", () => {
   // the contract by name: a partial bump fails here naming the file left behind.
   // MUST match Tests/Test-Consts.ps1's and Tests/test_consts.py's.
   describe("one version", () => {
-    const EXPECTED_VERSION = "1.3.0";
+    const EXPECTED_VERSION = "1.4.0";
     const pkgRoot = path.resolve(__dirname, "../../..");
 
     it("is stated by the contract", () => {

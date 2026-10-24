@@ -313,7 +313,7 @@ Write-Host "-- One version, and the two files that carry a copy ---" -Foreground
 # read another file), so each is held to the contract by name: a partial bump
 # fails here, naming the file that was left behind.
 # MUST match Tests/test_consts.py's and web/src/shell/consts.test.ts's.
-$expectedVersion = '1.3.0'
+$expectedVersion = '1.4.0'
 Assert-Equal 'version' $expectedVersion ([string]$c.version)
 Assert-True 'the version is three dotted numbers' ([string]$c.version -match '^\d+\.\d+\.\d+$') "got '$($c.version)'"
 
