@@ -1,21 +1,20 @@
 /* The landing page's look: the family's (the juggling and bowling engines,
-   Connected Deck). A dark ground, the wordmark and the product's one accent,
-   kickers in mono small caps, one call to action. One column on a phone; the
-   hero's words beside the commercial from 900px up.
-
-   The accent is not typed here. Landing.tsx sets --lp-accent, --lp-cta,
-   --lp-cta-hover, --lp-blob, --lp-dot and --lp-glow on the page from
-   shared/accent.ts, the one place it is. The call to action's text is the
-   page's own text colour: accent.test.ts computes which of the page's two
-   inks reads on the key and holds this line to it. */
+   Connected Deck). A dark ground, the wordmark and one cyan accent, kickers in
+   mono small caps, one teal call to action. One column on a phone; the hero's
+   words beside the commercial from 900px up. */
 
 :root {
   --lp-bg: #131022;
   --lp-text: #eae6f6;
   --lp-muted: #9a92b8;
+  --lp-accent: #62e6ff;
   --lp-panel: rgba(8, 7, 16, 0.5);
   --lp-line: rgba(234, 230, 246, 0.14);
-  --lp-cta-text: var(--lp-text);
+  --lp-cta: #d97706;
+  --lp-cta-hover: #f59e0b;
+  --lp-cta-text: #1b1b1f;
+  --lp-blob: rgba(245, 158, 11, 0.5);
+  --lp-dot: #f59e0b;
   --lp-mono: "Cascadia Code", "Fira Code", Consolas, ui-monospace, monospace;
   color-scheme: dark;
 }
@@ -69,7 +68,8 @@ body {
   border: 1px solid var(--lp-line);
   border-radius: 16px;
   background:
-    radial-gradient(1200px 420px at 85% 20%, var(--lp-glow), transparent 60%), var(--lp-panel);
+    radial-gradient(1200px 420px at 85% 20%, rgba(34, 211, 238, 0.1), transparent 60%),
+    var(--lp-panel);
 }
 
 @media (min-width: 900px) {

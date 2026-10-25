@@ -14,21 +14,14 @@
 // that hook is pulled into vite-node by the deck voice-bake, outside a browser.
 // shell/theme.ts turns one of these records into a Fluent theme.
 //
-// THE ACCENT IS THE PRODUCT'S, NOT THE THEME'S. Every named theme wears the
-// one accent (shared/accent.ts): one key colour, a ramp generated from it, and
-// the face, the call to action and the dots read from that ramp by mode. A
-// theme is its page, its grain and its cards -- the mood -- and `accented()`
-// fills in the rest. Only a Lounge skin (SKIN_THEMES, below) carries an
-// accent of its own, because it is its scene's.
-//
-// ADDING A THEME is adding a record: its page, grain, kind and card, and
-// `...accented(mode)`. The numbers are held for every record by tests --
-// the text on the call to action, a tint badge's text on its background
-// (themeList.test.ts) and the ramp's own (shared/accent.test.ts) -- so the
-// one thing left to check by eye is the page under the accent.
-
-import { ACCENT, accentFor } from "../shared/accent";
-import type { Ramp } from "../shared/accent";
+// ADDING A THEME is adding a record. Check three things by eye: white text on
+// `brand.background` (the primary button), `brand.foreground1` on the card
+// (links), and the logo's word over `logo` (the face blob). And one by number:
+// `brand.foreground2` is a tint badge's text, on the ramp's palest step in a
+// light theme and its darkest in a dark one -- 4.5:1 at the badge's 10px, which
+// themeList.test.ts holds for every record. Fluent's own order is the
+// safe one: foreground2 a step DARKER than foreground1 in a light theme, a
+// step LIGHTER in a dark one.
 
 export type ThemeMode = "dark" | "light";
 
@@ -54,24 +47,6 @@ export interface ToolkitTheme {
     foreground1: string;
     foreground2: string;
   };
-  /** The sixteen-step brand ramp. Absent: generated from `brand.background` (shell/theme.ts). */
-  ramp?: Ramp;
-}
-
-/** The product's accent for a named theme of this mode: the face, the brand and the ramp. */
-function accented(mode: ThemeMode): Pick<ToolkitTheme, "logo" | "brand" | "ramp"> {
-  const a = accentFor(mode);
-  return {
-    logo: a.face,
-    brand: {
-      background: a.button,
-      hover: a.hover,
-      pressed: a.pressed,
-      foreground1: a.dot,
-      foreground2: a.tint,
-    },
-    ramp: ACCENT,
-  };
 }
 
 export const THEMES: ToolkitTheme[] = [
@@ -86,7 +61,14 @@ export const THEMES: ToolkitTheme[] = [
       image: "linear-gradient(33deg, #0f766e52 0%, #0f548c8a 55%, #1e3a8a70 100%)",
     },
     grain: 0.45,
-    ...accented("dark"),
+    logo: "rgba(34, 211, 238, 0.38)",
+    brand: {
+      background: "#0e7490",
+      hover: "#0891b2",
+      pressed: "#155e75",
+      foreground1: "#67e8f9",
+      foreground2: "#22d3ee",
+    },
   },
   {
     id: "aurora",
@@ -99,7 +81,14 @@ export const THEMES: ToolkitTheme[] = [
       image: "linear-gradient(33deg, #5a25c147 0%, #0f548c8a 62%, #10b9812e 100%)",
     },
     grain: 0.45,
-    ...accented("dark"),
+    logo: "rgba(129, 140, 248, 0.45)",
+    brand: {
+      background: "#4F46E5",
+      hover: "#6366F1",
+      pressed: "#4338CA",
+      foreground1: "#818CF8",
+      foreground2: "#A5B4FC",
+    },
   },
   {
     id: "basement",
@@ -109,8 +98,15 @@ export const THEMES: ToolkitTheme[] = [
     blurb: "Plain charcoal and one warm lamp. Easy at night.",
     page: { color: "#19191b", image: "none" },
     grain: 0,
-    ...accented("dark"),
+    logo: "rgba(245, 158, 11, 0.50)",
     card: "#232326",
+    brand: {
+      background: "#b45309",
+      hover: "#c2600c",
+      pressed: "#92400e",
+      foreground1: "#fbbf24",
+      foreground2: "#f59e0b",
+    },
   },
   {
     id: "seaglass",
@@ -123,7 +119,14 @@ export const THEMES: ToolkitTheme[] = [
       image: "linear-gradient(210deg, #34c5b845 0%, #5a25c175 100%)",
     },
     grain: 1,
-    ...accented("light"),
+    logo: "#c4768a",
+    brand: {
+      background: "#0F766E",
+      hover: "#0D9488",
+      pressed: "#115E59",
+      foreground1: "#0F766E",
+      foreground2: "#115E59",
+    },
   },
   {
     id: "sunny",
@@ -136,18 +139,32 @@ export const THEMES: ToolkitTheme[] = [
       image: "linear-gradient(200deg, #fde68a70 0%, #fdba7452 50%, #fda4af5c 100%)",
     },
     grain: 1,
-    ...accented("light"),
+    logo: "#f4a533",
+    brand: {
+      background: "#be123c",
+      hover: "#e11d48",
+      pressed: "#9f1239",
+      foreground1: "#be123c",
+      foreground2: "#9f1239",
+    },
   },
   {
     id: "office",
     name: "Office",
     mode: "light",
     kind: "flat",
-    blurb: "Paper and one accent. Fine on a shared screen.",
+    blurb: "Paper and one teal accent. Fine on a shared screen.",
     page: { color: "#f3f2f1", image: "none" },
     grain: 0,
-    ...accented("light"),
+    logo: "#7dd3c8",
     card: "#ffffff",
+    brand: {
+      background: "#0F766E",
+      hover: "#0D9488",
+      pressed: "#115E59",
+      foreground1: "#0F766E",
+      foreground2: "#115E59",
+    },
   },
 ];
 
