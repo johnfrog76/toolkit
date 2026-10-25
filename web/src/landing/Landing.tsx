@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import type { CSSProperties } from "react";
 import { COPY, fileUrl } from "./copy";
 import type { LandingCopy } from "./copy";
 import { PEOPLE } from "./people";
@@ -7,6 +8,7 @@ import { Window, WindowStyles } from "./Window";
 import { Code } from "./Code";
 import { Butler } from "./Butler";
 import { Faces } from "./Faces";
+import { accentFor, accentWash } from "../shared/accent";
 
 // The landing page, in the family's shape (the juggling and bowling engines,
 // Connected Deck). A banner first: the wordmark, the offering, three bullets,
@@ -17,6 +19,22 @@ import { Faces } from "./Faces";
 
 /** The product's name: the wordmark's accessible name and the page's heading. */
 export const PRODUCT_NAME = "ToolKit";
+
+/**
+ * The page's accent, from the product's one place (shared/accent.ts), as the
+ * custom properties landing.css draws with. The page is dark, so it wears the
+ * dark mode's steps: wine behind the wordmark, the key on the call to action,
+ * the pale rose for the dots and the links.
+ */
+const DARK = accentFor("dark");
+export const LANDING_ACCENT = {
+  "--lp-accent": DARK.dot,
+  "--lp-dot": DARK.dot,
+  "--lp-blob": DARK.face,
+  "--lp-cta": DARK.button,
+  "--lp-cta-hover": DARK.hover,
+  "--lp-glow": accentWash(0.1),
+} as CSSProperties;
 
 /** The visible address of the repository: the URL without its scheme. */
 function shown(url: string): string {
@@ -40,7 +58,7 @@ export function Landing({
     if (focusCta) cta.current?.focus();
   }, [focusCta]);
   return (
-    <div className="lp">
+    <div className="lp" style={LANDING_ACCENT}>
       <WindowStyles />
       {/* The banner. */}
       <header className="lp-banner">

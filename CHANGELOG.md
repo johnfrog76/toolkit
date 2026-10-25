@@ -8,6 +8,10 @@ release.
 
 ## [Unreleased]
 
+### Changed
+
+- ToolKit's accent is now rose and wine, in every theme and on the landing page: the logo's face, the call to action and the way-of-working dots all take it, while each theme keeps its own page and cards.
+
 ## [1.4.0] - 2026-10-24
 
 ### Added
