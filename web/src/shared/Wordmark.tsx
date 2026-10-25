@@ -1,5 +1,6 @@
 import { WORDMARK_FACES, WORDMARK_LETTERS, WORDMARK_WIDTH } from "./wordmarkPaths";
 import { DEFAULT_FACE_ID } from "./faces";
+import { accentFor } from "./accent";
 
 // The wordmark as one SVG: the letters as outlines, the blob behind the two
 // o's and a face under them, so the o's are the eyes. No font is needed to
@@ -20,7 +21,7 @@ export const WORDMARK_NAME = "ToolKit";
 export function Wordmark({
   size = 240,
   ink = "currentColor",
-  blob = "rgba(34, 211, 238, 0.38)",
+  blob = accentFor("dark").face,
   face = DEFAULT_FACE_ID,
   theme = "dark",
   faceInk,
