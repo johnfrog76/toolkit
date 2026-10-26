@@ -8,10 +8,6 @@ release.
 
 ## [Unreleased]
 
-### Fixed
-
-- Team Agile's award dialog opens once, naming every milestone reached since the last one, with one burst of confetti; a revisit, a reload or a late refetch never opens it again.
-
 ## [1.5.0] - 2026-10-26
 
 ### Added
@@ -26,6 +22,7 @@ release.
 ### Fixed
 
 - Every theme in the web UI wears its own accent again -- Atlantis its cyan, Basement its amber, Office its teal -- instead of the product's rose, and looks exactly as it did in 1.4.0.
+- Team Agile's award dialog opens once, naming every milestone reached since the last one, with one burst of confetti; a revisit, a reload or a late refetch never opens it again.
 
 ## [1.4.0] - 2026-10-24
 
