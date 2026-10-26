@@ -113,6 +113,8 @@ was added, dropped or changed; the played view reads it. It writes nothing to th
 `gh` answer a minute, shared with triage, and a dressed reply by its facts in the agent's cache -- and a Space
 with no reachable GitHub tracker still answers 200 with the ritual and the reason
 ([Team Agile](modules/solitaire-agile.md), "The file shape, and how a standup is read").
+`GET /api/ritual/milestones` is the Milestones tab's read, the ado core's milestone reader and its one
+reached rule under the same gate, kept a minute, against `Tests/fixtures/rituals/milestones.json`.
 `GET /api/ritual/triage` (V1) is the same shape for triage, against `Tests/fixtures/rituals/triage.json`;
 its answers are the CLI's `Route`, which the web runs only as `POST /api/cmd/Route` -- the module's
 first write is a tracker label, through the bridge like every other. The hand-off block (`StartWork`)
