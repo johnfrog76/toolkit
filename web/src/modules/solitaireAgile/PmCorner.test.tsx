@@ -69,9 +69,9 @@ describe("PmCorner", () => {
     const onStart = jest.fn();
     draw(many, onStart);
     expect(screen.getByTestId("pm-corner").textContent).toContain(many.line);
-    fireEvent.click(screen.getByRole("button", { name: "Start work on #5" }));
+    fireEvent.click(screen.getByRole("button", { name: "Work it now: #5" }));
     expect(onStart).toHaveBeenCalledWith("5");
-    expect(screen.getByRole("button", { name: "Start work on #5" }).textContent).toBe(
+    expect(screen.getByRole("button", { name: "Work it now: #5" }).textContent).toBe(
       RITUALS.text.cornerChevron,
     );
     expect(screen.queryByRole("link", { name: SEE_MILESTONES })).toBeNull();
@@ -89,7 +89,7 @@ describe("PmCorner", () => {
       kind: "card",
     };
     draw(card, onStart);
-    fireEvent.click(screen.getByRole("button", { name: "Start work on 23A3" }));
+    fireEvent.click(screen.getByRole("button", { name: "Work it now: 23A3" }));
     expect(onStart).toHaveBeenCalledWith("23A3");
   });
 

@@ -258,7 +258,7 @@ The one stated refusal (`Error:`, `Hint:`, exit 2) is a `-Space` nobody declared
 
 | Route | Gate | Reads | Writes |
 | --- | --- | --- | --- |
-| `GET /api/ritual/standup?space=<slug>&since=<yyyy-MM-dd>&refresh=1` | `features.solitaireAgile` per request, with the active Space's answer applied (**404** unless the switch is on and the Space you are in works with agents; the detail names which is off); `space` scoped like `/api/issue-report` (an undeclared slug 404); `since` widens yesterday's window as `Standup -Since` does, and a `since` that is not a day, or is after today, is a **422** naming it; `refresh=1` reads the tracker again past the kept read ([below](#one-tracker-read-kept-a-minute)) | the same two `gh` reads (the issues with `milestone` and `body`), through the same data files, kept a minute -- or, for a local Space, its cards | nothing |
+| `GET /api/ritual/standup?space=<slug>&since=<yyyy-MM-dd>&refresh=1` | `features.solitaireAgile` per request, with the active Space's answer applied (**404** unless the switch is on and the Space you are in works with agents; the detail names which is off); `space` scoped like `/api/issue-report` (an undeclared slug 404); `since` widens yesterday's window as `Standup -Since` does, and a `since` that is not a day, or is after today, is a **422** naming it; `refresh=1` reads the tracker again past the kept read ([below](#one-tracker-read-kept-a-minute)) | the same two `gh` reads (the issues with `milestone`, `body` and `createdAt`), through the same data files, kept a minute -- or, for a local Space, its cards | nothing |
 | `GET /api/ritual/triage?space=<slug>&refresh=1` | the same | `gh label list`, `gh issue list --state open` with `milestone` and `assignees`, and `gh api user` (who "me" is, best effort), kept a minute and shared with the standup | nothing |
 | `GET /api/ritual/milestones?space=<slug>&refresh=1` | the same | one `gh api --method GET repos/{owner}/{repo}/milestones -f state=all -F per_page=100` per repo -- the ado core's own reader -- kept a minute ([Milestones](#milestones-the-tab-and-the-award)) | nothing |
 | `POST /api/cmd/Route` | the bridge: `Route` is in the CLI's command table only while the flag resolves on -- the switch on and the Space answered `agents` | -- | what `Route` writes, and nothing else |
@@ -301,7 +301,8 @@ model), `text` and `brief` (the chair's reading), and `counts` -- what moved in 
 ([the suggestion](#the-suggestion-one-next-move-derived)) -- every candidate in the rule's order and the
 first, each `ref`, `number`, `id`, `kind` (`issue` or `card`), `shape`, `sentence`, `command` and `line`;
 `[]` and null with the Space's switch off; `corner` ([the PM Corner](#the-pm-corner-the-line-the-chevron-the-confetti)),
-null with it off. Every item has seven keys -- `number`, `id`,
+null with it off; and `agenda` ([the page](#the-page)), `moved` and `waiting`, the agent's alone like
+`spoken`. Every item has seven keys -- `number`, `id`,
 `title`, `url`, `path`, `motion` (`closed`, `started` or `inProgress`, `consts.json` `rituals.motions`) and
 `commits` (a walk item also `worker`): an issue's `id` is null and its `path` `""`; a card's `number`
 is null and its `url` `""`. `tracker.ok` false still answers 200 with the ritual. `Standup -AsJson`
@@ -321,14 +322,20 @@ and before the Lounge's, while `features.solitaireAgile` is on. Off: no route, n
 and no bytes -- the descriptor imports no component (the page is a `lazyPart`), and the smoke's off mode
 asserts that no module source and no `/api/ritual` request was made. The page reads
 `GET /api/ritual/standup?space=<active Space>` -- the route from `consts.json` `rituals.route`, through
-`@consts` -- and shows the response's `text` verbatim: the first line (the ceremony and its date) as the
+`@consts` -- and opens on **the Agenda**, the response's `agenda` as two lanes of tiles ([the page](#the-page)).
+The three tabs after it show the response's `text` verbatim: the first line (the ceremony and its date) as the
 card's header, every line after it in a monospace block with its padding and line breaks kept, and each
 `#<n>` the response names (the walk queue and every worker's three slots) linked to that issue's `url`.
-Header, a line break and body are `text` byte for byte, and the page test says so. Above the prose, a
-small **Detail | Work | Brief** tab strip picks the grain ([the work grain](#the-work-grain)),
-remembered per browser (`usePersistedValue`, key `p20.solitaireAgile.grain`), `Detail` the default: Work
-shows `work.text`, Brief shows `brief` as the body (and drops the small brief above it), each verbatim; a
-response from an agent that predates `work` shows Detail for it. Beside Play, **Copy** (Daily's pattern: `copyText`, "Copied!" for a moment) puts the grain on screen -- `text` at Detail -- on the clipboard exactly as the response gives it. Under the prose a quiet **Show as list** / **Hide list** toggle (collapsed by default, constant box) opens the same items as rows read from the response's structured fields, nothing re-fetched: the queue's items first (kind, number linked to `url`, title, worker), then each worker's (slot, number, title, worker); a card shows its id and no link. Each row ends in a quiet **Start work**, which opens the hand-off block's copy box for that item ([StartWork: the hand-off block](#startwork-the-hand-off-block)). When nothing waits and the Space's switch is on, the brief's last line is [the suggestion](#the-suggestion-one-next-move-derived), drawn as a row of its own with its action and a dismiss. At the head of the page, above the card, sits [the PM Corner](#the-pm-corner-the-line-the-chevron-the-confetti): one line, its chevron, and, when a milestone is reached, a link to the Milestones tab. The other thing
+Header, a line break and body are `text` byte for byte, and the page test says so. The tab strip is
+**Agenda | Detail | Work | Brief**: Agenda first and the default, then the three grains
+([the work grain](#the-work-grain)). The tab is remembered per browser (`usePersistedValue`, key
+`p20.solitaireAgile.tab`), and so is the last grain read (key `p20.solitaireAgile.grain`, `Detail` the
+default): Work shows `work.text`, Brief shows `brief` as the body (and drops the small brief above it),
+each verbatim; a response from an agent that predates `work` shows Detail for it. Beside Play, **Copy**
+(Daily's pattern: `copyText`, "Copied!" for a moment) puts the grain on the clipboard exactly as the
+response gives it -- the grain on screen, or, on the Agenda, the last grain read (`text` in a fresh
+browser): the same text Copy carried before the Agenda existed. The text and the brief are drawn on the
+three text tabs only, never on the Agenda. When nothing waits and the Space's switch is on, the brief's last line is [the suggestion](#the-suggestion-one-next-move-derived), drawn as a row of its own with its action and a dismiss -- under the brief on the text tabs, and on the Agenda as its first line after the sentence, above the lanes. At the head of the page, above the card, sits [the PM Corner](#the-pm-corner-the-line-the-chevron-the-confetti): one line, its chevron, and, when a milestone is reached, a link to the Milestones tab. The other thing
 to click is **Play**, quiet, in the header (V1, below). With `tracker.ok` false the page still draws the ritual -- the chair's lines and the
 `Tracker` reason -- and when the agent does not answer it says so as an error, never as an empty standup.
 `StandupPage.test.tsx` builds the response from `Tests/fixtures/rituals/standup.json` and asserts the
@@ -369,9 +376,72 @@ the exact argv of every answer; `RitualPage.test.tsx` holds the strip.
 Milestones**. It is [its own section](#milestones-the-tab-and-the-award): one row per milestone with its
 bar, and the award dialog -- the one place the module throws confetti.
 
+### The page
+
+The Team Agile page opens on **the Agenda**: the standup's two questions -- what moved, and what is
+waiting on you -- as tiles you can act on. Under the tab strip, one sentence says what it is:
+
+> Here you can see the work items you can in fact kick off now, with the Work it now button.
+
+Beside it, a **Cards | List** toggle, remembered per browser (`usePersistedValue`, key
+`p20.solitaireAgile.agendaView`), cards the default. Under the sentence, when the chair has one, comes
+[the suggestion](#the-suggestion-one-next-move-derived)'s row -- the same row the text tabs draw, the
+line verbatim, its action and its dismiss. It is the Agenda's first line, above the lanes, and it is
+where a pick that no lane carries is named: an unrouted issue, with its `route it?` and **Open Triage**.
+The brief's other lines (they say "closed yesterday") stay on the text tabs. Under it, two lanes:
+
+- **Since `<day>`** -- the standup's own window, its first day the long way (`Since Friday 23
+  October`, from the response's `since`): what moved in it, the issues closed and the cards archived, as
+  the board draws Done. Its tiles carry **no action**.
+- **Waiting on you** (`rituals.text.queueHeading`, the brief's own phrase): a card in `current/` that is
+  Active (nothing started) or in Code Review, and an open issue that is routed -- someone has it, by the
+  [who](#who-takes-it) rule, and it is not someone else's -- or on the walk. The
+  [suggestion's](#the-suggestion-one-next-move-derived) order, so the top tile is the pick when the pick
+  can be started; an unrouted pick is not on the lanes -- the suggestion row above them names it --
+  and the top tile is then the first candidate that can be started. Then what that rule sets aside as
+  waiting or in flight. Each tile carries **one** button: **Work it now**, which opens the same
+  hand-off box `StartWork` builds ([StartWork](#startwork-the-hand-off-block)), or, on a tile waiting on a
+  review or a merge (Code Review, or the walk), **Review it** -- the card's page, or the issue on the
+  tracker when there is no card.
+
+**Readiness is not a flag.** A card is on the Agenda because it is in `current/` -- pulled from
+`backlog/` by `Move -To Active` or by its first commit -- or because its issue is routed on the tracker.
+A `backlog/` card never appears. A card **In Progress** is in somebody's hands, not waiting, and is not
+on the Agenda at all: the board is where its lane means something.
+
+**A tile looks like a board card and is the Agenda's own.** It borrows the board's pieces --
+`BoardCover` (`web/src/modules/ado/CardCover.tsx`), and `CardName` and `CardProgress`
+(`web/src/modules/ado/CardFace.tsx`), the same pieces the board's tile now draws with -- but not the
+board's tile, which carries the lane drag and the action menu. An issue with no card is the same tile with
+no cover and no progress, so cards and issues stand side by side from one renderer. Each tile is the
+cover, the title (a card's opens its page), the ref (`#<n>` opens the issue popover; a card's id its own
+surface), the progress, the one button or none, and **one line of fact with a long date** -- no lane
+badge, and no relative day: no "yesterday", no "today".
+
+| The tile | Its fact line | Dated from |
+| --- | --- | --- |
+| an issue that closed in the window | `Closed Saturday 24 October` | its `closedAt`, in the standup's own offset |
+| a card archived in the window | `Archived Saturday 24 October` | its `**Closed:**` day |
+| a card in Code Review (or an issue whose card is) | `In review since Thursday 22 October` | the card's `**Review:**` day; with none (a `PR URL:` line alone), `In review` |
+| an Active card (or an issue whose card is) | `Active since Friday 23 October` | the card's `**Created:**` day |
+| an open issue with no card | `Open since Tuesday 20 October` | its `createdAt` |
+
+**The list** is the same two groups as compact rows -- the ref, the title, the fact line and the same
+one button -- for those who like it.
+
+**The agent derives it; the page draws it.** `agenda` in the response is `moved` and `waiting`, each a
+list of tiles: `ref`, `number`, `id`, `kind` (`issue` or `card`), `title`, `url`, `path`, `file` (the
+card's filename while it is in `current/`, what the card page opens; `""` otherwise), `lane` (`consts.json`
+`status`, `""` for an issue with no card), `day` (`yyyy-MM-dd`, `""` when the record has none), `review`,
+`cover`, `checked`, `total` and `progress` -- `agent/solitaire/agenda.py`, over the same read the text is
+rendered from, no second `gh` call and no second folder walk. It is the agent's alone, like `spoken`:
+the CLI's `Standup` prints text, and `Standup -AsJson` has no such key. The page re-derives no lane; it
+words the fact (`web/src/modules/solitaireAgile/agenda.ts`). With the tracker not answering, both lanes
+are empty and say so (`Nothing moved.`, `Nothing is waiting on you.`).
+
 ### The played view
 
-**Play** opens `/deck/ritual/standup`: the same standup, read from the same route (RTK's cache, so
+**Play** opens `/deck/ritual/standup` from any of the page's tabs, the Agenda's included: the same standup, read from the same route (RTK's cache, so
 nothing is fetched twice), played on **the stage** -- the Wasteland's Remote Standup, its nine tiles in
 their composition, every time (D-TA17). The route is this module's,
 chromeless like any deck, and it plays **with `features.deck` off**: the page, the stage and the deck
@@ -562,9 +632,9 @@ design prompt does. A team changes a row with
 (`startWork.prompts.Meeting=...`); `-Prompt <path>` carries another prompt for one call. A kind with no
 row, or a row whose file is not there, is a stated refusal naming `startWork.prompts.<kind>`.
 
-**The page.** On the standup's **Show as list**, every row -- an issue or a card -- ends in a quiet
-**Start work**. It opens the copy box (`StartWorkBox.tsx`, a `lazyPart`: its chunk is fetched the first
-time a row asks), which makes **one** `POST /api/cmd/StartWork` with the item's number or id and shows the
+**The page.** On the standup's [Agenda](#the-page), every tile waiting on you to start it -- an issue or
+a card -- carries **Work it now**. It opens the copy box (`StartWorkBox.tsx`, a `lazyPart`: its chunk is
+fetched the first time a tile asks), which makes **one** `POST /api/cmd/StartWork` with the item's number or id and shows the
 block verbatim in a monospace region, the block's own head as the dialog's title, and one button,
 **Copy**. A refusal shows the sentence the verb stated and nothing else; an agent that does not answer
 says so. No agent runs in the browser (D-AR1): the block is text you carry to your editor.
@@ -692,15 +762,17 @@ shapes: `the last open <card|issue> in milestone <m>` when the item's milestone 
 line is `Next: <sentence> (<prefix><command>)`.
 
 **Where it shows.** `Standup -Brief` (and every brief the standup carries), and the Team Agile page's
-chair's reading, which draws the line as a row of its own: the line verbatim, its action -- **Start
-work** opens [the hand-off box](#startwork-the-hand-off-block) for a start or a delegation, **Open
+chair's reading, which draws the line as a row of its own: the line verbatim, its action -- **Work
+it now**, the same words as the Agenda's tiles, opens [the hand-off box](#startwork-the-hand-off-block) for a start or a delegation, **Open
 Triage** for a route or a place -- and a dismiss. The dismiss is per surface, per item, per session: the page keeps
 the dismissed refs in `localStorage` (`p20.solitaireAgile.suggest.dismissed`, under a session id kept in
 `sessionStorage`), every read and write wrapped so a browser that refuses storage still draws the line
 and holds a dismiss for the page's life; the next candidate's line takes the dismissed one's place, and
 with none left the line is today's. The CLI has no dismiss -- a line in a terminal is already gone.
 [The PM Corner](#the-pm-corner-the-line-the-chevron-the-confetti) is the second surface, and reads the same
-pick inside the nearest milestone.
+pick inside the nearest milestone. [The Agenda](#the-page) draws the same row as its first line, above its lanes,
+and orders its **Waiting on you** lane by the same rule, so the top tile is the pick when the pick can be
+started; an unrouted pick is named only by the row.
 
 **The switch** is `spaces[].features.suggestions` ([the switch](#the-switch-and-its-scope)). Off, or on
 an Azure DevOps Space, or with the tracker not answering, the standup carries no suggestion and the
@@ -757,8 +829,8 @@ issues. Null with the switch off, on an Azure DevOps Space, or with the tracker 
 
 **On the page** the Corner is a `lazyPart` (`PmCorner.tsx`) drawn at the head of the Team Agile page,
 above the standup's card: the line verbatim, and, when it names a pick, the chevron (`>`,
-`rituals.text.cornerChevron`), which opens [the hand-off box](#startwork-the-hand-off-block) -- the same
-`POST /api/cmd/StartWork` every **Start work** makes. Where the launch exists (`/env`'s
+`rituals.text.cornerChevron`; its accessible name is `Work it now: <ref>`, the Agenda tiles' words), which opens [the hand-off box](#startwork-the-hand-off-block) -- the same
+`POST /api/cmd/StartWork` every **Work it now** makes. Where the launch exists (`/env`'s
 `startWorkLaunch`, true -- the name is `consts.json` `startWork.launchEnvFlag`), the box offers a second button, **Launch**, which sends the same verb with
 `-Launch`; absent or false -- every agent today -- the box has one button. The brief below stops above the
 Corner's line, because the Corner is drawn at the head; **Copy** still copies the brief exactly as the agent
@@ -1305,7 +1377,7 @@ standup is complete and correct; nothing on screen says a dress was skipped.
 | Suite | Holds |
 | --- | --- |
 | `tkTestToolkit -Rituals` | every case of `Tests/fixtures/rituals/standup.json` and of `standup-cards.json` (the cards alone: the one worker's slots and the walk queue by card id, the source and title tables, the card reader over real folders, a not-billable card nowhere) and of `standup-joined.json` (the two sources joined: every shape's walk, each worker's slots by ref, the `Check` lines and the links, the together case's detail, work and brief goldens and their JSON round trip, no card in play reading as the issues alone, the tracker down, rounds of one id; what moved: each item's motion and commits, the counts per worker and in total, the counts and window cases' goldens, the window rule and the hash rule in words) -- `since`, the day of the year, the chair's two lines, the queue, each worker's slots by number, `empty` and the status sentence -- and the rendered text against `standup-<name>.txt` and the chair's reading against `standup-<name>.brief.txt`, byte for byte, with `Standup -Brief` typed in a fresh shell printing that reading alone and `-AsJson` carrying it; the same object read back from JSON rendering the same text; no `fakeWork` line in any case; off is no verb, no function, no bridge entry and no `Menu -All` line; **`Standup` typed in a fresh shell** with only this package's manifest and `gh` stubbed as a function answering the friday case: the text the rule renders for now, the queue, the blocks, the window, `-AsJson` round-tripping to the same text, `gh` failing and an ADO Space each a `Tracker` line with exit 0 (ADO's the contract's sentence), a local Space filling from its scratch cards line for line with `source: cards` in `-AsJson`, the GitHub Space with `source: both` and, with scratch cards in its folder, the joined standup line for line (a card of its own under the Space's tile, a `Check` line for a card whose issue is closed, a not-billable card nowhere, the hub untouched), an undeclared `-Space` a stated refusal, `-Since` widening yesterday (an issue closed a month ago said, closed; the brief's counts line naming the day) and a day after today, a word that is not a day and `-Since -Remind` each a stated refusal, `-Help`, and the hub untouched; the work grain over `standup-work.json`, the same rows `Tests/test_rituals.py` asserts -- every group (name, `by`, count, refs, phrase) of the queue and of each worker's slots, the `heads`, `keys`, `types` and `counts` tables, `standup-work-<case>.txt` byte for byte and again after a JSON round trip, `Get-P20StandupGrainText`; the prose over `standup-prose.json`, the same rows the agent asserts -- every `sentences` row, each case's queue sentences and each worker's in order, `standup-prose-<case>.txt` byte for byte and again after a JSON round trip; the dress guard over `standup-dress.json`, the same rows the agent asserts -- every row's reason, every group's prose sentence passing its own guard, every guard of `rituals.dressGuards` with a row, the `verbs` family and the two `kinds`, and the reply that names a ref the group lacks keeping the prose for that group; and typed, `Standup -Grain work` printing the rule's work text for now and `-AsJson` carrying it, `-Grain detail` the standup as it always printed, `-Grain brief` the same as `-Brief`, and a word that is not a grain or `-Brief -Grain work` a stated refusal |
-| `Tests/test_rituals.py` | the agent's issues, cards and joined fills and the rendering over the same three tables and goldens (the joined goldens also against `Tests/regenerate_joined_goldens.py`'s output); the work grain over `standup-work.json` -- every group of the queue and of each worker's slots, the `heads`, `keys`, `types` and `counts` tables, `standup-work-<case>.txt` byte for byte, the JSON round trip, the work grain's own phrases; the prose over `standup-prose.json` -- every `sentences` row, each case's queue and worker sentences, `standup-prose-<case>.txt` byte for byte, the JSON round trip, the prose's own sentences, no word that is not the contract's or the tracker's; the dress over `standup-dress.json` -- every row, every guard with a row, the rows its issue asked for (a ref the group lacks refused, "20g of protein" kept), the reply that names one, and around it with the model STUBBED: the facts are the workers' group sentences and nothing else, the kinds counted from labels and a card's type, the prompt offering the `verbs` and no other family, a model that answers dressed and guarded, the same groups dressed once, no key / a failing model / a reply that is not JSON all the prose, nothing to dress asking nothing; the route with no key answering `spoken: null` and `work` unchanged, and with a stubbed model `spoken` beside `work` with `text`, `brief` and the register untouched; the route asking `gh` for `milestone` and `body` and answering `work`; `read_cards` over real folders (with each card's type, body and billable, and its `begun` day and commit hashes); what moved over `standup-joined.json` -- each item's motion and commits, the counts, the counts line opening the brief, the window rule, the hash rule; the route's `?since=` widening the window and a `since` that is not a day before today a 422 naming it; a local Space's route filling from its cards with no `gh` call; a GitHub Space's route joining its cards to its issues (`checks`, `links`, a card of its own on the Space's tile, a not-billable card nowhere, the hub unwritten); an ADO Space's `adoTracker` reason; 404 off; one tracker read per minute (QP33): two standups, two triages, and triage after the standup each one read, Refresh and a verb through the bridge reading again, a failed read not kept, an all-states read at its limit not answering for triage, the kept limits the reader's; the dress kept by its facts -- identical facts with no model call, across a restart from disk, a changed fact or model asked again, the guard run on a kept reply |
+| `Tests/test_rituals.py` | the agent's issues, cards and joined fills and the rendering over the same three tables and goldens (the joined goldens also against `Tests/regenerate_joined_goldens.py`'s output); the work grain over `standup-work.json` -- every group of the queue and of each worker's slots, the `heads`, `keys`, `types` and `counts` tables, `standup-work-<case>.txt` byte for byte, the JSON round trip, the work grain's own phrases; the prose over `standup-prose.json` -- every `sentences` row, each case's queue and worker sentences, `standup-prose-<case>.txt` byte for byte, the JSON round trip, the prose's own sentences, no word that is not the contract's or the tracker's; the dress over `standup-dress.json` -- every row, every guard with a row, the rows its issue asked for (a ref the group lacks refused, "20g of protein" kept), the reply that names one, and around it with the model STUBBED: the facts are the workers' group sentences and nothing else, the kinds counted from labels and a card's type, the prompt offering the `verbs` and no other family, a model that answers dressed and guarded, the same groups dressed once, no key / a failing model / a reply that is not JSON all the prose, nothing to dress asking nothing; the route with no key answering `spoken: null` and `work` unchanged, and with a stubbed model `spoken` beside `work` with `text`, `brief` and the register untouched; the route asking `gh` for `milestone`, `body` and `createdAt` and answering `work`; the Agenda (`TheAgenda`) -- what moved once each and dated in the standup's offset, waiting as Active cards, Code Review and routed issues and never In Progress, not billable, unrouted, someone else's or in `backlog/`, a card's face and file, the suggestion's pick first, nothing with no tracker, a cards Space its cards -- and the route carrying `agenda` with every tile's fields; `read_cards` over real folders (with each card's type, body and billable, and its `begun` day and commit hashes); what moved over `standup-joined.json` -- each item's motion and commits, the counts, the counts line opening the brief, the window rule, the hash rule; the route's `?since=` widening the window and a `since` that is not a day before today a 422 naming it; a local Space's route filling from its cards with no `gh` call; a GitHub Space's route joining its cards to its issues (`checks`, `links`, a card of its own on the Space's tile, a not-billable card nowhere, the hub unwritten); an ADO Space's `adoTracker` reason; 404 off; one tracker read per minute (QP33): two standups, two triages, and triage after the standup each one read, Refresh and a verb through the bridge reading again, a failed read not kept, an all-states read at its limit not answering for triage, the kept limits the reader's; the dress kept by its facts -- identical facts with no model call, across a restart from disk, a changed fact or model asked again, the guard run on a kept reply |
 | `tkTestToolkit -Rituals`, `Tests/test_rituals.py` -- the PM Corner | `Tests/fixtures/rituals/corner.json` from both halves: every row from the raw read through each half's card reader, the join and the window (shape, milestone, remaining, pick, noun, line, command), every shape of `rituals.cornerShapes` reached by a row, the long milestone read whole (and the card model's `sprint` not it), and the three `briefs` cases end to end -- `corner-<case>.brief.txt` byte for byte, the Corner the last line, again after a JSON round trip; typed, `Standup -Brief` ending on the Corner's line; the agent's route carrying `corner` (its fields, a shape of the contract, the brief's last line), none with the Space's switch off and none on an Azure DevOps Space |
 | `web/src/modules/solitaireAgile/PmCorner.test.tsx`, `celebrate.test.ts` | the Corner: the line verbatim, the chevron opening the hand-off for the pick (a card by its id), no chevron for reached or nothing in reach; reached ending in `: see Milestones`, a link that goes to the tab; NO confetti -- not on first sight, not on the transition to reached, nothing marked; the mark held in memory when storage throws |
 | `Tests/test_ritual_milestones.py` | `GET /api/ritual/milestones` over `Tests/fixtures/rituals/milestones.json`: gh's rows in and the route's out, `reached` by shape (open, every issue closed with GitHub open and closed, closed on GitHub with one open, empty open and closed -- never reached), due dates with and without, the bar the tracker's numbers; the `gh` argv with fields and no `&` or `?`; one read a minute and `?refresh=1` reading again; no space the active one, an ADO Space and tier below 1 a tracker reason with `gh` never asked, `gh` failing a reason and not kept, an unknown Space a 404 naming it, the hub unwritten; 404 off |
@@ -1317,7 +1389,7 @@ standup is complete and correct; nothing on screen says a dress was skipped.
 | `Tests/test_bridge.py`, "StartWorkThroughTheBridge" | `StartWork` in the bridge's table with Team Agile on and `rejected` with it off; through the bridge, `expected-card.md` byte for byte; a refusal `status: error` with the verb's sentence |
 | `web/src/modules/solitaireAgile/StartWorkBox.test.tsx` | the copy box: one `StartWork` call, `expected-card.md` shown verbatim with its head as the title, Copy copying exactly the block, a refusal shown as the verb's sentence with no Copy, the agent away said so; no **Launch** while `/env` does not say `startWorkLaunch` is true, and with it, one more `StartWork` call with `-Launch` and what it printed or refused with |
 | `tkTestToolkit -Consts`, `Tests/test_consts.py`, `web/src/shell/consts.test.ts` | the `startWork.text` headings; the `rituals` values (`triageRoute`, `milestonesRoute`, `grains`, `numberWords`, the four `work*Regex` patterns, the `work*` phrases and the `prose*` words among them, the dress's `dressGuards` and four `dress*Regex` patterns, and what moved's `motions`, the `itemMotion`, `motion*`, `commit*` and `counts*` words), stated from all three halves; `{n} to walk`, `Nothing blocked.` and `Yesterday I closed` never retyped in the CLI's scripts or the agent; `Waiting on you`, `nothing in flight` and `Routed to` never retyped in the CLI's scripts |
-| `web/src/modules/solitaireAgile/StandupPage.test.tsx` | the page over the shared fixture and goldens (above); a list row's **Start work** making one `StartWork` call with the issue's number (a card's row by its id), and none before a row asks; the counts line the first line at the top of the page, and an item's motion in the text; the grain: three tabs from `rituals.grains`, Detail by default, Work showing `work.text` (`standup-prose-friday.txt`, the prose) verbatim and Copy copying it, Brief the brief as the body once, the choice remembered by the browser, a stored word that is not a grain read as Detail; the chair's suggestion over `suggestion-suggested.brief.txt` -- the Next line as its own row, Start work making one `StartWork` call with the number, a dismiss yielding the next (a route's action Open Triage) and holding for the session, none left the line today's, another session nothing dismissed, a browser that refuses storage still drawing it, the Brief grain showing it once, no row while something waits or with the switch off; the PM Corner over `corner-many-left.brief.txt` and `corner-reached.brief.txt` -- at the head of the page, the brief below stopping above its line while the suggestion still stands, the chevron one `StartWork` call, the Brief grain without the Corner's line and Copy the brief as it came, reached one burst and a fresh draw none, no Corner when the response has none |
+| `web/src/modules/solitaireAgile/StandupPage.test.tsx` | the page over the shared fixture and goldens (above); the Agenda -- a fresh page on it with its one sentence and no text, the two lanes and their headings (`Since Thursday 1 October`, `Waiting on you`), no action on what moved, one button a waiting tile with the suggestion's pick first, the suggestion row the first line after the sentence and above the lanes with no brief (a dismiss bringing an unrouted pick and its Open Triage), no Yesterday or Today word and no lane badge, each tile's fact and long date, a card's cover and progress and an issue's neither, **Work it now** one `StartWork` call with the number (a card by its id) and none before it is pressed, **Review it** a card's page or the walked issue, the cards / list toggle remembered with the list the same groups and buttons, **Copy and Play carrying exactly the text they carried before** (`standup-friday.txt` read from disk, and a stored Work or Brief grain), the tab remembered, an agent with no `agenda` both lanes empty; the counts line the first line at the top of the page, and an item's motion in the text; the grain: three tabs from `rituals.grains` after the Agenda, Detail the grain by default, Work showing `work.text` (`standup-prose-friday.txt`, the prose) verbatim and Copy copying it, Brief the brief as the body once, the choice remembered by the browser, a stored word that is not a grain read as Detail; the chair's suggestion over `suggestion-suggested.brief.txt` -- the Next line as its own row, its **Work it now** (the tiles' label) making one `StartWork` call with the number, a dismiss yielding the next (a route's action Open Triage) and holding for the session, none left the line today's, another session nothing dismissed, a browser that refuses storage still drawing it, the Brief grain showing it once, no row while something waits or with the switch off; the PM Corner over `corner-many-left.brief.txt` and `corner-reached.brief.txt` -- at the head of the page, the brief below stopping above its line while the suggestion still stands, the chevron one `StartWork` call, the Brief grain without the Corner's line and Copy the brief as it came, reached one burst and a fresh draw none, no Corner when the response has none |
 | `web/src/modules/solitaireAgile/stage/standupDeck.test.tsx` | at the work grain, spoken as prose over `standup-prose.json`'s `friday`: the queue's sentences as one Say line each, Opus's and Fable's sentences as the agent wrote them with nothing for an empty slot, an empty queue the contract's sentence, the mug unchanged, the tracker's line whatever `work` says; dressed, from `standup-dress.json`'s reply: a worker in `spoken` speaking and showing its spoken sentences, a worker not in it its prose, `spoken: null` the prose, the queue and the mug never dressed, the slide ids unchanged; and the played deck built from the shared fixture's `friday` and `no-tracker` cases: the slides in order with their ids, the plates, the Say lines, the mug on Sonnet, nine tiles and the register on every slide, reduced motion; the deal of workers onto seats |
 | `web/src/modules/solitaireAgile/stage/StandupPlay.test.tsx`, `web/src/modules/deck/engine/DeckPlayer.audiobook.test.tsx`, `web/src/modules/deck/GeneratedDeckHost.mute.test.tsx` | the mute, the played route's loading, error and Suitcase states; the audiobook hint at desktop width with prev and next, the browser voice, and a deck without the hint untouched |
 | `tkTestToolkit -Environment`, `Tests/test_surfaces.py` | its inventory row has its question; the Space's answer over `Tests/fixtures/how-i-work/table.json` -- every row and every gate row -- and, typed in a fresh shell with the switch on, a GitHub Space answered with agents (`on`, `Standup` a verb), one nobody answered (`not configured`), an Azure DevOps Space and one with no tracker (`off`, derived, no verb), each with the line that changes it, and the question naming the Space |

@@ -155,6 +155,42 @@ export interface StandupResponse {
    *  chevron, the confetti"): one derived line for the head of the page. Null where
    *  the suggestion is off or the tracker did not answer; absent from an older agent. */
   corner?: Corner | null;
+  /** The Agenda (docs/modules/solitaire-agile.md, "The page"): what moved in the window
+   *  and what is waiting on you, as the page's tiles draw them. The agent's alone
+   *  (`Standup -AsJson` has no such key); absent from an agent that predates it. */
+  agenda?: Agenda;
+}
+
+/** One tile of the Agenda, as the agent serves it (agent/solitaire/agenda.py). */
+export interface AgendaItem {
+  /** `#<n>` for an issue, the card's id. */
+  ref: string;
+  number: number | null;
+  id: string | null;
+  kind: "issue" | "card";
+  title: string;
+  /** The issue's; "" for a card of its own. */
+  url: string;
+  path: string;
+  /** The card's filename while it is in current/ -- what the card page opens; "" otherwise. */
+  file: string;
+  /** The card's lane (consts.json `status`), "" for an issue with no card. */
+  lane: string;
+  /** The day the fact line names (yyyy-MM-dd), "" when the record has none. */
+  day: string;
+  /** Waiting on a review or a merge: the action is Review it, not Work it now. */
+  review: boolean;
+  cover: string | null;
+  checked: number;
+  total: number;
+  progress: string;
+}
+
+export interface Agenda {
+  /** What moved in the window: issues closed, cards archived. No action. */
+  moved: AgendaItem[];
+  /** What is waiting on you, the suggestion's pick first. */
+  waiting: AgendaItem[];
 }
 
 /** The PM Corner's line, derived by the agent and never re-derived here. */

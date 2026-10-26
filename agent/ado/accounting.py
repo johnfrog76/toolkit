@@ -324,9 +324,10 @@ def _gh_issues(repo: str, all_items: bool, state: str = "open", body: bool = Fal
     # A closed history is longer than an open backlog, so the opt-in reads further.
     limit = str(ISSUE_LIMIT_OPEN if state == "open" else ISSUE_LIMIT_ALL)
     fields = "number,title,state,labels,assignees,milestone,updatedAt,closedAt,url,isPinned"
-    # The standup's work grain reads the design card an issue's body names.
+    # The standup's work grain reads the design card an issue's body names; its
+    # suggestion and its Agenda read an open issue's age, as the CLI's read does.
     if body:
-        fields += ",body"
+        fields += ",body,createdAt"
     cmd = ["gh", "issue", "list", "--repo", repo, "--state", state, "--limit", limit, "--json", fields]
     if not all_items:
         cmd += ["--assignee", "@me"]

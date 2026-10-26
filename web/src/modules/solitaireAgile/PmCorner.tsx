@@ -9,6 +9,7 @@ import {
 import { useNavigate } from "react-router";
 import { RITUALS } from "../../shell/consts";
 import type { Corner } from "./api.solitaireAgile";
+import { WORK_IT_NOW } from "./agenda";
 import { cornerArg, hasChevron, isReached } from "./corner";
 import { ROUTES } from "./paths";
 
@@ -74,7 +75,7 @@ export function PmCorner({ corner, onStart }: { corner: Corner; onStart: (arg: s
         <Button
           appearance="subtle"
           size="small"
-          aria-label={`Start work on ${corner.ref}`}
+          aria-label={`${WORK_IT_NOW}: ${corner.ref}`}
           onClick={() => onStart(cornerArg(corner))}
         >
           {RITUALS.text.cornerChevron}

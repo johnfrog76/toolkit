@@ -56,7 +56,7 @@ import {
   spaceLifecycleActions,
 } from "../modules/studio/foyer";
 import { visibilityLabel } from "../shared/visibility";
-import { VISIBILITY } from "./consts";
+import { STATUS, VISIBILITY } from "./consts";
 import { WORKFLOW_ENTRIES, answerLive, answerTarget } from "./settingsWorkflows";
 import type { SpaceBucket, SpaceLifecycleAction } from "../modules/studio/foyer";
 import { promptSets, spaceWorkflow } from "../modules/studio/prompts";
@@ -67,7 +67,8 @@ import { briefSansCorner, cornerOf, hasChevron, isReached } from "../modules/sol
 import { pendingAwards, awardStage, AWARD_SEEN_KEY } from "../modules/solitaireAgile/award";
 import { resetCelebrateMemory } from "../modules/solitaireAgile/celebrate";
 import type { Milestone } from "../modules/ado/api.ado";
-import type { StandupResponse } from "../modules/solitaireAgile/api.solitaireAgile";
+import type { AgendaItem, StandupResponse } from "../modules/solitaireAgile/api.solitaireAgile";
+import { agendaArg, agendaFact, sinceHeading } from "../modules/solitaireAgile/agenda";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -608,6 +609,54 @@ describe("the scenario grid: what each configuration shows", () => {
       cornerOf({ brief: brief("switched-off"), corner: null } as unknown as StandupResponse),
     ).toBeNull();
     expect(brief("switched-off").includes("Corner:")).toBe(false);
+  });
+
+  // The Agenda (docs/SCENARIOS.md, "Team Agile's standup"): the page opens on it.
+  // Two lanes the agent derives (agent/solitaire/agenda.py) -- what moved since the
+  // window's day, and what is waiting on you -- each tile one fact with a long date,
+  // never a relative day, and at most one action: none on what moved, Work it now
+  // on what waits, Review it on what waits on a review.
+  it("the Agenda: Since <day> and the queue's heading; one fact a tile, a long date, no Yesterday or Today", () => {
+    const tile = (over: Partial<AgendaItem>): AgendaItem => ({
+      ref: "#1",
+      number: 1,
+      id: null,
+      kind: "issue",
+      title: "",
+      url: "",
+      path: "",
+      file: "",
+      lane: "",
+      day: "2026-10-23",
+      review: false,
+      cover: null,
+      checked: 0,
+      total: 0,
+      progress: "--",
+      ...over,
+    });
+    expect(sinceHeading("2026-10-23T00:00:00-04:00")).toBe("Since Friday 23 October");
+    const facts = [
+      agendaFact(tile({}), true),
+      agendaFact(tile({ kind: "card", number: null, id: "K7M2", lane: STATUS.done }), true),
+      agendaFact(tile({ kind: "card", lane: STATUS.active }), false),
+      agendaFact(tile({ lane: STATUS.codeReview, review: true, day: "2026-10-24" }), false),
+      agendaFact(tile({}), false),
+      agendaFact(tile({ lane: STATUS.codeReview, review: true, day: "" }), false),
+    ];
+    expect(facts).toEqual([
+      "Closed Friday 23 October",
+      "Archived Friday 23 October",
+      "Active since Friday 23 October",
+      "In review since Saturday 24 October",
+      "Open since Friday 23 October",
+      "In review",
+    ]);
+    for (const f of facts) expect(f).not.toMatch(/yesterday|today/i);
+    expect([agendaArg(tile({})), agendaArg(tile({ number: null, id: "K7M2" }))]).toEqual([
+      "1",
+      "K7M2",
+    ]);
   });
 
   // Team Agile's Milestones (docs/SCENARIOS.md, "Team Agile's milestones"): a third

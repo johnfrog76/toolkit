@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router";
 import {
+  Body1,
   Button,
   Caption1,
   Link,
   Subtitle2,
   Tab,
   TabList,
+  ToggleButton,
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
@@ -15,8 +17,10 @@ import {
   CheckmarkRegular,
   CopyRegular,
   DismissRegular,
+  GridRegular,
   PeopleTeamRegular,
   PlayRegular,
+  TextBulletListLtrRegular,
 } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
 import { copyText } from "../../shared/copyText";
@@ -33,7 +37,9 @@ import {
 import type { RitualItem, StandupResponse, TriageResponse } from "./api.solitaireAgile";
 import { IssuePopover } from "./IssuePopover";
 import type { IssueFacts } from "./IssuePopover";
-import { isIssue, itemFacts, itemRef } from "./itemRef";
+import { isIssue } from "./itemRef";
+import { AgendaLanes } from "./AgendaLanes";
+import { AGENDA_SENTENCE, AGENDA_VIEWS, WORK_IT_NOW } from "./agenda";
 import { ROUTES } from "./paths";
 import { SEATS, plateFor } from "./stage/seats";
 import { SURFACE_CHAIR, dismissRef, dismissedRefs } from "./suggestDismiss";
@@ -58,7 +64,14 @@ export const startWorkArg = (i: RitualItem): string =>
   isIssue(i) ? String(i.number) : (i.id ?? "");
 
 // Today's standup, `/solitaire-agile` (docs/modules/solitaire-agile.md,
-// "The web UI"): the agent's `text`, VERBATIM -- the same string the CLI's Standup
+// "The web UI"). The page opens on the AGENDA (AgendaLanes.tsx): the response's
+// `agenda` as two lanes of tiles -- what moved since the window opened, and what is
+// waiting on you, the suggestion's pick first, each waiting tile with one button,
+// Work it now (the hand-off box) or Review it. A cards / list toggle beside it is
+// remembered per browser. Above the lanes, the chair's suggestion row, as on the
+// text tabs. The Agenda draws no text and no brief: the three tabs after it do.
+//
+// On Detail, Work and Brief: the agent's `text`, VERBATIM -- the same string the CLI's Standup
 // prints, so parity between the two renderers is one string comparison and
 // this page renders nothing of its own. The text's first line is the
 // ceremony's title and date, and it is the card's header; every line after it
@@ -87,7 +100,7 @@ export const startWorkArg = (i: RitualItem): string =>
 // The chair's Next line may be the SUGGESTION (AR-3; docs/modules/solitaire-agile.md,
 // "The suggestion: one next move, derived"): when nothing waits, the brief's last
 // line is the first candidate's `line`. The page draws that line as a row of its
-// own -- the line verbatim, the action (Start work opens the hand-off box for a
+// own -- the line verbatim, the action (Work it now opens the hand-off box for a
 // start or a delegation; a route, or a place in a milestone, opens Triage) and a dismiss. A dismiss is per
 // surface, per item, per session (suggestDismiss.ts): the next candidate's line
 // takes its place, and with none left the line is today's briefNextNone. The
@@ -126,8 +139,17 @@ const useStyles = makeStyles({
     marginTop: tokens.spacingVerticalS,
     color: tokens.colorNeutralForeground2,
   },
-  // The toggle's box is constant: the label changes, the width does not.
-  toggle: { alignSelf: "flex-start", minWidth: "120px", marginTop: tokens.spacingVerticalS },
+  // The Agenda's head: its sentence, and the cards / list toggle at the row's end.
+  agendaHead: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: tokens.spacingHorizontalM,
+    rowGap: tokens.spacingVerticalXS,
+    marginTop: tokens.spacingVerticalS,
+  },
+  agendaSentence: { flex: "1 1 20rem", minWidth: 0, color: tokens.colorNeutralForeground2 },
+  views: { display: "flex", gap: tokens.spacingHorizontalXS },
   // The suggestion: the line, its action and its dismiss, on one wrapping row.
   suggestion: {
     display: "flex",
@@ -135,25 +157,21 @@ const useStyles = makeStyles({
     alignItems: "center",
     columnGap: tokens.spacingHorizontalS,
   },
-  list: { listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column" },
-  row: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "baseline",
-    columnGap: tokens.spacingHorizontalS,
-    padding: `${tokens.spacingVerticalXS} 0`,
-    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-  },
-  kind: { color: tokens.colorNeutralForeground3, minWidth: "72px" },
-  title: { flex: 1, minWidth: 0 },
-  who: { color: tokens.colorNeutralForeground3 },
 });
 
-/** The browser's own key for the grain it was last read at. */
+/** The browser's own key for the grain it was last read at -- what Copy carries. */
 export const GRAIN_KEY = "p20.solitaireAgile.grain";
+/** The browser's own key for the tab it was last on: the Agenda, or a grain. */
+export const TAB_KEY = "p20.solitaireAgile.tab";
+/** The browser's own key for the Agenda's view: cards or list. */
+export const AGENDA_VIEW_KEY = "p20.solitaireAgile.agendaView";
+/** The first tab, and the default: the Agenda. */
+export const AGENDA = "agenda";
 const GRAINS = RITUALS.grains;
 const [DETAIL, WORK, BRIEF] = GRAINS;
 const isGrain = (v: string) => GRAINS.includes(v);
+const isTab = (v: string) => v === AGENDA || isGrain(v);
+const isAgendaView = (v: string) => (AGENDA_VIEWS as readonly string[]).includes(v);
 /** A grain's name as its tab says it: "work" -> "Work". */
 const grainLabel = (g: string) => g.slice(0, 1).toUpperCase() + g.slice(1);
 
@@ -335,10 +353,18 @@ export function StandupPage() {
     void attend();
   }, [readable, attend]);
   const [copied, setCopied] = useState(false);
-  const [showList, setShowList] = useState(false);
   // The item whose hand-off block is open: the box is mounted only while it is.
   const [startFor, setStartFor] = useState<string | null>(null);
+  // The grain is what Copy carries on every tab, the Agenda's included: the text it
+  // carried before the Agenda existed. The tab is where the page is; Agenda first.
   const { value: grain, setValue: setGrain } = usePersistedValue(GRAIN_KEY, DETAIL, isGrain);
+  const { value: tab, setValue: setTab } = usePersistedValue(TAB_KEY, AGENDA, isTab);
+  const { value: agendaView, setValue: setAgendaView } = usePersistedValue(
+    AGENDA_VIEW_KEY,
+    AGENDA_VIEWS[0],
+    isAgendaView,
+  );
+  const onAgenda = tab === AGENDA;
   // The refs dismissed on the chair's line this session (never throws).
   const [dismissed, setDismissed] = useState<string[]>(() => dismissedRefs(SURFACE_CHAIR));
   const chair = useMemo(
@@ -363,7 +389,6 @@ export function StandupPage() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }, [parts]);
-  const rows = useMemo(() => (readable ? listRows(data) : []), [readable, data]);
   // The chair's reading sits above the prose -- unless it IS the prose.
   const briefLines = useMemo(() => {
     if (!readable || !data.brief || grain === BRIEF) return [];
@@ -379,10 +404,10 @@ export function StandupPage() {
         <Button
           appearance="subtle"
           size="small"
-          aria-label={`Start work on ${current.ref}`}
+          aria-label={`${WORK_IT_NOW}: ${current.ref}`}
           onClick={() => setStartFor(suggestionArg(current))}
         >
-          Start work
+          {WORK_IT_NOW}
         </Button>
       )}
       {current && !RITUALS.suggestShapes.slice(0, 2).includes(current.shape) && (
@@ -454,17 +479,63 @@ export function StandupPage() {
           <>
             <TabList
               size="small"
-              aria-label="Grain"
-              selectedValue={grain}
-              onTabSelect={(_e, d) => setGrain(String(d.value))}
+              aria-label="Standup"
+              selectedValue={onAgenda ? AGENDA : grain}
+              onTabSelect={(_e, d) => {
+                const v = String(d.value);
+                setTab(v);
+                if (isGrain(v)) setGrain(v);
+              }}
             >
+              <Tab value={AGENDA}>Agenda</Tab>
               {GRAINS.map((g) => (
                 <Tab key={g} value={g}>
                   {grainLabel(g)}
                 </Tab>
               ))}
             </TabList>
-            {briefLines.length > 0 && (
+            {onAgenda && (
+              <>
+                <div className={styles.agendaHead}>
+                  <Body1 className={styles.agendaSentence} data-testid="agenda-sentence">
+                    {AGENDA_SENTENCE}
+                  </Body1>
+                  <div className={styles.views} role="group" aria-label="Agenda view">
+                    <ToggleButton
+                      size="small"
+                      appearance="subtle"
+                      icon={<GridRegular />}
+                      checked={agendaView === "cards"}
+                      onClick={() => setAgendaView("cards")}
+                    >
+                      Cards
+                    </ToggleButton>
+                    <ToggleButton
+                      size="small"
+                      appearance="subtle"
+                      icon={<TextBulletListLtrRegular />}
+                      checked={agendaView === "list"}
+                      onClick={() => setAgendaView("list")}
+                    >
+                      List
+                    </ToggleButton>
+                  </div>
+                </div>
+                {/* The chair's suggestion is the Agenda's first line after its sentence: where
+                    an unrouted pick -- which no lane carries -- is named, with its action. The
+                    brief's other lines are the text tabs' (they say "closed yesterday"). */}
+                {suggestionRow}
+                <div data-testid="agenda" data-view={agendaView}>
+                  <AgendaLanes
+                    data={data}
+                    view={agendaView}
+                    facts={facts}
+                    onWork={(arg) => setStartFor(arg)}
+                  />
+                </div>
+              </>
+            )}
+            {!onAgenda && briefLines.length > 0 && (
               <div className={styles.brief} data-testid="standup-brief">
                 {briefLines.map((line, i) => (
                   <Caption1 key={i}>{line}</Caption1>
@@ -476,59 +547,18 @@ export function StandupPage() {
                 scrolls sideways -- and a region that scrolls must be reachable
                 by keyboard (axe's scrollable-region-focusable). A named
                 region is the pattern that may take the tab stop and a label. */}
-            <pre
-              className={styles.body}
-              data-testid="standup-text"
-              tabIndex={0}
-              role="region"
-              aria-label="Standup text"
-            >
-              {linked}
-            </pre>
-            {grain === BRIEF && suggestionRow}
-            <Button
-              appearance="transparent"
-              size="small"
-              className={styles.toggle}
-              aria-expanded={showList}
-              onClick={() => setShowList((v) => !v)}
-            >
-              {showList ? "Hide list" : "Show as list"}
-            </Button>
-            {showList && (
-              <ul className={styles.list} data-testid="standup-list">
-                {rows.map((r) => (
-                  <li key={r.key} className={styles.row}>
-                    <span className={styles.kind}>{r.kind}</span>
-                    <span>
-                      {isIssue(r.item) && facts?.get(r.item.number!) ? (
-                        <IssuePopover facts={facts.get(r.item.number!)!} />
-                      ) : isIssue(r.item) ? (
-                        <Link href={r.item.url} target="_blank" rel="noopener noreferrer">
-                          {itemRef(r.item)}
-                        </Link>
-                      ) : r.item.id ? (
-                        <IssuePopover facts={itemFacts(r.item)} />
-                      ) : (
-                        ""
-                      )}
-                    </span>
-                    <span className={styles.title}>{r.item.title}</span>
-                    {r.worker && <span className={styles.who}>{r.worker}</span>}
-                    {startWorkArg(r.item) && (
-                      <Button
-                        appearance="subtle"
-                        size="small"
-                        aria-label={`Start work on ${itemRef(r.item)}`}
-                        onClick={() => setStartFor(startWorkArg(r.item))}
-                      >
-                        Start work
-                      </Button>
-                    )}
-                  </li>
-                ))}
-              </ul>
+            {!onAgenda && (
+              <pre
+                className={styles.body}
+                data-testid="standup-text"
+                tabIndex={0}
+                role="region"
+                aria-label="Standup text"
+              >
+                {linked}
+              </pre>
             )}
+            {!onAgenda && grain === BRIEF && suggestionRow}
           </>
         )}
       </PageCard>

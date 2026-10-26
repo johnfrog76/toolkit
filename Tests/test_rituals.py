@@ -1357,6 +1357,24 @@ TOP_FIELDS = {
     "suggestions",
     "suggestion",
     "corner",
+    "agenda",
+}
+AGENDA_FIELDS = {
+    "ref",
+    "number",
+    "id",
+    "kind",
+    "title",
+    "url",
+    "path",
+    "file",
+    "lane",
+    "day",
+    "review",
+    "cover",
+    "checked",
+    "total",
+    "progress",
 }
 SUGGESTION_FIELDS = {"ref", "number", "id", "kind", "shape", "sentence", "command", "line"}
 CORNER_FIELDS = {"shape", "milestone", "remaining", "ref", "number", "id", "kind", "noun", "line", "command", "brief"}
@@ -1547,6 +1565,8 @@ class TheRoute(unittest.TestCase):
         fields = calls[1][calls[1].index("--json") + 1].split(",")
         self.assertIn("milestone", fields)
         self.assertIn("body", fields)
+        # An open issue's age: the suggestion's order and the Agenda's "Open since" read it, as the CLI's read does.
+        self.assertIn("createdAt", fields)
         filled = _fill(CASES["friday"])
         filled.work.text = standup.render_work(filled)
         self.assertEqual(body["work"]["text"], filled.work.text)
@@ -1554,6 +1574,11 @@ class TheRoute(unittest.TestCase):
     def test_the_response_field_names_are_section_4bs(self):
         body = self._get("/api/ritual/standup")[0].json()
         self.assertEqual(set(body), TOP_FIELDS)
+        self.assertEqual(set(body["agenda"]), {"moved", "waiting"})
+        tiles = body["agenda"]["moved"] + body["agenda"]["waiting"]
+        self.assertTrue(tiles, "friday has closes and routed issues")
+        for tile in tiles:
+            self.assertEqual(set(tile), AGENDA_FIELDS)
         self.assertEqual(set(body["tracker"]), {"ok", "reason"})
         self.assertEqual(set(body["chair"]), {"open", "close"})
         self.assertEqual(set(body["queue"]), {"walk", "decide", "look"})
@@ -2085,6 +2110,156 @@ class TheDressIsKeptByItsFacts(unittest.TestCase):
         complete, calls = _answering(self.REPLY)
         self._dress(filled, complete)
         self.assertEqual(len(calls), 1)
+
+
+class TheAgenda(unittest.TestCase):
+    """The Agenda (agent/solitaire/agenda.py; docs/modules/solitaire-agile.md, "The page"):
+    what moved in the window and what is waiting on you, over the standup's own read.
+    One row per shape the rule tells apart -- the table is the scenario below."""
+
+    AS_OF = "2026-10-26T09:00:00-04:00"  # a Monday: the window opens on Friday 23 October
+
+    def setUp(self):
+        from agent.core.config import card_types
+        from agent.solitaire import agenda, suggest
+
+        self.agenda, self.suggest = agenda, suggest
+        self.tmp = tempfile.TemporaryDirectory()
+        space = Path(self.tmp.name)
+        for folder in ("current", "archive", "backlog"):
+            (space / folder).mkdir()
+
+        def card(folder: str, name: str, body: str) -> None:
+            (space / folder / name).write_text(body, encoding="utf-8")
+
+        card(
+            "current",
+            "TaskK7M2-wire-the-board.prompt.md",
+            "# Task K7M2: Wire the board\n- [x] one\n- [ ] two\n\n**Created:** 2026-10-23\n",
+        )
+        card(
+            "current",
+            "TaskP4X8-in-hand.prompt.md",
+            "# Task P4X8: In hand\n- abc1234 a commit\n\n**Created:** 2026-10-21\n",
+        )
+        card(
+            "current",
+            "TaskB1B1-not-billable.prompt.md",
+            "# Task B1B1: Not billable\n\n**Billable:** no\n**Created:** 2026-10-21\n",
+        )
+        card(
+            "current",
+            "203-in-progress.prompt.md",
+            "# Bug 203: In progress\n- def5678 a commit\n\n**Created:** 2026-10-21\n",
+        )
+        card(
+            "current",
+            "206-in-review.prompt.md",
+            "# Bug 206: In review\n\n**Created:** 2026-10-20\n**Review:** 2026-10-22\n",
+        )
+        card(
+            "archive",
+            "TaskQ3R9-photo-import.prompt.md",
+            "# Task Q3R9: Photo import\n\n**Created:** 2026-10-20\n**Closed:** 2026-10-24\n",
+        )
+        card("backlog", "TaskZ9Z9-planned.prompt.md", "# Task Z9Z9: Planned\n\n**Created:** 2026-10-19\n")
+        names, prefixes = card_types()
+        self.cards = standup.read_cards(space, names, prefixes)
+        walk = C.rituals_walk_label()
+        self.labels = [
+            {"name": "opus", "description": C.rituals_worker_label_prefix() + "Opus"},
+            {"name": walk, "description": "walk"},
+        ]
+
+        def issue(n, state, labels, created=None, closed=None, assignee=None):
+            return {
+                "number": n,
+                "title": f"Issue {n}",
+                "state": state,
+                "labels": [{"name": x} for x in labels],
+                "createdAt": created,
+                "closedAt": closed,
+                "url": f"https://github.com/acme/widgets/issues/{n}",
+                "assignees": [{"login": assignee}] if assignee else [],
+            }
+
+        self.issues = [
+            issue(201, "OPEN", ["opus"], "2026-10-20T14:00:00Z"),  # routed, no card
+            issue(202, "OPEN", [], "2026-10-19T14:00:00Z"),  # nobody has it: Triage's, not the Agenda's
+            issue(203, "OPEN", ["opus"]),  # its card is In Progress: in somebody's hands
+            issue(204, "OPEN", ["opus", walk], "2026-10-18T10:00:00Z"),  # on the walk
+            issue(205, "CLOSED", ["opus"], None, "2026-10-24T02:30:00Z"),  # closed Friday evening, local time
+            issue(206, "OPEN", ["opus"]),  # its card is in Code Review
+            issue(207, "OPEN", [], "2026-10-19T14:00:00Z", assignee="someone"),  # someone else's
+        ]
+        self.filled = standup.fill_joined_standup(
+            datetime.fromisoformat(self.AS_OF),
+            self.labels,
+            self.issues,
+            {"ok": True, "reason": ""},
+            self.cards,
+            space="widgets",
+            space_name="Widgets",
+        )
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _agenda(self):
+        return self.agenda.build_agenda(self.filled, self.labels, self.issues, self.cards, "", "widgets")
+
+    def test_what_moved_is_the_windows_closes_once_each_dated_in_the_standups_own_offset(self):
+        moved = self._agenda().moved
+        self.assertEqual(
+            [(i.ref, i.kind, i.day, i.review) for i in moved],
+            [("#205", "issue", "2026-10-23", False), ("Q3R9", "card", "2026-10-24", False)],
+        )
+        # An archived card is not on the card page (it reads current/): no file to open.
+        self.assertEqual(moved[1].file, "")
+        self.assertEqual(moved[0].url, "https://github.com/acme/widgets/issues/205")
+
+    def test_waiting_is_active_cards_code_review_and_routed_issues_never_in_progress_or_backlog(self):
+        waiting = self._agenda().waiting
+        self.assertEqual(
+            [(i.ref, i.kind, i.lane, i.day, i.review) for i in waiting],
+            [
+                ("#201", "issue", "", "2026-10-20", False),
+                ("K7M2", "card", C.status_active(), "2026-10-23", False),
+                ("#204", "issue", "", "2026-10-18", True),
+                ("#206", "issue", C.status_code_review(), "2026-10-22", True),
+            ],
+        )
+        refs = {i.ref for i in waiting}
+        for absent in ("#202", "#203", "#207", "P4X8", "B1B1", "Z9Z9"):
+            self.assertNotIn(absent, refs)
+
+    def test_a_cards_tile_carries_the_boards_face_and_the_file_the_card_page_opens(self):
+        k7 = next(i for i in self._agenda().waiting if i.ref == "K7M2")
+        self.assertEqual((k7.checked, k7.total, k7.progress), (1, 2, "1/2"))
+        self.assertEqual(k7.file, "TaskK7M2-wire-the-board.prompt.md")
+        self.assertIsNone(k7.cover)
+        review = next(i for i in self._agenda().waiting if i.ref == "#206")
+        self.assertEqual(review.file, "206-in-review.prompt.md")
+
+    def test_the_suggestions_pick_is_first_wherever_it_is_on_the_agenda(self):
+        # Take the unrouted issue out: the pick is then a routed one, and it leads.
+        self.issues = [i for i in self.issues if i["number"] != 202]
+        self.suggest.attach_suggestions(self.filled, self.labels, self.issues, self.cards, "agents", True, "tk")
+        self.assertEqual(self._agenda().waiting[0].ref, self.filled.suggestion.ref)
+
+    def test_no_tracker_no_agenda(self):
+        filled = standup.fill_joined_standup(
+            datetime.fromisoformat(self.AS_OF), [], [], {"ok": False, "reason": "gh is away"}, self.cards
+        )
+        empty = self.agenda.build_agenda(filled, [], [], self.cards)
+        self.assertEqual((empty.moved, empty.waiting), ([], []))
+
+    def test_a_cards_space_is_its_cards(self):
+        filled = standup.fill_cards_standup(datetime.fromisoformat(self.AS_OF), self.cards, space="solo")
+        got = self.agenda.build_agenda(filled, [], [], self.cards)
+        self.assertEqual([i.ref for i in got.moved], ["Q3R9"])
+        self.assertEqual([i.ref for i in got.waiting], ["K7M2", "206"])
+        self.assertTrue(got.waiting[1].review)
 
 
 if __name__ == "__main__":
