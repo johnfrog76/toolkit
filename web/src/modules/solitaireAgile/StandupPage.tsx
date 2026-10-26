@@ -39,7 +39,7 @@ import { IssuePopover } from "./IssuePopover";
 import type { IssueFacts } from "./IssuePopover";
 import { isIssue } from "./itemRef";
 import { AgendaLanes } from "./AgendaLanes";
-import { AGENDA_SENTENCE, AGENDA_VIEWS } from "./agenda";
+import { AGENDA_SENTENCE, AGENDA_VIEWS, WORK_IT_NOW } from "./agenda";
 import { ROUTES } from "./paths";
 import { SEATS, plateFor } from "./stage/seats";
 import { SURFACE_CHAIR, dismissRef, dismissedRefs } from "./suggestDismiss";
@@ -100,7 +100,7 @@ export const startWorkArg = (i: RitualItem): string =>
 // The chair's Next line may be the SUGGESTION (AR-3; docs/modules/solitaire-agile.md,
 // "The suggestion: one next move, derived"): when nothing waits, the brief's last
 // line is the first candidate's `line`. The page draws that line as a row of its
-// own -- the line verbatim, the action (Start work opens the hand-off box for a
+// own -- the line verbatim, the action (Work it now opens the hand-off box for a
 // start or a delegation; a route, or a place in a milestone, opens Triage) and a dismiss. A dismiss is per
 // surface, per item, per session (suggestDismiss.ts): the next candidate's line
 // takes its place, and with none left the line is today's briefNextNone. The
@@ -404,10 +404,10 @@ export function StandupPage() {
         <Button
           appearance="subtle"
           size="small"
-          aria-label={`Start work on ${current.ref}`}
+          aria-label={`${WORK_IT_NOW}: ${current.ref}`}
           onClick={() => setStartFor(suggestionArg(current))}
         >
-          Start work
+          {WORK_IT_NOW}
         </Button>
       )}
       {current && !RITUALS.suggestShapes.slice(0, 2).includes(current.shape) && (

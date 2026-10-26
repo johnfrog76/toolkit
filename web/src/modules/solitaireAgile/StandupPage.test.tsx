@@ -1045,10 +1045,15 @@ describe("the chair's suggestion", () => {
     expect(screen.getByRole("button", { name: "Open Triage" })).toBeTruthy();
   });
 
-  it("Start work opens the hand-off box for the suggestion: one StartWork call, the number", async () => {
+  it("Work it now opens the hand-off box for the suggestion: one StartWork call, the number", async () => {
     answer = { data: suggested() };
     render(<StandupPage />);
-    fireEvent.click(screen.getByRole("button", { name: "Start work on #141" }));
+    // The row's button says what the Agenda's tiles say.
+    expect(screen.getByRole("button", { name: "Work it now: #141" }).textContent).toBe(
+      "Work it now",
+    );
+    expect(screen.queryByRole("button", { name: /Start work/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Work it now: #141" }));
     await screen.findByTestId("start-work-block");
     expect(startWork).toHaveBeenCalledTimes(1);
     expect(startWork).toHaveBeenCalledWith({ id: "141" });
@@ -1061,7 +1066,7 @@ describe("the chair's suggestion", () => {
     expect(screen.getByTestId("standup-suggestion").textContent).toContain(second.line);
     // A route's action is Triage, not the hand-off box.
     expect(screen.getByRole("button", { name: "Open Triage" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Start work on #150" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Work it now: #150" })).toBeNull();
     expect(JSON.parse(localStorage.getItem(DISMISS_KEY) ?? "{}").surfaces).toEqual({
       [SURFACE_CHAIR]: ["#141"],
     });

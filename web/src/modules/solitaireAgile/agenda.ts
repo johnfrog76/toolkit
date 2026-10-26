@@ -8,6 +8,7 @@ import type { AgendaItem } from "./api.solitaireAgile";
 /** The sentence under the tab's title -- the owner's words. */
 export const AGENDA_SENTENCE =
   "Here you can see the work items you can in fact kick off now, with the Work it now button.";
+/** The one label for opening the hand-off box: the Agenda's tiles and the suggestion row alike. */
 export const WORK_IT_NOW = "Work it now";
 export const REVIEW_IT = "Review it";
 
