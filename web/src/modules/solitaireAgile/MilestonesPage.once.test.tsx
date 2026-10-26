@@ -10,7 +10,14 @@ import { MilestonesPage } from "./MilestonesPage";
 // (button, Escape, navigation), revisited, or fed (the env and the ritual payload
 // arriving in either order, the Space's slug changing between renders).
 
-jest.mock("react-confetti", () => ({ __esModule: true, default: () => null }));
+const bursts: unknown[] = [];
+jest.mock("react-confetti", () => ({
+  __esModule: true,
+  default: (props: unknown) => {
+    bursts.push(props);
+    return null;
+  },
+}));
 
 let response: { data?: MilestonesResponse; isLoading: boolean; error?: unknown } = {
   isLoading: false,
@@ -49,6 +56,7 @@ const C = { ...ms(3, "M3"), updated_at: "2026-10-25" };
 const D = ms(4, "M4");
 
 beforeEach(() => {
+  bursts.length = 0;
   localStorage.clear();
   resetCelebrateMemory();
   envSpace = "widgets";
@@ -89,9 +97,11 @@ describe.each([
   it("opens once for a backlog, and a revisit with the same storage opens nothing", async () => {
     response = { isLoading: false, data: ok([A, B, C, D]) };
     const { unmount } = render(<MilestonesPage />);
-    // The most recently reached of the four; the others are not queued behind it.
+    // One dialog naming all four, oldest reached first, one burst.
     const d = await dialog();
-    await within(d).findByText("Congratulations: M3 reached!");
+    await within(d).findByText("Congratulations: M1, M2, M4 and M3 reached!");
+    expect(within(d).getAllByTestId("award-line")).toHaveLength(4);
+    expect(bursts).toHaveLength(1);
     await close();
     await settle();
     await none();

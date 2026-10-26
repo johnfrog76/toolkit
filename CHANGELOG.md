@@ -10,7 +10,7 @@ release.
 
 ### Fixed
 
-- Team Agile's award dialog opens once, as it should: a machine that meets several milestones already reached is congratulated once, for the latest, instead of once for each, and a revisit, a reload or a late refetch never opens it again.
+- Team Agile's award dialog opens once, naming every milestone reached since the last one, with one burst of confetti; a revisit, a reload or a late refetch never opens it again.
 
 ## [1.5.0] - 2026-10-26
 

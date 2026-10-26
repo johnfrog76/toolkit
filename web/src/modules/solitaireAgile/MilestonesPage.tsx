@@ -18,7 +18,7 @@ import type { Milestone } from "../ado/api.ado";
 import { milestoneProgress, milestoneStage, orderMilestones } from "../ado/milestones";
 import { useGetRitualMilestonesQuery } from "./api.solitaireAgile";
 import type { AwardStage } from "./award";
-import { awardKey, awardStage, dayWords, markAwarded, pickAward } from "./award";
+import { awardKey, awardStage, dayWords, markAwarded, pickAwards } from "./award";
 
 // The Milestones tab (docs/modules/solitaire-agile.md, "Milestones: the tab and the
 // award"): Team Agile's third page, after Standup and Triage. One row per milestone
@@ -154,17 +154,16 @@ export function MilestonesPage() {
   // refetch with a new list) reads the marks and finds nothing pending, and closing
   // the dialog by any route leaves them in place.
   const [visit, setVisit] = useState<{
-    shown: Milestone | null;
+    shown: Milestone[];
     slug: string;
-    seen: Milestone[];
   } | null>(null);
-  if (visit === null && readable) setVisit({ shown: pickAward(slug, list), slug, seen: list });
+  if (visit === null && readable) setVisit({ shown: pickAwards(slug, list), slug });
   useLayoutEffect(() => {
-    if (visit) markAwarded(visit.slug, visit.seen);
+    if (visit) markAwarded(visit.slug, visit.shown);
   }, [visit]);
-  const awarding = visit?.shown ?? null;
+  const awarding = visit?.shown ?? [];
   const stageOf = (m: Milestone): AwardStage =>
-    awarding && awardKey(slug, m) === awardKey(slug, awarding)
+    awarding.some((a) => awardKey(slug, a) === awardKey(slug, m))
       ? milestoneStage(m)
       : awardStage(slug, m);
 
@@ -209,11 +208,10 @@ export function MilestonesPage() {
           <MilestoneRow key={`${m.repo}-${m.number}`} m={m} stage={stageOf(m)} />
         ))}
       </PageCard>
-      {awarding && (
+      {awarding.length > 0 && (
         <AwardDialog
-          key={awardKey(slug, awarding)}
-          milestone={awarding}
-          onClose={() => setVisit((v) => (v ? { ...v, shown: null } : v))}
+          milestones={awarding}
+          onClose={() => setVisit((v) => (v ? { ...v, shown: [] } : v))}
         />
       )}
     </div>

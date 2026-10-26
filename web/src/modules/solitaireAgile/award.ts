@@ -52,21 +52,20 @@ export const pendingAwards = (space: string, list: Milestone[]): Milestone[] =>
 /** The day it was reached: GitHub's close, else its last change -- the last issue closing. */
 export const reachedDay = (m: Milestone): string => m.closed_at || m.updated_at || "";
 
-/** The ONE award a visit owes: the most recently reached of the pending milestones
- *  (the list's order breaks a tie), or null. A machine that meets a backlog -- every
- *  milestone reached before this browser first looked -- is congratulated once, for
- *  the latest, not once per milestone it never saw. Pure: marks nothing. */
-export function pickAward(space: string, list: Milestone[]): Milestone | null {
-  let best: Milestone | null = null;
-  for (const m of pendingAwards(space, list))
-    if (!best || reachedDay(m) > reachedDay(best)) best = m;
-  return best;
+/** The milestones a visit's one award names: every pending reached milestone, oldest
+ *  reached first (the order the work was done in; the list's order breaks a tie).
+ *  Empty when nothing is waiting. Pure: marks nothing. */
+export function pickAwards(space: string, list: Milestone[]): Milestone[] {
+  return pendingAwards(space, list)
+    .map((m, i) => ({ m, i }))
+    .sort((x, y) => reachedDay(x.m).localeCompare(reachedDay(y.m)) || x.i - y.i)
+    .map((x) => x.m);
 }
 
-/** Set the marks for a visit's award: every pending milestone, the one shown and the
- *  backlog behind it, so none is shown on a later visit or after a refetch. */
-export function markAwarded(space: string, list: Milestone[]): void {
-  for (const m of pendingAwards(space, list)) markSeen(AWARD_SEEN_KEY, awardKey(space, m));
+/** Set the marks for the milestones a visit's award names, so none is shown on a later
+ *  visit or after a refetch. Nothing is marked that the dialog did not name. */
+export function markAwarded(space: string, shown: Milestone[]): void {
+  for (const m of shown) markSeen(AWARD_SEEN_KEY, awardKey(space, m));
 }
 
 const MONTHS = [
@@ -92,8 +91,13 @@ export function dayWords(day: string | undefined): string {
   return month ? `${Number(m[3])} ${month} ${m[1]}` : "";
 }
 
-/** The dialog's heading. */
-export const awardTitle = (m: Milestone): string => `Congratulations: ${m.title} reached!`;
+/** The dialog's heading: one title, or "A and B", or "A, B and C". */
+export function awardTitle(ms: Milestone[]): string {
+  const names = ms.map((m) => m.title);
+  const last = names.pop();
+  const who = names.length ? `${names.join(", ")} and ${last}` : (last ?? "");
+  return `Congratulations: ${who} reached!`;
+}
 
 /** The dialog's one line of what it took: the issues, then the dates the tracker gives. */
 export function tookLine(m: Milestone): string {

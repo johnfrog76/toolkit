@@ -72,7 +72,13 @@ function WordmarkStandIn() {
 /** The picture the award shows -- the stand-in until the real one is drawn. */
 export const AWARD_PICTURE = WordmarkStandIn;
 
-export function AwardDialog({ milestone, onClose }: { milestone: Milestone; onClose: () => void }) {
+export function AwardDialog({
+  milestones,
+  onClose,
+}: {
+  milestones: Milestone[];
+  onClose: () => void;
+}) {
   const styles = useStyles();
   // One burst for this dialog's moment: it ends itself and is not drawn again
   // while the dialog stays open.
@@ -82,12 +88,24 @@ export function AwardDialog({ milestone, onClose }: { milestone: Milestone; onCl
     <Dialog open onOpenChange={(_e, d) => !d.open && onClose()}>
       <DialogSurface className={styles.surface} data-testid="award-dialog">
         <DialogBody>
-          <DialogTitle action={<DialogDismiss />}>{awardTitle(milestone)}</DialogTitle>
+          <DialogTitle action={<DialogDismiss />}>{awardTitle(milestones)}</DialogTitle>
           <DialogContent className={styles.content}>
             <div data-testid="award-picture">
               <Picture />
             </div>
-            <Body1 className={styles.took}>{tookLine(milestone)}</Body1>
+            {milestones.length === 1 ? (
+              <Body1 className={styles.took}>{tookLine(milestones[0])}</Body1>
+            ) : (
+              milestones.map((m) => (
+                <Body1
+                  key={`${m.repo}#${m.number}`}
+                  className={styles.took}
+                  data-testid="award-line"
+                >
+                  <strong>{m.title}</strong>: {tookLine(m)}
+                </Body1>
+              ))
+            )}
           </DialogContent>
           <DialogActions>
             <Button appearance="primary" onClick={onClose}>
