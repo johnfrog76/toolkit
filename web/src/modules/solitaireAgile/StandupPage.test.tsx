@@ -1220,7 +1220,7 @@ describe("the PM Corner", () => {
     answer = { data: withCorner("many-left", many) };
     render(<StandupPage />);
     const corner = await screen.findByTestId("pm-corner");
-    fireEvent.click(within(corner).getByRole("button", { name: "Start work on #5" }));
+    fireEvent.click(within(corner).getByRole("button", { name: "Work it now: #5" }));
     await screen.findByTestId("start-work-block");
     expect(startWork).toHaveBeenCalledTimes(1);
     expect(startWork).toHaveBeenCalledWith({ id: "5" });

@@ -829,7 +829,7 @@ issues. Null with the switch off, on an Azure DevOps Space, or with the tracker 
 
 **On the page** the Corner is a `lazyPart` (`PmCorner.tsx`) drawn at the head of the Team Agile page,
 above the standup's card: the line verbatim, and, when it names a pick, the chevron (`>`,
-`rituals.text.cornerChevron`), which opens [the hand-off box](#startwork-the-hand-off-block) -- the same
+`rituals.text.cornerChevron`; its accessible name is `Work it now: <ref>`, the Agenda tiles' words), which opens [the hand-off box](#startwork-the-hand-off-block) -- the same
 `POST /api/cmd/StartWork` every **Work it now** makes. Where the launch exists (`/env`'s
 `startWorkLaunch`, true -- the name is `consts.json` `startWork.launchEnvFlag`), the box offers a second button, **Launch**, which sends the same verb with
 `-Launch`; absent or false -- every agent today -- the box has one button. The brief below stops above the
