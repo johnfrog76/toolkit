@@ -22,6 +22,7 @@ release.
 ### Fixed
 
 - Every theme in the web UI wears its own accent again -- Atlantis its cyan, Basement its amber, Office its teal -- instead of the product's rose, and looks exactly as it did in 1.4.0.
+- On the Team Agile Agenda, the id button on each card is readable in every theme; it was too faint in Seaglass and Aurora.
 
 ## [1.4.0] - 2026-10-24
 

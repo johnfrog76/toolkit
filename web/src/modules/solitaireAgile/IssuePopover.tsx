@@ -28,6 +28,13 @@ const useStyles = makeStyles({
     rowGap: tokens.spacingVerticalXS,
     maxWidth: "320px",
   },
+  // The theme's own brand foreground, not the ramp's generated link step, which
+  // misses AA on a card in Seaglass and Aurora.
+  link: {
+    color: tokens.colorBrandForeground1,
+    ":hover": { color: tokens.colorBrandForeground2 },
+    ":active": { color: tokens.colorBrandForeground2 },
+  },
   fact: { color: tokens.colorNeutralForeground3 },
 });
 
@@ -56,11 +63,17 @@ export function IssuePopover({ facts }: { facts: IssueFacts }) {
   // The trigger is a real link for an issue (the text and the href stay); a click
   // opens the surface rather than leaving, and "Open on GitHub" is the way out.
   const trigger: ReactNode = url ? (
-    <Link href={url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.preventDefault()}>
+    <Link
+      className={styles.link}
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.preventDefault()}
+    >
       {facts.label}
     </Link>
   ) : (
-    <Link>{facts.label}</Link>
+    <Link className={styles.link}>{facts.label}</Link>
   );
   return (
     <Popover openOnHover mouseLeaveDelay={HOVER_CLOSE_DELAY_MS} positioning="below-start" withArrow>

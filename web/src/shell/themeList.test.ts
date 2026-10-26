@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { FIRST_DARK, FIRST_LIGHT, THEMES, themeById } from "./themeList";
 import { brandRamp, fluentThemeFor } from "./theme";
+import { AA_TEXT, contrastRatio } from "../shared/accent";
 
 function luminance(hex: string): number {
   const n = parseInt(hex.slice(1, 7), 16);
@@ -132,4 +133,18 @@ describe("themes", () => {
       expect({ file, imports: /shared\/accent/.test(src) }).toEqual({ file, imports: false });
     }
   });
+});
+
+describe("brand foreground on a card", () => {
+  // The issue popover's trigger is a Link painted with these two (the ramp's own
+  // link step fails AA on a card in Seaglass and Aurora).
+  it.each(THEMES.map((t) => [t.id, t] as const))(
+    "%s: foreground1 and foreground2 clear AA on the card face",
+    (_id, t) => {
+      const f = fluentThemeFor(t);
+      for (const ink of [f.colorBrandForeground1, f.colorBrandForeground2]) {
+        expect(contrastRatio(ink, f.colorNeutralBackground1)).toBeGreaterThanOrEqual(AA_TEXT);
+      }
+    },
+  );
 });
