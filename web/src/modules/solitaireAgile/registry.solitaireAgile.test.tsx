@@ -31,6 +31,7 @@ jest.mock("../lounge", () => ({
   },
 }));
 jest.mock("./StandupPage", () => ({ StandupPage: () => null }));
+jest.mock("./MilestonesPage", () => ({ MilestonesPage: () => null }));
 jest.mock("./RitualPage", () => ({ RitualPage: () => null }));
 jest.mock("./stage/StandupPlay", () => ({ StandupPlay: () => null }));
 
@@ -91,6 +92,7 @@ describe("the solitaireAgile module's registry contract", () => {
     expect(moduleRoutes(active).map((r) => r.path)).toEqual([
       "/solitaire-agile",
       "/solitaire-agile/triage",
+      "/solitaire-agile/milestones",
       "/deck/ritual/standup",
     ]);
     expect(moduleNav(active, ctx).map((n) => n.label)).toEqual(["Team Agile"]);
@@ -100,10 +102,12 @@ describe("the solitaireAgile module's registry contract", () => {
     expect(solitaireAgileModule.headerItems).toBeUndefined();
   });
 
-  it("Triage is a second page under the ONE Team Agile entry, and not chromeless", () => {
+  it("Triage and Milestones are pages under the ONE Team Agile entry, and not chromeless", () => {
     const [entry] = moduleNav(activeModules(all, env({ solitaireAgile: true })), ctx);
-    expect(entry.match("/solitaire-agile/triage")).toBe(true);
-    expect(solitaireAgileModule.chromeless?.("/solitaire-agile/triage")).toBe(false);
+    for (const page of ["/solitaire-agile/triage", "/solitaire-agile/milestones"]) {
+      expect(entry.match(page)).toBe(true);
+      expect(solitaireAgileModule.chromeless?.(page)).toBe(false);
+    }
   });
 
   it("the played standup is a room of its own (chromeless) only while the flag is on", () => {

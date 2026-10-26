@@ -64,7 +64,9 @@ import type { PromptRow, PromptWorkflow } from "../modules/studio/api.studio";
 import { itemFacts, itemRef, itemSpoken } from "../modules/solitaireAgile/itemRef";
 import { chairSuggestion } from "../modules/solitaireAgile/suggestion";
 import { briefSansCorner, cornerOf, hasChevron, isReached } from "../modules/solitaireAgile/corner";
-import { shouldCelebrate } from "../modules/solitaireAgile/celebrate";
+import { pendingAwards, awardStage, AWARD_SEEN_KEY } from "../modules/solitaireAgile/award";
+import { resetCelebrateMemory } from "../modules/solitaireAgile/celebrate";
+import type { Milestone } from "../modules/ado/api.ado";
 import type { StandupResponse } from "../modules/solitaireAgile/api.solitaireAgile";
 import fs from "node:fs";
 import path from "node:path";
@@ -569,10 +571,10 @@ describe("the scenario grid: what each configuration shows", () => {
 
   // The PM Corner (docs/SCENARIOS.md, "Team Agile's standup"): the agent attaches it
   // where the suggestion is on, as the brief's LAST line; the page draws it at the
-  // head instead. Reached throws the confetti once per milestone per viewer: on the
-  // page that sees it first with no mark, and never again on a reload with the mark
-  // set. Over corner.json's generated goldens and celebrate.ts's rule.
-  it("the PM Corner: reached is the line and one burst; a reload is the line and no burst; no Corner off GitHub", () => {
+  // head instead. Reached is the line and a link to the Milestones tab -- the Corner
+  // throws no confetti (PmCorner.test.tsx holds that); the award dialog does.
+  // Over corner.json's generated goldens.
+  it("the PM Corner: reached is the line and a way to Milestones; several left the chevron; no Corner off GitHub", () => {
     const dir = path.resolve(__dirname, "../../../Tests/fixtures/rituals");
     const brief = (name: string) =>
       fs.readFileSync(path.join(dir, `corner-${name}.brief.txt`), "utf8");
@@ -596,10 +598,7 @@ describe("the scenario grid: what each configuration shows", () => {
     expect([isReached(corner), hasChevron(corner)]).toEqual([true, false]);
     // The brief the page draws below the Corner stops above its line.
     expect(briefSansCorner(data).includes("Corner:")).toBe(false);
-    // Reached, first seen, no mark: one burst. A reload, the mark set: none.
-    expect(shouldCelebrate({ active: true, wasActive: null, seen: false })).toBe(true);
-    expect(shouldCelebrate({ active: true, wasActive: null, seen: true })).toBe(false);
-    // Several left: the line and its chevron, no burst.
+    // Several left: the line and its chevron.
     expect(last(brief("many-left"))).toBe(
       "Corner: 3 more issues to get milestone B - start #5 now > (tkStartWork 5)",
     );
@@ -609,6 +608,50 @@ describe("the scenario grid: what each configuration shows", () => {
       cornerOf({ brief: brief("switched-off"), corner: null } as unknown as StandupResponse),
     ).toBeNull();
     expect(brief("switched-off").includes("Corner:")).toBe(false);
+  });
+
+  // Team Agile's Milestones (docs/SCENARIOS.md, "Team Agile's milestones"): a third
+  // page under the ONE Team Agile entry, absent with the flag off; over the shared
+  // table (Tests/fixtures/rituals/milestones.json) a reached milestone first seen in
+  // this browser is the award -- once -- and then reads awarded; an empty one is
+  // never awarded.
+  it("Milestones: a page under Team Agile's one entry; reached is the award once, then awarded; empty never", () => {
+    const at = (features: Record<string, boolean>) => {
+      const e = env({ status: "active", tier: 1, tracker: "github", features });
+      const active = activeModules(modules, e);
+      const ctx = { env: e } as CardContext;
+      return {
+        route: moduleRoutes(active).some((r) => r.path === "/solitaire-agile/milestones"),
+        chromeless: isChromeless(active, "/solitaire-agile/milestones"),
+        nav: moduleNavSplit(active, ctx)
+          .tabs.filter((n) => n.match("/solitaire-agile/milestones"))
+          .map((n) => n.label),
+      };
+    };
+    expect(at({ solitaireAgile: true })).toEqual({
+      route: true,
+      chromeless: false,
+      nav: ["Team Agile"],
+    });
+    expect(at({ solitaireAgile: false })).toEqual({ route: false, chromeless: false, nav: [] });
+
+    const table = JSON.parse(
+      fs.readFileSync(
+        path.resolve(__dirname, "../../../Tests/fixtures/rituals/milestones.json"),
+        "utf8",
+      ),
+    ) as { expected: Milestone[] };
+    localStorage.clear();
+    resetCelebrateMemory();
+    const reached = pendingAwards("widgets", table.expected);
+    expect(reached.map((m) => m.title)).toEqual(["M4b -- 1.5.0", "M2 -- 1.3.0"]);
+    localStorage.setItem(AWARD_SEEN_KEY, JSON.stringify(["widgets:M4b -- 1.5.0"]));
+    expect(awardStage("widgets", reached[0])).toBe("awarded");
+    expect(pendingAwards("widgets", table.expected).map((m) => m.title)).toEqual(["M2 -- 1.3.0"]);
+    const empty = table.expected.filter((m) => m.open + m.closed === 0);
+    expect(empty.map((m) => awardStage("widgets", m))).toEqual(["empty", "empty"]);
+    localStorage.clear();
+    resetCelebrateMemory();
   });
 
   // "How do you want to work in <Space>?" (docs/SCENARIOS.md, the "How do

@@ -430,6 +430,11 @@ def rituals_triage_route() -> str:
     return consts()["rituals"]["triageRoute"]
 
 
+def rituals_milestones_route() -> str:
+    """The Milestones tab's route, with the /api prefix: ``/api/ritual/milestones``."""
+    return consts()["rituals"]["milestonesRoute"]
+
+
 def rituals_assign_me() -> str:
     """``me`` -- the one answer to who takes an item that is not a size (D-AR10):
     ``Route -Assign me``, a card's ``**Assigned:** me``, and a triage item's

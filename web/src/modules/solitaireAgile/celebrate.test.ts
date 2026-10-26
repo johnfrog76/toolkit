@@ -1,38 +1,7 @@
-import { hasSeen, markSeen, resetCelebrateMemory, shouldCelebrate } from "./celebrate";
+import { hasSeen, markSeen, resetCelebrateMemory } from "./celebrate";
 
-// The once-per-thing rule behind the confetti (D-AR14): a table, one row per input the
-// rule distinguishes, and the seen mark's storage falling back to memory.
-
-describe("shouldCelebrate", () => {
-  const rows: [string, { active: boolean; wasActive: boolean | null; seen: boolean }, boolean][] = [
-    ["not reached: never", { active: false, wasActive: null, seen: false }, false],
-    ["not reached, was reached: never", { active: false, wasActive: true, seen: false }, false],
-    ["first sight, reached, no mark: once", { active: true, wasActive: null, seen: false }, true],
-    [
-      "first sight, reached, the mark set (a reload): never",
-      { active: true, wasActive: null, seen: true },
-      false,
-    ],
-    [
-      "the transition while watching, no mark: once",
-      { active: true, wasActive: false, seen: false },
-      true,
-    ],
-    [
-      "the transition while watching, the mark set: once",
-      { active: true, wasActive: false, seen: true },
-      true,
-    ],
-    [
-      "already reached and still reached: never again",
-      { active: true, wasActive: true, seen: false },
-      false,
-    ],
-  ];
-  it.each(rows)("%s", (_name, state, want) => {
-    expect(shouldCelebrate(state)).toBe(want);
-  });
-});
+// The once-per-thing mark behind the award (D-AR14): the seen mark's storage, and its
+// fallback to memory when the browser refuses it.
 
 describe("the seen mark", () => {
   const KEY = "p20.test.celebrate";
