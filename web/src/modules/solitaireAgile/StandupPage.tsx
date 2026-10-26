@@ -46,9 +46,8 @@ const StartWorkBox = lazyPart(
   () => import("./StartWorkBox"),
   (m) => m.StartWorkBox,
 );
-// The PM Corner (AR-4): the line at the head of the page, its chevron and the
-// confetti -- a chunk of its own, with react-confetti in it, fetched when the
-// response first carries a Corner.
+// The PM Corner (AR-4): the line at the head of the page and its chevron -- a
+// chunk of its own, fetched when the response first carries a Corner.
 const PmCorner = lazyPart(
   () => import("./PmCorner"),
   (m) => m.PmCorner,
@@ -98,7 +97,7 @@ export const startWorkArg = (i: RitualItem): string =>
 // The PM Corner (AR-4; docs/modules/solitaire-agile.md, "The PM Corner: the line,
 // the chevron, the confetti") sits at the head of the page: the response's `corner.line`
 // verbatim, its chevron -- the same hand-off box every Start work opens -- and, when it
-// reads reached, the confetti once per milestone per viewer (PmCorner.tsx). The agent puts
+// reads reached, a link to the Milestones tab, where the award is (PmCorner.tsx). The agent puts
 // the same line last in the brief; the page draws it at the head instead, so the brief
 // below stops above it, and Copy still copies the brief as the agent rendered it.
 //
@@ -424,13 +423,7 @@ export function StandupPage() {
 
   return (
     <div className={styles.page}>
-      {corner && (
-        <PmCorner
-          corner={corner}
-          space={data?.space ?? space}
-          onStart={(arg) => setStartFor(arg)}
-        />
-      )}
+      {corner && <PmCorner corner={corner} onStart={(arg) => setStartFor(arg)} />}
       <PageCard
         loading={envLoading || isLoading}
         loadingLabel="Checking the tracker..."

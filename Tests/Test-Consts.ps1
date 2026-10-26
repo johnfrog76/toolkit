@@ -195,6 +195,7 @@ $expected = [ordered]@{
     # stays flat; Tests/fixtures/rituals/ holds the goldens the words make.
     'rituals.route'             = '/api/ritual/standup'
     'rituals.triageRoute'       = '/api/ritual/triage'
+    'rituals.milestonesRoute'   = '/api/ritual/milestones'
     'rituals.assignMe'          = 'me'
     'rituals.ceremoniesFile'    = 'Config/ceremonies.json'
     'rituals.vocabularyFile'    = 'Config/standup-vocabulary.json'

@@ -36,7 +36,7 @@ READ_TTL_SECONDS = LIST_TTL_SECONDS
 _OPEN = "OPEN"
 
 # key -> (when, the answer). A key is ("labels", repo), ("issues", repo, state,
-# body) or ("viewer",).
+# body), ("milestones", repo) -- the Milestones tab's read (milestones.py) -- or ("viewer",).
 _reads: dict[tuple, tuple[float, object]] = {}
 
 
@@ -96,6 +96,23 @@ def issues(repo: str, state: str, body: bool = False, refresh: bool = False) -> 
     return copy.deepcopy(rows), why
 
 
+def github_repos(
+    org: str, status: str, projects: list[dict], *, ritual: str, refresh: bool = False
+) -> tuple[list[str], dict]:
+    """(the Space's repos, tracker state) -- the checks every ceremony makes before
+    asking gh anything: a GitHub Space, tier 1, and at least one repo. Never raises."""
+    if tracker(org) != "github":
+        reason = f"This Space's tracker is not GitHub -- {ritual} reads a GitHub Space's issues."
+        return [], {"ok": False, "reason": reason}
+    tier, _ = _resolve_tier(org, status, refresh)
+    if tier != 1:
+        return [], {"ok": False, "reason": f"The tracker is not reachable from here (tier {tier})."}
+    repos = tracker_repos(org, projects)
+    if not repos:
+        return [], {"ok": False, "reason": NO_REPO_REASON}
+    return repos, {"ok": True, "reason": ""}
+
+
 def read_tracker(
     org: str,
     status: str,
@@ -113,15 +130,9 @@ def read_tracker(
     ``ritual`` names the reader in the not-GitHub sentence; ``refresh`` reads
     the tracker again past the kept answers (and past the tier probe's cache).
     """
-    if tracker(org) != "github":
-        reason = f"This Space's tracker is not GitHub -- {ritual} reads a GitHub Space's issues."
-        return [], [], {"ok": False, "reason": reason}
-    tier, _ = _resolve_tier(org, status, refresh)
-    if tier != 1:
-        return [], [], {"ok": False, "reason": f"The tracker is not reachable from here (tier {tier})."}
-    repos = tracker_repos(org, projects)
-    if not repos:
-        return [], [], {"ok": False, "reason": NO_REPO_REASON}
+    repos, state_ = github_repos(org, status, projects, ritual=ritual, refresh=refresh)
+    if not state_["ok"]:
+        return [], [], state_
     found: dict[str, dict] = {}
     rows_in: list[dict] = []
     try:

@@ -8,6 +8,10 @@ release.
 
 ## [Unreleased]
 
+### Added
+
+- Team Agile has a **Milestones** tab: every milestone of your tracker with a progress bar and its due date, and when one is reached a dialog congratulates you the next time you open the tab -- the confetti now lives there, once per milestone, and the standup's corner line links to it instead of celebrating.
+
 ### Changed
 
 - ToolKit's own accent is now rose and wine, on the landing page and as the wordmark's default colour: the logo's face, the call to action and the way-of-working dots there all take it.

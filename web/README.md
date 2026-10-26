@@ -126,12 +126,14 @@ web/
     │   ├── reminderEntry   a stored due split into the Edit dialog's date and time, and joined back
     │   └── RemindersCard   bucket chips, snooze menu, edit, done, the quick add
     ├── modules/solitaireAgile/   opt-in, features.solitaireAgile -- today's standup, read and played, and triage
-    │   ├── index.tsx       export solitaireAgileModule: three routes (the standup, triage, the played view, chromeless), one nav entry, no cards elsewhere
+    │   ├── index.tsx       export solitaireAgileModule: four routes (the standup, triage, milestones, the played view, chromeless), one nav entry, no cards elsewhere
     │   ├── paths.ts        the module's route paths and the played deck's id
-    │   ├── api.solitaireAgile.ts   GET /api/ritual/standup and /triage ?space=<slug>, read through @consts; POST /api/cmd/Route
-    │   ├── RitualPage      the Standup | Triage strip, each tab an address, and the page under it
+    │   ├── api.solitaireAgile.ts   GET /api/ritual/standup, /triage and /milestones ?space=<slug>, read through @consts; POST /api/cmd/Route
+    │   ├── RitualPage      the Standup | Triage | Milestones strip, each tab an address, and the page under it
     │   ├── StandupPage     the agent's text verbatim: line one the header, the rest monospace, #<n> linked; Play in the header
     │   ├── TriagePage      one open issue at a time, unplaced first: milestone, severity, size; each answer one Route
+    │   ├── MilestonesPage  one row per milestone, its bar the tracker's numbers; the award queue (award.ts)
+    │   ├── AwardDialog     the award -- congratulations, what it took, the picture -- and Confetti's one caller
     │   └── stage/          the played view: one lazy chunk with the deck engine
     │       ├── cast.tsx        the Remote Standup's atoms, by copy from the Wasteland (no bios); reduced motion stills them
     │       ├── seats.ts        the nine seats, the plates (role · persona (label)), the deal of workers onto seats

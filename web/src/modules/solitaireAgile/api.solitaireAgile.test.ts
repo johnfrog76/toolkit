@@ -2,9 +2,11 @@ import { API_BASE } from "../../shell/api";
 import { RITUALS } from "../../shell/consts";
 import {
   ATTEND_QUERY,
+  MILESTONES_QUERY,
   REMIND_QUERY,
   STANDUP_QUERY,
   TRIAGE_QUERY,
+  milestonesQuery,
   standupQuery,
   triageQuery,
 } from "./api.solitaireAgile";
@@ -41,5 +43,16 @@ describe("the triage query", () => {
   it("asks past the agent's kept read when it is the page's Refresh", () => {
     expect(triageQuery("toolkit", true)).toBe(`${TRIAGE_QUERY}?space=toolkit&refresh=1`);
     expect(triageQuery("", true)).toBe(`${TRIAGE_QUERY}?refresh=1`);
+  });
+});
+
+describe("the milestones query", () => {
+  it("is the contract's milestonesRoute under the slice's base", () => {
+    expect(`${API_BASE}/${MILESTONES_QUERY}`).toBe(RITUALS.milestonesRoute);
+  });
+
+  it("asks about a Space by slug, and the one you are in with none", () => {
+    expect(milestonesQuery("toolkit")).toBe(`${MILESTONES_QUERY}?space=toolkit`);
+    expect(milestonesQuery("")).toBe(MILESTONES_QUERY);
   });
 });

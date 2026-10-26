@@ -1,19 +1,32 @@
-import { Button, Caption1, makeStyles, mergeClasses, tokens } from "@fluentui/react-components";
+import {
+  Button,
+  Caption1,
+  Link,
+  makeStyles,
+  mergeClasses,
+  tokens,
+} from "@fluentui/react-components";
+import { useNavigate } from "react-router";
 import { RITUALS } from "../../shell/consts";
 import type { Corner } from "./api.solitaireAgile";
-import { Confetti, useCelebrateOnce } from "./Confetti";
-import { CORNER_SEEN_KEY, cornerArg, hasChevron, isReached, milestoneKey } from "./corner";
+import { cornerArg, hasChevron, isReached } from "./corner";
+import { ROUTES } from "./paths";
 
 // The PM Corner (AR-4; docs/modules/solitaire-agile.md, "The PM Corner: the line, the
 // chevron, the confetti"): one line at the head of the Team Agile page -- the agent's
 // `corner.line`, verbatim -- and, where it names a pick, the chevron, which opens the
 // same hand-off copy box every Start work opens (one POST /api/cmd/StartWork, J2GV's).
-// When the line reads reached, the page throws confetti ONCE per milestone per viewer
-// (Confetti.tsx): on the transition to reached while the page watched, or on first
-// sight with the browser's mark absent -- never on a reload with the mark set.
 //
-// A lazyPart of StandupPage (shell/lazy.tsx): its bytes, the confetti's and the
-// package's are fetched when the Corner is first drawn.
+// It does NOT celebrate. When the line reads reached it says where the celebration is
+// -- "reached: see Milestones", a link to the Milestones tab -- and the award dialog
+// there is the one thing that throws confetti (AwardDialog.tsx; "Milestones: the tab
+// and the award"). Confetti over a standup nobody asked about read as a glitch.
+//
+// A lazyPart of StandupPage (shell/lazy.tsx): its bytes are fetched when the Corner
+// is first drawn.
+
+/** The words of the link a reached line carries, to the Milestones tab. */
+export const SEE_MILESTONES = "see Milestones";
 
 const useStyles = makeStyles({
   corner: {
@@ -29,18 +42,10 @@ const useStyles = makeStyles({
   reached: { borderLeftColor: tokens.colorPaletteGreenBorder2 },
 });
 
-export function PmCorner({
-  corner,
-  space,
-  onStart,
-}: {
-  corner: Corner;
-  space: string;
-  onStart: (arg: string) => void;
-}) {
+export function PmCorner({ corner, onStart }: { corner: Corner; onStart: (arg: string) => void }) {
   const styles = useStyles();
+  const navigate = useNavigate();
   const reached = isReached(corner);
-  const { firing, done } = useCelebrateOnce(CORNER_SEEN_KEY, milestoneKey(space, corner), reached);
   return (
     <div
       className={mergeClasses(styles.corner, reached && styles.reached)}
@@ -48,7 +53,23 @@ export function PmCorner({
       data-shape={corner.shape}
       role="status"
     >
-      <Caption1>{corner.line}</Caption1>
+      <Caption1>
+        {corner.line}
+        {reached && (
+          <>
+            {": "}
+            <Link
+              href={ROUTES.milestones}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate(ROUTES.milestones);
+              }}
+            >
+              {SEE_MILESTONES}
+            </Link>
+          </>
+        )}
+      </Caption1>
       {hasChevron(corner) && (
         <Button
           appearance="subtle"
@@ -59,7 +80,6 @@ export function PmCorner({
           {RITUALS.text.cornerChevron}
         </Button>
       )}
-      {firing && <Confetti onDone={done} />}
     </div>
   );
 }

@@ -184,6 +184,7 @@ describe("consts.json", () => {
     expect(rituals).toEqual({
       route: "/api/ritual/standup",
       triageRoute: "/api/ritual/triage",
+      milestonesRoute: "/api/ritual/milestones",
       assignMe: "me",
       ceremoniesFile: "Config/ceremonies.json",
       vocabularyFile: "Config/standup-vocabulary.json",
