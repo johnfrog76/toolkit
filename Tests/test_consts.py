@@ -349,7 +349,7 @@ class TheFileParses(unittest.TestCase):
 # The product's version, typed once in consts.json. The module manifest and the
 # web package carry their own literal, so each is held to it here by name.
 # MUST match Tests/Test-Consts.ps1's and web/src/shell/consts.test.ts's.
-EXPECTED_VERSION = "1.4.0"
+EXPECTED_VERSION = "1.5.0"
 
 
 class OneVersion(unittest.TestCase):

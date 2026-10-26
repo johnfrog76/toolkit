@@ -60,7 +60,9 @@ M3  1.3.0  The Studio opens in a second   done 2026-10-22: one gh call cold and 
         |
 M4  1.4.0  Ten minutes to your own board   cut 2026-10-24: the first run, the word, how we work, the landing page
         |
-M4b 1.5.0  The tour                    Kit's narrated tour, and the ten-minute walk on a machine that has never seen the product
+M4c 1.5.0  Team Agile says what it is   cut 2026-10-26: the Agenda, the Milestones tab and the award, every theme its own accent
+        |
+M4b 1.6.0  The tour                    Kit's narrated tour, and the ten-minute walk on a machine that has never seen the product
         |
 M5         The rename                 a cards core and an ado module; no version
         :
@@ -150,7 +152,19 @@ the release is not held on a deck.
 - New Space asks how you want to work, and the orchestrating answer writes the team's files. The old F4.
 - The landing page's links back and forth, and its look at banner size.
 
-### M4b -- 1.5.0, the tour
+### M4c -- 1.5.0, Team Agile says what it is -- cut 2026-10-26
+
+Team Agile's page says what it is for, and what it shows has a place of its own. **Cut 2026-10-26** with all
+three on main and green, ahead of the tour, which carries to 1.6.0 unchanged.
+
+- The standup page opens on an **Agenda**: what moved since the last standup, and what is waiting on you,
+  as cards with one action, Work it now; the suggestion's row above them; the text stays on its own tabs (C6VH).
+- A **Milestones** tab with the tracker's progress bars, and the award dialog as the one place confetti
+  fires, once per milestone per machine; the corner line links to it instead of celebrating (29QA).
+- **Every theme keeps its own accent** again; the product's rose and wine are the landing page's and the
+  wordmark's default only (U6FU).
+
+### M4b -- 1.6.0, the tour
 
 **Done when:** Kit's guided tour is narrated and in the launcher, and the ten-minute walk has been timed on a
 machine that has never seen the product (the `VERIFY.md` Gate 12 row 4D77 added, with the time on it).
