@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useState } from "react";
 import {
   Badge,
   Body1,
@@ -18,7 +18,7 @@ import type { Milestone } from "../ado/api.ado";
 import { milestoneProgress, milestoneStage, orderMilestones } from "../ado/milestones";
 import { useGetRitualMilestonesQuery } from "./api.solitaireAgile";
 import type { AwardStage } from "./award";
-import { awardKey, awardStage, dayWords, markAwarded, pendingAwards } from "./award";
+import { awardKey, awardStage, dayWords, markAwarded, pickAward } from "./award";
 
 // The Milestones tab (docs/modules/solitaire-agile.md, "Milestones: the tab and the
 // award"): Team Agile's third page, after Standup and Triage. One row per milestone
@@ -146,21 +146,27 @@ export function MilestonesPage() {
   const slug = data?.space || space;
   const list = useMemo(() => (readable ? orderMilestones(data.milestones) : []), [readable, data]);
 
-  // The awards this visit owes, taken ONCE when the list first reads: the reached
-  // milestones with no mark. Taken while rendering (React's "adjusting state when
-  // a prop changes"), so the first draw with the list already knows its queue; the
-  // marks are only set in the effect below, so a second render reads the same one.
-  const [queue, setQueue] = useState<Milestone[] | null>(null);
-  if (queue === null && readable) setQueue(pendingAwards(slug, list));
-  const awarding = queue?.[0] ?? null;
-  // The mark is set when the dialog is SHOWN, one at a time: closing the page
-  // mid-award never shows that award again, and the ones still waiting keep theirs.
-  useEffect(() => {
-    if (awarding) markAwarded(slug, awarding);
-  }, [awarding, slug]);
-  const waiting = new Set((queue ?? []).map((m) => awardKey(slug, m)));
+  // The ONE award this visit owes, decided once when the list first reads: the most
+  // recently reached milestone with no mark. Decided while rendering (React's
+  // "adjusting state when a prop changes") from the marks, and every pending mark --
+  // this one and the backlog behind it -- is set in a layout effect, before the
+  // dialog's first paint. So a later stage of the data (the env's slug arriving, a
+  // refetch with a new list) reads the marks and finds nothing pending, and closing
+  // the dialog by any route leaves them in place.
+  const [visit, setVisit] = useState<{
+    shown: Milestone | null;
+    slug: string;
+    seen: Milestone[];
+  } | null>(null);
+  if (visit === null && readable) setVisit({ shown: pickAward(slug, list), slug, seen: list });
+  useLayoutEffect(() => {
+    if (visit) markAwarded(visit.slug, visit.seen);
+  }, [visit]);
+  const awarding = visit?.shown ?? null;
   const stageOf = (m: Milestone): AwardStage =>
-    waiting.has(awardKey(slug, m)) ? milestoneStage(m) : awardStage(slug, m);
+    awarding && awardKey(slug, m) === awardKey(slug, awarding)
+      ? milestoneStage(m)
+      : awardStage(slug, m);
 
   const icon = <FlagRegular />;
   const empty =
@@ -207,7 +213,7 @@ export function MilestonesPage() {
         <AwardDialog
           key={awardKey(slug, awarding)}
           milestone={awarding}
-          onClose={() => setQueue((q) => (q ? q.slice(1) : q))}
+          onClose={() => setVisit((v) => (v ? { ...v, shown: null } : v))}
         />
       )}
     </div>

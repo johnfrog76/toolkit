@@ -23,12 +23,22 @@ export const AWARD_SEEN_KEY = "p20.solitaireAgile.milestones.awarded";
 export type AwardStage = MilestoneStage | "awarded";
 
 /** The id a milestone is remembered by: the Space slug (never a colon in it), a
- *  colon and its title, whole -- the PM Corner's own key shape (corner.ts). */
-export const awardKey = (space: string, m: Pick<Milestone, "title">): string =>
+ *  colon, then the milestone's repository and number. A number is the tracker's
+ *  own identity for it -- a title can be renamed, and two repositories in one Space
+ *  can both have a milestone of the same title -- and the repository keeps two
+ *  repositories' number 1 apart. The ONE key: written and read through this. */
+export const awardKey = (space: string, m: Pick<Milestone, "repo" | "number">): string =>
+  `${space}:${m.repo}#${m.number}`;
+
+/** The key this tab used before milestones were remembered by number: the title,
+ *  whole. Still READ, so a mark written by an earlier version keeps holding. */
+export const legacyAwardKey = (space: string, m: Pick<Milestone, "title">): string =>
   `${space}:${m.title}`;
 
-export const isAwarded = (space: string, m: Milestone): boolean =>
-  m.reached && hasSeen(AWARD_SEEN_KEY, awardKey(space, m));
+const hasMark = (space: string, m: Milestone): boolean =>
+  hasSeen(AWARD_SEEN_KEY, awardKey(space, m)) || hasSeen(AWARD_SEEN_KEY, legacyAwardKey(space, m));
+
+export const isAwarded = (space: string, m: Milestone): boolean => m.reached && hasMark(space, m);
 
 /** A row's stage on the tab: awarded once its dialog has been seen. */
 export function awardStage(space: string, m: Milestone): AwardStage {
@@ -36,13 +46,27 @@ export function awardStage(space: string, m: Milestone): AwardStage {
 }
 
 /** The reached milestones this browser has not congratulated yet, in the list's order. */
-export function pendingAwards(space: string, list: Milestone[]): Milestone[] {
-  return list.filter((m) => m.reached && !hasSeen(AWARD_SEEN_KEY, awardKey(space, m)));
+export const pendingAwards = (space: string, list: Milestone[]): Milestone[] =>
+  list.filter((m) => m.reached && !hasMark(space, m));
+
+/** The day it was reached: GitHub's close, else its last change -- the last issue closing. */
+export const reachedDay = (m: Milestone): string => m.closed_at || m.updated_at || "";
+
+/** The ONE award a visit owes: the most recently reached of the pending milestones
+ *  (the list's order breaks a tie), or null. A machine that meets a backlog -- every
+ *  milestone reached before this browser first looked -- is congratulated once, for
+ *  the latest, not once per milestone it never saw. Pure: marks nothing. */
+export function pickAward(space: string, list: Milestone[]): Milestone | null {
+  let best: Milestone | null = null;
+  for (const m of pendingAwards(space, list))
+    if (!best || reachedDay(m) > reachedDay(best)) best = m;
+  return best;
 }
 
-/** Set the mark: this milestone has had its dialog, and never gets another. */
-export function markAwarded(space: string, m: Milestone): void {
-  markSeen(AWARD_SEEN_KEY, awardKey(space, m));
+/** Set the marks for a visit's award: every pending milestone, the one shown and the
+ *  backlog behind it, so none is shown on a later visit or after a refetch. */
+export function markAwarded(space: string, list: Milestone[]): void {
+  for (const m of pendingAwards(space, list)) markSeen(AWARD_SEEN_KEY, awardKey(space, m));
 }
 
 const MONTHS = [
@@ -67,9 +91,6 @@ export function dayWords(day: string | undefined): string {
   const month = MONTHS[Number(m[2]) - 1];
   return month ? `${Number(m[3])} ${month} ${m[1]}` : "";
 }
-
-/** The day it was reached: GitHub's close, else its last change -- the last issue closing. */
-export const reachedDay = (m: Milestone): string => m.closed_at || m.updated_at || "";
 
 /** The dialog's heading. */
 export const awardTitle = (m: Milestone): string => `Congratulations: ${m.title} reached!`;

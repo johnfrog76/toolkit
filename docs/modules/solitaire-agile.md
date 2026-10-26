@@ -884,14 +884,19 @@ has shown) and `no issues yet`.
 `Congratulations: <title> reached!`, one line of what it took -- `12 issues closed, 1 October 2026 to
 24 October 2026.`, from the day it was made to the day it was reached (GitHub's close, else its last
 change: the last issue closing) --, the picture, and the confetti, once, inside the dialog's moment.
-Close it and the tab is there with that milestone marked `awarded`. Several waiting are awarded one after
-another, in the list's order. The queue is taken once, when the tab first reads its list: a milestone
-reached while you watch is awarded on your next visit.
+Close it and the tab is there with that milestone marked `awarded`. A visit owes **one** award: when
+several reached milestones are waiting (a browser that first looks at a Space with a backlog), the dialog is
+for the most recently reached, and the rest are marked awarded with it rather than shown one after another.
+The decision is taken once, when the tab first reads its list: a milestone reached while you watch is
+awarded on your next visit.
 
 It fires **once per Space and milestone per browser**. The mark is `celebrate.ts`'s -- `localStorage`, every
 read and write wrapped, a refusal held in the page's memory -- under its own key,
-`p20.solitaireAgile.milestones.awarded`, each id `<space slug>:<milestone title>`. It is set when the dialog
-is SHOWN, so leaving mid-award never shows that one again, and the ones still waiting keep theirs. (The PM
+`p20.solitaireAgile.milestones.awarded`, each id `<space slug>:<repository>#<milestone number>`, built and
+read by `awardKey` in `award.ts` alone (a title can be renamed on the tracker, and two repositories can share
+one). A mark written as `<space slug>:<milestone title>` by an earlier version is still read as awarded. The
+marks are set before the dialog's first paint -- the shown one and the backlog behind it -- so closing it by
+the button, Escape or leaving, a revisit, or a refetch of the list never shows it again. (The PM
 Corner's old confetti mark, `p20.solitaireAgile.corner.reached`, is no longer read: nobody has seen an
 award yet.) Under `prefers-reduced-motion` the dialog opens and nothing rains.
 
