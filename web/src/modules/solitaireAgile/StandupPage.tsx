@@ -68,7 +68,8 @@ export const startWorkArg = (i: RitualItem): string =>
 // `agenda` as two lanes of tiles -- what moved since the window opened, and what is
 // waiting on you, the suggestion's pick first, each waiting tile with one button,
 // Work it now (the hand-off box) or Review it. A cards / list toggle beside it is
-// remembered per browser. The Agenda draws no text: the three tabs after it do.
+// remembered per browser. Above the lanes, the chair's suggestion row, as on the
+// text tabs. The Agenda draws no text and no brief: the three tabs after it do.
 //
 // On Detail, Work and Brief: the agent's `text`, VERBATIM -- the same string the CLI's Standup
 // prints, so parity between the two renderers is one string comparison and
@@ -520,6 +521,10 @@ export function StandupPage() {
                     </ToggleButton>
                   </div>
                 </div>
+                {/* The chair's suggestion is the Agenda's first line after its sentence: where
+                    an unrouted pick -- which no lane carries -- is named, with its action. The
+                    brief's other lines are the text tabs' (they say "closed yesterday"). */}
+                {suggestionRow}
                 <div data-testid="agenda" data-view={agendaView}>
                   <AgendaLanes
                     data={data}

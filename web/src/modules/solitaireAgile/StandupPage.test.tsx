@@ -1024,6 +1024,27 @@ describe("the chair's suggestion", () => {
     );
   });
 
+  it("on the Agenda, the row is the first line after the sentence, above the lanes, with no brief", () => {
+    localStorage.removeItem(TAB_KEY);
+    answer = { data: suggested() };
+    render(<StandupPage />);
+    const sentence = screen.getByTestId("agenda-sentence");
+    const row = screen.getByTestId("standup-suggestion");
+    const lanes = screen.getByTestId("agenda");
+    expect(row.textContent).toContain(first.line);
+    const follows = (a: Element, b: Element) =>
+      Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(follows(sentence, row)).toBe(true);
+    expect(follows(row, lanes)).toBe(true);
+    expect(lanes.contains(row)).toBe(false);
+    // The brief's other lines stay on the text tabs.
+    expect(screen.queryByTestId("standup-brief")).toBeNull();
+    // An unrouted pick, which no lane carries, is named here with its own action.
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss the suggestion #141" }));
+    expect(screen.getByTestId("standup-suggestion").textContent).toContain(second.line);
+    expect(screen.getByRole("button", { name: "Open Triage" })).toBeTruthy();
+  });
+
   it("Start work opens the hand-off box for the suggestion: one StartWork call, the number", async () => {
     answer = { data: suggested() };
     render(<StandupPage />);
