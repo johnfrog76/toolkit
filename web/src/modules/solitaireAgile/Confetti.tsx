@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import ReactConfetti from "react-confetti";
-import { hasSeen, markSeen, shouldCelebrate } from "./celebrate";
 
-// The celebration (D-AR14; docs/modules/solitaire-agile.md, "The PM Corner: the line,
-// the chevron, the confetti"): confetti over the whole viewport, once, in the page --
-// no backend, no sound, no push, no message to anyone. ONE wrapper over the
-// `react-confetti` package owns it, so every surface that celebrates looks the same:
-// the Team Agile page's milestone reached today, and any later surface that calls
-// <Confetti> and useCelebrateOnce with its own storage key.
+// The celebration (D-AR14; docs/modules/solitaire-agile.md, "Milestones: the tab and
+// the award"): confetti over the whole viewport, once, in the page -- no backend, no
+// sound, no push, no message to anyone. ONE wrapper over the `react-confetti` package
+// owns it, so every surface that celebrates looks the same. Its one caller is the
+// award dialog on the Milestones tab (AwardDialog.tsx) -- a test holds that: confetti
+// with no dialog around it to say why read as a glitch. Whether to celebrate is the
+// caller's rule, over celebrate.ts's mark.
 //
 // The wrapper is mounted with the viewport's size, `recycle={false}` and a piece count
 // that rains out in a few seconds, and draws NOTHING under prefers-reduced-motion --
@@ -77,31 +77,4 @@ export function Confetti({
       }}
     />
   );
-}
-
-/**
- * Whether to show a burst for `id` now, and the call that ends it. The rule is
- * celebrate.ts's: a transition to `active` while this mount watched, or a first sight of
- * it active with the browser's mark absent under `storageKey`. Firing sets the mark, so
- * a reload does not fire again.
- */
-export function useCelebrateOnce(
-  storageKey: string,
-  id: string,
-  active: boolean,
-): { firing: boolean; done: () => void } {
-  const last = useRef<{ id: string; active: boolean } | null>(null);
-  const [firing, setFiring] = useState<string | null>(null);
-
-  useEffect(() => {
-    const wasActive = last.current && last.current.id === id ? last.current.active : null;
-    last.current = { id, active };
-    if (!id) return;
-    if (shouldCelebrate({ active, wasActive, seen: hasSeen(storageKey, id) })) {
-      markSeen(storageKey, id);
-      setFiring(id);
-    }
-  }, [storageKey, id, active]);
-
-  return { firing: !!id && firing === id, done: () => setFiring(null) };
 }

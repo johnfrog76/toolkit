@@ -126,14 +126,16 @@ web/
     │   ├── reminderEntry   a stored due split into the Edit dialog's date and time, and joined back
     │   └── RemindersCard   bucket chips, snooze menu, edit, done, the quick add
     ├── modules/solitaireAgile/   opt-in, features.solitaireAgile -- today's standup, read and played, and triage
-    │   ├── index.tsx       export solitaireAgileModule: three routes (the standup, triage, the played view, chromeless), one nav entry, no cards elsewhere
+    │   ├── index.tsx       export solitaireAgileModule: four routes (the standup, triage, milestones, the played view, chromeless), one nav entry, no cards elsewhere
     │   ├── paths.ts        the module's route paths and the played deck's id
-    │   ├── api.solitaireAgile.ts   GET /api/ritual/standup and /triage ?space=<slug>, read through @consts; POST /api/cmd/Route
-    │   ├── RitualPage      the Standup | Triage strip, each tab an address, and the page under it
+    │   ├── api.solitaireAgile.ts   GET /api/ritual/standup, /triage and /milestones ?space=<slug>, read through @consts; POST /api/cmd/Route
+    │   ├── RitualPage      the Standup | Triage | Milestones strip, each tab an address, and the page under it
     │   ├── StandupPage     Agenda first, then the agent's text verbatim on Detail | Work | Brief: line one the header, the rest monospace, #<n> linked; Copy and Play in the header
     │   ├── AgendaLanes     the Agenda: Since <day> and Waiting on you, tiles from the board's face pieces (or rows), one button a waiting tile
     │   ├── agenda.ts       the Agenda's words: the long day, the lane heading, each tile's one fact
     │   ├── TriagePage      one open issue at a time, unplaced first: milestone, severity, size; each answer one Route
+    │   ├── MilestonesPage  one row per milestone, its bar the tracker's numbers; the award queue (award.ts)
+    │   ├── AwardDialog     the award -- congratulations, what it took, the picture -- and Confetti's one caller
     │   └── stage/          the played view: one lazy chunk with the deck engine
     │       ├── cast.tsx        the Remote Standup's atoms, by copy from the Wasteland (no bios); reduced motion stills them
     │       ├── seats.ts        the nine seats, the plates (role · persona (label)), the deal of workers onto seats
@@ -571,39 +573,42 @@ what the operating system says. (A browser that has never chosen follows the sys
 | --- | --- | --- | --- |
 | **Atlantis** | glass -- blue into teal | **Seaglass** | glass -- teal into lilac (the original light) |
 | **Aurora** | glass -- violet and green (the original dark) | **Sunny** | glass -- warm cream |
-| **Basement** | flat -- charcoal | **Office** | flat -- paper |
+| **Basement** | flat -- charcoal, one amber lamp | **Office** | flat -- paper, one teal accent |
 
 Two **kinds**, because both are wanted. *Glass* is translucent cards over a gradient and paper grain.
 *Flat* is opaque cards on a plain page: functional, classic, right for a projector. Every card in the
 app is `colorNeutralBackgroundAlpha` (`shared/PageCard.tsx`), so that one token is the whole
 difference -- no component knows which kind it is in.
 
-**The accent is the product's, not the theme's: rose, with wine at its deep end.** Every named theme
-wears it; a theme is its page, its grain and its cards. Only a Lounge skin keeps an accent of its own,
-because it is its scene's.
+**Every theme keeps its own accent.** Atlantis's cyan, Basement's amber lamp, Office's teal: the
+accent is part of the mood, and a theme is its page, its grain, its cards and its accent together.
+The product's own accent (rose, below) is worn in exactly two places, the landing page and the
+wordmark's default blob, and by no theme.
 
-- **`shared/accent.ts`** is the one place an accent colour is typed. One key colour, `ACCENT_KEY`
-  (rose, `#c0285e`), is the ramp's 80, and `accentRamp` generates the other fifteen steps from it,
-  dark at 10 and light at 160, in OKLCH -- no step is edited by hand. Where the accent shows reads
-  the ramp by mode (`ACCENT_STEPS`): the wordmark's face is the 40 (wine) on dark and, on light, the
-  deepest step the dark ink still reads on at AA (the 100); the way-of-working dots -- and with them
-  Fluent's brand foreground, a link or a checked radio -- are the key on light and the 110 on dark;
-  the call to action is the key in both. Its text is whichever of the theme's own text colours reads
-  on the key, chosen by `readableOn` and never assumed. Change `ACCENT_KEY` and the face, the button
-  and the dots change everywhere, the landing page included; `accent.test.ts` holds the ramp's shape,
-  the call to action's contrast (white on the key in the app, 5.67:1; the landing's own ink, 4.63:1),
-  and that no accent hex is typed anywhere else in `src/`.
 - **`shell/themeList.ts`** is the themes as data: name, mode, kind, page colour and gradient, grain,
-  the card, and `...accented(mode)`, which fills in the logo's colour, the five brand colours and the
-  ramp from `shared/accent.ts`. It imports nothing from Fluent, because `useCurrentTheme` reads it and
-  that hook is pulled into vite-node by the deck voice-bake. **Adding a theme is adding a record**;
-  the numbers are held by tests -- the text on the primary button at rest, hovered and pressed, and
-  `brand.foreground2`, a brand tint badge's text, at AA on the ramp's tint background in every theme
-  (`themeList.test.ts`) -- so what is left to check by eye is the page under the accent.
+  the logo's colour, the card, five accent colours. It imports nothing from Fluent, because
+  `useCurrentTheme` reads it and that hook is pulled into vite-node by the deck voice-bake.
+  **Adding a theme is adding a record**, and checking three things by eye: white on the primary
+  button (a test holds it to AA), links on a card, and the logo's word over its face. A fourth is
+  held by number: `brand.foreground2` is a brand tint badge's text, and `themeList.test.ts` holds it
+  to AA on the ramp's tint background in every theme. The same file snapshots every named theme --
+  its record and the whole Fluent theme made of it -- against `shell/fixtures/themes-93d9d88.json`,
+  the themes as they were in 1.4.0, so a theme changes only on purpose (regenerate the fixture and
+  say so in the commit).
 - **`shell/theme.ts`** makes a record into a Fluent theme. Fluent derives some forty tokens from a
-  sixteen-step brand ramp; overriding the five obvious ones left the rest Fluent's blue, so the whole
-  ramp follows the accent: a named theme's is the product's, a skin's is generated from its own
-  button colour (`brandRamp`), and the five are set on top with the text on the brand fill.
+  sixteen-step brand ramp; overriding the five obvious ones left the rest Fluent's blue, so the ramp
+  is generated from the theme's accent (`brandRamp`) and the five are set on top.
+- **`shared/accent.ts`** is the product's accent, and the one place it is typed. One key colour,
+  `ACCENT_KEY` (rose, `#c0285e`), is the ramp's 80, and `accentRamp` generates the other fifteen
+  steps from it, dark at 10 and light at 160, in OKLCH -- no step is edited by hand; wine is its
+  deep end. Where it shows reads the ramp by mode (`ACCENT_STEPS`); the landing page and the
+  wordmark's default wear the dark steps: the face is the 40 (wine), the dots and links the 110, the
+  call to action the key, its text the page's own ink chosen by `readableOn` (4.63:1). Change
+  `ACCENT_KEY` and the landing page and the default wordmark change together, and nothing else;
+  `accent.test.ts` holds the ramp's shape, that every landing accent property follows the key (it
+  builds the page's properties from a cyan ramp and checks each), that no app theme wears a step of
+  the ramp, and that no ramp hex is typed anywhere else in `src/`. The app's own logo wears the
+  worn theme's `logo`, not this.
 - **`shell/ThemePicker.tsx`** is the first section of the settings drawer -- the shell's own, above
   the modules'. **Choosing is the preview**: it applies at once and there is nothing to save. A theme
   is this browser's preference (`localStorage["toolkit-theme"]`, the theme's id), never config, so
@@ -1123,9 +1128,10 @@ addresses, because Pages serves it from a subpath; no `public/`; and the entry's
 
 **The page, top to bottom**, in the family's shape (the house's other public front pages: a dark
 ground, one accent, one call to action). The accent is the product's (`shared/accent.ts`, under
-"Themes"), worn as the dark mode wears it: wine behind the wordmark, rose on the call to action, the
-pale rose for the bullets' dots and the links. `Landing.tsx` sets them on the page as custom
-properties, so `landing.css` types none of them.
+"Themes") -- the landing page is one of the two places it shows, the app's themes keeping their own
+-- worn as the dark mode wears it: wine behind the wordmark, rose on the call to action, the pale
+rose for the bullets' dots and the links. `Landing.tsx` sets them on the page as custom properties
+(`landingAccent`), so `landing.css` types none of them.
 
 | Band | What it holds |
 | --- | --- |

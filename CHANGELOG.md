@@ -8,10 +8,18 @@ release.
 
 ## [Unreleased]
 
+### Added
+
+- Team Agile has a **Milestones** tab: every milestone of your tracker with a progress bar and its due date, and when one is reached a dialog congratulates you the next time you open the tab -- the confetti now lives there, once per milestone, and the standup's corner line links to it instead of celebrating.
+
 ### Changed
 
 - The Team Agile standup page now opens on an **Agenda**: what moved since the last standup, and what is waiting on you as cards you can act on -- **Work it now** opens the hand-off, **Review it** opens what waits on a review -- with a cards or list view; the text moves to the Detail, Work and Brief tabs, and Copy and Play carry the same text as before.
-- ToolKit's accent is now rose and wine, in every theme and on the landing page: the logo's face, the call to action and the way-of-working dots all take it, while each theme keeps its own page and cards.
+- ToolKit's own accent is now rose and wine, on the landing page and as the wordmark's default colour: the logo's face, the call to action and the way-of-working dots there all take it.
+
+### Fixed
+
+- Every theme in the web UI wears its own accent again -- Atlantis its cyan, Basement its amber, Office its teal -- instead of the product's rose, and looks exactly as it did in 1.4.0.
 
 ## [1.4.0] - 2026-10-24
 

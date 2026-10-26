@@ -1213,12 +1213,13 @@ describe("the PM Corner", () => {
     expect(copyMock).toHaveBeenCalledWith(data.brief);
   });
 
-  it("reached: the line, one burst, and a fresh draw (a reload) is the line with no burst", async () => {
+  it("reached: the line and 'see Milestones', and the standup never throws confetti", async () => {
     answer = { data: withCorner("reached", reached) };
     const { unmount } = render(<StandupPage />);
     const corner = await screen.findByTestId("pm-corner");
-    expect(corner.textContent).toContain("milestone B reached");
-    expect(screen.getAllByTestId("confetti")).toHaveLength(1);
+    expect(corner.textContent).toBe("milestone B reached: see Milestones");
+    expect(within(corner).getByRole("link", { name: "see Milestones" })).toBeTruthy();
+    expect(screen.queryByTestId("confetti")).toBeNull();
     // Reached has no chevron: nothing left to start in B.
     expect(within(corner).queryByRole("button")).toBeNull();
     unmount();

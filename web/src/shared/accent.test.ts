@@ -12,14 +12,22 @@ import {
   contrastRatio,
   readableOn,
 } from "./accent";
-import { FIRST_DARK, FIRST_LIGHT, THEMES, themeById } from "../shell/themeList";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { THEMES } from "../shell/themeList";
 import { fluentThemeFor } from "../shell/theme";
-import { LANDING_ACCENT } from "../landing/Landing";
+import { LANDING_ACCENT, landingAccent } from "../landing/Landing";
+import { Wordmark } from "./Wordmark";
 
-// The accent is one key colour and a ramp generated from it, and this file is
-// what holds it to that: the ramp's shape, where each of the three places the
-// accent shows reads from it, the text on the call to action chosen by number,
-// and no accent hex typed anywhere in src/ but shared/accent.ts.
+// The product's accent is one key colour and a ramp generated from it, and
+// this file is what holds it to that: the ramp's shape, where the two places
+// the accent shows (the landing page and the wordmark's default blob) read
+// from it, the text on the landing's call to action chosen by number, that no
+// app theme wears it, and no accent hex typed anywhere in src/ but
+// shared/accent.ts.
+
+/** Cyan, the accent before rose: the key the "swap it in one place" check uses. */
+const CYAN_KEY = "#0e7490";
 
 const SRC_DIR = path.resolve(__dirname, "..");
 const hex = /^#[0-9a-f]{6}$/;
@@ -59,31 +67,62 @@ describe("the accent", () => {
     expect(apart(ACCENT[110], "#f27ab0")).toBeLessThanOrEqual(8);
   });
 
-  it("the face, the dots and the button read from the ramp by mode", () => {
+  it("the landing page and the wordmark's default read from the ramp", () => {
     expect(ACCENT_STEPS.dark).toMatchObject({ face: 40, dot: 110, button: 80 });
     expect(ACCENT_STEPS.light).toMatchObject({ dot: 80, button: 80 });
-    for (const t of THEMES) {
-      const a = accentFor(t.mode);
-      expect({
-        id: t.id,
-        logo: t.logo,
-        button: t.brand.background,
-        dot: t.brand.foreground1,
-      }).toEqual({
-        id: t.id,
-        logo: a.face,
-        button: ACCENT_KEY,
-        dot: t.mode === "light" ? ACCENT_KEY : ACCENT[110],
-      });
-      // The dot is a checked radio's: Fluent's compound brand foreground.
-      expect(fluentThemeFor(t).colorCompoundBrandForeground1).toBe(a.dot);
-      expect(fluentThemeFor(t).colorBrandBackground).toBe(ACCENT_KEY);
-    }
-    expect(LANDING_ACCENT).toMatchObject({
-      "--lp-blob": ACCENT[40],
+    expect(LANDING_ACCENT).toEqual({
+      "--lp-accent": ACCENT[110],
       "--lp-dot": ACCENT[110],
+      "--lp-blob": ACCENT[40],
       "--lp-cta": ACCENT_KEY,
+      "--lp-cta-hover": ACCENT[70],
+      "--lp-glow": `${ACCENT_KEY}1a`,
     });
+    // The wordmark drawn with no blob given wears wine, the dark face.
+    const svg = renderToStaticMarkup(createElement(Wordmark));
+    expect(svg).toContain(`fill="${ACCENT[40]}"`);
+  });
+
+  // Every accent property the landing page has comes from the key: built
+  // from a cyan ramp instead, each is the same step of THAT ramp and none is
+  // rose. So swapping ACCENT_KEY -- one line -- repaints the whole page, and
+  // nothing in landing.css or Landing.tsx holds a colour of its own for these.
+  it("swapping the key in one place repaints every landing accent property", () => {
+    const cyan = accentRamp(CYAN_KEY);
+    const rose = landingAccent() as Record<string, string>;
+    const swapped = landingAccent(cyan) as Record<string, string>;
+    expect(swapped).toEqual({
+      "--lp-accent": cyan[110],
+      "--lp-dot": cyan[110],
+      "--lp-blob": cyan[40],
+      "--lp-cta": CYAN_KEY,
+      "--lp-cta-hover": cyan[70],
+      "--lp-glow": `${CYAN_KEY}1a`,
+    });
+    for (const [name, value] of Object.entries(swapped))
+      expect({ name, same: value === rose[name] }).toEqual({ name, same: false });
+    // The page draws with every one of these (landing.css, or the wordmark's
+    // blob in Landing.tsx), and the stylesheet never sets one itself.
+    const read = (f: string) => fs.readFileSync(path.join(SRC_DIR, "landing", f), "utf8");
+    const css = read("landing.css");
+    const page = css + read("Landing.tsx");
+    for (const name of Object.keys(rose)) {
+      expect({ name, set: new RegExp(`${name}\\s*:`).test(css) }).toEqual({ name, set: false });
+      expect({ name, used: page.includes(`var(${name})`) }).toEqual({ name, used: true });
+    }
+  });
+
+  // The app's themes each keep their own accent: the product's is not worn
+  // by any of them, in the record or in the Fluent theme made of it.
+  it("no app theme wears the product's accent", () => {
+    const ramp = new Set(Object.values(ACCENT));
+    for (const t of THEMES) {
+      const fluent = fluentThemeFor(t) as unknown as Record<string, string>;
+      const worn = [t.logo, ...Object.values(t.brand), ...Object.values(fluent)].filter(
+        (v) => typeof v === "string" && ramp.has(v.toLowerCase()),
+      );
+      expect({ id: t.id, worn }).toEqual({ id: t.id, worn: [] });
+    }
   });
 
   // On a light page the wordmark's ink is dark, so wine under it would hide
@@ -93,29 +132,6 @@ describe("the accent", () => {
     const ink = webLightTheme.colorNeutralForeground1;
     const deepest = RAMP_STEPS.find((s) => contrastRatio(ink, ACCENT[s]) >= AA_TEXT);
     expect(ACCENT_STEPS.light.face).toBe(deepest);
-  });
-
-  // The call to action's text is whichever of the theme's text colours reads
-  // on the key -- computed, and held at 4.5:1.
-  it("the app's call to action: the theme's readable text on the key, at AA", () => {
-    for (const id of [FIRST_LIGHT, FIRST_DARK]) {
-      const fluent = fluentThemeFor(themeById(id)!);
-      const text = fluent.colorNeutralForegroundOnBrand;
-      expect(text).toBe(
-        readableOn(ACCENT_KEY, [
-          id === FIRST_LIGHT ? webLightTheme.colorNeutralForeground1 : "#ffffff",
-          fluent.colorNeutralBackground1,
-          "#ffffff",
-        ]),
-      );
-      const ratio = contrastRatio(text, ACCENT_KEY);
-      expect({ id, text, ratio: Number(ratio.toFixed(2)), ok: ratio >= AA_TEXT }).toEqual({
-        id,
-        text: "#ffffff",
-        ratio: 5.67,
-        ok: true,
-      });
-    }
   });
 
   it("the landing's call to action: the page's readable ink on the key, at AA", () => {
@@ -154,37 +170,32 @@ describe("one place for the accent", () => {
   const EXEMPT = ["shared/accent.ts", "shared/accent.test.ts", "landing/Faces.tsx"];
   const EXEMPT_DIRS = ["modules/deck/decks/"];
 
-  // Every step of the ramp, the values product asked for, and the cyan and
-  // teal the accent was before (a Lounge skin's own accent is its scene's).
-  const RETIRED = [
-    "#0e7490",
-    "#0891b2",
-    "#155e75",
-    "#67e8f9",
-    "#22d3ee",
-    "#0f766e",
-    "#0d9488",
-    "#115e59",
-    "#7dd3c8",
-    "#62e6ff",
-    "#c4768a",
-    "#6a2446",
-    "#f27ab0",
-  ];
-  const LITERALS = [...new Set([...Object.values(ACCENT), ...RETIRED])];
+  // Every step of the ramp and the values product asked for: typed nowhere
+  // in src/ but accent.ts. The app's themes keep their own accents
+  // (shell/themeList.ts), so their hexes -- cyan, teal, amber and the rest --
+  // are not on this list; themeList.test.ts holds them to how they were.
+  const LITERALS = [...new Set([...Object.values(ACCENT), "#6a2446", "#f27ab0"])];
+
+  // What the landing page and the wordmark's default wore before the product
+  // had one accent: the landing's cyan, its amber call to action and blob, and
+  // the wordmark's cyan blob. Those two places read accent.ts now, so none of
+  // these may come back THERE. (Atlantis's own logo blob is the same cyan, and
+  // stays in themeList.ts, which this list does not read.)
+  const FORMER_HERE = ["landing/", "shared/Wordmark.tsx"];
+  const FORMER = [/#(?:62e6ff|d97706|f59e0b)(?![0-9a-f])/i, /34,\s*211,\s*238/, /245,\s*158,\s*11/];
 
   it("no accent hex is typed outside shared/accent.ts", () => {
     const hexes = new RegExp(`#(?:${LITERALS.map((h) => h.slice(1)).join("|")})(?![0-9a-f])`, "i");
-    // Today's cyan as rgba() -- how the face's blob was typed.
-    const rgba = /34,\s*211,\s*238/;
     const found: string[] = [];
     for (const file of walk(SRC_DIR)) {
       const rel = path.relative(SRC_DIR, file).split(path.sep).join("/");
       if (EXEMPT.includes(rel) || EXEMPT_DIRS.some((d) => rel.startsWith(d))) continue;
+      const former = FORMER_HERE.some((p) => rel.startsWith(p));
       fs.readFileSync(file, "utf8")
         .split("\n")
         .forEach((line, i) => {
-          if (hexes.test(line) || rgba.test(line)) found.push(`${rel}:${i + 1}: ${line.trim()}`);
+          if (hexes.test(line) || (former && FORMER.some((re) => re.test(line))))
+            found.push(`${rel}:${i + 1}: ${line.trim()}`);
         });
     }
     expect(found).toEqual([]);

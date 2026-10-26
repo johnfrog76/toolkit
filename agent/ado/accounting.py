@@ -538,6 +538,8 @@ class Milestone(BaseModel):
     closed: int = 0
     due: str = ""  # the day, "" when none is set
     closed_at: str = ""  # the day GitHub closed it, "" while open
+    created_at: str = ""  # the day it was made on GitHub
+    updated_at: str = ""  # the day GitHub last changed it -- an issue closing in it is one
     reached: bool = False  # every issue closed, and at least one issue
 
 
@@ -555,6 +557,43 @@ def milestone_reached(open_count: int, closed_count: int) -> bool:
     return closed_count > 0 and open_count == 0
 
 
+def github_milestone_rows(repo: str) -> tuple[list[Milestone], str | None]:
+    """One repo's milestones, every state, in ONE ``gh api`` call: (rows, None),
+    or ([], the reason). The one reader both ``GET /api/milestones`` and Team
+    Agile's ``GET /api/ritual/milestones`` (agent/solitaire/milestones.py) use."""
+    # Query parameters go as flags, never in the URL: on Windows the call runs
+    # through cmd.exe (shell=True, for az.cmd), and an unquoted `&` splits the
+    # command -- "'per_page' is not recognized as an internal or external
+    # command". _gh_json refuses such an argument before it runs.
+    rows, why = _gh_json(
+        ["gh", "api", "--method", "GET", f"repos/{repo}/milestones", "-f", "state=all", "-F", "per_page=100"]
+    )
+    if why:
+        return [], gh_repo_reason(repo, why)
+    short = repo.split("/", 1)[1]
+    out: list[Milestone] = []
+    for r in rows or []:
+        n_open = int(r.get("open_issues") or 0)
+        n_closed = int(r.get("closed_issues") or 0)
+        out.append(
+            Milestone(
+                title=str(r.get("title", "")),
+                number=int(r.get("number") or 0),
+                repo=short,
+                url=str(r.get("html_url", "")),
+                state=str(r.get("state", "open")).lower(),
+                open=n_open,
+                closed=n_closed,
+                due=str(r.get("due_on") or "")[:10],
+                closed_at=str(r.get("closed_at") or "")[:10],
+                created_at=str(r.get("created_at") or "")[:10],
+                updated_at=str(r.get("updated_at") or "")[:10],
+                reached=milestone_reached(n_open, n_closed),
+            )
+        )
+    return out, None
+
+
 def _github_milestones(org: str, projects: list[dict]) -> MilestonesResponse:
     repos = tracker_repos(org, projects)
     if not repos:
@@ -562,34 +601,11 @@ def _github_milestones(org: str, projects: list[dict]) -> MilestonesResponse:
     rows_out: list[Milestone] = []
     failures: list[str] = []
     for repo in repos:
-        # Query parameters go as flags, never in the URL: on Windows the call runs
-        # through cmd.exe (shell=True, for az.cmd), and an unquoted `&` splits the
-        # command -- "'per_page' is not recognized as an internal or external
-        # command". _gh_json refuses such an argument before it runs.
-        rows, why = _gh_json(
-            ["gh", "api", "--method", "GET", f"repos/{repo}/milestones", "-f", "state=all", "-F", "per_page=100"]
-        )
+        rows, why = github_milestone_rows(repo)
         if why:
-            failures.append(gh_repo_reason(repo, why))
+            failures.append(why)
             continue
-        short = repo.split("/", 1)[1]
-        for r in rows or []:
-            n_open = int(r.get("open_issues") or 0)
-            n_closed = int(r.get("closed_issues") or 0)
-            rows_out.append(
-                Milestone(
-                    title=str(r.get("title", "")),
-                    number=int(r.get("number") or 0),
-                    repo=short,
-                    url=str(r.get("html_url", "")),
-                    state=str(r.get("state", "open")).lower(),
-                    open=n_open,
-                    closed=n_closed,
-                    due=str(r.get("due_on") or "")[:10],
-                    closed_at=str(r.get("closed_at") or "")[:10],
-                    reached=milestone_reached(n_open, n_closed),
-                )
-            )
+        rows_out += rows
     resp = MilestonesResponse(milestones=rows_out)
     resp.reason = failures[0] if (failures and not rows_out) else None
     log_writer.write_log(

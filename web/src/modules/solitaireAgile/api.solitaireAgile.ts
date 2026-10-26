@@ -18,7 +18,7 @@
  */
 import { API_BASE, api, CACHE_TTL } from "../../shell/api";
 import { RITUALS } from "../../shell/consts";
-import type { CommandResponse } from "../ado/api.ado";
+import type { CommandResponse, Milestone } from "../ado/api.ado";
 
 /** One item in a slot, as the route serves it: an issue (a number and a url)
  *  or, from a local Space, a card (an id and a path, number null, url ""). */
@@ -435,3 +435,38 @@ export const startWorkEndpoints = api.injectEndpoints({
 });
 
 export const { useRunStartWorkMutation } = startWorkEndpoints;
+
+// -- Milestones (the Milestones tab) ----------------------------------------
+//
+// The Space's tracker milestones with the tracker's own counts. Each row is the
+// ado core's own Milestone -- the shape GET /api/milestones serves the Stats
+// tab's card, with its one reached rule (every issue closed, and at least one
+// issue) -- under Team Agile's gate, scoped to a Space and kept a minute by the
+// agent. A READ: the award's seen mark is this browser's (award.ts).
+
+export interface MilestonesResponse {
+  ceremony: "milestones";
+  space: string;
+  /** false: no tracker answered; `reason` says why, and there are no rows. */
+  tracker: { ok: boolean; reason: string };
+  milestones: Milestone[];
+}
+
+export const MILESTONES_QUERY = underBase(RITUALS.milestonesRoute);
+
+/** The query for one Space's milestones; "" asks for the Space you are in. */
+export function milestonesQuery(space: string): string {
+  return space ? `${MILESTONES_QUERY}?space=${encodeURIComponent(space)}` : MILESTONES_QUERY;
+}
+
+export const milestonesEndpoints = api.injectEndpoints({
+  endpoints: (builder) => ({
+    // GET /api/ritual/milestones?space=<slug> -- every milestone, the tracker's counts
+    getRitualMilestones: builder.query<MilestonesResponse, string>({
+      query: milestonesQuery,
+      keepUnusedDataFor: CACHE_TTL,
+    }),
+  }),
+});
+
+export const { useGetRitualMilestonesQuery } = milestonesEndpoints;

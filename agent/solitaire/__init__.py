@@ -1,7 +1,8 @@
 """The Solitaire Agile add-on: the ceremonies, played alone, from the tracker.
 
 M0 is one ceremony, the standup (``standup.py``); V1 adds triage (``triage.py``,
-the open issues by milestone). Each is derived on every request from
+the open issues by milestone), and the Milestones tab reads the tracker's
+milestones with its own counts (``milestones.py``). Each is derived on every request from
 what the Space's GitHub tracker says -- read at most once a minute
 (``tracker.py``) -- and nothing is stored in the hub
 (docs/modules/solitaire-agile.md, "What it owns"). ``api`` is what
@@ -17,6 +18,7 @@ the bridge.
 """
 
 from . import (
+    milestones,  # noqa: F401 -- registers GET /api/ritual/milestones (the Milestones tab)
     remind,  # noqa: F401 -- registers the reminder's two routes on ``api``
     triage,  # noqa: F401  -- registers GET /api/ritual/triage on the same router (V1)
 )
