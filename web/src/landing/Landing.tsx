@@ -8,7 +8,8 @@ import { Window, WindowStyles } from "./Window";
 import { Code } from "./Code";
 import { Butler } from "./Butler";
 import { Faces } from "./Faces";
-import { accentFor, accentWash } from "../shared/accent";
+import { ACCENT, accentFor, accentWash } from "../shared/accent";
+import type { Ramp } from "../shared/accent";
 
 // The landing page, in the family's shape (the juggling and bowling engines,
 // Connected Deck). A banner first: the wordmark, the offering, three bullets,
@@ -24,17 +25,25 @@ export const PRODUCT_NAME = "ToolKit";
  * The page's accent, from the product's one place (shared/accent.ts), as the
  * custom properties landing.css draws with. The page is dark, so it wears the
  * dark mode's steps: wine behind the wordmark, the key on the call to action,
- * the pale rose for the dots and the links.
+ * the pale rose for the dots and the links. Every property is a step of the
+ * ramp or a wash of its key, so a different ACCENT_KEY is a different page:
+ * accent.test.ts builds this from a cyan ramp and holds each property to it.
+ * The landing page and the wordmark's default are the only places the
+ * product's accent shows; each of the app's themes keeps its own.
  */
-const DARK = accentFor("dark");
-export const LANDING_ACCENT = {
-  "--lp-accent": DARK.dot,
-  "--lp-dot": DARK.dot,
-  "--lp-blob": DARK.face,
-  "--lp-cta": DARK.button,
-  "--lp-cta-hover": DARK.hover,
-  "--lp-glow": accentWash(0.1),
-} as CSSProperties;
+export function landingAccent(ramp: Ramp = ACCENT): CSSProperties {
+  const dark = accentFor("dark", ramp);
+  return {
+    "--lp-accent": dark.dot,
+    "--lp-dot": dark.dot,
+    "--lp-blob": dark.face,
+    "--lp-cta": dark.button,
+    "--lp-cta-hover": dark.hover,
+    "--lp-glow": accentWash(0.1, dark.button),
+  } as CSSProperties;
+}
+
+export const LANDING_ACCENT = landingAccent();
 
 /** The visible address of the repository: the URL without its scheme. */
 function shown(url: string): string {
