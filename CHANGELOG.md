@@ -10,6 +10,7 @@ release.
 
 ### Changed
 
+- The Team Agile standup page now opens on an **Agenda**: what moved since the last standup, and what is waiting on you as cards you can act on -- **Work it now** opens the hand-off, **Review it** opens what waits on a review -- with a cards or list view; the text moves to the Detail, Work and Brief tabs, and Copy and Play carry the same text as before.
 - ToolKit's accent is now rose and wine, in every theme and on the landing page: the logo's face, the call to action and the way-of-working dots all take it, while each theme keeps its own page and cards.
 
 ## [1.4.0] - 2026-10-24

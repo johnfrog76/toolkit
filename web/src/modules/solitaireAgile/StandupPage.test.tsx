@@ -13,17 +13,20 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { RITUALS } from "../../shell/consts";
 import { chairSuggestion } from "./suggestion";
 import {
+  AGENDA_VIEW_KEY,
   GRAIN_KEY,
+  TAB_KEY,
   StandupPage,
   grainParts,
   issueFacts,
   slotState,
   issueUrls,
   linkIssues,
-  listRows,
   splitHeader,
 } from "./StandupPage";
+import { AGENDA_SENTENCE } from "./agenda";
 import type {
+  AgendaItem,
   Corner,
   RitualItem,
   StandupResponse,
@@ -117,6 +120,7 @@ function render(ui: ReactElement) {
       <Routes>
         <Route path="/solitaire-agile" element={el} />
         <Route path="/deck/ritual/standup" element={<p>played</p>} />
+        <Route path="/prompts/:filename" element={<p>card page</p>} />
       </Routes>
     </MemoryRouter>
   );
@@ -183,6 +187,9 @@ function withWork(data: StandupResponse): StandupResponse {
 
 beforeEach(() => {
   localStorage.clear();
+  // Most of this file is about the TEXT -- the three grains' tabs. The page opens on
+  // the Agenda; "the Agenda" below starts from a fresh browser, with nothing stored.
+  localStorage.setItem(TAB_KEY, "detail");
   answer = {};
   triageAnswer = {};
   askedSpace = null;
@@ -211,11 +218,7 @@ describe("the standup page", () => {
     expect(shown()).toContain('Mug        "Nothing on the board for me. All green, no blockers."');
     expect(shown()).not.toContain("The dog ate the sprint.");
     // Nothing to click but the issue numbers -- and Play.
-    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
-      "Copy",
-      "Play",
-      "Show as list",
-    ]);
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["Copy", "Play"]);
     // The text scrolls sideways, so it is a named region a keyboard reaches.
     const region = screen.getByRole("region", { name: "Standup text" });
     expect(region).toBe(screen.getByTestId("standup-text"));
@@ -320,7 +323,7 @@ describe("attending", () => {
   });
 });
 
-describe("copy and the list", () => {
+describe("copy and the joined text", () => {
   it("Copy puts text on the clipboard exactly and says Copied!", async () => {
     const data = responseFor("friday");
     answer = { data };
@@ -330,43 +333,6 @@ describe("copy and the list", () => {
     });
     expect(copyMock).toHaveBeenCalledWith(data.text);
     expect(screen.getByRole("button", { name: "Copied!" })).toBeTruthy();
-  });
-
-  it("hides the list by default and shows the items in order when toggled", () => {
-    const data = responseFor("friday");
-    answer = { data };
-    render(<StandupPage />);
-    expect(screen.queryByTestId("standup-list")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Show as list" }));
-    const items = screen.getAllByRole("listitem");
-    const expected = listRows(data);
-    expect(items).toHaveLength(expected.length);
-    expected.forEach((r, i) => {
-      expect(items[i].textContent).toContain(r.item.title);
-      expect(items[i].textContent).toContain(`#${r.item.number}`);
-    });
-    // The queue's rows come first, as walk.
-    expect(items[0].textContent).toContain("walk");
-    const link = screen
-      .getAllByRole("link", { name: "#104" })
-      .find((a) => items.some((li) => li.contains(a)));
-    expect(link?.getAttribute("href")).toBe("https://github.com/johnfrog76/toolkit/issues/104");
-    fireEvent.click(screen.getByRole("button", { name: "Hide list" }));
-    expect(screen.queryByTestId("standup-list")).toBeNull();
-  });
-
-  it("opens the hand-off block from a row's Start work: one StartWork call, the issue's number", async () => {
-    startWork.mockClear();
-    answer = { data: responseFor("friday") };
-    render(<StandupPage />);
-    // Nothing is asked before a row asks for it.
-    expect(startWork).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Show as list" }));
-    fireEvent.click(screen.getAllByRole("button", { name: "Start work on #104" })[0]);
-    const block = await screen.findByTestId("start-work-block");
-    expect(block.textContent).toContain("## How we work in Toolkit (x)");
-    expect(startWork).toHaveBeenCalledTimes(1);
-    expect(startWork).toHaveBeenCalledWith({ id: "104" });
   });
 
   it("shows a GitHub Space's joined standup verbatim: issues linked, a card by its id, the Check lines as text", () => {
@@ -430,45 +396,25 @@ describe("copy and the list", () => {
     expect(screen.queryByRole("link", { name: "K7M2" })).toBeNull();
     expect(shown()).toMatch(/^ {2}Check {6}#142 Port the cast atoms -- /m);
   });
-
-  it("shows a card by its id, with no link", () => {
-    const data = responseFor("friday");
-    data.source = "cards";
-    data.queue = {
-      walk: [{ number: null, id: "K7M2", title: "A card", url: "", path: "current/K7M2-a.md" }],
-      decide: [],
-      look: [],
-    };
-    data.workers = [];
-    data.text = "Standup\n  nothing linked\n";
-    answer = { data };
-    render(<StandupPage />);
-    fireEvent.click(screen.getByRole("button", { name: "Show as list" }));
-    const li = screen.getByRole("listitem");
-    expect(li.textContent).toContain("K7M2");
-    expect(li.textContent).toContain("A card");
-    expect(li.querySelector("a")).toBeNull();
-    // A card's row starts the work by its id.
-    expect(screen.getByRole("button", { name: "Start work on K7M2" })).toBeTruthy();
-  });
 });
 
 // D-TA20: the grain is a setting per browser -- detail (the default),
 // work (the ritual's grain) or brief (the chair's reading) -- and each is the
 // agent's own string, shown verbatim.
 describe("the grain", () => {
-  it("offers the contract's three grains as tabs, detail selected by default", () => {
+  it("offers the contract's three grains as tabs after the Agenda, detail the grain by default", () => {
+    localStorage.clear();
     answer = { data: withWork(responseFor("friday")) };
     render(<StandupPage />);
-    expect(screen.getAllByRole("tab")).toHaveLength(3);
+    expect(screen.getAllByRole("tab")).toEqual(
+      ["Agenda", "Detail", "Work", "Brief"].map((name) => screen.getByRole("tab", { name })),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Detail" }));
     const tabs = ["Detail", "Work", "Brief"].map((name) => screen.getByRole("tab", { name }));
     expect(tabs.map((t) => t.getAttribute("aria-selected"))).toEqual(["true", "false", "false"]);
-    // The tabs are not buttons: nothing else to click was added.
-    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
-      "Copy",
-      "Play",
-      "Show as list",
-    ]);
+    expect(shown()).toBe(withWork(responseFor("friday")).text);
+    // The tabs are not buttons: nothing else to click was added beside the text.
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["Copy", "Play"]);
   });
 
   it("work shows work.text verbatim, keeps the brief above it, and Copy copies it", async () => {
@@ -524,6 +470,297 @@ describe("the grain", () => {
       body: data.brief,
       copy: data.brief,
     });
+  });
+});
+
+// The Agenda (docs/modules/solitaire-agile.md, "The page"): the first tab and the
+// default. Two lanes of tiles from the response's `agenda` -- the agent derives it
+// (agent/solitaire/agenda.py, Tests/test_rituals.py "TheAgenda"); the page draws it.
+describe("the Agenda", () => {
+  const U = "https://github.com/johnfrog76/toolkit/issues/";
+  const tile = (over: Partial<AgendaItem>): AgendaItem => ({
+    ref: "",
+    number: null,
+    id: null,
+    kind: "issue",
+    title: "",
+    url: "",
+    path: "",
+    file: "",
+    lane: "",
+    day: "",
+    review: false,
+    cover: null,
+    checked: 0,
+    total: 0,
+    progress: "--",
+    ...over,
+  });
+  /** Friday's standup with the agenda its read gives, and two cards beside the issues. */
+  function withAgenda(): StandupResponse {
+    const data = withWork(responseFor("friday"));
+    data.suggestion = {
+      ref: "#101",
+      number: 101,
+      id: null,
+      kind: "issue",
+      shape: "delegate",
+      sentence: "",
+      command: "StartWork 101",
+      line: "",
+    };
+    data.agenda = {
+      moved: [
+        tile({
+          ref: "#107",
+          number: 107,
+          title: "Port the cast atoms",
+          url: `${U}107`,
+          day: "2026-10-01",
+        }),
+        tile({
+          ref: "Q3R9",
+          id: "Q3R9",
+          kind: "card",
+          title: "Photo import",
+          lane: "Done",
+          day: "2026-10-01",
+          path: "archive/TaskQ3R9-photo-import.prompt.md",
+        }),
+      ],
+      waiting: [
+        tile({
+          ref: "#101",
+          number: 101,
+          title: "Build the foyer counts",
+          url: `${U}101`,
+          day: "2026-09-28",
+        }),
+        tile({
+          ref: "K7M2",
+          id: "K7M2",
+          kind: "card",
+          title: "Wire the board",
+          lane: "Active",
+          day: "2026-09-30",
+          file: "TaskK7M2-wire-the-board.prompt.md",
+          cover: "/api/assets/toolkit/k7m2/cover.png",
+          checked: 1,
+          total: 2,
+          progress: "1/2",
+        }),
+        tile({
+          ref: "#104",
+          number: 104,
+          title: "Verify the Studio tab draws on the PC",
+          url: `${U}104`,
+          day: "2026-09-25",
+          review: true,
+        }),
+        tile({
+          ref: "139",
+          id: "139",
+          kind: "card",
+          title: "Write the docs",
+          lane: "Code Review",
+          day: "",
+          file: "139-write-the-docs.prompt.md",
+          review: true,
+        }),
+      ],
+    };
+    return data;
+  }
+  const group = (key: string) => {
+    const el = document.querySelector(`[data-agenda-group="${key}"]`);
+    if (!el) throw new Error(`no group ${key}`);
+    return el as HTMLElement;
+  };
+  const ACTION = /Work it now|Review it/;
+  const cards = (key: string) =>
+    Array.from(group(key).querySelectorAll("[data-agenda-card]")) as HTMLElement[];
+
+  beforeEach(() => {
+    // A fresh browser: nothing stored, so the page opens where it opens by default.
+    localStorage.clear();
+    startWork.mockClear();
+  });
+
+  it("a fresh page opens on the Agenda: the first tab, its one sentence, and no text", () => {
+    answer = { data: withAgenda() };
+    render(<StandupPage />);
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs[0]).toBe(screen.getByRole("tab", { name: "Agenda" }));
+    expect(tabs[0].getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByTestId("agenda-sentence").textContent).toBe(
+      "Here you can see the work items you can in fact kick off now, with the Work it now button.",
+    );
+    expect(AGENDA_SENTENCE).toBe(screen.getByTestId("agenda-sentence").textContent);
+    // The text is the three text tabs', never the Agenda's; the brief goes with it.
+    expect(screen.queryByTestId("standup-text")).toBeNull();
+    expect(screen.queryByTestId("standup-brief")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Show as list/ })).toBeNull();
+  });
+
+  it("two lanes: Since the window's day, then the queue's heading -- what moved has no action", () => {
+    answer = { data: withAgenda() };
+    render(<StandupPage />);
+    expect(within(group("moved")).getByRole("heading", { level: 2 }).textContent).toBe(
+      "Since Thursday 1 October",
+    );
+    expect(within(group("waiting")).getByRole("heading", { level: 2 }).textContent).toBe(
+      RITUALS.text.queueHeading,
+    );
+    expect(cards("moved").map((c) => c.dataset.agendaCard)).toEqual(["#107", "Q3R9"]);
+    // No action: a ref opens its popover, and nothing else on the tile is a button or a link out.
+    for (const c of cards("moved")) {
+      expect(within(c).queryByRole("button", { name: ACTION })).toBeNull();
+      expect(within(c).queryByRole("link", { name: ACTION })).toBeNull();
+    }
+  });
+
+  it("each waiting tile carries one button, the suggestion's pick first: Work it now, or Review it", () => {
+    const data = withAgenda();
+    answer = { data };
+    render(<StandupPage />);
+    const waiting = cards("waiting");
+    expect(waiting.map((c) => c.dataset.agendaCard)).toEqual(["#101", "K7M2", "#104", "139"]);
+    expect(waiting[0].dataset.agendaCard).toBe(data.suggestion?.ref);
+    const actions = waiting.map((c) =>
+      [...within(c).queryAllByRole("button"), ...within(c).queryAllByRole("link")]
+        .filter((b) => /Work it now|Review it/.test(b.textContent ?? ""))
+        .map((b) => b.textContent),
+    );
+    expect(actions).toEqual([["Work it now"], ["Work it now"], ["Review it"], ["Review it"]]);
+    // A card's title opens the card; the Board's Start work words are not here.
+    expect(screen.queryByRole("button", { name: /Start work/ })).toBeNull();
+  });
+
+  it("no Yesterday or Today words and no lane badge: each tile says one fact, with a long date", () => {
+    answer = { data: withAgenda() };
+    render(<StandupPage />);
+    const agenda = screen.getByTestId("agenda");
+    expect(agenda.textContent).not.toMatch(/yesterday|today|tomorrow/i);
+    const facts = Array.from(agenda.querySelectorAll("[data-agenda-fact]")).map(
+      (f) => f.textContent,
+    );
+    expect(facts).toEqual([
+      "Closed Thursday 1 October",
+      "Archived Thursday 1 October",
+      "Open since Monday 28 September",
+      "Active since Wednesday 30 September",
+      "Open since Friday 25 September",
+      "In review",
+    ]);
+    // The lane is not drawn as a badge: "Code Review" and "Active" appear only inside a fact.
+    expect(agenda.textContent).not.toContain("Code Review");
+  });
+
+  it("a card's tile borrows the board's face -- its cover and its progress; an issue's has neither", () => {
+    answer = { data: withAgenda() };
+    render(<StandupPage />);
+    const k7 = cards("waiting")[1];
+    expect(k7.querySelector("[data-card-cover]")).not.toBeNull();
+    expect(within(k7).getByRole("progressbar", { name: "1 of 2 done" })).toBeTruthy();
+    const issue = cards("waiting")[0];
+    expect(issue.querySelector("[data-card-cover]")).toBeNull();
+    expect(within(issue).queryByRole("progressbar")).toBeNull();
+    // An issue's number opens its popover, as everywhere on the page.
+    expect(within(issue).getByRole("link", { name: "#101" }).getAttribute("href")).toBe(`${U}101`);
+  });
+
+  it("Work it now opens the same hand-off box: one StartWork call, the number or the card's id", async () => {
+    answer = { data: withAgenda() };
+    render(<StandupPage />);
+    expect(startWork).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Work it now: #101" }));
+    expect(await screen.findByTestId("start-work-block")).toBeTruthy();
+    expect(startWork).toHaveBeenCalledTimes(1);
+    expect(startWork).toHaveBeenCalledWith({ id: "101" });
+  });
+
+  it("Work it now on a card starts it by its id", async () => {
+    answer = { data: withAgenda() };
+    render(<StandupPage />);
+    fireEvent.click(screen.getByRole("button", { name: "Work it now: K7M2" }));
+    await screen.findByTestId("start-work-block");
+    expect(startWork).toHaveBeenCalledWith({ id: "K7M2" });
+  });
+
+  it("Review it opens a card's page, or a walked issue on the tracker", () => {
+    answer = { data: withAgenda() };
+    render(<StandupPage />);
+    expect(screen.getByRole("link", { name: "Review it: #104" }).getAttribute("href")).toBe(
+      `${U}104`,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Review it: 139" }));
+    expect(screen.getByText("card page")).toBeTruthy();
+  });
+
+  it("cards by default; the list is the same two groups as rows with the same one button, remembered", () => {
+    const data = withAgenda();
+    answer = { data };
+    const first = render(<StandupPage />);
+    expect(screen.getByTestId("agenda").dataset.view).toBe("cards");
+    expect(screen.getByRole("button", { name: "Cards" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "List" }));
+    expect(localStorage.getItem(AGENDA_VIEW_KEY)).toBe("list");
+    const rows = (key: string) =>
+      Array.from(group(key).querySelectorAll("[data-agenda-row]")).map(
+        (r) => (r as HTMLElement).dataset.agendaRow,
+      );
+    expect(rows("moved")).toEqual(["#107", "Q3R9"]);
+    expect(rows("waiting")).toEqual(["#101", "K7M2", "#104", "139"]);
+    expect(within(group("moved")).queryByRole("button", { name: ACTION })).toBeNull();
+    expect(screen.getByRole("button", { name: "Work it now: #101" })).toBeTruthy();
+    first.unmount();
+    render(<StandupPage />);
+    expect(screen.getByTestId("agenda").dataset.view).toBe("list");
+  });
+
+  it("Copy and Play carry exactly the text they carried before", async () => {
+    const data = withAgenda();
+    answer = { data };
+    const first = render(<StandupPage />);
+    // Before the Agenda, a fresh page copied `text` -- the golden's bytes, read from disk.
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    });
+    expect(copyMock).toHaveBeenLastCalledWith(
+      fs.readFileSync(path.join(FIXTURES, "standup-friday.txt"), "utf8"),
+    );
+    first.unmount();
+    // ...and a browser that last read Work or Brief copied that grain, as it still does.
+    for (const [g, want] of [
+      ["work", data.work!.text],
+      ["brief", data.brief],
+    ] as const) {
+      localStorage.setItem(GRAIN_KEY, g);
+      const again = render(<StandupPage />);
+      expect(screen.getAllByRole("tab")[0].getAttribute("aria-selected")).toBe("true");
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+      });
+      expect(copyMock).toHaveBeenLastCalledWith(want);
+      again.unmount();
+    }
+    render(<StandupPage />);
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    expect(screen.getByText("played")).toBeTruthy();
+  });
+
+  it("the tab is remembered; an agent that predates the Agenda draws both lanes empty", () => {
+    const data = withAgenda();
+    delete data.agenda;
+    answer = { data };
+    const first = render(<StandupPage />);
+    expect(group("moved").textContent).toContain("Nothing moved.");
+    expect(group("waiting").textContent).toContain(RITUALS.text.queueEmpty);
+    fireEvent.click(screen.getByRole("tab", { name: "Detail" }));
+    expect(localStorage.getItem(TAB_KEY)).toBe("detail");
+    first.unmount();
+    render(<StandupPage />);
+    expect(shown()).toBe(data.text);
   });
 });
 
@@ -694,9 +931,32 @@ describe("the issue popover", () => {
     };
     data.workers = [];
     data.text = "Standup\n  nothing linked\n";
+    // The Agenda names the card by its id, and the id opens the same surface.
+    data.agenda = {
+      moved: [],
+      waiting: [
+        {
+          ref: "K7M2",
+          number: null,
+          id: "K7M2",
+          kind: "card",
+          title: "A card",
+          url: "",
+          path: "current/K7M2-a.md",
+          file: "",
+          lane: "Code Review",
+          day: "",
+          review: true,
+          cover: null,
+          checked: 0,
+          total: 0,
+          progress: "--",
+        },
+      ],
+    };
+    localStorage.removeItem(TAB_KEY);
     answer = { data };
     render(<StandupPage />);
-    fireEvent.click(screen.getByRole("button", { name: "Show as list" }));
     fireEvent.click(screen.getByText("K7M2"));
     await waitFor(() => expect(surface()).toBeTruthy());
     expect(surface().textContent).toContain("A card");
@@ -814,6 +1074,8 @@ describe("the chair's suggestion", () => {
     try {
       answer = { data: suggested() };
       render(<StandupPage />);
+      // Nothing stored can be read, so the page opens on the Agenda; the row is the text tabs'.
+      fireEvent.click(screen.getByRole("tab", { name: "Detail" }));
       expect(screen.getByTestId("standup-suggestion").textContent).toContain(first.line);
       fireEvent.click(screen.getByRole("button", { name: "Dismiss the suggestion #141" }));
       expect(screen.getByTestId("standup-suggestion").textContent).toContain(second.line);

@@ -130,7 +130,9 @@ web/
     │   ├── paths.ts        the module's route paths and the played deck's id
     │   ├── api.solitaireAgile.ts   GET /api/ritual/standup and /triage ?space=<slug>, read through @consts; POST /api/cmd/Route
     │   ├── RitualPage      the Standup | Triage strip, each tab an address, and the page under it
-    │   ├── StandupPage     the agent's text verbatim: line one the header, the rest monospace, #<n> linked; Play in the header
+    │   ├── StandupPage     Agenda first, then the agent's text verbatim on Detail | Work | Brief: line one the header, the rest monospace, #<n> linked; Copy and Play in the header
+    │   ├── AgendaLanes     the Agenda: Since <day> and Waiting on you, tiles from the board's face pieces (or rows), one button a waiting tile
+    │   ├── agenda.ts       the Agenda's words: the long day, the lane heading, each tile's one fact
     │   ├── TriagePage      one open issue at a time, unplaced first: milestone, severity, size; each answer one Route
     │   └── stage/          the played view: one lazy chunk with the deck engine
     │       ├── cast.tsx        the Remote Standup's atoms, by copy from the Wasteland (no bios); reduced motion stills them
@@ -251,8 +253,10 @@ The other modules each have a document that owns their detail:
   Its pages are still lazy parts.
 - **solitaireAgile** (`features.solitaireAgile`, served on only where the active Space answers `agents`;
   [`docs/modules/solitaire-agile.md`](../docs/modules/solitaire-agile.md)) -- `/solitaire-agile`
-  and a **Team Agile** nav entry after the Studio's and before the Lounge's. One page in M0, today's
-  standup: the agent's `text` shown verbatim, its first line as the card's header and the rest in a
+  and a **Team Agile** nav entry after the Studio's and before the Lounge's. Today's standup opens on its
+  **Agenda** -- what moved since the last standup, and what is waiting on you as tiles built from the
+  board's card face, each waiting one with **Work it now** or **Review it** -- and its Detail, Work and
+  Brief tabs show the agent's `text` verbatim, its first line as the card's header and the rest in a
   monospace block, each `#<n>` the response names linked to its issue. Under the tab, a Standup | Triage
   strip: Triage (`/solitaire-agile/triage`) asks the open issues one at a time -- milestone,
   severity, size -- and each answer is the CLI's `Route` through `POST /api/cmd/Route`.

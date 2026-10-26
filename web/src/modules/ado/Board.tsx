@@ -7,7 +7,6 @@ import {
   Caption1,
   Dropdown,
   Option,
-  ProgressBar,
   Spinner,
   makeStyles,
   mergeClasses,
@@ -39,6 +38,7 @@ import { laneConfigKey, useLaneLabel } from "./laneNames";
 import { LaneLabelEditor } from "./LaneLabelEditor";
 import { TrackerBadge, trackerName } from "./TrackerBadge";
 import { BoardCover } from "./CardCover";
+import { CARD_FACE_BOX, CardName, CardProgress } from "./CardFace";
 import { useGetEnvQuery } from "../../shell/api";
 import type { Lane } from "./legalMoves";
 import { filterPrompts, sprintsOf } from "./promptFilters";
@@ -146,33 +146,10 @@ const useStyles = makeStyles({
     paddingRight: "2px",
     ...thinScrollbar,
   },
-  card: {
-    display: "flex",
-    flexDirection: "column",
-    gap: tokens.spacingVerticalXS,
-    padding: tokens.spacingVerticalS,
-    backgroundColor: tokens.colorNeutralBackground1,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusMedium,
-    cursor: "grab",
-  },
+  // The face's box is shared (CardFace.tsx, which the Agenda's tiles borrow); the drag cursor is the board's.
+  card: { ...CARD_FACE_BOX, cursor: "grab" },
   cardBusy: { opacity: 0.55, cursor: "progress" },
   cardTop: { display: "flex", alignItems: "flex-start", gap: tokens.spacingHorizontalXS },
-  cardName: {
-    flex: "1 1 auto",
-    minWidth: 0,
-    textAlign: "left",
-    font: "inherit",
-    fontWeight: tokens.fontWeightSemibold,
-    color: "inherit",
-    background: "none",
-    border: "none",
-    padding: 0,
-    cursor: "pointer",
-    overflowWrap: "anywhere",
-    ":hover": { textDecoration: "underline" },
-    ":focus-visible": { outline: `2px solid ${tokens.colorStrokeFocus2}`, outlineOffset: "2px" },
-  },
   cardMeta: {
     display: "flex",
     alignItems: "center",
@@ -219,9 +196,9 @@ function BoardCard({
           gap -- BoardCover draws nothing, and the face is exactly what it was. */}
       <BoardCover cover={card.cover} label={label} />
       <div className={styles.cardTop}>
-        <button type="button" className={styles.cardName} onClick={onOpen} title={card.file}>
+        <CardName onOpen={onOpen} title={card.file}>
           {label}
-        </button>
+        </CardName>
         {/* Everything a drag can do, without a mouse -- and everything the list's row
             offers, because it is the SAME answer (cardActions.ts). Mandatory: a board
             that only works by dragging is closed to a keyboard and to a touch screen. */}
@@ -262,18 +239,7 @@ function BoardCard({
           </Badge>
         ) : null}
       </div>
-      {card.total > 0 ? (
-        <div className={styles.cardMeta}>
-          <ProgressBar
-            value={card.checked / card.total}
-            thickness="medium"
-            color={card.checked === card.total ? "success" : "brand"}
-            aria-label={`${card.checked} of ${card.total} done`}
-            style={{ flex: "1 1 auto" }}
-          />
-          <Caption1 className={styles.quiet}>{card.progress}</Caption1>
-        </div>
-      ) : null}
+      <CardProgress checked={card.checked} total={card.total} progress={card.progress} />
     </div>
   );
 }

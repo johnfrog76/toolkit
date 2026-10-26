@@ -325,6 +325,38 @@ class Corner(BaseModel):
     brief: str = ""
 
 
+class AgendaItem(BaseModel):
+    # One tile of the Agenda (agenda.py; docs/modules/solitaire-agile.md, "The page").
+    # How the standup names it: `#<n>` for an issue, the card's id.
+    ref: str = ""
+    number: int | None = None
+    id: str | None = None
+    kind: str = ""  # issue | card
+    title: str = ""
+    url: str = ""  # the issue's; "" for a card of its own
+    path: str = ""  # the card's; "" for an issue with no card
+    # The card's filename while it is in current/ -- what the card page opens; "" otherwise.
+    file: str = ""
+    # The card's lane (consts.json status), "" for an issue with no card.
+    lane: str = ""
+    # The day the tile's fact line names: an issue's closedAt or createdAt (in the
+    # standup's own offset), a card's **Closed:**, **Review:** or **Created:** day.
+    day: str = ""
+    # Waiting on a review or a merge -- in Code Review, or on the queue: its one
+    # action is Review it, not Work it now. Always false in ``moved``.
+    review: bool = False
+    # The card's cover (GET /api/assets/...) and progress, as the board's face reads them.
+    cover: str | None = None
+    checked: int = 0
+    total: int = 0
+    progress: str = ""
+
+
+class Agenda(BaseModel):
+    moved: list[AgendaItem] = []
+    waiting: list[AgendaItem] = []
+
+
 class Standup(BaseModel):
     # ``register`` is a BaseModel attribute, so the field is held under another
     # name and SERVED as "register" -- FastAPI serialises by alias. A caller
@@ -370,6 +402,9 @@ class Standup(BaseModel):
     # left in it and the suggestion's pick inside it, or a milestone reached in the
     # window. Null wherever the suggestion is off, or the tracker did not answer.
     corner: Corner | None = None
+    # The Agenda (agenda.py): what moved in the window and what is waiting on you,
+    # as the page's tiles draw them. The agent's alone: Standup -AsJson has no such key.
+    agenda: Agenda = Agenda()
     # What kind each item is: ref -> its label names (an issue) or its
     # type (a card), read against the ceremony's kinds. Not served.
     _marks: dict[str, list[str]] = PrivateAttr(default_factory=dict)
@@ -1865,6 +1900,18 @@ def standup_for(space: str = "", as_of: datetime | None = None, since: str = "",
             str(cfg.get("commandPrefix") or ""),
             viewer,
         )
+    # The Agenda (agenda.py): the page's tiles, over the same read. The viewer is
+    # the suggestion's, asked only while it is on; "" leaves an assignee someone else's.
+    from .agenda import build_agenda
+
+    filled.agenda = build_agenda(
+        filled,
+        labels if source == "both" else [],
+        issues if source == "both" else [],
+        cards,
+        viewer if on and source in ("cards", "both") else "",
+        slug,
+    )
     filled.text = render_standup(filled)
     filled.work.text = render_work(filled)
     filled.brief = render_brief(filled)

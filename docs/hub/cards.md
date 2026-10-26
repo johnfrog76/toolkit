@@ -342,6 +342,16 @@ reads the same `**Sprint:**` line through the same readers, and one more thing: 
 `**Closed:**` day, so a milestone whose last card was archived in the standup's window reads reached. It
 writes nothing either.
 
+### What the Agenda reads
+
+The Team Agile page's Agenda ([Team Agile](../modules/solitaire-agile.md#the-page)) draws a card in `current/`
+that is Active or in Code Review, and a card archived in the standup's window, as tiles, and dates each
+tile's one line of fact from the footer -- reading, never writing: `**Created:**` for an Active card
+(`Active since <day>`), `**Review:**` for one in Code Review (`In review since <day>`; a card in review by
+its `PR URL:` line alone has no day, and the line says `In review`), `**Closed:**` for an archived one
+(`Archived <day>`). The cover and the progress are the board's. A card In Progress, or in `backlog/`, is
+not on it.
+
 ## The model, as the agent serves it
 
 `GET /api/status` lists `current/` and then `backlog/` (a card from `backlog/` is served as `Backlog`, and the
