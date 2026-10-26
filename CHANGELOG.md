@@ -14,7 +14,11 @@ release.
 
 ### Changed
 
-- ToolKit's accent is now rose and wine, in every theme and on the landing page: the logo's face, the call to action and the way-of-working dots all take it, while each theme keeps its own page and cards.
+- ToolKit's own accent is now rose and wine, on the landing page and as the wordmark's default colour: the logo's face, the call to action and the way-of-working dots there all take it.
+
+### Fixed
+
+- Every theme in the web UI wears its own accent again -- Atlantis its cyan, Basement its amber, Office its teal -- instead of the product's rose, and looks exactly as it did in 1.4.0.
 
 ## [1.4.0] - 2026-10-24
 

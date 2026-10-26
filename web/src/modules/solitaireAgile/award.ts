@@ -60,7 +60,7 @@ const MONTHS = [
   "December",
 ];
 
-/** "2026-10-24" as "24 October 2026"; "" for anything that is not a day. */
+/** A YYYY-MM-DD day as "D Month YYYY"; "" for anything that is not a day. */
 export function dayWords(day: string | undefined): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day ?? "");
   if (!m) return "";

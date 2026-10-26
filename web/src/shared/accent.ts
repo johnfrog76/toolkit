@@ -1,14 +1,14 @@
-// The accent: ONE key colour, and everything else read from it. This file is
-// the one place an accent hex is typed -- the app's named themes
-// (shell/themeList.ts), the Fluent theme each becomes (shell/theme.ts), the
-// wordmark's default blob (shared/Wordmark.tsx) and the landing page
-// (landing/Landing.tsx) all read it, so changing ACCENT_KEY changes the face,
-// the call to action and the way-of-working dots everywhere, in both modes.
-// accent.test.ts holds the rest of src/ to that: no ramp hex typed anywhere
-// else.
+// The product's accent: ONE key colour, and everything else read from it. This
+// file is the one place it is typed, and two places read it: the landing page
+// (landing/Landing.tsx) and the wordmark's DEFAULT blob (shared/Wordmark.tsx),
+// so changing ACCENT_KEY changes the landing page's face, call to action and
+// dots, and the default mark, together. The app's named themes do NOT read it:
+// each keeps its own accent (shell/themeList.ts), and the app's logo wears the
+// theme's blob, not this one. accent.test.ts holds the rest of src/ to that:
+// no ramp hex typed anywhere else, and no theme reading this file.
 //
-// No import from Fluent, on purpose: themeList.ts reads this file, and that
-// file is pulled into vite-node by the deck voice-bake, outside a browser.
+// No import from Fluent, on purpose: the landing page and the wordmark are
+// drawn without Fluent, and this file keeps them that way.
 
 /** The key: rose. It is the ramp's 80, the step Fluent's Theme Designer puts a key colour at. */
 export const ACCENT_KEY = "#c0285e";
@@ -137,11 +137,14 @@ export const ACCENT: Ramp = accentRamp(ACCENT_KEY);
 //   face    -- the blob behind the wordmark's o's. Wine on dark: the ramp's 40.
 //              On light it is the deepest step under which a light theme's
 //              dark ink still reads at AA (accent.test.ts computes it).
-//   dot     -- the way-of-working dot, and with it Fluent's brand foreground
-//              (links, a checked radio): the key on light, 110 on dark.
+//   dot     -- the way-of-working dot, and the links beside it: the key on
+//              light, 110 on dark.
 //   button  -- the call to action: the key in both modes; hover and pressed
 //              go deeper, so the text chosen for the key holds on all three.
-//   tint    -- a brand tint badge's text (Fluent's colorBrandForeground2).
+//   tint    -- a tint's text, the palest (dark) or deepest (light) of them.
+// The landing page is dark and wears the dark steps, as does the wordmark's
+// default blob. The light steps are kept, held by accent.test.ts, for a light
+// page that wears the accent; none does today.
 export type AccentMode = "light" | "dark";
 
 export const ACCENT_STEPS: Record<

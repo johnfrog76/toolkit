@@ -1,6 +1,7 @@
-import { FIRST_DARK, FIRST_LIGHT, SKIN_THEMES, THEMES, themeById } from "./themeList";
+import fs from "node:fs";
+import path from "node:path";
+import { FIRST_DARK, FIRST_LIGHT, THEMES, themeById } from "./themeList";
 import { brandRamp, fluentThemeFor } from "./theme";
-import { ACCENT } from "../shared/accent";
 
 function luminance(hex: string): number {
   const n = parseInt(hex.slice(1, 7), 16);
@@ -11,11 +12,8 @@ function luminance(hex: string): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-/** A ramp step as the luminance of its RGB: a hex (the product's ramp,
- *  shared/accent.ts) or `hsl(h s% l%)` (a skin's, theme.ts). */
-function stepLuminance(step: string): number {
-  if (step.startsWith("#")) return luminance(step);
-  const hsl = step;
+/** A ramp step (`hsl(h s% l%)`, theme.ts) as the luminance of its RGB. */
+function hslLuminance(hsl: string): number {
   const [h, s, l] = (/hsl\((\d+) (\d+)% (\d+)%\)/.exec(hsl) ?? []).slice(1).map(Number);
   const a = (s / 100) * Math.min(l / 100, 1 - l / 100);
   const f = (n: number) => {
@@ -58,21 +56,11 @@ describe("themes", () => {
     }
   });
 
-  // The one number that cannot be left to taste: the text on the primary
-  // button -- the product's accent at rest, hovered and pressed in every named
-  // theme, and a Lounge skin's own at rest.
-  it("the text on every theme's primary button passes AA", () => {
-    for (const t of [...THEMES, ...Object.values(SKIN_THEMES)]) {
-      const fluent = fluentThemeFor(t);
-      const text = luminance(fluent.colorNeutralForegroundOnBrand);
-      const fills = t.ramp
-        ? [t.brand.background, t.brand.hover, t.brand.pressed]
-        : [t.brand.background];
-      for (const fill of fills) {
-        const [hi, lo] = [text, luminance(fill)].sort((x, y) => y - x);
-        const contrast = (hi + 0.05) / (lo + 0.05);
-        expect({ theme: t.id, fill, ok: contrast >= 4.5 }).toEqual({ theme: t.id, fill, ok: true });
-      }
+  // The one number that cannot be left to taste: white on the primary button.
+  it("white text on every theme's primary button passes AA", () => {
+    for (const t of THEMES) {
+      const contrast = 1.05 / (luminance(t.brand.background) + 0.05);
+      expect({ theme: t.id, ok: contrast >= 4.5 }).toEqual({ theme: t.id, ok: true });
     }
   });
 
@@ -84,7 +72,7 @@ describe("themes", () => {
       const fluent = fluentThemeFor(t);
       const [hi, lo] = [
         luminance(fluent.colorBrandForeground2),
-        stepLuminance(fluent.colorBrandBackground2),
+        hslLuminance(fluent.colorBrandBackground2),
       ].sort((x, y) => y - x);
       const contrast = (hi + 0.05) / (lo + 0.05);
       expect({ theme: t.id, ok: contrast >= 4.5 }).toEqual({ theme: t.id, ok: true });
@@ -101,18 +89,47 @@ describe("themes", () => {
   });
 
   it("the whole accent follows the theme, not five tokens of it", () => {
-    // A named theme wears the product's ramp, every step of it.
+    const ramp = brandRamp("#b45309");
+    expect(Object.keys(ramp)).toHaveLength(16);
     const basement = fluentThemeFor(themeById("basement")!);
-    expect(basement.colorBrandBackground2).toBe(ACCENT[20]);
-    expect(basement.colorBrandBackground).toBe(ACCENT[80]);
+    // Fluent's own blue is hue 206-212. A tinted badge must not be.
+    expect(basement.colorBrandBackground2).not.toMatch(/^#0[0-9a-f]{5}$/i);
+    expect(basement.colorBrandBackground2).toMatch(/^hsl\(2\d /); // amber, hue in the twenties
     expect(basement.colorNeutralBackgroundAlpha).toBe("#232326");
     expect(fluentThemeFor(themeById("basement")!)).toBe(basement); // built once
-    // A Lounge skin keeps its scene's accent, its ramp generated from it.
-    const ramp = brandRamp(SKIN_THEMES.temple.brand.background);
-    expect(Object.keys(ramp)).toHaveLength(16);
-    const temple = fluentThemeFor(SKIN_THEMES.temple);
-    // Fluent's own blue is hue 206-212. A tinted badge must not be.
-    expect(temple.colorBrandBackground2).toBe(ramp[20]);
-    expect(temple.colorBrandBackground2).toMatch(/^hsl\(0 /); // lacquer red, hue zero
+  });
+
+  // Every named theme wears its OWN accent: the product's (shared/accent.ts)
+  // is the landing page's and the wordmark's default, never a theme's. So each
+  // theme renders exactly as it did before the accent was made one colour.
+  // fixtures/themes-93d9d88.json is that "before": every named theme's record
+  // and the whole Fluent theme fluentThemeFor() made of it, written by a
+  // throwaway jest test run against a checkout of commit 93d9d88 (the 1.4.0
+  // release, the last commit before the change) that JSON.stringify'd
+  // `{ record: t, fluent: fluentThemeFor(t) }` for each of THEMES. Each named
+  // theme is one mode, so one Fluent theme each. A theme that changes on
+  // purpose regenerates the fixture the same way and says so in its commit.
+  it("every named theme renders exactly as before the one-accent change", () => {
+    const before = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "fixtures", "themes-93d9d88.json"), "utf8"),
+    ) as Record<string, { record: unknown; fluent: unknown }>;
+    expect(THEMES.map((t) => t.id)).toEqual(Object.keys(before));
+    for (const t of THEMES) {
+      expect({ id: t.id, record: JSON.parse(JSON.stringify(t)) }).toEqual({
+        id: t.id,
+        record: before[t.id].record,
+      });
+      expect({ id: t.id, fluent: JSON.parse(JSON.stringify(fluentThemeFor(t))) }).toEqual({
+        id: t.id,
+        fluent: before[t.id].fluent,
+      });
+    }
+  });
+
+  it("no named theme reads the product's accent", () => {
+    for (const file of ["themeList.ts", "theme.ts"]) {
+      const src = fs.readFileSync(path.join(__dirname, file), "utf8");
+      expect({ file, imports: /shared\/accent/.test(src) }).toEqual({ file, imports: false });
+    }
   });
 });
