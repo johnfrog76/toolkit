@@ -68,6 +68,7 @@ const ok = (milestones: Milestone[], space = SPACE): MilestonesResponse => ({
 const byTitle = (title: string) => table.expected.find((m) => m.title === title)!;
 const REACHED_OPEN = "M4b -- 1.5.0"; // every issue closed, GitHub still shows it open
 const REACHED_CLOSED = "M2 -- 1.3.0"; // every issue closed, closed on GitHub
+const BOTH = () => [byTitle(REACHED_CLOSED), byTitle(REACHED_OPEN)]; // oldest reached first
 
 let reduced = false;
 beforeEach(() => {
@@ -137,7 +138,11 @@ describe("the award's rule (award.ts), over the shared table", () => {
   });
 
   it("says what it took: the issues, then the tracker's dates", () => {
-    expect(awardTitle(byTitle(REACHED_OPEN))).toBe("Congratulations: M4b -- 1.5.0 reached!");
+    expect(awardTitle([byTitle(REACHED_OPEN)])).toBe("Congratulations: M4b -- 1.5.0 reached!");
+    const named = (...t: string[]) =>
+      awardTitle(t.map((title) => ({ ...byTitle(REACHED_OPEN), title })));
+    expect(named("A", "B")).toBe("Congratulations: A and B reached!");
+    expect(named("A", "B", "C")).toBe("Congratulations: A, B and C reached!");
     expect(tookLine(byTitle(REACHED_OPEN))).toBe(
       "12 issues closed, 1 October 2026 to 24 October 2026.",
     );
@@ -199,12 +204,16 @@ describe("the Milestones tab", () => {
     expect(bursts).toHaveLength(0);
   });
 
-  it("the award fires once per milestone, inside its dialog; closing it lands on the tab with it awarded", async () => {
+  it("the award fires once per visit, naming every reached milestone, inside its dialog; closing it lands on the tab with them awarded", async () => {
     const { unmount } = render(<MilestonesPage />);
-    // The first reached milestone with no mark: its dialog, its line, its picture, one burst.
-    let d = await dialog();
-    expect(within(d).getByText(awardTitle(byTitle(REACHED_OPEN)))).toBeTruthy();
-    expect(within(d).getByText(tookLine(byTitle(REACHED_OPEN)))).toBeTruthy();
+    // One dialog naming every reached milestone with no mark, oldest first, each with its
+    // own line, its picture, one burst.
+    const d = await dialog();
+    expect(within(d).getByText(awardTitle(BOTH()))).toBeTruthy();
+    const lines = within(d).getAllByTestId("award-line");
+    expect(lines.map((l) => l.textContent)).toEqual(
+      BOTH().map((m) => `${m.title}: ${tookLine(m)}`),
+    );
     expect(within(d).getByTestId("award-picture")).toBeTruthy();
     // The confetti is the dialog's: drawn inside its surface, and nowhere else.
     await waitFor(() => expect(within(d).getAllByTestId("confetti")).toHaveLength(1));
@@ -215,18 +224,15 @@ describe("the Milestones tab", () => {
     await waitFor(() => expect(screen.queryByTestId("confetti")).toBeNull());
     expect(bursts).toHaveLength(1);
 
-    // Close: the next reached one waiting gets its own dialog and its own burst.
-    await closeDialog();
-    d = await dialog();
-    await within(d).findByText(awardTitle(byTitle(REACHED_CLOSED)));
-    expect(bursts).toHaveLength(2);
+    // Close: the backlog behind it was marked with it, so no second dialog follows.
     await closeDialog();
     await waitFor(() => expect(screen.queryByRole("dialog", { hidden: true })).toBeNull());
+    expect(bursts).toHaveLength(1);
     expect(stateOf(REACHED_OPEN)).toBe(STAGE_WORDS.awarded);
     expect(stateOf(REACHED_CLOSED)).toBe(STAGE_WORDS.awarded);
     expect(JSON.parse(localStorage.getItem(AWARD_SEEN_KEY) ?? "[]")).toEqual([
-      `${SPACE}:${REACHED_OPEN}`,
-      `${SPACE}:${REACHED_CLOSED}`,
+      awardKey(SPACE, byTitle(REACHED_CLOSED)),
+      awardKey(SPACE, byTitle(REACHED_OPEN)),
     ]);
     unmount();
 
@@ -236,7 +242,7 @@ describe("the Milestones tab", () => {
       await new Promise((r) => setTimeout(r, 0));
     });
     expect(screen.queryByRole("dialog", { hidden: true })).toBeNull();
-    expect(bursts).toHaveLength(2);
+    expect(bursts).toHaveLength(1);
     expect(stateOf(REACHED_OPEN)).toBe(STAGE_WORDS.awarded);
   });
 
@@ -245,10 +251,10 @@ describe("the Milestones tab", () => {
     await dialog();
     unmount();
     render(<MilestonesPage />);
-    const d = await dialog();
-    // The one shown before is not shown again; the one still waiting is.
-    await within(d).findByText(awardTitle(byTitle(REACHED_CLOSED)));
-    expect(within(d).queryByText(awardTitle(byTitle(REACHED_OPEN)))).toBeNull();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(screen.queryByRole("dialog", { hidden: true })).toBeNull();
   });
 
   it("another Space's milestone of the same title is awarded on its own", async () => {
@@ -259,7 +265,7 @@ describe("the Milestones tab", () => {
     response = { isLoading: false, data: ok(table.expected, "toolkit") };
     render(<MilestonesPage />);
     const d = await dialog();
-    await within(d).findByText(awardTitle(byTitle(REACHED_OPEN)));
+    await within(d).findByText(awardTitle(BOTH()));
   });
 
   it("an empty milestone is never awarded", async () => {
@@ -280,7 +286,7 @@ describe("the Milestones tab", () => {
     reduced = true;
     render(<MilestonesPage />);
     const d = await dialog();
-    await within(d).findByText(awardTitle(byTitle(REACHED_OPEN)));
+    await within(d).findByText(awardTitle(BOTH()));
     expect(screen.queryByTestId("confetti")).toBeNull();
     expect(bursts).toHaveLength(0);
   });
