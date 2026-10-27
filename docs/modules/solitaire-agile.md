@@ -44,13 +44,14 @@ says why its slots are empty.
 4. [The verbs](#the-verbs)
 5. [The routes](#the-routes)
 6. [The web UI](#the-web-ui)
-7. [StartWork: the hand-off block](#startwork-the-hand-off-block)
-8. [The suggestion: one next move, derived](#the-suggestion-one-next-move-derived)
-9. [The PM Corner: the line, the chevron, the confetti](#the-pm-corner-the-line-the-chevron-the-confetti)
-10. [Milestones: the tab and the award](#milestones-the-tab-and-the-award)
-11. [The file shape, and how a standup is read](#the-file-shape-and-how-a-standup-is-read)
-12. [The tests](#the-tests)
-13. [Known gaps](#known-gaps)
+7. [The loop, as a drive-through](#the-loop-as-a-drive-through)
+8. [StartWork: the hand-off block](#startwork-the-hand-off-block)
+9. [The suggestion: one next move, derived](#the-suggestion-one-next-move-derived)
+10. [The PM Corner: the line, the chevron, the confetti](#the-pm-corner-the-line-the-chevron-the-confetti)
+11. [Milestones: the tab and the award](#milestones-the-tab-and-the-award)
+12. [The file shape, and how a standup is read](#the-file-shape-and-how-a-standup-is-read)
+13. [The tests](#the-tests)
+14. [Known gaps](#known-gaps)
 
 ## The switch, and its scope
 
@@ -558,6 +559,26 @@ on "you", and say neither "all on the PC" nor "none in flight". A joined GitHub 
 GitHub Space, except that a card on its walk puts the walks on "you" (and drops "all on the PC"), its
 card tile says no "none in flight", and its `Check` lines follow the workers. With the tracker not
 answering, the brief is the one `Tracker` line.
+
+## The loop, as a drive-through
+
+The whole module is a drive-through, and that is the shortest way to explain it. You pull up to the
+menu board, give your order at the speaker, the ticket goes to the kitchen, the kitchen cooks without
+you, and you collect at the window. Each piece is a verb or a page:
+
+| The drive-through | Team Agile |
+| --- | --- |
+| The menu board: what the house serves, what is waiting | the standup and triage: `Standup`, `Triage`, their routes and tabs |
+| The speaker: you give your order | `Route`: a label, a size, an assignee on the issue. That is the ticket |
+| The ticket, carried to the kitchen | `StartWork`: the block, the card and the prompt, handed to a cold agent. The page's Start button is the speaker: it copies the block through the bridge, or starts the session where [the launch](#the-launch-the-block-handed-to-a-session) is on |
+| The kitchen, cooking without you | the launched session, in a worktree of the Space's repository, on the machine running the agent |
+| The window: you drive up and collect | the pull request. The card moves to Code Review when its PR URL lands, and the tracker carries the rest |
+
+So pressing Start on the page is not a second workflow beside the verbs. It is the speaker on the same
+lane. What the picture also shows is the piece the lane does not have yet: nobody calls your number. The
+session is detached, its result is a log and a pull request, and the page does not say that an order is
+up; you find out by looking. That window screen, one line per order, cooking or ready, is a
+[known gap](#known-gaps).
 
 ## StartWork: the hand-off block
 
@@ -1420,6 +1441,9 @@ repository", is the real write).
 
 ## Known gaps
 
+- **Nobody calls your number.** A launched session is detached: its result is its log and, when it gets
+  there, a pull request on the tracker. The page has no window screen, one line per order saying cooking
+  or ready ([the drive-through](#the-loop-as-a-drive-through)); you look at the tracker or the log.
 - **The suggestion's delegation does not launch.** The launch exists (`StartWork <n> -Launch`, [a
   session in a worktree](#the-launch-the-block-handed-to-a-session)), and the copy box offers it where `/env`
   says so, but the chair's Next line still names `StartWork <n>`, the block carried by hand; the command
