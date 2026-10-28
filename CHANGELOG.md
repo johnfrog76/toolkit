@@ -8,6 +8,10 @@ release.
 
 ## [Unreleased]
 
+### Fixed
+
+- The Reference field in the New Reminder dialog is now as wide as the other fields, instead of sharing a half-width row with Source.
+
 ## [1.5.0] - 2026-10-26
 
 ### Added
