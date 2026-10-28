@@ -6,7 +6,7 @@ import type { Reminder } from "./api.organize";
 // A reminder's ref, as the card draws it: a ref the agent resolved to a card in
 // current/ is a link to that card's page; one resolved to an archived card is
 // named, not linked (the card page reads current/); any other ref stays in the
-// tag as written. And both dialogs carry a Ref field beside Source.
+// tag as written. And both dialogs carry a Ref field with Source.
 
 const runReminders = jest.fn();
 const runNewReminder = jest.fn();
@@ -145,6 +145,19 @@ describe("the Ref field", () => {
         params: ["-Title", "Chase the review", "-Ref", "K7M2"],
       }),
     );
+  });
+
+  it("is as wide as the New Reminder dialog's other inputs: a field of its own, not half a row", async () => {
+    draw();
+    fireEvent.click(screen.getByRole("button", { name: "New Reminder" }));
+    const dialog = await screen.findByRole("dialog");
+    const fieldOf = (name: RegExp) =>
+      within(dialog).getByRole("textbox", { name }).closest(".fui-Field") as HTMLElement;
+    const what = fieldOf(/What/);
+    // Siblings of What in one column; a field inside a shared row would be half as wide.
+    for (const name of [/Source/, /Ref/]) {
+      expect(fieldOf(name).parentElement).toBe(what.parentElement);
+    }
   });
 
   it("is in the Edit dialog beside Source, filled in, and an emptied ref is sent as an empty -Ref", async () => {

@@ -40,7 +40,7 @@ export const useReminderFieldStyles = makeStyles({
     gap: tokens.spacingVerticalM,
     paddingTop: tokens.spacingVerticalS,
   },
-  // Two fields side by side: a date and its time, a source and its ref.
+  // Two fields side by side where they belong together: the Edit dialog's date and its time.
   pair: { display: "flex", gap: tokens.spacingHorizontalS, "& > *": { flex: 1, minWidth: 0 } },
 });
 
@@ -120,14 +120,12 @@ export function NewReminderDialog({
                   onChange={(_, d) => setDue(d.value)}
                 />
               </Field>
-              <div className={styles.pair}>
-                <Field label="Source" hint="Optional tag, such as ado or goal. Default: manual.">
-                  <Input size="small" value={source} onChange={(_, d) => setSource(d.value)} />
-                </Field>
-                <Field label="Ref" hint={REF_HINT}>
-                  <Input size="small" value={ref} onChange={(_, d) => setRef(d.value)} />
-                </Field>
-              </div>
+              <Field label="Source" hint="Optional tag, such as ado or goal. Default: manual.">
+                <Input size="small" value={source} onChange={(_, d) => setSource(d.value)} />
+              </Field>
+              <Field label="Ref" hint={REF_HINT}>
+                <Input size="small" value={ref} onChange={(_, d) => setRef(d.value)} />
+              </Field>
               {message && (
                 <Caption1
                   role="alert"
