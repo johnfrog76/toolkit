@@ -461,6 +461,43 @@ describe("the Designs card's pager", () => {
   });
 });
 
+describe("the Designs card's Docs line", () => {
+  const complete = (space: string) => ({
+    ...GROUPED,
+    designs: [
+      row({
+        id: "aaaaaaaa-0000-4000-8000-000000000004",
+        short: "aaaaaaaa",
+        state: "Complete",
+        title: "Built",
+        closed: "2026-10-01",
+        docs: "docs/x.md",
+        space,
+        spec: doc("spec/archive", "built.spec.md", "Built", { docs: "docs/x.md" }),
+      }),
+    ],
+  });
+
+  it("opens the document in the Docs tab when the design names the Space you are in", () => {
+    listAnswer = { data: complete("toolkit") };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Show Complete" }));
+    fireEvent.click(screen.getByText("docs/x.md"));
+    expect(screen.getByTestId("where").textContent).toBe("/docs/docs/x.md");
+  });
+
+  it("stays a caption when the design names another Space, or none", () => {
+    for (const space of ["wasteland", ""]) {
+      listAnswer = { data: complete(space) };
+      const { unmount } = mount();
+      fireEvent.click(screen.getByRole("button", { name: "Show Complete" }));
+      expect(screen.getByText("Docs: docs/x.md")).toBeTruthy();
+      expect(screen.queryByRole("link", { name: "docs/x.md" })).toBeNull();
+      unmount();
+    }
+  });
+});
+
 describe("the Designs card's groups (L2)", () => {
   beforeEach(() => {
     listAnswer = { data: GROUPED };

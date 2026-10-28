@@ -27,7 +27,7 @@ import { useGetDesignQuery, useLazySearchDesignQuery } from "./api.ado";
 import { designRoomPath } from "./docRooms";
 import type { Design, DesignDoc } from "./api.ado";
 import { DesignGroups, LearnMoreLink, NO_STRUCTURE, stateColor } from "./DesignGroups";
-import { BoundCards } from "./DesignBindings";
+import { BoundCards, DesignDocsLine } from "./DesignBindings";
 import { DesignSearchInside, SearchInsideButton } from "./DesignSearchInside";
 import { ALL, DESIGN_KINDS, designMatches, filterSummary, useDesignFilters } from "./docFilters";
 
@@ -147,9 +147,7 @@ function DesignRow({ design }: { design: Design }) {
             {design.outcome}
           </Badge>
         ) : null}
-        {design.docs ? (
-          <Caption1 title="Where its durable part landed">Docs: {design.docs}</Caption1>
-        ) : null}
+        {design.docs ? <DesignDocsLine docs={design.docs} linked /> : null}
       </div>
       {design.mismatch ? (
         <Caption1 role="note" className={styles.mismatch}>

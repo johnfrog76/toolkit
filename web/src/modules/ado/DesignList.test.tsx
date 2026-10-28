@@ -238,7 +238,14 @@ describe("the Design tab's list", () => {
     expect(within(archived).getAllByText("dropped").length).toBeGreaterThan(1);
     expect(within(archived).getByText("Closed 2026-11-20")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Show Complete" }));
-    expect(within(group("Complete")).getByText("Docs: docs/hub/cards.md")).toBeTruthy();
+    expect(within(group("Complete")).getByText("docs/hub/cards.md")).toBeTruthy();
+  });
+
+  it("a Complete design's Docs line opens the document in the Docs tab", () => {
+    mountList();
+    fireEvent.click(screen.getByRole("button", { name: "Show Complete" }));
+    fireEvent.click(within(group("Complete")).getByText("docs/hub/cards.md"));
+    expect(screen.getByTestId("where").textContent).toBe("/docs/docs/hub/cards.md");
   });
 
   it("a row is the design: its title, description, state, short id and thread chip", () => {

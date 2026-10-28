@@ -43,7 +43,7 @@ import { StatusMessage } from "../../shared/StatusMessage";
 import { useGetEnvQuery } from "../../shell/api";
 import { buildNewDesignParams, commandResultMessage } from "../ado/cliBridge";
 import { DesignGroups, LearnMoreLink, groupByState, stateColor } from "../ado/DesignGroups";
-import { BoundCards } from "../ado/DesignBindings";
+import { BoundCards, DesignDocsLine } from "../ado/DesignBindings";
 import { DesignSearchInside, SearchInsideButton } from "../ado/DesignSearchInside";
 import { ALL, designMatches } from "../ado/docFilters";
 import { useSharedPersistedValue } from "../../shared/usePersistedState";
@@ -219,7 +219,10 @@ function DesignRow({
           </Badge>
         ) : null}
         {design.docs ? (
-          <Caption1 title="Where its durable part landed">Docs: {design.docs}</Caption1>
+          <DesignDocsLine
+            docs={design.docs}
+            linked={!!design.space && design.space === activeSpace}
+          />
         ) : null}
       </div>
       {design.mismatch ? (
