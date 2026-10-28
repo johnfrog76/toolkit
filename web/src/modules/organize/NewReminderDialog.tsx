@@ -106,25 +106,19 @@ export function NewReminderDialog({
             <div className={styles.fields}>
               <Field label="What" required>
                 <Input
-                  size="small"
                   value={title}
                   onChange={(_, d) => setTitle(d.value)}
                   placeholder="Review sprint goals"
                 />
               </Field>
               <Field label="Due" hint="Optional. Local time.">
-                <Input
-                  type="datetime-local"
-                  size="small"
-                  value={due}
-                  onChange={(_, d) => setDue(d.value)}
-                />
+                <Input type="datetime-local" value={due} onChange={(_, d) => setDue(d.value)} />
               </Field>
               <Field label="Source" hint="Optional tag, such as ado or goal. Default: manual.">
-                <Input size="small" value={source} onChange={(_, d) => setSource(d.value)} />
+                <Input value={source} onChange={(_, d) => setSource(d.value)} />
               </Field>
               <Field label="Ref" hint={REF_HINT}>
-                <Input size="small" value={ref} onChange={(_, d) => setRef(d.value)} />
+                <Input value={ref} onChange={(_, d) => setRef(d.value)} />
               </Field>
               {message && (
                 <Caption1
