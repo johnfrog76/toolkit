@@ -144,7 +144,7 @@ and refuse any other path with a 404 before anything is read.
 Design, Spec, Complete, Archived -- with Complete and Archived collapsed to a count until opened or
 searched. A row is the design: its title, description, state, short id and thread chip, and under them the
 cards worked against it -- each its id and state, opening the card when it is in this Space's `current/`,
-named only when it is archived or another Space's; in Spec and Complete the repo's row opens the spec with
+named only when it is archived or another Space's; a Complete row's `Docs:` line opens the document it names in the Docs tab (on the Hub Designs card, when the design names the Space you are in, else it is a caption); in Spec and Complete the repo's row opens the spec with
 the note in its menu. A card names its design with `{cliPrefix}NewPrompt -Design <name|id>`. The archive is read in the same room as
 a live note, with its Closed date and outcome. No `design/` at all: the empty state says what the four
 folders would give and links here (**Learn more**). Files with no id: one line under the list, counted,

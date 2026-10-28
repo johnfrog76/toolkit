@@ -5,7 +5,7 @@ import { notePath } from "../studio/paths";
 import { cardPath } from "./paths";
 import type { BoundCard, CardDesign } from "./api.ado";
 import { stateColor } from "./DesignGroups";
-import { designRoomPath } from "./docRooms";
+import { designRoomPath, roomFor } from "./docRooms";
 
 // The card and its design, bound both ways (docs/hub/design.md). A card names the design it was worked against with one line
 // under its Template line; the agent parses it into the card's `design` and, on
@@ -154,5 +154,22 @@ export function BoundCards({
         );
       })}
     </div>
+  );
+}
+
+/**
+ * A Complete design's Docs line: where its durable part landed. A link to the
+ * room the Docs tab reads that path in when `linked` (the path is in the active
+ * Space's repository) and the app has a room for it; else the plain caption.
+ */
+export function DesignDocsLine({ docs, linked }: { docs: string; linked: boolean }) {
+  const navigate = useNavigate();
+  const room = linked ? roomFor(docs) : null;
+  return room ? (
+    <Caption1 title="Where its durable part landed">
+      Docs: <Link onClick={() => navigate(room)}>{docs}</Link>
+    </Caption1>
+  ) : (
+    <Caption1 title="Where its durable part landed">Docs: {docs}</Caption1>
   );
 }
