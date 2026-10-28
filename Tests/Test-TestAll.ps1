@@ -708,13 +708,8 @@ try {
     if (Test-Path (Join-Path $pkgRoot 'Config')) { Copy-Item (Join-Path $pkgRoot 'Config') (Join-Path $missBase 'Config') -Recurse }
     Copy-Item (Join-Path $scriptDir 'Test-Toolkit.ps1'), (Join-Path $scriptDir 'Get-ToolkitSuiteRegistry.ps1') (Join-Path $missBase 'Tests')
     $missHost = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
-    $savedQuiet = $env:TOOLKIT_QUIET_STARTUP
-    $env:TOOLKIT_QUIET_STARTUP = '1'
-    try {
-        $missOut = (& $missHost -NoProfile -ExecutionPolicy Bypass -File (Join-Path $missBase 'Tests/Test-Toolkit.ps1') -Consts 2>&1 | ForEach-Object { [string]$_ }) -join "`n"
-        $missExit = $LASTEXITCODE
-    }
-    finally { $env:TOOLKIT_QUIET_STARTUP = $savedQuiet }
+    $missOut = (& $missHost -NoProfile -ExecutionPolicy Bypass -File (Join-Path $missBase 'Tests/Test-Toolkit.ps1') -Consts 2>&1 | ForEach-Object { [string]$_ }) -join "`n"
+    $missExit = $LASTEXITCODE
     Assert-True 'the console says the file was not found' ($missOut -match 'file not found: Test-Consts\.ps1') $missOut
     Assert-True 'the runner exits non-zero: a missing suite fails the run' ($missExit -ne 0) "exit $missExit"
     $missLogs = @(Get-ChildItem -Path $missBase -Filter 'test-results.*.log')
