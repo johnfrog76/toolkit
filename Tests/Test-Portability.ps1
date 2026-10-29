@@ -1211,6 +1211,7 @@ $rawTrackerCases = @(
     @{ Hit = $false; Why = 'a comment that names the trap';            Body = '# gh x 2>&1 throws under Stop on 5.1' }
     @{ Hit = $false; Why = 'a hint string that names a call';          Body = 'Write-Host "run: gh auth status 2>&1"' }
     @{ Hit = $false; Why = 'a variable that only ends in the name';    Body = '$gh 2>$null' }
+    @{ Hit = $true;  Why = 'a raw call inside an expandable string''s $(...)'; Body = 'Write-Host "$(git rev-parse HEAD 2>$null)"' }
 )
 foreach ($case in $rawTrackerCases) {
     $caseHits = @(Get-RawTrackerCalls $case.Body).Count
