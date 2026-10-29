@@ -12,6 +12,7 @@ release.
 
 - The Reference field in the New Reminder dialog is now as wide as the other fields, instead of sharing a half-width row with Source.
 - The Edit Reminder dialog's Source and Reference fields are full width too, like the New Reminder dialog's, and the fields in both reminder dialogs are the same size as the rest of the app's.
+- Completing a design that a Space keeps in the hub (`MoveDesign -Hub -Space <slug> -To Complete -Doc <path>`, or the Move dialog) now looks for the document in the Space's own repository instead of the hub, so it no longer refuses every such spec; with no clone of that repository on the machine, the path is accepted as written and a note says so.
 
 ## [1.5.0] - 2026-10-26
 

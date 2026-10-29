@@ -134,3 +134,18 @@ function Resolve-P20TrackerRepo {
         Hint   = "Say which: make the address repo-grained (https://github.com/$owner/<repo>), or keep one repo in spaces.<slug>.projects."
     }
 }
+
+<#
+ A git remote URL's GitHub repository, 'owner/name' -- https://github.com/o/r(.git),
+ or the scp-like and ssh:// forms of the same address -- or '' for anything else.
+ The one reading of "is this clone that repository", shared by StartWork -Launch
+ and Resolve-P20SpaceCheckout (Resolve-SpaceCheckout.ps1).
+#>
+function Get-P20GitHubOriginRepo {
+    param(
+        [AllowEmptyString()][AllowNull()][string]$Url
+    )
+    $m = [regex]::Match("$Url".Trim(), '(?i)github\.com[:/]+([^/\s]+)/([^/\s]+?)(?:\.git)?/?$')
+    if ($m.Success) { return $m.Groups[1].Value + '/' + $m.Groups[2].Value }
+    return ''
+}
