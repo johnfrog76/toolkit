@@ -8,6 +8,10 @@ release.
 
 ## [Unreleased]
 
+### Added
+
+- `GetPRComments` now works on a GitHub Space: it reads a pull request's inline review comments, its conversation and its reviews' summaries through `gh`, and appends them to the card exactly as it does for Azure DevOps -- safe to re-run, a reviewer's follow-ups included. The card's own `PR URL:` line tells it which repository to read, so it works from the browser with no checkout.
+
 ### Changed
 
 - Every list's row menu now uses one vocabulary: the same move has the same word, icon and tooltip on every page, and the link out is always last, reading "Open on GitHub" or "Open on Azure DevOps" behind one icon. A goal's Retire, a reminder's Done and a card's Move to Done now read Archive, a design's two archives read Archive as shipped and Archive as dropped, a card's exposed action opens the card, and Remove cover reads Delete the cover.

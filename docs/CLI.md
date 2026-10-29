@@ -126,6 +126,25 @@ triage item of its own, with its own `Decision:` and `Reply:` slot, marked
 fills the thread's `Reply:` slot the moment it posts, so the card is the record before the next fetch
 as well as after it.
 
+**On a GitHub board** `GetPRComments` reads through `gh api`, and reads all three places GitHub keeps a
+review: the inline review comments (a reply joins the thread of the comment it answers), the
+conversation tab, and each review's own summary text. Each becomes a thread in the same block shape,
+under GitHub's own id -- the root comment's, the comment's, the review's -- so a later reply has
+something to answer. What does not carry over is not invented: GitHub has no severity or category
+on a comment, and its REST API does not say whether an inline thread is resolved, so a block's
+`Status:` says what the thread IS (`review comment`, `review comment, outdated`, `review, changes
+requested`, `conversation`). Kept whoever wrote it: every inline comment (it is anchored to code) and
+every review with text. Not triaged: an empty comment, a review with no text (an approval is a vote),
+and a conversation-tab comment from a Bot account (CI, coverage, deploy previews) -- which the card
+still NAMES, on its `Non-actionable threads` line, so nothing is dropped unseen. **The repository**
+comes from the card first: the one in `current/` whose `PR URL:` names this pull request (`NewPR` wrote
+it) names the repository too, so the browser, with no checkout, needs nothing else. Then `-Repository`
+(`owner/name`, or a name under the board's owner), then this checkout's GitHub remote (never the
+Toolkit's own), then the board's one repository. A board with several and none of those is refused,
+naming them -- a read, but it writes a card, and the same number on the wrong repository is someone
+else's review. **The card** is the one whose `PR URL:` names it, else the head branch's, else the issue
+the pull request's body names (`NewPR`'s `Issue: #n` line, or a closing keyword such as `Fixes #n`).
+
 **The side record.** Besides the card, a run writes one small file per PR fetch,
 `<promptsRoot>/<promptsFolder>/pr-comments/<date>-PR<id>.md` (the PR title, its URL, the fetch time, the
 repository and the count of new comments). It exists so `prsReviewed` is countable at archive time; nothing
@@ -506,7 +525,7 @@ is LF like everything else, whatever `templates/ManagerSession.template.md` chec
 | --- | --- |
 | `NewPR [<card>]` | PR + move card to Code Review + comment + write PR URL back to the file. `-WhatIf` resolves everything and calls nothing. On a GitHub board: `gh pr create` (repo from the checkout's github remote, else the board's one repo; `-Draft` and `-AutoComplete` map to draft and auto-merge), the PR body references the issue PLAINLY -- never `Closes #n`, because closing is `CloseItem`'s job -- and the ledger entry is a markdown comment on the issue; GitHub has no Code Review state to move, and the card's lane comes from the `PR URL:` line as ever. A card in `backlog/` is found too, and is moved to `current/` before its `PR URL:` is written |
 | `PublishPR [<card>]` | Stage 2 of the ship flow: flip the card's draft pull request on Azure DevOps to ready. Reads the card's `PR URL:` line (the card by id or filename, else the one for this branch from the code repository), takes the token `NewPR` takes, confirms the pull request is an active draft, sends `PATCH .../pullrequests/{id}?api-version=7.1` with `{"isDraft":false}`, and writes one line under `PR URL:` -- `PR published: <url>`, once, not a dated stamp and not state. `-WhatIf` prints the exact call and sends nothing. Refused, exit 2 and nothing written: no `PR URL:` line, a pull request already ready or not active, and a GitHub pull request, whose hint is `gh pr ready <url>` |
-| `GetPRComments [<id>]` | Fetch PR review comments and append to the prompt file -- every comment of every thread, a reviewer's follow-ups included; append-only and idempotent |
+| `GetPRComments [<id>]` | Fetch PR review comments and append to the prompt file -- every comment of every thread, a reviewer's follow-ups included; append-only and idempotent. On a GitHub board it answers through `gh` (below, "On a GitHub board") |
 | `ReplyPR <pr> <thread> -Reply "..."` | Post a reply to a PR thread (`-Status` to set its state) and fill that thread's `Reply:` slot in the card -- the card in `current/` whose `PR URL:` names the PR, else the branch's |
 | `ThreadHash [<id\|file>] [-Hash <h>]` | Thread **this repo's** branch commits into the Git section and PR replies. Run it from the code repo. A card in `backlog/` is found too, and its first thread moves it to `current/` before writing |
 | `AddPRReview <pr>` | Post an AI code review to a PR as inline comments (`-DryRun` to preview) |
