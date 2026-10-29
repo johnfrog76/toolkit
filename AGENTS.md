@@ -113,8 +113,8 @@ exception and is not: the gate is checked **per request**, so flipping a flag in
 needs no restart **of the agent or the web UI**; a shell that is already open keeps the verbs it
 registered at import (`docs/CONFIGURATION.md`, "A module flag and an open shell").
 
-The fourteen verbs the modules contribute: `NewGrowth`, `NewWorkReview`, `PublishWorkReview`,
-`LogPeerReview`, `UpdateResume` (growth); `SendTeams`, `NewMeeting`, `MeetingAgenda`
+The fifteen verbs the modules contribute: `NewGrowth`, `NewWorkReview`, `PublishWorkReview`,
+`WorkReview`, `LogPeerReview`, `UpdateResume` (growth); `SendTeams`, `NewMeeting`, `MeetingAgenda`
 (communication); `NewReminder`, `Reminders` (organize); `Standup`, `Triage`, `Route`, `StartWork` (solitaireAgile).
 (`NewDesign`, `StampDesign`, `MoveDesign`, `NewSpace`, `RetireSpace`, `RemoveSpace` and `HowWeWork` are the Studio's, and core.) **A module closes its own data.** `Archive` is org-scoped and cannot see a hub-root
 sibling like `manager/` or `growth/`, and the answer is not to teach it: it is
@@ -169,7 +169,7 @@ module and you add a mock line to every one of these files.
 **Four test runners**, one per half plus one for the two together. Run the ones your change touches:
 
 ```powershell
-tkTestToolkit                 # the CLI -- 46 suites, 8157 assertions on this commit
+tkTestToolkit                 # the CLI -- 47 suites, 8387 assertions on this commit
 ```
 
 ```bash

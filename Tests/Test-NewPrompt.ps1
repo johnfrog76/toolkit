@@ -636,6 +636,42 @@ catch {
 finally { Remove-PromptSandbox $sandbox }
 
 Write-Host ""
+
+# -- -Description: fills Context/Summary in place of (TBD) --------------------
+# Offline only, beside -Title. Omitted, the card reads (TBD) exactly as before
+# (CAE7); given, the text lands where the ADO-linked path puts a work item's own
+# description -- ## Context for a Task, ## Summary for everything else.
+
+Write-Host "-- -Description: fills Context/Summary, (TBD) when omitted ---" -ForegroundColor Cyan
+
+$sandbox = New-PromptSandbox
+try {
+    $r = Invoke-NewPrompt $sandbox @('-Title', 'No description given', '-Type', 'Task')
+    $path = Join-Path (Join-Path $sandbox 'current') $r.Created
+    $text = [System.IO.File]::ReadAllText($path)
+    Assert-True 'omitted, a Task card still reads (TBD) under Context' ($text -match "(?m)^## Context`n\(TBD\)$") $text
+
+    $r = Invoke-NewPrompt $sandbox @('-Title', 'Timeout on large files', '-Type', 'Bug', '-Description', 'Uploads over 2GB hang past the 60s gateway timeout.')
+    $path = Join-Path (Join-Path $sandbox 'current') $r.Created
+    $text = [System.IO.File]::ReadAllText($path)
+    Assert-True 'given, a non-Task card carries it under Summary' ($text -match "(?m)^## Summary`nUploads over 2GB hang past the 60s gateway timeout\.$") $text
+    Assert-True 'and Summary itself is not (TBD)' ($text -notmatch "(?m)^## Summary`n\(TBD\)$") $text
+
+    $multiLine = 'Second line of the diagnosis.' + [Environment]::NewLine + 'Third line.'
+    $r = Invoke-NewPrompt $sandbox @('-Title', 'A task with real context', '-Type', 'Task', '-Description', $multiLine)
+    Assert-Equal 'a multi-line -Description still exits 0' 0 $r.ExitCode
+    $path = Join-Path (Join-Path $sandbox 'current') $r.Created
+    $text = [System.IO.File]::ReadAllText($path)
+    Assert-True 'under Context for a Task' ($text -match '(?m)^## Context$') $text
+    Assert-True 'and every line is kept' ($text -match 'Second line of the diagnosis\.' -and $text -match 'Third line\.') $text
+    Assert-True 'written LF, like the rest of the card' ($text -notmatch "`r`n") $text
+}
+catch {
+    Assert-True 'the -Description cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally { Remove-PromptSandbox $sandbox }
+
+Write-Host ""
 Write-Host "=======================================================" -ForegroundColor Cyan
 $total = $script:passed + $script:failed
 Write-Host "  Results: $($script:passed)/$total passed" -ForegroundColor $(if ($script:failed -eq 0) { 'Green' } else { 'Red' })

@@ -921,9 +921,18 @@ export const adoEndpoints = adoApi.injectEndpoints({
     }),
 
     // GET /api/reviews/:folder (full content)
-    getReviewDetail: builder.query<ReviewDetailResponse, { folder: string; slugs?: string }>({
-      query: ({ folder, slugs }) =>
-        `reviews/${encodeURIComponent(folder)}${slugs ? `?slugs=${encodeURIComponent(slugs)}` : ""}`,
+    // `archived` reads reviews/archive/, where WorkReview -Archive moves a review.
+    getReviewDetail: builder.query<
+      ReviewDetailResponse,
+      { folder: string; slugs?: string; archived?: boolean }
+    >({
+      query: ({ folder, slugs, archived }) => {
+        const q = new URLSearchParams();
+        if (slugs) q.set("slugs", slugs);
+        if (archived) q.set("archived", "true");
+        const qs = q.toString();
+        return `reviews/${encodeURIComponent(folder)}${qs ? `?${qs}` : ""}`;
+      },
       keepUnusedDataFor: CACHE_TTL,
     }),
 

@@ -121,9 +121,12 @@ NOTES:
     - From the code repository, on the work branch, everything is inferred:
       branch -> card -> work item ID, title, described changes.
     - Named by -File from anywhere else (the web UI runs verbs in the Toolkit's own
-      folder), the CARD answers instead: its ADO Link names the project and its
-      ## Branch section the source branch. The Toolkit's own checkout is never
-      read as a card's code repository.
+      folder) on a GitHub board, NewPR first looks for the card's own checkout --
+      a clone of the board's repository at <wsRoot>/<repo> or a nav shortcut's
+      path -- and works from there, as if run in it.
+    - With no such checkout, the CARD answers instead: its ADO Link names the
+      project and its ## Branch section the source branch. The Toolkit's own
+      checkout is never read as a card's code repository.
     - A project or repository that cannot be told is a refusal, never a guess.
     - Ctrl-click the PR URL in the prompt file to open in browser for PoP.
 
@@ -193,6 +196,42 @@ if ($toolkitRead.Code -eq 0) { $toolkitGitDir = "$(@($toolkitRead.Out)[0])".Trim
 $cwdIsToolkit = ($cwdIsRepo -and $toolkitGitDir -and ($cwdGitDir -eq $toolkitGitDir))
 $cwdIsCode = ($cwdIsRepo -and -not $cwdIsToolkit)
 
+# A card named from outside a code checkout (the browser's Create PR runs here,
+# in the Toolkit's folder): is the card's own checkout on this machine? Asked of
+# the one resolver (Scripts/Resolve-SpaceCheckout.ps1) -- the board's repository,
+# found as a clone whose origin IS that repository, in the nav shortcuts' paths
+# or at <wsRoot>/<repo>. Found: NewPR moves into it and works as if run there.
+# Not found, not a GitHub board, or a -Project/-Repository passed by hand (the
+# caller has named something the board rule may not): nothing changes, and the
+# card answers as below. The process is the verb's own and ends with it, so the
+# move is never undone.
+. (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
+$cardCheckout = ''
+if ($File -and (Test-Path -LiteralPath $File)) {
+    # Absolute before any move, so a relative -File still names the same card.
+    $File = (Resolve-Path -LiteralPath $File).Path
+    if (-not $cwdIsCode -and -not $PSBoundParameters.ContainsKey('Repository') -and
+        -not $PSBoundParameters.ContainsKey('Project') -and (Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
+        . (Join-Path $PSScriptRoot 'Resolve-SpaceCheckout.ps1')
+        $navAliases = $null
+        if (Get-Command Get-P20NavAliases -ErrorAction SilentlyContinue) { $navAliases = Get-P20NavAliases }
+        $checkout = Resolve-P20SpaceCheckout -OrgUrl $org -Projects $cfg.Projects `
+            -Candidates @(Get-P20NavAliasPaths -NavAliases $navAliases)
+        if ($checkout.Root) {
+            $checkoutRead = Invoke-P20TrackerRead 'git' @('-C', $checkout.Root, 'rev-parse', '--absolute-git-dir')
+            $checkoutGitDir = "$(@($checkoutRead.Out)[0])".Trim()
+            # The Toolkit's own checkout is never a card's, even when it is the board's repository.
+            if ($checkoutRead.Code -eq 0 -and $checkoutGitDir -and $checkoutGitDir -ne $toolkitGitDir) {
+                Set-Location -LiteralPath $checkout.Root
+                $cardCheckout = $checkout.Root
+                $cwdIsCode = $true
+                $cwdIsToolkit = $false
+                Write-Host "[*] In the card's code checkout: $($checkout.Root) ($($checkout.Repo))" -ForegroundColor DarkGray
+            }
+        }
+    }
+}
+
 # The card's own branch -- the first line of its ## Branch section that is not a
 # comment or a placeholder. What the browser has instead of a checkout.
 $cardBranch = ''
@@ -210,12 +249,37 @@ if ($File -and (Test-Path -LiteralPath $File)) {
 }
 
 # -- The source branch ---------------------------------------------------------
-# Standing in a code checkout: its branch, as it always was. Anywhere else, with a
-# card named: the card's ## Branch. Neither: there is nothing honest to use.
+# Standing in a code checkout: its branch, as it always was. In the card's own
+# checkout, found above: the card's ## Branch -- the card was named, and the
+# checkout may be on any branch -- else the checkout's branch, but only when that
+# branch leads back to this very card (the one branch -> card rule,
+# Resolve-CardForBranch.ps1). Anywhere else, with a card named: the card's
+# ## Branch. None of these: there is nothing honest to use.
 $currentBranch = ''
+$checkoutBranch = ''
 if ($cwdIsCode) {
     $branchRead = Invoke-P20TrackerRead 'git' @('rev-parse', '--abbrev-ref', 'HEAD')
-    if ($branchRead.Code -eq 0) { $currentBranch = "$(@($branchRead.Out)[0])".Trim() }
+    if ($branchRead.Code -eq 0) { $checkoutBranch = "$(@($branchRead.Out)[0])".Trim() }
+}
+if ($cwdIsCode -and -not $cardCheckout) {
+    $currentBranch = $checkoutBranch
+}
+elseif ($cardCheckout) {
+    if ($cardBranch) {
+        $currentBranch = $cardBranch
+        if ($checkoutBranch -and $checkoutBranch -ne $cardBranch) {
+            Write-Host "[*] The checkout is on '$checkoutBranch'; the branch is the card's own: $cardBranch" -ForegroundColor DarkGray
+        }
+    }
+    elseif ($checkoutBranch -and $checkoutBranch -ne 'HEAD') {
+        . (Join-Path $PSScriptRoot 'Resolve-CardForBranch.ps1')
+        $branchFolders = Get-PromptFolders
+        $branchCard = Resolve-P20CardForBranch -Branch $checkoutBranch -CurrentDir @($branchFolders.Current, (Get-P20BacklogFolder -Folders $branchFolders))
+        if ($branchCard -and ((Resolve-Path -LiteralPath $branchCard).Path -eq $File)) {
+            $currentBranch = $checkoutBranch
+            Write-Host "[*] The card names no branch; the checkout's branch is this card's: $checkoutBranch" -ForegroundColor DarkGray
+        }
+    }
 }
 elseif ($cardBranch) {
     $currentBranch = $cardBranch
@@ -223,9 +287,12 @@ elseif ($cardBranch) {
 }
 if (-not $currentBranch) {
     $why = 'Not in a git repository, and no card was named.'
-    if ($cwdIsToolkit) { $why = "This is the Toolkit's own checkout, not a card's code repository, and no card with a branch was named." }
+    if ($cardCheckout) { $why = "The card names no branch under ## Branch, and its checkout at $cardCheckout is on '$checkoutBranch', which is not this card's branch." }
+    elseif ($cwdIsToolkit) { $why = "This is the Toolkit's own checkout, not a card's code repository, and no card with a branch was named." }
     elseif ($File) { $why = "Not in a code repository, and the card names no branch under ## Branch." }
-    Write-CliError -Message $why -Hint "Run $(Get-CliPrefix)NewPR from the code repository on the work branch, or name the card: $(Get-CliPrefix)NewPR -File <id>."
+    $branchHint = "Run $(Get-CliPrefix)NewPR from the code repository on the work branch, or name the card: $(Get-CliPrefix)NewPR -File <id>."
+    if ($cardCheckout) { $branchHint = "Write the work branch under the card's ## Branch, or check it out in $cardCheckout, then run $(Get-CliPrefix)NewPR again." }
+    Write-CliError -Message $why -Hint $branchHint
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
 
@@ -526,8 +593,20 @@ if ($trackerKind -eq 'github') {
     # from -- asked first, so the refusal says what to do (the ADO rule, kept).
     $branchRead = Invoke-P20TrackerRead 'gh' @('api', "repos/$ghRepoFull/branches/$([Uri]::EscapeDataString($currentBranch))")
     if ($branchRead.Code -ne 0) {
+        $pushHint = "Push it from the code repository: git push -u origin $currentBranch -- then run $(Get-CliPrefix)NewPR again."
+        if ($cardCheckout) {
+            # In the card's checkout, the verb can say which of the two it is:
+            # a branch that is only local, or one that is not here either.
+            $localRead = Invoke-P20TrackerRead 'git' @('rev-parse', '--verify', '--quiet', "refs/heads/$currentBranch")
+            if ($localRead.Code -eq 0) {
+                $pushHint = "It is in the card's checkout at $cardCheckout but was never pushed: git -C `"$cardCheckout`" push -u origin $currentBranch -- then run $(Get-CliPrefix)NewPR again."
+            }
+            else {
+                $pushHint = "It is not in the card's checkout at $cardCheckout either. Create or fetch it there, push it (git push -u origin $currentBranch), then run $(Get-CliPrefix)NewPR again."
+            }
+        }
         Write-CliError -Message "Branch '$currentBranch' is not on GitHub ($ghRepoFull), so there is nothing to open a pull request from." `
-            -Hint "Push it from the code repository: git push -u origin $currentBranch -- then run $(Get-CliPrefix)NewPR again."
+            -Hint $pushHint
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
 

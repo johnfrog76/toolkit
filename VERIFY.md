@@ -39,8 +39,8 @@ halves talking to each other, and the flag that makes a whole module appear and 
 three halves at once. A check that can be automated belongs in a suite; one that cannot is a gate here,
 or it is not verified.
 
-Every verb `config.default.json` defines is in the table below -- 44 always-on, and the 14 the modules
-contribute through `Config/*.commands.psd1` (58 in all; `docs/CLI.md` prints both counts) -- with the
+Every verb `config.default.json` defines is in the table below -- 44 always-on, and the 15 the modules
+contribute through `Config/*.commands.psd1` (59 in all; `docs/CLI.md` prints both counts) -- with the
 suite that types it and the gate that walks it. `Tests/Test-DocCounts.ps1` reads the table back, so a
 verb added without a row fails a suite. **A row that says "neither" is a verb nothing verifies**; it is
 left in the table rather than dropped, because a verb the reader cannot see in it is indistinguishable
@@ -97,6 +97,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `NewGrowth` | `ModuleCommands` (registration only) | 9 |
 | `NewWorkReview` | `Review` (script only: `Generate-Review.ps1`) | 9, 12 (a git-history read under 5.1) |
 | `PublishWorkReview` | neither | 9 (registration and `-Help` only) |
+| `WorkReview` | `WorkReview` (typed in a fresh shell over a scratch git hub) | 9, 12 (the move and the commit under 5.1) |
 | `LogPeerReview` | `Archive` (script only: the record's bytes) | 9 (registration and `-Help` only) |
 | `UpdateResume` | `ModuleCommands` (registration only) | 9 (registration and `-Help` only) |
 | `SendTeams` | `SendTeams` | 10 |
@@ -286,7 +287,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **46 suites, 8157 assertions** with a `config.local.json`, every one
+findings. On this commit that is **47 suites, 8387 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -685,12 +686,12 @@ pwsh -NoProfile -Command "Import-Module ./Prompt20Toolkit/Prompt20Toolkit.psd1 -
 pwsh -NoProfile -Command "Import-Module ./Prompt20Toolkit/Prompt20Toolkit.psd1 -Force; tkNewGrowth -Help"
 ```
 
-**Expect:** `tkMenu -All` lists five more commands than it did with no flag -- `NewGrowth`,
-`NewWorkReview`, `PublishWorkReview`, `LogPeerReview`, `UpdateResume` -- and each one answers `-Help`
+**Expect:** `tkMenu -All` lists six more commands than it did with no flag -- `NewGrowth`,
+`NewWorkReview`, `PublishWorkReview`, `WorkReview`, `LogPeerReview`, `UpdateResume` -- and each one answers `-Help`
 with a usage line carrying **your** prefix, not a literal `{cliPrefix}`.
 
-- [ ] All five verbs appear in `tkMenu -All`
-- [ ] All five answer `-Help`, in the calling prefix
+- [ ] All six verbs appear in `tkMenu -All`
+- [ ] All six answer `-Help`, in the calling prefix
 
 Then the web half, with `tkWeb -Dev` up and the fixture hub configured:
 
@@ -1085,6 +1086,14 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   should see the **To do** lane empty, and the last card's closing line pointing at the **+** -- inside ten
   minutes of the clone. Any step where the card's words were not enough is a defect, filed. The walker writes
   the time here: stopwatch, clone to empty To do: `____` min `____` s, on `________` (host and date).
+- [ ] **A review is put away the same under Windows PowerShell 5.1.** In `powershell` (5.1) run
+  `tkTestToolkit -WorkReview`: green. Then, with `features.growth` on and a hub whose `storeSync` is `git`,
+  generate a review from the Reviews card (+), run `tkPublishWorkReview -NoPush`, and on its row choose
+  **Archive**: the row leaves the list, the filter's **Archived** option shows it, and in the hub
+  `reviews\archive\<slug-set>\<year>\<start>_<end>\review.md` ends with `**Closed:** <today>` in the file's own line
+  ending, and `git log -1 --name-status` is `review: archive <slug-set>/<start>_<end>` with forward slashes and only
+  that review's paths. Then **Delete** it from the Archived filter: the confirm names the range and the Space, Submit
+  removes the folder, and the next commit is `review: delete archive/<slug-set>/<start>_<end>`. Refs #148.
 
 ## Recording a run
 
