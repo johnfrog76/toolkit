@@ -50,14 +50,19 @@
         'NewGrowth' = @{
             category    = 'growth'
             description = 'Create a training, presentation or goal'
-            usage       = '{cliPrefix}NewGrowth -Title <t> [-Type training|presentation|goal] [-Date <YYYY-MM-DD>] [-DueDate <YYYY-MM-DD> (required for a training)] [-Provider <p>] [-Hours <h>] [-Notes <n>] | -Close <file> [-Help]'
+            usage       = '{cliPrefix}NewGrowth -Title <t> [-Type training|presentation|goal] [-Date <YYYY-MM-DD>] [-DueDate <YYYY-MM-DD> (required for a training)] [-Provider <p>] [-Hours <h>] [-Notes <n>] | -Close <file> | -Complete <file> [-WhatIf] [-Help]'
             examples    = @(
                 '{cliPrefix}NewGrowth -Title ''Intro to PowerShell'' -DueDate 2026-10-01 -Hours 2',
                 '{cliPrefix}NewGrowth -Type presentation -Title ''Designing for Non-Determinism'' -Date 2026-09-15',
                 '{cliPrefix}NewGrowth -Type goal -Title ''Improve test coverage patterns''',
+                '{cliPrefix}NewGrowth -Complete goal-2026-improve-test-coverage-patterns -WhatIf',
                 '{cliPrefix}NewGrowth -Close training-2026-09-01-clean-architecture'
             )
-            notes       = @('-Close retires an item: growth/current/<file> moves to growth/archive/ and is stamped **Closed:** -- the module closes its own data, since Archive is org-scoped and cannot see growth/.')
+            notes       = @(
+                '-Close archives an item: growth/current/<file> moves to growth/archive/ and is stamped **Closed:** -- the module closes its own data, since Archive is org-scoped and cannot see growth/.',
+                '-Complete marks a goal complete: the **Status** line under its ## Outcome heading is written as Achieved, and nothing else in the file changes. A goal only; it stays in growth/current/ until -Close.',
+                '-WhatIf names the file that would be written or moved, and writes nothing.'
+            )
         }
         'NewWorkReview' = @{
             # It walks git log over the whole hub; the bridge's default 120 s is not enough for a year of it.

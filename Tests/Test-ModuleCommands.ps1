@@ -198,6 +198,34 @@ Assert-True 'flag on: a second -Close is a report, not an error' ($again -match 
 $missing = Invoke-InScratch -Package $onPkg -Snippet $closeSnippet.Replace('clean-architecture', 'no-such-item')
 Assert-True 'flag on: -Close on nothing is a stated refusal' ($missing -match 'Error: No growth item matches' -and $missing -match 'EXIT=2') $missing
 
+# -- NewGrowth -Complete: a goal's Outcome Status line, and nothing else ---------
+# Written through the shared line writer; the rest of the file is byte-for-byte
+# what it was, and -WhatIf names the file and writes nothing.
+$goalName = 'goal-2026-improve-test-coverage.prompt.md'
+$goalPath = Join-Path $closeHub "growth/current/$goalName"
+$goalBefore = "# Goal Artifact`n`n## Goal`n`nImprove test coverage`n`n## Progress Log`n`n| Date | Update |`n|------|--------|`n| 2026-03-01 | halfway |`n`n---`n`n## Outcome`n`n- **Status**: In Progress`n- **Evidence**: the suite`n- **Impact**:`n"
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText($goalPath, $goalBefore, $utf8NoBom)
+$completeSnippet = "`$env:PROMPTS_ROOT = '$($closeHub -replace "'", "''")'; tkNewGrowth -Complete improve-test-coverage -WhatIf; 'EXIT=' + `$LASTEXITCODE"
+$whatIfOut = Invoke-InScratch -Package $onPkg -Snippet $completeSnippet
+Assert-True 'flag on: -Complete -WhatIf names the file and the line' ($whatIfOut -match [regex]::Escape($goalName) -and $whatIfOut -match 'Status\*\*: Achieved' -and $whatIfOut -match 'EXIT=0') $whatIfOut
+Assert-True 'flag on: -Complete -WhatIf writes nothing' ([System.IO.File]::ReadAllText($goalPath) -ceq $goalBefore) $whatIfOut
+$completeOut = Invoke-InScratch -Package $onPkg -Snippet $completeSnippet.Replace(' -WhatIf', '')
+$goalAfter = [System.IO.File]::ReadAllText($goalPath)
+Assert-True 'flag on: -Complete writes the Outcome Status line as Achieved' ($goalAfter -match '(?m)^- \*\*Status\*\*: Achieved$' -and $completeOut -match 'EXIT=0') $completeOut
+Assert-True 'flag on: -Complete leaves the rest of the file byte-for-byte' ($goalAfter -ceq $goalBefore.Replace('- **Status**: In Progress', '- **Status**: Achieved')) $goalAfter
+Assert-True 'flag on: -Complete leaves the goal in growth/current/' (Test-Path $goalPath) $completeOut
+$completeAgain = Invoke-InScratch -Package $onPkg -Snippet $completeSnippet.Replace(' -WhatIf', '')
+Assert-True 'flag on: a second -Complete is a report, not an error' ($completeAgain -match 'Already complete' -and $completeAgain -match 'EXIT=0') $completeAgain
+[System.IO.File]::WriteAllText((Join-Path $closeHub 'growth/current/training-2026-10-01-not-a-goal.prompt.md'), "# Training Artifact`n`n## Status`n`nIn Progress`n", $utf8NoBom)
+$notGoal = Invoke-InScratch -Package $onPkg -Snippet $completeSnippet.Replace('improve-test-coverage -WhatIf', 'not-a-goal')
+Assert-True 'flag on: -Complete on a training is a stated refusal' ($notGoal -match 'Error: .*is not a goal' -and $notGoal -match 'EXIT=2') $notGoal
+[System.IO.File]::WriteAllText((Join-Path $closeHub 'growth/current/goal-2026-no-outcome.prompt.md'), "# Goal Artifact`n`n## Goal`n`nNo outcome`n", $utf8NoBom)
+$noOutcome = Invoke-InScratch -Package $onPkg -Snippet $completeSnippet.Replace('improve-test-coverage -WhatIf', 'no-outcome')
+Assert-True 'flag on: -Complete on a goal with no Outcome Status line refuses and writes nothing' ($noOutcome -match 'no \*\*Status\*\* line' -and $noOutcome -match 'EXIT=2' -and ([System.IO.File]::ReadAllText((Join-Path $closeHub 'growth/current/goal-2026-no-outcome.prompt.md')) -notmatch 'Achieved')) $noOutcome
+$closeWhatIf = Invoke-InScratch -Package $onPkg -Snippet $completeSnippet.Replace('-Complete improve-test-coverage', '-Close improve-test-coverage')
+Assert-True 'flag on: -Close -WhatIf names the file and moves nothing' ($closeWhatIf -match 'No changes were made' -and (Test-Path $goalPath) -and $closeWhatIf -match 'EXIT=0') $closeWhatIf
+
 # -- A module verb reached from a module-launched script ---------------
 # Every wrapper launches a script, and a script can call a verb back. In that shape a
 # global function's FREE names resolve against the intervening script, so a wrapper that
@@ -229,6 +257,8 @@ Assert-True 'flag on: -Help renders the description from the module data file' `
     ($onHelp -match 'Create a training, presentation or goal') $onHelp
 Assert-True 'flag on: -Help renders the usage line from the module data file' `
     ($onHelp -match '-Type training\|presentation\|goal') $onHelp
+Assert-True 'flag on: -Help prints the -Complete switch and -WhatIf' `
+    (($onHelp -match '-Complete <file>') -and ($onHelp -match '-WhatIf')) $onHelp
 Assert-True 'flag on: {cliPrefix} is expanded in the module help' `
     (($onHelp -match 'tkNewGrowth -Title') -and ($onHelp -notmatch '\{cliPrefix\}')) $onHelp
 

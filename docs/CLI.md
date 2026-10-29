@@ -828,7 +828,7 @@ is off, and `SwitchSpace` brings them back in one that works with agents.
 
 | Command | Flag | Does |
 | --- | --- | --- |
-| `NewGrowth -Title <t> [-Type training\|presentation\|goal] [-Date <d>] [-DueDate <d> (required for a training)] [-Provider <p>] [-Hours <h>] [-Notes <n>]` | `features.growth` | Create a training, presentation or goal artifact under `growth/current/`. `training` is the **default** type and a training **needs** `-DueDate`, so the shortest form the usage suggests is the one that is refused |
+| `NewGrowth -Title <t> [-Type training\|presentation\|goal] [-Date <d>] [-DueDate <d> (required for a training)] [-Provider <p>] [-Hours <h>] [-Notes <n>]` | `features.growth` | Create a training, presentation or goal artifact under `growth/current/`. `training` is the **default** type and a training **needs** `-DueDate`, so the shortest form the usage suggests is the one that is refused. `-Close <file>` archives an item to `growth/archive/`, stamped **Closed:**; `-Complete <file>` writes a goal's Outcome Status line as `Achieved` and nothing else; `-WhatIf` names the file and writes nothing |
 | `NewWorkReview -StartDate <d> -EndDate <d> [-Slugs <csv>]` | `features.growth` | Generate a work review scaffold for a date range from local history. Answers JSON on stdout, because the agent parses it |
 | `PublishWorkReview [-NoPush] [-Preview]` | `features.growth` | Stage and commit `reviews/`, then sync the hub. `-Preview` emits the pending diff as JSON instead |
 | `UpdateResume [-NoPush] [-Preview]` | `features.growth` | The same three for `resume/` |

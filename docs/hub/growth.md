@@ -69,11 +69,17 @@ rather than guessed at.
    goal gets progress-log entries. Evidence written down while it is fresh is
    the whole point.
 3. When it is finished, record the outcome in the file's own words -- `Completed`,
-   `Delivered`, `Status` -- because that is what the readers key on.
-4. Retire it: `{cliPrefix}NewGrowth -Close <file>`, or *Retire* on the Growth
-   page, moves it to `archive/` and stamps `**Closed:** YYYY-MM-DD` through the
-   shared stamp writer. The review generator reads both folders, so archiving
-   loses nothing.
+   `Delivered`, `Status` -- because that is what the readers key on. For a goal
+   there is a writer: `{cliPrefix}NewGrowth -Complete <file>`, or *Complete* on
+   the goal's row or its page, writes the `**Status**` line under its
+   `## Outcome` heading as `Achieved` through the shared line writer
+   (`Set-P20CardLine`) and changes nothing else in the file. It is offered while
+   the goal does not already read complete; `-WhatIf` names the file and the line
+   and writes nothing. A training and a talk are still recorded by hand.
+4. Archive it: `{cliPrefix}NewGrowth -Close <file>`, or *Archive* on the item's
+   row or its page, moves it to `archive/` and stamps `**Closed:** YYYY-MM-DD`
+   through the shared stamp writer. It is offered whether or not the item is
+   complete. The review generator reads both folders, so archiving loses nothing.
 
 There is no status field anywhere else, and nothing is stored about these files
 outside the files. State is derived by reading them, the same rule cards follow.

@@ -31,6 +31,8 @@ function global:New-P20GrowthItem {
         [string]$Hours,
         [string]$Notes,
         [string]$Close,
+        [string]$Complete,
+        [switch]$WhatIf,
         [switch]$Help
     )
     $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'NewGrowth'

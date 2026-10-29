@@ -8,6 +8,10 @@ release.
 
 ## [Unreleased]
 
+### Added
+
+- A goal can be marked complete from the Growth page: **Complete** on its row or on its own page writes the goal's Status line as Achieved and changes nothing else in the file, and the goal's page now offers **Archive** too. In the terminal it is `NewGrowth -Complete <file>`, and `-WhatIf` names the file and writes nothing.
+
 ### Changed
 
 - Every list's row menu now uses one vocabulary: the same move has the same word, icon and tooltip on every page, and the link out is always last, reading "Open on GitHub" or "Open on Azure DevOps" behind one icon. A goal's Retire, a reminder's Done and a card's Move to Done now read Archive, a design's two archives read Archive as shipped and Archive as dropped, a card's exposed action opens the card, and Remove cover reads Delete the cover.

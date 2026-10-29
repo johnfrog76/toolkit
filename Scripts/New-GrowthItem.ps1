@@ -51,6 +51,17 @@ param(
     [Parameter(Mandatory = $false)]
     [string]$Close,
 
+    # -Complete <file>: mark a GOAL complete. Writes the `**Status**` line under
+    # the goal's `## Outcome` heading as `Achieved`, through Set-P20CardLine (the
+    # one in-place line writer), and nothing else in the file moves. The file
+    # stays in growth/current/ -- putting it away is -Close.
+    [Parameter(Mandatory = $false)]
+    [string]$Complete,
+
+    # Names what would be written or moved, and writes nothing.
+    [Parameter(Mandatory = $false)]
+    [switch]$WhatIf,
+
     [Parameter(Mandatory = $false)]
     [switch]$Help
 )
@@ -69,7 +80,9 @@ if ($Help) {
     Write-Host "  USAGE:" -ForegroundColor Yellow
     Write-Host "    $($p)NewGrowth -Title <string> [-Type training|presentation|goal] [-Date YYYY-MM-DD]"
     Write-Host "              [-DueDate YYYY-MM-DD (required for a training)] [-Provider <string>]"
-    Write-Host "              [-Hours <string>] [-Notes <string>]"
+    Write-Host "              [-Hours <string>] [-Notes <string>] [-WhatIf]"
+    Write-Host "    $($p)NewGrowth -Close <file> [-WhatIf]"
+    Write-Host "    $($p)NewGrowth -Complete <file> [-WhatIf]"
     Write-Host ""
     Write-Host "  PARAMETERS:" -ForegroundColor Yellow
     Write-Host "    -Type       training (default), presentation or goal"
@@ -79,13 +92,16 @@ if ($Help) {
     Write-Host "    -Provider   who delivers the training (training only)"
     Write-Host "    -Hours      total hours (training only)"
     Write-Host "    -Notes      one line of context, written into Description / Context / Why This Matters"
-    Write-Host "    -Close      retire a growth item: move growth/current/<file> to growth/archive/ and stamp the date"
+    Write-Host "    -Close      archive a growth item: move growth/current/<file> to growth/archive/ and stamp the date"
+    Write-Host "    -Complete   mark a goal complete: write its Outcome Status line as Achieved; nothing else changes"
+    Write-Host "    -WhatIf     name the file that would be written or moved, and write nothing"
     Write-Host ""
     Write-Host "  EXAMPLES:" -ForegroundColor Yellow
     Write-Host "    $($p)NewGrowth -Title 'Clean Architecture' -DueDate 2026-10-01 -Hours 8"
     Write-Host "    $($p)NewGrowth -Type presentation -Title 'Designing for Non-Determinism' -Date 2026-09-15"
     Write-Host "    $($p)NewGrowth -Type goal -Title 'Improve test coverage patterns'"
     Write-Host "    $($p)NewGrowth -Close training-2026-09-01-clean-architecture"
+    Write-Host "    $($p)NewGrowth -Complete goal-2026-improve-test-coverage-patterns -WhatIf"
     Write-Host ""
     exit 0
 }
@@ -120,8 +136,16 @@ if (-not $displayName) {
 # The one byte contract for a hub file -- see Scripts/Write-CardText.ps1.
 . (Join-Path $PSScriptRoot 'Write-CardText.ps1')
 
-# -- Close ----------------------------------------------------------------------
-if ($Close) {
+# -- Close / Complete: one lookup, two moves ----------------------------------------
+# Both name an item already in growth/current/, and both find it the same way: the
+# exact file name first, then a unique partial match.
+if ($Close -and $Complete) {
+    Write-CliError -Message '-Close and -Complete are two moves; pass one.' `
+        -Hint "Complete the goal first, then archive it with -Close."
+    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+}
+$target = if ($Close) { $Close } else { $Complete }
+if ($target) {
     if (-not $promptsRoot -or -not (Test-Path $promptsRoot)) {
         Write-CliError -Message (Get-P20HubMissingMessage $promptsRoot)
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
@@ -129,7 +153,7 @@ if ($Close) {
     $growthRoot = Get-P20HubFolder -Name 'growth' -PromptsRoot $promptsRoot -PackageRoot $repoRoot
     $growthCurrent = Join-Path $growthRoot 'current'
     $growthArchive = Join-Path $growthRoot 'archive'
-    $wanted = [System.IO.Path]::GetFileName($Close)
+    $wanted = [System.IO.Path]::GetFileName($target)
     if ($wanted -notmatch '\.prompt\.md$') { $wanted = "$wanted.prompt.md" }
     $hits = @()
     if (Test-Path $growthCurrent) {
@@ -140,27 +164,105 @@ if ($Close) {
         }
     }
     if ($hits.Count -eq 0) {
-        # Idempotent: already retired is a report, not an error -- the state is
+        $archived = (Test-Path $growthArchive) -and (Test-Path (Join-Path $growthArchive $wanted))
+        # Idempotent: already archived is a report, not an error -- the state is
         # where the file is, exactly as a card's and a session's are.
-        if ((Test-Path $growthArchive) -and (Test-Path (Join-Path $growthArchive $wanted))) {
+        if ($Close -and $archived) {
             Write-Host "Already closed: growth/archive/$wanted" -ForegroundColor DarkGray
             exit 0
         }
-        Write-CliError -Message "No growth item matches '$Close' in growth/current/." `
+        if ($archived) {
+            Write-CliError -Message "growth/archive/$wanted is archived; an archived goal is not edited from here." `
+                -Hint "The archive is the record. Edit the file by hand if its Status line is wrong."
+            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+        }
+        Write-CliError -Message "No growth item matches '$target' in growth/current/." `
             -Hint "Pass the file name as it appears under growth/current/."
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
     if ($hits.Count -gt 1) {
-        Write-CliError -Message "'$Close' matches $($hits.Count) growth items: $(($hits | ForEach-Object { $_.Name }) -join ', ')" `
+        Write-CliError -Message "'$target' matches $($hits.Count) growth items: $(($hits | ForEach-Object { $_.Name }) -join ', ')" `
             -Hint "Be more specific, or pass the full file name."
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
+
+    if ($Complete) {
+        $goalName = $hits[0].Name
+        if ($goalName -notlike 'goal-*') {
+            Write-CliError -Message "$goalName is not a goal. -Complete writes a goal's Outcome Status line." `
+                -Hint "A training reads complete from its ## Status line and a presentation from **Delivered**; edit those in the file."
+            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+        }
+        # Where the Status line is: the first `**Status**...:` line under the first
+        # heading that STARTS WITH `## Outcome`, up to the next `##` heading. That is
+        # the reader's own rule (agent/growth/growth.py, parse_growth_file; the table
+        # in docs/hub/growth.md), so the line written is the line read.
+        $goalPath = $hits[0].FullName
+        $goalLines = ([System.IO.File]::ReadAllText($goalPath) -replace "`r`n", "`n").Split("`n")
+        $inOutcome = $false
+        $statusAt = -1
+        for ($i = 0; $i -lt $goalLines.Count; $i++) {
+            $trimmed = $goalLines[$i].Trim()
+            if ($inOutcome) {
+                if ($goalLines[$i].StartsWith('##')) { break }
+                if ($goalLines[$i] -match '\*\*Status\*\*[^:]*:') { $statusAt = $i; break }
+            }
+            elseif ($trimmed -match '^##\s+outcome') { $inOutcome = $true }
+        }
+        if ($statusAt -lt 0) {
+            Write-CliError -Message "$goalName has no **Status** line under its ## Outcome heading. Nothing was written." `
+                -Hint "Add '- **Status**: Not Started' under ## Outcome, as the goal template has it, and run it again."
+            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+        }
+        $statusLine = $goalLines[$statusAt]
+        # The label as this file writes it -- `- **Status**:` in the template, any
+        # older shape the reader accepts otherwise -- so the line keeps its own form.
+        $stamp = ([regex]::Match($statusLine, '^.*?\*\*Status\*\*[^:]*:')).Value
+        $current = $statusLine.Substring($stamp.Length).Trim()
+        # Already complete is a report, not an error. The words are the reader's:
+        # a value starting Complet or Achiev reads as complete (docs/hub/growth.md).
+        if ($current.ToLower().StartsWith('complet') -or $current.ToLower().StartsWith('achiev')) {
+            Write-Host "Already complete: growth/current/$goalName ($current)" -ForegroundColor DarkGray
+            exit 0
+        }
+        # Set-P20CardLine replaces the FIRST line starting with the label, so the
+        # label must not start an earlier line too -- a hand-written goal with a
+        # second Status line above its outcome would otherwise be edited in the wrong place.
+        $firstAt = -1
+        for ($i = 0; $i -lt $goalLines.Count; $i++) {
+            if ($goalLines[$i] -match ('^' + [regex]::Escape($stamp))) { $firstAt = $i; break }
+        }
+        if ($firstAt -ne $statusAt) {
+            Write-CliError -Message "$goalName has a '$stamp' line above its ## Outcome heading, so the Status line is not the only one. Nothing was written." `
+                -Hint "Edit the Outcome Status line by hand."
+            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+        }
+        $completeValue = 'Achieved'
+        if ($WhatIf) {
+            Write-Host "  [WhatIf] growth/current/$($goalName): $stamp $completeValue"
+            Write-Host "    FILE: $goalPath"
+            Write-Host "  [WhatIf] No changes were made."
+            exit 0
+        }
+        . (Join-Path $PSScriptRoot 'Set-CardLine.ps1')
+        [void](Set-P20CardLine -Path $goalPath -Stamp $stamp -Value $completeValue)
+        Write-Host "Completed: growth/current/$goalName -- Status: $completeValue" -ForegroundColor Green
+        Write-Host "    FILE: $goalPath"
+        exit 0
+    }
+
     $source = $hits[0].FullName
     $dest = Join-Path $growthArchive $hits[0].Name
     if (Test-Path $dest) {
         Write-CliError -Message "growth/archive/$($hits[0].Name) already exists. Not overwriting it." `
             -Hint "The archived copy is the record. Compare the two and delete whichever is the duplicate."
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+    }
+    if ($WhatIf) {
+        Write-Host "  [WhatIf] growth/current/$($hits[0].Name) -> growth/archive/$($hits[0].Name), stamped with the date it closed"
+        Write-Host "    FILE: $source"
+        Write-Host "  [WhatIf] No changes were made."
+        exit 0
     }
     if (-not (Test-Path $growthArchive)) { New-Item -ItemType Directory -Path $growthArchive -Force | Out-Null }
     Move-Item -LiteralPath $source -Destination $dest -ErrorAction Stop
@@ -216,15 +318,21 @@ else {
 }
 
 $currentDir = Join-Path (Get-P20HubFolder -Name 'growth' -PromptsRoot $promptsRoot -PackageRoot $repoRoot) 'current'
-if (-not (Test-Path $currentDir)) {
-    New-Item -Path $currentDir -ItemType Directory -Force | Out-Null
-}
 $filePath = Join-Path $currentDir $fileName
 
 if (Test-Path $filePath) {
     Write-Host "Already there: $filePath" -ForegroundColor Yellow
     Write-Host "    FILE: $filePath"
     exit 0
+}
+if ($WhatIf) {
+    Write-Host "  [WhatIf] would create $fileName"
+    Write-Host "    FILE: $filePath"
+    Write-Host "  [WhatIf] No changes were made."
+    exit 0
+}
+if (-not (Test-Path $currentDir)) {
+    New-Item -Path $currentDir -ItemType Directory -Force | Out-Null
 }
 
 # ASCII 'to' rather than a dash: this string is parsed back by both readers and

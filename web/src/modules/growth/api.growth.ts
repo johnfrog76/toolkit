@@ -145,6 +145,8 @@ export const growthEndpoints = growthApi.injectEndpoints({
     getGrowthDetail: builder.query<GrowthDetailResponse, string>({
       query: (filename) => `growth/${encodeURIComponent(filename)}`,
       keepUnusedDataFor: CACHE_TTL,
+      // A write through NewGrowth (Complete, Archive) re-reads the page too.
+      providesTags: ["Growth"],
     }),
 
     // POST /api/cmd/NewGrowth -- every growth write goes the way every other

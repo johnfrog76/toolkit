@@ -106,10 +106,11 @@ whatever prefix is configured; `tk` below.
 Writes a growth artifact into `growth/current/`.
 
 ```text
-tkNewGrowth -Close <file>                       # retire: growth/current/ -> growth/archive/, stamped **Closed:**
+tkNewGrowth -Close <file> [-WhatIf]             # archive: growth/current/ -> growth/archive/, stamped **Closed:**
+tkNewGrowth -Complete <file> [-WhatIf]          # a goal's Outcome Status line -> Achieved, nothing else
 tkNewGrowth -Title <string> [-Type training|presentation|goal] [-Date YYYY-MM-DD]
             [-DueDate YYYY-MM-DD (required for a training)] [-Provider <string>]
-            [-Hours <string>] [-Notes <string>] [-Help]
+            [-Hours <string>] [-Notes <string>] [-WhatIf] [-Help]
 ```
 
 | Flag | Notes |
@@ -120,17 +121,38 @@ tkNewGrowth -Title <string> [-Type training|presentation|goal] [-Date YYYY-MM-DD
 | `-DueDate` | **required for a training**; a goal's end of period; a talk has none |
 | `-Provider`, `-Hours` | trainings only. `-Hours` defaults to `TBD` |
 | `-Notes` | one line of context: Description / Context & Intent / Why This Matters |
+| `-Close <file>` | archive an item (below) |
+| `-Complete <file>` | complete a goal (below) |
+| `-WhatIf` | name the file that would be created, moved or written, and write nothing |
 
 Exits 0 on success and on "already there"; 2 (a stated refusal) on a missing
 title, a bad date, a training with no due date, or an unconfigured hub. Script:
 `Scripts/New-GrowthItem.ps1`.
 
-**`-Close <file>` retires an item**, from the terminal or the browser: *Archive* on
-a `Goals` row (the row vocabulary's word for the move to the archive; it said *Retire*) runs the same verb through the bridge (`POST /api/cmd/NewGrowth`,
+**`-Close <file>` archives an item**, from the terminal or the browser: *Archive* on
+a `Goals` row, and in the header of the item's own page (the row vocabulary's word for the
+move to the archive; it said *Retire*), runs the same verb through the bridge (`POST /api/cmd/NewGrowth`,
 argv `buildGrowthCloseParams`) behind the house's one confirm
 (`shared/ConfirmDialog`). The item moves to `growth/archive/` and is stamped
 `**Closed:**` by the shared writer -- the module closes its own data, since
-`Archive` is org-scoped and a hub-root sibling is invisible to it.
+`Archive` is org-scoped and a hub-root sibling is invisible to it. Archive is offered
+whether or not the item is complete; from the page, it returns to the Growth page.
+
+**`-Complete <file>` completes a goal**: the first `**Status**` line under the
+heading that starts `## Outcome` -- the line the reader keys on, found by the reader's
+own rule ([docs/hub/growth.md](../hub/growth.md), "How a reader decides what state an
+item is in") -- is rewritten as `Achieved` through `Set-P20CardLine`, the shared
+in-place line writer, so the file keeps its line endings and every other byte. The goal
+stays in `growth/current/` until it is archived. A goal already reading `Completed` or
+`Achieved` answers "Already complete" and exit 0; a training or a presentation, a goal
+with no Status line under its outcome, or one whose label also starts an earlier line, is
+a stated refusal (exit 2) that writes nothing. In the browser it is *Complete* -- the
+row vocabulary's `complete` -- on a goal's row and in its page's header, behind the
+same confirm (argv `buildGrowthCompleteParams`), and it is offered only while the agent
+does not already read the goal as complete (`canComplete` in
+`web/src/modules/growth/GoalActions.tsx`, reading the derived `status` the agent
+serves). Both moves are drawn by one component, `GoalActions`, so the row and the page
+offer the same thing; with the growth module off there is no row, no page and no verb.
 
 **A new item from the browser is the same verb.** The `Goals` card's New Growth
 Item dialog runs `POST /api/cmd/NewGrowth` (argv `buildNewGrowthParams`), so the
@@ -388,10 +410,11 @@ committed config where every module flag is off, so it resolves after
 
 | Suite | What it guards |
 | --- | --- |
-| `tkTestToolkit -ModuleCommands` | D-CM end to end: off means absent, the prefix is data, help comes from the module's own file, a colliding name refuses the module whole, a malformed or `[ordered]` data file is skipped by path, `Order` decides registration order, a data file cannot run code, and a locally-enabled module stays out of the autoload manifest |
+| `tkTestToolkit -ModuleCommands` | D-CM end to end: off means absent, the prefix is data, help comes from the module's own file, a colliding name refuses the module whole, a malformed or `[ordered]` data file is skipped by path, `Order` decides registration order, a data file cannot run code, and a locally-enabled module stays out of the autoload manifest; and `NewGrowth -Close` / `-Complete` against a scratch hub: Complete rewrites only the goal's Outcome Status line, byte for byte, `-WhatIf` writes nothing, and a training or a goal with no Status line is a stated refusal |
 | `tkTestToolkit -Review` | `Generate-Review.ps1` against a scratch git hub: the bare-date regression, what the scan includes and excludes, the scaffold's sections, multi-org slug sets, edge cases, and the publish preview |
 | `pytest Tests/test_growth.py` | the routes against the fixture hub, the 404 gate, and the heading reader: an empty provider is `None`, not the writer's `---`, and a file made from the template reads its comments as nothing |
 | `pytest Tests/test_reviews_multi_org.py` | a review folder's membership is split-on-`+` SET membership, not a substring search |
+| `npm test -- GoalActions` | a goal's row and page offer Complete and Archive while it is not complete and Archive alone once it is; a training or a talk keeps Archive alone; Complete asks, then runs `NewGrowth -Complete <file>`, and Archive `NewGrowth -Close <file>` |
 | `npm test -- Goals.create` | the New Growth Item dialog runs `NewGrowth` through the bridge with the dialog's fields as argv, opens the file the verb names, and keeps a refusal or an "Already there" in the dialog |
 | `npm test -- registry.growth` | the module contributes routes and nav only when the flag is true, and no home cards of its own |
 | `pytest Tests/test_growth_status.py` | the status rules in "The file shape", one row per input the rule distinguishes |
