@@ -7,20 +7,26 @@ import {
   Caption1,
   Badge,
   Select,
-  Spinner,
   Tooltip,
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { PageCard } from "../../shared/PageCard";
-import { CardActions } from "../../shared/CardActions";
-import { OpenRegular, CommentRegular, CloudRegular } from "@fluentui/react-icons";
+import { CardActions, ROW, defineRowMoves } from "../../shared/CardActions";
+import { trackerName } from "./TrackerBadge";
+import { CommentRegular, CloudRegular } from "@fluentui/react-icons";
 import { useGetPrsQuery, useFetchPrCommentsMutation } from "./api.ado";
 import { getProjectTag } from "./repoTags";
 import { BranchRequestRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
 import type { EmptyMessage } from "../../shared/EmptyState";
+
+/** A pull request's own move. Its page is the tracker's, so the row's one
+ *  exposed action is the vocabulary's external link. */
+const PR_MOVES = defineRowMoves("pr", {
+  fetchComments: { word: "Fetch PR comments", icon: CommentRegular },
+});
 
 const useStyles = makeStyles({
   prCard: {
@@ -184,19 +190,14 @@ export function MyPRs({
               </Body1>
             </div>
             <CardActions
-              primaryAction={{ icon: <OpenRegular />, label: "Open in ADO", href: pr.url }}
+              primaryAction={ROW.external.action({ detail: trackerName("ado"), href: pr.url })}
               menuLabel={`Actions for ${pr.title}`}
               secondaryActions={[
-                {
-                  icon: fetchingPrIds.has(pr.pull_request_id) ? (
-                    <Spinner size="tiny" aria-label="Fetching comments..." />
-                  ) : (
-                    <CommentRegular />
-                  ),
-                  label: "Fetch PR comments",
+                PR_MOVES.fetchComments.action({
+                  busy: fetchingPrIds.has(pr.pull_request_id) ? "Fetching comments..." : undefined,
                   disabled: fetchingPrIds.has(pr.pull_request_id),
                   onClick: () => handleFetchComments(pr.pull_request_id),
-                },
+                }),
               ]}
             />
           </div>

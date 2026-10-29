@@ -135,9 +135,9 @@ so it is absent there. A flag answered `false` reads exactly as one never set.
 
 The board's card and the list's row draw one action model (`cardActions.ts`), so this holds for both:
 
-| Organize | A card's `...` ends with |
+| Organize | A card's own moves in its `...` end with (the link out, where there is one, comes after, last) |
 | --- | --- |
-| off, or not configured | **Open the card** -- no reminder item, and nothing of Organize is fetched |
+| off, or not configured | the billable toggle, **Mark not billable** -- no reminder item, and nothing of Organize is fetched |
 | on | **Remind me about this**: Organize's New Reminder dialog, the card's title as what and its id as the ref (`docs/modules/organize.md`, "The web UI") |
 
 ### The board's lanes, by a card's status (`scenarios.test.tsx`; the rule is `legalMoves.ts`)

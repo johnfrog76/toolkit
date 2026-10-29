@@ -5,7 +5,7 @@ import { AttachActions, AttachZone } from "./AttachCover";
 // Attach a card's picture from the browser (C2): the bytes go to the
 // upload route, the path comes back, and the Cover verb runs through the
 // bridge with it -- one writer. With no cover the zone IS the cover's box;
-// with one, the header offers Replace cover, Add before, Remove cover.
+// with one, the header offers Replace cover, Add before, Delete the cover.
 
 const uploaded: File[] = [];
 let uploadReply: { path: string } | { error: { status: number; data: { detail: string } } } = {
@@ -176,27 +176,27 @@ describe("the header's actions for a card with a cover", () => {
     expect(screen.queryByRole("button")).toBeNull();
   });
 
-  it("offers Replace cover, Add before and Remove cover", async () => {
+  it("offers Replace cover, Add before and Delete the cover", async () => {
     const ask = jest.fn();
     render(<AttachActions filename={FILE} content={COVERED} onDone={jest.fn()} onAsk={ask} />);
     fireEvent.click(screen.getByRole("button", { name: "Replace cover" }));
     expect(ask).toHaveBeenCalledWith("cover");
     fireEvent.click(screen.getByRole("button", { name: "Actions for the cover" }));
     const items = (await screen.findAllByRole("menuitem")).map((m) => m.textContent);
-    expect(items).toEqual(["Add before", "Remove cover"]);
+    expect(items).toEqual(["Add before", "Delete the cover"]);
     fireEvent.click(screen.getByRole("menuitem", { name: "Add before" }));
     expect(ask).toHaveBeenCalledWith("before");
   });
 
-  it("Remove asks first, then runs Cover -Remove", async () => {
+  it("Delete asks first, then runs Cover -Remove", async () => {
     const done = jest.fn();
     render(<AttachActions filename={FILE} content={COVERED} onDone={done} onAsk={jest.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "Actions for the cover" }));
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Remove cover" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete the cover" }));
     expect(screen.getByRole("dialog")).toBeTruthy();
     expect(ran).toEqual([]);
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+      fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     });
     expect(ran).toEqual([[FILE, "-Remove"]]);
     expect(done).toHaveBeenCalled();
