@@ -514,9 +514,7 @@ if ($Launch) {
     $originUrl = ''
     if ($originRead.Code -eq 0) { $originUrl = ([string](@($originRead.Out) | Select-Object -First 1)).Trim() }
     # https://github.com/o/r(.git), git@github.com:o/r(.git), ssh://git@github.com/o/r -- the owner/repo after the host.
-    $originRepo = ''
-    $om = [regex]::Match($originUrl, '(?i)github\.com[:/]+([^/\s]+)/([^/\s]+?)(?:\.git)?/?$')
-    if ($om.Success) { $originRepo = $om.Groups[1].Value + '/' + $om.Groups[2].Value }
+    $originRepo = Get-P20GitHubOriginRepo -Url $originUrl
     if (-not $originRepo -or $originRepo -ine $spaceRepo) {
         $originWords = 'no origin'
         if ($originUrl) { $originWords = "origin $originUrl" }

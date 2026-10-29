@@ -49,7 +49,10 @@
     Appended to the journey line of any move; required with -Dropped.
 
 .PARAMETER Doc
-    With -To Complete: where the durable part landed, a path in the same tree.
+    With -To Complete: where the durable part landed, a path in the same tree --
+    or, with -Hub -Space, in the Space's own repository: checked in a clone of
+    it on this machine (the folder you stand in, else a nav shortcut's path),
+    taken as written with a Note: line when there is no clone here.
 
 .PARAMETER Hub
     Work on the hub's folders instead of the current repository.
@@ -120,6 +123,8 @@ if ($Help) {
 . (Join-Path $PSScriptRoot 'Write-CardText.ps1')
 . (Join-Path $PSScriptRoot 'Add-ClosedStamp.ps1')
 . (Join-Path $PSScriptRoot 'Read-DesignTree.ps1')
+. (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
+. (Join-Path $PSScriptRoot 'Resolve-SpaceCheckout.ps1')
 $consts = Get-P20Consts
 $states = @($consts.design.states)          # Design, Spec, Complete, Archived
 $stateDesign = [string]$states[0]; $stateSpec = [string]$states[1]; $stateComplete = [string]$states[2]
@@ -159,6 +164,7 @@ if ($Space -and -not $Hub) {
 
 # -- Where: the repository we stand in, or the hub -----------------------------------
 $base = ''; $designDir = ''; $specDir = ''; $where = ''; $repoName = ''; $inRepo = $false
+$spaceEntry = $null
 if ($Hub) {
     $promptsRoot = Get-P20PromptsRoot -PackageRoot $repoRoot
     if (-not (Test-P20HubRoot $promptsRoot)) {
@@ -179,6 +185,7 @@ if ($Hub) {
                 -Hint "${prefix}Env lists the Spaces; -Hub without -Space works on the hub's root design/ and spec/."
             exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
         }
+        $spaceEntry = $match
         $folder = [string]$match.promptsFolder
         if (-not $folder) { $folder = [string]$match.slug }
         $base = Join-Path $promptsRoot $folder
@@ -573,7 +580,42 @@ switch ($To) {
             exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
         }
         $docRel = (& $rel $Doc.Trim()).TrimStart('/')
-        if (-not (Test-Path -LiteralPath (& $full $docRel) -PathType Leaf)) {
+        if ($spaceEntry) {
+            # -Hub -Space: the hub holds the design, the Space's own repository
+            # holds the docs it landed in (docs/hub/design.md, "The file", the
+            # `> Docs:` row).
+            # So -Doc is looked for in a clone of that repository on this
+            # machine; with no clone here there is nothing to check it against,
+            # and it is taken as written, said once.
+            $spaceLabel = [string]$spaceEntry.name
+            if (-not $spaceLabel) { $spaceLabel = [string]$spaceEntry.slug }
+            $candidates = @((Get-Location).Path)
+            $navAliases = $null
+            if (Get-Command Get-P20NavAliases -ErrorAction SilentlyContinue) { $navAliases = Get-P20NavAliases }
+            if ($navAliases) {
+                foreach ($key in @($navAliases.Keys | Sort-Object)) {
+                    $entry = $navAliases[$key]
+                    $aliasPath = ''
+                    if ($entry -is [System.Collections.IDictionary]) { $aliasPath = [string]$entry['path'] }
+                    elseif ($entry -and $entry.PSObject.Properties['path']) { $aliasPath = [string]$entry.path }
+                    if ($aliasPath) { $candidates += $aliasPath }
+                }
+            }
+            $checkout = Resolve-P20SpaceCheckout -OrgUrl ([string]$spaceEntry.org) -Projects $spaceEntry.projects -Candidates $candidates
+            if ($checkout.Root) {
+                $docAt = Join-Path $checkout.Root ($docRel -replace '/', [IO.Path]::DirectorySeparatorChar)
+                if (-not (Test-Path -LiteralPath $docAt -PathType Leaf)) {
+                    Write-CliError -Message "-Doc $docRel does not exist in $($checkout.Repo), the $spaceLabel Space's repository, checked out at $($checkout.Root)." `
+                        -Hint 'The docs land first, in the Space''s repository; the spec completes after.'
+                    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+                }
+                Write-Host "Doc: $docRel in $($checkout.Repo) at $($checkout.Root)"
+            }
+            else {
+                Write-Host "Note: -Doc $docRel is taken as written, not checked: for the $spaceLabel Space, $($checkout.Reason)." -ForegroundColor Yellow
+            }
+        }
+        elseif (-not (Test-Path -LiteralPath (& $full $docRel) -PathType Leaf)) {
             Write-CliError -Message "-Doc $docRel does not exist in $where." `
                 -Hint 'The docs land first; the spec completes after.'
             exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
