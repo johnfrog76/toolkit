@@ -9,14 +9,9 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
-import {
-  CommentRegular,
-  DocumentTextRegular,
-  LightbulbRegular,
-  NotebookRegular,
-  OpenRegular,
-} from "@fluentui/react-icons";
-import { CardActions } from "../../shared/CardActions";
+import { CommentRegular, LightbulbRegular } from "@fluentui/react-icons";
+import { CardActions, ROW } from "../../shared/CardActions";
+import { trackerName } from "./TrackerBadge";
 import type { CardAction } from "../../shared/CardActions";
 import { CardSpinner } from "../../shared/CardSpinner";
 import { EmptyState } from "../../shared/EmptyState";
@@ -79,29 +74,23 @@ function DesignRow({ design }: { design: Design }) {
   const main = primaryDoc(design);
   const secondary: CardAction[] = [];
   if (design.spec && design.note) {
-    secondary.push({
-      icon: <NotebookRegular />,
-      label: "Open the note",
-      onClick: () => navigate(designDocPath(design.note!)),
-    });
+    secondary.push(
+      ROW.open.action({ detail: "the note", onClick: () => navigate(designDocPath(design.note!)) }),
+    );
   }
   if (design.thread_number) {
-    secondary.push({
-      icon: <CommentRegular />,
-      label: "Open the thread",
-      onClick: () =>
-        navigate(
-          `/issue/${design.thread_number}?repo=${encodeURIComponent(design.thread_repo.split("/")[1] ?? "")}`,
-        ),
-    });
+    secondary.push(
+      ROW.open.action({
+        detail: "the thread",
+        onClick: () =>
+          navigate(
+            `/issue/${design.thread_number}?repo=${encodeURIComponent(design.thread_repo.split("/")[1] ?? "")}`,
+          ),
+      }),
+    );
   }
   if (main?.url) {
-    secondary.push({
-      icon: <OpenRegular />,
-      label: "Open on GitHub",
-      href: main.url,
-      dividerBefore: secondary.length > 0,
-    });
+    secondary.push(ROW.external.action({ detail: trackerName("github"), href: main.url }));
   }
   return (
     <Card className={styles.row} size="small" appearance="outline">
@@ -113,11 +102,10 @@ function DesignRow({ design }: { design: Design }) {
         </div>
         {main ? (
           <CardActions
-            primaryAction={{
-              icon: <DocumentTextRegular />,
-              label: design.spec ? "Open the spec" : "Open the document",
+            primaryAction={ROW.open.action({
+              detail: design.spec ? "the spec" : "the document",
               onClick: () => navigate(designDocPath(main)),
-            }}
+            })}
             menuLabel={`Actions for ${design.title}`}
             secondaryActions={secondary}
           />

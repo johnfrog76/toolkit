@@ -124,7 +124,7 @@ export function PromptDetailPage() {
               {data.sprint !== "--" && (
                 <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>{data.sprint}</Caption1>
               )}
-              {/* With a cover: Replace cover, Add before, Remove cover (C2). */}
+              {/* With a cover: Replace cover, Add before, Delete the cover (C2). */}
               <AttachActions
                 filename={data.filename}
                 content={data.content}

@@ -125,8 +125,8 @@ Exits 0 on success and on "already there"; 2 (a stated refusal) on a missing
 title, a bad date, a training with no due date, or an unconfigured hub. Script:
 `Scripts/New-GrowthItem.ps1`.
 
-**`-Close <file>` retires an item**, from the terminal or the browser: *Retire* on
-a `Goals` card runs the same verb through the bridge (`POST /api/cmd/NewGrowth`,
+**`-Close <file>` retires an item**, from the terminal or the browser: *Archive* on
+a `Goals` row (the row vocabulary's word for the move to the archive; it said *Retire*) runs the same verb through the bridge (`POST /api/cmd/NewGrowth`,
 argv `buildGrowthCloseParams`) behind the house's one confirm
 (`shared/ConfirmDialog`). The item moves to `growth/archive/` and is stamped
 `**Closed:**` by the shared writer -- the module closes its own data, since
