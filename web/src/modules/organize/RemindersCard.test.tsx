@@ -1,3 +1,4 @@
+import { Input } from "@fluentui/react-components";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { RemindersCard } from "./RemindersCard";
@@ -128,6 +129,26 @@ describe("a reminder's ref", () => {
   });
 });
 
+// Fluent puts no size marker on an Input's root, only atomic style classes, so a
+// dialog's Input is compared with a bare default one: same classes, same size.
+function expectDefaultSizeInputs(dialog: HTMLElement) {
+  const probe = render(
+    <>
+      <Input data-testid="bare" />
+      <Input data-testid="off" disabled />
+    </>,
+  );
+  const classOf = (id: string) => (probe.getByTestId(id).parentElement as HTMLElement).className;
+  const [enabled, disabled] = [classOf("bare"), classOf("off")];
+  probe.unmount();
+  const inputs = Array.from(dialog.querySelectorAll<HTMLElement>(".fui-Input"));
+  expect(inputs.length).toBeGreaterThan(0);
+  for (const input of inputs) {
+    const off = input.querySelector("input")?.disabled;
+    expect(input.className).toBe(off ? disabled : enabled);
+  }
+}
+
 describe("the Ref field", () => {
   it("is in the New Reminder dialog, and what is typed there goes to NewReminder as -Ref", async () => {
     draw();
@@ -160,7 +181,37 @@ describe("the Ref field", () => {
     }
   });
 
-  it("is in the Edit dialog beside Source, filled in, and an emptied ref is sent as an empty -Ref", async () => {
+  it("keeps the Edit dialog's Source and Ref in the same column as What: a field each, not half a row", async () => {
+    items = [reminder("Q4TN", { ref: "41" })];
+    draw();
+    fireEvent.click(screen.getByRole("button", { name: "Actions for Reminder Q4TN" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Edit" }));
+    const dialog = await screen.findByRole("dialog");
+    const fieldOf = (name: RegExp) =>
+      within(dialog).getByRole("textbox", { name }).closest(".fui-Field") as HTMLElement;
+    const what = fieldOf(/What/);
+    for (const name of [/Source/, /Ref/]) {
+      expect(fieldOf(name).parentElement).toBe(what.parentElement);
+    }
+  });
+
+  it("draws every input in both reminder dialogs at the default size, like the app's other dialogs", async () => {
+    items = [reminder("Q4TN", { ref: "41" })];
+    draw();
+    fireEvent.click(screen.getByRole("button", { name: "New Reminder" }));
+    let dialog = await screen.findByRole("dialog");
+    expect(dialog.querySelectorAll(".fui-Input").length).toBeGreaterThan(0);
+    expectDefaultSizeInputs(dialog);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "Actions for Reminder Q4TN" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Edit" }));
+    dialog = await screen.findByRole("dialog");
+    expect(dialog.querySelectorAll(".fui-Input").length).toBeGreaterThan(0);
+    expectDefaultSizeInputs(dialog);
+  });
+
+  it("is in the Edit dialog, filled in, and an emptied ref is sent as an empty -Ref", async () => {
     items = [reminder("Q4TN", { ref: "41" })];
     draw();
     fireEvent.click(screen.getByRole("button", { name: "Actions for Reminder Q4TN" }));

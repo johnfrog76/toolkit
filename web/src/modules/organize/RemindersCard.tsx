@@ -416,46 +416,30 @@ export function RemindersCard() {
             <DialogContent>
               <div className={styles.fields}>
                 <Field label="What" required>
-                  <Input
-                    size="small"
-                    value={editTitle}
-                    onChange={(_, d) => setEditTitle(d.value)}
-                  />
+                  <Input value={editTitle} onChange={(_, d) => setEditTitle(d.value)} />
                 </Field>
                 {/* A date and an optional time, not one datetime input: a
                     reminder due on a DAY has no time, and one input would
                     have to invent one (reminderEntry.ts). */}
                 <div className={styles.pair}>
                   <Field label="Due date" hint="Empty for no due date.">
-                    <Input
-                      type="date"
-                      size="small"
-                      value={editDate}
-                      onChange={(_, d) => setEditDate(d.value)}
-                    />
+                    <Input type="date" value={editDate} onChange={(_, d) => setEditDate(d.value)} />
                   </Field>
                   <Field label="Time" hint="Optional. Local time.">
                     <Input
                       type="time"
-                      size="small"
                       value={editTime}
                       disabled={!editDate}
                       onChange={(_, d) => setEditTime(d.value)}
                     />
                   </Field>
                 </div>
-                <div className={styles.pair}>
-                  <Field label="Source" required hint="A tag, such as manual, ado or goal.">
-                    <Input
-                      size="small"
-                      value={editSource}
-                      onChange={(_, d) => setEditSource(d.value)}
-                    />
-                  </Field>
-                  <Field label="Ref" hint={`${REF_HINT} Empty for none.`}>
-                    <Input size="small" value={editRef} onChange={(_, d) => setEditRef(d.value)} />
-                  </Field>
-                </div>
+                <Field label="Source" required hint="A tag, such as manual, ado or goal.">
+                  <Input value={editSource} onChange={(_, d) => setEditSource(d.value)} />
+                </Field>
+                <Field label="Ref" hint={`${REF_HINT} Empty for none.`}>
+                  <Input value={editRef} onChange={(_, d) => setEditRef(d.value)} />
+                </Field>
                 {editMessage && (
                   <Caption1
                     role="alert"
