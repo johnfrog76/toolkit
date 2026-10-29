@@ -1,4 +1,8 @@
+import { AlertRegular, ArrowUploadRegular, MoneyRegular } from "@fluentui/react-icons";
+import { ROW, defineRowMoves } from "../../shared/CardActions";
+import type { RowMove } from "../../shared/CardActions";
 import { STATUS } from "../../shell/consts";
+import { trackerName } from "./TrackerBadge";
 import type { PromptInfo } from "./api.ado";
 import { LANES, legalMoves, whyNotAMove } from "./legalMoves";
 import type { Lane } from "./legalMoves";
@@ -14,7 +18,7 @@ import type { Lane } from "./legalMoves";
 // DevOps is in use at all (`/env` ado.enabled). And one rule over all three,
 // the one sendButton.ts draws:
 //
-//   absent    the action cannot apply to this card at all -- Open in ADO on a
+//   absent    the action cannot apply to this card at all -- Open on <tracker> on a
 //             card with no work item, every ADO action when ADO is off, Create
 //             PR on an archived card. Offering it wastes a click and teaches a
 //             person to distrust the menu.
@@ -49,8 +53,22 @@ import type { Lane } from "./legalMoves";
 
 export type CardActionId = "open-ado" | "open-card" | "move" | "billable" | "create-pr" | "remind";
 
+/** A card's own moves -- on no other record. Everything else on its menu is the
+ *  shared vocabulary (shared/CardActions ROW): Open the card, Move to <lane>,
+ *  Archive (move to Done), and Open on <tracker>. */
+export const CARD_MOVES = defineRowMoves("card", {
+  createPr: { word: "Create PR", icon: ArrowUploadRegular },
+  markNotBillable: { word: "Mark not billable", icon: MoneyRegular },
+  makeBillable: { word: "Make billable again", icon: MoneyRegular },
+  remind: { word: "Remind me about this", icon: AlertRegular },
+});
+
 export interface CardActionSpec {
   id: CardActionId;
+  /** The vocabulary entry, or the card's own move, this action is drawn from. */
+  move: RowMove;
+  /** The detail the move's word takes ("the card", "In Progress", "GitHub"). */
+  detail?: string;
   /** The lane, for a `move`. Done is the archive. */
   to?: Lane;
   label: string;
@@ -61,7 +79,7 @@ export interface CardActionSpec {
 }
 
 export interface CardActionPlan {
-  /** The flat button beside the menu -- the card's link into Azure DevOps. */
+  /** The flat button beside the menu -- Open the card, the one that goes somewhere in the app. */
   primary?: CardActionSpec;
   secondary: CardActionSpec[];
 }
@@ -86,11 +104,25 @@ export interface CardActionContext {
 }
 
 /** The organize module's item on a card's menu. */
-export const REMIND_LABEL = "Remind me about this";
+export const REMIND_LABEL = CARD_MOVES.remind.label();
+
+/** The billable toggle: the opposite of what the card says now. */
+function billableMove(card: Pick<PromptInfo, "billable">): RowMove {
+  return card.billable ? CARD_MOVES.markNotBillable : CARD_MOVES.makeBillable;
+}
 
 /** The billable toggle's words: the opposite of what the card says now. */
 export function billableActionLabel(card: Pick<PromptInfo, "billable">): string {
-  return card.billable ? "Mark not billable" : "Make billable again";
+  return billableMove(card).label();
+}
+
+/** One spec, its label drawn from the move it names. */
+function spec(
+  id: CardActionId,
+  move: RowMove,
+  rest: Omit<CardActionSpec, "id" | "move" | "label"> = {},
+): CardActionSpec {
+  return { id, move, label: move.label(rest.detail), ...rest };
 }
 
 /** The reason Create PR is not available yet -- "" when it is, or when it is absent. */
@@ -108,48 +140,45 @@ export function cardActions(card: ActionCard, ctx: CardActionContext): CardActio
   const ado = ctx.adoEnabled && card.linked && !!card.ado_url;
   const moves = legalMoves(card.status);
 
-  const lanes: CardActionSpec[] = LANES.filter((lane) => lane !== card.status).map((lane) =>
-    moves.includes(lane)
-      ? {
-          id: "move",
-          to: lane,
-          label: `Move to ${label(lane)}${lane === STATUS.done ? " (archive)" : ""}`,
-        }
-      : {
-          id: "move",
-          to: lane,
-          label: label(lane),
-          disabled: true,
-          whyNot: whyNotAMove(card.status, lane),
-        },
+  // Done is the archive: its lane is the archive move, in the vocabulary's
+  // word, with the org's name for the lane after it.
+  const lane = (to: Lane, rest: Omit<CardActionSpec, "id" | "move" | "label"> = {}) =>
+    to === STATUS.done
+      ? spec("move", ROW.archive, { to, detail: `(move to ${label(to)})`, ...rest })
+      : spec("move", ROW.move, { to, detail: label(to), ...rest });
+  const lanes: CardActionSpec[] = LANES.filter((to) => to !== card.status).map((to) =>
+    moves.includes(to)
+      ? lane(to)
+      : lane(to, { disabled: true, whyNot: whyNotAMove(card.status, to) }),
   );
 
   const secondary: CardActionSpec[] = [...lanes];
 
   if (ado && card.status !== STATUS.done) {
     const whyNot = whyNotCreatePR(card, ctx);
-    secondary.push({
-      id: "create-pr",
-      label: "Create PR",
-      ...(whyNot ? { disabled: true, whyNot } : {}),
-    });
+    secondary.push(
+      spec("create-pr", CARD_MOVES.createPr, whyNot ? { disabled: true, whyNot } : {}),
+    );
   }
-  secondary.push({ id: "billable", label: billableActionLabel(card) });
-  secondary.push({ id: "open-card", label: "Open the card" });
-  if (ctx.organize) secondary.push({ id: "remind", label: REMIND_LABEL });
+  secondary.push(spec("billable", billableMove(card)));
+  if (ctx.organize) secondary.push(spec("remind", CARD_MOVES.remind));
   // The lanes are one group, what you do WITH the card is the other.
   if (lanes.length > 0 && secondary.length > lanes.length) {
     secondary[lanes.length] = { ...secondary[lanes.length], dividerBefore: true };
   }
+  // The external link last, always (shared/CardActions draws its divider).
+  if (ado) {
+    secondary.push(
+      spec("open-ado", ROW.external, {
+        detail: trackerName(ctx.tracker) || trackerName("ado"),
+        href: card.ado_url!,
+      }),
+    );
+  }
 
   return {
-    primary: ado
-      ? {
-          id: "open-ado",
-          label: ctx.tracker === "github" ? "Open on GitHub" : "Open in ADO",
-          href: card.ado_url!,
-        }
-      : undefined,
+    // The one exposed action goes somewhere in the app: the card's own page.
+    primary: spec("open-card", ROW.open, { detail: "the card" }),
     secondary,
   };
 }

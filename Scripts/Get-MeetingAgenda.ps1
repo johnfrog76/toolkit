@@ -133,8 +133,8 @@ $cardWriterPath = Join-Path $PSScriptRoot 'Write-CardText.ps1'
 if (Test-Path $cardWriterPath) { . $cardWriterPath }
 
 $managerRoot = Join-Path $promptsRoot $managerFolder
-$currentDir = Join-Path $managerRoot 'current'
-$archiveDir = Join-Path $managerRoot 'archive'
+$currentDir = Join-Path $managerRoot ([string](Get-P20Consts).folders.current)
+$archiveDir = Join-Path $managerRoot ([string](Get-P20Consts).folders.archive)
 
 # -- The series -------------------------------------------------------------------
 # -Type IS the series (docs/hub/manager.md, "Where it lives"): a named recurring meeting

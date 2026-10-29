@@ -25,15 +25,10 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
-import {
-  AddRegular,
-  ArrowRightRegular,
-  DocumentSearchRegular,
-  InfoRegular,
-} from "@fluentui/react-icons";
+import { AddRegular, DocumentSearchRegular, InfoRegular } from "@fluentui/react-icons";
 import { useNavigate } from "react-router";
 import { DialogDismiss } from "../../shared/DialogDismiss";
-import { CardActions } from "../../shared/CardActions";
+import { CardActions, ROW, defineRowMoves } from "../../shared/CardActions";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { PageCard } from "../../shared/PageCard";
 import { CreateButton } from "../../shared/CreateButton";
@@ -54,6 +49,12 @@ import { EmptyState } from "../../shared/EmptyState";
 import { localToday, previousMonth } from "../../utility/dates";
 
 const PAGE_SIZE = 4;
+
+/** The resume's own moves, on no other record. */
+const RESUME_MOVES = defineRowMoves("resume", {
+  generate: { word: "Generate resume scaffold", icon: AddRegular },
+  howItWorks: { word: "How resume updates work", icon: InfoRegular },
+});
 
 function prevMonthStart(): string {
   return previousMonth().start;
@@ -201,14 +202,13 @@ function ReviewCard({ item, orgs }: { item: EngagementReviewItem; orgs: SpaceInf
           )}
         </div>
         <CardActions
-          primaryAction={{
-            icon: <ArrowRightRegular />,
-            label: "Open review",
+          primaryAction={ROW.open.action({
+            detail: "the review",
             onClick: () =>
               navigate(
                 `/review/${encodeURIComponent(folder)}?slugs=${encodeURIComponent(item.spaces.join("+"))}`,
               ),
-          }}
+          })}
         />
       </div>
     </Card>
@@ -275,27 +275,18 @@ function ResumeItemCard({ lastModified }: { lastModified: string }) {
               </Body1>
             </div>
           </div>
-          {/* The house row: the title is text, View resume the one
+          {/* The house row: the title is text, Open the resume the one
               exposed action, the rest in the menu. The scaffold and the
               how-to used to sit as two bare icons inside the title. */}
           <CardActions
-            primaryAction={{
-              icon: <ArrowRightRegular />,
-              label: "View resume",
+            primaryAction={ROW.open.action({
+              detail: "the resume",
               onClick: () => navigate("/skills"),
-            }}
+            })}
             menuLabel="Actions for the resume"
             secondaryActions={[
-              {
-                icon: <AddRegular />,
-                label: "Generate resume scaffold",
-                onClick: () => setGenerateOpen(true),
-              },
-              {
-                icon: <InfoRegular />,
-                label: "How resume updates work",
-                onClick: () => setInfoOpen(true),
-              },
+              RESUME_MOVES.generate.action({ onClick: () => setGenerateOpen(true) }),
+              RESUME_MOVES.howItWorks.action({ onClick: () => setInfoOpen(true) }),
             ]}
           />
         </div>

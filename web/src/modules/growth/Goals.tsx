@@ -22,10 +22,9 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
-import { ArchiveRegular, ArrowRightRegular } from "@fluentui/react-icons";
 import { RetireGoalDialog } from "./RetireGoal";
 import { DialogDismiss } from "../../shared/DialogDismiss";
-import { CardActions } from "../../shared/CardActions";
+import { CardActions, ROW } from "../../shared/CardActions";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { PageCard } from "../../shared/PageCard";
 import { CreateButton } from "../../shared/CreateButton";
@@ -156,19 +155,14 @@ function GoalCard({ item }: { item: GrowthItem }) {
           </div>
         </div>
         <CardActions
-          primaryAction={{
-            icon: <ArrowRightRegular />,
-            label: "View goal",
+          primaryAction={ROW.open.action({
+            detail: "the goal",
             onClick: () => navigate(`/growth/goals/${encodeURIComponent(item.filename)}`),
-          }}
+          })}
           menuLabel={`Actions for ${item.title}`}
-          secondaryActions={[
-            {
-              icon: <ArchiveRegular />,
-              label: "Retire",
-              onClick: () => setRetireOpen(true),
-            },
-          ]}
+          // Archive: the vocabulary's word for the move to the archive. The
+          // verb behind it is still `NewGrowth -Close`.
+          secondaryActions={[ROW.archive.action({ onClick: () => setRetireOpen(true) })]}
         />
       </div>
       <RetireGoalDialog

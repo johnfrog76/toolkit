@@ -68,7 +68,7 @@ GitHub Space, where they answer through `gh`.
 | --- | --- | --- |
 | CLI | twelve verbs and the work-item form of `NewPrompt` (below), the `Scripts/` they run, the tier check | `NewPrompt -Title`, `Archive`, `Billable`, `Status`, `Sync`, `ThreadHash` |
 | Agent | `ado/accounting.py` -- `/prs`, `/work-items`, `/dashboard`, `/dashboard/pipelines/{project}`; the identity those filter by | `ado/status.py`, `ado/reporting.py` (Daily, engagement), `ado/pr_comments.py` (reads files), `ado/bridge.py` |
-| Web | `MyWork`, `MyPRs`, `Dashboard`, the work-item tab of the New card dialog, *Open in ADO* and *Create PR* on a card, the repo filter, `ConnectAdoCard` | `Board`, `PromptStatus`, `PromptDetailPage`, `Billing` (Daily), `EnvCard`, `ConfigSettings` |
+| Web | `MyWork`, `MyPRs`, `Dashboard`, the work-item tab of the New card dialog, *Open on Azure DevOps* and *Create PR* on a card, the repo filter, `ConnectAdoCard` | `Board`, `PromptStatus`, `PromptDetailPage`, `Billing` (Daily), `EnvCard`, `ConfigSettings` |
 | A card | the `**ADO Link:**` line, the `PR URL:` line, the review rounds | everything else ([the card](../hub/cards.md)) |
 
 ## Turning it on
@@ -190,7 +190,7 @@ and `hub.json`), or the first `az` call that failed, as one sentence naming the 
 - **The New card dialog** -- a *From a work item* tab beside *New card*, and the default where ADO is
   reachable. Where ADO is not in use there are no tabs at all.
 - **On a card** -- an **ado** badge first in its meta line (a GitHub-born card wears **gh**, a custom card
-  nothing: the card model's `tracker`, from the card's own link), *Open in ADO*, *Create PR*, the project tag, and the repo filter (which matches on the
+  nothing: the card model's `tracker`, from the card's own link), *Open on Azure DevOps* (last in the menu), *Create PR*, the project tag, and the repo filter (which matches on the
   ADO link, so it hides every unlinked card and SAYS how many). The first two are ABSENT on a card with
   no work item, and on every card while ADO is off; *Create PR* is disabled, with the reason, until the
   card records a commit (`web/src/modules/ado/cardActions.ts`, [the web README](../../web/README.md#the-board)).

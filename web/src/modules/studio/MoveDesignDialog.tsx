@@ -17,6 +17,9 @@ import {
 } from "@fluentui/react-components";
 import { DialogDismiss } from "../../shared/DialogDismiss";
 import { buildMoveDesignParams, commandResultMessage } from "../ado/cliBridge";
+import { HatGraduationRegular } from "@fluentui/react-icons";
+import { ROW, defineRowMoves } from "../../shared/CardActions";
+import type { RowMove } from "../../shared/CardActions";
 import type { MoveDesignFields } from "../ado/cliBridge";
 import type { Design } from "../ado/api.ado";
 import { useRunMoveDesignMutation } from "./api.studio";
@@ -32,9 +35,22 @@ import { useRunMoveDesignMutation } from "./api.studio";
  *  the path the docs landed in; a graduation and a shipped archive nothing. */
 export type MoveRoad = "spec" | "shipped" | "dropped" | "complete";
 
+/** A hub design's own move: a graduation is on no other record. Its archives
+ *  and its completion are the vocabulary's (shared/CardActions ROW). */
+export const DESIGN_MOVES = defineRowMoves("design", {
+  graduate: { word: "Graduate to a spec", icon: HatGraduationRegular },
+});
+
+function road(move: RowMove, detail?: string) {
+  return { move, detail, label: move.label(detail) };
+}
+
 export const ROADS: Record<
   MoveRoad,
   {
+    /** The row-menu move this road is, and the detail its word takes. */
+    move: RowMove;
+    detail?: string;
     label: string;
     to: MoveDesignFields["to"];
     dropped?: boolean;
@@ -43,24 +59,24 @@ export const ROADS: Record<
   }
 > = {
   spec: {
-    label: "Graduate to a spec",
+    ...road(DESIGN_MOVES.graduate),
     to: "Spec",
     what: "Scaffold the spec beside the note, with the note's id, description and thread. The note stays in design/.",
   },
   shipped: {
-    label: "Archive as shipped",
+    ...road(ROW.archive, "as shipped"),
     to: "Archive",
     what: "Move the note to design/archive/ and stamp it Closed and shipped -- a design that shipped as written.",
   },
   dropped: {
-    label: "Drop",
+    ...road(ROW.archive, "as dropped"),
     to: "Archive",
     dropped: true,
     needs: "reason",
     what: "Move the note to design/archive/ and stamp it Closed and dropped. An idea that never made it is only worth keeping with why.",
   },
   complete: {
-    label: "Complete",
+    ...road(ROW.complete),
     to: "Complete",
     needs: "doc",
     what: "Move the spec to spec/archive/ and the note to design/archive/, stamp both Closed, and write where the docs landed into the spec.",
