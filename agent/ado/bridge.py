@@ -54,6 +54,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from ..core import config as _config
+from ..core import hub_sync
 from ..core.assets import remove_upload
 from ..core.config import ACTIVE_LEDGER_KEY, REPO_ROOT, TRACKER_WRITE_VERBS, load_config
 from ..core.hosts import NO_HOST_ERROR, host_argv, resolve_host
@@ -450,6 +451,11 @@ async def _run_command(name: str, req: CommandRequest | None = None):
     if name == "EditItem":
         # A pin may have changed; the Board's pinned set is read again.
         pinned_cache_clear()
+
+    # Any verb may have committed into a git hub (or, for Sync, pushed and
+    # pulled): the next /env reads the hub's ahead count again rather than
+    # serve the one held from before (core/hub_sync.py).
+    hub_sync.local_cache_clear()
 
     if result.returncode == 0:
         write_log("CMD", f"Agent/{name}", "ok")

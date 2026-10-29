@@ -34,6 +34,7 @@ import { ConfirmDialog } from "../../shared/ConfirmDialog";
 import { buildWorkReviewParams, commandResultMessage } from "../ado/cliBridge";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { PageCard } from "../../shared/PageCard";
+import { HubSyncLine } from "../ado/HubSyncLine";
 import { CreateButton } from "../../shared/CreateButton";
 import { Pagination } from "../../shared/Pagination";
 import { usePagination } from "../../hooks/usePagination";
@@ -713,6 +714,7 @@ export function ReviewArchive({ activeTag }: { activeTag?: string | null }) {
             }}
           />
         }
+        footNote={<HubSyncLine />}
       >
         {collection.length === 0 ? (
           isError ? (
