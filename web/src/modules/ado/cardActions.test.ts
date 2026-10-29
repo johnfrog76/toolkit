@@ -34,13 +34,17 @@ function shape(plan: CardActionPlan): { primary: string | null; menu: string[] }
   };
 }
 
-const CARD_ONLY = ["Mark not billable", "Open the card"];
+const CARD_ONLY = ["Mark not billable"];
+/** The one exposed action: the card's own page, on every card. */
+const OPEN = "Open the card";
+/** The external link, last, on a card with a work item while ADO is in use. */
+const EXTERNAL = "Open on Azure DevOps";
 
 const rows: Array<{
   name: string;
   card: ActionCard;
   adoEnabled: boolean;
-  primary: string | null;
+  primary: string;
   menu: string[];
 }> = [
   // --- an ADO card, ADO in use --------------------------------------------------
@@ -48,97 +52,104 @@ const rows: Array<{
     name: "ADO card, Active, nothing threaded",
     card: card("ado", "Active"),
     adoEnabled: true,
-    primary: "Open in ADO",
+    primary: OPEN,
     menu: [
       "Move to Backlog",
       "Move to In Progress",
       "Move to Code Review",
-      "Move to Done (archive)",
+      "Archive (move to Done)",
       `Create PR [x: ${NO_COMMITS}]`,
       ...CARD_ONLY,
+      EXTERNAL,
     ],
   },
   {
     name: "ADO card, In Progress with commits threaded",
     card: card("ado", "In Progress", { commits: 2 }),
     adoEnabled: true,
-    primary: "Open in ADO",
+    primary: OPEN,
     menu: [
-      `Backlog [x: ${THREADED}]`,
-      `Active [x: ${ONE_WAY}]`,
+      `Move to Backlog [x: ${THREADED}]`,
+      `Move to Active [x: ${ONE_WAY}]`,
       "Move to Code Review",
-      "Move to Done (archive)",
+      "Archive (move to Done)",
       "Create PR",
       ...CARD_ONLY,
+      EXTERNAL,
     ],
   },
   {
     name: "ADO card, In Progress by a person's Started line (no commit)",
     card: card("ado", "In Progress", { commits: 0 }),
     adoEnabled: true,
-    primary: "Open in ADO",
+    primary: OPEN,
     menu: [
-      `Backlog [x: ${THREADED}]`,
-      `Active [x: ${ONE_WAY}]`,
+      `Move to Backlog [x: ${THREADED}]`,
+      `Move to Active [x: ${ONE_WAY}]`,
       "Move to Code Review",
-      "Move to Done (archive)",
+      "Archive (move to Done)",
       `Create PR [x: ${NO_COMMITS}]`,
       ...CARD_ONLY,
+      EXTERNAL,
     ],
   },
   {
     name: "ADO card, Code Review with a pull request",
     card: card("ado", "Code Review", { commits: 1, pr_url: PR }),
     adoEnabled: true,
-    primary: "Open in ADO",
+    primary: OPEN,
     menu: [
-      `Backlog [x: ${THREADED}]`,
-      `Active [x: ${ONE_WAY}]`,
-      `In Progress [x: ${ONE_WAY}]`,
-      "Move to Done (archive)",
+      `Move to Backlog [x: ${THREADED}]`,
+      `Move to Active [x: ${ONE_WAY}]`,
+      `Move to In Progress [x: ${ONE_WAY}]`,
+      "Archive (move to Done)",
       `Create PR [x: ${HAS_PR}]`,
       ...CARD_ONLY,
+      EXTERNAL,
     ],
   },
   {
     name: "ADO card, Code Review by a person's Review line, commits threaded",
     card: card("ado", "Code Review", { commits: 3 }),
     adoEnabled: true,
-    primary: "Open in ADO",
+    primary: OPEN,
     menu: [
-      `Backlog [x: ${THREADED}]`,
-      `Active [x: ${ONE_WAY}]`,
-      `In Progress [x: ${ONE_WAY}]`,
-      "Move to Done (archive)",
+      `Move to Backlog [x: ${THREADED}]`,
+      `Move to Active [x: ${ONE_WAY}]`,
+      `Move to In Progress [x: ${ONE_WAY}]`,
+      "Archive (move to Done)",
       "Create PR",
       ...CARD_ONLY,
+      EXTERNAL,
     ],
   },
   {
     name: "ADO card, Done (archived): no PR, nothing ahead",
     card: card("ado", "Done", { commits: 1, pr_url: PR }),
     adoEnabled: true,
-    primary: "Open in ADO",
+    primary: OPEN,
     menu: [
-      `Backlog [x: ${ONE_WAY}]`,
-      `Active [x: ${ONE_WAY}]`,
-      `In Progress [x: ${ONE_WAY}]`,
-      `Code Review [x: ${ONE_WAY}]`,
+      `Move to Backlog [x: ${ONE_WAY}]`,
+      `Move to Active [x: ${ONE_WAY}]`,
+      `Move to In Progress [x: ${ONE_WAY}]`,
+      `Move to Code Review [x: ${ONE_WAY}]`,
       ...CARD_ONLY,
+      EXTERNAL,
     ],
   },
   {
     name: "ADO card, Backlog (planned): every lane ahead pulls it into play",
     card: card("ado", "Backlog"),
     adoEnabled: true,
-    primary: "Open in ADO",
+    primary: OPEN,
     menu: [
       "Move to Active",
       "Move to In Progress",
       "Move to Code Review",
-      "Move to Done (archive)",
+      "Archive (move to Done)",
       `Create PR [x: ${NO_COMMITS}]`,
       ...CARD_ONLY,
+      EXTERNAL,
     ],
   },
   // --- a card with no work item, ADO in use: no ADO action, ever ------------------
@@ -146,12 +157,12 @@ const rows: Array<{
     name: "non-ADO card, Active",
     card: card("local", "Active"),
     adoEnabled: true,
-    primary: null,
+    primary: OPEN,
     menu: [
       "Move to Backlog",
       "Move to In Progress",
       "Move to Code Review",
-      "Move to Done (archive)",
+      "Archive (move to Done)",
       ...CARD_ONLY,
     ],
   },
@@ -159,12 +170,12 @@ const rows: Array<{
     name: "non-ADO card, In Progress with a commit",
     card: card("local", "In Progress", { commits: 1 }),
     adoEnabled: true,
-    primary: null,
+    primary: OPEN,
     menu: [
-      `Backlog [x: ${THREADED}]`,
-      `Active [x: ${ONE_WAY}]`,
+      `Move to Backlog [x: ${THREADED}]`,
+      `Move to Active [x: ${ONE_WAY}]`,
       "Move to Code Review",
-      "Move to Done (archive)",
+      "Archive (move to Done)",
       ...CARD_ONLY,
     ],
   },
@@ -172,12 +183,12 @@ const rows: Array<{
     name: "non-ADO card, Code Review",
     card: card("local", "Code Review", { commits: 1 }),
     adoEnabled: true,
-    primary: null,
+    primary: OPEN,
     menu: [
-      `Backlog [x: ${THREADED}]`,
-      `Active [x: ${ONE_WAY}]`,
-      `In Progress [x: ${ONE_WAY}]`,
-      "Move to Done (archive)",
+      `Move to Backlog [x: ${THREADED}]`,
+      `Move to Active [x: ${ONE_WAY}]`,
+      `Move to In Progress [x: ${ONE_WAY}]`,
+      "Archive (move to Done)",
       ...CARD_ONLY,
     ],
   },
@@ -185,12 +196,12 @@ const rows: Array<{
     name: "non-ADO card, Done",
     card: card("local", "Done"),
     adoEnabled: true,
-    primary: null,
+    primary: OPEN,
     menu: [
-      `Backlog [x: ${ONE_WAY}]`,
-      `Active [x: ${ONE_WAY}]`,
-      `In Progress [x: ${ONE_WAY}]`,
-      `Code Review [x: ${ONE_WAY}]`,
+      `Move to Backlog [x: ${ONE_WAY}]`,
+      `Move to Active [x: ${ONE_WAY}]`,
+      `Move to In Progress [x: ${ONE_WAY}]`,
+      `Move to Code Review [x: ${ONE_WAY}]`,
       ...CARD_ONLY,
     ],
   },
@@ -198,12 +209,12 @@ const rows: Array<{
     name: "non-ADO card, Backlog",
     card: card("local", "Backlog"),
     adoEnabled: true,
-    primary: null,
+    primary: OPEN,
     menu: [
       "Move to Active",
       "Move to In Progress",
       "Move to Code Review",
-      "Move to Done (archive)",
+      "Archive (move to Done)",
       ...CARD_ONLY,
     ],
   },
@@ -212,12 +223,12 @@ const rows: Array<{
     name: "ADO card, Active, ADO off",
     card: card("ado", "Active"),
     adoEnabled: false,
-    primary: null,
+    primary: OPEN,
     menu: [
       "Move to Backlog",
       "Move to In Progress",
       "Move to Code Review",
-      "Move to Done (archive)",
+      "Archive (move to Done)",
       ...CARD_ONLY,
     ],
   },
@@ -225,12 +236,12 @@ const rows: Array<{
     name: "ADO card, In Progress with commits, ADO off",
     card: card("ado", "In Progress", { commits: 2 }),
     adoEnabled: false,
-    primary: null,
+    primary: OPEN,
     menu: [
-      `Backlog [x: ${THREADED}]`,
-      `Active [x: ${ONE_WAY}]`,
+      `Move to Backlog [x: ${THREADED}]`,
+      `Move to Active [x: ${ONE_WAY}]`,
       "Move to Code Review",
-      "Move to Done (archive)",
+      "Archive (move to Done)",
       ...CARD_ONLY,
     ],
   },
@@ -238,12 +249,12 @@ const rows: Array<{
     name: "ADO card, Code Review with a PR, ADO off",
     card: card("ado", "Code Review", { commits: 1, pr_url: PR }),
     adoEnabled: false,
-    primary: null,
+    primary: OPEN,
     menu: [
-      `Backlog [x: ${THREADED}]`,
-      `Active [x: ${ONE_WAY}]`,
-      `In Progress [x: ${ONE_WAY}]`,
-      "Move to Done (archive)",
+      `Move to Backlog [x: ${THREADED}]`,
+      `Move to Active [x: ${ONE_WAY}]`,
+      `Move to In Progress [x: ${ONE_WAY}]`,
+      "Archive (move to Done)",
       ...CARD_ONLY,
     ],
   },
@@ -251,12 +262,12 @@ const rows: Array<{
     name: "ADO card, Done, ADO off",
     card: card("ado", "Done", { commits: 1, pr_url: PR }),
     adoEnabled: false,
-    primary: null,
+    primary: OPEN,
     menu: [
-      `Backlog [x: ${ONE_WAY}]`,
-      `Active [x: ${ONE_WAY}]`,
-      `In Progress [x: ${ONE_WAY}]`,
-      `Code Review [x: ${ONE_WAY}]`,
+      `Move to Backlog [x: ${ONE_WAY}]`,
+      `Move to Active [x: ${ONE_WAY}]`,
+      `Move to In Progress [x: ${ONE_WAY}]`,
+      `Move to Code Review [x: ${ONE_WAY}]`,
       ...CARD_ONLY,
     ],
   },
@@ -264,12 +275,12 @@ const rows: Array<{
     name: "non-ADO card, Active, ADO off",
     card: card("local", "Active"),
     adoEnabled: false,
-    primary: null,
+    primary: OPEN,
     menu: [
       "Move to Backlog",
       "Move to In Progress",
       "Move to Code Review",
-      "Move to Done (archive)",
+      "Archive (move to Done)",
       ...CARD_ONLY,
     ],
   },
@@ -277,12 +288,12 @@ const rows: Array<{
     name: "non-ADO card, In Progress, ADO off",
     card: card("local", "In Progress", { commits: 1 }),
     adoEnabled: false,
-    primary: null,
+    primary: OPEN,
     menu: [
-      `Backlog [x: ${THREADED}]`,
-      `Active [x: ${ONE_WAY}]`,
+      `Move to Backlog [x: ${THREADED}]`,
+      `Move to Active [x: ${ONE_WAY}]`,
       "Move to Code Review",
-      "Move to Done (archive)",
+      "Archive (move to Done)",
       ...CARD_ONLY,
     ],
   },
@@ -290,12 +301,12 @@ const rows: Array<{
     name: "non-ADO card, Code Review, ADO off",
     card: card("local", "Code Review", { commits: 1 }),
     adoEnabled: false,
-    primary: null,
+    primary: OPEN,
     menu: [
-      `Backlog [x: ${THREADED}]`,
-      `Active [x: ${ONE_WAY}]`,
-      `In Progress [x: ${ONE_WAY}]`,
-      "Move to Done (archive)",
+      `Move to Backlog [x: ${THREADED}]`,
+      `Move to Active [x: ${ONE_WAY}]`,
+      `Move to In Progress [x: ${ONE_WAY}]`,
+      "Archive (move to Done)",
       ...CARD_ONLY,
     ],
   },
@@ -323,7 +334,7 @@ describe("cardActions -- one action model for a card, in every view", () => {
     expect(pr?.whyNot).toMatch(/p20ThreadHash/);
   });
 
-  it("the lanes use the org's own words, and the primary links to the work item", () => {
+  it("the lanes use the org's own words, the primary opens the card, the link out is last", () => {
     const plan = cardActions(card("ado", "Active"), {
       adoEnabled: true,
       cliPrefix: "tk",
@@ -334,7 +345,18 @@ describe("cardActions -- one action model for a card, in every view", () => {
       to: "In Progress",
       label: "Move to Doing",
     });
-    expect(plan.primary).toMatchObject({ id: "open-ado", href: ADO_URL });
+    expect(plan.primary).toMatchObject({ id: "open-card", label: "Open the card" });
+    expect(plan.secondary[plan.secondary.length - 1]).toMatchObject({
+      id: "open-ado",
+      href: ADO_URL,
+      label: "Open on Azure DevOps",
+    });
+    const gh = cardActions(card("ado", "Active"), {
+      adoEnabled: true,
+      cliPrefix: "tk",
+      tracker: "github",
+    });
+    expect(gh.secondary[gh.secondary.length - 1].label).toBe("Open on GitHub");
   });
 
   it("the lanes are one group, what you do with the card another", () => {
@@ -363,11 +385,12 @@ describe("cardActions -- one action model for a card, in every view", () => {
     expect(older("In Progress")?.disabled).toBeUndefined();
   });
 
-  it("offers Remind me about this, last, only while the organize module is on", () => {
+  it("offers Remind me about this, last of the card's own moves, only while the organize module is on", () => {
     for (const kind of ["ado", "local"] as const) {
       const ctx = { adoEnabled: true, cliPrefix: "tk" };
-      const off = cardActions(card(kind, "Active"), ctx).secondary.map((a) => a.id);
-      const on = cardActions(card(kind, "Active"), { ...ctx, organize: true }).secondary;
+      const own = (plan: CardActionPlan) => plan.secondary.filter((a) => a.id !== "open-ado");
+      const off = own(cardActions(card(kind, "Active"), ctx)).map((a) => a.id);
+      const on = own(cardActions(card(kind, "Active"), { ...ctx, organize: true }));
       expect(off).not.toContain("remind");
       expect(on[on.length - 1]).toMatchObject({ id: "remind", label: "Remind me about this" });
       expect(on.slice(0, -1).map((a) => a.id)).toEqual(off);

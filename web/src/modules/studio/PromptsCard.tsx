@@ -10,13 +10,8 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
-import {
-  CopyRegular,
-  DocumentTextRegular,
-  OpenRegular,
-  SparkleRegular,
-} from "@fluentui/react-icons";
-import { CardActions } from "../../shared/CardActions";
+import { SparkleRegular } from "@fluentui/react-icons";
+import { CardActions, ROW } from "../../shared/CardActions";
 import type { CardAction } from "../../shared/CardActions";
 import { CardSpinner } from "../../shared/CardSpinner";
 import { copyText } from "../../shared/copyText";
@@ -128,9 +123,8 @@ function PromptCardRow({
   const [readPrompt] = useLazyGetPromptQuery();
   const open = () => navigate(promptPath(row.ref));
   const secondary: CardAction[] = [
-    {
-      icon: <CopyRegular />,
-      label: "Copy prompt",
+    ROW.copy.action({
+      detail: "prompt",
       // The list carries no text: the body is read now, by the one-prompt
       // route, and copied when it arrives.
       onClick: () => {
@@ -142,16 +136,12 @@ function PromptCardRow({
           .catch(() => onCopied({ name: row.name, what: "failed" }))
           .finally(() => onReading(null));
       },
-    },
-    { icon: <DocumentTextRegular />, label: "Open the prompt", onClick: open },
+    }),
+    ROW.open.action({ detail: "the prompt", onClick: open }),
   ];
   if (row.history) {
-    secondary.push({
-      icon: <OpenRegular />,
-      label: "Its history on GitHub",
-      href: row.history,
-      dividerBefore: true,
-    });
+    // Its history: the folder's log on GitHub, the external link, last.
+    secondary.push(ROW.external.action({ detail: "GitHub", href: row.history }));
   }
   return (
     <Card className={styles.row} size="small" appearance="outline">
@@ -162,15 +152,14 @@ function PromptCardRow({
           </Body1>
         </Link>
         <CardActions
-          primaryAction={{
-            icon: <CopyRegular />,
-            label: "Copy reference",
+          primaryAction={ROW.copy.action({
+            detail: "reference",
             onClick: () => {
               void copyText(promptReference(row)).then(() =>
                 onCopied({ name: row.name, what: "reference" }),
               );
             },
-          }}
+          })}
           menuLabel={`Actions for ${row.name}`}
           secondaryActions={secondary}
         />

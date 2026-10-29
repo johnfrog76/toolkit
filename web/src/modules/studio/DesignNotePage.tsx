@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useParams } from "react-router";
 import { Badge, Button, Caption1, Subtitle2, makeStyles, tokens } from "@fluentui/react-components";
 import { CommentRegular, LightbulbRegular, ShareRegular } from "@fluentui/react-icons";
-import { CardActions } from "../../shared/CardActions";
+import { CardActions, defineRowMoves } from "../../shared/CardActions";
 import { ConfirmDialog } from "../../shared/ConfirmDialog";
 import { StatusMessage } from "../../shared/StatusMessage";
 import { STUDIO } from "../../shell/consts";
@@ -35,6 +35,11 @@ import { noteLinkBase } from "./noteLinks";
  *  NewItem), so that Space must be GitHub (D-S9) and, when the note names a
  *  Space, must be that one. The verb holds the same two rules; this says them
  *  before the click. */
+/** A design note's own move: Promote opens its thread on the tracker. */
+const NOTE_MOVES = defineRowMoves("design", {
+  promote: { word: "Promote", icon: ShareRegular },
+});
+
 export function promoteBlocked(
   note: Pick<DesignNote, "space" | "thread">,
   env: EnvStatus | undefined,
@@ -183,13 +188,11 @@ export function DesignNotePage() {
                 />
               ) : isLiveNote ? (
                 <CardActions
-                  primaryAction={{
-                    icon: <ShareRegular />,
-                    label: "Promote",
+                  primaryAction={NOTE_MOVES.promote.action({
                     onClick: () => setConfirming(true),
                     disabled: !!promoteBlocked(data, env) || promoting,
                     whyNot: promoteBlocked(data, env) ?? undefined,
-                  }}
+                  })}
                 />
               ) : null}
               <RefreshButton onClick={refetch} isFetching={isFetching} />
