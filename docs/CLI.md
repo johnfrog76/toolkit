@@ -956,6 +956,24 @@ unchanged -- the first `ThreadHash` pulls it into `current/`.
   A dated file such as the `2026-05-14-PR141415.prompt.md` the PR-comment flow writes into
   `archive/`, or a slug that merely contains a year, is not a card -- reading the first run of digits
   in any name would take a date for an id.
+- **A card's full path is that card, whichever Space is active.** `Move`, `Plan`, `Billable`, `Cover`
+  and `Archive` -- the verbs whose usage says `<id|file>` -- also take a path to the card file
+  (absolute, or relative to where you stand), and act on that file in the Space its path names:
+  `tkMove <hub>/<space>/backlog/TaskK7M2-....prompt.md -To Active` works with any other Space active,
+  and the card moves between that Space's `backlog/`, `current/` and `archive/`, never the active
+  one's. Before this the folders of the active Space were the only ones searched, and the same
+  command was refused with `No card matching '<path>'`. A path counts only when it carries a
+  directory separator, names a file that exists, and sits in a folder of the kind the verb reads
+  (`Move` reads `current/` and `backlog/`, so a path into `archive/` is still refused) **inside the
+  hub** -- under the resolved `promptsRoot`, compared whole folder by whole folder (so
+  `<hub>-other/` is not inside `<hub>/`), ignoring case on Windows only. A folder elsewhere on disk
+  that happens to be called `current/` or `backlog/` is not a Space's, and a path into one is refused
+  with `No card matching` like any other: `Archive` never moves or stages a file the hub does not
+  hold. Nothing else
+  is loosened: an id is still read as an id in the active Space only, a bare filename or partial
+  name is matched exactly as before, and a partial name still refuses a non-interactive caller.
+  `ThreadHash`, `NewPR` and `PublishPR` already took a path. The other card verbs (`StartWork`,
+  `Route`, `Reminders`) still read the active Space: set `P20_ACTIVE_SPACE` for the shell to act in another one.
 - The fields a card would have got from ADO say so: `**Sprint:** (not linked)` and
   `**ADO Link:** (not linked -- created offline with -Title)`. Fill them in by hand if the work
   later gets a card; nothing reconciles them for you.

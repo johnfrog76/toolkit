@@ -178,6 +178,29 @@ function Test-P20IsCardId {
     return [bool]([regex]::IsMatch($Argument.Trim().ToUpperInvariant(), '^(?:' + (Get-P20CardIdShape) + ')$'))
 }
 
+function Test-P20PathInside {
+    <#
+        Is -Path strictly inside -Root? Whole path segments, not a string
+        prefix: ~/Repos/toolkit-hub is not inside ~/Repos/toolkit, one character
+        short of a separator (the trap Start-Toolkit.ps1 names). Both sides are
+        made absolute first, so a relative or a `..` spelling cannot step out.
+        Case is ignored on Windows and kept elsewhere -- the rule Start-Agent's
+        Test-SameHub applies to the same question about a hub path. An empty
+        root contains nothing.
+    #>
+    param([AllowEmptyString()][string]$Path, [AllowEmptyString()][string]$Root)
+    if (-not $Path -or -not $Root) { return $false }
+    try {
+        $full = [System.IO.Path]::GetFullPath($Path)
+        $base = [System.IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+    }
+    catch { return $false }
+    $isWin = ([System.IO.Path]::DirectorySeparatorChar -eq [char]92)
+    if ($isWin) { $full = $full.Replace('/', '\'); $base = $base.Replace('/', '\') }
+    $cmp = if ($isWin) { [System.StringComparison]::OrdinalIgnoreCase } else { [System.StringComparison]::Ordinal }
+    return $full.StartsWith($base + [System.IO.Path]::DirectorySeparatorChar, $cmp)
+}
+
 function Resolve-P20CardArgument {
     <#
         The one way a verb turns what a person typed into a card.
@@ -198,14 +221,47 @@ function Resolve-P20CardArgument {
         the same rule `Move K7M2 -To InProgress` finds a current one. A match in
         more than one folder is returned as more than one match -- the caller's
         "matches N cards" refusal, never a guess.
+
+        -AllowPath adds a third reading, for the verbs whose usage says
+        <id|file>:
+
+          a path   -> an argument that is NOT an id, carries a directory
+                      separator, names a file that exists (resolved against
+                      the current location), and sits in a folder of the same
+                      KIND as one the verb named -- its folder's leaf is the
+                      leaf of one of -Folder (current/, backlog/, archive/).
+                      That file, exactly (IsPath = $true). The path already
+                      says which Space the card is in, so the active Space's
+                      folders are not searched: a full path into another
+                      Space works whichever one is active.
+
+        It loosens nothing. An id is decided first and never reaches it. A
+        filename has no separator in it, so before this reading existed an
+        argument with one could match nothing at all -- no exact name, no
+        partial name -- and an argument without one is read exactly as it
+        always was. And the folder KIND is kept: a verb that asked for
+        current/ and backlog/ is not handed a card in archive/ by its path.
+        Off by default, because some callers read a folder of their own
+        whose leaf is also current/ (Reminders) or act on the active
+        Space's tracker (Route, StartWork): for them a path into another
+        Space would be the wrong card or the wrong Space.
+
+        And the path must be INSIDE the hub (-PromptsRoot, the verb's resolved
+        promptsRoot; Get-P20PromptsRoot when the caller passes none). A folder's
+        leaf name alone is not a hub: some unrelated ~/notes/current/ would
+        otherwise pass, and Archive would then stage a file this tool does not
+        own. Outside the hub, or with no hub to measure against, a path matches
+        nothing -- the same answer as a path in no card folder.
     #>
     param(
         [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Argument,
         [Parameter(Mandatory = $true)][AllowEmptyString()][AllowEmptyCollection()][AllowNull()][string[]]$Folder,
-        [hashtable]$WorkItemTypes
+        [hashtable]$WorkItemTypes,
+        [switch]$AllowPath,
+        [string]$PromptsRoot = ''
     )
 
-    $result = @{ Match = @(); IsId = $false; Fuzzy = $false }
+    $result = @{ Match = @(); IsId = $false; Fuzzy = $false; IsPath = $false }
     $candidates = @()
     foreach ($one in @($Folder)) {
         if ($one -and (Test-Path -LiteralPath $one)) {
@@ -221,6 +277,23 @@ function Resolve-P20CardArgument {
                 $cardId = Get-P20CardId -Name $_.Name -Pattern $pattern
                 ($null -ne $cardId) -and [string]::Equals($cardId, $wanted, [System.StringComparison]::OrdinalIgnoreCase)
             })
+        return $result
+    }
+    if ($AllowPath -and $Argument -match '[\\/]' -and (Test-Path -LiteralPath $Argument -PathType Leaf)) {
+        $item = Get-Item -LiteralPath $Argument -ErrorAction SilentlyContinue
+        if ($item) {
+            $kinds = @(@($Folder) | Where-Object { $_ } | ForEach-Object { Split-Path ($_.TrimEnd('/', '\')) -Leaf })
+            $leaf = Split-Path $item.DirectoryName -Leaf
+            $sameKind = @($kinds | Where-Object { [string]::Equals($_, $leaf, [System.StringComparison]::OrdinalIgnoreCase) })
+            $hub = $PromptsRoot
+            if (-not $hub -and (Get-Command Get-P20PromptsRoot -ErrorAction SilentlyContinue)) { $hub = Get-P20PromptsRoot }
+            if ($sameKind.Count -gt 0 -and (Test-P20PathInside -Path $item.FullName -Root $hub)) {
+                $result.Match = @($item)
+                $result.IsPath = $true
+            }
+        }
+        # A path that exists but sits in no folder the verb named matches
+        # nothing: it does not fall to a partial name.
         return $result
     }
     $exact = @($candidates | Where-Object { $_.Name -eq $Argument })
