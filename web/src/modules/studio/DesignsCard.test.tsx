@@ -570,19 +570,15 @@ describe("the Designs card's moves (L3)", () => {
     return (await screen.findAllByRole("menuitem")).map((m) => m.textContent);
   };
 
-  it("a note alone offers Graduate, Archive as shipped and Drop; a design with a live spec offers Complete; the archive nothing", async () => {
+  it("a note alone offers Graduate, Archive as shipped and Archive as dropped; a design with a live spec offers Complete; the archive nothing", async () => {
     mount();
     expect(await menuOf("Offline specs")).toEqual([
       "Graduate to a spec",
       "Archive as shipped",
-      "Drop",
+      "Archive as dropped",
     ]);
     fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
-    expect(await menuOf("Board ideas")).toEqual([
-      "Open the spec",
-      "Complete",
-      "Open the thread on GitHub",
-    ]);
+    expect(await menuOf("Board ideas")).toEqual(["Open the spec", "Complete", "Open on GitHub"]);
     fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
     fireEvent.click(screen.getByRole("button", { name: "Show Complete" }));
     expect(screen.queryByRole("button", { name: "Actions for Built (spec)" })).toBeNull();
@@ -604,14 +600,14 @@ describe("the Designs card's moves (L3)", () => {
   it("a drop asks for its reason first, and sends -Dropped with it", async () => {
     mount();
     await menuOf("Offline specs");
-    fireEvent.click(screen.getByRole("menuitem", { name: "Drop" }));
-    const go = screen.getByRole("button", { name: "Drop" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Archive as dropped" }));
+    const go = screen.getByRole("button", { name: "Archive as dropped" });
     expect(go.hasAttribute("disabled")).toBe(true);
     fireEvent.change(screen.getByRole("textbox", { name: /Why it never made it/ }), {
       target: { value: " The Lounge already does this " },
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Drop" }));
+      fireEvent.click(screen.getByRole("button", { name: "Archive as dropped" }));
     });
     expect(movedWith).toEqual([
       [
