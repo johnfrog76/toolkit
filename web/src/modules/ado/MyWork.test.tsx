@@ -120,7 +120,9 @@ describe("an Issues row", () => {
     tracker = "ado";
     mount();
     expect(screen.queryByRole("button", { name: "Open the issue" })).toBeNull();
-    expect(screen.getByRole("link", { name: "Open in ADO" }).getAttribute("href")).toBe(ITEM.url);
+    expect(screen.getByRole("link", { name: "Open on Azure DevOps" }).getAttribute("href")).toBe(
+      ITEM.url,
+    );
   });
 });
 

@@ -1003,7 +1003,7 @@ describe("the scenario grid: a card's menu, by the Organize flag", () => {
     [
       "organize off",
       env({ status: "local", tier: 3, tracker: "none", features: {} }),
-      "Open the card",
+      "Mark not billable",
     ],
     [
       "organize on",

@@ -12,11 +12,16 @@ release.
 
 - `NewPrompt -Title ... -Description <text>` fills a new card's Context or Summary with that text instead of leaving it `(TBD)`; the New ToolKit Card dialog has a matching description field.
 
+### Changed
+
+- Every list's row menu now uses one vocabulary: the same move has the same word, icon and tooltip on every page, and the link out is always last, reading "Open on GitHub" or "Open on Azure DevOps" behind one icon. A goal's Retire, a reminder's Done and a card's Move to Done now read Archive, a design's two archives read Archive as shipped and Archive as dropped, a card's exposed action opens the card, and Remove cover reads Delete the cover.
+
 ### Fixed
 
 - The Reference field in the New Reminder dialog is now as wide as the other fields, instead of sharing a half-width row with Source.
 - The Edit Reminder dialog's Source and Reference fields are full width too, like the New Reminder dialog's, and the fields in both reminder dialogs are the same size as the rest of the app's.
 - The New ToolKit Card dialog no longer claims a custom card "is in play as soon as it is made" -- it now says the card starts in the Backlog, which is where `NewPrompt` actually puts it unless `-Now` is given.
+- The test suite's check for a raw, unredirected `git`/`gh`/`az` call now catches one written inside a double-quoted string's `$(...)`, a shape it previously missed entirely; the handful of real call sites it found this way now go through the same safe helper as the rest of the CLI.
 
 ## [1.5.0] - 2026-10-26
 

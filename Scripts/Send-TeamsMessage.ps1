@@ -252,7 +252,7 @@ switch ($result.status) {
             $sessionPath = $Session
             if (-not (Test-Path -LiteralPath $sessionPath)) {
                 $managerDir = Get-P20HubFolder -Name 'manager' -PromptsRoot (Get-P20PromptsRoot -PackageRoot $repoRoot) -PackageRoot $repoRoot
-                $sessionPath = Join-Path (Join-Path $managerDir 'current') ([System.IO.Path]::GetFileName($Session))
+                $sessionPath = Join-Path (Join-Path $managerDir ([string]$script:SendConsts.folders.current)) ([System.IO.Path]::GetFileName($Session))
             }
             if (Test-Path -LiteralPath $sessionPath) {
                 Add-P20SentLine -Path $sessionPath -Recipient $Recipient -Date (Get-Date -Format 'yyyy-MM-dd')

@@ -199,7 +199,7 @@ A card can carry a picture: a screen snap of what was wrong (`**Before:**`) and 
 - With `storeSync: git`, `Cover` commits the picture and the card together, the way `Archive` commits a move.
 - `Repair-CardLinks` is not involved: the path is inside the hub and does not move with the package.
 - **From the browser, the same writer** (C2). The card page's drop zone, the header's Replace cover /
-  Add before / Remove cover, and the + dialog's picture field all go one way: the bytes to
+  Add before / Delete the cover, and the + dialog's picture field all go one way: the bytes to
   `POST /api/assets/upload`, which puts them in a temp file under the system temp folder and answers its
   path, writing nothing into the hub; then `Cover <card> <path>` (or `NewPrompt -Cover` / `-Before <path>`)
   through the bridge, which copies the file into `assets/<card key>/` and writes the line, after which the bridge removes the upload's temp folder (success or failure; and the agent sweeps any a day old at start). The route
