@@ -269,6 +269,53 @@ config file, and a build that asked for the port would refuse.
   it, so a hub kept in sync across two machines needs no per-machine switch. The order is the orgs'
   order -- `config.default.json`, then the hub's `hub.json`, then `config.local.json` -- so a
   machine that must never push sets `none` here and leaves the hub alone.
+  Under `git` the web app syncs too: [Syncing the hub from the web app](#syncing-the-hub-from-the-web-app).
+
+## Syncing the hub from the web app
+
+Under `storeSync: git` every write the web app makes into the hub is already a commit, the same as
+the command line's, and the one step left is the push and the pull -- `{prefix}Sync`. The web app takes
+that step with the same verb, and says how far the hub is from its remote. Two states, the inventory's
+`storeSync` row (`{prefix}Env`, "Optional surfaces"): **on** for `git`, **off** for anything else. There
+is no "not configured": the shipped config answers `none`.
+
+**The System page's Environment card** has a **Store sync** row, whose Change link opens the setting.
+
+- **on** (`git`): the row says how far the hub is from its remote, and **Sync the hub** runs the `Sync`
+  verb through the bridge (`POST /api/cmd/Sync`) and shows what the verb printed, in its own words --
+  what was pulled and pushed, or its refusal when the pull conflicts or the remote cannot be reached. A
+  conflict is not resolved from the browser: the verb aborts the rebase and leaves the hub as it was, and
+  the terminal resolves it.
+- **off** (`none`): the row says the hub syncs by whatever carries its folder -- a synced drive, a
+  share -- and draws no button and no numbers.
+
+**Ahead and behind are not known the same way.**
+
+- **Ahead** is local -- the commits this clone has that its remote-tracking branch does not -- and needs
+  no network. `/api/env` reports it in `hubSync.ahead`, read by `Scripts/Get-HubSyncState.ps1` and held
+  for 45 seconds, the tier probe's window; the bridge forgets it after any verb runs, so a write is
+  counted on the next read.
+- **Behind** is known only after a `git fetch`, so it is always shown with the time of that fetch:
+  `behind by 2, checked 10:42`. Before the first fetch the card says **not checked against the remote
+  yet** -- never "in step", which only a fetch can say. A fetch happens in two places and nowhere else:
+  **once when the System page opens**, and **as part of Sync the hub**. Nothing fetches on a timer.
+  The fetch is `POST /api/hub-sync/check` (`?refresh=1` from Sync the hub); a second opening inside 45
+  seconds of the last fetch is answered from it.
+- **A failed fetch keeps what was known.** The last count and its time stay on screen, and the card says
+  the latest check failed, with git's own sentence -- a remote unreachable for a minute does not wipe a
+  count that was true a minute ago.
+
+Every git call this makes is the CLI half's -- `Scripts/Get-HubSyncState.ps1`, through
+`Invoke-P20TrackerRead` -- so it reads the same on Windows PowerShell 5.1 as on 7. The hub must be the
+root of its repository, the same question `Sync` asks before it writes; a hub with no upstream branch
+says so in git's words.
+
+**The foot line.** The cards that write into the hub -- the Studio's **Spaces** and **Hub Designs**,
+**Reminders**, and the **Reviews** -- draw one shared line at their foot while the hub is ahead or
+behind, or has not been checked, or its last check failed: `The hub is ahead by 1 and behind by 2,
+checked 10:42. Sync on the System page`. It is absent under any `storeSync` but `git`, and absent once a
+fetch has found the hub in step. It only **reads** the state `/api/env` already carries; it never asks
+for a fetch of its own.
 
 ## `spaces[].features.trainingHoursPerQuarter` -- the quarter's training requirement
 

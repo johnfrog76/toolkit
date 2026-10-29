@@ -8,6 +8,10 @@ release.
 
 ## [Unreleased]
 
+### Added
+
+- When your hub's store sync is git, the System page's Environment card has **Sync the hub**, which pulls and pushes and shows the sync command's own answer, and says how far the hub is ahead of or behind its remote, with the time it last checked; the Spaces, Hub Designs, Reminders and Reviews cards say so in a line at their foot while the hub is out of step.
+
 ### Fixed
 
 - The Reference field in the New Reminder dialog is now as wide as the other fields, instead of sharing a half-width row with Source.

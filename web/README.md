@@ -482,6 +482,10 @@ defect, not a style question. What the pass settled, beside the intro lines and 
 - **The settings and system surfaces.** The Environment card names the hub and its cards
   (**Hub folder**, **Hub is writable**, **Hub git history**, **Settings files**, **Cards in this Space**), and its tracker row wears the Space's tracker
   (**GitHub**, **Azure DevOps**, or **Tracker** on a Space with none);
+  its **Store sync** row is `HubSyncRow.tsx` -- under `git`, ahead and behind and **Sync the hub**, one
+  fetch when the page opens; under `none`, what carries the folder -- and the cards that write into the
+  hub share one foot line, `HubSyncLine.tsx`, through `PageCard`'s `footNote`, both worded by `hubSync.ts`
+  (`docs/CONFIGURATION.md`, "Syncing the hub from the web app");
   its badge's sentence names the tracker too ("this Space's GitHub answered", never "az CLI, and ADO" on gh;
   `envBadge.ts`, shared with the Build card). The drawer's Configuration says "the Space you are working
   in", not "the active org"; the Space's address is the **Tracker address**, its status hint names both trackers, and sprint awareness speaks of a

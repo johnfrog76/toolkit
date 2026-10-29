@@ -36,6 +36,7 @@ import { DialogDismiss } from "../../shared/DialogDismiss";
 import { CardActions } from "../../shared/CardActions";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { PageCard } from "../../shared/PageCard";
+import { HubSyncLine } from "../ado/HubSyncLine";
 import { CreateButton } from "../../shared/CreateButton";
 import { Pagination } from "../../shared/Pagination";
 import { usePagination } from "../../hooks/usePagination";
@@ -613,6 +614,7 @@ export function ReviewArchive({ activeTag }: { activeTag?: string | null }) {
             }}
           />
         }
+        footNote={<HubSyncLine />}
       >
         {collection.length === 0 ? (
           isError ? (

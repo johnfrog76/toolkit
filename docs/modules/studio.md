@@ -368,6 +368,13 @@ file's address on GitHub), and ONE `MarkdownViewer` over the whole file. Its hea
 prompt**. It is read-only: a prompt is changed in its file. A name the agent does not know says so in the
 agent's words.
 
+**The hub-sync foot line.** The **Spaces** and **Hub Designs** cards write into the hub, so under
+`storeSync: git` each draws the one shared line at its foot (`HubSyncLine`, `web/src/modules/ado/`)
+while the hub is ahead of its remote or behind it, has not been checked yet, or its last check failed --
+`The hub is ahead by 1 and behind by 2, checked 10:42. Sync on the System page` -- and nothing once a
+fetch has found it in step, or under any other `storeSync`. It reads `/env`'s `hubSync` and never asks
+for a fetch; [`docs/CONFIGURATION.md`, "Syncing the hub from the web app"](../CONFIGURATION.md#syncing-the-hub-from-the-web-app) has the states.
+
 ## The file shape, and how a note is read
 
 [`docs/hub/design.md`](../hub/design.md) is the contract. In short: one note is one file,

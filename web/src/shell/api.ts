@@ -66,6 +66,30 @@ export interface HowIWork {
   switch?: boolean | null;
 }
 
+/**
+ * `/env`'s `hubSync`: storeSync and, under git, how far the hub is from its
+ * remote (agent/core/hub_sync.py; docs/CONFIGURATION.md, "Syncing the hub from
+ * the web app"). `state` is the inventory's storeSync row: `on` for git, `off`
+ * for anything else, where every number is null.
+ *
+ * `ahead` is local and read with every /env. `behind` is known only after a
+ * fetch, so it comes with `checkedAt` (ISO, the time of the last fetch that
+ * worked) and both are null before the first one -- "not checked yet", never
+ * "in step". `checkFailed` is the latest fetch's failure, kept BESIDE the last
+ * known count rather than replacing it. `error` is the local read's own failure
+ * (not a git root, no upstream branch).
+ */
+export interface HubSync {
+  storeSync: string;
+  state: "on" | "off";
+  ahead: number | null;
+  behind: number | null;
+  checkedAt: string | null;
+  checkFailed: string | null;
+  checking: boolean;
+  error: string | null;
+}
+
 export interface EnvStatus {
   /** Which build the agent is: consts.json's `version`. Absent from an older agent. */
   version?: string;
@@ -118,6 +142,8 @@ export interface EnvStatus {
   /** Who the ADO routes filter by, and where it came from. */
   identity?: Identity;
   checks: Record<string, EnvCheck>;
+  /** The hub's sync state. Absent from an older agent, which reads as nothing to show. */
+  hubSync?: HubSync;
   config: {
     org: string | null;
     projects: Array<{ name: string; repo: string }>;
@@ -260,6 +286,37 @@ export const api = createApi({
       },
     }),
 
+    // POST /api/hub-sync/check[?refresh=1] -- the one request that makes the
+    // agent run `git fetch`. The System page sends it once when it opens and
+    // again after Sync the hub; nothing else sends it, and nothing on a timer.
+    // Its answer is /env's `hubSync`, so it is written into the getEnv cache --
+    // which is what every card's foot line reads, without asking for anything.
+    // While it runs, the cached block says `checking`.
+    checkHubSync: builder.mutation<HubSync, { refresh?: boolean } | void>({
+      query: (arg) => ({
+        url: arg && arg.refresh ? "hub-sync/check?refresh=1" : "hub-sync/check",
+        method: "POST",
+      }),
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        const pending = dispatch(
+          api.util.updateQueryData("getEnv", undefined, (env) => {
+            if (env.hubSync && env.hubSync.state === "on") env.hubSync.checking = true;
+          }),
+        );
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            api.util.updateQueryData("getEnv", undefined, (env) => {
+              env.hubSync = data;
+            }),
+          );
+        } catch {
+          // An agent that did not answer leaves the last known state in place.
+          pending.undo();
+        }
+      },
+    }),
+
     // POST /api/switch-mode
     switchMode: builder.mutation<EnvStatus, { mode: string }>({
       query: (body) => ({
@@ -283,5 +340,6 @@ export const {
   useRefreshSpaceVisibilityMutation,
   useGetHealthQuery,
   useRefreshEnvMutation,
+  useCheckHubSyncMutation,
   useSwitchModeMutation,
 } = api;

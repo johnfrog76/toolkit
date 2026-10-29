@@ -510,7 +510,7 @@ is LF like everything else, whatever `templates/ManagerSession.template.md` chec
 | `ReplyPR <pr> <thread> -Reply "..."` | Post a reply to a PR thread (`-Status` to set its state) and fill that thread's `Reply:` slot in the card -- the card in `current/` whose `PR URL:` names the PR, else the branch's |
 | `ThreadHash [<id\|file>] [-Hash <h>]` | Thread **this repo's** branch commits into the Git section and PR replies. Run it from the code repo. A card in `backlog/` is found too, and its first thread moves it to `current/` before writing |
 | `AddPRReview <pr>` | Post an AI code review to a PR as inline comments (`-DryRun` to preview) |
-| `Sync` | Pull with rebase, then push, on the prompt store -- when `storeSync` is `git` (the hub's `hub.json`, or `config.local.json` per machine). The hub must be the **root** of its own repository: a hub sitting inside some other repository is refused before anything is committed, because `git add -A` from a subfolder stages that whole repository |
+| `Sync` | Pull with rebase, then push, on the prompt store -- when `storeSync` is `git` (the hub's `hub.json`, or `config.local.json` per machine). The hub must be the **root** of its own repository: a hub sitting inside some other repository is refused before anything is committed, because `git add -A` from a subfolder stages that whole repository. The System page's **Sync the hub** runs this verb through the bridge and shows what it printed ([`CONFIGURATION.md`, "Syncing the hub from the web app"](CONFIGURATION.md#syncing-the-hub-from-the-web-app)) |
 
 **Where `NewPR` gets its facts.** From the code repository, on the work branch, everything is inferred:
 the branch finds the card, and the card gives the work item, title and described changes. Named from

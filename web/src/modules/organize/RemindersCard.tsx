@@ -42,6 +42,7 @@ import {
 } from "@fluentui/react-components";
 import { AlertRegular, CheckmarkRegular, EditRegular, SnoozeRegular } from "@fluentui/react-icons";
 import { PageCard } from "../../shared/PageCard";
+import { HubSyncLine } from "../ado/HubSyncLine";
 import { CreateButton } from "../../shared/CreateButton";
 import { FilterBadge } from "../../shared/FilterBadge";
 import { useFilterRowStyles, useListRowStyles } from "../../shared/listRowStyles";
@@ -338,6 +339,7 @@ export function RemindersCard() {
           ) : undefined
         }
         footerRight={<CreateButton label="New Reminder" onClick={() => setAddOpen(true)} />}
+        footNote={<HubSyncLine />}
       >
         <div className={styles.chips} role="group" aria-label="Filter reminders">
           <FilterBadge

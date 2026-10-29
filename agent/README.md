@@ -56,6 +56,7 @@ agent/
 │   ├── consts.py             the reader for ../consts.json, the literals all three halves parse
 │   ├── env.py                GET /health, GET /env, POST /switch-mode
 │   ├── surfaces.py           GET /surfaces -- the CLI's optional-surface inventory, as one answer
+│   ├── hub_sync.py           POST /hub-sync/check, and /env's hubSync: a git hub's ahead (local) and behind (after a fetch), through the CLI's Scripts/Get-HubSyncState.ps1
 │   ├── cards.py              write_card_text: the agent's one writer for a hub file that already exists (today: the meeting-session save)
 │   ├── clock.py              a timestamp to the reader's LOCAL day, the one way
 │   ├── git_history.py        one git log for a folder: the day each file last changed (status, studio prompts)
@@ -472,7 +473,8 @@ route list.
 | --- | --- | --- | --- | --- |
 | `GET /health` | `core/env` | any | hub root, `current/` | — |
 | `GET /surfaces` | `core/surfaces` | any | the CLI's `Get-P20SurfaceInventory` in a child PowerShell (the state of a surface is the CLI's, D-W2); `Config/settings-workflows.json` through it | — |
-| `GET /env` | `core/env` | any | config, hub, `az` (the tier probe **and** the identity fallback), `PATH` (the bridge host); each offered Space in `config.spaces` carries the `tracker` its address names | — |
+| `GET /env` | `core/env` | any | config, hub, `az` (the tier probe **and** the identity fallback), `PATH` (the bridge host); each offered Space in `config.spaces` carries the `tracker` its address names; `hubSync` -- under `storeSync: git`, the hub's commits ahead of its remote from `Scripts/Get-HubSyncState.ps1` in a child PowerShell (local, no fetch, held 45 s like the tier probe; the bridge forgets it after any verb) and the last fetch's `behind` and `checkedAt`. **Never fetches** | — |
+| `POST /hub-sync/check` | `core/hub_sync` | any | under `storeSync: git` only: `git fetch`, then ahead and behind, through `Scripts/Get-HubSyncState.ps1 -Fetch` (every git call through `Invoke-P20TrackerRead`). One fetch at a time; a second ask inside 45 s of the last attempt is answered from it, `?refresh=1` goes past. A failed fetch keeps the last `behind` and `checkedAt` and sets `checkFailed`. Answers `/env`'s `hubSync` block; under any other `storeSync` runs nothing and answers `state: off`. The System page sends it once when it opens and after Sync the hub -- nothing else, and never on a timer | — (the fetch moves the hub's remote-tracking refs, nothing else) |
 | `POST /switch-mode` | `core/env` | any | config | **`config.local.json`** (`activeSpace`) |
 | `GET /config/schema` | `core/config_routes` | any | `Config -Schema -AsJson`, through the bridge; cached per process | — |
 | `GET /config` | `core/config_routes` | any | `Config -List -AsJson`, through the bridge | — |

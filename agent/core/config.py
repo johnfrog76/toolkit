@@ -71,6 +71,11 @@ PROMPT_SUFFIX = ".prompt.md"
 # relative to the agent's own tree, not to the hub.
 BILLING_SCRIPT = AGENT_DIR / "ado" / "Get-WeeklyBilling.ps1"
 
+# The hub's distance from its remote -- ahead, and behind after a fetch -- read
+# by the CLI half's script, so every git call it makes goes through
+# Invoke-P20TrackerRead (core/hub_sync.py says why).
+HUB_SYNC_SCRIPT = REPO_ROOT / "Scripts" / "Get-HubSyncState.ps1"
+
 # Stand-in for "no hub configured". Deliberately a path that cannot exist, so
 # every `.exists()` guard already in the read routes does the right thing
 # without a second code path.

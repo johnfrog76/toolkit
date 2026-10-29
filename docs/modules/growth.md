@@ -270,6 +270,12 @@ those tags exist.
 `GrowthPage` is `ReviewArchive` + `Goals`, under the quarter line when there is one. The 1:1s are the communication
 module's ([`communication.md`](communication.md)).
 
+`ReviewArchive` -- the **Reviews** card -- writes into the hub (a generated review is a file in
+`reviews/`), so under `storeSync: git` it draws the one shared hub-sync foot line (`HubSyncLine`,
+`web/src/modules/ado/`) while the hub is ahead of its remote or behind it, not checked yet, or its
+last check failed, and nothing once a fetch has found it in step or under any other `storeSync`. It
+reads `/env` and never fetches; [`docs/CONFIGURATION.md`, "Syncing the hub from the web app"](../CONFIGURATION.md#syncing-the-hub-from-the-web-app).
+
 The deck launcher is on this page too, and `GrowthPage` does not know it: the
 page renders `useShellSlot("growth")`, and the **deck** module fills that slot with its launcher
 when `features.deck` is on. A presentation is a growth item and a deck is what a presentation

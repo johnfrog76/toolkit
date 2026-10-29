@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from . import consts, log_writer, model
+from . import consts, hub_sync, log_writer, model
 from .config import (
     LOCAL_CONFIG_PATH,
     REPO_ROOT,
@@ -372,7 +372,14 @@ async def get_env(refresh: int = 0):
     """
     cfg = load_config()
     org_url = cfg.get("org", "")
-    probe = await _probe(cfg, refresh)
+    # The hub's distance from its remote (core/hub_sync.py): the local half
+    # only -- ahead, plus whatever the last fetch left. /env never fetches.
+    # Read beside the probe rather than after it, and off the event loop: on
+    # a git hub it is one PowerShell start per TTL.
+    probe, hub_sync_state = await asyncio.gather(
+        _probe(cfg, refresh),
+        asyncio.to_thread(hub_sync.hub_sync_block, str(cfg.get("storeSync") or "none"), bool(refresh)),
+    )
     tier = probe.tier
     identity = probe.identity
     bridge_host = probe.bridge_host
@@ -435,6 +442,12 @@ async def get_env(refresh: int = 0):
         "identity": identity,
         "uptime": int(time.monotonic()),
         "checks": _checks(cfg, probe, ado_on),
+        # storeSync and, under git, the hub's distance from its remote:
+        # {storeSync, state (on|off), ahead, behind, checkedAt, checkFailed,
+        # checking, error}. `behind` and `checkedAt` are the last fetch's and
+        # null before the first one (docs/CONFIGURATION.md, "Syncing the hub
+        # from the web app").
+        "hubSync": hub_sync_state,
         **module_blocks,
         "config": _config_block(cfg),
     }
