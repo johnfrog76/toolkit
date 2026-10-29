@@ -178,6 +178,29 @@ function Test-P20IsCardId {
     return [bool]([regex]::IsMatch($Argument.Trim().ToUpperInvariant(), '^(?:' + (Get-P20CardIdShape) + ')$'))
 }
 
+function Test-P20PathInside {
+    <#
+        Is -Path strictly inside -Root? Whole path segments, not a string
+        prefix: ~/Repos/toolkit-hub is not inside ~/Repos/toolkit, one character
+        short of a separator (the trap Start-Toolkit.ps1 names). Both sides are
+        made absolute first, so a relative or a `..` spelling cannot step out.
+        Case is ignored on Windows and kept elsewhere -- the rule Start-Agent's
+        Test-SameHub applies to the same question about a hub path. An empty
+        root contains nothing.
+    #>
+    param([AllowEmptyString()][string]$Path, [AllowEmptyString()][string]$Root)
+    if (-not $Path -or -not $Root) { return $false }
+    try {
+        $full = [System.IO.Path]::GetFullPath($Path)
+        $base = [System.IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+    }
+    catch { return $false }
+    $isWin = ([System.IO.Path]::DirectorySeparatorChar -eq [char]92)
+    if ($isWin) { $full = $full.Replace('/', '\'); $base = $base.Replace('/', '\') }
+    $cmp = if ($isWin) { [System.StringComparison]::OrdinalIgnoreCase } else { [System.StringComparison]::Ordinal }
+    return $full.StartsWith($base + [System.IO.Path]::DirectorySeparatorChar, $cmp)
+}
+
 function Resolve-P20CardArgument {
     <#
         The one way a verb turns what a person typed into a card.
@@ -222,12 +245,20 @@ function Resolve-P20CardArgument {
         whose leaf is also current/ (Reminders) or act on the active
         Space's tracker (Route, StartWork): for them a path into another
         Space would be the wrong card or the wrong Space.
+
+        And the path must be INSIDE the hub (-PromptsRoot, the verb's resolved
+        promptsRoot; Get-P20PromptsRoot when the caller passes none). A folder's
+        leaf name alone is not a hub: some unrelated ~/notes/current/ would
+        otherwise pass, and Archive would then stage a file this tool does not
+        own. Outside the hub, or with no hub to measure against, a path matches
+        nothing -- the same answer as a path in no card folder.
     #>
     param(
         [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Argument,
         [Parameter(Mandatory = $true)][AllowEmptyString()][AllowEmptyCollection()][AllowNull()][string[]]$Folder,
         [hashtable]$WorkItemTypes,
-        [switch]$AllowPath
+        [switch]$AllowPath,
+        [string]$PromptsRoot = ''
     )
 
     $result = @{ Match = @(); IsId = $false; Fuzzy = $false; IsPath = $false }
@@ -254,7 +285,9 @@ function Resolve-P20CardArgument {
             $kinds = @(@($Folder) | Where-Object { $_ } | ForEach-Object { Split-Path ($_.TrimEnd('/', '\')) -Leaf })
             $leaf = Split-Path $item.DirectoryName -Leaf
             $sameKind = @($kinds | Where-Object { [string]::Equals($_, $leaf, [System.StringComparison]::OrdinalIgnoreCase) })
-            if ($sameKind.Count -gt 0) {
+            $hub = $PromptsRoot
+            if (-not $hub -and (Get-Command Get-P20PromptsRoot -ErrorAction SilentlyContinue)) { $hub = Get-P20PromptsRoot }
+            if ($sameKind.Count -gt 0 -and (Test-P20PathInside -Path $item.FullName -Root $hub)) {
                 $result.Match = @($item)
                 $result.IsPath = $true
             }

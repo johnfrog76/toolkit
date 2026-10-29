@@ -103,7 +103,7 @@ $types = Get-P20WorkItemTypes -Config $cfg
 # backlog card is never pulled into play by this verb, because being planned before being
 # pulled into play is the whole point (AGENTS.md: a backlog card's value is being planned).
 # -AllowPath: a card's full path is that card, whichever Space is active.
-$resolved = Resolve-P20CardArgument -Argument $Card -Folder @($folders.Current, $backlogDir) -WorkItemTypes $types -AllowPath
+$resolved = Resolve-P20CardArgument -Argument $Card -Folder @($folders.Current, $backlogDir) -WorkItemTypes $types -AllowPath -PromptsRoot $promptsRoot
 $found = @($resolved.Match | Where-Object { $_.Name -like '*.md' })
 if ($found.Count -eq 0) {
     if ($resolved.IsId) {

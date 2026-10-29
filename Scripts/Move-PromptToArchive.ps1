@@ -202,7 +202,7 @@ if (-not $File) {
 # -AllowPath: a card's full path is that card, whichever Space is active; its
 # archive/ is then the one beside it, in its own Space (below).
 $resolved = Resolve-P20CardArgument -Argument $File -Folder @($currentDir, $backlogDir) `
-    -WorkItemTypes (Get-P20WorkItemTypes -Config $cfg) -AllowPath
+    -WorkItemTypes (Get-P20WorkItemTypes -Config $cfg) -AllowPath -PromptsRoot $promptsRoot
 if ($resolved.IsPath) {
     $archiveDir = Get-P20SiblingCardFolder -Folder (@($resolved.Match)[0].DirectoryName) -Name (Split-Path ($archiveDir.TrimEnd('/', '\')) -Leaf)
 }
@@ -221,7 +221,7 @@ $match = $resolved.Match
 # An id, or an exact filename, counts; a partial name never does.
 if (-not $match) {
     $archivedHit = Resolve-P20CardArgument -Argument $File -Folder $archiveDir `
-        -WorkItemTypes (Get-P20WorkItemTypes -Config $cfg) -AllowPath
+        -WorkItemTypes (Get-P20WorkItemTypes -Config $cfg) -AllowPath -PromptsRoot $promptsRoot
     $archived = @($archivedHit.Match | Where-Object { $_.Name -like '*.prompt.md' })
     if ($archived.Count -gt 0 -and -not $archivedHit.Fuzzy) {
         $rootForRel = ($promptsRoot -replace '\\', '/').TrimEnd('/')

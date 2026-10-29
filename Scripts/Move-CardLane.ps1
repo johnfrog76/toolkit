@@ -118,7 +118,7 @@ $types = Get-P20WorkItemTypes -Config $cfg
 # current/ and backlog/: the two folders a card can be moved FROM, named on purpose.
 # -AllowPath: a card's full path is that card, whichever Space is active -- the
 # path names its Space, so the folders it moves between are that Space's (below).
-$resolved = Resolve-P20CardArgument -Argument $Card -Folder @($folders.Current, $backlogDir) -WorkItemTypes $types -AllowPath
+$resolved = Resolve-P20CardArgument -Argument $Card -Folder @($folders.Current, $backlogDir) -WorkItemTypes $types -AllowPath -PromptsRoot $promptsRoot
 $found = @($resolved.Match | Where-Object { $_.Name -like '*.md' })
 if ($found.Count -eq 0) {
     if ($resolved.IsId) {

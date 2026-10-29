@@ -204,6 +204,17 @@ try {
     $out = Invoke-InSpace 'alpha' "${prefix}Archive '$otherPath'; 'ARCHPATH=' + `$LASTEXITCODE"
     Assert-True "Archive <beta's backlog path>, with alpha active: into beta/archive/" ($out -match 'ARCHPATH=0' -and (Get-SpaceCard 'beta' $consts.folders.archive 'TaskJ7RT-*.prompt.md').Count -eq 1) $out
 
+    # A folder named backlog/ OUTSIDE the hub is not a Space's backlog: the path is
+    # refused, and nothing is moved or staged -- the leaf name alone is not the hub.
+    $strayDir = Join-Path (Join-Path $base 'elsewhere') $consts.folders.backlog
+    New-Item -ItemType Directory -Path $strayDir -Force | Out-Null
+    $strayPath = Join-Path $strayDir 'TaskZ9Y8-not-a-hub-card.prompt.md'
+    [System.IO.File]::WriteAllText($strayPath, "# Task Z9Y8: not a hub card`n", (New-Object System.Text.UTF8Encoding($false)))
+    $out = Invoke-InSpace 'alpha' ("${prefix}Archive '$strayPath'; 'STRAYARCH=' + `$LASTEXITCODE; " +
+        "${prefix}Move '$strayPath' -To Active; 'STRAYMOVE=' + `$LASTEXITCODE")
+    Assert-True 'Archive <a backlog/ path outside the hub> is refused, exit 2, and the file stays put' ($out -match 'STRAYARCH=2' -and (Test-Path -LiteralPath $strayPath) -and -not (Test-Path -LiteralPath (Join-Path (Join-Path $base 'elsewhere') $consts.folders.archive))) $out
+    Assert-True 'Move <the same path> -To Active is refused too, exit 2, nothing written beside it' ($out -match 'STRAYMOVE=2' -and $out -match 'No card matching' -and (Test-Path -LiteralPath $strayPath) -and -not (Test-Path -LiteralPath (Join-Path (Join-Path $base 'elsewhere') $consts.folders.current))) $out
+
     # What must not move: an id and a partial name still read the ACTIVE Space only,
     # and a partial name still refuses a non-interactive caller.
     $out = Invoke-InSpace 'beta' "${prefix}NewPrompt -Title 'Gamma ray burst' -Type Task -Id M3XC -Now | Out-Null; 'MADE=' + `$LASTEXITCODE"

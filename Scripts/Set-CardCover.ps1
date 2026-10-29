@@ -178,7 +178,7 @@ $found = @()
 $isId = $false
 foreach ($folder in $cardFolders) {
     # -AllowPath: a card's full path is that card, whichever Space is active.
-    $resolved = Resolve-P20CardArgument -Argument $Card -Folder $folder -WorkItemTypes $types -AllowPath
+    $resolved = Resolve-P20CardArgument -Argument $Card -Folder $folder -WorkItemTypes $types -AllowPath -PromptsRoot $promptsRoot
     $isId = $resolved.IsId
     $found = @($resolved.Match | Where-Object { $_.Name -like '*.md' })
     if ($found.Count -gt 0) { break }
