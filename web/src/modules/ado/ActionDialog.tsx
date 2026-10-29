@@ -200,6 +200,7 @@ export function ActionDialog({
   }, [adoReachable, env, initialWorkItemId]);
   const cardTypes = env?.cardTypes?.length ? env.cardTypes : ["Task"];
   const [cardTitle, setCardTitle] = useState("");
+  const [cardDescription, setCardDescription] = useState("");
   const [cardType, setCardType] = useState("");
   const chosenType = cardType || (cardTypes.includes("Task") ? "Task" : cardTypes[0]);
   const createValid = source === "new" ? cardTitle.trim().length > 0 : /^\d+$/.test(workItemId);
@@ -330,6 +331,7 @@ export function ActionDialog({
         const data = await createPrompt({
           params: buildNewCardParams({
             title: cardTitle,
+            description: cardDescription,
             type: chosenType,
             cover: path && !pictureIsBefore ? path : undefined,
             before: path && pictureIsBefore ? path : undefined,
@@ -338,6 +340,7 @@ export function ActionDialog({
         setCreateResult(data);
         if (data.status === "success") {
           setCardTitle("");
+          setCardDescription("");
           setPicture(null);
           setPictureIsBefore(false);
         }
@@ -627,6 +630,20 @@ export function ActionDialog({
                       />
                     </div>
                     <div className={styles.field}>
+                      <Caption1 id="new-card-description-label">
+                        A description, if you have one
+                      </Caption1>
+                      <Textarea
+                        aria-labelledby="new-card-description-label"
+                        placeholder="Optional context -- fills the card's Context/Summary in place of (TBD)"
+                        value={cardDescription}
+                        onChange={(_e, d) => setCardDescription(d.value)}
+                        disabled={creating}
+                        resize="vertical"
+                        rows={3}
+                      />
+                    </div>
+                    <div className={styles.field}>
                       <Caption1 id="new-card-type-label">What kind of thing is it?</Caption1>
                       <TruncatedDropdown
                         aria-labelledby="new-card-type-label"
@@ -669,8 +686,8 @@ export function ActionDialog({
                       the string pass's rule in action) -- and no tracker
                       named, because this door exists on every space kind. */}
                     <Caption1 className={styles.quiet}>
-                      A custom card, created by ToolKit: it gets a short id of its own, and is in
-                      play as soon as it is made.
+                      A custom card, created by ToolKit: it gets a short id of its own, and starts
+                      in the Backlog -- planned, not yet in play.
                     </Caption1>
                   </>
                 )}

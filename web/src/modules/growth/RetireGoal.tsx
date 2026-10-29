@@ -1,5 +1,6 @@
 /**
- * Retire a growth item from the browser: `NewGrowth -Close <file>` through the
+ * Archive a growth item from the browser (a goal row's Archive -- it said Retire
+ * until the row vocabulary): `NewGrowth -Close <file>` through the
  * bridge, behind a confirm because it moves a file. The module closes its own
  * data -- Archive is org-scoped and cannot see growth/ -- and the CLI verb is
  * the one implementation; this dialog only asks.
@@ -33,7 +34,7 @@ export function RetireGoalDialog({ filename, title, open, onOpenChange, onRetire
         return;
       }
       // A refusal is the dialog's message, in the verb's own words.
-      setMessage(commandResultMessage(result, "Retired."));
+      setMessage(commandResultMessage(result, "Archived."));
     } catch {
       setMessage("Could not reach the agent. Nothing was moved.");
     }
@@ -44,7 +45,7 @@ export function RetireGoalDialog({ filename, title, open, onOpenChange, onRetire
       open={open}
       what={
         <>
-          Retire <strong>{title}</strong>. It moves to <code>growth/archive/</code>, stamped with
+          Archive <strong>{title}</strong>. It moves to <code>growth/archive/</code>, stamped with
           the date it closed -- it stays in the year&apos;s evidence and is not edited from here
           again.
         </>

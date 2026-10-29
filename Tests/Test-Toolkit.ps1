@@ -85,6 +85,7 @@ param(
     [switch]$SendTeams,
     [switch]$NewMeeting,
     [switch]$MeetingAgenda,
+    [switch]$WorkReview,
     [switch]$NewPrompt,
     [switch]$DocCounts,
     [switch]$Connect,

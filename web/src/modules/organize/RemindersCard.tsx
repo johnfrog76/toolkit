@@ -40,7 +40,7 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
-import { AlertRegular, CheckmarkRegular, EditRegular, SnoozeRegular } from "@fluentui/react-icons";
+import { AlertRegular, EditRegular, SnoozeRegular } from "@fluentui/react-icons";
 import { PageCard } from "../../shared/PageCard";
 import { HubSyncLine } from "../ado/HubSyncLine";
 import { CreateButton } from "../../shared/CreateButton";
@@ -51,7 +51,7 @@ import { StatusMessage } from "../../shared/StatusMessage";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { Pagination } from "../../shared/Pagination";
 import { DialogDismiss } from "../../shared/DialogDismiss";
-import { CardActions } from "../../shared/CardActions";
+import { CardActions, ROW, defineRowMoves } from "../../shared/CardActions";
 import { usePagination } from "../../hooks/usePagination";
 import { usePersistedValue } from "../../shared/usePersistedState";
 import { dueLabel } from "../../utility/dates";
@@ -94,6 +94,12 @@ const SNOOZE_LABEL: Record<(typeof REMINDERS.snooze)[number], string> = {
   tomorrow: "Tomorrow, 9:00 AM",
   nextweek: "Next Monday, 9:00 AM",
 };
+
+/** A reminder's own moves, on no other record. */
+const REMINDER_MOVES = defineRowMoves("reminder", {
+  snooze: { word: "Snooze:", icon: SnoozeRegular },
+  edit: { word: "Edit", icon: EditRegular },
+});
 
 const useStyles = makeStyles({
   rowBody: { flex: 1, minWidth: 0 },
@@ -174,26 +180,23 @@ function ReminderRow({
           </Body1Strong>
           <Caption1 className={styles.meta}>{due ? `Due: ${due}` : "No due date"}</Caption1>
         </div>
-        {/* The house row: one exposed action -- Done, the act a
-            reminder exists for; there is no page to go to -- and the menu
-            for the rest: the snoozes first (the same one choice away they
-            always were), then Edit. */}
+        {/* The house row: one exposed action -- Archive, the act a
+            reminder exists for (`Reminders <id> -Archive`), in the
+            vocabulary's word for the move to the archive; there is no page to
+            go to -- and the menu for the rest: the snoozes first (the same one
+            choice away they always were), then Edit. */}
         <CardActions
-          primaryAction={{
-            icon: <CheckmarkRegular />,
-            label: "Done",
-            disabled: busy,
-            onClick: onDone,
-          }}
+          primaryAction={ROW.archive.action({ disabled: busy, onClick: onDone })}
           menuLabel={`Actions for ${item.title}`}
           busy={busy}
           secondaryActions={[
-            ...REMINDERS.snooze.map((word) => ({
-              icon: <SnoozeRegular />,
-              label: `Snooze: ${SNOOZE_LABEL[word]}`,
-              onClick: () => onSnooze(word),
-            })),
-            { icon: <EditRegular />, label: "Edit", dividerBefore: true, onClick: onEdit },
+            ...REMINDERS.snooze.map((word) =>
+              REMINDER_MOVES.snooze.action({
+                detail: SNOOZE_LABEL[word],
+                onClick: () => onSnooze(word),
+              }),
+            ),
+            REMINDER_MOVES.edit.action({ dividerBefore: true, onClick: onEdit }),
           ]}
         />
       </div>

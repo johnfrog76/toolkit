@@ -68,7 +68,7 @@ GitHub Space, where they answer through `gh`.
 | --- | --- | --- |
 | CLI | twelve verbs and the work-item form of `NewPrompt` (below), the `Scripts/` they run, the tier check | `NewPrompt -Title`, `Archive`, `Billable`, `Status`, `Sync`, `ThreadHash` |
 | Agent | `ado/accounting.py` -- `/prs`, `/work-items`, `/dashboard`, `/dashboard/pipelines/{project}`; the identity those filter by | `ado/status.py`, `ado/reporting.py` (Daily, engagement), `ado/pr_comments.py` (reads files), `ado/bridge.py` |
-| Web | `MyWork`, `MyPRs`, `Dashboard`, the work-item tab of the New card dialog, *Open in ADO* and *Create PR* on a card, the repo filter, `ConnectAdoCard` | `Board`, `PromptStatus`, `PromptDetailPage`, `Billing` (Daily), `EnvCard`, `ConfigSettings` |
+| Web | `MyWork`, `MyPRs`, `Dashboard`, the work-item tab of the New card dialog, *Open on Azure DevOps* and *Create PR* on a card, the repo filter, `ConnectAdoCard` | `Board`, `PromptStatus`, `PromptDetailPage`, `Billing` (Daily), `EnvCard`, `ConfigSettings` |
 | A card | the `**ADO Link:**` line, the `PR URL:` line, the review rounds | everything else ([the card](../hub/cards.md)) |
 
 ## Turning it on
@@ -145,7 +145,7 @@ Eleven of the twelve are in the table below; the twelfth is `LogPeerReview`, a g
 | `Dashboard` | PRs across projects, assigned items with staleness, recent pipeline runs | no |
 | `NewPR [<card>]` | the ship-it step: opens the PR, moves the work item to Code Review, comments on it, writes `PR URL:` into the card. Named by id from outside the code repository, the card's `ADO Link` and `## Branch` answer; a project it cannot tell is refused, never guessed; `-WhatIf` calls nothing | writes `PR URL:` |
 | `PublishPR [<card>]` | the ship flow's second stage: flips the card's draft pull request to ready (`PATCH` with `{"isDraft":false}`, the token `NewPR` takes). A card with no `PR URL:` line, a pull request already ready and a GitHub pull request (`gh pr ready <url>`) are refused; `-WhatIf` prints the call and sends nothing | writes `PR published: <url>` under `PR URL:`, once |
-| `GetPRComments [<pr>]` | fetches review threads and appends them to the card; append-only, safe to re-run | writes `PR URL:` if absent; appends rounds |
+| `GetPRComments [<pr>]` | fetches review threads and appends them to the card; append-only, safe to re-run. On a GitHub Space it answers through `gh` -- inline comments, the conversation tab and review summaries; the card's `PR URL:` names the repository ([CLI](../CLI.md), "On a GitHub board") | writes `PR URL:` if absent; appends rounds |
 | `ReplyPR <pr> <thread> -Reply "..."` | posts a reply to a thread, optionally setting its status, and fills that thread's `Reply:` slot in the card | fills the slot |
 | `AddPRReview <pr>` | an AI code review as inline comments; needs `ANTHROPIC_API_KEY`; run it from the PR's own repository | no |
 | `CloseItem <id> -Comment "..."` | closes or resolves the work item; `-WhatIf` prints the transition without calling ADO | no |
@@ -190,14 +190,14 @@ and `hub.json`), or the first `az` call that failed, as one sentence naming the 
 - **The New card dialog** -- a *From a work item* tab beside *New card*, and the default where ADO is
   reachable. Where ADO is not in use there are no tabs at all.
 - **On a card** -- an **ado** badge first in its meta line (a GitHub-born card wears **gh**, a custom card
-  nothing: the card model's `tracker`, from the card's own link), *Open in ADO*, *Create PR*, the project tag, and the repo filter (which matches on the
+  nothing: the card model's `tracker`, from the card's own link), *Open on Azure DevOps* (last in the menu), *Create PR*, the project tag, and the repo filter (which matches on the
   ADO link, so it hides every unlinked card and SAYS how many). The first two are ABSENT on a card with
   no work item, and on every card while ADO is off; *Create PR* is disabled, with the reason, until the
   card records a commit (`web/src/modules/ado/cardActions.ts`, [the web README](../../web/README.md#the-board)).
 - **Design, on a GitHub Space** (Studio S2, D-S11) -- the fourth Home tab, after Issues,
   Board and Stats: the product repo's `design/` and `spec/` folders, read through the tracker
   (`GET /api/design`, `gh api repos/{owner}/{repo}/contents/...`), the note first and the spec beside
-  it. A row shows the title (the file's first `#` heading, else its name), the frontmatter
+  it. A row shows the title (a leading `# ` heading, else the line under `## Title`, else the file's name -- `docs/hub/design.md`, "How the title is read"), the frontmatter
   `description`, the folder, and the thread its `> GitHub:` line names; it opens a reading room at
   `/design/{folder}/{name}` -- the house reading page, the document and then its thread in one viewer.
   Gated by the tracker and Tier 1, nothing else: no flag, and an ADO or local Space has no such tab.

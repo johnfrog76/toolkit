@@ -109,7 +109,7 @@ It answers `{ count, buckets: {overdue, today, upcoming}, items: [...], asOf }`.
 bucket then soonest due, undated last. A hub that has never had a reminder answers empty, not an error.
 A file in the folder whose name carries no id is not a reminder and is skipped.
 
-**There is no write route.** Snooze, Done and the quick add go through the bridge:
+**There is no write route.** Snooze, Archive and the quick add go through the bridge:
 
 ```text
 POST /api/cmd/Reminders    { "params": ["-Id", "K7M2", "-Snooze", "1h"] }
@@ -139,10 +139,10 @@ when something is. A Fluent `appearance="transparent"` button -- no background, 
 under the pointer too: `transparent` alone paints the icon brand on hover, so the bell holds it grey. Its name and tooltip are the state in
 words: `No past-due reminders`, `2 past-due reminders`, and `Checking reminders` / `Could not check
 reminders` (asleep, no badge) before the first answer or when the agent is away. A click opens this tab
-with the Reminders card on **Overdue**, where Snooze and Done are; the bell lists nothing itself.
+with the Reminders card on **Overdue**, where Snooze and Archive are; the bell lists nothing itself.
 
 The count is `useOverdueReminders()` (`useOverdueReminders.ts`), a selector over the SAME
-`GET /api/reminders` the card reads -- no second route, no second cache entry, so a Snooze or Done on the
+`GET /api/reminders` the card reads -- no second route, no second cache entry, so a Snooze or Archive on the
 card moves the bell at once. It polls every minute, because a reminder becomes overdue with no write to
 invalidate anything. The bucket is still the agent's.
 
@@ -153,7 +153,7 @@ The Reminders card:
 | Header | the title, a refresh, and the count badge (open reminders) |
 | Chip row | `All` / `Overdue` / `Today` / `Upcoming`, each with its count -- a filter over ONE list, remembered per browser |
 | A row | the bucket badge, the source tag, the ref, the title, and the due date in words -- `Today 2:00 PM`, `Yesterday`, `Mon 28 Sep 9:00 AM`, `No due date`. A ref the agent resolved to a card in `current/` is a link to the card's page reading `<id> <title>`; one resolved to an archived card reads `<id> <title> (done)`, named and not linked, because the card page reads `current/` only; any other ref stays in the tag as written, `ado 41` ([A ref that names a card](#a-ref-that-names-a-card)) |
-| Row actions | the house row (`shared/CardActions`): **Done**, which archives, is the one exposed action; the `...` menu (`Actions for <title>`) holds **Snooze: In an hour** / **Snooze: Tomorrow, 9:00 AM** / **Snooze: Next Monday, 9:00 AM**, then **Edit**, which corrects the entry. A snooze is one choice away |
+| Row actions | the house row (`shared/CardActions`): **Archive** (`Reminders <id> -Archive`; the row said Done until the row vocabulary) is the one exposed action; the `...` menu (`Actions for <title>`) holds **Snooze: In an hour** / **Snooze: Tomorrow, 9:00 AM** / **Snooze: Next Monday, 9:00 AM**, then **Edit**, which corrects the entry. A snooze is one choice away |
 | Edit | the reminder's title, due date, optional time, source and ref, filled in, the source and the ref each a full-width field of its own (the date and its time stay side by side). An emptied ref is sent as an empty `-Ref`, which removes the line. A date and a separate time rather than one date-time input, because a reminder due on a DAY has no time and one input would have to invent one (`reminderEntry.ts` splits and joins). Save is off until something changed, and sends only what changed (`buildReminderEditParams`); an emptied date is `-NoDue`. A refusal stays in the dialog in the verb's words |
 | Footer | the pager (five a page), and **+**, the quick add: what, an optional due (local date and time), an optional source and an optional ref, each a full-width field of its own. The dialog is `NewReminderDialog.tsx`, the one place the web creates a reminder |
 | Foot line | under `storeSync: git`, the one shared hub-sync line (`HubSyncLine`) while the hub is ahead of its remote or behind it, not checked yet, or its last check failed -- `The hub is ahead by 1. Sync on the System page` -- and nothing in step or under any other `storeSync`. It reads `/env` and never fetches; [`docs/CONFIGURATION.md`, "Syncing the hub from the web app"](../CONFIGURATION.md#syncing-the-hub-from-the-web-app) |
@@ -164,7 +164,8 @@ never `toISOString`. The bucket is never worked out in the browser -- it is the 
 ### Remind me about this
 
 A card's `...` menu -- on the Board and on the list, which draw ONE action model (`cardActions.ts`) --
-ends with **Remind me about this** while Organize is on. It opens the same New Reminder dialog, with the
+ends its own moves with **Remind me about this** while Organize is on (the link out to the tracker,
+where the card has one, stays last). It opens the same New Reminder dialog, with the
 card's name as what and its id as the ref, so the reminder links back to the card the moment it is
 listed. The write is `NewReminder` through the bridge like every other; the board or the list says
 `Reminder added about <name>. It is on the Organize tab.`
@@ -234,11 +235,11 @@ link ([The web UI](#the-web-ui)).
 | `web`: `cliBridge.test.ts` | the exact argv of the four reminder builders -- an edit sends only what changed, an emptied due as `-NoDue`, an emptied ref as an empty `-Ref`, nothing changed as `null`; a new reminder's ref as `-Ref` |
 | `web`: `reminderEntry.test.ts` | a stored due split into date and time and joined back unchanged; a day keeps no invented time |
 | `web`: `RemindersCard.test.tsx` | a ref resolved to a card in `current/` drawn as a link to the card's page, one resolved to an archived card named and not linked, a plain ref (and an older agent's answer with no `card`) as the tag it was; the Ref field in the New dialog sent as `-Ref` and as wide as its sibling inputs, and in the Edit dialog filled in and in the same column as What, an emptied one sent as an empty `-Ref`; every input in both dialogs at the default size, like the app's other dialogs |
-| `web`: `Board.remind.test.tsx`, `cardActions.test.ts`, `scenarios.test.tsx` | **Remind me about this** absent from a card's menu with Organize off and last with it on; chosen, the dialog filled with the card's name and id, and `NewReminder` sent with `-Ref` |
+| `web`: `Board.remind.test.tsx`, `cardActions.test.ts`, `scenarios.test.tsx` | **Remind me about this** absent from a card's menu with Organize off and last of its own moves with it on; chosen, the dialog filled with the card's name and id, and `NewReminder` sent with `-Ref` |
 | `web`: `utility/dates.test.ts` | the local day at 23:30 west of UTC (where the UTC date is tomorrow), and every due label |
 
 **By hand**, against a scratch hub through the real agent and bridge: the chips filter, Snooze ->
-Tomorrow rewrites the file's Due line, Done archives and stamps, the + adds a reminder. With both
+Tomorrow rewrites the file's Due line, Archive archives and stamps, the + adds a reminder. With both
 modules on, `/communication` lands on `/organize`, which shows Meetings then Reminders and no Meetings
 tab; with organize off, the Meetings tab is back, `/api/reminders` is 404, and `/organize` says it
 belongs to a module that is off.

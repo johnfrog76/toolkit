@@ -60,6 +60,7 @@ param(
 )
 
 . (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 
 
 # ── Help ─────────────────────────────────────────────────────────────────────
@@ -231,7 +232,7 @@ try {
         if ($hits.Count -eq 1) { $card = $hits[0].FullName }
         elseif ($hits.Count -eq 0) {
             . (Join-Path $PSScriptRoot 'Resolve-CardForBranch.ps1')
-            $branch = "$(git rev-parse --abbrev-ref HEAD 2>$null)".Trim()
+            $branch = "$((Invoke-P20TrackerRead 'git' @('rev-parse', '--abbrev-ref', 'HEAD')).Out)".Trim()
             if ($branch) { $card = Resolve-P20CardForBranch -Branch $branch -CurrentDir $currentDir }
         }
     }

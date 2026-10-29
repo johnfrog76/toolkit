@@ -89,6 +89,11 @@ still has a `title`; it has no `type` and no `name`.
 | Spike | `Spike.template.md` | Branch; Git; Summary; Question; Findings; Recommendation; Done when; Questions / Blockers |
 | Meeting | `Meeting.template.md` | Branch; Git; When; Where; Who; Purpose; Notes; Outcomes; Follow-ups; Questions / Blockers -- a meeting you ATTENDED, written after the fact (`NewPrompt -Date` puts `**Created:**` on the day it was); a meeting you RUN is the Meeting Agenda Planner's, under `manager/` |
 
+`## Context` (a Task) and `## Summary` (everything else) start with a description: the work item's own,
+for a card made from an id; the text passed to **`NewPrompt -Title ... -Description <text>`**, for a
+card made offline; `(TBD)` when neither gave one. Multi-line text is kept exactly. This is not a parsed
+token -- it is prose a person edits like the rest of the section.
+
 Sections are documents, not a schema: nothing fails if one is missing or renamed, **except the things
 below, which ARE parsed wherever they appear in the file.**
 
@@ -194,7 +199,7 @@ A card can carry a picture: a screen snap of what was wrong (`**Before:**`) and 
 - With `storeSync: git`, `Cover` commits the picture and the card together, the way `Archive` commits a move.
 - `Repair-CardLinks` is not involved: the path is inside the hub and does not move with the package.
 - **From the browser, the same writer** (C2). The card page's drop zone, the header's Replace cover /
-  Add before / Remove cover, and the + dialog's picture field all go one way: the bytes to
+  Add before / Delete the cover, and the + dialog's picture field all go one way: the bytes to
   `POST /api/assets/upload`, which puts them in a temp file under the system temp folder and answers its
   path, writing nothing into the hub; then `Cover <card> <path>` (or `NewPrompt -Cover` / `-Before <path>`)
   through the bridge, which copies the file into `assets/<card key>/` and writes the line, after which the bridge removes the upload's temp folder (success or failure; and the agent sweeps any a day old at start). The route

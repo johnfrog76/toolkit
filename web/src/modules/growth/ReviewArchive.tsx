@@ -25,15 +25,13 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
-import {
-  AddRegular,
-  ArrowRightRegular,
-  DocumentSearchRegular,
-  InfoRegular,
-} from "@fluentui/react-icons";
+import { AddRegular, DocumentSearchRegular, InfoRegular } from "@fluentui/react-icons";
 import { useNavigate } from "react-router";
 import { DialogDismiss } from "../../shared/DialogDismiss";
-import { CardActions } from "../../shared/CardActions";
+import { CardActions, ROW, defineRowMoves } from "../../shared/CardActions";
+import type { CardAction } from "../../shared/CardActions";
+import { ConfirmDialog } from "../../shared/ConfirmDialog";
+import { buildWorkReviewParams, commandResultMessage } from "../ado/cliBridge";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { PageCard } from "../../shared/PageCard";
 import { HubSyncLine } from "../ado/HubSyncLine";
@@ -49,12 +47,19 @@ import {
   useGetEngagementReviewsQuery,
   useGenerateReviewMutation,
   useGetResumeQuery,
+  useRunWorkReviewMutation,
 } from "./api.growth";
 import type { EngagementReviewItem } from "./api.growth";
 import { EmptyState } from "../../shared/EmptyState";
 import { localToday, previousMonth } from "../../utility/dates";
 
 const PAGE_SIZE = 4;
+
+/** The resume's own moves, on no other record. */
+const RESUME_MOVES = defineRowMoves("resume", {
+  generate: { word: "Generate resume scaffold", icon: AddRegular },
+  howItWorks: { word: "How resume updates work", icon: InfoRegular },
+});
 
 function prevMonthStart(): string {
   return previousMonth().start;
@@ -150,11 +155,68 @@ export function orgDisplayName(slug: string, orgs: SpaceInfo[]): string {
   return orgs.find((o) => o.slug === slug)?.name ?? slug;
 }
 
+/**
+ * What the Delete confirm names: the range and the Spaces, so the person
+ * confirms the review they meant -- the same range can exist for two slug-sets.
+ */
+export function deleteReviewWhat(period: string, spaceNames: string[]) {
+  return (
+    <>
+      Delete the review of <strong>{period}</strong> for <strong>{spaceNames.join(", ")}</strong>.
+      Its folder and every file in it are removed -- it does not go to the archive.
+    </>
+  );
+}
+
 function ReviewCard({ item, orgs }: { item: EngagementReviewItem; orgs: SpaceInfo[] }) {
   const styles = useStyles();
   const navigate = useNavigate();
   const folder = item.link.replace("/reviews/", "");
   const orgLabel = (slug: string) => orgDisplayName(slug, orgs);
+  const [runWorkReview, { isLoading: isRunning }] = useRunWorkReviewMutation();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteMessage, setDeleteMessage] = useState<string | null>(null);
+  const [archiveMessage, setArchiveMessage] = useState<string | null>(null);
+
+  // WorkReview through the bridge: the verb is the one writer, this only asks.
+  // A success refetches the list (the mutation invalidates Reviews), so the row
+  // simply leaves it; a refusal is said in the verb's own words.
+  const runMove = async (move: "archive" | "delete"): Promise<string | null> => {
+    try {
+      const result = await runWorkReview({
+        params: buildWorkReviewParams(item.review!, move),
+      }).unwrap();
+      return result.status === "success"
+        ? null
+        : commandResultMessage(result, move === "archive" ? "Archived." : "Deleted.");
+    } catch {
+      return "Could not reach the agent. Nothing was changed.";
+    }
+  };
+
+  // A legacy review (no slug-set folder) has no name the verb takes: no moves.
+  const moves: CardAction[] = [];
+  if (item.review) {
+    if (!item.archived) {
+      moves.push(
+        ROW.archive.action({
+          onClick: async () => {
+            setArchiveMessage(null);
+            setArchiveMessage(await runMove("archive"));
+          },
+        }),
+      );
+    }
+    moves.push(
+      ROW.delete.action({
+        detail: "the review",
+        onClick: () => {
+          setDeleteMessage(null);
+          setConfirmDelete(true);
+        },
+      }),
+    );
+  }
 
   const renderSummary = (text: string) => {
     const parts = text.split(/\*\*(.+?)\*\*/g);
@@ -177,6 +239,11 @@ function ReviewCard({ item, orgs }: { item: EngagementReviewItem; orgs: SpaceInf
             <Badge color="brand" appearance="outline" size="small">
               Review
             </Badge>
+            {item.archived && (
+              <Badge color="subtle" appearance="outline" size="small">
+                Archived
+              </Badge>
+            )}
             {item.spaces.map((org) => (
               <Badge key={org} color="informative" appearance="tint" size="small" title={org}>
                 {orgLabel(org)}
@@ -200,18 +267,48 @@ function ReviewCard({ item, orgs }: { item: EngagementReviewItem; orgs: SpaceInf
               <Caption1>{item.artifactsScanned} artifacts</Caption1>
             </div>
           )}
+          {archiveMessage && (
+            <Caption1
+              role="alert"
+              style={{
+                display: "block",
+                marginTop: tokens.spacingVerticalXS,
+                color: tokens.colorPaletteRedForeground1,
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              {archiveMessage}
+            </Caption1>
+          )}
         </div>
         <CardActions
-          primaryAction={{
-            icon: <ArrowRightRegular />,
-            label: "Open review",
+          primaryAction={ROW.open.action({
+            detail: "the review",
             onClick: () =>
               navigate(
-                `/review/${encodeURIComponent(folder)}?slugs=${encodeURIComponent(item.spaces.join("+"))}`,
+                `/review/${encodeURIComponent(folder)}?slugs=${encodeURIComponent(item.spaces.join("+"))}${item.archived ? "&archived=true" : ""}`,
               ),
-          }}
+          })}
+          secondaryActions={moves}
+          menuLabel={`Actions for the review of ${item.period}`}
+          busy={isRunning}
         />
       </div>
+      <ConfirmDialog
+        open={confirmDelete}
+        what={deleteReviewWhat(item.period, item.spaces.map(orgLabel))}
+        busy={isRunning}
+        message={deleteMessage}
+        onCancel={() => {
+          setDeleteMessage(null);
+          setConfirmDelete(false);
+        }}
+        onConfirm={async () => {
+          const refused = await runMove("delete");
+          if (refused) setDeleteMessage(refused);
+          else setConfirmDelete(false);
+        }}
+      />
     </Card>
   );
 }
@@ -276,27 +373,18 @@ function ResumeItemCard({ lastModified }: { lastModified: string }) {
               </Body1>
             </div>
           </div>
-          {/* The house row: the title is text, View resume the one
+          {/* The house row: the title is text, Open the resume the one
               exposed action, the rest in the menu. The scaffold and the
               how-to used to sit as two bare icons inside the title. */}
           <CardActions
-            primaryAction={{
-              icon: <ArrowRightRegular />,
-              label: "View resume",
+            primaryAction={ROW.open.action({
+              detail: "the resume",
               onClick: () => navigate("/skills"),
-            }}
+            })}
             menuLabel="Actions for the resume"
             secondaryActions={[
-              {
-                icon: <AddRegular />,
-                label: "Generate resume scaffold",
-                onClick: () => setGenerateOpen(true),
-              },
-              {
-                icon: <InfoRegular />,
-                label: "How resume updates work",
-                onClick: () => setInfoOpen(true),
-              },
+              RESUME_MOVES.generate.action({ onClick: () => setGenerateOpen(true) }),
+              RESUME_MOVES.howItWorks.action({ onClick: () => setInfoOpen(true) }),
             ]}
           />
         </div>
@@ -444,14 +532,21 @@ export function ReviewArchive({ activeTag }: { activeTag?: string | null }) {
   const orgs = env?.config.spaces ?? [];
   const activeSpace = env?.config.activeSpace ?? "";
 
-  // filter is one of: "all" | "review" | "resume" | <org slug>
+  // filter is one of: "all" | "review" | "resume" | "archived" | <org slug>.
+  // "archived" is its own value, the way a card list's archive is: an archived
+  // review (reviews/archive/, where WorkReview -Archive moves it) is read under
+  // it and never on any other -- the default list leaves it out.
   const [filter, setFilter] = useState<string>("all");
 
-  const isOrgFilter = filter !== "all" && filter !== "review" && filter !== "resume";
+  const isArchivedFilter = filter === "archived";
+  const isOrgFilter =
+    filter !== "all" && filter !== "review" && filter !== "resume" && !isArchivedFilter;
   const orgQueryArg = isOrgFilter ? filter : "all";
 
-  const { data, isLoading, isFetching, isError, refetch } =
-    useGetEngagementReviewsQuery(orgQueryArg);
+  const { data, isLoading, isFetching, isError, refetch } = useGetEngagementReviewsQuery({
+    slug: orgQueryArg,
+    archived: isArchivedFilter,
+  });
   const { data: resumeData, isFetching: isResumeFetching } = useGetResumeQuery();
   const [generateReview, { isLoading: isGenerating }] = useGenerateReviewMutation();
 
@@ -533,7 +628,9 @@ export function ReviewArchive({ activeTag }: { activeTag?: string | null }) {
         ? "Reviews"
         : filter === "resume"
           ? "Resume"
-          : (orgs.find((o) => o.slug === filter)?.name ?? filter);
+          : isArchivedFilter
+            ? "Archived"
+            : (orgs.find((o) => o.slug === filter)?.name ?? filter);
 
   const isFiltered = activeTag != null || filter !== "all";
   const totalCount = reviews.length + (hasResume ? 1 : 0);
@@ -586,6 +683,9 @@ export function ReviewArchive({ activeTag }: { activeTag?: string | null }) {
                 <Option value="resume" text="Resume">
                   Resume
                 </Option>
+                <Option value="archived" text="Archived">
+                  Archived
+                </Option>
               </OptionGroup>
             </Dropdown>
             <RefreshButton
@@ -629,6 +729,12 @@ export function ReviewArchive({ activeTag }: { activeTag?: string | null }) {
               icon={<DocumentSearchRegular />}
               tone="filtered"
               title={`No reviews matching "${activeTag}"`}
+            />
+          ) : isArchivedFilter ? (
+            <EmptyState
+              icon={<DocumentSearchRegular />}
+              title="No archived reviews"
+              detail="A review's Archive moves it here, out of the default list."
             />
           ) : filter === "resume" ? (
             <EmptyState

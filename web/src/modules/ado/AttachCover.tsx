@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Button, Caption1, makeStyles, tokens } from "@fluentui/react-components";
-import { DeleteRegular, ImageAddRegular, ImageEditRegular } from "@fluentui/react-icons";
-import { CardActions } from "../../shared/CardActions";
+import { ImageAddRegular, ImageEditRegular } from "@fluentui/react-icons";
+import { CardActions, ROW, defineRowMoves } from "../../shared/CardActions";
 import type { CardAction } from "../../shared/CardActions";
 import { ConfirmDialog } from "../../shared/ConfirmDialog";
 import { ImageDropZone } from "../../shared/ImageDropZone";
@@ -21,7 +21,7 @@ import { buildCoverParams, commandResultMessage } from "./cliBridge";
 // picker and paste as the other ways in. With no cover the zone IS the
 // cover's box, under the header, the same 16:10 the picture will fill -- so
 // nothing jumps when the picture lands. With a cover, the header's actions
-// take over: Replace cover, Add before, Remove cover.
+// take over: Replace cover, Add before, Delete the cover.
 
 const useStyles = makeStyles({
   zoneBox: { marginBottom: tokens.spacingVerticalM },
@@ -81,7 +81,14 @@ export function useAttach(filename: string, onDone: () => void) {
   return { send, remove, busy, message, error, clearMessage: () => setMessage(null) };
 }
 
-/** The header's actions for a card that has a cover: Replace, Add before, Remove. */
+/** A cover's own moves; deleting it is the vocabulary's Delete. */
+const COVER_MOVES = defineRowMoves("cover", {
+  replace: { word: "Replace cover", icon: ImageEditRegular },
+  addBefore: { word: "Add before", icon: ImageAddRegular },
+  replaceBefore: { word: "Replace before", icon: ImageAddRegular },
+});
+
+/** The header's actions for a card that has a cover: Replace, Add before, Delete. */
 export function AttachActions({
   filename,
   content,
@@ -100,40 +107,35 @@ export function AttachActions({
   const { remove, busy, error } = useAttach(filename, onDone);
   if (!hasCover) return null;
   const secondary: CardAction[] = [
-    {
-      icon: <ImageAddRegular />,
-      label: hasBefore ? "Replace before" : "Add before",
+    (hasBefore ? COVER_MOVES.replaceBefore : COVER_MOVES.addBefore).action({
       onClick: () => onAsk("before"),
-    },
-    {
-      icon: <DeleteRegular />,
-      label: "Remove cover",
+    }),
+    ROW.delete.action({
+      detail: "the cover",
       onClick: () => setConfirming(true),
       dividerBefore: true,
-    },
+    }),
   ];
   return (
     <>
       <CardActions
-        primaryAction={{
-          icon: <ImageEditRegular />,
-          label: "Replace cover",
+        primaryAction={COVER_MOVES.replace.action({
           onClick: () => onAsk("cover"),
           disabled: busy,
-        }}
+        })}
         menuLabel="Actions for the cover"
         secondaryActions={secondary}
       />
       <ConfirmDialog
         open={confirming}
-        title="Remove the cover?"
+        title="Delete the cover?"
         what={
           <>
             Delete the picture from the Space&apos;s assets/ and the card&apos;s Cover line. The
             card keeps everything else.
           </>
         }
-        confirmLabel="Remove"
+        confirmLabel="Delete"
         busy={busy}
         message={error}
         onConfirm={async () => {
