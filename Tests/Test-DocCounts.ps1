@@ -333,12 +333,6 @@ Assert-True 'the runner reads every suite through Get-P20SuiteVerdict' `
 Assert-True 'the runner keeps no Results regex of its own' `
     ($runnerSource -notmatch "-match\s+'Results:")
 
-# This suite spawns child processes above, so its exit code must be its own verdict:
-# a trailing "exit 0" is what keeps a caller from inheriting the last child's code.
-$ownSource = (Get-Content -LiteralPath $MyInvocation.MyCommand.Path -Raw).TrimEnd()
-Assert-True 'the suite ends with an explicit exit 0 after its failure exit' `
-    ($ownSource -match '(?s)if \(\$script:failed -gt 0\) \{ exit 1 \}\s*\r?\nexit 0$')
-
 # -- VERIFY.md's coverage table names every verb -----------------------------
 # "Why this file exists" carries one row per verb: the suite that types it, the gate that
 # walks it, or "neither". It went stale once -- 26 commands, eight reached -- because

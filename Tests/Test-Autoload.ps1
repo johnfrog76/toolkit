@@ -653,3 +653,4 @@ if (Get-Command Write-P20TestResult -ErrorAction SilentlyContinue) {
 }
 
 if ($script:failed -gt 0) { exit 1 }
+exit 0
