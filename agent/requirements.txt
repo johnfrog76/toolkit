@@ -1,7 +1,7 @@
 # Runtime floors: the versions the agent's suite passes on, and `pip-audit` is clean on
 # (docs/CONTRIBUTING.md, "Dependencies and the audit"). Dependabot moves them.
 # Python 3.12 or newer (docs/QUICKSTART.md, "Requirements"); nothing older is run.
-fastapi>=0.149.0
+fastapi>=0.162.0
 uvicorn[standard]>=0.54.0
 pydantic>=2.14.1
 # The model-assisted routes (suggest, rewrite) call the model through the
