@@ -13,16 +13,14 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import {
-  OpenRegular,
   CloudRegular,
   DocumentAddRegular,
   CheckmarkCircleRegular,
-  DocumentTextRegular,
   PinRegular,
   PinOffRegular,
   FilterRegular,
 } from "@fluentui/react-icons";
-import { CardActions } from "../../shared/CardActions";
+import { CardActions, ROW, defineRowMoves } from "../../shared/CardActions";
 import { CreateButton } from "../../shared/CreateButton";
 import type { CardAction } from "../../shared/CardActions";
 import { CardSpinner } from "../../shared/CardSpinner";
@@ -45,6 +43,26 @@ import { TrackerBadge, trackerName } from "./TrackerBadge";
 import { TaskListSquareLtrRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
 import type { EmptyMessage } from "../../shared/EmptyState";
+
+/** A tracker item's own moves, on no other record. Close and Resolve read like
+ *  Complete and are not it: they close the item on the tracker, and nothing in
+ *  ToolKit moves. */
+const ISSUE_MOVES = defineRowMoves("issue", {
+  makeCard: { word: "Make a card", icon: DocumentAddRegular },
+  close: {
+    word: "Close issue",
+    icon: CheckmarkCircleRegular,
+    differentMove: "It closes the issue on the tracker; nothing in ToolKit is completed or moved.",
+  },
+  resolve: {
+    word: "Resolve Work Item",
+    icon: CheckmarkCircleRegular,
+    differentMove:
+      "It resolves the work item on the tracker; nothing in ToolKit is completed or moved.",
+  },
+  pin: { word: "Pin on", icon: PinRegular },
+  unpin: { word: "Unpin", icon: PinOffRegular },
+});
 
 const useStyles = makeStyles({
   itemCard: {
@@ -135,34 +153,27 @@ function WorkItemRow({
 }) {
   const styles = useStyles();
   const navigate = useNavigate();
-  const external: CardAction = {
-    icon: <OpenRegular />,
-    label: isGithub ? `Open on ${tracker}` : "Open in ADO",
-    href: item.url,
-  };
+  const external: CardAction = ROW.external.action({ detail: tracker, href: item.url });
   // The pin: the tracker's own, so the words name the tracker. What is
   // pinned can be unpinned from the same place -- a closed issue still pinned
   // keeps its Unpin, so a pin is never stuck.
   const pin: CardAction | null = onTogglePin
-    ? {
-        icon: item.pinned ? <PinOffRegular /> : <PinRegular />,
-        label: item.pinned ? "Unpin" : `Pin on ${tracker}`,
-        onClick: () => onTogglePin(item),
-        disabled: pinBusy,
-      }
+    ? item.pinned
+      ? ISSUE_MOVES.unpin.action({ onClick: () => onTogglePin(item), disabled: pinBusy })
+      : ISSUE_MOVES.pin.action({
+          detail: tracker,
+          onClick: () => onTogglePin(item),
+          disabled: pinBusy,
+        })
     : null;
-  const pickUp: CardAction = {
-    icon: <DocumentAddRegular />,
-    // The same act on both trackers, so the same words: the row is
-    // already the place, the card is the thing it makes.
-    label: "Make a card",
+  // The same act on both trackers, so the same words: the row is
+  // already the place, the card is the thing it makes.
+  const pickUp: CardAction = ISSUE_MOVES.makeCard.action({
     onClick: () => onCreateFrom(String(item.id)),
-  };
-  const close: CardAction = {
-    icon: <CheckmarkCircleRegular />,
-    label: isGithub ? "Close issue" : "Resolve Work Item",
+  });
+  const close: CardAction = (isGithub ? ISSUE_MOVES.close : ISSUE_MOVES.resolve).action({
     onClick: () => onResolve(String(item.id), item.type),
-  };
+  });
   return (
     <Card className={styles.itemCard} size="small" appearance="outline">
       <div className={styles.itemHeader}>
@@ -179,19 +190,16 @@ function WorkItemRow({
         <CardActions
           primaryAction={
             isGithub
-              ? {
-                  icon: <DocumentTextRegular />,
-                  label: "Open the issue",
+              ? ROW.open.action({
+                  detail: "the issue",
                   onClick: () =>
                     navigate(`/issue/${item.id}?repo=${encodeURIComponent(item.project)}`),
-                }
+                })
               : external
           }
           menuLabel={`Actions for ${item.title}`}
           secondaryActions={
-            isGithub
-              ? [pickUp, close, ...(pin ? [pin] : []), { ...external, dividerBefore: true }]
-              : [pickUp, close]
+            isGithub ? [pickUp, close, ...(pin ? [pin] : []), external] : [pickUp, close]
           }
         />
       </div>

@@ -73,6 +73,7 @@ if ($Help) {
 
 . (Join-Path $PSScriptRoot 'Resolve-HubConfig.ps1')
 . (Join-Path $PSScriptRoot 'Write-CardText.ps1')
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 $consts = Get-P20Consts
 $idKey = $consts.design.idKey
 $archiveName = $consts.folders.archive
@@ -124,7 +125,7 @@ if ($Hub) {
 }
 else {
     $top = ''
-    try { $top = "$(git rev-parse --show-toplevel 2>$null)".Trim() } catch { $top = '' }
+    try { $top = "$((Invoke-P20TrackerRead 'git' @('rev-parse', '--show-toplevel')).Out)".Trim() } catch { $top = '' }
     if (-not $top) {
         Write-CliError -Message "$((Get-Location).Path) is not inside a git repository." `
             -Hint "Run it from the repository whose design/ you mean to stamp, or use -Hub for the hub's."

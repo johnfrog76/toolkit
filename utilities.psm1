@@ -1692,6 +1692,7 @@ function global:Get-P20PromptFromWorkItem {
     param(
         [Parameter(Position = 0)][Alias('Id')][string]$WorkItemId,
         [string]$Title,
+        [string]$Description,
         [string]$Type,
         [string]$AssignTo,
         [string]$Date,

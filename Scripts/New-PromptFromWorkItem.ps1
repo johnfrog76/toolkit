@@ -16,6 +16,13 @@ param(
     [Parameter(Mandatory = $false)]
     [string]$Title = "",
 
+    # Offline mode only (beside -Title): the text that goes where the ADO-linked
+    # path puts a work item's description -- ## Context for a Task, ## Summary for
+    # everything else. Multi-line is fine; a quoted string already carries embedded
+    # newlines. Omitted, the card reads (TBD) there exactly as it always has.
+    [Parameter(Mandatory = $false)]
+    [string]$Description = "",
+
     # Any key in workItemTypes (config) -- Task, Bug, User Story, Feature by
     # default. 'UserStory' and 'userstory' are accepted for the one that has a
     # space in it, because a shell argument with a space is a nuisance.
@@ -845,7 +852,7 @@ if ($script:LocalMode) {
         Type               = $resolvedType
         Id                 = $localId
         Title              = $Title
-        Description        = '(TBD)'
+        Description        = if ($Description) { $Description } else { '(TBD)' }
         ReproSteps         = if ($resolvedType -eq 'Bug') { '(TBD)' } else { '' }
         AcceptanceCriteria = '- [ ] (TBD)'
         Sprint             = $notLinked
