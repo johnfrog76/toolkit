@@ -1149,18 +1149,35 @@ $rawTrackerAllowed = @{
 }
 $rawTrackerPattern = '(?<![\w$-])(gh|az|git)\s[^|\r\n]*(2>|\*>)'
 function Get-RawTrackerCalls {
-    # Every match of the pattern that starts outside a comment and a string.
+    # Every match of the pattern that starts outside a comment and a string --
+    # except inside an expandable string's own $(...), which is code, not text.
+    # A naive token-skip treats a whole "...$(git x 2>$null)..." as one STRING
+    # token and never looks inside it; the AST's SubExpressionAst nodes are
+    # exactly those $(...) spans, wherever they sit (bare in code or nested in
+    # a string), so a match inside one is read even though it is also inside
+    # the string token that contains it.
     param([string]$Text)
     $tokens = $null; $parseErrors = $null
-    [void][System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$tokens, [ref]$parseErrors)
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$tokens, [ref]$parseErrors)
     $skip = @($tokens | Where-Object {
             $_.Kind -eq 'Comment' -or $_ -is [System.Management.Automation.Language.StringToken]
         })
+    $execRanges = @()
+    if ($ast) {
+        $execRanges = @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.SubExpressionAst] }, $true) |
+            ForEach-Object { $_.Extent })
+    }
     $found = @()
     foreach ($m in [regex]::Matches($Text, $rawTrackerPattern)) {
         $inside = $false
         foreach ($t in $skip) {
-            if ($m.Index -ge $t.Extent.StartOffset -and $m.Index -lt $t.Extent.EndOffset) { $inside = $true; break }
+            if ($m.Index -ge $t.Extent.StartOffset -and $m.Index -lt $t.Extent.EndOffset) {
+                $inside = $true
+                foreach ($e in $execRanges) {
+                    if ($m.Index -ge $e.StartOffset -and $m.Index -lt $e.EndOffset) { $inside = $false; break }
+                }
+                break
+            }
         }
         if ($inside) { continue }
         $lineNo = ([regex]::Matches($Text.Substring(0, $m.Index), "`n")).Count + 1
