@@ -9,6 +9,10 @@
       - the STATE RULE, Resolve-P20DesignState, over the ONE table both halves
         assert (Tests/fixtures/design/states.json; Tests/test_design.py is the
         agent's side of it) -- state, outcome, mismatch and Closed, row for row;
+      - the TITLE RULE, Get-P20DesignTitle, over the ONE table both halves
+        assert (Tests/fixtures/design/titles.json; Tests/test_design.py is the
+        agent's side) -- a leading `# `, else the line after `## Title`, else
+        the file's name;
       - the TREE READER, Read-P20DesignTree, over a scratch tree: the four
         folders, grouping by id, a file with no id counted and not shown, two
         notes with one id a conflict, README.md skipped, CRLF read the same,
@@ -107,6 +111,21 @@ try {
         Assert-Equal "$($row.name): outcome" $expectedOutcome $r.Outcome
         Assert-Equal "$($row.name): mismatch" ([bool]$e.mismatch) $r.Mismatch
         Assert-Equal "$($row.name): closed" ([string]$e.closed) $r.Closed
+    }
+
+    # -- 1b. The title rule over the shared table -----------------------------
+    # Get-P20DesignTitle over the ONE table the agent's parse_doc asserts too
+    # (Tests/fixtures/design/titles.json; Tests/test_design.py is its side), #147.
+    Write-Host ""
+    Write-Host "-- Get-P20DesignTitle: the shared table -----------------" -ForegroundColor Cyan
+
+    $titleTable = Get-Content (Join-Path $pkgRoot 'Tests/fixtures/design/titles.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+    Assert-True 'the title table has its rows' (@($titleTable.rows).Count -ge 4)
+    foreach ($row in @($titleTable.rows)) {
+        $eol = "`n"
+        if ($row.crlf) { $eol = "`r`n" }
+        $text = (@($row.lines) -join $eol) + $eol
+        Assert-Equal "title: $($row.name)" ([string]$row.expected) (Get-P20DesignTitle -Text $text -Name ([string]$row.file))
     }
 
     # -- 2. The tree reader --------------------------------------------------

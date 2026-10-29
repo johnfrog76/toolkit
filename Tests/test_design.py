@@ -515,7 +515,7 @@ class TheParser(unittest.TestCase):
         ("---\ntitle: not read\n---\nno heading\n", "x.md", ("x.md", "", None)),
         ("# T\n> GitHub: https://github.com/o/r/issues/7\n", "x.md", ("T", "", 7)),
         ("# T\n> GitHub: https://github.com/o/r/pull/7\n", "x.md", ("T", "", None)),
-        ("## Not a title\n# The title\n", "x.md", ("The title", "", None)),
+        ("## Not a title\n# Deep in the body\n", "x.md", ("x.md", "", None)),  # #147: not a title
         ("---\r\ndescription: 'crlf'\r\n---\r\n# CRLF\r\n", "x.md", ("CRLF", "crlf", None)),
     ]
 
@@ -523,6 +523,28 @@ class TheParser(unittest.TestCase):
         for text, name, (title, desc, num) in self.ROWS:
             got = design.parse_doc(text, name)
             self.assertEqual((got[0], got[1], got[3]), (title, desc, num), text)
+
+
+TITLES = Path(__file__).parent / "fixtures" / "design" / "titles.json"
+
+
+class TheTitleRule(unittest.TestCase):
+    """How a note's or a spec's title is read, over the ONE table both halves
+    assert (Tests/fixtures/design/titles.json; tkTestToolkit -Design is the
+    CLI's side), row for row -- through parse_doc (a hub note, a doc) and
+    through the repo listing's row (design_fields, then design_doc), for a
+    note in design/ and a spec in spec/ alike."""
+
+    def test_every_row(self):
+        table = json.loads(TITLES.read_text(encoding="utf-8"))
+        self.assertGreaterEqual(len(table["rows"]), 4)
+        for row in table["rows"]:
+            with self.subTest(row["name"]):
+                text = ("\r\n" if row["crlf"] else "\n").join(row["lines"]) + "\n"
+                self.assertEqual(design.parse_doc(text, row["file"])[0], row["expected"])
+                folder = "spec" if row["file"].endswith(".spec.md") else "design"
+                doc = design.parse_design_doc(text, f"{folder}/{row['file']}")
+                self.assertEqual(doc.title, row["expected"])
 
 
 FIXTURE = Path(__file__).parent / "fixtures" / "design" / "states.json"
