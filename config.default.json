@@ -19,6 +19,10 @@
   "firstRun": {
     "welcome": false
   },
+  "_deck": "The deck module's per-machine settings. archived is the decks this machine has put away, by deck id, as a JSON array: the Decks card leaves them out of its default list and shows them under its archived filter. The deck file is never edited -- a deck's own state is the studio's. Written by the deck page's Archive, through Config.",
+  "deck": {
+    "archived": []
+  },
   "_web": "Settings for the web UI and the agent that serves it. agentPort is where the agent listens; corsOrigins is the list of dev-server origins allowed to call it. Both used to be fixed numbers in source, which meant a second person could not choose their own ports. Leave corsOrigins empty to accept the two defaults (5173, 5174).",
   "web": {
     "agentPort": 4100,

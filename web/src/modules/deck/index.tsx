@@ -2,6 +2,7 @@ import { Suspense, lazy } from "react";
 import { Spinner } from "@fluentui/react-components";
 import { HOME_BANNER_SLOT } from "../../shell/slots";
 import type { ToolkitModule } from "../../shell/registry";
+import { DECKS_HOME, DECK_PAGE_ROUTE, DECK_PLAY_PREFIX } from "./paths";
 
 /**
  * The deck module: a presentation engine where a slide is a React component.
@@ -31,6 +32,10 @@ const DeckLauncher = lazy(() =>
 // slide, and a person who has dismissed it should never download it.
 const HomeBanner = lazy(() => import("./HomeBanner"));
 
+// A deck's page: what the deck file says about it, Play, and this machine's
+// Archive -- between the list and the player (docs/modules/deck.md, "A deck's page").
+const DeckPage = lazy(() => import("./DeckPage").then((m) => ({ default: m.DeckPage })));
+
 const loading = <Spinner size="tiny" label="Loading decks..." />;
 
 function Launcher() {
@@ -41,7 +46,7 @@ function Launcher() {
   );
 }
 
-export const DECKS_HOME = "/decks";
+export { DECKS_HOME };
 
 export const deckModule: ToolkitModule = {
   id: "deck",
@@ -64,12 +69,20 @@ export const deckModule: ToolkitModule = {
       ),
     },
     { path: DECKS_HOME, element: <Launcher /> },
+    {
+      path: DECK_PAGE_ROUTE,
+      element: (
+        <Suspense fallback={loading}>
+          <DeckPage />
+        </Suspense>
+      ),
+    },
   ],
   nav: [
     {
       label: "Decks",
       to: DECKS_HOME,
-      match: (p) => p === DECKS_HOME,
+      match: (p) => p === DECKS_HOME || p.startsWith(`${DECKS_HOME}/`),
       // Under the Growth tab when there is one; a tab of its own when there is not.
       hidden: (ctx) => ctx.env?.features?.growth === true,
     },
@@ -89,5 +102,6 @@ export const deckModule: ToolkitModule = {
         : [],
   },
   // A deck is a room of its own: the player and its notes window take the screen.
-  chromeless: (pathname) => pathname.startsWith("/deck/"),
+  // A deck's PAGE (/decks/<id>) is not: it is read inside the shell like every other record.
+  chromeless: (pathname) => pathname.startsWith(DECK_PLAY_PREFIX),
 };

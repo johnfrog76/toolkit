@@ -192,6 +192,19 @@ and the count ignores the board's filters. `Status` opens with the same line (`d
 | 5 | 5 | `in play 5`, quiet |
 | 5 | 7 | `in play 7 of 5`, **amber** |
 
+### The Decks card, by what this machine has archived (`scenarios.test.tsx`; the rules `deckList.test.ts`, the render `DeckPickerCard.archive.test.tsx`)
+
+`deck.archived` is a machine list of deck ids, written by a deck's page (**Archive**, **Unarchive**)
+through `Config` and served by `/env` as `config.deckArchived`; the deck files are never edited
+(`docs/modules/deck.md`, "A deck's page"). With the deck module on, the two shipped decks, both
+Complete, so no state chip is drawn in any row:
+
+| `deck.archived` | The Decks card lists | Its chips | Under **archived** |
+| --- | --- | --- | --- |
+| unset (the shipped config) | Introducing ToolKit, the Trailer | none | -- (no chip) |
+| `["the-toolkit"]` | the Trailer alone; the header counts 1 | **All 1 · archived 1** | Introducing ToolKit, whose page says `archived on this machine` |
+| both ids | nothing: `Every deck is archived on this machine -- the archived filter shows them.` | **All 0 · archived 2** | both |
+
 ### The settings drawer's "How do I…" (settings by workflow; `HowDoI.test.tsx`)
 
 | Opened | What the section shows |

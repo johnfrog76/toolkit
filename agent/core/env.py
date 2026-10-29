@@ -23,6 +23,7 @@ from .config import (
     ado_enabled,
     anthropic_configured,
     card_types,
+    deck_archived,
     how_i_work,
     hub_configured,
     hub_detail,
@@ -350,6 +351,9 @@ def _config_block(cfg: dict) -> dict:
         # The first-run banner's switch. The web renders it only when this
         # is true AND the deck module is on.
         "firstRunWelcome": bool((cfg.get("firstRun") or {}).get("welcome", False)),
+        # deck.archived: the decks this machine has put away, by id. The Decks
+        # card leaves them out of its default list; the deck file is untouched.
+        "deckArchived": deck_archived(cfg),
         # limits.inPlay: the WIP number the board's Active column warns past, or
         # null when there is none. The web reads it here and keeps no reader of
         # its own; the CLI's Status line is the other half (Get-InPlayLine.ps1).

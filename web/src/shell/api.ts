@@ -130,6 +130,8 @@ export interface EnvStatus {
     isDemoDismissed?: boolean;
     /** `firstRun.welcome`: the first-run banner is on. Set by tkStart, cleared by the banner. */
     firstRunWelcome?: boolean;
+    /** `deck.archived`: the decks this machine has put away, by id. The deck files are untouched. */
+    deckArchived?: string[];
     /** `limits.inPlay`: the WIP number the Active column goes amber past; null when none is set. */
     inPlayLimit?: number | null;
   };
