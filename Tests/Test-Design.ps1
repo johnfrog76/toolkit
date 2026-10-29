@@ -115,7 +115,7 @@ try {
 
     # -- 1b. The title rule over the shared table -----------------------------
     # Get-P20DesignTitle over the ONE table the agent's parse_doc asserts too
-    # (Tests/fixtures/design/titles.json; Tests/test_design.py is its side), #147.
+    # (Tests/fixtures/design/titles.json; Tests/test_design.py is its side).
     Write-Host ""
     Write-Host "-- Get-P20DesignTitle: the shared table -----------------" -ForegroundColor Cyan
 

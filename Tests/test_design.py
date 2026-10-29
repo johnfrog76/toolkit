@@ -515,7 +515,7 @@ class TheParser(unittest.TestCase):
         ("---\ntitle: not read\n---\nno heading\n", "x.md", ("x.md", "", None)),
         ("# T\n> GitHub: https://github.com/o/r/issues/7\n", "x.md", ("T", "", 7)),
         ("# T\n> GitHub: https://github.com/o/r/pull/7\n", "x.md", ("T", "", None)),
-        ("## Not a title\n# Deep in the body\n", "x.md", ("x.md", "", None)),  # #147: not a title
+        ("## Not a title\n# Deep in the body\n", "x.md", ("x.md", "", None)),  # a deep `# ` is not a title
         ("---\r\ndescription: 'crlf'\r\n---\r\n# CRLF\r\n", "x.md", ("CRLF", "crlf", None)),
     ]
 
