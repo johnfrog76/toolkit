@@ -10,6 +10,7 @@ release.
 
 ### Added
 
+- `GetPRComments` now works on a GitHub Space: it reads a pull request's inline review comments, its conversation and its reviews' summaries through `gh`, and appends them to the card exactly as it does for Azure DevOps -- safe to re-run, a reviewer's follow-ups included. The card's own `PR URL:` line tells it which repository to read, so it works from the browser with no checkout.
 - A work review's row on the Reviews card now offers **Archive** and **Delete**, and the new `WorkReview` command does the same from the terminal: Archive moves the review under `reviews/archive/` with a closed date in its `review.md`, Delete removes a draft for good after asking, and the list's new **Archived** filter shows the reviews you put away. A review's row also no longer shows its raw `orgs: [...]` line as its summary.
 - `NewPrompt -Title ... -Description <text>` fills a new card's Context or Summary with that text instead of leaving it `(TBD)`; the New ToolKit Card dialog has a matching description field.
 

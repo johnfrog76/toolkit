@@ -67,7 +67,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `NewItem` | `EditItem` (typed, `-FromCard` only, with `gh` stubbed); `Tests/test_studio.py` (typed, `-FromDesign` only) | 6; 12 (`-FromCard` against the GitHub demo) |
 | `NewPR` | `PullRequest` (script only: the Described Changes parser) | 6 |
 | `PublishPR` | `PublishPR` (typed, with `az`, `gh` and the REST call stubbed) | 6; 12 (a real draft on a real Azure DevOps org: the row under "Rows added by a fix") |
-| `GetPRComments` | `PRComments` (script only: the thread filter, follow-ups, the side record; not the live fetch) | 6 |
+| `GetPRComments` | `PRComments` (script: the thread filter, follow-ups, the side record; on a GitHub Space typed, with `gh` and `git` stubbed: the three channels, the repository from the card, a refusal on a board of several repositories, no `&` in any argument) | 6; 12 (a real GitHub pull request: the row under "Rows added by a fix") |
 | `ReplyPR` | `PRComments` (script only: the reply written into the card; not the live post) | 6 |
 | `AddPRReview` | `ExitCodes` (the missing-key refusal; the branch search's and the details fetch's 401/403/404 with the REST call stubbed) | 12 (a real expired token) |
 | `ThreadHash` | `ThreadHash` (script only) | 6 |
@@ -287,7 +287,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **47 suites, 8326 assertions** with a `config.local.json`, every one
+findings. On this commit that is **47 suites, 8387 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -1008,6 +1008,13 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   card in `current/` that has commit bullets, `tkStandup`: its line reads `(<n> commits)` or
   `(started, ...)`, and `tkStandup -Brief` opens on `Since <day>: ...`. Closes Feature RC6D (the standup says
   what moved).
+- [ ] **GetPRComments reads a real GitHub pull request, under Windows PowerShell 5.1 too.** In a GitHub
+  Space whose card in `current/` carries the `PR URL:` of a real pull request with at least one inline
+  review comment, one reply to it and one conversation comment, run `tkGetPRComments <n>` from the
+  Toolkit's own folder in `powershell` (5.1), then again. You should see the inline thread with its file
+  and line and the reply as its follow-up, the conversation comment as its own block, any review with
+  text as `Status: review, ...`, exit 0 -- and the second run adding nothing and rewriting nothing. Then
+  `tkTestToolkit -PRComments` on that host: green. Added with GetPRComments on GitHub (the read side).
 - [ ] **The cold-agent walk: the hand-off block starts the work without a question.** With
   `features.solitaireAgile` on in a GitHub Space answered `agents`, run `tkStartWork <id>` for a real card in
   `current/`, and once for an open issue no card carries; paste each output, whole, into a fresh editor chat
