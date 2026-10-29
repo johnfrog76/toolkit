@@ -63,6 +63,10 @@ export interface NewCardFields {
   title: string;
   /** A configured card type name, as `/env.cardTypes` spells it ("User Story"). */
   type: string;
+  /** Optional: fills the card's Context (a Task) or Summary (everything else)
+   *  in place of `(TBD)`, the same slot an ADO-linked card fills from the work
+   *  item's own description. Multi-line is kept, as `-Description <text>`. */
+  description?: string;
   /** A picture at birth (docs/hub/cards.md, "A card's pictures"): the temp
    *  path the upload route answered, as `-Cover <path>` -- or `-Before <path>`
    *  when the snap shows what is wrong. The verb copies it in and writes the line. */
@@ -104,6 +108,7 @@ export function buildCoverParams(fields: CoverFields): string[] {
  */
 export function buildNewCardParams(fields: NewCardFields): string[] {
   const params = ["-Title", fields.title.trim(), "-Type", fields.type.replace(/\s+/g, "")];
+  if (fields.description?.trim()) params.push("-Description", fields.description);
   if (fields.cover?.trim()) params.push("-Cover", fields.cover.trim());
   if (fields.before?.trim()) params.push("-Before", fields.before.trim());
   return params;

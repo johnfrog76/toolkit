@@ -146,6 +146,84 @@ try {
     Assert-True 'NewPrompt -Now writes the card to current/, not backlog/' ((Find-Card 'TaskT3MX-*.prompt.md' 'current').Count -eq 1 -and (Find-Card 'TaskT3MX-*.prompt.md' $consts.folders.backlog).Count -eq 0)
     $retired = Find-Card 'TaskW4CY-*.prompt.md' 'archive'
     Assert-True 'Archive retires a planned card straight from backlog/, with the Closed stamp' ($out -match 'ARCH=0' -and $retired.Count -eq 1 -and ([System.IO.File]::ReadAllText($retired[0].FullName)) -match [regex]::Escape($consts.stamps.closed) -and (Find-Card 'TaskW4CY-*.prompt.md' $consts.folders.backlog).Count -eq 0) $out
+
+    Write-Host ""
+    Write-Host "-- A card's full path works whichever Space is active -------" -ForegroundColor Cyan
+    # Two Spaces in one hub. Every card below belongs to beta; every verb that acts
+    # on one runs with P20_ACTIVE_SPACE=alpha and names the card by its full path.
+    $sHub = Join-Path $base 'spaces-hub'
+    New-Item -ItemType Directory -Path $sHub -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $sHub 'hub.json'),
+        '{ "hub": 1, "spaces": [ { "slug": "alpha", "name": "Alpha", "status": "local", "promptsFolder": "alpha" }, { "slug": "beta", "name": "Beta", "status": "local", "promptsFolder": "beta" } ] }',
+        (New-Object System.Text.UTF8Encoding($false)))
+    function Invoke-InSpace {
+        param([string]$Space, [string]$Commands)
+        $pre = "`$env:PSModulePath = '$pkgRoot'; `$env:PROMPTS_ROOT = '$sHub'; `$env:P20_ACTIVE_SPACE = '$Space'; `$env:P20_USAGE_LOG_DIR = '$log'; " +
+            "Import-Module '$pkgRoot/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; "
+        return (& pwsh -NoProfile -NonInteractive -Command ($pre + $Commands) 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    }
+    function Get-SpaceCard { param([string]$Space, [string]$Folder, [string]$Filter)
+        $dir = Join-Path (Join-Path $sHub $Space) $Folder
+        if (-not (Test-Path -LiteralPath $dir)) { return @() }
+        return @(Get-ChildItem -LiteralPath $dir -File -Filter $Filter) }
+
+    $out = Invoke-InSpace 'beta' ("${prefix}NewPrompt -Title 'Belongs to beta' -Type Task -Id H6PN | Out-Null; " +
+        "${prefix}NewPrompt -Title 'Also beta' -Type Task -Id J7RT | Out-Null; 'MADE=' + `$LASTEXITCODE")
+    $planned = Get-SpaceCard 'beta' $consts.folders.backlog 'TaskH6PN-*.prompt.md'
+    Assert-True 'the beta cards were made in beta/backlog/' ($planned.Count -eq 1 -and (Get-SpaceCard 'beta' $consts.folders.backlog 'TaskJ7RT-*.prompt.md').Count -eq 1) $out
+    $plannedPath = $planned[0].FullName
+
+    # The finding, exactly: a full path into another Space refused with "No card matching".
+    $out = Invoke-InSpace 'alpha' "${prefix}Move '$plannedPath' -To Active; 'PULL=' + `$LASTEXITCODE"
+    $pulled = Get-SpaceCard 'beta' $consts.folders.current 'TaskH6PN-*.prompt.md'
+    Assert-True "Move <beta's backlog path> -To Active, with alpha active: exit 0, into beta/current/" ($out -match 'PULL=0' -and $pulled.Count -eq 1 -and (Get-SpaceCard 'beta' $consts.folders.backlog 'TaskH6PN-*.prompt.md').Count -eq 0) $out
+    Assert-True 'and nothing landed in alpha' ((Get-SpaceCard 'alpha' $consts.folders.current '*.prompt.md').Count -eq 0 -and (Get-SpaceCard 'alpha' $consts.folders.backlog '*.prompt.md').Count -eq 0)
+    $inPlayPath = if ($pulled.Count -eq 1) { $pulled[0].FullName } else { Join-Path (Join-Path (Join-Path $sHub 'beta') $consts.folders.current) $planned[0].Name }
+
+    $out = Invoke-InSpace 'alpha' "${prefix}Move '$inPlayPath' -To Backlog; 'PARK=' + `$LASTEXITCODE"
+    Assert-True "Move <beta's current path> -To Backlog parks it in BETA's backlog/, not alpha's" ($out -match 'PARK=0' -and (Get-SpaceCard 'beta' $consts.folders.backlog 'TaskH6PN-*.prompt.md').Count -eq 1 -and (Get-SpaceCard 'alpha' $consts.folders.backlog '*.prompt.md').Count -eq 0) $out
+    $out = Invoke-InSpace 'alpha' "${prefix}Move '$plannedPath' -To InProgress; 'IP=' + `$LASTEXITCODE"
+    $started = Get-SpaceCard 'beta' $consts.folders.current 'TaskH6PN-*.prompt.md'
+    Assert-True "Move <beta's backlog path> -To InProgress pulls it into beta/current/ and writes Started" ($out -match 'IP=0' -and $started.Count -eq 1 -and ([System.IO.File]::ReadAllText($started[0].FullName)) -match [regex]::Escape($consts.stamps.started)) $out
+    $startedPath = $inPlayPath
+
+    $out = Invoke-InSpace 'alpha' "${prefix}Plan '$startedPath' -Milestone 'Sprint 9'; 'PLAN=' + `$LASTEXITCODE"
+    Assert-True "Plan <beta's current path> -Milestone writes the Sprint line on that card" ($out -match 'PLAN=0' -and (Test-Path -LiteralPath $startedPath) -and ([System.IO.File]::ReadAllText($startedPath)) -match '\*\*Sprint:\*\* Sprint 9') $out
+
+    $out = Invoke-InSpace 'alpha' "${prefix}Move '$startedPath' -To Done; 'DONE=' + `$LASTEXITCODE"
+    $done = Get-SpaceCard 'beta' $consts.folders.archive 'TaskH6PN-*.prompt.md'
+    Assert-True "Move <beta's current path> -To Done archives it into BETA's archive/, stamped Closed" ($out -match 'DONE=0' -and $done.Count -eq 1 -and ([System.IO.File]::ReadAllText($done[0].FullName)) -match [regex]::Escape($consts.stamps.closed) -and (Get-SpaceCard 'alpha' $consts.folders.archive '*.prompt.md').Count -eq 0) $out
+    $donePath = Join-Path (Join-Path (Join-Path $sHub 'beta') $consts.folders.archive) $planned[0].Name
+
+    $out = Invoke-InSpace 'alpha' ("${prefix}Archive '$donePath'; 'AGAIN=' + `$LASTEXITCODE; " +
+        "${prefix}Move '$donePath' -To CodeReview; 'FROMARCH=' + `$LASTEXITCODE")
+    Assert-True 'Archive <an archived path> says it is already archived, exit 0' ($out -match 'AGAIN=0' -and $out -match 'Already archived') $out
+    Assert-True 'Move <an archived path> is refused, exit 2: a path into archive/ is not a card in play' ($out -match 'FROMARCH=2' -and $out -match 'No card matching') $out
+
+    $otherPath = Join-Path (Join-Path (Join-Path $sHub 'beta') $consts.folders.backlog) 'TaskJ7RT-also-beta.prompt.md'
+    $out = Invoke-InSpace 'alpha' "${prefix}Archive '$otherPath'; 'ARCHPATH=' + `$LASTEXITCODE"
+    Assert-True "Archive <beta's backlog path>, with alpha active: into beta/archive/" ($out -match 'ARCHPATH=0' -and (Get-SpaceCard 'beta' $consts.folders.archive 'TaskJ7RT-*.prompt.md').Count -eq 1) $out
+
+    # A folder named backlog/ OUTSIDE the hub is not a Space's backlog: the path is
+    # refused, and nothing is moved or staged -- the leaf name alone is not the hub.
+    $strayDir = Join-Path (Join-Path $base 'elsewhere') $consts.folders.backlog
+    New-Item -ItemType Directory -Path $strayDir -Force | Out-Null
+    $strayPath = Join-Path $strayDir 'TaskZ9Y8-not-a-hub-card.prompt.md'
+    [System.IO.File]::WriteAllText($strayPath, "# Task Z9Y8: not a hub card`n", (New-Object System.Text.UTF8Encoding($false)))
+    $out = Invoke-InSpace 'alpha' ("${prefix}Archive '$strayPath'; 'STRAYARCH=' + `$LASTEXITCODE; " +
+        "${prefix}Move '$strayPath' -To Active; 'STRAYMOVE=' + `$LASTEXITCODE")
+    Assert-True 'Archive <a backlog/ path outside the hub> is refused, exit 2, and the file stays put' ($out -match 'STRAYARCH=2' -and (Test-Path -LiteralPath $strayPath) -and -not (Test-Path -LiteralPath (Join-Path (Join-Path $base 'elsewhere') $consts.folders.archive))) $out
+    Assert-True 'Move <the same path> -To Active is refused too, exit 2, nothing written beside it' ($out -match 'STRAYMOVE=2' -and $out -match 'No card matching' -and (Test-Path -LiteralPath $strayPath) -and -not (Test-Path -LiteralPath (Join-Path (Join-Path $base 'elsewhere') $consts.folders.current))) $out
+
+    # What must not move: an id and a partial name still read the ACTIVE Space only,
+    # and a partial name still refuses a non-interactive caller.
+    $out = Invoke-InSpace 'beta' "${prefix}NewPrompt -Title 'Gamma ray burst' -Type Task -Id M3XC -Now | Out-Null; 'MADE=' + `$LASTEXITCODE"
+    $out = Invoke-InSpace 'alpha' ("${prefix}Move M3XC -To InProgress; 'BYID=' + `$LASTEXITCODE; " +
+        "${prefix}Move 'gamma-ray' -To InProgress; 'BYNAME=' + `$LASTEXITCODE")
+    Assert-True "with alpha active, beta's card by ID is not found: an id reads the active Space" ($out -match 'BYID=2' -and $out -match "No card with id 'M3XC'") $out
+    Assert-True "and by partial name is not found either" ($out -match 'BYNAME=2' -and $out -match "No card matching 'gamma-ray'") $out
+    $out = Invoke-InSpace 'beta' "`$env:TOOLKIT_QUIET_STARTUP = '1'; try { ${prefix}Archive 'gamma-ray' } catch { 'RAISED: ' + `$_.Exception.Message }; 'QUIET=' + `$LASTEXITCODE"
+    Assert-True 'a partial name still refuses a non-interactive caller, exit 2, and moves nothing' ($out -match 'QUIET=2' -and $out -match 'only by partial name' -and (Get-SpaceCard 'beta' $consts.folders.current 'TaskM3XC-*.prompt.md').Count -eq 1) $out
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
