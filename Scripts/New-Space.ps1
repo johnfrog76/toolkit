@@ -556,8 +556,8 @@ $cardsCurrent = 0
 $cardsArchive = 0
 $cardsBacklog = 0
 if ($adopted) {
-    $cur = Join-Path $folder 'current'
-    $arc = Join-Path $folder 'archive'
+    $cur = Join-Path $folder ([string](Get-P20Consts).folders.current)
+    $arc = Join-Path $folder ([string](Get-P20Consts).folders.archive)
     $blg = Join-Path $folder 'backlog'
     if (Test-Path -LiteralPath $blg) { $cardsBacklog = @(Get-ChildItem -LiteralPath $blg -File -Filter '*.md' -ErrorAction SilentlyContinue).Count }
     if (Test-Path -LiteralPath $cur) { $cardsCurrent = @(Get-ChildItem -LiteralPath $cur -File -Filter '*.md' -ErrorAction SilentlyContinue).Count }
@@ -606,7 +606,7 @@ if ($WhatIf) {
         Write-Host ""
         foreach ($pair in $pairs) { Write-Host "  [WhatIf] ${prefix}Config -Set $pair -Hub" -ForegroundColor Yellow }
         if ($adopted) { Write-Host "  [WhatIf] adopt $folder as it is -- $cards cards ($cardsBreakdown)" -ForegroundColor Yellow }
-        else { Write-Host "  [WhatIf] make $(Join-Path $folder 'current') and $(Join-Path $folder 'archive')" -ForegroundColor Yellow }
+        else { Write-Host "  [WhatIf] make $(Join-Path $folder ([string](Get-P20Consts).folders.current)) and $(Join-Path $folder ([string](Get-P20Consts).folders.archive))" -ForegroundColor Yellow }
     }
 }
 else {
