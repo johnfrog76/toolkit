@@ -483,7 +483,7 @@ Where each one is drawn: **Open** -- the card (list and board), an issue, a desi
 document and thread, a goal, a review, the resume, a prompt, the Space you are in. **Archive** -- a
 goal (it said Retire), a reminder (it said Done; the verb is `Reminders <id> -Archive`), a card's Done
 lane (**Archive (move to Done)**), and a hub design, **Archive as shipped** and **Archive as dropped**
-(it said Drop). **Complete** -- a hub design's spec. **Delete** -- a card's cover (it said Remove
+(it said Drop) -- and a product design on the Design tab, where this machine names the Space's checkout. **Complete** -- a hub design's spec, and a product design's on the same terms. **Delete** -- a card's cover (it said Remove
 cover; the picture is deleted). **Move to** -- a card's lanes. **Copy** -- a prompt's reference and
 text. **Open on** -- every row's link out, whatever it said before (Open in ADO, Open in Azure
 DevOps, Open the thread on GitHub, Its history on GitHub). The verbs behind the menus keep their
@@ -525,7 +525,7 @@ row that draws them, and listed here. Two kinds, both named:
 | `reminder.edit` | Edit | `EditRegular` | one record | Reminders |
 | `resume.generate` | Generate resume scaffold | `AddRegular` | one record | the resume |
 | `resume.howItWorks` | How resume updates work | `InfoRegular` | one record | the resume |
-| `design.graduate` | Graduate to a spec | `HatGraduationRegular` | one record | a hub design (Studio) |
+| `design.graduate` | Graduate to a spec | `HatGraduationRegular` | one record | a hub design (Studio), and a product design (the Design tab) where its Space's checkout is named |
 | `design.promote` | Promote | `ShareRegular` | one record | a design note's page |
 | `space.enter` | Go into *the Space* | `ArrowEnterRegular` | one record | the Studio's Spaces |
 | `space.connect` | Connect *the Space* | `LinkRegular` | one record | the Studio's Spaces |

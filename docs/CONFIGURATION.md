@@ -82,7 +82,7 @@ table; this is the shape of it:
 
 | Scope | Keys | Goes to |
 | --- | --- | --- |
-| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `web.agentPort`, `web.corsOrigins`, `limits.inPlay`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display` | `config.local.json`, created as a sparse patch if it is not there |
+| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `web.agentPort`, `web.corsOrigins`, `limits.inPlay`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display`, `spaceCheckouts.<slug>.path` | `config.local.json`, created as a sparse patch if it is not there |
 | **org** | `spaces.<slug>.name` / `.status` / `.orgType` / `.org` / `.tenant` / `.promptsFolder` / `.projects` / `.howIWork` / `.features.sprintAwareness` / `.features.suggestions` / `.features.trainingHoursPerQuarter` | the hub's `hub.json` -- or `config.local.json`'s `spaces.<slug>` patch with **`-Local`** |
 | **hub** | `storeSync`, `folders.<name>` | the hub's `hub.json`, and only with **`-Hub`** |
 | **default** | `commands`, `workItemTypes`, `cliVersion`, `managerWorkflow` | nowhere. These are the team's, and a `-Set` on one is refused by name |
@@ -295,6 +295,39 @@ hides a card -- "limit doesn't mean slow it down, it means more focus." The web 
 `GET /api/env` (`config.inPlayLimit`, `null` when unset) and keeps no reader of its own. `tkEnv` lists it
 under "Optional surfaces" as `WIP limit`: `on` with the number, `not configured` while it is unset. The
 shipped file carries an empty `limits` block and nothing in it.
+
+## `spaceCheckouts.<slug>.path` -- a Space's checkout on this machine
+
+Where a Space's own repository is cloned **on this machine**: `tkConfig -Set spaceCheckouts.toolkit.path=~/Repos/toolkit`,
+or the **This Space's checkout** row in Settings (the drawer lists the Space you are in; another Space's is set by
+its key). A folder anywhere inside the clone will do; the path is absolute or starts with `~`. Keyed by the
+Space's slug, and the slug must be a declared Space.
+
+**It is this machine's, and only ever this machine's.** It is written to `config.local.json` and nowhere else:
+`-Hub` with it is refused, and a `spaceCheckouts` block in `config.default.json` or `hub.json` is read by
+nobody. The hub syncs between machines whose clones of the same repository sit in different folders, so a path
+in `hub.json` would be wrong everywhere but where it was typed.
+
+**What it turns on.** The Design tab reads a product's `design/` and `spec/` from GitHub, so its rows could only
+open a design, never move one -- a move is a `git mv` in a clone. With a checkout named, and its `origin` the
+Space's repository, a product design's menu offers the same moves a hub design's does (**Graduate to a spec**,
+**Archive as shipped**, **Archive as dropped**, **Complete**), each running `MoveDesign -Space <slug>` through
+the bridge. The verb **stages the move in that clone and never commits**: a product's history is the engineer's.
+The dialog shows what was staged and the commit line the verb suggests, and the tab re-reads -- though a row
+moves only once the commit is pushed, because the tab reads GitHub ([Known gaps](KNOWN-GAPS.md)).
+
+**One resolver.** `Resolve-P20SpaceCheckout` (`Scripts/Resolve-SpaceCheckout.ps1`) is the one thing that finds a
+Space's clone, and this setting is its first candidate, before the folder you stand in and the nav shortcuts'
+paths -- so `MoveDesign -Hub -Space <slug> -To Complete` checks `-Doc` in the configured checkout too. A
+candidate counts only when its `origin` names the Space's repository; a setting that points at another clone is
+passed over and said. The agent asks the same question of the configured path alone for the Design tab
+(`agent/core/checkout.py`, on every `GET /api/design`, as `checkout`), and never searches; the path and
+origin rules are one table both halves assert, `Tests/fixtures/space-checkout/table.json`.
+
+Unset, a product row keeps its one link out, **Open on GitHub**, and the Design tab's foot names this setting;
+set to a folder that is not a clone of the Space's repository, the foot says why. `tkEnv` lists it under
+"Optional surfaces" as `Space checkouts`: `on` with how many are set and where the Space you are in is,
+`not configured` while none is. Its question is `How do I move a product's designs from the Design tab?`.
 
 ## `spaces[].laneNames` -- what this org calls its lanes
 

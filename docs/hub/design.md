@@ -145,7 +145,10 @@ Design, Spec, Complete, Archived -- with Complete and Archived collapsed to a co
 searched. A row is the design: its title, description, state, short id and thread chip, and under them the
 cards worked against it -- each its id and state, opening the card when it is in this Space's `current/`,
 named only when it is archived or another Space's; a Complete row's `Docs:` line opens the document it names in the Docs tab (on the Hub Designs card, when the design names the Space you are in, else it is a caption); in Spec and Complete the repo's row opens the spec with
-the note in its menu. A card names its design with `{cliPrefix}NewPrompt -Design <name|id>`. The archive is read in the same room as
+the note in its menu. A hub row's menu carries its road's moves (`MoveDesign -Hub`); a repo's row carries the same
+moves where this machine names the Space's checkout (`spaceCheckouts.<slug>.path`), staged in that clone by
+`MoveDesign -Space <slug>` and never committed -- and where it does not, the tab's foot names the setting
+([Studio](../modules/studio.md), "The web UI"). A card names its design with `{cliPrefix}NewPrompt -Design <name|id>`. The archive is read in the same room as
 a live note, with its Closed date and outcome. No `design/` at all: the empty state says what the four
 folders would give and links here (**Learn more**). Files with no id: one line under the list, counted,
 naming `StampDesign` (or `StampDesign -Hub`) and linking here. Never inference, never a blank (D-DL11).

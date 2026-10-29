@@ -1078,6 +1078,15 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   should see the **To do** lane empty, and the last card's closing line pointing at the **+** -- inside ten
   minutes of the clone. Any step where the card's words were not enough is a defect, filed. The walker writes
   the time here: stopwatch, clone to empty To do: `____` min `____` s, on `________` (host and date).
+- [ ] **A product design moves from the Design tab on Windows, staged in a configured checkout.** With a GitHub
+  Space whose repository is cloned at a Windows path, run `tkConfig -Set spaceCheckouts.<slug>.path=C:\<clone>`
+  (and once more with `~\<clone>` under your profile), then in `powershell` (5.1) and in `pwsh` stand in the hub
+  and run `tkMoveDesign <a note> -To Archive -Space <slug> -WhatIf`. You should see `Git root: C:\<clone> (the
+  <Space> Space's checkout)` first and nothing written. On the Design tab, the same note's menu offers **Archive
+  as shipped**; choosing it shows the staged lines and the suggested `git commit -m "design: ..."`, and `git
+  status` in the clone shows the rename staged with no new commit. Set the key to a folder that is not a clone of
+  the Space's repository: the menu is **Open on GitHub** alone and the tab's foot says why, naming the key.
+  Refs #146.
 
 ## Recording a run
 

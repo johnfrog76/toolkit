@@ -208,6 +208,7 @@ anywhere).
 | Surface | Key | Where that key lives |
 | --- | --- | --- |
 | Navigation shortcuts | `aliases.<Name>.path` | `config.local.json` -- `Config -Set aliases.Home.path=<path>` |
+| Space checkouts | `spaceCheckouts.<slug>.path` | `config.local.json` only, never `hub.json` -- `Config -Set spaceCheckouts.<slug>.path=<folder>`. Where a Space's repository is cloned on this machine: the first candidate of the one resolver (`Scripts/Resolve-SpaceCheckout.ps1`), and what lets the Design tab's product rows run `MoveDesign -Space <slug>`, staged and never committed. `docs/CONFIGURATION.md` |
 | Azure DevOps | `features.ado`, else the active Space's `status` and its tracker | DERIVED (`Scripts/Test-AdoEnabled.ps1`): unset, it follows the org you are in -- on in an `active` org whose address is Azure DevOps (`Scripts/Resolve-Tracker.ps1`), off in a `local` one, and off on a connected GitHub Space, where the row says `<slug>'s tracker is GitHub`. It decides what is SHOWN (Setup's checks, the inventory); nothing is unregistered, and `Menu`'s tracker rows stay on a connected GitHub Space because they answer through `gh`. `docs/modules/ado.md`, "The switch, and its scope" |
 | GitHub issues | `tracker.github` | DERIVED: `on` once a Space whose address is `github.com` is `active`, else `not configured`. The address is a Space's, written by `Connect <slug>` (`hub.json`); the shipped GitHub demo has one and is `local` until connected |
 | growth module | `features.growth` | `config.local.json`, top-level |

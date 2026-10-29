@@ -8,6 +8,10 @@ release.
 
 ## [Unreleased]
 
+### Added
+
+- A product's designs can be moved from the Design tab: name where the Space's repository is cloned on this machine (`Config -Set spaceCheckouts.<slug>.path=<folder>`, or This Space's checkout in Settings) and each design's menu offers Graduate to a spec, Archive and Complete, staging the move in that clone for you to commit. Without one, the tab names the setting. `MoveDesign -Space <slug>` does the same from any folder.
+
 ### Changed
 
 - Every list's row menu now uses one vocabulary: the same move has the same word, icon and tooltip on every page, and the link out is always last, reading "Open on GitHub" or "Open on Azure DevOps" behind one icon. A goal's Retire, a reminder's Done and a card's Move to Done now read Archive, a design's two archives read Archive as shipped and Archive as dropped, a card's exposed action opens the card, and Remove cover reads Delete the cover.

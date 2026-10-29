@@ -242,6 +242,16 @@
       "anchor": "shortcuts"
     },
     {
+      "id": "space-checkout",
+      "question": "How do I move a product's designs from the Design tab?",
+      "sentence": "Tell this machine where the Space's repository is cloned. With a checkout named, a product design's menu offers the same moves as a hub design's, and each one is staged in that clone for you to commit -- never committed for you.",
+      "surfaces": [
+        "spaceCheckouts"
+      ],
+      "door": "change",
+      "anchor": "spaceCheckouts.{slug}.path"
+    },
+    {
       "id": "web",
       "question": "Where does the web UI run?",
       "sentence": "The agent and the web UI share one port setting; Web -Dev starts both, and this page is the result.",

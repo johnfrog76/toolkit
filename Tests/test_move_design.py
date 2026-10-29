@@ -394,7 +394,11 @@ class TheMoveDesignVerb(unittest.TestCase):
         self.assertTrue((self.hub / "demo/design/archive/space-note.md").exists())
         self.assertIn("in the hub (demo).", self.read(self.hub / "demo/design/archive/space-note.md"))
         self.assert_refused("space-note -To Archive -Hub -Space nowhere", "No Space 'nowhere' is declared", at=self.hub)
-        self.assert_refused("space-note -To Archive -Space demo", "-Space is the hub's", at=self.hub)
+        # -Space alone is the Space's own repository; Demo has no GitHub address, so no checkout.
+        self.assert_refused(
+            "space-note -To Archive -Space demo", "The Demo Space has no checkout here to move a design in", at=self.hub
+        )
+        self.assert_refused("space-note -To Archive -Space nowhere", "No Space 'nowhere' is declared", at=self.hub)
 
     # -- -Hub -Space -To Complete: -Doc is the Space's repository's, not the hub's ------
 
@@ -459,6 +463,86 @@ class TheMoveDesignVerb(unittest.TestCase):
             )
             self.assertRegex(out, r"checked out at .*repo")
         self.assertTrue((self.hub / "prod/spec/shipped.spec.md").exists())
+
+    def test_hub_space_complete_finds_the_clone_through_its_configured_checkout(self):
+        archived = self.space_with_a_spec("https://github.com/o/r")
+        local = {"spaceCheckouts": {"prod": {"path": self.repo.as_posix()}}}
+        out = self.move("shipped -Hub -Space prod -To Complete -Doc docs/board.md", at=self.hub, local=local)
+        self.assertIn("X=0", out)
+        self.assertRegex(out, r"Doc: docs/board\.md in o/r at .*repo")
+        self.assertIn(f"{DOCS} docs/board.md", self.read(archived))
+
+    # -- -Space alone: the Space's own repository, in its checkout here (#146) ---------
+
+    def commits(self, path: Path) -> int:
+        return len(_git(path, "rev-list", "--all").split())
+
+    def test_space_moves_stage_in_its_configured_checkout_and_never_commit(self):
+        self.space_with_a_spec("https://github.com/o/r")
+        local = {"spaceCheckouts": {"prod": {"path": self.repo.as_posix()}}}
+        before = self.commits(self.repo)
+        # Standing in the hub -- as the bridge stands in the package: the setting finds the clone.
+        out = self.move("board-ideas -To Archive -Space prod", at=self.hub, local=local)
+        self.assertIn("X=0", out)
+        self.assertNotIn("Error:", out)
+        first = out.strip().split("\n")[0]
+        self.assertRegex(first, r"^Git root: .*repo \(the Prod Space's checkout\)$")
+        self.assertIn("Staged, not committed. Suggested:", out)
+        self.assertIn('git commit -m "design: Board ideas archived (shipped)"', out)
+        self.assertNotIn("Committed.", out)
+        self.assertEqual(self.commits(self.repo), before, "the move committed")
+        self.assertEqual(_staged(self.repo), ["A  design/archive/board-ideas.md", "D  design/board-ideas.md"])
+        self.assertIn(
+            "This note is now design/archive/board-ideas.md in o/r.",
+            self.read(self.repo / "design/archive/board-ideas.md"),
+        )
+        # The hub is untouched.
+        self.assertEqual(_git(self.hub, "status", "--porcelain").strip(), "")
+
+    def test_space_moves_take_every_road(self):
+        self.space_with_a_spec("https://github.com/o/r")
+        local = {"spaceCheckouts": {"prod": {"path": (self.repo / "design").as_posix()}}}  # a folder inside the clone
+        out = self.move("board-ideas -To Spec -Space prod", at=self.hub, local=local)
+        self.assertIn("X=0", out)
+        self.assertTrue((self.repo / "spec/board-ideas.spec.md").exists())
+        out = self.move("the-pair -To Complete -Doc docs/board.md -Space prod", at=self.hub, local=local)
+        self.assertIn("X=0", out)
+        self.assertTrue((self.repo / "spec/archive/the-pair.spec.md").exists())
+        out = self.move("a-second-room -To Archive -Dropped -Reason no -Space prod", at=self.hub, local=local)
+        self.assertIn("X=0", out)
+        self.assertIn("Staged, not committed.", out)
+
+    def test_a_space_with_no_checkout_here_refuses_and_names_the_setting(self):
+        self.space_with_a_spec("https://github.com/o/r")
+        out = self.assert_refused(
+            "board-ideas -To Archive -Space prod",
+            "The Prod Space has no checkout here to move a design in",
+            at=self.hub,
+        )
+        self.assertIn("spaceCheckouts.prod.path is not set", out)
+        self.assertIn("Config -Set spaceCheckouts.prod.path=", out)
+        self.assertEqual(_staged(self.repo), [])
+
+    def test_a_configured_checkout_of_another_repository_is_passed_over_and_said(self):
+        self.space_with_a_spec("https://github.com/o/other")
+        local = {"spaceCheckouts": {"prod": {"path": self.repo.as_posix()}}}
+        out = self.assert_refused(
+            "board-ideas -To Archive -Space prod", "The Prod Space has no checkout here", at=self.hub, local=local
+        )
+        self.assertIn("is a clone of o/r, not o/other", out)
+        self.assertEqual(_staged(self.repo), [])
+
+    def test_the_configured_checkout_wins_over_the_folder_you_stand_in(self):
+        # A second clone of o/r: the setting is the one used, wherever you stand.
+        second = self.hub.parent / "second"
+        shutil.copytree(self.repo, second)
+        self.space_with_a_spec("https://github.com/o/r")
+        local = {"spaceCheckouts": {"prod": {"path": second.as_posix()}}}
+        out = self.move("board-ideas -To Archive -Space prod", at=self.repo, local=local)
+        self.assertIn("X=0", out)
+        self.assertRegex(out.strip().split("\n")[0], r"second \(the Prod Space's checkout\)$")
+        self.assertTrue((second / "design/archive/board-ideas.md").exists())
+        self.assertTrue((self.repo / "design/board-ideas.md").exists())
 
     def test_in_repo_and_hub_root_complete_still_look_in_their_own_tree(self):
         # In a repository, -Doc is that repository's, whatever the Spaces say.
