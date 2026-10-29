@@ -78,7 +78,8 @@ $found = @()
 $isId = $false
 . (Join-Path $PSScriptRoot 'Move-CardFolder.ps1')
 foreach ($folder in @($folders.Current, (Get-P20BacklogFolder -Folders $folders), $folders.Archive)) {
-    $resolved = Resolve-P20CardArgument -Argument $Card -Folder $folder -WorkItemTypes $types
+    # -AllowPath: a card's full path is that card, whichever Space is active.
+    $resolved = Resolve-P20CardArgument -Argument $Card -Folder $folder -WorkItemTypes $types -AllowPath
     $isId = $resolved.IsId
     $found = @($resolved.Match | Where-Object { $_.Name -like '*.md' })
     if ($found.Count -gt 0) { break }

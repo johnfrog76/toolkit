@@ -628,6 +628,70 @@ Assert-True 'Get-P20CardId returns a string, not a number' ((Get-P20CardId -Name
 
 Write-Host ""
 
+# -- A card's path is that card; the path reading loosens nothing -------------------
+# Resolve-P20CardArgument -AllowPath: an argument that is not an id, carries a
+# separator, names an existing file, and sits in a folder of a KIND the verb asked
+# for, is that file -- in whichever Space the path names. Every other argument is
+# read exactly as before: these rows pin both halves of that sentence.
+
+Write-Host "-- A card's path is that card, and nothing looser ----" -ForegroundColor Cyan
+
+$pathBase = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-cardpath-" + [System.Guid]::NewGuid().Guid.Substring(0, 8))
+try {
+    foreach ($d in @('alpha/current', 'alpha/backlog', 'alpha/archive', 'beta/current', 'beta/archive', 'beta/notes')) {
+        New-Item -ItemType Directory -Path (Join-Path $pathBase $d) -Force | Out-Null
+    }
+    $alphaCurrent = Join-Path $pathBase 'alpha/current'
+    $alphaBacklog = Join-Path $pathBase 'alpha/backlog'
+    $alphaArchive = Join-Path $pathBase 'alpha/archive'
+    Write-FixtureText (Join-Path $alphaCurrent 'Task139-alpha-card.prompt.md') '# alpha'
+    $betaCard = Join-Path $pathBase 'beta/current/TaskK7M2-beta-card.prompt.md'
+    $betaArchived = Join-Path $pathBase 'beta/archive/TaskW3X7-old-card.prompt.md'
+    $betaNote = Join-Path $pathBase 'beta/notes/TaskQ4R9-a-note.prompt.md'
+    foreach ($f in @($betaCard, $betaArchived, $betaNote)) { Write-FixtureText $f '# beta' }
+    $types = @{ Task = @{ FilePrefix = 'Task' } }
+    $inPlay = @($alphaCurrent, $alphaBacklog)
+
+    $r = Resolve-P20CardArgument -Argument $betaCard -Folder $inPlay -WorkItemTypes $types -AllowPath
+    Assert-True "a full path into another Space's current/ is that card, exactly" (@($r.Match).Count -eq 1 -and @($r.Match)[0].FullName -eq (Get-Item -LiteralPath $betaCard).FullName -and $r.IsPath -and -not $r.Fuzzy -and -not $r.IsId) "matched [$(@($r.Match).FullName -join ', ')]"
+    $r = Resolve-P20CardArgument -Argument $betaCard -Folder $inPlay -WorkItemTypes $types
+    Assert-True 'without -AllowPath the same path matches nothing: a caller opts in' (@($r.Match).Count -eq 0 -and -not $r.IsPath)
+    $r = Resolve-P20CardArgument -Argument $betaArchived -Folder $inPlay -WorkItemTypes $types -AllowPath
+    Assert-True 'a path into archive/ is not a card for a verb that asked for current/ and backlog/' (@($r.Match).Count -eq 0 -and -not $r.Fuzzy)
+    $r = Resolve-P20CardArgument -Argument $betaArchived -Folder $alphaArchive -WorkItemTypes $types -AllowPath
+    Assert-True 'and is one for a verb that asked for archive/ -- the folder KIND counts, not the Space' (@($r.Match).Count -eq 1 -and $r.IsPath)
+    $r = Resolve-P20CardArgument -Argument $betaNote -Folder $inPlay -WorkItemTypes $types -AllowPath
+    Assert-True 'a path to a file in no card folder matches nothing' (@($r.Match).Count -eq 0 -and -not $r.Fuzzy)
+    $r = Resolve-P20CardArgument -Argument (Join-Path $pathBase 'beta/current/TaskK7M2') -Folder $inPlay -WorkItemTypes $types -AllowPath
+    Assert-True 'a path that names no file is not a partial name: nothing, not fuzzy' (@($r.Match).Count -eq 0 -and -not $r.Fuzzy -and -not $r.IsPath)
+
+    # The rows that must NOT move: an id is an id, a name is a name.
+    $r = Resolve-P20CardArgument -Argument '39' -Folder $inPlay -WorkItemTypes $types -AllowPath
+    Assert-True "'39' with -AllowPath is still an id, and Task139 is still not it" ($r.IsId -and @($r.Match).Count -eq 0 -and -not $r.IsPath)
+    $r = Resolve-P20CardArgument -Argument '139' -Folder $inPlay -WorkItemTypes $types -AllowPath
+    Assert-True "'139' with -AllowPath matches Task139 as an id, exactly as before" ($r.IsId -and @($r.Match).Count -eq 1 -and -not $r.Fuzzy)
+    $r = Resolve-P20CardArgument -Argument 'alpha-card' -Folder $inPlay -WorkItemTypes $types -AllowPath
+    Assert-True 'a partial name with -AllowPath is still a partial name: one match, Fuzzy' (@($r.Match).Count -eq 1 -and $r.Fuzzy -and -not $r.IsPath)
+    Push-Location (Join-Path $pathBase 'beta/current')
+    try {
+        $r = Resolve-P20CardArgument -Argument 'TaskK7M2-beta-card.prompt.md' -Folder $inPlay -WorkItemTypes $types -AllowPath
+        Assert-True 'a bare filename is a name, never a path -- even standing beside that file' (@($r.Match).Count -eq 0 -and -not $r.IsPath)
+    }
+    finally { Pop-Location }
+    Push-Location $pathBase
+    try {
+        $r = Resolve-P20CardArgument -Argument 'beta/current/TaskK7M2-beta-card.prompt.md' -Folder $inPlay -WorkItemTypes $types -AllowPath
+        Assert-True 'a relative path is read against the current location' (@($r.Match).Count -eq 1 -and $r.IsPath)
+    }
+    finally { Pop-Location }
+}
+catch {
+    Assert-True "the path rows ran to the end without a terminating error -- $($_.Exception.Message)" $false
+}
+finally { Remove-Item $pathBase -Recurse -Force -ErrorAction SilentlyContinue }
+
+Write-Host ""
+
 # -- The `> Previous round:` token: one fixture, two readers -------------------------
 # Tests/fixtures/parsers/previous-round.md is read here AND by Tests/test_parsers.py
 # (previous_round). The line is written by NewPrompt, re-aimed by Archive's link

@@ -177,7 +177,8 @@ $cardFolders = @($folders.Current, (Get-P20BacklogFolder -Folders $folders), $fo
 $found = @()
 $isId = $false
 foreach ($folder in $cardFolders) {
-    $resolved = Resolve-P20CardArgument -Argument $Card -Folder $folder -WorkItemTypes $types
+    # -AllowPath: a card's full path is that card, whichever Space is active.
+    $resolved = Resolve-P20CardArgument -Argument $Card -Folder $folder -WorkItemTypes $types -AllowPath
     $isId = $resolved.IsId
     $found = @($resolved.Match | Where-Object { $_.Name -like '*.md' })
     if ($found.Count -gt 0) { break }
@@ -203,6 +204,10 @@ if ($found.Count -gt 1) {
 }
 
 $file = $found[0]
+if ($resolved.IsPath) {
+    # The card's rounds are looked for in its own Space, beside it -- not in the active one's.
+    $cardFolders = @($cardFolders | Where-Object { $_ } | ForEach-Object { Get-P20SiblingCardFolder -Folder $file.DirectoryName -Name (Split-Path ($_.TrimEnd('/', '\')) -Leaf) })
+}
 $kind = 'cover'
 $word = 'cover'
 if ($Before) { $kind = 'before'; $word = 'before picture' }

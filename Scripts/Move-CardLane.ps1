@@ -116,7 +116,9 @@ $folders = Get-PromptFolders
 $backlogDir = Get-P20BacklogFolder -Folders $folders
 $types = Get-P20WorkItemTypes -Config $cfg
 # current/ and backlog/: the two folders a card can be moved FROM, named on purpose.
-$resolved = Resolve-P20CardArgument -Argument $Card -Folder @($folders.Current, $backlogDir) -WorkItemTypes $types
+# -AllowPath: a card's full path is that card, whichever Space is active -- the
+# path names its Space, so the folders it moves between are that Space's (below).
+$resolved = Resolve-P20CardArgument -Argument $Card -Folder @($folders.Current, $backlogDir) -WorkItemTypes $types -AllowPath
 $found = @($resolved.Match | Where-Object { $_.Name -like '*.md' })
 if ($found.Count -eq 0) {
     if ($resolved.IsId) {
@@ -136,12 +138,19 @@ if ($found.Count -gt 1) {
 }
 
 $file = $found[0]
+if ($resolved.IsPath) {
+    # The card's own Space's backlog/, beside the folder it is in -- not the
+    # active Space's, which a path into another Space has nothing to do with.
+    $backlogDir = Get-P20SiblingCardFolder -Folder $file.DirectoryName -Name (Split-Path ($backlogDir.TrimEnd('/', '\')) -Leaf)
+}
 $label = Get-P20CardId -Name $file.Name -Pattern (Get-P20CardIdPattern -WorkItemTypes $types)
 if (-not $label) { $label = $file.Name }
 
 # Done is Archive, exactly -- one implementation, and its refusals are its own.
 if ($target -eq $c.status.done) {
-    & (Join-Path $PSScriptRoot 'Move-PromptToArchive.ps1') -File $file.Name
+    # A card named by its path is handed on by its path, so Archive finds it in its own Space.
+    $handOn = if ($resolved.IsPath) { $file.FullName } else { $file.Name }
+    & (Join-Path $PSScriptRoot 'Move-PromptToArchive.ps1') -File $handOn
     exit $LASTEXITCODE
 }
 

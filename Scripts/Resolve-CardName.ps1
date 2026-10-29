@@ -198,14 +198,39 @@ function Resolve-P20CardArgument {
         the same rule `Move K7M2 -To InProgress` finds a current one. A match in
         more than one folder is returned as more than one match -- the caller's
         "matches N cards" refusal, never a guess.
+
+        -AllowPath adds a third reading, for the verbs whose usage says
+        <id|file>:
+
+          a path   -> an argument that is NOT an id, carries a directory
+                      separator, names a file that exists (resolved against
+                      the current location), and sits in a folder of the same
+                      KIND as one the verb named -- its folder's leaf is the
+                      leaf of one of -Folder (current/, backlog/, archive/).
+                      That file, exactly (IsPath = $true). The path already
+                      says which Space the card is in, so the active Space's
+                      folders are not searched: a full path into another
+                      Space works whichever one is active.
+
+        It loosens nothing. An id is decided first and never reaches it. A
+        filename has no separator in it, so before this reading existed an
+        argument with one could match nothing at all -- no exact name, no
+        partial name -- and an argument without one is read exactly as it
+        always was. And the folder KIND is kept: a verb that asked for
+        current/ and backlog/ is not handed a card in archive/ by its path.
+        Off by default, because some callers read a folder of their own
+        whose leaf is also current/ (Reminders) or act on the active
+        Space's tracker (Route, StartWork): for them a path into another
+        Space would be the wrong card or the wrong Space.
     #>
     param(
         [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Argument,
         [Parameter(Mandatory = $true)][AllowEmptyString()][AllowEmptyCollection()][AllowNull()][string[]]$Folder,
-        [hashtable]$WorkItemTypes
+        [hashtable]$WorkItemTypes,
+        [switch]$AllowPath
     )
 
-    $result = @{ Match = @(); IsId = $false; Fuzzy = $false }
+    $result = @{ Match = @(); IsId = $false; Fuzzy = $false; IsPath = $false }
     $candidates = @()
     foreach ($one in @($Folder)) {
         if ($one -and (Test-Path -LiteralPath $one)) {
@@ -221,6 +246,21 @@ function Resolve-P20CardArgument {
                 $cardId = Get-P20CardId -Name $_.Name -Pattern $pattern
                 ($null -ne $cardId) -and [string]::Equals($cardId, $wanted, [System.StringComparison]::OrdinalIgnoreCase)
             })
+        return $result
+    }
+    if ($AllowPath -and $Argument -match '[\\/]' -and (Test-Path -LiteralPath $Argument -PathType Leaf)) {
+        $item = Get-Item -LiteralPath $Argument -ErrorAction SilentlyContinue
+        if ($item) {
+            $kinds = @(@($Folder) | Where-Object { $_ } | ForEach-Object { Split-Path ($_.TrimEnd('/', '\')) -Leaf })
+            $leaf = Split-Path $item.DirectoryName -Leaf
+            $sameKind = @($kinds | Where-Object { [string]::Equals($_, $leaf, [System.StringComparison]::OrdinalIgnoreCase) })
+            if ($sameKind.Count -gt 0) {
+                $result.Match = @($item)
+                $result.IsPath = $true
+            }
+        }
+        # A path that exists but sits in no folder the verb named matches
+        # nothing: it does not fall to a partial name.
         return $result
     }
     $exact = @($candidates | Where-Object { $_.Name -eq $Argument })
