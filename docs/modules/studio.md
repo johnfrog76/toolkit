@@ -380,7 +380,7 @@ tab reads a repo's documents with:
 
 | Field | Rule |
 | --- | --- |
-| title | the first `#` heading after the frontmatter; none, the file name |
+| title | a leading `# ` heading, else the line under `## Title`, else the file name -- [the hub's design document](../hub/design.md#how-the-title-is-read), "How the title is read" |
 | description | the frontmatter's `description:`, quotes stripped; none, `""` |
 | space | the frontmatter's `space:`; none, `""` |
 | thread | the first line matching `consts.json` `studio.threadRegex`; none, not promoted. Promote writes it, under the title |
