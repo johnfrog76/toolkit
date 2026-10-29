@@ -31,6 +31,7 @@ jest.mock("./api.growth", () => ({
     isError: false,
     refetch: jest.fn(),
   }),
+  useRunWorkReviewMutation: () => [jest.fn(), { isLoading: false }],
   useGetResumeQuery: () => ({ data: undefined, isFetching: false }),
   useGenerateReviewMutation: () => [jest.fn(), { isLoading: false }],
 }));

@@ -8,6 +8,10 @@ release.
 
 ## [Unreleased]
 
+### Added
+
+- A work review's row on the Reviews card now offers **Archive** and **Delete**, and the new `WorkReview` command does the same from the terminal: Archive moves the review under `reviews/archive/` with a closed date in its `review.md`, Delete removes a draft for good after asking, and the list's new **Archived** filter shows the reviews you put away. A review's row also no longer shows its raw `orgs: [...]` line as its summary.
+
 ### Changed
 
 - Every list's row menu now uses one vocabulary: the same move has the same word, icon and tooltip on every page, and the link out is always last, reading "Open on GitHub" or "Open on Azure DevOps" behind one icon. A goal's Retire, a reminder's Done and a card's Move to Done now read Archive, a design's two archives read Archive as shipped and Archive as dropped, a card's exposed action opens the card, and Remove cover reads Delete the cover.

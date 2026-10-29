@@ -139,6 +139,15 @@ export function buildGrowthCloseParams(fields: { file: string }): string[] {
   return ["-Close", fields.file];
 }
 
+/**
+ * `WorkReview <review> -Archive | -Delete` -- a review's row's two moves. `review`
+ * is the row's own name for its folder, `[archive/]<slug-set>/<start>_<end>`, as
+ * the agent reads it off the path.
+ */
+export function buildWorkReviewParams(review: string, move: "archive" | "delete"): string[] {
+  return [review, move === "archive" ? "-Archive" : "-Delete"];
+}
+
 /** The New Growth Item dialog's fields. Named for the CLI parameters they feed. */
 export interface NewGrowthFields {
   type: "training" | "presentation" | "goal";

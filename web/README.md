@@ -483,8 +483,10 @@ Where each one is drawn: **Open** -- the card (list and board), an issue, a desi
 document and thread, a goal, a review, the resume, a prompt, the Space you are in. **Archive** -- a
 goal (it said Retire), a reminder (it said Done; the verb is `Reminders <id> -Archive`), a card's Done
 lane (**Archive (move to Done)**), and a hub design, **Archive as shipped** and **Archive as dropped**
-(it said Drop). **Complete** -- a hub design's spec. **Delete** -- a card's cover (it said Remove
-cover; the picture is deleted). **Move to** -- a card's lanes. **Copy** -- a prompt's reference and
+(it said Drop), and a review (`WorkReview <review> -Archive`; at once, no confirm). **Complete** -- a
+hub design's spec. **Delete** -- a card's cover (it said Remove cover; the picture is deleted), and a
+review, **Delete the review** (`WorkReview <review> -Delete`, behind `shared/ConfirmDialog` naming the
+range and the Spaces). **Move to** -- a card's lanes. **Copy** -- a prompt's reference and
 text. **Open on** -- every row's link out, whatever it said before (Open in ADO, Open in Azure
 DevOps, Open the thread on GitHub, Its history on GitHub). The verbs behind the menus keep their
 names: a goal's Archive still runs `NewGrowth -Close`.

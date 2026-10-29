@@ -418,9 +418,9 @@ three the agent's `GET /api/visibility` serves: `public`, `private`, `unknown`.
 
 ## Command reference
 
-**44 always on, 58 with every opt-in module switched on.** The 44 are `config.default.json`'s
+**44 always on, 59 with every opt-in module switched on.** The 44 are `config.default.json`'s
 `commands`, and are below -- the Studio's `NewDesign`, `StampDesign`, `MoveDesign`, `NewSpace`, `RetireSpace`, `RemoveSpace` and `HowWeWork` among them, because the Studio is
-core ([Studio](modules/studio.md); D-S13); the fourteen the growth,
+core ([Studio](modules/studio.md); D-S13); the fifteen the growth,
 communication, organize and Team Agile modules contribute have their own table further down, each marked
 with the flag that produces it.
 
@@ -811,7 +811,7 @@ the Studio's too: it writes the team's page for a Space worked with agents, whic
 
 ### The opt-in modules' verbs
 
-These fourteen exist **only** when their module's flag is on. With the flag off there is no alias, no
+These fifteen exist **only** when their module's flag is on. With the flag off there is no alias, no
 command row in `tkMenu`, no `-Help` and nothing for the bridge to call -- they are absent, not
 refused ([the modules guide](modules/README.md)). The one place an off module is *named* is the
 `Opt in by configuration` block at the foot of `tkMenu -All` and in `tkEnv` -- each row led by the
@@ -831,6 +831,7 @@ is off, and `SwitchSpace` brings them back in one that works with agents.
 | `NewGrowth -Title <t> [-Type training\|presentation\|goal] [-Date <d>] [-DueDate <d> (required for a training)] [-Provider <p>] [-Hours <h>] [-Notes <n>]` | `features.growth` | Create a training, presentation or goal artifact under `growth/current/`. `training` is the **default** type and a training **needs** `-DueDate`, so the shortest form the usage suggests is the one that is refused |
 | `NewWorkReview -StartDate <d> -EndDate <d> [-Slugs <csv>]` | `features.growth` | Generate a work review scaffold for a date range from local history. Answers JSON on stdout, because the agent parses it |
 | `PublishWorkReview [-NoPush] [-Preview]` | `features.growth` | Stage and commit `reviews/`, then sync the hub. `-Preview` emits the pending diff as JSON instead |
+| `WorkReview <slug-set>/<start>_<end> -Archive\|-Delete [-WhatIf]` | `features.growth` | Put a review away. `-Archive` moves the review's folder to `reviews/archive/<slug-set>/<year>/<start>_<end>/` and stamps `**Closed:**` into **its `review.md`** -- the one file every review has; `summary.md` moves untouched. `-Delete` removes the folder. With `storeSync: git` either is committed, scoped to that review's paths. `-WhatIf` names the folder and writes nothing. An archived review is named `archive/<slug-set>/<start>_<end>`. The Reviews card's row offers both, Delete behind a confirm ([Growth](modules/growth.md#tkworkreview)) |
 | `UpdateResume [-NoPush] [-Preview]` | `features.growth` | The same three for `resume/` |
 | `LogPeerReview <id> [-Title <t>] [-Notes <n>]` | `features.growth` | Log a completed review of someone else's PR. The one thing growth writes that is **org**-scoped: it lands in the active Space's `pr-comments/` |
 | `SendTeams <recipient> <message> [-Session <file>] [-WhatIf] [-AsJson]` | `features.communication` | Post one line to a Teams recipient through the communication engine. `-Session` names the meeting record in `manager/current/` the send is for, and a sent message is noted under its `## Sent` |

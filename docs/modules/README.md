@@ -131,7 +131,7 @@ generated work reviews, and the resume.
 | | |
 | --- | --- |
 | Flag | `features.growth` -- top-level, engineer-scoped |
-| Verbs | `NewGrowth`, `NewWorkReview`, `PublishWorkReview`, `LogPeerReview`, `UpdateResume`. Each answers `-Help`; flags are in [the command reference](../CLI.md#the-opt-in-modules-verbs) |
+| Verbs | `NewGrowth`, `NewWorkReview`, `PublishWorkReview`, `WorkReview`, `LogPeerReview`, `UpdateResume`. Each answers `-Help`; flags are in [the command reference](../CLI.md#the-opt-in-modules-verbs) |
 | Agent | `agent/growth/` -- `growth.py`, `reviews.py`, `resume.py`, behind one gated router |
 | Web UI | `web/src/modules/growth/index.tsx`, export `growthModule` |
 | Hub folders | `growth/current/`, `growth/archive/`, `reviews/<slug-set>/<year>/<start>_<end>/review.md`, `resume/resume.md` -- and [`docs/hub/growth.md`](../hub/growth.md) is the file-shape contract both the CLI and the agent are held to |
