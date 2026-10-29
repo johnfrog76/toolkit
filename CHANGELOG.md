@@ -8,6 +8,11 @@ release.
 
 ## [Unreleased]
 
+### Changed
+
+- **Create PR** from the browser now works from the card's own code checkout when one is on this machine (a clone of the board's GitHub repository at `<wsRoot>/<repo>` or a nav shortcut's path): the repository comes from that checkout, a card with no `## Branch` uses the checkout's branch when it is the card's, and a branch that was never pushed is refused with the exact `git push` to run in that checkout. With no checkout found, it reads the card as before.
+- Completing a hub-kept design (`MoveDesign -Hub -Space`) also finds the Space's repository at `<wsRoot>/<repo>`.
+
 ### Fixed
 
 - The Reference field in the New Reminder dialog is now as wide as the other fields, instead of sharing a half-width row with Source.

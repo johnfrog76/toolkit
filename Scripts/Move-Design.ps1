@@ -51,7 +51,8 @@
 .PARAMETER Doc
     With -To Complete: where the durable part landed, a path in the same tree --
     or, with -Hub -Space, in the Space's own repository: checked in a clone of
-    it on this machine (the folder you stand in, else a nav shortcut's path),
+    it on this machine (the folder you stand in, else a nav shortcut's path,
+    else <wsRoot>/<repo>),
     taken as written with a Note: line when there is no clone here.
 
 .PARAMETER Hub
@@ -589,18 +590,9 @@ switch ($To) {
             # and it is taken as written, said once.
             $spaceLabel = [string]$spaceEntry.name
             if (-not $spaceLabel) { $spaceLabel = [string]$spaceEntry.slug }
-            $candidates = @((Get-Location).Path)
             $navAliases = $null
             if (Get-Command Get-P20NavAliases -ErrorAction SilentlyContinue) { $navAliases = Get-P20NavAliases }
-            if ($navAliases) {
-                foreach ($key in @($navAliases.Keys | Sort-Object)) {
-                    $entry = $navAliases[$key]
-                    $aliasPath = ''
-                    if ($entry -is [System.Collections.IDictionary]) { $aliasPath = [string]$entry['path'] }
-                    elseif ($entry -and $entry.PSObject.Properties['path']) { $aliasPath = [string]$entry.path }
-                    if ($aliasPath) { $candidates += $aliasPath }
-                }
-            }
+            $candidates = @((Get-Location).Path) + @(Get-P20NavAliasPaths -NavAliases $navAliases)
             $checkout = Resolve-P20SpaceCheckout -OrgUrl ([string]$spaceEntry.org) -Projects $spaceEntry.projects -Candidates $candidates
             if ($checkout.Root) {
                 $docAt = Join-Path $checkout.Root ($docRel -replace '/', [IO.Path]::DirectorySeparatorChar)

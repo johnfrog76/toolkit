@@ -438,6 +438,22 @@ class TheMoveDesignVerb(unittest.TestCase):
         self.assertRegex(out, r"Doc: docs/board\.md in o/r at .*repo")
         self.assertIn(f"{DOCS} docs/board.md", self.read(archived))
 
+    def test_hub_space_complete_finds_the_clone_at_ws_root(self):
+        # <wsRoot>/<repo name> is asked after the caller's candidates: a clone of o/r at ws/r.
+        archived = self.space_with_a_spec("https://github.com/o/r")
+        ws = self.repo.parent / "ws"
+        clone = ws / "r"
+        self.write(clone / "docs/board.md", "# Board docs\n")
+        self.init_repo(clone)
+        subprocess.run(["git", "-C", str(clone), "remote", "add", "origin", "https://github.com/o/r.git"], check=True)
+        self.commit(clone)
+        out = self.move(
+            "shipped -Hub -Space prod -To Complete -Doc docs/board.md", at=self.hub, local={"wsRoot": ws.as_posix()}
+        )
+        self.assertIn("X=0", out)
+        self.assertRegex(out, r"Doc: docs/board\.md in o/r at .*ws[/\\]r")
+        self.assertIn(f"{DOCS} docs/board.md", self.read(archived))
+
     def test_hub_space_complete_with_no_clone_here_takes_the_doc_as_written(self):
         archived = self.space_with_a_spec("https://github.com/o/not-cloned-here")
         out = self.move("shipped -Hub -Space prod -To Complete -Doc docs/anywhere.md", at=self.hub)

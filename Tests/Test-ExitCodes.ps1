@@ -546,6 +546,92 @@ finally { Remove-Item $ghHub -Recurse -Force -ErrorAction SilentlyContinue }
 
 Write-Host ""
 
+# -- NewPR from the Toolkit's folder finds the card's own checkout ------------
+# The browser's Create PR runs NewPR in the Toolkit's folder. On a GitHub board,
+# a clone of the board's repository at <wsRoot>/<repo> (WS_ROOT here, as the
+# module exports it) is the card's own checkout: NewPR moves into it and works
+# as if run there -- the card's ## Branch when it names one, else the checkout's
+# branch when that branch leads back to this card -- and an unpushed branch is
+# said in the checkout's own terms. A clone whose origin is some other
+# repository is never taken for it. gh is stubbed as above (every call fails),
+# so the branch probe always answers "not on GitHub"; -WhatIf stops before it.
+
+Write-Host "-- NewPR finds the card's own checkout at wsRoot --" -ForegroundColor Cyan
+
+$coHub = Join-Path ([System.IO.Path]::GetTempPath()) "exitcode-cohub-$([guid]::NewGuid())"
+$coBin = Join-Path $coHub 'bin'
+$coWs = Join-Path $coHub 'ws'
+$coClone = Join-Path $coWs 'widgets'
+$coCards = Join-Path $coHub 'widgets/current'
+New-Item -ItemType Directory -Path $coCards, $coBin, $coClone -Force | Out-Null
+[System.IO.File]::WriteAllText((Join-Path $coHub 'hub.json'), '{ "hub": 1, "spaces": [ { "slug": "widgets", "name": "Widgets", "status": "active", "promptsFolder": "widgets", "org": "https://github.com/acme/widgets" } ] }')
+$coCardPath = Join-Path $coCards 'TaskK7M2-a-widget.prompt.md'
+$withBranch = @('# Task K7M2: A widget', '', '**ADO Link:** (not linked)', '', '## Branch', 'you/K7M2-a-widget', '', '## Described Changes', '- The widget.', '') -join "`n"
+$noBranch = @('# Task K7M2: A widget', '', '**ADO Link:** (not linked)', '', '## Branch', '(TBD)', '', '## Described Changes', '- The widget.', '') -join "`n"
+if ($onWindows) {
+    [System.IO.File]::WriteAllText((Join-Path $coBin 'gh.cmd'), "@echo off`r`necho gh: Not Found (HTTP 404) 1>&2`r`nexit /b 1`r`n")
+}
+else {
+    $coGh = Join-Path $coBin 'gh'
+    [System.IO.File]::WriteAllText($coGh, "#!/bin/sh`necho 'gh: Not Found (HTTP 404)' >&2`nexit 1`n")
+    & chmod +x $coGh
+}
+$coGit = { param([string[]]$GitArgs) $null = & git -C $coClone -c user.name=t -c user.email=t@t @GitArgs 2>&1 }
+& git init -q -b main $coClone 2>&1 | Out-Null
+& $coGit @('remote', 'add', 'origin', 'https://github.com/acme/widgets.git')
+[System.IO.File]::WriteAllText((Join-Path $coClone 'README.md'), "widgets`n")
+& $coGit @('add', '-A')
+& $coGit @('commit', '-q', '-m', 'init')
+$coEnv = @{ PROMPTS_ROOT = $coHub; WS_ROOT = $coWs }
+$coEnv[(Get-Content (Join-Path $pkgRoot 'consts.json') -Raw | ConvertFrom-Json).env.activeSpace] = 'widgets'
+$coPath = "`$env:PATH = '$($coBin -replace "'", "''")' + [System.IO.Path]::PathSeparator + `$env:PATH"
+$coRun = { param([string]$NewPrArgs) Invoke-ChildRun "$ghTier`n$coPath`n$atToolkit`n${cfgPrefix}NewPR $NewPrArgs`n'LASTEXITCODE=' + `$LASTEXITCODE`nexit `$LASTEXITCODE" -Environment $coEnv }
+$coCheckoutLine = "In the card's code checkout: .*widgets \(acme/widgets\)"
+try {
+    # The card names its branch; the clone holds it, never pushed.
+    [System.IO.File]::WriteAllText($coCardPath, $withBranch)
+    & $coGit @('branch', 'you/K7M2-a-widget')
+    $r = & $coRun 'K7M2'
+    Assert-True "NewPR from the Toolkit's folder moves into the card's checkout at wsRoot" ($r.Output -match $coCheckoutLine) $r.Output
+    Assert-True "an unpushed branch is said in the checkout's terms: in the checkout, never pushed" ($r.Output -match "Error: Branch 'you/K7M2-a-widget' is not on GitHub \(acme/widgets\)" -and $r.Output -match 'Hint:.*in the card''s checkout at .*widgets but was never pushed: git -C ".*widgets" push -u origin you/K7M2-a-widget') $r.Output
+    Assert-True "one block, exit 2 (got $($r.ExitCode))" ((@([regex]::Matches($r.Output, '(?m)^Error: ')).Count) -eq 1 -and $r.ExitCode -eq 2) $r.Output
+
+    # The checkout is on main; the card's ## Branch still decides, and a branch the clone does not hold says so.
+    & $coGit @('branch', '-D', 'you/K7M2-a-widget')
+    $r = & $coRun 'K7M2'
+    Assert-True "the card's ## Branch is the source, not the checkout's main" ($r.Output -match "The checkout is on 'main'; the branch is the card's own: you/K7M2-a-widget") $r.Output
+    Assert-True "a branch the checkout does not hold is said as such" ($r.Output -match 'Hint:.*not in the card''s checkout at .*widgets either') $r.Output
+
+    # The card names no branch: the checkout's branch answers only when it leads back to this card.
+    [System.IO.File]::WriteAllText($coCardPath, $noBranch)
+    $r = & $coRun 'K7M2 -WhatIf'
+    Assert-True "no ## Branch and a checkout on main: refused, naming the checkout's branch (exit $($r.ExitCode))" ($r.Output -match "Error: The card names no branch under ## Branch, and its checkout at .*widgets is on 'main', which is not this card's branch\." -and $r.ExitCode -eq 2) $r.Output
+    Assert-True "and nothing was resolved as the source branch" ($r.Output -notmatch '\[\*\] Branch: ') $r.Output
+    & $coGit @('checkout', '-q', '-b', 'you/K7M2-a-widget')
+    $r = & $coRun 'K7M2 -WhatIf'
+    Assert-True "no ## Branch, checkout on this card's branch: -WhatIf resolves it and exits 0 (got $($r.ExitCode))" ($r.ExitCode -eq 0 -and $r.Output -match "the checkout's branch is this card's: you/K7M2-a-widget") $r.Output
+    Assert-True "the repo is the checkout's origin and the branch the checkout's" ($r.Output -match 'Repo: acme / widgets' -and $r.Output -match 'Branch: you/K7M2-a-widget -> ') $r.Output
+
+    # A folder of the right name whose origin is another repository is not the card's checkout: today's path, unchanged.
+    [System.IO.File]::WriteAllText($coCardPath, $withBranch)
+    & $coGit @('remote', 'set-url', 'origin', 'https://github.com/someone-else/widgets.git')
+    $r = & $coRun 'K7M2'
+    Assert-True "a clone of another repository at wsRoot is not taken for the card's checkout" ($r.Output -notmatch "In the card's code checkout") $r.Output
+    Assert-True "and NewPR reads the card, as before, with the plain push hint" ($r.Output -match "Not in the card's code repository -- the branch is the card's own: you/K7M2-a-widget" -and $r.Output -match 'Hint:\s+Push it from the code repository: git push -u origin you/K7M2-a-widget') $r.Output
+
+    # No wsRoot at all: the same.
+    & $coGit @('remote', 'set-url', 'origin', 'https://github.com/acme/widgets.git')
+    $coEnv.WS_ROOT = ''
+    $r = & $coRun 'K7M2'
+    Assert-True "with no wsRoot, NewPR reads the card as before" ($r.Output -notmatch "In the card's code checkout" -and $r.Output -match "the branch is the card's own: you/K7M2-a-widget" -and $r.ExitCode -eq 2) $r.Output
+}
+catch {
+    Assert-True "the checkout cases ran to the end without a terminating error -- $($_.Exception.Message)" $false
+}
+finally { Remove-Item $coHub -Recurse -Force -ErrorAction SilentlyContinue }
+
+Write-Host ""
+
 # -- ReplyPR typed on its success path: the reply lands in the card -----------
 # The refusal above reaches the script's first lines. The success path is the
 # wrapper's call into Send-PRReply.ps1 and that script's call into
