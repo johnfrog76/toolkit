@@ -1701,3 +1701,4 @@ Write-Host ""
 
 # Exit with failure code if any tests failed
 if ($script:failed -gt 0) { exit 1 }
+exit 0

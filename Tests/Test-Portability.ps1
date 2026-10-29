@@ -37,6 +37,7 @@ if ($Help) {
   Clause 9  config.local.json's documented shape is the shape the merge implements
   Clause 11 Every suite's top-level try ends with a catch
   Clause 12 Every Assert- call in a suite resolves to a helper it defines or loads
+  Clause 17 Every suite's last statement is its own exit (exit 0 after a failure exit, or exit <verdict>)
   Clause 13 No work-marker comment (the four words a seam must not hide behind) ships
   Clause 14 No comment carries a date, a name, an agent, a nickname for a host, a tracker
             number, an archive pointer, a private repository or a machine path
@@ -696,6 +697,38 @@ if ($unresolvedAsserts.Count -gt 0) {
     $assertDetail = "$assertDetail -- an Assert- call the file neither defines nor loads by a literal path prints CommandNotFound and is never counted: " + (($unresolvedAsserts | Select-Object -First 6) -join '; ')
 }
 Assert-True "Clause 12: every Assert- call in a suite resolves to a helper it defines or loads" (($unresolvedAsserts.Count -eq 0) -and ($suiteFiles.Count -ge 30)) $assertDetail
+
+# -- Clause 17: a suite ends with its own verdict -----------------------------
+# A suite's exit code is its verdict. One that ends without an `exit` hands its
+# caller the code of the last child process it ran, so a green run can report 1
+# (a pwsh -Command wrapper, the PowerShell tool) and a red one 0. The last
+# top-level statement of every Tests/Test-*.ps1 (the runner aside) is an `exit`.
+# Two shapes are correct: `exit 0`, which needs an earlier `exit` with a non-zero
+# verdict somewhere in the file, and an `exit <expression>` that carries the
+# verdict itself (`exit $script:failed`). Anything else is reported by file.
+$noVerdict = @()
+foreach ($sf in $suiteFiles) {
+    $tk = $null; $pe = $null
+    $vAst = [System.Management.Automation.Language.Parser]::ParseFile($sf.FullName, [ref]$tk, [ref]$pe)
+    $vStatements = @($vAst.EndBlock.Statements)
+    $vLast = if ($vStatements.Count -gt 0) { $vStatements[-1] } else { $null }
+    $vOk = $false
+    if ($null -ne $vLast -and $vLast.Extent.Text -match '^exit\b') {
+        $vArg = ($vLast.Extent.Text -replace '^exit\b', '').Trim()
+        if ($vArg -eq '0') {
+            $vOk = @($vAst.FindAll({ param($n) $n.Extent.Text -match '^exit\s+[1-9]' }, $true)).Count -gt 0
+        }
+        else {
+            $vOk = $vArg.Length -gt 0
+        }
+    }
+    if (-not $vOk) { $noVerdict += "Tests/$($sf.Name)" }
+}
+$verdictDetail = "read $($suiteFiles.Count) suites"
+if ($noVerdict.Count -gt 0) {
+    $verdictDetail = "$verdictDetail -- a suite that does not end with an exit hands its caller the last child process's code. End it with ``if (`$script:failed -gt 0) { exit 1 }`` then ``exit 0``: " + ($noVerdict -join '; ')
+}
+Assert-True "Clause 17: every suite ends with its own exit verdict" (($noVerdict.Count -eq 0) -and ($suiteFiles.Count -ge 30)) $verdictDetail
 
 # -- Clause 13: no work-marker comment ships ------------------------------
 # A seam the code leaves open is a roadmap row in docs/KNOWN-GAPS.md, not a

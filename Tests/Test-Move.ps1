@@ -160,3 +160,4 @@ if ($script:errors.Count -gt 0) { Write-Host ""; Write-Host "  Failures:" -Foreg
 Write-Host "=======================================================" -ForegroundColor Cyan
 Write-Host ""
 if ($script:failed -gt 0) { exit 1 }
+exit 0

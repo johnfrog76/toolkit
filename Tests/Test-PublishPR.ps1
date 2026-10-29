@@ -222,3 +222,4 @@ $total = $script:passed + $script:failed
 Write-Host "  Results: $($script:passed)/$total passed" -ForegroundColor $(if ($script:failed -eq 0) { 'Green' } else { 'Red' })
 Write-Host ""
 if ($script:failed -gt 0) { exit 1 }
+exit 0

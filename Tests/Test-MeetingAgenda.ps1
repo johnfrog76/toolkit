@@ -751,3 +751,4 @@ Write-Host "=========================================================" -Foregrou
 Write-Host ""
 
 if ($script:failed -gt 0) { exit 1 }
+exit 0
