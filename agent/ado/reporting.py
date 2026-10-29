@@ -222,6 +222,10 @@ class EngagementReviewItem(BaseModel):
     summary: str
     tags: list[str] = []
     spaces: list[str] = []  # member Space slugs, sorted ascending; ≥1 entry
+    # The folder's path under reviews/ without the year: "<slug-set>/<start>_<end>",
+    # with "archive/" in front for an archived one -- what WorkReview takes.
+    review: str = ""
+    archived: bool = False
 
 
 def _engagement_org_config(slug: str) -> dict | None:
@@ -249,7 +253,13 @@ def _count_archive_items(org_config: dict) -> int:
 # reviews/ is a hub-root sibling owned by the growth spec; the engagement cards
 # only count and title what is there, and an absent folder reads as zero.
 # ---------------------------------------------------------------------------
-def _slug_set_from_path(review_md: Path) -> list[str]:
+def _reviews_base(archived: bool = False) -> Path:
+    """reviews/, or reviews/archive/ -- where WorkReview -Archive puts a review."""
+    reviews_dir = hub_folder("reviews")
+    return reviews_dir / folder_archive() if archived else reviews_dir
+
+
+def _slug_set_from_path(review_md: Path, archived: bool = False) -> list[str]:
     """Derive the slug-set for a review from its path under reviews/.
 
     reviews/globex/2026/...      → ["globex"]
@@ -259,9 +269,8 @@ def _slug_set_from_path(review_md: Path) -> list[str]:
     The top-level child of reviews/ is the slug-set segment.  We detect whether
     it is a slug-set segment by checking it does NOT look like a YYYY year dir.
     """
-    reviews_dir = hub_folder("reviews")
     try:
-        rel = review_md.relative_to(reviews_dir)
+        rel = review_md.relative_to(_reviews_base(archived))
     except ValueError:
         return []
     parts = rel.parts
@@ -294,7 +303,7 @@ def _slug_set_from_frontmatter(review_md: Path) -> list[str]:
     return []
 
 
-def _scan_reviews(slug: str | None = None) -> list[tuple[str, str, str, str, Path, list[str]]]:
+def _scan_reviews(slug: str | None = None, archived: bool = False) -> list[tuple[str, str, str, str, Path, list[str]]]:
     """Return (folder, start, end, title, path, orgs) tuples sorted newest-first.
 
     Membership rule: a review folder belongs to slug S iff
@@ -307,12 +316,19 @@ def _scan_reviews(slug: str | None = None) -> list[tuple[str, str, str, str, Pat
 
     Legacy reviews sitting directly under reviews/ (no slug segment) fall back
     to frontmatter orgs:/org: for their slug-set.
+
+    An archived review -- reviews/archive/<slug-set>/<year>/<range>/, where
+    WorkReview -Archive moves it -- is never on the default scan; archived=True
+    reads that tree and nothing else.
     """
-    reviews_dir = hub_folder("reviews")
-    if not reviews_dir.exists():
+    base = _reviews_base(archived)
+    if not base.exists():
         return []
+    archive_dir = _reviews_base(True)
     results = []
-    for review_md in sorted(reviews_dir.rglob(review_file_name()), reverse=True):
+    for review_md in sorted(base.rglob(review_file_name()), reverse=True):
+        if not archived and review_md.is_relative_to(archive_dir):
+            continue
         folder_name = review_md.parent.name
         m = re.match(r"(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})", folder_name)
         if not m:
@@ -320,7 +336,7 @@ def _scan_reviews(slug: str | None = None) -> list[tuple[str, str, str, str, Pat
         start, end = m.group(1), m.group(2)
 
         # Derive slug-set for membership filtering
-        path_slugs = _slug_set_from_path(review_md)
+        path_slugs = _slug_set_from_path(review_md, archived)
         if path_slugs:
             review_spaces = path_slugs
         else:
@@ -345,7 +361,22 @@ def _scan_reviews(slug: str | None = None) -> list[tuple[str, str, str, str, Pat
     return results
 
 
-def _count_org_reviews(slug: str | None) -> tuple[int, list[dict]]:
+def _review_summary(text: str) -> str:
+    """The first line of prose, up to 200 chars -- never the frontmatter.
+
+    A review opens with a ``---`` block (``orgs: [first]``, ``period: ...``), and
+    reading from the top took its first key for the summary: the row printed the
+    raw ``orgs: [...]`` line. Its Spaces are the row's chips, from ``spaces``.
+    """
+    body = re.sub(r"\A\ufeff?---\r?\n.*?\r?\n---[ \t]*(\r?\n|\Z)", "", text, count=1, flags=re.DOTALL)
+    for line in body.splitlines():
+        line = line.strip()
+        if line and not line.startswith(("#", "|", "-")):
+            return line[:200]
+    return ""
+
+
+def _count_org_reviews(slug: str | None, archived: bool = False) -> tuple[int, list[dict]]:
     """Return (count, review_items) for the given org slug.
 
     slug=None (or "all") returns every review across all orgs — used by the
@@ -354,7 +385,7 @@ def _count_org_reviews(slug: str | None) -> tuple[int, list[dict]]:
     """
     scan_slug = None if slug in (None, "all") else slug
     items = []
-    for folder, start, end, title, path, review_spaces in _scan_reviews(slug=scan_slug):
+    for folder, start, end, title, path, review_spaces in _scan_reviews(slug=scan_slug, archived=archived):
         try:
             mtime = path.stat().st_mtime
             gen_date = time.strftime("%Y-%m-%d", time.localtime(mtime))
@@ -373,13 +404,7 @@ def _count_org_reviews(slug: str | None) -> tuple[int, list[dict]]:
         if m:
             artifacts = int(m.group(1))
 
-        # First non-heading paragraph as summary (up to 200 chars)
-        summary = ""
-        for line in text.splitlines():
-            line = line.strip()
-            if line and not line.startswith(("#", "|", "-")):
-                summary = line[:200]
-                break
+        summary = _review_summary(text)
 
         # Extract skill tags from review text using the same allowlist as _build_skills
         tags: list[str] = []
@@ -398,9 +423,27 @@ def _count_org_reviews(slug: str | None) -> tuple[int, list[dict]]:
                 "summary": summary,
                 "tags": tags,
                 "spaces": sorted(review_spaces) if review_spaces else ([scan_slug] if scan_slug else []),
+                "review": _review_name(path, archived),
+                "archived": archived,
             }
         )
     return len(items), items
+
+
+def _review_name(review_md: Path, archived: bool) -> str:
+    """``[archive/]<slug-set>/<start>_<end>`` -- the name WorkReview takes.
+
+    Read off the path, so it names the folder exactly; a legacy review with no
+    slug-set segment has no such name and gets "" (its row offers no move).
+    """
+    try:
+        parts = review_md.relative_to(_reviews_base(archived)).parts
+    except ValueError:
+        return ""
+    if len(parts) != 4 or re.fullmatch(r"\d{4}", parts[0]):
+        return ""
+    name = f"{parts[0]}/{parts[2]}"
+    return f"{folder_archive()}/{name}" if archived else name
 
 
 def _org_archive_dir(org_config: dict) -> Path:
@@ -709,11 +752,12 @@ async def get_engagement_summary(slug: str):
 
 
 @api.get("/engagement/{slug}/reviews", response_model=list[EngagementReviewItem])
-async def get_engagement_reviews(slug: str):
+async def get_engagement_reviews(slug: str, archived: bool = False):
     # "all" is a cross-org view, not a real org — skip the org-config check.
     if slug != "all":
         org = _engagement_org_config(slug)
         if org is None:
             raise HTTPException(status_code=404, detail=f"Unknown Space slug: {slug}")
-    _, items = _count_org_reviews(slug)
+    # ?archived=true is the list's Archived filter: reviews/archive/ and nothing else.
+    _, items = _count_org_reviews(slug, archived=archived)
     return [EngagementReviewItem(**item) for item in items]

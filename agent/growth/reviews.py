@@ -228,7 +228,7 @@ async def list_reviews():
 
 
 @api.get("/reviews/{folder}", response_model=ReviewDetailResponse)
-async def get_review_detail(folder: str, slugs: str | None = None):
+async def get_review_detail(folder: str, slugs: str | None = None, archived: bool = False):
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}", folder):
         raise HTTPException(status_code=400, detail="Invalid folder format")
     # A folder name is only a date range, so the same one can exist under
@@ -237,7 +237,8 @@ async def get_review_detail(folder: str, slugs: str | None = None):
     target = sorted(slugs.split("+")) if slugs else None
     active_slug = None if slugs else (load_config().get("activeSpace") or None)
 
-    for name, start, end, title, path, orgs in await asyncio.to_thread(_scan_reviews, active_slug):
+    # ?archived=true reads reviews/archive/ -- an archived review is still there to open.
+    for name, start, end, title, path, orgs in await asyncio.to_thread(_scan_reviews, active_slug, archived):
         if name != folder:
             continue
         if target is not None and sorted(orgs) != target:

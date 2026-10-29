@@ -506,7 +506,7 @@ route list.
 | `GET /engagement/{slug}/summary` | `ado/reporting` | Tier 2+ | `archive/`, config | — |
 | `GET /engagement/{slug}/work-breakdown` | `ado/reporting` | Tier 2+ | `archive/` | — |
 | `GET /engagement/{slug}/skills` | `ado/reporting` | Tier 2+ | `archive/`, reviews | — |
-| `GET /engagement/{slug}/reviews` | `ado/reporting` | Tier 2+ | review folders in the hub | — |
+| `GET /engagement/{slug}/reviews` | `ado/reporting` | Tier 2+ | review folders in the hub, never `reviews/archive/`; `?archived=true` reads only that | — |
 | `GET /stress-status` | `ado/sprint` | `features.sprintAwareness` | `stress-log*.json` | — |
 | `GET /stress-sprint-activity` | `ado/sprint` | `features.sprintAwareness` | `stress-log*.json`, `git log` | — |
 | `GET /stress-repos` | `ado/sprint` | `features.sprintAwareness` | config aliases, local checkouts | — |
@@ -536,7 +536,7 @@ And the modules', gated per request on their flag and 404 when it is off:
 | `GET /resume` | `growth/resume` | `{hub}/resume/resume.md` | — |
 | `GET /resume-preview` | `growth/resume` | `UpdateResume -Preview`, through the bridge | — |
 | `GET /reviews` | `growth/reviews` | `{hub}/reviews/`, scoped to the active Space | — |
-| `GET /reviews/{folder}` | `growth/reviews` | one `review.md` | — |
+| `GET /reviews/{folder}` | `growth/reviews` | one `review.md`; `?archived=true` reads `reviews/archive/` | — |
 | `GET /review-preview` | `growth/reviews` | `PublishWorkReview -Preview`, through the bridge | — |
 | `POST /review/generate` | `growth/reviews` | `NewWorkReview`, through the bridge | **the scaffold the verb writes** |
 | `GET /manager` | `communication/manager` | `{hub}/manager/{current,archive}/` | — |
