@@ -258,6 +258,9 @@
       "usage": "{cliPrefix}ReplyPR <PrId> <ThreadId> -Reply <Message> [-Status <state>] [-Repository <r>] [-Project <p>] [-Help]",
       "examples": [
         "{cliPrefix}ReplyPR 6789 12 'Fixed, please re-review'"
+      ],
+      "notes": [
+        "On a GitHub Space a thread is only resolved or unresolved: -Status fixed or closed resolves it, active reopens it, and byDesign, pending and wontFix are refused before anything is posted."
       ]
     },
     "ThreadHash": {
@@ -669,7 +672,7 @@
         "{cliPrefix}AddPRReview 34 -DryRun"
       ],
       "notes": [
-        "Needs ANTHROPIC_API_KEY. Run it from the repository the PR belongs to: the diff is computed locally."
+        "Needs ANTHROPIC_API_KEY. On Azure DevOps run it from the repository the PR belongs to: the diff is computed locally. On a GitHub Space the diff comes from GitHub, and the findings are one review."
       ]
     },
     "CloseItem": {

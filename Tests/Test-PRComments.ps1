@@ -1080,6 +1080,85 @@ Assert-True 'the linked issues are NewPR''s Issue: line and closing keywords, no
     (((Get-P20GitHubLinkedIssues "Adds export.`n`nIssue: #41`nFixes #8, and see #99 for context") -join ',') -eq '41,8')
 
 Write-Host ""
+Write-Host "-- GitHub: the write side's rules (pure) --" -ForegroundColor Cyan
+# ReplyPR's -Status on GitHub, what a -ThreadId is, the GraphQL node lookup,
+# and AddPRReview's line positioning -- one row per case each rule tells apart.
+
+foreach ($stName in @('fixed', 'closed')) {
+    $plan = Get-P20GitHubReplyStatus -Status $stName
+    Assert-True "-Status $stName resolves the thread" ($plan.Action -eq 'resolveReviewThread' -and $plan.Word -eq 'resolved' -and -not $plan.Error)
+}
+$plan = Get-P20GitHubReplyStatus -Status 'active'
+Assert-True '-Status active reopens it (unresolveReviewThread): ADO''s open state is GitHub''s unresolved' ($plan.Action -eq 'unresolveReviewThread' -and $plan.Word -eq 'unresolved' -and -not $plan.Error)
+$plan = Get-P20GitHubReplyStatus -Status ''
+Assert-True 'no -Status: the reply alone' (-not $plan.Action -and -not $plan.Error)
+foreach ($stName in @('byDesign', 'pending', 'wontFix')) {
+    $plan = Get-P20GitHubReplyStatus -Status $stName
+    Assert-True "-Status $stName is refused by name: GitHub keeps no reason" (-not $plan.Action -and $plan.Error -match [regex]::Escape("-Status $stName has no equivalent on GitHub") -and $plan.Hint -match 'Nothing was posted') $plan.Error
+}
+
+$rcRoot = [PSCustomObject]@{ id = 2412345678; pull_request_url = 'https://api.github.com/repos/acme/widgets/pulls/12'; html_url = 'https://github.com/acme/widgets/pull/12#discussion_r2412345678' }
+$rcReply = [PSCustomObject]@{ id = 2412345690; in_reply_to_id = 2412345678; pull_request_url = 'https://api.github.com/repos/acme/widgets/pulls/12' }
+$rcOther = [PSCustomObject]@{ id = 2412345678; pull_request_url = 'https://api.github.com/repos/acme/widgets/pulls/120' }
+$icHere = [PSCustomObject]@{ id = 3300000001; issue_url = 'https://api.github.com/repos/acme/widgets/issues/12'; html_url = 'https://github.com/acme/widgets/pull/12#issuecomment-3300000001' }
+$k = Get-P20GitHubCommentKind -Number 12 -ReviewComment $rcRoot
+Assert-True 'an inline review comment on this PR is a review thread, its own root' ($k.Kind -eq 'review' -and $k.Root -eq 2412345678 -and $k.Root -is [long])
+$k = Get-P20GitHubCommentKind -Number 12 -ReviewComment $rcReply
+Assert-True 'a reply in the thread answers through its ROOT (GitHub replies to a top-level comment only)' ($k.Kind -eq 'review' -and $k.Root -eq 2412345678)
+Assert-True 'a review comment on ANOTHER pull request (12 is not 120) is not this one''s' ($null -eq (Get-P20GitHubCommentKind -Number 12 -ReviewComment $rcOther))
+$k = Get-P20GitHubCommentKind -Number 12 -ReviewComment $rcOther -IssueComment $icHere
+Assert-True '...and the lookup falls through to the conversation tab' ($k.Kind -eq 'conversation' -and $k.Root -eq 3300000001 -and $k.Url -match 'issuecomment-3300000001')
+$k = Get-P20GitHubCommentKind -Number 12 -Review ([PSCustomObject]@{ id = 2900000001; html_url = 'https://github.com/acme/widgets/pull/12#pullrequestreview-2900000001' })
+Assert-True 'a review''s summary is its own kind' ($k.Kind -eq 'summary' -and $k.Root -eq 2900000001)
+Assert-True 'nothing found is $null' ($null -eq (Get-P20GitHubCommentKind -Number 12))
+
+$gqlNodes = @(
+    [PSCustomObject]@{ id = 'PRRT_a'; isResolved = $false; comments = [PSCustomObject]@{ nodes = @([PSCustomObject]@{ databaseId = 2412345700 }) } },
+    [PSCustomObject]@{ id = 'PRRT_b'; isResolved = $true; comments = [PSCustomObject]@{ nodes = @([PSCustomObject]@{ databaseId = 2412345678 }) } }
+)
+Assert-True 'the GraphQL thread is found by its first comment''s REST id (databaseId)' ((Find-P20GitHubReviewThreadNode -Nodes $gqlNodes -RootId 2412345678).id -eq 'PRRT_b')
+Assert-True 'and a root on no node of the page is $null (the caller reads the next page)' ($null -eq (Find-P20GitHubReviewThreadNode -Nodes $gqlNodes -RootId 1))
+
+$sampleDiff = @(
+    'diff --git a/src/export.ts b/src/export.ts',
+    'index 1111111..2222222 100644',
+    '--- a/src/export.ts',
+    '+++ b/src/export.ts',
+    '@@ -38,4 +38,5 @@ export function run() {',
+    ' const xs = load();',
+    '-for (const x of xs) { for (const y of xs) {} }',
+    '+for (const x of xs) {',
+    '+  use(x);',
+    ' }',
+    ' return xs;',
+    'diff --git a/src/gone.ts b/src/gone.ts',
+    'deleted file mode 100644',
+    '--- a/src/gone.ts',
+    '+++ /dev/null',
+    '@@ -1,1 +0,0 @@',
+    '-old();'
+) -join "`n"
+$right = Get-P20DiffRightLines -Diff $sampleDiff
+Assert-True 'the diff''s new-side lines: context and added, numbered from the hunk header' ((@($right['src/export.ts'].Keys | Sort-Object) -join ',') -eq '38,39,40,41,42') ((@($right['src/export.ts'].Keys | Sort-Object) -join ','))
+Assert-True 'a deleted file has no new side to comment on' (-not $right.ContainsKey('src/gone.ts') -and -not $right.ContainsKey('/dev/null'))
+
+$findings = @(
+    [PSCustomObject]@{ file = 'b/src/export.ts'; line = 39; comment = 'use() can throw; nothing catches it.' },
+    [PSCustomObject]@{ file = 'b/src/export.ts'; line = 400; comment = 'A line the diff does not show.' },
+    [PSCustomObject]@{ file = 'src/elsewhere.ts'; line = 3; comment = 'A file the diff does not touch.' }
+)
+$rp = New-P20GitHubReviewPayload -Findings $findings -RightLines $right
+Assert-True 'one review, event COMMENT' ($rp.Payload.event -eq 'COMMENT')
+Assert-True 'a finding on a line the diff shows is inline: path without b/, the new-side line, side RIGHT' `
+    ($rp.Inline -eq 1 -and $rp.Payload.comments[0].path -eq 'src/export.ts' -and $rp.Payload.comments[0].line -eq 39 -and $rp.Payload.comments[0].side -eq 'RIGHT')
+Assert-True 'every inline body carries the marker GetPRComments reads as the bot''s' ($rp.Payload.comments[0].body -eq '[AI Code Review] use() can throw; nothing catches it.' -and $rp.Payload.comments[0].body -match 'PR Assistant|AI Code Review')
+Assert-True 'a line or a file outside the diff is named in the body, not dropped and not guessed onto a line' `
+    ($rp.Moved -eq 2 -and $rp.Payload.body -match '(?m)^- `src/export\.ts` L400 -- A line the diff does not show\.$' -and $rp.Payload.body -match '(?m)^- `src/elsewhere\.ts` L3 -- ') $rp.Payload.body
+Assert-True 'the body opens with the marker too' ($rp.Payload.body.StartsWith('[AI Code Review] 3 finding(s).'))
+$rp = New-P20GitHubReviewPayload -Findings $findings -RightLines @{}
+Assert-True 'with no positions (the retry), every finding is in the body and comments is an empty list' ($rp.Inline -eq 0 -and $rp.Moved -eq 3 -and @($rp.Payload.comments).Count -eq 0 -and ((ConvertTo-Json -InputObject $rp.Payload -Depth 5 -Compress) -match '"comments":\[\]'))
+
+Write-Host ""
 Write-Host "-- GitHub: GetPRComments typed as the verb, gh stubbed --" -ForegroundColor Cyan
 # Typed as the verb in a fresh child shell against a scratch package and hub
 # (AGENTS.md: a suite that runs a script directly does not test the verb) --
@@ -1095,6 +1174,8 @@ $ghPkg = Join-Path $ghRoot 'pkg'
 $ghHub = Join-Path $ghRoot 'hub'
 $ghFx = Join-Path $ghRoot 'fx'
 $ghCalls = Join-Path $ghRoot 'calls.log'
+# A write's body travels in a file (--input); the stub copies each one here.
+$ghInputs = Join-Path $ghRoot 'inputs.log'
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 function Set-GhFixture([string]$ApiPath, [string[]]$Lines) {
@@ -1116,7 +1197,9 @@ function New-GhCard([string]$Space, [string]$FileName, [string]$Heading, [string
 function Invoke-GhVerb {
     param([string]$Snippet, [string]$Cwd = '', [string]$Branch = '')
     if (Test-Path $ghCalls) { Remove-Item $ghCalls -Force }
+    if (Test-Path $ghInputs) { Remove-Item $ghInputs -Force }
     $p = $ghPkg -replace "'", "''"; $h = $ghHub -replace "'", "''"; $c = $ghCalls -replace "'", "''"; $f = $ghFx -replace "'", "''"
+    $in = $ghInputs -replace "'", "''"
     $pre = @"
 `$env:PSModulePath = '$p'
 `$env:PROMPTS_ROOT = '$h'
@@ -1127,7 +1210,30 @@ function global:gh {
     `$a = @(`$args | ForEach-Object { "`$_" })
     Add-Content -Path '$c' -Value (ConvertTo-Json -Compress -InputObject (@('gh') + `$a))
     `$path = @(`$a | Where-Object { `$_ -like 'repos/*' })[0]
-    `$file = Join-Path '$f' ((`$path -replace '/', '_') + '.json')
+    # The fixture's name: the API path; a POST's is prefixed POST_; the diff
+    # media type ends .diff; a GraphQL call is graphql_query (_<cursor> past
+    # page one) or graphql_<mutation>.
+    `$key = (`$path -replace '/', '_')
+    `$m = [array]::IndexOf(`$a, '--method')
+    if (`$m -ge 0 -and `$a[`$m + 1] -eq 'POST') { `$key = 'POST_' + `$key }
+    `$ext = '.json'
+    if (`$a -contains 'Accept: application/vnd.github.diff') { `$ext = '.diff' }
+    if (`$a[1] -eq 'graphql') {
+        `$q = "`$(@(`$a | Where-Object { `$_ -like 'query=*' })[0])"
+        `$key = 'graphql_query'
+        if (`$q -cmatch '\b(resolveReviewThread|unresolveReviewThread)\(') { `$key = 'graphql_' + `$Matches[1] }
+        `$cur = @(`$a | Where-Object { `$_ -like 'cursor=*' })[0]
+        if (`$cur) { `$key += '_' + `$cur.Substring(7) }
+        `$path = 'graphql'
+    }
+    `$i = [array]::IndexOf(`$a, '--input')
+    if (`$i -ge 0) {
+        `$sent = [System.IO.File]::ReadAllText(`$a[`$i + 1])
+        Add-Content -Path '$in' -Value `$sent
+        # GitHub refuses a whole review when an inline position does not resolve.
+        if ((Test-Path -LiteralPath (Join-Path '$f' (`$key + '.reject-inline'))) -and `$sent -match '"comments":\[\{') { `$global:LASTEXITCODE = 1; return 'gh: Unprocessable Entity (HTTP 422)' }
+    }
+    `$file = Join-Path '$f' (`$key + `$ext)
     if (`$path -and (Test-Path -LiteralPath `$file)) { `$global:LASTEXITCODE = 0; return @(Get-Content -LiteralPath `$file | Where-Object { `$_ -ne '' }) }
     `$global:LASTEXITCODE = 1
     return 'gh: Not Found (HTTP 404)'
@@ -1154,7 +1260,9 @@ Import-Module '$p/utilities.psm1' -Force -DisableNameChecking *>`$null
     $text = (($out | ForEach-Object { $_.ToString() }) -join "`n")
     $argv = @()
     if (Test-Path $ghCalls) { $argv = @(Get-Content $ghCalls | ForEach-Object { , @($_ | ConvertFrom-Json) }) }
-    return [pscustomobject]@{ Text = $text; Calls = $argv }
+    $sentBodies = @()
+    if (Test-Path $ghInputs) { $sentBodies = @(Get-Content $ghInputs | Where-Object { $_ } | ForEach-Object { $_ | ConvertFrom-Json }) }
+    return [pscustomobject]@{ Text = $text; Calls = $argv; Inputs = $sentBodies }
 }
 # The tracker calls the verb made. The module's own probe at import (`gh auth
 # status`, a read of the sign-in) is not the verb's and is left out.
@@ -1313,6 +1421,146 @@ try {
     $r = Invoke-GhVerb "${cfgPrefix}GetPRComments 5"
     Assert-True 'run again, the card itself now names PR 5: no checkout needed, and no git remote read' ($r.Text -match 'The card names it: 8-gadget-thing' -and -not (@($r.Calls | Where-Object { $_ -contains 'get-url' }).Count) -and $r.Text -match 'EXIT=0') $r.Text
     Assert-True 'and the PR URL line is not written twice' ([System.IO.File]::ReadAllText($iCard) -eq $iBefore)
+
+    # == The write side: ReplyPR and AddPRReview, typed, with the same stubs ======
+    Set-GhSpace 'widgets'
+    $prApi = 'https://api.github.com/repos/acme/widgets'
+    Set-GhFixture 'repos/acme/widgets/pulls/comments/2412345690' @("{`"id`":2412345690,`"in_reply_to_id`":2412345678,`"pull_request_url`":`"$prApi/pulls/12`",`"html_url`":`"https://github.com/acme/widgets/pull/12#discussion_r2412345690`"}")
+    Set-GhFixture 'repos/acme/widgets/pulls/comments/2412345700' @("{`"id`":2412345700,`"pull_request_url`":`"$prApi/pulls/12`",`"html_url`":`"https://github.com/acme/widgets/pull/12#discussion_r2412345700`"}")
+    Set-GhFixture 'repos/acme/widgets/issues/comments/3300000001' @("{`"id`":3300000001,`"issue_url`":`"$prApi/issues/12`",`"html_url`":`"https://github.com/acme/widgets/pull/12#issuecomment-3300000001`"}")
+    Set-GhFixture 'repos/acme/widgets/pulls/12/reviews/2900000001' @('{"id":2900000001,"state":"CHANGES_REQUESTED","html_url":"https://github.com/acme/widgets/pull/12#pullrequestreview-2900000001"}')
+    Set-GhFixture 'POST/repos/acme/widgets/pulls/12/comments/2412345678/replies' @('{"id":2412345999}')
+    Set-GhFixture 'POST/repos/acme/widgets/pulls/12/comments/2412345700/replies' @('{"id":2412346000}')
+    Set-GhFixture 'POST/repos/acme/widgets/issues/12/comments' @('{"id":3300000099}')
+    # Page one of reviewThreads holds neither thread, so the lookup must page.
+    Set-GhFixture 'graphql/query' @('{"data":{"repository":{"pullRequest":{"reviewThreads":{"pageInfo":{"hasNextPage":true,"endCursor":"CUR1"},"nodes":[{"id":"PRRT_other","isResolved":false,"comments":{"nodes":[{"databaseId":1}]}}]}}}}}')
+    Set-GhFixture 'graphql/query/CUR1' @('{"data":{"repository":{"pullRequest":{"reviewThreads":{"pageInfo":{"hasNextPage":false,"endCursor":"CUR2"},"nodes":[{"id":"PRRT_x","isResolved":false,"comments":{"nodes":[{"databaseId":2412345678}]}},{"id":"PRRT_y","isResolved":true,"comments":{"nodes":[{"databaseId":2412345700}]}}]}}}}}')
+    Set-GhFixture 'graphql/resolveReviewThread' @('{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}')
+    Set-GhFixture 'graphql/unresolveReviewThread' @('{"data":{"unresolveReviewThread":{"thread":{"isResolved":false}}}}')
+    # A public repository: a write to it carries the one line (Get-RepoVisibility.ps1).
+    Set-GhFixture 'repos/acme/widgets' @('{"full_name":"acme/widgets","visibility":"public"}')
+    function Get-GqlCalls($r) { return @(Get-GhCalls $r | Where-Object { $_[2] -eq 'graphql' }) }
+
+    # -- R1. A status GitHub has no word for: refused, before anything is asked --
+    foreach ($bad in @('wontFix', 'byDesign', 'pending')) {
+        $before = [System.IO.File]::ReadAllText($wCard)
+        $r = Invoke-GhVerb "${cfgPrefix}ReplyPR 12 2412345690 -Reply 'Not this time.' -Status $bad"
+        Assert-True "ReplyPR -Status $bad on GitHub: refused, exit 2, one block naming the status" `
+            ($r.Text -match "Error: -Status $bad has no equivalent on GitHub" -and $r.Text -match 'EXIT=2' -and ([regex]::Matches($r.Text, '(?m)^Error: ')).Count -eq 1) $r.Text
+        Assert-True "...and nothing was asked or posted: no gh call, no git call, the card untouched ($bad)" `
+            ((Get-GhCalls $r).Count -eq 0 -and @($r.Calls | Where-Object { $_[0] -eq 'git' }).Count -eq 0 -and [System.IO.File]::ReadAllText($wCard) -eq $before) (Format-Calls $r)
+    }
+
+    # -- R2. A reply in an inline thread, -Status fixed: REST reply, GraphQL resolve --
+    $replyText = 'Fixed in "abc1234" -- see a && b.'
+    $r = Invoke-GhVerb "${cfgPrefix}ReplyPR 12 2412345690 -Reply '$replyText' -Status fixed"
+    $paths = @(Get-GhCalls $r | ForEach-Object { @($_ | Where-Object { $_ -like 'repos/*' })[0] } | Where-Object { $_ })
+    Assert-True 'ReplyPR on GitHub exits 0, with a -ThreadId past 32 bits' ($r.Text -match 'EXIT=0' -and 2412345690 -gt [int]::MaxValue) $r.Text
+    Assert-True 'the card names the repository: no git call' (@($r.Calls | Where-Object { $_[0] -eq 'git' -and $_ -contains 'get-url' }).Count -eq 0) (Format-Calls $r)
+    Assert-True 'it looks the id up, asks the repository''s visibility, then replies to the thread''s ROOT through REST' `
+        (($paths -join ',') -eq 'repos/acme/widgets/pulls/comments/2412345690,repos/acme/widgets,repos/acme/widgets/pulls/12/comments/2412345678/replies') (Format-Calls $r)
+    Assert-True 'a public repository: the line, once, before the write' (@([regex]::Matches($r.Text, '\[!\] This repository is public')).Count -eq 1 -and $r.Text.IndexOf('This repository is public') -lt $r.Text.IndexOf('Reply posted')) $r.Text
+    $postCall = @(Get-GhCalls $r | Where-Object { $_ -contains 'repos/acme/widgets/pulls/12/comments/2412345678/replies' })[0]
+    Assert-True 'the reply is a POST whose body travels as a file (--input), not in argv' ($postCall -contains 'POST' -and $postCall -contains '--input' -and -not (@($postCall | Where-Object { $_ -like 'body=*' }).Count)) (Format-Calls $r)
+    Assert-True 'the body is the reply, byte for byte: quotes and ampersands intact' (@($r.Inputs).Count -eq 1 -and $r.Inputs[0].body -eq $replyText) ((@($r.Inputs) | ConvertTo-Json -Compress))
+    $gql = @(Get-GqlCalls $r)
+    Assert-True 'the thread''s node id is looked up by GraphQL, a page at a time: page two by its cursor' `
+        ($gql.Count -eq 3 -and ($gql[0] -contains 'owner=acme') -and ($gql[0] -contains 'name=widgets') -and ($gql[0] -contains 'number=12') -and -not (@($gql[0] | Where-Object { $_ -like 'cursor=*' }).Count) -and ($gql[1] -contains 'cursor=CUR1')) (Format-Calls $r)
+    Assert-True 'then resolveReviewThread on THAT node -- the id travels as a variable' (($gql[2] -join ' ') -match 'query=mutation\(\$threadId: ID!\) \{ resolveReviewThread\(' -and $gql[2] -contains 'threadId=PRRT_x') (Format-Calls $r)
+    Assert-True 'no query string reaches gh, and no double quote rides in a GraphQL argument' `
+        ((Test-NoQueryInArgv $r) -and -not (@($gql | ForEach-Object { $_ } | Where-Object { $_.Contains('"') }).Count)) (Format-Calls $r)
+    Assert-True 'it says the thread is resolved' ($r.Text -match "Thread 2412345678 resolved \('fixed'\)") $r.Text
+    $after = [System.IO.File]::ReadAllText($wCard)
+    Assert-True 'the card''s slot for the ROOT thread is filled, and its Status reads resolved' `
+        ($after -match "\(Thread 2412345678\)\r\nLine: [^\r]*\r\nReviewer/Bot: reviewer-a\r\nPublished: [^\r]*\r\nStatus: resolved\r\n[\s\S]*?Reply: Fixed in `"abc1234`"") $after
+    Assert-True 'a CRLF card stays CRLF after the reply' (-not ($after -match '(?<!\r)\n')) $after
+
+    # -- R3. -Status active reopens a resolved thread; on an open one it does nothing --
+    $r = Invoke-GhVerb "${cfgPrefix}ReplyPR 12 2412345700 -Reply 'Reopening: the import is used after all.' -Status active"
+    $gql = @(Get-GqlCalls $r)
+    Assert-True '-Status active on a resolved thread: unresolveReviewThread on its node' ($r.Text -match 'EXIT=0' -and $gql.Count -eq 3 -and (($gql[2] -join ' ') -match 'unresolveReviewThread\(') -and $gql[2] -contains 'threadId=PRRT_y') (Format-Calls $r)
+    $r = Invoke-GhVerb "${cfgPrefix}ReplyPR 12 2412345700 -Reply 'Done.' -Status fixed"
+    $gql = @(Get-GqlCalls $r)
+    Assert-True '-Status fixed on a thread already resolved: said, and no mutation sent' ($r.Text -match 'EXIT=0' -and $r.Text -match 'Thread 2412345700 is already resolved' -and $gql.Count -eq 2) (Format-Calls $r)
+
+    # -- R4. A conversation comment: a new comment, and never a resolve --------------
+    $r = Invoke-GhVerb "${cfgPrefix}ReplyPR 12 3300000001 -Reply 'Thanks -- inline answers below.' -Status fixed"
+    $paths = @(Get-GhCalls $r | ForEach-Object { @($_ | Where-Object { $_ -like 'repos/*' })[0] } | Where-Object { $_ })
+    Assert-True 'a conversation id: the review-comment lookup misses, the conversation one answers, a new comment is posted' `
+        (($paths -join ',') -eq 'repos/acme/widgets/pulls/comments/3300000001,repos/acme/widgets/issues/comments/3300000001,repos/acme/widgets,repos/acme/widgets/issues/12/comments' -and $r.Text -match 'EXIT=0') (Format-Calls $r)
+    Assert-True 'opening with a link to the comment it answers' (@($r.Inputs).Count -eq 1 -and $r.Inputs[0].body -eq "In reply to https://github.com/acme/widgets/pull/12#issuecomment-3300000001:`n`nThanks -- inline answers below.") ((@($r.Inputs) | ConvertTo-Json -Compress))
+    Assert-True 'no GraphQL at all, and -Status is said not to apply' ((Get-GqlCalls $r).Count -eq 0 -and $r.Text -match '-Status fixed not applied: on GitHub a conversation comment has no thread to resolve') $r.Text
+    $after = [System.IO.File]::ReadAllText($wCard)
+    Assert-True 'the card''s slot for that comment is filled, its Status left as it was' ($after -match "\(Thread 3300000001\)[\s\S]*?Status: conversation\r\nComment: [^\r]*\r\nCode suggestion: \(none\)\r\nDecision: [^\r]*\r\nReply: Thanks -- inline answers below\.") $after
+
+    # -- R5. A review's summary: the same new comment --------------------------------
+    $r = Invoke-GhVerb "${cfgPrefix}ReplyPR 12 2900000001 -Reply 'Loop fixed.'"
+    $paths = @(Get-GhCalls $r | ForEach-Object { @($_ | Where-Object { $_ -like 'repos/*' })[0] } | Where-Object { $_ })
+    Assert-True 'a review summary id: found third, answered on the conversation tab' `
+        ($paths[-1] -eq 'repos/acme/widgets/issues/12/comments' -and $paths -contains 'repos/acme/widgets/pulls/12/reviews/2900000001' -and $r.Inputs[0].body -match '^In reply to https://github\.com/acme/widgets/pull/12#pullrequestreview-2900000001:' -and $r.Text -match 'EXIT=0') (Format-Calls $r)
+
+    # -- R6. An id the pull request does not have ------------------------------------
+    $r = Invoke-GhVerb "${cfgPrefix}ReplyPR 12 4444444444 -Reply 'Hello?'"
+    Assert-True 'an id with no comment or review on the PR: refused, exit 2, nothing posted' `
+        ($r.Text -match 'Error: PR #12 on acme/widgets has no review comment, conversation comment or review 4444444444' -and $r.Text -match 'EXIT=2' -and @(Get-GhCalls $r | Where-Object { $_ -contains 'POST' }).Count -eq 0) $r.Text
+
+    # -- A1. AddPRReview: the diff from GitHub, one review back -----------------------
+    $diffText = @(
+        'diff --git a/src/export.ts b/src/export.ts',
+        'index 1111111..2222222 100644',
+        '--- a/src/export.ts',
+        '+++ b/src/export.ts',
+        '@@ -38,4 +38,5 @@ export function run() {',
+        ' const xs = load();',
+        '-for (const x of xs) { for (const y of xs) {} }',
+        '+for (const x of xs) {',
+        '+  use(x);',
+        ' }',
+        ' return xs;'
+    )
+    [System.IO.File]::WriteAllText((Join-Path $ghFx 'repos_acme_widgets_pulls_12.diff'), (($diffText -join "`n") + "`n"), $utf8NoBom)
+    Set-GhFixture 'POST/repos/acme/widgets/pulls/12/reviews' @('{"id":2900000050}')
+    [System.IO.File]::WriteAllText((Join-Path $ghFx 'model-reply.json'), '[{"file":"b/src/export.ts","line":39,"comment":"use() can throw and nothing catches it."},{"file":"b/src/export.ts","line":400,"comment":"Off the diff."}]', $utf8NoBom)
+    $fxq = $ghFx -replace "'", "''"
+    $modelStub = @"
+`$env:ANTHROPIC_API_KEY = 'sk-test-not-a-key'
+function global:Invoke-RestMethod { param(`$Uri, `$Method, `$Headers, `$Body) [System.IO.File]::WriteAllText('$fxq/model-request.json', [string]`$Body); return [pscustomobject]@{ content = @([pscustomobject]@{ text = [System.IO.File]::ReadAllText('$fxq/model-reply.json') }) } }
+"@
+    $r = Invoke-GhVerb "$modelStub`n${cfgPrefix}AddPRReview 12"
+    $paths = @(Get-GhCalls $r | ForEach-Object { @($_ | Where-Object { $_ -like 'repos/*' })[0] } | Where-Object { $_ })
+    Assert-True 'AddPRReview on GitHub exits 0' ($r.Text -match 'EXIT=0') $r.Text
+    Assert-True 'no checkout is read: the card names the repository and GitHub gives the diff' (@($r.Calls | Where-Object { $_[0] -eq 'git' }).Count -eq 0) (Format-Calls $r)
+    Assert-True 'it reads the PR, its diff (as a media type, a header), the visibility, then posts ONE review' `
+        (($paths -join ',') -eq 'repos/acme/widgets/pulls/12,repos/acme/widgets/pulls/12,repos/acme/widgets,repos/acme/widgets/pulls/12/reviews' -and (@(Get-GhCalls $r)[1] -contains 'Accept: application/vnd.github.diff')) (Format-Calls $r)
+    $modelSent = [System.IO.File]::ReadAllText((Join-Path $ghFx 'model-request.json'))
+    Assert-True 'the model is sent the diff GitHub gave' ($modelSent -match [regex]::Escape('+  use(x);')) $modelSent
+    $sent = @($r.Inputs)
+    Assert-True 'the review is event COMMENT, sent as a file' ($sent.Count -eq 1 -and $sent[0].event -eq 'COMMENT' -and (@(Get-GhCalls $r)[3] -contains '--input')) ((@($r.Inputs) | ConvertTo-Json -Compress -Depth 5))
+    Assert-True 'the finding on a diff line is inline: path, new-side line, RIGHT, the marker' `
+        (@($sent[0].comments).Count -eq 1 -and $sent[0].comments[0].path -eq 'src/export.ts' -and $sent[0].comments[0].line -eq 39 -and $sent[0].comments[0].side -eq 'RIGHT' -and $sent[0].comments[0].body -eq '[AI Code Review] use() can throw and nothing catches it.') ((@($r.Inputs) | ConvertTo-Json -Compress -Depth 5))
+    Assert-True 'the finding off the diff is in the review body, by file and line' ($sent[0].body -match 'src/export\.ts` L400 -- Off the diff\.') $sent[0].body
+    Assert-True 'and no query string reaches gh' (Test-NoQueryInArgv $r) (Format-Calls $r)
+
+    # -- A2. -DryRun posts nothing -----------------------------------------------------
+    $r = Invoke-GhVerb "$modelStub`n${cfgPrefix}AddPRReview 12 -DryRun"
+    Assert-True 'AddPRReview -DryRun: the review is printed with the public line, nothing is posted' ($r.Text -match 'EXIT=0' -and $r.Text -match '\[!\] This repository is public' -and $r.Text -match '\[DryRun\] Would post one review on acme/widgets PR #12 \(1 inline, 1 in the body\)' -and @(Get-GhCalls $r | Where-Object { $_ -contains 'POST' }).Count -eq 0) $r.Text
+
+    # -- A3. GitHub refuses the inline positions: once more, all in the body ------------
+    [System.IO.File]::WriteAllText((Join-Path $ghFx 'POST_repos_acme_widgets_pulls_12_reviews.reject-inline'), 'x', $utf8NoBom)
+    $r = Invoke-GhVerb "$modelStub`n${cfgPrefix}AddPRReview 12"
+    $sent = @($r.Inputs)
+    Assert-True 'a refused inline review is retried once, every finding in the body, and posts' `
+        ($r.Text -match 'EXIT=0' -and $sent.Count -eq 2 -and @($sent[0].comments).Count -eq 1 -and @($sent[1].comments).Count -eq 0 -and $sent[1].body -match 'L39 -- use\(\) can throw') $r.Text
+    Remove-Item (Join-Path $ghFx 'POST_repos_acme_widgets_pulls_12_reviews.reject-inline') -Force
+
+    # -- A4. The round trip: GetPRComments reads the review back as the bot's ---------
+    Set-GhFixture 'repos/acme/widgets/pulls/12/comments' ($reviewLines + '{"id":2412346100,"path":"src/export.ts","line":39,"user":{"login":"you","type":"User"},"body":"[AI Code Review] use() can throw and nothing catches it.","created_at":"2026-10-03T09:00:00Z"}')
+    $scratch2 = Join-Path $ghRoot 'roundtrip.md'
+    $r = Invoke-GhVerb "${cfgPrefix}GetPRComments 12 -OutputFile '$scratch2'"
+    $rt = [System.IO.File]::ReadAllText($scratch2)
+    Assert-True 'GetPRComments reads AddPRReview''s inline comment back as the bot review, on its file and line' `
+        ($rt -match "\(Thread 2412346100\)\r?\nLine: ``src/export\.ts`` L39\r?\nReviewer/Bot: PR Assistant \(AI Code Review\)") $rt
+    Set-GhFixture 'repos/acme/widgets/pulls/12/comments' $reviewLines
 }
 catch {
     Assert-True "the GitHub cases ran to the end without a terminating error -- $($_.Exception.Message)" $false

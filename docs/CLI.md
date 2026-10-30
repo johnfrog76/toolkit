@@ -145,6 +145,24 @@ naming them -- a read, but it writes a card, and the same number on the wrong re
 else's review. **The card** is the one whose `PR URL:` names it, else the head branch's, else the issue
 the pull request's body names (`NewPR`'s `Issue: #n` line, or a closing keyword such as `Fixes #n`).
 
+**Answering on a GitHub board.** `ReplyPR <pr> <thread>` takes the `(Thread N)` the card shows and finds
+the repository the same way, in the same order. The id is one of the three kinds above, and each is
+answered the way GitHub allows. An **inline thread** gets a real reply, through REST
+(`pulls/<n>/comments/<root>/replies`, to the thread's first comment -- GitHub replies to a top-level
+comment only, so a follow-up's id answers through its root). A **conversation comment** or a **review's
+summary** has no thread on GitHub, so the reply is a new comment on the pull request that opens with a
+link to the one it answers -- and the next `GetPRComments` reads that comment back as a thread of its own ([Known gaps](KNOWN-GAPS.md)). Bodies travel as a JSON file (`gh api --input`), never in an argument --
+Windows PowerShell 5.1 drops a bare `"` from a native command's argv. **`-Status`** keeps Azure DevOps'
+words and maps the ones GitHub has: a review thread is only resolved or unresolved, and REST cannot set
+either, so the status goes through GraphQL. `fixed` and `closed` run `resolveReviewThread`; `active`, the
+state a reopened thread returns to on Azure DevOps, runs `unresolveReviewThread`. GraphQL names a thread
+by a node id REST never shows, so the thread is first found by its first comment's REST id
+(`reviewThreads`, a hundred at a time, paged). A thread already in that state is said and left alone.
+`byDesign`, `pending` and `wontFix` carry a reason GitHub has nowhere to keep, so each is **refused by
+name, before anything is asked or posted**, exit 2 -- say it in the reply instead. On a conversation
+comment or a review summary there is no thread to resolve: the reply is posted and the line says
+`-Status` was not applied. The card's `Status:` line reads `resolved` or `unresolved` afterwards.
+
 **The side record.** Besides the card, a run writes one small file per PR fetch,
 `<promptsRoot>/<promptsFolder>/pr-comments/<date>-PR<id>.md` (the PR title, its URL, the fetch time, the
 repository and the count of new comments). It exists so `prsReviewed` is countable at archive time; nothing
@@ -418,7 +436,7 @@ one place this is written.
 #### A write to a public repository says so
 
 On a GitHub Space, the verbs that write to the tracker -- `NewItem`, `EditItem`, `CloseItem`, `Route`
-and `NewPR` -- print one line before they write when the repository they write to is public:
+`NewPR`, `ReplyPR` and `AddPRReview` -- print one line before they write when the repository they write to is public:
 
 ```text
 [!] This repository is public
@@ -428,7 +446,7 @@ A public repository is read by strangers, and GitHub keeps an edited issue's fir
 comes after the verb's reads and before its write, so the dry run shows it too -- `-WhatIf`, and
 `NewItem`'s `-ReadOnly`. It is the line only: nothing is asked, so a script or the web's bridge runs
 exactly as before. A private repository (gh's `INTERNAL` too), or one `gh` did not answer about,
-prints nothing. `ReplyPR` replies on Azure DevOps only, so it has no line; an Azure DevOps Space, or one
+prints nothing. An Azure DevOps Space, or one
 with no tracker, has no visibility and `gh` is not asked. The rule is `Scripts/Get-RepoVisibility.ps1`
 -- one `gh api repos/<owner>/<name>` per verb -- and the words are `consts.json` `visibility`, the same
 three the agent's `GET /api/visibility` serves: `public`, `private`, `unknown`.
@@ -528,9 +546,9 @@ is LF like everything else, whatever `templates/ManagerSession.template.md` chec
 | `NewPR [<card>]` | PR + move card to Code Review + comment + write PR URL back to the file. `-WhatIf` resolves everything and calls nothing. On a GitHub board: `gh pr create` (repo from the checkout's github remote, else the board's one repo; `-Draft` and `-AutoComplete` map to draft and auto-merge), the PR body references the issue PLAINLY -- never `Closes #n`, because closing is `CloseItem`'s job -- and the ledger entry is a markdown comment on the issue; GitHub has no Code Review state to move, and the card's lane comes from the `PR URL:` line as ever. A card in `backlog/` is found too, and is moved to `current/` before its `PR URL:` is written |
 | `PublishPR [<card>]` | Stage 2 of the ship flow: flip the card's draft pull request on Azure DevOps to ready. Reads the card's `PR URL:` line (the card by id or filename, else the one for this branch from the code repository), takes the token `NewPR` takes, confirms the pull request is an active draft, sends `PATCH .../pullrequests/{id}?api-version=7.1` with `{"isDraft":false}`, and writes one line under `PR URL:` -- `PR published: <url>`, once, not a dated stamp and not state. `-WhatIf` prints the exact call and sends nothing. Refused, exit 2 and nothing written: no `PR URL:` line, a pull request already ready or not active, and a GitHub pull request, whose hint is `gh pr ready <url>` |
 | `GetPRComments [<id>]` | Fetch PR review comments and append to the prompt file -- every comment of every thread, a reviewer's follow-ups included; append-only and idempotent. On a GitHub board it answers through `gh` (below, "On a GitHub board") |
-| `ReplyPR <pr> <thread> -Reply "..."` | Post a reply to a PR thread (`-Status` to set its state) and fill that thread's `Reply:` slot in the card -- the card in `current/` whose `PR URL:` names the PR, else the branch's |
+| `ReplyPR <pr> <thread> -Reply "..."` | Post a reply to a PR thread (`-Status` to set its state) and fill that thread's `Reply:` slot in the card -- the card in `current/` whose `PR URL:` names the PR, else the branch's. On a GitHub board it answers through `gh`: `fixed` / `closed` resolve, `active` reopens, `byDesign` / `pending` / `wontFix` are refused (above, "Answering on a GitHub board") |
 | `ThreadHash [<id\|file>] [-Hash <h>]` | Thread **this repo's** branch commits into the Git section and PR replies. Run it from the code repo. A card in `backlog/` is found too, and its first thread moves it to `current/` before writing |
-| `AddPRReview <pr>` | Post an AI code review to a PR as inline comments (`-DryRun` to preview) |
+| `AddPRReview <pr>` | Post an AI code review to a PR as inline comments (`-DryRun` to preview). On a GitHub board: one review, the diff read from GitHub ("AI review (optional)") |
 | `Sync` | Pull with rebase, then push, on the prompt store -- when `storeSync` is `git` (the hub's `hub.json`, or `config.local.json` per machine). The hub must be the **root** of its own repository: a hub sitting inside some other repository is refused before anything is committed, because `git add -A` from a subfolder stages that whole repository. The System page's **Sync the hub** runs this verb through the bridge and shows what it printed ([`CONFIGURATION.md`, "Syncing the hub from the web app"](CONFIGURATION.md#syncing-the-hub-from-the-web-app)) |
 
 **Where `NewPR` gets its facts.** From the code repository, on the work branch, everything is inferred:
@@ -1156,6 +1174,18 @@ comment anchored to a file and line.
 
 **Run it from the repository the PR belongs to** -- it computes the diff locally. If you run it
 somewhere else the command stops and says so rather than sending you a review of nothing.
+
+**On a GitHub board it needs no checkout.** The repository is found as `GetPRComments` finds it (the card
+whose `PR URL:` names the pull request first), the diff comes from GitHub (`gh api` with the
+`application/vnd.github.diff` media type -- the same unified diff), the same prompt and model review it,
+and the findings are posted as **one review** (`event: COMMENT`). Each finding is an inline comment
+positioned by path and new-side line (`side: RIGHT`) -- the numbering the review prompt already asks the
+model for, so nothing is translated. GitHub refuses the whole review when one position is not a line the
+diff shows, so each is checked against the diff's hunks first: a finding on a line the diff does not
+show is named in the review's body instead, as the Azure DevOps path falls back to a general comment.
+If GitHub still refuses the inline positions, the review is sent once more with every finding in its
+body. Every comment and the body start `[AI Code Review]`, which is how `GetPRComments` reads them back
+as the bot's. With no PR number it finds the open pull request whose head is the current branch.
 
 With no PR number it finds the PR for the current branch, asking each of the Space's projects in
 turn. A project that answers 404, or with no PR, is simply not the one and the search goes on. An
