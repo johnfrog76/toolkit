@@ -27,7 +27,8 @@ function Set-P20CardReply {
     #>
     param(
         [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][int]$ThreadId,
+        # A [long]: a GitHub thread id is past the 32-bit range.
+        [Parameter(Mandatory = $true)][long]$ThreadId,
         [Parameter(Mandatory = $true)][string]$Reply,
         [string]$Status = ''
     )

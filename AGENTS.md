@@ -169,7 +169,7 @@ module and you add a mock line to every one of these files.
 **Four test runners**, one per half plus one for the two together. Run the ones your change touches:
 
 ```powershell
-tkTestToolkit                 # the CLI -- 47 suites, 8441 assertions on this commit
+tkTestToolkit                 # the CLI -- 47 suites, 8501 assertions on this commit
 ```
 
 ```bash
@@ -319,8 +319,9 @@ Done locally is not Closed on the board. If the card should be closed, run `tkCl
 
 - **The prompt file does not live in the tool's repo.** It lives under the configured prompt
   store — check with `tkEnv`. Never create one inside the ToolKit checkout.
-- **`tkAddPRReview` must run from the repository the PR belongs to**; it computes the diff
-  locally and will stop rather than review nothing.
+- **`tkAddPRReview` must run from the repository the PR belongs to** on Azure DevOps; it computes
+  the diff locally and will stop rather than review nothing. On a GitHub Space the diff comes
+  from GitHub, and no checkout is needed.
 - **`-WhatIf` on the first of a batch.** `tkCloseItem` supports it and prints the exact
   transition without calling ADO. Worth it before closing a queue of bugs.
 - **`tkGetPRComments` is safe to re-run** — it skips threads already in the file. It also writes

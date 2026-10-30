@@ -1929,7 +1929,8 @@ function global:Send-P20PRReply {
     [CmdletBinding()]
     param(
         [Parameter(Position = 0)][int]$PullRequestId,
-        [Parameter(Position = 1)][int]$ThreadId,
+        # A [long]: a GitHub thread id is past the 32-bit range.
+        [Parameter(Position = 1)][long]$ThreadId,
         [string]$Reply,
         [string]$Status,
         [string]$Repository,
