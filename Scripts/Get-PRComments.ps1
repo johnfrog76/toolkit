@@ -384,67 +384,23 @@ try {
     # The ADO body sits in the else below, unindented on purpose, as NewPR's does.
     if ($trackerKind -eq 'github') {
         . (Join-Path $PSScriptRoot 'Read-GitHubPRThreads.ps1')
-        $ghOwner = Get-P20TrackerOwner -OrgUrl $org
         $folders = Get-PromptFolders
         $currentDir = $folders.Current
-        $ghRepoFull = ''
-        $cardByUrl = $null
 
-        # -Repository, as the user typed it: owner/name, or a name under the owner.
-        $askedRepo = ''
-        if ($Repository) {
-            if ($Repository -match '/') { $askedRepo = $Repository }
-            else {
-                $askedOwner = $ghOwner
-                if ($Project) { $askedOwner = $Project }
-                $askedRepo = "$askedOwner/$Repository"
-            }
+        # Which repository: the card that names the pull request, -Repository,
+        # this checkout's GitHub remote, the board's one repo -- in that order,
+        # one function for every pull-request verb (Read-GitHubPRThreads.ps1).
+        $where = Resolve-P20GitHubPRRepo -PullRequestId $PullRequestId -Repository $Repository -Project $Project `
+            -OrgUrl $org -Projects $cfg.Projects -CurrentDir $currentDir -Token $script:Consts.tokens.prUrl `
+            -ToolkitRoot (Split-Path -Parent $PSScriptRoot) -Verb 'GetPRComments'
+        if ($where.Error) {
+            # A read, but it WRITES a card: comments from the wrong repository's
+            # PR of the same number would land in it. So nothing is guessed.
+            Write-CliError -Message $where.Error -Hint $where.Hint
+            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
         }
-
-        # 1. The card that already names this pull request names its repository
-        #    too: NewPR wrote the line. No checkout is needed, and none is read.
-        if ($PullRequestId) {
-            $named = @(Find-P20CardsForGitHubPR -Folder @($currentDir) -Number $PullRequestId -Repo $askedRepo -Token $script:Consts.tokens.prUrl)
-            $namedRepos = @($named | ForEach-Object { $_.Repo } | Sort-Object -Unique)
-            if ($namedRepos.Count -gt 1) {
-                Write-CliError -Message "PR #$PullRequestId is named by cards in more than one repository: $($namedRepos -join ', ')." `
-                    -Hint "Say which: $(Get-CliPrefix)GetPRComments $PullRequestId -Repository <owner>/<name>."
-                exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
-            }
-            if ($namedRepos.Count -eq 1) {
-                $ghRepoFull = $namedRepos[0]
-                if ($named.Count -eq 1) { $cardByUrl = $named[0].Path }
-                Write-Host "[*] The card names it: $(Split-Path $named[0].Path -Leaf) -> $($named[0].Url)" -ForegroundColor DarkGray
-            }
-        }
-        # 2. -Repository.  3. This checkout's GitHub remote -- only when the cwd
-        #    is a code checkout, never the Toolkit's own.  4. The board's one repo.
-        if (-not $ghRepoFull -and $askedRepo) { $ghRepoFull = $askedRepo }
-        if (-not $ghRepoFull) {
-            $cwdRead = Invoke-P20TrackerRead 'git' @('rev-parse', '--absolute-git-dir')
-            $cwdDir = "$(@($cwdRead.Out)[0])".Trim()
-            $tkRead = Invoke-P20TrackerRead 'git' @('-C', (Split-Path -Parent $PSScriptRoot), 'rev-parse', '--absolute-git-dir')
-            $tkDir = "$(@($tkRead.Out)[0])".Trim()
-            if ($cwdRead.Code -eq 0 -and $cwdDir -and $cwdDir -ne $tkDir) {
-                $remoteRead = Invoke-P20TrackerRead 'git' @('remote', 'get-url', 'origin')
-                $remote = "$(@($remoteRead.Out)[0])".Trim()
-                if ($remoteRead.Code -eq 0 -and $remote -match 'github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?$') {
-                    $ghRepoFull = "$($Matches[1])/$($Matches[2])"
-                }
-            }
-        }
-        if (-not $ghRepoFull) {
-            $repoAnswer = Resolve-P20TrackerRepo -OrgUrl $org -Projects $cfg.Projects -CliPrefix (Get-CliPrefix)
-            if (-not $repoAnswer.Repo) {
-                # A read, but it WRITES a card: comments from the wrong
-                # repository's PR of the same number would land in it. So, as
-                # for NewPR, nothing is guessed.
-                $why = "$($repoAnswer.Reason) No card in current/ names this pull request, so its repository cannot be told."
-                Write-CliError -Message $why -Hint "Pass it: $(Get-CliPrefix)GetPRComments <PrId> -Repository <owner>/<name>. $($repoAnswer.Hint)"
-                exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
-            }
-            $ghRepoFull = $repoAnswer.Repo
-        }
+        $ghRepoFull = $where.Repo
+        $cardByUrl = $where.Card
         $Repository = $ghRepoFull
 
         # The pull request: by number, or the newest whose head is the branch.

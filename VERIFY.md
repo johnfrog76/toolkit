@@ -68,8 +68,8 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `NewPR` | `PullRequest` (script only: the Described Changes parser) | 6 |
 | `PublishPR` | `PublishPR` (typed, with `az`, `gh` and the REST call stubbed) | 6; 12 (a real draft on a real Azure DevOps org: the row under "Rows added by a fix") |
 | `GetPRComments` | `PRComments` (script: the thread filter, follow-ups, the side record; on a GitHub Space typed, with `gh` and `git` stubbed: the three channels, the repository from the card, a refusal on a board of several repositories, no `&` in any argument) | 6; 12 (a real GitHub pull request: the row under "Rows added by a fix") |
-| `ReplyPR` | `PRComments` (script only: the reply written into the card; not the live post) | 6 |
-| `AddPRReview` | `ExitCodes` (the missing-key refusal; the branch search's and the details fetch's 401/403/404 with the REST call stubbed) | 12 (a real expired token) |
+| `ReplyPR` | `PRComments` (script: the reply written into the card; on a GitHub Space typed, with `gh` and `git` stubbed: the reply to an inline thread's root, the GraphQL lookup paged and resolve / unresolve, a conversation comment and a review summary answered with a new comment, the three statuses GitHub has no word for refused before anything is asked, the body sent as a file); `ExitCodes` (the ADO success path, stubbed) | 6; 12 (a real GitHub pull request: the row under "Rows added by a fix") |
+| `AddPRReview` | `ExitCodes` (the missing-key refusal; the branch search's and the details fetch's 401/403/404 with the REST call stubbed); `PRComments` (on a GitHub Space typed, with `gh` and the model call stubbed: the diff from GitHub, one review with an inline comment and an off-diff finding in its body, `-DryRun`, the retry, and `GetPRComments` reading it back as the bot's) | 12 (a real expired token; a real GitHub pull request) |
 | `ThreadHash` | `ThreadHash` (script only) | 6 |
 | `CloseItem` | `CloseWorkItem` (the transition rule and error parsing; typed in a fresh shell with `az` and the REST calls stubbed: `-WhatIf`, a Task to Closed, a Bug to Resolved, an item already closed) | 6 (the live close on a real board), 12 |
 | `EditItem` | `EditItem` (typed, with `gh` and `az` stubbed) | 12 (a real repository) |
@@ -287,7 +287,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **47 suites, 8441 assertions** with a `config.local.json`, every one
+findings. On this commit that is **47 suites, 8501 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -1015,6 +1015,17 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   and line and the reply as its follow-up, the conversation comment as its own block, any review with
   text as `Status: review, ...`, exit 0 -- and the second run adding nothing and rewriting nothing. Then
   `tkTestToolkit -PRComments` on that host: green. Added with GetPRComments on GitHub (the read side).
+- [ ] **ReplyPR and AddPRReview write to a real GitHub pull request, under Windows PowerShell 5.1 too.** On
+  a throwaway pull request in a GitHub Space whose card names it, with one inline review comment and one
+  conversation comment, run in `powershell` (5.1): `tkReplyPR <n> <inline id> -Reply 'Fixed in "abc" & done.' -Status fixed`,
+  then `-Status active` on the same thread, then `tkReplyPR <n> <conversation id> -Reply 'Thanks.'`, then
+  `tkReplyPR <n> <inline id> -Reply x -Status wontFix`. You should see the reply in the thread with its
+  quotes and ampersand intact and the thread resolved, then reopened; the conversation answer as a new
+  comment linking to the one it answers; the `wontFix` run refused with exit 2 and nothing new on the pull
+  request. Then, with `ANTHROPIC_API_KEY` set and no checkout of that repository, `tkAddPRReview <n>`: one
+  review on the pull request, its findings inline where they fall on the diff, and `tkGetPRComments <n>`
+  bringing them into the card as `PR Assistant (AI Code Review)`. Added with ReplyPR and AddPRReview on GitHub
+  (the write side).
 - [ ] **The cold-agent walk: the hand-off block starts the work without a question.** With
   `features.solitaireAgile` on in a GitHub Space answered `agents`, run `tkStartWork <id>` for a real card in
   `current/`, and once for an open issue no card carries; paste each output, whole, into a fresh editor chat
