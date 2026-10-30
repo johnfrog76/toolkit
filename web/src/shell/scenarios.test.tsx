@@ -42,6 +42,8 @@ import { cardActions } from "../modules/ado/cardActions";
 import { LANES, legalMoves, whyNotAMove } from "../modules/ado/legalMoves";
 import { LANE_FIELD_KEY, laneLabel } from "../modules/ado/laneNames";
 import { countInPlay, inPlayLine } from "../modules/ado/inPlay";
+import { ARCHIVED_FILTER, deckListView } from "../modules/deck/deckList";
+import { DeckState } from "../modules/deck/decks/types";
 import type { StatusResponse } from "../modules/ado/api.ado";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { AvatarMenu } from "./AvatarMenu";
@@ -1119,5 +1121,44 @@ describe("the scenario grid: the Active column's WIP line, by the limit", () => 
   });
   it("the backlog and Done are not in play", () => {
     expect(countInPlay([{ status: "Backlog" }, { status: "Done" }, { status: "Active" }])).toBe(1);
+  });
+});
+
+// The Decks card, by what this machine has archived (docs/SCENARIOS.md, "The
+// Decks card, by what this machine has archived"): `deck.archived` is a machine
+// list written through Config; the deck files are never edited. The two shipped
+// decks, newest first as the card lists them; the rules are deckList.test.ts's,
+// the render DeckPickerCard.archive.test.tsx's.
+describe("the scenario grid: the Decks card, by what this machine has archived", () => {
+  const shipped = [
+    { id: "the-toolkit", state: DeckState.Complete },
+    { id: "connected-deck-trailer", state: DeckState.Complete },
+  ];
+  it.each<[string, string[], string[], boolean, string[]]>([
+    // deck.archived, the default list, the archived chip drawn, the archived filter
+    ["unset (the shipped config)", [], ["the-toolkit", "connected-deck-trailer"], false, []],
+    [
+      "Introducing ToolKit archived",
+      ["the-toolkit"],
+      ["connected-deck-trailer"],
+      true,
+      ["the-toolkit"],
+    ],
+    [
+      "both archived",
+      ["the-toolkit", "connected-deck-trailer"],
+      [],
+      true,
+      ["the-toolkit", "connected-deck-trailer"],
+    ],
+  ])("%s", (_name, archived, list, chip, underArchived) => {
+    const all = deckListView(shipped, archived, null);
+    expect(all.shown.map((d) => d.id)).toEqual(list);
+    expect(all.showArchived).toBe(chip);
+    // Both shipped decks are Complete, so no state chip is ever drawn.
+    expect(all.showStates).toBe(false);
+    expect(deckListView(shipped, archived, ARCHIVED_FILTER).shown.map((d) => d.id)).toEqual(
+      underArchived,
+    );
   });
 });

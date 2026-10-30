@@ -480,8 +480,9 @@ takes one, follows the word: **Open the note**, **Archive as shipped**, **Move t
 | `external` | Open on *the system's name* | `OpenRegular` | Open it on {detail}, outside ToolKit |
 
 Where each one is drawn: **Open** -- the card (list and board), an issue, a design's note, spec,
-document and thread, a goal, a review, the resume, a prompt, the Space you are in. **Archive** -- a
-goal (it said Retire), a reminder (it said Done; the verb is `Reminders <id> -Archive`), a card's Done
+document and thread, a goal, a review, the resume, a prompt, the Space you are in, a deck's page. **Archive** -- a
+goal (it said Retire), a deck on this machine (its page; `deck.archived` through `Config`, the deck
+file untouched), a reminder (it said Done; the verb is `Reminders <id> -Archive`), a card's Done
 lane (**Archive (move to Done)**), and a hub design, **Archive as shipped** and **Archive as dropped**
 (it said Drop), a review (`WorkReview <review> -Archive`; at once, no confirm), and a product design
 on the Design tab, where this machine names the Space's checkout. **Complete** -- a hub design's
@@ -527,6 +528,8 @@ row that draws them, and listed here. Two kinds, both named:
 | `issue.unpin` | Unpin | `PinOffRegular` | one record | the Issues tab |
 | `reminder.snooze` | Snooze: *when* | `SnoozeRegular` | one record | Reminders |
 | `reminder.edit` | Edit | `EditRegular` | one record | Reminders |
+| `deck.play` | Play | `PlayRegular` | one record | a deck, its row's menu and its page's exposed action |
+| `deck.unarchive` | Unarchive | `ArchiveArrowBackRegular` | one record | a deck's page, once it is archived on this machine |
 | `resume.generate` | Generate resume scaffold | `AddRegular` | one record | the resume |
 | `resume.howItWorks` | How resume updates work | `InfoRegular` | one record | the resume |
 | `design.graduate` | Graduate to a spec | `HatGraduationRegular` | one record | a hub design (Studio), and a product design (the Design tab) where its Space's checkout is named |
@@ -1180,11 +1183,11 @@ Deck's README for the engine itself. What matters to the shell:
 | | |
 | --- | --- |
 | `feature` | `"deck"` |
-| `routes` | `/deck/:deckId`, `/deck/:deckId/notes`, `/decks` -- every element is `lazy`, so no deck code is in the first load |
+| `routes` | `/deck/:deckId` (the player), `/deck/:deckId/notes`, `/decks`, and `/decks/:deckId` (a deck's page: what its file says, **Play**, and this machine's **Archive**, written as `deck.archived` through `Config`) -- every element is `lazy`, so no deck code is in the first load. The strings are `modules/deck/paths.ts`, the one file the descriptor imports statically |
 | `nav` | one entry, **Decks**, and it is `hidden` while growth is on |
 | `slotCards.growth` | the launcher card. **This is how it appears under the Growth tab**: `GrowthPage` renders `useShellSlot("growth")` and imports nothing from `modules/deck`. One module on another's page, neither importing the other |
 | `slotCards["home-banner"]` | the first-run banner: Introducing ToolKit's first slide IS the banner (the Wasteland's home hero without the carousel), with **Get Started** bottom right and a label-less close **x** top right -- only while `/env`'s `config.firstRunWelcome` is true. Home (`modules/ado/routes.tsx`) renders `useShellSlot(HOME_BANNER_SLOT)` above its tabs; the name is `shell/slots.ts`, a file that imports nothing, because a module that read it from `registry.ts` would read it before the registry had run. `homeBanner.test.tsx` holds the gate |
-| `chromeless` | `/deck/*` -- the shell draws no nav bar, no padding and no background around a deck. `isChromeless` only counts a module that is ON, so a flagged-off module cannot strip the chrome |
+| `chromeless` | `/deck/*` (the player, not a deck's page under `/decks/`) -- the shell draws no nav bar, no padding and no background around a deck. `isChromeless` only counts a module that is ON, so a flagged-off module cannot strip the chrome |
 
 With growth off nobody renders the `growth` slot, which is why the module carries a tab of its own:
 a flag that shows nothing when it is on was the defect this module was filed over.

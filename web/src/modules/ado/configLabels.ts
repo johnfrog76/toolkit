@@ -56,6 +56,10 @@ const WORDS: Record<string, SettingWords> = {
     hint: "The banner on Home that offers Introducing ToolKit, a short narrated deck. It hides itself once you watch it or close it; turn this off to bring it back.",
     inverted: true,
   },
+  "deck.archived": {
+    label: "Archived decks",
+    hint: "The decks you have put away on this machine, by id. The Decks card leaves them out of its list and shows them under its archived filter; a deck's own page puts one away or brings it back. The deck itself is not changed.",
+  },
   quietStart: {
     label: "Quiet terminal start",
     hint: "Skip the banner the Toolkit prints when a terminal opens.",
