@@ -75,6 +75,23 @@ function global:Publish-P20WorkReview {
     if (-not $Preview) { Write-ToolkitLog -Type CMD -Source $inv.Name -Detail 'ok' }
 }
 
+function global:Set-P20WorkReview {
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0)][string]$Review,
+        [switch]$Archive,
+        [switch]$Delete,
+        [switch]$WhatIf,
+        [switch]$Help
+    )
+    $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'WorkReview'
+    if ($Help) { Show-CommandHelp 'WorkReview'; return }
+    $pkgRoot = (Get-P20ModuleState).PackageRoot
+    $move = if ($Delete) { 'delete' } else { 'archive' }
+    Invoke-ToolkitScript -Path "$($pkgRoot)/Scripts/Set-WorkReview.ps1" -Parameters $PSBoundParameters `
+        -Name $inv.Name -Prefix $inv.Prefix -Detail "$move $Review"
+}
+
 function global:Write-P20PeerReviewLog {
     [CmdletBinding()]
     param(

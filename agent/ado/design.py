@@ -46,6 +46,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ..core import log_writer
+from ..core.checkout import SpaceCheckout, space_checkout
 from ..core.config import card_types, load_config, org_folder, resolve_dirs, tracker, tracker_owner
 from ..core.consts import (
     design_id_key,
@@ -77,7 +78,7 @@ LIST_TTL_SECONDS = 60
 # The disk cache of parsed rows (repo_read.read_folder_rows). The number is the
 # parse's version: change what design_fields reads and bump it, so every row is
 # parsed again rather than read as the old rule left it.
-DESIGN_ROWS = "design-rows-1"
+DESIGN_ROWS = "design-rows-2"
 
 # A document's name: one markdown file, no path. What the route accepts is
 # exactly what the listing can produce -- nothing else reaches gh.
@@ -200,6 +201,10 @@ class DesignListResponse(BaseModel):
     notShown: list[NotShown] = []  # files in the four folders that are not designs
     structure: Structure = Structure()
     reason: str | None = None
+    # The Space's checkout on this machine (spaceCheckouts.<slug>.path): ready,
+    # and a product row offers MoveDesign's roads; not, and the tab names the
+    # setting. Read fresh on every request -- never from the listing's cache.
+    checkout: SpaceCheckout | None = None
 
 
 class DesignDocDetail(DesignDoc):
@@ -380,12 +385,45 @@ def _front(text: str) -> tuple[dict[str, str], int]:
     return {}, 0
 
 
+# A markdown heading line, and the section the design contract template puts
+# a note's title under (its text on the next line, not on the heading's).
+_HEADING = re.compile(r"^(#{1,6})(?:[ \t]+(.*?))?[ \t]*$")
+_TITLE_SECTION = "Title"
+
+
+def doc_title(lines: list[str]) -> str:
+    """A document's title from its body lines (frontmatter already cut), "" for
+    none -- the ONE rule, pinned row for row by Tests/fixtures/design/titles.json
+    (Scripts/Read-DesignTree.ps1 Get-P20DesignTitle is the CLI's side):
+
+    1. the FIRST heading, when it is level one (``# Title``) -- a ``# `` deeper in
+       the body, after any other heading, is a sentence, not the title;
+    2. else the first non-empty line after the first ``## Title`` heading, unless
+       that line is itself a heading;
+    3. else "" (the caller stands the file name in)."""
+    first = True
+    for i, line in enumerate(lines):
+        m = _HEADING.match(line)
+        if not m:
+            continue
+        hashes, words = m.group(1), (m.group(2) or "").strip()
+        if first and hashes == "#" and words:
+            return words
+        first = False
+        if hashes == "##" and words == _TITLE_SECTION:
+            for nxt in lines[i + 1 :]:
+                if nxt.strip():
+                    return "" if _HEADING.match(nxt) else nxt.strip()
+            return ""
+    return ""
+
+
 def parse_doc(text: str, name: str) -> tuple[str, str, str, int | None, str]:
     """(title, description, thread url, thread number, thread repo) from a file's text."""
     front, start = _front(text)
     lines = (text or "").replace("\r\n", "\n").split("\n")
     description = front.get("description", "")
-    title = next((ln[2:].strip() for ln in lines[start:] if ln.startswith("# ")), "") or name
+    title = doc_title(lines[start:]) or name
     t = _THREAD.search(text or "")
     if t:
         return title, description, t.group(1), int(t.group(4)), f"{t.group(2)}/{t.group(3)}"
@@ -401,7 +439,7 @@ def _stamp(text: str, stamp: str) -> str:
 def design_fields(text: str) -> dict:
     """What a row needs from a file, read from its TEXT ALONE -- the dict the
     disk cache keeps by blob sha, so it may not depend on the file's name or
-    folder: ``heading`` is the first ``# `` heading or "" (the name stands in at
+    folder: ``heading`` is ``doc_title``'s answer or "" (the name stands in at
     build time), and ``docs`` is read on every file (only a spec's is shown)."""
     heading, description, thread, number, thread_repo = parse_doc(text, "")
     front, _ = _front(text)
@@ -719,8 +757,14 @@ async def get_design():
     # bound a second ago is on the next read (toolkit card C3).
     resp = listed.model_copy(deep=True)
     # The active Space's own cards: a repo's design is that product's.
-    folders = [(str(load_config().get("activeSpace") or ""), resolve_dirs()[0].parent)]
+    cfg = load_config()
+    slug = str(cfg.get("activeSpace") or "")
+    folders = [(slug, resolve_dirs()[0].parent)]
     await asyncio.to_thread(attach_cards, resp.designs, folders)
+    # Whether the moves can run here: the configured checkout, checked against
+    # this repo (#146). Fresh per request, so a Config -Set shows on a re-read.
+    if slug:
+        resp.checkout = await asyncio.to_thread(space_checkout, slug, repo, cfg)
     return resp
 
 

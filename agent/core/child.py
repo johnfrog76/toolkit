@@ -34,14 +34,20 @@ class ChildReadError(RuntimeError):
 
 
 def run_read(
-    cmd: list[str], timeout: float, *, shell: bool | None = None, cwd: str | None = None
+    cmd: list[str],
+    timeout: float,
+    *,
+    shell: bool | None = None,
+    cwd: str | None = None,
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess:
     """Run ``cmd`` and return it with ``stdout``/``stderr`` as UTF-8 text.
 
     ``shell`` defaults to True on Windows, which ``gh`` and ``az`` need; a
-    ``git`` read passes False. Raises what ``subprocess.run`` raises (a missing
-    CLI, ``TimeoutExpired``) and :class:`ChildReadError` when the output did not
-    arrive -- never an empty success.
+    ``git`` read passes False. ``env`` is the child's whole environment when
+    given (the agent's own otherwise). Raises what ``subprocess.run`` raises (a
+    missing CLI, ``TimeoutExpired``) and :class:`ChildReadError` when the output
+    did not arrive -- never an empty success.
     """
     if shell is None:
         shell = platform.system() == "Windows"
@@ -54,6 +60,7 @@ def run_read(
         timeout=timeout,
         shell=shell,
         cwd=cwd,
+        env=env,
         check=False,
     )
     if result.stdout is None:

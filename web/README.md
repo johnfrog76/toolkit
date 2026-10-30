@@ -483,8 +483,12 @@ Where each one is drawn: **Open** -- the card (list and board), an issue, a desi
 document and thread, a goal, a review, the resume, a prompt, the Space you are in. **Archive** -- a
 goal (it said Retire), a reminder (it said Done; the verb is `Reminders <id> -Archive`), a card's Done
 lane (**Archive (move to Done)**), and a hub design, **Archive as shipped** and **Archive as dropped**
-(it said Drop). **Complete** -- a hub design's spec, and a goal that is not complete yet (row and page). **Delete** -- a card's cover (it said Remove
-cover; the picture is deleted). **Move to** -- a card's lanes. **Copy** -- a prompt's reference and
+(it said Drop), a review (`WorkReview <review> -Archive`; at once, no confirm), and a product design
+on the Design tab, where this machine names the Space's checkout. **Complete** -- a hub design's
+spec, a product design's on the same terms, and a goal that is not complete yet (row and page).
+**Delete** -- a card's cover (it said Remove cover; the picture is deleted), and a review, **Delete
+the review** (`WorkReview <review> -Delete`, behind `shared/ConfirmDialog` naming the range and the
+Spaces). **Move to** -- a card's lanes. **Copy** -- a prompt's reference and
 text. **Open on** -- every row's link out, whatever it said before (Open in ADO, Open in Azure
 DevOps, Open the thread on GitHub, Its history on GitHub). The verbs behind the menus keep their
 names: a goal's Archive still runs `NewGrowth -Close`, and its Complete runs `NewGrowth -Complete`.
@@ -525,7 +529,7 @@ row that draws them, and listed here. Two kinds, both named:
 | `reminder.edit` | Edit | `EditRegular` | one record | Reminders |
 | `resume.generate` | Generate resume scaffold | `AddRegular` | one record | the resume |
 | `resume.howItWorks` | How resume updates work | `InfoRegular` | one record | the resume |
-| `design.graduate` | Graduate to a spec | `HatGraduationRegular` | one record | a hub design (Studio) |
+| `design.graduate` | Graduate to a spec | `HatGraduationRegular` | one record | a hub design (Studio), and a product design (the Design tab) where its Space's checkout is named |
 | `design.promote` | Promote | `ShareRegular` | one record | a design note's page |
 | `space.enter` | Go into *the Space* | `ArrowEnterRegular` | one record | the Studio's Spaces |
 | `space.connect` | Connect *the Space* | `LinkRegular` | one record | the Studio's Spaces |
@@ -564,6 +568,10 @@ defect, not a style question. What the pass settled, beside the intro lines and 
 - **The settings and system surfaces.** The Environment card names the hub and its cards
   (**Hub folder**, **Hub is writable**, **Hub git history**, **Settings files**, **Cards in this Space**), and its tracker row wears the Space's tracker
   (**GitHub**, **Azure DevOps**, or **Tracker** on a Space with none);
+  its **Store sync** row is `HubSyncRow.tsx` -- under `git`, ahead and behind and **Sync the hub**, one
+  fetch when the page opens; under `none`, what carries the folder -- and the cards that write into the
+  hub share one foot line, `HubSyncLine.tsx`, through `PageCard`'s `footNote`, both worded by `hubSync.ts`
+  (`docs/CONFIGURATION.md`, "Syncing the hub from the web app");
   its badge's sentence names the tracker too ("this Space's GitHub answered", never "az CLI, and ADO" on gh;
   `envBadge.ts`, shared with the Build card). The drawer's Configuration says "the Space you are working
   in", not "the active org"; the Space's address is the **Tracker address**, its status hint names both trackers, and sprint awareness speaks of a

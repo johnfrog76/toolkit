@@ -18,7 +18,7 @@ verb, the reader's fixtures and this file change in the same sitting.
   growth/
     current/     in-progress trainings, upcoming talks, active goals
     archive/     completed trainings, delivered talks, achieved goals
-  reviews/       generated work reviews, per slug-set
+  reviews/       generated work reviews, per slug-set; reviews/archive/ the ones put away
   resume/        resume.md
   <org>/         one folder per engagement -- cards, not growth
 ```
@@ -292,6 +292,39 @@ scan follows it. What does **not** follow it is the section: the review groups,
 labels and orders by a stable *kind* -- `archive`, `current`, `growth` -- so a
 hub that renames the folder still gets a Professional Development heading rather
 than a group with no label. The path is data; the section is a contract.
+
+## A review, put away
+
+A review is a **folder**, `reviews/<slug-set>/<year>/<start>_<end>/`, not one file: `review.md` is
+written when the review is generated, and `summary.md` joins it once the prose pass has run. It is
+put away by `{cliPrefix}WorkReview <slug-set>/<start>_<end>`, or by the Reviews card's row menu,
+which runs the same verb through the bridge:
+
+```text
+<promptsRoot>/reviews/
+  first/2026/2026-04-01_2026-04-30/            a review
+  archive/first/2026/2026-01-01_2026-03-31/    a review put away -- the same path under archive/
+    review.md                                  ... ends with **Closed:** YYYY-MM-DD
+    summary.md                                 ... moved untouched
+```
+
+- **`-Archive` moves the whole folder** to the same path under `reviews/archive/` and stamps
+  `**Closed:** YYYY-MM-DD` into **`review.md`** -- the one file every review has from the moment it
+  is generated, the file `consts.json`'s `reviews.fileName` names, and the file every reader identifies
+  a review by. No marker file is added; `summary.md` and anything else in the folder moves untouched.
+  The stamp is the shared writer's (`Scripts/Add-ClosedStamp.ps1`): the file's own line ending, and an
+  existing stamp is never rewritten.
+- **`-Delete` removes the folder** and every file in it. It is not a move; nothing goes to the archive.
+- **Readers leave `reviews/archive/` out** of every list, count and scan by default, and read it --
+  and only it -- when asked for archived reviews: the Reviews card's *Archived* filter. `archive` is
+  therefore not a slug-set. An archived review opens as before.
+- **A review is named without its year**: `<slug-set>/<start>_<end>`, with `archive/` in front for one
+  that is put away. The slug-set is a set, so `second+first` names `first+second`'s folder.
+
+With `storeSync: git` either move is committed with the review's own paths as the pathspec. Nothing in
+`reviews/archive/` is overwritten: an archive that would land on an archived review of the same range
+and Spaces is refused. A legacy review sitting directly under `reviews/<year>/` has no slug-set folder
+and no name the verb takes; it is moved or removed by hand.
 
 ## Templates
 

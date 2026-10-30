@@ -25,10 +25,15 @@
 
     WHERE. By default the git root of the CURRENT directory, named on the
     first line of output, which must hold design/. In a repo it STAGES (git mv,
-    git add) and never commits: a product's history is the engineer's. -Hub
-    works on the hub's folders instead, and -Hub -Space <slug> on that Space's
-    own design/ and spec/; in the hub it follows storeSync the way Archive does.
-    Never both, never guessed.
+    git add) and never commits: a product's history is the engineer's. -Space
+    <slug> alone works in THAT Space's own repository instead, in its checkout
+    on this machine (Resolve-P20SpaceCheckout: spaceCheckouts.<slug>.path
+    first, then the folder you stand in, then a nav shortcut's path) -- the
+    road the Design tab's product rows take through the bridge, which always
+    runs in the package. It stages there too and never commits. -Hub works on
+    the hub's folders instead, and -Hub -Space <slug> on that Space's own
+    design/ and spec/ inside the hub; in the hub it follows storeSync the way
+    Archive does. Never guessed.
 
     It never overwrites, in either folder. Edits go through Write-CardText (the
     file keeps its endings); the scaffolded spec is created with -New. -WhatIf
@@ -49,13 +54,18 @@
     Appended to the journey line of any move; required with -Dropped.
 
 .PARAMETER Doc
-    With -To Complete: where the durable part landed, a path in the same tree.
+    With -To Complete: where the durable part landed, a path in the same tree --
+    or, with -Hub -Space, in the Space's own repository: checked in a clone of
+    it on this machine (spaceCheckouts.<slug>.path, else the folder you stand
+    in, else a nav shortcut's path, else <wsRoot>/<repo>), taken as written
+    with a Note: line when there is no clone here.
 
 .PARAMETER Hub
     Work on the hub's folders instead of the current repository.
 
 .PARAMETER Space
     With -Hub: that declared Space's own design/ and spec/ inside the hub.
+    Without -Hub: that Space's own repository, in its checkout on this machine.
 
 .PARAMETER WhatIf
     Print every move and stamp; write nothing.
@@ -68,6 +78,8 @@
     {cliPrefix}MoveDesign ee925272 -To Complete -Doc docs/hub/design.md
 .EXAMPLE
     {cliPrefix}MoveDesign board-ideas -To Archive -Hub -WhatIf
+.EXAMPLE
+    {cliPrefix}MoveDesign board-ideas -To Spec -Space toolkit
 
 .NOTES
     PowerShell 5.1 compatible (ASCII dashes only).
@@ -111,7 +123,8 @@ if ($Help) {
     Write-Host "  Spec scaffolds the spec beside the note; Archive moves the note to design/archive/ (shipped,"
     Write-Host "  or dropped with -Dropped -Reason); Complete archives the spec and the note together and"
     Write-Host "  needs -Doc <path>. Every move writes one line into the note's ## Journey. In a repo it"
-    Write-Host "  stages and never commits; -Hub works on the hub's folders and follows storeSync."
+    Write-Host "  stages and never commits; -Space <slug> stages in that Space's checkout on this machine"
+    Write-Host "  (spaceCheckouts.<slug>.path); -Hub works on the hub's folders and follows storeSync."
     Write-Host ""
     return
 }
@@ -120,6 +133,8 @@ if ($Help) {
 . (Join-Path $PSScriptRoot 'Write-CardText.ps1')
 . (Join-Path $PSScriptRoot 'Add-ClosedStamp.ps1')
 . (Join-Path $PSScriptRoot 'Read-DesignTree.ps1')
+. (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
+. (Join-Path $PSScriptRoot 'Resolve-SpaceCheckout.ps1')
 $consts = Get-P20Consts
 $states = @($consts.design.states)          # Design, Spec, Complete, Archived
 $stateDesign = [string]$states[0]; $stateSpec = [string]$states[1]; $stateComplete = [string]$states[2]
@@ -151,10 +166,24 @@ if ($Dropped -and [string]::IsNullOrWhiteSpace($Reason)) {
         -Hint "${prefix}MoveDesign $Name -To Archive -Dropped -Reason `"...`""
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
-if ($Space -and -not $Hub) {
-    Write-CliError -Message '-Space is the hub''s: it names a Space folder inside the hub, so it goes with -Hub.' `
-        -Hint "${prefix}MoveDesign $Name -To $To -Hub -Space $Space"
-    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+
+# A declared Space by slug: -Hub -Space names its folder in the hub, -Space
+# alone its own repository. Either way, a slug nobody declared is refused.
+$spaceEntry = $null
+$spaceLabel = ''
+if ($Space) {
+    $declared = @()
+    if ($global:P20Config -and $global:P20Config.Spaces) { $declared = @($global:P20Config.Spaces) }
+    $spaceEntry = $declared | Where-Object { [string]$_.slug -eq $Space } | Select-Object -First 1
+    if (-not $spaceEntry) {
+        $tail = 'with -Hub, its folder in the hub'
+        if (-not $Hub) { $tail = 'its repository' }
+        Write-CliError -Message "No Space '$Space' is declared, so there is no $tail to move a design in." `
+            -Hint "${prefix}Env lists the Spaces; -Hub without -Space works on the hub's root design/ and spec/."
+        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+    }
+    $spaceLabel = [string]$spaceEntry.name
+    if (-not $spaceLabel) { $spaceLabel = [string]$spaceEntry.slug }
 }
 
 # -- Where: the repository we stand in, or the hub -----------------------------------
@@ -171,14 +200,7 @@ if ($Hub) {
     $where = 'the hub'
     $repoName = 'the hub'
     if ($Space) {
-        $declared = @()
-        if ($global:P20Config -and $global:P20Config.Spaces) { $declared = @($global:P20Config.Spaces) }
-        $match = $declared | Where-Object { [string]$_.slug -eq $Space } | Select-Object -First 1
-        if (-not $match) {
-            Write-CliError -Message "No Space '$Space' is declared, so the hub has no folder of its own for it." `
-                -Hint "${prefix}Env lists the Spaces; -Hub without -Space works on the hub's root design/ and spec/."
-            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
-        }
+        $match = $spaceEntry
         $folder = [string]$match.promptsFolder
         if (-not $folder) { $folder = [string]$match.slug }
         $base = Join-Path $promptsRoot $folder
@@ -194,14 +216,33 @@ if ($Hub) {
 }
 else {
     $top = ''
-    try { $top = "$((Invoke-P20TrackerRead 'git' @('rev-parse', '--show-toplevel')).Out)".Trim() } catch { $top = '' }
+    if ($Space) {
+        # The Space's own repository, in its checkout on this machine: the one
+        # resolver, its configured path first. Nothing is cloned or fetched --
+        # with no checkout here there is nothing to stage in, and a commit
+        # through the API would write the engineer's history for them.
+        $checkoutKey = Get-P20SpaceCheckoutKey -Slug ([string]$spaceEntry.slug)
+        $checkout = Resolve-P20SpaceCheckout -OrgUrl ([string]$spaceEntry.org) -Projects $spaceEntry.projects `
+            -Configured (Get-P20ConfiguredCheckout -Slug ([string]$spaceEntry.slug)) -ConfiguredKey $checkoutKey `
+            -Candidates (Get-P20SpaceCheckoutCandidates)
+        if (-not $checkout.Root) {
+            Write-CliError -Message "The $spaceLabel Space has no checkout here to move a design in: $($checkout.Reason)." `
+                -Hint "${prefix}Config -Set $checkoutKey=<the folder of your clone>"
+            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+        }
+        $top = $checkout.Root
+    }
+    else {
+        try { $top = "$((Invoke-P20TrackerRead 'git' @('rev-parse', '--show-toplevel')).Out)".Trim() } catch { $top = '' }
+    }
     if (-not $top) {
         Write-CliError -Message "$((Get-Location).Path) is not inside a git repository." `
             -Hint "Run it from the repository whose design/ holds the design, or use -Hub for the hub's."
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
     $top = ConvertTo-P20LongPath -Path (Resolve-Path -LiteralPath $top).Path
-    Write-Host "Git root: $top"
+    if ($Space) { Write-Host "Git root: $top (the $spaceLabel Space's checkout)" }
+    else { Write-Host "Git root: $top" }
     if (-not (Test-Path -LiteralPath (Join-Path $top 'design') -PathType Container)) {
         Write-CliError -Message "$top has no design/ folder." `
             -Hint "A product keeps its designs in design/ with spec/ beside it; use -Hub for the hub's."
@@ -211,11 +252,12 @@ else {
     $designDir = Join-Path $top 'design'
     $specDir = Join-Path $top 'spec'
     $where = 'this repository'
+    if ($Space) { $where = "the $spaceLabel Space's repository" }
     # The name a journey line calls this repository by: owner/repo from the
     # origin remote when there is one, else the folder's name.
     $repoName = Split-Path -Leaf $top
     try {
-        $origin = "$((Invoke-P20TrackerRead 'git' @('remote', 'get-url', 'origin')).Out)".Trim()
+        $origin = "$((Invoke-P20TrackerRead 'git' @('-C', $top, 'remote', 'get-url', 'origin')).Out)".Trim()
         $m = [regex]::Match($origin, '[:/]([^/:]+)/([^/]+?)(?:\.git)?/?$')
         if ($m.Success) { $repoName = "$($m.Groups[1].Value)/$($m.Groups[2].Value)" }
     } catch { $null = $_ }
@@ -573,7 +615,31 @@ switch ($To) {
             exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
         }
         $docRel = (& $rel $Doc.Trim()).TrimStart('/')
-        if (-not (Test-Path -LiteralPath (& $full $docRel) -PathType Leaf)) {
+        if ($spaceEntry -and $Hub) {
+            # -Hub -Space: the hub holds the design, the Space's own repository
+            # holds the docs it landed in (docs/hub/design.md, "The file", the
+            # `> Docs:` row).
+            # So -Doc is looked for in a clone of that repository on this
+            # machine; with no clone here there is nothing to check it against,
+            # and it is taken as written, said once.
+            $checkout = Resolve-P20SpaceCheckout -OrgUrl ([string]$spaceEntry.org) -Projects $spaceEntry.projects `
+                -Configured (Get-P20ConfiguredCheckout -Slug ([string]$spaceEntry.slug)) `
+                -ConfiguredKey (Get-P20SpaceCheckoutKey -Slug ([string]$spaceEntry.slug)) `
+                -Candidates (Get-P20SpaceCheckoutCandidates)
+            if ($checkout.Root) {
+                $docAt = Join-Path $checkout.Root ($docRel -replace '/', [IO.Path]::DirectorySeparatorChar)
+                if (-not (Test-Path -LiteralPath $docAt -PathType Leaf)) {
+                    Write-CliError -Message "-Doc $docRel does not exist in $($checkout.Repo), the $spaceLabel Space's repository, checked out at $($checkout.Root)." `
+                        -Hint 'The docs land first, in the Space''s repository; the spec completes after.'
+                    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+                }
+                Write-Host "Doc: $docRel in $($checkout.Repo) at $($checkout.Root)"
+            }
+            else {
+                Write-Host "Note: -Doc $docRel is taken as written, not checked: for the $spaceLabel Space, $($checkout.Reason)." -ForegroundColor Yellow
+            }
+        }
+        elseif (-not (Test-Path -LiteralPath (& $full $docRel) -PathType Leaf)) {
             Write-CliError -Message "-Doc $docRel does not exist in $where." `
                 -Hint 'The docs land first; the spec completes after.'
             exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"

@@ -13,6 +13,12 @@ const runReminders = jest.fn();
 const runNewReminder = jest.fn();
 let items: Reminder[] = [];
 
+// The card's hub-sync foot line reads /env from the shell's cache; these cases
+// are about reminders, so the env says nothing about sync and the line is absent.
+jest.mock("../../shell/api", () => ({
+  useGetEnvQuery: () => ({ data: undefined }),
+}));
+
 jest.mock("./api.organize", () => ({
   useGetRemindersQuery: () => ({
     data: {

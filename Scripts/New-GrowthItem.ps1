@@ -135,6 +135,7 @@ if (-not $displayName) {
 }
 # The one byte contract for a hub file -- see Scripts/Write-CardText.ps1.
 . (Join-Path $PSScriptRoot 'Write-CardText.ps1')
+if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Get-Consts.ps1') }
 
 # -- Close / Complete: one lookup, two moves ----------------------------------------
 # Both name an item already in growth/current/, and both find it the same way: the
@@ -151,8 +152,8 @@ if ($target) {
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
     $growthRoot = Get-P20HubFolder -Name 'growth' -PromptsRoot $promptsRoot -PackageRoot $repoRoot
-    $growthCurrent = Join-Path $growthRoot 'current'
-    $growthArchive = Join-Path $growthRoot 'archive'
+    $growthCurrent = Join-Path $growthRoot ([string](Get-P20Consts).folders.current)
+    $growthArchive = Join-Path $growthRoot ([string](Get-P20Consts).folders.archive)
     $wanted = [System.IO.Path]::GetFileName($target)
     if ($wanted -notmatch '\.prompt\.md$') { $wanted = "$wanted.prompt.md" }
     $hits = @()
@@ -317,7 +318,7 @@ else {
     $fileName = "$Type-$Date-$slug.prompt.md"
 }
 
-$currentDir = Join-Path (Get-P20HubFolder -Name 'growth' -PromptsRoot $promptsRoot -PackageRoot $repoRoot) 'current'
+$currentDir = Join-Path (Get-P20HubFolder -Name 'growth' -PromptsRoot $promptsRoot -PackageRoot $repoRoot) ([string](Get-P20Consts).folders.current)
 $filePath = Join-Path $currentDir $fileName
 
 if (Test-Path $filePath) {

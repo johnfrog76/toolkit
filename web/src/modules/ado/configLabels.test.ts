@@ -50,6 +50,15 @@ describe("configLabels", () => {
     });
   });
 
+  // A Space's checkout (#146) is keyed by its slug, like a Space's own fields.
+  it("names a Space's checkout by its pattern", () => {
+    expect(schemaKeyOf("spaceCheckouts.toolkit.path")).toBe("spaceCheckouts.<slug>.path");
+    expect(wordsFor("spaceCheckouts.toolkit.path", "")).toMatchObject({
+      label: "This Space's checkout",
+      named: true,
+    });
+  });
+
   it("every label and hint is a sentence a person can read", () => {
     for (const key of NAMED_SCHEMA_KEYS) {
       const { label, hint } = wordsFor(key.replace("<slug>", "x").replace("<name>", "X"), "");

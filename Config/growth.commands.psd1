@@ -32,16 +32,19 @@
         'NewGrowth'         = 'New-P20GrowthItem'
         'NewWorkReview'     = 'New-P20WorkReview'
         'PublishWorkReview' = 'Publish-P20WorkReview'
+        'WorkReview'        = 'Set-P20WorkReview'
         'LogPeerReview'     = 'Write-P20PeerReviewLog'
         'UpdateResume'      = 'Update-P20Resume'
     }
 
     # The order the work happens in: create the artifact, generate the review,
-    # publish it. LogPeerReview and UpdateResume are the two that stand alone.
+    # publish it, put it away. LogPeerReview and UpdateResume are the two that
+    # stand alone.
     Order = @(
         'NewGrowth'
         'NewWorkReview'
         'PublishWorkReview'
+        'WorkReview'
         'LogPeerReview'
         'UpdateResume'
     )
@@ -82,6 +85,21 @@
             examples    = @(
                 '{cliPrefix}PublishWorkReview',
                 '{cliPrefix}PublishWorkReview -NoPush'
+            )
+        }
+        'WorkReview' = @{
+            category    = 'review'
+            description = 'Archive or delete a work review'
+            usage       = '{cliPrefix}WorkReview <slug-set>/<start>_<end> -Archive | -Delete [-WhatIf] [-Help]'
+            examples    = @(
+                '{cliPrefix}WorkReview first/2026-04-01_2026-04-30 -Archive',
+                '{cliPrefix}WorkReview first+second/2026-01-01_2026-03-31 -Delete -WhatIf',
+                '{cliPrefix}WorkReview archive/first/2026-04-01_2026-04-30 -Delete'
+            )
+            notes       = @(
+                '-Archive moves reviews/<slug-set>/<year>/<start>_<end>/ to reviews/archive/<slug-set>/<year>/<start>_<end>/ and stamps **Closed:** into its review.md -- the file every review has; summary.md moves untouched.',
+                '-Delete removes the folder and every file in it. Name an archived review with archive/ in front.',
+                'With storeSync: git the move is committed, scoped to the review''s own paths; Sync pushes it. -WhatIf names the folder and writes nothing.'
             )
         }
         'LogPeerReview' = @{

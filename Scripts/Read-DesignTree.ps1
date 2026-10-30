@@ -75,13 +75,37 @@ function Get-P20FileId {
 }
 
 function Get-P20DesignTitle {
-    # The first `# ` heading after the frontmatter; the file's name when there is none.
+    <#
+      A note's or a spec's title, read after the frontmatter -- the ONE rule,
+      pinned row for row by Tests/fixtures/design/titles.json (agent/ado/design.py
+      doc_title is the agent's side):
+        1. the FIRST heading, when it is level one (`# Title`) -- a `# ` deeper in
+           the body, after any other heading, is a sentence, not the title;
+        2. else the first non-empty line after the first `## Title` heading,
+           unless that line is itself a heading;
+        3. else the file's name.
+    #>
     param([string]$Text, [string]$Name)
+    $heading = '^(#{1,6})(?:[ \t]+(.*?))?[ \t]*$'
     $lines = $Text -split "`n"
     $start = (Get-P20FrontEnd -Lines $lines) + 1
+    $first = $true
     for ($i = $start; $i -lt $lines.Count; $i++) {
-        $line = $lines[$i].TrimEnd("`r")
-        if ($line.StartsWith('# ')) { return $line.Substring(2).Trim() }
+        $m = [regex]::Match($lines[$i].TrimEnd("`r"), $heading)
+        if (-not $m.Success) { continue }
+        $hashes = $m.Groups[1].Value
+        $words = $m.Groups[2].Value.Trim()
+        if ($first -and $hashes -eq '#' -and $words) { return $words }
+        $first = $false
+        if ($hashes -ceq '##' -and $words -ceq 'Title') {
+            for ($j = $i + 1; $j -lt $lines.Count; $j++) {
+                $next = $lines[$j].TrimEnd("`r")
+                if (-not $next.Trim()) { continue }
+                if ([regex]::IsMatch($next, $heading)) { return $Name }
+                return $next.Trim()
+            }
+            return $Name
+        }
     }
     return $Name
 }

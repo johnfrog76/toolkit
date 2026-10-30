@@ -79,8 +79,9 @@ if ($Date -notmatch '^\d{4}-\d{2}-\d{2}$') {
 # of that, dot-sourced above.
 $managerFolder = (Get-P20HubFolderNames -PromptsRoot $promptsRoot)['manager']
 $managerRoot = Join-Path $promptsRoot $managerFolder
-$currentDir = Join-Path $managerRoot 'current'
-$archiveDir = Join-Path $managerRoot 'archive'
+if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Get-Consts.ps1') }
+$currentDir = Join-Path $managerRoot ([string](Get-P20Consts).folders.current)
+$archiveDir = Join-Path $managerRoot ([string](Get-P20Consts).folders.archive)
 foreach ($dir in @($currentDir, $archiveDir)) {
     if (-not (Test-Path $dir)) { New-Item -Path $dir -ItemType Directory -Force | Out-Null }
 }

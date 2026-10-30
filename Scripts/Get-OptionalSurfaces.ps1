@@ -48,6 +48,10 @@ if (-not (Get-Command Resolve-P20HowIWork -ErrorAction SilentlyContinue)) {
 if (-not (Get-Command Get-P20SettingsWorkflows -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Get-SettingsWorkflows.ps1')
 }
+# The one way this file calls git with stderr read as text (Invoke-TrackerRead.ps1).
+if (-not (Get-Command Invoke-P20TrackerRead -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
+}
 
 function Get-P20SurfaceStates {
     <#
@@ -217,6 +221,36 @@ function Get-P20OptionalSurfaces {
     }
     $rows += New-P20SurfaceRow -Key 'aliases' -Title 'Navigation shortcuts' -State $navState `
         -Config "$($Prefix)Config -Set aliases.$navExample.path=<path>" -Note $navNote
+
+    # -- A Space's checkout on this machine ------------------------------------
+    # The second surface whose state is a PATH: where a Space's own repository
+    # is cloned here (spaceCheckouts.<slug>.path, config.local.json only). It is
+    # the resolver's first candidate (Scripts/Resolve-SpaceCheckout.ps1), and
+    # what lets the Design tab's rows move a product's designs. Named, not
+    # validated, here: the Design tab says whether the folder is really a clone.
+    $checkoutSlug = 'toolkit'
+    if ($Config -and $Config.ActiveSpace) { $checkoutSlug = [string]$Config.ActiveSpace }
+    $checkoutCount = 0
+    $checkoutActive = ''
+    if ($Config -and $Config.SpaceCheckouts) {
+        foreach ($prop in @($Config.SpaceCheckouts.PSObject.Properties)) {
+            $p = ''
+            if ($prop.Value -and $prop.Value.PSObject.Properties['path']) { $p = [string]$prop.Value.path }
+            if ([string]::IsNullOrWhiteSpace($p)) { continue }
+            $checkoutCount++
+            if ($prop.Name -eq $checkoutSlug) { $checkoutActive = $p }
+        }
+    }
+    $checkoutState = $states.Unset
+    $checkoutNote = ''
+    if ($checkoutCount -gt 0) {
+        $checkoutState = $states.On
+        $checkoutNote = "$checkoutCount configured"
+        if ($checkoutActive) { $checkoutNote += "; $checkoutSlug is at $checkoutActive" }
+        else { $checkoutNote += "; none for $checkoutSlug" }
+    }
+    $rows += New-P20SurfaceRow -Key 'spaceCheckouts' -Title 'Space checkouts' -State $checkoutState `
+        -Config "$($Prefix)Config -Set spaceCheckouts.$checkoutSlug.path=<folder>" -Note $checkoutNote
 
     # -- Azure DevOps ----------------------------------------------------------
     # Something you plug in. Its state is DERIVED (Scripts/Test-AdoEnabled.ps1):
@@ -487,7 +521,7 @@ function Get-P20OptionalSurfaces {
     $designLine = "mkdir design; $($Prefix)StampDesign   (or -Hub for the hub's)"
     $repoTop = ''
     if (Get-Command git -ErrorAction SilentlyContinue) {
-        try { $repoTop = "$(git rev-parse --show-toplevel 2>$null)".Trim() } catch { $repoTop = '' }
+        try { $repoTop = "$((Invoke-P20TrackerRead 'git' @('rev-parse', '--show-toplevel')).Out)".Trim() } catch { $repoTop = '' }
     }
     if ($repoTop -and (Test-Path -LiteralPath (Join-Path $repoTop 'design') -PathType Container)) {
         $tree = Read-P20DesignTree -DesignDir (Join-Path $repoTop 'design') -SpecDir (Join-Path $repoTop 'spec') -Base $repoTop

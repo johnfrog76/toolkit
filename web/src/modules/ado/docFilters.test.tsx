@@ -143,6 +143,10 @@ jest.mock("./api.ado", () => ({
 jest.mock("../../shell/api", () => ({
   useGetEnvQuery: () => ({ data: { cardTypes: [], config: { projects: [] } } }),
 }));
+// The Design tab's move dialog (#146) is never opened here; its mutation is a stand-in.
+jest.mock("../studio/api.studio", () => ({
+  useRunMoveDesignMutation: () => [jest.fn(), { isLoading: false }],
+}));
 
 beforeEach(() => window.localStorage.clear());
 

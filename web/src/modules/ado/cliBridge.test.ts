@@ -431,6 +431,24 @@ describe("buildNewCardParams", () => {
     expect(params).toHaveLength(4);
     expect(params[1]).toBe('The "big" one');
   });
+
+  it("sends -Description only when given, and keeps it multi-line", () => {
+    expect(buildNewCardParams({ title: "T", type: "Task" })).toEqual([
+      "-Title",
+      "T",
+      "-Type",
+      "Task",
+    ]);
+    expect(buildNewCardParams({ title: "T", type: "Task", description: "  " })).toEqual([
+      "-Title",
+      "T",
+      "-Type",
+      "Task",
+    ]);
+    expect(
+      buildNewCardParams({ title: "T", type: "Task", description: "Line one.\nLine two." }),
+    ).toEqual(["-Title", "T", "-Type", "Task", "-Description", "Line one.\nLine two."]);
+  });
 });
 
 describe("buildBillableParams", () => {
