@@ -137,9 +137,10 @@ try {
     $pullCode = $LASTEXITCODE
     $ErrorActionPreference = 'Stop'
     if ($pullCode -ne 0) {
-        Write-Warning "Rebase failed - aborting to leave repo unchanged."
         $null = Invoke-P20TrackerRead 'git' @('rebase', '--abort')
-        return
+        Write-CliError -Message "git pull --rebase failed in '$promptsRoot'; the rebase was aborted and nothing was synced." `
+            -Hint "Resolve the conflict in a terminal, or check the remote, then run Sync again."
+        exit 2  # stated refusal
     }
 
     # The hub's manifest in the product's spelling (stage 2): a hub.json
@@ -193,8 +194,9 @@ try {
     $pushCode = $LASTEXITCODE
     $ErrorActionPreference = 'Stop'
     if ($pushCode -ne 0) {
-        Write-Warning "Push failed. Check remote status."
-        return
+        Write-CliError -Message "git push failed in '$promptsRoot'; the pull above went through but nothing was pushed." `
+            -Hint "Check the remote and your network, then run Sync again."
+        exit 2  # stated refusal
     }
 
     # Ensure current/ directory exists (Git drops empty directories)
