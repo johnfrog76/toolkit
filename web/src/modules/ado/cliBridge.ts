@@ -277,6 +277,28 @@ export function buildMoveDesignParams(fields: MoveDesignFields): string[] {
   return params;
 }
 
+/** `MoveDesign -Space <slug>` from the Design tab (#146): a PRODUCT's design,
+ *  moved in that Space's checkout on this machine (`spaceCheckouts.<slug>.path`)
+ *  -- no `-Hub`, so the verb stages in the clone and never commits. The bridge
+ *  runs in the package; `-Space` is how the verb finds the clone, the way
+ *  `-Hub` finds the hub. */
+export function buildCheckoutMoveDesignParams(
+  fields: MoveDesignFields & { space: string },
+): string[] {
+  const params = [fields.name, "-To", fields.to, "-Space", fields.space.trim()];
+  if (fields.dropped) params.push("-Dropped");
+  if (fields.reason?.trim()) params.push("-Reason", fields.reason.trim());
+  if (fields.doc?.trim()) params.push("-Doc", fields.doc.trim());
+  return params;
+}
+
+/** The commit line MoveDesign suggests after a staged move, or "" -- the
+ *  verb's own words, never retyped here. */
+export function suggestedCommitLine(output: string | null | undefined): string {
+  const m = /^\s*(git commit -m .+?)\s*$/m.exec(output ?? "");
+  return m ? m[1] : "";
+}
+
 /** `NewReminder` (the Organize add-on). Only what was given goes on the line:
  *  the verb defaults the source to "manual" and a missing due to none. */
 export interface NewReminderFields {

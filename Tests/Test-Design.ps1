@@ -352,6 +352,50 @@ catch {
     Assert-True 'the card-line cases ran to the end without a terminating error' $false $_.Exception.Message
 }
 
+# -- A Space's checkout on this machine (#146) --------------------------------------
+# spaceCheckouts.<slug>.path: the resolver's first candidate. The path and origin
+# rules over the table the agent asserts too (Tests/test_space_checkout.py), and
+# the surfaces row with its question. The verb end to end is
+# Tests/test_move_design.py's.
+try {
+    Write-Host ""
+    Write-Host "-- spaceCheckouts: the shared table and the surfaces row -----" -ForegroundColor Cyan
+    . (Join-Path $pkgRoot 'Scripts/Resolve-Tracker.ps1')
+    . (Join-Path $pkgRoot 'Scripts/Resolve-SpaceCheckout.ps1')
+    $table = Get-Content -LiteralPath (Join-Path $pkgRoot 'Tests/fixtures/space-checkout/table.json') -Raw | ConvertFrom-Json
+    foreach ($row in @($table.paths)) {
+        if ($row.PSObject.Properties['home']) {
+            $want = $HOME
+            if ($row.home) { $want = Join-Path $HOME $row.home }
+        }
+        else { $want = [string]$row.expect }
+        Assert-Equal "a path written '$($row.written)' reads as '$want'" $want (ConvertTo-P20CheckoutPath $row.written)
+    }
+    foreach ($row in @($table.origins)) {
+        Assert-Equal "the remote '$($row.url)' names '$($row.repo)'" $row.repo (Get-P20GitHubOriginRepo -Url $row.url)
+    }
+    foreach ($row in @($table.matches)) {
+        $same = [bool]$row.origin -and ($row.origin -ieq $row.space)
+        Assert-Equal "origin '$($row.origin)' against '$($row.space)'" $row.match $same
+    }
+    Assert-Equal 'the setting is spelled once' 'spaceCheckouts.prod.path' (Get-P20SpaceCheckoutKey -Slug 'prod')
+    $cfg = @{ SpaceCheckouts = ('{"prod":{"path":"/srv/r"}}' | ConvertFrom-Json) }
+    Assert-Equal 'Get-P20ConfiguredCheckout reads the Space''s path' '/srv/r' (Get-P20ConfiguredCheckout -Slug 'prod' -Config $cfg)
+    Assert-Equal 'and another Space has none' '' (Get-P20ConfiguredCheckout -Slug 'other' -Config $cfg)
+
+    . (Join-Path $pkgRoot 'Scripts/Get-OptionalSurfaces.ps1')
+    $none = Get-P20OptionalSurfaces -Prefix 'tk' -PackageRoot $pkgRoot -Config @{ ActiveSpace = 'prod'; Spaces = @() } | Where-Object { $_.key -eq 'spaceCheckouts' }
+    Assert-Equal 'the Space checkouts row reads not configured with none set' 'not configured' $none.state
+    Assert-Equal 'and its line names the Space you are in' 'tkConfig -Set spaceCheckouts.prod.path=<folder>' $none.config
+    Assert-True 'and it carries its question' ([bool]$none.question) "question: '$($none.question)'"
+    $set = Get-P20OptionalSurfaces -Prefix 'tk' -PackageRoot $pkgRoot -Config @{ ActiveSpace = 'prod'; Spaces = @(); SpaceCheckouts = $cfg.SpaceCheckouts } | Where-Object { $_.key -eq 'spaceCheckouts' }
+    Assert-Equal 'one set reads on' 'on' $set.state
+    Assert-Equal 'and the note names where' '1 configured; prod is at /srv/r' $set.note
+}
+catch {
+    Assert-True 'the spaceCheckouts cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+
 Write-Host ""
 Write-Host "=======================================================" -ForegroundColor Cyan
 $total = $script:passed + $script:failed

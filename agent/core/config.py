@@ -779,6 +779,11 @@ def load_config() -> dict:
         "isDemoDismissed": bool(local.get("isDemoDismissed", defaults.get("isDemoDismissed", False))),
         # The WIP limit (limits.inPlay): a line Status and the board say, never a gate.
         "limits": _deep_merge(dict(defaults.get("limits", {}) or {}), local.get("limits", {}) or {}),
+        # Where each Space's repository is cloned on THIS machine
+        # (spaceCheckouts.<slug>.path; agent/core/checkout.py). This machine's
+        # file only -- never the shipped one, never hub.json -- as utilities.psm1
+        # reads it.
+        "spaceCheckouts": local.get("spaceCheckouts") if isinstance(local.get("spaceCheckouts"), dict) else {},
         "firstRun": _deep_merge(dict(defaults.get("firstRun", {}) or {}), local.get("firstRun", {}) or {}),
         # The verb table's own metadata. The bridge reads one key off it --
         # bridgeTimeoutSeconds -- and a per-machine config may patch an entry,

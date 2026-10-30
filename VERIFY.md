@@ -287,7 +287,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **47 suites, 8403 assertions** with a `config.local.json`, every one
+findings. On this commit that is **47 suites, 8380 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -1086,6 +1086,15 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   should see the **To do** lane empty, and the last card's closing line pointing at the **+** -- inside ten
   minutes of the clone. Any step where the card's words were not enough is a defect, filed. The walker writes
   the time here: stopwatch, clone to empty To do: `____` min `____` s, on `________` (host and date).
+- [ ] **A product design moves from the Design tab on Windows, staged in a configured checkout.** With a GitHub
+  Space whose repository is cloned at a Windows path, run `tkConfig -Set spaceCheckouts.<slug>.path=C:\<clone>`
+  (and once more with `~\<clone>` under your profile), then in `powershell` (5.1) and in `pwsh` stand in the hub
+  and run `tkMoveDesign <a note> -To Archive -Space <slug> -WhatIf`. You should see `Git root: C:\<clone> (the
+  <Space> Space's checkout)` first and nothing written. On the Design tab, the same note's menu offers **Archive
+  as shipped**; choosing it shows the staged lines and the suggested `git commit -m "design: ..."`, and `git
+  status` in the clone shows the rename staged with no new commit. Set the key to a folder that is not a clone of
+  the Space's repository: the menu is **Open on GitHub** alone and the tab's foot says why, naming the key.
+  Refs #146.
 - [ ] **A review is put away the same under Windows PowerShell 5.1.** In `powershell` (5.1) run
   `tkTestToolkit -WorkReview`: green. Then, with `features.growth` on and a hub whose `storeSync` is `git`,
   generate a review from the Reviews card (+), run `tkPublishWorkReview -NoPush`, and on its row choose

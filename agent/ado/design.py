@@ -46,6 +46,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ..core import log_writer
+from ..core.checkout import SpaceCheckout, space_checkout
 from ..core.config import card_types, load_config, org_folder, resolve_dirs, tracker, tracker_owner
 from ..core.consts import (
     design_id_key,
@@ -200,6 +201,10 @@ class DesignListResponse(BaseModel):
     notShown: list[NotShown] = []  # files in the four folders that are not designs
     structure: Structure = Structure()
     reason: str | None = None
+    # The Space's checkout on this machine (spaceCheckouts.<slug>.path): ready,
+    # and a product row offers MoveDesign's roads; not, and the tab names the
+    # setting. Read fresh on every request -- never from the listing's cache.
+    checkout: SpaceCheckout | None = None
 
 
 class DesignDocDetail(DesignDoc):
@@ -752,8 +757,14 @@ async def get_design():
     # bound a second ago is on the next read (toolkit card C3).
     resp = listed.model_copy(deep=True)
     # The active Space's own cards: a repo's design is that product's.
-    folders = [(str(load_config().get("activeSpace") or ""), resolve_dirs()[0].parent)]
+    cfg = load_config()
+    slug = str(cfg.get("activeSpace") or "")
+    folders = [(slug, resolve_dirs()[0].parent)]
     await asyncio.to_thread(attach_cards, resp.designs, folders)
+    # Whether the moves can run here: the configured checkout, checked against
+    # this repo (#146). Fresh per request, so a Config -Set shows on a re-read.
+    if slug:
+        resp.checkout = await asyncio.to_thread(space_checkout, slug, repo, cfg)
     return resp
 
 

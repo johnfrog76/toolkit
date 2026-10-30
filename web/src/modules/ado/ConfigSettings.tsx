@@ -18,7 +18,7 @@ import { StatusMessage } from "../../shared/StatusMessage";
 import { TruncatedDropdown } from "../../shared/TruncatedDropdown";
 import { useGetEnvQuery } from "../../shell/api";
 import { reportUnsaved, useSettingsFooter } from "../../shell/settings";
-import { wordsFor } from "./configLabels";
+import { schemaKeyOf, wordsFor } from "./configLabels";
 import { useGetConfigQuery, useGetConfigSchemaQuery, useWriteConfigMutation } from "./api.ado";
 import type { ConfigSchemaRow, ConfigSetting, CommandResponse } from "./api.ado";
 import { buildConfigEdit, commandResultMessage, configEditNeedsRestart } from "./cliBridge";
@@ -200,6 +200,7 @@ function runAnchor(keys: string[], key: string): string | undefined {
 function schemaFor(rows: ConfigSchemaRow[], key: string): ConfigSchemaRow | undefined {
   const exact = rows.find((r) => r.key === key);
   if (exact) return exact;
+  if (key.startsWith("spaceCheckouts.")) return rows.find((r) => r.key === schemaKeyOf(key));
   const parts = key.split(".");
   if (parts[0] !== "spaces" || parts.length < 3) return undefined;
   const field = parts.slice(2).join(".");

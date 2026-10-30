@@ -480,6 +480,12 @@ $script:ModuleState.Config = @{
     AiModel = if ($localConfig.ai -and $localConfig.ai.model) { [string]$localConfig.ai.model }
     elseif ($defaultConfig.ai -and $defaultConfig.ai.model) { [string]$defaultConfig.ai.model }
     else { '' }
+    # Where each Space's own repository is checked out on THIS machine
+    # (spaceCheckouts.<slug>.path) -- config.local.json only, never the shipped
+    # file and never hub.json: the hub syncs between machines whose clones sit
+    # in different places. Read by Get-P20ConfiguredCheckout
+    # (Scripts/Resolve-SpaceCheckout.ps1), the resolver's first candidate.
+    SpaceCheckouts = if ($localConfig -and $localConfig.PSObject.Properties['spaceCheckouts'] -and $localConfig.spaceCheckouts) { $localConfig.spaceCheckouts } else { $null }
 }
 
 # Fallback: derive PromptsRoot from toolkit location if not configured. Nothing

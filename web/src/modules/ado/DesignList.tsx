@@ -20,7 +20,9 @@ import { PageCard } from "../../shared/PageCard";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { useGetDesignQuery, useLazySearchDesignQuery } from "./api.ado";
 import { designRoomPath } from "./docRooms";
-import type { Design, DesignDoc } from "./api.ado";
+import type { Design, DesignCheckout, DesignDoc } from "./api.ado";
+import { MoveDesignDialog, ROADS, roadsFor } from "../studio/MoveDesignDialog";
+import type { MoveRoad, ProductCheckout } from "../studio/MoveDesignDialog";
 import { DesignGroups, LearnMoreLink, NO_STRUCTURE, stateColor } from "./DesignGroups";
 import { BoundCards, DesignDocsLine } from "./DesignBindings";
 import { DesignSearchInside, SearchInsideButton } from "./DesignSearchInside";
@@ -35,6 +37,13 @@ import { ALL, DESIGN_KINDS, designMatches, filterSummary, useDesignFilters } fro
 // its thread chip; in Spec and Complete the row opens the spec with the note
 // beside it ("no spec really exists without design"). The agent decides every
 // state; this file draws.
+//
+// A row's moves (#146): where this machine names the Space's checkout
+// (spaceCheckouts.<slug>.path) and the agent found it a clone of this repo, a
+// row offers the same roads a hub design's does -- the same ROADS entries, from
+// the same vocabulary -- and the dialog runs MoveDesign -Space <slug> through
+// the bridge, staged in that clone and never committed. Where it does not, the
+// menu is what it was, and the card's foot names the setting.
 const useStyles = makeStyles({
   row: {
     marginTop: tokens.spacingVerticalS,
@@ -68,7 +77,26 @@ export function primaryDoc(d: Pick<Design, "note" | "spec">): DesignDoc | null {
   return d.spec ?? d.note;
 }
 
-function DesignRow({ design }: { design: Design }) {
+/** The one line the card's foot says when the rows cannot move: which setting
+ *  would let them, or why the one set does not. "" when they can, or when the
+ *  agent said nothing (an older agent, no Space). */
+export function checkoutLine(checkout: DesignCheckout | null | undefined, repo: string): string {
+  if (!checkout || checkout.ready) return "";
+  if (checkout.reason)
+    return `${checkout.reason} Point it at a clone of ${repo} to move these designs from here.`;
+  return `To move these designs from here, name this machine's clone of ${repo || "the repo"}: ${checkout.key} in Settings.`;
+}
+
+function DesignRow({
+  design,
+  canMove,
+  onMove,
+}: {
+  design: Design;
+  /** The Space's checkout is here: the row offers its roads. */
+  canMove: boolean;
+  onMove: (road: MoveRoad) => void;
+}) {
   const styles = useStyles();
   const navigate = useNavigate();
   const main = primaryDoc(design);
@@ -89,6 +117,18 @@ function DesignRow({ design }: { design: Design }) {
       }),
     );
   }
+  // The moves a product row offers where its checkout is here (#146): the hub
+  // row's roads, built the same way, from the same entries.
+  const roads = canMove ? roadsFor(design) : [];
+  roads.forEach((road, i) => {
+    secondary.push(
+      ROADS[road].move.action({
+        detail: ROADS[road].detail,
+        onClick: () => onMove(road),
+        dividerBefore: i === 0 && secondary.length > 0,
+      }),
+    );
+  });
   if (main?.url) {
     secondary.push(ROW.external.action({ detail: trackerName("github"), href: main.url }));
   }
@@ -150,6 +190,13 @@ function DesignRow({ design }: { design: Design }) {
 
 export function DesignList() {
   const { data, isLoading, isFetching, error, refetch } = useGetDesignQuery();
+  // One move at a time: the row's road and its design, until the dialog closes.
+  const [move, setMove] = useState<{ design: Design; road: MoveRoad } | null>(null);
+  const checkout = data?.checkout;
+  const product: ProductCheckout | undefined =
+    checkout?.ready && checkout.space && data?.repo
+      ? { space: checkout.space, repo: data.repo, root: checkout.root }
+      : undefined;
   // An older agent answers the flat list and no groups; it reads as no designs,
   // and its items stay counted in the chip so nothing looks lost.
   const designs = data?.designs ?? [];
@@ -226,60 +273,82 @@ export function DesignList() {
                       action: <LearnMoreLink />,
                     }
                   : undefined;
+  const footLine = data?.supported && designs.length > 0 ? checkoutLine(checkout, data.repo) : "";
   return (
-    <PageCard
-      scrollable
-      empty={empty ? <EmptyState {...empty} /> : undefined}
-      headerLeft={
-        <>
-          <LightbulbRegular />
-          <Subtitle2>Designs and specs</Subtitle2>
-          {summary ? <Caption1>{summary}</Caption1> : null}
-          {searching && data?.supported ? (
-            <SearchInsideButton onClick={runSearch} busy={inside.isFetching} />
-          ) : null}
-        </>
-      }
-      headerRight={
-        <>
-          <RefreshButton
-            onClick={refetch}
-            isFetching={isFetching && !isLoading}
-            disabled={isLoading}
-          />
-          <Badge color="informative" appearance="filled" size="large">
-            {shown.length}
-          </Badge>
-        </>
-      }
-    >
-      {isLoading || isFetching ? (
-        <CardSpinner label="Reading the repo's design/ and spec/..." />
-      ) : (
-        <>
-          {asked !== null ? (
-            <DesignSearchInside
-              result={inside.data}
-              loading={inside.isFetching}
-              failed={!!inside.error}
-              onOpen={(h) =>
-                navigate(designRoomPath(h.path.slice(0, h.path.lastIndexOf("/")), h.name))
-              }
-              onClear={() => setAsked(null)}
+    <>
+      <PageCard
+        scrollable
+        empty={empty ? <EmptyState {...empty} /> : undefined}
+        footerLeft={footLine ? <Caption1 role="note">{footLine}</Caption1> : undefined}
+        headerLeft={
+          <>
+            <LightbulbRegular />
+            <Subtitle2>Designs and specs</Subtitle2>
+            {summary ? <Caption1>{summary}</Caption1> : null}
+            {searching && data?.supported ? (
+              <SearchInsideButton onClick={runSearch} busy={inside.isFetching} />
+            ) : null}
+          </>
+        }
+        headerRight={
+          <>
+            <RefreshButton
+              onClick={refetch}
+              isFetching={isFetching && !isLoading}
+              disabled={isLoading}
             />
-          ) : null}
-          <DesignGroups
-            designs={shown}
-            notShown={notShown}
-            stampHint="StampDesign"
-            searching={searching}
-            renderRow={(d) => <DesignRow key={d.id} design={d} />}
-          />
-          {designs.length > 0 && shown.length === 0 ? (
-            <Caption1 role="status">No designs or specs match the filters.</Caption1>
-          ) : null}
-        </>
-      )}
-    </PageCard>
+            <Badge color="informative" appearance="filled" size="large">
+              {shown.length}
+            </Badge>
+          </>
+        }
+      >
+        {isLoading || isFetching ? (
+          <CardSpinner label="Reading the repo's design/ and spec/..." />
+        ) : (
+          <>
+            {asked !== null ? (
+              <DesignSearchInside
+                result={inside.data}
+                loading={inside.isFetching}
+                failed={!!inside.error}
+                onOpen={(h) =>
+                  navigate(designRoomPath(h.path.slice(0, h.path.lastIndexOf("/")), h.name))
+                }
+                onClear={() => setAsked(null)}
+              />
+            ) : null}
+            <DesignGroups
+              designs={shown}
+              notShown={notShown}
+              stampHint="StampDesign"
+              searching={searching}
+              renderRow={(d) => (
+                <DesignRow
+                  key={d.id}
+                  design={d}
+                  canMove={!!product}
+                  onMove={(road) => setMove({ design: d, road })}
+                />
+              )}
+            />
+            {designs.length > 0 && shown.length === 0 ? (
+              <Caption1 role="status">No designs or specs match the filters.</Caption1>
+            ) : null}
+          </>
+        )}
+      </PageCard>
+      {move && product ? (
+        <MoveDesignDialog
+          design={move.design}
+          road={move.road}
+          open
+          checkout={product}
+          onClose={() => setMove(null)}
+          // Staged: the tab re-reads (the row moves once the commit is pushed).
+          onMoved={() => void refetch()}
+        />
+      ) : null}
+    </>
   );
 }
