@@ -87,6 +87,10 @@ interface PageCardProps {
   footerLeft?: ReactNode;
   footerCenter?: ReactNode;
   footerRight?: ReactNode;
+  /** One line under the footer row, the width of the card -- the hub-sync foot
+   *  line (modules/ado/HubSyncLine.tsx) on the cards that write into the hub.
+   *  The node draws itself, or nothing; this only places it. */
+  footNote?: ReactNode;
   scrollable?: boolean;
   loading?: boolean;
   loadingLabel?: string;
@@ -108,6 +112,7 @@ export function PageCard({
   footerLeft,
   footerCenter,
   footerRight,
+  footNote,
   scrollable = false,
   loading = false,
   loadingLabel = "Loading...",
@@ -160,6 +165,7 @@ export function PageCard({
       {!hasFooterSlots && footer != null && !loading && (
         <div className={styles.footer}>{footer}</div>
       )}
+      {footNote != null && !loading && footNote}
     </Card>
   );
 }

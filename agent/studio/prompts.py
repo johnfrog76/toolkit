@@ -113,7 +113,7 @@ _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _space_cache: dict[str, tuple[float, list[PromptRow], dict[str, str]]] = {}
 
 # The disk cache of parsed Space rows. Bump the number when ``_space_fields`` changes.
-SPACE_ROWS_NAMESPACE = "prompts-rows-1"
+SPACE_ROWS_NAMESPACE = "prompts-rows-2"
 
 
 def clear_cache() -> None:

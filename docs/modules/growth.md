@@ -79,6 +79,7 @@ names; a hub renames any of them in `hub.json`'s `folders`
   growth/current/   trainings, presentations, goals in flight
   growth/archive/   the finished ones
   reviews/<slug-set>/<year>/<start>_<end>/review.md
+  reviews/archive/<slug-set>/<year>/<start>_<end>/   a review put away (tkWorkReview -Archive)
   resume/resume.md
 ```
 
@@ -98,7 +99,7 @@ writes under `<promptsRoot>/<promptsFolder>/pr-comments/`.
 
 ## The verbs
 
-Five, contributed through D-CM from `Config/growth.commands.psd1`. Aliases carry
+Six, contributed through D-CM from `Config/growth.commands.psd1`. Aliases carry
 whatever prefix is configured; `tk` below.
 
 ### `tkNewGrowth`
@@ -176,6 +177,44 @@ the web UI instead of committing. A commit git refuses (a pre-commit hook, say)
 is a stated refusal: git's own first line and a hint that the files are already
 written, then exit 2. Script: `Scripts/Update-Review.ps1`.
 
+### `tkWorkReview`
+
+Puts a review away: archive it, or delete a draft that should never have existed.
+
+```text
+tkWorkReview <slug-set>/<start>_<end> -Archive | -Delete [-WhatIf] [-Help]
+```
+
+A review is a **folder**, not one file -- `review.md` always, and `summary.md` once the prose pass
+has run -- so the verb takes the folder's name the way a person reads it: the Spaces joined with `+`
+(a set: `second+first` names the same folder as `first+second`), then the range. The year folder
+is found, not typed. An archived review is named with `archive/` in front.
+
+| Switch | What it does |
+| --- | --- |
+| `-Archive` | moves the whole folder to `reviews/archive/<slug-set>/<year>/<start>_<end>/` and stamps `**Closed:** YYYY-MM-DD` into **its `review.md`** |
+| `-Delete` | removes the folder and every file in it. A real deletion, not a move |
+| `-WhatIf` | names the folder (and, for `-Archive`, where it would go; for `-Delete`, the files in it) and writes nothing |
+
+**The stamp goes in `review.md`.** It is the one file every review has from the moment it is
+generated, the file `consts.json`'s `reviews.fileName` names, and the file every reader identifies a
+review by (`_scan_reviews`); `summary.md` is optional and moves untouched. No marker file is added.
+The line comes from the one shared writer, `Scripts/Add-ClosedStamp.ps1`, appended in the file's own
+line ending, and never rewritten -- the same stamp an archived card carries. The module closes its own
+data: `Archive` is org-scoped and cannot see `reviews/`.
+
+**`storeSync` decides the commit.** With `storeSync: git` the move is staged and committed --
+`review: archive <slug-set>/<range>` or `review: delete <slug-set>/<range>` -- with the review's own
+paths as the pathspec, so anything else a person had staged stays staged and out of it; `tkSync`
+pushes it. A review that was never committed is moved or removed with nothing to commit. With any
+other `storeSync` nothing is committed and the verb says so.
+
+Archiving a review that is already archived is a report, exit 0. An archive that would land on an
+archived review of the same range and Spaces is refused -- nothing in the archive is overwritten;
+delete one of the two first. Every refusal (no move, both moves, a name that is not
+`<slug-set>/<start>_<end>`, a review that is not there) is exit 2 and writes nothing.
+`NewWorkReview` and `PublishWorkReview` are untouched by it. Script: `Scripts/Set-WorkReview.ps1`.
+
 ### `tkUpdateResume`
 
 ```text
@@ -214,7 +253,7 @@ later is gated by existing.
 | `GET /api/resume` | `resume/resume.md`; answers `content`, `last_modified` and the file's absolute `path` | SkillsPage |
 | `GET /api/resume-preview` | `UpdateResume -Preview`, via the bridge | SkillsPage |
 | `GET /api/reviews` | `reviews/`, scoped to the active Space | ReviewArchive |
-| `GET /api/reviews/{folder}` | one `review.md`; answers `title`, `period`, `content` and the file's absolute `path` | ReviewPage (ADO) |
+| `GET /api/reviews/{folder}` | one `review.md`; answers `title`, `period`, `content` and the file's absolute `path`. `?archived=true` reads `reviews/archive/` | ReviewPage (ADO) |
 | `GET /api/review-preview` | `PublishWorkReview -Preview`, via the bridge | ReviewPage (ADO) |
 | `POST /api/review/generate` | `NewWorkReview`, via the bridge | ReviewArchive |
 
@@ -267,8 +306,26 @@ shell never learns the names of a module's tags. `growthApi.util.invalidateTags`
 is what the refresh buttons dispatch; the shell's `api` object does not know
 those tags exist.
 
-`GrowthPage` is `ReviewArchive` + `Goals`, under the quarter line when there is one. The 1:1s are the communication
+`GrowthPage` is `ReviewArchive` + `Goals`, under the quarter line when there is one.
+
+**A review's row** shows its Spaces as chips -- one `Badge` per Space, by the Space's name -- and a
+summary that is the review's first line of prose, never its frontmatter (it used to print the raw
+`orgs: [...]` line). Its menu offers the row vocabulary's **Archive** and **Delete**, each
+`WorkReview` through the bridge (`POST /api/cmd/WorkReview`, argv `buildWorkReviewParams`, the
+review's name from the row's `review` field). Archive runs at once, as the vocabulary's archive does
+on a row that only moves a file; Delete asks first, through the house's one confirm
+(`shared/ConfirmDialog`), which names the review's range and its Spaces. A refusal is shown in the
+verb's own words. A legacy review with no slug-set folder has no name the verb takes, so its row has
+no menu. **Archived reviews are their own filter value**: the default list (`GET
+/api/engagement/{slug}/reviews`) never reads `reviews/archive/`, and the filter's *Archived* option
+reads only it (`?archived=true`), where a row offers Delete and opens the review as before. The 1:1s are the communication
 module's ([`communication.md`](communication.md)).
+
+`ReviewArchive` -- the **Reviews** card -- writes into the hub (a generated review is a file in
+`reviews/`), so under `storeSync: git` it draws the one shared hub-sync foot line (`HubSyncLine`,
+`web/src/modules/ado/`) while the hub is ahead of its remote or behind it, not checked yet, or its
+last check failed, and nothing once a fetch has found it in step or under any other `storeSync`. It
+reads `/env` and never fetches; [`docs/CONFIGURATION.md`, "Syncing the hub from the web app"](../CONFIGURATION.md#syncing-the-hub-from-the-web-app).
 
 The deck launcher is on this page too, and `GrowthPage` does not know it: the
 page renders `useShellSlot("growth")`, and the **deck** module fills that slot with its launcher
@@ -359,7 +416,7 @@ Then, in a fresh shell:
 
 ```powershell
 Import-Module ./Prompt20Toolkit/Prompt20Toolkit.psd1 -Force
-tkMenu -All          # the five verbs appear under Growth and Reviews
+tkMenu -All          # the six verbs appear under Growth and Reviews
 tkNewGrowth -Help
 ```
 
@@ -391,7 +448,9 @@ committed config where every module flag is off, so it resolves after
 | `tkTestToolkit -ModuleCommands` | D-CM end to end: off means absent, the prefix is data, help comes from the module's own file, a colliding name refuses the module whole, a malformed or `[ordered]` data file is skipped by path, `Order` decides registration order, a data file cannot run code, and a locally-enabled module stays out of the autoload manifest |
 | `tkTestToolkit -Review` | `Generate-Review.ps1` against a scratch git hub: the bare-date regression, what the scan includes and excludes, the scaffold's sections, multi-org slug sets, edge cases, and the publish preview |
 | `pytest Tests/test_growth.py` | the routes against the fixture hub, the 404 gate, and the heading reader: an empty provider is `None`, not the writer's `---`, and a file made from the template reads its comments as nothing |
-| `pytest Tests/test_reviews_multi_org.py` | a review folder's membership is split-on-`+` SET membership, not a substring search |
+| `tkTestToolkit -WorkReview` | `WorkReview` typed in a fresh shell over a scratch git hub: off means no verb, `-Help` names both moves, `-WhatIf` writes nothing, `-Archive` moves the folder with `**Closed:**` in `review.md`, `-Delete` removes it, `storeSync: git` commits that review's paths only, every refusal exit 2 |
+| `pytest Tests/test_reviews_multi_org.py` | a review folder's membership is split-on-`+` SET membership, not a substring search; `reviews/archive/` is off the default scan and the only thing `archived=True` reads; a summary is never the frontmatter |
+| `npm test -- ReviewArchive.rows` | a review's row offers Archive and Delete through `WorkReview`, Delete only after the confirm naming the range and Spaces, and archived reviews only under the Archived filter |
 | `npm test -- Goals.create` | the New Growth Item dialog runs `NewGrowth` through the bridge with the dialog's fields as argv, opens the file the verb names, and keeps a refusal or an "Already there" in the dialog |
 | `npm test -- registry.growth` | the module contributes routes and nav only when the flag is true, and no home cards of its own |
 | `pytest Tests/test_growth_status.py` | the status rules in "The file shape", one row per input the rule distinguishes |

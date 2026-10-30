@@ -11,24 +11,27 @@
          written by Config -Set (Get-P20ConfiguredCheckout). Machine-scoped on
          purpose: the hub syncs between machines whose clones sit in different
          places, so a path never goes in hub.json.
-      2. the folder you stand in, then
-      3. the nav shortcuts' paths (aliases.<Name>.path, the toolkit's existing
-         record of where things live on this machine, which the agent's
-         stress-repos read uses for the same question).
+      2. the caller's own candidates -- MoveDesign and NewPR pass the folder
+         you stand in first, then the nav shortcuts' paths (aliases.<Name>.path,
+         the toolkit's existing record of where things live on this machine,
+         which the agent's stress-repos read uses for the same question).
+      3. <wsRoot>/<repo>, the machine's workspace root (WS_ROOT, which the
+         module exports from config) joined with the repository's own name.
 
-    Get-P20SpaceCheckoutCandidates builds 2 and 3; the caller passes the
-    configured path as -Configured and the rest as -Candidates. A candidate
-    counts only when it is inside a git repository whose origin IS the Space's
-    repository (Get-P20GitHubOriginRepo, the rule StartWork -Launch holds a
-    clone to), so a folder that merely shares a name never answers -- the
-    configured path included: a setting that points at the wrong clone is
-    named in the result's ConfiguredReason and passed over.
+    Get-P20SpaceCheckoutCandidates builds the folder-you-stand-in-and-nav-
+    shortcuts half of 2; the caller passes the configured path as -Configured
+    and its own candidates as -Candidates. A candidate counts only when it is
+    inside a git repository whose origin IS the Space's repository
+    (Get-P20GitHubOriginRepo, the rule StartWork -Launch holds a clone to), so
+    a folder that merely shares a name never answers -- the configured path
+    included: a setting that points at the wrong clone is named in the
+    result's ConfiguredReason and passed over.
 
     Returns a hashtable:
         Root              the clone's top level, or '' when none was found
         Repo              'owner/name' when the address names one, else ''
         Source            'configured' when Root came from the setting, 'found'
-                          when from the folder you stand in or a shortcut, ''
+                          when from a candidate or wsRoot, '' when none was found
         Reason            why there is no Root, in words a refusal or a note can print
         ConfiguredReason  why the configured path was passed over ('' when it
                           was not set, or was used)
@@ -44,7 +47,7 @@
     It never searches.
 
     PowerShell 5.1 compatible (ASCII only). Resolve-P20SpaceCheckout reads no
-    module state; the two helpers read $global:P20Config and the nav table.
+    module state; the helpers read $global:P20Config and the nav table.
 #>
 
 function Get-P20SpaceCheckoutKey {
@@ -112,6 +115,26 @@ function Get-P20SpaceCheckoutCandidates {
     return @($candidates)
 }
 
+<#
+ The nav shortcuts' paths (aliases.<Name>.path), in name order -- the candidates
+ MoveDesign and NewPR hand Resolve-P20SpaceCheckout. Takes the table
+ Get-P20NavAliases returns (entries are hashtables or objects with a path);
+ $null or empty gives an empty list.
+#>
+function Get-P20NavAliasPaths {
+    param($NavAliases)
+    $paths = @()
+    if (-not $NavAliases) { return $paths }
+    foreach ($key in @($NavAliases.Keys | Sort-Object)) {
+        $entry = $NavAliases[$key]
+        $aliasPath = ''
+        if ($entry -is [System.Collections.IDictionary]) { $aliasPath = [string]$entry['path'] }
+        elseif ($entry -and $entry.PSObject.Properties['path']) { $aliasPath = [string]$entry.path }
+        if ($aliasPath) { $paths += $aliasPath }
+    }
+    return $paths
+}
+
 function Test-P20CheckoutCandidate {
     # The top level of the clone $Path is in when its origin is $Repo; else
     # Top is '' and Why says why, in words a note can print.
@@ -142,7 +165,10 @@ function Resolve-P20SpaceCheckout {
         $Projects,
         [AllowEmptyString()][AllowNull()][string]$Configured = '',
         [string]$ConfiguredKey = '',
-        [string[]]$Candidates = @()
+        [string[]]$Candidates = @(),
+        # The machine's wsRoot. Defaults to WS_ROOT, which the module exports
+        # from config; passed explicitly only by a caller that holds its own.
+        [AllowEmptyString()][AllowNull()][string]$WsRoot = $env:WS_ROOT
     )
     $result = @{ Root = ''; Repo = ''; Source = ''; Reason = ''; ConfiguredReason = '' }
     if ((Resolve-P20Tracker -OrgUrl $OrgUrl) -ne 'github') {
@@ -173,22 +199,33 @@ function Resolve-P20SpaceCheckout {
             $result.ConfiguredReason = "$keyWords is $path, but $($hit.Why)"
         }
     }
-    # 2 and 3. The folder you stand in, then the nav shortcuts' paths.
-    foreach ($candidate in @($Candidates)) {
+    # 2. The caller's own candidates (the folder you stand in, the nav
+    #    shortcuts' paths), then 3. <wsRoot>/<repo>.
+    $all = @($Candidates)
+    $wsCandidate = ''
+    if ("$WsRoot".Trim()) {
+        $wsCandidate = Join-Path "$WsRoot".Trim() ($result.Repo.Split('/')[1])
+        $all += $wsCandidate
+    }
+    foreach ($candidate in $all) {
         $c = "$candidate".Trim()
         if (-not $c) { continue }
-        if (-not (Test-Path -LiteralPath $c -PathType Container)) { continue }
         $hit = Test-P20CheckoutCandidate -Path $c -Repo $result.Repo
         if (-not $hit.Top) { continue }
         $result.Root = $hit.Top
         $result.Source = 'found'
         return $result
     }
+    # Every place asked, named -- the caller's own and wsRoot's -- so the
+    # reason reads the same whoever printed it.
+    $asked = @($all | ForEach-Object { "$_".Trim() } | Where-Object { $_ } | Select-Object -Unique)
+    $where = 'there was no folder to look in, and no wsRoot set'
+    if ($asked.Count -gt 0) { $where = 'looked in ' + ($asked -join ', ') }
     if ("$Configured".Trim()) {
-        $result.Reason = "no clone of $($result.Repo) was found on this machine ($($result.ConfiguredReason); looked in the folder you stand in and the nav shortcuts' paths too)"
+        $result.Reason = "no clone of $($result.Repo) was found on this machine ($($result.ConfiguredReason); $where)"
     }
     else {
-        $result.Reason = "no clone of $($result.Repo) was found on this machine ($keyWords is not set; looked in the folder you stand in and the nav shortcuts' paths)"
+        $result.Reason = "no clone of $($result.Repo) was found on this machine ($keyWords is not set; $where)"
     }
     return $result
 }

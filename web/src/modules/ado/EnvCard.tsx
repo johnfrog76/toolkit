@@ -8,6 +8,7 @@ import { ChangeLink, useRowStyles } from "./settingRows";
 import { PlugDisconnectedRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
 import { checkLabel, envBadge } from "./envBadge";
+import { HubSyncRow } from "./HubSyncRow";
 
 // A row that REPORTS a setting sends you to the place that changes it (the
 // Change link, settingRows.tsx). The key is a config key.
@@ -119,6 +120,9 @@ export function EnvCard({ className }: { className?: string }) {
                 setting={settingFor(key, env.config?.activeSpace ?? "")}
               />
             ))}
+            {/* storeSync, and under git the hub's distance from its remote and
+                Sync the hub. Absent from an older agent. */}
+            {env.hubSync ? <HubSyncRow sync={env.hubSync} /> : null}
           </div>
         </>
       ) : null}

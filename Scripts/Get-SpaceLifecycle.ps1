@@ -14,6 +14,10 @@
     PowerShell 5.1 compatible (ASCII only).
 #>
 
+if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
+}
+
 function Read-P20SpaceLifecycleJson {
     param([string]$Path)
     if (-not (Test-Path -LiteralPath $Path)) { return $null }
@@ -97,8 +101,8 @@ function Get-P20SpaceFolderCount {
     $backlog = 0
     $exists = Test-Path -LiteralPath $folder -PathType Container
     if ($exists) {
-        $cur = Join-Path $folder 'current'
-        $arc = Join-Path $folder 'archive'
+        $cur = Join-Path $folder ([string](Get-P20Consts).folders.current)
+        $arc = Join-Path $folder ([string](Get-P20Consts).folders.archive)
         if (Test-Path -LiteralPath $cur) { $current = @(Get-ChildItem -LiteralPath $cur -File -Filter '*.md' -ErrorAction SilentlyContinue).Count }
         if (Test-Path -LiteralPath $arc) { $archive = @(Get-ChildItem -LiteralPath $arc -File -Filter '*.md' -ErrorAction SilentlyContinue).Count }
         $blg = Join-Path $folder 'backlog'

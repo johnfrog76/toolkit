@@ -25,6 +25,7 @@ import { FilterBadge } from "../../shared/FilterBadge";
 import { useFilterRowStyles, useListRowStyles } from "../../shared/listRowStyles";
 import { EmptyState } from "../../shared/EmptyState";
 import { PageCard } from "../../shared/PageCard";
+import { HubSyncLine } from "../ado/HubSyncLine";
 import { Pagination } from "../../shared/Pagination";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { usePagination } from "../../hooks/usePagination";
@@ -419,6 +420,7 @@ export function FoyerCard() {
           ) : undefined
         }
         footerRight={<CreateButton label="New Space" onClick={() => setAdding(true)} />}
+        footNote={<HubSyncLine />}
       >
         {outcome ? (
           <StatusMessage status="success" onDismiss={() => setOutcome(null)}>

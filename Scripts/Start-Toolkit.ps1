@@ -210,7 +210,7 @@ Write-Host "  Copied." -ForegroundColor Green
 # written into the package is in the past by the time someone runs this; stamped
 # here, on the COPY, it lands in Organize's Today bucket on day one. A day, not a
 # moment, so it is not overdue by the afternoon. The package's file is never touched.
-$dayOne = Join-Path (Join-Path (Join-Path $target 'reminders') 'current') 'D1WK-welcome-to-your-first-day.md'
+$dayOne = Join-Path (Join-Path (Join-Path $target 'reminders') ([string](Get-P20Consts).folders.current)) 'D1WK-welcome-to-your-first-day.md'
 if (Test-Path -LiteralPath $dayOne) {
     . (Join-Path $PSScriptRoot 'Set-CardLine.ps1')
     [void](Set-P20CardLine -Path $dayOne -Stamp (Get-P20Consts).stamps.due -Value (Get-Date).ToString('yyyy-MM-dd'))

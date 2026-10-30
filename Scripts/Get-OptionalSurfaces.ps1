@@ -48,6 +48,10 @@ if (-not (Get-Command Resolve-P20HowIWork -ErrorAction SilentlyContinue)) {
 if (-not (Get-Command Get-P20SettingsWorkflows -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Get-SettingsWorkflows.ps1')
 }
+# The one way this file calls git with stderr read as text (Invoke-TrackerRead.ps1).
+if (-not (Get-Command Invoke-P20TrackerRead -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
+}
 
 function Get-P20SurfaceStates {
     <#
@@ -517,7 +521,7 @@ function Get-P20OptionalSurfaces {
     $designLine = "mkdir design; $($Prefix)StampDesign   (or -Hub for the hub's)"
     $repoTop = ''
     if (Get-Command git -ErrorAction SilentlyContinue) {
-        try { $repoTop = "$(git rev-parse --show-toplevel 2>$null)".Trim() } catch { $repoTop = '' }
+        try { $repoTop = "$((Invoke-P20TrackerRead 'git' @('rev-parse', '--show-toplevel')).Out)".Trim() } catch { $repoTop = '' }
     }
     if ($repoTop -and (Test-Path -LiteralPath (Join-Path $repoTop 'design') -PathType Container)) {
         $tree = Read-P20DesignTree -DesignDir (Join-Path $repoTop 'design') -SpecDir (Join-Path $repoTop 'spec') -Base $repoTop

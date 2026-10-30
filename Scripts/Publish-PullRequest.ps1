@@ -100,6 +100,7 @@ NOTES:
 . (Join-Path $PSScriptRoot 'Write-CardText.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-CardName.ps1')
 . (Join-Path $PSScriptRoot 'Get-AdoToken.ps1')
+. (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 
 # The line this verb writes. CLI-only: nothing in the agent or the web reads it, and
 # it is not state -- the PR URL: line above it is the gate into Code Review.
@@ -153,12 +154,13 @@ if ($Card) {
 }
 else {
     $toolkitRoot = Split-Path -Parent $PSScriptRoot
-    $cwdGitDir = "$(git rev-parse --absolute-git-dir 2>$null)".Trim()
-    $cwdIsRepo = ($LASTEXITCODE -eq 0 -and $cwdGitDir)
-    $toolkitGitDir = "$(git -C $toolkitRoot rev-parse --absolute-git-dir 2>$null)".Trim()
+    $cwdGitDirRead = Invoke-P20TrackerRead 'git' @('rev-parse', '--absolute-git-dir')
+    $cwdGitDir = "$($cwdGitDirRead.Out)".Trim()
+    $cwdIsRepo = ($cwdGitDirRead.Code -eq 0 -and $cwdGitDir)
+    $toolkitGitDir = "$((Invoke-P20TrackerRead 'git' @('-C', $toolkitRoot, 'rev-parse', '--absolute-git-dir')).Out)".Trim()
     $cwdIsCode = ($cwdIsRepo -and -not ($toolkitGitDir -and ($cwdGitDir -eq $toolkitGitDir)))
     $branch = ''
-    if ($cwdIsCode) { $branch = "$(git rev-parse --abbrev-ref HEAD 2>$null)".Trim() }
+    if ($cwdIsCode) { $branch = "$((Invoke-P20TrackerRead 'git' @('rev-parse', '--abbrev-ref', 'HEAD')).Out)".Trim() }
     if (-not $branch) {
         Write-CliError -Message 'No card was named, and this is not a code repository on a work branch.' `
             -Hint "Name the card: ${p}PublishPR <id>."

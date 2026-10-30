@@ -11,16 +11,26 @@ release.
 ### Added
 
 - A product's designs can be moved from the Design tab: name where the Space's repository is cloned on this machine (`Config -Set spaceCheckouts.<slug>.path=<folder>`, or This Space's checkout in Settings) and each design's menu offers Graduate to a spec, Archive and Complete, staging the move in that clone for you to commit. Without one, the tab names the setting. `MoveDesign -Space <slug>` does the same from any folder.
+- When your hub's store sync is git, the System page's Environment card has **Sync the hub**, which pulls and pushes and shows the sync command's own answer, and says how far the hub is ahead of or behind its remote, with the time it last checked; the Spaces, Hub Designs, Reminders and Reviews cards say so in a line at their foot while the hub is out of step.
+- `GetPRComments` now works on a GitHub Space: it reads a pull request's inline review comments, its conversation and its reviews' summaries through `gh`, and appends them to the card exactly as it does for Azure DevOps -- safe to re-run, a reviewer's follow-ups included. The card's own `PR URL:` line tells it which repository to read, so it works from the browser with no checkout.
+- A work review's row on the Reviews card now offers **Archive** and **Delete**, and the new `WorkReview` command does the same from the terminal: Archive moves the review under `reviews/archive/` with a closed date in its `review.md`, Delete removes a draft for good after asking, and the list's new **Archived** filter shows the reviews you put away. A review's row also no longer shows its raw `orgs: [...]` line as its summary.
+- `NewPrompt -Title ... -Description <text>` fills a new card's Context or Summary with that text instead of leaving it `(TBD)`; the New ToolKit Card dialog has a matching description field.
 
 ### Changed
 
+- **Create PR** from the browser now works from the card's own code checkout when one is on this machine (a clone of the board's GitHub repository at `<wsRoot>/<repo>` or a nav shortcut's path): the repository comes from that checkout, a card with no `## Branch` uses the checkout's branch when it is the card's, and a branch that was never pushed is refused with the exact `git push` to run in that checkout. With no checkout found, it reads the card as before.
+- Completing a hub-kept design (`MoveDesign -Hub -Space`) also finds the Space's repository at `<wsRoot>/<repo>`.
 - Every list's row menu now uses one vocabulary: the same move has the same word, icon and tooltip on every page, and the link out is always last, reading "Open on GitHub" or "Open on Azure DevOps" behind one icon. A goal's Retire, a reminder's Done and a card's Move to Done now read Archive, a design's two archives read Archive as shipped and Archive as dropped, a card's exposed action opens the card, and Remove cover reads Delete the cover.
 
 ### Fixed
 
 - The Reference field in the New Reminder dialog is now as wide as the other fields, instead of sharing a half-width row with Source.
 - The Edit Reminder dialog's Source and Reference fields are full width too, like the New Reminder dialog's, and the fields in both reminder dialogs are the same size as the rest of the app's.
+- `Move`, `Plan`, `Billable`, `Cover` and `Archive` given the full file path of a card in your hub now work on that card in whichever Space it belongs to, instead of refusing with "No card matching" when a different Space is active.
+- The New ToolKit Card dialog no longer claims a custom card "is in play as soon as it is made" -- it now says the card starts in the Backlog, which is where `NewPrompt` actually puts it unless `-Now` is given.
+- A design note or spec written with a `## Title` section, its title on the next line, is now listed under that title on the Design tab instead of its file name, and a note whose only level-one heading is a sentence deep in the body is listed by its file name instead of that sentence.
 - Completing a design that a Space keeps in the hub (`MoveDesign -Hub -Space <slug> -To Complete -Doc <path>`, or the Move dialog) now looks for the document in the Space's own repository instead of the hub, so it no longer refuses every such spec; with no clone of that repository on the machine, the path is accepted as written and a note says so.
+- The test suite's check for a raw, unredirected `git`/`gh`/`az` call now catches one written inside a double-quoted string's `$(...)`, a shape it previously missed entirely; the handful of real call sites it found this way now go through the same safe helper as the rest of the CLI.
 
 ## [1.5.0] - 2026-10-26
 

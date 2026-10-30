@@ -198,6 +198,73 @@ class CountOrgReviewsUnreadableTests(_HubCase):
         self.assertEqual(unreadable["tags"], [])
 
 
+class ArchivedReviewTests(_HubCase):
+    """reviews/archive/<slug-set>/<year>/<range>/ -- where WorkReview -Archive
+    moves a review (#148). Never on the default scan; read with archived=True,
+    which reads that tree and nothing else. Without the exclusion the rglob
+    found it anyway, with "archive" as its slug-set."""
+
+    def setUp(self):
+        super().setUp()
+        _review(self.hub, "first", "2026", "2026-04-01_2026-04-30", _frontmatter("orgs: [first]", "Live"))
+        _review(
+            self.hub,
+            "archive/first+second",
+            "2026",
+            "2026-01-01_2026-03-31",
+            _frontmatter("orgs: [first, second]", "Put away") + "\n**Closed:** 2026-10-29\n",
+        )
+
+    def test_the_default_scan_leaves_the_archive_out(self):
+        self.assertEqual([r[3] for r in reporting._scan_reviews()], ["Live"])
+
+    def test_the_archive_is_not_a_slug_set(self):
+        self.assertEqual(reporting._scan_reviews("archive"), [])
+
+    def test_archived_reads_the_archive_and_nothing_else(self):
+        found = reporting._scan_reviews(archived=True)
+        self.assertEqual([r[3] for r in found], ["Put away"])
+        self.assertEqual(found[0][5], ["first", "second"])
+
+    def test_membership_holds_in_the_archive_too(self):
+        self.assertEqual(len(reporting._scan_reviews("second", archived=True)), 1)
+        self.assertEqual(reporting._scan_reviews("third", archived=True), [])
+
+    def test_each_row_carries_the_name_workreview_takes(self):
+        _, live = reporting._count_org_reviews(None)
+        _, put_away = reporting._count_org_reviews(None, archived=True)
+        self.assertEqual(live[0]["review"], "first/2026-04-01_2026-04-30")
+        self.assertFalse(live[0]["archived"])
+        self.assertEqual(put_away[0]["review"], "archive/first+second/2026-01-01_2026-03-31")
+        self.assertTrue(put_away[0]["archived"])
+
+    def test_a_legacy_review_has_no_name_to_take(self):
+        _review(self.hub, "2025", "", "2025-01-01_2025-03-31", _frontmatter("org: first", "Old"))
+        _, items = reporting._count_org_reviews(None)
+        legacy = [i for i in items if i["period"].startswith("2025")]
+        self.assertEqual(legacy[0]["review"], "")
+
+
+class ReviewSummaryTests(unittest.TestCase):
+    """The row printed the raw `orgs: [...]` line: the summary was the first line
+    that was not a heading, and the frontmatter's first key is one. The Spaces
+    are the row's chips; the summary is the first line of prose."""
+
+    def test_the_frontmatter_is_never_the_summary(self):
+        text = _frontmatter("orgs: [first, second]") + "\n**Period:** April\n"
+        self.assertEqual(reporting._review_summary(text), "**Period:** April")
+
+    def test_crlf_and_a_bom_are_read_the_same(self):
+        text = "\ufeff" + (_frontmatter("orgs: [first]") + "\nProse.\n").replace("\n", "\r\n")
+        self.assertEqual(reporting._review_summary(text), "Prose.")
+
+    def test_a_review_with_no_frontmatter_reads_as_before(self):
+        self.assertEqual(reporting._review_summary("# Title\n\n- a\n\nFirst prose.\n"), "First prose.")
+
+    def test_no_prose_is_an_empty_summary(self):
+        self.assertEqual(reporting._review_summary(_frontmatter("orgs: [first]")), "")
+
+
 class ReviewGenerateRequestTests(unittest.TestCase):
     """The request model itself -- what the route is handed before it validates."""
 

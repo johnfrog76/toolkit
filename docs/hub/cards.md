@@ -89,6 +89,11 @@ still has a `title`; it has no `type` and no `name`.
 | Spike | `Spike.template.md` | Branch; Git; Summary; Question; Findings; Recommendation; Done when; Questions / Blockers |
 | Meeting | `Meeting.template.md` | Branch; Git; When; Where; Who; Purpose; Notes; Outcomes; Follow-ups; Questions / Blockers -- a meeting you ATTENDED, written after the fact (`NewPrompt -Date` puts `**Created:**` on the day it was); a meeting you RUN is the Meeting Agenda Planner's, under `manager/` |
 
+`## Context` (a Task) and `## Summary` (everything else) start with a description: the work item's own,
+for a card made from an id; the text passed to **`NewPrompt -Title ... -Description <text>`**, for a
+card made offline; `(TBD)` when neither gave one. Multi-line text is kept exactly. This is not a parsed
+token -- it is prose a person edits like the rest of the section.
+
 Sections are documents, not a schema: nothing fails if one is missing or renamed, **except the things
 below, which ARE parsed wherever they appear in the file.**
 

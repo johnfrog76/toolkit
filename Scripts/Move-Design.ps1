@@ -57,8 +57,8 @@
     With -To Complete: where the durable part landed, a path in the same tree --
     or, with -Hub -Space, in the Space's own repository: checked in a clone of
     it on this machine (spaceCheckouts.<slug>.path, else the folder you stand
-    in, else a nav shortcut's path), taken as written with a Note: line when
-    there is no clone here.
+    in, else a nav shortcut's path, else <wsRoot>/<repo>), taken as written
+    with a Note: line when there is no clone here.
 
 .PARAMETER Hub
     Work on the hub's folders instead of the current repository.

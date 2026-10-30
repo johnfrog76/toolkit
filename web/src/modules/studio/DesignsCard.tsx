@@ -31,6 +31,7 @@ import { CreateButton } from "../../shared/CreateButton";
 import { DialogDismiss } from "../../shared/DialogDismiss";
 import { EmptyState } from "../../shared/EmptyState";
 import { PageCard } from "../../shared/PageCard";
+import { HubSyncLine } from "../ado/HubSyncLine";
 import { Pagination } from "../../shared/Pagination";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { StatusMessage } from "../../shared/StatusMessage";
@@ -391,6 +392,7 @@ export function DesignsCard() {
           ) : undefined
         }
         footerRight={<CreateButton label="New Design Note" onClick={() => setOpen(true)} />}
+        footNote={<HubSyncLine />}
       >
         {outcome ? (
           <StatusMessage status="success" onDismiss={() => setOutcome(null)}>
