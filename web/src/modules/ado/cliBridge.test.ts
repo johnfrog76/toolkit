@@ -9,6 +9,7 @@ import {
   buildMoveParams,
   buildMeetingAgendaParams,
   buildGrowthCloseParams,
+  buildGrowthCompleteParams,
   buildNewGrowthParams,
   fileFromCommandOutput,
   buildNewReminderParams,
@@ -470,6 +471,16 @@ describe("buildGrowthCloseParams", () => {
     expect(
       buildGrowthCloseParams({ file: "training-2026-09-01-clean-architecture.prompt.md" }),
     ).toEqual(["-Close", "training-2026-09-01-clean-architecture.prompt.md"]);
+  });
+});
+
+describe("buildGrowthCompleteParams", () => {
+  // Scripts/New-GrowthItem.ps1: -Complete takes a goal's file name under growth/current/.
+  it("is -Complete and the file, nothing else", () => {
+    expect(buildGrowthCompleteParams({ file: "goal-2026-learn-rust.prompt.md" })).toEqual([
+      "-Complete",
+      "goal-2026-learn-rust.prompt.md",
+    ]);
   });
 });
 

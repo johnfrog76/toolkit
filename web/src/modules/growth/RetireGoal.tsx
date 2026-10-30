@@ -1,6 +1,6 @@
 /**
- * Archive a growth item from the browser (a goal row's Archive -- it said Retire
- * until the row vocabulary): `NewGrowth -Close <file>` through the
+ * Archive a growth item from the browser (a goal's Archive, on its row and its
+ * page -- it said Retire before the row vocabulary): `NewGrowth -Close <file>` through the
  * bridge, behind a confirm because it moves a file. The module closes its own
  * data -- Archive is org-scoped and cannot see growth/ -- and the CLI verb is
  * the one implementation; this dialog only asks.

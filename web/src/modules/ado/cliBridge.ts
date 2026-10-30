@@ -138,10 +138,16 @@ export function buildMoveParams(fields: { file: string; to: string }): string[] 
   return ["-Card", fields.file, "-To", fields.to.replace(/\s+/g, "")];
 }
 
-/** `NewGrowth -Close <file>`: retire a growth item. The file is the name as the
+/** `NewGrowth -Close <file>`: archive a growth item. The file is the name as the
  *  agent serves it (`filename`), which is the name under growth/current/. */
 export function buildGrowthCloseParams(fields: { file: string }): string[] {
   return ["-Close", fields.file];
+}
+
+/** `NewGrowth -Complete <file>`: write a goal's Outcome Status line as Achieved.
+ *  The file stays in growth/current/; archiving it is `-Close`. */
+export function buildGrowthCompleteParams(fields: { file: string }): string[] {
+  return ["-Complete", fields.file];
 }
 
 /**

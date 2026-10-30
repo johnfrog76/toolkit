@@ -10,6 +10,7 @@ release.
 
 ### Added
 
+- A goal can be marked complete from the Growth page: **Complete** on its row or on its own page writes the goal's Status line as Achieved and changes nothing else in the file, and the goal's page now offers **Archive** too. In the terminal it is `NewGrowth -Complete <file>`, and `-WhatIf` names the file and writes nothing.
 - A product's designs can be moved from the Design tab: name where the Space's repository is cloned on this machine (`Config -Set spaceCheckouts.<slug>.path=<folder>`, or This Space's checkout in Settings) and each design's menu offers Graduate to a spec, Archive and Complete, staging the move in that clone for you to commit. Without one, the tab names the setting. `MoveDesign -Space <slug>` does the same from any folder.
 - When your hub's store sync is git, the System page's Environment card has **Sync the hub**, which pulls and pushes and shows the sync command's own answer, and says how far the hub is ahead of or behind its remote, with the time it last checked; the Spaces, Hub Designs, Reminders and Reviews cards say so in a line at their foot while the hub is out of step.
 - `GetPRComments` now works on a GitHub Space: it reads a pull request's inline review comments, its conversation and its reviews' summaries through `gh`, and appends them to the card exactly as it does for Azure DevOps -- safe to re-run, a reviewer's follow-ups included. The card's own `PR URL:` line tells it which repository to read, so it works from the browser with no checkout.

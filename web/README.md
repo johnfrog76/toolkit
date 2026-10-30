@@ -424,7 +424,7 @@ button opens `shared/ConfirmDialog` -- the owner's sketch: "Are you sure?", the 
 ("Close issue #N."), Cancel (secondary) and Submit (primary), the house dismiss top right -- and
 only Submit runs the verb. `ActionDialog.resolve.test.tsx` holds it: Cancel and the dismiss run
 nothing, Submit runs it once. `ConfirmDialog` is the shared shape for any act worth a second
-thought, and the only one: the list's and the board's archive, a growth item's Retire and a
+thought, and the only one: the list's and the board's archive, a growth item's Archive and a goal's Complete, and a
 meeting's Close all ask through it (see "One grammar for dialogs and row actions").
 
 `cliBridge.test.ts` asserts the exact array for each, so a flag renamed in either `.ps1` fails a
@@ -485,12 +485,13 @@ goal (it said Retire), a reminder (it said Done; the verb is `Reminders <id> -Ar
 lane (**Archive (move to Done)**), and a hub design, **Archive as shipped** and **Archive as dropped**
 (it said Drop), a review (`WorkReview <review> -Archive`; at once, no confirm), and a product design
 on the Design tab, where this machine names the Space's checkout. **Complete** -- a hub design's
-spec, and a product design's on the same terms. **Delete** -- a card's cover (it said Remove cover;
-the picture is deleted), and a review, **Delete the review** (`WorkReview <review> -Delete`, behind
-`shared/ConfirmDialog` naming the range and the Spaces). **Move to** -- a card's lanes. **Copy** -- a prompt's reference and
+spec, a product design's on the same terms, and a goal that is not complete yet (row and page).
+**Delete** -- a card's cover (it said Remove cover; the picture is deleted), and a review, **Delete
+the review** (`WorkReview <review> -Delete`, behind `shared/ConfirmDialog` naming the range and the
+Spaces). **Move to** -- a card's lanes. **Copy** -- a prompt's reference and
 text. **Open on** -- every row's link out, whatever it said before (Open in ADO, Open in Azure
 DevOps, Open the thread on GitHub, Its history on GitHub). The verbs behind the menus keep their
-names: a goal's Archive still runs `NewGrowth -Close`.
+names: a goal's Archive still runs `NewGrowth -Close`, and its Complete runs `NewGrowth -Complete`.
 
 **The order is one rule.** The row's one exposed action first, the record's own moves next, the external
 link last. The last is the component's: an action built from `ROW.external` is drawn at the end of the
