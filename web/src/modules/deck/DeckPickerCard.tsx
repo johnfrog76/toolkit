@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
+import type { MouseEvent } from "react";
 import { useNavigate } from "react-router";
 import {
-  Button,
   Badge,
   Subtitle2,
   tokens,
@@ -11,28 +11,26 @@ import {
   Dropdown,
   Option,
 } from "@fluentui/react-components";
-import { ArrowRightRegular, Clock12Regular } from "@fluentui/react-icons";
+import { Clock12Regular } from "@fluentui/react-icons";
 import { DECKS } from "./decks/index";
-import { DeckState } from "./decks/types";
 import { estimateDeckDuration } from "./engine/deckDuration";
+import { CardActions, ROW } from "../../shared/CardActions";
+import {
+  ARCHIVED_FILTER,
+  STATE_LABEL,
+  STATE_ORDER,
+  archivedIds,
+  deckListView,
+  deckState,
+} from "./deckList";
+import type { DeckFilter } from "./deckList";
+import { DECK_MOVES } from "./deckMoves";
+import { deckPagePath, deckPlayPath } from "./paths";
+import { useGetEnvQuery } from "../../shell/api";
 import { PageCard } from "../../shared/PageCard";
 import { Pagination } from "../../shared/Pagination";
 import { usePagination } from "../../hooks/usePagination";
 import { FilterBadge } from "../../shared/FilterBadge";
-
-const STATE_BADGE: Record<DeckState, { label: string; color: "subtle" }> = {
-  [DeckState.Draft]: { label: "draft", color: "subtle" },
-  [DeckState.InProgress]: { label: "in progress", color: "subtle" },
-  [DeckState.Complete]: { label: "complete", color: "subtle" },
-  [DeckState.Archive]: { label: "archive", color: "subtle" },
-};
-
-const STATE_FILTERS: DeckState[] = [
-  DeckState.Draft,
-  DeckState.InProgress,
-  DeckState.Complete,
-  DeckState.Archive,
-];
 
 const PAGE_SIZE = 5;
 const ALL_TAGS = "all";
@@ -46,6 +44,7 @@ const usePickerStyles = makeStyles({
     marginTop: tokens.spacingVerticalS,
     padding: tokens.spacingVerticalS,
     backgroundColor: tokens.colorNeutralBackgroundAlpha,
+    cursor: "pointer",
   },
   cardItem: {
     display: "flex",
@@ -102,54 +101,48 @@ const usePickerStyles = makeStyles({
 
 interface DeckPickerProps {
   tagFilter: string;
+  /** This machine's put-away list (`deck.archived`), from /env. */
+  archived: string[];
 }
 
-export function DeckPicker({ tagFilter }: DeckPickerProps) {
+export function DeckPicker({ tagFilter, archived }: DeckPickerProps) {
   const styles = usePickerStyles();
   const navigate = useNavigate();
-  const [stateFilter, setStateFilter] = useState<DeckState | null>(null);
+  const [filter, setFilter] = useState<DeckFilter>(null);
 
   // Registration order in DECKS is chronological (oldest first) — reverse so
   // the newest presentation shows first.
   const newestFirst = useMemo(() => [...DECKS].reverse(), []);
 
-  const stateCounts = useMemo(() => {
-    const counts: Partial<Record<DeckState, number>> = {};
-    for (const deck of newestFirst) {
-      const state = deck.state ?? DeckState.Complete;
-      counts[state] = (counts[state] ?? 0) + 1;
-    }
-    return counts;
-  }, [newestFirst]);
-
-  const filteredDecks = useMemo(
+  // The default list leaves out what this machine has put away; the archived
+  // chip shows those. A filter that can only ever show everything is a control
+  // that changes nothing -- the same rule as the Home drawer's -- so the state
+  // chips wait until two decks in the list differ, and the archived chip until
+  // a deck is put away (deckList.ts holds both).
+  const view = useMemo(
+    () => deckListView(newestFirst, archived, filter),
+    [newestFirst, archived, filter],
+  );
+  // A filter left on a chip that has gone (the last archived deck brought back) reads as All.
+  const active: DeckFilter =
+    (filter === ARCHIVED_FILTER && !view.showArchived) ||
+    (filter !== null && filter !== ARCHIVED_FILTER && !view.showStates)
+      ? null
+      : filter;
+  const shown = useMemo(
     () =>
-      newestFirst
-        .filter(
-          (deck) => stateFilter === null || (deck.state ?? DeckState.Complete) === stateFilter,
-        )
-        .filter((deck) => tagFilter === ALL_TAGS || (deck.tags ?? []).includes(tagFilter)),
-    [newestFirst, stateFilter, tagFilter],
+      (active === filter ? view.shown : view.current).filter(
+        (deck) => tagFilter === ALL_TAGS || (deck.tags ?? []).includes(tagFilter),
+      ),
+    [active, filter, view, tagFilter],
   );
 
-  const {
-    page,
-    totalPages,
-    pageItems: pageDecks,
-    setPage,
-  } = usePagination(filteredDecks, PAGE_SIZE);
+  const { page, totalPages, pageItems: pageDecks, setPage } = usePagination(shown, PAGE_SIZE);
 
-  const handleStateChange = (next: DeckState | null) => {
-    setStateFilter(next);
+  const choose = (next: DeckFilter) => {
+    setFilter(active === next ? null : next);
     setPage(0);
   };
-
-  // A filter that can only ever show everything is a control that changes
-  // nothing -- the same rule as the Home drawer's
-  // applies here: with every deck in one state (today, both are Complete),
-  // the state row is the SECOND filter on a card with one deck to filter,
-  // and it filters nothing.
-  const distinctStates = Object.values(stateCounts).filter((n) => (n ?? 0) > 0).length;
 
   if (DECKS.length === 0) {
     return (
@@ -159,30 +152,44 @@ export function DeckPicker({ tagFilter }: DeckPickerProps) {
     );
   }
 
+  // The row's controls sit inside a row that is itself a click target.
+  const only = (e: MouseEvent) => e.stopPropagation();
+
   return (
     <div>
-      {distinctStates > 1 && (
-        <div className={styles.filterRow}>
+      {(view.showStates || view.showArchived) && (
+        <div className={styles.filterRow} role="group" aria-label="Filter decks">
           <FilterBadge
             label="All"
-            count={newestFirst.length}
-            active={stateFilter === null}
-            onClick={() => handleStateChange(null)}
+            count={view.current.length}
+            active={active === null}
+            onClick={() => choose(null)}
           />
-          {STATE_FILTERS.map((s) => (
+          {view.showStates &&
+            STATE_ORDER.map((s) => (
+              <FilterBadge
+                key={s}
+                label={STATE_LABEL[s]}
+                count={view.stateCounts[s] ?? 0}
+                active={active === s}
+                onClick={() => choose(s)}
+              />
+            ))}
+          {view.showArchived && (
             <FilterBadge
-              key={s}
-              label={STATE_BADGE[s].label}
-              count={stateCounts[s] ?? 0}
-              active={stateFilter === s}
-              onClick={() => handleStateChange(stateFilter === s ? null : s)}
+              label={ARCHIVED_FILTER}
+              count={view.archived.length}
+              active={active === ARCHIVED_FILTER}
+              onClick={() => choose(ARCHIVED_FILTER)}
             />
-          ))}
+          )}
         </div>
       )}
-      {filteredDecks.length === 0 && (
+      {shown.length === 0 && (
         <span style={{ color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 }}>
-          No decks match this filter.
+          {view.current.length === 0 && active === null
+            ? "Every deck is archived on this machine -- the archived filter shows them."
+            : "No decks match this filter."}
         </span>
       )}
       <div className={styles.list}>
@@ -190,9 +197,15 @@ export function DeckPicker({ tagFilter }: DeckPickerProps) {
           const slides = deck.slides();
           const slideCount = slides.length;
           const duration = estimateDeckDuration(slides);
-          const state = STATE_BADGE[deck.state ?? DeckState.Complete];
+          const open = () => navigate(deckPagePath(deck.id));
           return (
-            <Card key={deck.id} size="small" appearance="outline" className={styles.card}>
+            <Card
+              key={deck.id}
+              size="small"
+              appearance="outline"
+              className={styles.card}
+              onClick={open}
+            >
               <div className={styles.cardItem}>
                 <div className={styles.cardBody}>
                   <div className={styles.meta}>
@@ -221,16 +234,21 @@ export function DeckPicker({ tagFilter }: DeckPickerProps) {
                 <Badge appearance="tint" color="informative" size="small">
                   {deck.id}
                 </Badge>
-                <Badge appearance="tint" color={state.color} size="small">
-                  {state.label}
+                <Badge appearance="tint" color="subtle" size="small">
+                  {STATE_LABEL[deckState(deck)]}
                 </Badge>
-                <Button
-                  icon={<ArrowRightRegular />}
-                  size="small"
-                  appearance="subtle"
-                  title="Present deck"
-                  onClick={() => navigate(`/deck/${deck.id}`)}
-                />
+                <span onClick={only}>
+                  {/* The row's one exposed action is its page; the menu plays it.
+                      No deck carries an address of its own (the Deck type has no
+                      field for one), so no row has a link out to put last. */}
+                  <CardActions
+                    primaryAction={ROW.open.action({ detail: "the deck", onClick: open })}
+                    menuLabel={`Actions for ${deck.title}`}
+                    secondaryActions={[
+                      DECK_MOVES.play.action({ onClick: () => navigate(deckPlayPath(deck.id)) }),
+                    ]}
+                  />
+                </span>
               </div>
             </Card>
           );
@@ -245,6 +263,9 @@ export function DeckPicker({ tagFilter }: DeckPickerProps) {
 
 export function DeckPickerCard() {
   const [tagFilter, setTagFilter] = useState<string>(ALL_TAGS);
+  const { data: env } = useGetEnvQuery();
+  const archived = archivedIds(env?.config?.deckArchived);
+  const listed = DECKS.filter((d) => !archived.includes(d.id)).length;
 
   const allTags = useMemo(() => {
     const tags = new Set<string>();
@@ -279,12 +300,12 @@ export function DeckPickerCard() {
             </Dropdown>
           )}
           <Badge color="informative" appearance="filled" size="large">
-            {DECKS?.length ?? 0}
+            {listed}
           </Badge>
         </>
       }
     >
-      <DeckPicker tagFilter={tagFilter} />
+      <DeckPicker tagFilter={tagFilter} archived={archived} />
     </PageCard>
   );
 }

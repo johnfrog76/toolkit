@@ -398,6 +398,17 @@ firstRun.welcome=true` brings the banner back, and so does turning off **Hide Ov
 which draws this key inverted. [`docs/modules/deck.md`](modules/deck.md), "The first-run
 banner".
 
+## `deck.archived` -- the decks this machine has put away
+
+A machine setting: a JSON array of deck ids, empty in the shipped config. A deck's page puts a deck
+away with **Archive** and brings it back with **Unarchive**, each one `PUT /api/config` -> `Config -Set`
+through the bridge, and the Decks card leaves the decks on the list out of its default list and shows
+them under its **archived** filter. The deck file is never edited: a deck's own `state` is the studio's,
+and this list is only where this machine keeps the ones it is done with. `/env` serves it as
+`config.deckArchived`; Settings shows it as **Archived decks**. By hand:
+`tkConfig -Set '{"deck.archived":["the-toolkit"]}'`, and `tkConfig -Unset deck.archived` clears it.
+[`docs/modules/deck.md`](modules/deck.md), "A deck's page".
+
 ## `features.studio` -- retired: the Studio has no switch
 
 The Studio is part of the core, from the first run (D-S13, which
