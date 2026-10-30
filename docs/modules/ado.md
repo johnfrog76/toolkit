@@ -197,7 +197,7 @@ and `hub.json`), or the first `az` call that failed, as one sentence naming the 
 - **Design, on a GitHub Space** (Studio S2, D-S11) -- the fourth Home tab, after Issues,
   Board and Stats: the product repo's `design/` and `spec/` folders, read through the tracker
   (`GET /api/design`, `gh api repos/{owner}/{repo}/contents/...`), the note first and the spec beside
-  it. A row shows the title (a leading `# ` heading, else the line under `## Title`, else the file's name -- `docs/hub/design.md`, "How the title is read"), the frontmatter
+  it. A row shows the title (a leading `#` heading, else the line under `## Title`, else the file's name -- `docs/hub/design.md`, "How the title is read"), the frontmatter
   `description`, the folder, and the thread its `> GitHub:` line names; it opens a reading room at
   `/design/{folder}/{name}` -- the house reading page, the document and then its thread in one viewer.
   Gated by the tracker and Tier 1, nothing else: no flag, and an ADO or local Space has no such tab.
