@@ -76,6 +76,7 @@
     "katex": "^0.18.2",
     "markdown-it": ">=15.0.3",
     "test-exclude": "^8.0.0",
+    "jsdom": "^30.0.0",
     "@istanbuljs/load-nyc-config": {
       "js-yaml": "^4.1.1"
     }
