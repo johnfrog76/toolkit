@@ -402,68 +402,6 @@ class TheMoveDesignVerb(unittest.TestCase):
 
     # -- -Hub -Space -To Complete: -Doc is the Space's repository's, not the hub's ------
 
-    def space_with_a_spec(self, org: str) -> Path:
-        """A Space 'prod' whose design and spec live in the hub, its address `org`."""
-        (self.hub / "hub.json").write_text(
-            json.dumps(
-                {
-                    "storeSync": "git",
-                    "orgs": [
-                        {"slug": "demo", "name": "Demo", "status": "local", "promptsFolder": "demo"},
-                        {"slug": "prod", "name": "Prod", "status": "local", "promptsFolder": "prod", "org": org},
-                    ],
-                }
-            ),
-            encoding="utf-8",
-        )
-        self.write(self.hub / "prod/spec/shipped.spec.md", f"---\nid: {ID_D}\n---\n\n# Shipped (spec)\n\nContract.\n")
-        # A document of the same name in the hub's own Space folder: never what -Doc means.
-        self.write(self.hub / "prod/docs/hub-only.md", "# In the hub\n")
-        self.commit(self.hub)
-        return self.hub / "prod/spec/archive/shipped.spec.md"
-
-    def test_hub_space_complete_finds_the_doc_in_the_clone_you_stand_in(self):
-        archived = self.space_with_a_spec("https://github.com/o/r")
-        # docs/board.md is in the repository (origin o/r), not in the hub.
-        self.assertFalse((self.hub / "prod/docs/board.md").exists())
-        out = self.move("shipped -Hub -Space prod -To Complete -Doc docs/board.md", at=self.repo)
-        self.assertIn("X=0", out)
-        self.assertNotIn("Error:", out)
-        self.assertRegex(out, r"Doc: docs/board\.md in o/r at .*repo")
-        self.assertIn(f"{DOCS} docs/board.md", self.read(archived))
-        self.assertFalse((self.hub / "prod/spec/shipped.spec.md").exists())
-        self.assertIn("Committed.", out)
-
-    def test_hub_space_complete_finds_the_clone_through_a_nav_shortcut(self):
-        archived = self.space_with_a_spec("https://github.com/o/r")
-        local = {"aliases": {"Product": {"path": self.repo.as_posix(), "description": "the product"}}}
-        out = self.move("shipped -Hub -Space prod -To Complete -Doc docs/board.md", at=self.hub, local=local)
-        self.assertIn("X=0", out)
-        self.assertRegex(out, r"Doc: docs/board\.md in o/r at .*repo")
-        self.assertIn(f"{DOCS} docs/board.md", self.read(archived))
-
-    def test_hub_space_complete_with_no_clone_here_takes_the_doc_as_written(self):
-        archived = self.space_with_a_spec("https://github.com/o/not-cloned-here")
-        out = self.move("shipped -Hub -Space prod -To Complete -Doc docs/anywhere.md", at=self.hub)
-        self.assertIn("X=0", out)
-        self.assertNotIn("Error:", out)
-        self.assertIn("Note: -Doc docs/anywhere.md is taken as written, not checked: for the Prod Space,", out)
-        self.assertIn("no clone of o/not-cloned-here was found on this machine", out)
-        self.assertIn(f"{DOCS} docs/anywhere.md", self.read(archived))
-
-    def test_hub_space_complete_refuses_a_doc_missing_from_the_clone_and_says_where_it_looked(self):
-        self.space_with_a_spec("https://github.com/o/r")
-        local = {"aliases": {"Product": {"path": self.repo.as_posix(), "description": "the product"}}}
-        for doc in ("docs/nope.md", "prod/docs/hub-only.md", "docs/hub-only.md"):
-            out = self.assert_refused(
-                f"shipped -Hub -Space prod -To Complete -Doc {doc}",
-                f"-Doc {doc} does not exist in o/r, the Prod Space's repository, checked out at ",
-                at=self.hub,
-                local=local,
-            )
-            self.assertRegex(out, r"checked out at .*repo")
-        self.assertTrue((self.hub / "prod/spec/shipped.spec.md").exists())
-
     def test_hub_space_complete_finds_the_clone_through_its_configured_checkout(self):
         archived = self.space_with_a_spec("https://github.com/o/r")
         local = {"spaceCheckouts": {"prod": {"path": self.repo.as_posix()}}}
@@ -543,22 +481,6 @@ class TheMoveDesignVerb(unittest.TestCase):
         self.assertRegex(out.strip().split("\n")[0], r"second \(the Prod Space's checkout\)$")
         self.assertTrue((second / "design/archive/board-ideas.md").exists())
         self.assertTrue((self.repo / "design/board-ideas.md").exists())
-
-    def test_in_repo_and_hub_root_complete_still_look_in_their_own_tree(self):
-        # In a repository, -Doc is that repository's, whatever the Spaces say.
-        self.space_with_a_spec("https://github.com/o/r")
-        self.assert_refused(
-            "the-pair -To Complete -Doc docs/nope.md", "-Doc docs/nope.md does not exist in this repository"
-        )
-        out = self.move("lonely -To Complete -Doc docs/board.md")
-        self.assertIn("X=0", out)
-        self.assertNotIn("Doc: docs/board.md in", out)
-        # -Hub with no -Space: the hub's own tree, as before.
-        self.write(self.hub / "spec/hub-note.spec.md", f"---\nid: {ID_A}\n---\n\n# A hub note (spec)\n")
-        self.commit(self.hub)
-        self.assert_refused("hub-note -Hub -To Complete -Doc docs/board.md", "does not exist in the hub.", at=self.hub)
-
-    # -- -Hub -Space -To Complete: -Doc is the Space's repository's, not the hub's ------
 
     def space_with_a_spec(self, org: str) -> Path:
         """A Space 'prod' whose design and spec live in the hub, its address `org`."""
