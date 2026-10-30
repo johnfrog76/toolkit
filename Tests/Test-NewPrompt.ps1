@@ -574,6 +574,107 @@ catch {
 }
 finally { if (Test-Path $dBase) { Remove-Item -Path $dBase -Recurse -Force -ErrorAction SilentlyContinue } }
 
+# -- -From: an agenda line becomes a card -------------------------------------
+# TYPED as the verb, in a fresh shell that imports this package's manifest and
+# nothing else, against a scratch hub whose hub.json renames the meeting folder --
+# so a record is found by the hub's folder name, never a literal. The line the verb
+# writes is the shape Tests/fixtures/parsers/from-lines.json's rows read, which the
+# agent's card_from_record is held to.
+
+Write-Host ""
+Write-Host "-- -From, typed as the verb ---------------------------" -ForegroundColor Cyan
+
+$fBase = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-np-from-" + [System.Guid]::NewGuid().Guid.Substring(0, 8))
+try {
+    . (Join-Path $pkgRoot 'Scripts/Get-Consts.ps1')
+    $utf8 = New-Object System.Text.UTF8Encoding($false)
+    $fHub = Join-Path $fBase 'hub'
+    $fLog = Join-Path $fBase 'log'
+    foreach ($d in @($fHub, $fLog, (Join-Path $fHub 'meetings/current'), (Join-Path $fHub 'meetings/archive'), (Join-Path $fHub 'solo/current'), (Join-Path $fHub 'solo/backlog'))) {
+        New-Item -ItemType Directory -Path $d -Force | Out-Null
+    }
+    [System.IO.File]::WriteAllText((Join-Path $fHub 'hub.json'), (@'
+{
+  "hub": 1,
+  "spaces": [
+    { "slug": "solo", "name": "Solo", "status": "local", "promptsFolder": "solo", "org": "" }
+  ],
+  "folders": { "manager": "meetings" }
+}
+'@), $utf8)
+    [System.IO.File]::WriteAllText((Join-Path $fHub 'meetings/current/2026-10-28.md'), "# 1:1 -- 2026-10-28`n`n## Agenda`n`n- Chase the cert renewal`n", $utf8)
+    [System.IO.File]::WriteAllText((Join-Path $fHub 'meetings/archive/client-weekly-2026-10-21.md'), "# client-weekly -- 2026-10-21`n`n## Agenda`n`n- Export the audit log`n", $utf8)
+
+    $fPrefix = (Get-Content (Join-Path $pkgRoot 'config.default.json') -Raw | ConvertFrom-Json).commandPrefix
+    $featuresVar = [string](Get-P20Consts).env.features
+    function Invoke-FromVerb {
+        # -Features is the module flags for the child, through the env override;
+        # '{}' (every module off) unless a case says otherwise, so a shell that
+        # holds a flag cannot change what a case sees.
+        param([string]$Commands, [string]$Features = '{}')
+        $ErrorActionPreference = 'Continue'
+        $q = { param([string]$s) $s -replace "'", "''" }
+        $pre = "`$env:$featuresVar = '$(& $q $Features)'; " +
+            "`$env:PSModulePath = '$(& $q $pkgRoot)'; `$env:PROMPTS_ROOT = '$(& $q $fHub)'; `$env:P20_ACTIVE_SPACE = 'solo'; " +
+            "`$env:P20_USAGE_LOG_DIR = '$(& $q $fLog)'; Set-Location '$(& $q $fBase)'; " +
+            "Import-Module '$(& $q $pkgRoot)/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; "
+        return ((& pwsh -NoProfile -NonInteractive -Command ($pre + $Commands + "; 'EXIT=' + `$LASTEXITCODE") 2>&1 | ForEach-Object { "$_" }) -join "`n")
+    }
+    function Get-FromCard([string]$Folder, [string]$Filter) {
+        return @(Get-ChildItem (Join-Path $fHub "solo/$Folder") -Filter $Filter -File -ErrorAction SilentlyContinue)
+    }
+    $fromStamp = [string](Get-P20Consts).stamps.from
+
+    # The 1:1's record, by its stem, in the meeting folder's current/.
+    $out = Invoke-FromVerb "${fPrefix}NewPrompt -Title 'Chase the cert renewal' -From 2026-10-28"
+    $card = Get-FromCard 'backlog' 'Task*-chase-the-cert-renewal.prompt.md'
+    Assert-True '-From writes the card (exit 0)' ($card.Count -eq 1 -and $out -match 'EXIT=0') $out
+    $text = ''
+    if ($card.Count -eq 1) { $text = [System.IO.File]::ReadAllText($card[0].FullName) }
+    Assert-True 'the card carries one From line naming the record''s stem' (([regex]::Matches($text, '(?m)^' + [regex]::Escape($fromStamp) + ' 2026-10-28$')).Count -eq 1) $text
+    Assert-True 'in the footer, directly above Created, the way every footer line lands' ($text -match ('(?m)^\*\*ADO Link:\*\* [^\n]*\n' + [regex]::Escape($fromStamp) + ' 2026-10-28\n\*\*Created:\*\* ')) $text
+    Assert-True 'and the card is still LF' ($text -notmatch "`r") $text
+    Assert-True 'the verb says which record, in the hub''s own folder name' ($out -match 'From: the meeting record meetings/current/2026-10-28\.md') $out
+
+    # A series' record, archived, named with .md: written without it.
+    $out = Invoke-FromVerb "${fPrefix}NewPrompt -Now -Title 'Export the audit log' -Type Bug -From client-weekly-2026-10-21.md"
+    $card = Get-FromCard 'current' '*export-the-audit-log.prompt.md'
+    $text = ''
+    if ($card.Count -eq 1) { $text = [System.IO.File]::ReadAllText($card[0].FullName) }
+    Assert-True 'a series'' record in archive/, given with .md, is written without it' ($out -match 'EXIT=0' -and $text -match ('(?m)^' + [regex]::Escape($fromStamp) + ' client-weekly-2026-10-21$')) ($out + "`n" + $text)
+
+    # A record that is not there, and a name that is not a record's: refused, nothing written.
+    $before = @(Get-ChildItem (Join-Path $fHub 'solo') -Recurse -File).Count
+    $out = Invoke-FromVerb "${fPrefix}NewPrompt -Title 'Nowhere' -From 2026-01-01"
+    Assert-True 'a record that does not exist is a stated refusal naming the stem and the folders (exit 2)' ($out -match "No meeting record '2026-01-01' in meetings/current/ or meetings/archive/" -and $out -match 'EXIT=2') $out
+    # Off means absent: with communication off (this case), MeetingAgenda is not a
+    # verb, so the hint names the meeting folder; with it on, the hint names the verb.
+    Assert-True 'with communication off, the hint names the meeting folder and not MeetingAgenda' ($out -match 'Hint:.*meetings/current/ or meetings/archive/' -and $out -notmatch 'MeetingAgenda') $out
+    $outOn = Invoke-FromVerb "${fPrefix}NewPrompt -Title 'Nowhere' -From 2026-01-01" -Features '{"communication":true}'
+    Assert-True 'with communication on, the same refusal''s hint names MeetingAgenda (exit 2)' ($outOn -match 'Hint:.*MeetingAgenda' -and $outOn -match 'EXIT=2') $outOn
+    $out2 = Invoke-FromVerb "${fPrefix}NewPrompt -Title 'Not a record' -From ../solo/backlog/x"
+    Assert-True 'a name that is not a record''s shape is refused the same way' ($out2 -match "No meeting record '\.\./solo/backlog/x'" -and $out2 -match 'EXIT=2') $out2
+    Assert-True 'and neither refusal writes a card' ((@(Get-ChildItem (Join-Path $fHub 'solo') -Recurse -File).Count) -eq $before)
+    Assert-True 'and each says it once, not wrapped in a generic error' (-not ($out -match 'exit code 2') -and -not ($out2 -match 'exit code 2')) ($out + $out2)
+
+    # An existing card: returned as it is, no footer added.
+    $existing = Get-FromCard 'current' '*export-the-audit-log.prompt.md'
+    $existingId = ''
+    if ($existing.Count -eq 1) { $existingId = [regex]::Match($existing[0].Name, '^[A-Za-z]*-?([A-Z0-9]{4})-').Groups[1].Value }
+    $bytesBefore = if ($existing.Count -eq 1) { [System.IO.File]::ReadAllText($existing[0].FullName) } else { '' }
+    $out = Invoke-FromVerb "${fPrefix}NewPrompt $existingId -Title 'Export the audit log' -From 2026-10-28"
+    $bytesAfter = if ($existing.Count -eq 1) { [System.IO.File]::ReadAllText($existing[0].FullName) } else { '' }
+    Assert-True 'an existing card is returned, exit 0, and says no From line was written' ($existingId -and $out -match 'EXIT=0' -and $out -match "Card $existingId is already in" -and $out -match 'No From line was written either') $out
+    Assert-True 'and its file is untouched' ($bytesBefore -and $bytesBefore -ceq $bytesAfter) $bytesAfter
+
+    $out = Invoke-FromVerb "${fPrefix}NewPrompt -Help"
+    Assert-True '-Help names -From' ($out -match '-From <record>') $out
+}
+catch {
+    Assert-True 'the -From cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally { if (Test-Path $fBase) { Remove-Item -Path $fBase -Recurse -Force -ErrorAction SilentlyContinue } }
+
 # -- The work item's comments cannot be read: no token ------------------------
 # The comments are fetched with a bearer token from `az account get-access-token`.
 # An empty token used to skip the fetch with no message and write a card without

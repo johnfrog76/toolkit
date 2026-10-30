@@ -10,6 +10,7 @@ release.
 
 ### Added
 
+- `NewPrompt -Title ... -From <meeting>` makes a card from an agenda line and records the meeting it came from in a `**From:**` line -- the record's name, such as `2026-10-28` for the 1:1 or `client-weekly-2026-10-28` for a series; a meeting record that does not exist writes no card.
 - A deck in the Decks card now opens a page of its own, showing its summary, state, tags, slide count, running time and where its file lives, with **Play** to present it. The page's **Archive** puts the deck away on this machine only (the `deck.archived` setting): it leaves the Decks list for an **archived** filter, and the deck itself is not changed.
 - A goal can be marked complete from the Growth page: **Complete** on its row or on its own page writes the goal's Status line as Achieved and changes nothing else in the file, and the goal's page now offers **Archive** too. In the terminal it is `NewGrowth -Complete <file>`, and `-WhatIf` names the file and writes nothing.
 - A product's designs can be moved from the Design tab: name where the Space's repository is cloned on this machine (`Config -Set spaceCheckouts.<slug>.path=<folder>`, or This Space's checkout in Settings) and each design's menu offers Graduate to a spec, Archive and Complete, staging the move in that clone for you to commit. Without one, the tab names the setting. `MoveDesign -Space <slug>` does the same from any folder.

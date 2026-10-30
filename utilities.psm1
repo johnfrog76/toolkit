@@ -1709,6 +1709,7 @@ function global:Get-P20PromptFromWorkItem {
         [string]$Cover,
         [string]$Before,
         [string]$Design,
+        [string]$From,
         [switch]$Help
     )
     $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'NewPrompt'
