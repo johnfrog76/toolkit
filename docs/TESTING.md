@@ -70,10 +70,10 @@ tkTestToolkit -GitRoot   # a folder inside someone else's repository is not a ch
 
 ```bash
 python3 -m pip install -r agent/requirements-dev.txt   # once -- runtime deps plus pytest, httpx and ruff
-python3 -m pytest Tests/     # 1350 passed, 3 skipped -- the agent
+python3 -m pytest Tests/     # 1351 passed, 3 skipped -- the agent
 cd web && npm ci             # once
 cd web && npx playwright install chromium   # once -- for `npm run smoke` only
-cd web && npm test           # 5 build-contract checks, then 148 suites, 1715 tests -- the shell
+cd web && npm test           # 5 build-contract checks, then 151 suites, 1744 tests -- the shell
 cd web && npm run smoke              # 23 checks, flags off -- the browser; needs two servers up
 cd web && npm run smoke -- --modules=on  # 30 checks, both module flags on
 cd web && npm run smoke -- --studio      # the Studio's contract -- starts and stops its own servers
@@ -101,8 +101,8 @@ a passing `pytest:` line may end `(via <python>)`, which is information and not 
   Counts for docs/TESTING.md's paste block, from this run:
   Consts 193, Compat 1613, Menu 1950, Environment 62, Archive 217, PRComments 170, BackfillStamps 50, Update 58, Start 87, PullRequest 10, CloseWorkItem 36, PromptStatus 125, ThreadHash 76, Setup 82, Move 51, Billable 36, Plan 33, Cover 106, Design 173, NewPrompt 97, ExitCodes 130, Autoload 85, GitRoot 17, Sync 19, Connect 62, NewSpace 149, HowWeWork 42, EditItem 69, PublishPR 31, Config 246, HubJson 184, Portability 91, Web 165, Agent 129, TestAll 167, ModuleCommands 84, Reminders 71, Rituals 637, StandupRemind 85, Triage 121, StartWork 72, Review 69, WorkReview 36, SendTeams 43, NewMeeting 63, MeetingAgenda 175, DocCounts 123
   47 suites, 8390 assertions
-  pytest: 1350 passed, 3 skipped
-  web: 148 suites, 1715 tests
+  pytest: 1351 passed, 3 skipped
+  web: 151 suites, 1744 tests
 ```
 
 **Which lines the paste owns.** The per-suite line is the `tkTestToolkit` row's list in the table below; the
