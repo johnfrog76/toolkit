@@ -407,18 +407,36 @@ if ($agentRow.Count -eq 1) {
     if ($fm.Success) {
         Assert-Equal "the agent row's file count is the number of Tests/test_*.py files" $realFiles.Count $fm.Groups[1].Value
     }
-    $perFile = @([regex]::Matches($agentRow[0], '`(test_\w+\.py)` \((\d+)[,)]'))
-    Assert-True 'the agent row carries per-file counts' ($perFile.Count -gt 0)
-    foreach ($pf in $perFile) {
-        $name = $pf.Groups[1].Value
-        $file = Join-Path $scriptDir $name
-        if (-not (Test-Path -LiteralPath $file)) {
-            Assert-True "$name (named in the agent row) exists" $false 'no such file in Tests/'
-            continue
-        }
-        $defs = @([regex]::Matches((Get-Content -LiteralPath $file -Raw -Encoding UTF8), 'def test_')).Count
-        Assert-Equal "$name's count in the agent row is its def test_ count" $defs $pf.Groups[2].Value
-    }
+    Assert-True 'the agent row carries per-file counts' (@(Get-P20StatedPytestCounts -Text $agentRow[0]).Count -gt 0)
+}
+
+# Every per-file count the document states -- the agent row's and each standalone
+# `pytest Tests/test_x.py` row's -- against the one counting rule.
+Write-Host ""
+Write-Host "  Every per-file pytest count in docs/TESTING.md is the file's def test_ count" -ForegroundColor Cyan
+$realCounts = @{}
+foreach ($f in @(Get-ChildItem -LiteralPath $scriptDir -Filter 'test_*.py' -File)) { $realCounts[$f.Name] = Get-P20PytestDefCount -Path $f.FullName }
+$stated = @(Get-P20StatedPytestCounts -Text $testingText)
+Assert-True 'standalone pytest rows with a count are read' (@($stated | Where-Object { $_.Where -eq 'its own row' }).Count -gt 0)
+foreach ($c in $stated) {
+    $pfFinding = @(Get-P20PytestCountDrift -Text $testingText -Counts $realCounts | Where-Object { $_ -like "$($c.File) ($($c.Where))*" })
+    Assert-True "$($c.File)'s count in $($c.Where) is its def test_ count" ($pfFinding.Count -eq 0) ($pfFinding -join ' | ')
+}
+
+# One fixture per shape, against a fixed table of real counts.
+$fixtureCounts = @{ 'test_alpha.py' = 5; 'test_beta.py' = 7; 'test_gamma.py' = 9 }
+$pytestDriftTable = @(
+    @('agree-pytest-counts.md', 0, ''),
+    @('stale-standalone-pytest-row.md', 1, 'test_beta.py (its own row): the document says 4, the file has 7 def test_'),
+    @('stale-standalone-subtests-row.md', 1, 'test_gamma.py (its own row): the document says 3, the file has 9 def test_'),
+    @('stale-agent-row-pytest-count.md', 1, 'test_alpha.py (the agent row): the document says 6, the file has 5 def test_'),
+    @('missing-pytest-file.md', 1, 'test_gone.py (its own row) is not a file in Tests/')
+)
+foreach ($case in $pytestDriftTable) {
+    $fx = Get-Content -LiteralPath (Join-Path $driftDir $case[0]) -Raw -Encoding UTF8
+    $got = @(Get-P20PytestCountDrift -Text $fx -Counts $fixtureCounts)
+    $okCase = ($got.Count -eq $case[1]) -and (($case[1] -eq 0) -or ($got[0] -like "*$($case[2])*"))
+    Assert-True "pytest count fixture $($case[0]): $($case[1]) finding(s)" $okCase ($got -join ' | ')
 }
 
 Write-Host ""
