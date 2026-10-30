@@ -6,6 +6,9 @@
 # Tests/Test-PRComments.ps1, which runs the pure functions below against
 # fixture payloads. Nothing here calls gh -- the script does that, through
 # Invoke-P20TrackerRead -- so every rule in this file can be held by a table.
+# One function, Resolve-P20GitHubPRRepo, asks git (through the same helper)
+# for a code checkout's remote; it is the one answer to "which repository does
+# this pull request number mean", for every verb that has to ask it.
 #
 # GitHub keeps a pull request's conversation in THREE places, and the card is
 # meant to be the whole review, so all three are read:
@@ -200,4 +203,102 @@ function Get-P20GitHubLinkedIssues {
     foreach ($m in [regex]::Matches("$Body", '(?im)^\s*Issue:\s*#(\d+)\b')) { $ids += $m.Groups[1].Value }
     foreach ($m in [regex]::Matches("$Body", '(?i)\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)\b')) { $ids += $m.Groups[1].Value }
     return @($ids | Select-Object -Unique)
+}
+
+function Resolve-P20GitHubPRRepo {
+    <#
+        Which repository a GitHub pull request number means, asked in the one
+        order every pull-request verb uses:
+
+          1. the card in current/ whose PR URL: line names this pull request
+             (NewPR wrote it, and it names the repository -- no checkout needed);
+          2. -Repository, as typed: owner/name, or a name under the owner
+             (-Project when given, else the board's);
+          3. this checkout's GitHub remote -- only when the cwd is a code
+             checkout, never the Toolkit's own;
+          4. the board's one repository.
+
+        Returns @{ Repo; Card; Error; Hint }. Card is the one card that named
+        the pull request, when exactly one did. Error set means refused: the
+        caller prints Error and Hint and exits 2. A board of several
+        repositories and none of the above is refused, never guessed -- the
+        same number on the wrong repository is somebody else's pull request.
+
+        Needs Invoke-TrackerRead.ps1, Resolve-Tracker.ps1 and the CLI fallbacks
+        dot-sourced by the caller.
+    #>
+    param(
+        [long]$PullRequestId = 0,
+        [string]$Repository = '',
+        [string]$Project = '',
+        [AllowEmptyString()][AllowNull()][string]$OrgUrl,
+        $Projects,
+        [AllowEmptyString()][AllowNull()][string]$CurrentDir,
+        # consts.json tokens.prUrl, passed in -- never retyped here.
+        [Parameter(Mandatory = $true)][string]$Token,
+        # The Toolkit's own checkout, whose remote is never a card's repository.
+        [Parameter(Mandatory = $true)][string]$ToolkitRoot,
+        # The verb, for the hint's usage line.
+        [string]$Verb = 'GetPRComments'
+    )
+    $prefix = Get-CliPrefix
+    $owner = Get-P20TrackerOwner -OrgUrl $OrgUrl
+    $askedRepo = ''
+    if ($Repository) {
+        if ($Repository -match '/') { $askedRepo = $Repository }
+        else {
+            $askedOwner = $owner
+            if ($Project) { $askedOwner = $Project }
+            $askedRepo = "$askedOwner/$Repository"
+        }
+    }
+
+    $repo = ''
+    $card = $null
+    # 1. The card that already names this pull request names its repository too.
+    if ($PullRequestId) {
+        $named = @(Find-P20CardsForGitHubPR -Folder @($CurrentDir) -Number $PullRequestId -Repo $askedRepo -Token $Token)
+        $namedRepos = @($named | ForEach-Object { $_.Repo } | Sort-Object -Unique)
+        if ($namedRepos.Count -gt 1) {
+            return @{
+                Repo = ''; Card = $null
+                Error = "PR #$PullRequestId is named by cards in more than one repository: $($namedRepos -join ', ')."
+                Hint = "Say which: $prefix$Verb $PullRequestId -Repository <owner>/<name>."
+            }
+        }
+        if ($namedRepos.Count -eq 1) {
+            $repo = $namedRepos[0]
+            if ($named.Count -eq 1) { $card = $named[0].Path }
+            Write-Host "[*] The card names it: $(Split-Path $named[0].Path -Leaf) -> $($named[0].Url)" -ForegroundColor DarkGray
+        }
+    }
+    # 2. -Repository.
+    if (-not $repo -and $askedRepo) { $repo = $askedRepo }
+    # 3. This checkout's GitHub remote, when the cwd is a code checkout.
+    if (-not $repo) {
+        $cwdRead = Invoke-P20TrackerRead 'git' @('rev-parse', '--absolute-git-dir')
+        $cwdDir = "$(@($cwdRead.Out)[0])".Trim()
+        $tkRead = Invoke-P20TrackerRead 'git' @('-C', $ToolkitRoot, 'rev-parse', '--absolute-git-dir')
+        $tkDir = "$(@($tkRead.Out)[0])".Trim()
+        if ($cwdRead.Code -eq 0 -and $cwdDir -and $cwdDir -ne $tkDir) {
+            $remoteRead = Invoke-P20TrackerRead 'git' @('remote', 'get-url', 'origin')
+            $remote = "$(@($remoteRead.Out)[0])".Trim()
+            if ($remoteRead.Code -eq 0 -and $remote -match 'github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?$') {
+                $repo = "$($Matches[1])/$($Matches[2])"
+            }
+        }
+    }
+    # 4. The board's one repository.
+    if (-not $repo) {
+        $answer = Resolve-P20TrackerRepo -OrgUrl $OrgUrl -Projects $Projects -CliPrefix $prefix
+        if (-not $answer.Repo) {
+            return @{
+                Repo = ''; Card = $null
+                Error = "$($answer.Reason) No card in current/ names this pull request, so its repository cannot be told."
+                Hint = "Pass it: $prefix$Verb <PrId> -Repository <owner>/<name>. $($answer.Hint)"
+            }
+        }
+        $repo = $answer.Repo
+    }
+    return @{ Repo = $repo; Card = $card; Error = ''; Hint = '' }
 }
