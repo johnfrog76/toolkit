@@ -606,11 +606,16 @@ try {
     [System.IO.File]::WriteAllText((Join-Path $fHub 'meetings/archive/client-weekly-2026-10-21.md'), "# client-weekly -- 2026-10-21`n`n## Agenda`n`n- Export the audit log`n", $utf8)
 
     $fPrefix = (Get-Content (Join-Path $pkgRoot 'config.default.json') -Raw | ConvertFrom-Json).commandPrefix
+    $featuresVar = [string](Get-P20Consts).env.features
     function Invoke-FromVerb {
-        param([string]$Commands)
+        # -Features is the module flags for the child, through the env override;
+        # '{}' (every module off) unless a case says otherwise, so a shell that
+        # holds a flag cannot change what a case sees.
+        param([string]$Commands, [string]$Features = '{}')
         $ErrorActionPreference = 'Continue'
         $q = { param([string]$s) $s -replace "'", "''" }
-        $pre = "`$env:PSModulePath = '$(& $q $pkgRoot)'; `$env:PROMPTS_ROOT = '$(& $q $fHub)'; `$env:P20_ACTIVE_SPACE = 'solo'; " +
+        $pre = "`$env:$featuresVar = '$(& $q $Features)'; " +
+            "`$env:PSModulePath = '$(& $q $pkgRoot)'; `$env:PROMPTS_ROOT = '$(& $q $fHub)'; `$env:P20_ACTIVE_SPACE = 'solo'; " +
             "`$env:P20_USAGE_LOG_DIR = '$(& $q $fLog)'; Set-Location '$(& $q $fBase)'; " +
             "Import-Module '$(& $q $pkgRoot)/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; "
         return ((& pwsh -NoProfile -NonInteractive -Command ($pre + $Commands + "; 'EXIT=' + `$LASTEXITCODE") 2>&1 | ForEach-Object { "$_" }) -join "`n")
@@ -642,7 +647,11 @@ try {
     $before = @(Get-ChildItem (Join-Path $fHub 'solo') -Recurse -File).Count
     $out = Invoke-FromVerb "${fPrefix}NewPrompt -Title 'Nowhere' -From 2026-01-01"
     Assert-True 'a record that does not exist is a stated refusal naming the stem and the folders (exit 2)' ($out -match "No meeting record '2026-01-01' in meetings/current/ or meetings/archive/" -and $out -match 'EXIT=2') $out
-    Assert-True 'and the hint names MeetingAgenda' ($out -match 'Hint:.*MeetingAgenda') $out
+    # Off means absent: with communication off (this case), MeetingAgenda is not a
+    # verb, so the hint names the meeting folder; with it on, the hint names the verb.
+    Assert-True 'with communication off, the hint names the meeting folder and not MeetingAgenda' ($out -match 'Hint:.*meetings/current/ or meetings/archive/' -and $out -notmatch 'MeetingAgenda') $out
+    $outOn = Invoke-FromVerb "${fPrefix}NewPrompt -Title 'Nowhere' -From 2026-01-01" -Features '{"communication":true}'
+    Assert-True 'with communication on, the same refusal''s hint names MeetingAgenda (exit 2)' ($outOn -match 'Hint:.*MeetingAgenda' -and $outOn -match 'EXIT=2') $outOn
     $out2 = Invoke-FromVerb "${fPrefix}NewPrompt -Title 'Not a record' -From ../solo/backlog/x"
     Assert-True 'a name that is not a record''s shape is refused the same way' ($out2 -match "No meeting record '\.\./solo/backlog/x'" -and $out2 -match 'EXIT=2') $out2
     Assert-True 'and neither refusal writes a card' ((@(Get-ChildItem (Join-Path $fHub 'solo') -Recurse -File).Count) -eq $before)

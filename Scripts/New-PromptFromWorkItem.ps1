@@ -427,8 +427,21 @@ if (-not [string]::IsNullOrWhiteSpace($From)) {
         }
     }
     if (-not $fromFound) {
+        # Off means absent: with the communication module off, MeetingAgenda is not
+        # a registered verb, so the hint names the meeting folder instead.
+        $communicationOn = $false
+        if (Get-Command Get-P20Features -ErrorAction SilentlyContinue) {
+            $features = Get-P20Features
+            $communicationOn = [bool]($features -and $features.ContainsKey('communication') -and $features['communication'])
+        }
+        $fromShapes = "YYYY-MM-DD for the 1:1, <series>-YYYY-MM-DD for a series"
+        $fromHint = if ($communicationOn) {
+            "-From names a record as $(Get-CliPrefix)MeetingAgenda writes it: $fromShapes (MeetingAgenda -Type <series>)."
+        } else {
+            "-From names a record by its file name in $meetingFolderName/$($folderNames.current)/ or $meetingFolderName/$($folderNames.archive)/ (hub.json folders.manager): $fromShapes."
+        }
         Write-CliError -Message "No meeting record '$fromStem' in $meetingFolderName/$($folderNames.current)/ or $meetingFolderName/$($folderNames.archive)/. No card was written." `
-            -Hint "-From names a record as $(Get-CliPrefix)MeetingAgenda writes it: YYYY-MM-DD for the 1:1, <series>-YYYY-MM-DD for a series (MeetingAgenda -Type <series>)."
+            -Hint $fromHint
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
     $script:FromRecord = $fromStem

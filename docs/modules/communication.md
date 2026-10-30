@@ -173,6 +173,8 @@ which the agent serves as the card model's `from_record`
 ([the footer](../hub/cards.md#3-the-footer----one-fact-per-line)). A record that is not there is a stated
 refusal and no card is written; a card that already exists is returned as it is, with no line added. The
 switch is core and works whether this module's flag is on or off: the record is a file in the hub either way.
+Only the refusal's hint follows the flag: on, it points at `MeetingAgenda`; off, where that verb is not
+registered, it names the meeting folder instead.
 
 ### How the verbs get registered
 
