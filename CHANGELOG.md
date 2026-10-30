@@ -32,6 +32,7 @@ release.
 - A design note or spec written with a `## Title` section, its title on the next line, is now listed under that title on the Design tab instead of its file name, and a note whose only level-one heading is a sentence deep in the body is listed by its file name instead of that sentence.
 - Completing a design that a Space keeps in the hub (`MoveDesign -Hub -Space <slug> -To Complete -Doc <path>`, or the Move dialog) now looks for the document in the Space's own repository instead of the hub, so it no longer refuses every such spec; with no clone of that repository on the machine, the path is accepted as written and a note says so.
 - The test suite's check for a raw, unredirected `git`/`gh`/`az` call now catches one written inside a double-quoted string's `$(...)`, a shape it previously missed entirely; the handful of real call sites it found this way now go through the same safe helper as the rest of the CLI.
+- `Sync` (and the System page's Sync the hub) now states a failed pull or push once, instead of printing its own warning and then a generic exit-code block on top.
 
 ## [1.5.0] - 2026-10-26
 
