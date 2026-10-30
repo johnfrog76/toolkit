@@ -162,6 +162,18 @@ for a literal `agent/ado/reporting.py` parses. A second `-Close` is a report, no
 data: `Archive` stays org-scoped and cannot see a hub-root sibling, and growth closes its own items
 from its own side.
 
+### An agenda line becomes a card
+
+There is no verb for it: it is the core's own `tkNewPrompt -Title "<the line>" [-Type <t>] -From <record>`,
+the one place this module's records reach into the board. `<record>` is the meeting record's file name as
+`MeetingAgenda` writes it -- `2026-10-28` for the 1:1, `client-weekly-2026-10-28` for a series, `.md` or
+not -- looked for in the meeting folder's `current/` and `archive/` (the folder's name is the hub's,
+`hub.json` `folders.manager`). The card is an ordinary card with one more footer line, `**From:** <record>`,
+which the agent serves as the card model's `from_record`
+([the footer](../hub/cards.md#3-the-footer----one-fact-per-line)). A record that is not there is a stated
+refusal and no card is written; a card that already exists is returned as it is, with no line added. The
+switch is core and works whether this module's flag is on or off: the record is a file in the hub either way.
+
 ### How the verbs get registered
 
 `Config/communication.commands.psd1` is the module's contribution to the CLI surface — a `Commands`
@@ -411,5 +423,7 @@ The three PowerShell suites are registered in `Tests/Test-Toolkit.ps1` (`-SendTe
 | --- | --- |
 | — | C7: `managerWorkflow` is top-level while every other recipient lives on an org. Answered by rendering both honestly (`scope` in `/env`) rather than by moving one. A config wizard has to show both |
 | — | Prep has no agent pass: the shipped prompt has two passes (Plan and Retro), not three |
+| — | An agenda line becomes a card from the terminal only (`NewPrompt -From`): the Meetings page has no "make a card" action on an agenda line, which belongs to the record's reading room, not yet built |
+| — | A card made from an agenda line names its record; the record does not name the card. Whether the agenda gets a line back (`-> card K7M2`) is undecided |
 | — | `Timer` is module-local. If a second module ever wants one, that is the moment to promote it to `shared/` |
 | — | `/rewrite` keeps its own copy of the Messages API call rather than sharing the ADO module's. Deliberate — a module reaching into a sibling for a helper is how two modules stop being separable — but it is thirty duplicated lines |

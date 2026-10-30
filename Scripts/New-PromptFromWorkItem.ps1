@@ -72,6 +72,13 @@ param(
     [Parameter(Mandatory = $false)]
     [string]$Design = "",
 
+    # The meeting record an agenda line came from (docs/modules/communication.md,
+    # "An agenda line becomes a card"): its file stem, YYYY-MM-DD or
+    # <series>-YYYY-MM-DD, with or without .md. Resolved before anything is
+    # written; the card gets one footer line, `**From:** <stem>`.
+    [Parameter(Mandatory = $false)]
+    [string]$From = "",
+
     [Parameter(Mandatory = $false)]
     [switch]$Help
 )
@@ -180,6 +187,11 @@ PARAMETERS:
                            Design line under its Template line. The hub's
                            designs, and the repo you stand in when it is this
                            Space's; a file name, its stem, or an id prefix
+    -From <record>         The meeting record an agenda line came from: its name,
+                           YYYY-MM-DD (the 1:1) or <series>-YYYY-MM-DD, .md or
+                           not. Adds a From footer line; a record that is not
+                           in the meeting folder's current/ or archive/ writes
+                           no card
     -Help                  Show this help message
 
 EXAMPLES:
@@ -195,6 +207,7 @@ EXAMPLES:
     $(Get-CliPrefix)NewPrompt -Title "Timeout on large files" -Type Bug
     $(Get-CliPrefix)NewPrompt -Title "Import flow" -Type UserStory -Id 144
     $(Get-CliPrefix)NewPrompt -Title "Lanes, part one" -Design board-ideas   # bound to its design
+    $(Get-CliPrefix)NewPrompt -Title "Chase the cert renewal" -From 2026-10-28  # an agenda line from the 1:1
 
   An offline card is an ordinary prompt file: {cliPrefix}Status lists it under
   Backlog (Active with -Now), {cliPrefix}ThreadHash and {cliPrefix}Archive work
@@ -380,6 +393,48 @@ if (-not $WorkItemId -and -not $script:LocalMode) {
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
 
+# -- The meeting record an agenda line came from (-From) -----------------------
+# The Meeting Agenda Planner's one write into the core (docs/modules/communication.md,
+# "An agenda line becomes a card"): the card it makes is an ordinary card, plus one
+# footer line, `**From:** <record>`, naming the meeting record by its file stem as
+# the hub names it -- YYYY-MM-DD for the 1:1, <series>-YYYY-MM-DD for a series
+# (regex.sessionName, the shape MeetingAgenda writes). The stem says the series
+# and the date. Resolved BEFORE anything is written or fetched, in the meeting
+# folder's current/ or archive/ -- the folder's NAME is the hub's (hub.json
+# "folders"), never a literal here. A record that is not there is a stated
+# refusal and no card is written.
+#
+# It rides every form of the verb, -Title and <id> alike: the line goes into the
+# footer Build-PromptContent writes for all of them, and a meeting can as well be
+# where an existing work item was picked up as where a new one was named.
+$script:FromRecord = ''
+if (-not [string]::IsNullOrWhiteSpace($From)) {
+    $fromStem = $From.Trim()
+    if ($fromStem.EndsWith('.md', [System.StringComparison]::OrdinalIgnoreCase)) { $fromStem = $fromStem.Substring(0, $fromStem.Length - 3) }
+    if (-not (Test-P20HubRoot $promptsRoot)) {
+        Write-CliError -Message (Get-P20HubMissingMessage $promptsRoot)
+        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+    }
+    $meetingFolderName = (Get-P20HubFolderNames -PromptsRoot $promptsRoot -PackageRoot (Split-Path -Parent $PSScriptRoot))['manager']
+    $meetingRoot = Join-Path $promptsRoot $meetingFolderName
+    $fromFound = ''
+    # The shape first: a name that is not a record's (a path, an upper-case series)
+    # is looked for nowhere, so nothing outside the two folders can be named.
+    if ([regex]::IsMatch("$fromStem.md", [string](Get-P20Consts).regex.sessionName)) {
+        foreach ($sub in @($folderNames.current, $folderNames.archive)) {
+            $candidate = Join-Path (Join-Path $meetingRoot $sub) "$fromStem.md"
+            if (Test-Path -LiteralPath $candidate -PathType Leaf) { $fromFound = "$meetingFolderName/$sub/$fromStem.md"; break }
+        }
+    }
+    if (-not $fromFound) {
+        Write-CliError -Message "No meeting record '$fromStem' in $meetingFolderName/$($folderNames.current)/ or $meetingFolderName/$($folderNames.archive)/. No card was written." `
+            -Hint "-From names a record as $(Get-CliPrefix)MeetingAgenda writes it: YYYY-MM-DD for the 1:1, <series>-YYYY-MM-DD for a series (MeetingAgenda -Type <series>)."
+        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+    }
+    $script:FromRecord = $fromStem
+    $script:FromRecordPath = $fromFound
+}
+
 # Resolved AFTER the argument guard, and only for the ADO path:
 # Resolve-P20Identity can reach for `az`, and neither a usage error nor a card
 # that touches no board needs an identity.
@@ -470,7 +525,11 @@ function Get-PreviousRoundInfo {
 }
 
 function Write-RoundNotice {
-    # The header lines a new card carries beyond its Template line, said once.
+    # The header lines a new card carries beyond its Template line, said once --
+    # and its From line, the one footer line a caller chose.
+    if ($script:FromRecord) {
+        Write-Host "    From: the meeting record $($script:FromRecordPath)" -ForegroundColor Gray
+    }
     if ($script:DesignBinding) {
         $b = $script:DesignBinding
         $whose = "the hub's $($b.Path)"
@@ -676,6 +735,10 @@ function Build-PromptContent {
     [void]$sb.AppendLine("**Sprint:** $sprint")
     [void]$sb.AppendLine("**Story Points:** $storyPoints")
     [void]$sb.AppendLine("**ADO Link:** $adoUrl")
+    # The meeting record an agenda line came from (-From): one fact, one line,
+    # above **Created:** where every later footer line lands too. consts.json
+    # stamps.from; the agent reads it into the model's from_record.
+    if ($script:FromRecord) { [void]$sb.AppendLine("$((Get-P20Consts).stamps.from) $($script:FromRecord)") }
     # When this card was opened. Move-PromptToArchive adds a matching
     # **Closed:** line, and the pair is what lets an archived corpus be reported
     # over -- billing included -- without reading git. See docs/hub/cards.md, "3. The footer -- one fact per line".
@@ -805,6 +868,9 @@ if ($WorkItemId) {
         }
         if ($script:DesignBinding) {
             Write-Host "    No design line was written either: an existing card names its design by hand, under its Template line." -ForegroundColor DarkGray
+        }
+        if ($script:FromRecord) {
+            Write-Host "    No From line was written either: an existing card keeps the footer it has." -ForegroundColor DarkGray
         }
         Write-Host ""
         exit 0

@@ -95,6 +95,8 @@ $expected = [ordered]@{
     'stamps.billable'         = '**Billable:**'
     # Who takes a card with no issue behind it (D-AR10): Route -Assign writes it.
     'stamps.assigned'         = '**Assigned:**'
+    # The meeting record an agenda line came from: NewPrompt -From writes it.
+    'stamps.from'             = '**From:**'
     'stamps.started'          = '**Started:**'
     'stamps.outcome'          = '**Outcome:**'
     'stamps.review'           = '**Review:**'
@@ -449,6 +451,8 @@ $guarded = [ordered]@{
     'stamps.cover'           = '**Cover:**'
     'stamps.before'          = '**Before:**'
     'stamps.outcome'         = '**Outcome:**'
+    # New-PromptFromWorkItem.ps1 writes the line from (Get-P20Consts).stamps.from.
+    'stamps.from'            = '**From:**'
     # The standup's distinctive words: Scripts/Standup-Rules.ps1 reads them
     # from rituals.text and rituals.workerLabelPrefix, and nothing types them.
     'rituals.text.queueHeading'  = 'Waiting on you'

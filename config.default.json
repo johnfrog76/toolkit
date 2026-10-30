@@ -509,7 +509,7 @@
       "category": "work",
       "description": "Create a prompt file from an ADO work item",
       "descriptionWithoutAdo": "Make a card: -Title names it, -Type its kind",
-      "usage": "{cliPrefix}NewPrompt <WorkItemId> | -Title <text> [-Description <text>] [-Type <name>] [-Id <id>] [-Date <date>] [-AssignTo <email>] [-ReadOnly] [-Force] [-Now] [-OutputFolder <name>] [-Cover <image>] [-Before <image>] [-Design <name|id>] [-Help]",
+      "usage": "{cliPrefix}NewPrompt <WorkItemId> | -Title <text> [-Description <text>] [-Type <name>] [-Id <id>] [-Date <date>] [-AssignTo <email>] [-ReadOnly] [-Force] [-Now] [-OutputFolder <name>] [-Cover <image>] [-Before <image>] [-Design <name|id>] [-From <record>] [-Help]",
       "examples": [
         "{cliPrefix}NewPrompt 12345",
         "{cliPrefix}NewPrompt 12345 -Now   # in play at once: current/, not the backlog",
@@ -519,7 +519,8 @@
         "{cliPrefix}NewPrompt -Title \"Import flow\" -Type UserStory -Id 144",
         "{cliPrefix}NewPrompt -Title \"Sprint review with the client\" -Type Meeting -Date 2026-09-21",
         "{cliPrefix}NewPrompt -Title \"Tags overlap in search\" -Type Bug -Before ./snap.png   # born with the picture of what is wrong",
-        "{cliPrefix}NewPrompt -Title \"Lanes, part one\" -Design board-ideas   # bound to the design it is worked against"
+        "{cliPrefix}NewPrompt -Title \"Lanes, part one\" -Design board-ideas   # bound to the design it is worked against",
+        "{cliPrefix}NewPrompt -Title \"Chase the cert renewal\" -From 2026-10-28   # an agenda line from the 1:1's record becomes a card"
       ],
       "notes": [
         "A new card is planned: it lands in the Space's backlog/, and Move <id> -To Active, its first ThreadHash or its NewPR pulls it into current/. -Now puts it in current/ at once.",
@@ -527,7 +528,8 @@
         "-Description <text>, offline only: fills ## Context (a Task) or ## Summary (everything else) with that text, the same slot an ADO-linked card fills from the work item's own description. Multi-line is kept. Omitted, it reads (TBD) exactly as before.",
         "-Date YYYY-MM-DD sets **Created:** to the day the work was -- a meeting attended yesterday -- so Daily lands the card on that day.",
         "-Cover / -Before <image> attach a picture as the card is made, through the same code as Cover. The picture is checked first, so a refused one writes no card.",
-        "-Design <name|id> binds the card to the design it is worked against: one header line, > Design: [<title>](<link>) <id>, under its Template line -- the design's own title and id, a link relative to the card for a hub design or its GitHub page for a repo design. Resolved against the hub's design/ and spec/ (and their archives), and the repository you stand in when it is this Space's; a file name, its stem, or an id prefix of four or more. A name that resolves to nothing, or to two, writes no card."
+        "-Design <name|id> binds the card to the design it is worked against: one header line, > Design: [<title>](<link>) <id>, under its Template line -- the design's own title and id, a link relative to the card for a hub design or its GitHub page for a repo design. Resolved against the hub's design/ and spec/ (and their archives), and the repository you stand in when it is this Space's; a file name, its stem, or an id prefix of four or more. A name that resolves to nothing, or to two, writes no card.",
+        "-From <record> names the meeting record an agenda line came from, by its file name as MeetingAgenda writes it -- YYYY-MM-DD for the 1:1, <series>-YYYY-MM-DD for a series, .md or not -- and adds one footer line, **From:** <record>, above **Created:**. The record is looked for in the meeting folder's current/ and archive/; one that is not there writes no card. An existing card is returned as it is, with no line added."
       ]
     },
     "NewItem": {
