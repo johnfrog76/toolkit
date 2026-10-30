@@ -39,8 +39,8 @@ halves talking to each other, and the flag that makes a whole module appear and 
 three halves at once. A check that can be automated belongs in a suite; one that cannot is a gate here,
 or it is not verified.
 
-Every verb `config.default.json` defines is in the table below -- 44 always-on, and the 14 the modules
-contribute through `Config/*.commands.psd1` (58 in all; `docs/CLI.md` prints both counts) -- with the
+Every verb `config.default.json` defines is in the table below -- 44 always-on, and the 15 the modules
+contribute through `Config/*.commands.psd1` (59 in all; `docs/CLI.md` prints both counts) -- with the
 suite that types it and the gate that walks it. `Tests/Test-DocCounts.ps1` reads the table back, so a
 verb added without a row fails a suite. **A row that says "neither" is a verb nothing verifies**; it is
 left in the table rather than dropped, because a verb the reader cannot see in it is indistinguishable
@@ -67,7 +67,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `NewItem` | `EditItem` (typed, `-FromCard` only, with `gh` stubbed); `Tests/test_studio.py` (typed, `-FromDesign` only) | 6; 12 (`-FromCard` against the GitHub demo) |
 | `NewPR` | `PullRequest` (script only: the Described Changes parser) | 6 |
 | `PublishPR` | `PublishPR` (typed, with `az`, `gh` and the REST call stubbed) | 6; 12 (a real draft on a real Azure DevOps org: the row under "Rows added by a fix") |
-| `GetPRComments` | `PRComments` (script only: the thread filter, follow-ups, the side record; not the live fetch) | 6 |
+| `GetPRComments` | `PRComments` (script: the thread filter, follow-ups, the side record; on a GitHub Space typed, with `gh` and `git` stubbed: the three channels, the repository from the card, a refusal on a board of several repositories, no `&` in any argument) | 6; 12 (a real GitHub pull request: the row under "Rows added by a fix") |
 | `ReplyPR` | `PRComments` (script only: the reply written into the card; not the live post) | 6 |
 | `AddPRReview` | `ExitCodes` (the missing-key refusal; the branch search's and the details fetch's 401/403/404 with the REST call stubbed) | 12 (a real expired token) |
 | `ThreadHash` | `ThreadHash` (script only) | 6 |
@@ -97,6 +97,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `NewGrowth` | `ModuleCommands` (registration only) | 9 |
 | `NewWorkReview` | `Review` (script only: `Generate-Review.ps1`) | 9, 12 (a git-history read under 5.1) |
 | `PublishWorkReview` | neither | 9 (registration and `-Help` only) |
+| `WorkReview` | `WorkReview` (typed in a fresh shell over a scratch git hub) | 9, 12 (the move and the commit under 5.1) |
 | `LogPeerReview` | `Archive` (script only: the record's bytes) | 9 (registration and `-Help` only) |
 | `UpdateResume` | `ModuleCommands` (registration only) | 9 (registration and `-Help` only) |
 | `SendTeams` | `SendTeams` | 10 |
@@ -286,7 +287,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **46 suites, 8096 assertions** with a `config.local.json`, every one
+findings. On this commit that is **47 suites, 8390 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -685,12 +686,12 @@ pwsh -NoProfile -Command "Import-Module ./Prompt20Toolkit/Prompt20Toolkit.psd1 -
 pwsh -NoProfile -Command "Import-Module ./Prompt20Toolkit/Prompt20Toolkit.psd1 -Force; tkNewGrowth -Help"
 ```
 
-**Expect:** `tkMenu -All` lists five more commands than it did with no flag -- `NewGrowth`,
-`NewWorkReview`, `PublishWorkReview`, `LogPeerReview`, `UpdateResume` -- and each one answers `-Help`
+**Expect:** `tkMenu -All` lists six more commands than it did with no flag -- `NewGrowth`,
+`NewWorkReview`, `PublishWorkReview`, `WorkReview`, `LogPeerReview`, `UpdateResume` -- and each one answers `-Help`
 with a usage line carrying **your** prefix, not a literal `{cliPrefix}`.
 
-- [ ] All five verbs appear in `tkMenu -All`
-- [ ] All five answer `-Help`, in the calling prefix
+- [ ] All six verbs appear in `tkMenu -All`
+- [ ] All six answer `-Help`, in the calling prefix
 
 Then the web half, with `tkWeb -Dev` up and the fixture hub configured:
 
@@ -1007,6 +1008,13 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   card in `current/` that has commit bullets, `tkStandup`: its line reads `(<n> commits)` or
   `(started, ...)`, and `tkStandup -Brief` opens on `Since <day>: ...`. Closes Feature RC6D (the standup says
   what moved).
+- [ ] **GetPRComments reads a real GitHub pull request, under Windows PowerShell 5.1 too.** In a GitHub
+  Space whose card in `current/` carries the `PR URL:` of a real pull request with at least one inline
+  review comment, one reply to it and one conversation comment, run `tkGetPRComments <n>` from the
+  Toolkit's own folder in `powershell` (5.1), then again. You should see the inline thread with its file
+  and line and the reply as its follow-up, the conversation comment as its own block, any review with
+  text as `Status: review, ...`, exit 0 -- and the second run adding nothing and rewriting nothing. Then
+  `tkTestToolkit -PRComments` on that host: green. Added with GetPRComments on GitHub (the read side).
 - [ ] **The cold-agent walk: the hand-off block starts the work without a question.** With
   `features.solitaireAgile` on in a GitHub Space answered `agents`, run `tkStartWork <id>` for a real card in
   `current/`, and once for an open issue no card carries; paste each output, whole, into a fresh editor chat
@@ -1078,6 +1086,23 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   should see the **To do** lane empty, and the last card's closing line pointing at the **+** -- inside ten
   minutes of the clone. Any step where the card's words were not enough is a defect, filed. The walker writes
   the time here: stopwatch, clone to empty To do: `____` min `____` s, on `________` (host and date).
+- [ ] **A product design moves from the Design tab on Windows, staged in a configured checkout.** With a GitHub
+  Space whose repository is cloned at a Windows path, run `tkConfig -Set spaceCheckouts.<slug>.path=C:\<clone>`
+  (and once more with `~\<clone>` under your profile), then in `powershell` (5.1) and in `pwsh` stand in the hub
+  and run `tkMoveDesign <a note> -To Archive -Space <slug> -WhatIf`. You should see `Git root: C:\<clone> (the
+  <Space> Space's checkout)` first and nothing written. On the Design tab, the same note's menu offers **Archive
+  as shipped**; choosing it shows the staged lines and the suggested `git commit -m "design: ..."`, and `git
+  status` in the clone shows the rename staged with no new commit. Set the key to a folder that is not a clone of
+  the Space's repository: the menu is **Open on GitHub** alone and the tab's foot says why, naming the key.
+  Refs #146.
+- [ ] **A review is put away the same under Windows PowerShell 5.1.** In `powershell` (5.1) run
+  `tkTestToolkit -WorkReview`: green. Then, with `features.growth` on and a hub whose `storeSync` is `git`,
+  generate a review from the Reviews card (+), run `tkPublishWorkReview -NoPush`, and on its row choose
+  **Archive**: the row leaves the list, the filter's **Archived** option shows it, and in the hub
+  `reviews\archive\<slug-set>\<year>\<start>_<end>\review.md` ends with `**Closed:** <today>` in the file's own line
+  ending, and `git log -1 --name-status` is `review: archive <slug-set>/<start>_<end>` with forward slashes and only
+  that review's paths. Then **Delete** it from the Archived filter: the confirm names the range and the Space, Submit
+  removes the folder, and the next commit is `review: delete archive/<slug-set>/<start>_<end>`. Refs #148.
 
 ## Recording a run
 

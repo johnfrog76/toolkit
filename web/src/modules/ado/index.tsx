@@ -9,7 +9,7 @@ import { ConnectPage } from "./ConnectPage";
 import { AdoHome, AdoSystem } from "./routes";
 import { PRCommentsDetail } from "./PRCommentsDetail";
 import { PromptDetailPage } from "./PromptDetailPage";
-import { CARD_ROUTE } from "./paths";
+import { CARD_ROUTE, SYSTEM_PATH } from "./paths";
 import { ReviewPage } from "./ReviewPage";
 import { Billing } from "./Billing";
 
@@ -55,7 +55,7 @@ export const adoModule: ToolkitModule = {
 
   routes: [
     { path: "/", element: <AdoHome /> },
-    { path: "/system", element: <AdoSystem /> },
+    { path: SYSTEM_PATH, element: <AdoSystem /> },
     { path: "/pr-comments/:filename", element: <PRCommentsDetail /> },
     { path: CARD_ROUTE, element: <PromptDetailPage /> },
     { path: "/review", element: <ReviewPage /> },
@@ -96,7 +96,7 @@ export const adoModule: ToolkitModule = {
         p.startsWith("/design/") ||
         p.startsWith("/docs/"),
     },
-    { label: "System", to: "/system", match: (p) => p === "/system" },
+    { label: "System", to: SYSTEM_PATH, match: (p) => p === SYSTEM_PATH },
     {
       label: "Daily",
       to: "/daily",

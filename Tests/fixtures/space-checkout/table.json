@@ -1,0 +1,30 @@
+{
+  "_": "A Space's configured checkout (spaceCheckouts.<slug>.path; docs/CONFIGURATION.md, \"A Space's checkout on this machine\"). Two rules both halves implement, one row per input each distinguishes: how a path AS WRITTEN is read (an absolute path stands; ~ is the home folder, with home naming the rest under it; anything relative has nothing on this machine to be relative to and reads as empty), and which repository a remote URL names (GitHub only, ignoring case when compared). The CLI's ConvertTo-P20CheckoutPath and Get-P20GitHubOriginRepo (Scripts/Resolve-SpaceCheckout.ps1, Scripts/Resolve-Tracker.ps1) and the agent's checkout_path and origin_repo (agent/core/checkout.py) are each asserted against this table: tkTestToolkit -Design and Tests/test_space_checkout.py.",
+  "paths": [
+    { "written": "/srv/clones/r", "expect": "/srv/clones/r" },
+    { "written": "  /srv/clones/r  ", "expect": "/srv/clones/r" },
+    { "written": "~/src/r", "home": "src/r" },
+    { "written": "~", "home": "" },
+    { "written": "src/r", "expect": "" },
+    { "written": "./r", "expect": "" },
+    { "written": "", "expect": "" },
+    { "written": "   ", "expect": "" }
+  ],
+  "origins": [
+    { "url": "https://github.com/o/r.git", "repo": "o/r" },
+    { "url": "https://github.com/o/r", "repo": "o/r" },
+    { "url": "https://github.com/o/r/", "repo": "o/r" },
+    { "url": "git@github.com:o/r.git", "repo": "o/r" },
+    { "url": "ssh://git@github.com/o/r.git", "repo": "o/r" },
+    { "url": "https://GitHub.com/O/R.git", "repo": "O/R" },
+    { "url": "https://gitlab.com/o/r.git", "repo": "" },
+    { "url": "https://dev.azure.com/acme/p/_git/r", "repo": "" },
+    { "url": "", "repo": "" }
+  ],
+  "matches": [
+    { "origin": "o/r", "space": "o/r", "match": true },
+    { "origin": "O/R", "space": "o/r", "match": true },
+    { "origin": "o/r", "space": "o/r2", "match": false },
+    { "origin": "", "space": "o/r", "match": false }
+  ]
+}

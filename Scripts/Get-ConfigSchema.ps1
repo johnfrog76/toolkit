@@ -129,6 +129,11 @@ function Get-P20AliasFieldSchema {
     return $fields
 }
 
+function Get-P20SpaceCheckoutHelp {
+    # One help line for spaceCheckouts.<slug>.path, the row and its matches.
+    return 'Where this Space''s own repository is checked out on THIS machine: a folder inside a clone whose origin is the Space''s repository (absolute, or under ~). The Design tab''s rows then move the product''s designs there through MoveDesign -Space, staged and never committed. This machine''s only -- never hub.json, which other machines read.'
+}
+
 function Get-P20StartWorkPromptHelp {
     # One help line for a startWork.prompts row, named or the pattern.
     param([string]$Kind)
@@ -230,6 +235,11 @@ function Get-P20ConfigSchema {
     foreach ($field in (Get-P20AliasFieldSchema)) {
         $rows += New-P20SchemaRow -Key "aliases.<name>.$($field.key)" -Scope 'machine' -Type $field.type -Help $field.help
     }
+
+    # A Space's checkout on this machine, as a PATTERN keyed by the Space's
+    # slug: a path is personal, so it is machine-scoped like a shortcut's and
+    # never the hub's (Scripts/Resolve-SpaceCheckout.ps1).
+    $rows += New-P20SchemaRow -Key 'spaceCheckouts.<slug>.path' -Scope 'machine' -Type 'path' -Help (Get-P20SpaceCheckoutHelp)
 
     # StartWork's prompt table (the Team Agile add-on): one row per kind the
     # shipped config names, read from it rather than listed here, and a pattern
@@ -416,6 +426,19 @@ function Resolve-P20SchemaKey {
         }
         $f = $match[0]
         $result.Row = New-P20SchemaRow -Key $key -Scope 'machine' -Type $f.type -Help $f.help
+        return $result
+    }
+
+    # A Space's checkout: spaceCheckouts.<slug>.path, machine-scoped. The slug
+    # is NOT returned as Slug -- that would make the write a Space field, which
+    # goes to hub.json -- and the verb checks it names a declared Space.
+    if ($key -like 'spaceCheckouts.*') {
+        $parts = $key.Split('.')
+        if ($parts.Count -ne 3 -or -not $parts[1] -or $parts[2] -ne 'path') {
+            $result.Reason = "'$key' is not a checkout setting. The shape is spaceCheckouts.<slug>.path -- for example spaceCheckouts.toolkit.path."
+            return $result
+        }
+        $result.Row = New-P20SchemaRow -Key $key -Scope 'machine' -Type 'path' -Help (Get-P20SpaceCheckoutHelp)
         return $result
     }
 

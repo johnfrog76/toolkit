@@ -1,4 +1,4 @@
-import { useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { Subtitle2, Badge, makeStyles, tokens } from "@fluentui/react-components";
 import { BackButton } from "../../shared/BackButton";
 import { PageCard } from "../../shared/PageCard";
@@ -7,6 +7,8 @@ import { useGetGrowthDetailQuery } from "./api.growth";
 import { TargetArrowRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
 import { FilePath } from "../../shared/FilePath";
+import { RefreshButton } from "../../shared/RefreshButton";
+import { GoalActions } from "./GoalActions";
 
 const useStyles = makeStyles({
   page: {
@@ -27,11 +29,15 @@ export function GoalDetailPage() {
   const styles = useStyles();
   const { filename } = useParams<{ filename: string }>();
 
-  const { data, isLoading, isError } = useGetGrowthDetailQuery(filename ?? "", {
-    skip: !filename,
-  });
+  const navigate = useNavigate();
+  const { data, isLoading, isFetching, isError, refetch } = useGetGrowthDetailQuery(
+    filename ?? "",
+    { skip: !filename },
+  );
 
   const isPresentation = data?.type === "presentation";
+  // A goal's badge used to read "Training": the page asked only whether it was a talk.
+  const isGoal = data?.type === "goal";
 
   return (
     <div className={styles.page}>
@@ -58,11 +64,11 @@ export function GoalDetailPage() {
             {data && (
               <>
                 <Badge
-                  color={isPresentation ? "brand" : "success"}
+                  color={isPresentation ? "brand" : isGoal ? "informative" : "success"}
                   appearance="outline"
                   size="small"
                 >
-                  {isPresentation ? "Presentation" : "Training"}
+                  {isPresentation ? "Presentation" : isGoal ? "Goal" : "Training"}
                 </Badge>
                 <div className={styles.titleBlock}>
                   <Subtitle2>{data.title}</Subtitle2>
@@ -74,19 +80,25 @@ export function GoalDetailPage() {
         }
         headerRight={
           data ? (
-            <Badge
-              color={
-                data.status === "complete"
-                  ? "success"
-                  : data.status === "new"
-                    ? "important"
-                    : "subtle"
-              }
-              appearance="tint"
-              size="small"
-            >
-              {data.status === "complete" ? "Complete" : data.status === "new" ? "New" : "Active"}
-            </Badge>
+            <>
+              <Badge
+                color={
+                  data.status === "complete"
+                    ? "success"
+                    : data.status === "new"
+                      ? "important"
+                      : "subtle"
+                }
+                appearance="tint"
+                size="small"
+              >
+                {data.status === "complete" ? "Complete" : data.status === "new" ? "New" : "Active"}
+              </Badge>
+              {/* The row's moves, on the page where the progress log is read:
+                  Complete while the goal is not complete, Archive either way. */}
+              <GoalActions item={data} onArchived={() => navigate("/growth")} />
+              <RefreshButton onClick={refetch} isFetching={isFetching} />
+            </>
           ) : undefined
         }
       >

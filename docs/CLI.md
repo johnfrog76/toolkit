@@ -126,6 +126,25 @@ triage item of its own, with its own `Decision:` and `Reply:` slot, marked
 fills the thread's `Reply:` slot the moment it posts, so the card is the record before the next fetch
 as well as after it.
 
+**On a GitHub board** `GetPRComments` reads through `gh api`, and reads all three places GitHub keeps a
+review: the inline review comments (a reply joins the thread of the comment it answers), the
+conversation tab, and each review's own summary text. Each becomes a thread in the same block shape,
+under GitHub's own id -- the root comment's, the comment's, the review's -- so a later reply has
+something to answer. What does not carry over is not invented: GitHub has no severity or category
+on a comment, and its REST API does not say whether an inline thread is resolved, so a block's
+`Status:` says what the thread IS (`review comment`, `review comment, outdated`, `review, changes
+requested`, `conversation`). Kept whoever wrote it: every inline comment (it is anchored to code) and
+every review with text. Not triaged: an empty comment, a review with no text (an approval is a vote),
+and a conversation-tab comment from a Bot account (CI, coverage, deploy previews) -- which the card
+still NAMES, on its `Non-actionable threads` line, so nothing is dropped unseen. **The repository**
+comes from the card first: the one in `current/` whose `PR URL:` names this pull request (`NewPR` wrote
+it) names the repository too, so the browser, with no checkout, needs nothing else. Then `-Repository`
+(`owner/name`, or a name under the board's owner), then this checkout's GitHub remote (never the
+Toolkit's own), then the board's one repository. A board with several and none of those is refused,
+naming them -- a read, but it writes a card, and the same number on the wrong repository is someone
+else's review. **The card** is the one whose `PR URL:` names it, else the head branch's, else the issue
+the pull request's body names (`NewPR`'s `Issue: #n` line, or a closing keyword such as `Fixes #n`).
+
 **The side record.** Besides the card, a run writes one small file per PR fetch,
 `<promptsRoot>/<promptsFolder>/pr-comments/<date>-PR<id>.md` (the PR title, its URL, the fetch time, the
 repository and the count of new comments). It exists so `prsReviewed` is countable at archive time; nothing
@@ -418,9 +437,9 @@ three the agent's `GET /api/visibility` serves: `public`, `private`, `unknown`.
 
 ## Command reference
 
-**44 always on, 58 with every opt-in module switched on.** The 44 are `config.default.json`'s
+**44 always on, 59 with every opt-in module switched on.** The 44 are `config.default.json`'s
 `commands`, and are below -- the Studio's `NewDesign`, `StampDesign`, `MoveDesign`, `NewSpace`, `RetireSpace`, `RemoveSpace` and `HowWeWork` among them, because the Studio is
-core ([Studio](modules/studio.md); D-S13); the fourteen the growth,
+core ([Studio](modules/studio.md); D-S13); the fifteen the growth,
 communication, organize and Team Agile modules contribute have their own table further down, each marked
 with the flag that produces it.
 
@@ -433,6 +452,7 @@ As `{prefix}Command`. `tkMenu` lists them live; `tkMenu -All` shows everything;
 | --- | --- |
 | `NewPrompt <id>` | Create a prompt file from the board's tracker: an ADO work item, or on a GitHub board an issue (`gh issue view`; the repo comes from a repo-grained address or the board's one `projects[]` entry -- several repos refuse, because issue numbers are per-repo; a label naming a card type sets the type, else Task; assignment and a closed issue's reopen prompt mirror the ADO flow). The card is written to the Space's `backlog/` -- planned, not in play -- and with **`-Now`** to `current/`. If card `<id>` is already in `current/` or `backlog/` it is **returned, not overwritten** -- found by id, before any tracker call. On an Azure DevOps board it also reads the work item's comments, which needs an `az` token: with none (`az login` has not been run, or `az` printed nothing) it is a stated refusal (exit 2, naming `az login`) before any card is written or the work item assigned or moved |
 | `NewPrompt -Title "..." [-Type <t>] [-Id <n>]` | The same file with **no ADO call** -- the Tier-2 way to start a card ([Tiers](#creating-a-card-with-no-ado)) |
+| `NewPrompt -Title "..." -Description <text>` | Offline only: fills `## Context` (a Task) or `## Summary` (everything else) with that text in place of `(TBD)` -- the same slot an ADO-linked card fills from the work item's own description. Multi-line is kept. Omitted, the card reads `(TBD)` there exactly as it always has |
 | `NewPrompt ... -Cover <image>` / `-Before <image>` | Make the card **with its picture**, attached by the same code `Cover` runs -- for a GUI issue the snap is the report. The picture is checked first, so a refused one writes no card; on a card that is already in `current/` (returned, not overwritten) nothing is attached and the line says to use `Cover` ([A card's picture](#a-cards-picture-cover)) |
 | `NewPrompt ... -Design <name\|id>` | Make the card **bound to the design it is worked against**: one header line under `> Template:` (after `> Previous round:` when there is one), `> Design: [<title>](<link>) <id>` -- the design's own title (a square bracket in it written round) and its whole id, the link relative to the card for a hub design and its page on GitHub (`/blob/HEAD/<path>`) for a repo design; a design with a spec links the spec. Resolved before anything is written or fetched, against the hub's `design/`, `spec/` and their archives, and the repository you stand in when its `origin` is one of the active Space's GitHub repos and it has `design/` -- one id in both is one design, and the repo's copy is named. What you type is read by the lifecycle's one rule (`Select-P20Design`, which `MoveDesign` asks too): a file name, its stem, or an id prefix of four or more. Nothing, or more than one, is a stated refusal (exit 2) and no card is written; on a card already in `current/` (returned, not overwritten) no line is written either. The corpus's hand-written `> Spec:` lines are read as written and never rewritten ([the card](hub/cards.md#2-the-sections----by-type-from-the-template)) |
 | `NewItem <title>` | Create a work item (UserStory/Task/Bug/Feature) -- on a GitHub space, an issue: Bug/Feature fold to labels, `-Tags` become labels, `-Sprint` is the milestone, AC/repro join the body; `-Parent <n>` makes the new issue a sub-issue of `#n` -- GitHub's sub-issues route (`POST repos/<repo>/issues/<n>/sub_issues`, by the new issue's id) after the create, or, where GitHub refuses that route, a `- [ ] #<new>` line appended to `#n`'s body, the output saying which; the parent is read first, so a wrong number is refused (exit 2) with nothing created, and `-WhatIf` prints both calls and makes neither; `-Priority`/`-Points` are refused by name. `-FromDesign <note>` promotes a hub design note (the Studio's): the issue is the note's title and body, labelled `design`, and its URL is written back as the note's `> GitHub:` line ([Studio](modules/studio.md#the-verbs)) |
@@ -506,18 +526,26 @@ is LF like everything else, whatever `templates/ManagerSession.template.md` chec
 | --- | --- |
 | `NewPR [<card>]` | PR + move card to Code Review + comment + write PR URL back to the file. `-WhatIf` resolves everything and calls nothing. On a GitHub board: `gh pr create` (repo from the checkout's github remote, else the board's one repo; `-Draft` and `-AutoComplete` map to draft and auto-merge), the PR body references the issue PLAINLY -- never `Closes #n`, because closing is `CloseItem`'s job -- and the ledger entry is a markdown comment on the issue; GitHub has no Code Review state to move, and the card's lane comes from the `PR URL:` line as ever. A card in `backlog/` is found too, and is moved to `current/` before its `PR URL:` is written |
 | `PublishPR [<card>]` | Stage 2 of the ship flow: flip the card's draft pull request on Azure DevOps to ready. Reads the card's `PR URL:` line (the card by id or filename, else the one for this branch from the code repository), takes the token `NewPR` takes, confirms the pull request is an active draft, sends `PATCH .../pullrequests/{id}?api-version=7.1` with `{"isDraft":false}`, and writes one line under `PR URL:` -- `PR published: <url>`, once, not a dated stamp and not state. `-WhatIf` prints the exact call and sends nothing. Refused, exit 2 and nothing written: no `PR URL:` line, a pull request already ready or not active, and a GitHub pull request, whose hint is `gh pr ready <url>` |
-| `GetPRComments [<id>]` | Fetch PR review comments and append to the prompt file -- every comment of every thread, a reviewer's follow-ups included; append-only and idempotent |
+| `GetPRComments [<id>]` | Fetch PR review comments and append to the prompt file -- every comment of every thread, a reviewer's follow-ups included; append-only and idempotent. On a GitHub board it answers through `gh` (below, "On a GitHub board") |
 | `ReplyPR <pr> <thread> -Reply "..."` | Post a reply to a PR thread (`-Status` to set its state) and fill that thread's `Reply:` slot in the card -- the card in `current/` whose `PR URL:` names the PR, else the branch's |
 | `ThreadHash [<id\|file>] [-Hash <h>]` | Thread **this repo's** branch commits into the Git section and PR replies. Run it from the code repo. A card in `backlog/` is found too, and its first thread moves it to `current/` before writing |
 | `AddPRReview <pr>` | Post an AI code review to a PR as inline comments (`-DryRun` to preview) |
-| `Sync` | Pull with rebase, then push, on the prompt store -- when `storeSync` is `git` (the hub's `hub.json`, or `config.local.json` per machine). The hub must be the **root** of its own repository: a hub sitting inside some other repository is refused before anything is committed, because `git add -A` from a subfolder stages that whole repository |
+| `Sync` | Pull with rebase, then push, on the prompt store -- when `storeSync` is `git` (the hub's `hub.json`, or `config.local.json` per machine). The hub must be the **root** of its own repository: a hub sitting inside some other repository is refused before anything is committed, because `git add -A` from a subfolder stages that whole repository. The System page's **Sync the hub** runs this verb through the bridge and shows what it printed ([`CONFIGURATION.md`, "Syncing the hub from the web app"](CONFIGURATION.md#syncing-the-hub-from-the-web-app)) |
 
 **Where `NewPR` gets its facts.** From the code repository, on the work branch, everything is inferred:
 the branch finds the card, and the card gives the work item, title and described changes. Named from
 anywhere else -- `tkNewPR 119`, or *Create PR* in the browser, whose verbs run in the Toolkit's own
-folder -- the **card** answers instead: its `ADO Link` names the project, and the first line of its
-`## Branch` section is the source branch. The Toolkit's own checkout is never read as a card's code
-repository. A project or repository it cannot tell is a stated refusal naming `-Project` and
+folder -- on a GitHub board `NewPR` first looks for the **card's own checkout**: a clone of the
+board's repository, at `<wsRoot>/<repo>` or a nav shortcut's path (`aliases.<Name>.path`), accepted
+only when its `origin` is that repository -- the one lookup `MoveDesign` uses
+(`Scripts/Resolve-SpaceCheckout.ps1`). Found, `NewPR` works from it as if run there: the repository
+is its `origin`, the source branch is the card's `## Branch`, or -- when the card names none -- the
+checkout's branch, but only if that branch leads back to this card; and a branch that is not on
+GitHub is refused saying whether the checkout holds it unpushed (with the `git -C <checkout> push` to
+run) or does not hold it at all. With no such checkout, an Azure DevOps board, or `-Project` or
+`-Repository` passed, the **card** answers instead: its `ADO Link` names the project, and the first
+line of its `## Branch` section is the source branch. The Toolkit's own checkout is never read as a
+card's code repository, even when it is a clone of the board's repository. A project or repository it cannot tell is a stated refusal naming `-Project` and
 `-Repository`; it never defaults to the first configured project, which for a write is a guess that
 opens a pull request somewhere unrelated. `GetPRComments` with no id and no branch refuses in the
 Toolkit's folder for the same reason.
@@ -807,11 +835,11 @@ the Studio's too: it writes the team's page for a Space worked with agents, whic
 | `HowWeWork <slug> [-WhatIf]` | Write a Space's **how-we-work note**, once: `<space folder>/agentic/how-we-work.md` in the hub (`consts.json` `startWork.howWeWorkNote`), from the package's `agentic/how-we-work.template.md` with the Space's name and tracker filled in, through `Write-CardText -New` (UTF-8, no BOM, LF). The note names roles and loops, never a model, a machine or a plan: the seats (product, engineering, crew), the loop (card, branch, pull request with proof lines, merge on green, archive with the hash), and the hand-off, relay and stand-in rules. Only the orchestrating answer to **How do you want to work in `<Space>`?** has one: for a Space whose answer is `alone` or `team` ([`spaces[].howIWork`](CONFIGURATION.md#spaceshowiwork----how-you-work-in-this-space)) it says so, names the `Config` line that answers `agents` where the Space can be asked, exits 0 and writes nothing. It prints the one line to paste into the repository's `AGENTS.md`, `How we work here: <path>` -- ToolKit never writes into a product's repository. `StartWork` quotes the note as section one of the hand-off block. **Never over a file that is there**: refused, exit 2, naming the path -- the note is the team's to edit, and starting it over is moving or deleting the file, on purpose. Refused too, exit 2: no slug, a slug that is not declared, a hub that is not there. `-WhatIf` prints the path and the text, and writes nothing ([Studio](modules/studio.md#the-verbs), [Team Agile](modules/solitaire-agile.md)) |
 | `NewDesign -Title <t> [-Description <text>] [-Space <slug>]` | Scaffold a design note into the hub's `design/` from `templates/DesignNote.template.md`: the frontmatter `id:` (a fresh UUID v4), description (and the Space it is for), the title, the template's headings, a `**Created:**` stamp. The file is the title's slug; never overwrites ([Studio](modules/studio.md), [the shape](hub/design.md)) |
 | `StampDesign [-Hub] [-WhatIf]` | Give every design note and spec an `id:` (design lifecycle L1; the identity rule is [the shape](hub/design.md), "The file"): walks `design/`, `design/archive/`, `spec/` and `spec/archive/` of the git root of the current directory (printed on the first line; it must hold `design/`) and adds `id: <uuid>` to the frontmatter of every markdown file that has none, creating the block where there is none. A spec takes the id of the note whose stem it shares (`design/x.md` and `spec/x.spec.md`); an id already there is never changed, a file that needs nothing is not written, a second run writes nothing, each file keeps its own line endings, `README.md` is skipped. `-Hub` works on the hub's `design/` and `spec/` (and a declared Space folder's own) instead. `-WhatIf` names every file and writes none. It stamps; it does not commit ([Studio](modules/studio.md), [the shape](hub/design.md)) |
-| `MoveDesign <name\|id> -To Spec\|Archive\|Complete [-Dropped] [-Reason <text>] [-Doc <path>] [-Hub] [-Space <slug>] [-WhatIf]` | Move a design along its road (design lifecycle L3; the states are [the shape](hub/design.md), "State -- derived, never stored"). The design is a note's or spec's file name, the stem both share, or any unique prefix of its id (four characters or more); its state is read from where its files are, and the verb refuses by that rule, exit 2 and one sentence. `-To Spec` scaffolds `spec/<stem>.spec.md` from `templates/Spec.template.md` with the note's id, description and thread (the note stays); refused for a spec standing alone, a design that already has its spec, or an archived note. `-To Archive` moves the note to `design/archive/` and stamps `**Closed:**` and `**Outcome:** shipped`, or `dropped` with `-Dropped`, which needs `-Reason`; refused while the spec is live. `-To Complete` moves the spec to `spec/archive/` and the note to `design/archive/` in one go, stamps both and writes `> Docs: <path>` into the spec; `-Doc` must exist in the same tree. Every move appends one dated, self-contained line to the note's `## Journey` (the first move adds the note's birth line, dated from `**Created:**`); `-Reason` joins any line. In a repo it names the git root first, STAGES (`git mv`, `git add`) and never commits, printing the commit line it suggests; `-Hub` works on the hub's folders, `-Hub -Space <slug>` on that Space's own, and follows `storeSync` the way `Archive` does, so a commit git refuses is a stated refusal (exit 2) that says the files are already moved. Never overwrites; `-WhatIf` prints every move and stamp and writes nothing ([Studio](modules/studio.md), [the shape](hub/design.md)) |
+| `MoveDesign <name\|id> -To Spec\|Archive\|Complete [-Dropped] [-Reason <text>] [-Doc <path>] [-Hub] [-Space <slug>] [-WhatIf]` | Move a design along its road (design lifecycle L3; the states are [the shape](hub/design.md), "State -- derived, never stored"). The design is a note's or spec's file name, the stem both share, or any unique prefix of its id (four characters or more); its state is read from where its files are, and the verb refuses by that rule, exit 2 and one sentence. `-To Spec` scaffolds `spec/<stem>.spec.md` from `templates/Spec.template.md` with the note's id, description and thread (the note stays); refused for a spec standing alone, a design that already has its spec, or an archived note. `-To Archive` moves the note to `design/archive/` and stamps `**Closed:**` and `**Outcome:** shipped`, or `dropped` with `-Dropped`, which needs `-Reason`; refused while the spec is live. `-To Complete` moves the spec to `spec/archive/` and the note to `design/archive/` in one go, stamps both and writes `> Docs: <path>` into the spec; `-Doc` must exist in the same tree -- except with `-Hub -Space <slug>`, where it is looked for in the Space's own repository (a clone of the repository its address names, found as the Space's configured checkout `spaceCheckouts.<slug>.path`, the folder you stand in, a nav shortcut's path or `<wsRoot>/<repo>`) and refused naming that clone when it is missing there, or taken as written with one `Note:` line when no clone is on this machine ([the shape](hub/design.md), "The file"). Every move appends one dated, self-contained line to the note's `## Journey` (the first move adds the note's birth line, dated from `**Created:**`); `-Reason` joins any line. In a repo it names the git root first, STAGES (`git mv`, `git add`) and never commits, printing the commit line it suggests. `-Space <slug>` without `-Hub` does the same in THAT Space's own repository, in its checkout on this machine -- `spaceCheckouts.<slug>.path` first ([configuration](CONFIGURATION.md#spacecheckoutsslugpath----a-spaces-checkout-on-this-machine)), then the folder you stand in, then a nav shortcut's path, then `<wsRoot>/<repo>`, each counted only when its `origin` is the Space's repository; the first line names the root and the Space, and with no checkout here it refuses (exit 2) naming the setting -- it never clones, and never commits through the API. That is the road the Design tab's product rows take through the bridge, which always runs in the package. `-Hub` works on the hub's folders, `-Hub -Space <slug>` on that Space's own, and follows `storeSync` the way `Archive` does, so a commit git refuses is a stated refusal (exit 2) that says the files are already moved. Never overwrites; `-WhatIf` prints every move and stamp and writes nothing ([Studio](modules/studio.md), [the shape](hub/design.md)) |
 
 ### The opt-in modules' verbs
 
-These fourteen exist **only** when their module's flag is on. With the flag off there is no alias, no
+These fifteen exist **only** when their module's flag is on. With the flag off there is no alias, no
 command row in `tkMenu`, no `-Help` and nothing for the bridge to call -- they are absent, not
 refused ([the modules guide](modules/README.md)). The one place an off module is *named* is the
 `Opt in by configuration` block at the foot of `tkMenu -All` and in `tkEnv` -- each row led by the
@@ -828,9 +856,10 @@ is off, and `SwitchSpace` brings them back in one that works with agents.
 
 | Command | Flag | Does |
 | --- | --- | --- |
-| `NewGrowth -Title <t> [-Type training\|presentation\|goal] [-Date <d>] [-DueDate <d> (required for a training)] [-Provider <p>] [-Hours <h>] [-Notes <n>]` | `features.growth` | Create a training, presentation or goal artifact under `growth/current/`. `training` is the **default** type and a training **needs** `-DueDate`, so the shortest form the usage suggests is the one that is refused |
+| `NewGrowth -Title <t> [-Type training\|presentation\|goal] [-Date <d>] [-DueDate <d> (required for a training)] [-Provider <p>] [-Hours <h>] [-Notes <n>]` | `features.growth` | Create a training, presentation or goal artifact under `growth/current/`. `training` is the **default** type and a training **needs** `-DueDate`, so the shortest form the usage suggests is the one that is refused. `-Close <file>` archives an item to `growth/archive/`, stamped **Closed:**; `-Complete <file>` writes a goal's Outcome Status line as `Achieved` and nothing else; `-WhatIf` names the file and writes nothing |
 | `NewWorkReview -StartDate <d> -EndDate <d> [-Slugs <csv>]` | `features.growth` | Generate a work review scaffold for a date range from local history. Answers JSON on stdout, because the agent parses it |
 | `PublishWorkReview [-NoPush] [-Preview]` | `features.growth` | Stage and commit `reviews/`, then sync the hub. `-Preview` emits the pending diff as JSON instead |
+| `WorkReview <slug-set>/<start>_<end> -Archive\|-Delete [-WhatIf]` | `features.growth` | Put a review away. `-Archive` moves the review's folder to `reviews/archive/<slug-set>/<year>/<start>_<end>/` and stamps `**Closed:**` into **its `review.md`** -- the one file every review has; `summary.md` moves untouched. `-Delete` removes the folder. With `storeSync: git` either is committed, scoped to that review's paths. `-WhatIf` names the folder and writes nothing. An archived review is named `archive/<slug-set>/<start>_<end>`. The Reviews card's row offers both, Delete behind a confirm ([Growth](modules/growth.md#tkworkreview)) |
 | `UpdateResume [-NoPush] [-Preview]` | `features.growth` | The same three for `resume/` |
 | `LogPeerReview <id> [-Title <t>] [-Notes <n>]` | `features.growth` | Log a completed review of someone else's PR. The one thing growth writes that is **org**-scoped: it lands in the active Space's `pr-comments/` |
 | `SendTeams <recipient> <message> [-Session <file>] [-WhatIf] [-AsJson]` | `features.communication` | Post one line to a Teams recipient through the communication engine. `-Session` names the meeting record in `manager/current/` the send is for, and a sent message is noted under its `## Sent` |
@@ -916,6 +945,10 @@ unchanged -- the first `ThreadHash` pulls it into `current/`.
   **Meeting** is one you attended -- it took time, it is billable, it is on Daily -- with When,
   Where, Who, Purpose, Notes, Outcomes and Follow-ups; a meeting you run is the Meeting Agenda
   Planner's, under `manager/`.
+- **`-Description <text>`** fills `## Context` (a Task) or `## Summary` (everything else) with that
+  text -- the same slot an ADO-linked card fills from the work item's own description. Multi-line is
+  kept, as a quoted string already carries embedded newlines. Omitted, the card reads `(TBD)` there
+  exactly as it always has.
 - **`-Date YYYY-MM-DD`** sets `**Created:**` to the day the work WAS -- a meeting attended yesterday
   -- so Daily lands the card on that day rather than on the day the card was typed. Daily also reads
   a person's `**Started:**` and `**Review:**` lines the way it reads git's days.
@@ -943,6 +976,24 @@ unchanged -- the first `ThreadHash` pulls it into `current/`.
   A dated file such as the `2026-05-14-PR141415.prompt.md` the PR-comment flow writes into
   `archive/`, or a slug that merely contains a year, is not a card -- reading the first run of digits
   in any name would take a date for an id.
+- **A card's full path is that card, whichever Space is active.** `Move`, `Plan`, `Billable`, `Cover`
+  and `Archive` -- the verbs whose usage says `<id|file>` -- also take a path to the card file
+  (absolute, or relative to where you stand), and act on that file in the Space its path names:
+  `tkMove <hub>/<space>/backlog/TaskK7M2-....prompt.md -To Active` works with any other Space active,
+  and the card moves between that Space's `backlog/`, `current/` and `archive/`, never the active
+  one's. Before this the folders of the active Space were the only ones searched, and the same
+  command was refused with `No card matching '<path>'`. A path counts only when it carries a
+  directory separator, names a file that exists, and sits in a folder of the kind the verb reads
+  (`Move` reads `current/` and `backlog/`, so a path into `archive/` is still refused) **inside the
+  hub** -- under the resolved `promptsRoot`, compared whole folder by whole folder (so
+  `<hub>-other/` is not inside `<hub>/`), ignoring case on Windows only. A folder elsewhere on disk
+  that happens to be called `current/` or `backlog/` is not a Space's, and a path into one is refused
+  with `No card matching` like any other: `Archive` never moves or stages a file the hub does not
+  hold. Nothing else
+  is loosened: an id is still read as an id in the active Space only, a bare filename or partial
+  name is matched exactly as before, and a partial name still refuses a non-interactive caller.
+  `ThreadHash`, `NewPR` and `PublishPR` already took a path. The other card verbs (`StartWork`,
+  `Route`, `Reminders`) still read the active Space: set `P20_ACTIVE_SPACE` for the shell to act in another one.
 - The fields a card would have got from ADO say so: `**Sprint:** (not linked)` and
   `**ADO Link:** (not linked -- created offline with -Title)`. Fill them in by hand if the work
   later gets a card; nothing reconciles them for you.

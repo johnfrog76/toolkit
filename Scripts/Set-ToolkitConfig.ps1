@@ -465,6 +465,18 @@ function Get-ListRows {
             value = (Format-Value $resolved.Value); source = $resolved.Source
         }
     }
+    # The Space you are in: where its repository is checked out on this
+    # machine. One row, keyed by the active slug, so the drawer has a field
+    # for it and Config -List names it; another Space's is set by its key.
+    $checkoutSlug = Get-ActiveSlug
+    if ($checkoutSlug) {
+        $key = "spaceCheckouts.$checkoutSlug.path"
+        $resolved = Get-ResolvedSetting $key
+        $rows += [PSCustomObject]@{
+            key = $key; scope = 'machine'; file = 'config.local.json'
+            value = (Format-Value $resolved.Value); source = $resolved.Source
+        }
+    }
     foreach ($row in @($configSchema | Where-Object { $_.scope -eq 'hub' })) {
         $resolved = Get-ResolvedSetting $row.key
         $rows += [PSCustomObject]@{
@@ -684,6 +696,20 @@ foreach ($pair in (ConvertTo-SetPairs $Set)) {
     if ($row.scope -eq 'hub' -and -not $Hub) {
         Deny "'$key' is the hub's own declaration, not this machine's." `
             "Pass -Hub to write it into hub.json."
+    }
+
+    # A Space's checkout is a path on THIS machine, so it is never the hub's:
+    # hub.json is read by every machine, and their clones sit in different
+    # places. And it is keyed by a Space that exists.
+    if ($key -like 'spaceCheckouts.*') {
+        if ($Hub -or $Local) {
+            Deny "'$key' is a path on this machine, so it is written to config.local.json and never to hub.json." `
+                "Drop -Hub: $($cliPrefix)Config -Set $key=<folder>"
+        }
+        $checkoutSlug = $key.Split('.')[1]
+        if ($resolvedSlugs.Count -gt 0 -and -not ($resolvedSlugs -contains $checkoutSlug)) {
+            Deny "'$checkoutSlug' is not a Space this machine knows, so it has no checkout to name." "Available: $($resolvedSlugs -join ', ')."
+        }
     }
 
     if ($key -eq 'activeSpace') {

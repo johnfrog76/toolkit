@@ -509,11 +509,12 @@
       "category": "work",
       "description": "Create a prompt file from an ADO work item",
       "descriptionWithoutAdo": "Make a card: -Title names it, -Type its kind",
-      "usage": "{cliPrefix}NewPrompt <WorkItemId> | -Title <text> [-Type <name>] [-Id <id>] [-Date <date>] [-AssignTo <email>] [-ReadOnly] [-Force] [-Now] [-OutputFolder <name>] [-Cover <image>] [-Before <image>] [-Design <name|id>] [-Help]",
+      "usage": "{cliPrefix}NewPrompt <WorkItemId> | -Title <text> [-Description <text>] [-Type <name>] [-Id <id>] [-Date <date>] [-AssignTo <email>] [-ReadOnly] [-Force] [-Now] [-OutputFolder <name>] [-Cover <image>] [-Before <image>] [-Design <name|id>] [-Help]",
       "examples": [
         "{cliPrefix}NewPrompt 12345",
         "{cliPrefix}NewPrompt 12345 -Now   # in play at once: current/, not the backlog",
         "{cliPrefix}NewPrompt -Title \"Timeout on large files\" -Type Bug",
+        "{cliPrefix}NewPrompt -Title \"Timeout on large files\" -Type Bug -Description \"Uploads over 2GB hang past the 60s gateway timeout.\"   # fills ## Context in place of (TBD)",
         "{cliPrefix}NewPrompt -Title \"Wallet ticket from a QR code\" -Type Spike   # a card with no work item gets a short id: Spike-K7M2-...",
         "{cliPrefix}NewPrompt -Title \"Import flow\" -Type UserStory -Id 144",
         "{cliPrefix}NewPrompt -Title \"Sprint review with the client\" -Type Meeting -Date 2026-09-21",
@@ -523,6 +524,7 @@
       "notes": [
         "A new card is planned: it lands in the Space's backlog/, and Move <id> -To Active, its first ThreadHash or its NewPR pulls it into current/. -Now puts it in current/ at once.",
         "Offline: -Title makes the same card with no ADO (Tier 2); it gets a short id of its own. -Type picks the kind of thing it is.",
+        "-Description <text>, offline only: fills ## Context (a Task) or ## Summary (everything else) with that text, the same slot an ADO-linked card fills from the work item's own description. Multi-line is kept. Omitted, it reads (TBD) exactly as before.",
         "-Date YYYY-MM-DD sets **Created:** to the day the work was -- a meeting attended yesterday -- so Daily lands the card on that day.",
         "-Cover / -Before <image> attach a picture as the card is made, through the same code as Cover. The picture is checked first, so a refused one writes no card.",
         "-Design <name|id> binds the card to the design it is worked against: one header line, > Design: [<title>](<link>) <id>, under its Template line -- the design's own title and id, a link relative to the card for a hub design or its GitHub page for a repo design. Resolved against the hub's design/ and spec/ (and their archives), and the repository you stand in when it is this Space's; a file name, its stem, or an id prefix of four or more. A name that resolves to nothing, or to two, writes no card."
@@ -582,15 +584,16 @@
         "{cliPrefix}MoveDesign board-ideas -To Spec",
         "{cliPrefix}MoveDesign a-second-room -To Archive -Dropped -Reason \"The Lounge already does this.\"",
         "{cliPrefix}MoveDesign ee925272 -To Complete -Doc docs/hub/design.md",
-        "{cliPrefix}MoveDesign board-ideas -To Archive -Hub -WhatIf"
+        "{cliPrefix}MoveDesign board-ideas -To Archive -Hub -WhatIf",
+        "{cliPrefix}MoveDesign board-ideas -To Spec -Space toolkit"
       ],
       "notes": [
         "The design lifecycle's one verb. A design is one id, a note and at most one spec, named by a file name, the stem both share, or any unique prefix of its id (four characters or more). Its state is read from where the files are, and the verb refuses by that rule.",
         "-To Spec scaffolds spec/<stem>.spec.md from templates/Spec.template.md with the note's id, description and thread; the note stays in design/. Refused for a spec standing alone, a design that already has its spec, or an archived note.",
         "-To Archive moves the note to design/archive/ and stamps **Closed:** and **Outcome:** shipped -- or dropped with -Dropped, which needs -Reason. Refused while the spec is live (-To Complete archives both), or when the archive already has a file of that name.",
-        "-To Complete moves the spec to spec/archive/ and the note to design/archive/ in one go, stamps **Closed:** on both and writes > Docs: <path> into the spec. -Doc is the gate: a path that exists in the same tree. Refused for anything that is not a Spec.",
+        "-To Complete moves the spec to spec/archive/ and the note to design/archive/ in one go, stamps **Closed:** on both and writes > Docs: <path> into the spec. -Doc is the gate: a path that exists in the same tree -- with -Hub -Space, in the Space's own repository (a clone of it on this machine: spaceCheckouts.<slug>.path, else the folder you stand in, else a nav shortcut's path, else <wsRoot>/<repo>), taken as written with a Note: line when there is no clone here. Refused for anything that is not a Spec.",
         "Every move appends one dated, self-contained line to the note's ## Journey: the date, the repository, every path in full -- the note's own path after the move included. -Reason is appended to any move's line.",
-        "Where: the git root of the current directory, named on the first line, which must hold design/ -- there it STAGES (git mv, git add) and never commits, printing the commit line it suggests. -Hub works on the hub's folders instead, -Hub -Space <slug> on that Space's own, and follows storeSync the way Archive does. It never overwrites; -WhatIf prints every move and stamp and writes nothing."
+        "Where: the git root of the current directory, named on the first line, which must hold design/ -- there it STAGES (git mv, git add) and never commits, printing the commit line it suggests. -Space <slug> alone does the same in that Space's own repository, in its checkout on this machine (spaceCheckouts.<slug>.path, else the folder you stand in, else a nav shortcut's path) -- the road the Design tab's product rows take through the bridge; with no checkout here it refuses and names the setting. -Hub works on the hub's folders instead, -Hub -Space <slug> on that Space's own, and follows storeSync the way Archive does. It never overwrites; -WhatIf prints every move and stamp and writes nothing."
       ]
     },
     "NewSpace": {

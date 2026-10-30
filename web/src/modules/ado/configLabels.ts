@@ -100,6 +100,10 @@ const WORDS: Record<string, SettingWords> = {
     label: "Shortcut",
     hint: "A folder you jump to from the terminal by name. A shortcut with no folder is switched off.",
   },
+  "spaceCheckouts.<slug>.path": {
+    label: "This Space's checkout",
+    hint: "Where this Space's repository is cloned on this machine. With it, a product design's menu on the Design tab moves the design in that clone -- staged for you to commit, never committed for you.",
+  },
   "spaces.<slug>.name": {
     label: "Display name",
     hint: "What this Space is called in the header and in lists.",
@@ -138,10 +142,13 @@ const WORDS: Record<string, SettingWords> = {
   },
 };
 
-/** `aliases.Hub.path` -> `aliases.<name>.path`; `spaces.demo.name` -> `spaces.<slug>.name`. */
+/** `aliases.Hub.path` -> `aliases.<name>.path`; `spaces.demo.name` -> `spaces.<slug>.name`;
+ *  `spaceCheckouts.demo.path` -> `spaceCheckouts.<slug>.path`. */
 export function schemaKeyOf(key: string): string {
   const alias = /^aliases\.[^.]+\.(.+)$/.exec(key);
   if (alias) return `aliases.<name>.${alias[1]}`;
+  const checkout = /^spaceCheckouts\.[^.]+\.(.+)$/.exec(key);
+  if (checkout) return `spaceCheckouts.<slug>.${checkout[1]}`;
   const org = /^spaces\.[^.]+\.(.+)$/.exec(key);
   if (org) return `spaces.<slug>.${org[1]}`;
   return key;
