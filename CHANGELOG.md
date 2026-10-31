@@ -28,6 +28,7 @@ release.
 
 ### Fixed
 
+- On an Azure DevOps Space the board now draws four lanes, with no Backlog lane, and `NewPrompt` writes a new card straight to `current/` so it is in play when it is made; the board's footer names the first lane the Space has. A local or GitHub Space keeps its five lanes and its backlog.
 - The Reference field in the New Reminder dialog is now as wide as the other fields, instead of sharing a half-width row with Source.
 - The Edit Reminder dialog's Source and Reference fields are full width too, like the New Reminder dialog's, and the fields in both reminder dialogs are the same size as the rest of the app's.
 - `Move`, `Plan`, `Billable`, `Cover` and `Archive` given the full file path of a card in your hub now work on that card in whichever Space it belongs to, instead of refusing with "No card matching" when a different Space is active.

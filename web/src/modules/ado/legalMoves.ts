@@ -29,6 +29,13 @@ export const LANES = [
 ] as const;
 export type Lane = (typeof LANES)[number];
 
+/** The lanes a Space's board draws. On an Azure DevOps Space the team's backlog lives in Azure
+ *  DevOps and a new card starts in play (`NewPrompt` writes `current/`), so there is no Backlog
+ *  lane; a GitHub or local Space draws all five. `tracker` is `/env`'s, the agent's one derivation. */
+export function lanesFor(tracker?: string): readonly Lane[] {
+  return tracker === "ado" ? LANES.filter((lane) => lane !== STATUS.backlog) : LANES;
+}
+
 const ORDER: Record<string, number> = {
   [STATUS.backlog]: 0,
   [STATUS.active]: 1,
@@ -39,10 +46,10 @@ const ORDER: Record<string, number> = {
 
 /** The lanes a card in `state` may be moved TO by a person: every lane ahead of
  *  it -- and, for an Active card, back to Backlog. */
-export function legalMoves(state: string): Lane[] {
+export function legalMoves(state: string, tracker?: string): Lane[] {
   const from = ORDER[state];
   if (from === undefined) return [];
-  return LANES.filter(
+  return lanesFor(tracker).filter(
     (lane) => ORDER[lane] > from || (state === STATUS.active && lane === STATUS.backlog),
   );
 }
