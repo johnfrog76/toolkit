@@ -10,21 +10,22 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import {
-  ArchiveRegular,
   ArrowEnterRegular,
   BuildingFactoryRegular,
+  HistoryRegular,
   LinkRegular,
-  OpenRegular,
   SubtractCircleRegular,
 } from "@fluentui/react-icons";
 import { useNavigate } from "react-router";
-import { CardActions } from "../../shared/CardActions";
+import { CardActions, ROW, defineRowMoves } from "../../shared/CardActions";
+import { trackerName } from "../ado/TrackerBadge";
 import { CreateButton } from "../../shared/CreateButton";
 import type { CardAction } from "../../shared/CardActions";
 import { FilterBadge } from "../../shared/FilterBadge";
 import { useFilterRowStyles, useListRowStyles } from "../../shared/listRowStyles";
 import { EmptyState } from "../../shared/EmptyState";
 import { PageCard } from "../../shared/PageCard";
+import { HubSyncLine } from "../ado/HubSyncLine";
 import { Pagination } from "../../shared/Pagination";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { usePagination } from "../../hooks/usePagination";
@@ -97,10 +98,26 @@ const useStyles = makeStyles({
   line: { color: tokens.colorNeutralForeground2 },
 });
 
-const OPEN_LABEL: Record<string, string> = {
-  github: "Open on GitHub",
-  ado: "Open in Azure DevOps",
-};
+/** A Space's own moves, on no other record. Retire and Remove read like the
+ *  vocabulary's Archive and Delete and are neither: Retire writes the Space's
+ *  `status: archive` through Config and moves no file; Remove un-declares the
+ *  Space and deletes nothing -- its folder and cards stay in the hub. */
+const SPACE_MOVES = defineRowMoves("space", {
+  enter: { word: "Go into", icon: ArrowEnterRegular },
+  connect: { word: "Connect", icon: LinkRegular },
+  retire: {
+    word: "Retire",
+    icon: HistoryRegular,
+    differentMove:
+      "RetireSpace writes the Space's status through Config; no file moves and nothing is stamped closed.",
+  },
+  remove: {
+    word: "Remove",
+    icon: SubtractCircleRegular,
+    differentMove:
+      "RemoveSpace un-declares the Space; its folder and every card in it stay in the hub.",
+  },
+});
 
 /** The row's frame: name, kind, where you are, the line, and the door. */
 function FoyerRow({
@@ -127,37 +144,32 @@ function FoyerRow({
   // the connect wizard (/connect/<slug>) is the core's, and the same door the
   // How-do-I list opens.
   if (space.status !== "active" && space.status !== "archive") {
-    secondary.push({
-      icon: <LinkRegular />,
-      label: `Connect ${name}`,
-      onClick: () => navigate(`/connect/${space.slug}`),
-    });
+    secondary.push(
+      SPACE_MOVES.connect.action({
+        detail: name,
+        onClick: () => navigate(`/connect/${space.slug}`),
+      }),
+    );
   }
   // The end of its life: Retire keeps it declared and archived, Remove
   // un-declares it -- its folder and cards stay either way.
   for (const action of spaceLifecycleActions(space, here)) {
     secondary.push(
       action === "retire"
-        ? {
-            icon: <ArchiveRegular />,
-            label: `Retire ${name}`,
+        ? SPACE_MOVES.retire.action({
+            detail: name,
             onClick: () => onLifecycle(space, "RetireSpace"),
-          }
-        : {
-            icon: <SubtractCircleRegular />,
-            label: `Remove ${name}`,
+          })
+        : SPACE_MOVES.remove.action({
+            detail: name,
             onClick: () => onLifecycle(space, "RemoveSpace"),
-          },
+          }),
     );
   }
-  const openLabel = space.tracker ? OPEN_LABEL[space.tracker] : undefined;
-  if (space.org && openLabel) {
-    secondary.push({
-      icon: <OpenRegular />,
-      label: openLabel,
-      href: space.org,
-      dividerBefore: secondary.length > 0,
-    });
+  // The Space's address on its tracker: the external link, last.
+  const tracker = trackerName(space.tracker);
+  if (space.org && tracker) {
+    secondary.push(ROW.external.action({ detail: tracker, href: space.org }));
   }
   return (
     <Card className={styles.row} size="small" appearance="outline">
@@ -187,12 +199,11 @@ function FoyerRow({
           ) : null}
         </div>
         <CardActions
-          primaryAction={{
-            icon: <ArrowEnterRegular />,
-            label: here ? `Open ${name}` : `Go into ${name}`,
+          primaryAction={(here ? ROW.open : SPACE_MOVES.enter).action({
+            detail: name,
             onClick: enterSpace,
             disabled: switching,
-          }}
+          })}
           menuLabel={`Actions for ${name}`}
           secondaryActions={secondary}
         />
@@ -409,6 +420,7 @@ export function FoyerCard() {
           ) : undefined
         }
         footerRight={<CreateButton label="New Space" onClick={() => setAdding(true)} />}
+        footNote={<HubSyncLine />}
       >
         {outcome ? (
           <StatusMessage status="success" onDismiss={() => setOutcome(null)}>

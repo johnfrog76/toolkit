@@ -31,6 +31,8 @@ function global:New-P20GrowthItem {
         [string]$Hours,
         [string]$Notes,
         [string]$Close,
+        [string]$Complete,
+        [switch]$WhatIf,
         [switch]$Help
     )
     $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'NewGrowth'
@@ -71,6 +73,23 @@ function global:Publish-P20WorkReview {
     # -Preview emits JSON for the agent; same reason as above, no re-report.
     & "$($pkgRoot)/Scripts/Update-Review.ps1" @PSBoundParameters
     if (-not $Preview) { Write-ToolkitLog -Type CMD -Source $inv.Name -Detail 'ok' }
+}
+
+function global:Set-P20WorkReview {
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0)][string]$Review,
+        [switch]$Archive,
+        [switch]$Delete,
+        [switch]$WhatIf,
+        [switch]$Help
+    )
+    $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'WorkReview'
+    if ($Help) { Show-CommandHelp 'WorkReview'; return }
+    $pkgRoot = (Get-P20ModuleState).PackageRoot
+    $move = if ($Delete) { 'delete' } else { 'archive' }
+    Invoke-ToolkitScript -Path "$($pkgRoot)/Scripts/Set-WorkReview.ps1" -Parameters $PSBoundParameters `
+        -Name $inv.Name -Prefix $inv.Prefix -Detail "$move $Review"
 }
 
 function global:Write-P20PeerReviewLog {

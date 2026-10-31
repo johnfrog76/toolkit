@@ -424,7 +424,7 @@ button opens `shared/ConfirmDialog` -- the owner's sketch: "Are you sure?", the 
 ("Close issue #N."), Cancel (secondary) and Submit (primary), the house dismiss top right -- and
 only Submit runs the verb. `ActionDialog.resolve.test.tsx` holds it: Cancel and the dismiss run
 nothing, Submit runs it once. `ConfirmDialog` is the shared shape for any act worth a second
-thought, and the only one: the list's and the board's archive, a growth item's Retire and a
+thought, and the only one: the list's and the board's archive, a growth item's Archive and a goal's Complete, and a
 meeting's Close all ask through it (see "One grammar for dialogs and row actions").
 
 `cliBridge.test.ts` asserts the exact array for each, so a flag renamed in either `.ps1` fails a
@@ -438,12 +438,12 @@ flow card actions etc"), converged on this:
 
 - **A row: one exposed action, the menu for the rest.** `shared/CardActions` draws the exposed action
   as a flat button and EVERY other action in the `...` menu -- even when there is only one, so every
-  row reads the same. The exposed action goes somewhere in the app (Open the issue, View goal, Open review,
-  View resume); where the tracker has no page of ours for the thing -- an ADO work item or PR -- it is
-  the tracker's page; a reminder has no page, so it is the act it exists for, **Done**. The external
-  link is LAST in the menu, behind a divider. The trigger's name is `Actions for <the row's title>`.
-  Rows on it: the card list and board (`CardActionMenu`), the Issues tab, My PRs, Goals, reviews, the
-  resume, Reminders.
+  row reads the same. The exposed action goes somewhere in the app (Open the card, Open the issue, Open
+  the goal, Open the review, Open the resume); where the tracker has no page of ours for the thing -- an
+  ADO work item or PR -- it is the tracker's page; a reminder has no page, so it is the act it exists
+  for, **Archive**. The external link is LAST in the menu, behind a divider. The trigger's name is
+  `Actions for <the row's title>`. Every word, icon and tooltip comes from one vocabulary --
+  [One vocabulary for row actions](#one-vocabulary-for-row-actions).
 - **A card that makes something has one +.** `shared/CreateButton`: the footer's subtle **+**, its
   tooltip and accessible name at once, and its words are the title of the dialog it opens -- New
   Growth Item, New 1:1, New Reminder, Generate Review, New ADO Item or **New GitHub Issue** on a gh
@@ -459,6 +459,95 @@ flow card actions etc"), converged on this:
   verb runs; `message` shows a stated refusal in place, and the dialog stays open.
 
 `CardActions.test.tsx`, `ConfirmDialog.test.tsx`, `RetireGoal.test.tsx` and `MyWork.test.tsx` pin it.
+
+### One vocabulary for row actions
+
+The same move reads the same on every page: one word, one icon, one tooltip. `shared/CardActions.tsx`
+defines each standard move once, in `ROW`, and every row's menu in the product builds its actions from
+those entries -- `ROW.archive.action({ onClick })`, `ROW.external.action({ detail: "GitHub", href })`.
+`CardAction.move` is required, so an action typed by hand does not compile. A detail, where the move
+takes one, follows the word: **Open the note**, **Archive as shipped**, **Move to In Progress**,
+**Copy reference**, **Open on Azure DevOps**.
+
+| Move | Word | Icon | Tooltip |
+| --- | --- | --- | --- |
+| `open` | Open *the thing* | `DocumentTextRegular` | Open {detail} here, in ToolKit -- inside the product, never another site |
+| `archive` | Archive *(as what, where there are two)* | `ArchiveRegular` | Move it to the archive, stamped closed |
+| `complete` | Complete | `CheckmarkRegular` | Mark it complete |
+| `delete` | Delete *the thing* | `DeleteRegular` | Delete {detail} for good |
+| `move` | Move to *where* | `ArrowRightRegular` | Move it to {detail} |
+| `copy` | Copy *what* | `CopyRegular` | Copy the {detail} to the clipboard |
+| `external` | Open on *the system's name* | `OpenRegular` | Open it on {detail}, outside ToolKit |
+
+Where each one is drawn: **Open** -- the card (list and board), an issue, a design's note, spec,
+document and thread, a goal, a review, the resume, a prompt, the Space you are in, a deck's page. **Archive** -- a
+goal (it said Retire), a deck on this machine (its page; `deck.archived` through `Config`, the deck
+file untouched), a reminder (it said Done; the verb is `Reminders <id> -Archive`), a card's Done
+lane (**Archive (move to Done)**), and a hub design, **Archive as shipped** and **Archive as dropped**
+(it said Drop), a review (`WorkReview <review> -Archive`; at once, no confirm), and a product design
+on the Design tab, where this machine names the Space's checkout. **Complete** -- a hub design's
+spec, a product design's on the same terms, and a goal that is not complete yet (row and page).
+**Delete** -- a card's cover (it said Remove cover; the picture is deleted), and a review, **Delete
+the review** (`WorkReview <review> -Delete`, behind `shared/ConfirmDialog` naming the range and the
+Spaces). **Move to** -- a card's lanes. **Copy** -- a prompt's reference and
+text. **Open on** -- every row's link out, whatever it said before (Open in ADO, Open in Azure
+DevOps, Open the thread on GitHub, Its history on GitHub). The verbs behind the menus keep their
+names: a goal's Archive still runs `NewGrowth -Close`, and its Complete runs `NewGrowth -Complete`.
+
+**The order is one rule.** The row's one exposed action first, the record's own moves next, the external
+link last. The last is the component's: an action built from `ROW.external` is drawn at the end of the
+menu behind a divider whatever order it was given in. Where the record has no page in ToolKit -- an
+Azure DevOps work item, a pull request -- the external link IS the exposed action, and the menu does
+not repeat it.
+
+**A module's own moves** are declared once, in a `defineRowMoves("<record>", { ... })` table beside the
+row that draws them, and listed here. Two kinds, both named:
+
+- **A move on one kind of record only** keeps its own word and icon (snoozing a reminder, graduating a
+  design).
+- **A move that is a different thing** keeps its different word even where it sounds like a vocabulary
+  move, and says why in `differentMove`: retiring a Space writes its `status: archive` through
+  `Config` and moves no file, so it is not an archive; removing a Space un-declares it and deletes
+  nothing, so it is not a delete; closing an issue or resolving a work item happens on the tracker, and
+  nothing in ToolKit completes.
+
+| Move | Word | Icon | Kind | Where |
+| --- | --- | --- | --- | --- |
+| `card.createPr` | Create PR | `ArrowUploadRegular` | one record | a card, list and board |
+| `card.markNotBillable` | Mark not billable | `MoneyRegular` | one record | a card |
+| `card.makeBillable` | Make billable again | `MoneyRegular` | one record | a card |
+| `card.remind` | Remind me about this | `AlertRegular` | one record | a card, while organize is on |
+| `cover.replace` | Replace cover | `ImageEditRegular` | one record | a card's cover, on its page |
+| `cover.addBefore` | Add before | `ImageAddRegular` | one record | a card's cover |
+| `cover.replaceBefore` | Replace before | `ImageAddRegular` | one record | a card's cover |
+| `pr.fetchComments` | Fetch PR comments | `CommentRegular` | one record | My PRs |
+| `issue.makeCard` | Make a card | `DocumentAddRegular` | one record | the Issues tab |
+| `issue.close` | Close issue | `CheckmarkCircleRegular` | different move: it closes the issue on GitHub | the Issues tab |
+| `issue.resolve` | Resolve Work Item | `CheckmarkCircleRegular` | different move: it resolves the work item on Azure DevOps | the Issues tab |
+| `issue.pin` | Pin on *the tracker* | `PinRegular` | one record | the Issues tab |
+| `issue.unpin` | Unpin | `PinOffRegular` | one record | the Issues tab |
+| `reminder.snooze` | Snooze: *when* | `SnoozeRegular` | one record | Reminders |
+| `reminder.edit` | Edit | `EditRegular` | one record | Reminders |
+| `deck.play` | Play | `PlayRegular` | one record | a deck, its row's menu and its page's exposed action |
+| `deck.unarchive` | Unarchive | `ArchiveArrowBackRegular` | one record | a deck's page, once it is archived on this machine |
+| `resume.generate` | Generate resume scaffold | `AddRegular` | one record | the resume |
+| `resume.howItWorks` | How resume updates work | `InfoRegular` | one record | the resume |
+| `design.graduate` | Graduate to a spec | `HatGraduationRegular` | one record | a hub design (Studio), and a product design (the Design tab) where its Space's checkout is named |
+| `design.promote` | Promote | `ShareRegular` | one record | a design note's page |
+| `space.enter` | Go into *the Space* | `ArrowEnterRegular` | one record | the Studio's Spaces |
+| `space.connect` | Connect *the Space* | `LinkRegular` | one record | the Studio's Spaces |
+| `space.retire` | Retire *the Space* | `HistoryRegular` | different move: a status written through `Config`, no file moved | the Studio's Spaces |
+| `space.remove` | Remove *the Space* | `SubtractCircleRegular` | different move: un-declared, nothing deleted | the Studio's Spaces |
+
+Completing a goal is not on this list yet: a goal's row offers Open and Archive today.
+
+**Adding to it.** A new standard move is an entry in `ROW`, a synonym list in `ROW_SYNONYMS` and a row in
+the first table. A module's new move is an entry in its `defineRowMoves` table and a row in the second.
+`shared/rowVocabulary.test.ts` reads every source file under `src/` and fails on an action typed by
+hand; on an own move whose word is a vocabulary word, or a synonym of one (Retire, Drop, Done, Remove,
+View...) without `differentMove`; on an own move wearing a vocabulary icon; on one word on two records'
+tables (it belongs in the vocabulary); and on either table here disagreeing with the source. It also
+runs itself over rows written wrong on purpose, so the check cannot quietly stop checking.
 
 ### Every sentence says where you are and what you are looking at
 
@@ -482,6 +571,10 @@ defect, not a style question. What the pass settled, beside the intro lines and 
 - **The settings and system surfaces.** The Environment card names the hub and its cards
   (**Hub folder**, **Hub is writable**, **Hub git history**, **Settings files**, **Cards in this Space**), and its tracker row wears the Space's tracker
   (**GitHub**, **Azure DevOps**, or **Tracker** on a Space with none);
+  its **Store sync** row is `HubSyncRow.tsx` -- under `git`, ahead and behind and **Sync the hub**, one
+  fetch when the page opens; under `none`, what carries the folder -- and the cards that write into the
+  hub share one foot line, `HubSyncLine.tsx`, through `PageCard`'s `footNote`, both worded by `hubSync.ts`
+  (`docs/CONFIGURATION.md`, "Syncing the hub from the web app");
   its badge's sentence names the tracker too ("this Space's GitHub answered", never "az CLI, and ADO" on gh;
   `envBadge.ts`, shared with the Build card). The drawer's Configuration says "the Space you are working
   in", not "the active org"; the Space's address is the **Tracker address**, its status hint names both trackers, and sprint awareness speaks of a
@@ -955,17 +1048,18 @@ are prompts, and agile lanes are a better view for how multiple items flow for h
   travels one way"), and `laneHint(lane)` under each heading says who puts a card there. No optimistic
   update: the file is the record, and the board is one more thing that writes a line.
 - **One action model for a card, in both views.** What a card offers is ONE pure
-  function, `cardActions(card, { adoEnabled, cliPrefix, laneLabel })` in `modules/ado/cardActions.ts`, and
-  ONE renderer, `CardActionMenu.tsx`, which gives each answer an icon and a handler and hands it to
-  `shared/CardActions`. The Home list's row and the board's card both draw it, so they cannot offer
+  function, `cardActions(card, { adoEnabled, cliPrefix, laneLabel })` in `modules/ado/cardActions.ts`, which
+  names each answer's move from the vocabulary, and ONE renderer, `CardActionMenu.tsx`, which gives each
+  answer a handler and hands it to `shared/CardActions`. The Home list's row and the board's card both draw it, so they cannot offer
   different things; the board keeps no `Menu` of its own. It answers on three axes -- the card's
   kind (`linked`), its state (the lane, `pr_url`, `commits`) and whether Azure DevOps is in use (`/env`
   `ado.enabled`) -- with the rule `sendButton.ts` draws: **absent** when the action cannot apply to this
   card at all, **disabled with a reason** (`CardAction.whyNot`, drawn as the menu item's `secondaryContent`
-  and in the exposed button's tooltip) when it applies but not yet. The primary is *Open in ADO*, absent on a
-  card with no work item and whenever ADO is off. The menu: *Move to* each lane ahead (from `legalMoves`;
-  the lanes behind are present, disabled, "A card travels one way."), *Move to Done (archive)* -- which
-  asks first, in both views -- then *Create PR*, the billable toggle and *Open the card*. **Create PR** is
+  and in the exposed button's tooltip) when it applies but not yet. The primary is *Open the card*. The
+  menu: *Move to* each lane ahead (from `legalMoves`; the lanes behind are present, disabled, "A card
+  travels one way."), *Archive (move to Done)* -- which asks first, in both views -- then *Create PR*, the
+  billable toggle, *Remind me about this* while organize is on, and last *Open on GitHub* or *Open on
+  Azure DevOps*, absent on a card with no work item and whenever ADO is off. **Create PR** is
   absent with ADO off, on a card with no work item and on a Done card; disabled while the file records no
   commit bullet ("thread them with `{prefix}ThreadHash` first" -- `commits` is served by the agent, and a
   `**Started:**` line is not a commit) or when a `PR URL:` is already there; otherwise it opens the Create
@@ -1089,11 +1183,11 @@ Deck's README for the engine itself. What matters to the shell:
 | | |
 | --- | --- |
 | `feature` | `"deck"` |
-| `routes` | `/deck/:deckId`, `/deck/:deckId/notes`, `/decks` -- every element is `lazy`, so no deck code is in the first load |
+| `routes` | `/deck/:deckId` (the player), `/deck/:deckId/notes`, `/decks`, and `/decks/:deckId` (a deck's page: what its file says, **Play**, and this machine's **Archive**, written as `deck.archived` through `Config`) -- every element is `lazy`, so no deck code is in the first load. The strings are `modules/deck/paths.ts`, the one file the descriptor imports statically |
 | `nav` | one entry, **Decks**, and it is `hidden` while growth is on |
 | `slotCards.growth` | the launcher card. **This is how it appears under the Growth tab**: `GrowthPage` renders `useShellSlot("growth")` and imports nothing from `modules/deck`. One module on another's page, neither importing the other |
 | `slotCards["home-banner"]` | the first-run banner: Introducing ToolKit's first slide IS the banner (the Wasteland's home hero without the carousel), with **Get Started** bottom right and a label-less close **x** top right -- only while `/env`'s `config.firstRunWelcome` is true. Home (`modules/ado/routes.tsx`) renders `useShellSlot(HOME_BANNER_SLOT)` above its tabs; the name is `shell/slots.ts`, a file that imports nothing, because a module that read it from `registry.ts` would read it before the registry had run. `homeBanner.test.tsx` holds the gate |
-| `chromeless` | `/deck/*` -- the shell draws no nav bar, no padding and no background around a deck. `isChromeless` only counts a module that is ON, so a flagged-off module cannot strip the chrome |
+| `chromeless` | `/deck/*` (the player, not a deck's page under `/decks/`) -- the shell draws no nav bar, no padding and no background around a deck. `isChromeless` only counts a module that is ON, so a flagged-off module cannot strip the chrome |
 
 With growth off nobody renders the `growth` slot, which is why the module carries a tab of its own:
 a flag that shows nothing when it is on was the defect this module was filed over.
@@ -1497,7 +1591,8 @@ paragraph:
 | `src/modules/communication/sendButton.test.ts` | The send button's three states -- including that it is **absent** rather than disabled when the workflow has no send, and that what goes out is the Agenda and never the self-assessment |
 | `src/modules/growth/registry.growth.test.tsx` | The registry contract from growth's side: off contributes no route, nav entry or card; on contributes its three routes and its one nav entry, and no home cards of its own |
 | `src/modules/communication/registry.communication.test.tsx` | The same from communication's side: off contributes nothing; on contributes exactly its seven routes, including the three redirects |
-| `src/modules/ado/cardActions.test.ts` | What a card offers in the list and on the board, as a table: an ADO card and a card with no work item at every state, with Azure DevOps on and off -- every action present, which are disabled, and each one's reason. Absent is not disabled: Open in ADO and Create PR are absent where they can never apply, and Create PR is disabled, naming `ThreadHash`, while no commit is recorded |
+| `src/modules/ado/cardActions.test.ts` | What a card offers in the list and on the board, as a table: an ADO card and a card with no work item at every state, with Azure DevOps on and off -- every action present, which are disabled, and each one's reason. Absent is not disabled: Open on the tracker and Create PR are absent where they can never apply, and Create PR is disabled, naming `ThreadHash`, while no commit is recorded |
+| `src/shared/rowVocabulary.test.ts` | One vocabulary for every row's menu: reads every source file and fails on a row action typed by hand, an own move that is a vocabulary move under another word or wears its icon, a word on two records, and a README that disagrees -- and proves it on rows written wrong on purpose ([One vocabulary for row actions](#one-vocabulary-for-row-actions)) |
 | `src/modules/ado/logChart.test.ts` | The Log card's chart puts the oldest day on the left whatever order the agent serves entries in, and its badge says `latest 500` only when the answer was cut at the cap and nothing narrows it |
 | `src/modules/ado/promptFilters.test.ts` | The predicates the list and the board share: state, sprint, text -- an exact id, a substring, the words in any order and never a typo -- type with Untyped inside All, the type row counted from the cards, and the unlinked cards a repo filter hid; and linkedness as a table: All / Linked / Custom over ADO-born, GitHub-born and custom cards, composed with the other filters, counted from the cards, and when the row is drawn -- a mixed Space, never an all-custom or all-linked one unless a filter is active |
 | `src/modules/ado/TrackerBadge.test.tsx` | The card's tracker chip as a table: `github` wears **gh**, `ado` wears **ado**, and `none`, an absent field (an older agent) or an unknown word wear nothing |

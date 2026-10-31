@@ -302,6 +302,22 @@ class TheRouteServesTheModel(unittest.TestCase):
         local.write_text(json.dumps({**patch, "firstRun": {"welcome": True}}), encoding="utf-8")
         self.assertIs(self.client.get("/api/env").json()["config"]["firstRunWelcome"], True)
 
+    def test_env_carries_the_decks_put_away_on_this_machine(self):
+        """deck.archived: the decks this machine has put away, by id (docs/modules/deck.md,
+        "A deck's page"). None unless this machine said so; a list of ids is served in
+        order, each once; anything that is not a list of strings reads as none."""
+        self.assertEqual(self.client.get("/api/env").json()["config"]["deckArchived"], [])
+        local = Path(self.cfg.name) / "config.local.json"
+        patch = json.loads(local.read_text(encoding="utf-8"))
+        for written, served in [
+            (["the-toolkit"], ["the-toolkit"]),
+            (["a", "b", "a", " ", 3], ["a", "b"]),
+            ("the-toolkit", []),
+            (None, []),
+        ]:
+            local.write_text(json.dumps({**patch, "deck": {"archived": written}}), encoding="utf-8")
+            self.assertEqual(self.client.get("/api/env").json()["config"]["deckArchived"], served, written)
+
     def test_env_carries_the_wip_limit_and_only_a_real_one(self):
         """limits.inPlay: unset is null (no line, the opt-in rule); a whole number of 1
         or more is served as is; zero, negative, text and a bool are no limit. A line

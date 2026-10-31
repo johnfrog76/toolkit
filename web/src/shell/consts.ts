@@ -39,6 +39,8 @@ export const STAMPS = consts.stamps as {
   billable: string;
   /** Who takes a card with no issue behind it: `**Assigned:** me`, or a size (D-AR10). */
   assigned: string;
+  /** The meeting record an agenda line came from: `**From:** <series>-YYYY-MM-DD` (NewPrompt -From). */
+  from: string;
   /** A person's In Progress and Code Review -- for a card with nothing checked in, or no pull request. */
   started: string;
   review: string;

@@ -23,20 +23,15 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
-import {
-  ArrowRightRegular,
-  CommentRegular,
-  DocumentTextRegular,
-  NotebookRegular,
-  OpenRegular,
-} from "@fluentui/react-icons";
-import { CardActions } from "../../shared/CardActions";
+import { CommentRegular, NotebookRegular } from "@fluentui/react-icons";
+import { CardActions, ROW } from "../../shared/CardActions";
 import type { CardAction } from "../../shared/CardActions";
 import { CardSpinner } from "../../shared/CardSpinner";
 import { CreateButton } from "../../shared/CreateButton";
 import { DialogDismiss } from "../../shared/DialogDismiss";
 import { EmptyState } from "../../shared/EmptyState";
 import { PageCard } from "../../shared/PageCard";
+import { HubSyncLine } from "../ado/HubSyncLine";
 import { Pagination } from "../../shared/Pagination";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { StatusMessage } from "../../shared/StatusMessage";
@@ -130,29 +125,24 @@ function DesignRow({
   const main = primaryPath(design);
   const secondary: CardAction[] = [];
   if (design.note && design.spec) {
-    secondary.push({
-      icon: <DocumentTextRegular />,
-      label: "Open the spec",
-      onClick: () => navigate(notePath(design.spec!.path)),
-    });
+    secondary.push(
+      ROW.open.action({ detail: "the spec", onClick: () => navigate(notePath(design.spec!.path)) }),
+    );
   }
   // The moves a hub row offers (L3): by what the design has and where it is.
   const roads = roadsFor(design);
   roads.forEach((road, i) => {
-    secondary.push({
-      icon: <ArrowRightRegular />,
-      label: ROADS[road].label,
-      onClick: () => onMove(road),
-      dividerBefore: i === 0 && secondary.length > 0,
-    });
+    secondary.push(
+      ROADS[road].move.action({
+        detail: ROADS[road].detail,
+        onClick: () => onMove(road),
+        dividerBefore: i === 0 && secondary.length > 0,
+      }),
+    );
   });
   if (design.thread) {
-    secondary.push({
-      icon: <OpenRegular />,
-      label: "Open the thread on GitHub",
-      href: design.thread,
-      dividerBefore: secondary.length > 0,
-    });
+    // The thread lives on GitHub: the external link, last.
+    secondary.push(ROW.external.action({ detail: "GitHub", href: design.thread }));
   }
   return (
     <Card className={styles.row} size="small" appearance="outline">
@@ -179,11 +169,10 @@ function DesignRow({
         </div>
         {main ? (
           <CardActions
-            primaryAction={{
-              icon: <DocumentTextRegular />,
-              label: design.note ? "Open the note" : "Open the spec",
+            primaryAction={ROW.open.action({
+              detail: design.note ? "the note" : "the spec",
               onClick: () => navigate(notePath(main)),
-            }}
+            })}
             menuLabel={`Actions for ${design.title}`}
             secondaryActions={secondary}
           />
@@ -403,6 +392,7 @@ export function DesignsCard() {
           ) : undefined
         }
         footerRight={<CreateButton label="New Design Note" onClick={() => setOpen(true)} />}
+        footNote={<HubSyncLine />}
       >
         {outcome ? (
           <StatusMessage status="success" onDismiss={() => setOutcome(null)}>

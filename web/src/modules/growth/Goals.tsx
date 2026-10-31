@@ -22,10 +22,9 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
-import { ArchiveRegular, ArrowRightRegular } from "@fluentui/react-icons";
-import { RetireGoalDialog } from "./RetireGoal";
+import { GoalActions } from "./GoalActions";
 import { DialogDismiss } from "../../shared/DialogDismiss";
-import { CardActions } from "../../shared/CardActions";
+import { ROW } from "../../shared/CardActions";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { PageCard } from "../../shared/PageCard";
 import { CreateButton } from "../../shared/CreateButton";
@@ -123,7 +122,6 @@ export function isUntitledGrowthItem(title: string, filename: string): boolean {
 function GoalCard({ item }: { item: GrowthItem }) {
   const styles = useStyles();
   const navigate = useNavigate();
-  const [retireOpen, setRetireOpen] = useState(false);
   const isTraining = item.type === "training";
   const dueLabel = item.due_date ? `Due: ${item.due_date}` : item.date || null;
   const noRealTitle = isUntitledGrowthItem(item.title, item.filename);
@@ -155,28 +153,14 @@ function GoalCard({ item }: { item: GrowthItem }) {
             {dueLabel && <Caption1>{dueLabel}</Caption1>}
           </div>
         </div>
-        <CardActions
-          primaryAction={{
-            icon: <ArrowRightRegular />,
-            label: "View goal",
+        <GoalActions
+          item={item}
+          primaryAction={ROW.open.action({
+            detail: "the goal",
             onClick: () => navigate(`/growth/goals/${encodeURIComponent(item.filename)}`),
-          }}
-          menuLabel={`Actions for ${item.title}`}
-          secondaryActions={[
-            {
-              icon: <ArchiveRegular />,
-              label: "Retire",
-              onClick: () => setRetireOpen(true),
-            },
-          ]}
+          })}
         />
       </div>
-      <RetireGoalDialog
-        filename={item.filename}
-        title={item.title}
-        open={retireOpen}
-        onOpenChange={setRetireOpen}
-      />
     </Card>
   );
 }

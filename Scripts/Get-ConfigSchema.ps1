@@ -129,6 +129,11 @@ function Get-P20AliasFieldSchema {
     return $fields
 }
 
+function Get-P20SpaceCheckoutHelp {
+    # One help line for spaceCheckouts.<slug>.path, the row and its matches.
+    return 'Where this Space''s own repository is checked out on THIS machine: a folder inside a clone whose origin is the Space''s repository (absolute, or under ~). The Design tab''s rows then move the product''s designs there through MoveDesign -Space, staged and never committed. This machine''s only -- never hub.json, which other machines read.'
+}
+
 function Get-P20StartWorkPromptHelp {
     # One help line for a startWork.prompts row, named or the pattern.
     param([string]$Kind)
@@ -218,6 +223,7 @@ function Get-P20ConfigSchema {
     $rows += New-P20SchemaRow -Key 'menuResetTimestamp' -Scope 'machine' -Type 'string' -Help 'When the menu''s usage scores last started over, yyyy-MM-ddTHH:mm:ss local time: the menu counts only the commands used since. Menu -Reset writes it; a value that is not a date is named and ignored.'
     $rows += New-P20SchemaRow -Key 'isDemoDismissed' -Scope 'machine' -Type 'bool' -Help "Hide the shipped demo Spaces (example: true -- Demo, the GitHub demo, the Azure demo) from the orgs you pick from -- the web's switcher and Settings, SwitchOrg Status. Nothing is removed from config, and the org you are in is always shown."
     $rows += New-P20SchemaRow -Key 'firstRun.welcome' -Scope 'machine' -Type 'bool' -Help "The Home banner that offers the deck Introducing ToolKit. Start sets it true; Get Started or Dismiss sets it false, and then it is gone for good. Shown only while the deck module is on."
+    $rows += New-P20SchemaRow -Key 'deck.archived' -Scope 'machine' -Type 'array' -Help 'The decks this machine has put away, by deck id, as a JSON array. The Decks card leaves them out of its default list and shows them under its archived filter; the deck file is never edited. The deck page''s Archive writes it.'
     $rows += New-P20SchemaRow -Key 'web.agentPort' -Scope 'machine' -Type 'int' -Help 'The port the agent listens on and the web half proxies to.'
     $rows += New-P20SchemaRow -Key 'web.corsOrigins' -Scope 'machine' -Type 'array' -Help 'Dev-server origins allowed to call the agent, as a JSON array. Empty accepts the two defaults (5173, 5174).'
     $rows += New-P20SchemaRow -Key 'limits.inPlay' -Scope 'machine' -Type 'int' -Help 'How many cards in play (current/, every lane) before Status and the board say so: a whole number of 1 or more. A line the product says, never a gate -- nothing refuses and nothing is hidden. Unset: no line.'
@@ -229,6 +235,11 @@ function Get-P20ConfigSchema {
     foreach ($field in (Get-P20AliasFieldSchema)) {
         $rows += New-P20SchemaRow -Key "aliases.<name>.$($field.key)" -Scope 'machine' -Type $field.type -Help $field.help
     }
+
+    # A Space's checkout on this machine, as a PATTERN keyed by the Space's
+    # slug: a path is personal, so it is machine-scoped like a shortcut's and
+    # never the hub's (Scripts/Resolve-SpaceCheckout.ps1).
+    $rows += New-P20SchemaRow -Key 'spaceCheckouts.<slug>.path' -Scope 'machine' -Type 'path' -Help (Get-P20SpaceCheckoutHelp)
 
     # StartWork's prompt table (the Team Agile add-on): one row per kind the
     # shipped config names, read from it rather than listed here, and a pattern
@@ -415,6 +426,19 @@ function Resolve-P20SchemaKey {
         }
         $f = $match[0]
         $result.Row = New-P20SchemaRow -Key $key -Scope 'machine' -Type $f.type -Help $f.help
+        return $result
+    }
+
+    # A Space's checkout: spaceCheckouts.<slug>.path, machine-scoped. The slug
+    # is NOT returned as Slug -- that would make the write a Space field, which
+    # goes to hub.json -- and the verb checks it names a declared Space.
+    if ($key -like 'spaceCheckouts.*') {
+        $parts = $key.Split('.')
+        if ($parts.Count -ne 3 -or -not $parts[1] -or $parts[2] -ne 'path') {
+            $result.Reason = "'$key' is not a checkout setting. The shape is spaceCheckouts.<slug>.path -- for example spaceCheckouts.toolkit.path."
+            return $result
+        }
+        $result.Row = New-P20SchemaRow -Key $key -Scope 'machine' -Type 'path' -Help (Get-P20SpaceCheckoutHelp)
         return $result
     }
 

@@ -135,9 +135,9 @@ so it is absent there. A flag answered `false` reads exactly as one never set.
 
 The board's card and the list's row draw one action model (`cardActions.ts`), so this holds for both:
 
-| Organize | A card's `...` ends with |
+| Organize | A card's own moves in its `...` end with (the link out, where there is one, comes after, last) |
 | --- | --- |
-| off, or not configured | **Open the card** -- no reminder item, and nothing of Organize is fetched |
+| off, or not configured | the billable toggle, **Mark not billable** -- no reminder item, and nothing of Organize is fetched |
 | on | **Remind me about this**: Organize's New Reminder dialog, the card's title as what and its id as the ref (`docs/modules/organize.md`, "The web UI") |
 
 ### The board's lanes, by a card's status (`scenarios.test.tsx`; the rule is `legalMoves.ts`)
@@ -191,6 +191,19 @@ and the count ignores the board's filters. `Status` opens with the same line (`d
 | 5 | 4 | `in play 4`, quiet |
 | 5 | 5 | `in play 5`, quiet |
 | 5 | 7 | `in play 7 of 5`, **amber** |
+
+### The Decks card, by what this machine has archived (`scenarios.test.tsx`; the rules `deckList.test.ts`, the render `DeckPickerCard.archive.test.tsx`)
+
+`deck.archived` is a machine list of deck ids, written by a deck's page (**Archive**, **Unarchive**)
+through `Config` and served by `/env` as `config.deckArchived`; the deck files are never edited
+(`docs/modules/deck.md`, "A deck's page"). With the deck module on, the two shipped decks, both
+Complete, so no state chip is drawn in any row:
+
+| `deck.archived` | The Decks card lists | Its chips | Under **archived** |
+| --- | --- | --- | --- |
+| unset (the shipped config) | Introducing ToolKit, the Trailer | none | -- (no chip) |
+| `["the-toolkit"]` | the Trailer alone; the header counts 1 | **All 1 · archived 1** | Introducing ToolKit, whose page says `archived on this machine` |
+| both ids | nothing: `Every deck is archived on this machine -- the archived filter shows them.` | **All 0 · archived 2** | both |
 
 ### The settings drawer's "How do I…" (settings by workflow; `HowDoI.test.tsx`)
 

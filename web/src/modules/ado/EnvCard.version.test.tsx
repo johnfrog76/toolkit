@@ -25,6 +25,10 @@ jest.mock("../../shell/api", () => ({
     isFetching: false,
   }),
   useRefreshEnvMutation: () => [jest.fn(), { isLoading: false }],
+  useCheckHubSyncMutation: () => [jest.fn(), { isLoading: false }],
+}));
+jest.mock("./api.ado", () => ({
+  useRunCommandMutation: () => [jest.fn(), { isLoading: false }],
 }));
 
 describe("the Environment card's version line", () => {

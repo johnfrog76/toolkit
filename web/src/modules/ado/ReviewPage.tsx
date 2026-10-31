@@ -68,6 +68,8 @@ export function ReviewPage() {
   const { folder: folderParam } = useParams<{ folder?: string }>();
   const [searchParams] = useSearchParams();
   const slugs = searchParams.get("slugs") ?? undefined;
+  // An archived review's row links with ?archived=true: it lives in reviews/archive/.
+  const archived = searchParams.get("archived") === "true";
 
   const { data, isLoading, isFetching, isError, refetch } = useGetReviewPreviewQuery();
   const [runCommand, { isLoading: isCommitting }] = useRunCommandMutation();
@@ -80,7 +82,7 @@ export function ReviewPage() {
     data: reviewDetail,
     isLoading: detailLoading,
     isFetching: detailFetching,
-  } = useGetReviewDetailQuery({ folder: activeFolder!, slugs }, { skip: !activeFolder });
+  } = useGetReviewDetailQuery({ folder: activeFolder!, slugs, archived }, { skip: !activeFolder });
 
   const commit = async (noPush: boolean) => {
     setCommitResult(null);

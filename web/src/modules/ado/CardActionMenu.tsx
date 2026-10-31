@@ -1,17 +1,6 @@
-import type { ReactElement } from "react";
-import {
-  AlertRegular,
-  ArchiveRegular,
-  ArrowRightRegular,
-  ArrowUploadRegular,
-  DocumentTextRegular,
-  MoneyRegular,
-  OpenRegular,
-} from "@fluentui/react-icons";
 import { CardActions } from "../../shared/CardActions";
 import type { CardAction } from "../../shared/CardActions";
 import { useGetEnvQuery } from "../../shell/api";
-import { STATUS } from "../../shell/consts";
 import type { PromptInfo } from "./api.ado";
 import { cardActions } from "./cardActions";
 import type { CardActionContext, CardActionSpec } from "./cardActions";
@@ -20,8 +9,9 @@ import type { Lane } from "./legalMoves";
 
 // The ONE renderer of a card's actions -- the list's row and the board's card
 // both draw this. It decides nothing: cardActions.ts says what is offered,
-// disabled and why; this gives each answer an icon and a handler and hands it
-// to shared/CardActions.
+// disabled and why, and which move each one is; this gives each answer its
+// handler and hands it to shared/CardActions, which draws the move's word,
+// icon and tooltip.
 
 /** What the action model needs from `/env`: is Azure DevOps in use, and the prefix. */
 export function useCardActionContext(): CardActionContext {
@@ -47,23 +37,6 @@ export interface CardActionHandlers {
   onRemind?: () => void;
 }
 
-function iconFor(spec: CardActionSpec): ReactElement {
-  switch (spec.id) {
-    case "open-ado":
-      return <OpenRegular />;
-    case "open-card":
-      return <DocumentTextRegular />;
-    case "billable":
-      return <MoneyRegular />;
-    case "create-pr":
-      return <ArrowUploadRegular />;
-    case "remind":
-      return <AlertRegular />;
-    default:
-      return spec.to === STATUS.done ? <ArchiveRegular /> : <ArrowRightRegular />;
-  }
-}
-
 function toCardAction(spec: CardActionSpec, h: CardActionHandlers): CardAction {
   const onClick =
     spec.id === "open-card"
@@ -77,15 +50,16 @@ function toCardAction(spec: CardActionSpec, h: CardActionHandlers): CardAction {
             : spec.id === "move" && spec.to
               ? () => h.onMove(spec.to!)
               : undefined;
-  return {
-    icon: iconFor(spec),
-    label: spec.label,
+  // The word, icon and tooltip are the move's (shared/CardActions ROW, or the
+  // card's own CARD_MOVES); nothing here names an action.
+  return spec.move.action({
+    detail: spec.detail,
     href: spec.href,
     disabled: spec.disabled,
     whyNot: spec.whyNot,
     dividerBefore: spec.dividerBefore,
     onClick: spec.disabled ? undefined : onClick,
-  };
+  });
 }
 
 interface CardActionMenuProps extends CardActionHandlers {

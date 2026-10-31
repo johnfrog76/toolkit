@@ -88,14 +88,33 @@ space: toolkit
 | frontmatter `id:` | `NewDesign` at birth -- a UUID v4, lowercase, hyphenated (`consts.json` `design.idKey` and `design.idRegex`); `StampDesign` for a file that has none. The first frontmatter line. Never changed once written | **the design's identity** (design lifecycle L1): it travels with the note when it is promoted into a repo, and a spec carries the SAME id as the note it graduated from -- that is the pairing, not the stem. The Design tab and the hub drawer group by it and show its first eight characters. **A file with no id is not a design**: it is counted (`notShown`, reason `no id`) and not shown. Two notes with one id, or two specs, are a conflict: all of them counted, none shown, the reason naming the id |
 | frontmatter `description:` | `NewDesign -Description` -- one line, in double quotes; a `"` in it is written as `'` | the line under the title in the list. The note's line is the row's when there is a note; a spec standing alone lends its own |
 | frontmatter `space:` | `NewDesign -Space <slug>` -- a declared Space; absent when none is named | the Space the note is for: its chip in the list, and where Promote files the thread |
-| `# Title` | `NewDesign -Title` | the first `#` heading after the frontmatter; no heading, the file name |
+| `# Title` | `NewDesign -Title` | the title, by the rule under this table: a leading `#` heading, else the line under `## Title`, else the file name |
 | `> GitHub: <issue url>` | `NewItem -FromDesign` (Promote), after the title, through `Write-CardText` | the design's THREAD (`consts.json` `studio.threadRegex`): the issue's number and repo. Read from the note first, the spec when the note has none. Absent means not promoted yet, and a note published without it reads the same |
-| `> Docs: <path>` | on a SPEC, by `MoveDesign -To Complete` (L3) | where the durable part landed, shown on a Complete row (`consts.json` `design.docsLine`) |
+| `> Docs: <path>` | on a SPEC, by `MoveDesign -To Complete` (L3), from `-Doc <path>` -- a path that must already exist. Where it is looked for follows where the design is: in a repository, that repository; `-Hub` alone, the hub; **`-Hub -Space <slug>`, the Space's own repository, not the hub** -- the hub holds the design, the product's repository holds its docs. That repository is the one the Space's address names (`spaces[].org`, or its one `projects[]` repo), found on this machine as a clone whose `origin` is that repository: the Space's configured checkout (`spaceCheckouts.<slug>.path`) first, then the folder you stand in, then the nav shortcuts' paths (`aliases.<Name>.path`), then `<wsRoot>/<repo>` (the machine's `wsRoot`, where code repositories are checked out). A `-Doc` missing from that clone is refused, naming the repository and where it is checked out; with no clone here (or a Space whose address names no single GitHub repository) there is nothing to check against, so the path is taken as written and one `Note:` line says why | where the durable part landed, shown on a Complete row (`consts.json` `design.docsLine`) |
 | the headings | the template, `templates/DesignNote.template.md` | nothing -- they are for the person writing |
 | `**Created:**` | `NewDesign`, the day it ran | nothing yet |
 | `**Closed:** yyyy-MM-dd` | the move verb, when a file enters an archive folder, through `Add-ClosedStamp.ps1` | a FACT, not a state: the date on a Complete (the spec's) or Archived (the note's) design |
 | `**Outcome:** shipped` or `dropped` | the move verb, on a note archived WITHOUT a spec (`consts.json` `stamps.outcome`, `design.outcomes`) | a fact, read only on an Archived design: a deck design that shipped as written, or an idea that never made it. Any other word, or none, reads as plain Archived |
 | `## Journey` | the move verb, one dated line per move (L3, D-DL18) | nothing -- a record a person reads, never state |
+
+### How the title is read
+
+A note's or a spec's title -- what the list, the drawer and the reading room show it as -- is read from
+the text after the frontmatter, in this order:
+
+1. **The first heading, when it is level one.** `# Board ideas` before any other heading is the title,
+   which is what `NewDesign` writes. A `#` line that comes AFTER any other heading is a sentence in the
+   body, not the title, and is passed over.
+2. **Else the first non-empty line after the first `## Title` heading** -- the shape the studio's design
+   contract template writes, the heading on one line and the title on the next. When that line is itself
+   a heading (an empty Title section), there is no title here.
+3. **Else the file's name**, `gym-llm-workouts.md`.
+
+A heading is a line of one to six `#` and then a space or a tab (or nothing). The frontmatter is never
+read for a title. Both halves implement the rule -- `Get-P20DesignTitle` in
+`Scripts/Read-DesignTree.ps1` and `doc_title` (through `parse_doc`) in `agent/ado/design.py`, which the
+hub drawer and a repo's Design tab both read through -- and `Tests/fixtures/design/titles.json` pins it
+row for row from both suites (`tkTestToolkit -Design`, `Tests/test_design.py`).
 
 ## State -- derived, never stored
 
@@ -145,7 +164,10 @@ Design, Spec, Complete, Archived -- with Complete and Archived collapsed to a co
 searched. A row is the design: its title, description, state, short id and thread chip, and under them the
 cards worked against it -- each its id and state, opening the card when it is in this Space's `current/`,
 named only when it is archived or another Space's; a Complete row's `Docs:` line opens the document it names in the Docs tab (on the Hub Designs card, when the design names the Space you are in, else it is a caption); in Spec and Complete the repo's row opens the spec with
-the note in its menu. A card names its design with `{cliPrefix}NewPrompt -Design <name|id>`. The archive is read in the same room as
+the note in its menu. A hub row's menu carries its road's moves (`MoveDesign -Hub`); a repo's row carries the same
+moves where this machine names the Space's checkout (`spaceCheckouts.<slug>.path`), staged in that clone by
+`MoveDesign -Space <slug>` and never committed -- and where it does not, the tab's foot names the setting
+([Studio](../modules/studio.md), "The web UI"). A card names its design with `{cliPrefix}NewPrompt -Design <name|id>`. The archive is read in the same room as
 a live note, with its Closed date and outcome. No `design/` at all: the empty state says what the four
 folders would give and links here (**Learn more**). Files with no id: one line under the list, counted,
 naming `StampDesign` (or `StampDesign -Hub`) and linking here. Never inference, never a blank (D-DL11).

@@ -318,6 +318,27 @@ try {
     [void](Invoke-Config $box @('-Set', 'aliases.Bowling.display=false'))
     Assert-Contains 'display false is kept when set on purpose' (Get-LocalConfigText $box) '"display": false'
 
+    # A Space's checkout (spaceCheckouts.<slug>.path, #146): this machine's, so
+    # config.local.json and never hub.json; keyed by a Space that exists; one
+    # shape. And -List names the Space you are in, so the drawer has its field.
+    $checkout = Invoke-Config $box @('-Set', 'spaceCheckouts.azure-demo.path=/somewhere/clone')
+    Assert-Equal 'a Space''s checkout is accepted' 0 $checkout.ExitCode
+    Assert-Contains 'and written to config.local.json' (Get-LocalConfigText $box) '/somewhere/clone'
+    Assert-True 'and not to hub.json' ((Get-HubText $box) -notlike '*/somewhere/clone*') (Get-HubText $box)
+    $checkoutHub = Invoke-Config $box @('-Set', 'spaceCheckouts.azure-demo.path=/elsewhere', '-Hub')
+    Assert-Equal '-Hub with a checkout is refused' 2 $checkoutHub.ExitCode
+    Assert-Contains 'saying it is never hub.json''s' $checkoutHub.Output 'never to hub.json'
+    $checkoutSlug = Invoke-Config $box @('-Set', 'spaceCheckouts.nowhere.path=/x')
+    Assert-Equal 'a checkout for a Space nobody declared is refused' 2 $checkoutSlug.ExitCode
+    Assert-Contains 'naming the slug' $checkoutSlug.Output "'nowhere' is not a Space this machine knows"
+    $checkoutShape = Invoke-Config $box @('-Set', 'spaceCheckouts.azure-demo=/x')
+    Assert-Equal 'a checkout key without its field is refused' 2 $checkoutShape.ExitCode
+    Assert-Contains 'naming the shape' $checkoutShape.Output 'spaceCheckouts.<slug>.path'
+    $checkoutList = Invoke-Config $box @('-AsJson')
+    Assert-Contains '-List names the active Space''s checkout row' $checkoutList.Output 'spaceCheckouts.azure-demo.path'
+    [void](Invoke-Config $box @('-Unset', 'spaceCheckouts.azure-demo.path'))
+    Assert-True '-Unset removes it' ((Get-LocalConfigText $box) -notlike '*/somewhere/clone*') (Get-LocalConfigText $box)
+
     # Several pairs in one call: -Set cannot be repeated, so this is the shape --
     # typed in a shell, where PowerShell splits the comma into an array. (Through
     # -File the same text arrives as ONE element; a batch there is the JSON form.)

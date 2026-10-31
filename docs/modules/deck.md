@@ -57,6 +57,7 @@ are a chunk the browser fetches when a deck is shown, never part of the first lo
 | | |
 | --- | --- |
 | **The launcher** | a **Decks** card on the **Growth** page -- a presentation is a growth item, and a deck is what a presentation produces. With growth off, the module has a **Decks** tab of its own |
+| **A deck's page** | `/decks/<id>`, inside the shell: what the deck file says about it, **Play**, and this machine's **Archive** -- "A deck's page", below. A click on a row of the Decks card opens it |
 | **A deck** | `/deck/<id>`, full screen: the Toolkit's nav bar is not drawn around it. **Exit** goes back where you came from |
 | **The podium** | `/deck/<id>?present=1` -- presenter mode: notes in a second window (`/deck/<id>/notes`), the deck window silent |
 | **The landing page** | Introducing ToolKit plays on the GitHub Pages landing page too, from the same engine and baked clips, whatever `features.deck` says: the page is not part of the app, so no flag applies to it ([`web/README.md`, "The landing page"](../../web/README.md#the-landing-page)) |
@@ -108,6 +109,37 @@ The poster is `SlidePoster` (`web/src/modules/deck/SlidePoster.tsx`, also the Wa
 a real slide rendered at its native 1280x720 and scaled to cover its box. The banner is lazy, like the
 rest of the module, so a machine that has dismissed it never downloads it.
 
+## A deck's page
+
+Between the Decks card and the player sits a page for each deck, `/decks/<id>`, in the shape of every
+other detail page here: the page card, the back arrow and the title on the left (with a `deck` chip,
+its state, and `archived on this machine` when it is), the controls on the right, and the body. The
+body is read from the deck file and nothing else: its **summary**, its **state** (the studio's four:
+draft, in progress, complete, archive), its **tags**, its **slide count**, its **running time** (the
+same estimate the card's clock chip shows) and the path of its **played copy**,
+`web/src/modules/deck/decks/<id>.tsx` -- a deck file is named for its id, and `deckList.test.ts` holds
+that for every file in `decks/`.
+
+**Play** is the page's one exposed action and opens the player, unchanged. Its `...` holds
+**Archive**, and on an archived deck **Unarchive** in its place.
+
+**Archive is this machine's, not the deck's.** The decks are built in the studio and shipped here as
+files, so nothing in the product edits one -- not its state, not its tags, not its summary. Archive
+adds the deck's id to `deck.archived`, a machine setting in `config.local.json`, through
+`PUT /api/config` -> `Config -Set`, the one writer ([`docs/CONFIGURATION.md`](../CONFIGURATION.md),
+"`deck.archived`"); Unarchive takes it out, and the last one out unsets the key. `/env` serves the list
+as `config.deckArchived`, `tkConfig -List` shows it, and Settings names it **Archived decks**. A deck
+archived this way leaves the Decks card's default list and sits under its **archived** filter; its
+page says so. A deck whose own `state` is `archive` is a different thing -- the studio's word for it
+-- and stays in the default list under that state's chip.
+
+**The Decks card's row** keeps its title, its slide count, its running time and its state chip. A click
+anywhere on it opens the page; its exposed action is **Open the deck**, and its `...` holds **Play**.
+The vocabulary puts a row's link out last (`web/README.md`, "One vocabulary for row actions"), and a
+deck has none: the `Deck` type carries no address of its own (`project` picks the player's giveaway
+repository, which is the engine's and not the deck's), so neither shipped deck has an **Open on**
+entry, and none is drawn disabled in its place.
+
 ## Where the decks are made
 
 Not here. The Toolkit's decks are **built, reviewed, fixed and baked in the Wasteland studio**
@@ -124,10 +156,11 @@ The two copies are kept byte-identical; edit the studio's, then copy.
   of the public bundle. The Toolkit publishes nothing: there is **one** registry,
   `web/src/modules/deck/decks/index.ts`, and nothing reads those two fields. They stay on the type
   so a deck file ports unchanged. `state` -- draft, in progress, complete, archive -- means what it
-  always did, and the launcher filters on it -- **only once two decks are in different states.**
-  With every registered deck in the same state the row would offer four choices that all show the
-  same thing, so `DeckPicker` counts distinct states in play and hides the row rather than showing
-  a filter that filters nothing.
+  always did, and the launcher filters on it -- **only once two decks in its list are in different
+  states.** With every listed deck in the same state the row would offer four choices that all show
+  the same thing, so `DeckPicker` counts distinct states in play and hides them rather than showing
+  a filter that filters nothing. The **archived** chip follows the same rule: it is drawn once a deck
+  is archived on this machine (`deckList.ts` holds both, `deckList.test.ts` is the table).
 - **Audience is the default mode.** Presenter-as-default suits an engine with a live narration service,
   where the notes window does the talking. The Toolkit has no such service; its voices are baked
   files, which the audience path plays.

@@ -82,7 +82,7 @@ table; this is the shape of it:
 
 | Scope | Keys | Goes to |
 | --- | --- | --- |
-| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `web.agentPort`, `web.corsOrigins`, `limits.inPlay`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display` | `config.local.json`, created as a sparse patch if it is not there |
+| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `web.agentPort`, `web.corsOrigins`, `limits.inPlay`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display`, `spaceCheckouts.<slug>.path` | `config.local.json`, created as a sparse patch if it is not there |
 | **org** | `spaces.<slug>.name` / `.status` / `.orgType` / `.org` / `.tenant` / `.promptsFolder` / `.projects` / `.howIWork` / `.features.sprintAwareness` / `.features.suggestions` / `.features.trainingHoursPerQuarter` | the hub's `hub.json` -- or `config.local.json`'s `spaces.<slug>` patch with **`-Local`** |
 | **hub** | `storeSync`, `folders.<name>` | the hub's `hub.json`, and only with **`-Hub`** |
 | **default** | `commands`, `workItemTypes`, `cliVersion`, `managerWorkflow` | nowhere. These are the team's, and a `-Set` on one is refused by name |
@@ -269,6 +269,53 @@ config file, and a build that asked for the port would refuse.
   it, so a hub kept in sync across two machines needs no per-machine switch. The order is the orgs'
   order -- `config.default.json`, then the hub's `hub.json`, then `config.local.json` -- so a
   machine that must never push sets `none` here and leaves the hub alone.
+  Under `git` the web app syncs too: [Syncing the hub from the web app](#syncing-the-hub-from-the-web-app).
+
+## Syncing the hub from the web app
+
+Under `storeSync: git` every write the web app makes into the hub is already a commit, the same as
+the command line's, and the one step left is the push and the pull -- `{prefix}Sync`. The web app takes
+that step with the same verb, and says how far the hub is from its remote. Two states, the inventory's
+`storeSync` row (`{prefix}Env`, "Optional surfaces"): **on** for `git`, **off** for anything else. There
+is no "not configured": the shipped config answers `none`.
+
+**The System page's Environment card** has a **Store sync** row, whose Change link opens the setting.
+
+- **on** (`git`): the row says how far the hub is from its remote, and **Sync the hub** runs the `Sync`
+  verb through the bridge (`POST /api/cmd/Sync`) and shows what the verb printed, in its own words --
+  what was pulled and pushed, or its refusal when the pull conflicts or the remote cannot be reached. A
+  conflict is not resolved from the browser: the verb aborts the rebase and leaves the hub as it was, and
+  the terminal resolves it.
+- **off** (`none`): the row says the hub syncs by whatever carries its folder -- a synced drive, a
+  share -- and draws no button and no numbers.
+
+**Ahead and behind are not known the same way.**
+
+- **Ahead** is local -- the commits this clone has that its remote-tracking branch does not -- and needs
+  no network. `/api/env` reports it in `hubSync.ahead`, read by `Scripts/Get-HubSyncState.ps1` and held
+  for 45 seconds, the tier probe's window; the bridge forgets it after any verb runs, so a write is
+  counted on the next read.
+- **Behind** is known only after a `git fetch`, so it is always shown with the time of that fetch:
+  `behind by 2, checked 10:42`. Before the first fetch the card says **not checked against the remote
+  yet** -- never "in step", which only a fetch can say. A fetch happens in two places and nowhere else:
+  **once when the System page opens**, and **as part of Sync the hub**. Nothing fetches on a timer.
+  The fetch is `POST /api/hub-sync/check` (`?refresh=1` from Sync the hub); a second opening inside 45
+  seconds of the last fetch is answered from it.
+- **A failed fetch keeps what was known.** The last count and its time stay on screen, and the card says
+  the latest check failed, with git's own sentence -- a remote unreachable for a minute does not wipe a
+  count that was true a minute ago.
+
+Every git call this makes is the CLI half's -- `Scripts/Get-HubSyncState.ps1`, through
+`Invoke-P20TrackerRead` -- so it reads the same on Windows PowerShell 5.1 as on 7. The hub must be the
+root of its repository, the same question `Sync` asks before it writes; a hub with no upstream branch
+says so in git's words.
+
+**The foot line.** The cards that write into the hub -- the Studio's **Spaces** and **Hub Designs**,
+**Reminders**, and the **Reviews** -- draw one shared line at their foot while the hub is ahead or
+behind, or has not been checked, or its last check failed: `The hub is ahead by 1 and behind by 2,
+checked 10:42. Sync on the System page`. It is absent under any `storeSync` but `git`, and absent once a
+fetch has found the hub in step. It only **reads** the state `/api/env` already carries; it never asks
+for a fetch of its own.
 
 ## `spaces[].features.trainingHoursPerQuarter` -- the quarter's training requirement
 
@@ -296,6 +343,39 @@ hides a card -- "limit doesn't mean slow it down, it means more focus." The web 
 under "Optional surfaces" as `WIP limit`: `on` with the number, `not configured` while it is unset. The
 shipped file carries an empty `limits` block and nothing in it.
 
+## `spaceCheckouts.<slug>.path` -- a Space's checkout on this machine
+
+Where a Space's own repository is cloned **on this machine**: `tkConfig -Set spaceCheckouts.toolkit.path=~/Repos/toolkit`,
+or the **This Space's checkout** row in Settings (the drawer lists the Space you are in; another Space's is set by
+its key). A folder anywhere inside the clone will do; the path is absolute or starts with `~`. Keyed by the
+Space's slug, and the slug must be a declared Space.
+
+**It is this machine's, and only ever this machine's.** It is written to `config.local.json` and nowhere else:
+`-Hub` with it is refused, and a `spaceCheckouts` block in `config.default.json` or `hub.json` is read by
+nobody. The hub syncs between machines whose clones of the same repository sit in different folders, so a path
+in `hub.json` would be wrong everywhere but where it was typed.
+
+**What it turns on.** The Design tab reads a product's `design/` and `spec/` from GitHub, so its rows could only
+open a design, never move one -- a move is a `git mv` in a clone. With a checkout named, and its `origin` the
+Space's repository, a product design's menu offers the same moves a hub design's does (**Graduate to a spec**,
+**Archive as shipped**, **Archive as dropped**, **Complete**), each running `MoveDesign -Space <slug>` through
+the bridge. The verb **stages the move in that clone and never commits**: a product's history is the engineer's.
+The dialog shows what was staged and the commit line the verb suggests, and the tab re-reads -- though a row
+moves only once the commit is pushed, because the tab reads GitHub ([Known gaps](KNOWN-GAPS.md)).
+
+**One resolver.** `Resolve-P20SpaceCheckout` (`Scripts/Resolve-SpaceCheckout.ps1`) is the one thing that finds a
+Space's clone, and this setting is its first candidate, before the folder you stand in and the nav shortcuts'
+paths -- so `MoveDesign -Hub -Space <slug> -To Complete` checks `-Doc` in the configured checkout too. A
+candidate counts only when its `origin` names the Space's repository; a setting that points at another clone is
+passed over and said. The agent asks the same question of the configured path alone for the Design tab
+(`agent/core/checkout.py`, on every `GET /api/design`, as `checkout`), and never searches; the path and
+origin rules are one table both halves assert, `Tests/fixtures/space-checkout/table.json`.
+
+Unset, a product row keeps its one link out, **Open on GitHub**, and the Design tab's foot names this setting;
+set to a folder that is not a clone of the Space's repository, the foot says why. `tkEnv` lists it under
+"Optional surfaces" as `Space checkouts`: `on` with how many are set and where the Space you are in is,
+`not configured` while none is. Its question is `How do I move a product's designs from the Design tab?`.
+
 ## `spaces[].laneNames` -- what this org calls its lanes
 
 Five org fields, display only: `laneNames.backlog`, `.active`, `.inProgress`, `.codeReview`, `.done`. The board and
@@ -317,6 +397,17 @@ as `config.firstRunWelcome`. It shows only while the deck module is on. `tkConfi
 firstRun.welcome=true` brings the banner back, and so does turning off **Hide Overview Deck** in Settings,
 which draws this key inverted. [`docs/modules/deck.md`](modules/deck.md), "The first-run
 banner".
+
+## `deck.archived` -- the decks this machine has put away
+
+A machine setting: a JSON array of deck ids, empty in the shipped config. A deck's page puts a deck
+away with **Archive** and brings it back with **Unarchive**, each one `PUT /api/config` -> `Config -Set`
+through the bridge, and the Decks card leaves the decks on the list out of its default list and shows
+them under its **archived** filter. The deck file is never edited: a deck's own `state` is the studio's,
+and this list is only where this machine keeps the ones it is done with. `/env` serves it as
+`config.deckArchived`; Settings shows it as **Archived decks**. By hand:
+`tkConfig -Set '{"deck.archived":["the-toolkit"]}'`, and `tkConfig -Unset deck.archived` clears it.
+[`docs/modules/deck.md`](modules/deck.md), "A deck's page".
 
 ## `features.studio` -- retired: the Studio has no switch
 

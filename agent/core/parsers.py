@@ -26,6 +26,7 @@ from .consts import (
     re_started_line,
     stamp_assigned,
     stamp_billable,
+    stamp_from,
     status_active,
     status_backlog,
     status_code_review,
@@ -194,6 +195,19 @@ def card_assigned(content: str) -> str:
     return m.group(1) if m else ""
 
 
+def card_from_record(content: str) -> str | None:
+    """The meeting record the card came from: the value of its first ``**From:**``
+    line, trimmed -- the record's file stem, ``<series>-YYYY-MM-DD`` or the bare
+    date for the 1:1 -- else None (no line, or an empty one).
+
+    ``NewPrompt -From`` writes it when an agenda line becomes a card
+    (docs/modules/communication.md). The one reader of ``stamps.from`` in this
+    half; ``Tests/fixtures/parsers/from-lines.json`` is its table, the same shape
+    as the ``**Assigned:**`` one."""
+    m = re.search(r"(?m)^" + re.escape(stamp_from()) + r"[ \t]*([^\r\n]*?)[ \t]*\r?$", content or "")
+    return (m.group(1) or None) if m else None
+
+
 def card_milestone(content: str) -> str:
     """The milestone a card names: its first ``**Sprint:**`` line's value, WHOLE and
     trimmed -- never the card model's ``sprint``, which keeps the last path segment
@@ -222,7 +236,7 @@ def card_tags(content: str) -> list[str]:
 def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES, folder: str = "") -> dict:
     """Extract the file-content-derived fields of PromptInfo.
 
-    Returns a dict with keys: title, type, name, linked, tracker, billable, assigned, sprint, progress,
+    Returns a dict with keys: title, type, name, linked, tracker, billable, assigned, from_record, sprint, progress,
     checked, total, ado_url, pr_url, previous_round, design, commits, status -- the content half of the Card
     model (docs/hub/cards.md, "The model, as the agent serves it"). ``id`` comes from the FILENAME
     (``card_id``), so the caller adds it. Fields that need filesystem access (file
@@ -299,6 +313,9 @@ def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES, folder:
         "billable": card_billable(content),
         # Who takes it: the **Assigned:** line's value (me, or a size), "" for nobody.
         "assigned": card_assigned(content),
+        # The meeting record an agenda line came from: the **From:** line's
+        # record stem, None when the card names none (NewPrompt -From writes it).
+        "from_record": card_from_record(content),
         "sprint": sprint,
         "progress": progress,
         "checked": checked,

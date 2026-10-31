@@ -470,6 +470,36 @@ Write-Host "RESOLVED-STORESYNC=`$(`$global:P20Config.StoreSync)"
     return (pwsh -NoProfile -Command $command 2>&1 | Out-String)
 }
 
+function Invoke-SyncWrapperInModule {
+    <# Same shape as Invoke-SyncInModule, but through the VERB
+       (Sync-P20Prompts), not the raw script -- so a failed pull or push is
+       read by Invoke-ToolkitScript, the one place the double-block bug (KVK7)
+       could reappear: a script that exits non-zero without having called
+       Write-CliError gets the wrapper's own generic "Error: exit code <n>"
+       block printed on top of whatever the script already said. Also prints
+       the process's own exit code, which the raw-script helper above has no
+       reason to read. #>
+    param($Sandbox, [string]$LocalJson)
+
+    $localPath = Join-Path $Sandbox.Pkg 'config.local.json'
+    for ($attempt = 1; $attempt -le 20; $attempt++) {
+        try { Set-Content -Path $localPath -Value $LocalJson -Encoding UTF8; break }
+        catch {
+            if ($attempt -eq 20) { throw }
+            Start-Sleep -Milliseconds 250
+        }
+    }
+    $modulePath = Join-Path $Sandbox.Pkg 'utilities.psm1'
+    $command = @"
+`$ErrorActionPreference = 'SilentlyContinue'
+Remove-Item Env:PROMPTS_ROOT -ErrorAction SilentlyContinue
+Import-Module '$modulePath' -Force -DisableNameChecking *>`$null
+Sync-P20Prompts *>&1 | ForEach-Object { Write-Host `$_ }
+Write-Host "SYNC-EXITCODE=`$LASTEXITCODE"
+"@
+    return (pwsh -NoProfile -Command $command 2>&1 | Out-String)
+}
+
 function Get-RemoteSubjects {
     param([string]$Remote)
     Push-Location $Remote
@@ -534,6 +564,104 @@ catch {
     Assert-True "the cases ran to the end without a terminating error -- $($_.Exception.Message)" $false
 }
 finally { Remove-SyncSandbox $rs.Base }
+
+Write-Host ""
+
+# ── Test 6: A failed pull states the refusal once (KVK7) ─────────────────────
+#
+# Through the WRAPPER (Sync-P20Prompts), not the raw script -- Test 5 above
+# never exercises Invoke-ToolkitScript, so it could not have caught this. The
+# old code left `git pull --rebase`'s failing exit code (128) as the script's
+# own exit code with no Write-CliError call, so the guard read it as "a
+# failure that said nothing" and printed its own generic "Error: exit code
+# 128" block on top of Sync's Write-Warning -- two messages where AGENTS.md's
+# refusal contract wants one. The fix calls Write-CliError and exits 2, so the
+# guard logs the stated reason and prints nothing more.
+
+Write-Host "── A failed pull states the refusal once ──────────────" -ForegroundColor Cyan
+
+$hubJson6 = '{ "hub": 1, "storeSync": "git", "spaces": [ { "slug": "test", "name": "Test", "status": "local", "promptsFolder": "test" } ] }'
+$rs6 = New-RemoteSandbox -HubJson $hubJson6
+try {
+    # Point origin at a path that is not a git repository at all, so
+    # `git pull --rebase` fails fast (fatal, exit 128) with no network and no
+    # race to arrange -- the repro's own wording: "whose remote cannot be
+    # reached".
+    Push-Location $rs6.Hub
+    try { git remote set-url origin (Join-Path $rs6.Base 'does-not-exist.git') 2>&1 | Out-Null }
+    finally { Pop-Location }
+
+    $output = Invoke-SyncWrapperInModule -Sandbox $rs6 -LocalJson "{ `"promptsRoot`": `"$($rs6.Hub -replace '\\', '/')`" }"
+
+    Assert-Contains "Sync names the failed pull" $output "git pull --rebase failed in"
+    Assert-Contains "and says nothing was synced" $output 'nothing was synced'
+    Assert-Contains "and hints at the next step" $output 'Resolve the conflict in a terminal'
+    Assert-Contains "exits 2, the stated-refusal code" $output 'SYNC-EXITCODE=2'
+    Assert-True "exactly one Error: block" (@([regex]::Matches($output, 'Error:')).Count -eq 1)
+    Assert-True "no generic exit-code block on top" ($output -notmatch 'Error: exit code \d+')
+    Assert-True "and no Log -Errors hint from the generic block" ($output -notmatch 'Log -Errors')
+}
+catch {
+    Assert-True "the cases ran to the end without a terminating error -- $($_.Exception.Message)" $false
+}
+finally { Remove-SyncSandbox $rs6.Base }
+
+Write-Host ""
+
+# ── Test 7: A failed push states the refusal once (KVK7) ─────────────────────
+#
+# Same bug, the push side: `git push`'s own exit code, with no Write-CliError
+# call, reached the guard as an unstated failure. Needs a remote that accepts
+# a fetch (the pull step, with nothing to rebase) but rejects a push, so a
+# read-only bare repo stands in for "push failed, pull already went through".
+# chmod-based read-only is not reliable on Windows, so this half skips there --
+# a skip is not a pass, and Test 6 above already proves the fix on every host.
+
+Write-Host "── A failed push states the refusal once ──────────────" -ForegroundColor Cyan
+
+$onWindowsForSync = ($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows
+if (-not (Get-Command chmod -ErrorAction SilentlyContinue) -or $onWindowsForSync) {
+    Write-Host "  SKIP  failed-push case -- chmod read-only is not reliable on this host" -ForegroundColor Yellow
+}
+else {
+    $hubJson7 = '{ "hub": 1, "storeSync": "git", "spaces": [ { "slug": "test", "name": "Test", "status": "local", "promptsFolder": "test" } ] }'
+    $rs7 = New-RemoteSandbox -HubJson $hubJson7
+    try {
+        # A local change so pull --rebase has nothing to do (already up to
+        # date) and the only thing left to fail is the push.
+        Write-FixtureText (Join-Path $rs7.Hub 'test/current/local-card.md') '# local'
+        Push-Location $rs7.Hub
+        try {
+            git add -A 2>&1 | Out-Null
+            git commit -m 'local change before push' --quiet 2>&1 | Out-Null
+        }
+        finally { Pop-Location }
+
+        & chmod -R a-w $rs7.Remote
+        try {
+            $output = Invoke-SyncWrapperInModule -Sandbox $rs7 -LocalJson "{ `"promptsRoot`": `"$($rs7.Hub -replace '\\', '/')`" }"
+        }
+        finally {
+            & chmod -R u+w $rs7.Remote
+        }
+
+        Assert-Contains "the pull above went through" $output 'Syncing prompts repo'
+        Assert-Contains "Sync names the failed push" $output "git push failed in"
+        Assert-Contains "and says the pull went through but nothing was pushed" $output 'went through but nothing was pushed'
+        Assert-Contains "and hints at checking the remote" $output 'Check the remote and your network'
+        Assert-Contains "exits 2, the stated-refusal code" $output 'SYNC-EXITCODE=2'
+        Assert-True "exactly one Error: block" (@([regex]::Matches($output, 'Error:')).Count -eq 1)
+        Assert-True "no generic exit-code block on top" ($output -notmatch 'Error: exit code \d+')
+        Assert-True "and no Log -Errors hint from the generic block" ($output -notmatch 'Log -Errors')
+    }
+    catch {
+        Assert-True "the cases ran to the end without a terminating error -- $($_.Exception.Message)" $false
+    }
+    finally {
+        & chmod -R u+w $rs7.Remote 2>$null
+        Remove-SyncSandbox $rs7.Base
+    }
+}
 
 Write-Host ""
 

@@ -350,6 +350,118 @@ class ARepoVerbDoesNotActOnTheToolkit(unittest.TestCase):
         self.assertNotIn("toolkit-branch", body["output"])
 
 
+class CreatePrRunsInTheCardsOwnCheckout(unittest.TestCase):
+    """The browser's Create PR, through the bridge, on a GitHub board: the bridge
+    still runs the verb in the Toolkit's checkout, and NewPR finds the card's own
+    checkout -- a clone of the board's repository at ``<wsRoot>/<repo>`` -- and
+    works from there. The card names no branch, so the branch can only be the
+    checkout's, which leads back to the card. ``-WhatIf`` stops before anything
+    is called; ``gh`` is a stub on PATH that fails every call, so nothing reaches
+    GitHub either.
+    """
+
+    def setUp(self):
+        if not HAVE_PWSH or not shutil.which("git") or os.name == "nt":
+            self.skipTest("needs pwsh, git and a POSIX shell for the gh stub")
+        self._tmp = tempfile.TemporaryDirectory()
+        root = Path(self._tmp.name)
+        self.pkg = root / "pkg"
+        self.pkg.mkdir()
+        for name in ("utilities.psm1", "config.default.json", "consts.json"):
+            shutil.copy(PKG_ROOT / name, self.pkg / name)
+        for folder in ("Scripts", "Config", "Prompt20Toolkit", "templates"):
+            shutil.copytree(PKG_ROOT / folder, self.pkg / folder)
+        (self.pkg / "agent" / "ado").mkdir(parents=True)
+        shutil.copy(bridge.BRIDGE_PS1, self.pkg / "agent" / "ado" / "bridge.ps1")
+
+        hub = root / "hub"
+        (hub / "widgets" / "current").mkdir(parents=True)
+        (hub / "hub.json").write_text(
+            json.dumps(
+                {
+                    "hub": 1,
+                    "spaces": [
+                        {
+                            "slug": "widgets",
+                            "name": "Widgets",
+                            "status": "active",
+                            "promptsFolder": "widgets",
+                            "org": "https://github.com/acme/widgets",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        (hub / "widgets" / "current" / "TaskK7M2-a-widget.prompt.md").write_text(
+            "# Task K7M2: A widget\n\n**ADO Link:** (not linked)\n\n## Branch\n(TBD)\n\n"
+            "## Described Changes\n- The widget.\n",
+            encoding="utf-8",
+        )
+        ws = root / "ws"
+        (self.pkg / "config.local.json").write_text(
+            json.dumps({"promptsRoot": str(hub), "activeSpace": "widgets", "wsRoot": str(ws)}), encoding="utf-8"
+        )
+
+        def git(path, *args):
+            subprocess.run(
+                ["git", "-C", str(path), "-c", "user.name=t", "-c", "user.email=t@t", *args],
+                check=True,
+                capture_output=True,
+            )
+
+        # The Toolkit's checkout, on a branch that is nobody's card.
+        git(self.pkg, "init", "-q", "-b", "toolkit-branch")
+        git(self.pkg, "add", "-A")
+        git(self.pkg, "commit", "-q", "-m", "scratch")
+        # The card's own checkout, on the card's branch, never pushed.
+        clone = ws / "widgets"
+        clone.mkdir(parents=True)
+        git(clone, "init", "-q", "-b", "main")
+        git(clone, "remote", "add", "origin", "https://github.com/acme/widgets.git")
+        git(clone, "commit", "-q", "--allow-empty", "-m", "init")
+        git(clone, "checkout", "-q", "-b", "you/K7M2-a-widget")
+
+        stub = root / "bin"
+        stub.mkdir()
+        (stub / "gh").write_text("#!/bin/sh\necho 'gh: Not Found (HTTP 404)' >&2\nexit 1\n", encoding="utf-8")
+        (stub / "gh").chmod(0o755)
+
+        self._saved = (bridge._map_cache, bridge._map_key)
+        env = {k: v for k, v in os.environ.items() if not k.startswith("TEAMS_WEBHOOK_")}
+        for k in ("PROMPTS_ROOT", "WS_ROOT"):
+            env.pop(k, None)
+        env["PATH"] = str(stub) + os.pathsep + env.get("PATH", "")
+        self._patches = [
+            mock.patch.dict(os.environ, env, clear=True),
+            mock.patch.object(bridge, "REPO_ROOT", self.pkg),
+            mock.patch.object(bridge, "UTILITIES", self.pkg / "utilities.psm1"),
+            mock.patch.object(bridge, "BRIDGE_PS1", self.pkg / "agent" / "ado" / "bridge.ps1"),
+            mock.patch.object(bridge, "MODULE_COMMANDS_DIR", self.pkg / "Config"),
+            mock.patch.object(config, "DEFAULT_CONFIG_PATH", self.pkg / "config.default.json"),
+            mock.patch.object(config, "LOCAL_CONFIG_PATH", self.pkg / "config.local.json"),
+            mock.patch.object(bridge, "_map_cache", {}),
+            mock.patch.object(bridge, "_map_key", None),
+        ]
+        for p in self._patches:
+            p.start()
+
+    def tearDown(self):
+        for p in reversed(self._patches):
+            p.stop()
+        bridge._map_cache, bridge._map_key = self._saved
+        self._tmp.cleanup()
+
+    def test_newpr_by_id_works_from_the_cards_checkout(self):
+        body = client.post("/api/cmd/NewPR", json={"params": ["K7M2", "-WhatIf"]}).json()
+        out = body["output"]
+        self.assertEqual(body["status"], "success", body.get("error") or out)
+        self.assertRegex(out, r"In the card's code checkout: .*ws/widgets \(acme/widgets\)")
+        self.assertIn("Repo: acme / widgets", out)
+        self.assertIn("Branch: you/K7M2-a-widget -> ", out)
+        self.assertNotIn("toolkit-branch", out)
+
+
 class StartWorkThroughTheBridge(unittest.TestCase):
     """Team Agile's hand-off block (AR-1 of the agent in the room): the web's one
     call is ``POST /api/cmd/StartWork`` and no native route builds the block

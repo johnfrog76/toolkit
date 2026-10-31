@@ -14,6 +14,9 @@ jest.mock("./decks/index", () => ({
   ],
 }));
 jest.mock("./engine/deckDuration", () => ({ estimateDeckDuration: () => 60 }));
+jest.mock("../../shell/api", () => ({
+  useGetEnvQuery: () => ({ data: { config: { deckArchived: [] } } }),
+}));
 
 describe("the Decks card's filter", () => {
   it("is named Tag", () => {
