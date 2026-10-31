@@ -7,7 +7,7 @@ pydantic>=2.14.1
 # The model-assisted routes (suggest, rewrite) call the model through the
 # official SDK; agent/core/model.py imports it lazily, so an agent without it
 # still starts and declines those two routes by name.
-anthropic>=1.15.0
+anthropic>=2.3.0
 
 # Test-only dependencies live in requirements-dev.txt (pytest, httpx).
 # This file stays runtime-only -- the agent imports nothing from it.
