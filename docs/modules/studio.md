@@ -314,7 +314,7 @@ its rows move them where this machine names the Space's checkout -- `spaceChecko
 ([configuration](../CONFIGURATION.md#spacecheckoutsslugpath----a-spaces-checkout-on-this-machine)) -- and
 `GET /api/design`'s `checkout` says the folder is a clone of the Space's repository (`ready`). Then a row's menu
 carries **the same roads a hub design's row carries**, built the same way from the same entries (`ROADS` and
-`roadsFor` in `MoveDesignDialog.tsx`, which are the row vocabulary's `design.graduate`, `archive` and `complete`):
+`roadsFor` in `web/src/modules/ado/designRoads.ts`, which are the row vocabulary's `design.graduate`, `archive` and `complete`; they live in `ado` because the Design tab loads with the app, while the dialog that runs a road is a lazy part and loads when a road is first chosen):
 a live note alone **Graduate to a spec**, **Archive as shipped** and **Archive as dropped**; a live spec
 **Complete**; between the row's own **Open** entries and **Open on GitHub**, which stays last. A road opens the
 same dialog with the clone named ("staged there, never committed"), runs `MoveDesign <name> -To <road> -Space <slug>`
