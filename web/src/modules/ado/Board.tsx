@@ -33,7 +33,7 @@ import type { CardActionContext } from "./cardActions";
 import { billableOutcomeMessage, useBillableToggle } from "./useBillableToggle";
 import type { CommandResponse, PromptInfo } from "./api.ado";
 import { commandResultMessage } from "./cliBridge";
-import { laneHint, lanesFor, legalMoves } from "./legalMoves";
+import { laneFor, laneHint, lanesFor, legalMoves } from "./legalMoves";
 import { laneConfigKey, useLaneLabel } from "./laneNames";
 import { LaneLabelEditor } from "./LaneLabelEditor";
 import { TrackerBadge, trackerName } from "./TrackerBadge";
@@ -323,7 +323,7 @@ export function Board() {
 
   // Pinned cards first within a lane, each group in the order it had.
   const byLane = (lane: Lane) => {
-    const inLane = shown.filter((p) => p.status === lane);
+    const inLane = shown.filter((p) => laneFor(p.status, env?.tracker) === lane);
     return [...inLane.filter((p) => p.pinned), ...inLane.filter((p) => !p.pinned)];
   };
   const open = (p: PromptInfo) => navigate(cardPath(p.file));
@@ -535,7 +535,7 @@ export function Board() {
               </div>
               {!isDone ? (
                 <Caption1 className={mergeClasses(styles.quiet, styles.laneHint)}>
-                  {laneHint(lane)}
+                  {laneHint(lane, env?.tracker)}
                 </Caption1>
               ) : null}
               {isDone ? (

@@ -64,13 +64,23 @@ export function whyNotAMove(state: string, lane: Lane): string {
   return "A card travels one way.";
 }
 
+/** The lane a card is DRAWN in. A card's own status is what its file says; on an Azure DevOps
+ *  Space there is no Backlog lane, so a card that already sits in backlog/ -- written before
+ *  NewPrompt started ADO cards in play -- is drawn in the first lane, Active, and its file stays
+ *  where it is. Files outlive their templates: a change keeps reading what they already say. */
+export function laneFor(status: string, tracker?: string): string {
+  return tracker === "ado" && status === STATUS.backlog ? STATUS.active : status;
+}
+
 /** The one-line rule under a lane's heading: who puts a card here. */
-export function laneHint(lane: Lane): string {
+export function laneHint(lane: Lane, tracker?: string): string {
   switch (lane) {
     case STATUS.backlog:
       return "A new card starts here, planned -- not yet in play.";
     case STATUS.active:
-      return "Pulled into play: drop a planned card here, or its first commit brings it.";
+      return tracker === "ado"
+        ? "A new card starts here, in play -- its first commit moves it on."
+        : "Pulled into play: drop a planned card here, or its first commit brings it.";
     case STATUS.inProgress:
       return "A commit puts a card here -- or drop one, and it says you started.";
     case STATUS.codeReview:

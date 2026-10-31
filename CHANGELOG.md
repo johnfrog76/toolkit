@@ -22,13 +22,13 @@ release.
 
 ### Changed
 
+- On an Azure DevOps Space the board now draws four lanes, with no Backlog lane, and `NewPrompt` writes a new card straight to `current/` so it is in play when it is made; the board's footer names the first lane the Space has. A local or GitHub Space keeps its five lanes and its backlog. A card already in the backlog on an Azure DevOps Space is drawn in Active, so nothing goes missing.
 - **Create PR** from the browser now works from the card's own code checkout when one is on this machine (a clone of the board's GitHub repository at `<wsRoot>/<repo>` or a nav shortcut's path): the repository comes from that checkout, a card with no `## Branch` uses the checkout's branch when it is the card's, and a branch that was never pushed is refused with the exact `git push` to run in that checkout. With no checkout found, it reads the card as before.
 - Completing a hub-kept design (`MoveDesign -Hub -Space`) also finds the Space's repository at `<wsRoot>/<repo>`.
 - Every list's row menu now uses one vocabulary: the same move has the same word, icon and tooltip on every page, and the link out is always last, reading "Open on GitHub" or "Open on Azure DevOps" behind one icon. A goal's Retire, a reminder's Done and a card's Move to Done now read Archive, a design's two archives read Archive as shipped and Archive as dropped, a card's exposed action opens the card, and Remove cover reads Delete the cover.
 
 ### Fixed
 
-- On an Azure DevOps Space the board now draws four lanes, with no Backlog lane, and `NewPrompt` writes a new card straight to `current/` so it is in play when it is made; the board's footer names the first lane the Space has. A local or GitHub Space keeps its five lanes and its backlog.
 - The Reference field in the New Reminder dialog is now as wide as the other fields, instead of sharing a half-width row with Source.
 - The Edit Reminder dialog's Source and Reference fields are full width too, like the New Reminder dialog's, and the fields in both reminder dialogs are the same size as the rest of the app's.
 - `Move`, `Plan`, `Billable`, `Cover` and `Archive` given the full file path of a card in your hub now work on that card in whichever Space it belongs to, instead of refusing with "No card matching" when a different Space is active.
