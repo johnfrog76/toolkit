@@ -28,11 +28,11 @@ lockfile does not mark as development-only.
 <!-- markdownlint-disable MD001 -- the generator below names each license group a level-four heading under this level-two one -->
 <!-- notices:npm begin -->
 
-What ships in the browser bundle: 250 packages, besides the web package itself (`toolkit-web`, MIT). Every one is under a permissive license.
+What ships in the browser bundle: 251 packages, besides the web package itself (`toolkit-web`, MIT). Every one is under a permissive license.
 
 | License | Packages |
 | --- | --- |
-| MIT | 232 |
+| MIT | 233 |
 | ISC | 12 |
 | 0BSD | 1 |
 | Apache-2.0 | 1 |
@@ -41,7 +41,7 @@ What ships in the browser bundle: 250 packages, besides the web package itself (
 | BSD-3-Clause | 1 |
 | MIT AND ISC | 1 |
 
-#### MIT (232)
+#### MIT (233)
 
 | Package | Version |
 | --- | --- |
@@ -58,14 +58,14 @@ What ships in the browser bundle: 250 packages, besides the web package itself (
 | `@fluentui/react-aria` | 9.17.16 |
 | `@fluentui/react-avatar` | 9.11.9 |
 | `@fluentui/react-badge` | 9.5.7 |
-| `@fluentui/react-breadcrumb` | 9.4.7 |
-| `@fluentui/react-button` | 9.11.2 |
+| `@fluentui/react-breadcrumb` | 9.4.8 |
+| `@fluentui/react-button` | 9.11.3 |
 | `@fluentui/react-card` | 9.7.4 |
-| `@fluentui/react-carousel` | 9.9.15 |
+| `@fluentui/react-carousel` | 9.9.16 |
 | `@fluentui/react-checkbox` | 9.6.6 |
-| `@fluentui/react-color-picker` | 9.3.2 |
+| `@fluentui/react-color-picker` | 9.3.3 |
 | `@fluentui/react-combobox` | 9.17.8 |
-| `@fluentui/react-components` | 9.74.10 |
+| `@fluentui/react-components` | 9.74.11 |
 | `@fluentui/react-context-selector` | 9.2.21 |
 | `@fluentui/react-dialog` | 9.18.6 |
 | `@fluentui/react-divider` | 9.7.6 |
@@ -81,10 +81,10 @@ What ships in the browser bundle: 250 packages, besides the web package itself (
 | `@fluentui/react-link` | 9.8.6 |
 | `@fluentui/react-list` | 9.7.0 |
 | `@fluentui/react-menu` | 9.25.7 |
-| `@fluentui/react-message-bar` | 9.7.8 |
+| `@fluentui/react-message-bar` | 9.7.9 |
 | `@fluentui/react-motion` | 9.16.5 |
 | `@fluentui/react-motion-components-preview` | 0.15.10 |
-| `@fluentui/react-nav` | 9.4.8 |
+| `@fluentui/react-nav` | 9.4.9 |
 | `@fluentui/react-overflow` | 9.9.5 |
 | `@fluentui/react-persona` | 9.7.11 |
 | `@fluentui/react-popover` | 9.14.10 |
@@ -98,7 +98,7 @@ What ships in the browser bundle: 250 packages, besides the web package itself (
 | `@fluentui/react-select` | 9.5.7 |
 | `@fluentui/react-shared-contexts` | 9.26.4 |
 | `@fluentui/react-skeleton` | 9.7.7 |
-| `@fluentui/react-slider` | 9.6.7 |
+| `@fluentui/react-slider` | 9.6.8 |
 | `@fluentui/react-spinbutton` | 9.6.8 |
 | `@fluentui/react-spinner` | 9.8.7 |
 | `@fluentui/react-swatch-picker` | 9.6.3 |
@@ -108,14 +108,14 @@ What ships in the browser bundle: 250 packages, besides the web package itself (
 | `@fluentui/react-tabster` | 9.26.19 |
 | `@fluentui/react-tag-picker` | 9.10.6 |
 | `@fluentui/react-tags` | 9.9.8 |
-| `@fluentui/react-teaching-popover` | 9.7.8 |
+| `@fluentui/react-teaching-popover` | 9.7.9 |
 | `@fluentui/react-text` | 9.6.21 |
 | `@fluentui/react-textarea` | 9.7.8 |
 | `@fluentui/react-theme` | 9.2.2 |
 | `@fluentui/react-toast` | 9.8.5 |
-| `@fluentui/react-toolbar` | 9.8.6 |
+| `@fluentui/react-toolbar` | 9.8.7 |
 | `@fluentui/react-tooltip` | 9.10.8 |
-| `@fluentui/react-tree` | 9.16.9 |
+| `@fluentui/react-tree` | 9.16.10 |
 | `@fluentui/react-utilities` | 9.27.0 |
 | `@fluentui/react-virtualizer` | 9.0.0-alpha.116 |
 | `@fluentui/tokens` | 1.0.0-alpha.24 |
@@ -205,18 +205,18 @@ What ships in the browser bundle: 250 packages, besides the web package itself (
 | `mdast-util-to-hast` | 13.2.1 |
 | `mdast-util-to-markdown` | 2.1.2 |
 | `mdast-util-to-string` | 4.0.0 |
-| `micromark` | 4.0.2 |
-| `micromark-core-commonmark` | 2.0.3 |
+| `micromark` | 4.0.3 |
+| `micromark-core-commonmark` | 2.0.4 |
 | `micromark-extension-gfm` | 3.0.0 |
 | `micromark-extension-gfm-autolink-literal` | 2.1.0 |
 | `micromark-extension-gfm-footnote` | 2.1.0 |
 | `micromark-extension-gfm-strikethrough` | 2.1.0 |
-| `micromark-extension-gfm-table` | 2.1.1 |
+| `micromark-extension-gfm-table` | 2.1.2 |
 | `micromark-extension-gfm-tagfilter` | 2.0.0 |
 | `micromark-extension-gfm-task-list-item` | 2.1.0 |
 | `micromark-factory-destination` | 2.0.1 |
 | `micromark-factory-label` | 2.0.1 |
-| `micromark-factory-space` | 2.0.1 |
+| `micromark-factory-space` | 2.1.0 |
 | `micromark-factory-title` | 2.0.1 |
 | `micromark-factory-whitespace` | 2.0.1 |
 | `micromark-util-character` | 2.1.1 |
@@ -225,6 +225,7 @@ What ships in the browser bundle: 250 packages, besides the web package itself (
 | `micromark-util-combine-extensions` | 2.0.1 |
 | `micromark-util-decode-numeric-character-reference` | 2.0.2 |
 | `micromark-util-decode-string` | 2.0.1 |
+| `micromark-util-edit-map` | 1.0.0 |
 | `micromark-util-encode` | 2.0.1 |
 | `micromark-util-html-tag-name` | 2.0.1 |
 | `micromark-util-normalize-identifier` | 2.0.1 |
@@ -232,7 +233,7 @@ What ships in the browser bundle: 250 packages, besides the web package itself (
 | `micromark-util-sanitize-uri` | 2.0.1 |
 | `micromark-util-subtokenize` | 2.1.0 |
 | `micromark-util-symbol` | 2.0.1 |
-| `micromark-util-types` | 2.0.2 |
+| `micromark-util-types` | 2.0.3 |
 | `ms` | 2.1.3 |
 | `parse-entities` | 4.0.2 |
 | `parse5` | 7.3.0 |
