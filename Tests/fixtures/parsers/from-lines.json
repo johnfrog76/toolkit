@@ -1,0 +1,53 @@
+{
+  "_": "ONE table for a card's **From:** footer line (consts.json stamps.from; docs/hub/cards.md, \"The footer\"; docs/modules/communication.md, \"An agenda line becomes a card\"): the meeting record an agenda line came from, by its file stem. Written by NewPrompt -From (Scripts/New-PromptFromWorkItem.ps1, tkTestToolkit -NewPrompt asserts the line it writes reads as the row 'the line NewPrompt -From writes' says); read by agent/core/parsers.py card_from_record() (Tests/test_parsers.py) into the model's from_record. The CLI has no reader of its own -- nothing in the CLI reads the line back -- so when one is added it is held to this same table. Each row's lines are joined with LF, or CRLF when crlf is true, into a card's text. expected is the value of the FIRST line that starts with the stamp, trimmed, and null when no line starts with it or that line is empty.",
+  "rows": [
+    {
+      "name": "no line: from nowhere",
+      "crlf": false,
+      "lines": ["# Task K7M2: Chase the cert renewal", "", "**ADO Link:** (not linked -- created offline with -Title)", "**Created:** 2026-10-29"],
+      "expected": null
+    },
+    {
+      "name": "the line NewPrompt -From writes for the 1:1, above Created",
+      "crlf": false,
+      "lines": ["# Task K7M2: Chase the cert renewal", "", "**ADO Link:** (not linked -- created offline with -Title)", "**From:** 2026-10-28", "**Created:** 2026-10-29"],
+      "expected": "2026-10-28"
+    },
+    {
+      "name": "a series names itself before the date",
+      "crlf": false,
+      "lines": ["**From:** client-weekly-2026-10-28", "**Created:** 2026-10-29"],
+      "expected": "client-weekly-2026-10-28"
+    },
+    {
+      "name": "the same line in a CRLF card",
+      "crlf": true,
+      "lines": ["# Task K7M2: Chase the cert renewal", "", "**From:** team-sync-2026-10-27", "**Created:** 2026-10-29"],
+      "expected": "team-sync-2026-10-27"
+    },
+    {
+      "name": "spaces around the value are not part of it",
+      "crlf": true,
+      "lines": ["**From:**    2026-10-28   ", "**Created:** 2026-10-29"],
+      "expected": "2026-10-28"
+    },
+    {
+      "name": "the first line wins",
+      "crlf": false,
+      "lines": ["**From:** 2026-10-28", "**From:** team-sync-2026-10-27"],
+      "expected": "2026-10-28"
+    },
+    {
+      "name": "an empty line names no record",
+      "crlf": false,
+      "lines": ["**From:**", "**Created:** 2026-10-29"],
+      "expected": null
+    },
+    {
+      "name": "the stamp inside a sentence is not the line",
+      "crlf": false,
+      "lines": ["This came **From:** 2026-10-28 at the start of nothing.", "  **From:** 2026-10-27"],
+      "expected": null
+    }
+  ]
+}

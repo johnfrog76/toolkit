@@ -65,6 +65,17 @@ Team Agile's `switch` as set -- `features` already carries the gate), `identity`
 including the full `spaces` list -- each Space with its `tracker` and its own `laneNames`. `agent/README.md`'s Tier and identity sections have each field's
 fallback chain and why the tier probe runs off the event loop, cached 45 seconds, keyed by the owner for a GitHub address, with concurrent misses merged into one probe.
 
+`/env` also carries `hubSync`: `storeSync`, its state (`on` for `git`, `off` otherwise) and, under
+`git`, how far the hub is from its remote -- `ahead` (local, read by the CLI's
+`Scripts/Get-HubSyncState.ps1` in a child PowerShell and held 45 seconds like the tier probe), and the
+last fetch's `behind` and `checkedAt`, null until a fetch has happened, with `checkFailed` beside them
+when the latest fetch did not work. **`/env` never fetches.** The one route that does is
+`POST /api/hub-sync/check`, which the System page sends once when it opens and again after **Sync the
+hub** (the `Sync` verb through the bridge); its answer is written into the web's cached `/env`, where
+the Environment card's Store sync row and the foot line on the cards that write into the hub read it.
+[`docs/CONFIGURATION.md`, "Syncing the hub from the web app"](CONFIGURATION.md#syncing-the-hub-from-the-web-app)
+has the states and the words.
+
 **Every route is under `/api`**: the ADO core's and the shell's, the GitHub tracker's, and each
 module's own. The module routes are mounted unconditionally and
 gated **per request** -- see [the modules guide](modules/README.md) -- so the schema does not move

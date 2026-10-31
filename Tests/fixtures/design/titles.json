@@ -1,0 +1,61 @@
+{
+  "_": "ONE table for how a design note's or a spec's TITLE is read (docs/hub/design.md, \"The file\", the title row and \"How the title is read\"; #147), read by both readers of it: Scripts/Read-DesignTree.ps1 Get-P20DesignTitle (tkTestToolkit -Design) and agent/ado/design.py parse_doc / doc_title (Tests/test_design.py). Each row's lines are joined with LF, or CRLF when crlf is true, into the file's text; name is the file's name; expected is the title the Design tab lists it under. The rule, in order: the FIRST heading after the frontmatter, when it is level one (# ); else the first non-empty line after the first '## Title' heading, unless that line is itself a heading; else the file's name. A level-one heading after any other heading is a sentence in the body, not the title. If the two halves ever disagree about a row, one of them is wrong.",
+  "rows": [
+    {
+      "name": "the design contract template: '## Title', the title on the next line",
+      "file": "gym-llm-workouts.md",
+      "crlf": false,
+      "lines": ["---", "id: 6bf8ba8f-3584-49d4-a39b-142532306afd", "---", "", "## Title", "The Gym Where the Models Work Out", "", "## Summary", "A neighborhood gym opens early."],
+      "expected": "The Gym Where the Models Work Out"
+    },
+    {
+      "name": "a level-one heading before any other heading: the title, as before",
+      "file": "board-ideas.md",
+      "crlf": false,
+      "lines": ["---", "id: ee925272-9564-4816-8944-e6b39c86339c", "description: \"What the board could show next\"", "---", "", "# Board ideas", "", "> GitHub: https://github.com/o/r/issues/7", "", "## Problem"],
+      "expected": "Board ideas"
+    },
+    {
+      "name": "the only level-one heading is deep in the body: the file's name, not that sentence",
+      "file": "sitcom-season2.md",
+      "crlf": false,
+      "lines": ["---", "id: aaaaaaaa-0000-4000-8000-000000000001", "---", "", "## Pitch", "Two roommates and a server rack.", "", "## Notes", "", "# TODO: move clothes to dryer"],
+      "expected": "sitcom-season2.md"
+    },
+    {
+      "name": "neither a leading level-one heading nor a '## Title' section: the file's name",
+      "file": "untitled-idea.md",
+      "crlf": false,
+      "lines": ["---", "id: aaaaaaaa-0000-4000-8000-000000000002", "---", "", "## Problem", "Nothing names this note.", "", "## The idea"],
+      "expected": "untitled-idea.md"
+    },
+    {
+      "name": "'## Title' ahead of a deep level-one heading: the Title section wins",
+      "file": "the-seals.md",
+      "crlf": false,
+      "lines": ["## Title", "Go See the Seals", "", "## Slides", "", "# Go See the Seals -- Slides (9)"],
+      "expected": "Go See the Seals"
+    },
+    {
+      "name": "the contract template in a CRLF file",
+      "file": "gym-llm-workouts.md",
+      "crlf": true,
+      "lines": ["---", "id: 6bf8ba8f-3584-49d4-a39b-142532306afd", "---", "", "## Title", "", "The Gym Where the Models Work Out  ", "", "## Summary"],
+      "expected": "The Gym Where the Models Work Out"
+    },
+    {
+      "name": "an empty '## Title' section: the next heading is not a title, so the file's name",
+      "file": "empty-title.md",
+      "crlf": false,
+      "lines": ["## Title", "", "## Summary", "Words."],
+      "expected": "empty-title.md"
+    },
+    {
+      "name": "a spec: the same rule",
+      "file": "board-ideas.spec.md",
+      "crlf": false,
+      "lines": ["---", "id: ee925272-9564-4816-8944-e6b39c86339c", "---", "", "## Title", "Board ideas (spec)", "", "## Contract"],
+      "expected": "Board ideas (spec)"
+    }
+  ]
+}

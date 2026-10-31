@@ -164,6 +164,25 @@ class StatusMetadataTests(unittest.TestCase):
                 # The model carries it as the card's `assigned`.
                 self.assertEqual(_parse_status_metadata(text)["assigned"], row["expected"])
 
+    def test_the_meeting_a_card_came_from_by_the_shared_table(self):
+        """The `**From:**` footer line (docs/hub/cards.md, consts.json stamps.from):
+        the meeting record an agenda line came from, by its file stem. NewPrompt -From
+        writes it; tkTestToolkit -NewPrompt asserts the line it writes is the shape
+        of Tests/fixtures/parsers/from-lines.json's 1:1 row."""
+        import json
+
+        from agent.core.parsers import card_from_record
+
+        table = json.loads((FIXTURES / "from-lines.json").read_text(encoding="utf-8"))
+        self.assertGreaterEqual(len(table["rows"]), 8)
+        for row in table["rows"]:
+            with self.subTest(row=row["name"]):
+                eol = "\r\n" if row["crlf"] else "\n"
+                text = eol.join(row["lines"]) + eol
+                self.assertEqual(card_from_record(text), row["expected"])
+                # The model carries it as the card's `from_record`.
+                self.assertEqual(_parse_status_metadata(text)["from_record"], row["expected"])
+
     def test_a_cards_milestone_and_tags_by_the_shared_table(self):
         """The whole `**Sprint:**` line and the `Tags:` line, the two things the
         suggestion reads from a card (docs/hub/cards.md, "What the suggestion

@@ -107,6 +107,14 @@ export interface EngagementReviewItem {
   tags: string[];
   /** member org slugs, sorted ascending; at least one entry */
   spaces: string[];
+  /**
+   * `<slug-set>/<start>_<end>`, with `archive/` in front for an archived one --
+   * the name the `WorkReview` verb takes. "" (or absent, from an older agent)
+   * for a legacy review with no slug-set folder: its row offers no move.
+   */
+  review?: string;
+  /** In reviews/archive/ -- read only under the list's Archived filter. */
+  archived?: boolean;
 }
 
 export type EngagementReviewsResponse = EngagementReviewItem[];
@@ -145,6 +153,8 @@ export const growthEndpoints = growthApi.injectEndpoints({
     getGrowthDetail: builder.query<GrowthDetailResponse, string>({
       query: (filename) => `growth/${encodeURIComponent(filename)}`,
       keepUnusedDataFor: CACHE_TTL,
+      // A write through NewGrowth (Complete, Archive) re-reads the page too.
+      providesTags: ["Growth"],
     }),
 
     // POST /api/cmd/NewGrowth -- every growth write goes the way every other
@@ -186,10 +196,23 @@ export const growthEndpoints = growthApi.injectEndpoints({
     // GET /api/engagement/:slug/reviews -- one engagement's generated reviews.
     // Served by the ADO module's reporting routes over this module's data;
     // the endpoint is declared here because ReviewArchive is the only caller.
-    getEngagementReviews: builder.query<EngagementReviewsResponse, string>({
-      query: (slug) => `engagement/${encodeURIComponent(slug)}/reviews`,
+    // `archived` is the list's Archived filter: reviews/archive/ and nothing else.
+    getEngagementReviews: builder.query<
+      EngagementReviewsResponse,
+      { slug: string; archived?: boolean }
+    >({
+      query: ({ slug, archived }) =>
+        `engagement/${encodeURIComponent(slug)}/reviews${archived ? "?archived=true" : ""}`,
       keepUnusedDataFor: CACHE_TTL,
       providesTags: ["Reviews"],
+    }),
+
+    // POST /api/cmd/WorkReview -- a review's row's Archive and Delete. The verb
+    // is the one writer (`buildWorkReviewParams`, ../ado/cliBridge.ts); this only
+    // asks, and the list refetches.
+    runWorkReview: builder.mutation<CommandResponse, { params: string[] }>({
+      query: ({ params }) => ({ url: "cmd/WorkReview", method: "POST", body: { params } }),
+      invalidatesTags: ["Reviews"],
     }),
 
     // GET /api/engagement/:slug/skills -- tag counts over one org's archive.
@@ -211,5 +234,6 @@ export const {
   useGetReviewsQuery,
   useGenerateReviewMutation,
   useGetEngagementReviewsQuery,
+  useRunWorkReviewMutation,
   useGetEngagementSkillsQuery,
 } = growthEndpoints;

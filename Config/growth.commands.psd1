@@ -32,16 +32,19 @@
         'NewGrowth'         = 'New-P20GrowthItem'
         'NewWorkReview'     = 'New-P20WorkReview'
         'PublishWorkReview' = 'Publish-P20WorkReview'
+        'WorkReview'        = 'Set-P20WorkReview'
         'LogPeerReview'     = 'Write-P20PeerReviewLog'
         'UpdateResume'      = 'Update-P20Resume'
     }
 
     # The order the work happens in: create the artifact, generate the review,
-    # publish it. LogPeerReview and UpdateResume are the two that stand alone.
+    # publish it, put it away. LogPeerReview and UpdateResume are the two that
+    # stand alone.
     Order = @(
         'NewGrowth'
         'NewWorkReview'
         'PublishWorkReview'
+        'WorkReview'
         'LogPeerReview'
         'UpdateResume'
     )
@@ -50,14 +53,19 @@
         'NewGrowth' = @{
             category    = 'growth'
             description = 'Create a training, presentation or goal'
-            usage       = '{cliPrefix}NewGrowth -Title <t> [-Type training|presentation|goal] [-Date <YYYY-MM-DD>] [-DueDate <YYYY-MM-DD> (required for a training)] [-Provider <p>] [-Hours <h>] [-Notes <n>] | -Close <file> [-Help]'
+            usage       = '{cliPrefix}NewGrowth -Title <t> [-Type training|presentation|goal] [-Date <YYYY-MM-DD>] [-DueDate <YYYY-MM-DD> (required for a training)] [-Provider <p>] [-Hours <h>] [-Notes <n>] | -Close <file> | -Complete <file> [-WhatIf] [-Help]'
             examples    = @(
                 '{cliPrefix}NewGrowth -Title ''Intro to PowerShell'' -DueDate 2026-10-01 -Hours 2',
                 '{cliPrefix}NewGrowth -Type presentation -Title ''Designing for Non-Determinism'' -Date 2026-09-15',
                 '{cliPrefix}NewGrowth -Type goal -Title ''Improve test coverage patterns''',
+                '{cliPrefix}NewGrowth -Complete goal-2026-improve-test-coverage-patterns -WhatIf',
                 '{cliPrefix}NewGrowth -Close training-2026-09-01-clean-architecture'
             )
-            notes       = @('-Close retires an item: growth/current/<file> moves to growth/archive/ and is stamped **Closed:** -- the module closes its own data, since Archive is org-scoped and cannot see growth/.')
+            notes       = @(
+                '-Close archives an item: growth/current/<file> moves to growth/archive/ and is stamped **Closed:** -- the module closes its own data, since Archive is org-scoped and cannot see growth/.',
+                '-Complete marks a goal complete: the **Status** line under its ## Outcome heading is written as Achieved, and nothing else in the file changes. A goal only; it stays in growth/current/ until -Close.',
+                '-WhatIf names the file that would be written or moved, and writes nothing.'
+            )
         }
         'NewWorkReview' = @{
             # It walks git log over the whole hub; the bridge's default 120 s is not enough for a year of it.
@@ -77,6 +85,21 @@
             examples    = @(
                 '{cliPrefix}PublishWorkReview',
                 '{cliPrefix}PublishWorkReview -NoPush'
+            )
+        }
+        'WorkReview' = @{
+            category    = 'review'
+            description = 'Archive or delete a work review'
+            usage       = '{cliPrefix}WorkReview <slug-set>/<start>_<end> -Archive | -Delete [-WhatIf] [-Help]'
+            examples    = @(
+                '{cliPrefix}WorkReview first/2026-04-01_2026-04-30 -Archive',
+                '{cliPrefix}WorkReview first+second/2026-01-01_2026-03-31 -Delete -WhatIf',
+                '{cliPrefix}WorkReview archive/first/2026-04-01_2026-04-30 -Delete'
+            )
+            notes       = @(
+                '-Archive moves reviews/<slug-set>/<year>/<start>_<end>/ to reviews/archive/<slug-set>/<year>/<start>_<end>/ and stamps **Closed:** into its review.md -- the file every review has; summary.md moves untouched.',
+                '-Delete removes the folder and every file in it. Name an archived review with archive/ in front.',
+                'With storeSync: git the move is committed, scoped to the review''s own paths; Sync pushes it. -WhatIf names the folder and writes nothing.'
             )
         }
         'LogPeerReview' = @{

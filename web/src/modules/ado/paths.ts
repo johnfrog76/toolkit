@@ -6,4 +6,7 @@
  */
 export const CARD_ROUTE = "/prompts/:filename";
 
+/** The System page: the Environment card, where the hub is synced. */
+export const SYSTEM_PATH = "/system";
+
 export const cardPath = (file: string) => `/prompts/${encodeURIComponent(file)}`;

@@ -9,6 +9,7 @@ import {
   buildMoveParams,
   buildMeetingAgendaParams,
   buildGrowthCloseParams,
+  buildGrowthCompleteParams,
   buildNewGrowthParams,
   fileFromCommandOutput,
   buildNewReminderParams,
@@ -430,6 +431,24 @@ describe("buildNewCardParams", () => {
     expect(params).toHaveLength(4);
     expect(params[1]).toBe('The "big" one');
   });
+
+  it("sends -Description only when given, and keeps it multi-line", () => {
+    expect(buildNewCardParams({ title: "T", type: "Task" })).toEqual([
+      "-Title",
+      "T",
+      "-Type",
+      "Task",
+    ]);
+    expect(buildNewCardParams({ title: "T", type: "Task", description: "  " })).toEqual([
+      "-Title",
+      "T",
+      "-Type",
+      "Task",
+    ]);
+    expect(
+      buildNewCardParams({ title: "T", type: "Task", description: "Line one.\nLine two." }),
+    ).toEqual(["-Title", "T", "-Type", "Task", "-Description", "Line one.\nLine two."]);
+  });
 });
 
 describe("buildBillableParams", () => {
@@ -452,6 +471,16 @@ describe("buildGrowthCloseParams", () => {
     expect(
       buildGrowthCloseParams({ file: "training-2026-09-01-clean-architecture.prompt.md" }),
     ).toEqual(["-Close", "training-2026-09-01-clean-architecture.prompt.md"]);
+  });
+});
+
+describe("buildGrowthCompleteParams", () => {
+  // Scripts/New-GrowthItem.ps1: -Complete takes a goal's file name under growth/current/.
+  it("is -Complete and the file, nothing else", () => {
+    expect(buildGrowthCompleteParams({ file: "goal-2026-learn-rust.prompt.md" })).toEqual([
+      "-Complete",
+      "goal-2026-learn-rust.prompt.md",
+    ]);
   });
 });
 

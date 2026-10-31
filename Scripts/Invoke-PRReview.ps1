@@ -1,11 +1,21 @@
 <#
 .SYNOPSIS
-    Posts an AI code review to an Azure DevOps pull request (up to 3 inline comment threads).
+    Posts an AI code review to a pull request (up to 3 inline comments) -- Azure DevOps, or GitHub through gh.
 
 .DESCRIPTION
     Gets the diff for a PR, sends it to Claude for review, and posts up to 3 findings as
     individual PR comment threads. Comments are formatted so $(Get-CliPrefix)GetPRComments picks them up
     as bot reviews and feeds them into the ado-comments triage flow.
+
+    On a GitHub Space the diff comes from GitHub, not a checkout (gh api, the
+    pull request as application/vnd.github.diff), the same model call reviews
+    it, and the findings are posted as ONE review (event COMMENT) whose inline
+    comments are positioned by path and new-side line -- the numbering the
+    review prompt already asks for. A finding whose line is not in the diff
+    is named in the review's body instead, as Azure DevOps falls back to a
+    general comment. The repository: the card whose PR URL: line names the
+    pull request, -Repository, this checkout's GitHub remote, the board's one
+    repo -- the one answer GetPRComments uses.
 
     Requires ANTHROPIC_API_KEY environment variable.
 
@@ -13,7 +23,8 @@
     The PR number (positional). Omit to auto-detect from current branch.
 
 .PARAMETER Repository
-    ADO repository name. Default: from toolkit config.
+    ADO repository name. Default: from toolkit config. On GitHub: <owner>/<name>, or <name>
+    under the Space's owner.
 
 .PARAMETER Project
     ADO project name. Default: from toolkit config.
@@ -35,7 +46,8 @@
     $(Get-CliPrefix)AddPRReview 1042 -DryRun
 
 .NOTES
-    Requires: az cli (ADO auth), git (for diff), ANTHROPIC_API_KEY env var
+    Requires: az cli (ADO auth), git (for diff), ANTHROPIC_API_KEY env var -- or, on a GitHub
+    Space, gh in place of az and git
 #>
 [CmdletBinding()]
 param(
@@ -83,7 +95,7 @@ function Get-P20ModelId {
 function Show-Help {
     Write-Host @"
 
-$(Get-CliPrefix)AddPRReview - Post an AI code review to an Azure DevOps pull request
+$(Get-CliPrefix)AddPRReview - Post an AI code review to a pull request (Azure DevOps, or GitHub through gh)
 
 USAGE:
     $(Get-CliPrefix)AddPRReview <PullRequestId> [options]
@@ -92,9 +104,10 @@ USAGE:
 PARAMETERS:
     -PullRequestId <int>   PR number (positional). Omit to detect from branch.
     -Repository <string>   ADO repo name. Default: from toolkit config.
+                           On GitHub: <owner>/<name>, or <name> under the Space's owner.
     -Project <string>      ADO project name. Default: from toolkit config.
     -Model <string>        Model id. Default: ai.model in config ($(Get-P20ModelId)).
-    -DryRun                Print review to console, do not post to ADO.
+    -DryRun                Print review to console, do not post it.
     -Help                  Show this help.
 
 REQUIRES:
@@ -103,10 +116,14 @@ REQUIRES:
       Get your key at console.anthropic.com -- API Keys
     - az cli authenticated (same as every other ADO command)
     - Run from within the git repo (used to get the diff)
+    - On a GitHub Space: gh signed in instead; no checkout is needed, the diff
+      comes from GitHub
 
 BEHAVIOR:
     Sends the PR diff to Claude, posts up to 3 inline comment threads.
     Comments appear as AI Code Review bot entries that $(Get-CliPrefix)GetPRComments picks up.
+    On GitHub: one review with the findings as inline comments; a finding on
+    a line the diff does not show is named in the review's body.
 
 EXAMPLES:
     $(Get-CliPrefix)AddPRReview 1042
@@ -139,7 +156,12 @@ if (-not $cfg) {
 
 $org = $cfg.Org
 
-if (-not $Project -or -not $Repository) {
+# WHICH tracker answers follows the board's address (D-G4), as in GetPRComments.
+# The GitHub path resolves its own repository below; the ADO defaults are ADO's.
+. (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
+$trackerKind = Resolve-P20Tracker -OrgUrl $org
+
+if ($trackerKind -ne 'github' -and (-not $Project -or -not $Repository)) {
     $projects = @($cfg.Projects | ForEach-Object { @{ Name = $_.name; Repo = $_.repo } })
     if ($projects.Count -eq 0) {
         Write-CliError -Message "No projects configured for the active Space." -Hint "Pass -Project and -Repository, or add projects to the Space in hub.json."
@@ -162,6 +184,86 @@ $ErrorActionPreference = 'Stop'
 
 # -- Main ----------------------------------------------------------------------
 try {
+    # What the shared middle reads, whichever tracker answered: the diff, and
+    # what it is a diff of.
+    $diff = ''
+    $diffOf = ''
+    $ghRepoFull = ''
+
+    # -- A GitHub Space: the diff from GitHub; the model call and the parse are
+    # shared; the post is GitHub's own, below. The ADO body sits in the else,
+    # unindented on purpose, as GetPRComments' does.
+    if ($trackerKind -eq 'github') {
+        . (Join-Path $PSScriptRoot 'Read-GitHubPRThreads.ps1')
+        . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
+        Write-P20TrackerHeader -Name $cfg.ActiveOrgName -OrgUrl $org
+        $currentDir = $null
+        if (Get-Command Get-PromptFolders -ErrorAction SilentlyContinue) { $currentDir = (Get-PromptFolders).Current }
+        $branchName = ''
+        if (-not $PullRequestId) {
+            $branchName = "$((Invoke-P20TrackerRead 'git' @('rev-parse', '--abbrev-ref', 'HEAD')).Out)".Trim()
+            if (-not $branchName -or $branchName -eq 'HEAD') {
+                Write-CliError -Message "Could not detect current branch." -Hint "Pass -PullRequestId explicitly."
+                exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+            }
+        }
+        $where = Resolve-P20GitHubPRRepo -PullRequestId $PullRequestId -Repository $Repository -Project $Project `
+            -OrgUrl $org -Projects $cfg.Projects -CurrentDir $currentDir -Token (Get-P20Consts).tokens.prUrl `
+            -ToolkitRoot (Split-Path -Parent $PSScriptRoot) -Verb 'AddPRReview'
+        if ($where.Error) {
+            # A write: the same number on the wrong repository is somebody
+            # else's pull request. Nothing is guessed.
+            Write-CliError -Message $where.Error -Hint $where.Hint
+            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+        }
+        $ghRepoFull = $where.Repo
+
+        # By branch: the open pull request whose head it is, as -f fields.
+        if (-not $PullRequestId) {
+            Write-Host "Auto-detecting PR for branch: $branchName ..." -ForegroundColor DarkGray
+            $listRead = Invoke-P20TrackerRead 'gh' @('api', '--method', 'GET', "repos/$ghRepoFull/pulls",
+                '-f', "head=$($ghRepoFull.Split('/')[0]):$branchName", '-f', 'state=open', '-F', 'per_page=10')
+            if ($listRead.Code -ne 0) {
+                Write-CliError -Message "Could not list pull requests on $ghRepoFull -- $((@($listRead.Lines) -join ' ').Trim())" -Hint "Check gh auth status, or $(Get-CliPrefix)Log -Errors."
+                exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+            }
+            $listed = @(@((@($listRead.Out) -join "`n") | ConvertFrom-Json) | ForEach-Object { $_ } | Where-Object { $_ })
+            if ($listed.Count -eq 0) {
+                Write-CliError -Message "No open PR found for branch '$branchName' on $ghRepoFull." -Hint "Push your branch, open a PR, then retry."
+                exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+            }
+            $PullRequestId = [int]$listed[0].number
+        }
+
+        Write-Host "Fetching PR #$PullRequestId details ..." -ForegroundColor DarkGray
+        $prRead = Invoke-P20TrackerRead 'gh' @('api', "repos/$ghRepoFull/pulls/$PullRequestId")
+        if ($prRead.Code -ne 0) {
+            $said = (@($prRead.Lines) -join ' ').Trim()
+            if ($said -match '404|Not Found') {
+                Write-CliError -Message "PR #$PullRequestId not found on $ghRepoFull." -Hint "Check the PR number, or name the repository: -Repository <owner>/<name>."
+            }
+            else {
+                Write-CliError -Message "Could not read PR #$PullRequestId on $ghRepoFull -- $said" -Hint "Check gh auth status, or $(Get-CliPrefix)Log -Errors."
+            }
+            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+        }
+        $pr = (@($prRead.Out) -join "`n") | ConvertFrom-Json
+        Write-Host "  PR #$($PullRequestId): $($pr.title) ($ghRepoFull)" -ForegroundColor DarkGray
+        if ($pr.head -and $pr.base) { Write-Host "  $($pr.head.ref) -> $($pr.base.ref)" -ForegroundColor DarkGray }
+
+        # The unified diff, from GitHub: the same text git diff gives the ADO
+        # path, and no checkout needed. The media type travels as a header.
+        Write-Host "Fetching the diff from GitHub ..." -ForegroundColor DarkGray
+        $diffRead = Invoke-P20TrackerRead 'gh' @('api', "repos/$ghRepoFull/pulls/$PullRequestId", '-H', 'Accept: application/vnd.github.diff')
+        if ($diffRead.Code -ne 0) {
+            Write-CliError -Message "Could not read the diff of PR #$PullRequestId on $ghRepoFull -- $((@($diffRead.Lines) -join ' ').Trim())" -Hint "GitHub refuses a diff past its size limit; nothing was sent to the model."
+            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+        }
+        $diff = @($diffRead.Out) -join "`n"
+        $diffOf = "PR #$PullRequestId on $ghRepoFull"
+    }
+    else {
+
     $tokenRead = Get-P20AdoToken -Tenant $global:P20Config.Tenant
     if (-not $tokenRead.Ok) {
         Write-CliError -Message $tokenRead.Message -Hint $tokenRead.Hint
@@ -248,6 +350,7 @@ try {
     $diffLines  = $diffRead.Lines
     $gitExit    = $diffRead.Code
     $diff       = $diffLines -join "`n"
+    $diffOf     = "origin/$targetBranch and origin/$sourceBranch"
 
     # 2>&1 folds stderr into $diffLines, so a git failure arrives looking like
     # content and passes an emptiness check. It then reaches the model as though
@@ -257,15 +360,23 @@ try {
         Write-CliError -Message "git diff failed between origin/$targetBranch and origin/$sourceBranch." -Hint "Run this from the repository the PR belongs to. git said: $diff"
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
+
+    }
+    # -- end of the ADO else; both trackers land here with $diff and $diffOf --
+
     if ($diff -and ($diff -notmatch '(?m)^diff --git ') -and ($diff -notmatch '(?m)^@@ ')) {
         Write-CliError -Message "Output from git does not look like a diff -- refusing to send it to the model." -Hint $diff.Substring(0, [Math]::Min(200, $diff.Length))
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
 
     if ([string]::IsNullOrWhiteSpace($diff)) {
-        Write-Host "No diff found between origin/$targetBranch and origin/$sourceBranch." -ForegroundColor Yellow
+        Write-Host "No diff found for $diffOf." -ForegroundColor Yellow
         exit 0
     }
+
+    # The whole diff, for GitHub's positioning check: a finding is placed on a
+    # line the diff shows, and the model may cite one past a truncation.
+    $fullDiff = $diff
 
     # Truncate if very large (haiku has plenty of context; keep it snappy)
     $maxChars = 120000
@@ -342,6 +453,46 @@ try {
     }
 
     Write-Host "Claude returned $($findings.Count) finding(s)." -ForegroundColor Cyan
+
+    # --- On GitHub: ONE review, the findings its inline comments ---
+    if ($trackerKind -eq 'github') {
+        $plan = New-P20GitHubReviewPayload -Findings @($findings) -RightLines (Get-P20DiffRightLines -Diff $fullDiff)
+        $review = $plan.Payload
+        # On stage: a public repository's review is read by strangers. One
+        # line before the write, and in -DryRun; nothing is asked.
+        . (Join-Path $PSScriptRoot 'Get-RepoVisibility.ps1')
+        Write-P20PublicLine -Repo $ghRepoFull
+        if ($DryRun) {
+            Write-Host ""
+            Write-Host "--- [DryRun] Would post one review on $ghRepoFull PR #$PullRequestId ($($plan.Inline) inline, $($plan.Moved) in the body) ---" -ForegroundColor DarkGray
+            foreach ($c in @($review.comments)) { Write-Host "  File: $($c.path)  L$($c.line)" -ForegroundColor DarkGray; Write-Host "  $($c.body)" -ForegroundColor White }
+            Write-Host "  Body: $($review.body)" -ForegroundColor White
+            exit 0
+        }
+        $reviewsPath = "repos/$ghRepoFull/pulls/$PullRequestId/reviews"
+        $post = Invoke-P20GhApiWrite $reviewsPath $review
+        if ($post.Code -ne 0 -and @($review.comments).Count -gt 0) {
+            # GitHub refuses the whole review when one inline position does not
+            # resolve. Once more with every finding in the body, as the ADO
+            # path retries a thread as a general comment.
+            Write-Host "  Warning: GitHub refused the inline review -- $((@($post.Lines) -join ' ').Trim())" -ForegroundColor Yellow
+            Write-Host "    Retrying with every finding in the review's body ..." -ForegroundColor DarkGray
+            $plan = New-P20GitHubReviewPayload -Findings @($findings) -RightLines @{}
+            $review = $plan.Payload
+            $post = Invoke-P20GhApiWrite $reviewsPath $review
+        }
+        if ($post.Code -ne 0) {
+            Write-CliError -Message "Could not post the review to PR #$PullRequestId on $ghRepoFull -- $((@($post.Lines) -join ' ').Trim())" -Hint "Check gh auth status, or $(Get-CliPrefix)Log -Errors. -DryRun prints the findings without posting."
+            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+        }
+        $posted = (@($post.Out) -join "`n") | ConvertFrom-Json
+        Write-Host "  Posted review $($posted.id): $($plan.Inline) inline comment(s), $($plan.Moved) in the body." -ForegroundColor Green
+        Write-Host ""
+        Write-Host "Done. $(@($findings).Count) finding(s) posted to PR #$PullRequestId." -ForegroundColor Green
+        Write-Host "  https://github.com/$ghRepoFull/pull/$PullRequestId" -ForegroundColor DarkGray
+        Write-Host "  Run $(Get-CliPrefix)GetPRComments $PullRequestId to pull them into a prompt file." -ForegroundColor Cyan
+        exit 0
+    }
 
     # --- Post findings as PR threads ---
     $threadsUri = "$org/$encodedProject/_apis/git/repositories/$Repository/pullRequests/$PullRequestId/threads?api-version=7.1"

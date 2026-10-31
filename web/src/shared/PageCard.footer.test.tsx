@@ -14,12 +14,12 @@ describe("PageCard's footer with a centre slot", () => {
     const left = screen.getByText("a long left sentence").parentElement as HTMLElement;
     expect(getComputedStyle(middle).flexShrink).toBe("0");
     expect(getComputedStyle(middle).whiteSpace).toBe("nowrap");
-    expect(getComputedStyle(left).minWidth).toBe("0");
+    expect(parseFloat(getComputedStyle(left).minWidth)).toBe(0);
   });
 
   it("leaves the footer as it was when there is no centre", () => {
     render(<PageCard footerLeft={<span>only left</span>}>body</PageCard>);
     const left = screen.getByText("only left").parentElement as HTMLElement;
-    expect(getComputedStyle(left).minWidth).not.toBe("0");
+    expect(parseFloat(getComputedStyle(left).minWidth)).not.toBe(0);
   });
 });

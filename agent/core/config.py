@@ -71,6 +71,11 @@ PROMPT_SUFFIX = ".prompt.md"
 # relative to the agent's own tree, not to the hub.
 BILLING_SCRIPT = AGENT_DIR / "ado" / "Get-WeeklyBilling.ps1"
 
+# The hub's distance from its remote -- ahead, and behind after a fetch -- read
+# by the CLI half's script, so every git call it makes goes through
+# Invoke-P20TrackerRead (core/hub_sync.py says why).
+HUB_SYNC_SCRIPT = REPO_ROOT / "Scripts" / "Get-HubSyncState.ps1"
+
 # Stand-in for "no hub configured". Deliberately a path that cannot exist, so
 # every `.exists()` guard already in the read routes does the right thing
 # without a second code path.
@@ -774,7 +779,15 @@ def load_config() -> dict:
         "isDemoDismissed": bool(local.get("isDemoDismissed", defaults.get("isDemoDismissed", False))),
         # The WIP limit (limits.inPlay): a line Status and the board say, never a gate.
         "limits": _deep_merge(dict(defaults.get("limits", {}) or {}), local.get("limits", {}) or {}),
+        # Where each Space's repository is cloned on THIS machine
+        # (spaceCheckouts.<slug>.path; agent/core/checkout.py). This machine's
+        # file only -- never the shipped one, never hub.json -- as utilities.psm1
+        # reads it.
+        "spaceCheckouts": local.get("spaceCheckouts") if isinstance(local.get("spaceCheckouts"), dict) else {},
         "firstRun": _deep_merge(dict(defaults.get("firstRun", {}) or {}), local.get("firstRun", {}) or {}),
+        # The deck module's per-machine put-away list (deck.archived): deck ids,
+        # written by the deck page's Archive through Config. A list replaces.
+        "deck": _deep_merge(dict(defaults.get("deck", {}) or {}), local.get("deck", {}) or {}),
         # The verb table's own metadata. The bridge reads one key off it --
         # bridgeTimeoutSeconds -- and a per-machine config may patch an entry,
         # so it merges rather than being taken from the defaults alone.
@@ -965,6 +978,22 @@ def in_play_limit(cfg: dict | None = None) -> int | None:
     except (TypeError, ValueError):
         return None
     return n if n >= 1 else None
+
+
+def deck_archived(cfg: dict | None = None) -> list[str]:
+    """The decks this machine has put away, ``deck.archived``: deck ids, in order,
+    each once. Anything that is not a list of non-empty strings reads as none --
+    a hand-edited value never breaks ``/env``. The deck file is not read or written:
+    the list is a machine preference, written by the deck page through ``Config``.
+    """
+    raw = ((cfg if cfg is not None else load_config()).get("deck") or {}).get("archived")
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    for item in raw:
+        if isinstance(item, str) and item.strip() and item.strip() not in out:
+            out.append(item.strip())
+    return out
 
 
 def start_work_launch() -> bool:

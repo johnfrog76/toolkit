@@ -200,6 +200,12 @@ def stamp_assigned() -> str:
     return consts()["stamps"]["assigned"]
 
 
+def stamp_from() -> str:
+    """``**From:**`` -- the meeting record an agenda line came from, by its file
+    stem (``<series>-YYYY-MM-DD``, or the bare date for the 1:1). NewPrompt -From writes it."""
+    return consts()["stamps"]["from"]
+
+
 def card_id_shape() -> str:
     """The shape of a card's id, WITHOUT anchors: a work item number, or the
     four-character id of a card with no work item. A string, not a pattern --

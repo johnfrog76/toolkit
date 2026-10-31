@@ -68,7 +68,7 @@ GitHub Space, where they answer through `gh`.
 | --- | --- | --- |
 | CLI | twelve verbs and the work-item form of `NewPrompt` (below), the `Scripts/` they run, the tier check | `NewPrompt -Title`, `Archive`, `Billable`, `Status`, `Sync`, `ThreadHash` |
 | Agent | `ado/accounting.py` -- `/prs`, `/work-items`, `/dashboard`, `/dashboard/pipelines/{project}`; the identity those filter by | `ado/status.py`, `ado/reporting.py` (Daily, engagement), `ado/pr_comments.py` (reads files), `ado/bridge.py` |
-| Web | `MyWork`, `MyPRs`, `Dashboard`, the work-item tab of the New card dialog, *Open in ADO* and *Create PR* on a card, the repo filter, `ConnectAdoCard` | `Board`, `PromptStatus`, `PromptDetailPage`, `Billing` (Daily), `EnvCard`, `ConfigSettings` |
+| Web | `MyWork`, `MyPRs`, `Dashboard`, the work-item tab of the New card dialog, *Open on Azure DevOps* and *Create PR* on a card, the repo filter, `ConnectAdoCard` | `Board`, `PromptStatus`, `PromptDetailPage`, `Billing` (Daily), `EnvCard`, `ConfigSettings` |
 | A card | the `**ADO Link:**` line, the `PR URL:` line, the review rounds | everything else ([the card](../hub/cards.md)) |
 
 ## Turning it on
@@ -145,9 +145,9 @@ Eleven of the twelve are in the table below; the twelfth is `LogPeerReview`, a g
 | `Dashboard` | PRs across projects, assigned items with staleness, recent pipeline runs | no |
 | `NewPR [<card>]` | the ship-it step: opens the PR, moves the work item to Code Review, comments on it, writes `PR URL:` into the card. Named by id from outside the code repository, the card's `ADO Link` and `## Branch` answer; a project it cannot tell is refused, never guessed; `-WhatIf` calls nothing | writes `PR URL:` |
 | `PublishPR [<card>]` | the ship flow's second stage: flips the card's draft pull request to ready (`PATCH` with `{"isDraft":false}`, the token `NewPR` takes). A card with no `PR URL:` line, a pull request already ready and a GitHub pull request (`gh pr ready <url>`) are refused; `-WhatIf` prints the call and sends nothing | writes `PR published: <url>` under `PR URL:`, once |
-| `GetPRComments [<pr>]` | fetches review threads and appends them to the card; append-only, safe to re-run | writes `PR URL:` if absent; appends rounds |
-| `ReplyPR <pr> <thread> -Reply "..."` | posts a reply to a thread, optionally setting its status, and fills that thread's `Reply:` slot in the card | fills the slot |
-| `AddPRReview <pr>` | an AI code review as inline comments; needs `ANTHROPIC_API_KEY`; run it from the PR's own repository | no |
+| `GetPRComments [<pr>]` | fetches review threads and appends them to the card; append-only, safe to re-run. On a GitHub Space it answers through `gh` -- inline comments, the conversation tab and review summaries; the card's `PR URL:` names the repository ([CLI](../CLI.md), "On a GitHub board") | writes `PR URL:` if absent; appends rounds |
+| `ReplyPR <pr> <thread> -Reply "..."` | posts a reply to a thread, optionally setting its status, and fills that thread's `Reply:` slot in the card. On a GitHub Space it answers through `gh`: `fixed` / `closed` resolve the thread, `active` reopens it, and `byDesign` / `pending` / `wontFix`, which GitHub has no word for, are refused before anything is posted ([CLI](../CLI.md), "Answering on a GitHub board") | fills the slot |
+| `AddPRReview <pr>` | an AI code review as inline comments; needs `ANTHROPIC_API_KEY`; run it from the PR's own repository. On a GitHub Space no checkout is needed: the diff comes from GitHub and the findings are one review ([CLI](../CLI.md), "AI review (optional)") | no |
 | `CloseItem <id> -Comment "..."` | closes or resolves the work item; `-WhatIf` prints the transition without calling ADO | no |
 | `EditItem <id>` | changes what the item says or wears (title, description, sprint, assignee, tags); on a GitHub Space `-Pin` / `-Unpin` are the tracker's own pin (`gh issue pin` / `unpin`, three per repository; a fourth is refused as "GitHub pins three issues per repository; unpin one first"), and on Azure DevOps they are a stated refusal -- a work item has no pin; `-WhatIf` prints the edit | no |
 
@@ -164,7 +164,7 @@ switch.
 | `GET /api/status` | 2+ | the Card model; on a GitHub Space at Tier 1 each card also carries `pinned` -- its issue is in the repository's pinned set, asked once per repo by `gh api graphql` and dropped when `EditItem` runs; at Tier 2, on Azure DevOps and with no tracker `gh` is not asked and `pinned` is false |
 | `GET /api/work-items` | 1 | ADO via `az` (WIQL); on a GitHub Space `gh issue list`, with `?state=open\|closed\|all` and `?all=1` as the Issues tab's two agent axes; a gh row carries `pinned`, GitHub's own `isPinned` |
 | `GET /api/issue-report`, `GET /api/milestones` | 1, GitHub only | the Stats tab: the report read from the Studio ledger's entry for the Space ([the Studio](studio.md)) -- no `gh` call of its own -- and `gh api .../milestones?state=all` with `reached` derived -- every issue closed and at least one |
-| `GET /api/design`, `GET /api/design/{folder}/{name}` | 1, GitHub only | the repo's `design/` and `spec/` via `gh api .../contents` (Studio S2); an owner-grained address is a 400 |
+| `GET /api/design`, `GET /api/design/{folder}/{name}` | 1, GitHub only | the repo's `design/` and `spec/` via `gh api .../contents` (Studio S2); an owner-grained address is a 400. The list also carries `checkout`: the active Space's `spaceCheckouts.<slug>.path` checked against the repo on every request (`space`, `key`, `path`, `root`, `ready`, `reason`; `agent/core/checkout.py`), which decides whether a row offers `MoveDesign`'s roads ([Studio](studio.md), "The web UI") |
 | `GET /api/docs`, `GET /api/docs/{path}`, `GET /api/docs/asset/{path}` | 1, GitHub only | the repo's `README.md` and `docs/` tree, one document (with `issues`, the repository's issues on github.com, or `""` when it has them turned off), one image's bytes -- via `gh api .../contents`, the same gate and cache as `/api/design` (D-S12); an image past the 1 MB the contents route inlines is read from `gh api .../git/blobs/<sha>`, up to 10 MB, and past that is a 413 with a sentence; a document path that is not `README.md` or a `.md` under `docs/`, an image path that is not an image, or any path with a `..` in it, is a 404 before `gh` is asked |
 | `GET /api/dashboard` | 1 | ADO via `az`, plus local repo health |
 | `GET /api/dashboard/pipelines/{project}` | 1 | ADO via `az` |
@@ -190,14 +190,14 @@ and `hub.json`), or the first `az` call that failed, as one sentence naming the 
 - **The New card dialog** -- a *From a work item* tab beside *New card*, and the default where ADO is
   reachable. Where ADO is not in use there are no tabs at all.
 - **On a card** -- an **ado** badge first in its meta line (a GitHub-born card wears **gh**, a custom card
-  nothing: the card model's `tracker`, from the card's own link), *Open in ADO*, *Create PR*, the project tag, and the repo filter (which matches on the
+  nothing: the card model's `tracker`, from the card's own link), *Open on Azure DevOps* (last in the menu), *Create PR*, the project tag, and the repo filter (which matches on the
   ADO link, so it hides every unlinked card and SAYS how many). The first two are ABSENT on a card with
   no work item, and on every card while ADO is off; *Create PR* is disabled, with the reason, until the
   card records a commit (`web/src/modules/ado/cardActions.ts`, [the web README](../../web/README.md#the-board)).
 - **Design, on a GitHub Space** (Studio S2, D-S11) -- the fourth Home tab, after Issues,
   Board and Stats: the product repo's `design/` and `spec/` folders, read through the tracker
   (`GET /api/design`, `gh api repos/{owner}/{repo}/contents/...`), the note first and the spec beside
-  it. A row shows the title (the file's first `#` heading, else its name), the frontmatter
+  it. A row shows the title (a leading `#` heading, else the line under `## Title`, else the file's name -- `docs/hub/design.md`, "How the title is read"), the frontmatter
   `description`, the folder, and the thread its `> GitHub:` line names; it opens a reading room at
   `/design/{folder}/{name}` -- the house reading page, the document and then its thread in one viewer.
   Gated by the tracker and Tier 1, nothing else: no flag, and an ADO or local Space has no such tab.

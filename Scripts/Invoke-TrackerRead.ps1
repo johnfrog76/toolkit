@@ -40,3 +40,29 @@ function Invoke-P20TrackerRead {
     $global:LASTEXITCODE = $code
     return [PSCustomObject]@{ Code = $code; Lines = $lines; Out = $out; Err = $err }
 }
+
+#
+# A gh api WRITE whose body is JSON: the body travels in a file (--input), never
+# in argv. Windows PowerShell 5.1 drops a bare double quote from a native
+# command's arguments, so a reply or a review comment that quotes code would
+# reach GitHub altered if it went as -f body=<text>; a file carries any text
+# byte for byte, on both hosts. The path is still a plain repos/... path with
+# no query in it. Returns Invoke-P20TrackerRead's @{ Code; Lines; Out; Err }.
+#
+function Invoke-P20GhApiWrite {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true, Position = 0)][string]$Path,
+        [Parameter(Mandatory = $true, Position = 1)]$Body,
+        [string]$Method = 'POST'
+    )
+    $file = Join-Path ([System.IO.Path]::GetTempPath()) ('p20-gh-' + [guid]::NewGuid().ToString('N') + '.json')
+    try {
+        $json = ConvertTo-Json -InputObject $Body -Depth 8 -Compress
+        [System.IO.File]::WriteAllText($file, $json, (New-Object System.Text.UTF8Encoding($false)))
+        return (Invoke-P20TrackerRead 'gh' @('api', '--method', $Method, $Path, '--input', $file))
+    }
+    finally {
+        Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
+    }
+}

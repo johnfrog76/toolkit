@@ -42,6 +42,8 @@ EXPECTED = {
     ("stamps", "billable"): "**Billable:**",
     # Who takes a card with no issue behind it (D-AR10): Route -Assign writes it.
     ("stamps", "assigned"): "**Assigned:**",
+    # The meeting record an agenda line came from: NewPrompt -From writes it.
+    ("stamps", "from"): "**From:**",
     ("stamps", "started"): "**Started:**",
     ("stamps", "outcome"): "**Outcome:**",
     ("stamps", "review"): "**Review:**",
@@ -539,6 +541,7 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("stamps.cover", "**Cover:**"),
         ("stamps.before", "**Before:**"),
         ("stamps.outcome", "**Outcome:**"),
+        ("stamps.from", "**From:**"),
         ("studio.threadLine", "GitHub:\\s*(https"),
         ("rituals.workerLabelPrefix", "Routed to"),
         ("rituals.text.queueHeading", "Waiting on you"),

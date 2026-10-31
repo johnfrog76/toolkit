@@ -63,6 +63,10 @@ export interface NewCardFields {
   title: string;
   /** A configured card type name, as `/env.cardTypes` spells it ("User Story"). */
   type: string;
+  /** Optional: fills the card's Context (a Task) or Summary (everything else)
+   *  in place of `(TBD)`, the same slot an ADO-linked card fills from the work
+   *  item's own description. Multi-line is kept, as `-Description <text>`. */
+  description?: string;
   /** A picture at birth (docs/hub/cards.md, "A card's pictures"): the temp
    *  path the upload route answered, as `-Cover <path>` -- or `-Before <path>`
    *  when the snap shows what is wrong. The verb copies it in and writes the line. */
@@ -104,6 +108,7 @@ export function buildCoverParams(fields: CoverFields): string[] {
  */
 export function buildNewCardParams(fields: NewCardFields): string[] {
   const params = ["-Title", fields.title.trim(), "-Type", fields.type.replace(/\s+/g, "")];
+  if (fields.description?.trim()) params.push("-Description", fields.description);
   if (fields.cover?.trim()) params.push("-Cover", fields.cover.trim());
   if (fields.before?.trim()) params.push("-Before", fields.before.trim());
   return params;
@@ -133,10 +138,25 @@ export function buildMoveParams(fields: { file: string; to: string }): string[] 
   return ["-Card", fields.file, "-To", fields.to.replace(/\s+/g, "")];
 }
 
-/** `NewGrowth -Close <file>`: retire a growth item. The file is the name as the
+/** `NewGrowth -Close <file>`: archive a growth item. The file is the name as the
  *  agent serves it (`filename`), which is the name under growth/current/. */
 export function buildGrowthCloseParams(fields: { file: string }): string[] {
   return ["-Close", fields.file];
+}
+
+/** `NewGrowth -Complete <file>`: write a goal's Outcome Status line as Achieved.
+ *  The file stays in growth/current/; archiving it is `-Close`. */
+export function buildGrowthCompleteParams(fields: { file: string }): string[] {
+  return ["-Complete", fields.file];
+}
+
+/**
+ * `WorkReview <review> -Archive | -Delete` -- a review's row's two moves. `review`
+ * is the row's own name for its folder, `[archive/]<slug-set>/<start>_<end>`, as
+ * the agent reads it off the path.
+ */
+export function buildWorkReviewParams(review: string, move: "archive" | "delete"): string[] {
+  return [review, move === "archive" ? "-Archive" : "-Delete"];
 }
 
 /** The New Growth Item dialog's fields. Named for the CLI parameters they feed. */
@@ -261,6 +281,28 @@ export function buildMoveDesignParams(fields: MoveDesignFields): string[] {
   if (fields.reason?.trim()) params.push("-Reason", fields.reason.trim());
   if (fields.doc?.trim()) params.push("-Doc", fields.doc.trim());
   return params;
+}
+
+/** `MoveDesign -Space <slug>` from the Design tab (#146): a PRODUCT's design,
+ *  moved in that Space's checkout on this machine (`spaceCheckouts.<slug>.path`)
+ *  -- no `-Hub`, so the verb stages in the clone and never commits. The bridge
+ *  runs in the package; `-Space` is how the verb finds the clone, the way
+ *  `-Hub` finds the hub. */
+export function buildCheckoutMoveDesignParams(
+  fields: MoveDesignFields & { space: string },
+): string[] {
+  const params = [fields.name, "-To", fields.to, "-Space", fields.space.trim()];
+  if (fields.dropped) params.push("-Dropped");
+  if (fields.reason?.trim()) params.push("-Reason", fields.reason.trim());
+  if (fields.doc?.trim()) params.push("-Doc", fields.doc.trim());
+  return params;
+}
+
+/** The commit line MoveDesign suggests after a staged move, or "" -- the
+ *  verb's own words, never retyped here. */
+export function suggestedCommitLine(output: string | null | undefined): string {
+  const m = /^\s*(git commit -m .+?)\s*$/m.exec(output ?? "");
+  return m ? m[1] : "";
 }
 
 /** `NewReminder` (the Organize add-on). Only what was given goes on the line:

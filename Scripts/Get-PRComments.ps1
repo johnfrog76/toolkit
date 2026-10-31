@@ -1,19 +1,32 @@
 ﻿<#
 .SYNOPSIS
-    Fetches PR review comments from Azure DevOps and appends them to a prompt file.
+    Fetches PR review comments from the Space's tracker -- Azure DevOps or GitHub -- and appends them to a prompt file.
 
 .DESCRIPTION
     Pulls all threads from a given PR, filters to actionable comments (skips system/build noise),
     formats as markdown matching the ADO-Comments.template.md structure, and appends to the
     matching prompt file in current/ (auto-detected from linked work items).
 
-    Workflow:
+    Workflow (Azure DevOps):
     1. Resolve PR ID from branch name (or accept PR ID directly)
     2. Fetch threads via ADO REST API (Bearer token from az cli)
     3. Filter: skip system threads (policy, auto-complete, publish), keep file-specific + human comments
     4. Parse each thread: extract file, line, author, category, severity, content, code suggestion
     5. Query linked work items and find matching prompt file in current/
     6. Append formatted comments to prompt file (or print to console)
+
+    On a GitHub Space the same card is written through gh (every call through
+    Invoke-P20TrackerRead, every query as -f / -F fields, never in the URL):
+    1. The repository: the card whose PR URL: line names this pull request
+       (no checkout needed), else -Repository, else this checkout's GitHub
+       remote, else the one repository the Space names. Several and none
+       named: refused, never guessed.
+    2. The pull request (and, with no number, the one whose head is the branch).
+    3. Inline review comments, the conversation tab and review summaries --
+       Scripts/Read-GitHubPRThreads.ps1 says what is kept and why.
+    4. The card: the one whose PR URL: line names it, else the head branch's,
+       else the issue its body names ("Issue: #n", "Fixes #n").
+    5. The same dedup, formatting and append as Azure DevOps, below.
 
 .PARAMETER PullRequestId
     The PR number (positional). If not provided, auto-detects from current branch.
@@ -22,10 +35,12 @@
     Source branch name to look up the PR. Ignored if PullRequestId is provided.
 
 .PARAMETER Repository
-    ADO repository name. Default: from toolkit config.
+    ADO repository name. Default: from toolkit config. On GitHub: <owner>/<name>, or <name>
+    under the Space's owner.
 
 .PARAMETER Project
-    ADO project name. Default: from toolkit config.
+    ADO project name. Default: from toolkit config. On GitHub: the owner, when -Repository
+    is a bare name.
 
 .PARAMETER OutputFile
     Write to a specific file instead of auto-detecting from linked work items.
@@ -39,7 +54,7 @@
     Get-P20PRComments 140123 -OutputFile .\my-bug.prompt.md
 
 .NOTES
-    Depends on: az cli (for access token), ADO REST API v7.1
+    Depends on: az cli (for access token), ADO REST API v7.1 -- or, on a GitHub Space, gh
     Config: reads org/project/repo from $global:P20Config
 #>
 [CmdletBinding()]
@@ -93,17 +108,22 @@ PARAMETERS:
     -PullRequestId <int>   PR number (positional). Omit to detect from branch.
     -BranchName <string>   Source branch to look up PR. Ignored if PullRequestId given.
     -Repository <string>   ADO repo name. Default: from toolkit config.
+                           On GitHub: <owner>/<name>, or <name> under the Space's owner.
     -Project <string>      ADO project name. Default: from toolkit config.
     -OutputFile <path>     Write to specific file instead of auto-detecting prompt (no pr-comments/ side record).
     -Help                  Show this help message.
 
 BEHAVIOR:
-    1. Fetches all PR threads from ADO
-    2. Filters out system noise (policy, auto-complete, build publish)
+    1. Fetches all PR threads from the Space's tracker (ADO, or GitHub through gh)
+    2. Filters out system noise (policy, auto-complete, build publish; on GitHub,
+       bot comments on the conversation tab -- named on the card, not hidden)
     3. Formats actionable comments as markdown (ADO-Comments template)
     4. Queries PR for linked work items
     5. Finds matching prompt file in current/ by work item ID
     6. Appends formatted comments to that prompt file
+
+    On GitHub the card whose pull request line names this PR answers first:
+    it names the repository too, so no checkout is needed.
 
     If no matching prompt file is found, prints to console with a warning.
 
@@ -112,6 +132,7 @@ EXAMPLES:
     $(Get-CliPrefix)GetPRComments                               # Auto-detect PR from current branch
     $(Get-CliPrefix)GetPRComments 140123 -OutputFile .\x.md     # Write to specific file
     $(Get-CliPrefix)GetPRComments 140123 -Project "Learning Coaches Everywhere" -Repository CoachWebApp
+    $(Get-CliPrefix)GetPRComments 12 -Repository acme/widgets     # GitHub, when no card names PR 12
 
 "@ -ForegroundColor Cyan
     exit 0
@@ -181,8 +202,14 @@ if (-not $cfg) {
 
 $org = $cfg.Org
 
+# WHICH tracker answers follows the board's address (D-G4), as in NewPR. The
+# GitHub path resolves its own repository below; the ADO defaults are ADO's.
+. (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
+$trackerKind = Resolve-P20Tracker -OrgUrl $org
+Write-P20TrackerHeader -Name $cfg.ActiveOrgName -OrgUrl $org
+
 # Resolve project/repo from config if not provided
-if (-not $Project -or -not $Repository) {
+if ($trackerKind -ne 'github' -and (-not $Project -or -not $Repository)) {
     $projects = @($cfg.Projects | ForEach-Object { @{ Name = $_.name; Repo = $_.repo } })
     if ($projects.Count -eq 0) {
         Write-CliError -Message "No projects configured for the active Space." -Hint "Pass -Project and -Repository, or add projects to the Space in hub.json."
@@ -243,13 +270,15 @@ function Get-P20RecordedComments {
     param([string]$FileContent)
     $recorded = @{}
     if (-not $FileContent) { return $recorded }
+    # Ids are [long]: a GitHub thread or comment id is past the 32-bit range.
+    # Every key is a [long], so a caller looks one up as a [long].
     foreach ($m in [regex]::Matches($FileContent, '(?i)threads?\s*\**\s*(\d+)')) {
-        $threadId = [int]$m.Groups[1].Value
+        $threadId = [long]$m.Groups[1].Value
         if (-not $recorded.ContainsKey($threadId)) { $recorded[$threadId] = @() }
     }
     foreach ($m in [regex]::Matches($FileContent, '\(Thread (\d+) / Comment (\d+)\)')) {
-        $threadId = [int]$m.Groups[1].Value
-        $recorded[$threadId] = @($recorded[$threadId]) + [int]$m.Groups[2].Value
+        $threadId = [long]$m.Groups[1].Value
+        $recorded[$threadId] = @($recorded[$threadId]) + [long]$m.Groups[2].Value
     }
     return $recorded
 }
@@ -267,11 +296,11 @@ function Get-P20ThreadDelta {
     #>
     param($Thread, [hashtable]$Recorded)
     $comments = @(Get-P20ThreadTextComments $Thread)
-    $threadId = [int]$Thread.id
+    $threadId = [long]$Thread.id
     $numbered = @()
     for ($i = 0; $i -lt $comments.Count; $i++) {
-        $commentId = $i + 1
-        if ($comments[$i].PSObject.Properties['id'] -and $comments[$i].id) { $commentId = [int]$comments[$i].id }
+        $commentId = [long]($i + 1)
+        if ($comments[$i].PSObject.Properties['id'] -and $comments[$i].id) { $commentId = [long]$comments[$i].id }
         $numbered += [PSCustomObject]@{ Id = $commentId; Comment = $comments[$i] }
     }
     $later = @($numbered | Select-Object -Skip 1)
@@ -343,6 +372,129 @@ try {
         }
         Write-Host "Detected branch: $BranchName" -ForegroundColor DarkGray
     }
+
+    # What the shared tail below reads, whichever tracker answered: the pull
+    # request's address, the threads, the non-actionable ids and the card.
+    $prUrl = ''
+    $prTitle = ''
+    $targetFile = $null
+    $nonActionableNote = 'votes / policy / status'
+
+    # -- A GitHub Space: gh answers, then the SHARED tail (dedup, format, write).
+    # The ADO body sits in the else below, unindented on purpose, as NewPR's does.
+    if ($trackerKind -eq 'github') {
+        . (Join-Path $PSScriptRoot 'Read-GitHubPRThreads.ps1')
+        $folders = Get-PromptFolders
+        $currentDir = $folders.Current
+
+        # Which repository: the card that names the pull request, -Repository,
+        # this checkout's GitHub remote, the board's one repo -- in that order,
+        # one function for every pull-request verb (Read-GitHubPRThreads.ps1).
+        $where = Resolve-P20GitHubPRRepo -PullRequestId $PullRequestId -Repository $Repository -Project $Project `
+            -OrgUrl $org -Projects $cfg.Projects -CurrentDir $currentDir -Token $script:Consts.tokens.prUrl `
+            -ToolkitRoot (Split-Path -Parent $PSScriptRoot) -Verb 'GetPRComments'
+        if ($where.Error) {
+            # A read, but it WRITES a card: comments from the wrong repository's
+            # PR of the same number would land in it. So nothing is guessed.
+            Write-CliError -Message $where.Error -Hint $where.Hint
+            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+        }
+        $ghRepoFull = $where.Repo
+        $cardByUrl = $where.Card
+        $Repository = $ghRepoFull
+
+        # The pull request: by number, or the newest whose head is the branch.
+        # A query travels as -f fields, never in the URL (AGENTS.md, Traps: a
+        # '&' in a URL is cmd's on Windows).
+        if (-not $PullRequestId) {
+            Write-Host "Looking up PR for branch: $BranchName..." -ForegroundColor DarkGray
+            $listRead = Invoke-P20TrackerRead 'gh' @('api', '--method', 'GET', "repos/$ghRepoFull/pulls",
+                '-f', "head=$($ghRepoFull.Split('/')[0]):$BranchName", '-f', 'state=all', '-F', 'per_page=10')
+            if ($listRead.Code -ne 0) {
+                Write-CliError -Message "Could not list pull requests on $ghRepoFull -- $((@($listRead.Lines) -join ' ').Trim())" -Hint "Check gh auth status, or $(Get-CliPrefix)Log -Errors."
+                exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+            }
+            $listed = @((@($listRead.Out) -join "`n") | ConvertFrom-Json)
+            $listed = @($listed | ForEach-Object { $_ } | Where-Object { $_ })
+            if ($listed.Count -eq 0) {
+                Write-CliError -Message "No PR found for branch '$BranchName' on $ghRepoFull." -Hint "Push your branch and create a PR first, or pass the PR number directly."
+                exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+            }
+            $PullRequestId = [int]$listed[0].number
+        }
+
+        $prRead = Invoke-P20TrackerRead 'gh' @('api', "repos/$ghRepoFull/pulls/$PullRequestId")
+        if ($prRead.Code -ne 0) {
+            $said = (@($prRead.Lines) -join ' ').Trim()
+            if ($said -match '404|Not Found') {
+                Write-CliError -Message "PR #$PullRequestId not found on $ghRepoFull." -Hint "Check the PR number, or name the repository: -Repository <owner>/<name>."
+            }
+            else {
+                Write-CliError -Message "Could not read PR #$PullRequestId on $ghRepoFull -- $said" -Hint "Check gh auth status, or $(Get-CliPrefix)Log -Errors."
+            }
+            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+        }
+        $pr = (@($prRead.Out) -join "`n") | ConvertFrom-Json
+        $prTitle = [string]$pr.title
+        $prUrl = [string]$pr.html_url
+        if (-not $prUrl) { $prUrl = "https://github.com/$ghRepoFull/pull/$PullRequestId" }
+        if (-not $BranchName -and $pr.head) { $BranchName = [string]$pr.head.ref }
+        Write-Host "PR #$($PullRequestId): $prTitle ($ghRepoFull)" -ForegroundColor Green
+
+        # Every comment of every thread, from all three of GitHub's places.
+        # Paginated, each element one line of JSON (tojson makes it a string,
+        # and a string is printed raw), so a page boundary cannot split a parse.
+        $payloads = @{}
+        foreach ($part in @(
+                @{ Key = 'review'; Path = "repos/$ghRepoFull/pulls/$PullRequestId/comments"; What = 'inline review comments' },
+                @{ Key = 'issue'; Path = "repos/$ghRepoFull/issues/$PullRequestId/comments"; What = 'conversation comments' },
+                @{ Key = 'reviews'; Path = "repos/$ghRepoFull/pulls/$PullRequestId/reviews"; What = 'reviews' })) {
+            Write-Host "Fetching $($part.What) for PR #$($PullRequestId)..." -ForegroundColor DarkGray
+            $read = Invoke-P20TrackerRead 'gh' @('api', '--paginate', '--method', 'GET', $part.Path, '-F', 'per_page=100', '--jq', 'map(tojson)[]')
+            if ($read.Code -ne 0) {
+                # Never half a review: a card missing one channel looks complete.
+                Write-CliError -Message "Could not read the $($part.What) of PR #$PullRequestId on $ghRepoFull -- $((@($read.Lines) -join ' ').Trim())" -Hint "Nothing was written. Check gh auth status, or $(Get-CliPrefix)Log -Errors."
+                exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+            }
+            $payloads[$part.Key] = @(@($read.Out) | Where-Object { "$_".Trim() } | ForEach-Object { "$_" | ConvertFrom-Json })
+        }
+        $gh = ConvertTo-P20GitHubThreads -ReviewComments $payloads['review'] -IssueComments $payloads['issue'] -Reviews $payloads['reviews']
+        $actionableThreads = @($gh.Threads)
+        $systemThreadIds = @($gh.NonActionable)
+        $nonActionableNote = 'bot comments on the conversation tab'
+        Write-Host "Found $($actionableThreads.Count) actionable thread(s) out of $($gh.Total) total." -ForegroundColor Cyan
+        if ($systemThreadIds.Count -gt 0) {
+            Write-Host "Not for triage: $($systemThreadIds.Count) bot comment(s) on the conversation tab -- named on the card's Non-actionable line." -ForegroundColor DarkGray
+        }
+
+        # The card: the one that names the PR, else the head branch's, else the
+        # issue the body names.
+        if ($OutputFile) { $targetFile = $OutputFile }
+        elseif ($cardByUrl) { $targetFile = $cardByUrl; Write-Host "Matched prompt file: $(Split-Path $cardByUrl -Leaf)" -ForegroundColor Green }
+        elseif ($currentDir -and (Test-Path $currentDir)) {
+            if ($BranchName) {
+                . (Join-Path $PSScriptRoot 'Resolve-CardForBranch.ps1')
+                $byBranch = Resolve-P20CardForBranch -Branch $BranchName -CurrentDir $currentDir
+                if ($byBranch) { $targetFile = $byBranch; Write-Host "Matched prompt file by branch: $(Split-Path $byBranch -Leaf)" -ForegroundColor Green }
+            }
+            if (-not $targetFile) {
+                $issueIds = @(Get-P20GitHubLinkedIssues -Body ([string]$pr.body))
+                if ($issueIds.Count -gt 0) {
+                    Write-Host "Linked issue(s): $($issueIds -join ', ')" -ForegroundColor DarkGray
+                    $promptFiles = Get-ChildItem -Path $currentDir -Filter "*.prompt.md" -File
+                    foreach ($issueId in $issueIds) {
+                        $match = Find-P20CardForWorkItem -PromptFiles $promptFiles -WorkItemId ([string]$issueId) -Config $cfg
+                        if ($match) {
+                            $targetFile = $match[0].FullName
+                            Write-Host "Matched prompt file: $($match[0].Name)" -ForegroundColor Green
+                            break
+                        }
+                    }
+                }
+            }
+        }
+    }
+    else {
 
     $tokenRead = Get-P20AdoToken -Tenant $global:P20Config.Tenant
     if (-not $tokenRead.Ok) {
@@ -515,13 +667,18 @@ try {
         }
     }
 
+    $prUrl = "$org/$encodedProject/_git/$Repository/pullrequest/$PullRequestId"
+
+    }
+    # -- end of the ADO else; both trackers land here with $actionableThreads,
+    # $systemThreadIds, $prUrl, $prTitle and $targetFile set --
+
     if ($actionableThreads.Count -eq 0) {
         # Design: writing "PR URL:" to the prompt file is what causes {cliPrefix}Status to flip the card
         # from In Progress → Code Review. Clicking fetch after creating a PR is the intentional
         # trigger for that transition — even with no comments yet. The PR URL is the state gate.
         if ($targetFile -and (Test-Path $targetFile)) {
             $fileContent = Get-Content -Path $targetFile -Raw
-            $prUrl = "$org/$encodedProject/_git/$Repository/pullrequest/$PullRequestId"
             if ($fileContent -notmatch [regex]::Escape($script:Consts.tokens.prUrl)) {
                 # Through the one card writer: it keeps the file's line endings.
                 Write-CardText -Path $targetFile -Content ($fileContent.TrimEnd("`r", "`n") + "`n`n$($script:Consts.tokens.prUrl) $prUrl`n")
@@ -542,7 +699,7 @@ try {
         $fileContent = Get-Content -Path $targetFile -Raw
     }
     $recordedComments = Get-P20RecordedComments -FileContent $fileContent
-    $existingThreadIds = @($recordedComments.Keys | ForEach-Object { [int]$_ } | Sort-Object -Unique)
+    $existingThreadIds = @($recordedComments.Keys | ForEach-Object { [long]$_ } | Sort-Object -Unique)
     if ($existingThreadIds.Count -gt 0) {
         Write-Host "Found $($existingThreadIds.Count) existing thread(s) in file." -ForegroundColor DarkGray
     }
@@ -588,7 +745,6 @@ try {
     # --- Format Markdown ---
     $md = @()
     $md += ""
-    $prUrl = "$org/$encodedProject/_git/$Repository/pullrequest/$PullRequestId"
 
     $heading = $script:Consts.tokens.prReviewHeading
     if ($isFirstRun) {
@@ -612,7 +768,7 @@ try {
     # the dedup regex catches them next run. Keeps votes/policy/status out of triage for good.
     $newSystemIds = @($systemThreadIds | Where-Object { $_ -notin $existingThreadIds })
     if ($newSystemIds.Count -gt 0) {
-        $md += "Non-actionable threads (votes / policy / status -- recorded for dedup, not for triage): " +
+        $md += "Non-actionable threads ($nonActionableNote -- recorded for dedup, not for triage): " +
             (($newSystemIds | ForEach-Object { "(Thread $_)" }) -join ' ')
     }
     $md += ""
@@ -673,9 +829,9 @@ try {
             # Collapse to single line for display
             $commentText = ($commentText -replace "`r`n|`n", " ").Trim()
 
-            # Extract code suggestion
+            # Extract code suggestion -- a plain fence, or GitHub's ```suggestion block
             $codeSuggestion = ""
-            if ($content -match '(?s)```\s*\n(.+?)\n```') {
+            if ($content -match '(?s)```(?:suggestion)?\s*\n(.+?)\n```') {
                 $codeSuggestion = $Matches[1].Trim()
             }
 

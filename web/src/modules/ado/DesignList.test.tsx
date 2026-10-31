@@ -179,6 +179,26 @@ jest.mock("./api.ado", () => ({
   },
 }));
 
+// A product's move (#146): the dialog runs MoveDesign through the bridge.
+const movedWith: string[][] = [];
+let moveReply: { status: string; output: string | null; error: string | null } = {
+  status: "success",
+  output: "",
+  error: null,
+};
+jest.mock("../studio/api.studio", () => ({
+  useRunMoveDesignMutation: () => [
+    ({ params }: { params: string[] }) => {
+      movedWith.push(params);
+      return {
+        unwrap: () =>
+          Promise.resolve({ command: "MoveDesign", exit_code: 0, duration: 1, ...moveReply }),
+      };
+    },
+    { isLoading: false },
+  ],
+}));
+
 function Where() {
   const loc = useLocation();
   return <div data-testid="where">{loc.pathname + loc.search}</div>;
@@ -675,5 +695,128 @@ describe("a design document's reading room", () => {
 
   it("designDocument leaves an unreadable thread out", () => {
     expect(designDocument(DETAIL, { ...THREAD, reason: "gh did not answer" })).toBe(DETAIL.body);
+  });
+});
+
+// A product's designs move where this machine names the Space's checkout (#146):
+// the same roads a hub design's row offers, from the same entries, run as
+// MoveDesign -Space <slug> -- staged in the clone, never committed; and where it
+// does not, today's menu and one line naming the setting.
+describe("a product design's moves", () => {
+  const READY = {
+    space: "toolkit",
+    key: "spaceCheckouts.toolkit.path",
+    path: "/src/toolkit",
+    root: "/src/toolkit",
+    ready: true,
+    reason: "",
+  };
+  const STAGED = [
+    "Git root: /src/toolkit (the Toolkit Space's checkout)",
+    "Move design/board-note.md -> design/archive/board-note.md",
+    "Staged, not committed. Suggested:",
+    '  git commit -m "design: A note about the board archived (shipped)"',
+    "Moved: 'A note about the board' -> Archive.",
+  ].join("\n");
+  let refetch: jest.Mock;
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    movedWith.length = 0;
+    refetch = jest.fn();
+    moveReply = { status: "success", output: STAGED, error: null };
+  });
+
+  const menuOf = async (title: string) => {
+    fireEvent.click(screen.getByRole("button", { name: `Actions for ${title}` }));
+    return (await screen.findAllByRole("menuitem")).map((m) => m.textContent);
+  };
+
+  it("with a checkout here, a note offers the hub's roads, and a spec its completion", async () => {
+    listAnswer = { data: { ...FULL, checkout: READY } };
+    mountList();
+    expect(await menuOf("A note about the board")).toEqual([
+      "Graduate to a spec",
+      "Archive as shipped",
+      "Archive as dropped",
+      "Open on GitHub",
+    ]);
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    expect(await menuOf("Feature: the Studio")).toEqual([
+      "Open the note",
+      "Open the thread",
+      "Complete",
+      "Open on GitHub",
+    ]);
+    // The card's foot says nothing: there is nothing to configure.
+    expect(screen.queryByRole("note")).toBeNull();
+  });
+
+  it("choosing a road runs MoveDesign -Space in the checkout, shows what was staged, and re-reads", async () => {
+    listAnswer = { data: { ...FULL, checkout: READY }, refetch } as typeof listAnswer;
+    mountList();
+    await menuOf("A note about the board");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Archive as shipped" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/staged there, never committed/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Archive as shipped" }));
+    const status = await within(dialog).findByRole("status");
+    expect(movedWith).toEqual([["board-note.md", "-To", "Archive", "-Space", "toolkit"]]);
+    expect(movedWith[0]).not.toContain("-Hub");
+    expect(within(status).getByText(/Staged in \/src\/toolkit, not committed/)).toBeTruthy();
+    expect(
+      within(status).getByText('git commit -m "design: A note about the board archived (shipped)"'),
+    ).toBeTruthy();
+    expect(within(status).getByText(/reads johnfrog76\/toolkit on GitHub/)).toBeTruthy();
+    expect(refetch).toHaveBeenCalledTimes(1);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Done" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("a refusal stays in the dialog in the verb's words, and nothing is re-read", async () => {
+    listAnswer = { data: { ...FULL, checkout: READY }, refetch } as typeof listAnswer;
+    moveReply = {
+      status: "error",
+      output: null,
+      error: "design/archive/board-note.md already exists.",
+    };
+    mountList();
+    await menuOf("A note about the board");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Archive as shipped" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Archive as shipped" }));
+    expect((await within(dialog).findByRole("alert")).textContent).toContain("already exists");
+    expect(refetch).not.toHaveBeenCalled();
+  });
+
+  it("with no checkout set, the menu is today's and the foot names the setting", async () => {
+    listAnswer = {
+      data: { ...FULL, checkout: { ...READY, path: "", root: "", ready: false } },
+    };
+    mountList();
+    expect(await menuOf("A note about the board")).toEqual(["Open on GitHub"]);
+    expect(screen.getByRole("note").textContent).toBe(
+      "To move these designs from here, name this machine's clone of johnfrog76/toolkit: spaceCheckouts.toolkit.path in Settings.",
+    );
+  });
+
+  it("a checkout set to the wrong clone says why, and offers no moves", async () => {
+    const reason =
+      "spaceCheckouts.toolkit.path is /src/other, but it is a clone of o/other, not johnfrog76/toolkit.";
+    listAnswer = {
+      data: { ...FULL, checkout: { ...READY, path: "/src/other", root: "", ready: false, reason } },
+    };
+    mountList();
+    expect(await menuOf("A note about the board")).toEqual(["Open on GitHub"]);
+    expect(screen.getByRole("note").textContent).toBe(
+      `${reason} Point it at a clone of johnfrog76/toolkit to move these designs from here.`,
+    );
+  });
+
+  it("an older agent that says nothing about a checkout keeps today's menu and says nothing", async () => {
+    listAnswer = { data: FULL };
+    mountList();
+    expect(await menuOf("A note about the board")).toEqual(["Open on GitHub"]);
+    expect(screen.queryByRole("note")).toBeNull();
   });
 });

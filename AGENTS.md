@@ -113,8 +113,8 @@ exception and is not: the gate is checked **per request**, so flipping a flag in
 needs no restart **of the agent or the web UI**; a shell that is already open keeps the verbs it
 registered at import (`docs/CONFIGURATION.md`, "A module flag and an open shell").
 
-The fourteen verbs the modules contribute: `NewGrowth`, `NewWorkReview`, `PublishWorkReview`,
-`LogPeerReview`, `UpdateResume` (growth); `SendTeams`, `NewMeeting`, `MeetingAgenda`
+The fifteen verbs the modules contribute: `NewGrowth`, `NewWorkReview`, `PublishWorkReview`,
+`WorkReview`, `LogPeerReview`, `UpdateResume` (growth); `SendTeams`, `NewMeeting`, `MeetingAgenda`
 (communication); `NewReminder`, `Reminders` (organize); `Standup`, `Triage`, `Route`, `StartWork` (solitaireAgile).
 (`NewDesign`, `StampDesign`, `MoveDesign`, `NewSpace`, `RetireSpace`, `RemoveSpace` and `HowWeWork` are the Studio's, and core.) **A module closes its own data.** `Archive` is org-scoped and cannot see a hub-root
 sibling like `manager/` or `growth/`, and the answer is not to teach it: it is
@@ -169,7 +169,7 @@ module and you add a mock line to every one of these files.
 **Four test runners**, one per half plus one for the two together. Run the ones your change touches:
 
 ```powershell
-tkTestToolkit                 # the CLI -- 46 suites, 8096 assertions on this commit
+tkTestToolkit                 # the CLI -- 47 suites, 8501 assertions on this commit
 ```
 
 ```bash
@@ -208,6 +208,7 @@ anywhere).
 | Surface | Key | Where that key lives |
 | --- | --- | --- |
 | Navigation shortcuts | `aliases.<Name>.path` | `config.local.json` -- `Config -Set aliases.Home.path=<path>` |
+| Space checkouts | `spaceCheckouts.<slug>.path` | `config.local.json` only, never `hub.json` -- `Config -Set spaceCheckouts.<slug>.path=<folder>`. Where a Space's repository is cloned on this machine: the first candidate of the one resolver (`Scripts/Resolve-SpaceCheckout.ps1`), and what lets the Design tab's product rows run `MoveDesign -Space <slug>`, staged and never committed. `docs/CONFIGURATION.md` |
 | Azure DevOps | `features.ado`, else the active Space's `status` and its tracker | DERIVED (`Scripts/Test-AdoEnabled.ps1`): unset, it follows the org you are in -- on in an `active` org whose address is Azure DevOps (`Scripts/Resolve-Tracker.ps1`), off in a `local` one, and off on a connected GitHub Space, where the row says `<slug>'s tracker is GitHub`. It decides what is SHOWN (Setup's checks, the inventory); nothing is unregistered, and `Menu`'s tracker rows stay on a connected GitHub Space because they answer through `gh`. `docs/modules/ado.md`, "The switch, and its scope" |
 | GitHub issues | `tracker.github` | DERIVED: `on` once a Space whose address is `github.com` is `active`, else `not configured`. The address is a Space's, written by `Connect <slug>` (`hub.json`); the shipped GitHub demo has one and is `local` until connected |
 | growth module | `features.growth` | `config.local.json`, top-level |
@@ -318,8 +319,9 @@ Done locally is not Closed on the board. If the card should be closed, run `tkCl
 
 - **The prompt file does not live in the tool's repo.** It lives under the configured prompt
   store — check with `tkEnv`. Never create one inside the ToolKit checkout.
-- **`tkAddPRReview` must run from the repository the PR belongs to**; it computes the diff
-  locally and will stop rather than review nothing.
+- **`tkAddPRReview` must run from the repository the PR belongs to** on Azure DevOps; it computes
+  the diff locally and will stop rather than review nothing. On a GitHub Space the diff comes
+  from GitHub, and no checkout is needed.
 - **`-WhatIf` on the first of a batch.** `tkCloseItem` supports it and prints the exact
   transition without calling ADO. Worth it before closing a queue of bugs.
 - **`tkGetPRComments` is safe to re-run** — it skips threads already in the file. It also writes

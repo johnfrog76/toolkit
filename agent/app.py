@@ -37,7 +37,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .ado import accounting, bridge, design, docs, pr_comments, reporting, sprint, status
 from .communication import api as communication_router
-from .core import assets, config_routes, env, log, surfaces
+from .core import assets, config_routes, env, hub_sync, log, surfaces
 from .core.config import API_PREFIX, REPO_ROOT, cors_origins
 from .growth import growth_router
 from .organize import api as organize_router
@@ -57,6 +57,7 @@ def build_api() -> APIRouter:
     """Every route, under the one prefix."""
     api = APIRouter(prefix=API_PREFIX)
     api.include_router(env.api)
+    api.include_router(hub_sync.api)
     api.include_router(config_routes.api)
     api.include_router(surfaces.api)
     api.include_router(log.api)

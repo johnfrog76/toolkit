@@ -51,6 +51,8 @@ describe("consts.json", () => {
     expect(STAMPS.started).toBe("**Started:**");
     expect(STAMPS.review).toBe("**Review:**");
     expect(STAMPS.outcome).toBe("**Outcome:**");
+    // The meeting record an agenda line came from (NewPrompt -From).
+    expect(STAMPS.from).toBe("**From:**");
     expect(TOKENS.prUrl).toBe("PR URL:");
     expect(TOKENS.prReviewHeading).toBe("## PR Review Comments");
     expect(TOKENS.previousRound).toBe("> Previous round:");
@@ -494,6 +496,7 @@ describe("no half retypes a contract literal", () => {
     ["stamps.created", consts.stamps.created],
     ["stamps.billable", STAMPS.billable],
     ["stamps.assigned", STAMPS.assigned],
+    ["stamps.from", STAMPS.from],
     ["stamps.started", STAMPS.started],
     ["stamps.review", STAMPS.review],
     ["stamps.cover", STAMPS.cover],

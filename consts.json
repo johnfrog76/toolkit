@@ -32,7 +32,7 @@
   },
 
   "stamps": {
-    "_": "Written by Scripts/Write-CardText.ps1's callers; read by the engagement summary's billed days and the web's session cards. assigned is who takes a card with no issue behind it -- `**Assigned:** me`, or a size (a worker label) -- written by Route -Assign and read by the card model's `assigned` (docs/hub/cards.md).",
+    "_": "Written by Scripts/Write-CardText.ps1's callers; read by the engagement summary's billed days and the web's session cards. assigned is who takes a card with no issue behind it -- `**Assigned:** me`, or a size (a worker label) -- written by Route -Assign and read by the card model's `assigned` (docs/hub/cards.md). from is the meeting record an agenda line came from -- `**From:** <series>-YYYY-MM-DD`, or the bare date for the 1:1: the record's file stem, which says the series and the date -- written by NewPrompt -From and read by the card model's `from_record` (docs/hub/cards.md; docs/modules/communication.md).",
     "closed": "**Closed:**",
     "created": "**Created:**",
     "billable": "**Billable:**",
@@ -45,7 +45,8 @@
     "cover": "**Cover:**",
     "before": "**Before:**",
     "outcome": "**Outcome:**",
-    "assigned": "**Assigned:**"
+    "assigned": "**Assigned:**",
+    "from": "**From:**"
   },
 
   "tokens": {

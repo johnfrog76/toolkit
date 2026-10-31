@@ -377,9 +377,28 @@ export interface Design {
   cards?: BoundCard[];
 }
 
+/** The Space's checkout on this machine (`spaceCheckouts.<slug>.path`, #146),
+ *  checked by the agent against the repo on every read. `ready`: a product
+ *  row offers MoveDesign's roads, run in that clone through the bridge. */
+export interface DesignCheckout {
+  /** The Space it was checked for: what MoveDesign -Space takes. */
+  space: string;
+  /** The setting, spelled for Config -Set. */
+  key: string;
+  /** As written in config.local.json; "" when unset. */
+  path: string;
+  /** The clone's top level, when ready. */
+  root: string;
+  ready: boolean;
+  /** Why not, a sentence that names the setting; "" when ready or unset. */
+  reason: string;
+}
+
 export interface DesignListResponse {
   supported: boolean;
   repo: string;
+  /** Absent from an older agent, and when no Space is active. */
+  checkout?: DesignCheckout | null;
   /** Every file read, in folder then name order. */
   items: DesignDoc[];
   /** Grouped by id, in road order then by title (L2). Absent from an older agent. */
@@ -921,9 +940,18 @@ export const adoEndpoints = adoApi.injectEndpoints({
     }),
 
     // GET /api/reviews/:folder (full content)
-    getReviewDetail: builder.query<ReviewDetailResponse, { folder: string; slugs?: string }>({
-      query: ({ folder, slugs }) =>
-        `reviews/${encodeURIComponent(folder)}${slugs ? `?slugs=${encodeURIComponent(slugs)}` : ""}`,
+    // `archived` reads reviews/archive/, where WorkReview -Archive moves a review.
+    getReviewDetail: builder.query<
+      ReviewDetailResponse,
+      { folder: string; slugs?: string; archived?: boolean }
+    >({
+      query: ({ folder, slugs, archived }) => {
+        const q = new URLSearchParams();
+        if (slugs) q.set("slugs", slugs);
+        if (archived) q.set("archived", "true");
+        const qs = q.toString();
+        return `reviews/${encodeURIComponent(folder)}${qs ? `?${qs}` : ""}`;
+      },
       keepUnusedDataFor: CACHE_TTL,
     }),
 

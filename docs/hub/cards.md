@@ -89,6 +89,11 @@ still has a `title`; it has no `type` and no `name`.
 | Spike | `Spike.template.md` | Branch; Git; Summary; Question; Findings; Recommendation; Done when; Questions / Blockers |
 | Meeting | `Meeting.template.md` | Branch; Git; When; Where; Who; Purpose; Notes; Outcomes; Follow-ups; Questions / Blockers -- a meeting you ATTENDED, written after the fact (`NewPrompt -Date` puts `**Created:**` on the day it was); a meeting you RUN is the Meeting Agenda Planner's, under `manager/` |
 
+`## Context` (a Task) and `## Summary` (everything else) start with a description: the work item's own,
+for a card made from an id; the text passed to **`NewPrompt -Title ... -Description <text>`**, for a
+card made offline; `(TBD)` when neither gave one. Multi-line text is kept exactly. This is not a parsed
+token -- it is prose a person edits like the rest of the section.
+
 Sections are documents, not a schema: nothing fails if one is missing or renamed, **except the things
 below, which ARE parsed wherever they appear in the file.**
 
@@ -116,6 +121,7 @@ After a `---` rule, bold-label lines. **This is the part of the model that is st
 **Sprint:** RecipeBox\Sprint 8
 **Story Points:** 2
 **ADO Link:** https://dev.azure.com/YOUR-ADO-ORG/RecipeBox/_workitems/edit/214
+**From:** client-weekly-2026-09-11
 **Billable:** no
 **Assigned:** me
 **Before:** ../assets/214/before.png
@@ -129,6 +135,7 @@ After a `---` rule, bold-label lines. **This is the part of the model that is st
 | `**Sprint:**` | The iteration path, or any title at all once planned by hand. Only the LAST segment is shown (`Sprint 8`), cut to 20 characters for the board -- the card itself keeps the title whole | `NewPrompt`, from the work item; `(not linked)` text offline; `Plan <id> -Milestone "<title>"` for a card already made, through `Set-P20CardLine` -- never the tracker (that is `NewItem`/`EditItem`'s own, tracker-bound `-Sprint`); `Plan <id> -Remove` deletes the line | the board's Sprint filter; the card's tag |
 | `**Story Points:**` | As the work item had it | `NewPrompt` | people |
 | `**ADO Link:**` | The work item's address. **An `https://` value here is what makes a card `linked`**; offline it reads `(not linked -- created offline with -Title)` | `NewPrompt`; and `NewItem -FromCard`, which publishes a card made offline as a GitHub issue and writes the issue's URL here, through `Set-P20CardLine` (the card keeps its id) | `linked`, `ado_url`, the repo filter (a card with no ADO link is never hidden by it), *Open in ADO* |
+| `**From:**` | The meeting record an agenda line came from, by its file stem: `YYYY-MM-DD` for the 1:1, `<series>-YYYY-MM-DD` for a series -- which says the series and the date. **No line means the card came from no meeting.** The value is the first such line's, trimmed; an empty line names none | `NewPrompt -From <record>`, at birth, directly above `**Created:**` ([communication](../modules/communication.md#an-agenda-line-becomes-a-card)) | the model's `from_record` (`card_from_record`, held to `Tests/fixtures/parsers/from-lines.json`; the CLI writes the line and has no reader of it). `stamps.from` |
 | `**Billable:**` | `no` takes the card off Daily and the standup. **No line means billable** -- "billable again" removes the line | `Billable -No`, through `Set-P20CardLine` | Daily and Team Agile's standup (one reader a half: `card_billable`, `Test-P20CardBillable`); the *Not billable* tag. `stamps.billable` |
 | `**Assigned:**` | Who takes the card: `me`, or a size -- a worker label (`sonnet`, `opus`, `fable`; `fable` is the owner's own seat). **No line means nobody.** The value is the first such line's, trimmed. On a GitHub issue the tracker's own fields say who -- the assignee, or the worker label -- so the line is for a card with no issue behind it | `Route <id> -Assign me\|<size>` (Team Agile, D-AR10), through `Set-P20CardLine` | the model's `assigned` (one reader a half: `card_assigned`, `Get-P20CardAssigned`, held to `Tests/fixtures/parsers/assigned-lines.json` from both suites). `stamps.assigned` |
 | `**Cover:**` | The card's picture: a path relative to the card's folder, `../assets/<card key>/cover.<ext>`. **No line means no picture**; a line whose file is missing, or that resolves outside the Space's `assets/`, reads as none too | `Cover`, or `NewPrompt -Cover`, through `Set-P20CardLine` | the board's card face, the list's thumbnail, the card page; the model's `cover`. `stamps.cover` |
@@ -194,7 +201,7 @@ A card can carry a picture: a screen snap of what was wrong (`**Before:**`) and 
 - With `storeSync: git`, `Cover` commits the picture and the card together, the way `Archive` commits a move.
 - `Repair-CardLinks` is not involved: the path is inside the hub and does not move with the package.
 - **From the browser, the same writer** (C2). The card page's drop zone, the header's Replace cover /
-  Add before / Remove cover, and the + dialog's picture field all go one way: the bytes to
+  Add before / Delete the cover, and the + dialog's picture field all go one way: the bytes to
   `POST /api/assets/upload`, which puts them in a temp file under the system temp folder and answers its
   path, writing nothing into the hub; then `Cover <card> <path>` (or `NewPrompt -Cover` / `-Before <path>`)
   through the bridge, which copies the file into `assets/<card key>/` and writes the line, after which the bridge removes the upload's temp folder (success or failure; and the agent sweeps any a day old at start). The route
@@ -370,6 +377,7 @@ fields, so nothing downstream parses a heading or a filename (`PromptInfo`, `age
 | `pinned` | NOT read from the file -- asked of the tracker: the card's `tracker` is `github`, its `**ADO Link:**` is an issue of the Space's own repository, and that number is in the repository's pinned set (one `gh api graphql` `pinnedIssues` call per repo, held 60 seconds and dropped when `EditItem` runs) | `false` unless all three hold **and** the Space is GitHub at Tier 1; at Tier 2, on Azure DevOps and on no tracker `gh` is not asked. The board's card face wears the pin and "Pinned on GitHub" in its meta line and sorts pinned cards first within a lane; the list and the detail route do not carry it |
 | `billable` | no `**Billable:** no` line | default `true` |
 | `assigned` | the first `**Assigned:**` line's value, trimmed | `me`, a size, or `""` -- nobody; on the list and the detail route |
+| `from_record` | the first `**From:**` line's value, trimmed | the meeting record's stem (`2026-10-28`, `client-weekly-2026-10-28`), or `null` -- no line, or an empty one; on the list and the detail route. Named `from_record` because `from` is a Python keyword |
 | `status` | derived, above | `Backlog`, `Active`, `In Progress`, `Code Review` (and `Done` for archive readers) |
 | `progress`, `checked`, `total` | the checkboxes | `--` when there are none |
 | `sprint` | `**Sprint:**`, last segment, cut to 20 | `--` when absent |
@@ -393,7 +401,7 @@ keeps the same edit rule -- the card's own line ending, no BOM.
 
 | Verb | Does to the file |
 | --- | --- |
-| `NewPrompt <id>` / `-Title` | creates it from the type's template, in `backlog/`; `-Now` in `current/`. For a card already in `current/` or `backlog/` it RETURNS that card and writes nothing. `-Design <name\|id>` adds the `> Design:` header line |
+| `NewPrompt <id>` / `-Title` | creates it from the type's template, in `backlog/`; `-Now` in `current/`. For a card already in `current/` or `backlog/` it RETURNS that card and writes nothing. `-Design <name\|id>` adds the `> Design:` header line; `-From <record>` adds the `**From:**` footer line |
 | `ThreadHash` | adds commit bullets under `Commits:`; fills `[commit]` placeholders in PR replies. A card in `backlog/` is moved to `current/` first |
 | `NewPR` | writes `PR URL:`. A card in `backlog/` is moved to `current/` first |
 | `PublishPR` | writes `PR published: <url>` on the line under `PR URL:`, once -- a record, not state |
