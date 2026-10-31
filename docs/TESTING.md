@@ -101,7 +101,7 @@ a passing `pytest:` line may end `(via <python>)`, which is information and not 
   Counts for docs/TESTING.md's paste block, from this run:
   Consts 195, Compat 1613, Menu 1950, Environment 62, Archive 217, PRComments 230, BackfillStamps 50, Update 58, Start 87, PullRequest 10, CloseWorkItem 36, PromptStatus 125, ThreadHash 76, Setup 82, Move 51, Billable 36, Plan 33, Cover 106, Design 173, NewPrompt 112, ExitCodes 130, Autoload 85, GitRoot 17, Sync 34, Connect 62, NewSpace 149, HowWeWork 42, EditItem 69, PublishPR 31, Config 246, HubJson 184, Portability 91, Web 165, Agent 129, TestAll 167, ModuleCommands 84, Reminders 71, Rituals 637, StandupRemind 85, Triage 121, StartWork 72, Review 69, WorkReview 36, SendTeams 43, NewMeeting 63, MeetingAgenda 175, DocCounts 142
   47 suites, 8501 assertions
-  pytest: 1352 passed, 3 skipped
+  pytest: 1353 passed, 3 skipped
   web: 151 suites, 1747 tests
 ```
 
