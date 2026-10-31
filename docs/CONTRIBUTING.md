@@ -69,7 +69,7 @@ means `tkInstallAutoload -Force`. Each half also has its own README for the deta
 Every pull request runs a check, `.github/workflows/verify.yml` (also on every push to `main`, and from the Actions tab's button): the agent's, the CLI's and the web UI's runners on Ubuntu. That is the check a pull request has to pass, alongside CodeQL. The Windows job -- the CLI typed from Windows PowerShell 5.1 and the two browser smoke modes that start their own servers (`smoke:matrix`, `smoke:a11y`) -- does not run on an ordinary pull request or a push to `main`: it runs once each weekday evening against `main`, from the Actions tab's button, and on a pull request that carries the `ci` label, so label a change that is heavy on PowerShell or the browser when it wants that proof before it merges. The label takes effect on the pull request's next push (or reopen); to run Windows on a branch right away, use the button on that branch (`gh workflow run verify.yml --ref <branch>`). A label added to an open pull request starts nothing by itself, on purpose: a label must never cancel the running checks. A scheduled failure is filed as an issue with the run's URL and the next fix to merge carries the repair. Each step failed on a failure, a skipped half or a run that counted nothing, read from the runner's own summary line ([Testing](TESTING.md), "In CI"). It needs no secret, and a suite that does not pass without one is a defect of the suite. It does not run each suite as a file under 5.1, the agent's or the web UI's runners on Windows, or the smoke against servers you started, so a change to anything only those can show is still proved by running them, and the pull request says which ran.
 
 The web half (`web/`) runs on **Node 24, the active LTS**. The version is stated twice and they say the
-same thing: `.nvmrc` at the repository root (`24`) and `web/package.json` `engines.node` (`">=24.22.0"`). There is
+same thing: `.nvmrc` at the repository root (`24`) and `web/package.json` `engines.node` (`">=24.22.0 <25"`). There is
 one `.nvmrc`, at the root, not a second copy in `web/`: `nvm use` (nvm-sh) finds it from `web/` by walking up,
 and on nvm-windows, which does not read the file, run `nvm use 24`. Without `engine-strict`, `npm ci` on an
 older Node warns about `engines` rather than refusing.
@@ -80,7 +80,9 @@ a crash inside V8's garbage collector (`ClearStaleLeftTrimmedPointerVisitor` in 
 test. It came on about one `npm test` in eight on an 18-core Mac with jest's cache warm, and never in 48 runs
 on 24.22.0. `.nvmrc` stays `24`, so CI resolves the newest 24; a machine whose default Node is older
 (`nvm alias default`) gets the `EBADENGINE` warning from `npm ci`, and the answer is `nvm install 24` and
-`nvm alias default 24`.
+`nvm alias default 24`. **And the ceiling is 25:** `engines` says `<25` to match `.nvmrc`'s `24`, so a
+machine whose `node` resolves to another major (a package manager's newer Node ahead of nvm on the `PATH`,
+for one) gets the same warning instead of running the suite on a Node it was never run on.
 
 ## Run the suites
 

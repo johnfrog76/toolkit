@@ -62,7 +62,7 @@ What each `npm run` script does:
 | `npm run smoke:first-run` | `node tests/smoke.mjs --first-run` | The first run's first move: on a copy of `samples/hub`, the first tutorial card dragged from Backlog to To do and the moved file read back, on its own servers |
 | (flag) `--shots=<dir>` | | One PNG per route per viewport, under the gitignored `web/shots/` |
 
-`npm test` wants Node 24.22 or later (`engines`; `npm ci` warns below it). On 24.21 a jest worker is
+`npm test` wants Node 24 at 24.22 or later (`engines` `>=24.22.0 <25`; `npm ci` warns outside it). On 24.21 a jest worker is
 killed by `SIGSEGV` about one run in eight and its suite reads "Test suite failed to run" with every
 assertion passing -- a V8 crash, not a test; [Contributing](../docs/CONTRIBUTING.md), "Set up the three halves", has
 the detail.
