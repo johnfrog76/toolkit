@@ -13,7 +13,7 @@ the same install gate by gate, with what you should see at each one.
 | **Azure CLI** (`az`) | Only for ADO commands. Sign in with `az login`. |
 | **Python** 3.12+ | Only for the agent (`agent/`). The CLI never calls it. Runtime deps: `agent/requirements.txt`. |
 | **Python test deps** | Only for `python3 -m pytest Tests/` (Windows: `python` or `py -3`): `pytest` and `httpx` (`fastapi.testclient` imports httpx), and `ruff`, the Python half's linter. All three live in `agent/requirements-dev.txt`, which pulls the runtime file in. |
-| **Node** 24 | Only for the web UI (`web/`). Node 24 is the active LTS; `.nvmrc` at the repository root and `web/package.json` `engines` both say so. |
+| **Node** 24.22 or later | Only for the web UI (`web/`). Node 24 is the active LTS; `.nvmrc` at the repository root and `web/package.json` `engines` both say so, and `engines` puts the floor at 24.22.0 because 24.21 crashes a jest worker now and then ([Contributing](CONTRIBUTING.md), "Set up the three halves"). |
 | **Playwright browsers** | Only for `npm run smoke`. `npm ci` installs the library; the chromium binary lives in a machine-level cache and needs `npx playwright install chromium` once. |
 | `ANTHROPIC_API_KEY` | **Optional.** Only for `AddPRReview` and the agent's `suggest` route. Everything else works without it. |
 
@@ -34,7 +34,7 @@ What has been run, and where. A row says "verified" only where someone ran it an
 | **PowerShell 7** | 7.6 | Both hosts: 7.6 on the Mac and on the Windows PC |
 | **Windows PowerShell** | 5.1, the floor: every script must parse and run on it | The Windows PC only (5.1.26100), under `powershell.exe`: `Test-PS51Compat`, `Test-Portability` and the Gate 12 rows. Nothing on a Mac can run it |
 | **Python** | 3.12 | Both hosts: 3.12.4 on the Mac and 3.12.10 on the Windows PC. 3.10 and 3.11 are not run by anything, so they are not claimed; the floor rises or falls with what runs |
-| **Node** | 24, the active LTS (`.nvmrc`, `web/package.json` `engines`) | The Windows PC: `npm ci` and `npm test` on Node 24.21. The Mac's recorded web counts were observed on Node 22; a Mac run on 24 is not recorded yet |
+| **Node** | 24.22 or later, the active LTS (`.nvmrc`, `web/package.json` `engines`) | The Mac: `npm ci` and `npm test` on Node 24.22.0, 1745 tests. CI resolves `.nvmrc` to the newest 24 (24.22.1 on this commit). The Windows PC last ran them on Node 24.21 |
 | **Docker image** (`web/Dockerfile`, `web/docker-compose.yml`) | Builds on `node:24-alpine`, serves from `nginx:alpine` | The Windows PC: `docker compose build` and the smoke against the running container, published on `127.0.0.1:5174`. Linux hosts: see the trust model's note on `host.docker.internal` |
 
 ---

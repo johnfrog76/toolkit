@@ -59,7 +59,10 @@ a reader that knows `fail` already breaks the streak and fails the run, which is
 
 **Four runners**, one per half plus one that drives a browser over both -- the one-half form, for when you
 want one. Every count below was
-observed on this commit, on one host with pwsh 7.6, Python 3.12 and Node 24.
+observed on this commit, on one host with pwsh 7.6, Python 3.12 and Node 24. The web half wants Node
+24.22 or later: on 24.21 a jest worker is killed by `SIGSEGV` now and then, and one suite reads "Test
+suite failed to run" with every assertion passing -- a V8 crash, not a test ([Contributing](CONTRIBUTING.md),
+"Set up the three halves").
 
 ```powershell
 tkTestToolkit            # 47 suites, 8501 assertions
