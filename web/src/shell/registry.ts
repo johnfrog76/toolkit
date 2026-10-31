@@ -195,6 +195,12 @@ export interface ToolkitModule {
    *  should see wherever they are (organize's reminder bell). Keyed elements;
    *  off means absent, like everything else a module contributes. */
   headerItems?: (ctx: CardContext) => ReactElement[];
+  /** Layers drawn ONCE at the app root, after everything else and over the whole
+   *  viewport -- whatever page or dialog is up. A thing that must not be clipped by a
+   *  page's tree earns a place here: Team Agile's confetti mount, which draws nothing
+   *  until a burst is thrown. Keyed elements, each a lazyPart like every other part;
+   *  off means absent, so a module that is off has no layer in the tree. */
+  overlays?: (ctx: CardContext) => ReactElement[];
   /** True for a path this module wants the WHOLE screen for: no nav bar, no
    *  page padding, no background. A deck is the case -- it is a room of its
    *  own, not a card on a page. */
@@ -280,6 +286,10 @@ export function moduleSlot(
 
 export function moduleHeaderItems(active: ToolkitModule[], ctx: CardContext): ReactElement[] {
   return active.flatMap((m) => m.headerItems?.(ctx) ?? []);
+}
+
+export function moduleOverlays(active: ToolkitModule[], ctx: CardContext): ReactElement[] {
+  return active.flatMap((m) => m.overlays?.(ctx) ?? []);
 }
 
 export function isChromeless(active: ToolkitModule[], pathname: string): boolean {

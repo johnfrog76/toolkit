@@ -6,7 +6,7 @@ import { ROUTES } from "./paths";
 // the module's DESCRIPTOR and imports no component of its own.
 // Standup, Triage and Milestones share one chunk: the tab's Standup | Triage |
 // Milestones strip and the page under it. StandupPage itself is drawn unchanged
-// inside it; the award dialog and its confetti are a chunk of their own.
+// inside it; the award dialog is a chunk of its own.
 const RitualPage = lazyPart(
   () => import("./RitualPage"),
   (m) => m.RitualPage,
@@ -16,6 +16,15 @@ const RitualPage = lazyPart(
 const StandupPlay = lazyPart(
   () => import("./stage/StandupPlay"),
   (m) => m.StandupPlay,
+);
+// The module's one confetti mount, drawn at the app root (the registry's `overlays`):
+// a small chunk that draws nothing until a burst is thrown through useConfetti(), and
+// fetches the confetti package only then. Its fallback is nothing -- a root layer
+// never shows a spinner.
+const ConfettiLayer = lazyPart(
+  () => import("./ConfettiLayer"),
+  (m) => m.ConfettiLayer,
+  null,
 );
 const StandupRemindSettings = lazyPart(
   () => import("./StandupRemindSettings"),
@@ -44,8 +53,9 @@ const StandupRemindSettings = lazyPart(
  * issue behind it takes one **Assigned:** line, through the same verb).
  *
  * Milestones is the third: one row per tracker milestone with its bar, and
- * the award dialog when one is reached -- the module's one confetti
- * (docs/modules/solitaire-agile.md, "Milestones: the tab and the award").
+ * the award dialog when one is reached -- the module's one confetti, thrown
+ * through useConfetti() and drawn by the one mount it contributes at the app
+ * root (docs/modules/solitaire-agile.md, "Milestones: the tab and the award").
  *
  * Its settings section is the reminder to attend (D-TA15): a time and
  * the days, saved as `Standup -Remind` through the bridge. The reminder is
@@ -72,4 +82,6 @@ export const solitaireAgileModule: ToolkitModule = {
   // The anchor it marks, `standup.remind`, is where the "How do I…" entry
   // "Can it remind me to attend?" opens the drawer (Config/settings-workflows.json).
   settingsSections: () => [<StandupRemindSettings key="solitaireAgile.remind" />],
+  // The confetti is drawn once, at the root, over the whole viewport.
+  overlays: () => [<ConfettiLayer key="solitaireAgile.confetti" />],
 };

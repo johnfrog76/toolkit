@@ -13,6 +13,8 @@ import {
   tookLine,
 } from "./award";
 import { resetCelebrateMemory } from "./celebrate";
+import { ConfettiLayer } from "./ConfettiLayer";
+import { resetConfetti } from "./useConfetti";
 import { MilestonesPage, STAGE_WORDS, countWords } from "./MilestonesPage";
 
 // The Milestones tab (docs/modules/solitaire-agile.md, "Milestones: the tab and the
@@ -71,7 +73,17 @@ const REACHED_CLOSED = "M2 -- 1.3.0"; // every issue closed, closed on GitHub
 const BOTH = () => [byTitle(REACHED_CLOSED), byTitle(REACHED_OPEN)]; // oldest reached first
 
 let reduced = false;
+/** The tab as the app draws it: the page, and the module's one confetti mount at the
+ *  root (ConfettiLayer, the registry's `overlays`), beside it rather than inside. */
+const Page = () => (
+  <>
+    <MilestonesPage />
+    <ConfettiLayer />
+  </>
+);
+
 beforeEach(() => {
+  resetConfetti();
   localStorage.clear();
   resetCelebrateMemory();
   bursts.length = 0;
@@ -163,7 +175,7 @@ describe("the Milestones tab", () => {
       AWARD_SEEN_KEY,
       JSON.stringify(table.expected.map((m) => awardKey(SPACE, m))),
     );
-    render(<MilestonesPage />);
+    render(<Page />);
     expect(asked[0]).toBe(SPACE);
   });
 
@@ -172,7 +184,7 @@ describe("the Milestones tab", () => {
       AWARD_SEEN_KEY,
       JSON.stringify(table.expected.map((m) => awardKey(SPACE, m))),
     );
-    render(<MilestonesPage />);
+    render(<Page />);
     const rows = screen.getAllByTestId("milestone-row");
     // In flight, most complete first; then reached, the one GitHub still shows open
     // first; then empty -- ado/milestones.ts's orderMilestones.
@@ -204,8 +216,8 @@ describe("the Milestones tab", () => {
     expect(bursts).toHaveLength(0);
   });
 
-  it("the award fires once per visit, naming every reached milestone, inside its dialog; closing it lands on the tab with them awarded", async () => {
-    const { unmount } = render(<MilestonesPage />);
+  it("the award fires once per visit, naming every reached milestone, from its dialog; closing it lands on the tab with them awarded", async () => {
+    const { unmount } = render(<Page />);
     // One dialog naming every reached milestone with no mark, oldest first, each with its
     // own line, its picture, one burst.
     const d = await dialog();
@@ -215,12 +227,13 @@ describe("the Milestones tab", () => {
       BOTH().map((m) => `${m.title}: ${tookLine(m)}`),
     );
     expect(within(d).getByTestId("award-picture")).toBeTruthy();
-    // The confetti is the dialog's: drawn inside its surface, and nowhere else.
-    await waitFor(() => expect(within(d).getAllByTestId("confetti")).toHaveLength(1));
-    expect(screen.getAllByTestId("confetti")).toHaveLength(1);
+    // The dialog throws the confetti, and the root mount draws it: one burst, over the
+    // viewport, outside the dialog's tree.
+    await waitFor(() => expect(screen.getAllByTestId("confetti")).toHaveLength(1));
+    expect(within(d).queryByTestId("confetti")).toBeNull();
     expect(stateOf(REACHED_OPEN)).toBe(STAGE_WORDS.reached);
     // The burst ends itself and is not thrown again while the dialog stays.
-    fireEvent.click(within(d).getByTestId("confetti"));
+    fireEvent.click(screen.getByTestId("confetti"));
     await waitFor(() => expect(screen.queryByTestId("confetti")).toBeNull());
     expect(bursts).toHaveLength(1);
 
@@ -237,7 +250,7 @@ describe("the Milestones tab", () => {
     unmount();
 
     // The next visit: never again for the same Space and milestone.
-    render(<MilestonesPage />);
+    render(<Page />);
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));
     });
@@ -247,10 +260,10 @@ describe("the Milestones tab", () => {
   });
 
   it("the mark is set when the dialog is shown: leaving mid-award never shows it again", async () => {
-    const { unmount } = render(<MilestonesPage />);
+    const { unmount } = render(<Page />);
     await dialog();
     unmount();
-    render(<MilestonesPage />);
+    render(<Page />);
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));
     });
@@ -263,7 +276,7 @@ describe("the Milestones tab", () => {
       JSON.stringify([`${SPACE}:${REACHED_OPEN}`, `${SPACE}:${REACHED_CLOSED}`]),
     );
     response = { isLoading: false, data: ok(table.expected, "toolkit") };
-    render(<MilestonesPage />);
+    render(<Page />);
     const d = await dialog();
     await within(d).findByText(awardTitle(BOTH()));
   });
@@ -273,7 +286,7 @@ describe("the Milestones tab", () => {
       isLoading: false,
       data: ok([byTitle("Parking lot"), byTitle("Abandoned"), byTitle("Someday")]),
     };
-    render(<MilestonesPage />);
+    render(<Page />);
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));
     });
@@ -284,7 +297,7 @@ describe("the Milestones tab", () => {
 
   it("under prefers-reduced-motion: the dialog says it, and nothing rains", async () => {
     reduced = true;
-    render(<MilestonesPage />);
+    render(<Page />);
     const d = await dialog();
     await within(d).findByText(awardTitle(BOTH()));
     expect(screen.queryByTestId("confetti")).toBeNull();
@@ -301,7 +314,7 @@ describe("the Milestones tab", () => {
         milestones: [],
       },
     };
-    render(<MilestonesPage />);
+    render(<Page />);
     expect(screen.getByText("Could not read the milestones")).toBeTruthy();
     expect(screen.getByText("This Space's tracker is not GitHub.")).toBeTruthy();
     expect(screen.queryAllByTestId("milestone-row")).toHaveLength(0);
@@ -309,20 +322,21 @@ describe("the Milestones tab", () => {
 
   it("no milestones: says so, as a fact rather than an error", () => {
     response = { isLoading: false, data: ok([]) };
-    render(<MilestonesPage />);
+    render(<Page />);
     expect(screen.getByText("No milestones yet")).toBeTruthy();
   });
 
   it("the agent away: an error, never an empty list", () => {
     response = { isLoading: false, error: { status: 500 } };
-    render(<MilestonesPage />);
+    render(<Page />);
     expect(screen.getByText("Could not read the milestones")).toBeTruthy();
   });
 });
 
-// Confetti.tsx is the one component, and the award dialog is its one caller: no other
-// file in the web tree imports it, or the package behind it.
-describe("the confetti's one caller", () => {
+// One mount, one hook: Confetti.tsx is the one component, ConfettiLayer.tsx -- the
+// module's root overlay -- the one place it is mounted, and the award dialog the one
+// caller of useConfetti(). Nothing throws confetti without a dialog saying why.
+describe("the confetti: one mount, one hook", () => {
   const SRC = path.resolve(__dirname, "../..");
   const files = (dir: string): string[] =>
     fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -330,17 +344,35 @@ describe("the confetti's one caller", () => {
       if (e.isDirectory()) return files(p);
       return /\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name) ? [p] : [];
     });
-  it("is AwardDialog.tsx", () => {
-    const rel = (p: string) => path.relative(SRC, p).split(path.sep).join("/");
-    const callers = files(SRC)
-      .filter((p) =>
-        /from\s+["'](?:\.{1,2}\/)+(?:[\w/]*\/)?Confetti["']/.test(fs.readFileSync(p, "utf8")),
-      )
+  const rel = (p: string) => path.relative(SRC, p).split(path.sep).join("/");
+  const matching = (re: RegExp) =>
+    files(SRC)
+      .filter((p) => re.test(fs.readFileSync(p, "utf8")))
       .map(rel);
-    expect(callers).toEqual(["modules/solitaireAgile/AwardDialog.tsx"]);
-    const pkg = files(SRC)
-      .filter((p) => /from\s+["']react-confetti["']/.test(fs.readFileSync(p, "utf8")))
-      .map(rel);
-    expect(pkg).toEqual(["modules/solitaireAgile/Confetti.tsx"]);
+  const importsOf = (name: string) =>
+    new RegExp(`(?:from\\s+|import\\()["'](?:\\.{1,2}/)+(?:[\\w/]*/)?${name}["']`);
+
+  it("Confetti.tsx is mounted in one place, the root layer", () => {
+    expect(matching(importsOf("Confetti"))).toEqual(["modules/solitaireAgile/ConfettiLayer.tsx"]);
+    expect(matching(/from\s+["']react-confetti["']/)).toEqual([
+      "modules/solitaireAgile/Confetti.tsx",
+    ]);
+    // The layer itself is contributed by the descriptor alone, as a lazy part.
+    expect(matching(importsOf("ConfettiLayer"))).toEqual(["modules/solitaireAgile/index.tsx"]);
+  });
+
+  it("every caller throws through useConfetti(), and the award dialog is the one caller", () => {
+    // Who takes what from the channel: the hook (a caller), the listener (the mount),
+    // the raw throw (nobody -- a caller goes through the hook).
+    const takes = (name: string) =>
+      matching(
+        new RegExp(`import\\s*\\{[^}]*\\b${name}\\b[^}]*\\}\\s*from\\s*["']\\./useConfetti["']`),
+      );
+    expect(takes("useConfetti")).toEqual(["modules/solitaireAgile/AwardDialog.tsx"]);
+    expect(takes("onConfetti")).toEqual(["modules/solitaireAgile/ConfettiLayer.tsx"]);
+    expect(takes("throwConfetti")).toEqual([]);
+    expect(
+      fs.readFileSync(path.join(SRC, "modules/solitaireAgile/AwardDialog.tsx"), "utf8"),
+    ).not.toMatch(/<Confetti\b/);
   });
 });

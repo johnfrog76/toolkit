@@ -23,6 +23,7 @@ import {
   activeModules,
   moduleCards,
   moduleHeaderItems,
+  moduleOverlays,
   moduleHomeTabs,
   moduleNav,
   moduleNavSplit,
@@ -290,6 +291,8 @@ export function App() {
     [active, cardContext],
   );
   const headerItems = useMemo(() => moduleHeaderItems(active, cardContext), [active, cardContext]);
+  // A module's root layers (Team Agile's confetti mount): drawn last, in every chrome.
+  const overlays = useMemo(() => moduleOverlays(active, cardContext), [active, cardContext]);
   const routes = useMemo(() => moduleRoutes(active), [active]);
 
   const settingsLinks = useMemo(
@@ -407,6 +410,7 @@ export function App() {
             ))}
           </Routes>
         </ShellProvider>
+        {overlays}
       </FluentProvider>
     );
   }
@@ -586,6 +590,8 @@ export function App() {
         <ThemePicker />
         {settingsSections}
       </SettingsDrawer>
+      {/* A module's root layers, last: over the page, the dialogs and the drawer. */}
+      {overlays}
     </FluentProvider>
   );
 }

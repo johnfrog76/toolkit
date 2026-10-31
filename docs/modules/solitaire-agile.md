@@ -904,7 +904,8 @@ has shown) and `no issues yet`.
 **The award.** When a milestone is reached and the person next opens the tab, a dialog opens for it:
 `Congratulations: <title> reached!`, one line of what it took -- `12 issues closed, 1 October 2026 to
 24 October 2026.`, from the day it was made to the day it was reached (GitHub's close, else its last
-change: the last issue closing) --, the picture, and the confetti, once, inside the dialog's moment.
+change: the last issue closing) --, the picture, and the confetti, once, over the whole viewport, when the
+dialog opens.
 Close it and the tab is there with that milestone marked `awarded`. A visit owes **one** dialog: when
 several reached milestones are waiting (a browser that first looks at a Space with a backlog), it names all
 of them, oldest reached first, the order the work was done in -- `Congratulations: A, B and C reached!` (`A`
@@ -925,9 +926,24 @@ Corner's old confetti mark, `p20.solitaireAgile.corner.reached`, is no longer re
 award yet.) Under `prefers-reduced-motion` the dialog opens and nothing rains.
 
 **The confetti** (D-AR14) stays one component, `Confetti.tsx` -- one wrapper over the `react-confetti`
-package, the viewport's size, `recycle` off, a burst that rains out in a few seconds -- and the award dialog
-(`AwardDialog.tsx`) is its one caller, drawn inside the dialog's surface. A test holds that no other file
-imports it. The dialog is a `lazyPart`, so the package's bytes are fetched only when an award is drawn.
+package, the viewport's size, `recycle` off, a burst that rains out in a few seconds -- **mounted once, at
+the app root**, and **thrown through a hook**. The mount is `ConfettiLayer.tsx`, which the module
+contributes through the registry's `overlays` (`web/README.md`, "The `ToolkitModule` interface"): the
+shell draws it after the page, the dialogs and the drawer, so a burst covers the whole screen rather than
+one dialog's tree -- in a layer just above the one Fluent puts its dialogs in (`CONFETTI_Z_INDEX`), so it
+rains over the dialog that threw it too, taking no clicks. A caller throws with `const throwConfetti = useConfetti()` (`useConfetti.ts`, a small
+channel with no component and no package in it); one call is one burst. The award dialog
+(`AwardDialog.tsx`) is the one caller, and throws when it opens; tests hold that `Confetti.tsx` is
+mounted only by the layer, the layer contributed only by the descriptor, and `useConfetti()` called only
+by the dialog -- nothing throws confetti without a dialog saying why. Under `prefers-reduced-motion` a
+throw does nothing at all, and the dialog's words stay.
+
+The bytes follow "off means absent": with the module off there is no layer in the tree and nothing
+listening. With it on, the layer is a small `lazyPart` that draws nothing, and the confetti component and
+the package behind it are a chunk of their own, fetched the first time something throws. The channel is a
+module-level listener rather than a React context on purpose: a provider that wraps the app cannot be a
+lazy part without suspending everything under it, and the layer can listen from wherever the shell draws
+it. A throw that lands before the layer's chunk has arrived is held and rained once it does.
 
 **The picture is not drawn yet.** It will be the team lead of the standup's cast lifting weights, drawn in
 the studio and shipped the way slide art is. Until it lands, the dialog wears the Team Agile wordmark (the

@@ -177,6 +177,7 @@ export interface ToolkitModule {
   homeCards?: (ctx: CardContext) => ReactElement[];
   systemCards?: (ctx: CardContext) => ReactElement[];
   headerItems?: (ctx: CardContext) => ReactElement[];
+  overlays?: (ctx: CardContext) => ReactElement[];
   // ...and settingsSections, settingsLinks, slotCards, chromeless: see registry.ts
 }
 ```
@@ -190,6 +191,7 @@ export interface ToolkitModule {
 | `homeCards` | Builds this module's cards for `/`, given the shared `CardContext`. The shell concatenates every active module's output in module order and pages it four at a time |
 | `systemCards` | The same for `/system` |
 | `headerItems` | Small keyed controls for the header, left of the avatar and 1rem from it, on every page -- a signal worth seeing wherever you are. Organize's reminder bell is the one there is |
+| `overlays` | Keyed layers drawn once at the app root, after the page, the dialogs and the drawer, in every chrome -- for a thing a page's tree must not clip. Each is a `lazyPart` like any other part. Team Agile's confetti mount is the one there is: it draws nothing until a burst is thrown through `useConfetti()`, and fetches the confetti package only then ([Milestones: the tab and the award](../docs/modules/solitaire-agile.md#milestones-the-tab-and-the-award)) |
 
 Two additions to the shape the spec sketched, both forced by real content:
 

@@ -4,6 +4,8 @@ import type { Milestone } from "../ado/api.ado";
 import type { MilestonesResponse } from "./api.solitaireAgile";
 import { AWARD_SEEN_KEY, awardKey } from "./award";
 import { resetCelebrateMemory } from "./celebrate";
+import { ConfettiLayer } from "./ConfettiLayer";
+import { resetConfetti } from "./useConfetti";
 import { MilestonesPage } from "./MilestonesPage";
 
 // The award opens ONCE per reached milestone per browser, however the page is left
@@ -55,7 +57,17 @@ const B = ms(2, "M2");
 const C = { ...ms(3, "M3"), updated_at: "2026-10-25" };
 const D = ms(4, "M4");
 
+/** The tab as the app draws it: the page, and the module's one confetti mount at the
+ *  root (ConfettiLayer, the registry's `overlays`), beside it rather than inside. */
+const Page = () => (
+  <>
+    <MilestonesPage />
+    <ConfettiLayer />
+  </>
+);
+
 beforeEach(() => {
+  resetConfetti();
   bursts.length = 0;
   localStorage.clear();
   resetCelebrateMemory();
@@ -96,7 +108,7 @@ describe.each([
 ])("closed by %s", (_name, close) => {
   it("opens once for a backlog, and a revisit with the same storage opens nothing", async () => {
     response = { isLoading: false, data: ok([A, B, C, D]) };
-    const { unmount } = render(<MilestonesPage />);
+    const { unmount } = render(<Page />);
     // One dialog naming all four, oldest reached first, one burst.
     const d = await dialog();
     await within(d).findByText("Congratulations: M1, M2, M4 and M3 reached!");
@@ -106,7 +118,7 @@ describe.each([
     await settle();
     await none();
     unmount();
-    render(<MilestonesPage />);
+    render(<Page />);
     await none();
   });
 });
@@ -114,17 +126,17 @@ describe.each([
 it("data landing in stages (no slug, then the slug, a payload, a refetch) opens ONE dialog", async () => {
   envSpace = undefined;
   response = { isLoading: true };
-  const { rerender } = render(<MilestonesPage />);
+  const { rerender } = render(<Page />);
   expect(dialogs()).toHaveLength(0);
   envSpace = "widgets";
-  rerender(<MilestonesPage />);
+  rerender(<Page />);
   response = { isLoading: false, data: ok([A, B, C, D]) };
-  rerender(<MilestonesPage />);
+  rerender(<Page />);
   await dialog();
   // A refetch: new list and row objects, the dialog still open.
   response = { isLoading: false, data: ok([A, B, C, D].map((m) => ({ ...m }))) };
-  rerender(<MilestonesPage />);
-  rerender(<MilestonesPage />);
+  rerender(<Page />);
+  rerender(<Page />);
   expect(dialogs()).toHaveLength(1);
   // The mark is in place the moment the dialog is up, before any close.
   expect(JSON.parse(localStorage.getItem(AWARD_SEEN_KEY) ?? "[]")).toHaveLength(4);
@@ -132,34 +144,34 @@ it("data landing in stages (no slug, then the slug, a payload, a refetch) opens 
   await settle();
   // A refetch after the close, and after a new milestone is reached: nothing opens.
   response = { isLoading: false, data: ok([A, B, C, D, ms(5, "M5")]) };
-  rerender(<MilestonesPage />);
+  rerender(<Page />);
   await none();
 });
 
 it("a milestone reached while you watch is awarded on the next visit, once", async () => {
   response = { isLoading: false, data: ok([{ ...A, reached: false }]) };
-  const { unmount } = render(<MilestonesPage />);
+  const { unmount } = render(<Page />);
   await none();
   unmount();
   response = { isLoading: false, data: ok([A]) };
-  const second = render(<MilestonesPage />);
+  const second = render(<Page />);
   await dialog();
   await closeByButton();
   await settle();
   second.unmount();
-  render(<MilestonesPage />);
+  render(<Page />);
   await none();
 });
 
 it("an existing title-keyed mark still counts as awarded, and a rename is not a new award", async () => {
   localStorage.setItem(AWARD_SEEN_KEY, JSON.stringify(["widgets:M1", "widgets:M2"]));
   response = { isLoading: false, data: ok([A, B]) };
-  render(<MilestonesPage />);
+  render(<Page />);
   await none();
 });
 
 it("the key is the repository and number, so a rename changes nothing", async () => {
-  const { unmount } = render(<MilestonesPage />);
+  const { unmount } = render(<Page />);
   await dialog();
   await closeByButton();
   await settle();
@@ -169,27 +181,27 @@ it("the key is the repository and number, so a rename changes nothing", async ()
     isLoading: false,
     data: ok([{ ...A, title: "M1 renamed" }, B]),
   };
-  const again = render(<MilestonesPage />);
+  const again = render(<Page />);
   await none();
   again.unmount();
 });
 
 it("the env slug and the agent's slug differing does not re-open on a revisit", async () => {
   envSpace = undefined;
-  const { unmount } = render(<MilestonesPage />);
+  const { unmount } = render(<Page />);
   await dialog();
   await closeByButton();
   await settle();
   unmount();
   envSpace = "widgets";
-  render(<MilestonesPage />);
+  render(<Page />);
   await none();
 });
 
 it("StrictMode changes nothing", async () => {
   const { unmount } = render(
     <StrictMode>
-      <MilestonesPage />
+      <Page />
     </StrictMode>,
   );
   await dialog();
@@ -198,7 +210,7 @@ it("StrictMode changes nothing", async () => {
   unmount();
   render(
     <StrictMode>
-      <MilestonesPage />
+      <Page />
     </StrictMode>,
   );
   await none();

@@ -34,6 +34,7 @@ jest.mock("./StandupPage", () => ({ StandupPage: () => null }));
 jest.mock("./MilestonesPage", () => ({ MilestonesPage: () => null }));
 jest.mock("./RitualPage", () => ({ RitualPage: () => null }));
 jest.mock("./stage/StandupPlay", () => ({ StandupPlay: () => null }));
+jest.mock("./ConfettiLayer", () => ({ ConfettiLayer: () => null }));
 
 import {
   activeModules,
@@ -41,6 +42,7 @@ import {
   moduleCards,
   moduleHeaderItems,
   moduleNav,
+  moduleOverlays,
   moduleRoutes,
   modules,
 } from "../../shell/registry";
@@ -80,6 +82,8 @@ describe("the solitaireAgile module's registry contract", () => {
     expect(moduleNav(active, ctx)).toEqual([]);
     expect(moduleCards(active, ctx, "home")).toEqual([]);
     expect(moduleHeaderItems(active, ctx)).toEqual([]);
+    // No confetti mount in the tree either: nothing to listen, nothing to fetch.
+    expect(moduleOverlays(active, ctx)).toEqual([]);
   });
 
   it("reads a missing features map as off", () => {
@@ -100,6 +104,14 @@ describe("the solitaireAgile module's registry contract", () => {
     expect(moduleCards(active, ctx, "system")).toEqual([]);
     expect(solitaireAgileModule.slotCards).toBeUndefined();
     expect(solitaireAgileModule.headerItems).toBeUndefined();
+  });
+
+  it("contributes ONE root overlay when on -- the confetti's one mount, a lazy part", () => {
+    const overlays = moduleOverlays(activeModules(all, env({ solitaireAgile: true })), ctx);
+    expect(overlays).toHaveLength(1);
+    expect(overlays[0].key).toBe("solitaireAgile.confetti");
+    // A lazy part, not the layer itself: the descriptor imports no component.
+    expect((overlays[0].type as { name?: string }).name).toBe("LazyPart");
   });
 
   it("Triage and Milestones are pages under the ONE Team Agile entry, and not chromeless", () => {

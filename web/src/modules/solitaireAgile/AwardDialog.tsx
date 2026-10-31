@@ -10,27 +10,29 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
-import { useState } from "react";
+import { useEffect, useRef } from "react";
 import { DialogDismiss } from "../../shared/DialogDismiss";
 import { Wordmark } from "../../shared/Wordmark";
 import { useFacePref } from "../../hooks/useFacePref";
 import { useWornTheme } from "../../hooks/useWornTheme";
 import type { Milestone } from "../ado/api.ado";
 import { awardTitle, tookLine } from "./award";
-import { Confetti } from "./Confetti";
+import { useConfetti } from "./useConfetti";
 
 // The award (docs/modules/solitaire-agile.md, "Milestones: the tab and the award"):
 // the ONE place Team Agile celebrates. When a milestone is reached and the person
 // next opens the Milestones tab, this dialog says so -- "Congratulations: <title>
 // reached!", one line of what it took, the picture -- and throws the confetti once,
-// inside the dialog's moment and nowhere else. It is the one caller of
-// <Confetti> (a test holds that); the PM Corner only points here.
+// when it opens, through useConfetti(). The burst is drawn by the module's one mount at
+// the app root (ConfettiLayer.tsx), over the whole viewport, not under this dialog's
+// tree. This dialog is the one caller of useConfetti() (a test holds that); the PM
+// Corner only points here.
 //
 // Whether it opens is the page's business (award.ts: once per Space and milestone
 // per browser); this component draws one award and says when it is closed.
 //
-// A lazyPart of the Milestones page (shell/lazy.tsx), so the confetti package's
-// bytes are fetched only when an award is first drawn.
+// A lazyPart of the Milestones page (shell/lazy.tsx); the confetti package's bytes are
+// fetched by the root mount when this first throws.
 
 const useStyles = makeStyles({
   surface: { maxWidth: "440px" },
@@ -80,9 +82,16 @@ export function AwardDialog({
   onClose: () => void;
 }) {
   const styles = useStyles();
-  // One burst for this dialog's moment: it ends itself and is not drawn again
-  // while the dialog stays open.
-  const [raining, setRaining] = useState(true);
+  // One burst for this dialog's moment, thrown when it opens: it ends itself and is not
+  // thrown again while the dialog stays open (a ref, so StrictMode's second effect run
+  // throws nothing).
+  const throwConfetti = useConfetti();
+  const thrown = useRef(false);
+  useEffect(() => {
+    if (thrown.current) return;
+    thrown.current = true;
+    throwConfetti();
+  }, [throwConfetti]);
   const Picture = AWARD_PICTURE;
   return (
     <Dialog open onOpenChange={(_e, d) => !d.open && onClose()}>
@@ -113,7 +122,6 @@ export function AwardDialog({
             </Button>
           </DialogActions>
         </DialogBody>
-        {raining && <Confetti onDone={() => setRaining(false)} />}
       </DialogSurface>
     </Dialog>
   );
