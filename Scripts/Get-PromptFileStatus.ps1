@@ -95,21 +95,56 @@ function Get-P20CardAssigned {
     return ''
 }
 
+function Get-P20CardLineValue {
+    <#
+      The value of a card's FIRST `<stamp> value` line, trimmed: @{ Present; Value }.
+      Value is '' for a parenthesised template placeholder (`(not linked)`,
+      `(none)`) as for an empty line; Present says whether the line is there at
+      all. The milestone and sprint readers below share it, so the two lines are
+      read by one rule.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Content, [string]$Stamp)
+    $m = [regex]::Match("$Content", '(?m)^' + [regex]::Escape($Stamp) + '[ \t]*([^\r\n]*?)[ \t]*\r?$')
+    if (-not $m.Success) { return @{ Present = $false; Value = '' } }
+    $value = $m.Groups[1].Value
+    if ($value.StartsWith('(')) { $value = '' }
+    return @{ Present = $true; Value = $value }
+}
+
 function Get-P20CardMilestone {
     <#
-      The milestone a card names: its first `**Sprint:**` line's value, WHOLE and
-      trimmed -- never the board's shortened sprint column -- and '' for none or a
-      template's parenthesised placeholder (`(not linked)`). D-AR11: the
-      milestone is the destination, and a card names it here. agent/core/parsers.py's
-      card_milestone is the same rule; Tests/fixtures/parsers/card-milestone.json
-      holds the two to one table.
+      The milestone a card names, WHOLE and trimmed -- never the board's shortened
+      sprint column -- and '' for none or a template's parenthesised placeholder.
+      A card's milestone and its sprint are two lines (stamps.milestone,
+      stamps.sprint; docs/hub/cards.md, "Milestone and sprint: two lines"):
+
+        - a `**Milestone:**` line            -> its value (a placeholder is none,
+                                                and the sprint line is a sprint only)
+        - no `**Milestone:**` line at all    -> the first `**Sprint:**` line's value,
+                                                exactly as every card read before
+                                                the two were separate
+
+      Files outlive their templates: a card written when one line held a sprint
+      OR a milestone still reads as the milestone it named. D-AR11: the milestone
+      is the destination. agent/core/parsers.py's card_milestone is the same rule;
+      Tests/fixtures/parsers/card-milestone.json holds the two to one table.
     #>
     param([AllowEmptyString()][AllowNull()][string]$Content)
-    $m = [regex]::Match("$Content", '(?m)^\*\*Sprint:\*\*[ \t]*([^\r\n]*?)[ \t]*\r?$')
-    $value = ''
-    if ($m.Success) { $value = $m.Groups[1].Value }
-    if ($value.StartsWith('(')) { return '' }
-    return $value
+    $c = Get-P20Consts
+    $own = Get-P20CardLineValue -Content $Content -Stamp ([string]$c.stamps.milestone)
+    if ($own.Present) { return $own.Value }
+    return (Get-P20CardLineValue -Content $Content -Stamp ([string]$c.stamps.sprint)).Value
+}
+
+function Get-P20CardSprint {
+    <#
+      The sprint a card names: its first `**Sprint:**` line's value, WHOLE and
+      trimmed, '' for none or a placeholder. Read whatever the milestone line
+      says -- on a card with no milestone line the same value is its milestone
+      too (Get-P20CardMilestone). card_sprint in the agent; the same table.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Content)
+    return (Get-P20CardLineValue -Content $Content -Stamp ([string](Get-P20Consts).stamps.sprint)).Value
 }
 
 function Get-P20CardTags {
@@ -120,7 +155,7 @@ function Get-P20CardTags {
       Returns an array -- callers wrap it in @().
     #>
     param([AllowEmptyString()][AllowNull()][string]$Content)
-    $m = [regex]::Match("$Content", '(?m)^Tags:[ \t]*([^\r\n]*?)[ \t]*\r?$')
+    $m = [regex]::Match("$Content", '(?m)^' + [regex]::Escape([string](Get-P20Consts).tokens.tags) + '[ \t]*([^\r\n]*?)[ \t]*\r?$')
     $value = ''
     if ($m.Success) { $value = $m.Groups[1].Value }
     if ($value.StartsWith('(')) { return @() }

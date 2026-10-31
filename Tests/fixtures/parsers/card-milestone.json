@@ -1,33 +1,200 @@
 {
-  "_": "ONE table, read by both readers of the two card lines the suggestion takes from a card (docs/hub/cards.md, \"What the suggestion reads\"; D-AR11): the milestone -- the first **Sprint:** line's value, WHOLE and trimmed, '' for none or a parenthesised template placeholder, never the card model's shortened sprint -- and the tags, the Tags: line split on commas and trimmed. Scripts/Get-PromptFileStatus.ps1 Get-P20CardMilestone and Get-P20CardTags (tkTestToolkit -Rituals) and agent/core/parsers.py card_milestone() and card_tags() (Tests/test_parsers.py). Each row's lines are joined with LF, or CRLF when crlf is true.",
+  "_": "ONE table, read by both readers of a card's planning lines and its tags (docs/hub/cards.md, \"Milestone and sprint: two lines\" and \"What the suggestion reads\"; D-AR11). milestone: the first **Milestone:** line's value, WHOLE and trimmed; a card with NO **Milestone:** line reads its first **Sprint:** line instead -- every card written before the two lines were separate, which must read as it always did; '' for none, an empty line or a parenthesised placeholder, and a milestone line that is a placeholder keeps the sprint line a sprint only. sprint: the first **Sprint:** line's value, whole and trimmed, '' for none or a placeholder -- never the card model's shortened sprint. tags: the Tags: line split on commas and trimmed. Scripts/Get-PromptFileStatus.ps1 Get-P20CardMilestone, Get-P20CardSprint and Get-P20CardTags (tkTestToolkit -Rituals) and agent/core/parsers.py card_milestone(), card_sprint() and card_tags() (Tests/test_parsers.py). Each row's lines are joined with LF, or CRLF when crlf is true.",
   "rows": [
     {
       "name": "no lines",
       "crlf": false,
-      "lines": ["# Task K7M2: Bench notes", "", "**Created:** 2026-10-17"],
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Created:** 2026-10-17"
+      ],
       "milestone": "",
+      "sprint": "",
       "tags": []
     },
     {
       "name": "placeholders are none",
       "crlf": false,
-      "lines": ["# Task K7M2: Bench notes", "Tags: (none)", "", "**Sprint:** (not linked)", "**Created:** 2026-10-17"],
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "Tags: (none)",
+        "",
+        "**Sprint:** (not linked)",
+        "**Created:** 2026-10-17"
+      ],
       "milestone": "",
+      "sprint": "",
       "tags": []
     },
     {
       "name": "a milestone longer than twenty characters is read whole",
       "crlf": false,
-      "lines": ["# Feature 4V3A: The suggestion rule", "Tags: spec, sev2, sonnet", "", "**Sprint:** M2 -- 1.2.0, the standup sees the work  ", "**Created:** 2026-10-17"],
+      "lines": [
+        "# Feature 4V3A: The suggestion rule",
+        "Tags: spec, sev2, sonnet",
+        "",
+        "**Sprint:** M2 -- 1.2.0, the standup sees the work  ",
+        "**Created:** 2026-10-17"
+      ],
       "milestone": "M2 -- 1.2.0, the standup sees the work",
-      "tags": ["spec", "sev2", "sonnet"]
+      "sprint": "M2 -- 1.2.0, the standup sees the work",
+      "tags": [
+        "spec",
+        "sev2",
+        "sonnet"
+      ]
     },
     {
       "name": "an iteration path is read whole, not its last segment",
       "crlf": true,
-      "lines": ["# Task 139: Write the docs", "Tags: ui,  ,docs ", "", "**Sprint:** RecipesApp\\Sprint 2", "**Created:** 2026-10-17"],
+      "lines": [
+        "# Task 139: Write the docs",
+        "Tags: ui,  ,docs ",
+        "",
+        "**Sprint:** RecipesApp\\Sprint 2",
+        "**Created:** 2026-10-17"
+      ],
       "milestone": "RecipesApp\\Sprint 2",
-      "tags": ["ui", "docs"]
+      "sprint": "RecipesApp\\Sprint 2",
+      "tags": [
+        "ui",
+        "docs"
+      ]
+    },
+    {
+      "name": "an old card: no milestone line, so its sprint line names its milestone, as it always read",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "Tags: (None)",
+        "",
+        "**Sprint:** M4 -- 1.4.0, ten minutes to your own board",
+        "**Created:** 2026-10-17"
+      ],
+      "milestone": "M4 -- 1.4.0, ten minutes to your own board",
+      "sprint": "M4 -- 1.4.0, ten minutes to your own board",
+      "tags": []
+    },
+    {
+      "name": "a milestone line and a sprint line are each their own",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "Tags: docs",
+        "",
+        "**Sprint:** RecipesApp\\Sprint 2",
+        "**Milestone:** M2 -- 1.2.0, the standup sees the work",
+        "**Created:** 2026-10-17"
+      ],
+      "milestone": "M2 -- 1.2.0, the standup sees the work",
+      "sprint": "RecipesApp\\Sprint 2",
+      "tags": [
+        "docs"
+      ]
+    },
+    {
+      "name": "a milestone line alone, and no sprint",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Milestone:** v0.3 -- Share",
+        "**Created:** 2026-10-17"
+      ],
+      "milestone": "v0.3 -- Share",
+      "sprint": "",
+      "tags": []
+    },
+    {
+      "name": "a milestone line above the sprint line, with CRLF",
+      "crlf": true,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "Tags: ui, docs",
+        "",
+        "**Milestone:**   M3 -- 1.3.0  ",
+        "**Sprint:** Sprint 9",
+        "**Created:** 2026-10-17"
+      ],
+      "milestone": "M3 -- 1.3.0",
+      "sprint": "Sprint 9",
+      "tags": [
+        "ui",
+        "docs"
+      ]
+    },
+    {
+      "name": "a milestone placeholder is none, and keeps the sprint line a sprint only",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Sprint:** Sprint 3",
+        "**Milestone:** (none)",
+        "**Created:** 2026-10-17"
+      ],
+      "milestone": "",
+      "sprint": "Sprint 3",
+      "tags": []
+    },
+    {
+      "name": "an empty milestone line is none, and keeps the sprint line a sprint only",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Sprint:** Sprint 3",
+        "**Milestone:**",
+        "**Created:** 2026-10-17"
+      ],
+      "milestone": "",
+      "sprint": "Sprint 3",
+      "tags": []
+    },
+    {
+      "name": "a milestone placeholder and a sprint placeholder are both none",
+      "crlf": true,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Sprint:** (not linked)",
+        "**Milestone:** (none)",
+        "**Created:** 2026-10-17"
+      ],
+      "milestone": "",
+      "sprint": "",
+      "tags": []
+    },
+    {
+      "name": "the first milestone line wins, as the first sprint line does",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Sprint:** Sprint 3",
+        "**Milestone:** M1",
+        "**Sprint:** Sprint 4",
+        "**Milestone:** M2",
+        "**Created:** 2026-10-17"
+      ],
+      "milestone": "M1",
+      "sprint": "Sprint 3",
+      "tags": []
+    },
+    {
+      "name": "a sprint placeholder with a milestone line: the milestone, no sprint",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Sprint:** (Not assigned to sprint)",
+        "**Milestone:** M4b -- 1.5.0, the tour",
+        "**Created:** 2026-10-17"
+      ],
+      "milestone": "M4b -- 1.5.0, the tour",
+      "sprint": "",
+      "tags": []
     }
   ]
 }

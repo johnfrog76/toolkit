@@ -2069,16 +2069,32 @@ function global:Set-P20CardCover {
 }
 
 function global:Set-P20CardSprint {
-    <# Plan -- the write side of the Sprint token: -Milestone stamps **Sprint:**, -Remove clears it. Never touches the tracker. #>
+    <# Plan -- the write side of a card's two planning lines: -Milestone and -Sprint, each its own line; -Remove [-Only Milestone|Sprint] clears them. Never touches the tracker. #>
     [CmdletBinding()]
     param(
         [Parameter(Position = 0)][string]$Card,
         [string]$Milestone,
+        [string]$Sprint,
         [switch]$Remove,
+        [string]$Only,
         [switch]$Help
     )
     $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'Plan'
     Invoke-ToolkitScript -Path "$toolkitRoot\Scripts\Plan-Card.ps1" -Parameters $PSBoundParameters `
+        -Name $inv.Name -Prefix $inv.Prefix
+}
+
+function global:Set-P20CardTags {
+    <# Tag -- the write side of a card's Tags: line: adds tags, or -Remove takes them off. Never touches the tracker. #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0)][string]$Card,
+        [Parameter(Position = 1, ValueFromRemainingArguments = $true)][string[]]$Tags,
+        [switch]$Remove,
+        [switch]$Help
+    )
+    $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'Tag'
+    Invoke-ToolkitScript -Path "$toolkitRoot\Scripts\Set-CardTags.ps1" -Parameters $PSBoundParameters `
         -Name $inv.Name -Prefix $inv.Prefix
 }
 
@@ -2432,6 +2448,7 @@ $script:ModuleState.CommandMap = [ordered]@{
     'Cover'            = 'Set-P20CardCover'
     'Move'             = 'Move-P20CardLane'
     'Plan'             = 'Set-P20CardSprint'
+    'Tag'              = 'Set-P20CardTags'
     'GetPRComments'    = 'Get-P20PRComments'
     'ReplyPR'          = 'Send-P20PRReply'
     'Env'              = 'Get-P20Environment'

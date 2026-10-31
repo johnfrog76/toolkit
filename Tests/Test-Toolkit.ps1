@@ -48,6 +48,7 @@ param(
     [switch]$ThreadHash,
     [switch]$Billable,
     [switch]$Plan,
+    [switch]$Tag,
     [switch]$Cover,
     [switch]$Design,
     [switch]$Move,

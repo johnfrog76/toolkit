@@ -67,6 +67,7 @@
         'tkSwitchOrg',
         'tkSwitchSpace',
         'tkSync',
+        'tkTag',
         'tkTest',
         'tkTestCompat',
         'tkTestMenu',

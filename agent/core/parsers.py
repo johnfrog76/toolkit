@@ -27,6 +27,8 @@ from .consts import (
     stamp_assigned,
     stamp_billable,
     stamp_from,
+    stamp_milestone,
+    stamp_sprint,
     status_active,
     status_backlog,
     status_code_review,
@@ -34,6 +36,7 @@ from .consts import (
     status_in_progress,
     token_pr_url,
     token_previous_round,
+    token_tags,
 )
 
 # The state vocabulary and the two patterns that derive it come from
@@ -208,25 +211,52 @@ def card_from_record(content: str) -> str | None:
     return (m.group(1) or None) if m else None
 
 
-def card_milestone(content: str) -> str:
-    """The milestone a card names: its first ``**Sprint:**`` line's value, WHOLE and
-    trimmed -- never the card model's ``sprint``, which keeps the last path segment
-    and cuts it at eighteen characters for the board. "" when it has none, or when
-    the value is a template's parenthesised placeholder (``(not linked)``).
+def _card_line(content: str, stamp: str) -> tuple[bool, str]:
+    """A card's FIRST ``<stamp> value`` line: (present, value). The value is trimmed,
+    and "" for a parenthesised template placeholder (``(not linked)``, ``(none)``)
+    as for an empty line. The milestone and sprint readers share it, so the two
+    lines are read by one rule. Mirror: ``Get-P20CardLineValue``."""
+    m = re.search(r"(?m)^" + re.escape(stamp) + r"[ \t]*([^\r\n]*?)[ \t]*\r?$", content or "")
+    if not m:
+        return False, ""
+    value = m.group(1)
+    return True, ("" if value.startswith("(") else value)
 
-    D-AR11: the milestone is the destination, and a card names it here. The CLI's
-    mirror is ``Get-P20CardMilestone`` in ``Scripts/Get-PromptFileStatus.ps1``;
+
+def card_milestone(content: str) -> str:
+    """The milestone a card names, WHOLE and trimmed -- never the card model's
+    ``sprint``, which keeps the last path segment and cuts it at eighteen
+    characters for the board. "" when it has none, or a placeholder.
+
+    A card's milestone and its sprint are two lines (``stamps.milestone``,
+    ``stamps.sprint``; docs/hub/cards.md, "Milestone and sprint: two lines"): a
+    ``**Milestone:**`` line is the milestone -- a placeholder is none, and the
+    sprint line is then a sprint only; a card with NO milestone line reads its
+    first ``**Sprint:**`` line, exactly as every card read before the two were
+    separate -- files outlive their templates.
+
+    D-AR11: the milestone is the destination. The CLI's mirror is
+    ``Get-P20CardMilestone`` in ``Scripts/Get-PromptFileStatus.ps1``;
     ``Tests/fixtures/parsers/card-milestone.json`` holds the two to one table."""
-    m = re.search(r"(?m)^\*\*Sprint:\*\*[ \t]*([^\r\n]*?)[ \t]*\r?$", content or "")
-    value = m.group(1) if m else ""
-    return "" if value.startswith("(") else value
+    present, value = _card_line(content, stamp_milestone())
+    if present:
+        return value
+    return _card_line(content, stamp_sprint())[1]
+
+
+def card_sprint(content: str) -> str:
+    """The sprint a card names: its first ``**Sprint:**`` line's value, WHOLE and
+    trimmed, "" for none or a placeholder -- whatever the milestone line says.
+    Mirror: ``Get-P20CardSprint``, same table."""
+    return _card_line(content, stamp_sprint())[1]
 
 
 def card_tags(content: str) -> list[str]:
     """The card's ``Tags:`` line, split on commas and trimmed, empties dropped;
     [] when it has none or a parenthesised placeholder. The suggestion reads a
-    card's severity and size from it. Mirror: ``Get-P20CardTags``, same table."""
-    m = re.search(r"(?m)^Tags:[ \t]*([^\r\n]*?)[ \t]*\r?$", content or "")
+    card's severity and size from it, and the board's tag filter the whole list.
+    ``Tag`` writes it. Mirror: ``Get-P20CardTags``, same table."""
+    m = re.search(r"(?m)^" + re.escape(token_tags()) + r"[ \t]*([^\r\n]*?)[ \t]*\r?$", content or "")
     value = m.group(1) if m else ""
     if value.startswith("("):
         return []
@@ -236,10 +266,10 @@ def card_tags(content: str) -> list[str]:
 def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES, folder: str = "") -> dict:
     """Extract the file-content-derived fields of PromptInfo.
 
-    Returns a dict with keys: title, type, name, linked, tracker, billable, assigned, from_record, sprint, progress,
-    checked, total, ado_url, pr_url, previous_round, design, commits, status -- the content half of the Card
-    model (docs/hub/cards.md, "The model, as the agent serves it"). ``id`` comes from the FILENAME
-    (``card_id``), so the caller adds it. Fields that need filesystem access (file
+    Returns a dict with keys: title, type, name, linked, tracker, billable, assigned, from_record, sprint,
+    milestone, tags, progress, checked, total, ado_url, pr_url, previous_round, design, commits, status --
+    the content half of the Card model (docs/hub/cards.md, "The model, as the agent serves it").
+    ``id`` comes from the FILENAME (``card_id``), so the caller adds it. Fields that need filesystem access (file
     name, modified date) are filled in by the caller.
     """
     title = ""
@@ -317,6 +347,11 @@ def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES, folder:
         # record stem, None when the card names none (NewPrompt -From writes it).
         "from_record": card_from_record(content),
         "sprint": sprint,
+        # The two planning lines read WHOLE (docs/hub/cards.md, "Milestone and
+        # sprint: two lines"): the milestone by the one rule (its own line, else
+        # an old card's sprint line), and the tags. The board's filters read them.
+        "milestone": card_milestone(content),
+        "tags": card_tags(content),
         "progress": progress,
         "checked": checked,
         "total": total,

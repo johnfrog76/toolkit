@@ -748,7 +748,8 @@ size are its labels (the triage ceremony's `sev1`-`sev3`, the worker labels), wh
 -- else its size; the standup asks `gh api user` once per call, the read Triage makes, and only while the
 suggestion is on), its milestone and due date are the tracker's, its age is
 `createdAt`. A card's severity and size are on its `Tags:` line, who has it is its `**Assigned:**` line
-(else its size), its milestone is its `**Sprint:**` line read WHOLE, and its age is its `**Created:**` day
+(else its size), its milestone is its `**Milestone:**` line read WHOLE -- or, on a card with none, its
+`**Sprint:**` line, as every card read before the two were separate -- and its age is its `**Created:**` day
 ([cards](../hub/cards.md#what-the-suggestion-reads)). A milestone's open count is its billable items, once
 per id.
 
@@ -772,7 +773,7 @@ that row together.
 | --- | --- | --- | --- | --- |
 | `alone`, or `agents` with it yours: `me`, or sized `fable` -- the owner's own seat, never the crew (D-AR10; `rituals.suggestOwnerSeat`) | -- | start | `23A3 is the last open card in milestone B -- start it?` | `StartWork 23A3` |
 | `agents` | a crew size, and the item has a milestone | delegate | `#4 is sonnet-sized and well defined -- send it to the crew?` | `StartWork 4` |
-| `agents` | a crew size, and no milestone | place | `#5 is sonnet-sized but has no milestone -- place it?` | `Route 5 -Milestone <title>` on an issue; `Plan K7M2 -Milestone <title>` on a card, whose milestone is its `**Sprint:**` line |
+| `agents` | a crew size, and no milestone | place | `#5 is sonnet-sized but has no milestone -- place it?` | `Route 5 -Milestone <title>` on an issue; `Plan K7M2 -Milestone <title>` on a card, which writes its `**Milestone:**` line |
 | `agents` | nobody | route | `#4 is the oldest open sev2 in milestone B and nobody has it -- route it?` | `Route 4 -Assign <me\|size>` |
 | any | nothing left after the exclusions | -- | `Next: nothing is waiting on you.` (today's line) | -- |
 
@@ -819,7 +820,8 @@ Corner: 3 more issues to get milestone B - start #5 now > (tkStartWork 5)
 ```
 
 **The milestone is the destination** (D-AR11). An issue names it on the tracker; a card names it on its
-`**Sprint:**` line, read WHOLE through the one card reader each half has -- never the card model's
+`**Milestone:**` line -- or, with none, its `**Sprint:**` line
+([cards](../hub/cards.md#milestone-and-sprint-two-lines)) -- read WHOLE through the one card reader each half has -- never the card model's
 `sprint`, which cuts the value to eighteen characters for the board, so a long title would split one
 milestone into two ([cards](../hub/cards.md#what-the-suggestion-reads)).
 
@@ -835,7 +837,7 @@ milestone into two ([cards](../hub/cards.md#what-the-suggestion-reads)).
 The nearest milestone is the suggestion's own (`Get-P20NearestMilestones`, `nearest_milestones` -- fewest
 open, then the earlier due date, then the title), taken over the suggestion's candidates, and the id is the
 suggestion's first candidate inside it. The remaining count is the joined list's open count for that
-milestone: its open issues plus the open cards whose `**Sprint:**` line names it, **once per id** -- a card
+milestone: its open issues plus the open cards that name it (the one card reader), **once per id** -- a card
 that tracks an issue is that issue's row. An item in flight still counts toward what is left; it is never
 the pick, because the suggestion excludes it.
 
@@ -886,7 +888,8 @@ tab's Milestones card, from the same reader (`accounting.github_milestone_rows`)
 (days, `""` when unset) and `reached`. There is no second milestone rule: `reached` is the core's
 `milestone_reached` -- **every issue closed, and at least one issue**, whatever GitHub's own state says. So
 a milestone closed on GitHub with an issue reopened in it is not reached, and one nobody closed on GitHub
-is. What the route adds is Team Agile's shape around it: the module's gate, `?space=`, the tracker state
+is. The tab reads no card: a card's milestone line feeds the suggestion and the PM Corner above, through
+the one card reader, and never these counts, which are the tracker's own. What the route adds is Team Agile's shape around it: the module's gate, `?space=`, the tracker state
 the ceremonies answer with (any repo that fails fails the read, with its reason, never a raise), and the
 kept read -- one `gh` call per repo a minute ([above](#one-tracker-read-kept-a-minute)), read again on
 `?refresh=1` or after a verb through the bridge. The query travels as `-f`/`-F` fields, never in the URL.
