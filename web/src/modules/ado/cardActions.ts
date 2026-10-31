@@ -46,12 +46,12 @@ import type { Lane } from "./legalMoves";
 //   - enabled otherwise. It opens the Create PR dialog, and the dialog asks
 //     for the work item id: typing it is the deliberate step.
 //
-// Land, decided here: present only on a Code Review card whose pull request
-// the agent read as MERGED (`merged` on the card model -- a GitHub Space at
-// Tier 1, docs/hub/cards.md). Absent everywhere else, never disabled: before
-// the merge there is nothing to land, and after it the card is in archive/. It
-// is the first of what you do with the card, and runs the CLI's Land verb
-// (record the merge, close the issue, archive), which asks first.
+// Land, decided here: present on every Code Review card, on either tracker,
+// and absent on every other lane. Nothing here knows whether the pull request
+// merged -- the board's data is the files, and asks no tracker. The VERB is the
+// gate: it asks the tracker, and an unmerged pull request comes back as Land's
+// own stated refusal, shown in the confirm like any refusal. It is the first of
+// what you do with the card, and the view asks before it runs.
 //
 // Remind me about this, decided here: present only while the organize module
 // is on (`/env` features.organize) -- off means absent, so with the flag off
@@ -101,7 +101,7 @@ export interface CardActionPlan {
 export type ActionCard = Pick<
   PromptInfo,
   "status" | "linked" | "ado_url" | "pr_url" | "billable"
-> & { commits?: number; merged?: boolean };
+> & { commits?: number };
 
 export interface CardActionContext {
   /** `/env` ado.enabled -- an older agent that does not say reads as on. */
@@ -168,7 +168,7 @@ export function cardActions(card: ActionCard, ctx: CardActionContext): CardActio
 
   const secondary: CardActionSpec[] = [...lanes];
 
-  if (card.status === STATUS.codeReview && card.merged) {
+  if (card.status === STATUS.codeReview) {
     secondary.push(spec("land", CARD_MOVES.land));
   }
   if (ado && card.status !== STATUS.done) {

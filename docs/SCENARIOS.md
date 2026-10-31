@@ -142,13 +142,13 @@ The board's card and the list's row draw one action model (`cardActions.ts`), so
 
 ### A card's menu, by its pull request (`scenarios.test.tsx`; the dialog is `useLandCard.test.tsx`)
 
-The same one action model. The card model's `merged` is served on a GitHub Space at Tier 1 only
-([the card](hub/cards.md), "The model, as the agent serves it"):
+The same one action model, by the card's lane alone. The board's data is the files and asks no
+tracker, so nothing here knows whether the pull request merged: `Land` asks, and an unmerged pull
+request is its stated refusal, shown in the confirm.
 
 | The card | **Land** in its `...` |
 | --- | --- |
-| Code Review, its GitHub pull request merged | present, first of what you do with the card: it asks, then runs `Land` -- the merge recorded, the issue closed, the card archived |
-| Code Review, its pull request open; or an Azure DevOps board, Tier 2, no tracker (`merged` is false or not sent) | absent -- `tkLand <id>` from the terminal still asks the tracker |
+| Code Review -- a GitHub pull request, an Azure DevOps one, or a person's `**Review:**` line | present, first of what you do with the card: it asks, then runs `Land` -- the merge recorded, the issue closed, the card archived -- or shows `Land`'s refusal (not merged yet, no pull request named) in the confirm |
 | any other lane | absent |
 
 ### The board's lanes, by a card's status (`scenarios.test.tsx`; the rule is `legalMoves.ts`)

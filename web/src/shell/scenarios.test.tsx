@@ -1025,31 +1025,32 @@ describe("the scenario grid: a card's menu, by the Organize flag", () => {
   });
 });
 
-// A card's menu, by its pull request (docs/SCENARIOS.md, "A card's menu, by its
-// pull request"): Land is there on a Code Review card the agent read as merged
-// -- a GitHub Space at Tier 1 is the only one that serves `merged` -- and
-// absent on every other card.
+// A card's menu, by its lane (docs/SCENARIOS.md, "A card's menu, by its pull
+// request"): Land is there on every Code Review card, on GitHub and Azure
+// DevOps alike, and absent on every other lane. Whether the pull request merged
+// is the verb's question -- an unmerged one is Land's stated refusal.
 describe("the scenario grid: a card's menu, by its pull request", () => {
-  const card = (status: string, merged?: boolean) => ({
+  const card = (status: string, prUrl: string | null) => ({
     status,
     linked: true,
     ado_url: "https://github.com/o/r/issues/7",
-    pr_url: status === "Code Review" ? "https://github.com/o/r/pull/8" : null,
+    pr_url: prUrl,
     billable: true,
     commits: 1,
-    merged,
   });
-  it.each<[string, ReturnType<typeof card>, boolean]>([
-    ["Code Review, its pull request merged", card("Code Review", true), true],
-    ["Code Review, its pull request open", card("Code Review", false), false],
-    ["Code Review, an agent that does not say (Azure DevOps, Tier 2)", card("Code Review"), false],
-    ["In Progress", card("In Progress", true), false],
-  ])("%s", (_why, c, offered) => {
-    const menu = cardActions(c, {
-      adoEnabled: true,
-      tracker: "github",
-      cliPrefix: "tk",
-    }).secondary.map((a) => a.label);
+  const GH = "https://github.com/o/r/pull/8";
+  const ADO = "https://dev.azure.com/o/p/_git/r/pullrequest/8";
+  it.each<[string, ReturnType<typeof card>, string, boolean]>([
+    ["Code Review, a GitHub pull request", card("Code Review", GH), "github", true],
+    ["Code Review, an Azure DevOps pull request", card("Code Review", ADO), "ado", true],
+    ["Code Review by a Review line, no PR URL", card("Code Review", null), "none", true],
+    ["In Progress", card("In Progress", null), "github", false],
+    ["Active", card("Active", null), "ado", false],
+    ["Backlog", card("Backlog", null), "github", false],
+  ])("%s", (_why, c, tracker, offered) => {
+    const menu = cardActions(c, { adoEnabled: true, tracker, cliPrefix: "tk" }).secondary.map(
+      (a) => a.label,
+    );
     expect(menu.filter((l) => l === "Land")).toHaveLength(offered ? 1 : 0);
   });
 });

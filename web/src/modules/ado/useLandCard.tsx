@@ -3,11 +3,11 @@
  *
  * A form over the CLI's `Land` verb (`POST /api/cmd/Land`), not a second
  * closer or archiver -- the bridge runs the verb, and the refetch is what takes
- * the card off the board. Offered only on a Code Review card whose pull request
- * the agent read as merged (cardActions.ts); it closes an issue other people
- * read, so it asks first, in the one confirm (shared/ConfirmDialog). A refusal
- * -- the pull request is not merged after all, the issue could not be closed --
- * keeps the dialog open with the verb's own sentence.
+ * the card off the board. Offered on every Code Review card (cardActions.ts);
+ * whether the pull request merged is the verb's question, not the board's. It
+ * closes an issue other people read, so it asks first, in the one confirm
+ * (shared/ConfirmDialog). A refusal -- the pull request is not merged yet, the
+ * issue could not be closed -- keeps the dialog open with the verb's own sentence.
  *
  * The mutation lives in the dialog, which is drawn only once a person chose
  * Land, so a view that never offers it never touches it.

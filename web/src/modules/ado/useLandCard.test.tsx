@@ -17,7 +17,6 @@ const card = {
   name: "A merged card",
   title: "Task 146: A merged card",
   status: "Code Review",
-  merged: true,
 } as PromptInfo;
 
 function answer(status: string, extra: Record<string, unknown> = {}) {

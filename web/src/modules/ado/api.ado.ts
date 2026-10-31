@@ -104,10 +104,6 @@ export interface PromptInfo {
   /** The tracker's own pin on the card's issue: true only on a GitHub
    *  Space at Tier 1. Absent from an older agent, which reads as unpinned. */
   pinned?: boolean;
-  /** The card's pull request is merged: true only for a Code Review card on a
-   *  GitHub Space at Tier 1. What Land is offered on (cardActions.ts). Absent
-   *  from an older agent, which reads as not merged. */
-  merged?: boolean;
   /** The card's picture: a URL of GET /api/assets/..., or null -- no
    *  `**Cover:**` line, or one whose file is missing. Absent from an older agent. */
   cover?: string | null;
@@ -1074,8 +1070,9 @@ export const adoEndpoints = adoApi.injectEndpoints({
     }),
 
     // POST /api/cmd/Land -- the merge recorded, the issue closed, the card
-    // archived, by the CLI's Land verb. A refusal (the pull request is not
-    // merged after all) comes back as the verb's own sentence.
+    // archived, by the CLI's Land verb, which asks the tracker whether the pull
+    // request merged. A refusal (not merged yet) comes back as the verb's own
+    // sentence.
     landCard: builder.mutation<CommandResponse, { file: string }>({
       query: ({ file }) => ({
         url: "cmd/Land",

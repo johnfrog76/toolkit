@@ -164,7 +164,7 @@ switch.
 | Route | Tier | Reads |
 | --- | --- | --- |
 | `GET /api/prs` | 1 | ADO via `az`, filtered by the resolved identity |
-| `GET /api/status` | 2+ | the Card model; on a GitHub Space at Tier 1 each card also carries `pinned` -- its issue is in the repository's pinned set, asked once per repo by `gh api graphql` and dropped when `EditItem` runs -- and each Code Review card `merged` -- its GitHub pull request is in its repository's merged set, asked once per repo by `gh pr list --state merged` and held a minute; at Tier 2, on Azure DevOps and with no tracker `gh` is not asked and both are false |
+| `GET /api/status` | 2+ | the Card model; on a GitHub Space at Tier 1 each card also carries `pinned` -- its issue is in the repository's pinned set, asked once per repo by `gh api graphql` and dropped when `EditItem` runs; at Tier 2, on Azure DevOps and with no tracker `gh` is not asked and `pinned` is false |
 | `GET /api/work-items` | 1 | ADO via `az` (WIQL); on a GitHub Space `gh issue list`, with `?state=open\|closed\|all` and `?all=1` as the Issues tab's two agent axes; a gh row carries `pinned`, GitHub's own `isPinned` |
 | `GET /api/issue-report`, `GET /api/milestones` | 1, GitHub only | the Stats tab: the report read from the Studio ledger's entry for the Space ([the Studio](studio.md)) -- no `gh` call of its own -- and `gh api .../milestones?state=all` with `reached` derived -- every issue closed and at least one |
 | `GET /api/design`, `GET /api/design/{folder}/{name}` | 1, GitHub only | the repo's `design/` and `spec/` via `gh api .../contents` (Studio S2); an owner-grained address is a 400. The list also carries `checkout`: the active Space's `spaceCheckouts.<slug>.path` checked against the repo on every request (`space`, `key`, `path`, `root`, `ready`, `reason`; `agent/core/checkout.py`), which decides whether a row offers `MoveDesign`'s roads ([Studio](studio.md), "The web UI") |
@@ -197,11 +197,10 @@ and `hub.json`), or the first `az` call that failed, as one sentence naming the 
   ADO link, so it hides every unlinked card and SAYS how many). The first two are ABSENT on a card with
   no work item, and on every card while ADO is off; *Create PR* is disabled, with the reason, until the
   card records a commit (`web/src/modules/ado/cardActions.ts`, [the web README](../../web/README.md#the-board)).
-  **Land** is on a Code Review card whose pull request the agent read as merged (the card model's
-  `merged`), and absent on every other card: it asks first, then runs `Land` through
-  `POST /api/cmd/Land` -- the merge recorded, the issue closed, the card archived -- and a refusal is
-  the verb's own sentence in the confirm. Only a GitHub Space at Tier 1 serves `merged`, so on an Azure
-  DevOps board a card is landed from the CLI (`tkLand <id>`), which asks `az repos pr show`.
+  **Land** is on every Code Review card, on this board and on a GitHub one alike, and absent on every
+  other card: it asks first, then runs `Land` through `POST /api/cmd/Land`, and the verb asks the tracker
+  (`az repos pr show` here) whether the pull request merged -- the merge recorded, the work item closed,
+  the card archived. An unmerged pull request is `Land`'s stated refusal, its own sentence in the confirm.
 - **Design, on a GitHub Space** (Studio S2, D-S11) -- the fourth Home tab, after Issues,
   Board and Stats: the product repo's `design/` and `spec/` folders, read through the tracker
   (`GET /api/design`, `gh api repos/{owner}/{repo}/contents/...`), the note first and the spec beside
@@ -312,7 +311,7 @@ reference](../CLI.md#errors), under "Not authenticated" and "Access denied".
 | `Tests/test_identity.py`, `test_env_probe.py` | who "me" is, with `az` stubbed; `/env` neither blocks on the probe nor repeats it |
 | `tkTestToolkit -PullRequest -CloseItem -PRComments` | the PR description parser, the transition rule and ADO's error messages, the actionable-thread filter; `-CloseItem` also holds the token helper on both PowerShells -- `az` failing with error text, or printing nothing, is a refusal and never a token |
 | `tkTestToolkit -Land` (`Tests/Test-Land.ps1`) | `Land` typed with `gh`, `az` and the REST calls stubbed: a merged Azure DevOps pull request read through `az repos pr show`, the work item closed through `CloseItem`'s PATCH with a comment naming the commit, a re-run that asks first and posts nothing, an abandoned pull request refused; the GitHub path the same way |
-| `web`: `cliBridge.test.ts`, `homeView.test.ts`, `cardActions.test.ts`, `useLandCard.test.tsx` | the exact argv each dialog sends; which view of Home an org gets; Land present only on a merged Code Review card, and what it runs |
+| `web`: `cliBridge.test.ts`, `homeView.test.ts`, `cardActions.test.ts`, `useLandCard.test.tsx` | the exact argv each dialog sends; which view of Home an org gets; Land on every Code Review card, and what it runs |
 | `VERIFY.md` | the verbs that cannot be automated, because they need a real board -- the manual runbook |
 
 **No suite calls Azure DevOps.** `az` is stubbed or absent in every one, by design: a signed-in machine
@@ -320,9 +319,6 @@ must not be able to pass a failing assertion.
 
 ## Known gaps
 
-- **No Land on an Azure DevOps board in the web.** The card model's `merged` is read on a GitHub Space
-  only, so a Code Review card on an Azure DevOps board never offers **Land**; `tkLand <id>` lands it from
-  the terminal, reading the pull request through `az repos pr show`.
 - **Hidden, not gone.** With ADO not in use its verbs leave `Menu` but stay registered; the bridge will
   still run them and the routes still exist. Unregistering is phase 8 of
   [`docs/ROADMAP.md`](../ROADMAP.md).

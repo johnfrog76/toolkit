@@ -288,7 +288,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **48 suites, 8618 assertions** with a `config.local.json`, every one
+findings. On this commit that is **48 suites, 8617 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -1127,8 +1127,8 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   GitHub is closed as completed with one comment, `Landed in <hash> -- pull request <n>, squash-merged to
   main <date>.`, its link to the pull request working. Run `tkLand <id>` once more: every step reads
   `Skipped`, it ends `Nothing changed.`, the issue has still one comment, and `archive/` has no `-r1`. On the
-  board, a Code Review card whose pull request has merged offers **Land** in its menu (allow a minute for the
-  held merged set). On an Azure DevOps board, a completed pull request lands the same way through
+  board, every Code Review card offers **Land** in its menu; on one whose pull request is still open, Land's
+  confirm shows the "is open, not merged" sentence and the card stays. On an Azure DevOps board, a completed pull request lands the same way through
   `az repos pr show`, the work item Closed with the comment. Refs the pull request that adds `Land`.
 
 ## Recording a run

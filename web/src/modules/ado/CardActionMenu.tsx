@@ -35,7 +35,7 @@ export interface CardActionHandlers {
   onCreatePR: () => void;
   /** Remind me about this -- offered only while organize is on (cardActions.ts). */
   onRemind?: () => void;
-  /** Land -- offered only on a merged Code Review card (cardActions.ts). */
+  /** Land -- offered on every Code Review card (cardActions.ts). */
   onLand?: () => void;
 }
 
