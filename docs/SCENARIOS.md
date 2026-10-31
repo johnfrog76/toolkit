@@ -140,6 +140,17 @@ The board's card and the list's row draw one action model (`cardActions.ts`), so
 | off, or not configured | the billable toggle, **Mark not billable** -- no reminder item, and nothing of Organize is fetched |
 | on | **Remind me about this**: Organize's New Reminder dialog, the card's title as what and its id as the ref (`docs/modules/organize.md`, "The web UI") |
 
+### A card's menu, by its pull request (`scenarios.test.tsx`; the dialog is `useLandCard.test.tsx`)
+
+The same one action model. The card model's `merged` is served on a GitHub Space at Tier 1 only
+([the card](hub/cards.md), "The model, as the agent serves it"):
+
+| The card | **Land** in its `...` |
+| --- | --- |
+| Code Review, its GitHub pull request merged | present, first of what you do with the card: it asks, then runs `Land` -- the merge recorded, the issue closed, the card archived |
+| Code Review, its pull request open; or an Azure DevOps board, Tier 2, no tracker (`merged` is false or not sent) | absent -- `tkLand <id>` from the terminal still asks the tracker |
+| any other lane | absent |
+
 ### The board's lanes, by a card's status (`scenarios.test.tsx`; the rule is `legalMoves.ts`)
 
 Five lanes, in this order, and a card is drawn in the lane its served `status` names. Backlog is first:

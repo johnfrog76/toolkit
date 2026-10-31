@@ -192,6 +192,10 @@ tkArchive 12345              # Your ledger says Done -- the file moves to archiv
 tkCloseItem 12345 -Comment "Shipped."   # ...and the board agrees
 ```
 
+Or, once the pull request is merged, the last two in one: `tkLand 12345` asks the tracker whether it
+merged, records the merge commit on the card, closes the work item with a comment naming that commit
+and archives the card -- and refuses, writing nothing, while the pull request is still open.
+
 Nothing in that sequence asks you where anything is. The active Space is assumed, the prompt file is
 found from the branch, and the PR is found from the card. Switch context any time -- `tkSwitchSpace
 demo` for a presentation, `tkSwitchSpace globex` to come back -- and every query and prompt re-scopes.
@@ -200,7 +204,9 @@ A shell that is already open follows the file. `config.local.json` and the hub's
 
 **Those last two lines are one event, posted twice.** `tkArchive` writes to your ledger; the tracker
 is the organisation's. Neither is a copy of the other, and nothing reconciles them automatically, so
-if you run only the first, your files say Done while the board still says Code Review.
+if you run only the first, your files say Done while the board still says Code Review. `Land` is the one
+verb that posts to both on purpose, and only after the merge: it runs `CloseItem` and `Archive` as they
+are, in that order.
 [The two can disagree](#3-the-two-can-disagree-and-nothing-notices) explains why that separation is
 deliberate rather than a missing feature.
 
@@ -397,7 +403,7 @@ its header (Before and After side by side). The rule a reader applies to the lin
 | --- | --- | --- |
 | `New` -> `Active` | `tkNewPrompt <id>` | The card is **exactly** `New`. Any other state is left alone with a warning. |
 | `Active` -> `Code Review` | `tkNewPR` | That work-item **type** has a `Code Review` state in that project -- some Bug definitions do not, and it says so and skips. Already `Code Review`, `Resolved` or `Closed` is also skipped. |
-| anything -> `Closed` | **nothing** | `tkArchive` never contacts ADO. Closing the card is manual. |
+| anything -> `Closed` | `tkCloseItem`, or `tkLand` | `tkArchive` never contacts ADO. Closing the card is a verb you type: `CloseItem`, or `Land` once the pull request is merged, which runs `CloseItem` and then `Archive`. |
 
 #### 3. The two can disagree, and nothing notices
 
@@ -406,7 +412,8 @@ work and ADO may still show every card in Code Review.
 
 That is deliberate rather than an oversight -- the file is the record
 ([docs/hub/cards.md](hub/cards.md)), and the tracker is a place the organisation looks. So **"Done"
-locally does not mean "Closed" in ADO**, and **no command reconciles the two**: `Archive` never contacts
+locally does not mean "Closed" in ADO**, and **no command reconciles the two behind your back** (`Land`
+closes and archives together, but only when you type it): `Archive` never contacts
 ADO, and nothing writes the board for you. If the board matters to someone else, close the card yourself.
 
 What notices is **`tkStatus -Board`**, an opt-in, read-only join. For every card in `current/` linked to a
@@ -455,7 +462,7 @@ three the agent's `GET /api/visibility` serves: `public`, `private`, `unknown`.
 
 ## Command reference
 
-**44 always on, 59 with every opt-in module switched on.** The 44 are `config.default.json`'s
+**45 always on, 60 with every opt-in module switched on.** The 45 are `config.default.json`'s
 `commands`, and are below -- the Studio's `NewDesign`, `StampDesign`, `MoveDesign`, `NewSpace`, `RetireSpace`, `RemoveSpace` and `HowWeWork` among them, because the Studio is
 core ([Studio](modules/studio.md); D-S13); the fifteen the growth,
 communication, organize and Team Agile modules contribute have their own table further down, each marked
@@ -548,6 +555,7 @@ is LF like everything else, whatever `templates/ManagerSession.template.md` chec
 | `GetPRComments [<id>]` | Fetch PR review comments and append to the prompt file -- every comment of every thread, a reviewer's follow-ups included; append-only and idempotent. On a GitHub board it answers through `gh` (below, "On a GitHub board") |
 | `ReplyPR <pr> <thread> -Reply "..."` | Post a reply to a PR thread (`-Status` to set its state) and fill that thread's `Reply:` slot in the card -- the card in `current/` whose `PR URL:` names the PR, else the branch's. On a GitHub board it answers through `gh`: `fixed` / `closed` resolve, `active` reopens, `byDesign` / `pending` / `wontFix` are refused (above, "Answering on a GitHub board") |
 | `ThreadHash [<id\|file>] [-Hash <h>]` | Thread **this repo's** branch commits into the Git section and PR replies. Run it from the code repo. A card in `backlog/` is found too, and its first thread moves it to `current/` before writing |
+| `Land <id\|file> [-Pr <n>] [-Comment <text>] [-WhatIf]` | The end of a card, after its pull request merges. It asks the tracker first -- `gh pr view <n> --repo <owner/repo> --json state,mergeCommit,mergedAt,baseRefName` for a GitHub `PR URL:`, `az repos pr show --id <n> --org <org>` for an Azure DevOps one, the active Space's tracker for `-Pr` on a card with no `PR URL:` line -- and a pull request that is open, closed without merging or abandoned is a stated refusal (exit 2) naming its state, with nothing written. Merged, three steps in order: (1) the bullet `- <short merge hash> #<n> squash-merged to <base> <yyyy-MM-dd>` under `Commits:`, by the rule `ThreadHash` writes by ([the card](hub/cards.md), "The landed bullet"); (2) the issue or work item behind the card -- its `**ADO Link:**` number, else its id when that is a number -- closed through `CloseItem` as it is, with a comment naming the commit and the pull request, then `-Comment`; (3) `Archive`, as it is. A card with no issue behind it (a `-Title` card) and a Space with no tracker skip step 2 and say so. **A re-run is safe**: each step already done is skipped -- the hash anywhere in the card, the issue already closed (asked first, so no second comment is posted), the card already in `archive/`, where `Land` finds it and writes into it without ever making a round. A run after a full `Land` changes nothing and says so. A refusal from `CloseItem` stops before the archive, with the merge recorded; run `Land` again. `-WhatIf` prints the three writes and makes none. The web offers it on a Code Review card whose pull request is merged ([Azure DevOps and the board](modules/ado.md)) |
 | `AddPRReview <pr>` | Post an AI code review to a PR as inline comments (`-DryRun` to preview). On a GitHub board: one review, the diff read from GitHub ("AI review (optional)") |
 | `Sync` | Pull with rebase, then push, on the prompt store -- when `storeSync` is `git` (the hub's `hub.json`, or `config.local.json` per machine). The hub must be the **root** of its own repository: a hub sitting inside some other repository is refused before anything is committed, because `git add -A` from a subfolder stages that whole repository. The System page's **Sync the hub** runs this verb through the bridge and shows what it printed ([`CONFIGURATION.md`, "Syncing the hub from the web app"](CONFIGURATION.md#syncing-the-hub-from-the-web-app)) |
 

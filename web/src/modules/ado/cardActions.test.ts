@@ -385,6 +385,36 @@ describe("cardActions -- one action model for a card, in every view", () => {
     expect(older("In Progress")?.disabled).toBeUndefined();
   });
 
+  it("offers Land only on a Code Review card whose pull request is merged, first of what you do with it", () => {
+    const ctx = { adoEnabled: true, cliPrefix: "tk" };
+    const GH_PR = "https://github.com/o/r/pull/7";
+    for (const kind of ["ado", "local"] as const) {
+      const merged = cardActions(
+        card(kind, "Code Review", { commits: 1, pr_url: GH_PR, merged: true }),
+        ctx,
+      ).secondary;
+      const land = merged.find((a) => a.id === "land");
+      expect(land).toMatchObject({ label: "Land", dividerBefore: true });
+      expect(land?.disabled).toBeUndefined();
+      // Right after the lanes: the first of what you do with the card.
+      expect(merged.findIndex((a) => a.id === "land")).toBe(
+        merged.filter((a) => a.id === "move").length,
+      );
+    }
+    // Absent, not disabled, everywhere else: an open pull request, an older
+    // agent that does not say, and every other lane even with merged set.
+    const absent: ActionCard[] = [
+      card("ado", "Code Review", { commits: 1, pr_url: GH_PR, merged: false }),
+      card("ado", "Code Review", { commits: 1, pr_url: GH_PR }),
+      card("local", "In Progress", { commits: 1, merged: true }),
+      card("local", "Active", { merged: true }),
+      card("local", "Backlog", { merged: true }),
+    ];
+    for (const c of absent) {
+      expect(cardActions(c, ctx).secondary.map((a) => a.id)).not.toContain("land");
+    }
+  });
+
   it("offers Remind me about this, last of the card's own moves, only while the organize module is on", () => {
     for (const kind of ["ado", "local"] as const) {
       const ctx = { adoEnabled: true, cliPrefix: "tk" };

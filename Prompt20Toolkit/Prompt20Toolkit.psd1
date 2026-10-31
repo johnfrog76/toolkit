@@ -41,6 +41,7 @@
         'tkHowWeWork',
         'tkHub',
         'tkInstallAutoload',
+        'tkLand',
         'tkLog',
         'tkMenu',
         'tkMove',

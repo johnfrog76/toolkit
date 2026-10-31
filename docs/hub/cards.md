@@ -291,6 +291,22 @@ fails on that side. It only holds for shapes a fixture HAS: `review-heading-no-u
 `## PR Review Comments` heading with no `PR URL:` line is not Code Review, on either side.
 **Add a rule, add a fixture -- and assert it from both suites.**
 
+**The landed bullet.** `Land` records the commit a pull request was merged as -- the line a person used
+to type by hand at the card's foot -- in one shape:
+
+```text
+- c84c6e3 #175 squash-merged to main 2026-10-30
+```
+
+The merge commit's first seven characters, the pull request's number, the branch it was merged into and
+the merge's local day. It goes under `Commits:`, after the branch's own commits, through the rule
+`ThreadHash` writes by (`Scripts/Add-CommitBullet.ps1`), and it is a commit bullet like any other: it
+matches `regex.commitBullet`, so it counts in `commits`, and a card carrying only it would read **In
+Progress** by row 4 -- but `Land` archives the card next, and row 2, the folder, is read first, so the
+card reads **Done**. In an archived card it is the record of what landed, not a state. A hand-written one
+at the card's foot is read the same way, and `Land` does not add a second: it looks for the hash anywhere
+in the card.
+
 Not a state: **a status field**, of any kind. Planned is now a FOLDER -- `backlog/`, whose cards read as
 Backlog because of where they are -- and not a word a card carries: there is no `Status: Planned` line,
 no priority and no order within the backlog, and nothing a reader should look for. A card with no pull
@@ -374,6 +390,7 @@ fields, so nothing downstream parses a heading or a filename (`PromptInfo`, `age
 | `title` | the heading, whole, cut to 60 characters | predates the model; kept for display |
 | `linked` | an `https://` `**ADO Link:**` | the only difference between an ADO card and any other. The filter drawer's **Linked / Custom** row reads it and nothing else |
 | `tracker` | the tracker rule (`tracker()`, D-G2) over the card's OWN `**ADO Link:**`, never the Space's address | `github`, `ado`, or `none` -- `none` exactly when not `linked`. The card's **gh** / **ado** badge, first in the list row's meta line and on the board's card face; a custom card wears none |
+| `merged` | NOT read from the file -- asked of the tracker: the card is in Code Review, its `PR URL:` is a GitHub pull request, and that number is in its repository's merged set (one `gh pr list --state merged --limit 100 --json number` per repository a Code Review card's pull request is in, held 60 seconds) | `false` unless all of that holds **and** the Space is GitHub at Tier 1; on Azure DevOps, on no tracker and at Tier 2 `gh` is not asked. What the web's **Land** is offered on (`web/src/modules/ado/cardActions.ts`); a merge older than the newest hundred is landed from the CLI, which asks about the one pull request. The list only; the detail route does not carry it |
 | `pinned` | NOT read from the file -- asked of the tracker: the card's `tracker` is `github`, its `**ADO Link:**` is an issue of the Space's own repository, and that number is in the repository's pinned set (one `gh api graphql` `pinnedIssues` call per repo, held 60 seconds and dropped when `EditItem` runs) | `false` unless all three hold **and** the Space is GitHub at Tier 1; at Tier 2, on Azure DevOps and on no tracker `gh` is not asked. The board's card face wears the pin and "Pinned on GitHub" in its meta line and sorts pinned cards first within a lane; the list and the detail route do not carry it |
 | `billable` | no `**Billable:** no` line | default `true` |
 | `assigned` | the first `**Assigned:**` line's value, trimmed | `me`, a size, or `""` -- nobody; on the list and the detail route |
@@ -412,6 +429,7 @@ keeps the same edit rule -- the card's own line ending, no BOM.
 | `Cover` | copies a picture into `<space>/assets/<card key>/` and writes `**Cover:**` (or `**Before:**`); `-Remove` deletes both. `NewPrompt -Cover` / `-Before` attach the same way at birth |
 | `Move` | adds `**Started:**` or `**Review:**` with today's date (a `backlog/` card moved to `current/` first); `-To Done` is `Archive`; `-To Active` / `-To Backlog` move the file between `backlog/` and `current/` and write nothing |
 | `Archive` | moves it from `current/` or `backlog/` to `archive/`, stamps `**Closed:**`, refreshes its package links. Already in `archive/` (by id or exact name): says so, exit 0 |
+| `Land` | once the tracker says its pull request is merged: adds the landed bullet under `Commits:` (below), then closes the issue through `CloseItem` and archives through `Archive`, each as it is. Finds the card in `archive/` too, and writes into it there -- never a second round. A step already done is skipped |
 
 ## A whole card
 

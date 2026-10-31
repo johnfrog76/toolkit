@@ -277,6 +277,22 @@
         "Run it from the code repository: the branch names the card, and the commits come from git."
       ]
     },
+    "Land": {
+      "category": "pr",
+      "description": "Record a merged PR, close its issue, archive the card",
+      "usage": "{cliPrefix}Land <id|file> [-Pr <n>] [-Comment <text>] [-WhatIf] [-Help]",
+      "examples": [
+        "{cliPrefix}Land 146",
+        "{cliPrefix}Land K7M2 -Pr 175",
+        "{cliPrefix}Land 146 -Comment \"Thanks for the review.\"",
+        "{cliPrefix}Land 146 -WhatIf"
+      ],
+      "notes": [
+        "Asks the tracker first: only a MERGED pull request is landed. Open, closed unmerged or abandoned is refused, and nothing is written.",
+        "Then, in order: the bullet '- <hash> #<n> squash-merged to <base> <date>' in the card's Git section, the issue closed through CloseItem with a comment naming the commit, and Archive. A card with no issue, or a Space with no tracker, skips the close and says so.",
+        "A step already done is skipped -- the bullet on the card, the issue closed, the card in archive/ -- so running it again changes nothing."
+      ]
+    },
     "Env": {
       "category": "info",
       "description": "Show machine, tier, hub, org and identity",

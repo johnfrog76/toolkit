@@ -39,8 +39,8 @@ halves talking to each other, and the flag that makes a whole module appear and 
 three halves at once. A check that can be automated belongs in a suite; one that cannot is a gate here,
 or it is not verified.
 
-Every verb `config.default.json` defines is in the table below -- 44 always-on, and the 15 the modules
-contribute through `Config/*.commands.psd1` (59 in all; `docs/CLI.md` prints both counts) -- with the
+Every verb `config.default.json` defines is in the table below -- 45 always-on, and the 15 the modules
+contribute through `Config/*.commands.psd1` (60 in all; `docs/CLI.md` prints both counts) -- with the
 suite that types it and the gate that walks it. `Tests/Test-DocCounts.ps1` reads the table back, so a
 verb added without a row fails a suite. **A row that says "neither" is a verb nothing verifies**; it is
 left in the table rather than dropped, because a verb the reader cannot see in it is indistinguishable
@@ -71,6 +71,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `ReplyPR` | `PRComments` (script: the reply written into the card; on a GitHub Space typed, with `gh` and `git` stubbed: the reply to an inline thread's root, the GraphQL lookup paged and resolve / unresolve, a conversation comment and a review summary answered with a new comment, the three statuses GitHub has no word for refused before anything is asked, the body sent as a file); `ExitCodes` (the ADO success path, stubbed) | 6; 12 (a real GitHub pull request: the row under "Rows added by a fix") |
 | `AddPRReview` | `ExitCodes` (the missing-key refusal; the branch search's and the details fetch's 401/403/404 with the REST call stubbed); `PRComments` (on a GitHub Space typed, with `gh` and the model call stubbed: the diff from GitHub, one review with an inline comment and an off-diff finding in its body, `-DryRun`, the retry, and `GetPRComments` reading it back as the bot's) | 12 (a real expired token; a real GitHub pull request) |
 | `ThreadHash` | `ThreadHash` (script only) | 6 |
+| `Land` | `Land` (typed, with `gh`, `az` and the REST calls stubbed: GitHub and Azure DevOps merged, a re-run, open, closed-unmerged and abandoned refused, a `-Title` card, a Space with no tracker, `-WhatIf`, a card archived by hand) | 12 (a real merged pull request, and Windows PowerShell 5.1: the row under "Rows added by a fix") |
 | `CloseItem` | `CloseWorkItem` (the transition rule and error parsing; typed in a fresh shell with `az` and the REST calls stubbed: `-WhatIf`, a Task to Closed, a Bug to Resolved, an item already closed) | 6 (the live close on a real board), 12 |
 | `EditItem` | `EditItem` (typed, with `gh` and `az` stubbed) | 12 (a real repository) |
 | `MyWork` | neither | 6, 8c |
@@ -287,7 +288,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **47 suites, 8501 assertions** with a `config.local.json`, every one
+findings. On this commit that is **48 suites, 8618 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -1114,6 +1115,21 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   ending, and `git log -1 --name-status` is `review: archive <slug-set>/<start>_<end>` with forward slashes and only
   that review's paths. Then **Delete** it from the Archived filter: the confirm names the range and the Space, Submit
   removes the folder, and the next commit is `review: delete archive/<slug-set>/<start>_<end>`. Refs #148.
+- [ ] **Land reads a real merge, and reads the same under Windows PowerShell 5.1.** In `powershell` (5.1)
+  run `tkTestToolkit -Land -ThreadHash`: green. Then, in a scratch GitHub Space whose repository you own,
+  on a card whose pull request is still open, run `tkLand <id>`: you should see
+  `Error: Pull request #<n> (<owner>/<repo>) is open, not merged. Nothing was written.` with
+  `$LASTEXITCODE` 2 -- never a `NativeCommandError` naming `gh`, and never the generic `Error: exit code`
+  block -- and the card unchanged. Merge it (squash), then `tkLand <id> -WhatIf`: three `[WhatIf]` lines
+  naming the bullet with the real merge commit's first seven characters and the merge's local day, the
+  close and its comment, and the archive. Then `tkLand <id>`: the card is in `archive/` with
+  `- <hash> #<n> squash-merged to main <date>` under `Commits:` in its own line endings, and the issue on
+  GitHub is closed as completed with one comment, `Landed in <hash> -- pull request <n>, squash-merged to
+  main <date>.`, its link to the pull request working. Run `tkLand <id>` once more: every step reads
+  `Skipped`, it ends `Nothing changed.`, the issue has still one comment, and `archive/` has no `-r1`. On the
+  board, a Code Review card whose pull request has merged offers **Land** in its menu (allow a minute for the
+  held merged set). On an Azure DevOps board, a completed pull request lands the same way through
+  `az repos pr show`, the work item Closed with the comment. Refs the pull request that adds `Land`.
 
 ## Recording a run
 

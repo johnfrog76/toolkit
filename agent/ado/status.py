@@ -25,7 +25,7 @@ from ..core.config import (
     tracker,
     tracker_repos,
 )
-from ..core.consts import folder_current
+from ..core.consts import folder_current, status_code_review
 from ..core.git_history import folder_changes
 from ..core.parsers import _parse_status_metadata, card_id, status_sort_key
 from ..core.tier import _resolve_tier
@@ -105,6 +105,11 @@ class PromptInfo(BaseModel):
     # repository and whose number is in the repository's pinned set. False
     # everywhere else, and in every one of those cases `gh` was not asked.
     pinned: bool = False
+    # The card's pull request is MERGED: true only on a GitHub Space at Tier
+    # 1, for a Code Review card whose `PR URL:` is a GitHub pull request whose
+    # number is in its repository's merged set. What the web's Land is offered
+    # on (cardActions.ts); False everywhere else, with nothing asked.
+    merged: bool = False
 
 
 class StatusResponse(BaseModel):
@@ -207,6 +212,72 @@ def _pinned_cards(prompts: list["PromptInfo"]) -> None:
             p.pinned = int(m.group(3)) in pinned.get(f"{m.group(1)}/{m.group(2)}".lower(), set())
 
 
+# The merged set: the pinned set's twin, for Land. ONE `gh pr list --state
+# merged` per repository a Code Review card's pull request is in, held as briefly
+# as the pinned set. The newest MERGED_LIMIT merged pull requests: Land is
+# offered right after a merge, and a card whose merge is older than that is
+# landed from the CLI, which asks about the one pull request.
+MERGED_TTL_SECONDS = 60
+MERGED_LIMIT = 100
+_GH_PR_URL = re.compile(r"github\.com/([^/]+)/([^/]+)/pull/(\d+)", re.IGNORECASE)
+_merged_cache: dict[str, tuple[float, set[int]]] = {}
+_merged_lock = threading.Lock()
+
+
+def merged_cache_clear() -> None:
+    """Forget every cached merged set. Called by tests."""
+    with _merged_lock:
+        _merged_cache.clear()
+
+
+def _gh_merged_set(repo: str) -> set[int]:
+    """The numbers of ``owner/name``'s newest merged pull requests; empty when
+    gh cannot say (an unanswered call is not cached, so the next read asks again)."""
+    with _merged_lock:
+        hit = _merged_cache.get(repo)
+    if hit is not None and (time.monotonic() - hit[0]) < MERGED_TTL_SECONDS:
+        return hit[1]
+    data, why = _gh_json(
+        ["gh", "pr", "list", "--repo", repo, "--state", "merged", "--limit", str(MERGED_LIMIT), "--json", "number"]
+    )
+    if why or not isinstance(data, list):
+        return set()
+    try:
+        found = {int(row["number"]) for row in data if isinstance(row, dict) and "number" in row}
+    except (TypeError, ValueError):
+        return set()
+    with _merged_lock:
+        _merged_cache[repo] = (time.monotonic(), found)
+    return found
+
+
+def _merged_cards(prompts: list["PromptInfo"]) -> None:
+    """Set ``merged`` on the Code Review cards whose pull request is merged.
+    Blocking (it shells out to gh); runs off the event loop. Gates first, as
+    the pinned set does: on ADO, on no tracker and below Tier 1 nothing is asked,
+    and only a card in Code Review with a GitHub pull request is looked at."""
+    wanted = []
+    for p in prompts:
+        m = _GH_PR_URL.search(p.pr_url or "") if p.status == status_code_review() else None
+        if m:
+            wanted.append((p, f"{m.group(1)}/{m.group(2)}", int(m.group(3))))
+    if not wanted:
+        return
+    cfg = load_config()
+    org = cfg.get("org", "")
+    if not org or tracker(org) != "github":
+        return
+    tier, _ = _resolve_tier(org, cfg.get("status", ""))
+    if tier != 1:
+        return
+    sets: dict[str, set[int]] = {}
+    for p, repo, number in wanted:
+        key = repo.lower()
+        if key not in sets:
+            sets[key] = _gh_merged_set(repo)
+        p.merged = number in sets[key]
+
+
 @api.get("/status", response_model=StatusResponse)
 async def get_status(space: str = ""):
     """The cards in a Space's ``current/`` (in play) and ``backlog/`` (planned).
@@ -275,6 +346,7 @@ async def get_status(space: str = ""):
     # read is a folder read and asks no tracker.
     if not elsewhere:
         await asyncio.to_thread(_pinned_cards, prompts)
+        await asyncio.to_thread(_merged_cards, prompts)
     prompts.sort(key=lambda p: status_sort_key(p.status, p.file))
     return StatusResponse(count=len(prompts), prompts=prompts)
 

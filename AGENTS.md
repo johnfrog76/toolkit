@@ -169,7 +169,7 @@ module and you add a mock line to every one of these files.
 **Four test runners**, one per half plus one for the two together. Run the ones your change touches:
 
 ```powershell
-tkTestToolkit                 # the CLI -- 47 suites, 8501 assertions on this commit
+tkTestToolkit                 # the CLI -- 48 suites, 8618 assertions on this commit
 ```
 
 ```bash
@@ -269,7 +269,7 @@ The five verbs carry most of it:
 | Ship | `tkNewPR` |
 | Review | `tkGetPRComments` |
 | Reply | `tkReplyPR <pr> <thread> -Reply "..." -Status fixed` |
-| Close | `tkArchive` then `tkCloseItem <id> -Comment "..."` |
+| Close | `tkArchive` then `tkCloseItem <id> -Comment "..."` -- or `tkLand <id>` once the PR is merged, which records the merge and runs both |
 
 `tkStatus` shows every active card and its derived state — that is your ledger.
 `tkDashboard` shows the tracker's: PRs across projects, assigned work items with an `Updated`
@@ -313,7 +313,10 @@ The prompt file is the engineer's record; ADO is the organisation's. One event p
 `tkNewPR` writes `PR URL:` **and** moves the card to Code Review.
 
 **Nothing reconciles them automatically.** `tkArchive` moves the file and does not touch ADO, so
-Done locally is not Closed on the board. If the card should be closed, run `tkCloseItem` too.
+Done locally is not Closed on the board. If the card should be closed, run `tkCloseItem` too -- or
+`tkLand <id>` once its pull request is merged: it asks the tracker whether the PR merged, writes the
+`- <hash> #<n> squash-merged to <base> <date>` bullet, then runs `CloseItem` and `Archive` as they are.
+Each step already done is skipped, so it is safe to re-run.
 
 ## Traps worth knowing
 

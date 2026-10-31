@@ -36,6 +36,7 @@ import { getProjectTag } from "./repoTags";
 import { TrackerBadge } from "./TrackerBadge";
 import { CoverThumb } from "./CardCover";
 import { cardPath } from "./paths";
+import { useLandCard } from "./useLandCard";
 import { useRemindAbout } from "./useRemindAbout";
 import { STATUS } from "../../shell/consts";
 import { DocumentTextRegular } from "@fluentui/react-icons";
@@ -104,6 +105,7 @@ export function PromptStatus({
   const [moveCard] = useMoveCardMutation();
   const billing = useBillableToggle();
   const remind = useRemindAbout();
+  const land = useLandCard();
   const laneLabel = useLaneLabel();
   // What this row may do is the action model's answer, not this file's: the
   // board draws the same one (cardActions.ts, CardActionMenu.tsx).
@@ -312,6 +314,10 @@ export function PromptStatus({
             <StatusMessage status="success" onDismiss={remind.clearAdded}>
               {remind.added}
             </StatusMessage>
+          ) : land.landed ? (
+            <StatusMessage status="success" onDismiss={land.clearLanded}>
+              {land.landed}
+            </StatusMessage>
           ) : (
             toast && (
               <StatusMessage
@@ -366,6 +372,7 @@ export function PromptStatus({
                   onToggleBillable={() => billing.toggle(p)}
                   onCreatePR={() => openDialog("pr")}
                   onRemind={() => remind.open(p)}
+                  onLand={() => land.open(p)}
                 />
               </div>
 
@@ -432,6 +439,7 @@ export function PromptStatus({
       </PageCard>
       <ActionDialog open={dialogState.open} onClose={closeDialog} tab={dialogState.tab} />
       {remind.dialog}
+      {land.dialog}
       <ConfirmDialog
         open={!!pending}
         what={archiveWhat(pending?.label ?? "")}

@@ -44,6 +44,7 @@ import type { Lane } from "./legalMoves";
 import { filterPrompts, sprintsOf } from "./promptFilters";
 import { cardPath } from "./paths";
 import { countInPlay, inPlayLine } from "./inPlay";
+import { useLandCard } from "./useLandCard";
 import { useRemindAbout } from "./useRemindAbout";
 
 // The board: the same cards as the list, arranged by where they ARE.
@@ -166,6 +167,7 @@ interface BoardCardProps {
   onToggleBillable: () => void;
   onCreatePR: () => void;
   onRemind: () => void;
+  onLand: () => void;
   context: CardActionContext;
 }
 
@@ -177,6 +179,7 @@ function BoardCard({
   onToggleBillable,
   onCreatePR,
   onRemind,
+  onLand,
   context,
 }: BoardCardProps) {
   const styles = useStyles();
@@ -211,6 +214,7 @@ function BoardCard({
           onToggleBillable={onToggleBillable}
           onCreatePR={onCreatePR}
           onRemind={onRemind}
+          onLand={onLand}
         />
       </div>
       <div className={styles.cardMeta}>
@@ -279,6 +283,7 @@ export function Board() {
   const actionContext = useCardActionContext();
   const billing = useBillableToggle();
   const remind = useRemindAbout();
+  const land = useLandCard();
   const [sprint, setSprint] = useState("All");
   // Which lane a dragged card is over, if any -- every lane ahead of the card is
   // a target now, not only Done.
@@ -476,6 +481,11 @@ export function Board() {
             {remind.added}
           </StatusMessage>
         ) : null}
+        {land.landed ? (
+          <StatusMessage status="success" onDismiss={land.clearLanded}>
+            {land.landed}
+          </StatusMessage>
+        ) : null}
       </div>
 
       <div className={styles.lanes}>
@@ -560,6 +570,7 @@ export function Board() {
                       onToggleBillable={() => billing.toggle(p)}
                       onCreatePR={() => setDialogTab("pr")}
                       onRemind={() => remind.open(p)}
+                      onLand={() => land.open(p)}
                       context={actionContext}
                     />
                   ))}
@@ -582,6 +593,7 @@ export function Board() {
         tab={dialogTab ?? "create"}
       />
       {remind.dialog}
+      {land.dialog}
     </section>
   );
 }

@@ -1,4 +1,9 @@
-import { AlertRegular, ArrowUploadRegular, MoneyRegular } from "@fluentui/react-icons";
+import {
+  AirplaneLandingRegular,
+  AlertRegular,
+  ArrowUploadRegular,
+  MoneyRegular,
+} from "@fluentui/react-icons";
 import { ROW, defineRowMoves } from "../../shared/CardActions";
 import type { RowMove } from "../../shared/CardActions";
 import { STATUS } from "../../shell/consts";
@@ -41,6 +46,13 @@ import type { Lane } from "./legalMoves";
 //   - enabled otherwise. It opens the Create PR dialog, and the dialog asks
 //     for the work item id: typing it is the deliberate step.
 //
+// Land, decided here: present only on a Code Review card whose pull request
+// the agent read as MERGED (`merged` on the card model -- a GitHub Space at
+// Tier 1, docs/hub/cards.md). Absent everywhere else, never disabled: before
+// the merge there is nothing to land, and after it the card is in archive/. It
+// is the first of what you do with the card, and runs the CLI's Land verb
+// (record the merge, close the issue, archive), which asks first.
+//
 // Remind me about this, decided here: present only while the organize module
 // is on (`/env` features.organize) -- off means absent, so with the flag off
 // the menu does not name a module that is not there. It is the last item, and
@@ -51,12 +63,14 @@ import type { Lane } from "./legalMoves";
 // agent does not send it; then a card past Active is given the benefit of the
 // doubt rather than a reason that may be false.
 
-export type CardActionId = "open-ado" | "open-card" | "move" | "billable" | "create-pr" | "remind";
+export type CardActionId =
+  "open-ado" | "open-card" | "move" | "land" | "billable" | "create-pr" | "remind";
 
 /** A card's own moves -- on no other record. Everything else on its menu is the
  *  shared vocabulary (shared/CardActions ROW): Open the card, Move to <lane>,
  *  Archive (move to Done), and Open on <tracker>. */
 export const CARD_MOVES = defineRowMoves("card", {
+  land: { word: "Land", icon: AirplaneLandingRegular },
   createPr: { word: "Create PR", icon: ArrowUploadRegular },
   markNotBillable: { word: "Mark not billable", icon: MoneyRegular },
   makeBillable: { word: "Make billable again", icon: MoneyRegular },
@@ -87,7 +101,7 @@ export interface CardActionPlan {
 export type ActionCard = Pick<
   PromptInfo,
   "status" | "linked" | "ado_url" | "pr_url" | "billable"
-> & { commits?: number };
+> & { commits?: number; merged?: boolean };
 
 export interface CardActionContext {
   /** `/env` ado.enabled -- an older agent that does not say reads as on. */
@@ -154,6 +168,9 @@ export function cardActions(card: ActionCard, ctx: CardActionContext): CardActio
 
   const secondary: CardActionSpec[] = [...lanes];
 
+  if (card.status === STATUS.codeReview && card.merged) {
+    secondary.push(spec("land", CARD_MOVES.land));
+  }
   if (ado && card.status !== STATUS.done) {
     const whyNot = whyNotCreatePR(card, ctx);
     secondary.push(

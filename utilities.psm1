@@ -2212,6 +2212,27 @@ function global:Add-P20CommitHash {
         -Name $inv.Name -Prefix $inv.Prefix -NoSuccessLog
 }
 
+# Land: the merge recorded, the issue closed, the card archived -- a
+# composition of the bullet rule ThreadHash writes by, CloseItem and Archive,
+# each run as it is. Not tier-gated here: its first act is the tracker read
+# that says whether the pull request is merged, and that read states its own
+# refusal when the tracker does not answer.
+function global:Invoke-P20Land {
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0)]
+        [string]$Card,
+        [int]$Pr,
+        [string]$Comment,
+        [switch]$WhatIf,
+        [switch]$Help
+    )
+    # The script logs its own CMD line (with what it wrote).
+    $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'Land'
+    Invoke-ToolkitScript -Path "$toolkitRoot\Scripts\Land-Card.ps1" -Parameters $PSBoundParameters `
+        -Name $inv.Name -Prefix $inv.Prefix -NoSuccessLog
+}
+
 function global:Start-P20Web {
     [CmdletBinding()]
     param(
@@ -2437,6 +2458,7 @@ $script:ModuleState.CommandMap = [ordered]@{
     'Env'              = 'Get-P20Environment'
     'Log'              = 'Get-P20ToolkitLog'
     'ThreadHash'       = 'Add-P20CommitHash'
+    'Land'             = 'Invoke-P20Land'          # merged -> recorded, closed, archived
     'Setup'            = 'Test-P20Prerequisites'
     'InstallAutoload'  = 'Install-P20ToolkitAutoload'
     'Update'           = 'Update-P20Toolkit'

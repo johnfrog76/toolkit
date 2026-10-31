@@ -1025,6 +1025,35 @@ describe("the scenario grid: a card's menu, by the Organize flag", () => {
   });
 });
 
+// A card's menu, by its pull request (docs/SCENARIOS.md, "A card's menu, by its
+// pull request"): Land is there on a Code Review card the agent read as merged
+// -- a GitHub Space at Tier 1 is the only one that serves `merged` -- and
+// absent on every other card.
+describe("the scenario grid: a card's menu, by its pull request", () => {
+  const card = (status: string, merged?: boolean) => ({
+    status,
+    linked: true,
+    ado_url: "https://github.com/o/r/issues/7",
+    pr_url: status === "Code Review" ? "https://github.com/o/r/pull/8" : null,
+    billable: true,
+    commits: 1,
+    merged,
+  });
+  it.each<[string, ReturnType<typeof card>, boolean]>([
+    ["Code Review, its pull request merged", card("Code Review", true), true],
+    ["Code Review, its pull request open", card("Code Review", false), false],
+    ["Code Review, an agent that does not say (Azure DevOps, Tier 2)", card("Code Review"), false],
+    ["In Progress", card("In Progress", true), false],
+  ])("%s", (_why, c, offered) => {
+    const menu = cardActions(c, {
+      adoEnabled: true,
+      tracker: "github",
+      cliPrefix: "tk",
+    }).secondary.map((a) => a.label);
+    expect(menu.filter((l) => l === "Land")).toHaveLength(offered ? 1 : 0);
+  });
+});
+
 // The board's lanes, by a card's status (docs/SCENARIOS.md, "The board's lanes,
 // by a card's status"): five lanes, Backlog first, and what a drop may do from
 // each -- the one rule the drop targets and the "Move to" menu both read.

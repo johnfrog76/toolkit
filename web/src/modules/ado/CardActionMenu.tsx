@@ -35,6 +35,8 @@ export interface CardActionHandlers {
   onCreatePR: () => void;
   /** Remind me about this -- offered only while organize is on (cardActions.ts). */
   onRemind?: () => void;
+  /** Land -- offered only on a merged Code Review card (cardActions.ts). */
+  onLand?: () => void;
 }
 
 function toCardAction(spec: CardActionSpec, h: CardActionHandlers): CardAction {
@@ -47,9 +49,11 @@ function toCardAction(spec: CardActionSpec, h: CardActionHandlers): CardAction {
           ? h.onCreatePR
           : spec.id === "remind"
             ? h.onRemind
-            : spec.id === "move" && spec.to
-              ? () => h.onMove(spec.to!)
-              : undefined;
+            : spec.id === "land"
+              ? h.onLand
+              : spec.id === "move" && spec.to
+                ? () => h.onMove(spec.to!)
+                : undefined;
   // The word, icon and tooltip are the move's (shared/CardActions ROW, or the
   // card's own CARD_MOVES); nothing here names an action.
   return spec.move.action({
