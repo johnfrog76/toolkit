@@ -12,11 +12,9 @@ import {
 } from "@fluentui/react-components";
 import { useEffect, useRef } from "react";
 import { DialogDismiss } from "../../shared/DialogDismiss";
-import { Wordmark } from "../../shared/Wordmark";
-import { useFacePref } from "../../hooks/useFacePref";
-import { useWornTheme } from "../../hooks/useWornTheme";
 import type { Milestone } from "../ado/api.ado";
 import { awardTitle, tookLine } from "./award";
+import { Trophy } from "./Trophy";
 import { useConfetti } from "./useConfetti";
 
 // The award (docs/modules/solitaire-agile.md, "Milestones: the tab and the award"):
@@ -48,31 +46,11 @@ const useStyles = makeStyles({
 });
 
 /**
- * The award's picture.
- *
- * NOT DRAWN YET: the real picture -- the team lead of the standup's cast, lifting
- * weights -- is drawn in the studio and shipped the way slide art is. Until it
- * lands, the dialog wears the Team Agile wordmark (the app's own mark, in the worn
- * theme's colours, with the face the person chose) as the stand-in. Swapping it is
- * ONE line: point AWARD_PICTURE at the picture's component.
+ * The award's picture: a gold trophy (Trophy.tsx), the gold tier of the studio's
+ * bowling-deck trophy, in the 200px picture box. Named here so a later picture is
+ * still a one-line swap.
  */
-function WordmarkStandIn() {
-  const { theme, active } = useWornTheme();
-  const { faceId } = useFacePref();
-  return (
-    <Wordmark
-      size={200}
-      ink={tokens.colorNeutralForeground1}
-      blob={active.logo}
-      face={faceId}
-      theme={theme}
-      title=""
-    />
-  );
-}
-
-/** The picture the award shows -- the stand-in until the real one is drawn. */
-export const AWARD_PICTURE = WordmarkStandIn;
+export const AWARD_PICTURE = Trophy;
 
 export function AwardDialog({
   milestones,

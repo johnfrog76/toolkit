@@ -945,10 +945,12 @@ module-level listener rather than a React context on purpose: a provider that wr
 lazy part without suspending everything under it, and the layer can listen from wherever the shell draws
 it. A throw that lands before the layer's chunk has arrived is held and rained once it does.
 
-**The picture is not drawn yet.** It will be the team lead of the standup's cast lifting weights, drawn in
-the studio and shipped the way slide art is. Until it lands, the dialog wears the Team Agile wordmark (the
-app's own mark, in the worn theme's colours, with the face the person chose) as the stand-in. The swap is one
-line: `AWARD_PICTURE` in `AwardDialog.tsx`.
+**The picture** is a gold trophy -- a cup with two handles, a stem and a plinth -- drawn as an SVG,
+`Trophy.tsx`, in the dialog's 200px picture box, with the accessible name `A gold trophy`. It is the gold
+tier of the trophy the studio draws for its bowling deck, by the same owner, ported as it is: the same
+paths and the three colours, named as constants (`TROPHY_GOLD`, `TROPHY_GOLD_DEEP`, `TROPHY_PLINTH`). The
+deep-gold outline keeps the cup's shape at 3.7:1 on a light theme's dialog and 4.0:1 on a dark one. A later
+picture is still one line: `AWARD_PICTURE` in `AwardDialog.tsx`.
 
 `Tests/fixtures/rituals/milestones.json` is the one table: gh's own rows in (open with and without a due
 date, every issue closed while GitHub shows it open, every issue closed and closed on GitHub, closed on
@@ -1469,9 +1471,6 @@ repository", is the real write).
   rows (Gate 12, "StartWork -Launch"); the suite's launch half runs off Windows only.
 - **The bell and Home's tips do not suggest yet.** They are the suggestion's later surfaces, behind the
   same switch; the chair's line and [the PM Corner](#the-pm-corner-the-line-the-chevron-the-confetti) are the two built.
-- **The award's picture is a stand-in.** The award dialog shows the Team Agile wordmark where the drawn
-  picture -- the team lead lifting weights -- will go ([Milestones](#milestones-the-tab-and-the-award)); swapping it
-  is `AWARD_PICTURE` in `AwardDialog.tsx`.
 - **The Corner's milestones in reach are the suggestion's candidates.** A milestone whose every open item is
   in flight, waiting on you or someone else's has nothing to start, and the Corner moves on to the next
   milestone with something to start, or reads `no milestone in reach`.

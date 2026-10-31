@@ -16,6 +16,10 @@ import { resetCelebrateMemory } from "./celebrate";
 import { ConfettiLayer } from "./ConfettiLayer";
 import { resetConfetti } from "./useConfetti";
 import { MilestonesPage, STAGE_WORDS, countWords } from "./MilestonesPage";
+import { AWARD_PICTURE } from "./AwardDialog";
+import { TROPHY_NAME, Trophy } from "./Trophy";
+import { WORDMARK_NAME } from "../../shared/Wordmark";
+import { WORDMARK_LETTERS } from "../../shared/wordmarkPaths";
 
 // The Milestones tab (docs/modules/solitaire-agile.md, "Milestones: the tab and the
 // award"): one row per milestone with the tracker's own numbers on its bar, and the
@@ -226,7 +230,17 @@ describe("the Milestones tab", () => {
     expect(lines.map((l) => l.textContent)).toEqual(
       BOTH().map((m) => `${m.title}: ${tookLine(m)}`),
     );
-    expect(within(d).getByTestId("award-picture")).toBeTruthy();
+    // The picture is the gold trophy, by its accessible name -- and not the wordmark.
+    const picture = within(d).getByTestId("award-picture");
+    expect(within(picture).getByRole("img", { name: TROPHY_NAME, hidden: true })).toBeTruthy();
+    expect(picture.querySelectorAll("svg")).toHaveLength(1);
+    const letters = new Set(WORDMARK_LETTERS.map((l) => l.d));
+    expect(
+      Array.from(picture.querySelectorAll("path")).filter((p) =>
+        letters.has(p.getAttribute("d") ?? ""),
+      ),
+    ).toEqual([]);
+    expect(picture.textContent).not.toContain(WORDMARK_NAME);
     // The dialog throws the confetti, and the root mount draws it: one burst, over the
     // viewport, outside the dialog's tree.
     await waitFor(() => expect(screen.getAllByTestId("confetti")).toHaveLength(1));
@@ -374,5 +388,14 @@ describe("the confetti: one mount, one hook", () => {
     expect(
       fs.readFileSync(path.join(SRC, "modules/solitaireAgile/AwardDialog.tsx"), "utf8"),
     ).not.toMatch(/<Confetti\b/);
+  });
+});
+
+// The award's picture is the gold trophy (Trophy.tsx), and the wordmark stand-in is gone.
+describe("the award's picture", () => {
+  it("is the trophy, and the award draws no wordmark", () => {
+    expect(AWARD_PICTURE).toBe(Trophy);
+    const src = fs.readFileSync(path.join(__dirname, "AwardDialog.tsx"), "utf8");
+    expect(src).not.toMatch(/Wordmark/);
   });
 });
