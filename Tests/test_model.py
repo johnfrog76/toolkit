@@ -126,6 +126,66 @@ class TheCall(unittest.TestCase):
         self.assertIn("sdk", d)
 
 
+try:
+    import anthropic as _real_sdk
+    import httpx2 as _httpx  # the SDK's HTTP layer since 1.0; it rejects a plain httpx client
+except ImportError:  # pragma: no cover -- the stubbed tests above still run
+    _real_sdk = _httpx = None
+
+
+_NO_SDK = "the anthropic SDK (and its httpx2) is not installed; CI installs requirements"
+
+
+@unittest.skipUnless(_real_sdk and _httpx, _NO_SDK)
+class TheRealSdk(unittest.TestCase):
+    """The stub above accepts any keyword, so a renamed or removed SDK parameter
+    would pass it. This runs ``complete()`` through the REAL client with the HTTP
+    transport replaced by a canned response: no network, no key that is real."""
+
+    def test_complete_runs_end_to_end_through_the_installed_sdk(self):
+        sent: dict = {}
+
+        def handler(request):
+            import json
+
+            sent["path"] = request.url.path
+            sent["body"] = json.loads(request.content)
+            return _httpx.Response(
+                200,
+                json={
+                    "id": "msg_test",
+                    "type": "message",
+                    "role": "assistant",
+                    "model": "claude-test-1",
+                    "content": [{"type": "text", "text": " hello "}],
+                    "stop_reason": "end_turn",
+                    "stop_sequence": None,
+                    "usage": {"input_tokens": 1, "output_tokens": 1},
+                },
+            )
+
+        real = _real_sdk.AsyncAnthropic
+
+        def client(**kwargs):
+            # model.py's own keywords go to the real constructor; only the transport is ours.
+            return real(http_client=_httpx.AsyncClient(transport=_httpx.MockTransport(handler)), **kwargs)
+
+        with (
+            mock.patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-dummy-not-real"}),
+            mock.patch.object(_real_sdk, "AsyncAnthropic", client),
+            mock.patch.object(model, "load_config", return_value={"ai": {"model": "claude-test-1"}}),
+        ):
+            text = asyncio.run(model.complete("the prompt", system="the system", max_tokens=42))
+        self.assertEqual(text, "hello")
+        self.assertEqual(sent["path"], "/v1/messages")
+        body = sent["body"]
+        self.assertEqual(body["model"], "claude-test-1")
+        self.assertEqual(body["max_tokens"], 42)
+        self.assertEqual(body["system"], "the system")
+        self.assertEqual(body["messages"], [{"role": "user", "content": "the prompt"}])
+        self.assertEqual(body["output_config"], {"effort": model.EFFORT})
+
+
 class NoSecondTransport(unittest.TestCase):
     def test_no_route_module_calls_the_api_itself(self):
         from agent.core.config import REPO_ROOT
