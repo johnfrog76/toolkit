@@ -347,6 +347,45 @@ class TheMoveDesignVerb(unittest.TestCase):
         self.assert_refused("board-ideas -To Complete -Doc docs/board.md", "'Board ideas' is Design, not Spec")
         self.assert_refused("done -To Complete -Doc docs/board.md", "is Archived, not Spec")
 
+    # -- -To Archive -Dropped on a Spec ---------------------------------------------
+
+    def test_dropping_a_spec_archives_both_files_together(self):
+        self.assert_refused("the-pair -To Archive -Dropped", "-Dropped needs -Reason")
+        out = self.move('cccccccc -To Archive -Dropped -Reason "Never built"')
+        self.assertIn("X=0", out)
+        self.assertFalse((self.repo / "design/the-pair.md").exists())
+        self.assertFalse((self.repo / "spec/the-pair.spec.md").exists())
+        spec = self.read(self.repo / "spec/archive/the-pair.spec.md")
+        self.assertRegex(spec, rf"{re.escape(CLOSED)} {TODAY_RX}\n{re.escape(OUTCOME)} dropped\n$")
+        self.assertNotIn(DOCS, spec)
+        note = self.read(self.repo / "design/archive/the-pair.md")
+        self.assertRegex(
+            note,
+            r"- 2026-09-01 Design: written as design/the-pair\.md in o/r\.\n- "
+            + TODAY_RX
+            + r" Dropped: Never built\. This note is now design/archive/the-pair\.md "
+            r"and the spec is spec/archive/the-pair\.spec\.md, in o/r\.\n",
+        )
+        self.assertRegex(note, rf"{re.escape(CLOSED)} {TODAY_RX}\n{re.escape(OUTCOME)} dropped\n$")
+        self.assertEqual(
+            _staged(self.repo),
+            [
+                "A  design/archive/the-pair.md",
+                "A  spec/archive/the-pair.spec.md",
+                "D  design/the-pair.md",
+                "D  spec/the-pair.spec.md",
+            ],
+        )
+
+    def test_a_live_spec_still_refuses_archive_without_dropped(self):
+        self.assert_refused("the-pair -To Archive", "its spec spec/the-pair.spec.md is live")
+        self.assert_refused("the-pair -To Archive", "-To Archive -Dropped -Reason <text> drops both")
+
+    def test_a_spec_standing_alone_can_be_dropped(self):
+        out = self.move('lonely -To Archive -Dropped -Reason "No longer wanted"')
+        self.assertIn("X=0", out)
+        self.assertRegex(self.read(self.repo / "spec/archive/lonely.spec.md"), rf"{re.escape(OUTCOME)} dropped\n$")
+
     # -- Naming the design ------------------------------------------------------------
 
     def test_names_an_id_prefix_a_file_or_a_stem_and_refuses_the_ambiguous_and_the_unknown(self):

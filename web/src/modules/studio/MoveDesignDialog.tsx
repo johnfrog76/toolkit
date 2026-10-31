@@ -84,7 +84,7 @@ export const ROADS: Record<
     to: "Archive",
     dropped: true,
     needs: "reason",
-    what: "Move the note to design/archive/ and stamp it Closed and dropped. An idea that never made it is only worth keeping with why.",
+    what: "Move the note (and the spec, if there is one) to their archives and stamp them Closed and dropped. An idea that never made it is only worth keeping with why.",
   },
   complete: {
     ...road(ROW.complete),
@@ -98,7 +98,7 @@ export const ROADS: Record<
 export function roadsFor(d: Pick<Design, "state" | "note" | "spec">): MoveRoad[] {
   const liveNote = !!d.note && !d.note.archived;
   const liveSpec = !!d.spec && !d.spec.archived;
-  if (liveSpec) return ["complete"];
+  if (liveSpec) return ["complete", "dropped"];
   if (liveNote) return ["spec", "shipped", "dropped"];
   return [];
 }
