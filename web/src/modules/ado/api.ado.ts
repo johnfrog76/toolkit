@@ -5,6 +5,8 @@ import type { IssueStateChoice } from "./issueAxes";
 import {
   buildBillableParams,
   buildMoveParams,
+  buildPlanParams,
+  buildTagParams,
   buildNewAdoItemParams,
   buildCloseWorkItemParams,
   buildEditWorkItemParams,
@@ -15,6 +17,7 @@ import type {
   NewAdoItemFields,
   CloseWorkItemFields,
   EditWorkItemFields,
+  PlanLine,
 } from "./cliBridge";
 
 // The ADO module's half of the API slice.
@@ -88,6 +91,12 @@ export interface PromptInfo {
   assigned?: string;
   title: string;
   sprint: string;
+  /** The card's milestone, WHOLE: its `**Milestone:**` line, else -- a card with none,
+   *  every card written before the two lines were separate -- its `**Sprint:**` line,
+   *  as it always read (docs/hub/cards.md). "" for none. Absent from an older agent. */
+  milestone?: string;
+  /** The card's `Tags:` line, split on commas. Absent from an older agent. */
+  tags?: string[];
   progress: string;
   checked: number;
   total: number;
@@ -1092,6 +1101,29 @@ export const adoEndpoints = adoApi.injectEndpoints({
       invalidatesTags: ["Status", "Billing"],
     }),
 
+    // POST /api/cmd/Plan -- a card's milestone or sprint line, through the verb.
+    planCard: builder.mutation<
+      CommandResponse,
+      { file: string; line: PlanLine; title?: string; remove?: boolean }
+    >({
+      query: (fields) => ({
+        url: "cmd/Plan",
+        method: "POST",
+        body: { params: buildPlanParams(fields) },
+      }),
+      invalidatesTags: ["Status"],
+    }),
+
+    // POST /api/cmd/Tag -- the card's Tags: line, through the verb.
+    tagCard: builder.mutation<CommandResponse, { file: string; tags: string[]; remove?: boolean }>({
+      query: (fields) => ({
+        url: "cmd/Tag",
+        method: "POST",
+        body: { params: buildTagParams(fields) },
+      }),
+      invalidatesTags: ["Status"],
+    }),
+
     // POST /api/cmd/NewPrompt
     createPrompt: builder.mutation<CommandResponse, { params: string[] }>({
       query: (body) => ({
@@ -1304,6 +1336,8 @@ export const {
   useRunCommandMutation,
   useArchivePromptMutation,
   useSetBillableMutation,
+  usePlanCardMutation,
+  useTagCardMutation,
   useMoveCardMutation,
   useCreatePromptMutation,
   useUploadAssetMutation,

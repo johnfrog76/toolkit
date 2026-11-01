@@ -188,7 +188,7 @@ try {
     $startedPath = $inPlayPath
 
     $out = Invoke-InSpace 'alpha' "${prefix}Plan '$startedPath' -Milestone 'Sprint 9'; 'PLAN=' + `$LASTEXITCODE"
-    Assert-True "Plan <beta's current path> -Milestone writes the Sprint line on that card" ($out -match 'PLAN=0' -and (Test-Path -LiteralPath $startedPath) -and ([System.IO.File]::ReadAllText($startedPath)) -match '\*\*Sprint:\*\* Sprint 9') $out
+    Assert-True "Plan <beta's current path> -Milestone writes the Milestone line on that card" ($out -match 'PLAN=0' -and (Test-Path -LiteralPath $startedPath) -and ([System.IO.File]::ReadAllText($startedPath)) -match ([regex]::Escape([string]$consts.stamps.milestone) + ' Sprint 9')) $out
 
     $out = Invoke-InSpace 'alpha' "${prefix}Move '$startedPath' -To Done; 'DONE=' + `$LASTEXITCODE"
     $done = Get-SpaceCard 'beta' $consts.folders.archive 'TaskH6PN-*.prompt.md'

@@ -41,7 +41,9 @@ import { BoardCover } from "./CardCover";
 import { CARD_FACE_BOX, CardName, CardProgress } from "./CardFace";
 import { useGetEnvQuery } from "../../shell/api";
 import type { Lane } from "./legalMoves";
-import { filterPrompts, sprintsOf } from "./promptFilters";
+import { filterPrompts, milestonesOf, sprintsOf, tagsOf } from "./promptFilters";
+import { usePlanCard } from "./PlanCardDialog";
+import type { PlanKind } from "./PlanCardDialog";
 import { cardPath } from "./paths";
 import { countInPlay, inPlayLine } from "./inPlay";
 import { useRemindAbout } from "./useRemindAbout";
@@ -166,6 +168,7 @@ interface BoardCardProps {
   onToggleBillable: () => void;
   onCreatePR: () => void;
   onRemind: () => void;
+  onPlan: (kind: PlanKind) => void;
   context: CardActionContext;
 }
 
@@ -177,6 +180,7 @@ function BoardCard({
   onToggleBillable,
   onCreatePR,
   onRemind,
+  onPlan,
   context,
 }: BoardCardProps) {
   const styles = useStyles();
@@ -211,6 +215,7 @@ function BoardCard({
           onToggleBillable={onToggleBillable}
           onCreatePR={onCreatePR}
           onRemind={onRemind}
+          onPlan={onPlan}
         />
       </div>
       <div className={styles.cardMeta}>
@@ -279,7 +284,10 @@ export function Board() {
   const actionContext = useCardActionContext();
   const billing = useBillableToggle();
   const remind = useRemindAbout();
+  const plan = usePlanCard();
   const [sprint, setSprint] = useState("All");
+  const [milestone, setMilestone] = useState("All");
+  const [tag, setTag] = useState("All");
   // Which lane a dragged card is over, if any -- every lane ahead of the card is
   // a target now, not only Done.
   const [over, setOver] = useState<Lane | null>(null);
@@ -300,6 +308,8 @@ export function Board() {
     [all, env?.config?.inPlayLimit],
   );
   const sprints = useMemo(() => sprintsOf(all), [all]);
+  const milestones = useMemo(() => milestonesOf(all), [all]);
+  const tags = useMemo(() => tagsOf(all), [all]);
   const shown = useMemo(
     () =>
       filterPrompts(all, {
@@ -307,6 +317,8 @@ export function Board() {
         status: filters.stateFilter,
         text: filters.filterValue,
         sprint,
+        milestone,
+        tag,
         type: filters.typeFilter,
         link: filters.linkFilter,
       }),
@@ -318,6 +330,8 @@ export function Board() {
       filters.typeFilter,
       filters.linkFilter,
       sprint,
+      milestone,
+      tag,
     ],
   );
 
@@ -418,22 +432,23 @@ export function Board() {
           {cardFrom ? ` ${cardFrom}` : ""}
         </Body1>
         <span className={styles.barSpacer} />
-        {sprints.length > 0 ? (
-          <Dropdown
-            size="small"
-            aria-label="Sprint"
-            value={sprint === "All" ? "All sprints" : sprint}
-            selectedOptions={[sprint]}
-            onOptionSelect={(_e, d) => setSprint(d.optionValue ?? "All")}
-          >
-            <Option value="All">All sprints</Option>
-            {sprints.map((s) => (
-              <Option key={s} value={s}>
-                {s}
-              </Option>
-            ))}
-          </Dropdown>
-        ) : null}
+        {/* The board's filters: one dropdown per thing a card is planned or tagged
+            by, each drawn only when some card names one (promptFilters.ts). */}
+        <BoardFilter
+          label="Milestone"
+          all="All milestones"
+          value={milestone}
+          options={milestones}
+          onChange={setMilestone}
+        />
+        <BoardFilter
+          label="Sprint"
+          all="All sprints"
+          value={sprint}
+          options={sprints}
+          onChange={setSprint}
+        />
+        <BoardFilter label="Tag" all="All tags" value={tag} options={tags} onChange={setTag} />
         {/* Last on the row: "New card button always follows the explain text"
             -- after the sprint filter, at the row's end. */}
         <Button
@@ -476,6 +491,11 @@ export function Board() {
         {remind.added ? (
           <StatusMessage status="success" onDismiss={remind.clearAdded}>
             {remind.added}
+          </StatusMessage>
+        ) : null}
+        {plan.done ? (
+          <StatusMessage status="success" onDismiss={plan.clearDone}>
+            {plan.done}
           </StatusMessage>
         ) : null}
       </div>
@@ -562,6 +582,7 @@ export function Board() {
                       onToggleBillable={() => billing.toggle(p)}
                       onCreatePR={() => setDialogTab("pr")}
                       onRemind={() => remind.open(p)}
+                      onPlan={(kind) => plan.open(p, kind)}
                       context={actionContext}
                     />
                   ))}
@@ -584,6 +605,42 @@ export function Board() {
         tab={dialogTab ?? "create"}
       />
       {remind.dialog}
+      {plan.dialog}
     </section>
+  );
+}
+
+/** One of the board's filters: "All <things>" and each value some card names.
+ *  Drawn only when there is a value to choose; while one is chosen it stays, so
+ *  the way back to All is never filtered away. */
+function BoardFilter({
+  label,
+  all,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  all: string;
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+}) {
+  if (options.length === 0 && value === "All") return null;
+  return (
+    <Dropdown
+      size="small"
+      aria-label={label}
+      value={value === "All" ? all : value}
+      selectedOptions={[value]}
+      onOptionSelect={(_e, d) => onChange(d.optionValue ?? "All")}
+    >
+      <Option value="All">{all}</Option>
+      {options.map((s) => (
+        <Option key={s} value={s}>
+          {s}
+        </Option>
+      ))}
+    </Dropdown>
   );
 }

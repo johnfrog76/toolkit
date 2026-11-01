@@ -137,8 +137,8 @@ The board's card and the list's row draw one action model (`cardActions.ts`), so
 
 | Organize | A card's own moves in its `...` end with (the link out, where there is one, comes after, last) |
 | --- | --- |
-| off, or not configured | the billable toggle, **Mark not billable** -- no reminder item, and nothing of Organize is fetched |
-| on | **Remind me about this**: Organize's New Reminder dialog, the card's title as what and its id as the ref (`docs/modules/organize.md`, "The web UI") |
+| off, or not configured | the billable toggle, then **Plan milestone**, **Plan sprint** and **Tag** (on a card in play or planned) -- ending on **Tag**; no reminder item, and nothing of Organize is fetched |
+| on | the same, then **Remind me about this**: Organize's New Reminder dialog, the card's title as what and its id as the ref (`docs/modules/organize.md`, "The web UI") |
 
 ### The board's lanes, by a card's status (`scenarios.test.tsx`; the rule is `legalMoves.ts`)
 

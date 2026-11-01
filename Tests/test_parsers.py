@@ -183,24 +183,38 @@ class StatusMetadataTests(unittest.TestCase):
                 # The model carries it as the card's `from_record`.
                 self.assertEqual(_parse_status_metadata(text)["from_record"], row["expected"])
 
-    def test_a_cards_milestone_and_tags_by_the_shared_table(self):
-        """The whole `**Sprint:**` line and the `Tags:` line, the two things the
-        suggestion reads from a card (docs/hub/cards.md, "What the suggestion
-        reads"; D-AR11). The CLI reads them with Get-P20CardMilestone and
-        Get-P20CardTags; tkTestToolkit -Rituals asserts the SAME table,
+    def test_a_cards_milestone_sprint_and_tags_by_the_shared_table(self):
+        """A card's two planning lines and its `Tags:` line (docs/hub/cards.md,
+        "Milestone and sprint: two lines"; D-AR11): the milestone is its own
+        `**Milestone:**` line, else -- a card with none, every card written before
+        the two were separate -- its `**Sprint:**` line, as it always read; the
+        sprint is the `**Sprint:**` line. The CLI reads them with
+        Get-P20CardMilestone, Get-P20CardSprint and Get-P20CardTags;
+        tkTestToolkit -Rituals asserts the SAME table,
         Tests/fixtures/parsers/card-milestone.json."""
         import json
 
-        from agent.core.parsers import card_milestone, card_tags
+        from agent.core.parsers import _parse_status_metadata, card_milestone, card_sprint, card_tags
 
         table = json.loads((FIXTURES / "card-milestone.json").read_text(encoding="utf-8"))
-        self.assertGreaterEqual(len(table["rows"]), 4)
+        self.assertGreaterEqual(len(table["rows"]), 13)
         for row in table["rows"]:
             with self.subTest(row=row["name"]):
                 eol = "\r\n" if row["crlf"] else "\n"
                 text = eol.join(row["lines"]) + eol
                 self.assertEqual(card_milestone(text), row["milestone"])
+                self.assertEqual(card_sprint(text), row["sprint"])
                 self.assertEqual(card_tags(text), row["tags"])
+                # The card model serves the same two readings the board filters by.
+                meta = _parse_status_metadata(text)
+                self.assertEqual((meta["milestone"], meta["tags"]), (row["milestone"], row["tags"]))
+        # Every shape the rule distinguishes has a row: an old card (no milestone
+        # line) read through its sprint line, both lines, a placeholder milestone.
+        self.assertTrue(
+            any(not any(ln.startswith("**Milestone:**") for ln in r["lines"]) and r["milestone"] for r in table["rows"])
+        )
+        self.assertTrue(any(r["milestone"] and r["sprint"] and r["milestone"] != r["sprint"] for r in table["rows"]))
+        self.assertTrue(any(not r["milestone"] and r["sprint"] for r in table["rows"]))
 
     def test_in_progress_status(self):
         meta = _parse_status_metadata(_read("in-progress.md"))

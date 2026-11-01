@@ -6,6 +6,7 @@ import { cardActions } from "./cardActions";
 import type { CardActionContext, CardActionSpec } from "./cardActions";
 import { useLaneLabel } from "./laneNames";
 import type { Lane } from "./legalMoves";
+import type { PlanKind } from "./PlanCardDialog";
 
 // The ONE renderer of a card's actions -- the list's row and the board's card
 // both draw this. It decides nothing: cardActions.ts says what is offered,
@@ -35,6 +36,8 @@ export interface CardActionHandlers {
   onCreatePR: () => void;
   /** Remind me about this -- offered only while organize is on (cardActions.ts). */
   onRemind?: () => void;
+  /** Plan milestone, Plan sprint, Tag: the form over the Plan and Tag verbs (PlanCardDialog). */
+  onPlan?: (kind: PlanKind) => void;
 }
 
 function toCardAction(spec: CardActionSpec, h: CardActionHandlers): CardAction {
@@ -47,9 +50,11 @@ function toCardAction(spec: CardActionSpec, h: CardActionHandlers): CardAction {
           ? h.onCreatePR
           : spec.id === "remind"
             ? h.onRemind
-            : spec.id === "move" && spec.to
-              ? () => h.onMove(spec.to!)
-              : undefined;
+            : spec.id === "milestone" || spec.id === "sprint" || spec.id === "tags"
+              ? () => h.onPlan?.(spec.id as PlanKind)
+              : spec.id === "move" && spec.to
+                ? () => h.onMove(spec.to!)
+                : undefined;
   // The word, icon and tooltip are the move's (shared/CardActions ROW, or the
   // card's own CARD_MOVES); nothing here names an action.
   return spec.move.action({

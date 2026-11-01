@@ -516,6 +516,9 @@ row that draws them, and listed here. Two kinds, both named:
 | `card.createPr` | Create PR | `ArrowUploadRegular` | one record | a card, list and board |
 | `card.markNotBillable` | Mark not billable | `MoneyRegular` | one record | a card |
 | `card.makeBillable` | Make billable again | `MoneyRegular` | one record | a card |
+| `card.planMilestone` | Plan milestone | `FlagRegular` | one record | a card in play or planned: a form over `Plan -Milestone` / `-Remove -Only Milestone` |
+| `card.planSprint` | Plan sprint | `CalendarLtrRegular` | one record | a card in play or planned: a form over `Plan -Sprint` / `-Remove -Only Sprint` |
+| `card.tag` | Tag | `TagRegular` | one record | a card in play or planned: a form over `Tag` / `Tag -Remove` |
 | `card.remind` | Remind me about this | `AlertRegular` | one record | a card, while organize is on |
 | `cover.replace` | Replace cover | `ImageEditRegular` | one record | a card's cover, on its page |
 | `cover.addBefore` | Add before | `ImageAddRegular` | one record | a card's cover |
@@ -1005,8 +1008,14 @@ are prompts, and agile lanes are a better view for how multiple items flow for h
   commit, not by hand"). HTML5 drag and drop, no new dependency. The menu is mandatory: a board that only
   works by dragging is closed to a keyboard and to a touch screen. The outcome is announced (`aria-live`).
 - **One set of predicates** (`promptFilters.ts`), lifted out of `PromptStatus.tsx` and used by the list and
-  the board, plus a Sprint filter on the board. A card with no ADO link cannot match the repo filter, so
+  the board, plus the board's own Milestone, Sprint and Tag filters -- each drawn only while some card
+  names one, and read from the card model's `milestone` (whole: its own line, else an old card's sprint
+  line), `sprint` and `tags`. A card with no ADO link cannot match the repo filter, so
   the board SAYS how many it hid rather than letting them vanish.
+- **A card's milestone, sprint and tags are set from its row menu** -- Plan milestone, Plan sprint, Tag
+  (`PlanCardDialog.tsx`): one small form over the CLI's `Plan` and `Tag` verbs through the bridge, one
+  line at a time (`Plan -Remove -Only Milestone|Sprint` to clear one, never the bare `-Remove`). Offered on
+  a card in play or planned; nothing writes the tracker.
 - **Finding a card that is not code work.** The one box is dual entry -- an exact card id first, then a
   substring of the file, the title or the link -- and the **words typed in any order**, so `angular
   signals` finds "Signals in Angular"; no typo tolerance, because on a 250-file corpus a loose match mostly
@@ -1072,7 +1081,7 @@ are prompts, and agile lanes are a better view for how multiple items flow for h
   compared. Demo reads To do / Doing / Waiting / Done; an org that says nothing reads the contract's words.
 - **The tab row spans the centre block, flush both ends.** Home's row above the cards (`viewBar`: flex,
   space-between) has the tabs at its left edge, level with the cards below. **New card
-  follows the explain text** on both rows: on the board, after the sprint filter, at the row's end; the
+  follows the explain text** on both rows: on the board, after the milestone, sprint and tag filters, at the row's end; the
   text wraps inside itself so the buttons keep the row. The System page keeps its pager under the grid.
 - **The board owns the height; a lane scrolls inside itself.** The owner: "they all expand to fill the
   space; if I have 20 cards in a single lane each lane has overflow-y." The lanes grid is

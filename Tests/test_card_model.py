@@ -30,7 +30,7 @@ try:
     from fastapi.testclient import TestClient
 
     from agent.core import config
-    from agent.core.consts import stamp_assigned, stamp_billable
+    from agent.core.consts import stamp_assigned, stamp_billable, stamp_milestone
 except Exception as exc:  # pragma: no cover - a machine without the agent's deps
     skip_module(f"the agent's dependencies are not installed: {exc}")
 
@@ -89,7 +89,10 @@ class TheRouteServesTheModel(unittest.TestCase):
                     id="W3X7",
                     commit="(pending)",
                     link="(not linked)",
-                ).replace("**Created:**", f"{stamp_billable()} no\n{stamp_assigned()} me\n**Created:**"),
+                ).replace(
+                    "**Created:**",
+                    f"{stamp_billable()} no\n{stamp_assigned()} me\n{stamp_milestone()} v0.3 -- Share\n**Created:**",
+                ),
                 "notes-from-tuesday.prompt.md": "# Notes from Tuesday\n\nNot a card.\n",
                 # A GitHub-born card in the same (local) Space: the mingling the tracker badge is for.
                 "Task54-badge-the-tracker.prompt.md": CARD.format(
@@ -213,6 +216,24 @@ class TheRouteServesTheModel(unittest.TestCase):
         self.assertEqual(cards["Spike-K7M2-wallet-ticket.prompt.md"]["assigned"], "")
         detail = self.client.get("/api/status/TaskW3X7-bench-reading.prompt.md").json()
         self.assertEqual(detail["assigned"], "me")
+
+    def test_the_card_model_serves_the_milestone_whole_and_the_tags(self):
+        """The two planning lines and the tags (docs/hub/cards.md, "Milestone and sprint:
+        two lines"): a card's own **Milestone:** line is its milestone, and a card with
+        none reads its **Sprint:** line, as before -- served whole, beside the board's
+        shortened `sprint`; `tags` is the Tags: line split. On the list and the detail."""
+        cards = self._by_file()
+        w3x7 = cards["TaskW3X7-bench-reading.prompt.md"]
+        self.assertEqual(w3x7["milestone"], "v0.3 -- Share")
+        # An old card: no milestone line, so its sprint line names it, whole.
+        self.assertEqual(cards["141-recipe-search.prompt.md"]["milestone"], "RecipeBox\\Sprint 8")
+        self.assertEqual(cards["141-recipe-search.prompt.md"]["sprint"], "Sprint 8")
+        for card in cards.values():
+            self.assertIn("milestone", card)
+            self.assertIsInstance(card["tags"], list)
+        detail = self.client.get("/api/status/TaskW3X7-bench-reading.prompt.md").json()
+        self.assertEqual(detail["milestone"], "v0.3 -- Share")
+        self.assertIsInstance(detail["tags"], list)
 
     def test_the_route_serves_how_many_commits_the_card_records(self):
         """What the web's Create PR gate reads: a placeholder is not a commit."""

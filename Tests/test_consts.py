@@ -44,6 +44,9 @@ EXPECTED = {
     ("stamps", "assigned"): "**Assigned:**",
     # The meeting record an agenda line came from: NewPrompt -From writes it.
     ("stamps", "from"): "**From:**",
+    # A card's two planning lines, each its own: Plan -Milestone and Plan -Sprint write them.
+    ("stamps", "milestone"): "**Milestone:**",
+    ("stamps", "sprint"): "**Sprint:**",
     ("stamps", "started"): "**Started:**",
     ("stamps", "outcome"): "**Outcome:**",
     ("stamps", "review"): "**Review:**",
@@ -53,6 +56,8 @@ EXPECTED = {
     # The design a card names (docs/hub/cards.md).
     ("tokens", "design"): "> Design:",
     ("tokens", "spec"): "> Spec:",
+    # The card's Tags: line: Tag writes it, the suggestion and the board's filter read it.
+    ("tokens", "tags"): "Tags:",
     ("regex", "prUrlLine"): r"(?m)^PR URL:\s*https://",
     ("regex", "prReviewHeading"): r"(?m)^##\s+PR Review Comments",
     ("regex", "commitBullet"): r"(?m)^\s*-\s+`?([0-9a-f]{7,})`?",
@@ -542,6 +547,7 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("stamps.before", "**Before:**"),
         ("stamps.outcome", "**Outcome:**"),
         ("stamps.from", "**From:**"),
+        ("stamps.milestone", "**Milestone:**"),
         ("studio.threadLine", "GitHub:\\s*(https"),
         ("rituals.workerLabelPrefix", "Routed to"),
         ("rituals.text.queueHeading", "Waiting on you"),

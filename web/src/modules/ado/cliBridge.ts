@@ -127,6 +127,45 @@ export function buildBillableParams(fields: { file: string; billable: boolean })
   return fields.billable ? ["-Card", fields.file] : ["-Card", fields.file, "-No"];
 }
 
+/** Which of a card's two planning lines a write is about (docs/hub/cards.md, "Milestone and sprint: two lines"). */
+export type PlanLine = "milestone" | "sprint";
+
+/**
+ * argv for `POST /cmd/Plan` -> `Scripts/Plan-Card.ps1`: a card's milestone or sprint.
+ *
+ * The card travels as its FILENAME. A title is one argv element, whole -- the verb
+ * never truncates it. `remove` takes the card out of that ONE line
+ * (`-Remove -Only Milestone|Sprint`), keeping the other as it read: the row menu
+ * edits one line at a time, so it never sends the bare `-Remove`, which clears both.
+ */
+export function buildPlanParams(fields: {
+  file: string;
+  line: PlanLine;
+  title?: string;
+  remove?: boolean;
+}): string[] {
+  const only = fields.line === "milestone" ? "Milestone" : "Sprint";
+  if (fields.remove) return ["-Card", fields.file, "-Remove", "-Only", only];
+  return ["-Card", fields.file, `-${only}`, (fields.title ?? "").trim()];
+}
+
+/**
+ * argv for `POST /cmd/Tag` -> `Scripts/Set-CardTags.ps1`: tags added to the card's
+ * `Tags:` line, or taken off with `-Remove`. The tags travel as ONE element joined
+ * by commas -- the verb splits on them, as the line's reader does -- each trimmed,
+ * the empty ones dropped.
+ */
+export function buildTagParams(fields: {
+  file: string;
+  tags: string[];
+  remove?: boolean;
+}): string[] {
+  const tags = fields.tags.map((t) => t.trim()).filter(Boolean);
+  const params = ["-Card", fields.file, "-Tags", tags.join(",")];
+  if (fields.remove) params.push("-Remove");
+  return params;
+}
+
 /**
  * argv for `POST /cmd/Move` -> `Scripts/Move-CardLane.ps1`.
  *

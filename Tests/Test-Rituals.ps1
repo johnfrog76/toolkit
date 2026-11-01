@@ -744,9 +744,15 @@ foreach ($row in @($cardTable.rows)) {
     if ($row.crlf) { $eol = "`r`n" }
     $text = ((@($row.lines | ForEach-Object { [string]$_ })) -join $eol) + $eol
     $gotM = Get-P20CardMilestone $text
+    $gotS = Get-P20CardSprint $text
     $gotT = (@(Get-P20CardTags $text)) -join '|'
-    Assert-True "a card's milestone and tags: $($row.name)" ($gotM -ceq [string]$row.milestone -and $gotT -ceq ((@($row.tags | ForEach-Object { [string]$_ })) -join '|')) "got '$gotM' [$gotT]"
+    Assert-True "a card's milestone, sprint and tags: $($row.name)" ($gotM -ceq [string]$row.milestone -and $gotS -ceq [string]$row.sprint -and $gotT -ceq ((@($row.tags | ForEach-Object { [string]$_ })) -join '|')) "got '$gotM' '$gotS' [$gotT]"
 }
+Assert-True 'the card-milestone table has every shape: an old card read through its sprint line, both lines, a placeholder milestone' (
+    @($cardTable.rows | Where-Object { -not (@($_.lines) -like '[*][*]Milestone:[*][*]*') -and [string]$_.milestone }).Count -gt 0 -and
+    @($cardTable.rows | Where-Object { [string]$_.milestone -and [string]$_.sprint -and ([string]$_.milestone -cne [string]$_.sprint) }).Count -gt 0 -and
+    @($cardTable.rows | Where-Object { -not [string]$_.milestone -and [string]$_.sprint }).Count -gt 0) ''
+
 
 # -- 1g. The PM Corner (AR-4) ----------------------------------------------------
 # Tests/fixtures/rituals/corner.json, both sections, the SAME rows

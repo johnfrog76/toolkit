@@ -10,6 +10,9 @@ release.
 
 ### Added
 
+- A card can be in a milestone and a sprint at once: `Plan <id> -Milestone <title>` now writes its own `**Milestone:**` line and the new `Plan <id> -Sprint <title>` writes `**Sprint:**`, each leaving the other as it was. A card written before keeps the milestone its `**Sprint:**` line named. `Plan -Remove` still takes the card out of both; `-Remove -Only Milestone` or `-Only Sprint` takes it out of one.
+- The new `Tag <id> <tag>[,<tag>] [-Remove]` adds tags to a card's `Tags:` line, or takes them off; a tag the card already carries is not added twice, and a call that changes nothing writes nothing.
+- A card's row menu, on the list and the board, offers **Plan milestone**, **Plan sprint** and **Tag**, and the board filters by milestone and by tag beside its sprint filter.
 - A design that has reached a spec can now be dropped: `MoveDesign <id> -To Archive -Dropped -Reason <text>` archives the spec and its note together, stamps both as dropped, and the Design tab lists it under Archived with its reason (and offers **Archive as dropped** on a design with a live spec). Without `-Dropped`, a live spec still has to be completed.
 - `NewPrompt -Title ... -From <meeting>` makes a card from an agenda line and records the meeting it came from in a `**From:**` line -- the record's name, such as `2026-10-28` for the 1:1 or `client-weekly-2026-10-28` for a series; a meeting record that does not exist writes no card.
 - A deck in the Decks card now opens a page of its own, showing its summary, state, tags, slide count, running time and where its file lives, with **Play** to present it. The page's **Archive** puts the deck away on this machine only (the `deck.archived` setting): it leaves the Decks list for an **archived** filter, and the deck itself is not changed.
