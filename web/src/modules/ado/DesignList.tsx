@@ -21,8 +21,18 @@ import { RefreshButton } from "../../shared/RefreshButton";
 import { useGetDesignQuery, useLazySearchDesignQuery } from "./api.ado";
 import { designRoomPath } from "./docRooms";
 import type { Design, DesignCheckout, DesignDoc } from "./api.ado";
-import { MoveDesignDialog, ROADS, roadsFor } from "../studio/MoveDesignDialog";
-import type { MoveRoad, ProductCheckout } from "../studio/MoveDesignDialog";
+import { lazyPart } from "../../shell/lazy";
+import { ROADS, roadsFor } from "./designRoads";
+import type { MoveRoad, ProductCheckout } from "./designRoads";
+
+// The dialog and its API module belong to the Studio and load when a road is
+// first chosen, not with the app: this tab is always mounted, the dialog is
+// not (shell/lazy.tsx). Only the roads, which are plain data, are imported.
+const MoveDesignDialog = lazyPart(
+  () => import("../studio/MoveDesignDialog"),
+  (m) => m.MoveDesignDialog,
+  null,
+);
 import { DesignGroups, LearnMoreLink, NO_STRUCTURE, stateColor } from "./DesignGroups";
 import { BoundCards, DesignDocsLine } from "./DesignBindings";
 import { DesignSearchInside, SearchInsideButton } from "./DesignSearchInside";

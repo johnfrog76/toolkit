@@ -675,6 +675,63 @@ catch {
 }
 finally { if (Test-Path $fBase) { Remove-Item -Path $fBase -Recurse -Force -ErrorAction SilentlyContinue } }
 
+# -- A new card on an Azure DevOps Space starts in play -----------------------
+# The team's backlog lives in Azure DevOps and that Space's board draws no Backlog
+# lane (issue #178), so NewPrompt writes current/. TYPED as the verb, in a fresh
+# shell, against a scratch hub with one Space per tracker; -Title is the offline
+# form of the creating verb (no az), and the folder rule is the same code the <id>
+# form runs. Only the address differs between the three Spaces.
+
+Write-Host ""
+Write-Host "-- A new card on an Azure DevOps Space is in play, typed as the verb ---" -ForegroundColor Cyan
+
+$tBase = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-np-tracker-" + [System.Guid]::NewGuid().Guid.Substring(0, 8))
+try {
+    . (Join-Path $pkgRoot 'Scripts/Get-Consts.ps1')
+    $utf8 = New-Object System.Text.UTF8Encoding($false)
+    $tHub = Join-Path $tBase 'hub'
+    $tLog = Join-Path $tBase 'log'
+    New-Item -ItemType Directory -Path $tHub, $tLog -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $tHub 'hub.json'), (@'
+{
+  "hub": 1,
+  "spaces": [
+    { "slug": "azdo", "name": "Azure", "status": "active", "promptsFolder": "azdo", "org": "https://dev.azure.com/example" },
+    { "slug": "gh", "name": "GitHub", "status": "active", "promptsFolder": "gh", "org": "https://github.com/example/repo" },
+    { "slug": "solo", "name": "Solo", "status": "local", "promptsFolder": "solo", "org": "" }
+  ]
+}
+'@), $utf8)
+    $tPrefix = (Get-Content (Join-Path $pkgRoot 'config.default.json') -Raw | ConvertFrom-Json).commandPrefix
+    $tFolders = (Get-P20Consts).folders
+    function Invoke-TrackerVerb {
+        param([string]$Space, [string]$Commands)
+        $ErrorActionPreference = 'Continue'
+        $q = { param([string]$s) $s -replace "'", "''" }
+        $pre = "`$env:PSModulePath = '$(& $q $pkgRoot)'; `$env:PROMPTS_ROOT = '$(& $q $tHub)'; `$env:P20_ACTIVE_SPACE = '$Space'; " +
+            "`$env:P20_USAGE_LOG_DIR = '$(& $q $tLog)'; Set-Location '$(& $q $tBase)'; " +
+            "Import-Module '$(& $q $pkgRoot)/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; "
+        return ((& pwsh -NoProfile -NonInteractive -Command ($pre + $Commands + "; 'EXIT=' + `$LASTEXITCODE") 2>&1 | ForEach-Object { "$_" }) -join "`n")
+    }
+    function Get-TrackerCard([string]$Space, [string]$Folder, [string]$Filter) {
+        return @(Get-ChildItem (Join-Path $tHub "$Space/$Folder") -Filter $Filter -File -ErrorAction SilentlyContinue)
+    }
+
+    $out = Invoke-TrackerVerb 'azdo' "${tPrefix}NewPrompt -Title 'Azure card' -Type Task -Id A7ED"
+    Assert-True 'on an Azure DevOps Space NewPrompt writes the card under current/, with no -Now' ((Get-TrackerCard 'azdo' $tFolders.current 'TaskA7ED-*.prompt.md').Count -eq 1 -and (Get-TrackerCard 'azdo' $tFolders.backlog 'TaskA7ED-*.prompt.md').Count -eq 0 -and $out -match 'EXIT=0') $out
+    Assert-True 'and the verb reports a path under current/' ($out -match ("Prompt: file://\S*/azdo/" + [regex]::Escape($tFolders.current) + "/TaskA7ED-")) $out
+
+    $out = Invoke-TrackerVerb 'gh' "${tPrefix}NewPrompt -Title 'Hub card' -Type Task -Id G7HC"
+    Assert-True 'on a GitHub Space the card is still planned, in backlog/' ((Get-TrackerCard 'gh' $tFolders.backlog 'TaskG7HC-*.prompt.md').Count -eq 1 -and (Get-TrackerCard 'gh' $tFolders.current 'TaskG7HC-*.prompt.md').Count -eq 0 -and $out -match 'EXIT=0') $out
+
+    $out = Invoke-TrackerVerb 'solo' "${tPrefix}NewPrompt -Title 'Local card' -Type Task -Id K7CM"
+    Assert-True 'on a local Space the card is still planned, in backlog/' ((Get-TrackerCard 'solo' $tFolders.backlog 'TaskK7CM-*.prompt.md').Count -eq 1 -and (Get-TrackerCard 'solo' $tFolders.current 'TaskK7CM-*.prompt.md').Count -eq 0 -and $out -match 'EXIT=0') $out
+}
+catch {
+    Assert-True 'the tracker cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally { if (Test-Path $tBase) { Remove-Item -Path $tBase -Recurse -Force -ErrorAction SilentlyContinue } }
+
 # -- The work item's comments cannot be read: no token ------------------------
 # The comments are fetched with a bearer token from `az account get-access-token`.
 # An empty token used to skip the fetch with no message and write a card without

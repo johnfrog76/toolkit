@@ -51,7 +51,8 @@ param(
     # A new card is PLANNED: it lands in the Space's backlog/ and is pulled into
     # play by Move -To Active, or by its first commit (ThreadHash) or PR (NewPR).
     # -Now writes it straight to current/, in play from the moment it is made --
-    # exactly what NewPrompt did before backlog/ existed (docs/hub/cards.md).
+    # exactly what NewPrompt did before backlog/ existed (docs/hub/cards.md). On an Azure DevOps
+    # Space a new card is always in play: that board has no Backlog lane.
     [Parameter(Mandatory = $false)]
     [switch]$Now,
 
@@ -139,7 +140,7 @@ function Resolve-TargetFolder {
 }
 
 # Default OutputFolder to <promptsFolder>/backlog -- a new card is planned, not
-# yet in play -- or <promptsFolder>/current with -Now. The names are consts.json's.
+# yet in play -- or <promptsFolder>/current with -Now, or on an Azure DevOps Space. The names are consts.json's.
 # $script:SpaceCardFolders: the Space's two folders a card can be "already here"
 # in, asked below; only when the folder was not given, because a given one is
 # the only one the caller named.
@@ -152,7 +153,12 @@ if (-not $OutputFolder) {
             -Hint 'Set activeSpace in config.local.json, or pass -OutputFolder.'
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
-    $OutputFolder = if ($Now) { "$pf/$($folderNames.current)" } else { "$pf/$($folderNames.backlog)" }
+    # On an Azure DevOps Space the team's backlog lives in Azure DevOps and the board draws no
+    # Backlog lane, so a new card starts in play, as -Now does. The tracker is the one resolver's
+    # answer (Resolve-P20Tracker; /env's `tracker` in the agent); GitHub and local keep the backlog.
+    . (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
+    $startsInPlay = $Now -or ((Resolve-P20Tracker -OrgUrl $org) -eq 'ado')
+    $OutputFolder = if ($startsInPlay) { "$pf/$($folderNames.current)" } else { "$pf/$($folderNames.backlog)" }
     $script:SpaceCardFolders = @("$pf/$($folderNames.current)", "$pf/$($folderNames.backlog)")
 }
 
@@ -179,8 +185,9 @@ PARAMETERS:
     -Now                   Put the card in play at once: <activeOrg>/current, not
                            the backlog. Without it a new card is planned, in
                            <activeOrg>/backlog, until Move -To Active, its first
-                           ThreadHash or its NewPR pulls it into current/
-    -OutputFolder <name>   Target folder (default: <activeOrg>/backlog)
+                           ThreadHash or its NewPR pulls it into current/. On an
+                           Azure DevOps Space it is always in play: no Backlog lane
+    -OutputFolder <name>   Target folder (default: <activeOrg>/backlog; current/ on Azure DevOps)
     -Cover <image>         Attach a cover picture as the card is made (as Cover does)
     -Before <image>        Attach the 'before' picture of a before/after proof
     -Design <name|id>      Bind the card to the design it is worked against: a
