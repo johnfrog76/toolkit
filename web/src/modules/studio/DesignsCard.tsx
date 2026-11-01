@@ -48,8 +48,9 @@ import {
   useLazySearchHubDesignsQuery,
   useRunNewDesignMutation,
 } from "./api.studio";
-import { MoveDesignDialog, ROADS, roadsFor } from "./MoveDesignDialog";
-import type { MoveRoad } from "./MoveDesignDialog";
+import { MoveDesignDialog } from "./MoveDesignDialog";
+import { ROADS, roadsFor } from "../ado/designRoads";
+import type { MoveRoad } from "../ado/designRoads";
 import { STUDIO_PAGE_SIZE, notePath } from "./paths";
 import { useEnterSpace } from "./useEnterSpace";
 
