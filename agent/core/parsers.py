@@ -223,6 +223,15 @@ def _card_line(content: str, stamp: str) -> tuple[bool, str]:
     return True, ("" if value.startswith("(") else value)
 
 
+def card_ado_url(content: str) -> str | None:
+    """The card's own ``**ADO Link:**`` address when it is an ``https://`` one, else
+    None. What makes a card ``linked``, and what ``tracker()`` reads to say which
+    tracker the card belongs to (docs/hub/cards.md, "The model, as the agent serves
+    it"). Mirror: ``Get-P20CardAdoUrl``."""
+    m = re.search(r"(?m)^\*\*ADO Link:\*\*\s*(https://\S+)", content or "")
+    return m.group(1).strip() if m else None
+
+
 def card_milestone(content: str) -> str:
     """The milestone a card names, WHOLE and trimmed -- never the card model's
     ``sprint``, which keeps the last path segment and cuts it at eighteen
@@ -233,7 +242,10 @@ def card_milestone(content: str) -> str:
     ``**Milestone:**`` line is the milestone -- a placeholder is none, and the
     sprint line is then a sprint only; a card with NO milestone line reads its
     first ``**Sprint:**`` line, exactly as every card read before the two were
-    separate -- files outlive their templates.
+    separate -- files outlive their templates. Except on an Azure DevOps card (its
+    own ``**ADO Link:**`` reads ``ado`` by ``tracker()``): there the sprint line is
+    the board's iteration path, which was never a milestone, so such a card's
+    milestone is its ``**Milestone:**`` line alone.
 
     D-AR11: the milestone is the destination. The CLI's mirror is
     ``Get-P20CardMilestone`` in ``Scripts/Get-PromptFileStatus.ps1``;
@@ -241,6 +253,8 @@ def card_milestone(content: str) -> str:
     present, value = _card_line(content, stamp_milestone())
     if present:
         return value
+    if tracker(card_ado_url(content)) == "ado":
+        return ""
     return _card_line(content, stamp_sprint())[1]
 
 
@@ -287,10 +301,7 @@ def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES, folder:
     total = len(re.findall(r"(?m)^\s*-\s*\[[x ]\]", content))
     progress = f"{checked}/{total}" if total > 0 else "--"
 
-    ado_url = None
-    m = re.search(r"(?m)^\*\*ADO Link:\*\*\s*(https://\S+)", content)
-    if m:
-        ado_url = m.group(1).strip()
+    ado_url = card_ado_url(content)
 
     pr_url = None
     # The TOKEN is the contract (consts.json); capturing what follows it is this

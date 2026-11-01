@@ -220,13 +220,14 @@ class TheRouteServesTheModel(unittest.TestCase):
     def test_the_card_model_serves_the_milestone_whole_and_the_tags(self):
         """The two planning lines and the tags (docs/hub/cards.md, "Milestone and sprint:
         two lines"): a card's own **Milestone:** line is its milestone, and a card with
-        none reads its **Sprint:** line, as before -- served whole, beside the board's
+        none reads its **Sprint:** line, as before, unless it is an Azure DevOps card -- served whole, beside the board's
         shortened `sprint`; `tags` is the Tags: line split. On the list and the detail."""
         cards = self._by_file()
         w3x7 = cards["TaskW3X7-bench-reading.prompt.md"]
         self.assertEqual(w3x7["milestone"], "v0.3 -- Share")
-        # An old card: no milestone line, so its sprint line names it, whole.
-        self.assertEqual(cards["141-recipe-search.prompt.md"]["milestone"], "RecipeBox\\Sprint 8")
+        # An Azure DevOps card (#187): its sprint line is the iteration path, never a
+        # milestone -- the model serves none, and keeps the sprint as the sprint.
+        self.assertEqual(cards["141-recipe-search.prompt.md"]["milestone"], "")
         self.assertEqual(cards["141-recipe-search.prompt.md"]["sprint"], "Sprint 8")
         for card in cards.values():
             self.assertIn("milestone", card)

@@ -31,6 +31,10 @@
 if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
 }
+# Resolve-P20Tracker: which tracker a card's own ADO Link names (Get-P20CardMilestone).
+if (-not (Get-Command Resolve-P20Tracker -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
+}
 
 function Get-PromptFileStatus {
     param(
@@ -111,6 +115,17 @@ function Get-P20CardLineValue {
     return @{ Present = $true; Value = $value }
 }
 
+function Get-P20CardAdoUrl {
+    <#
+      The card's own `**ADO Link:**` address when it is an https:// one, else ''.
+      What makes a card linked, and what Resolve-P20Tracker reads to say which
+      tracker the card belongs to. agent/core/parsers.py's card_ado_url is the same.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Content)
+    if ([string]$Content -match '(?m)^\*\*ADO Link:\*\*\s*(https://\S+)') { return $Matches[1].Trim() }
+    return ''
+}
+
 function Get-P20CardMilestone {
     <#
       The milestone a card names, WHOLE and trimmed -- never the board's shortened
@@ -123,6 +138,10 @@ function Get-P20CardMilestone {
         - no `**Milestone:**` line at all    -> the first `**Sprint:**` line's value,
                                                 exactly as every card read before
                                                 the two were separate
+        - ...except on an Azure DevOps card  -> '' (its own ADO Link reads 'ado' by
+                                                Resolve-P20Tracker): there the sprint
+                                                line is the iteration path, never a
+                                                milestone
 
       Files outlive their templates: a card written when one line held a sprint
       OR a milestone still reads as the milestone it named. D-AR11: the milestone
@@ -133,6 +152,7 @@ function Get-P20CardMilestone {
     $c = Get-P20Consts
     $own = Get-P20CardLineValue -Content $Content -Stamp ([string]$c.stamps.milestone)
     if ($own.Present) { return $own.Value }
+    if ((Resolve-P20Tracker -OrgUrl (Get-P20CardAdoUrl $Content)) -eq 'ado') { return '' }
     return (Get-P20CardLineValue -Content $Content -Stamp ([string]$c.stamps.sprint)).Value
 }
 
