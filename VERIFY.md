@@ -986,7 +986,7 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   row. Follows #182, which closes at merge: the Mac proved the floor.
   CONFIRMED on Windows: `node -v` read 24.22.0, and a full `npm test` ran with no `SIGSEGV` and no "failed to
   run": 1775 of 1776 passed, the one failure a `findBy*` timeout at `MilestonesPage.test.tsx:211` (#192, which
-  raises the wait); that suite alone passed 28 of 28.
+  raises the wait); run alone, both MilestonesPage suites passed, 28/28 (20 + 8).
 
 - [x] **A save from the browser keeps a session's line endings.** In a scratch hub with
   `communication` on, `NewMeeting -Date 2026-10-20` from a fresh shell writes an LF session. Make the hub a git
