@@ -1837,7 +1837,7 @@ holds it with a scratch `dist/client`.
 
 React 19 · Fluent UI v9 (`@fluentui/react-components`, `makeStyles`/`tokens`) · Redux Toolkit +
 RTK Query · React Router 8 (`react-router`) · Recharts · react-markdown 10 + remark-gfm + rehype-raw + rehype-sanitize · Vite 8 · Jest 30 +
-ts-jest + Testing Library · Playwright (the raw package) · TypeScript 6.0, because ts-jest and typescript-eslint do not yet accept 7 ([Known gaps](../docs/KNOWN-GAPS.md)). Node 24, the active LTS (`.nvmrc`, `engines`); verified on 24.21. Lint is ESLint 10 with typescript-eslint; `eslint-plugin-react` still declares a peer range that ends at ESLint 9, so `package.json` `overrides` hands it the root's ESLint, and `eslint.config.js` reads React's version from its package because the plugin's `"detect"` calls an API ESLint 10 removed.
+ts-jest + Testing Library · Playwright (the raw package) · TypeScript 6.0, because ts-jest and typescript-eslint do not yet accept 7 ([Known gaps](../docs/KNOWN-GAPS.md)). Node 24, the active LTS, from 24.22.0 (`.nvmrc`, `engines`): on 24.21 a jest worker is sometimes killed by a crash in V8 ([Contributing](../docs/CONTRIBUTING.md)); verified on 24.22.0. Lint is ESLint 10 with typescript-eslint; `eslint-plugin-react` still declares a peer range that ends at ESLint 9, so `package.json` `overrides` hands it the root's ESLint, and `eslint.config.js` reads React's version from its package because the plugin's `"detect"` calls an API ESLint 10 removed.
 
 Fluent and RTK Query are whole-app dependencies, not per-card ones. A fork that wanted a different
 stack would be rewriting the views, not relocating files.
