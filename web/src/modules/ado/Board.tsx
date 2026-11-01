@@ -33,7 +33,7 @@ import type { CardActionContext } from "./cardActions";
 import { billableOutcomeMessage, useBillableToggle } from "./useBillableToggle";
 import type { CommandResponse, PromptInfo } from "./api.ado";
 import { commandResultMessage } from "./cliBridge";
-import { LANES, laneHint, legalMoves } from "./legalMoves";
+import { laneFor, laneHint, lanesFor, legalMoves } from "./legalMoves";
 import { laneConfigKey, useLaneLabel } from "./laneNames";
 import { LaneLabelEditor } from "./LaneLabelEditor";
 import { TrackerBadge, trackerName } from "./TrackerBadge";
@@ -89,7 +89,7 @@ const useStyles = makeStyles({
     minWidth: 0,
     padding: `${tokens.spacingVerticalL} ${tokens.spacingHorizontalS}`,
   },
-  // Five lanes side by side, Backlog first; below that they scroll sideways INSIDE the board,
+  // Five lanes side by side, Backlog first (four on an Azure DevOps Space, which has none); below that they scroll sideways INSIDE the board,
   // so the page itself never overflows (the UX audit's rule).
   //
   // The BOARD owns the height and every lane fills it -- the owner's rule: "they
@@ -184,7 +184,7 @@ function BoardCard({
   context,
 }: BoardCardProps) {
   const styles = useStyles();
-  const moves = legalMoves(card.status);
+  const moves = legalMoves(card.status, context.tracker);
   const label = card.name || card.title || card.file;
   return (
     <div
@@ -337,7 +337,7 @@ export function Board() {
 
   // Pinned cards first within a lane, each group in the order it had.
   const byLane = (lane: Lane) => {
-    const inLane = shown.filter((p) => p.status === lane);
+    const inLane = shown.filter((p) => laneFor(p.status, env?.tracker) === lane);
     return [...inLane.filter((p) => p.pinned), ...inLane.filter((p) => !p.pinned)];
   };
   const open = (p: PromptInfo) => navigate(cardPath(p.file));
@@ -404,7 +404,7 @@ export function Board() {
     setOver(null);
     const file = e.dataTransfer.getData(DRAG_TYPE);
     const card = all.find((p) => p.file === file);
-    if (card && legalMoves(card.status).includes(lane)) void runMove(card, lane);
+    if (card && legalMoves(card.status, env?.tracker).includes(lane)) void runMove(card, lane);
   };
 
   if (isLoading) return <Spinner label="Loading the board..." />;
@@ -420,11 +420,13 @@ export function Board() {
     );
   }
 
+  const lanes = lanesFor(env?.tracker);
+
   return (
     <section className={styles.root} aria-label="Board">
       <div className={styles.bar}>
         <Body1 className={mergeClasses(styles.quiet, styles.barText)}>
-          ToolKit cards move by themselves: a new card is {laneLabel(STATUS.backlog)}, a commit is{" "}
+          ToolKit cards move by themselves: a new card is {laneLabel(lanes[0])}, a commit is{" "}
           {laneLabel(STATUS.inProgress)}, a pull request is {laneLabel(STATUS.codeReview)}. Drop a
           card on a lane to move it yourself; on {laneLabel(STATUS.done)}, to archive it.
           {cardFrom ? ` ${cardFrom}` : ""}
@@ -499,7 +501,7 @@ export function Board() {
       </div>
 
       <div className={styles.lanes}>
-        {LANES.map((lane) => {
+        {lanes.map((lane) => {
           const isDone = lane === STATUS.done;
           const cards = isDone ? [] : byLane(lane);
           return (
@@ -553,7 +555,7 @@ export function Board() {
               </div>
               {!isDone ? (
                 <Caption1 className={mergeClasses(styles.quiet, styles.laneHint)}>
-                  {laneHint(lane)}
+                  {laneHint(lane, env?.tracker)}
                 </Caption1>
               ) : null}
               {isDone ? (

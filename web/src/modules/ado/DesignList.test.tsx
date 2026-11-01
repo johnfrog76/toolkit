@@ -746,6 +746,7 @@ describe("a product design's moves", () => {
       "Open the note",
       "Open the thread",
       "Complete",
+      "Archive as dropped",
       "Open on GitHub",
     ]);
     // The card's foot says nothing: there is nothing to configure.

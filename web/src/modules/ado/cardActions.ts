@@ -11,7 +11,7 @@ import type { RowMove } from "../../shared/CardActions";
 import { STATUS } from "../../shell/consts";
 import { trackerName } from "./TrackerBadge";
 import type { PromptInfo } from "./api.ado";
-import { LANES, legalMoves, whyNotAMove } from "./legalMoves";
+import { lanesFor, legalMoves, whyNotAMove } from "./legalMoves";
 import type { Lane } from "./legalMoves";
 
 // What a PERSON may do to a card -- every action, in every view. One pure
@@ -172,7 +172,7 @@ export function whyNotCreatePR(card: ActionCard, ctx: CardActionContext): string
 export function cardActions(card: ActionCard, ctx: CardActionContext): CardActionPlan {
   const label = ctx.laneLabel ?? ((s: string) => s);
   const ado = ctx.adoEnabled && card.linked && !!card.ado_url;
-  const moves = legalMoves(card.status);
+  const moves = legalMoves(card.status, ctx.tracker);
 
   // Done is the archive: its lane is the archive move, in the vocabulary's
   // word, with the org's name for the lane after it.
@@ -180,11 +180,13 @@ export function cardActions(card: ActionCard, ctx: CardActionContext): CardActio
     to === STATUS.done
       ? spec("move", ROW.archive, { to, detail: `(move to ${label(to)})`, ...rest })
       : spec("move", ROW.move, { to, detail: label(to), ...rest });
-  const lanes: CardActionSpec[] = LANES.filter((to) => to !== card.status).map((to) =>
-    moves.includes(to)
-      ? lane(to)
-      : lane(to, { disabled: true, whyNot: whyNotAMove(card.status, to) }),
-  );
+  const lanes: CardActionSpec[] = lanesFor(ctx.tracker)
+    .filter((to) => to !== card.status)
+    .map((to) =>
+      moves.includes(to)
+        ? lane(to)
+        : lane(to, { disabled: true, whyNot: whyNotAMove(card.status, to) }),
+    );
 
   const secondary: CardActionSpec[] = [...lanes];
 

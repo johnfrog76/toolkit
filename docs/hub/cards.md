@@ -20,7 +20,7 @@ did not come from Azure DevOps is a card with no link on it, and nothing else ab
     current/                       cards in flight
       214-search-returns-duplicates.prompt.md
       Spike-K7M2-photo-import.prompt.md
-    backlog/                       cards planned, not yet in play -- where NewPrompt writes unless -Now
+    backlog/                       cards planned, not yet in play -- where NewPrompt writes unless -Now (never on an Azure DevOps Space)
       Task9QHT-cache-the-thumbnails.prompt.md
     archive/                       cards that are done
       198-fix-the-export.prompt.md
@@ -286,7 +286,9 @@ still a legitimate way to correct a state. A card travels one way: `Move` refuse
 
 **A new card is planned, and pulled into play.** `NewPrompt <id>`, `NewPrompt -Title` and the web's New
 card dialog (`POST /api/cmd/NewPrompt`, the same script) write the card to `backlog/`; `NewPrompt -Now`
-writes it to `current/` as before. A card leaves `backlog/` two ways, because the state is derived:
+writes it to `current/` as before. **On an Azure DevOps Space a new card is always written to `current/`**:
+the team's backlog lives in Azure DevOps, so that Space's board draws no Backlog lane (the tracker is
+`Resolve-P20Tracker`'s answer, `/env`'s `tracker`). A local or GitHub Space is as described here. A card leaves `backlog/` two ways, because the state is derived:
 
 - **Explicitly**: `Move <id> -To Active` moves the file to `current/` -- a rename, not a rewrite: the
   card's bytes do not change.

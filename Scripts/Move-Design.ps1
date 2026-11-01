@@ -13,7 +13,11 @@
       -To Archive   moves the note to design/archive/, stamps **Closed:** and
                     **Outcome:** shipped -- or dropped with -Dropped, which
                     needs -Reason: an idea that never made it is only worth
-                    keeping with why.
+                    keeping with why. On a design in the Spec state, -Dropped
+                    archives the spec AND the note together, as -To Complete
+                    does, with no -Doc (nothing was built); both get **Closed:**
+                    and **Outcome:** dropped. Without -Dropped a live spec
+                    refuses -To Archive.
       -To Complete  moves the spec to spec/archive/ and the note to
                     design/archive/ in one go, stamps **Closed:** on both and
                     writes `> Docs: <path>` into the spec. -Doc is the gate:
@@ -121,7 +125,7 @@ if ($Help) {
     Write-Host "    ${p}MoveDesign <name|id> -To Spec|Archive|Complete [-Dropped] [-Reason <text>] [-Doc <path>] [-Hub] [-Space <slug>] [-WhatIf]"
     Write-Host ""
     Write-Host "  Spec scaffolds the spec beside the note; Archive moves the note to design/archive/ (shipped,"
-    Write-Host "  or dropped with -Dropped -Reason); Complete archives the spec and the note together and"
+    Write-Host "  or dropped with -Dropped -Reason, which on a Spec archives the spec and the note together); Complete archives the spec and the note together and"
     Write-Host "  needs -Doc <path>. Every move writes one line into the note's ## Journey. In a repo it"
     Write-Host "  stages and never commits; -Space <slug> stages in that Space's checkout on this machine"
     Write-Host "  (spaceCheckouts.<slug>.path); -Hub works on the hub's folders and follows storeSync."
@@ -567,40 +571,87 @@ switch ($To) {
         }
     }
     'Archive' {
-        if (-not $note) {
-            Write-CliError -Message "'$title' ($($design.Short)) has no note to archive: it is a spec standing alone." `
-                -Hint '-To Complete archives a spec, with -Doc <path>.'
-            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+        if ($Dropped -and $spec -and -not $spec.Archived -and $design.State -eq $stateSpec) {
+            # A dropped Spec: the spec and its note archive together, as -To Complete
+            # does, with no -Doc -- nothing was built. Both carry Closed and Outcome.
+            $word = [string]$outcomes[1]
+            $label = $word.Substring(0, 1).ToUpperInvariant() + $word.Substring(1)
+            $specDest = "$(& $rel ((Split-Path -Leaf $specDir)))/$archiveName/$($spec.Name)"
+            if (Test-Path -LiteralPath (& $full $specDest)) {
+                Write-CliError -Message "$specDest already exists. Not overwriting it."
+                exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+            }
+            $noteDest = ''
+            if ($note -and -not $note.Archived) {
+                $noteDest = "$(& $rel ((Split-Path -Leaf $designDir)))/$archiveName/$($note.Name)"
+                if (Test-Path -LiteralPath (& $full $noteDest)) {
+                    Write-CliError -Message "$noteDest already exists. Not overwriting it."
+                    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+                }
+            }
+            $notePathAfter = ''
+            if ($noteDest) { $notePathAfter = $noteDest } elseif ($note) { $notePathAfter = $note.Path }
+            $line = "- $today $label`:$reasonTail"
+            if ($notePathAfter) { $line += " This note is now $notePathAfter and the spec is $specDest, in $repoName." }
+            else { $line += " The spec is now $specDest in $repoName." }
+            Say 'move' "$($spec.Path) -> $specDest"
+            if ($noteDest) { Say 'move' "$($note.Path) -> $noteDest" }
+            Say 'stamp' "$specDest with $($consts.stamps.closed) $today and $outcomeStamp $word"
+            if ($noteDest) { Say 'stamp' "$noteDest with $($consts.stamps.closed) $today and $outcomeStamp $word" }
+            if ($notePathAfter) { Say 'append' "to $notePathAfter`: $line" }
+            if (-not $WhatIf) {
+                Move-P20DesignFile -FromRel $spec.Path -ToRel $specDest
+                Add-P20BlankBeforeStamp -Path (& $full $specDest)
+                Add-ClosedDate -Path (& $full $specDest)
+                Add-P20OutcomeLine -Path (& $full $specDest) -Word $word
+                if ($noteDest) {
+                    Move-P20DesignFile -FromRel $note.Path -ToRel $noteDest
+                    Add-ClosedDate -Path (& $full $noteDest)
+                    Add-P20OutcomeLine -Path (& $full $noteDest) -Word $word
+                }
+                if ($notePathAfter) {
+                    Add-P20JourneyLine -Path (& $full $notePathAfter) -NoteRel $note.Path -Line $line -Thread $design.Thread
+                    $staged += $notePathAfter
+                }
+                Complete-P20Staging -Summary "$title archived ($word, spec and note)"
+            }
         }
-        if ($note.Archived) {
-            Write-CliError -Message "'$title' is already in $($note.Path)."
-            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
-        }
-        if ($spec -and -not $spec.Archived) {
-            Write-CliError -Message "'$title' is $stateSpec`: its spec $($spec.Path) is live, so the note does not archive alone." `
-                -Hint "${prefix}MoveDesign $Name -To Complete -Doc <path> archives both."
-            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
-        }
-        $destRel = "$(& $rel ((Split-Path -Leaf $designDir)))/$archiveName/$($note.Name)"
-        if (Test-Path -LiteralPath (& $full $destRel)) {
-            Write-CliError -Message "$destRel already exists. Not overwriting it."
-            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
-        }
-        $word = [string]$outcomes[0]
-        if ($Dropped) { $word = [string]$outcomes[1] }
-        $label = $word.Substring(0, 1).ToUpperInvariant() + $word.Substring(1)
-        if ($Dropped) { $line = "- $today $label`:$reasonTail This note is now $destRel in $repoName." }
-        else { $line = "- $today $label`: shipped as written.$reasonTail This note is now $destRel in $repoName." }
-        Say 'move' "$($note.Path) -> $destRel"
-        Say 'stamp' "$destRel with $($consts.stamps.closed) $today and $outcomeStamp $word"
-        Say 'append' "to $destRel`: $line"
-        if (-not $WhatIf) {
-            Move-P20DesignFile -FromRel $note.Path -ToRel $destRel
-            $dest = & $full $destRel
-            Add-ClosedDate -Path $dest
-            Add-P20OutcomeLine -Path $dest -Word $word
-            Add-P20JourneyLine -Path $dest -NoteRel $note.Path -Line $line -Thread $design.Thread
-            Complete-P20Staging -Summary "$title archived ($word)"
+        else {
+            if (-not $note) {
+                Write-CliError -Message "'$title' ($($design.Short)) has no note to archive: it is a spec standing alone." `
+                    -Hint '-To Complete archives a spec, with -Doc <path>.'
+                exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+            }
+            if ($note.Archived) {
+                Write-CliError -Message "'$title' is already in $($note.Path)."
+                exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+            }
+            if ($spec -and -not $spec.Archived) {
+                Write-CliError -Message "'$title' is $stateSpec`: its spec $($spec.Path) is live, so the note does not archive alone." `
+                    -Hint "${prefix}MoveDesign $Name -To Complete -Doc <path> archives both; -To Archive -Dropped -Reason <text> drops both."
+                exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+            }
+            $destRel = "$(& $rel ((Split-Path -Leaf $designDir)))/$archiveName/$($note.Name)"
+            if (Test-Path -LiteralPath (& $full $destRel)) {
+                Write-CliError -Message "$destRel already exists. Not overwriting it."
+                exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+            }
+            $word = [string]$outcomes[0]
+            if ($Dropped) { $word = [string]$outcomes[1] }
+            $label = $word.Substring(0, 1).ToUpperInvariant() + $word.Substring(1)
+            if ($Dropped) { $line = "- $today $label`:$reasonTail This note is now $destRel in $repoName." }
+            else { $line = "- $today $label`: shipped as written.$reasonTail This note is now $destRel in $repoName." }
+            Say 'move' "$($note.Path) -> $destRel"
+            Say 'stamp' "$destRel with $($consts.stamps.closed) $today and $outcomeStamp $word"
+            Say 'append' "to $destRel`: $line"
+            if (-not $WhatIf) {
+                Move-P20DesignFile -FromRel $note.Path -ToRel $destRel
+                $dest = & $full $destRel
+                Add-ClosedDate -Path $dest
+                Add-P20OutcomeLine -Path $dest -Word $word
+                Add-P20JourneyLine -Path $dest -NoteRel $note.Path -Line $line -Thread $design.Thread
+                Complete-P20Staging -Summary "$title archived ($word)"
+            }
         }
     }
     'Complete' {
