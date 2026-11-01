@@ -88,6 +88,12 @@ fewer on the same commit, every suite green on both (a Windows run, at `0381f12`
 it with is a comment on the issue that made the CLI total per platform. A `config.local.json` moves the figure too -- "One more on a machine that
 has a `config.local.json`", below.
 
+**How long a web test waits.** A web test that waits for something to appear (Testing Library's `findBy*` and
+`waitFor`) waits up to 5 seconds, set once for the whole suite in `web/tests/jest.afterEnv.cjs`, not the library's
+default of 1 second. A full run puts a jest worker on every core, and on a managed machine whose antivirus scans
+every file it reads, the suite runs slower, slow enough that a dialog can take longer than a second to draw. A
+wait that succeeds returns at once, so a passing run takes no longer. No test sets a timeout of its own for this.
+
 **The counts, after a merge.** The paste block is the one record of a run's figures, and it is three
 figures: the CLI's per-suite line and total, a `pytest:` line and a `web:` line. `tkTest` (the
 all-halves runner, every half and no `-Fast`) prints all three under its summary. `tkTestToolkit`

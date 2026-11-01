@@ -33,6 +33,7 @@ release.
 
 ### Fixed
 
+- A full `npm test` in `web/` on a busy machine no longer fails a test because a dialog took more than a second to appear; the web tests now wait up to 5 seconds for an element.
 - The web UI's tests no longer fail now and then with `Test suite failed to run` while every test passes: `web/package.json` now asks for Node 24.22.0 or later, and `npm ci` on an older Node warns. Run `nvm install 24 && nvm alias default 24` to move up.
 - The Reference field in the New Reminder dialog is now as wide as the other fields, instead of sharing a half-width row with Source.
 - The Edit Reminder dialog's Source and Reference fields are full width too, like the New Reminder dialog's, and the fields in both reminder dialogs are the same size as the rest of the app's.
