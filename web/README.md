@@ -1010,7 +1010,7 @@ are prompts, and agile lanes are a better view for how multiple items flow for h
 - **One set of predicates** (`promptFilters.ts`), lifted out of `PromptStatus.tsx` and used by the list and
   the board, plus the board's own Milestone, Sprint and Tag filters -- each drawn only while some card
   names one, and read from the card model's `milestone` (whole: its own line, else an old card's sprint
-  line), `sprint` and `tags`. A card with no ADO link cannot match the repo filter, so
+  line, never an Azure DevOps card's iteration path), `sprint` and `tags`. A card with no ADO link cannot match the repo filter, so
   the board SAYS how many it hid rather than letting them vanish.
 - **A card's milestone, sprint and tags are set from its row menu** -- Plan milestone, Plan sprint, Tag
   (`PlanCardDialog.tsx`): one small form over the CLI's `Plan` and `Tag` verbs through the bridge, one

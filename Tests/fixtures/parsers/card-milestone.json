@@ -1,5 +1,5 @@
 {
-  "_": "ONE table, read by both readers of a card's planning lines and its tags (docs/hub/cards.md, \"Milestone and sprint: two lines\" and \"What the suggestion reads\"; D-AR11). milestone: the first **Milestone:** line's value, WHOLE and trimmed; a card with NO **Milestone:** line reads its first **Sprint:** line instead -- every card written before the two lines were separate, which must read as it always did; '' for none, an empty line or a parenthesised placeholder, and a milestone line that is a placeholder keeps the sprint line a sprint only. sprint: the first **Sprint:** line's value, whole and trimmed, '' for none or a placeholder -- never the card model's shortened sprint. tags: the Tags: line split on commas and trimmed. Scripts/Get-PromptFileStatus.ps1 Get-P20CardMilestone, Get-P20CardSprint and Get-P20CardTags (tkTestToolkit -Rituals) and agent/core/parsers.py card_milestone(), card_sprint() and card_tags() (Tests/test_parsers.py). Each row's lines are joined with LF, or CRLF when crlf is true.",
+  "_": "ONE table, read by both readers of a card's planning lines and its tags (docs/hub/cards.md, \"Milestone and sprint: two lines\" and \"What the suggestion reads\"; D-AR11). milestone: the first **Milestone:** line's value, WHOLE and trimmed; a card with NO **Milestone:** line reads its first **Sprint:** line instead -- every card written before the two lines were separate, which must read as it always did -- EXCEPT an Azure DevOps card (its own https **ADO Link:** names an Azure DevOps host), whose sprint line is the board's iteration path and never a milestone; '' for none, an empty line or a parenthesised placeholder, and a milestone line that is a placeholder keeps the sprint line a sprint only. sprint: the first **Sprint:** line's value, whole and trimmed, '' for none or a placeholder -- never the card model's shortened sprint. tags: the Tags: line split on commas and trimmed. Scripts/Get-PromptFileStatus.ps1 Get-P20CardMilestone, Get-P20CardSprint and Get-P20CardTags (tkTestToolkit -Rituals) and agent/core/parsers.py card_milestone(), card_sprint() and card_tags() (Tests/test_parsers.py). Each row's lines are joined with LF, or CRLF when crlf is true.",
   "rows": [
     {
       "name": "no lines",
@@ -194,6 +194,63 @@
       ],
       "milestone": "M4b -- 1.5.0, the tour",
       "sprint": "",
+      "tags": []
+    },
+    {
+      "name": "an Azure DevOps card: its sprint line is the iteration path, never its milestone",
+      "crlf": false,
+      "lines": [
+        "# Bug 141: Recipe search returns duplicates",
+        "",
+        "**Sprint:** RecipesApp\\Sprint 3",
+        "**ADO Link:** https://dev.azure.com/YOUR-ADO-ORG/RecipesApp/_workitems/edit/141",
+        "**Created:** 2026-06-20"
+      ],
+      "milestone": "",
+      "sprint": "RecipesApp\\Sprint 3",
+      "tags": []
+    },
+    {
+      "name": "an Azure DevOps card with a milestone line reads that line",
+      "crlf": true,
+      "lines": [
+        "# Bug 141: Recipe search returns duplicates",
+        "",
+        "**Milestone:** M5 -- 1.6.0",
+        "**Sprint:** RecipesApp\\Sprint 3",
+        "**ADO Link:** https://dev.azure.com/YOUR-ADO-ORG/RecipesApp/_workitems/edit/141",
+        "**Created:** 2026-06-20"
+      ],
+      "milestone": "M5 -- 1.6.0",
+      "sprint": "RecipesApp\\Sprint 3",
+      "tags": []
+    },
+    {
+      "name": "a GitHub card with no milestone line still reads its sprint line as its milestone",
+      "crlf": false,
+      "lines": [
+        "# Task 52: Share a recipe",
+        "",
+        "**Sprint:** v0.3 -- Share",
+        "**ADO Link:** https://github.com/example/recipes/issues/52",
+        "**Created:** 2026-10-17"
+      ],
+      "milestone": "v0.3 -- Share",
+      "sprint": "v0.3 -- Share",
+      "tags": []
+    },
+    {
+      "name": "a card made offline is not an Azure DevOps card: its sprint line names its milestone",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Sprint:** M4 -- 1.4.0",
+        "**ADO Link:** (not linked -- created offline with -Title)",
+        "**Created:** 2026-10-17"
+      ],
+      "milestone": "M4 -- 1.4.0",
+      "sprint": "M4 -- 1.4.0",
       "tags": []
     }
   ]

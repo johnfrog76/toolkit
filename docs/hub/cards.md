@@ -133,7 +133,7 @@ After a `---` rule, bold-label lines. **This is the part of the model that is st
 
 | Line | Means | Written by | Read by |
 | --- | --- | --- | --- |
-| `**Sprint:**` | The sprint: the iteration path, or any title at all once planned by hand. Only the LAST segment is shown (`Sprint 8`), cut to 20 characters for the board -- the card itself keeps the title whole. **On a card with no `**Milestone:**` line it is the card's milestone too**, as every card read before the two were separate ([below](#milestone-and-sprint-two-lines)). `stamps.sprint` | `NewPrompt`, from the work item; `(not linked)` text offline; `Plan <id> -Sprint "<title>"` for a card already made, through `Set-P20CardLine` -- never the tracker (that is `NewItem`/`EditItem`'s own, tracker-bound `-Sprint`); `Plan <id> -Remove [-Only Sprint]` deletes the line | the board's Sprint filter; the card's tag; the model's `sprint` |
+| `**Sprint:**` | The sprint: the iteration path, or any title at all once planned by hand. Only the LAST segment is shown (`Sprint 8`), cut to 20 characters for the board -- the card itself keeps the title whole. **On a card with no `**Milestone:**` line it is the card's milestone too** (never on an Azure DevOps card), as every card read before the two were separate ([below](#milestone-and-sprint-two-lines)). `stamps.sprint` | `NewPrompt`, from the work item; `(not linked)` text offline; `Plan <id> -Sprint "<title>"` for a card already made, through `Set-P20CardLine` -- never the tracker (that is `NewItem`/`EditItem`'s own, tracker-bound `-Sprint`); `Plan <id> -Remove [-Only Sprint]` deletes the line | the board's Sprint filter; the card's tag; the model's `sprint` |
 | `**Milestone:**` | The milestone the card is planned into -- the destination (D-AR11). **No line means the `**Sprint:**` line names it**; a placeholder (`(none)`) means none, and keeps the Sprint line a sprint only. `stamps.milestone` | `Plan <id> -Milestone "<title>"`, through `Set-P20CardLine`; `Plan <id> -Sprint` writes one carrying the milestone the card read, on a card that had none; `Plan <id> -Remove [-Only Milestone]` | the model's `milestone`; the board's Milestone filter; Team Agile's suggestion and PM Corner ([below](#what-the-suggestion-reads)) |
 | `**Story Points:**` | As the work item had it | `NewPrompt` | people |
 | `**ADO Link:**` | The work item's address. **An `https://` value here is what makes a card `linked`**; offline it reads `(not linked -- created offline with -Title)` | `NewPrompt`; and `NewItem -FromCard`, which publishes a card made offline as a GitHub issue and writes the issue's URL here, through `Set-P20CardLine` (the card keeps its id) | `linked`, `ado_url`, the repo filter (a card with no ADO link is never hidden by it), *Open in ADO* |
@@ -175,9 +175,16 @@ as it did**:
 | The card carries | Its milestone | Its sprint |
 | --- | --- | --- |
 | no `**Milestone:**` line, a `**Sprint:**` line | the `**Sprint:**` value -- as it always read | the same value |
+| an Azure DevOps card: no `**Milestone:**` line, a `**Sprint:**` line | none -- the Sprint line is the board's iteration path | the `**Sprint:**` value |
 | a `**Milestone:**` line and a `**Sprint:**` line | the `**Milestone:**` value | the `**Sprint:**` value |
 | a `**Milestone:**` line that is a placeholder (`(none)`) or empty | none -- and the Sprint line is a sprint only | the `**Sprint:**` value |
 | neither, or placeholders only (`(not linked)`) | none | none |
+
+**An Azure DevOps card** is one whose own `**ADO Link:**` is an `https://` address that the tracker rule
+(`tracker()` and `Resolve-P20Tracker`, D-G2) reads as `ado` -- the card model's `tracker`, the card's **ado**
+badge. Its `**Sprint:**` line is written by `NewPrompt` from the work item's iteration path and was never a
+milestone, so only its own `**Milestone:**` line names one. A GitHub card (its link a `github.com` issue) and
+a card with no link keep the old fallback.
 
 Each value is the first such line's, WHOLE and trimmed. `Get-P20CardMilestone` and `Get-P20CardSprint`
 (`Scripts/Get-PromptFileStatus.ps1`) and `card_milestone()` and `card_sprint()` (`agent/core/parsers.py`) are
@@ -384,7 +391,7 @@ The standup's suggestion -- one derived next move ([Team Agile](../modules/solit
 
 | What | Read from | Rule |
 | --- | --- | --- |
-| its milestone | the first `**Milestone:**` line, else -- a card with none -- the first `**Sprint:**` line ([the rule](#milestone-and-sprint-two-lines)) | the value WHOLE and trimmed -- `M2 -- 1.2.0, the standup sees the work`, `RecipesApp\Sprint 2` -- never the model's `sprint`, which keeps the last segment and cuts it at eighteen characters for the board; a parenthesised placeholder (`(not linked)`, `(none)`) is none |
+| its milestone | the first `**Milestone:**` line, else -- a card with none that is not an Azure DevOps card -- the first `**Sprint:**` line ([the rule](#milestone-and-sprint-two-lines)) | the value WHOLE and trimmed -- `M2 -- 1.2.0, the standup sees the work`, `RecipesApp\Sprint 2` -- never the model's `sprint`, which keeps the last segment and cuts it at eighteen characters for the board; a parenthesised placeholder (`(not linked)`, `(none)`) is none |
 | its severity and size | the `Tags:` line | split on commas and trimmed; the first tag that is one of the triage ceremony's severities, and the first that is one of the repo's worker labels |
 | who takes it | the `**Assigned:**` line | `me`, or a size; with none, its size |
 | its age | the `**Created:**` day | the oldest first; a card with none after every one with one |
