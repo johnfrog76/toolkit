@@ -83,5 +83,10 @@
   },
   "engines": {
     "node": ">=24.22.0"
+  },
+  "allowScripts": {
+    "@parcel/watcher": false,
+    "unrs-resolver": false,
+    "fsevents": false
   }
 }

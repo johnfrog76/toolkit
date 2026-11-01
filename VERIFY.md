@@ -979,6 +979,13 @@ names the command, what you should see, and the issue it closes. A row stays unt
 it and records that on the issue. Then the row moves into the gate it belongs to, or goes if a suite
 now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on the verifying host: it prints each `verify-close` issue with the row below that names it, by issue number.
 
+- [ ] **`npm ci` asks nothing about install scripts on Windows.** On the Windows PC, in `web/`, `git diff package.json`
+  first: a local `allowScripts` edit from approving `@parcel/watcher` or `unrs-resolver` by hand is thrown away with
+  `git checkout -- package.json` before the pull. Then delete `node_modules`, run `npm ci`, and you should see no
+  `npm warn install-scripts` lines. `npm install-scripts ls` prints `No packages with unreviewed install scripts.`,
+  `git status` is clean, and `npm test` and `npm run lint` are green with the web line `docs/TESTING.md` states.
+  Closes nothing on its own: #190 closes at merge, the Windows CI job having run the same `npm ci` and suite.
+
 - [ ] **The web UI's Node floor holds on Windows.** On the Windows PC, `node --version` in a fresh shell. Below
   24.22.0, `cd web; npm ci` prints `npm warn EBADENGINE` naming `required: { node: '>=24.22.0' }`; then
   `nvm install 24` and `nvm use` with the version it installed, and `npm ci; npm test` on 24.22.0 or later: no
