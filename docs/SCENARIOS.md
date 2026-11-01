@@ -142,11 +142,19 @@ The board's card and the list's row draw one action model (`cardActions.ts`), so
 
 ### The board's lanes, by a card's status (`scenarios.test.tsx`; the rule is `legalMoves.ts`)
 
-Five lanes, in this order, and a card is drawn in the lane its served `status` names. Backlog is first:
-a new card is planned there (`NewPrompt` writes `backlog/` unless told `-Now`), and `/api/status` reads
-`backlog/` beside `current/`. Done is a drop target, not a list. A drop, or the card's **Move to** item,
+Five lanes on a local or GitHub Space, in this order, and **four on an Azure DevOps Space, which has
+no Backlog lane** (`/env`'s `tracker` is `ado`; the team's backlog lives in Azure DevOps, so `NewPrompt`
+writes `current/` there and an Active card has no Backlog to be parked in). A card is drawn in the lane
+its served `status` names, with one exception: on an Azure DevOps Space a card that already sits in `backlog/`
+(written before `NewPrompt` started cards in play there) is drawn in **Active**, its file left where it is --
+files outlive their templates (`laneFor`). There the Active lane's hint reads `A new card starts here, in play
+-- its first commit moves it on.`; elsewhere it still names dropping a planned card. Where Backlog exists it is first: a new card is planned there (`NewPrompt`
+writes `backlog/` unless told `-Now`), and `/api/status` reads `backlog/` beside `current/`. The board's
+footer sentence names the first lane the Space really has (`a new card is Backlog` / `a new card is Active`).
+Done is a drop target, not a list. A drop, or the card's **Move to** item,
 runs `Move` through the bridge -- the same verb for every lane (`docs/hub/cards.md`, "State is derived,
-never stored"):
+never stored"). The table is the five-lane board; on an Azure DevOps Space drop its Backlog row and
+column entries:
 
 | A card's status | Its lane | It may be moved to | Refused, and why |
 | --- | --- | --- | --- |

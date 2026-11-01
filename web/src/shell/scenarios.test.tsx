@@ -39,7 +39,14 @@ import type { CardContext } from "./registry";
 import type { EnvStatus, HowIWork, SpaceInfo } from "./api";
 import { drawerSections } from "../modules/ado/homeTabs";
 import { cardActions } from "../modules/ado/cardActions";
-import { LANES, legalMoves, whyNotAMove } from "../modules/ado/legalMoves";
+import {
+  LANES,
+  laneFor,
+  laneHint,
+  lanesFor,
+  legalMoves,
+  whyNotAMove,
+} from "../modules/ado/legalMoves";
 import { LANE_FIELD_KEY, laneLabel } from "../modules/ado/laneNames";
 import { countInPlay, inPlayLine } from "../modules/ado/inPlay";
 import { ARCHIVED_FILTER, deckListView } from "../modules/deck/deckList";
@@ -1031,6 +1038,50 @@ describe("the scenario grid: a card's menu, by the Organize flag", () => {
 describe("the scenario grid: the board's lanes, by a card's status", () => {
   it("five lanes, Backlog first, Done last", () => {
     expect([...LANES]).toEqual(["Backlog", "Active", "In Progress", "Code Review", "Done"]);
+  });
+
+  // The tracker is /env's `tracker`, the agent's one derivation of the Space's address.
+  it.each([
+    ["ado", ["Active", "In Progress", "Code Review", "Done"]],
+    ["github", ["Backlog", "Active", "In Progress", "Code Review", "Done"]],
+    ["none", ["Backlog", "Active", "In Progress", "Code Review", "Done"]],
+    [undefined, ["Backlog", "Active", "In Progress", "Code Review", "Done"]],
+  ])("a %s Space draws these lanes", (tracker, lanes) => {
+    expect([...lanesFor(tracker)]).toEqual(lanes);
+  });
+
+  it("on an Azure DevOps Space an Active card cannot be parked: there is no Backlog", () => {
+    expect(legalMoves("Active", "ado")).toEqual(["In Progress", "Code Review", "Done"]);
+    expect(legalMoves("Active", "github")).toContain("Backlog");
+  });
+
+  // Files outlive their templates: a card written to backlog/ before NewPrompt started ADO cards
+  // in play is not lost on an Azure DevOps Space -- it is drawn in Active, its file unmoved.
+  it.each([
+    ["ado", "Backlog", "Active"],
+    ["ado", "Active", "Active"],
+    ["ado", "In Progress", "In Progress"],
+    ["github", "Backlog", "Backlog"],
+    ["none", "Backlog", "Backlog"],
+  ])("on a %s Space a %s card is drawn in %s", (tracker, status, lane) => {
+    expect(laneFor(status, tracker)).toBe(lane);
+  });
+
+  it("the Active lane's hint names no planned card on an Azure DevOps Space", () => {
+    expect(laneHint("Active", "ado")).toBe(
+      "A new card starts here, in play -- its first commit moves it on.",
+    );
+    expect(laneHint("Active", "github")).toContain("drop a planned card here");
+  });
+
+  it("the Move to menu offers no Backlog item on an Azure DevOps Space", () => {
+    const labels = (tracker: string) =>
+      cardActions(
+        { status: "Active", linked: false, ado_url: "", pr_url: "", billable: true },
+        { adoEnabled: true, tracker, cliPrefix: "tk" },
+      ).secondary.map((a) => a.label);
+    expect(labels("ado")).not.toContain("Move to Backlog");
+    expect(labels("github")).toContain("Move to Backlog");
   });
   it.each<[string, string[], Array<[string, string]>]>([
     ["Backlog", ["Active", "In Progress", "Code Review", "Done"], []],

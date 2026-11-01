@@ -44,6 +44,11 @@ tkNewPrompt 113        # ADO card 113 -> prompt file in {promptsRoot}/{org}/back
 tkNewPrompt 113 -Now   # ...or in {promptsRoot}/{org}/current/ -- in play at once
 ```
 
+**On an Azure DevOps Space there is no Backlog.** The team's backlog lives in Azure DevOps and work
+is opened to you by assignment, so `NewPrompt` writes the card to `current/` as `-Now` does, and the
+board draws four lanes. A local or GitHub Space is unchanged: `backlog/` first, five lanes. The Space's
+tracker is the one resolver's answer (`Resolve-P20Tracker`; `/env`'s `tracker`).
+
 Creates the file in the shape matching the work item type, seeded with the card's title,
 repro, acceptance criteria, sprint and link -- plus a suggested branch name.
 
@@ -468,7 +473,7 @@ As `{prefix}Command`. `tkMenu` lists them live; `tkMenu -All` shows everything;
 
 | Command | Does |
 | --- | --- |
-| `NewPrompt <id>` | Create a prompt file from the board's tracker: an ADO work item, or on a GitHub board an issue (`gh issue view`; the repo comes from a repo-grained address or the board's one `projects[]` entry -- several repos refuse, because issue numbers are per-repo; a label naming a card type sets the type, else Task; assignment and a closed issue's reopen prompt mirror the ADO flow). The card is written to the Space's `backlog/` -- planned, not in play -- and with **`-Now`** to `current/`. If card `<id>` is already in `current/` or `backlog/` it is **returned, not overwritten** -- found by id, before any tracker call. On an Azure DevOps board it also reads the work item's comments, which needs an `az` token: with none (`az login` has not been run, or `az` printed nothing) it is a stated refusal (exit 2, naming `az login`) before any card is written or the work item assigned or moved |
+| `NewPrompt <id>` | Create a prompt file from the board's tracker: an ADO work item, or on a GitHub board an issue (`gh issue view`; the repo comes from a repo-grained address or the board's one `projects[]` entry -- several repos refuse, because issue numbers are per-repo; a label naming a card type sets the type, else Task; assignment and a closed issue's reopen prompt mirror the ADO flow). The card is written to the Space's `backlog/` -- planned, not in play -- and with **`-Now`** to `current/`; on an Azure DevOps Space always to `current/`, which has no Backlog lane. If card `<id>` is already in `current/` or `backlog/` it is **returned, not overwritten** -- found by id, before any tracker call. On an Azure DevOps board it also reads the work item's comments, which needs an `az` token: with none (`az login` has not been run, or `az` printed nothing) it is a stated refusal (exit 2, naming `az login`) before any card is written or the work item assigned or moved |
 | `NewPrompt -Title "..." [-Type <t>] [-Id <n>]` | The same file with **no ADO call** -- the Tier-2 way to start a card ([Tiers](#creating-a-card-with-no-ado)) |
 | `NewPrompt -Title "..." -Description <text>` | Offline only: fills `## Context` (a Task) or `## Summary` (everything else) with that text in place of `(TBD)` -- the same slot an ADO-linked card fills from the work item's own description. Multi-line is kept. Omitted, the card reads `(TBD)` there exactly as it always has |
 | `NewPrompt ... -Cover <image>` / `-Before <image>` | Make the card **with its picture**, attached by the same code `Cover` runs -- for a GUI issue the snap is the report. The picture is checked first, so a refused one writes no card; on a card that is already in `current/` (returned, not overwritten) nothing is attached and the line says to use `Cover` ([A card's picture](#a-cards-picture-cover)) |
