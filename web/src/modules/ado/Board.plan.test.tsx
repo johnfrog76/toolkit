@@ -103,8 +103,10 @@ describe("planning a card from its row menu", () => {
   it("Plan milestone shows the milestone it has, and Save runs Plan -Milestone", async () => {
     draw();
     const dialog = await choose("Plan milestone");
-    expect(within(dialog).getByText("M2 -- 1.2.0")).toBeTruthy();
-    const box = within(dialog).getByRole("textbox", { hidden: true });
+    // The milestone it has is the box's starting value; no "Now:" line repeats it.
+    const box = within(dialog).getByRole<HTMLInputElement>("textbox", { hidden: true });
+    expect(box.value).toBe("M2 -- 1.2.0");
+    expect(within(dialog).queryByText(/^Now:/)).toBeNull();
     fireEvent.change(box, { target: { value: "M3" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save", hidden: true }));
     await waitFor(() =>

@@ -10,7 +10,6 @@ import type { ReactElement } from "react";
 import {
   Body1,
   Button,
-  Caption1,
   Dialog,
   DialogActions,
   DialogBody,
@@ -111,9 +110,11 @@ export function PlanCardDialog({ card, kind, onClose, onDone }: PlanCardDialogPr
             {NOUN[kind]} for {name}
           </DialogTitle>
           <DialogContent>
-            <Body1>
-              Now: <strong>{now}</strong>
-            </Body1>
+            {kind === "milestone" ? null : (
+              <Body1>
+                Now: <strong>{now}</strong>
+              </Body1>
+            )}
             <Field label={label}>
               <Input
                 value={text}
@@ -124,14 +125,11 @@ export function PlanCardDialog({ card, kind, onClose, onDone }: PlanCardDialogPr
                 }}
               />
             </Field>
-            <Caption1>
-              {kind === "tags"
-                ? "Add puts these on the card's Tags line; Take off removes them. A tag it already carries is not added twice."
-                : `Written whole on the card's own ${NOUN[kind]} line, never on the tracker.`}
-            </Caption1>
             {failed ? <StatusMessage status="error">{failed}</StatusMessage> : null}
           </DialogContent>
-          <DialogActions>
+          {/* The take-off sits apart, at the start (Fluent's DialogActions position): the
+              end column holds two buttons, and a third there wraps its own label. */}
+          <DialogActions position="start">
             {kind === "tags" ? (
               <Button disabled={busy || empty} onClick={() => void clear()}>
                 Take off
@@ -141,6 +139,8 @@ export function PlanCardDialog({ card, kind, onClose, onDone }: PlanCardDialogPr
                 Clear {NOUN[kind].toLowerCase()}
               </Button>
             ) : null}
+          </DialogActions>
+          <DialogActions>
             <Button appearance="secondary" disabled={busy} onClick={onClose}>
               Cancel
             </Button>
