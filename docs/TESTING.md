@@ -59,7 +59,7 @@ a reader that knows `fail` already breaks the streak and fails the run, which is
 
 **Four runners**, one per half plus one that drives a browser over both -- the one-half form, for when you
 want one. Every count below was
-observed on this commit, on one host with pwsh 7.6, Python 3.12 and Node 24.
+observed on this commit, on one host with pwsh 7.6, Python 3.12 and Node 24.22.0.
 
 ```powershell
 tkTestToolkit            # 48 suites, 8622 assertions
