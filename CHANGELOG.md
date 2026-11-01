@@ -10,6 +10,7 @@ release.
 
 ### Added
 
+- A design that has reached a spec can now be dropped: `MoveDesign <id> -To Archive -Dropped -Reason <text>` archives the spec and its note together, stamps both as dropped, and the Design tab lists it under Archived with its reason (and offers **Archive as dropped** on a design with a live spec). Without `-Dropped`, a live spec still has to be completed.
 - `NewPrompt -Title ... -From <meeting>` makes a card from an agenda line and records the meeting it came from in a `**From:**` line -- the record's name, such as `2026-10-28` for the 1:1 or `client-weekly-2026-10-28` for a series; a meeting record that does not exist writes no card.
 - A deck in the Decks card now opens a page of its own, showing its summary, state, tags, slide count, running time and where its file lives, with **Play** to present it. The page's **Archive** puts the deck away on this machine only (the `deck.archived` setting): it leaves the Decks list for an **archived** filter, and the deck itself is not changed.
 - A goal can be marked complete from the Growth page: **Complete** on its row or on its own page writes the goal's Status line as Achieved and changes nothing else in the file, and the goal's page now offers **Archive** too. In the terminal it is `NewGrowth -Complete <file>`, and `-WhatIf` names the file and writes nothing.

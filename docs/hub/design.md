@@ -94,7 +94,7 @@ space: toolkit
 | the headings | the template, `templates/DesignNote.template.md` | nothing -- they are for the person writing |
 | `**Created:**` | `NewDesign`, the day it ran | nothing yet |
 | `**Closed:** yyyy-MM-dd` | the move verb, when a file enters an archive folder, through `Add-ClosedStamp.ps1` | a FACT, not a state: the date on a Complete (the spec's) or Archived (the note's) design |
-| `**Outcome:** shipped` or `dropped` | the move verb, on a note archived WITHOUT a spec (`consts.json` `stamps.outcome`, `design.outcomes`) | a fact, read only on an Archived design: a deck design that shipped as written, or an idea that never made it. Any other word, or none, reads as plain Archived |
+| `**Outcome:** shipped` or `dropped` | the move verb, on a note archived WITHOUT a spec, and `dropped` on both files of a dropped spec (`consts.json` `stamps.outcome`, `design.outcomes`) | a fact, read only on an Archived design: a deck design that shipped as written, or an idea that never made it. Any other word, or none, reads as plain Archived |
 | `## Journey` | the move verb, one dated line per move (L3, D-DL18) | nothing -- a record a person reads, never state |
 
 ### How the title is read
@@ -129,6 +129,7 @@ are, by one rule both halves implement (`design_state` in `agent/ado/design.py`;
 | `design/` | in `spec/` | **Spec** |
 | `design/archive/` | in `spec/archive/` | **Complete** |
 | `design/archive/` | none | **Archived** |
+| `design/archive/` | in `spec/archive/` with `**Outcome:** dropped` | **Archived**, outcome dropped -- a spec dropped before it was built (`MoveDesign -To Archive -Dropped`); the spec's `**Closed:**` date is the design's |
 | `design/` | in `spec/archive/` | **Complete** -- the spec's folder wins; the row says the note was left behind |
 | `design/archive/` | in `spec/` | **Spec** -- the same, the other way round |
 | none | in `spec/` or `spec/archive/` | **Spec** / **Complete** -- a spec may stand without a note |
@@ -136,7 +137,10 @@ are, by one rule both halves implement (`design_state` in `agent/ado/design.py`;
 The four names are `consts.json` `design.states`, in that order -- the road's order, which is the order the
 list groups them in. `Closed` is a fact about a design that has reached an archive state (`""` for Design
 and Spec: a note archived before its spec is still a Spec), and `Outcome` only about an Archived one (a
-Complete design needs none: its spec was built).
+Complete design needs none: its spec was built). An archived spec stamped `**Outcome:** dropped` is the one
+spec that reads Archived rather than Complete: `MoveDesign <id> -To Archive -Dropped -Reason <text>` on a
+Spec archives the spec and its note together, stamps both, and appends the reason to the note's Journey;
+without `-Dropped` a live spec still refuses `-To Archive`. A design archived before this rule keeps its state.
 
 **What the agent serves.** `GET /api/design` (a repo, through `gh`) and `GET /api/studio/design` (the hub,
 from disk) answer the same shape: `designs` -- one row per id, `{ id, short, state, title, description,
