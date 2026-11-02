@@ -79,7 +79,8 @@
     "jsdom": "^30.0.0",
     "@istanbuljs/load-nyc-config": {
       "js-yaml": "^4.1.1"
-    }
+    },
+    "re2js": "2.8.7"
   },
   "engines": {
     "node": ">=24.22.0"
