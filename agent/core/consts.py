@@ -108,6 +108,12 @@ def folder_assets() -> str:
     return consts()["folders"]["assets"]
 
 
+def folder_milestones() -> str:
+    """The Space's folder for a milestone's order: one file per milestone
+    (docs/hub/milestones.md)."""
+    return consts()["folders"]["milestones"]
+
+
 def stamp_cover() -> str:
     """``**Cover:**`` -- a card's picture, ``../assets/<card key>/<file>``."""
     return consts()["stamps"]["cover"]

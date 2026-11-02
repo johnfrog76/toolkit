@@ -2069,12 +2069,13 @@ function global:Set-P20CardCover {
 }
 
 function global:Set-P20CardSprint {
-    <# Plan -- the write side of a card's two planning lines: -Milestone and -Sprint, each its own line; -Remove [-Only Milestone|Sprint] clears them. Never touches the tracker. #>
+    <# Plan -- the write side of a card's two planning lines and its milestone's order: -Milestone and -Sprint, each its own line; -Rank moves the card in milestones/<slug>.md; -Remove [-Only Milestone|Sprint] clears them. Never touches the tracker. #>
     [CmdletBinding()]
     param(
         [Parameter(Position = 0)][string]$Card,
         [string]$Milestone,
         [string]$Sprint,
+        [string]$Rank,
         [switch]$Remove,
         [string]$Only,
         [switch]$Help

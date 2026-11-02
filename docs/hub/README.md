@@ -10,6 +10,7 @@ own checkout -- and it need not be a git repository (`storeSync`, [Configuration
   <promptsFolder>/          ONE PER ORG -- its cards
     current/  backlog/  archive/   in play, planned, done
     assets/<card key>/      a card's pictures -- cover.png, before.png (Cover)
+    milestones/<slug>.md    a milestone's order, one file per milestone (Plan -Rank)
     agentic/how-we-work.md  how the Space is worked, when it is worked with agents (HowWeWork)
   growth/                   trainings, presentations, goals        -- the engineer's, not an org's
     current/  archive/
@@ -30,6 +31,7 @@ own checkout -- and it need not be a git repository (`storeSync`, [Configuration
 | --- | --- | --- | --- | --- |
 | `<org>/current`, `<org>/backlog`, `<org>/archive` | **a card** -- one piece of work; the product's core. `backlog/` holds the planned ones, not yet in play | the org | [`cards.md`](cards.md) | `samples/hub/demo/` |
 | `<org>/assets/<card key>/` | a card's picture -- its cover, or the before of a before/after -- named by the card's `**Cover:**` / `**Before:**` line | the org, beside its cards | [`cards.md`](cards.md#a-cards-pictures----spaceassets) | `Tests/fixtures/parsers/covers.json` |
+| `<org>/milestones/<slug>.md` | **a milestone's order** -- its title, a theme, and the card ids in rank order under `## Order`; a card's MEMBERSHIP stays on its own `**Milestone:**` line. Written by `Plan` alone; none on an Azure DevOps Space | the org, beside its cards | [`milestones.md`](milestones.md) | `Tests/fixtures/parsers/milestone-order.json` |
 | `<org>/agentic/how-we-work.md` | **the team's page** for a Space worked with agents -- the seats, the loop, the hand-off, relay and stand-in rules -- written once by `HowWeWork`, then the team's to edit; quoted by `StartWork`, listed on the Studio's Prompts card under **Your hub** | the org | [How we work -- a Space's `agentic/`](#how-we-work----a-spaces-agentic) below | `agentic/how-we-work.template.md` in the package |
 | `growth/` | a training, a presentation or a goal | the engineer | [`growth.md`](growth.md) | `samples/hub/growth/`, `Tests/fixtures/hub/growth/` |
 | `manager/` | one 1:1 session, through plan, prep and retro | the engineer | [`manager.md`](manager.md) | `Tests/fixtures/hub/manager/` |

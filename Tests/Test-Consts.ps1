@@ -149,6 +149,8 @@ $expected = [ordered]@{
     'stamps.cover'            = '**Cover:**'
     'stamps.before'           = '**Before:**'
     'folders.assets'          = 'assets'
+    # A milestone's order: one file per milestone, beside the card folders.
+    'folders.milestones'      = 'milestones'
     'assets.coverExtensions'  = 'png,jpg,jpeg,webp,gif'
     'assets.coverMaxBytes'    = '5242880'
     'regex.dueLine'           = '(?m)^\*\*Due:\*\*[ \t]*(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?'
