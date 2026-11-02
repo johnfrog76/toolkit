@@ -1033,6 +1033,36 @@ describe("the scenario grid: a card's menu, by the Organize flag", () => {
   });
 });
 
+// A card's menu, by its lane (docs/SCENARIOS.md, "A card's menu, by its pull
+// request"): Land is there on every Code Review card, on GitHub and Azure
+// DevOps alike, and absent on every other lane. Whether the pull request merged
+// is the verb's question -- an unmerged one is Land's stated refusal.
+describe("the scenario grid: a card's menu, by its pull request", () => {
+  const card = (status: string, prUrl: string | null) => ({
+    status,
+    linked: true,
+    ado_url: "https://github.com/o/r/issues/7",
+    pr_url: prUrl,
+    billable: true,
+    commits: 1,
+  });
+  const GH = "https://github.com/o/r/pull/8";
+  const ADO = "https://dev.azure.com/o/p/_git/r/pullrequest/8";
+  it.each<[string, ReturnType<typeof card>, string, boolean]>([
+    ["Code Review, a GitHub pull request", card("Code Review", GH), "github", true],
+    ["Code Review, an Azure DevOps pull request", card("Code Review", ADO), "ado", true],
+    ["Code Review by a Review line, no PR URL", card("Code Review", null), "none", true],
+    ["In Progress", card("In Progress", null), "github", false],
+    ["Active", card("Active", null), "ado", false],
+    ["Backlog", card("Backlog", null), "github", false],
+  ])("%s", (_why, c, tracker, offered) => {
+    const menu = cardActions(c, { adoEnabled: true, tracker, cliPrefix: "tk" }).secondary.map(
+      (a) => a.label,
+    );
+    expect(menu.filter((l) => l === "Land")).toHaveLength(offered ? 1 : 0);
+  });
+});
+
 // The board's lanes, by a card's status (docs/SCENARIOS.md, "The board's lanes,
 // by a card's status"): five lanes, Backlog first, and what a drop may do from
 // each -- the one rule the drop targets and the "Move to" menu both read.

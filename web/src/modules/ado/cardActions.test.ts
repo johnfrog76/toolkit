@@ -39,6 +39,8 @@ function shape(plan: CardActionPlan): { primary: string | null; menu: string[] }
 const CARD_ONLY = ["Mark not billable", "Plan milestone", "Plan sprint", "Tag"];
 /** A Done card is archived: Plan and Tag do not look there, so it offers neither. */
 const DONE_ONLY = ["Mark not billable"];
+/** On every Code Review card: the verb asks the tracker whether the PR merged. */
+const LAND = "Land";
 /** The one exposed action: the card's own page, on every card. */
 const OPEN = "Open the card";
 /** The external link, last, on a card with a work item while ADO is in use. */
@@ -107,6 +109,7 @@ const rows: Array<{
       `Move to Active [x: ${ONE_WAY}]`,
       `Move to In Progress [x: ${ONE_WAY}]`,
       "Archive (move to Done)",
+      LAND,
       `Create PR [x: ${HAS_PR}]`,
       ...CARD_ONLY,
       EXTERNAL,
@@ -122,6 +125,7 @@ const rows: Array<{
       `Move to Active [x: ${ONE_WAY}]`,
       `Move to In Progress [x: ${ONE_WAY}]`,
       "Archive (move to Done)",
+      LAND,
       "Create PR",
       ...CARD_ONLY,
       EXTERNAL,
@@ -193,6 +197,7 @@ const rows: Array<{
       `Move to Active [x: ${ONE_WAY}]`,
       `Move to In Progress [x: ${ONE_WAY}]`,
       "Archive (move to Done)",
+      LAND,
       ...CARD_ONLY,
     ],
   },
@@ -259,6 +264,7 @@ const rows: Array<{
       `Move to Active [x: ${ONE_WAY}]`,
       `Move to In Progress [x: ${ONE_WAY}]`,
       "Archive (move to Done)",
+      LAND,
       ...CARD_ONLY,
     ],
   },
@@ -311,6 +317,7 @@ const rows: Array<{
       `Move to Active [x: ${ONE_WAY}]`,
       `Move to In Progress [x: ${ONE_WAY}]`,
       "Archive (move to Done)",
+      LAND,
       ...CARD_ONLY,
     ],
   },
@@ -387,6 +394,36 @@ describe("cardActions -- one action model for a card, in every view", () => {
       }).secondary.find((a) => a.id === "create-pr");
     expect(older("Active")).toMatchObject({ disabled: true, whyNot: NO_COMMITS });
     expect(older("In Progress")?.disabled).toBeUndefined();
+  });
+
+  it("offers Land on every Code Review card, on either tracker, first of what you do with it", () => {
+    const ctx = { adoEnabled: true, cliPrefix: "tk" };
+    const GH_PR = "https://github.com/o/r/pull/7";
+    const codeReview: ActionCard[] = [
+      card("ado", "Code Review", { commits: 1, pr_url: PR }),
+      card("ado", "Code Review", { commits: 1, pr_url: GH_PR }),
+      card("local", "Code Review", { commits: 1 }),
+    ];
+    for (const c of codeReview) {
+      for (const adoEnabled of [true, false]) {
+        const menu = cardActions(c, { ...ctx, adoEnabled }).secondary;
+        const land = menu.find((a) => a.id === "land");
+        expect(land).toMatchObject({ label: "Land", dividerBefore: true });
+        // Never disabled: whether the pull request merged is the verb's question.
+        expect(land?.disabled).toBeUndefined();
+        // Right after the lanes: the first of what you do with the card.
+        expect(menu.findIndex((a) => a.id === "land")).toBe(
+          menu.filter((a) => a.id === "move").length,
+        );
+      }
+    }
+    // Absent, not disabled, on every other lane.
+    for (const status of ["Backlog", "Active", "In Progress", "Done"]) {
+      for (const kind of ["ado", "local"] as const) {
+        const ids = cardActions(card(kind, status, { commits: 1 }), ctx).secondary.map((a) => a.id);
+        expect(ids).not.toContain("land");
+      }
+    }
   });
 
   it("offers Remind me about this, last of the card's own moves, only while the organize module is on", () => {

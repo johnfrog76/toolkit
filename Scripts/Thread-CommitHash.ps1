@@ -68,18 +68,11 @@ $promptsRoot = $cfg.PromptsRoot
 . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 # The bullet shape this writes is what Get-PromptStatus.ps1 and
 # agent/core/parsers.py both read to call a card In Progress -- one pattern, in
-# consts.json, compiled by each half.
+# consts.json, compiled by each half. Where a bullet goes, and which ones a card
+# already carries, is Add-CommitBullet.ps1's: Land writes the merge commit's
+# bullet through the same rule.
 . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
-$script:Consts = Get-P20Consts
-
-function Get-P20BulletHash {
-    # The hash out of a bullet the CONTRACT pattern matched. Matching and
-    # extracting are one step so no second copy of the shape can exist here.
-    param([string]$Line)
-    $m = [regex]::Match($Line, $script:Consts.regex.commitBullet)
-    if (-not $m.Success) { return '' }
-    return (($m.Value -replace '^\s*-\s+', '') -replace '`', '').Trim().ToLower()
-}
+. (Join-Path $PSScriptRoot 'Add-CommitBullet.ps1')
 if (-not (Test-P20HubRoot $promptsRoot)) {
     Write-CliError -Message (Get-P20HubMissingMessage $promptsRoot)
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
@@ -275,66 +268,15 @@ if ($replacements -gt 0 -and $firstHash) {
     $content = $content -replace '\[commit\]', $firstHash
 }
 
-$lines = [System.Collections.Generic.List[string]]($content -split "`n")
-
-# The Git section: `## Git` to the next `## ` heading, or end of file.
-$gitStart = -1
-for ($i = 0; $i -lt $lines.Count; $i++) {
-    if ($lines[$i] -match '^##\s+Git\s*$') { $gitStart = $i; break }
-}
-if ($gitStart -lt 0) {
+$bulletEdit = Add-P20CommitBullets -Content $content -Bullets $wanted
+if (-not $bulletEdit.Ok) {
     Write-CliError -Message "No '## Git' section in $(Split-Path $File -Leaf)." `
         -Hint "Add a '## Git' heading with a 'Commits:' line, as the card templates have."
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
-$gitEnd = $lines.Count
-for ($i = $gitStart + 1; $i -lt $lines.Count; $i++) {
-    if ($lines[$i] -match '^##\s+') { $gitEnd = $i; break }
-}
-
-# Hashes the card already carries -- the whole point of re-running being safe.
-$existing = @{}
-for ($i = $gitStart; $i -lt $gitEnd; $i++) {
-    $h = Get-P20BulletHash $lines[$i]
-    if ($h) { $existing[$h] = $true }
-}
-
-$toAdd = @()
-foreach ($line in $wanted) {
-    $h = Get-P20BulletHash $line
-    $seen = $false
-    foreach ($k in $existing.Keys) {
-        if ($k.StartsWith($h) -or $h.StartsWith($k)) { $seen = $true; break }
-    }
-    if (-not $seen) {
-        $toAdd += $line
-        if ($h) { $existing[$h] = $true }
-    }
-}
-
+$toAdd = @($bulletEdit.Added)
 $added = $toAdd.Count
-if ($added -gt 0) {
-    # Insert after the last existing commit bullet under Commits:, else right
-    # after the Commits: line, else at the end of the Git section.
-    $insertAt = -1
-    for ($i = $gitStart; $i -lt $gitEnd; $i++) {
-        if ($lines[$i] -match '^Commits:') { $insertAt = $i + 1; break }
-    }
-    if ($insertAt -lt 0) { $insertAt = $gitEnd }
-    for ($i = $insertAt; $i -lt $gitEnd; $i++) {
-        if (Get-P20BulletHash $lines[$i]) { $insertAt = $i + 1 }
-        elseif ($lines[$i].Trim() -ne '') { break }
-    }
-    $lines.InsertRange($insertAt, [string[]]$toAdd)
-    $gitEnd += $added
-
-    # The placeholder has done its job the moment a real commit is recorded.
-    for ($i = $gitEnd - 1; $i -ge $gitStart; $i--) {
-        if ($lines[$i] -match '^\s*-\s+\(pending\)\s*$') { $lines.RemoveAt($i) }
-    }
-}
-
-$content = ($lines -join "`n")
+$content = $bulletEdit.Content
 if ($wasCrlf) { $content = $content -replace "`n", "`r`n" }
 
 if ($content -ne $original) {

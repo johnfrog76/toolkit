@@ -36,6 +36,8 @@ export interface CardActionHandlers {
   onCreatePR: () => void;
   /** Remind me about this -- offered only while organize is on (cardActions.ts). */
   onRemind?: () => void;
+  /** Land -- offered on every Code Review card (cardActions.ts). */
+  onLand?: () => void;
   /** Plan milestone, Plan sprint, Tag: the form over the Plan and Tag verbs (PlanCardDialog). */
   onPlan?: (kind: PlanKind) => void;
 }
@@ -50,11 +52,13 @@ function toCardAction(spec: CardActionSpec, h: CardActionHandlers): CardAction {
           ? h.onCreatePR
           : spec.id === "remind"
             ? h.onRemind
-            : spec.id === "milestone" || spec.id === "sprint" || spec.id === "tags"
-              ? () => h.onPlan?.(spec.id as PlanKind)
-              : spec.id === "move" && spec.to
-                ? () => h.onMove(spec.to!)
-                : undefined;
+            : spec.id === "land"
+              ? h.onLand
+              : spec.id === "milestone" || spec.id === "sprint" || spec.id === "tags"
+                ? () => h.onPlan?.(spec.id as PlanKind)
+                : spec.id === "move" && spec.to
+                  ? () => h.onMove(spec.to!)
+                  : undefined;
   // The word, icon and tooltip are the move's (shared/CardActions ROW, or the
   // card's own CARD_MOVES); nothing here names an action.
   return spec.move.action({
