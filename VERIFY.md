@@ -984,7 +984,8 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `git checkout -- package.json` before the pull. Then delete `node_modules`, run `npm ci`, and you should see no
   `npm warn install-scripts` lines. `npm install-scripts ls` prints `No packages with unreviewed install scripts.`,
   `git status` is clean, and `npm test` and `npm run lint` are green with the web line `docs/TESTING.md` states.
-  Closes nothing on its own: #190 closes at merge, the Windows CI job having run the same `npm ci` and suite.
+  Closes nothing on its own: #190 closes at merge. The Windows CI job runs the same `npm ci` (no install-scripts
+  warning) and the browser smoke, but not `npm test` or the lint -- those two are this row's.
 
 - [ ] **The web UI's Node floor holds on Windows.** On the Windows PC, `node --version` in a fresh shell. Below
   24.22.0, `cd web; npm ci` prints `npm warn EBADENGINE` naming `required: { node: '>=24.22.0' }`; then

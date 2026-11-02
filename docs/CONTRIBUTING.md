@@ -83,8 +83,8 @@ until `package.json` `allowScripts` says yes or no, and `npm install-scripts app
 answer into the file. `web/package.json` records a `false` for each of the three dev dependencies that have one:
 `@parcel/watcher` (it compiles from source only when asked to), `unrs-resolver` (a fallback that fetches the
 native binding when the optional dependency is missing) and `fsevents` (macOS only, and it ships its binary).
-The prebuilt binaries arrive as optional dependencies, so `npm ci` and `npm test` pass on macOS, Linux and
-Windows with all three skipped, and a fresh `npm ci` asks nothing and leaves `git status` clean. Approve nothing
+The prebuilt binaries arrive as optional dependencies, so with all three skipped `npm test` and the lint pass on
+macOS and Linux, and the browser smoke on Windows; a fresh `npm ci` asks nothing and leaves `git status` clean. Approve nothing
 locally: that edits `package.json`, a change nobody meant to commit. A dependency update that brings a new
 install script shows up in `npm ci`'s warning and in `npm install-scripts ls`; review it there, and record the
 answer with `npm install-scripts approve <pkg>` or `deny <pkg>`, in the same pull request as the update.
