@@ -34,7 +34,7 @@ What has been run, and where. A row says "verified" only where someone ran it an
 | **PowerShell 7** | 7.6 | Both hosts: 7.6 on the Mac and on the Windows PC |
 | **Windows PowerShell** | 5.1, the floor: every script must parse and run on it | The Windows PC only (5.1.26100), under `powershell.exe`: `Test-PS51Compat`, `Test-Portability` and the Gate 12 rows. Nothing on a Mac can run it |
 | **Python** | 3.12 | Both hosts: 3.12.4 on the Mac and 3.12.10 on the Windows PC. 3.10 and 3.11 are not run by anything, so they are not claimed; the floor rises or falls with what runs |
-| **Node** | 24, the active LTS, from 24.22.0 (`.nvmrc`, `web/package.json` `engines`) | The Mac: `npm ci` and `npm test` on Node 24.22.0, the recorded web counts. The Windows PC ran them on 24.21, below the floor; its run on 24.22.0 or later is a row under [`VERIFY.md`](../VERIFY.md)'s "Rows added by a fix" |
+| **Node** | 24, the active LTS, from 24.22.0 (`.nvmrc`, `web/package.json` `engines`) | The Mac: `npm ci` and `npm test` on Node 24.22.0, the recorded web counts. The Windows PC: `npm test` on Node 24.22.0, with no crash in Node (the row under [`VERIFY.md`](../VERIFY.md)'s "Rows added by a fix") |
 | **Docker image** (`web/Dockerfile`, `web/docker-compose.yml`) | Builds on `node:24-alpine`, serves from `nginx:alpine` | The Windows PC: `docker compose build` and the smoke against the running container, published on `127.0.0.1:5174`. Linux hosts: see the trust model's note on `host.docker.internal` |
 
 ---

@@ -86,6 +86,7 @@ web/
 ├── tests/smokeA11y.mjs     its --a11y audit, on the same kind of servers
 ├── tests/smokeFirstRun.mjs  its --first-run drag, on the same kind of servers and a copy of samples/hub
 ├── tests/jest.setup.cjs   jest setupFiles: Node's TextEncoder/TextDecoder for jsdom, which React Router 8 needs
+├── tests/jest.afterEnv.cjs jest setupFilesAfterEnv: Testing Library waits up to 5 s for an element
 ├── tests/routeModules.jest.cjs  jest only: a stub for react-router's one file that reads import.meta
 └── src/
     ├── shell/            the composition root -- owns chrome, owns no decisions
