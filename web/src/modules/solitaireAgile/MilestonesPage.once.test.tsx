@@ -1,10 +1,23 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render as rtlRender,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import type { ReactElement } from "react";
 import { StrictMode } from "react";
 import type { Milestone } from "../ado/api.ado";
 import type { MilestonesResponse } from "./api.solitaireAgile";
 import { AWARD_SEEN_KEY, awardKey } from "./award";
 import { resetCelebrateMemory } from "./celebrate";
+import { ConfettiProvider } from "../../shell/ConfettiProvider";
 import { MilestonesPage } from "./MilestonesPage";
+
+// Every render is under the app's one confetti mount, as the page is in the app: the
+// dialog throws through useConfetti() and the burst is drawn at that root.
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: ConfettiProvider });
 
 // The award opens ONCE per reached milestone per browser, however the page is left
 // (button, Escape, navigation), revisited, or fed (the env and the ritual payload

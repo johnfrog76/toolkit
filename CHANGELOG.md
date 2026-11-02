@@ -26,6 +26,7 @@ release.
 
 ### Changed
 
+- The milestone award shows a gold trophy instead of the ToolKit logo, and its confetti now falls over the whole app rather than inside the dialog.
 - On an Azure DevOps Space the board now draws four lanes, with no Backlog lane, and `NewPrompt` writes a new card straight to `current/` so it is in play when it is made; the board's footer names the first lane the Space has. A local or GitHub Space keeps its five lanes and its backlog. A card already in the backlog on an Azure DevOps Space is drawn in Active, so nothing goes missing.
 - **Create PR** from the browser now works from the card's own code checkout when one is on this machine (a clone of the board's GitHub repository at `<wsRoot>/<repo>` or a nav shortcut's path): the repository comes from that checkout, a card with no `## Branch` uses the checkout's branch when it is the card's, and a branch that was never pushed is refused with the exact `git push` to run in that checkout. With no checkout found, it reads the card as before.
 - Completing a hub-kept design (`MoveDesign -Hub -Space`) also finds the Space's repository at `<wsRoot>/<repo>`.

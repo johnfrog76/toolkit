@@ -1,35 +1,29 @@
 import { useEffect, useRef, useState } from "react";
 import ReactConfetti from "react-confetti";
+import { prefersReducedMotion } from "../hooks/useConfetti";
 
 // The celebration (D-AR14; docs/modules/solitaire-agile.md, "Milestones: the tab and
-// the award"): confetti over the whole viewport, once, in the page -- no backend, no
-// sound, no push, no message to anyone. ONE wrapper over the `react-confetti` package
-// owns it, so every surface that celebrates looks the same. Its one caller is the
-// award dialog on the Milestones tab (AwardDialog.tsx) -- a test holds that: confetti
-// with no dialog around it to say why read as a glitch. Whether to celebrate is the
-// caller's rule, over celebrate.ts's mark.
+// the award"): confetti over the whole viewport, once -- no backend, no sound, no
+// push, no message to anyone. ONE wrapper over the `react-confetti` package owns it,
+// so every burst looks the same, and ONE place draws it: the shell's root
+// (shell/ConfettiProvider.tsx), which a caller reaches through `useConfetti()`. A
+// test holds both: no other file imports this one or the package.
 //
 // The wrapper is mounted with the viewport's size, `recycle={false}` and a piece count
 // that rains out in a few seconds, and draws NOTHING under prefers-reduced-motion --
 // the words that say what was reached are the caller's, and they stay.
 //
 // It is only ever imported by a lazyPart (shell/lazy.tsx), so its bytes and the
-// package's are fetched with the part that celebrates, never with the app.
+// package's are fetched with the first burst, never with the app.
 
 /** How many pieces one burst throws: enough to fill the screen, few enough to finish
  *  in a few seconds with recycle off. */
 export const CONFETTI_PIECES = 400;
 
-const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
-
-/** Whether the viewer asked for less motion. Never throws; no matchMedia reads as no. */
-export function prefersReducedMotion(): boolean {
-  try {
-    return !!window.matchMedia?.(REDUCED_MOTION).matches;
-  } catch {
-    return false;
-  }
-}
+/** The burst's layer: just above Fluent's portal layer (its FluentProvider portals sit at
+ *  z-index 1000000), so the party falls OVER a dialog and its backdrop rather than under
+ *  them. It never takes a click: pointer-events are off. */
+export const CONFETTI_LAYER = 1000001;
 
 function viewport(): { width: number; height: number } {
   return { width: window.innerWidth || 0, height: window.innerHeight || 0 };
@@ -70,7 +64,7 @@ export function Confetti({
       height={size.height}
       recycle={false}
       numberOfPieces={pieces}
-      style={{ position: "fixed", inset: 0, zIndex: 1000, pointerEvents: "none" }}
+      style={{ position: "fixed", inset: 0, zIndex: CONFETTI_LAYER, pointerEvents: "none" }}
       onConfettiComplete={(instance) => {
         instance?.reset();
         done.current?.();

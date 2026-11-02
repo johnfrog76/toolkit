@@ -907,7 +907,7 @@ has shown) and `no issues yet`.
 **The award.** When a milestone is reached and the person next opens the tab, a dialog opens for it:
 `Congratulations: <title> reached!`, one line of what it took -- `12 issues closed, 1 October 2026 to
 24 October 2026.`, from the day it was made to the day it was reached (GitHub's close, else its last
-change: the last issue closing) --, the picture, and the confetti, once, inside the dialog's moment.
+change: the last issue closing) --, a gold trophy, and the confetti, once, over the whole app as it opens.
 Close it and the tab is there with that milestone marked `awarded`. A visit owes **one** dialog: when
 several reached milestones are waiting (a browser that first looks at a Space with a backlog), it names all
 of them, oldest reached first, the order the work was done in -- `Congratulations: A, B and C reached!` (`A`
@@ -927,15 +927,25 @@ fresh store and shows the award again. (The PM
 Corner's old confetti mark, `p20.solitaireAgile.corner.reached`, is no longer read: nobody has seen an
 award yet.) Under `prefers-reduced-motion` the dialog opens and nothing rains.
 
-**The confetti** (D-AR14) stays one component, `Confetti.tsx` -- one wrapper over the `react-confetti`
-package, the viewport's size, `recycle` off, a burst that rains out in a few seconds -- and the award dialog
-(`AwardDialog.tsx`) is its one caller, drawn inside the dialog's surface. A test holds that no other file
-imports it. The dialog is a `lazyPart`, so the package's bytes are fetched only when an award is drawn.
+**The confetti** (D-AR14) belongs to the whole app, and it is mounted once: `shell/ConfettiProvider.tsx`
+wraps the app near its root (`shell/main.tsx`) and draws the burst there, over the whole viewport, outside
+every page's and dialog's tree -- on a layer of its own just above Fluent's portals (`CONFETTI_LAYER`), so it
+falls over an open dialog and its backdrop, and never takes a click. A caller does not mount anything -- it throws, through the `useConfetti()`
+hook (`hooks/useConfetti.ts`), which returns `throwConfetti()`. One call is one burst; a call while a burst
+is still raining is absorbed into it; under `prefers-reduced-motion` a call does nothing. The burst is still
+one wrapper over the `react-confetti` package, `shared/Confetti.tsx` -- the viewport's size, `recycle` off, a
+burst that rains out in a few seconds -- and the award dialog (`AwardDialog.tsx`) is the one caller, throwing
+once when it opens. Tests hold all three: the package is imported by the wrapper alone, the wrapper is
+mounted by the provider alone, and the dialog is the one file that calls the hook. No bytes until something
+throws: the wrapper and the package are the provider's `lazyPart`, fetched with the first burst, so with Team
+Agile off -- nothing to throw -- and under reduced motion, they are never fetched. The provider itself is a
+context and a counter, shell code with no package behind it.
 
-**The picture is not drawn yet.** It will be the team lead of the standup's cast lifting weights, drawn in
-the studio and shipped the way slide art is. Until it lands, the dialog wears the Team Agile wordmark (the
-app's own mark, in the worn theme's colours, with the face the person chose) as the stand-in. The swap is one
-line: `AWARD_PICTURE` in `AwardDialog.tsx`.
+**The picture is a gold trophy**, `Trophy.tsx`: an inline SVG -- a cup with two handles, a stem and a plinth --
+in the 200 px box, no raster and no package, with `A gold trophy` as its accessible name. It is the gold
+podium trophy the studio drew for its bowling decks, ported as a picture of its own in the studio's geometry
+and golds; the golds are named once in the file and are the same in every theme, and the deep gold outlines the
+cup and the plinth so the shape still reads on a dark dialog. `AWARD_PICTURE` in `AwardDialog.tsx` names it.
 
 `Tests/fixtures/rituals/milestones.json` is the one table: gh's own rows in (open with and without a due
 date, every issue closed while GitHub shows it open, every issue closed and closed on GitHub, closed on
@@ -1413,7 +1423,8 @@ standup is complete and correct; nothing on screen says a dress was skipped.
 | `tkTestToolkit -Rituals`, `Tests/test_rituals.py` -- the PM Corner | `Tests/fixtures/rituals/corner.json` from both halves: every row from the raw read through each half's card reader, the join and the window (shape, milestone, remaining, pick, noun, line, command), every shape of `rituals.cornerShapes` reached by a row, the long milestone read whole (and the card model's `sprint` not it), and the three `briefs` cases end to end -- `corner-<case>.brief.txt` byte for byte, the Corner the last line, again after a JSON round trip; typed, `Standup -Brief` ending on the Corner's line; the agent's route carrying `corner` (its fields, a shape of the contract, the brief's last line), none with the Space's switch off and none on an Azure DevOps Space |
 | `web/src/modules/solitaireAgile/PmCorner.test.tsx`, `celebrate.test.ts` | the Corner: the line verbatim, the chevron opening the hand-off for the pick (a card by its id), no chevron for reached or nothing in reach; reached ending in `: see Milestones`, a link that goes to the tab; NO confetti -- not on first sight, not on the transition to reached, nothing marked; the mark held in memory when storage throws |
 | `Tests/test_ritual_milestones.py` | `GET /api/ritual/milestones` over `Tests/fixtures/rituals/milestones.json`: gh's rows in and the route's out, `reached` by shape (open, every issue closed with GitHub open and closed, closed on GitHub with one open, empty open and closed -- never reached), due dates with and without, the bar the tracker's numbers; the `gh` argv with fields and no `&` or `?`; one read a minute and `?refresh=1` reading again; no space the active one, an ADO Space and tier below 1 a tracker reason with `gh` never asked, `gh` failing a reason and not kept, an unknown Space a 404 naming it, the hub unwritten; 404 off |
-| `web/src/modules/solitaireAgile/MilestonesPage.test.tsx`, `RitualPage.test.tsx` | the tab over the same table: the Stats card's order, each bar's value the tracker's closed over total, the due date where there is one, the state words; the award rule as a table (every milestone's state, marked and not -- an empty one never awarded); the award: the first reached with no mark opens its dialog with the title, the line and the picture, one burst INSIDE the dialog, closing it opening the next, then both `awarded` and marked, a new visit no dialog and no burst; leaving mid-award never shows that one again; another Space's milestone its own; reduced motion the dialog and no rain; no tracker, no milestones, the agent away; and the confetti's one caller -- no file but `AwardDialog.tsx` imports `Confetti.tsx`, none but it imports `react-confetti`. The strip: three tabs, each an address. Dialog queries are awaited with `hidden: true` (Fluent's focus manager marks nodes `aria-hidden` on a timer) |
+| `web/src/modules/solitaireAgile/MilestonesPage.test.tsx`, `RitualPage.test.tsx` | the tab over the same table: the Stats card's order, each bar's value the tracker's closed over total, the due date where there is one, the state words; the award rule as a table (every milestone's state, marked and not -- an empty one never awarded); the award: the first reached with no mark opens its dialog with the title, the line and the gold trophy by its accessible name (the only drawing in the box), one burst at the app's root and NOT inside the dialog, closing it opening the next, then both `awarded` and marked, a new visit no dialog and no burst; leaving mid-award never shows that one again; another Space's milestone its own; reduced motion the dialog and no rain; no tracker, no milestones, the agent away; and the confetti's one caller -- no file but `AwardDialog.tsx` imports `Confetti.tsx`, none but it imports `react-confetti`. The strip: three tabs, each an address. Dialog queries are awaited with `hidden: true` (Fluent's focus manager marks nodes `aria-hidden` on a timer) |
+| `web/src/shell/ConfettiProvider.test.tsx`, and `MilestonesPage.test.tsx`'s "one mount, one hook, one caller" | the root's burst: a throw draws one, a throw while it rains is absorbed, the next throw after it ends is a fresh burst, reduced motion draws nothing, and with no provider the hook is a no-op; the package imported by `shared/Confetti.tsx` alone, the wrapper mounted (as a lazy part) by `shell/ConfettiProvider.tsx` alone, the provider mounted once in `shell/main.tsx`, and `AwardDialog.tsx` the one file that calls `useConfetti()` |
 | `tkTestToolkit -Triage` | every case of `Tests/fixtures/rituals/triage.json` -- the groups in order, each group's counts, context and numbers, each issue's worker, size, who, severity and deep-water, the sizes -- and the text against `triage-<name>.txt` byte for byte, again after a JSON round trip; the who rule; `Tests/fixtures/parsers/assigned-lines.json` through `Get-P20CardAssigned`; off is no `Triage`, no `Route`, no `-Assign`, no bridge entry; `Triage` typed with `gh` stubbed (who: `me`, `@<login>`, `nobody`); **`Route` typed with `gh` stubbed as a function that writes down every call**: the exact `gh issue edit` argv for each switch, alone and all four in order, `-Assign me` (`--add-assignee @me`, and under `-WhatIf` printed and not made), `-Assign <size>` the `-Size` write byte for byte, `-WhatIf` writing nothing, the two moves printed, every refusal exit 2 with one `Error:` block and no write, the hub untouched; `-Assign` on a card -- the `**Assigned:**` line above `**Created:**`, LF and CRLF kept, no BOM, an unchanged card not written, the sizes from the repo, a local Space's card taking `-Assign me` alone, and its refusals (a size with no repository to read labels from among them) |
 | `tkTestToolkit -Rituals`, `Tests/test_rituals.py` -- the suggestion | who "me" is (the viewer's assignee `me` and a candidate, another's `@<login>` excluded `theirs`, no viewer every assignee theirs; the route asking `gh api user` once with the suggestion on, never with it off); `Tests/fixtures/suggestion/table.json` from both halves: every `nearest` row (the order and the nearest), every `rows` row (the candidates in order, the pick, its shape, sentence and command, each excluded ref with the first exclusion it met), every shape and every exclusion of the contract reached by a row, every `switch` row, and the three `briefs` cases end to end -- the joined fill, the suggestion attached, the candidates, the pick and `suggestion-<case>.brief.txt` byte for byte (with something waiting the Next line is the queue's; switched off it is today's), again after a JSON round trip; the card reader's milestone (whole), Created day, Tags and Assigned, and `Tests/fixtures/parsers/card-milestone.json` through both halves' readers; typed, `Standup -AsJson` carrying the rule's candidates with each line naming the prefixed command, the brief's Next line staying the queue's while walks wait, and `spaces.<slug>.features.suggestions=false` in the hub leaving no candidate; the agent's route carrying `suggestions` (the fields, the order, the line) and none with the Space's switch off |
 | `Tests/test_triage.py` | the agent's grouping, who and text over the same table and goldens, the goldens the regeneration script's; the route's `gh` calls (with `assignees`, then `gh api user`); a viewer `gh` cannot name; ADO and tier below 1 a `Tracker` line; 404 off |
@@ -1456,9 +1467,6 @@ repository", is the real write).
   rows (Gate 12, "StartWork -Launch"); the suite's launch half runs off Windows only.
 - **The bell and Home's tips do not suggest yet.** They are the suggestion's later surfaces, behind the
   same switch; the chair's line and [the PM Corner](#the-pm-corner-the-line-the-chevron-the-confetti) are the two built.
-- **The award's picture is a stand-in.** The award dialog shows the Team Agile wordmark where the drawn
-  picture -- the team lead lifting weights -- will go ([Milestones](#milestones-the-tab-and-the-award)); swapping it
-  is `AWARD_PICTURE` in `AwardDialog.tsx`.
 - **The Corner's milestones in reach are the suggestion's candidates.** A milestone whose every open item is
   in flight, waiting on you or someone else's has nothing to start, and the Corner moves on to the next
   milestone with something to start, or reads `no milestone in reach`.

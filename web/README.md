@@ -97,7 +97,8 @@ web/
     │   ├── App.tsx         theme, nav, the /env gate, Home's tabs, System's pager, the <Routes> table
     │   ├── SpaceAnchor.tsx the Space pill at the left of the nav, which IS the Home entry
     │   ├── SettingsDrawer.tsx  the one settings surface; the avatar in the nav bar opens it
-    │   ├── main.tsx        Provider + BrowserRouter + App
+    │   ├── main.tsx        Provider + BrowserRouter + ConfettiProvider + App
+    │   ├── ConfettiProvider.tsx  the app's one confetti mount: the burst over the viewport, a lazy part, thrown through useConfetti()
     │   ├── themeList.ts    the named themes, as plain data -- adding one is adding a record
     │   ├── theme.ts        a named theme made into a Fluent theme (the accent ramp), and the noise overlay
     │   ├── ThemePicker.tsx the first section of the settings drawer
@@ -140,7 +141,8 @@ web/
     │   ├── agenda.ts       the Agenda's words: the long day, the lane heading, each tile's one fact
     │   ├── TriagePage      one open issue at a time, unplaced first: milestone, severity, size; each answer one Route
     │   ├── MilestonesPage  one row per milestone, its bar the tracker's numbers; the award queue (award.ts)
-    │   ├── AwardDialog     the award -- congratulations, what it took, the picture -- and Confetti's one caller
+    │   ├── AwardDialog     the award -- congratulations, what it took, the trophy -- and useConfetti()'s one caller
+    │   ├── Trophy          the award's picture: a gold trophy, an inline SVG
     │   └── stage/          the played view: one lazy chunk with the deck engine
     │       ├── cast.tsx        the Remote Standup's atoms, by copy from the Wasteland (no bios); reduced motion stills them
     │       ├── seats.ts        the nine seats, the plates (role · persona (label)), the deal of workers onto seats
@@ -155,10 +157,10 @@ web/
     ├── shared/           reusable UI: PageCard, Pagination, FilterBadge, listRowStyles (the house list row), MarkdownViewer, ImageDropZone (one picture in: drop, paste, or a file; C2),
     │                     StatusMessage (a live region: role=status, role=alert for an error), StatTile (the one way a card counts), CardActions,
     │                     ConfirmDialog and CreateButton (one grammar for acting), ToolKitLogo over Wordmark (the SVG mark, its outlines in wordmarkPaths.ts),
-    │                     usePersistedState, faces, health,
+    │                     usePersistedState, faces, health, Confetti (the one wrapper over react-confetti; the root mounts it),
 │                     thinScrollbar (the one themed scrollbar -- spread it, never retype it), ...
     ├── hooks/            reusable logic: useWornTheme (and the store's useCurrentTheme), usePagination, useFacePref,
-    │                     chartPalette, useUserRefetch
+    │                     chartPalette, useUserRefetch, useConfetti (the one way to throw confetti)
     └── utility/          formatters: abbreviate, and dates -- the ONE place the clock is read
                           (Luxon: local day, days ago, next weekday, last month, due in words,
                           timeAgo, formatDate); never toISOString for a day -- a test greps for it

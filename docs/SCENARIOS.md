@@ -430,7 +430,7 @@ under Team Agile's one entry").
 | `GET /api/ritual/milestones` answers | The page shows |
 | --- | --- |
 | milestones, none reached and not yet awarded | one row each, in flight first: the title, its state (`open`, `awarded`, `no issues yet`), a bar of closed over total with `5 of 8 closed` under it, `due <day>` where there is one, `closed on the tracker` where GitHub closed it, and its GitHub link; no dialog, no confetti |
-| a reached milestone this browser has not awarded | the award dialog over the tab: `Congratulations: <title> reached!`, `12 issues closed, 1 October 2026 to 24 October 2026.`, the picture (the Team Agile wordmark, a stand-in), and confetti once inside it -- nothing rains under reduced motion. Close: the next one waiting, else the tab with it `awarded` |
+| a reached milestone this browser has not awarded | the award dialog over the tab: `Congratulations: <title> reached!`, `12 issues closed, 1 October 2026 to 24 October 2026.`, a gold trophy, and confetti once over the whole app -- nothing rains under reduced motion. Close: the next one waiting, else the tab with it `awarded` |
 | the same, a later visit (the browser's mark set) | the tab, the milestone `awarded`, no dialog, no confetti |
 | a milestone with no issues | `no issues yet`, open or closed on GitHub; never reached, never awarded |
 | no tracker (`tracker.ok` false) | `Could not read the milestones`, with the reason |
