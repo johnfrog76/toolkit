@@ -1078,6 +1078,19 @@ export const adoEndpoints = adoApi.injectEndpoints({
       invalidatesTags: ["Status", "Billing"],
     }),
 
+    // POST /api/cmd/Land -- the merge recorded, the issue closed, the card
+    // archived, by the CLI's Land verb, which asks the tracker whether the pull
+    // request merged. A refusal (not merged yet) comes back as the verb's own
+    // sentence.
+    landCard: builder.mutation<CommandResponse, { file: string }>({
+      query: ({ file }) => ({
+        url: "cmd/Land",
+        method: "POST",
+        body: { params: ["-Card", file] },
+      }),
+      invalidatesTags: ["Status", "Billing"],
+    }),
+
     // POST /api/cmd/Move -- a person's move to a lane, written as a line by the
     // CLI. Dropping a card on the board runs this; the board keeps no copy of
     // the answer, the refetch is what moves the card.
@@ -1334,6 +1347,7 @@ export const {
   useGetPrCommentDetailQuery,
   useSuggestReplyMutation,
   useRunCommandMutation,
+  useLandCardMutation,
   useArchivePromptMutation,
   useSetBillableMutation,
   usePlanCardMutation,

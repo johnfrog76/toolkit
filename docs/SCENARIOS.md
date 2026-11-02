@@ -140,6 +140,17 @@ The board's card and the list's row draw one action model (`cardActions.ts`), so
 | off, or not configured | the billable toggle, then **Plan milestone**, **Plan sprint** and **Tag** (on a card in play or planned) -- ending on **Tag**; no reminder item, and nothing of Organize is fetched |
 | on | the same, then **Remind me about this**: Organize's New Reminder dialog, the card's title as what and its id as the ref (`docs/modules/organize.md`, "The web UI") |
 
+### A card's menu, by its pull request (`scenarios.test.tsx`; the dialog is `useLandCard.test.tsx`)
+
+The same one action model, by the card's lane alone. The board's data is the files and asks no
+tracker, so nothing here knows whether the pull request merged: `Land` asks, and an unmerged pull
+request is its stated refusal, shown in the confirm.
+
+| The card | **Land** in its `...` |
+| --- | --- |
+| Code Review -- a GitHub pull request, an Azure DevOps one, or a person's `**Review:**` line | present, first of what you do with the card: it asks, then runs `Land` -- the merge recorded, the issue closed, the card archived -- or shows `Land`'s refusal (not merged yet, no pull request named) in the confirm |
+| any other lane | absent |
+
 ### The board's lanes, by a card's status (`scenarios.test.tsx`; the rule is `legalMoves.ts`)
 
 Five lanes on a local or GitHub Space, in this order, and **four on an Azure DevOps Space, which has

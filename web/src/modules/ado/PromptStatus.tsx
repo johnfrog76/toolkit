@@ -36,6 +36,7 @@ import { getProjectTag } from "./repoTags";
 import { TrackerBadge } from "./TrackerBadge";
 import { CoverThumb } from "./CardCover";
 import { cardPath } from "./paths";
+import { useLandCard } from "./useLandCard";
 import { useRemindAbout } from "./useRemindAbout";
 import { usePlanCard } from "./PlanCardDialog";
 import { STATUS } from "../../shell/consts";
@@ -105,6 +106,7 @@ export function PromptStatus({
   const [moveCard] = useMoveCardMutation();
   const billing = useBillableToggle();
   const remind = useRemindAbout();
+  const land = useLandCard();
   const plan = usePlanCard();
   const laneLabel = useLaneLabel();
   // What this row may do is the action model's answer, not this file's: the
@@ -314,6 +316,10 @@ export function PromptStatus({
             <StatusMessage status="success" onDismiss={remind.clearAdded}>
               {remind.added}
             </StatusMessage>
+          ) : land.landed ? (
+            <StatusMessage status="success" onDismiss={land.clearLanded}>
+              {land.landed}
+            </StatusMessage>
           ) : plan.done ? (
             <StatusMessage status="success" onDismiss={plan.clearDone}>
               {plan.done}
@@ -372,6 +378,7 @@ export function PromptStatus({
                   onToggleBillable={() => billing.toggle(p)}
                   onCreatePR={() => openDialog("pr")}
                   onRemind={() => remind.open(p)}
+                  onLand={() => land.open(p)}
                   onPlan={(kind) => plan.open(p, kind)}
                 />
               </div>
@@ -439,6 +446,7 @@ export function PromptStatus({
       </PageCard>
       <ActionDialog open={dialogState.open} onClose={closeDialog} tab={dialogState.tab} />
       {remind.dialog}
+      {land.dialog}
       {plan.dialog}
       <ConfirmDialog
         open={!!pending}

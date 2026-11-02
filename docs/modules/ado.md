@@ -153,7 +153,10 @@ Eleven of the twelve are in the table below; the twelfth is `LogPeerReview`, a g
 
 **Two ledgers.** The card is the engineer's record; ADO is the organisation's. `NewPR` posts to both.
 **Nothing reconciles them automatically**: `Archive` moves the file and does not touch ADO, so Done here
-is not Closed there -- run `CloseItem` too. [The CLI reference](../CLI.md#command-reference) has every
+is not Closed there -- run `CloseItem` too, or, once the pull request is merged, `Land`, which runs
+`CloseItem` and `Archive` as they are after recording the merge commit on the card. `Land` is not on the
+add-on's list: it asks whichever tracker the card's `PR URL:` names, and a card with no issue behind it
+still lands. [The CLI reference](../CLI.md#command-reference) has every
 switch.
 
 ## The routes
@@ -194,6 +197,10 @@ and `hub.json`), or the first `az` call that failed, as one sentence naming the 
   ADO link, so it hides every unlinked card and SAYS how many). The first two are ABSENT on a card with
   no work item, and on every card while ADO is off; *Create PR* is disabled, with the reason, until the
   card records a commit (`web/src/modules/ado/cardActions.ts`, [the web README](../../web/README.md#the-board)).
+  **Land** is on every Code Review card, on this board and on a GitHub one alike, and absent on every
+  other card: it asks first, then runs `Land` through `POST /api/cmd/Land`, and the verb asks the tracker
+  (`az repos pr show` here) whether the pull request merged -- the merge recorded, the work item closed,
+  the card archived. An unmerged pull request is `Land`'s stated refusal, its own sentence in the confirm.
 - **Design, on a GitHub Space** (Studio S2, D-S11) -- the fourth Home tab, after Issues,
   Board and Stats: the product repo's `design/` and `spec/` folders, read through the tracker
   (`GET /api/design`, `gh api repos/{owner}/{repo}/contents/...`), the note first and the spec beside
@@ -262,6 +269,10 @@ Four things, and only these ([the card](../hub/cards.md) is the whole model):
 | `## PR Review Comments`, one block per round | `GetPRComments` | the PR Comments card and page; not state |
 | `PR published: https://...`, directly under `PR URL:` | `PublishPR` | a record that the draft was published; not state, and nothing reads it but `PublishPR`, which does not write it twice |
 
+`Land` adds one more line, `- <hash> #<n> squash-merged to <base> <date>` under `Commits:`, on a card
+whose pull request is merged -- on either tracker, so it is the card's own record rather than this
+add-on's ([the card](../hub/cards.md), "The landed bullet").
+
 Take all four away and a card is still a card: that is the whole meaning of "plug-in".
 
 ## Tiers: what happens when ADO does not answer
@@ -299,7 +310,8 @@ reference](../CLI.md#errors), under "Not authenticated" and "Access denied".
 | `Tests/test_env_org_state.py` | "never asked" is not a failure |
 | `Tests/test_identity.py`, `test_env_probe.py` | who "me" is, with `az` stubbed; `/env` neither blocks on the probe nor repeats it |
 | `tkTestToolkit -PullRequest -CloseItem -PRComments` | the PR description parser, the transition rule and ADO's error messages, the actionable-thread filter; `-CloseItem` also holds the token helper on both PowerShells -- `az` failing with error text, or printing nothing, is a refusal and never a token |
-| `web`: `cliBridge.test.ts`, `homeView.test.ts` | the exact argv each dialog sends; which view of Home an org gets |
+| `tkTestToolkit -Land` (`Tests/Test-Land.ps1`) | `Land` typed with `gh`, `az` and the REST calls stubbed: a merged Azure DevOps pull request read through `az repos pr show`, the work item closed through `CloseItem`'s PATCH with a comment naming the commit, a re-run that asks first and posts nothing, an abandoned pull request refused; the GitHub path the same way |
+| `web`: `cliBridge.test.ts`, `homeView.test.ts`, `cardActions.test.ts`, `useLandCard.test.tsx` | the exact argv each dialog sends; which view of Home an org gets; Land on every Code Review card, and what it runs |
 | `VERIFY.md` | the verbs that cannot be automated, because they need a real board -- the manual runbook |
 
 **No suite calls Azure DevOps.** `az` is stubbed or absent in every one, by design: a signed-in machine
