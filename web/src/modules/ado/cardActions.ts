@@ -2,14 +2,17 @@ import {
   AirplaneLandingRegular,
   AlertRegular,
   ArrowUploadRegular,
+  CalendarLtrRegular,
+  FlagRegular,
   MoneyRegular,
+  TagRegular,
 } from "@fluentui/react-icons";
 import { ROW, defineRowMoves } from "../../shared/CardActions";
 import type { RowMove } from "../../shared/CardActions";
 import { STATUS } from "../../shell/consts";
 import { trackerName } from "./TrackerBadge";
 import type { PromptInfo } from "./api.ado";
-import { LANES, legalMoves, whyNotAMove } from "./legalMoves";
+import { lanesFor, legalMoves, whyNotAMove } from "./legalMoves";
 import type { Lane } from "./legalMoves";
 
 // What a PERSON may do to a card -- every action, in every view. One pure
@@ -63,8 +66,24 @@ import type { Lane } from "./legalMoves";
 // agent does not send it; then a card past Active is given the benefit of the
 // doubt rather than a reason that may be false.
 
+// Plan milestone, Plan sprint and Tag, decided here: a form over the CLI's Plan and
+// Tag verbs (POST /api/cmd/Plan, /api/cmd/Tag), each one line of the card
+// (docs/hub/cards.md, "Milestone and sprint: two lines"). Present on every card in
+// play or planned -- the verbs find a card in current/ and backlog/ -- and absent on
+// a Done card, which the verbs do not look for: planning is forward. Nothing here
+// writes the tracker; a GitHub milestone is Route's, an Azure DevOps one EditItem's.
+
 export type CardActionId =
-  "open-ado" | "open-card" | "move" | "land" | "billable" | "create-pr" | "remind";
+  | "open-ado"
+  | "open-card"
+  | "move"
+  | "land"
+  | "billable"
+  | "create-pr"
+  | "milestone"
+  | "sprint"
+  | "tags"
+  | "remind";
 
 /** A card's own moves -- on no other record. Everything else on its menu is the
  *  shared vocabulary (shared/CardActions ROW): Open the card, Move to <lane>,
@@ -74,6 +93,17 @@ export const CARD_MOVES = defineRowMoves("card", {
   createPr: { word: "Create PR", icon: ArrowUploadRegular },
   markNotBillable: { word: "Mark not billable", icon: MoneyRegular },
   makeBillable: { word: "Make billable again", icon: MoneyRegular },
+  planMilestone: {
+    word: "Plan milestone",
+    icon: FlagRegular,
+    tooltip: "Set or clear the card's milestone line",
+  },
+  planSprint: {
+    word: "Plan sprint",
+    icon: CalendarLtrRegular,
+    tooltip: "Set or clear the card's sprint line",
+  },
+  tag: { word: "Tag", icon: TagRegular, tooltip: "Add or take off the card's tags" },
   remind: { word: "Remind me about this", icon: AlertRegular },
 });
 
@@ -152,7 +182,7 @@ export function whyNotCreatePR(card: ActionCard, ctx: CardActionContext): string
 export function cardActions(card: ActionCard, ctx: CardActionContext): CardActionPlan {
   const label = ctx.laneLabel ?? ((s: string) => s);
   const ado = ctx.adoEnabled && card.linked && !!card.ado_url;
-  const moves = legalMoves(card.status);
+  const moves = legalMoves(card.status, ctx.tracker);
 
   // Done is the archive: its lane is the archive move, in the vocabulary's
   // word, with the org's name for the lane after it.
@@ -160,11 +190,13 @@ export function cardActions(card: ActionCard, ctx: CardActionContext): CardActio
     to === STATUS.done
       ? spec("move", ROW.archive, { to, detail: `(move to ${label(to)})`, ...rest })
       : spec("move", ROW.move, { to, detail: label(to), ...rest });
-  const lanes: CardActionSpec[] = LANES.filter((to) => to !== card.status).map((to) =>
-    moves.includes(to)
-      ? lane(to)
-      : lane(to, { disabled: true, whyNot: whyNotAMove(card.status, to) }),
-  );
+  const lanes: CardActionSpec[] = lanesFor(ctx.tracker)
+    .filter((to) => to !== card.status)
+    .map((to) =>
+      moves.includes(to)
+        ? lane(to)
+        : lane(to, { disabled: true, whyNot: whyNotAMove(card.status, to) }),
+    );
 
   const secondary: CardActionSpec[] = [...lanes];
 
@@ -178,6 +210,11 @@ export function cardActions(card: ActionCard, ctx: CardActionContext): CardActio
     );
   }
   secondary.push(spec("billable", billableMove(card)));
+  if (card.status !== STATUS.done) {
+    secondary.push(spec("milestone", CARD_MOVES.planMilestone));
+    secondary.push(spec("sprint", CARD_MOVES.planSprint));
+    secondary.push(spec("tags", CARD_MOVES.tag));
+  }
   if (ctx.organize) secondary.push(spec("remind", CARD_MOVES.remind));
   // The lanes are one group, what you do WITH the card is the other.
   if (lanes.length > 0 && secondary.length > lanes.length) {

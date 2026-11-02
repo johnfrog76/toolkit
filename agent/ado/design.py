@@ -513,23 +513,29 @@ def design_state(note: str | None, spec: str | None, note_text: str = "", spec_t
     """
     s_design, s_spec, s_complete, s_archived = design_states()
     state, mismatch = s_design, False
+    spec_dropped = False
     if spec == ARCHIVE:
         state = s_complete
         mismatch = note == LIVE
+        # A spec archived with the dropped outcome was never built: Archived, not Complete.
+        if _stamp(spec_text, stamp_outcome()).lower() == design_outcomes()[1]:
+            state, spec_dropped = s_archived, True
     elif spec == LIVE:
         state = s_spec
         mismatch = note == ARCHIVE
     elif note == ARCHIVE:
         state = s_archived
     outcome = ""
-    if state == s_archived:
+    if spec_dropped:
+        outcome = design_outcomes()[1]
+    elif state == s_archived:
         word = _stamp(note_text, stamp_outcome()).lower()
         outcome = word if word in design_outcomes() else ""
     closed = ""
     if state == s_complete:
         closed = _stamp(spec_text, stamp_closed())
     elif state == s_archived:
-        closed = _stamp(note_text, stamp_closed())
+        closed = _stamp(spec_text if spec_dropped else note_text, stamp_closed())
     m = re.match(r"^\d{4}-\d{2}-\d{2}", closed)
     return {"state": state, "outcome": outcome, "mismatch": mismatch, "closed": m.group(0) if m else ""}
 

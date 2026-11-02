@@ -8,6 +8,10 @@
     the line goes, and one to what bytes the card is written with:
 
       - the line already exists  -> its value is replaced, in place
+      - it does not, and -InsertAfter names a line the card has
+                                 -> it is inserted directly BELOW the first such
+                                    line (Tag puts `Tags:` under `Priority:`, in
+                                    `## Work Item Info`, where every template has it)
       - it does not              -> it is inserted directly ABOVE `**Created:**`,
                                     so Created / Closed stay the last two lines
                                     every reader of the footer expects
@@ -34,7 +38,10 @@ function Set-P20CardLine {
         # The label exactly as the card carries it, e.g. '**Billable:**'.
         [Parameter(Mandatory = $true)][string]$Stamp,
         [string]$Value,
-        [switch]$Remove
+        [switch]$Remove,
+        # Where a NEW line goes when the card has none: below the first line matching
+        # one of these patterns, tried in order; else the footer rule above.
+        [string[]]$InsertAfter = @()
     )
 
     $raw = [System.IO.File]::ReadAllText($Path)
@@ -60,12 +67,22 @@ function Set-P20CardLine {
             $lines[$at] = $wanted
         }
         else {
+            $afterAt = -1
+            foreach ($rx in @($InsertAfter)) {
+                for ($i = 0; $i -lt $lines.Count; $i++) {
+                    if ($lines[$i] -match $rx) { $afterAt = $i; break }
+                }
+                if ($afterAt -ge 0) { break }
+            }
             $createdRx = '^' + [regex]::Escape((Get-P20Consts).stamps.created)
             $createdAt = -1
             for ($i = 0; $i -lt $lines.Count; $i++) {
                 if ($lines[$i] -match $createdRx) { $createdAt = $i; break }
             }
-            if ($createdAt -ge 0) {
+            if ($afterAt -ge 0) {
+                $lines.Insert($afterAt + 1, $wanted)
+            }
+            elseif ($createdAt -ge 0) {
                 $lines.Insert($createdAt, $wanted)
             }
             else {

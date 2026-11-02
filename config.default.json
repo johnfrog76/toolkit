@@ -233,15 +233,31 @@
     },
     "Plan": {
       "category": "prompt",
-      "description": "Plan a card into a sprint or milestone",
-      "usage": "{cliPrefix}Plan <id|file> -Milestone <title> [-Help] | {cliPrefix}Plan <id|file> -Remove [-Help]",
+      "description": "Plan a card into a milestone, a sprint, or both",
+      "usage": "{cliPrefix}Plan <id|file> [-Milestone <title>] [-Sprint <title>] [-Help] | {cliPrefix}Plan <id|file> -Remove [-Only Milestone|Sprint] [-Help]",
       "examples": [
         "{cliPrefix}Plan K7M2 -Milestone \"M2 -- 1.2.0\"",
+        "{cliPrefix}Plan K7M2 -Sprint \"Sprint 9\"",
+        "{cliPrefix}Plan K7M2 -Remove -Only Sprint",
         "{cliPrefix}Plan K7M2 -Remove"
       ],
       "notes": [
-        "Writes the card's **Sprint:** footer line, through Set-P20CardLine -- never a tracker call. The different, tracker-bound -Sprint on NewItem / EditItem sets a milestone on the work item itself, through gh / az; this verb touches nothing but the file. The title is written WHOLE, never truncated -- a card's own tile shortens it for display.",
-        "Found in current/ or backlog/, and never pulled into play: a backlog card is planned into a milestone before it is ever pulled into play, which is the point of planning one. Sprints are opt-in at every grain -- no verb here ever requires a card to carry one."
+        "Writes the card's **Milestone:** and **Sprint:** footer lines, each its own, through Set-P20CardLine -- never a tracker call. The different, tracker-bound -Sprint on NewItem / EditItem sets a milestone on the work item itself, through gh / az; this verb touches nothing but the file. Titles are written WHOLE, never truncated -- a card's own tile shortens them for display.",
+        "A card with no **Milestone:** line reads its milestone from its **Sprint:** line, as every card did before the two were separate. -Sprint on such a card first writes a **Milestone:** line keeping what it read, so setting a sprint never moves a card out of a milestone. -Remove takes the card out of both; -Remove -Only Milestone or -Only Sprint out of one, keeping the other.",
+        "Found in current/ or backlog/, and never pulled into play: a backlog card is planned into a milestone before it is ever pulled into play, which is the point of planning one. Sprints and milestones are opt-in at every grain -- no verb here ever requires a card to carry one."
+      ]
+    },
+    "Tag": {
+      "category": "prompt",
+      "description": "Tag a card, or take a tag off it",
+      "usage": "{cliPrefix}Tag <id|file> <tag>[,<tag>] [-Remove] [-Help]",
+      "examples": [
+        "{cliPrefix}Tag K7M2 docs,sev3",
+        "{cliPrefix}Tag K7M2 sev3 -Remove"
+      ],
+      "notes": [
+        "Writes the card's Tags: line under ## Work Item Info, through Set-P20CardLine -- never a tracker call (a label on a GitHub issue is Route's write). Tags are added after the ones already there, joined by a comma; one the card already carries, in any case, is not added twice; the last one off leaves the template's Tags: (None). A call that changes no tag writes nothing.",
+        "Found in current/ or backlog/, like Plan. The suggestion reads a card's severity and size from this line, and the board filters by it."
       ]
     },
     "GetPRComments": {

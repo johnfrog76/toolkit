@@ -2,8 +2,10 @@ import {
   UNTYPED,
   filterPrompts,
   linkRowOf,
+  milestonesOf,
   showLinkRow,
   sprintsOf,
+  tagsOf,
   typeRowOf,
 } from "./promptFilters";
 import type { PromptInfo } from "./api.ado";
@@ -214,5 +216,52 @@ describe("the linkedness filter", () => {
     ["every card linked, Linked still active", linked, "Linked", true],
   ])("draws the row for %s: %#", (_label, prompts, active, shown) => {
     expect(showLinkRow(prompts, active)).toBe(shown);
+  });
+});
+
+describe("the milestone and tag filters", () => {
+  // The board's two new dropdowns read the card model's `milestone` (whole: its own
+  // line, else an old card's sprint line) and `tags` (docs/hub/cards.md).
+  const planned = [
+    card({
+      file: "a.prompt.md",
+      milestone: "M2 -- 1.2.0",
+      sprint: "Sprint 9",
+      tags: ["docs", "sev3"],
+    }),
+    card({ file: "b.prompt.md", milestone: "M3 -- 1.3.0", sprint: "Sprint 9", tags: ["Docs"] }),
+    card({ file: "c.prompt.md", milestone: "", tags: [] }),
+    // An older agent sends neither field.
+    card({ file: "d.prompt.md" }),
+  ];
+  const all = { activeRepo: null, status: "All", text: "" };
+
+  it("lists the milestones the cards name, whole, none for a card with none", () => {
+    expect(milestonesOf(planned)).toEqual(["M2 -- 1.2.0", "M3 -- 1.3.0"]);
+  });
+
+  it("lists each tag once, whatever case a card spells it in", () => {
+    expect(tagsOf(planned)).toEqual(["docs", "sev3"]);
+  });
+
+  it("filters by milestone, and All shows every card", () => {
+    const f = (milestone: string) =>
+      filterPrompts(planned, { ...all, milestone }).map((p) => p.file);
+    expect(f("M2 -- 1.2.0")).toEqual(["a.prompt.md"]);
+    expect(f("All")).toEqual(["a.prompt.md", "b.prompt.md", "c.prompt.md", "d.prompt.md"]);
+  });
+
+  it("filters by tag ignoring case", () => {
+    const f = (tag: string) => filterPrompts(planned, { ...all, tag }).map((p) => p.file);
+    expect(f("docs")).toEqual(["a.prompt.md", "b.prompt.md"]);
+    expect(f("SEV3")).toEqual(["a.prompt.md"]);
+  });
+
+  it("composes with the sprint filter: a card in a sprint AND a milestone", () => {
+    expect(
+      filterPrompts(planned, { ...all, sprint: "Sprint 9", milestone: "M3 -- 1.3.0" }).map(
+        (p) => p.file,
+      ),
+    ).toEqual(["b.prompt.md"]);
   });
 });

@@ -206,6 +206,22 @@ def stamp_from() -> str:
     return consts()["stamps"]["from"]
 
 
+def stamp_milestone() -> str:
+    """``**Milestone:**`` -- the milestone a card is planned into. Plan -Milestone writes it."""
+    return consts()["stamps"]["milestone"]
+
+
+def stamp_sprint() -> str:
+    """``**Sprint:**`` -- the sprint a card is in, and for a card with no milestone line (every
+    card written before the two were separate) its milestone too. Plan -Sprint writes it."""
+    return consts()["stamps"]["sprint"]
+
+
+def token_tags() -> str:
+    """``Tags:`` -- the card's tags line under ``## Work Item Info``. Tag writes it."""
+    return consts()["tokens"]["tags"]
+
+
 def card_id_shape() -> str:
     """The shape of a card's id, WITHOUT anchors: a work item number, or the
     four-character id of a card with no work item. A string, not a pattern --

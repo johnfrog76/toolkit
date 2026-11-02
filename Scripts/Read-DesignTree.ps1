@@ -143,9 +143,13 @@ function Resolve-P20DesignState {
 
     $state = $states[0]
     $mismatch = $false
+    $specDropped = $false
     if ($Spec -eq 'archive') {
         $state = $states[2]
         if ($Note -eq 'live') { $mismatch = $true }
+        # A spec archived with the dropped outcome was never built: Archived, not Complete.
+        $specWord = (Get-P20StampValue -Text $SpecText -Stamp $outcomeStamp).ToLowerInvariant()
+        if ($specWord -eq [string]$outcomes[1]) { $state = $states[3]; $specDropped = $true }
     }
     elseif ($Spec -eq 'live') {
         $state = $states[1]
@@ -156,7 +160,8 @@ function Resolve-P20DesignState {
     }
 
     $outcome = ''
-    if ($state -eq $states[3]) {
+    if ($specDropped) { $outcome = [string]$outcomes[1] }
+    elseif ($state -eq $states[3]) {
         $word = (Get-P20StampValue -Text $NoteText -Stamp $outcomeStamp).ToLowerInvariant()
         if ($outcomes -contains $word) { $outcome = $word }
     }
@@ -166,7 +171,10 @@ function Resolve-P20DesignState {
     # its spec is still a Spec, and a Spec has no Closed date.
     $closed = ''
     if ($state -eq $states[2]) { $closed = Get-P20StampValue -Text $SpecText -Stamp $closedStamp }
-    elseif ($state -eq $states[3]) { $closed = Get-P20StampValue -Text $NoteText -Stamp $closedStamp }
+    elseif ($state -eq $states[3]) {
+        if ($specDropped) { $closed = Get-P20StampValue -Text $SpecText -Stamp $closedStamp }
+        else { $closed = Get-P20StampValue -Text $NoteText -Stamp $closedStamp }
+    }
     if ($closed) {
         $m = [regex]::Match($closed, '^\d{4}-\d{2}-\d{2}')
         if ($m.Success) { $closed = $m.Value } else { $closed = '' }

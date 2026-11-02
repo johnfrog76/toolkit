@@ -66,6 +66,12 @@
       "expected": { "state": "Complete", "outcome": null, "mismatch": false, "closed": "2026-11-20" }
     },
     {
+      "name": "a spec dropped: both archived, the spec carries the dropped outcome, so it reads Archived, not Complete",
+      "note": "archive", "spec": "archive",
+      "noteLines": ["**Closed:** 2026-11-20", "**Outcome:** dropped"], "specLines": ["**Closed:** 2026-11-20", "**Outcome:** dropped"],
+      "expected": { "state": "Archived", "outcome": "dropped", "mismatch": false, "closed": "2026-11-20" }
+    },
+    {
       "name": "an outcome word outside the contract's two reads as none",
       "note": "archive", "spec": null,
       "noteLines": ["**Closed:** 2026-11-20", "**Outcome:** maybe"], "specLines": [],

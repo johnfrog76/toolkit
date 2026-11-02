@@ -62,6 +62,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `Move` | `Move` (typed) | neither |
 | `Billable` | `Billable` (typed) | neither |
 | `Plan` | `Plan` (typed) | neither |
+| `Tag` | `Tag` (typed) | neither |
 | `Cover` | `Cover` (typed) | 12 (the reader's paths on Windows and 5.1, and a picture on the board) |
 | `NewPrompt` | `NewPrompt` (`-Title` offline form; `-Design` and `-From` typed in a fresh shell) | 6 (the ADO form); 12 (`-Design` and its chip on Windows) |
 | `NewItem` | `EditItem` (typed, `-FromCard` only, with `gh` stubbed); `Tests/test_studio.py` (typed, `-FromDesign` only) | 6; 12 (`-FromCard` against the GitHub demo) |
@@ -288,7 +289,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **48 suites, 8617 assertions** with a `config.local.json`, every one
+findings. On this commit that is **48 suites, 8627 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -978,6 +979,23 @@ the same commit (AGENTS.md, "A fix its own host cannot confirm leaves its check 
 names the command, what you should see, and the issue it closes. A row stays until a verification run confirms
 it and records that on the issue. Then the row moves into the gate it belongs to, or goes if a suite
 now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on the verifying host: it prints each `verify-close` issue with the row below that names it, by issue number.
+
+- [ ] **`npm ci` asks nothing about install scripts on Windows.** On the Windows PC, in `web/`, `git diff package.json`
+  first: a local `allowScripts` edit from approving `@parcel/watcher` or `unrs-resolver` by hand is thrown away with
+  `git checkout -- package.json` before the pull. Then delete `node_modules`, run `npm ci`, and you should see no
+  `npm warn install-scripts` lines. `npm install-scripts ls` prints `No packages with unreviewed install scripts.`,
+  `git status` is clean, and `npm test` and `npm run lint` are green with the web line `docs/TESTING.md` states.
+  Closes nothing on its own: #190 closes at merge. The Windows CI job runs the same `npm ci` (no install-scripts
+  warning) and the browser smoke, but not `npm test` or the lint -- those two are this row's.
+
+- [x] **The web UI's Node floor holds on Windows.** On the Windows PC, `node --version` in a fresh shell. Below
+  24.22.0, `cd web; npm ci` prints `npm warn EBADENGINE` naming `required: { node: '>=24.22.0' }`; then
+  `nvm install 24` and `nvm use` with the version it installed, and `npm ci; npm test` on 24.22.0 or later: no
+  `EBADENGINE`, and the web line matches `docs/TESTING.md`'s. Record the version in `docs/QUICKSTART.md`'s Node
+  row. Follows #182, which closes at merge: the Mac proved the floor.
+  CONFIRMED on Windows: `node -v` read 24.22.0, and a full `npm test` ran with no `SIGSEGV` and no "failed to
+  run": 1775 of 1776 passed, the one failure a `findBy*` timeout at `MilestonesPage.test.tsx:211` (#192, which
+  raises the wait); run alone, both MilestonesPage suites passed, 28/28 (20 + 8).
 
 - [x] **A save from the browser keeps a session's line endings.** In a scratch hub with
   `communication` on, `NewMeeting -Date 2026-10-20` from a fresh shell writes an LF session. Make the hub a git

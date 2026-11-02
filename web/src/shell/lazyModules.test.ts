@@ -50,4 +50,68 @@ describe("a lazily loaded module's descriptor imports no component statically", 
       ),
     ).toEqual(["A", "D", "paths"]);
   });
+
+  it("the rule reads what it thinks it reads, across folders", () => {
+    expect(
+      staticImportsOf(
+        'import { A } from "../studio/A";\nimport type { B } from "../studio/B";\nconst C = lazyPart(() => import("../studio/C"));\nimport { n } from "../studio/paths";',
+      ),
+    ).toEqual(["../studio/A", "../studio/paths"]);
+  });
+});
+
+/**
+ * The other half of the same rule: a descriptor importing nothing is not
+ * enough if a file that DOES load with the app imports a module's component or
+ * API statically. The Design tab (ado, always mounted) once imported the
+ * Studio's MoveDesignDialog, which pulled the dialog and api.studio.ts into the
+ * first load. A file outside a lazy module may import from it only its paths
+ * file, or types (erased at build); anything else comes through `lazyPart`.
+ */
+function staticImportsOf(source: string): string[] {
+  const found: string[] = [];
+  const re = /^(?:import|export)\s+(?!type\b)[^;]*?\bfrom\s+"([^"]+)"/gm;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(source))) found.push(m[1]);
+  return found;
+}
+
+function sourceFiles(dir: string): string[] {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) return sourceFiles(full);
+    return /\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name) ? [full] : [];
+  });
+}
+
+// The Studio is core: every other module is reached from the registry and, for
+// growth and the deck, from the landing page's own entry or a sibling's stage,
+// by design. The Studio's code is reached only through its own descriptor.
+const CHECKED_ACROSS_FOLDERS = ["studio"];
+
+describe("nothing that loads with the app imports a lazy module's code statically", () => {
+  const src = path.join(__dirname, "..");
+  const files = sourceFiles(src);
+  for (const id of CHECKED_ACROSS_FOLDERS) {
+    it(`${id}`, () => {
+      const offenders: string[] = [];
+      for (const file of files) {
+        const rel = path.relative(src, file);
+        if (rel.startsWith(path.join("modules", id) + path.sep)) continue;
+        for (const spec of staticImportsOf(fs.readFileSync(file, "utf8"))) {
+          const target = path.normalize(path.join(path.dirname(file), spec));
+          const inside = path.relative(path.join(src, "modules", id), target);
+          if (
+            spec.startsWith(".") &&
+            !inside.startsWith("..") &&
+            inside !== "" &&
+            !OWN_FOLDER_ALLOWED.has(inside)
+          ) {
+            offenders.push(`${rel} imports ${spec}`);
+          }
+        }
+      }
+      expect(offenders).toEqual([]);
+    });
+  }
 });

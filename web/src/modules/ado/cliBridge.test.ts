@@ -7,6 +7,8 @@ import {
   buildNewCardParams,
   buildBillableParams,
   buildMoveParams,
+  buildPlanParams,
+  buildTagParams,
   buildMeetingAgendaParams,
   buildGrowthCloseParams,
   buildGrowthCompleteParams,
@@ -448,6 +450,74 @@ describe("buildNewCardParams", () => {
     expect(
       buildNewCardParams({ title: "T", type: "Task", description: "Line one.\nLine two." }),
     ).toEqual(["-Title", "T", "-Type", "Task", "-Description", "Line one.\nLine two."]);
+  });
+});
+
+describe("buildPlanParams", () => {
+  // Scripts/Plan-Card.ps1: -Card the filename; -Milestone / -Sprint a title, whole;
+  // -Remove -Only Milestone|Sprint takes the card out of ONE line. The row menu edits
+  // one line at a time, so it never sends the bare -Remove, which clears both.
+  const file = "Spike-K7M2-wallet-ticket.prompt.md";
+
+  it("writes the milestone line, the title whole and trimmed, as one argv element", () => {
+    expect(
+      buildPlanParams({
+        file,
+        line: "milestone",
+        title: "  M2 -- 1.2.0, the standup sees the work ",
+      }),
+    ).toEqual(["-Card", file, "-Milestone", "M2 -- 1.2.0, the standup sees the work"]);
+  });
+
+  it("writes the sprint line with -Sprint", () => {
+    expect(buildPlanParams({ file, line: "sprint", title: "RecipesApp\\Sprint 2" })).toEqual([
+      "-Card",
+      file,
+      "-Sprint",
+      "RecipesApp\\Sprint 2",
+    ]);
+  });
+
+  it("clears one line with -Remove -Only, never the bare -Remove", () => {
+    expect(buildPlanParams({ file, line: "milestone", remove: true })).toEqual([
+      "-Card",
+      file,
+      "-Remove",
+      "-Only",
+      "Milestone",
+    ]);
+    expect(buildPlanParams({ file, line: "sprint", remove: true })).toEqual([
+      "-Card",
+      file,
+      "-Remove",
+      "-Only",
+      "Sprint",
+    ]);
+  });
+});
+
+describe("buildTagParams", () => {
+  // Scripts/Set-CardTags.ps1: -Card the filename, -Tags ONE element joined by commas
+  // (the verb splits on them, as the line's reader does), -Remove to take them off.
+  const file = "Spike-K7M2-wallet-ticket.prompt.md";
+
+  it("joins the tags with commas, each trimmed, the empty ones dropped", () => {
+    expect(buildTagParams({ file, tags: [" docs", "", "sev3 "] })).toEqual([
+      "-Card",
+      file,
+      "-Tags",
+      "docs,sev3",
+    ]);
+  });
+
+  it("adds -Remove to take them off", () => {
+    expect(buildTagParams({ file, tags: ["sev3"], remove: true })).toEqual([
+      "-Card",
+      file,
+      "-Tags",
+      "sev3",
+      "-Remove",
+    ]);
   });
 });
 

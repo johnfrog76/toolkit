@@ -41,6 +41,9 @@ export const STAMPS = consts.stamps as {
   assigned: string;
   /** The meeting record an agenda line came from: `**From:** <series>-YYYY-MM-DD` (NewPrompt -From). */
   from: string;
+  /** A card's two planning lines, each its own: `**Milestone:**` (Plan -Milestone) and `**Sprint:**` (Plan -Sprint). */
+  milestone: string;
+  sprint: string;
   /** A person's In Progress and Code Review -- for a card with nothing checked in, or no pull request. */
   started: string;
   review: string;
@@ -85,6 +88,8 @@ export const TOKENS = consts.tokens as {
   /** The line a card carries naming its design, and the corpus's hand-written form. */
   design: string;
   spec: string;
+  /** The card's `Tags:` line, which Tag writes. */
+  tags: string;
 };
 
 /** The folders a card lives in -- in play, done, planned -- and the Space's folder for its pictures. */

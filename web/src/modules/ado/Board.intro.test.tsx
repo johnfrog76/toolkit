@@ -60,7 +60,8 @@ describe("the board's intro", () => {
   it("on an Azure DevOps Space ends with the Focus tab's Make a card", () => {
     tracker = "ado";
     const text = intro();
-    expect(text).toContain(OPENING);
+    // Four lanes, no Backlog: the first lane the Space has is Active.
+    expect(text).toContain(OPENING.replace("Backlog", "Active"));
     expect(text).toContain(
       "to archive it. A work item gets a card from the Focus tab: Make a card.",
     );

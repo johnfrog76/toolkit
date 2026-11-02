@@ -10,6 +10,10 @@ release.
 
 ### Added
 
+- A card can be in a milestone and a sprint at once: `Plan <id> -Milestone <title>` now writes its own `**Milestone:**` line and the new `Plan <id> -Sprint <title>` writes `**Sprint:**`, each leaving the other as it was. A card written before keeps the milestone its `**Sprint:**` line named -- except a card from Azure DevOps, whose `**Sprint:**` line is the board's iteration path and is never read as a milestone. `Plan -Remove` still takes the card out of both; `-Remove -Only Milestone` or `-Only Sprint` takes it out of one.
+- The new `Tag <id> <tag>[,<tag>] [-Remove]` adds tags to a card's `Tags:` line, or takes them off; a tag the card already carries is not added twice, and a call that changes nothing writes nothing.
+- A card's row menu, on the list and the board, offers **Plan milestone**, **Plan sprint** and **Tag**, and the board filters by milestone and by tag beside its sprint filter.
+- A design that has reached a spec can now be dropped: `MoveDesign <id> -To Archive -Dropped -Reason <text>` archives the spec and its note together, stamps both as dropped, and the Design tab lists it under Archived with its reason (and offers **Archive as dropped** on a design with a live spec). Without `-Dropped`, a live spec still has to be completed.
 - `Land <id>` ends a card once its pull request is merged: it records the merge commit on the card (`- <hash> #<n> squash-merged to main <date>`), closes the issue or work item behind it with a comment naming the commit, and archives the card. An open or unmerged pull request is refused with nothing written, a step already done is skipped so running it again is safe, and `-WhatIf` shows the three writes without making them. On the board and the list, every Code Review card offers **Land**; if its pull request has not merged yet, the confirm says so and nothing changes.
 - `NewPrompt -Title ... -From <meeting>` makes a card from an agenda line and records the meeting it came from in a `**From:**` line -- the record's name, such as `2026-10-28` for the 1:1 or `client-weekly-2026-10-28` for a series; a meeting record that does not exist writes no card.
 - A deck in the Decks card now opens a page of its own, showing its summary, state, tags, slide count, running time and where its file lives, with **Play** to present it. The page's **Archive** puts the deck away on this machine only (the `deck.archived` setting): it leaves the Decks list for an **archived** filter, and the deck itself is not changed.
@@ -23,12 +27,17 @@ release.
 
 ### Changed
 
+- On an Azure DevOps Space the board now draws four lanes, with no Backlog lane, and `NewPrompt` writes a new card straight to `current/` so it is in play when it is made; the board's footer names the first lane the Space has. A local or GitHub Space keeps its five lanes and its backlog. A card already in the backlog on an Azure DevOps Space is drawn in Active, so nothing goes missing.
 - **Create PR** from the browser now works from the card's own code checkout when one is on this machine (a clone of the board's GitHub repository at `<wsRoot>/<repo>` or a nav shortcut's path): the repository comes from that checkout, a card with no `## Branch` uses the checkout's branch when it is the card's, and a branch that was never pushed is refused with the exact `git push` to run in that checkout. With no checkout found, it reads the card as before.
 - Completing a hub-kept design (`MoveDesign -Hub -Space`) also finds the Space's repository at `<wsRoot>/<repo>`.
 - Every list's row menu now uses one vocabulary: the same move has the same word, icon and tooltip on every page, and the link out is always last, reading "Open on GitHub" or "Open on Azure DevOps" behind one icon. A goal's Retire, a reminder's Done and a card's Move to Done now read Archive, a design's two archives read Archive as shipped and Archive as dropped, a card's exposed action opens the card, and Remove cover reads Delete the cover.
 
 ### Fixed
 
+- `npm ci` in `web/` no longer asks about install scripts: the decision for each dependency that has one is recorded in `web/package.json`, so approving one locally no longer leaves a change in your working tree. If you approved `@parcel/watcher` or `unrs-resolver` yourself, discard that edit to `web/package.json` before you pull.
+- A full `npm test` in `web/` on a busy machine no longer fails a test because a dialog took more than a second to appear; the web tests now wait up to 5 seconds for an element.
+- The web half's Markdown lint now runs on `re2js` 2.8.7, which fixes a regular-expression denial of service in 2.8.6.
+- The web UI's tests no longer fail now and then with `Test suite failed to run` while every test passes: `web/package.json` now asks for Node 24.22.0 or later, and `npm ci` on an older Node warns. Run `nvm install 24 && nvm alias default 24` to move up.
 - The Reference field in the New Reminder dialog is now as wide as the other fields, instead of sharing a half-width row with Source.
 - The Edit Reminder dialog's Source and Reference fields are full width too, like the New Reminder dialog's, and the fields in both reminder dialogs are the same size as the rest of the app's.
 - `Move`, `Plan`, `Billable`, `Cover` and `Archive` given the full file path of a card in your hub now work on that card in whichever Space it belongs to, instead of refusing with "No card matching" when a different Space is active.

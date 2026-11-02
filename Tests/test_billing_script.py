@@ -73,8 +73,10 @@ def _scratch_package(root: Path, local_config: dict) -> Path:
         "Resolve-CardName.ps1",
         "ConvertTo-LocalDay.ps1",
         "Write-ConfigParseWarning.ps1",
-        # The one reader of **Billable:**, shared with the standup.
+        # The one reader of **Billable:**, shared with the standup -- and the
+        # tracker rule it dot-sources for a card's milestone (#187).
         "Get-PromptFileStatus.ps1",
+        "Resolve-Tracker.ps1",
     ):
         shutil.copy(REPO / "Scripts" / name, root / "Scripts" / name)
     shutil.copy(REPO / "consts.json", root / "consts.json")

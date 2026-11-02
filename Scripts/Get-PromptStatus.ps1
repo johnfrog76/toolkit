@@ -289,11 +289,8 @@ foreach ($file in $files) {
         $progress = '--'
     }
 
-    # ADO Link from footer
-    $adoUrl = ''
-    if ($content -match '(?m)^\*\*ADO Link:\*\*\s*(https://\S+)') {
-        $adoUrl = $Matches[1].Trim()
-    }
+    # ADO Link from footer (the one reader, Get-PromptFileStatus.ps1)
+    $adoUrl = Get-P20CardAdoUrl $content
 
     # PR URL from PR Review Comments section
     $prUrl = ''

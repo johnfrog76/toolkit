@@ -20,6 +20,10 @@ npx playwright install chromium   # once per machine, and only for `npm run smok
 npm run dev          # http://localhost:5174 -- or the next free port, which Vite prints
 ```
 
+`npm ci` asks nothing about install scripts: `package.json` `allowScripts` records a decision for every
+dependency that has one, all three denied because the prebuilt binaries cover each platform. A new one is
+reviewed with `npm install-scripts ls` -- [Contributing](../docs/CONTRIBUTING.md) has the rule.
+
 `tkWeb -Dev` does both of those in one command and **opens the browser** when a person typed it;
 `npm run dev` here is the half without the launcher. `tkWeb -NoBrowser` (or a `CI` variable, or a
 redirected stdout) skips the opening and prints the URL instead -- see the `Web` row in [the command reference](../docs/CLI.md#command-reference).
@@ -86,6 +90,7 @@ web/
 ├── tests/smokeA11y.mjs     its --a11y audit, on the same kind of servers
 ├── tests/smokeFirstRun.mjs  its --first-run drag, on the same kind of servers and a copy of samples/hub
 ├── tests/jest.setup.cjs   jest setupFiles: Node's TextEncoder/TextDecoder for jsdom, which React Router 8 needs
+├── tests/jest.afterEnv.cjs jest setupFilesAfterEnv: Testing Library waits up to 5 s for an element
 ├── tests/routeModules.jest.cjs  jest only: a stub for react-router's one file that reads import.meta
 └── src/
     ├── shell/            the composition root -- owns chrome, owns no decisions
@@ -517,6 +522,9 @@ row that draws them, and listed here. Two kinds, both named:
 | `card.createPr` | Create PR | `ArrowUploadRegular` | one record | a card, list and board |
 | `card.markNotBillable` | Mark not billable | `MoneyRegular` | one record | a card |
 | `card.makeBillable` | Make billable again | `MoneyRegular` | one record | a card |
+| `card.planMilestone` | Plan milestone | `FlagRegular` | one record | a card in play or planned: a form over `Plan -Milestone` / `-Remove -Only Milestone` |
+| `card.planSprint` | Plan sprint | `CalendarLtrRegular` | one record | a card in play or planned: a form over `Plan -Sprint` / `-Remove -Only Sprint` |
+| `card.tag` | Tag | `TagRegular` | one record | a card in play or planned: a form over `Tag` / `Tag -Remove` |
 | `card.remind` | Remind me about this | `AlertRegular` | one record | a card, while organize is on |
 | `cover.replace` | Replace cover | `ImageEditRegular` | one record | a card's cover, on its page |
 | `cover.addBefore` | Add before | `ImageAddRegular` | one record | a card's cover |
@@ -1006,8 +1014,14 @@ are prompts, and agile lanes are a better view for how multiple items flow for h
   commit, not by hand"). HTML5 drag and drop, no new dependency. The menu is mandatory: a board that only
   works by dragging is closed to a keyboard and to a touch screen. The outcome is announced (`aria-live`).
 - **One set of predicates** (`promptFilters.ts`), lifted out of `PromptStatus.tsx` and used by the list and
-  the board, plus a Sprint filter on the board. A card with no ADO link cannot match the repo filter, so
+  the board, plus the board's own Milestone, Sprint and Tag filters -- each drawn only while some card
+  names one, and read from the card model's `milestone` (whole: its own line, else an old card's sprint
+  line, never an Azure DevOps card's iteration path), `sprint` and `tags`. A card with no ADO link cannot match the repo filter, so
   the board SAYS how many it hid rather than letting them vanish.
+- **A card's milestone, sprint and tags are set from its row menu** -- Plan milestone, Plan sprint, Tag
+  (`PlanCardDialog.tsx`): one small form over the CLI's `Plan` and `Tag` verbs through the bridge, one
+  line at a time (`Plan -Remove -Only Milestone|Sprint` to clear one, never the bare `-Remove`). Offered on
+  a card in play or planned; nothing writes the tracker.
 - **Finding a card that is not code work.** The one box is dual entry -- an exact card id first, then a
   substring of the file, the title or the link -- and the **words typed in any order**, so `angular
   signals` finds "Signals in Angular"; no typo tolerance, because on a 250-file corpus a loose match mostly
@@ -1078,7 +1092,7 @@ are prompts, and agile lanes are a better view for how multiple items flow for h
   compared. Demo reads To do / Doing / Waiting / Done; an org that says nothing reads the contract's words.
 - **The tab row spans the centre block, flush both ends.** Home's row above the cards (`viewBar`: flex,
   space-between) has the tabs at its left edge, level with the cards below. **New card
-  follows the explain text** on both rows: on the board, after the sprint filter, at the row's end; the
+  follows the explain text** on both rows: on the board, after the milestone, sprint and tag filters, at the row's end; the
   text wraps inside itself so the buttons keep the row. The System page keeps its pager under the grid.
 - **The board owns the height; a lane scrolls inside itself.** The owner: "they all expand to fill the
   space; if I have 20 cards in a single lane each lane has overflow-y." The lanes grid is
@@ -1835,7 +1849,7 @@ holds it with a scratch `dist/client`.
 
 React 19 · Fluent UI v9 (`@fluentui/react-components`, `makeStyles`/`tokens`) · Redux Toolkit +
 RTK Query · React Router 8 (`react-router`) · Recharts · react-markdown 10 + remark-gfm + rehype-raw + rehype-sanitize · Vite 8 · Jest 30 +
-ts-jest + Testing Library · Playwright (the raw package) · TypeScript 6.0, because ts-jest and typescript-eslint do not yet accept 7 ([Known gaps](../docs/KNOWN-GAPS.md)). Node 24, the active LTS (`.nvmrc`, `engines`); verified on 24.21. Lint is ESLint 10 with typescript-eslint; `eslint-plugin-react` still declares a peer range that ends at ESLint 9, so `package.json` `overrides` hands it the root's ESLint, and `eslint.config.js` reads React's version from its package because the plugin's `"detect"` calls an API ESLint 10 removed.
+ts-jest + Testing Library · Playwright (the raw package) · TypeScript 6.0, because ts-jest and typescript-eslint do not yet accept 7 ([Known gaps](../docs/KNOWN-GAPS.md)). Node 24, the active LTS, from 24.22.0 (`.nvmrc`, `engines`): on 24.21 a jest worker is sometimes killed by a crash in V8 ([Contributing](../docs/CONTRIBUTING.md)); verified on 24.22.0. Lint is ESLint 10 with typescript-eslint; `eslint-plugin-react` still declares a peer range that ends at ESLint 9, so `package.json` `overrides` hands it the root's ESLint, and `eslint.config.js` reads React's version from its package because the plugin's `"detect"` calls an API ESLint 10 removed. `overrides` also pins `re2js` to 2.8.7, a patch release with a security fix, because `markdownlint` 0.42.0 (under `markdownlint-cli2`) pins 2.8.6 exactly; drop it when a `markdownlint` release allows 2.8.7. `minimatch` has no override: 11, the fixed release, is a major version, and `eslint-plugin-react` calls 3.x's default export as a function, which 11 does not have, so five of its rules would crash ESLint the day one is turned on.
 
 Fluent and RTK Query are whole-app dependencies, not per-card ones. A fork that wanted a different
 stack would be rewriting the views, not relocating files.

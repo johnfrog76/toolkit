@@ -34,7 +34,11 @@ function shape(plan: CardActionPlan): { primary: string | null; menu: string[] }
   };
 }
 
-const CARD_ONLY = ["Mark not billable"];
+/** What every card offers itself: the billable toggle, then its two planning lines and
+ *  its tags (Plan and Tag through the bridge) -- on a card in play or planned. */
+const CARD_ONLY = ["Mark not billable", "Plan milestone", "Plan sprint", "Tag"];
+/** A Done card is archived: Plan and Tag do not look there, so it offers neither. */
+const DONE_ONLY = ["Mark not billable"];
 /** On every Code Review card: the verb asks the tracker whether the PR merged. */
 const LAND = "Land";
 /** The one exposed action: the card's own page, on every card. */
@@ -137,7 +141,7 @@ const rows: Array<{
       `Move to Active [x: ${ONE_WAY}]`,
       `Move to In Progress [x: ${ONE_WAY}]`,
       `Move to Code Review [x: ${ONE_WAY}]`,
-      ...CARD_ONLY,
+      ...DONE_ONLY,
       EXTERNAL,
     ],
   },
@@ -207,7 +211,7 @@ const rows: Array<{
       `Move to Active [x: ${ONE_WAY}]`,
       `Move to In Progress [x: ${ONE_WAY}]`,
       `Move to Code Review [x: ${ONE_WAY}]`,
-      ...CARD_ONLY,
+      ...DONE_ONLY,
     ],
   },
   {
@@ -274,7 +278,7 @@ const rows: Array<{
       `Move to Active [x: ${ONE_WAY}]`,
       `Move to In Progress [x: ${ONE_WAY}]`,
       `Move to Code Review [x: ${ONE_WAY}]`,
-      ...CARD_ONLY,
+      ...DONE_ONLY,
     ],
   },
   {

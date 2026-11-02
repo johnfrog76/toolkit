@@ -16,6 +16,10 @@ export interface PromptFilter {
   text: string;
   /** A sprint name, or "All". The board's own filter. */
   sprint?: string;
+  /** A milestone, WHOLE (the card model's `milestone`), or "All". The board's own filter. */
+  milestone?: string;
+  /** One tag (the card model's `tags`, compared ignoring case), or "All". The board's own filter. */
+  tag?: string;
   /** A card type as the heading names it ("Bug", "User Story"), UNTYPED for a
    *  card whose heading names no configured type, or "All". */
   type?: string;
@@ -75,8 +79,17 @@ export function filterPrompts(prompts: PromptInfo[], f: PromptFilter): PromptInf
   const byStatus = f.status === "All" ? byRepo : byRepo.filter((p) => p.status === f.status);
   const bySprint =
     !f.sprint || f.sprint === "All" ? byStatus : byStatus.filter((p) => p.sprint === f.sprint);
-  const byType =
-    !f.type || f.type === "All" ? bySprint : bySprint.filter((p) => matchesType(p, f.type!));
+  const byMilestone =
+    !f.milestone || f.milestone === "All"
+      ? bySprint
+      : bySprint.filter((p) => (p.milestone ?? "") === f.milestone);
+  const byTag =
+    !f.tag || f.tag === "All"
+      ? byMilestone
+      : byMilestone.filter((p) =>
+          (p.tags ?? []).some((t) => t.toLowerCase() === f.tag!.toLowerCase()),
+        );
+  const byType = !f.type || f.type === "All" ? byTag : byTag.filter((p) => matchesType(p, f.type!));
   const byLink =
     !f.link || f.link === "All"
       ? byType
@@ -134,4 +147,22 @@ export function sprintsOf(prompts: PromptInfo[]): string[] {
     if (p.sprint && p.sprint !== "--" && !p.sprint.startsWith("(")) names.add(p.sprint);
   }
   return [...names].sort();
+}
+
+/** The milestones these cards name, whole, for the board's filter -- the card
+ *  model's `milestone`: its own line, else an old card's sprint line (one rule,
+ *  agent/core/parsers.py card_milestone). "" is no milestone, and not an option. */
+export function milestonesOf(prompts: PromptInfo[]): string[] {
+  const names = new Set<string>();
+  for (const p of prompts) if (p.milestone) names.add(p.milestone);
+  return [...names].sort();
+}
+
+/** The tags these cards carry, for the board's filter: one option per tag, the
+ *  first spelling met kept when two cards spell it in different cases. */
+export function tagsOf(prompts: PromptInfo[]): string[] {
+  const seen = new Map<string, string>();
+  for (const p of prompts)
+    for (const t of p.tags ?? []) if (!seen.has(t.toLowerCase())) seen.set(t.toLowerCase(), t);
+  return [...seen.values()].sort((a, b) => a.localeCompare(b));
 }

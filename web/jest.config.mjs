@@ -18,6 +18,8 @@ export default {
   testMatch: ["<rootDir>/src/**/*.test.ts", "<rootDir>/src/**/*.test.tsx"],
   // TextEncoder/TextDecoder for jsdom, which React Router 8 needs at import.
   setupFiles: ["<rootDir>/tests/jest.setup.cjs"],
+  // Testing Library's wait for an element, raised for the whole suite.
+  setupFilesAfterEnv: ["<rootDir>/tests/jest.afterEnv.cjs"],
   // The @consts alias, third of three resolvers (vite.config.ts and tsconfig's
   // `paths` are the others). The contract file is real JSON on disk and jest
   // requires it directly -- nothing is stubbed, so a test reads exactly what

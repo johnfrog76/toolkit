@@ -570,7 +570,7 @@ describe("the Designs card's moves (L3)", () => {
     return (await screen.findAllByRole("menuitem")).map((m) => m.textContent);
   };
 
-  it("a note alone offers Graduate, Archive as shipped and Archive as dropped; a design with a live spec offers Complete; the archive nothing", async () => {
+  it("a note alone offers Graduate, Archive as shipped and Archive as dropped; a design with a live spec offers Complete and Archive as dropped; the archive nothing", async () => {
     mount();
     expect(await menuOf("Offline specs")).toEqual([
       "Graduate to a spec",
@@ -578,7 +578,12 @@ describe("the Designs card's moves (L3)", () => {
       "Archive as dropped",
     ]);
     fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
-    expect(await menuOf("Board ideas")).toEqual(["Open the spec", "Complete", "Open on GitHub"]);
+    expect(await menuOf("Board ideas")).toEqual([
+      "Open the spec",
+      "Complete",
+      "Archive as dropped",
+      "Open on GitHub",
+    ]);
     fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
     fireEvent.click(screen.getByRole("button", { name: "Show Complete" }));
     expect(screen.queryByRole("button", { name: "Actions for Built (spec)" })).toBeNull();

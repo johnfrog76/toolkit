@@ -76,6 +76,11 @@ class PromptInfo(BaseModel):
     from_record: str | None = None
     title: str
     sprint: str
+    # The card's milestone, WHOLE -- its **Milestone:** line, else an old card's
+    # **Sprint:** line (card_milestone) -- and its Tags: line, split. "" and [] for
+    # none. The board's milestone and tag filters read them. docs/hub/cards.md.
+    milestone: str = ""
+    tags: list[str] = []
     progress: str
     checked: int
     total: int
@@ -127,6 +132,8 @@ class PromptDetailResponse(BaseModel):
     from_record: str | None = None
     title: str
     sprint: str
+    milestone: str = ""
+    tags: list[str] = []
     status: str
     ado_url: str | None = None
     pr_url: str | None = None

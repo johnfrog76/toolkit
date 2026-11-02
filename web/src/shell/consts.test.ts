@@ -53,11 +53,15 @@ describe("consts.json", () => {
     expect(STAMPS.outcome).toBe("**Outcome:**");
     // The meeting record an agenda line came from (NewPrompt -From).
     expect(STAMPS.from).toBe("**From:**");
+    // A card's two planning lines, each its own (Plan -Milestone, Plan -Sprint).
+    expect(STAMPS.milestone).toBe("**Milestone:**");
+    expect(STAMPS.sprint).toBe("**Sprint:**");
     expect(TOKENS.prUrl).toBe("PR URL:");
     expect(TOKENS.prReviewHeading).toBe("## PR Review Comments");
     expect(TOKENS.previousRound).toBe("> Previous round:");
     expect(TOKENS.design).toBe("> Design:");
     expect(TOKENS.spec).toBe("> Spec:");
+    expect(TOKENS.tags).toBe("Tags:");
     expect(FOLDERS.current).toBe("current");
     expect(FOLDERS.archive).toBe("archive");
     expect(FOLDERS.backlog).toBe("backlog");
@@ -497,6 +501,7 @@ describe("no half retypes a contract literal", () => {
     ["stamps.billable", STAMPS.billable],
     ["stamps.assigned", STAMPS.assigned],
     ["stamps.from", STAMPS.from],
+    ["stamps.milestone", STAMPS.milestone],
     ["stamps.started", STAMPS.started],
     ["stamps.review", STAMPS.review],
     ["stamps.cover", STAMPS.cover],

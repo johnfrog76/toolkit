@@ -33,7 +33,7 @@ import type { CardActionContext } from "./cardActions";
 import { billableOutcomeMessage, useBillableToggle } from "./useBillableToggle";
 import type { CommandResponse, PromptInfo } from "./api.ado";
 import { commandResultMessage } from "./cliBridge";
-import { LANES, laneHint, legalMoves } from "./legalMoves";
+import { laneFor, laneHint, lanesFor, legalMoves } from "./legalMoves";
 import { laneConfigKey, useLaneLabel } from "./laneNames";
 import { LaneLabelEditor } from "./LaneLabelEditor";
 import { TrackerBadge, trackerName } from "./TrackerBadge";
@@ -41,7 +41,9 @@ import { BoardCover } from "./CardCover";
 import { CARD_FACE_BOX, CardName, CardProgress } from "./CardFace";
 import { useGetEnvQuery } from "../../shell/api";
 import type { Lane } from "./legalMoves";
-import { filterPrompts, sprintsOf } from "./promptFilters";
+import { filterPrompts, milestonesOf, sprintsOf, tagsOf } from "./promptFilters";
+import { usePlanCard } from "./PlanCardDialog";
+import type { PlanKind } from "./PlanCardDialog";
 import { cardPath } from "./paths";
 import { countInPlay, inPlayLine } from "./inPlay";
 import { useLandCard } from "./useLandCard";
@@ -88,7 +90,7 @@ const useStyles = makeStyles({
     minWidth: 0,
     padding: `${tokens.spacingVerticalL} ${tokens.spacingHorizontalS}`,
   },
-  // Five lanes side by side, Backlog first; below that they scroll sideways INSIDE the board,
+  // Five lanes side by side, Backlog first (four on an Azure DevOps Space, which has none); below that they scroll sideways INSIDE the board,
   // so the page itself never overflows (the UX audit's rule).
   //
   // The BOARD owns the height and every lane fills it -- the owner's rule: "they
@@ -168,6 +170,7 @@ interface BoardCardProps {
   onCreatePR: () => void;
   onRemind: () => void;
   onLand: () => void;
+  onPlan: (kind: PlanKind) => void;
   context: CardActionContext;
 }
 
@@ -180,10 +183,11 @@ function BoardCard({
   onCreatePR,
   onRemind,
   onLand,
+  onPlan,
   context,
 }: BoardCardProps) {
   const styles = useStyles();
-  const moves = legalMoves(card.status);
+  const moves = legalMoves(card.status, context.tracker);
   const label = card.name || card.title || card.file;
   return (
     <div
@@ -215,6 +219,7 @@ function BoardCard({
           onCreatePR={onCreatePR}
           onRemind={onRemind}
           onLand={onLand}
+          onPlan={onPlan}
         />
       </div>
       <div className={styles.cardMeta}>
@@ -284,7 +289,10 @@ export function Board() {
   const billing = useBillableToggle();
   const remind = useRemindAbout();
   const land = useLandCard();
+  const plan = usePlanCard();
   const [sprint, setSprint] = useState("All");
+  const [milestone, setMilestone] = useState("All");
+  const [tag, setTag] = useState("All");
   // Which lane a dragged card is over, if any -- every lane ahead of the card is
   // a target now, not only Done.
   const [over, setOver] = useState<Lane | null>(null);
@@ -305,6 +313,8 @@ export function Board() {
     [all, env?.config?.inPlayLimit],
   );
   const sprints = useMemo(() => sprintsOf(all), [all]);
+  const milestones = useMemo(() => milestonesOf(all), [all]);
+  const tags = useMemo(() => tagsOf(all), [all]);
   const shown = useMemo(
     () =>
       filterPrompts(all, {
@@ -312,6 +322,8 @@ export function Board() {
         status: filters.stateFilter,
         text: filters.filterValue,
         sprint,
+        milestone,
+        tag,
         type: filters.typeFilter,
         link: filters.linkFilter,
       }),
@@ -323,12 +335,14 @@ export function Board() {
       filters.typeFilter,
       filters.linkFilter,
       sprint,
+      milestone,
+      tag,
     ],
   );
 
   // Pinned cards first within a lane, each group in the order it had.
   const byLane = (lane: Lane) => {
-    const inLane = shown.filter((p) => p.status === lane);
+    const inLane = shown.filter((p) => laneFor(p.status, env?.tracker) === lane);
     return [...inLane.filter((p) => p.pinned), ...inLane.filter((p) => !p.pinned)];
   };
   const open = (p: PromptInfo) => navigate(cardPath(p.file));
@@ -395,7 +409,7 @@ export function Board() {
     setOver(null);
     const file = e.dataTransfer.getData(DRAG_TYPE);
     const card = all.find((p) => p.file === file);
-    if (card && legalMoves(card.status).includes(lane)) void runMove(card, lane);
+    if (card && legalMoves(card.status, env?.tracker).includes(lane)) void runMove(card, lane);
   };
 
   if (isLoading) return <Spinner label="Loading the board..." />;
@@ -411,32 +425,35 @@ export function Board() {
     );
   }
 
+  const lanes = lanesFor(env?.tracker);
+
   return (
     <section className={styles.root} aria-label="Board">
       <div className={styles.bar}>
         <Body1 className={mergeClasses(styles.quiet, styles.barText)}>
-          ToolKit cards move by themselves: a new card is {laneLabel(STATUS.backlog)}, a commit is{" "}
+          ToolKit cards move by themselves: a new card is {laneLabel(lanes[0])}, a commit is{" "}
           {laneLabel(STATUS.inProgress)}, a pull request is {laneLabel(STATUS.codeReview)}. Drop a
           card on a lane to move it yourself; on {laneLabel(STATUS.done)}, to archive it.
           {cardFrom ? ` ${cardFrom}` : ""}
         </Body1>
         <span className={styles.barSpacer} />
-        {sprints.length > 0 ? (
-          <Dropdown
-            size="small"
-            aria-label="Sprint"
-            value={sprint === "All" ? "All sprints" : sprint}
-            selectedOptions={[sprint]}
-            onOptionSelect={(_e, d) => setSprint(d.optionValue ?? "All")}
-          >
-            <Option value="All">All sprints</Option>
-            {sprints.map((s) => (
-              <Option key={s} value={s}>
-                {s}
-              </Option>
-            ))}
-          </Dropdown>
-        ) : null}
+        {/* The board's filters: one dropdown per thing a card is planned or tagged
+            by, each drawn only when some card names one (promptFilters.ts). */}
+        <BoardFilter
+          label="Milestone"
+          all="All milestones"
+          value={milestone}
+          options={milestones}
+          onChange={setMilestone}
+        />
+        <BoardFilter
+          label="Sprint"
+          all="All sprints"
+          value={sprint}
+          options={sprints}
+          onChange={setSprint}
+        />
+        <BoardFilter label="Tag" all="All tags" value={tag} options={tags} onChange={setTag} />
         {/* Last on the row: "New card button always follows the explain text"
             -- after the sprint filter, at the row's end. */}
         <Button
@@ -486,10 +503,15 @@ export function Board() {
             {land.landed}
           </StatusMessage>
         ) : null}
+        {plan.done ? (
+          <StatusMessage status="success" onDismiss={plan.clearDone}>
+            {plan.done}
+          </StatusMessage>
+        ) : null}
       </div>
 
       <div className={styles.lanes}>
-        {LANES.map((lane) => {
+        {lanes.map((lane) => {
           const isDone = lane === STATUS.done;
           const cards = isDone ? [] : byLane(lane);
           return (
@@ -543,7 +565,7 @@ export function Board() {
               </div>
               {!isDone ? (
                 <Caption1 className={mergeClasses(styles.quiet, styles.laneHint)}>
-                  {laneHint(lane)}
+                  {laneHint(lane, env?.tracker)}
                 </Caption1>
               ) : null}
               {isDone ? (
@@ -571,6 +593,7 @@ export function Board() {
                       onCreatePR={() => setDialogTab("pr")}
                       onRemind={() => remind.open(p)}
                       onLand={() => land.open(p)}
+                      onPlan={(kind) => plan.open(p, kind)}
                       context={actionContext}
                     />
                   ))}
@@ -594,6 +617,42 @@ export function Board() {
       />
       {remind.dialog}
       {land.dialog}
+      {plan.dialog}
     </section>
+  );
+}
+
+/** One of the board's filters: "All <things>" and each value some card names.
+ *  Drawn only when there is a value to choose; while one is chosen it stays, so
+ *  the way back to All is never filtered away. */
+function BoardFilter({
+  label,
+  all,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  all: string;
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+}) {
+  if (options.length === 0 && value === "All") return null;
+  return (
+    <Dropdown
+      size="small"
+      aria-label={label}
+      value={value === "All" ? all : value}
+      selectedOptions={[value]}
+      onOptionSelect={(_e, d) => onChange(d.optionValue ?? "All")}
+    >
+      <Option value="All">{all}</Option>
+      {options.map((s) => (
+        <Option key={s} value={s}>
+          {s}
+        </Option>
+      ))}
+    </Dropdown>
   );
 }
