@@ -22,6 +22,13 @@
       - an archived card is not found -- Plan is not Billable's "still worth adjusting after
         the fact", it is planning forward
       - every refusal exits 2 and writes nothing; a repeat of the same milestone writes nothing
+      - a milestone's ORDER (docs/hub/milestones.md): the one reader, Get-P20MilestoneOrder,
+        over the shared table Tests/fixtures/parsers/milestone-order.json (Tests/test_parsers.py
+        asserts it too); and, as a verb, the one writer: -Milestone creates or adds to
+        milestones/<slug>.md and moves the id between two files, -Rank top|up|down|<n> moves
+        one line and touches no card, free text and stale lines are kept, a CRLF file stays
+        CRLF, -Remove takes the id out, and -Rank refuses on a card with no milestone and on
+        an Azure DevOps Space, where no order file is written
 
     Run:  pwsh -File Tests/Test-Plan.ps1
     Or:   {cliPrefix}TestToolkit -Plan
@@ -75,6 +82,29 @@ $sprint = [string]$consts.stamps.sprint
 $milestone = [string]$consts.stamps.milestone
 . (Join-Path $pkgRoot 'Scripts/Get-PromptFileStatus.ps1')
 $created = $consts.stamps.created
+
+. (Join-Path $pkgRoot 'Scripts/Get-MilestoneOrder.ps1')
+
+# -- The one reader, over the shared table ---------------------------------------
+Write-Host "-- A milestone's order: the shared table ---------------" -ForegroundColor Cyan
+$orderTable = [System.IO.File]::ReadAllText((Join-Path $scriptDir 'fixtures/parsers/milestone-order.json')) | ConvertFrom-Json
+foreach ($row in $orderTable.slugs) {
+    Assert-Equal "slug: '$($row.title)'" ([string]$row.slug) (ConvertTo-P20MilestoneSlug ([string]$row.title))
+}
+foreach ($row in $orderTable.rows) {
+    $eol = if ($row.crlf) { "`r`n" } else { "`n" }
+    $text = (@($row.lines) | ForEach-Object { [string]$_ }) -join $eol
+    $cards = @($row.cards | ForEach-Object { @{ Id = [string]$_.id; Milestone = [string]$_.milestone; Created = [string]$_.created } })
+    $got = Get-P20MilestoneOrder -Text $text -Title ([string]$row.title) -Cards $cards
+    $want = "$(@($row.ranked) -join ',')|$(@($row.unranked) -join ',')|$($row.stale)"
+    $seen = "$(@($got.Ranked) -join ',')|$(@($got.Unranked) -join ',')|$($got.Stale)"
+    Assert-True "order: $($row.name)" ($seen -ceq $want) "got [$seen] want [$want]"
+}
+$orderNames = @($orderTable.rows | ForEach-Object { [string]$_.name })
+foreach ($shape in @('ranked', 'unranked', 'stale', 'another milestone', 'no file', 'empty file', 'free text', 'CRLF')) {
+    Assert-True "the order table has a row for: $shape" (@($orderNames | Where-Object { $_.Contains($shape) }).Count -gt 0)
+}
+Write-Host ""
 
 $base = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-plan-" + [System.Guid]::NewGuid().Guid.Substring(0, 8))
 New-Item -ItemType Directory -Path $base -Force | Out-Null
@@ -267,6 +297,95 @@ try {
     Assert-True "'Plan Q4R9' does not find it there, exit 2" ($out -match "No card with id 'Q4R9' in current/ or backlog/" -and $out -match 'ARCHIVED-EXIT=2') $out
     $closedText = [System.IO.File]::ReadAllText($archived[0].FullName)
     Assert-True 'the archived card keeps its planned Milestone line untouched' ($closedText -match [regex]::Escape("$milestone M2"))
+
+    Write-Host ""
+    Write-Host "-- A milestone's order: one file, one writer ----------" -ForegroundColor Cyan
+
+    $space = Split-Path $spike[0].DirectoryName -Parent
+    $msDir = Join-Path $space ([string]$consts.folders.milestones)
+    $m2Path = Join-Path $msDir 'm2-1-2-0.md'
+    $m3Path = Join-Path $msDir 'm3-1-3-0.md'
+    function Get-Order { param([string]$Path) return ((Get-P20MilestoneOrderIds ([System.IO.File]::ReadAllText($Path))) -join ',') }
+
+    $out = Invoke-Verbs ("${prefix}NewPrompt -Now -Title 'Order one' -Type Task -Id T3MX | Out-Null; " +
+        "${prefix}NewPrompt -Now -Title 'Order two' -Type Task -Id W4CY | Out-Null; " +
+        "${prefix}NewPrompt -Title 'Order three' -Type Task -Id H6PN | Out-Null; " +
+        "${prefix}Plan T3MX -Rank top; 'NOMS-EXIT=' + `$LASTEXITCODE")
+    Assert-True "'Plan T3MX -Rank top' on a card with no milestone refuses, exit 2, naming the fix" ($out -match 'NOMS-EXIT=2' -and $out -match 'carries no milestone' -and $out -match [regex]::Escape("${prefix}Plan T3MX -Milestone")) $out
+    Assert-True 'and no order file was written' (-not (Test-Path -LiteralPath $m2Path))
+
+    $out = Invoke-Verbs ("${prefix}Plan T3MX -Milestone 'M2 -- 1.2.0'; 'ADD1-EXIT=' + `$LASTEXITCODE; " +
+        "${prefix}Plan W4CY -Milestone 'M2 -- 1.2.0' | Out-Null; ${prefix}Plan H6PN -Milestone 'M2 -- 1.2.0' | Out-Null; 'X'")
+    Assert-True "'Plan T3MX -Milestone' creates milestones/m2-1-2-0.md and says so" ($out -match 'ADD1-EXIT=0' -and (Test-Path -LiteralPath $m2Path) -and $out -match [regex]::Escape('T3MX is at the bottom of M2 -- 1.2.0''s order')) $out
+    $bytes = [System.IO.File]::ReadAllBytes($m2Path)
+    $m2Text = [System.IO.File]::ReadAllText($m2Path)
+    Assert-True 'the file it created is UTF-8 with no BOM, and LF' (-not ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB) -and -not $m2Text.Contains("`r"))
+    Assert-True 'it carries the title, a Theme, its Created day and an Order' ($m2Text.StartsWith("# M2 -- 1.2.0`n") -and $m2Text -match '(?m)^\*\*Theme:\*\* ' -and $m2Text -match ('(?m)^' + [regex]::Escape($created) + ' \d{4}-\d{2}-\d{2}$') -and $m2Text -match '(?m)^## Order$') $m2Text
+    Assert-Equal 'each -Milestone appended its id at the bottom, in the order planned' 'T3MX,W4CY,H6PN' (Get-Order $m2Path)
+    Assert-True 'the backlog card is in the order and still in backlog/' ((Find-Card 'TaskH6PN-*.prompt.md' $consts.folders.backlog).Count -eq 1)
+    $out = Invoke-Verbs ("${prefix}Plan W4CY -Milestone 'M2 -- 1.2.0'; 'SAME-EXIT=' + `$LASTEXITCODE")
+    Assert-True 'planning into the same milestone again adds nothing' ($out -match 'SAME-EXIT=0' -and (Get-Order $m2Path) -ceq 'T3MX,W4CY,H6PN' -and ([System.IO.File]::ReadAllText($m2Path)) -ceq $m2Text) $out
+
+    # A person's free text, outside the Order and inside it, and a stale line.
+    $m2Text = $m2Text.Replace("## Order`n", "Why this milestone, in a person's words.`n`n## Order`n") + "- 999 a card that is gone`nProse a person wrote under the list.`n`n## Notes`n`n- W4CY is risky`n"
+    [System.IO.File]::WriteAllText($m2Path, $m2Text)
+    $h6pn = (Find-Card 'TaskH6PN-*.prompt.md' $consts.folders.backlog)[0].FullName
+    $h6Before = [System.IO.File]::ReadAllText($h6pn)
+    $out = Invoke-Verbs ("${prefix}Plan H6PN -Rank top; 'TOP-EXIT=' + `$LASTEXITCODE")
+    Assert-True "'Plan H6PN -Rank top' exits 0 and names the place" ($out -match 'TOP-EXIT=0' -and $out -match [regex]::Escape('H6PN is #1 of 3 in M2 -- 1.2.0''s order')) $out
+    Assert-Equal '-Rank top moved one line to the top' 'H6PN,T3MX,W4CY,999' (Get-Order $m2Path)
+    Assert-Equal 'and touched no card' $h6Before ([System.IO.File]::ReadAllText($h6pn))
+    $after = [System.IO.File]::ReadAllText($m2Path)
+    Assert-True 'the free text, the stale line and the Notes are all still there' ($after.Contains("Why this milestone, in a person's words.") -and $after.Contains('- 999 a card that is gone') -and $after.Contains('Prose a person wrote under the list.') -and $after.Contains("## Notes`n`n- W4CY is risky")) $after
+    Assert-Equal 'one line removed and one inserted: the same lines, sorted' (($m2Text -split "`n" | Sort-Object) -join '|') (($after -split "`n" | Sort-Object) -join '|')
+    $out = Invoke-Verbs ("${prefix}Plan H6PN -Rank down | Out-Null; 'A=' + `$LASTEXITCODE")
+    Assert-Equal '-Rank down moves it one place down' 'T3MX,H6PN,W4CY,999' (Get-Order $m2Path)
+    $out = Invoke-Verbs ("${prefix}Plan W4CY -Rank up | Out-Null; 'A=' + `$LASTEXITCODE")
+    Assert-Equal '-Rank up moves it one place up' 'T3MX,W4CY,H6PN,999' (Get-Order $m2Path)
+    $out = Invoke-Verbs ("${prefix}Plan T3MX -Rank 3; 'N-EXIT=' + `$LASTEXITCODE")
+    Assert-True "'-Rank 3' puts it third, counted among the ranked cards -- the stale line is not a step" ($out -match 'N-EXIT=0' -and (Get-Order $m2Path) -ceq 'W4CY,H6PN,T3MX,999') "$out $(Get-Order $m2Path)"
+    $settled = [System.IO.File]::ReadAllText($m2Path)
+    $out = Invoke-Verbs ("${prefix}Plan T3MX -Rank 9; 'CLAMP-EXIT=' + `$LASTEXITCODE; ${prefix}Plan T3MX -Rank down; 'BOTTOM-EXIT=' + `$LASTEXITCODE")
+    Assert-True 'past the bottom is the bottom: nothing written, and it says where the card is' ($out -match 'CLAMP-EXIT=0' -and $out -match 'BOTTOM-EXIT=0' -and $out -match [regex]::Escape('T3MX is already #3 of 3') -and ([System.IO.File]::ReadAllText($m2Path)) -ceq $settled) $out
+
+    $out = Invoke-Verbs ("${prefix}Plan T3MX -Rank sideways; 'BAD-EXIT=' + `$LASTEXITCODE; ${prefix}Plan T3MX -Rank 0; 'ZERO-EXIT=' + `$LASTEXITCODE; ${prefix}Plan T3MX -Rank top -Remove; 'RR-EXIT=' + `$LASTEXITCODE")
+    Assert-True "'-Rank sideways' and '-Rank 0' refuse, exit 2" ($out -match "'-Rank sideways' is not a place in an order" -and $out -match 'BAD-EXIT=2' -and $out -match 'ZERO-EXIT=2') $out
+    Assert-True "'-Rank' with '-Remove' refuses, exit 2" ($out -match "'-Rank' and '-Remove' do not go together" -and $out -match 'RR-EXIT=2') $out
+    Assert-Equal 'and no refusal changed the order' $settled ([System.IO.File]::ReadAllText($m2Path))
+
+    # A CRLF order file keeps its terminator through every edit.
+    [System.IO.File]::WriteAllText($m2Path, ($settled -replace "`n", "`r`n"))
+    $out = Invoke-Verbs ("${prefix}Plan T3MX -Rank top | Out-Null; 'X'")
+    $crlf = [System.IO.File]::ReadAllText($m2Path)
+    Assert-True 'a CRLF order file is edited and stays CRLF, no bare LF' ((Get-Order $m2Path) -ceq 'T3MX,W4CY,H6PN,999' -and -not ($crlf -replace "`r`n", '').Contains("`n")) (Get-Order $m2Path)
+
+    $out = Invoke-Verbs ("${prefix}Plan W4CY -Milestone 'M3 -- 1.3.0'; 'MOVE-EXIT=' + `$LASTEXITCODE")
+    Assert-True 'moving a card to another milestone moves its line between the two files' ($out -match 'MOVE-EXIT=0' -and (Get-Order $m2Path) -ceq 'T3MX,H6PN,999' -and (Test-Path -LiteralPath $m3Path) -and (Get-Order $m3Path) -ceq 'W4CY') "$out $(Get-Order $m2Path)"
+    Assert-True "and the Notes' mention of W4CY, outside the Order, stays" (([System.IO.File]::ReadAllText($m2Path)).Contains('- W4CY is risky'))
+    $out = Invoke-Verbs ("${prefix}Plan H6PN -Remove; 'RM-EXIT=' + `$LASTEXITCODE; ${prefix}Plan W4CY -Remove -Only Milestone; 'RMO-EXIT=' + `$LASTEXITCODE")
+    Assert-True '-Remove and -Remove -Only Milestone take the id out of the order with the line' ($out -match 'RM-EXIT=0' -and $out -match 'RMO-EXIT=0' -and (Get-Order $m2Path) -ceq 'T3MX,999' -and (Get-Order $m3Path) -ceq '') "$out $(Get-Order $m2Path)|$(Get-Order $m3Path)"
+
+    $read = Get-P20SpaceMilestoneOrders -SpaceDir $space
+    $m2Read = @($read | Where-Object { $_.Title -ceq 'M2 -- 1.2.0' })
+    Assert-True 'the disk reader reads the order back: one ranked, the stale line counted' ($m2Read.Count -eq 1 -and (@($m2Read[0].Ranked) -join ',') -ceq 'T3MX' -and $m2Read[0].Stale -eq 1) ''
+    Assert-Equal 'and on an Azure DevOps Space it reads nothing' 0 @(Get-P20SpaceMilestoneOrders -SpaceDir $space -TrackerKind 'ado').Count
+
+    Write-Host ""
+    Write-Host "-- On an Azure DevOps Space the board keeps the order -" -ForegroundColor Cyan
+
+    $aHub = Join-Path $base 'ado-hub'
+    New-Item -ItemType Directory -Path $aHub -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $aHub 'hub.json'),
+        '{ "hub": 1, "spaces": [ { "slug": "acme", "name": "Acme", "status": "local", "org": "https://dev.azure.com/acme", "promptsFolder": "acme" } ] }',
+        (New-Object System.Text.UTF8Encoding($false)))
+    $aPre = "`$env:PSModulePath = '$pkgRoot'; `$env:PROMPTS_ROOT = '$aHub'; `$env:P20_ACTIVE_SPACE = 'acme'; `$env:P20_USAGE_LOG_DIR = '$log'; " +
+        "Import-Module '$pkgRoot/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; "
+    $out = (& pwsh -NoProfile -NonInteractive -Command ($aPre + "${prefix}NewPrompt -Now -Title 'Ado card' -Type Task -Id J7RT | Out-Null; " +
+            "${prefix}Plan J7RT -Milestone 'Sprint 9'; 'AMS-EXIT=' + `$LASTEXITCODE; ${prefix}Plan J7RT -Rank top; 'ARANK-EXIT=' + `$LASTEXITCODE") 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    Assert-True "'Plan -Rank' refuses on an Azure DevOps Space, exit 2, naming MyWork" ($out -match 'ARANK-EXIT=2' -and $out -match 'ranking lives in Azure DevOps' -and $out -match [regex]::Escape("${prefix}MyWork")) $out
+    $aCard = @(Get-ChildItem $aHub -Recurse -Filter 'TaskJ7RT-*.prompt.md')
+    Assert-True "'Plan -Milestone' still writes the card's line there" ($out -match 'AMS-EXIT=0' -and $aCard.Count -eq 1 -and ([System.IO.File]::ReadAllText($aCard[0].FullName)) -match [regex]::Escape("$milestone Sprint 9")) $out
+    Assert-True 'and no order file is written on that Space' (@(Get-ChildItem $aHub -Recurse -Directory -Filter ([string]$consts.folders.milestones)).Count -eq 0)
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message

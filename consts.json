@@ -83,11 +83,12 @@
   },
 
   "folders": {
-    "_": "The folders a card lives in, under an org's promptsFolder: current/ (in play), archive/ (done) and backlog/ (planned, not yet in play -- where NewPrompt writes unless told -Now; a Space's folder only, a hub-root sibling such as growth/ or manager/ has none). Under each hub-root sibling, current/ and archive/. And assets, the Space's sibling of the three, where a card keeps what is not text: assets/<card key>/cover.png (docs/hub/cards.md, \"A card's pictures\").",
+    "_": "The folders a card lives in, under an org's promptsFolder: current/ (in play), archive/ (done) and backlog/ (planned, not yet in play -- where NewPrompt writes unless told -Now; a Space's folder only, a hub-root sibling such as growth/ or manager/ has none). Under each hub-root sibling, current/ and archive/. And assets, the Space's sibling of the three, where a card keeps what is not text: assets/<card key>/cover.png (docs/hub/cards.md, \"A card's pictures\"). And milestones, the Space's sibling where a milestone's ORDER lives, one file per milestone, milestones/<slug>.md (docs/hub/milestones.md); a card's membership stays on its own **Milestone:** line.",
     "current": "current",
     "archive": "archive",
     "backlog": "backlog",
-    "assets": "assets"
+    "assets": "assets",
+    "milestones": "milestones"
   },
 
   "assets": {

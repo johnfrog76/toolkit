@@ -1,0 +1,173 @@
+{
+  "_": "ONE table, read by both readers of a milestone's order (docs/hub/milestones.md). A milestone's membership is each card's **Milestone:** line; its ORDER is <Space>/milestones/<slug>.md, whose ## Order bullets, in line order, are the rank. ranked: the file's ids (a bullet's first word, each once, up to the next heading) that a card carrying that milestone still answers, in file order. unranked: the members the file does not list, by created oldest first, a card with no date last, ties by id (ordinal). stale: how many of the file's ids answered no member -- no card, or a card naming another milestone; a reader never deletes one. A milestone matches a card's line exactly, case and all. Each row's lines are the file, joined with LF, or CRLF when crlf is true; no lines is no file. cards are the Space's open cards (current/ and backlog/) as id, milestone, created. slugs: the file's name, the title slugged the way a card slug is (lowercase, runs of anything but a-z0-9 one hyphen, trimmed, at most 60). Scripts/Get-MilestoneOrder.ps1 Get-P20MilestoneOrder and ConvertTo-P20MilestoneSlug (tkTestToolkit -Plan) and agent/core/parsers.py milestone_order() and milestone_slug() (Tests/test_parsers.py).",
+  "slugs": [
+    { "title": "M2 -- 1.2.0", "slug": "m2-1-2-0" },
+    { "title": "Phase 6: the long milestone", "slug": "phase-6-the-long-milestone" },
+    { "title": "  Trimmed -- both ends!  ", "slug": "trimmed-both-ends" },
+    { "title": "M2 -- 1.2.0, the standup sees the work, and a title this long is never cut down", "slug": "m2-1-2-0-the-standup-sees-the-work-and-a-title-this-long-is" }
+  ],
+  "rows": [
+    {
+      "name": "ranked: the file's order is the rank",
+      "title": "M2 -- 1.2.0",
+      "crlf": false,
+      "lines": ["# M2 -- 1.2.0", "", "**Theme:** the standup sees the work", "**Created:** 2026-10-31", "", "## Order", "", "- Q4R9", "- K7M2", "- 141", ""],
+      "cards": [
+        { "id": "K7M2", "milestone": "M2 -- 1.2.0", "created": "2026-10-01" },
+        { "id": "Q4R9", "milestone": "M2 -- 1.2.0", "created": "2026-10-02" },
+        { "id": "141", "milestone": "M2 -- 1.2.0", "created": "2026-09-01" }
+      ],
+      "ranked": ["Q4R9", "K7M2", "141"],
+      "unranked": [],
+      "stale": 0
+    },
+    {
+      "name": "unranked members come after, by created oldest first, no date last",
+      "title": "M2",
+      "crlf": false,
+      "lines": ["# M2", "", "## Order", "", "- K7M2", ""],
+      "cards": [
+        { "id": "K7M2", "milestone": "M2", "created": "2026-10-31" },
+        { "id": "W3X7", "milestone": "M2", "created": "2026-10-20" },
+        { "id": "R9YP", "milestone": "M2", "created": "" },
+        { "id": "141", "milestone": "M2", "created": "2026-10-10" }
+      ],
+      "ranked": ["K7M2"],
+      "unranked": ["141", "W3X7", "R9YP"],
+      "stale": 0
+    },
+    {
+      "name": "the same created day is broken by id",
+      "title": "M2",
+      "crlf": false,
+      "lines": [],
+      "cards": [
+        { "id": "W3X7", "milestone": "M2", "created": "2026-10-20" },
+        { "id": "141", "milestone": "M2", "created": "2026-10-20" },
+        { "id": "K7M2", "milestone": "M2", "created": "2026-10-20" }
+      ],
+      "ranked": [],
+      "unranked": ["141", "K7M2", "W3X7"],
+      "stale": 0
+    },
+    {
+      "name": "a stale id -- no card answers it -- is skipped and counted",
+      "title": "M2",
+      "crlf": false,
+      "lines": ["# M2", "", "## Order", "", "- T3MX", "- K7M2", "- 999", ""],
+      "cards": [
+        { "id": "K7M2", "milestone": "M2", "created": "2026-10-01" }
+      ],
+      "ranked": ["K7M2"],
+      "unranked": [],
+      "stale": 2
+    },
+    {
+      "name": "a card moved to another milestone is stale here and not a member",
+      "title": "M2",
+      "crlf": false,
+      "lines": ["# M2", "", "## Order", "", "- K7M2", "- Q4R9", ""],
+      "cards": [
+        { "id": "K7M2", "milestone": "M2", "created": "2026-10-01" },
+        { "id": "Q4R9", "milestone": "M3", "created": "2026-10-02" }
+      ],
+      "ranked": ["K7M2"],
+      "unranked": [],
+      "stale": 1
+    },
+    {
+      "name": "no file: every member is unranked, the first day",
+      "title": "M2",
+      "crlf": false,
+      "lines": [],
+      "cards": [
+        { "id": "Q4R9", "milestone": "M2", "created": "2026-10-02" },
+        { "id": "K7M2", "milestone": "M2", "created": "2026-10-01" },
+        { "id": "W3X7", "milestone": "", "created": "2026-09-01" }
+      ],
+      "ranked": [],
+      "unranked": ["K7M2", "Q4R9"],
+      "stale": 0
+    },
+    {
+      "name": "an empty file -- a heading and no Order -- ranks nothing",
+      "title": "M2",
+      "crlf": false,
+      "lines": ["# M2", "", "**Theme:** (not set)", ""],
+      "cards": [
+        { "id": "K7M2", "milestone": "M2", "created": "2026-10-01" }
+      ],
+      "ranked": [],
+      "unranked": ["K7M2"],
+      "stale": 0
+    },
+    {
+      "name": "free text outside ## Order is not read, and a bullet's note is not its id",
+      "title": "M2",
+      "crlf": false,
+      "lines": [
+        "# M2",
+        "",
+        "Why this milestone, in a person's words.",
+        "- Q4R9 is mentioned up here and is not ranked by it",
+        "",
+        "## Order",
+        "",
+        "- K7M2 the one that unblocks the rest",
+        "Prose between the bullets is kept and never read.",
+        "* 141",
+        "",
+        "## Notes",
+        "",
+        "- Q4R9 is mentioned down here too"
+      ],
+      "cards": [
+        { "id": "K7M2", "milestone": "M2", "created": "2026-10-03" },
+        { "id": "Q4R9", "milestone": "M2", "created": "2026-10-01" },
+        { "id": "141", "milestone": "M2", "created": "2026-10-02" }
+      ],
+      "ranked": ["K7M2", "141"],
+      "unranked": ["Q4R9"],
+      "stale": 0
+    },
+    {
+      "name": "a CRLF file reads the same",
+      "title": "M2",
+      "crlf": true,
+      "lines": ["# M2", "", "## Order", "", "- Q4R9", "- K7M2", ""],
+      "cards": [
+        { "id": "K7M2", "milestone": "M2", "created": "2026-10-01" },
+        { "id": "Q4R9", "milestone": "M2", "created": "2026-10-02" }
+      ],
+      "ranked": ["Q4R9", "K7M2"],
+      "unranked": [],
+      "stale": 0
+    },
+    {
+      "name": "an id listed twice ranks once and is not stale",
+      "title": "M2",
+      "crlf": false,
+      "lines": ["# M2", "## order", "- K7M2", "- Q4R9", "- K7M2"],
+      "cards": [
+        { "id": "K7M2", "milestone": "M2", "created": "2026-10-01" },
+        { "id": "Q4R9", "milestone": "M2", "created": "2026-10-02" }
+      ],
+      "ranked": ["K7M2", "Q4R9"],
+      "unranked": [],
+      "stale": 0
+    },
+    {
+      "name": "a milestone matches the card's line exactly, case and all",
+      "title": "M2",
+      "crlf": false,
+      "lines": ["# M2", "", "## Order", "", "- K7M2", ""],
+      "cards": [
+        { "id": "K7M2", "milestone": "m2", "created": "2026-10-01" },
+        { "id": "Q4R9", "milestone": "M2", "created": "2026-10-02" }
+      ],
+      "ranked": [],
+      "unranked": ["Q4R9"],
+      "stale": 1
+    }
+  ]
+}

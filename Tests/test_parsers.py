@@ -216,6 +216,32 @@ class StatusMetadataTests(unittest.TestCase):
         self.assertTrue(any(r["milestone"] and r["sprint"] and r["milestone"] != r["sprint"] for r in table["rows"]))
         self.assertTrue(any(not r["milestone"] and r["sprint"] for r in table["rows"]))
 
+    def test_a_milestones_order_by_the_shared_table(self):
+        """A milestone's order (docs/hub/milestones.md): the ranked ids are the
+        milestone file's ``## Order`` bullets that a member still answers, in file
+        order; then the members the file does not list, by created; a listed id
+        no member answers is counted stale, never dropped from the file. The CLI
+        reads it with Get-P20MilestoneOrder; tkTestToolkit -Plan asserts the SAME
+        table, Tests/fixtures/parsers/milestone-order.json."""
+        import json
+
+        from agent.core.parsers import milestone_order, milestone_slug
+
+        table = json.loads((FIXTURES / "milestone-order.json").read_text(encoding="utf-8"))
+        for row in table["slugs"]:
+            with self.subTest(slug=row["title"]):
+                self.assertEqual(milestone_slug(row["title"]), row["slug"])
+        names = [r["name"] for r in table["rows"]]
+        # Every shape the acceptance names has a row.
+        for shape in ("ranked", "unranked", "stale", "another milestone", "no file", "empty file", "free text", "CRLF"):
+            self.assertTrue(any(shape in n for n in names), shape)
+        for row in table["rows"]:
+            with self.subTest(row=row["name"]):
+                eol = "\r\n" if row["crlf"] else "\n"
+                text = eol.join(row["lines"])
+                got = milestone_order(text, row["title"], row["cards"])
+                self.assertEqual(got, {"ranked": row["ranked"], "unranked": row["unranked"], "stale": row["stale"]})
+
     def test_in_progress_status(self):
         meta = _parse_status_metadata(_read("in-progress.md"))
         self.assertEqual(meta["status"], "In Progress")

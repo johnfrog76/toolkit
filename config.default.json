@@ -234,17 +234,19 @@
     "Plan": {
       "category": "prompt",
       "description": "Plan a card into a milestone, a sprint, or both",
-      "usage": "{cliPrefix}Plan <id|file> [-Milestone <title>] [-Sprint <title>] [-Help] | {cliPrefix}Plan <id|file> -Remove [-Only Milestone|Sprint] [-Help]",
+      "usage": "{cliPrefix}Plan <id|file> [-Milestone <title>] [-Sprint <title>] [-Rank top|up|down|<n>] [-Help] | {cliPrefix}Plan <id|file> -Remove [-Only Milestone|Sprint] [-Help]",
       "examples": [
         "{cliPrefix}Plan K7M2 -Milestone \"M2 -- 1.2.0\"",
         "{cliPrefix}Plan K7M2 -Sprint \"Sprint 9\"",
+        "{cliPrefix}Plan K7M2 -Rank top",
         "{cliPrefix}Plan K7M2 -Remove -Only Sprint",
         "{cliPrefix}Plan K7M2 -Remove"
       ],
       "notes": [
         "Writes the card's **Milestone:** and **Sprint:** footer lines, each its own, through Set-P20CardLine -- never a tracker call. The different, tracker-bound -Sprint on NewItem / EditItem sets a milestone on the work item itself, through gh / az; this verb touches nothing but the file. Titles are written WHOLE, never truncated -- a card's own tile shortens them for display.",
         "A card with no **Milestone:** line reads its milestone from its **Sprint:** line, as every card did before the two were separate. -Sprint on such a card first writes a **Milestone:** line keeping what it read, so setting a sprint never moves a card out of a milestone. -Remove takes the card out of both; -Remove -Only Milestone or -Only Sprint out of one, keeping the other.",
-        "Found in current/ or backlog/, and never pulled into play: a backlog card is planned into a milestone before it is ever pulled into play, which is the point of planning one. Sprints and milestones are opt-in at every grain -- no verb here ever requires a card to carry one."
+        "Found in current/ or backlog/, and never pulled into play: a backlog card is planned into a milestone before it is ever pulled into play, which is the point of planning one. Sprints and milestones are opt-in at every grain -- no verb here ever requires a card to carry one.",
+        "A milestone's ORDER is one file, milestones/<slug>.md beside current/ and backlog/ (docs/hub/milestones.md), and this verb is its one writer: -Milestone adds the card's id at the bottom of its milestone's order and takes it out of the one it left, -Remove takes it out, and -Rank top|up|down|<n> moves it -- one line removed, one inserted, no card touched. A position counts the cards the order ranks. -Rank refuses on a card with no milestone. On an Azure DevOps Space the board keeps the order: -Rank refuses, and no order file is written."
       ]
     },
     "Tag": {

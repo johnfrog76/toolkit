@@ -20,6 +20,16 @@
         sprint never moves a card out of (or into) a milestone;
       - a write that leaves both readings as they were writes nothing.
 
+    A milestone is also an ORDER: one small file per milestone,
+    `<Space>/milestones/<slug>.md` (docs/hub/milestones.md), whose `## Order`
+    bullets are the rank. This verb is that file's one writer. -Milestone appends
+    the card's id to the bottom of its milestone's order (creating the file if
+    there is none) and takes it out of the order of the milestone it left; -Remove
+    takes it out of the order with the line; -Rank top|up|down|<n> moves it within
+    its milestone's order, one line removed and one inserted, and never touches a
+    card. On an Azure DevOps Space the board keeps the order: -Rank refuses and no
+    order file is written.
+
     -Remove takes the card out of both, deleting both lines -- what -Remove always did
     to the one line. -Remove -Only Milestone or -Remove -Only Sprint takes it out of one
     and keeps the other reading as it was, by the same rule.
@@ -45,6 +55,11 @@
 .PARAMETER Sprint
     The sprint title, written whole into `**Sprint:**`. Goes with -Milestone; not with
     -Remove.
+.PARAMETER Rank
+    Move the card within its milestone's order: top, up, down, or a position
+    counted from 1 among the cards the order ranks. A card the order does not list
+    yet joins it at the bottom first. Refuses on a card with no milestone, and on
+    an Azure DevOps Space.
 .PARAMETER Remove
     Take the card out of its milestone and its sprint -- both lines are deleted. With
     -Only, out of one of them.
@@ -53,6 +68,7 @@
 .EXAMPLE
     {cliPrefix}Plan K7M2 -Milestone "M2 -- 1.2.0"
     {cliPrefix}Plan K7M2 -Sprint "Sprint 9"
+    {cliPrefix}Plan K7M2 -Rank top
     {cliPrefix}Plan K7M2 -Remove -Only Sprint
     {cliPrefix}Plan K7M2 -Remove
 #>
@@ -64,6 +80,8 @@ param(
     [string]$Milestone,
 
     [string]$Sprint,
+
+    [string]$Rank,
 
     [switch]$Remove,
 
@@ -79,6 +97,7 @@ if ($Help) {
     Write-Host ""
     Write-Host "  ${p}Plan <id|file> -Milestone ""<title>""   Plan the card into a milestone" -ForegroundColor Cyan
     Write-Host "  ${p}Plan <id|file> -Sprint ""<title>""      Put the card in a sprint (with -Milestone, both at once)" -ForegroundColor Cyan
+    Write-Host "  ${p}Plan <id|file> -Rank top|up|down|<n>   Move it within its milestone's order" -ForegroundColor Cyan
     Write-Host "  ${p}Plan <id|file> -Remove                 Take it out of its milestone and its sprint" -ForegroundColor Cyan
     Write-Host "  ${p}Plan <id|file> -Remove -Only Sprint    Take it out of one (Milestone or Sprint), keep the other" -ForegroundColor Cyan
     Write-Host "  ${p}Plan -Help                             Show this help" -ForegroundColor Cyan
@@ -90,6 +109,9 @@ if ($Help) {
     Write-Host "  NewItem / EditItem have their own -Sprint, which sets a milestone through gh / az." -ForegroundColor Gray
     Write-Host "  Found in current/ or backlog/, and never pulled into play: a backlog card is" -ForegroundColor Gray
     Write-Host "  planned into a milestone before it is ever pulled into play." -ForegroundColor Gray
+    Write-Host "  A milestone's order is one file, milestones/<slug>.md beside current/: -Milestone" -ForegroundColor Gray
+    Write-Host "  adds the card at its bottom, -Rank moves it, -Remove takes it out. On an Azure" -ForegroundColor Gray
+    Write-Host "  DevOps Space the board keeps the order: -Rank refuses, and no order file is written." -ForegroundColor Gray
     Write-Host ""
     return
 }
@@ -107,6 +129,7 @@ if (-not (Test-P20HubRoot $promptsRoot)) {
 . (Join-Path $PSScriptRoot 'Resolve-CardName.ps1')
 . (Join-Path $PSScriptRoot 'Set-CardLine.ps1')
 . (Join-Path $PSScriptRoot 'Move-CardFolder.ps1')
+. (Join-Path $PSScriptRoot 'Get-MilestoneOrder.ps1')
 
 $p = Get-CliPrefix
 
@@ -131,9 +154,27 @@ if ($PSBoundParameters.ContainsKey('Only')) {
     }
 }
 
-if (-not $Milestone -and -not $Sprint -and -not $Remove) {
+if (-not $Milestone -and -not $Sprint -and -not $Remove -and -not $Rank) {
     Write-CliError -Message "no milestone or sprint given." `
-        -Hint "Pass '-Milestone ""<title>""' or '-Sprint ""<title>""' (or both) to plan the card, or '-Remove' to take it out of them."
+        -Hint "Pass '-Milestone ""<title>""' or '-Sprint ""<title>""' (or both) to plan the card, '-Rank top|up|down|<n>' to move it in its milestone's order, or '-Remove' to take it out of them."
+    exit 2  # stated refusal
+}
+if ($Rank -and $Remove) {
+    Write-CliError -Message "'-Rank' and '-Remove' do not go together." `
+        -Hint "'-Remove' takes the card out of its milestone and its order; '-Rank' moves it within the order."
+    exit 2  # stated refusal
+}
+if ($PSBoundParameters.ContainsKey('Rank') -and "$Rank".Trim() -notmatch '^(?i:top|up|down|[1-9][0-9]*)$') {
+    Write-CliError -Message "'-Rank $Rank' is not a place in an order." `
+        -Hint "Pass '-Rank top', '-Rank up', '-Rank down' or a position counted from 1, as in '-Rank 3'."
+    exit 2  # stated refusal
+}
+# On an Azure DevOps Space the board owns the order, and ToolKit keeps none: -Rank
+# refuses, and no order file is written by any switch (docs/hub/milestones.md).
+$keepsOrder = (Resolve-P20Tracker -OrgUrl ([string]$cfg.Org)) -ne 'ado'
+if ($Rank -and -not $keepsOrder) {
+    Write-CliError -Message "ranking lives in Azure DevOps; ${p}MyWork lists what is assigned to you." `
+        -Hint "On an Azure DevOps Space the board keeps a milestone's order. '${p}Plan <id> -Milestone' still writes the card's line."
     exit 2  # stated refusal
 }
 if (($Milestone -or $Sprint) -and $Remove) {
@@ -178,6 +219,43 @@ $noMilestone = '(none)'
 $label = Get-P20CardId -Name $file.Name -Pattern (Get-P20CardIdPattern -WorkItemTypes $types)
 if (-not $label) { $label = $file.Name }
 
+# A milestone's order lives beside the card folders of the card's own Space.
+$spaceDir = Split-Path (Split-Path $file.FullName -Parent) -Parent
+$milestonesDir = Get-P20MilestoneFolder -SpaceDir $spaceDir
+$cardId = Get-P20CardId -Name $file.Name -Pattern (Get-P20CardIdPattern -WorkItemTypes $types)
+
+function Get-OrderPath {
+    # milestones/<slug>.md, and whether a file there names a DIFFERENT milestone.
+    param([string]$Title)
+    $slug = ConvertTo-P20MilestoneSlug $Title
+    $path = if ($slug) { Join-Path $milestonesDir "$slug.md" } else { '' }
+    $other = ''
+    if ($path -and (Test-Path -LiteralPath $path)) {
+        $heading = Get-P20MilestoneTitle ([System.IO.File]::ReadAllText($path))
+        if ($heading -cne $Title) { $other = $heading }
+    }
+    return @{ Slug = $slug; Path = $path; Other = $other }
+}
+
+function Update-Order {
+    # The one write of a milestone's order: Add, Remove or Move the card's id.
+    # Returns $true when the file changed. An unchanged file is not written.
+    param([string]$Title, [string]$Action, [string]$To = '', [string[]]$Live = @())
+    $o = Get-OrderPath $Title
+    if (-not $o.Path -or $o.Other) { return $false }
+    if (Test-Path -LiteralPath $o.Path) {
+        $text = [System.IO.File]::ReadAllText($o.Path)
+        $next = Edit-P20MilestoneOrderText -Text $text -Id $cardId -Action $Action -To $To -Live $Live
+        if ($next -ceq $text) { return $false }
+        Write-CardText -Path $o.Path -Content $next
+        return $true
+    }
+    if ($Action -eq 'Remove') { return $false }
+    New-Item -ItemType Directory -Path $milestonesDir -Force | Out-Null
+    Write-CardText -Path $o.Path -Content (New-P20MilestoneOrderText -Title $Title -Id $cardId) -New
+    return $true
+}
+
 function Read-PlanState {
     # The card's two readings now, and whether it carries its own milestone line.
     param([string]$Path)
@@ -192,6 +270,52 @@ function Read-PlanState {
 
 $changed = $false
 $state = Read-PlanState $file.FullName
+$milestoneBefore = $state.Milestone
+
+# A refusal is decided before anything is written.
+if ($keepsOrder -and $cardId) {
+    if ($Milestone) {
+        $o = Get-OrderPath $Milestone
+        if (-not $o.Slug) {
+            Write-CliError -Message "'$Milestone' has no letter or digit to name its order file with." `
+                -Hint "Give the milestone a title with a word in it."
+            exit 2  # stated refusal
+        }
+        if ($o.Other) {
+            Write-CliError -Message "$((Get-P20Consts).folders.milestones)/$($o.Slug).md is the order of '$($o.Other)', not '$Milestone'." `
+                -Hint "Two milestone titles slug to the same file. Rename one milestone, on its cards and in that file's heading."
+            exit 2  # stated refusal
+        }
+    }
+    if ($Rank -and -not $Milestone -and -not $state.Milestone) {
+        Write-CliError -Message "$label carries no milestone, so it is in no order to rank." `
+            -Hint "Plan it into one first: '${p}Plan $label -Milestone ""<title>""', then '${p}Plan $label -Rank $Rank'."
+        exit 2  # stated refusal
+    }
+}
+if ($Rank -and -not $cardId) {
+    Write-CliError -Message "$($file.Name) carries no card id, so it cannot stand in an order." `
+        -Hint "An order lists cards by id; rename the file to the card's id shape, or plan a card that has one."
+    exit 2  # stated refusal
+}
+
+function Sync-Order {
+    # The card's milestone moved from $milestoneBefore to what it reads now: its id
+    # leaves the old order and joins the new one at the bottom. -Milestone also adds
+    # a card that already named the milestone, so an unranked card joins its order.
+    if (-not $keepsOrder -or -not $cardId) { return }
+    $now = (Read-PlanState $file.FullName).Milestone
+    if ($milestoneBefore -and $milestoneBefore -cne $now) {
+        if (Update-Order -Title $milestoneBefore -Action Remove) {
+            Write-Host "[+] $label left $milestoneBefore's order. ($((Get-OrderPath $milestoneBefore).Slug).md)" -ForegroundColor Green
+        }
+    }
+    if ($now -and ($now -cne $milestoneBefore -or $Milestone)) {
+        if (Update-Order -Title $now -Action Add) {
+            Write-Host "[+] $label is at the bottom of $now's order. ($((Get-OrderPath $now).Slug).md)" -ForegroundColor Green
+        }
+    }
+}
 
 if ($Remove) {
     if (-not $which) {
@@ -228,6 +352,7 @@ if ($Remove) {
         if ($changed) { Write-Host "[+] $label is out of its sprint. ($($file.Name))" -ForegroundColor Green }
         else { Write-Host "$label carries no sprint -- nothing written." -ForegroundColor Gray }
     }
+    Sync-Order
     exit 0
 }
 
@@ -256,5 +381,22 @@ if ($Sprint) {
         [void](Set-P20CardLine -Path $file.FullName -Stamp $sprintStamp -Value $Sprint)
         Write-Host "[+] $label is in sprint $Sprint. ($($file.Name))" -ForegroundColor Green
     }
+}
+Sync-Order
+
+if ($Rank) {
+    # Positions count the cards the order ranks; the members are the Space's open
+    # cards that name this milestone -- a stale line is never a step.
+    $title = (Read-PlanState $file.FullName).Milestone
+    $members = @(Get-P20SpaceOpenCards -SpaceDir $spaceDir -WorkItemTypes $types | Where-Object { [string]$_.Milestone -ceq $title } | ForEach-Object { [string]$_.Id })
+    $o = Get-OrderPath $title
+    $moved = Update-Order -Title $title -Action Move -To $Rank.Trim() -Live $members
+    $text = ''
+    if (Test-Path -LiteralPath $o.Path) { $text = [System.IO.File]::ReadAllText($o.Path) }
+    $read = Get-P20MilestoneOrder -Text $text -Title $title -Cards @(Get-P20SpaceOpenCards -SpaceDir $spaceDir -WorkItemTypes $types)
+    $place = [Array]::IndexOf([string[]]@($read.Ranked), [string]$cardId) + 1
+    $of = @($read.Ranked).Count
+    if ($moved) { Write-Host "[+] $label is #$place of $of in $title's order. ($($o.Slug).md)" -ForegroundColor Green }
+    else { Write-Host "$label is already #$place of $of in $title's order -- nothing written." -ForegroundColor Gray }
 }
 exit 0
