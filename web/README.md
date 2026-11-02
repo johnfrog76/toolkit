@@ -20,6 +20,10 @@ npx playwright install chromium   # once per machine, and only for `npm run smok
 npm run dev          # http://localhost:5174 -- or the next free port, which Vite prints
 ```
 
+`npm ci` asks nothing about install scripts: `package.json` `allowScripts` records a decision for every
+dependency that has one, all three denied because the prebuilt binaries cover each platform. A new one is
+reviewed with `npm install-scripts ls` -- [Contributing](../docs/CONTRIBUTING.md) has the rule.
+
 `tkWeb -Dev` does both of those in one command and **opens the browser** when a person typed it;
 `npm run dev` here is the half without the launcher. `tkWeb -NoBrowser` (or a `CI` variable, or a
 redirected stdout) skips the opening and prints the URL instead -- see the `Web` row in [the command reference](../docs/CLI.md#command-reference).

@@ -78,6 +78,17 @@ one `.nvmrc`, at the root, not a second copy in `web/`: `nvm use` (nvm-sh) finds
 and on nvm-windows, which does not read the file, run `nvm install 24` then `nvm use` with the version it
 installed. Without `engine-strict`, `npm ci` on an older Node warns (`EBADENGINE`) rather than refusing.
 
+**Install scripts are decided once, in the repository.** npm 11.19 and later skip a dependency's install script
+until `package.json` `allowScripts` says yes or no, and `npm install-scripts approve` or `deny` writes that
+answer into the file. `web/package.json` records a `false` for each of the three dev dependencies that have one:
+`@parcel/watcher` (it compiles from source only when asked to), `unrs-resolver` (a fallback that fetches the
+native binding when the optional dependency is missing) and `fsevents` (macOS only, and it ships its binary).
+The prebuilt binaries arrive as optional dependencies, so with all three skipped `npm test` and the lint pass on
+macOS and Linux, and the browser smoke on Windows; a fresh `npm ci` asks nothing and leaves `git status` clean. Approve nothing
+locally: that edits `package.json`, a change nobody meant to commit. A dependency update that brings a new
+install script shows up in `npm ci`'s warning and in `npm install-scripts ls`; review it there, and record the
+answer with `npm install-scripts approve <pkg>` or `deny <pkg>`, in the same pull request as the update.
+
 ## Run the suites
 
 One command runs all three halves and prints one verdict:

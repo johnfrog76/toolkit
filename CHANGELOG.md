@@ -33,6 +33,7 @@ release.
 
 ### Fixed
 
+- `npm ci` in `web/` no longer asks about install scripts: the decision for each dependency that has one is recorded in `web/package.json`, so approving one locally no longer leaves a change in your working tree. If you approved `@parcel/watcher` or `unrs-resolver` yourself, discard that edit to `web/package.json` before you pull.
 - A full `npm test` in `web/` on a busy machine no longer fails a test because a dialog took more than a second to appear; the web tests now wait up to 5 seconds for an element.
 - The web half's Markdown lint now runs on `re2js` 2.8.7, which fixes a regular-expression denial of service in 2.8.6.
 - The web UI's tests no longer fail now and then with `Test suite failed to run` while every test passes: `web/package.json` now asks for Node 24.22.0 or later, and `npm ci` on an older Node warns. Run `nvm install 24 && nvm alias default 24` to move up.
