@@ -277,6 +277,66 @@ def card_tags(content: str) -> list[str]:
     return [t.strip() for t in value.split(",") if t.strip()]
 
 
+_ORDER_HEADING = re.compile(r"^##[ \t]+Order[ \t]*$", re.IGNORECASE)
+_ANY_HEADING = re.compile(r"^#{1,6}[ \t]")
+_ORDER_BULLET = re.compile(r"^[ \t]*[-*+][ \t]+(\S+)")
+
+
+def milestone_slug(title: str) -> str:
+    """A milestone file's name without ``.md``: the title slugged the way a card's
+    slug is -- lowercased, every run of anything but a-z and 0-9 one hyphen,
+    trimmed, at most 60 characters. ``M2 -- 1.2.0`` is ``m2-1-2-0``. Mirror:
+    ``ConvertTo-P20MilestoneSlug``; ``Tests/fixtures/parsers/milestone-order.json``."""
+    slug = re.sub(r"[^a-z0-9]+", "-", (title or "").lower()).strip("-")
+    if len(slug) > 60:
+        slug = slug[:60].rstrip("-")
+    return slug
+
+
+def milestone_order_ids(text: str) -> list[str]:
+    """The ids in a milestone file's ``## Order``, in file order, each once: a
+    bullet's first word, up to the next heading. Mirror: ``Get-P20MilestoneOrderIds``."""
+    lines = (text or "").replace("\r\n", "\n").split("\n")
+    ids: list[str] = []
+    inside = False
+    for line in lines:
+        if not inside:
+            inside = bool(_ORDER_HEADING.match(line))
+            continue
+        if _ANY_HEADING.match(line):
+            break
+        m = _ORDER_BULLET.match(line)
+        if m and m.group(1) not in ids:
+            ids.append(m.group(1))
+    return ids
+
+
+def milestone_order(text: str, title: str, cards: list[dict]) -> dict:
+    """A milestone's order, the one reader in this half (docs/hub/milestones.md).
+
+    ``text`` is the milestone file ("" when there is none), ``title`` the
+    milestone, ``cards`` the Space's open cards as ``{id, milestone, created}``.
+    The ranked list is the file's ids that a card carrying that **Milestone:**
+    line still answers, in file order; then the members the file does not list,
+    by created day, oldest first (a card with no date last, ties by id) --
+    unranked, never dropped. An id with no card, or whose card names another
+    milestone, is skipped and counted as ``stale``; a reader never deletes it.
+
+    Mirror: ``Get-P20MilestoneOrder`` in ``Scripts/Get-MilestoneOrder.ps1``;
+    ``Tests/fixtures/parsers/milestone-order.json`` holds the two to one table."""
+    members = {str(c.get("id", "")): c for c in cards or [] if title and str(c.get("milestone") or "") == title}
+    ranked: list[str] = []
+    stale = 0
+    for cid in milestone_order_ids(text):
+        if cid in members:
+            ranked.append(cid)
+        else:
+            stale += 1
+    rest = [c for cid, c in members.items() if cid not in ranked]
+    rest.sort(key=lambda c: (str(c.get("created") or "") == "", str(c.get("created") or ""), str(c.get("id", ""))))
+    return {"ranked": ranked, "unranked": [str(c.get("id", "")) for c in rest], "stale": stale}
+
+
 def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES, folder: str = "") -> dict:
     """Extract the file-content-derived fields of PromptInfo.
 

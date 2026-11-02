@@ -92,12 +92,13 @@ export const TOKENS = consts.tokens as {
   tags: string;
 };
 
-/** The folders a card lives in -- in play, done, planned -- and the Space's folder for its pictures. */
+/** The folders a card lives in -- in play, done, planned -- the Space's folder for its pictures, and its folder of milestone orders. */
 export const FOLDERS = consts.folders as {
   current: string;
   archive: string;
   backlog: string;
   assets: string;
+  milestones: string;
 };
 
 /**

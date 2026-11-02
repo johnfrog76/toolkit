@@ -100,6 +100,8 @@ describe("consts.json", () => {
     expect(STAMPS.cover).toBe("**Cover:**");
     expect(STAMPS.before).toBe("**Before:**");
     expect(FOLDERS.assets).toBe("assets");
+    // A milestone's order: one file per milestone, the Space's sibling of the card folders.
+    expect(FOLDERS.milestones).toBe("milestones");
     expect(ASSETS.coverExtensions).toEqual(["png", "jpg", "jpeg", "webp", "gif"]);
     expect(ASSETS.coverMaxBytes).toBe(5242880);
     expect(consts.regex.dueLine).toBe(

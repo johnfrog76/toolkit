@@ -92,6 +92,7 @@ EXPECTED = {
     ("stamps", "cover"): "**Cover:**",
     ("stamps", "before"): "**Before:**",
     ("folders", "assets"): "assets",
+    ("folders", "milestones"): "milestones",
     ("assets", "coverExtensions"): ["png", "jpg", "jpeg", "webp", "gif"],
     ("assets", "coverMaxBytes"): 5242880,
     ("regex", "dueLine"): r"(?m)^\*\*Due:\*\*[ \t]*(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?",
@@ -407,6 +408,7 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.folder_backlog(), EXPECTED[("folders", "backlog")])
         self.assertEqual(C.status_backlog(), EXPECTED[("status", "backlog")])
         self.assertEqual(C.folder_assets(), EXPECTED[("folders", "assets")])
+        self.assertEqual(C.folder_milestones(), EXPECTED[("folders", "milestones")])
         self.assertEqual(C.stamp_cover(), EXPECTED[("stamps", "cover")])
         self.assertEqual(C.stamp_before(), EXPECTED[("stamps", "before")])
         self.assertEqual(list(C.cover_extensions()), EXPECTED[("assets", "coverExtensions")])

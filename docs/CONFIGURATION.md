@@ -561,7 +561,9 @@ strings and patterns the CLI, the agent and the web UI must agree on to the char
 `**Closed:**` and `**Created:**`, the `PR URL:` line, the `## PR Review Comments` heading, the
 state names `Backlog` / `Active` / `In Progress` / `Code Review` / `Done`, the `current`, `archive` and
 `backlog` folder names (`backlog/` is a Space's third card folder: cards planned, not yet in play -- [the
-card](hub/cards.md), "State is derived, never stored"), the `reviews/` file name and its `+` slug-set separator, the two regexes that derive a
+card](hub/cards.md), "State is derived, never stored"), and `milestones`, the Space's folder of milestone
+orders (`folders.milestones`: one file per milestone, `milestones/<slug>.md`, written by `Plan` alone and
+read by `Get-P20MilestoneOrder` and `milestone_order()` -- [milestones](hub/milestones.md)), the `reviews/` file name and its `+` slug-set separator, the two regexes that derive a
 card's state, **the shape of a card's id** (`regex.cardId`: a work item number, or the
 four-character id of a card with no work item -- at least one letter and one digit, no look-alike
 characters, uppercase; see [The workflow](CLI.md#the-workflow) and [the card](hub/cards.md), "The filename"),
