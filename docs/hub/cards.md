@@ -346,6 +346,22 @@ fails on that side. It only holds for shapes a fixture HAS: `review-heading-no-u
 `## PR Review Comments` heading with no `PR URL:` line is not Code Review, on either side.
 **Add a rule, add a fixture -- and assert it from both suites.**
 
+**The landed bullet.** `Land` records the commit a pull request was merged as -- the line a person used
+to type by hand at the card's foot -- in one shape:
+
+```text
+- c84c6e3 #175 squash-merged to main 2026-10-30
+```
+
+The merge commit's first seven characters, the pull request's number, the branch it was merged into and
+the merge's local day. It goes under `Commits:`, after the branch's own commits, through the rule
+`ThreadHash` writes by (`Scripts/Add-CommitBullet.ps1`), and it is a commit bullet like any other: it
+matches `regex.commitBullet`, so it counts in `commits`, and a card carrying only it would read **In
+Progress** by row 4 -- but `Land` archives the card next, and row 2, the folder, is read first, so the
+card reads **Done**. In an archived card it is the record of what landed, not a state. A hand-written one
+at the card's foot is read the same way, and `Land` does not add a second: it looks for the hash anywhere
+in the card.
+
 Not a state: **a status field**, of any kind. Planned is now a FOLDER -- `backlog/`, whose cards read as
 Backlog because of where they are -- and not a word a card carries: there is no `Status: Planned` line,
 no priority and no order within the backlog, and nothing a reader should look for. A card with no pull
@@ -469,6 +485,7 @@ keeps the same edit rule -- the card's own line ending, no BOM.
 | `Cover` | copies a picture into `<space>/assets/<card key>/` and writes `**Cover:**` (or `**Before:**`); `-Remove` deletes both. `NewPrompt -Cover` / `-Before` attach the same way at birth |
 | `Move` | adds `**Started:**` or `**Review:**` with today's date (a `backlog/` card moved to `current/` first); `-To Done` is `Archive`; `-To Active` / `-To Backlog` move the file between `backlog/` and `current/` and write nothing |
 | `Archive` | moves it from `current/` or `backlog/` to `archive/`, stamps `**Closed:**`, refreshes its package links. Already in `archive/` (by id or exact name): says so, exit 0 |
+| `Land` | once the tracker says its pull request is merged: adds the landed bullet under `Commits:` (below), then closes the issue through `CloseItem` and archives through `Archive`, each as it is. Finds the card in `archive/` too, and writes into it there -- never a second round. A step already done is skipped |
 
 ## A whole card
 

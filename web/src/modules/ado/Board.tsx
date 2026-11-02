@@ -46,6 +46,7 @@ import { usePlanCard } from "./PlanCardDialog";
 import type { PlanKind } from "./PlanCardDialog";
 import { cardPath } from "./paths";
 import { countInPlay, inPlayLine } from "./inPlay";
+import { useLandCard } from "./useLandCard";
 import { useRemindAbout } from "./useRemindAbout";
 
 // The board: the same cards as the list, arranged by where they ARE.
@@ -168,6 +169,7 @@ interface BoardCardProps {
   onToggleBillable: () => void;
   onCreatePR: () => void;
   onRemind: () => void;
+  onLand: () => void;
   onPlan: (kind: PlanKind) => void;
   context: CardActionContext;
 }
@@ -180,6 +182,7 @@ function BoardCard({
   onToggleBillable,
   onCreatePR,
   onRemind,
+  onLand,
   onPlan,
   context,
 }: BoardCardProps) {
@@ -215,6 +218,7 @@ function BoardCard({
           onToggleBillable={onToggleBillable}
           onCreatePR={onCreatePR}
           onRemind={onRemind}
+          onLand={onLand}
           onPlan={onPlan}
         />
       </div>
@@ -284,6 +288,7 @@ export function Board() {
   const actionContext = useCardActionContext();
   const billing = useBillableToggle();
   const remind = useRemindAbout();
+  const land = useLandCard();
   const plan = usePlanCard();
   const [sprint, setSprint] = useState("All");
   const [milestone, setMilestone] = useState("All");
@@ -493,6 +498,11 @@ export function Board() {
             {remind.added}
           </StatusMessage>
         ) : null}
+        {land.landed ? (
+          <StatusMessage status="success" onDismiss={land.clearLanded}>
+            {land.landed}
+          </StatusMessage>
+        ) : null}
         {plan.done ? (
           <StatusMessage status="success" onDismiss={plan.clearDone}>
             {plan.done}
@@ -582,6 +592,7 @@ export function Board() {
                       onToggleBillable={() => billing.toggle(p)}
                       onCreatePR={() => setDialogTab("pr")}
                       onRemind={() => remind.open(p)}
+                      onLand={() => land.open(p)}
                       onPlan={(kind) => plan.open(p, kind)}
                       context={actionContext}
                     />
@@ -605,6 +616,7 @@ export function Board() {
         tab={dialogTab ?? "create"}
       />
       {remind.dialog}
+      {land.dialog}
       {plan.dialog}
     </section>
   );

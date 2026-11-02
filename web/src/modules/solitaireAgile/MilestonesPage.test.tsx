@@ -1,6 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render as rtlRender,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import type { ReactElement } from "react";
 import type { Milestone } from "../ado/api.ado";
 import type { MilestonesResponse } from "./api.solitaireAgile";
 import {
@@ -13,7 +21,13 @@ import {
   tookLine,
 } from "./award";
 import { resetCelebrateMemory } from "./celebrate";
+import { ConfettiProvider } from "../../shell/ConfettiProvider";
+import { TROPHY_NAME } from "./Trophy";
 import { MilestonesPage, STAGE_WORDS, countWords } from "./MilestonesPage";
+
+// Every render is under the app's one confetti mount, as the page is in the app: the
+// dialog throws through useConfetti() and the burst is drawn at that root.
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: ConfettiProvider });
 
 // The Milestones tab (docs/modules/solitaire-agile.md, "Milestones: the tab and the
 // award"): one row per milestone with the tracker's own numbers on its bar, and the
@@ -214,13 +228,18 @@ describe("the Milestones tab", () => {
     expect(lines.map((l) => l.textContent)).toEqual(
       BOTH().map((m) => `${m.title}: ${tookLine(m)}`),
     );
-    expect(within(d).getByTestId("award-picture")).toBeTruthy();
-    // The confetti is the dialog's: drawn inside its surface, and nowhere else.
-    await waitFor(() => expect(within(d).getAllByTestId("confetti")).toHaveLength(1));
-    expect(screen.getAllByTestId("confetti")).toHaveLength(1);
+    // The picture is the gold trophy, by its accessible name, and the wordmark is gone.
+    const picture = within(d).getByTestId("award-picture");
+    const trophy = within(picture).getByRole("img", { name: TROPHY_NAME, hidden: true });
+    // ...and it is the ONLY drawing in the box: the wordmark stand-in is gone.
+    expect(Array.from(picture.querySelectorAll("svg"))).toEqual([trophy]);
+    // The confetti is the app's: one burst, drawn at the root over the viewport, so it is
+    // NOT inside the dialog's surface.
+    await waitFor(() => expect(screen.getAllByTestId("confetti")).toHaveLength(1));
+    expect(within(d).queryByTestId("confetti")).toBeNull();
     expect(stateOf(REACHED_OPEN)).toBe(STAGE_WORDS.reached);
     // The burst ends itself and is not thrown again while the dialog stays.
-    fireEvent.click(within(d).getByTestId("confetti"));
+    fireEvent.click(screen.getByTestId("confetti"));
     await waitFor(() => expect(screen.queryByTestId("confetti")).toBeNull());
     expect(bursts).toHaveLength(1);
 
@@ -320,9 +339,12 @@ describe("the Milestones tab", () => {
   });
 });
 
-// Confetti.tsx is the one component, and the award dialog is its one caller: no other
-// file in the web tree imports it, or the package behind it.
-describe("the confetti's one caller", () => {
+// One mount, one hook (docs/modules/solitaire-agile.md, "Milestones: the tab and the
+// award"): the wrapper (shared/Confetti.tsx) is the one importer of the package, the
+// shell's ConfettiProvider is the one place that mounts the wrapper, and the award
+// dialog is the one caller of useConfetti() -- confetti with no dialog around it to say
+// why read as a glitch.
+describe("the confetti: one mount, one hook, one caller", () => {
   const SRC = path.resolve(__dirname, "../..");
   const files = (dir: string): string[] =>
     fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -330,17 +352,24 @@ describe("the confetti's one caller", () => {
       if (e.isDirectory()) return files(p);
       return /\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name) ? [p] : [];
     });
-  it("is AwardDialog.tsx", () => {
-    const rel = (p: string) => path.relative(SRC, p).split(path.sep).join("/");
-    const callers = files(SRC)
-      .filter((p) =>
-        /from\s+["'](?:\.{1,2}\/)+(?:[\w/]*\/)?Confetti["']/.test(fs.readFileSync(p, "utf8")),
-      )
+  const rel = (p: string) => path.relative(SRC, p).split(path.sep).join("/");
+  const reading = (re: RegExp) =>
+    files(SRC)
+      .filter((p) => re.test(fs.readFileSync(p, "utf8")))
       .map(rel);
-    expect(callers).toEqual(["modules/solitaireAgile/AwardDialog.tsx"]);
-    const pkg = files(SRC)
-      .filter((p) => /from\s+["']react-confetti["']/.test(fs.readFileSync(p, "utf8")))
-      .map(rel);
-    expect(pkg).toEqual(["modules/solitaireAgile/Confetti.tsx"]);
+  it("the package is the wrapper's alone", () => {
+    expect(reading(/from\s+["']react-confetti["']/)).toEqual(["shared/Confetti.tsx"]);
+  });
+  it("the wrapper is mounted in one place, the shell's root, and only as a lazy part", () => {
+    // A static import or a dynamic import() of the wrapper, from anywhere in the tree.
+    expect(reading(/(?:from\s+|import\()["'](?:\.{1,2}\/)+(?:[\w/]*\/)?Confetti["']/)).toEqual([
+      "shell/ConfettiProvider.tsx",
+    ]);
+    expect(reading(/from\s+["'](?:\.{1,2}\/)+(?:[\w/]*\/)?Confetti["']/)).toEqual([]);
+  });
+  it("the provider is mounted once, at the root, and the award dialog is the one caller", () => {
+    expect(reading(/<ConfettiProvider>/)).toEqual(["shell/main.tsx"]);
+    // A CALL of the hook -- `= useConfetti()` --, not a comment that names it.
+    expect(reading(/=\s*useConfetti\(\)/)).toEqual(["modules/solitaireAgile/AwardDialog.tsx"]);
   });
 });

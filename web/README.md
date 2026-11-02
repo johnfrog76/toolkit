@@ -97,7 +97,9 @@ web/
     │   ├── App.tsx         theme, nav, the /env gate, Home's tabs, System's pager, the <Routes> table
     │   ├── SpaceAnchor.tsx the Space pill at the left of the nav, which IS the Home entry
     │   ├── SettingsDrawer.tsx  the one settings surface; the avatar in the nav bar opens it
-    │   ├── main.tsx        Provider + BrowserRouter + App
+    │   ├── main.tsx        Provider + BrowserRouter + ConfettiProvider + App
+    │   ├── ConfettiProvider.tsx  the app's one confetti mount: the burst over the viewport, a lazy part, thrown through useConfetti()
+    │   ├── layers.ts       the stacking layers, named once: Fluent's portal layer and the confetti's above it
     │   ├── themeList.ts    the named themes, as plain data -- adding one is adding a record
     │   ├── theme.ts        a named theme made into a Fluent theme (the accent ramp), and the noise overlay
     │   ├── ThemePicker.tsx the first section of the settings drawer
@@ -140,7 +142,8 @@ web/
     │   ├── agenda.ts       the Agenda's words: the long day, the lane heading, each tile's one fact
     │   ├── TriagePage      one open issue at a time, unplaced first: milestone, severity, size; each answer one Route
     │   ├── MilestonesPage  one row per milestone, its bar the tracker's numbers; the award queue (award.ts)
-    │   ├── AwardDialog     the award -- congratulations, what it took, the picture -- and Confetti's one caller
+    │   ├── AwardDialog     the award -- congratulations, what it took, the trophy -- and useConfetti()'s one caller
+    │   ├── Trophy          the award's picture: a gold trophy, an inline SVG
     │   └── stage/          the played view: one lazy chunk with the deck engine
     │       ├── cast.tsx        the Remote Standup's atoms, by copy from the Wasteland (no bios); reduced motion stills them
     │       ├── seats.ts        the nine seats, the plates (role · persona (label)), the deal of workers onto seats
@@ -155,10 +158,10 @@ web/
     ├── shared/           reusable UI: PageCard, Pagination, FilterBadge, listRowStyles (the house list row), MarkdownViewer, ImageDropZone (one picture in: drop, paste, or a file; C2),
     │                     StatusMessage (a live region: role=status, role=alert for an error), StatTile (the one way a card counts), CardActions,
     │                     ConfirmDialog and CreateButton (one grammar for acting), ToolKitLogo over Wordmark (the SVG mark, its outlines in wordmarkPaths.ts),
-    │                     usePersistedState, faces, health,
+    │                     usePersistedState, faces, health, Confetti (the one wrapper over react-confetti; the root mounts it),
 │                     thinScrollbar (the one themed scrollbar -- spread it, never retype it), ...
     ├── hooks/            reusable logic: useWornTheme (and the store's useCurrentTheme), usePagination, useFacePref,
-    │                     chartPalette, useUserRefetch
+    │                     chartPalette, useUserRefetch, useConfetti (the one way to throw confetti)
     └── utility/          formatters: abbreviate, and dates -- the ONE place the clock is read
                           (Luxon: local day, days ago, next weekday, last month, due in words,
                           timeAgo, formatDate); never toISOString for a day -- a test greps for it
@@ -518,6 +521,7 @@ row that draws them, and listed here. Two kinds, both named:
 
 | Move | Word | Icon | Kind | Where |
 | --- | --- | --- | --- | --- |
+| `card.land` | Land | `AirplaneLandingRegular` | one record | a Code Review card, list and board |
 | `card.createPr` | Create PR | `ArrowUploadRegular` | one record | a card, list and board |
 | `card.markNotBillable` | Mark not billable | `MoneyRegular` | one record | a card |
 | `card.makeBillable` | Make billable again | `MoneyRegular` | one record | a card |
@@ -1071,7 +1075,12 @@ are prompts, and agile lanes are a better view for how multiple items flow for h
   card at all, **disabled with a reason** (`CardAction.whyNot`, drawn as the menu item's `secondaryContent`
   and in the exposed button's tooltip) when it applies but not yet. The primary is *Open the card*. The
   menu: *Move to* each lane ahead (from `legalMoves`; the lanes behind are present, disabled, "A card
-  travels one way."), *Archive (move to Done)* -- which asks first, in both views -- then *Create PR*, the
+  travels one way."), *Archive (move to Done)* -- which asks first, in both views -- then *Land* on every Code
+  Review card, either tracker (absent on every other lane), which asks first and runs the CLI's `Land` verb
+  through `POST /api/cmd/Land` (`useLandCard.tsx`) -- the merge recorded, the issue closed, the card
+  archived; the verb asks the tracker whether the pull request merged, and an unmerged one is its refusal,
+  shown in the confirm --
+  then *Create PR*, the
   billable toggle, *Remind me about this* while organize is on, and last *Open on GitHub* or *Open on
   Azure DevOps*, absent on a card with no work item and whenever ADO is off. **Create PR** is
   absent with ADO off, on a card with no work item and on a Done card; disabled while the file records no
@@ -1605,7 +1614,7 @@ paragraph:
 | `src/modules/communication/sendButton.test.ts` | The send button's three states -- including that it is **absent** rather than disabled when the workflow has no send, and that what goes out is the Agenda and never the self-assessment |
 | `src/modules/growth/registry.growth.test.tsx` | The registry contract from growth's side: off contributes no route, nav entry or card; on contributes its three routes and its one nav entry, and no home cards of its own |
 | `src/modules/communication/registry.communication.test.tsx` | The same from communication's side: off contributes nothing; on contributes exactly its seven routes, including the three redirects |
-| `src/modules/ado/cardActions.test.ts` | What a card offers in the list and on the board, as a table: an ADO card and a card with no work item at every state, with Azure DevOps on and off -- every action present, which are disabled, and each one's reason. Absent is not disabled: Open on the tracker and Create PR are absent where they can never apply, and Create PR is disabled, naming `ThreadHash`, while no commit is recorded |
+| `src/modules/ado/cardActions.test.ts` | What a card offers in the list and on the board, as a table: an ADO card and a card with no work item at every state, with Azure DevOps on and off -- every action present, which are disabled, and each one's reason. Absent is not disabled: Open on the tracker and Create PR are absent where they can never apply, and Create PR is disabled, naming `ThreadHash`, while no commit is recorded; Land is present on every Code Review card, on either tracker and with ADO on or off, never disabled, first of what you do with the card, and absent on every other lane |
 | `src/shared/rowVocabulary.test.ts` | One vocabulary for every row's menu: reads every source file and fails on a row action typed by hand, an own move that is a vocabulary move under another word or wears its icon, a word on two records, and a README that disagrees -- and proves it on rows written wrong on purpose ([One vocabulary for row actions](#one-vocabulary-for-row-actions)) |
 | `src/modules/ado/logChart.test.ts` | The Log card's chart puts the oldest day on the left whatever order the agent serves entries in, and its badge says `latest 500` only when the answer was cut at the cap and nothing narrows it |
 | `src/modules/ado/promptFilters.test.ts` | The predicates the list and the board share: state, sprint, text -- an exact id, a substring, the words in any order and never a typo -- type with Untyped inside All, the type row counted from the cards, and the unlinked cards a repo filter hid; and linkedness as a table: All / Linked / Custom over ADO-born, GitHub-born and custom cards, composed with the other filters, counted from the cards, and when the row is drawn -- a mixed Space, never an all-custom or all-linked one unless a filter is active |
@@ -1613,6 +1622,7 @@ paragraph:
 | `src/modules/ado/Board.badge.test.tsx` | The board's card face in a mixed Space: a GitHub-born, an ADO-born and a custom card each wear their own chip, the custom one none |
 | `src/modules/ado/FilterDrawer.test.tsx` | The drawer's linkedness row: drawn in a mixed Space with counts from the cards, a badge sets its filter and the active one sets All back, absent where every card is custom, kept while a filter is active |
 | `src/modules/ado/billingNote.test.ts` | The sentence under the week on Daily Activity: what it was built from, and the cards that are NOT on it and why -- singular and plural, silence for a count of zero, and the git clause only for a hub that has git |
+| `src/modules/ado/useLandCard.test.tsx` | Land asks first, naming the card; Land runs `POST /api/cmd/Land` with the card's file and says once that it landed; a refusal keeps the confirm open with the verb's own sentence; Cancel runs nothing |
 | `src/modules/ado/useBillableToggle.test.ts` | The toggle offers the opposite of what the card says now, and says what the change means for Daily |
 | `src/hooks/useFacePref.test.tsx` | A browser that refuses storage: with `localStorage.getItem` throwing BEFORE the Face store is imported -- its read runs at module scope, in the shell, through the logo -- the store answers the default face and the logo renders; with `setItem` throwing, a chosen face holds for the session and nothing is kept |
 | `src/hooks/useCurrentTheme.test.ts` | A theme choice in a browser that refuses storage: with every storage call throwing, a chosen theme holds for the session, and a fresh load of the store answers the default again; where storage keeps, a fresh load answers the choice |

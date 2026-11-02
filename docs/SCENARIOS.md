@@ -140,6 +140,17 @@ The board's card and the list's row draw one action model (`cardActions.ts`), so
 | off, or not configured | the billable toggle, then **Plan milestone**, **Plan sprint** and **Tag** (on a card in play or planned) -- ending on **Tag**; no reminder item, and nothing of Organize is fetched |
 | on | the same, then **Remind me about this**: Organize's New Reminder dialog, the card's title as what and its id as the ref (`docs/modules/organize.md`, "The web UI") |
 
+### A card's menu, by its pull request (`scenarios.test.tsx`; the dialog is `useLandCard.test.tsx`)
+
+The same one action model, by the card's lane alone. The board's data is the files and asks no
+tracker, so nothing here knows whether the pull request merged: `Land` asks, and an unmerged pull
+request is its stated refusal, shown in the confirm.
+
+| The card | **Land** in its `...` |
+| --- | --- |
+| Code Review -- a GitHub pull request, an Azure DevOps one, or a person's `**Review:**` line | present, first of what you do with the card: it asks, then runs `Land` -- the merge recorded, the issue closed, the card archived -- or shows `Land`'s refusal (not merged yet, no pull request named) in the confirm |
+| any other lane | absent |
+
 ### The board's lanes, by a card's status (`scenarios.test.tsx`; the rule is `legalMoves.ts`)
 
 Five lanes on a local or GitHub Space, in this order, and **four on an Azure DevOps Space, which has
@@ -430,7 +441,7 @@ under Team Agile's one entry").
 | `GET /api/ritual/milestones` answers | The page shows |
 | --- | --- |
 | milestones, none reached and not yet awarded | one row each, in flight first: the title, its state (`open`, `awarded`, `no issues yet`), a bar of closed over total with `5 of 8 closed` under it, `due <day>` where there is one, `closed on the tracker` where GitHub closed it, and its GitHub link; no dialog, no confetti |
-| a reached milestone this browser has not awarded | the award dialog over the tab: `Congratulations: <title> reached!`, `12 issues closed, 1 October 2026 to 24 October 2026.`, the picture (the Team Agile wordmark, a stand-in), and confetti once inside it -- nothing rains under reduced motion. Close: the next one waiting, else the tab with it `awarded` |
+| a reached milestone this browser has not awarded | the award dialog over the tab: `Congratulations: <title> reached!`, `12 issues closed, 1 October 2026 to 24 October 2026.`, a gold trophy, and confetti once over the whole app -- nothing rains under reduced motion. Close: the next one waiting, else the tab with it `awarded` |
 | the same, a later visit (the browser's mark set) | the tab, the milestone `awarded`, no dialog, no confetti |
 | a milestone with no issues | `no issues yet`, open or closed on GitHub; never reached, never awarded |
 | no tracker (`tracker.ok` false) | `Could not read the milestones`, with the reason |

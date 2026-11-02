@@ -1,4 +1,5 @@
 import {
+  AirplaneLandingRegular,
   AlertRegular,
   ArrowUploadRegular,
   CalendarLtrRegular,
@@ -48,6 +49,13 @@ import type { Lane } from "./legalMoves";
 //   - enabled otherwise. It opens the Create PR dialog, and the dialog asks
 //     for the work item id: typing it is the deliberate step.
 //
+// Land, decided here: present on every Code Review card, on either tracker,
+// and absent on every other lane. Nothing here knows whether the pull request
+// merged -- the board's data is the files, and asks no tracker. The VERB is the
+// gate: it asks the tracker, and an unmerged pull request comes back as Land's
+// own stated refusal, shown in the confirm like any refusal. It is the first of
+// what you do with the card, and the view asks before it runs.
+//
 // Remind me about this, decided here: present only while the organize module
 // is on (`/env` features.organize) -- off means absent, so with the flag off
 // the menu does not name a module that is not there. It is the last item, and
@@ -69,6 +77,7 @@ export type CardActionId =
   | "open-ado"
   | "open-card"
   | "move"
+  | "land"
   | "billable"
   | "create-pr"
   | "milestone"
@@ -80,6 +89,7 @@ export type CardActionId =
  *  shared vocabulary (shared/CardActions ROW): Open the card, Move to <lane>,
  *  Archive (move to Done), and Open on <tracker>. */
 export const CARD_MOVES = defineRowMoves("card", {
+  land: { word: "Land", icon: AirplaneLandingRegular },
   createPr: { word: "Create PR", icon: ArrowUploadRegular },
   markNotBillable: { word: "Mark not billable", icon: MoneyRegular },
   makeBillable: { word: "Make billable again", icon: MoneyRegular },
@@ -190,6 +200,9 @@ export function cardActions(card: ActionCard, ctx: CardActionContext): CardActio
 
   const secondary: CardActionSpec[] = [...lanes];
 
+  if (card.status === STATUS.codeReview) {
+    secondary.push(spec("land", CARD_MOVES.land));
+  }
   if (ado && card.status !== STATUS.done) {
     const whyNot = whyNotCreatePR(card, ctx);
     secondary.push(
