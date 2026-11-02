@@ -99,6 +99,7 @@ web/
     │   ├── SettingsDrawer.tsx  the one settings surface; the avatar in the nav bar opens it
     │   ├── main.tsx        Provider + BrowserRouter + ConfettiProvider + App
     │   ├── ConfettiProvider.tsx  the app's one confetti mount: the burst over the viewport, a lazy part, thrown through useConfetti()
+    │   ├── layers.ts       the stacking layers, named once: Fluent's portal layer and the confetti's above it
     │   ├── themeList.ts    the named themes, as plain data -- adding one is adding a record
     │   ├── theme.ts        a named theme made into a Fluent theme (the accent ramp), and the noise overlay
     │   ├── ThemePicker.tsx the first section of the settings drawer

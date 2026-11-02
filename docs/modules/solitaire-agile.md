@@ -929,7 +929,7 @@ award yet.) Under `prefers-reduced-motion` the dialog opens and nothing rains.
 
 **The confetti** (D-AR14) belongs to the whole app, and it is mounted once: `shell/ConfettiProvider.tsx`
 wraps the app near its root (`shell/main.tsx`) and draws the burst there, over the whole viewport, outside
-every page's and dialog's tree -- on a layer of its own just above Fluent's portals (`CONFETTI_LAYER`), so it
+every page's and dialog's tree -- on a layer of its own just above Fluent's portals (`CONFETTI_LAYER` in `shell/layers.ts`), so it
 falls over an open dialog and its backdrop, and never takes a click. A caller does not mount anything -- it throws, through the `useConfetti()`
 hook (`hooks/useConfetti.ts`), which returns `throwConfetti()`. One call is one burst; a call while a burst
 is still raining is absorbed into it; under `prefers-reduced-motion` a call does nothing. The burst is still

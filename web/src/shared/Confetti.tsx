@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import ReactConfetti from "react-confetti";
 import { prefersReducedMotion } from "../hooks/useConfetti";
+import { CONFETTI_LAYER } from "../shell/layers";
 
 // The celebration (D-AR14; docs/modules/solitaire-agile.md, "Milestones: the tab and
 // the award"): confetti over the whole viewport, once -- no backend, no sound, no
@@ -19,11 +20,6 @@ import { prefersReducedMotion } from "../hooks/useConfetti";
 /** How many pieces one burst throws: enough to fill the screen, few enough to finish
  *  in a few seconds with recycle off. */
 export const CONFETTI_PIECES = 400;
-
-/** The burst's layer: just above Fluent's portal layer (its FluentProvider portals sit at
- *  z-index 1000000), so the party falls OVER a dialog and its backdrop rather than under
- *  them. It never takes a click: pointer-events are off. */
-export const CONFETTI_LAYER = 1000001;
 
 function viewport(): { width: number; height: number } {
   return { width: window.innerWidth || 0, height: window.innerHeight || 0 };
