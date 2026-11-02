@@ -10,27 +10,27 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
-import { useState } from "react";
+import { useEffect, useRef } from "react";
 import { DialogDismiss } from "../../shared/DialogDismiss";
-import { Wordmark } from "../../shared/Wordmark";
-import { useFacePref } from "../../hooks/useFacePref";
-import { useWornTheme } from "../../hooks/useWornTheme";
 import type { Milestone } from "../ado/api.ado";
 import { awardTitle, tookLine } from "./award";
-import { Confetti } from "./Confetti";
+import { Trophy } from "./Trophy";
+import { useConfetti } from "../../hooks/useConfetti";
 
 // The award (docs/modules/solitaire-agile.md, "Milestones: the tab and the award"):
 // the ONE place Team Agile celebrates. When a milestone is reached and the person
 // next opens the Milestones tab, this dialog says so -- "Congratulations: <title>
-// reached!", one line of what it took, the picture -- and throws the confetti once,
-// inside the dialog's moment and nowhere else. It is the one caller of
-// <Confetti> (a test holds that); the PM Corner only points here.
+// reached!", one line of what it took, the gold trophy -- and throws the confetti once,
+// when it opens. The burst is the app's, drawn at the shell's root over the whole
+// viewport (shell/ConfettiProvider.tsx); this dialog only says when, through
+// useConfetti(), and is its one caller (a test holds that); the PM Corner only
+// points here.
 //
 // Whether it opens is the page's business (award.ts: once per Space and milestone
 // per browser); this component draws one award and says when it is closed.
 //
-// A lazyPart of the Milestones page (shell/lazy.tsx), so the confetti package's
-// bytes are fetched only when an award is first drawn.
+// A lazyPart of the Milestones page (shell/lazy.tsx); the confetti's own bytes are
+// the root's lazyPart, fetched only when this dialog first throws.
 
 const useStyles = makeStyles({
   surface: { maxWidth: "440px" },
@@ -45,32 +45,8 @@ const useStyles = makeStyles({
   took: { color: tokens.colorNeutralForeground2 },
 });
 
-/**
- * The award's picture.
- *
- * NOT DRAWN YET: the real picture -- the team lead of the standup's cast, lifting
- * weights -- is drawn in the studio and shipped the way slide art is. Until it
- * lands, the dialog wears the Team Agile wordmark (the app's own mark, in the worn
- * theme's colours, with the face the person chose) as the stand-in. Swapping it is
- * ONE line: point AWARD_PICTURE at the picture's component.
- */
-function WordmarkStandIn() {
-  const { theme, active } = useWornTheme();
-  const { faceId } = useFacePref();
-  return (
-    <Wordmark
-      size={200}
-      ink={tokens.colorNeutralForeground1}
-      blob={active.logo}
-      face={faceId}
-      theme={theme}
-      title=""
-    />
-  );
-}
-
-/** The picture the award shows -- the stand-in until the real one is drawn. */
-export const AWARD_PICTURE = WordmarkStandIn;
+/** The picture the award shows: the gold trophy (Trophy.tsx), in the 200px box. */
+export const AWARD_PICTURE = Trophy;
 
 export function AwardDialog({
   milestones,
@@ -80,9 +56,15 @@ export function AwardDialog({
   onClose: () => void;
 }) {
   const styles = useStyles();
-  // One burst for this dialog's moment: it ends itself and is not drawn again
-  // while the dialog stays open.
-  const [raining, setRaining] = useState(true);
+  // One burst for this dialog's moment, thrown when it opens: it ends itself and is
+  // not thrown again while the dialog stays open.
+  const throwConfetti = useConfetti();
+  const thrown = useRef(false);
+  useEffect(() => {
+    if (thrown.current) return;
+    thrown.current = true;
+    throwConfetti();
+  }, [throwConfetti]);
   const Picture = AWARD_PICTURE;
   return (
     <Dialog open onOpenChange={(_e, d) => !d.open && onClose()}>
@@ -113,7 +95,6 @@ export function AwardDialog({
             </Button>
           </DialogActions>
         </DialogBody>
-        {raining && <Confetti onDone={() => setRaining(false)} />}
       </DialogSurface>
     </Dialog>
   );
