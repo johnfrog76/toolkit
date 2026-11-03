@@ -12,8 +12,14 @@
     "storeSync": "git" and NO config.local.json names it, so what is proved is
     the resolution as well as the behaviour: Sync commits, rebases in the other
     machine's commit and pushes its own. A second run with a config.local.json
-    that says "none" proves the machine still has the last word. These run
-    everywhere; they need git and a child pwsh, not hooks.
+    that says "none" proves the machine still has the last word. A third pair of
+    clones archives a card on one machine and creates one from the same
+    template on the other, and Sync through the verb must rebase without a
+    conflict and leave each card in its folder (the pull turns folder-rename
+    detection off). A fourth pair does the same while this machine also edits
+    the card being archived, and the edit must follow the card into archive/
+    (file-rename detection stays on). These run everywhere; they need git and a child pwsh, not
+    hooks.
 
     HOOKS — an isolated temp git repo with core.hooksPath pointed at a copy of
     the repo's tracked hooks/ folder, $global:P20Config stubbed at it, and
@@ -662,6 +668,163 @@ else {
         Remove-SyncSandbox $rs7.Base
     }
 }
+
+Write-Host ""
+
+# ── Test 8: One machine archives, the other creates, and Sync applies (#200) ─
+#
+# Two clones of one hub. The other machine archives the hub's only card in
+# current/ (a move to archive/, as Archive commits it) and pushes; this machine
+# has meanwhile created a new card in current/ from the same template, and runs
+# Sync. With git's rename detection on, the rebase reads the move as current/
+# being renamed to archive/ and the new card as one that should have followed
+# it -- "CONFLICT (file location)" -- and Sync aborts with nothing synced,
+# though the two files never touch. Sync's pull turns folder-rename detection
+# off, so the rebase applies and both cards are where they belong. Through the verb in
+# a fresh shell, so it is Sync as typed that is proved.
+
+Write-Host "── An archive on one machine and a new card on the other ──" -ForegroundColor Cyan
+
+function New-TemplateCard {
+    # A card as NewPrompt would scaffold it: the shipped Task template with
+    # its id, title and branch filled in.
+    param([string]$Id, [string]$Title, [string]$Slug)
+    $template = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'templates/Task.template.md'))
+    return $template.Replace('{ID}', $Id).Replace('{Title}', $Title).Replace('{branch-name}', "user/$Id-$Slug").Replace('{cliPrefix}', 'tk')
+}
+
+$hubJson8 = '{ "hub": 1, "storeSync": "git", "spaces": [ { "slug": "test", "name": "Test", "status": "local", "promptsFolder": "test" } ] }'
+$rs8 = New-RemoteSandbox -HubJson $hubJson8
+try {
+    $archivedName = 'Task-K7M2-fix-login.md'
+    $createdName  = 'Task-P3Q9-add-search.md'
+
+    # The hub as both machines have it: one card in current/, and nothing else
+    # there -- the shape in which the move empties the folder.
+    Push-Location $rs8.Other
+    try {
+        Write-FixtureText (Join-Path $rs8.Other "test/current/$archivedName") (New-TemplateCard 'K7M2' 'Fix login' 'fix-login')
+        git rm --quiet 'test/current/.gitkeep' 2>&1 | Out-Null
+        git add -A 2>&1 | Out-Null
+        git commit -m 'card in play' --quiet 2>&1 | Out-Null
+        git push --quiet 2>&1 | Out-Null
+    }
+    finally { Pop-Location }
+    Push-Location $rs8.Hub
+    try { git pull --quiet 2>&1 | Out-Null }
+    finally { Pop-Location }
+
+    # The other machine archives it and pushes.
+    Push-Location $rs8.Other
+    try {
+        New-Item -ItemType Directory -Path (Join-Path $rs8.Other 'test/archive') -Force | Out-Null
+        git mv "test/current/$archivedName" "test/archive/$archivedName" 2>&1 | Out-Null
+        git commit -m 'archive the card' --quiet 2>&1 | Out-Null
+        git push --quiet 2>&1 | Out-Null
+    }
+    finally { Pop-Location }
+
+    # This machine has created a card of its own, from the same template.
+    Write-FixtureText (Join-Path $rs8.Hub "test/current/$createdName") (New-TemplateCard 'P3Q9' 'Add search' 'add-search')
+
+    $output = Invoke-SyncWrapperInModule -Sandbox $rs8 -LocalJson "{ `"promptsRoot`": `"$($rs8.Hub -replace '\\', '/')`" }"
+
+    Assert-True "the rebase does not conflict" ($output -notmatch 'CONFLICT')
+    Assert-True "and Sync does not abort" ($output -notmatch 'git pull --rebase failed')
+    Assert-Contains "Sync says it finished" $output 'Sync complete'
+    Assert-Contains "and exits 0" $output 'SYNC-EXITCODE=0'
+    Assert-True "the archived card is in archive/ here" (Test-Path (Join-Path $rs8.Hub "test/archive/$archivedName"))
+    Assert-True "and no longer in current/" (-not (Test-Path (Join-Path $rs8.Hub "test/current/$archivedName")))
+    Assert-True "the new card stays in current/" (Test-Path (Join-Path $rs8.Hub "test/current/$createdName"))
+    Assert-True "and was not carried into archive/" (-not (Test-Path (Join-Path $rs8.Hub "test/archive/$createdName")))
+    $remoteFiles = @(git -C $rs8.Remote ls-tree -r --name-only main 2>$null)
+    Assert-True "the remote has the archived card in archive/" ($remoteFiles -contains "test/archive/$archivedName")
+    Assert-True "and the new card in current/" ($remoteFiles -contains "test/current/$createdName")
+}
+catch {
+    Assert-True "the cases ran to the end without a terminating error -- $($_.Exception.Message)" $false
+}
+finally { Remove-SyncSandbox $rs8.Base }
+
+Write-Host ""
+
+# ── Test 9: The same, while this machine edits the card being archived (#200) ─
+#
+# The daily shape: the other machine archives card X and appends a commit
+# bullet to it in archive/, and pushes; this machine has meanwhile edited X in
+# current/ AND created Y there, and Sync commits both as one commit. Turning
+# off every rename (merge.renames=false) still conflicts here, and would make
+# the edit a modify/delete against the archive if it did not. With only
+# directory renames off, the rebase follows X's own move: the edit made here
+# lands on X in archive/ beside the other machine's bullet, and Y stays in
+# current/.
+
+Write-Host "── An archive on one machine, an edit to it and a new card on the other ──" -ForegroundColor Cyan
+
+$rs9 = New-RemoteSandbox -HubJson $hubJson8
+try {
+    $archivedName = 'Task-K7M2-fix-login.md'
+    $createdName  = 'Task-P3Q9-add-search.md'
+    $editLine     = 'Diagnosis written on this machine.'
+    $bulletLine   = '- 80e2168 thread the fix'
+
+    Push-Location $rs9.Other
+    try {
+        Write-FixtureText (Join-Path $rs9.Other "test/current/$archivedName") (New-TemplateCard 'K7M2' 'Fix login' 'fix-login')
+        git rm --quiet 'test/current/.gitkeep' 2>&1 | Out-Null
+        git add -A 2>&1 | Out-Null
+        git commit -m 'card in play' --quiet 2>&1 | Out-Null
+        git push --quiet 2>&1 | Out-Null
+    }
+    finally { Pop-Location }
+    Push-Location $rs9.Hub
+    try { git pull --quiet 2>&1 | Out-Null }
+    finally { Pop-Location }
+
+    # The other machine archives it, threads a bullet onto it there, and pushes.
+    Push-Location $rs9.Other
+    try {
+        New-Item -ItemType Directory -Path (Join-Path $rs9.Other 'test/archive') -Force | Out-Null
+        git mv "test/current/$archivedName" "test/archive/$archivedName" 2>&1 | Out-Null
+        $moved = Join-Path $rs9.Other "test/archive/$archivedName"
+        Add-FixtureText $moved "$bulletLine`n"
+        git add -A 2>&1 | Out-Null
+        git commit -m 'archive the card' --quiet 2>&1 | Out-Null
+        git push --quiet 2>&1 | Out-Null
+    }
+    finally { Pop-Location }
+
+    # This machine edits the card near its top, far from the bullet at the
+    # foot, and creates a card of its own.
+    $here = Join-Path $rs9.Hub "test/current/$archivedName"
+    $text = [System.IO.File]::ReadAllText($here)
+    $firstBreak = $text.IndexOf("`n") + 1
+    [System.IO.File]::WriteAllText($here, $text.Insert($firstBreak, "`n$editLine`n"), (New-Object System.Text.UTF8Encoding $false))
+    Write-FixtureText (Join-Path $rs9.Hub "test/current/$createdName") (New-TemplateCard 'P3Q9' 'Add search' 'add-search')
+
+    $output = Invoke-SyncWrapperInModule -Sandbox $rs9 -LocalJson "{ `"promptsRoot`": `"$($rs9.Hub -replace '\\', '/')`" }"
+
+    Assert-True "the rebase does not conflict" ($output -notmatch 'CONFLICT')
+    Assert-True "and Sync does not abort" ($output -notmatch 'git pull --rebase failed')
+    Assert-Contains "and exits 0" $output 'SYNC-EXITCODE=0'
+    $archivedHere = Join-Path $rs9.Hub "test/archive/$archivedName"
+    Assert-True "the archived card is in archive/ here" (Test-Path $archivedHere)
+    Assert-True "and no longer in current/" (-not (Test-Path (Join-Path $rs9.Hub "test/current/$archivedName")))
+    $archivedText = if (Test-Path $archivedHere) { [System.IO.File]::ReadAllText($archivedHere) } else { '' }
+    Assert-True "it carries the edit made on this machine" ($archivedText.Contains($editLine))
+    Assert-True "and the bullet the other machine threaded" ($archivedText.Contains($bulletLine))
+    Assert-True "the new card stays in current/" (Test-Path (Join-Path $rs9.Hub "test/current/$createdName"))
+    Assert-True "and was not carried into archive/" (-not (Test-Path (Join-Path $rs9.Hub "test/archive/$createdName")))
+    $remoteFiles = @(git -C $rs9.Remote ls-tree -r --name-only main 2>$null)
+    Assert-True "the remote has the archived card in archive/" ($remoteFiles -contains "test/archive/$archivedName")
+    Assert-True "and the new card in current/" ($remoteFiles -contains "test/current/$createdName")
+    $remoteText = (git -C $rs9.Remote show "main:test/archive/$archivedName" 2>$null) -join "`n"
+    Assert-True "and the remote's archived card carries the edit" ($remoteText.Contains($editLine))
+}
+catch {
+    Assert-True "the cases ran to the end without a terminating error -- $($_.Exception.Message)" $false
+}
+finally { Remove-SyncSandbox $rs9.Base }
 
 Write-Host ""
 
