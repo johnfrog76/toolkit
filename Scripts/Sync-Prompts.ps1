@@ -131,15 +131,16 @@ try {
     # stderr as it goes and the person watching wants it as it arrives. 'Stop'
     # would make the first line a throw on 5.1, so each runs under 'Continue'
     # and the exit code is read right after.
-    # Pull with rebase, and with rename detection off for that rebase only.
-    # In a hub a card is never renamed in place: it is created, edited, or moved
-    # by Archive, so reading those as an add and a delete loses nothing. Left
-    # on, git's directory-rename detection sees another machine's Archive empty
-    # current/ into archive/ and reads a card created here in current/ as one
-    # that should have followed it -- a conflict between files that never touch,
-    # and the rebase aborts with nothing synced. The push is unchanged.
+    # Pull with rebase, and with directory-rename detection off for that rebase
+    # only. Left on, git sees another machine's Archive empty current/ into
+    # archive/, reads it as the folder renamed, and takes a card created here in
+    # current/ for one that should have followed it -- a conflict between files
+    # that never touch, and the rebase aborts with nothing synced. File-rename
+    # detection stays on, on purpose: it is what carries an edit made here to a
+    # card the other machine archived into archive/, instead of a modify/delete
+    # conflict. The push is unchanged.
     $ErrorActionPreference = 'Continue'
-    git -c merge.renames=false -c diff.renames=false pull --rebase 2>&1 | ForEach-Object { Write-Host $_ }
+    git -c merge.directoryRenames=false pull --rebase 2>&1 | ForEach-Object { Write-Host $_ }
     $pullCode = $LASTEXITCODE
     $ErrorActionPreference = 'Stop'
     if ($pullCode -ne 0) {

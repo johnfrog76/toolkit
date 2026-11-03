@@ -1144,7 +1144,7 @@ $rawTrackerAllowed = @{
     # git, deliberate: the hub sync prints git's own pull/push output as it arrives and reads the exit code itself
     'Scripts/Sync-Prompts.ps1'       = @{
         Reason = 'the hub sync passes git output through to the terminal'
-        Lines  = @('git -c merge.renames=false -c diff.renames=false pull --rebase 2>', 'git push 2>')
+        Lines  = @('git -c merge.directoryRenames=false pull --rebase 2>', 'git push 2>')
     }
 }
 $rawTrackerPattern = '(?<![\w$-])(gh|az|git)\s[^|\r\n]*(2>|\*>)'
