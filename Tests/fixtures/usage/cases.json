@@ -1,0 +1,187 @@
+{
+  "_comment": "The rule Burn -Log counts by, one row per input it distinguishes (docs/hub/usage.md; Tests/Test-Burn.ps1 types the verb over each row). A case is a scratch projects folder: each file is a path under it and its lines. A line is a SPEC the suite renders into a Claude Code assistant line -- t is the time from the logged day's LOCAL midnight (+09:00, -00:30 the evening before, +24:30 the next day), so every row reads the same in any timezone; id is message.id, req the requestId, sid the sessionId, cwd the working folder, side the subagent flag, in/out/think/w5/w1/read the usage, and noBreakdown leaves usage.cache_creation out. raw is a line written as it is. mtimeDays sets the file's last write that many days from the day's midnight. expect names only what the row is about.",
+  "day": "2026-07-15",
+  "cases": [
+    {
+      "name": "an empty day: the folder is there and no line falls on the day",
+      "files": {
+        "-Users-alex-Repos-demo/aaaaaaaa-0000-4000-8000-000000000001.jsonl": [
+          { "t": "-12:00", "id": "msg_e1", "sid": "aaaaaaaa-0000-4000-8000-000000000001", "cwd": "/Users/alex/Repos/demo", "model": "claude-opus-5-5", "in": 10, "out": 20 }
+        ]
+      },
+      "expect": {
+        "totals": { "input": 0, "output": 0, "thinking": 0, "cacheWrite5m": 0, "cacheWrite1h": 0, "cacheRead": 0, "messages": 0, "costUsdDerived": "0" },
+        "models": [], "sessions": 0, "unpriced": []
+      }
+    },
+    {
+      "name": "two models in one session, each priced from its own row",
+      "files": {
+        "-Users-alex-Repos-demo/aaaaaaaa-0000-4000-8000-000000000002.jsonl": [
+          { "t": "+09:00", "id": "msg_t1", "sid": "aaaaaaaa-0000-4000-8000-000000000002", "cwd": "/Users/alex/Repos/demo", "model": "claude-opus-5-5", "in": 1000, "out": 2000, "think": 300, "w1": 10000, "read": 100000 },
+          { "t": "+09:10", "id": "msg_t2", "sid": "aaaaaaaa-0000-4000-8000-000000000002", "cwd": "/Users/alex/Repos/demo", "model": "claude-sonnet-5-5", "in": 500, "out": 1000, "w5": 2000, "read": 50000 }
+        ]
+      },
+      "expect": {
+        "totals": { "input": 1500, "output": 3000, "thinking": 300, "cacheWrite5m": 2000, "cacheWrite1h": 10000, "cacheRead": 150000, "messages": 2, "costUsdDerived": "0.17" },
+        "models": [ "claude-opus-5-5=0.144", "claude-sonnet-5-5=0.026" ], "sessions": 1, "unpriced": []
+      }
+    },
+    {
+      "name": "a session across midnight is split by each line's own time",
+      "files": {
+        "-Users-alex-Repos-demo/aaaaaaaa-0000-4000-8000-000000000003.jsonl": [
+          { "t": "-00:30", "id": "msg_m1", "sid": "aaaaaaaa-0000-4000-8000-000000000003", "cwd": "/Users/alex/Repos/demo", "model": "claude-opus-5-5", "in": 1, "out": 1 },
+          { "t": "+00:30", "id": "msg_m2", "sid": "aaaaaaaa-0000-4000-8000-000000000003", "cwd": "/Users/alex/Repos/demo", "model": "claude-opus-5-5", "in": 10, "out": 100 },
+          { "t": "+23:30", "id": "msg_m3", "sid": "aaaaaaaa-0000-4000-8000-000000000003", "cwd": "/Users/alex/Repos/demo", "model": "claude-opus-5-5", "in": 20, "out": 200 },
+          { "t": "+24:30", "id": "msg_m4", "sid": "aaaaaaaa-0000-4000-8000-000000000003", "cwd": "/Users/alex/Repos/demo", "model": "claude-opus-5-5", "in": 1000, "out": 1000 }
+        ]
+      },
+      "expect": {
+        "totals": { "input": 30, "output": 300, "messages": 2 },
+        "models": [ "claude-opus-5-5=0.00612" ], "sessions": 1, "unpriced": []
+      }
+    },
+    {
+      "name": "the lines of one response count once, with the largest numbers any of them carries",
+      "files": {
+        "-Users-alex-Repos-demo/aaaaaaaa-0000-4000-8000-000000000004.jsonl": [
+          { "t": "+10:00", "id": "msg_d1", "req": "req_d1", "sid": "aaaaaaaa-0000-4000-8000-000000000004", "cwd": "/Users/alex/Repos/demo", "model": "claude-opus-5-5", "in": 2, "out": 3, "w1": 275, "read": 78325 },
+          { "t": "+10:00", "id": "msg_d1", "req": "req_d1", "sid": "aaaaaaaa-0000-4000-8000-000000000004", "cwd": "/Users/alex/Repos/demo", "model": "claude-opus-5-5", "in": 2, "out": 3, "w1": 275, "read": 78325 },
+          { "t": "+10:01", "id": "msg_d1", "req": "req_d1", "sid": "aaaaaaaa-0000-4000-8000-000000000004", "cwd": "/Users/alex/Repos/demo", "model": "claude-opus-5-5", "in": 2, "out": 1543, "think": 82, "w1": 275, "read": 78325 },
+          { "t": "+10:05", "req": "req_d2", "sid": "aaaaaaaa-0000-4000-8000-000000000004", "cwd": "/Users/alex/Repos/demo", "model": "claude-opus-5-5", "in": 5, "out": 7 },
+          { "t": "+10:05", "req": "req_d2", "sid": "aaaaaaaa-0000-4000-8000-000000000004", "cwd": "/Users/alex/Repos/demo", "model": "claude-opus-5-5", "in": 5, "out": 7 }
+        ]
+      },
+      "expect": {
+        "totals": { "input": 7, "output": 1550, "thinking": 82, "cacheWrite1h": 275, "cacheRead": 78325, "messages": 2 },
+        "models": [ "claude-opus-5-5=0.048893" ], "sessions": 1, "unpriced": []
+      }
+    },
+    {
+      "name": "a subagent's transcript counts to its parent session; other files beside it are not read",
+      "files": {
+        "-Users-alex-Repos-demo/aaaaaaaa-0000-4000-8000-000000000005.jsonl": [
+          { "t": "+11:00", "id": "msg_s1", "sid": "aaaaaaaa-0000-4000-8000-000000000005", "cwd": "/Users/alex/Repos/demo", "model": "claude-opus-5-5", "in": 100, "out": 100 }
+        ],
+        "-Users-alex-Repos-demo/aaaaaaaa-0000-4000-8000-000000000005/subagents/agent-a1b2c3.jsonl": [
+          { "t": "+11:02", "id": "msg_s2", "sid": "aaaaaaaa-0000-4000-8000-000000000005", "side": true, "cwd": "/Users/alex/Repos/demo", "model": "claude-sonnet-5-5", "in": 50, "out": 50 }
+        ],
+        "-Users-alex-Repos-demo/aaaaaaaa-0000-4000-8000-000000000005/tool-results/stray.jsonl": [
+          { "t": "+11:03", "id": "msg_s3", "sid": "aaaaaaaa-0000-4000-8000-000000000005", "cwd": "/Users/alex/Repos/demo", "model": "claude-opus-5-5", "in": 9999, "out": 9999 }
+        ],
+        "-Users-alex-Repos-demo/notes.txt": [
+          { "t": "+11:04", "id": "msg_s4", "sid": "aaaaaaaa-0000-4000-8000-000000000005", "cwd": "/Users/alex/Repos/demo", "model": "claude-opus-5-5", "in": 9999, "out": 9999 }
+        ]
+      },
+      "expect": {
+        "totals": { "input": 150, "output": 150, "messages": 2 },
+        "models": [ "claude-opus-5-5=0.0024", "claude-sonnet-5-5=0.0006" ], "sessions": 1, "unpriced": []
+      }
+    },
+    {
+      "name": "a model with no price is counted, named as unpriced, and has no cost",
+      "files": {
+        "-Users-alex-Repos-demo/aaaaaaaa-0000-4000-8000-000000000006.jsonl": [
+          { "t": "+12:00", "id": "msg_u1", "sid": "aaaaaaaa-0000-4000-8000-000000000006", "cwd": "/Users/alex/Repos/demo", "model": "claude-mystery-9", "in": 10, "out": 10 },
+          { "t": "+12:01", "id": "msg_u2", "sid": "aaaaaaaa-0000-4000-8000-000000000006", "cwd": "/Users/alex/Repos/demo", "model": "claude-haiku-5-5", "in": 100, "out": 200 }
+        ]
+      },
+      "expect": {
+        "totals": { "input": 110, "output": 210, "messages": 2, "costUsdDerived": "0.00011" },
+        "models": [ "claude-haiku-5-5=0.00011", "claude-mystery-9=null" ], "sessions": 1, "unpriced": [ "claude-mystery-9" ]
+      }
+    },
+    {
+      "name": "a day of only unpriced models has no cost to state",
+      "files": {
+        "-Users-alex-Repos-demo/aaaaaaaa-0000-4000-8000-000000000007.jsonl": [
+          { "t": "+12:00", "id": "msg_n1", "sid": "aaaaaaaa-0000-4000-8000-000000000007", "cwd": "/Users/alex/Repos/demo", "model": "claude-mystery-9", "in": 10, "out": 10 }
+        ]
+      },
+      "expect": {
+        "totals": { "messages": 1, "costUsdDerived": "null" },
+        "models": [ "claude-mystery-9=null" ], "sessions": 1, "unpriced": [ "claude-mystery-9" ]
+      }
+    },
+    {
+      "name": "a dated snapshot of a priced model takes that model's row",
+      "files": {
+        "-Users-alex-Repos-demo/aaaaaaaa-0000-4000-8000-000000000008.jsonl": [
+          { "t": "+13:00", "id": "msg_p1", "sid": "aaaaaaaa-0000-4000-8000-000000000008", "cwd": "/Users/alex/Repos/demo", "model": "claude-sonnet-5-20260901", "in": 1000, "out": 1000 }
+        ]
+      },
+      "expect": {
+        "totals": { "messages": 1, "costUsdDerived": "0.012" },
+        "models": [ "claude-sonnet-5-20260901=0.012" ], "sessions": 1, "unpriced": []
+      }
+    },
+    {
+      "name": "a malformed line is skipped, not fatal; synthetic and user lines are not counted",
+      "files": {
+        "-Users-alex-Repos-demo/aaaaaaaa-0000-4000-8000-000000000009.jsonl": [
+          { "raw": "{\"type\":\"assistant\",\"message\":{\"usage\":{\"input_tokens\":5" },
+          { "raw": "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"what is my usage\"},\"sessionId\":\"aaaaaaaa-0000-4000-8000-000000000009\"}" },
+          { "t": "+14:00", "id": "msg_x1", "sid": "aaaaaaaa-0000-4000-8000-000000000009", "cwd": "/Users/alex/Repos/demo", "model": "<synthetic>", "in": 0, "out": 0 },
+          { "t": "+14:01", "id": "msg_x2", "sid": "aaaaaaaa-0000-4000-8000-000000000009", "cwd": "/Users/alex/Repos/demo", "model": "claude-opus-5-5", "in": 10, "out": 10 }
+        ]
+      },
+      "expect": {
+        "totals": { "input": 10, "output": 10, "messages": 1 },
+        "models": [ "claude-opus-5-5=0.00024" ], "sessions": 1, "unpriced": [], "skipped": 1
+      }
+    },
+    {
+      "name": "no cache breakdown: the whole cache write is the five-minute kind",
+      "files": {
+        "-Users-alex-Repos-demo/aaaaaaaa-0000-4000-8000-00000000000a.jsonl": [
+          { "t": "+15:00", "id": "msg_c1", "sid": "aaaaaaaa-0000-4000-8000-00000000000a", "cwd": "/Users/alex/Repos/demo", "model": "claude-opus-5-5", "w5": 1000, "noBreakdown": true }
+        ]
+      },
+      "expect": {
+        "totals": { "cacheWrite5m": 1000, "cacheWrite1h": 0, "messages": 1, "costUsdDerived": "0.005" },
+        "models": [ "claude-opus-5-5=0.005" ], "sessions": 1, "unpriced": []
+      }
+    },
+    {
+      "name": "a file last written before the day starts is not read",
+      "files": {
+        "-Users-alex-Repos-demo/aaaaaaaa-0000-4000-8000-00000000000b.jsonl": {
+          "mtimeDays": -2,
+          "lines": [
+            { "t": "+16:00", "id": "msg_o1", "sid": "aaaaaaaa-0000-4000-8000-00000000000b", "cwd": "/Users/alex/Repos/demo", "model": "claude-opus-5-5", "in": 10, "out": 10 }
+          ]
+        }
+      },
+      "expect": {
+        "totals": { "messages": 0 },
+        "models": [], "sessions": 0, "unpriced": []
+      }
+    },
+    {
+      "name": "a project is its last folder name, and a home folder is ~",
+      "files": {
+        "-Users-alex-Repos-my-web-app/aaaaaaaa-0000-4000-8000-00000000000c.jsonl": [
+          { "t": "+17:00", "id": "msg_j1", "sid": "aaaaaaaa-0000-4000-8000-00000000000c", "cwd": "/Users/alex/Repos/my-web-app", "model": "claude-opus-5-5", "in": 1, "out": 1 }
+        ],
+        "-Users-alex-Repos-site/aaaaaaaa-0000-4000-8000-00000000000d.jsonl": [
+          { "t": "+17:01", "id": "msg_j2", "sid": "aaaaaaaa-0000-4000-8000-00000000000d", "model": "claude-opus-5-5", "in": 1, "out": 1 }
+        ],
+        "-Users-alex/aaaaaaaa-0000-4000-8000-00000000000e.jsonl": [
+          { "t": "+17:02", "id": "msg_j3", "sid": "aaaaaaaa-0000-4000-8000-00000000000e", "cwd": "/Users/alex", "model": "claude-opus-5-5", "in": 1, "out": 1 }
+        ],
+        "C--Users-alex-Repos-demo/aaaaaaaa-0000-4000-8000-00000000000f.jsonl": [
+          { "t": "+17:03", "id": "msg_j4", "sid": "aaaaaaaa-0000-4000-8000-00000000000f", "cwd": "C:\\Users\\alex\\Repos\\demo", "model": "claude-opus-5-5", "in": 1, "out": 1 }
+        ],
+        "-home-alex/aaaaaaaa-0000-4000-8000-000000000010.jsonl": [
+          { "t": "+17:04", "id": "msg_j5", "sid": "aaaaaaaa-0000-4000-8000-000000000010", "model": "claude-opus-5-5", "in": 1, "out": 1 }
+        ]
+      },
+      "expect": {
+        "totals": { "messages": 5 },
+        "models": [ "claude-opus-5-5=0.00012" ], "sessions": 5, "unpriced": [],
+        "projects": [ "my-web-app", "site", "~", "demo", "~" ]
+      }
+    }
+  ]
+}

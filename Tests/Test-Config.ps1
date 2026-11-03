@@ -211,9 +211,10 @@ Assert-Equal 'status offers the three org statuses' 'active, local, archive' `
     ((@($schemaRows | Where-Object { $_.key -like '*status' } | Select-Object -First 1).allowed) -join ', ')
 
 $folderRows = @($schemaRows | Where-Object { $_.key -like 'folders.*' })
-# Eight since the design lifecycle's `spec` folder joined the table (D-DL12).
-Assert-Equal 'the hub-root folder set is eight names' 8 $folderRows.Count
+# Nine since Burn -Log's `usage` folder joined the table (docs/hub/usage.md).
+Assert-Equal 'the hub-root folder set is nine names' 9 $folderRows.Count
 Assert-True 'and spec is one of them' (@($folderRows | Where-Object { $_.key -eq 'folders.spec' }).Count -eq 1)
+Assert-True 'and usage is one of them' (@($folderRows | Where-Object { $_.key -eq 'folders.usage' }).Count -eq 1)
 Assert-True 'a folder row is hub-scoped' (@($folderRows | Where-Object { $_.scope -ne 'hub' }).Count -eq 0)
 
 # -- -List ---------------------------------------------------------------------

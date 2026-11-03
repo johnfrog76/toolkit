@@ -127,8 +127,8 @@ Write-Host ""
 Write-Host "-- The folder set ----------------------------------------" -ForegroundColor Cyan
 
 $defaults = Get-P20DefaultHubFolders
-Assert-Equal "the folder set has eight names" 8 $defaults.Count
-foreach ($name in @('growth', 'manager', 'reviews', 'resume', 'agentic', 'reminders', 'design', 'spec')) {
+Assert-Equal "the folder set has nine names" 9 $defaults.Count
+foreach ($name in @('growth', 'manager', 'reviews', 'resume', 'agentic', 'reminders', 'design', 'spec', 'usage')) {
     Assert-Equal "'$name' defaults to itself" $name $defaults[$name]
 }
 
@@ -342,7 +342,7 @@ try {
     Remove-Item (Join-Path $sandbox 'hub.json') -Force
     $names = Get-P20HubFolderNames -PromptsRoot $sandbox
     Assert-Equal "with no manifest the defaults stand" 'growth' $names['growth']
-    Assert-Equal "all eight of them" 8 $names.Count
+    Assert-Equal "all nine of them" 9 $names.Count
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message

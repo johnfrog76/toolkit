@@ -94,6 +94,7 @@ param(
     [switch]$HowWeWork,
     [switch]$EditItem,
     [switch]$Land,
+    [switch]$Burn,
     [switch]$PublishPR,
     # Named sets and a rerun, for a run that cannot afford 35 minutes on
     # Windows:

@@ -147,6 +147,9 @@ DEFAULT_HUB_FOLDERS = {
     # The hub's specs (design lifecycle L2): the same four folders a product
     # keeps -- design/, design/archive/, spec/, spec/archive/ -- at the hub's root (D-DL12).
     "spec": "spec",
+    # The day's Claude Code usage, one record per day per machine, written by Burn -Log
+    # (docs/hub/usage.md).
+    "usage": "usage",
 }
 
 DEFAULT_CORS_ORIGINS = [

@@ -27,6 +27,7 @@
         'tkAgent',
         'tkArchive',
         'tkBillable',
+        'tkBurn',
         'tkCloseItem',
         'tkCloseWorkItem',
         'tkConfig',

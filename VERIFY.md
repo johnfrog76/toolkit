@@ -39,8 +39,8 @@ halves talking to each other, and the flag that makes a whole module appear and 
 three halves at once. A check that can be automated belongs in a suite; one that cannot is a gate here,
 or it is not verified.
 
-Every verb `config.default.json` defines is in the table below -- 46 always-on, and the 15 the modules
-contribute through `Config/*.commands.psd1` (61 in all; `docs/CLI.md` prints both counts) -- with the
+Every verb `config.default.json` defines is in the table below -- 47 always-on, and the 15 the modules
+contribute through `Config/*.commands.psd1` (62 in all; `docs/CLI.md` prints both counts) -- with the
 suite that types it and the gate that walks it. `Tests/Test-DocCounts.ps1` reads the table back, so a
 verb added without a row fails a suite. **A row that says "neither" is a verb nothing verifies**; it is
 left in the table rather than dropped, because a verb the reader cannot see in it is indistinguishable
@@ -88,6 +88,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `HowWeWork` | `HowWeWork` (typed: alone and team write nothing, `-WhatIf` writes nothing, the write once in LF with no BOM, the second run refused naming the path, `StartWork` quoting the note); `Menu` (usage, wrapper and script agree) | 12 (under 5.1) |
 | `RemoveSpace` | `NewSpace` (typed: `-WhatIf`, the `-Force` rule, the folder and its cards untouched, the line that adopts them back, every refusal); `Config` (the whole-Space `-Unset`); `Menu` (usage, wrapper and script agree) | 12 (under 5.1, and from the Spaces card's row menu) |
 | `Log` | `ExitCodes` (`Log -Days` leaves no stale exit code) | 7 |
+| `Burn` | `Burn` (typed, with `CLAUDE_CONFIG_DIR` pointing at scratch projects folders: the table over `Tests/fixtures/usage/cases.json`, the documented record byte for byte, a re-run's bytes, no path or name in a record, the projects folders unchanged, the refusals and a machine with no session files) | 12 (Windows PowerShell 5.1 and a real Claude Code folder: the row under "Rows added by a fix") |
 | `InstallAutoload` | `Autoload` (typed) | 1 |
 | `Web` | `Web` (the guards only: no suite starts a real server) | 8 |
 | `Agent` | `Agent` (the guards only) | 8 |
@@ -289,7 +290,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **49 suites, 8837 assertions** with a `config.local.json`, every one
+findings. On this commit that is **50 suites, 8954 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -1148,6 +1149,16 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   board, every Code Review card offers **Land** in its menu; on one whose pull request is still open, Land's
   confirm shows the "is open, not merged" sentence and the card stays. On an Azure DevOps board, a completed pull request lands the same way through
   `az repos pr show`, the work item Closed with the comment. Refs the pull request that adds `Land`.
+- [ ] **Burn -Log reads a real Claude Code folder, and reads the same under Windows PowerShell 5.1.** In
+  `powershell` (5.1) run `tkTestToolkit -Burn`: green. Then, on a Windows machine that has used Claude Code
+  today, with `PROMPTS_ROOT` pointed at a scratch copy of a hub, run `tkBurn -Log`: you should see
+  `[+] Wrote the Claude Code usage for <today> on <machine>`, the path under the hub's `usage/`, and one line
+  per model with a cost marked `derived`, exit 0 -- never a `NativeCommandError`, never the generic
+  `Error: exit code` block. Open the file: UTF-8 with no BOM, LF, no `C:\`, no `\Users\` and not your user
+  name anywhere but the `machine` line. Run it again: `[+] Replaced`, still one file. Read-only: list
+  `%USERPROFILE%\.claude\projects` with each file's last write time before and after the two runs, from a
+  plain `powershell` window with no Claude Code session open: the two lists are the same. Refs the pull
+  request that adds `Burn`.
 
 ## Recording a run
 
