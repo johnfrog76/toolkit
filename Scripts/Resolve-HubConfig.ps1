@@ -170,6 +170,9 @@ function Get-P20DefaultHubFolders {
         # folders a product keeps -- design/, design/archive/, spec/,
         # spec/archive/ -- at the hub's root (D-DL12).
         spec = 'spec'
+        # The day's Claude Code usage, one record per day per machine,
+        # written by Burn -Log (docs/hub/usage.md).
+        usage = 'usage'
     }
 }
 

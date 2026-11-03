@@ -343,6 +343,26 @@
         "-Help": "This"
       }
     },
+    "Burn": {
+      "category": "info",
+      "description": "Log the day's Claude Code usage into the hub",
+      "usage": "{cliPrefix}Burn -Log [-Date <yyyy-mm-dd>] [-Help]",
+      "examples": [
+        "{cliPrefix}Burn -Log",
+        "{cliPrefix}Burn -Log -Date 2026-11-02"
+      ],
+      "switches": {
+        "-Log": "Write the day's record: usage/<date>-<machine>.json in the hub",
+        "-Date <yyyy-mm-dd>": "The local day to log. Default: today",
+        "-Help": "This"
+      },
+      "notes": [
+        "Reads Claude Code's own session files on this machine -- the projects folder under CLAUDE_CONFIG_DIR, else ~/.claude/projects -- and never writes there. A machine without them writes nothing and says so.",
+        "One record per local day per machine. Run it again the same day and it replaces the record; over the same session files it writes the same bytes.",
+        "Tokens by model and by session, each message counted once. The cost is derived from Config/claude-prices.json (list prices) and labelled so -- never the plan's allocation. A model with no price is counted and named as unpriced.",
+        "No path and no user name in the record: a project is its last folder name, a session its id, the machine its short host name."
+      ]
+    },
     "Setup": {
       "category": "setup",
       "description": "Check what the tool needs and state the tier",

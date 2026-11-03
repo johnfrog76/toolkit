@@ -470,6 +470,8 @@ class HubFolderTests(HubManifestCase):
                 "design": "design",
                 # The hub's specs (design lifecycle L2).
                 "spec": "spec",
+                # The day's Claude Code usage (Burn -Log).
+                "usage": "usage",
             },
         )
 

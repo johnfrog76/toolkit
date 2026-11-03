@@ -160,6 +160,15 @@
       "door": "sentence"
     },
     {
+      "id": "claude-usage",
+      "question": "What did my Claude Code sessions use today?",
+      "sentence": "With Claude Code on this machine, Burn -Log reads its session files (read-only) and writes the day's record into the hub's usage/ folder: tokens by model and by session, and a cost derived from list prices -- never the plan's allocation. One record per day per machine; run it again and it replaces the day's.",
+      "surfaces": [
+        "claudeUsage"
+      ],
+      "door": "sentence"
+    },
+    {
       "id": "review",
       "question": "Can it review my pull request?",
       "sentence": "With ANTHROPIC_API_KEY in your environment, AddPRReview reads the diff and writes a review into the card. The key never goes in a file this tool writes.",

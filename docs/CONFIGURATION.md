@@ -473,6 +473,17 @@ button only where it would work. The block itself works either way. Which model 
 setting either: the size label is the model's name, `sonnet` or `opus`, and `fable` -- the owner's own
 seat -- never launches.
 
+## `claudeUsage` -- whether `Burn -Log` has session files to read
+
+`Burn -Log` writes the day's Claude Code usage into the hub's `usage/` ([the record](hub/usage.md)). Whether
+there is anything to read is an optional surface with **no key to set**: it is DERIVED, like the
+`startWorkLaunch` row -- `on` where Claude Code's projects folder is on this machine, `not configured` where it
+is not, never `off`. `tkEnv` and `tkMenu -All` name it as **Claude Code usage**, with its question, "What did
+my Claude Code sessions use today?". The folder is `CLAUDE_CONFIG_DIR`'s `projects/` when that variable is
+set -- it is Claude Code's own, for moving its configuration folder, and this tool only reads it -- and
+`~/.claude/projects` otherwise. The prices a cost is derived from are not a setting either: they are one
+table in the package, `Config/claude-prices.json`, dated.
+
 ## `spaces[].howIWork` -- how you work in this Space
 
 **How do you want to work in `<Space>`?** is the Space's answer, not the person's: nobody works one
@@ -739,7 +750,8 @@ one, while an engineer's flag there is ignored and told where it belongs.
 
 `folders` names the hub-root siblings the modules read -- `growth/`, `manager/`, `reviews/`,
 `resume/`, `agentic/`, `reminders/` (the Organize add-on's), `design/` and `spec/` (the hub's designs
-and specs, the same four folders a product keeps, [`hub/design.md`](hub/design.md)). Omit a key and it
+and specs, the same four folders a product keeps, [`hub/design.md`](hub/design.md)), and `usage/` (the
+day's Claude Code usage, [`hub/usage.md`](hub/usage.md)). Omit a key and it
 keeps its default, which is its own name.
 
 `storeSync` is the same argument applied to a scalar: whether the store is a repository is the

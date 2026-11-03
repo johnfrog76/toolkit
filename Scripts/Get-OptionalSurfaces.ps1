@@ -48,6 +48,10 @@ if (-not (Get-Command Resolve-P20HowIWork -ErrorAction SilentlyContinue)) {
 if (-not (Get-Command Get-P20SettingsWorkflows -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Get-SettingsWorkflows.ps1')
 }
+# Where Claude Code keeps its session files -- the Claude Code usage row's question.
+if (-not (Get-Command Get-P20ClaudeProjectsRoot -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Read-ClaudeUsage.ps1')
+}
 # The one way this file calls git with stderr read as text (Invoke-TrackerRead.ps1).
 if (-not (Get-Command Invoke-P20TrackerRead -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
@@ -584,6 +588,20 @@ function Get-P20OptionalSurfaces {
     if (Get-Command claude -CommandType Application -ErrorAction SilentlyContinue) { $launchState = $states.On }
     $rows += New-P20SurfaceRow -Key (Get-P20Consts).startWork.launchEnvFlag -Title 'StartWork launch' -State $launchState `
         -Config 'claude on the PATH (install Claude Code)' -Note $launchNote
+
+    # -- Burn -Log: Claude Code's session files (docs/hub/usage.md) -------------
+    # DERIVED, like the launch row: `on` where Claude Code's projects folder is
+    # on this machine (CLAUDE_CONFIG_DIR's, else ~/.claude's), `not configured`
+    # otherwise -- never `off`, because nothing was answered. Read-only: the
+    # row asks whether the folder is there and opens nothing in it.
+    $usageState = $states.Unset
+    $usageNote = 'no Claude Code session files on this machine'
+    if (Test-Path -LiteralPath (Get-P20ClaudeProjectsRoot) -PathType Container) {
+        $usageState = $states.On
+        $usageNote = $Prefix + 'Burn -Log writes the day''s record into the hub''s usage/'
+    }
+    $rows += New-P20SurfaceRow -Key 'claudeUsage' -Title 'Claude Code usage' -State $usageState `
+        -Config 'Claude Code on this machine (its session files; CLAUDE_CONFIG_DIR if it was moved)' -Note $usageNote
 
     # The question on every row, from the one list (D-W1). A row with no entry
     # carries '' and tkTestToolkit -Environment fails naming the key.
