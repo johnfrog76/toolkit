@@ -695,17 +695,23 @@ the last version would have to do: touch their files or their config, **major**;
 find the new thing when they go looking, **minor**; nothing, and something stopped being broken,
 **patch**.
 
-What every change does: **a change a user would notice adds one line under `## [Unreleased]` in
-`CHANGELOG.md`, in the same commit**, under `### Added`, `### Changed`, `### Fixed` or `### Removed`
-(Keep a Changelog). Written for the user who reads release notes, not for this project: what they
+What every change does: **a change a user would notice adds one file under `changelog.d/`, in the
+same commit**, named `<id>.<kind>.md` -- the card or issue, then `added`, `changed`, `fixed` or
+`removed`, the Keep a Changelog heading it goes under -- holding the entry as it will read, a line
+that starts `- `. Not a line in `CHANGELOG.md`: two pull requests built side by side then never edit
+the same lines. Written for the user who reads release notes, not for this project: what they
 can now do, or what stopped going wrong, in a sentence. A fix nobody would notice adds nothing.
+`changelog.d/README.md` has the shape, and the CLI suite (`-Changelog`) refuses a file in any other.
 
-What a release does, in one small pull request on main: rename `## [Unreleased]` to `## [x.y.z] - YYYY-MM-DD`
-and open a fresh empty `## [Unreleased]` above it; set the same version in the three places that state
+What a release does, in one small pull request on main: fold the entries in, with
+`pwsh -NoProfile -File Scripts/Fold-Changelog.ps1` (`-WhatIf` first) -- each goes under its heading
+in `## [Unreleased]`, after any written there by hand, and its file is deleted; then rename
+`## [Unreleased]` to `## [x.y.z] - YYYY-MM-DD` and open a fresh empty `## [Unreleased]` above it; set the same version in the three places that state
 it, `Prompt20Toolkit/Prompt20Toolkit.psd1` (`ModuleVersion`), `consts.json` (`version`) and
 `web/package.json` (`version`); merge; then push the tag, `git tag vx.y.z && git push origin vx.y.z`.
 `.github/workflows/release.yml` makes the GitHub Release from the changelog section with that
-version and refuses a tag that has none, so a release never ships with empty notes. Only the owner
+version and refuses a tag that has none, or one cut while `changelog.d/` still holds an entry, so a
+release never ships with empty or missing notes. Only the owner
 tags; an agent never does.
 
 ## Conventions come from the corpus, not from taste

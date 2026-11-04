@@ -377,6 +377,7 @@ samples/hub/            The sample hub `tkStart` copies out on a first run: one 
 design/                 Where a product may keep its design notes; this tree keeps only the README ([design/README.md](../design/README.md))
 .github/workflows/      verify.yml, the suites in CI; pages.yml, the landing page's deploy (docs/TESTING.md, "In CI")
 AGENTS.md  CHANGELOG.md  VERIFY.md  the agent guide, the change log, the verification gates
+changelog.d/            The next release's changelog entries, one file each, until the release folds them in
 docs/                   The documentation. The root README is the map; each subject has one owner
   QUICKSTART.md           Requirements, install, the first run, a first card, the web UI up
   CONFIGURATION.md        tkConfig, the three config files, consts.json, the hub's hub.json
