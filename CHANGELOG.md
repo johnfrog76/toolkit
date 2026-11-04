@@ -37,6 +37,7 @@ release.
 
 ### Fixed
 
+- On the Docs page, a README's dark-mode logo written as a `<picture>` with a `<source srcset>` now shows instead of a broken image, because the `<source>`'s images are read from the repository the way an `<img>` already was.
 - `Sync` no longer stops with a conflict when one machine has archived a card and another has created a new one in `current/`: the pull no longer treats the archive as `current/` being renamed, so both cards land where they belong, an edit made meanwhile to the archived card follows it into `archive/`, and the sync goes through.
 - `npm ci` in `web/` no longer asks about install scripts: the decision for each dependency that has one is recorded in `web/package.json`, so approving one locally no longer leaves a change in your working tree. If you approved `@parcel/watcher` or `unrs-resolver` yourself, discard that edit to `web/package.json` before you pull.
 - A full `npm test` in `web/` on a busy machine no longer fails a test because a dialog took more than a second to appear; the web tests now wait up to 5 seconds for an element.

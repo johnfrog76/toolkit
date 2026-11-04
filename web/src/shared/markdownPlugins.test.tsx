@@ -121,6 +121,48 @@ describe("MarkdownViewer: raw HTML reaches the existing handlers", () => {
     expect(img?.getAttribute("width")).toBe("200");
   });
 
+  it("resolves a <picture>'s dark <source> and its <img>, keeping media and type", () => {
+    const { container } = render(
+      <MarkdownViewer
+        content={
+          '<picture>\n<source media="(prefers-color-scheme: dark)" type="image/svg+xml" srcset="assets/logo-dark.svg">\n<img src="assets/logo.svg" alt="Logo">\n</picture>'
+        }
+        links={base as never}
+      />,
+    );
+    const source = container.querySelector("picture source");
+    expect(source?.getAttribute("srcset")).toBe("/asset/assets/logo-dark.svg");
+    expect(source?.getAttribute("media")).toBe("(prefers-color-scheme: dark)");
+    expect(source?.getAttribute("type")).toBe("image/svg+xml");
+    expect(container.querySelector("picture img")?.getAttribute("src")).toBe(
+      "/asset/assets/logo.svg",
+    );
+  });
+
+  it("resolves every candidate of a <source srcset> and keeps its descriptor", () => {
+    const { container } = render(
+      <MarkdownViewer
+        content={'<picture><source srcset="a.png 1x, b.png 2x"><img src="a.png" alt="A"></picture>'}
+        links={base as never}
+      />,
+    );
+    expect(container.querySelector("source")?.getAttribute("srcset")).toBe(
+      "/asset/a.png 1x, /asset/b.png 2x",
+    );
+  });
+
+  it("leaves an absolute https: srcset alone", () => {
+    const { container } = render(
+      <MarkdownViewer
+        content={
+          '<picture><source srcset="https://x.test/d.svg"><img src="a.png" alt="A"></picture>'
+        }
+        links={base as never}
+      />,
+    );
+    expect(container.querySelector("source")?.getAttribute("srcset")).toBe("https://x.test/d.svg");
+  });
+
   it("sends a raw <a> through the link handling (external opens in a new tab)", () => {
     const { container } = render(
       <MarkdownViewer content={'<a href="https://example.com">x</a>'} />,

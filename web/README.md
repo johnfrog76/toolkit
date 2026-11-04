@@ -868,7 +868,7 @@ wordmark's default blob, and by no theme.
   Then: a relative `.md` link with a room opens it in the app, its `#anchor` kept (`room`); a
   `#anchor` scrolls this page (`anchor`); an absolute link leaves in a new tab, as ever, and so does
   a relative link to a repo file with no room (`AGENTS.md`, `VERIFY.md`) -- on github.com, with a
-  hover title that says it is not one of the documents this room reads (`out`). A relative image is
+  hover title that says it is not one of the documents this room reads (`out`). A relative image -- an `<img src>`, and each candidate of a `<picture>` `<source srcset>` -- is
   served from `/api/docs/asset/<path>` wherever the repository keeps it (a root path `/x.png` is
   the repository root; one that climbs out of the repository is never asked for), and from
   github.com's raw view only when the path rule refuses its name. Given `issues` (the agent's

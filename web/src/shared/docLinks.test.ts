@@ -2,7 +2,7 @@
 // the image rule beside them, against a base like the one the Docs and Design
 // rooms hand the viewer. The rooms' own rule (which paths are docs) is pinned
 // by docRooms.test.ts against the shared fixture; here it is a stand-in.
-import { joinRepoPath, outsideTitle, resolveImage, resolveLink } from "./docLinks";
+import { joinRepoPath, outsideTitle, resolveImage, resolveLink, resolveSrcSet } from "./docLinks";
 import type { DocLinkBase } from "./docLinks";
 
 const BLOB = "https://github.com/o/r/blob/main/";
@@ -109,5 +109,33 @@ describe("resolveImage", () => {
       "data:image/png;base64,AA",
     );
     expect(resolveImage("a.png")).toBe("a.png");
+  });
+});
+
+describe("resolveSrcSet", () => {
+  it("resolves one URL like resolveImage", () => {
+    expect(resolveSrcSet("assets/logo-dark.svg", base("README.md"))).toBe(
+      "/api/docs/asset/assets/logo-dark.svg",
+    );
+  });
+
+  it("resolves each candidate and keeps its descriptor", () => {
+    expect(resolveSrcSet("a.png 1x, ../b.png 2x", base("docs/x.md"))).toBe(
+      "/api/docs/asset/docs/a.png 1x, /api/docs/asset/b.png 2x",
+    );
+    expect(resolveSrcSet("s.png 480w,l.png 800w", base("README.md"))).toBe(
+      "/api/docs/asset/s.png 480w, /api/docs/asset/l.png 800w",
+    );
+  });
+
+  it("leaves absolute candidates, a data URL with a comma, and no base alone", () => {
+    expect(resolveSrcSet("https://x.test/a.png 1x, //x.test/b.png 2x", base("README.md"))).toBe(
+      "https://x.test/a.png 1x, //x.test/b.png 2x",
+    );
+    expect(resolveSrcSet("data:image/png;base64,AA 1x", base("README.md"))).toBe(
+      "data:image/png;base64,AA 1x",
+    );
+    expect(resolveSrcSet("a.png 1x, b.png 2x")).toBe("a.png 1x, b.png 2x");
+    expect(resolveSrcSet(undefined, base("README.md"))).toBeUndefined();
   });
 });
