@@ -593,14 +593,16 @@ function Get-P20OptionalSurfaces {
     # DERIVED, like the launch row: `on` where Claude Code's projects folder is
     # on this machine (CLAUDE_CONFIG_DIR's, else ~/.claude's), `not configured`
     # otherwise -- never `off`, because nothing was answered. Read-only: the
-    # row asks whether the folder is there and opens nothing in it.
+    # row asks whether the folder is there and opens nothing in it. The row's
+    # key IS /env's flag for it (consts.json usage.envFlag; agent/core/config.py
+    # claude_usage is the same rule), which the System page's burn tile follows.
     $usageState = $states.Unset
     $usageNote = 'no Claude Code session files on this machine'
     if (Test-Path -LiteralPath (Get-P20ClaudeProjectsRoot) -PathType Container) {
         $usageState = $states.On
-        $usageNote = $Prefix + 'Burn -Log writes the day''s record into the hub''s usage/'
+        $usageNote = $Prefix + 'Burn shows today and this week; ' + $Prefix + 'Burn -Log writes the day''s record into the hub''s usage/'
     }
-    $rows += New-P20SurfaceRow -Key 'claudeUsage' -Title 'Claude Code usage' -State $usageState `
+    $rows += New-P20SurfaceRow -Key (Get-P20Consts).usage.envFlag -Title 'Claude Code usage' -State $usageState `
         -Config 'Claude Code on this machine (its session files; CLAUDE_CONFIG_DIR if it was moved)' -Note $usageNote
 
     # The question on every row, from the one list (D-W1). A row with no entry

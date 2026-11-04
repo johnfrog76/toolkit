@@ -1,5 +1,5 @@
 {
-  "_comment": "The ONE price table Burn -Log derives a cost from (Scripts/Read-ClaudeUsage.ps1; docs/hub/usage.md, \"The cost is derived\"). List prices of the first-party API, in USD per million tokens, on the day asOf names. A cache write is priced from the input price: cacheWrite5mMultiplier for the five-minute lifetime, cacheWrite1hMultiplier for the one-hour. Thinking tokens are inside output and are not priced twice. A model with no row here is still counted, its cost is null, and the record names it under unpriced. Change a price here and nowhere else; the record says which table it used.",
+  "_comment": "The ONE price table Burn -Log derives a cost from (Scripts/Read-ClaudeUsage.ps1; docs/hub/usage.md, \"The cost is derived\"). List prices of the first-party API, in USD per million tokens, on the day asOf names. A cache write is priced from the input price: cacheWrite5mMultiplier for the five-minute lifetime, cacheWrite1hMultiplier for the one-hour. Thinking tokens are inside output and are not priced twice. A row may carry a note, which every cost read from it repeats (cost.priceNotes): a model whose price depends on the prompt's length is priced at its lower rate card only, and its note says so. A model with no row here is still counted, its cost is null, and the record names it under unpriced. Change a price here and nowhere else; the record says which table it used.",
   "asOf": "2026-10-06",
   "currency": "USD",
   "unit": "per million tokens",
@@ -11,6 +11,6 @@
     "claude-opus-5-5": { "input": 4, "output": 20, "cacheRead": 0.20 },
     "claude-sonnet-5-5": { "input": 2, "output": 10, "cacheRead": 0.20 },
     "claude-sonnet-5": { "input": 2, "output": 10, "cacheRead": 0.20 },
-    "claude-haiku-5-5": { "input": 0.10, "output": 0.50, "cacheRead": 0.01 }
+    "claude-haiku-5-5": { "input": 0.10, "output": 0.50, "cacheRead": 0.01, "note": "priced at its lower rate card, for prompts up to 100K tokens; a longer prompt is billed higher and is not priced so here" }
   }
 }

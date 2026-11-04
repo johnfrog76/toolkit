@@ -2,8 +2,9 @@
 
 `Burn -Log` reads Claude Code's own session files on this machine and writes what they say the day
 used: one record per local day per machine, in the hub. It is a ledger of tokens, kept beside the work
-those tokens bought, so a later reader can set the two side by side. Nothing reads it back yet: the
-record is written, and showing it is later work ([`Not yet`](#not-yet)).
+those tokens bought, so a later reader can set the two side by side. `Burn` alone reads them back, with
+this machine's session files, as **today and this week** -- in the terminal, and on the System page's
+**Claude Code burn** tile ([Today and this week](#today-and-this-week)).
 
 ## Where
 
@@ -45,7 +46,8 @@ byte. Shortened:
   ],
   "unpriced": ["claude-mystery-9"],
   "cost": { "derived": true, "currency": "USD", "priceTableAsOf": "2026-10-06",
-            "note": "list prices; not the plan's allocation" }
+            "note": "list prices; not the plan's allocation",
+            "priceNotes": [ { "model": "claude-haiku-5-5", "note": "priced at its lower rate card, ..." } ] }
 }
 ```
 
@@ -60,7 +62,7 @@ byte. Shortened:
 | `byModel` | one row per model id, the same fields, sorted by model id |
 | `bySession` | one row per session: its id, its `project`, the `models` it used, the same fields, and `firstAt` / `lastAt` -- its first and last response of the day, in UTC. Sorted by `firstAt`, then id |
 | `unpriced` | the model ids the price table has no row for. Their tokens are in every sum; their cost is `null` |
-| `cost` | that `costUsdDerived` is DERIVED, in what currency, and from which table |
+| `cost` | that `costUsdDerived` is DERIVED, in what currency, and from which table; `priceNotes`, one `{model, note}` for each counted model whose price row carries a note -- today, Haiku's, which says it is priced at its lower rate card -- sorted by model, `[]` when none does |
 
 Every array is sorted and no field records when the verb ran, so **a second run over the same session
 files writes the same bytes**: a hub kept in git sees no change.
@@ -117,6 +119,11 @@ only when none of their models is priced.
 It is **list price, not what anyone paid**, and never a share of a plan's allocation: a subscription is
 not billed per token, and nothing here knows what a plan allows.
 
+**Haiku is priced at its lower rate card.** Its list price has two cards by prompt length -- one for prompts
+up to 100K tokens, a higher one past that -- and the table carries only the lower. Nothing here prices by
+prompt length; instead the price row carries a `note`, and every cost read from that row repeats it
+(`cost.priceNotes`): the record, `Burn`'s console and `-AsJson`, and the web tile all say so.
+
 ## What it never carries
 
 A path, the home folder, or a user name. A project folder's name spells the home path out
@@ -139,15 +146,62 @@ grows through the day. It is written through `Write-CardText -New`: UTF-8, no BO
 
 ## Held by
 
-`tkTestToolkit -Burn`: the rule over the table [`Tests/fixtures/usage/cases.json`](../../Tests/fixtures/usage/cases.json)
+`tkTestToolkit -Burn`: the windows and the week boundary over
+[`Tests/fixtures/usage/week.json`](../../Tests/fixtures/usage/week.json) -- a Friday-dated record the week
+before's, this machine's lines split at Friday 05:00, this machine's own record never read -- and `Burn` and
+`Burn -AsJson` typed; whether there are session files over
+[`Tests/fixtures/usage/projects-root.json`](../../Tests/fixtures/usage/projects-root.json), the table
+`Tests/test_usage_burn.py` holds the agent's `claudeUsage` to as well, with the route's hour-long cache. And
+the rule over the table [`Tests/fixtures/usage/cases.json`](../../Tests/fixtures/usage/cases.json)
 -- an empty day, two models, a session across midnight, one response's lines counted once, a subagent's
 transcript, an unpriced model, a dated snapshot, a malformed line, no cache breakdown, a file untouched
 since before the day, the project names -- typed as the verb in a fresh shell, with every line's time built
 from the day's local midnight so the suite reads the same in any timezone; the record above byte for byte; a
 re-run's bytes; no path or name in any record; and every file under the projects folders unchanged.
 
+## Today and this week
+
+`Burn` with no switch is the current burn, and `Burn -AsJson` the same answer as one JSON object:
+
+```powershell
+tkBurn           # today and this week, on the console
+tkBurn -AsJson   # the same, as JSON -- what the agent serves
+```
+
+- **Today** runs from local midnight to now; **this week** from the latest **Friday 05:00 local** to now,
+  when the allocation resets.
+- **Two readings meet in it.** THIS machine is read from its session files, live, by the same rules as the
+  record. Every OTHER machine is read from the day records it logged into the hub's `usage/` -- so another
+  machine is only as current as its last `Burn -Log`. This machine's own records in `usage/` are never read
+  here, so nothing is counted twice. A file in `usage/` that is not a record is skipped and counted.
+- **The week boundary.** This machine's own lines are read by timestamp and **split at Friday 05:00
+  exactly**. A day record cannot be split, so **another machine's day record counts toward the week it
+  starts in**: a record starts at 00:00 on its date (read on this machine's calendar), so **a record dated
+  Friday counts toward the week that ENDS that Friday at 05:00, not the one that begins then**. One
+  consequence worth knowing: on a Friday after 05:00, another machine's record for that day is in **today**
+  and not in **this week** -- it belongs to the week that just ended.
+- **The same blocks.** Each window has `totals`, `byModel` (tokens by model and a derived cost each) and
+  `unpriced` in the record's own field shapes, and `machines`: one row per machine counted, its `source`
+  (`session-files` for this one, `usage-records` for another, with the `days` it logged), its messages and
+  its derived cost. Every model is priced from the table as it is now, so one answer is one table's
+  arithmetic; `cost` is the record's block, `priceNotes` included. No plan percentage, anywhere.
+- **When it stops being right.** `nextBoundaryAt` is the sooner of the next local midnight and the next Friday
+  05:00 -- after it, the windows themselves are different. `asOf` is when it was read; `sessionFiles` and
+  `hub` say whether there were session files here and a `usage/` folder to read.
+- A machine with no session files adds nothing and says so; with no hub, only this machine is read.
+  `-Date` belongs to `-Log` and `-AsJson` to the read: `Burn -Date ...` and `Burn -Log -AsJson` refuse, exit 2.
+
+**In the web UI** it is the **Claude Code burn** tile on the System page: today and this week, a small table
+by model, which machines were counted, the price notes, and when it was read. It is drawn only where `/env`'s
+`claudeUsage` is true -- the **Claude Code usage** inventory row's rule, Claude Code's projects folder on the
+agent's machine -- and absent otherwise, with nothing fetched. Facts only: no colour and no word says good or
+bad. The figures are the CLI's by construction: `GET /api/usage/burn` runs `Burn -AsJson` through the bridge
+([Architecture](../ARCHITECTURE.md)) and keeps the answer on the agent's disk for an hour, never past its
+`nextBoundaryAt`; the browser keeps it for the session and never polls. **Refresh** asks again with
+`refresh=1`, past the agent's hour.
+
 ## Not yet
 
-Nothing reads the record back. `Burn` without `-Log` -- the day's numbers on the console, and the web UI's
-view of them -- is a later verb; until then it refuses, exit 2, naming `-Log`. No record is written unless
-someone runs the verb: nothing schedules it.
+No record is written unless someone runs `Burn -Log`: nothing schedules it, so another machine's share of
+today is as old as its last log. The ratio of the burn to the work it bought, and a weekly chart, are later
+work on the records this logs.

@@ -88,7 +88,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `HowWeWork` | `HowWeWork` (typed: alone and team write nothing, `-WhatIf` writes nothing, the write once in LF with no BOM, the second run refused naming the path, `StartWork` quoting the note); `Menu` (usage, wrapper and script agree) | 12 (under 5.1) |
 | `RemoveSpace` | `NewSpace` (typed: `-WhatIf`, the `-Force` rule, the folder and its cards untouched, the line that adopts them back, every refusal); `Config` (the whole-Space `-Unset`); `Menu` (usage, wrapper and script agree) | 12 (under 5.1, and from the Spaces card's row menu) |
 | `Log` | `ExitCodes` (`Log -Days` leaves no stale exit code) | 7 |
-| `Burn` | `Burn` (typed, with `CLAUDE_CONFIG_DIR` pointing at scratch projects folders: the table over `Tests/fixtures/usage/cases.json`, the documented record byte for byte, a re-run's bytes, no path or name in a record, the projects folders unchanged, the refusals and a machine with no session files) | 12 (Windows PowerShell 5.1 and a real Claude Code folder: the row under "Rows added by a fix") |
+| `Burn` | `Burn` (typed, with `CLAUDE_CONFIG_DIR` pointing at scratch projects folders: the current burn's week over `Tests/fixtures/usage/week.json` and `Burn -AsJson`, the gate over `projects-root.json`, the table over `Tests/fixtures/usage/cases.json`, the documented record byte for byte, a re-run's bytes, no path or name in a record, the projects folders unchanged, the refusals and a machine with no session files) | 12 (Windows PowerShell 5.1 and a real Claude Code folder: the row under "Rows added by a fix") |
 | `InstallAutoload` | `Autoload` (typed) | 1 |
 | `Web` | `Web` (the guards only: no suite starts a real server) | 8 |
 | `Agent` | `Agent` (the guards only) | 8 |

@@ -417,6 +417,18 @@ export function toRegExp(pattern: string, extraFlags = ""): RegExp {
   return new RegExp(body, flags);
 }
 
+/**
+ * Claude Code usage (docs/hub/usage.md, "Today and this week"): the name of /env's
+ * top-level boolean -- true where this machine has Claude Code session files, the
+ * CLI inventory row's rule -- and the agent's route for the current burn. The
+ * System page draws its burn tile, and asks the route, only when
+ * `env[USAGE.envFlag] === true`.
+ */
+export const USAGE = consts.usage as {
+  envFlag: string;
+  burnRoute: string;
+};
+
 /** The contract's patterns, compiled once for this bundle. */
 export const RE = {
   prUrlLine: toRegExp(consts.regex.prUrlLine),

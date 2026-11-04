@@ -162,7 +162,7 @@
     {
       "id": "claude-usage",
       "question": "What did my Claude Code sessions use today?",
-      "sentence": "With Claude Code on this machine, Burn -Log reads its session files (read-only) and writes the day's record into the hub's usage/ folder: tokens by model and by session, and a cost derived from list prices -- never the plan's allocation. One record per day per machine; run it again and it replaces the day's.",
+      "sentence": "With Claude Code on this machine, Burn shows today and this week (from Friday 05:00) -- this machine's session files plus your other machines' logged records -- and the System page has the same as its Claude Code burn tile. Burn -Log reads the session files (read-only) and writes the day's record into the hub's usage/ folder: tokens by model and by session, and a cost derived from list prices -- never the plan's allocation. One record per day per machine; run it again and it replaces the day's.",
       "surfaces": [
         "claudeUsage"
       ],

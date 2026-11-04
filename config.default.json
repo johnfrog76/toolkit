@@ -345,21 +345,27 @@
     },
     "Burn": {
       "category": "info",
-      "description": "Log the day's Claude Code usage into the hub",
-      "usage": "{cliPrefix}Burn -Log [-Date <yyyy-mm-dd>] [-Help]",
+      "description": "Claude Code usage: today, this week, the day's log",
+      "usage": "{cliPrefix}Burn [-AsJson] [-Log] [-Date <yyyy-mm-dd>] [-Help]",
+      "bridgeTimeoutSeconds": 180,
       "examples": [
+        "{cliPrefix}Burn",
+        "{cliPrefix}Burn -AsJson",
         "{cliPrefix}Burn -Log",
         "{cliPrefix}Burn -Log -Date 2026-11-02"
       ],
       "switches": {
+        "-AsJson": "The current burn as one JSON object -- what the agent's GET /api/usage/burn reads. Not with -Log",
         "-Log": "Write the day's record: usage/<date>-<machine>.json in the hub",
-        "-Date <yyyy-mm-dd>": "The local day to log. Default: today",
+        "-Date <yyyy-mm-dd>": "The local day -Log writes. Default: today. Only with -Log",
         "-Help": "This"
       },
       "notes": [
+        "Alone, it prints today (from local midnight) and this week (from the latest Friday 05:00 local, when the allocation resets): this machine's session files, read live, plus the day records the other machines logged into the hub's usage/. This machine's own records are not read, so nothing is counted twice.",
+        "Another machine's day record counts toward the week it starts in -- 00:00 on its date -- so a record dated Friday counts toward the week that ends that Friday at 05:00. This machine's lines are split at Friday 05:00 exactly.",
         "Reads Claude Code's own session files on this machine -- the projects folder under CLAUDE_CONFIG_DIR, else ~/.claude/projects -- and never writes there. A machine without them writes nothing and says so.",
         "One record per local day per machine. Run it again the same day and it replaces the record; over the same session files it writes the same bytes.",
-        "Tokens by model and by session, each message counted once. The cost is derived from Config/claude-prices.json (list prices) and labelled so -- never the plan's allocation. A model with no price is counted and named as unpriced.",
+        "Tokens by model and by session, each message counted once. The cost is derived from Config/claude-prices.json (list prices) and labelled so -- never the plan's allocation. A model with no price is counted and named as unpriced; Haiku is priced at its lower rate card, and says so.",
         "No path and no user name in the record: a project is its last folder name, a session its id, the machine its short host name."
       ]
     },

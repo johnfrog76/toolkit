@@ -1,0 +1,10 @@
+{
+  "_": "Whether this machine has Claude Code session files to read: the rule both halves implement -- the CLI's Claude Code usage inventory row (Scripts/Get-OptionalSurfaces.ps1, through Get-P20ClaudeProjectsRoot) and the agent's /env flag (agent/core/config.py claude_usage), which gates GET /api/usage/burn and the System page's burn tile. One row per input the rule distinguishes. dir is a folder under a scratch root that CLAUDE_CONFIG_DIR is set to, with pad spaces around it when pad is true; projects says what is at <dir>/projects: a folder, a file, or nothing. on is the answer: the row's state 'on' (else 'not configured'), and the flag true (else false). Asserted by tkTestToolkit -Burn and Tests/test_usage_burn.py.",
+  "rows": [
+    { "name": "a configuration folder with a projects folder", "dir": "with", "pad": false, "projects": "folder", "on": true },
+    { "name": "a configuration folder with no projects folder", "dir": "without", "pad": false, "projects": "none", "on": false },
+    { "name": "projects is a file, not a folder", "dir": "file", "pad": false, "projects": "file", "on": false },
+    { "name": "CLAUDE_CONFIG_DIR padded with spaces is trimmed", "dir": "padded", "pad": true, "projects": "folder", "on": true },
+    { "name": "a configuration folder that is not there", "dir": "missing", "pad": false, "projects": "absent", "on": false }
+  ]
+}

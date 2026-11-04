@@ -106,6 +106,12 @@
     "derived": true,
     "currency": "USD",
     "priceTableAsOf": "2026-10-06",
-    "note": "list prices; not the plan's allocation"
+    "note": "list prices; not the plan's allocation",
+    "priceNotes": [
+      {
+        "model": "claude-haiku-5-5",
+        "note": "priced at its lower rate card, for prompts up to 100K tokens; a longer prompt is billed higher and is not priced so here"
+      }
+    ]
   }
 }
