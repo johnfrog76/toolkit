@@ -23,6 +23,7 @@ from .config import (
     ado_enabled,
     anthropic_configured,
     card_types,
+    claude_usage,
     deck_archived,
     how_i_work,
     hub_configured,
@@ -430,6 +431,10 @@ async def get_env(refresh: int = 0):
         # (D-AR13), the launch inventory row's rule. The key is the contract's
         # (consts.json startWork.launchEnvFlag); the copy box reads it by that name.
         consts.startwork_launch_env_flag(): start_work_launch(),
+        # Whether this machine has Claude Code session files -- the Claude Code
+        # usage inventory row's rule. The key is the contract's (consts.json
+        # usage.envFlag); the System page's burn tile, and its fetch, follow it.
+        consts.usage_env_flag(): claude_usage(),
         # The provider profile: what every model call sends, from ai.model.
         "aiModel": model.model_id(),
         "bridgeHost": bridge_host,

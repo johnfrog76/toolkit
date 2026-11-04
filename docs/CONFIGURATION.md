@@ -855,7 +855,10 @@ ledger -- its issue counts, newest runs and repository visibility -- held for 60
 Space's repositories and status, so a foyer opened twice in ten minutes, or after an agent restart, reads
 GitHub once ([the Studio](modules/studio.md#the-routes)). And the standup's dressed sentences, keyed by a hash
 of the model, the register and the facts the model was given, so a sentence is re-dressed only when its facts
-change ([Team Agile](modules/solitaire-agile.md), "The agentic layer"). `agent/core/disk_cache.py` owns the place:
+change ([Team Agile](modules/solitaire-agile.md), "The agentic layer"). And the current Claude Code burn,
+`burn-1/current.json`: one file, `Burn -AsJson`'s last answer with the hub it was read against and when, served
+for an hour and never past the answer's own next midnight or Friday 05:00 ([usage](hub/usage.md#today-and-this-week)).
+`agent/core/disk_cache.py` owns the place:
 
 | Where | When |
 | --- | --- |
@@ -875,7 +878,8 @@ All four folders are **capped by one rule**, applied when something is written: 
 was last written or served. In `rows/` a row carries a stamp in its file's `seen` map, refreshed by a warm
 read at most once a day; in `bodies/` and `standup-dress-1/` it is the file's modification time, set by the
 write and touched on a disk hit. `ledger-1/` is held to the Spaces instead: on a write, the file of any
-Space no longer in the config is dropped. A prune that cannot run leaves the cache as it was.
+Space no longer in the config is dropped. `burn-1/` is one file, replaced on every read, so it needs no cap.
+A prune that cannot run leaves the cache as it was.
 Delete the folder whenever you like: the next read fetches what it needs again. `Config` does not know the
 variable; like the other overrides it is a launcher's, not a setting.
 
