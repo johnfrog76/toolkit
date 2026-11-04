@@ -24,7 +24,7 @@ import { ChevronUpRegular } from "@fluentui/react-icons";
 import type { Components } from "react-markdown";
 import { ZoomControl } from "./ZoomControl";
 import { DocLink } from "./DocLink";
-import { resolveImage } from "./docLinks";
+import { resolveImage, resolveSrcSet } from "./docLinks";
 import type { DocLinkBase } from "./docLinks";
 
 const useStyles = makeStyles({
@@ -511,6 +511,11 @@ export function MarkdownViewer({ content, titleAbove, maxHeight, style, links, a
             className={styles.img}
           />
         );
+      },
+      // A <picture>'s <source>: its srcset is a list of images, resolved the
+      // way an <img src> is. media, type, sizes, width and height stay the author's.
+      source({ node: _n, srcSet, ...props }) {
+        return <source {...props} srcSet={resolveSrcSet(srcSet, links)} />;
       },
       hr() {
         return <hr className={styles.hr} />;

@@ -218,7 +218,7 @@ and `hub.json`), or the first `az` call that failed, as one sentence naming the 
   README's relative links are the drawers, and ONE resolver in the shared viewer decides where each
   goes (`web/src/shared/docLinks.ts`): a relative link to `README.md` or a `.md` under `docs/` opens
   that document in the room with its `#anchor` kept; a link to a design note or a spec opens the
-  Design room; a `#anchor` scrolls, to the id github.com gives the heading; a relative image --
+  Design room; a `#anchor` scrolls, to the id github.com gives the heading; a relative image (an `<img src>`, or a `<picture>` `<source srcset>` candidate) --
   under `docs/`, beside the README, in a folder of its own, climbing above `docs/` with `../`, or
   written from the repository root as `/assets/x.png` -- comes through `GET /api/docs/asset/<path>`,
   so a private repository's pictures load without a GitHub sign-in in the browser; a path that would
