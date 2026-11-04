@@ -16,18 +16,26 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 import time
 import unittest
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
-from fastapi.testclient import TestClient
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # Tests/, for _skipguard
 
-from agent.app import app
-from agent.core import config as config_mod
-from agent.core import usage
-from agent.core.consts import usage_burn_route, usage_env_flag
+from _skipguard import skip_module
+
+try:
+    from fastapi.testclient import TestClient
+
+    from agent.app import app
+    from agent.core import config as config_mod
+    from agent.core import usage
+    from agent.core.consts import usage_burn_route, usage_env_flag
+except Exception as e:  # pragma: no cover - environment without the deps
+    skip_module(f"cannot import the app ({type(e).__name__}: {e})")
 
 ROOT = Path(__file__).resolve().parent
 TABLE = json.loads((ROOT / "fixtures" / "usage" / "projects-root.json").read_text(encoding="utf-8"))
