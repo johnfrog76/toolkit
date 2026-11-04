@@ -107,7 +107,8 @@ Space" exist once, in the CLI. It writes nothing, and it never refuses: with no 
 plus the other machines' day records in the hub's `usage/` -- and it is `Burn -AsJson` run through the
 bridge's runner, so the terminal and the System page's tile show the same numbers by construction; there is
 no second reader in Python. The answer is kept on the agent's disk for an hour (`burn-1/current.json`, keyed
-by the hub) and never past the verb's own `nextBoundaryAt`, the next local midnight or Friday 05:00;
+by the hub and the config files' fingerprint) and never past the verb's own `nextBoundaryAt`, the next local
+midnight or week start (`burn.weekStarts`, Friday 05:00 by default);
 `?refresh=1`, the tile's Refresh, goes past it. It is **404 where `/env`'s `claudeUsage` is false**, and the
 web then draws no tile and asks nothing ([`hub/usage.md`](hub/usage.md#today-and-this-week)).
 

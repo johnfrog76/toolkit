@@ -3,11 +3,12 @@
     Burn -- the current Claude Code burn, today and this week; Burn -Log writes the day's record into the hub.
 .DESCRIPTION
     With no switch: the current burn, TODAY (from local midnight) and THIS WEEK (from
-    the latest Friday 05:00 local, when the allocation resets) -- this machine's
+    the latest burn.weekStarts -- Friday 05:00 local by default -- when the
+    allocation resets) -- this machine's
     Claude Code session files, read live, plus the day records the OTHER machines
     logged into the hub's usage/ folder. This machine's own records are not read:
     its session files are. A day record counts toward the week it starts in (00:00
-    on its date), so one dated Friday is the week before's. Blocks: tokens by model,
+    on its date), so with the default one dated Friday is the week before's. Blocks: tokens by model,
     and a cost DERIVED from Config/claude-prices.json, labelled so; never the plan's
     allocation. -AsJson prints the same answer as one JSON object -- what the agent's
     GET /api/usage/burn serves. docs/hub/usage.md, "Today and this week".
@@ -29,6 +30,10 @@
     The local day -Log writes, yyyy-mm-dd. Default: today. Only with -Log.
 .PARAMETER AsJson
     The current burn as one JSON object. Not with -Log.
+.PARAMETER At
+    Read the burn as it stood at a past local time, yyyy-mm-dd HH:mm, instead of now:
+    the windows are the ones that held then, and nothing after it is counted. Not
+    with -Log (whose day is -Date).
 .NOTES
     PowerShell 5.1 compatible (ASCII only).
 #>
@@ -37,6 +42,7 @@ param(
     [switch]$Log,
     [string]$Date,
     [switch]$AsJson,
+    [string]$At,
     [switch]$Help
 )
 
@@ -51,10 +57,11 @@ if ($Help) {
     Write-Host ""
     Write-Host "  ${prefix}Burn -- Claude Code usage: the current burn, and the day's record" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "    ${prefix}Burn [-AsJson]"
+    Write-Host "    ${prefix}Burn [-AsJson] [-At <yyyy-mm-dd HH:mm>]"
     Write-Host "    ${prefix}Burn -Log [-Date <yyyy-mm-dd>]"
     Write-Host ""
-    Write-Host "  Alone: today and this week (from Friday 05:00), this machine's session files"
+    Write-Host "  Alone: today and this week (from burn.weekStarts, Friday 05:00 by default),"
+    Write-Host "  this machine's session files"
     Write-Host "  plus the other machines' records in the hub. -Log writes"
     Write-Host "  usage/<date>-<machine>.json in the hub: tokens by model and session, cost derived."
     Write-Host ""
@@ -72,6 +79,11 @@ if ($Log -and $AsJson) {
         -Hint "${prefix}Burn -AsJson for today and this week, or ${prefix}Burn -Log to write the day's record."
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
+if ($Log -and $PSBoundParameters.ContainsKey('At')) {
+    Write-CliError -Message "-At is the current burn's, not -Log's: -Log's day is -Date." `
+        -Hint "${prefix}Burn -At <yyyy-mm-dd HH:mm> for the burn as it stood then, or ${prefix}Burn -Log -Date <yyyy-mm-dd>."
+    exit 2  # stated refusal
+}
 if (-not $Log -and $PSBoundParameters.ContainsKey('Date')) {
     Write-CliError -Message "-Date names the day -Log writes; ${prefix}Burn alone reads today and this week." `
         -Hint "${prefix}Burn -Log -Date $([string]$Date), or ${prefix}Burn for today and this week."
@@ -80,12 +92,37 @@ if (-not $Log -and $PSBoundParameters.ContainsKey('Date')) {
 
 if (-not $Log) {
     # -- The current burn: today and this week ---------------------------------
+    $now = Get-Date
+    if ($PSBoundParameters.ContainsKey('At')) {
+        $typedAt = ([string]$At).Trim()
+        $parsedAt = [DateTime]::MinValue
+        $okAt = [DateTime]::TryParseExact($typedAt, [string[]]@('yyyy-MM-dd HH:mm', 'yyyy-MM-ddTHH:mm'), $inv,
+            [System.Globalization.DateTimeStyles]::None, [ref]$parsedAt)
+        if (-not $okAt) {
+            Write-CliError -Message "'$typedAt' is not a time: -At takes yyyy-mm-dd HH:mm, local." -Hint "${prefix}Burn -At '$($now.ToString('yyyy-MM-dd HH:mm', $inv))'"
+            exit 2  # stated refusal
+        }
+        if ($parsedAt -gt $now) {
+            Write-CliError -Message "$typedAt has not happened yet: -At reads the burn as it stood at a past time." -Hint "${prefix}Burn reads it now."
+            exit 2  # stated refusal
+        }
+        $now = [DateTime]::SpecifyKind($parsedAt, [DateTimeKind]::Local)
+    }
+    # When the week starts: burn.weekStarts, read through its one parser.
+    $weekText = ''
+    if ($global:P20Config -and $global:P20Config.BurnWeekStarts) { $weekText = [string]$global:P20Config.BurnWeekStarts }
+    $weekStart = ConvertFrom-P20WeekStart -Text $weekText
+    if (-not $weekStart.Ok) {
+        Write-CliError -Message $weekStart.Reason `
+            -Hint "${prefix}Config -Set burn.weekStarts=`"Friday 05:00`" -- the key is read from config.local.json, then config.default.json."
+        exit 2  # stated refusal
+    }
     $projectsRoot = Get-P20ClaudeProjectsRoot
     $machine = Get-P20UsageMachineName
     $promptsRoot = Get-P20PromptsRoot -PackageRoot $packageRoot
     $usageDir = ''
     if (Test-P20HubRoot $promptsRoot) { $usageDir = Get-P20HubFolder -Name 'usage' -PromptsRoot $promptsRoot -PackageRoot $packageRoot }
-    $read = Read-P20BurnSummary -ProjectsRoot $projectsRoot -UsageDir $usageDir -Now (Get-Date) `
+    $read = Read-P20BurnSummary -ProjectsRoot $projectsRoot -UsageDir $usageDir -Now $now -WeekStart $weekStart `
         -PriceTable (Get-P20ClaudePriceTable -PackageRoot $packageRoot) -Machine $machine
     $sum = $read.Summary
     $burnCost = { param($v) if ($null -eq $v) { 'no priced model' } else { '$' + ([decimal]$v).ToString('0.00', $inv) + ' derived' } }
@@ -118,11 +155,13 @@ if (-not $Log) {
     }
 
     $todayStart = [DateTime]::Parse($sum.today.from, $inv).ToLocalTime()
-    $weekStart = [DateTime]::Parse($sum.week.from, $inv).ToLocalTime()
+    $weekFrom = [DateTime]::Parse($sum.week.from, $inv).ToLocalTime()
     Write-Host ""
-    Write-Host "  Claude Code burn on $machine -- cost derived from list prices as of $($sum.cost.priceTableAsOf), not the plan's allocation" -ForegroundColor Cyan
+    $asOfText = ''
+    if ($PSBoundParameters.ContainsKey('At')) { $asOfText = ' as of ' + $now.ToString('yyyy-MM-dd HH:mm', $inv) }
+    Write-Host "  Claude Code burn on $machine$asOfText -- cost derived from list prices as of $($sum.cost.priceTableAsOf), not the plan's allocation" -ForegroundColor Cyan
     & $writeBlock ("Today, " + $todayStart.ToString('ddd d MMM', $inv)) $sum.today
-    & $writeBlock ("This week, from " + $weekStart.ToString('ddd d MMM HH:mm', $inv) + " (the week starts Friday 05:00)") $sum.week
+    & $writeBlock ("This week, from " + $weekFrom.ToString('ddd d MMM HH:mm', $inv) + " (the week starts $($weekStart.Text), burn.weekStarts)") $sum.week
     Write-Host ""
     if (-not $sum.sessionFiles) { Write-Host "  No Claude Code session files on this machine ($projectsRoot is not there): it adds nothing." -ForegroundColor DarkGray }
     if (-not $sum.hub) { Write-Host "  No hub usage/ folder: no other machine's records were read." -ForegroundColor DarkGray }

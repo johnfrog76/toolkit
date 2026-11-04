@@ -8,7 +8,7 @@ docs/hub/usage.md, "Today and this week"; agent/core/usage.py. Holds:
    ``usage.envFlag``; and the route is 404 where it is false -- no verb run.
 2. One reader: the route runs ``Burn -AsJson`` through the bridge's runner,
    by the function the CLI's command table names, and serves what it printed.
-3. The cache: an hour on disk, keyed by the hub; never past the verb's own
+3. The cache: an hour on disk, keyed by the hub and the config files; never past the verb's own
    ``nextBoundaryAt``; ``?refresh=1`` goes past it; a failed read is not kept.
 """
 
@@ -43,6 +43,7 @@ def _answer(boundary_in: timedelta = timedelta(hours=6)) -> dict:
         "burn": 1,
         "machine": "build-box",
         "asOf": _iso(now),
+        "weekStarts": "Friday 05:00 local",
         "nextBoundaryAt": _iso(now + boundary_in),
         "today": {"totals": {"messages": 3, "costUsdDerived": 0.5}, "byModel": [], "machines": []},
         "week": {"totals": {"messages": 9, "costUsdDerived": 1.5}, "byModel": [], "machines": []},
@@ -152,6 +153,14 @@ class TheRoute(unittest.TestCase):
     def test_another_hub_is_a_miss(self):
         self.client.get(self.path)
         with mock.patch("agent.core.usage.hub_root", return_value=Path("/elsewhere/hub")):
+            self.client.get(self.path)
+        self.assertEqual(len(self.calls), 2)
+
+    def test_a_config_change_is_a_miss(self):
+        # Config -Set burn.weekStarts changes config.local.json; the agent never
+        # reads the key, it notices the file changed.
+        self.client.get(self.path)
+        with mock.patch("agent.core.usage._inputs", return_value="another config"):
             self.client.get(self.path)
         self.assertEqual(len(self.calls), 2)
 

@@ -33,6 +33,9 @@
 if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
 }
+if (-not (Get-Command ConvertFrom-P20WeekStart -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'ConvertFrom-WeekStart.ps1')
+}
 
 function Get-P20ClaudeProjectsRoot {
     <#
@@ -436,16 +439,17 @@ function Get-P20UsageMachineName {
 
 # -- The current burn: today and this week (Burn with no switch) ----------------
 #
-# THE WEEK starts Friday 05:00 local, when the plan's allocation resets
-# (docs/hub/usage.md, "Today and this week"). Two readings meet in it:
+# THE WEEK starts at burn.weekStarts, local time -- Friday 05:00 by default
+# (config.default.json), when the plan's allocation resets (docs/hub/usage.md,
+# "Today and this week"). Two readings meet in it:
 #
 #   - THIS machine is read from its session files, by each response's own time,
-#     so its lines split at Friday 05:00 exactly.
+#     so its lines split at the week's start exactly.
 #   - ANOTHER machine is read from the day records it logged into the hub's
 #     usage/, and a day record cannot be split: it counts toward the week it
-#     STARTS in. A record starts at 00:00 on its date, so one dated Friday counts
-#     toward the week that ENDS that Friday at 05:00, not the one that begins
-#     then. Its date is read on this machine's calendar.
+#     STARTS in. A record starts at 00:00 on its date, so with the default one
+#     dated Friday counts toward the week that ENDS that Friday at 05:00, not the
+#     one that begins then. Its date is read on this machine's calendar.
 #
 # This machine's own records in usage/ are never read here: its session files
 # are, and reading both would count it twice.
@@ -453,20 +457,19 @@ function Get-P20UsageMachineName {
 function Get-P20BurnWindows {
     <#
       The two windows at -Now (a local time): Today from local midnight, This
-      week from the latest Friday 05:00 at or before -Now. NextBoundary is the
+      week from the latest week start at or before -Now. -WeekStart is
+      ConvertFrom-P20WeekStart's answer for burn.weekStarts. NextBoundary is the
       sooner of the next midnight and the next week start -- the instant the
       answer stops being right, which the agent's cache honours.
     #>
-    param([Parameter(Mandatory = $true)][DateTime]$Now)
-    # The allocation resets Friday 05:00 local. Here and nowhere else.
-    $weekDay = [DayOfWeek]::Friday
-    $weekHour = 5
+    param([Parameter(Mandatory = $true)][DateTime]$Now, [Parameter(Mandatory = $true)]$WeekStart)
+    $weekDay = $WeekStart.Day
     $local = $Now
     if ($local.Kind -eq [DateTimeKind]::Utc) { $local = $local.ToLocalTime() }
     $local = [DateTime]::SpecifyKind($local, [DateTimeKind]::Local)
     $todayStart = $local.Date
     $back = ((([int]$todayStart.DayOfWeek) - [int]$weekDay) + 7) % 7
-    $weekStart = $todayStart.AddDays(-$back).AddHours($weekHour)
+    $weekStart = $todayStart.AddDays(-$back).AddHours($WeekStart.Hour).AddMinutes($WeekStart.Minute)
     if ($weekStart -gt $local) { $weekStart = $weekStart.AddDays(-7) }
     $nextMidnight = $todayStart.AddDays(1)
     $nextWeek = $weekStart.AddDays(7)
@@ -486,9 +489,10 @@ function Get-P20BurnWindows {
 function Test-P20RecordInWeek {
     <#
       Whether a day record dated -DayKey (yyyy-mm-dd) counts toward the week
-      starting -WeekStart: the week it STARTS in, a record starting at 00:00 on
-      its date. A record dated the Friday a week starts on starts five hours
-      before it, so it is the week before's.
+      starting -WeekStart (an instant): the week it STARTS in, a record starting
+      at 00:00 on its date. With the default, a record dated the Friday a week
+      starts on starts five hours before it, so it is the week before's. A week
+      start at 00:00 takes its own day's record.
     #>
     param([Parameter(Mandatory = $true)][string]$DayKey, [Parameter(Mandatory = $true)][DateTime]$WeekStart)
     $parsed = [DateTime]::MinValue
@@ -620,19 +624,21 @@ function Read-P20BurnSummary {
     <#
       The current burn at -Now: Today and This week, this machine's session
       files plus the other machines' day records in -UsageDir (docs/hub/usage.md,
-      "Today and this week"). -ProjectsRoot may not exist: this machine then
-      adds nothing and the answer says so. Returns @{ Summary; Files; Skipped }.
+      "Today and this week"). -WeekStart is ConvertFrom-P20WeekStart's answer
+      for burn.weekStarts. -ProjectsRoot may not exist: this machine then adds
+      nothing and the answer says so. Returns @{ Summary; Files; Skipped }.
     #>
     param(
         [string]$ProjectsRoot,
         [string]$UsageDir,
         [Parameter(Mandatory = $true)][DateTime]$Now,
+        [Parameter(Mandatory = $true)]$WeekStart,
         [Parameter(Mandatory = $true)]$PriceTable,
         [Parameter(Mandatory = $true)][string]$Machine
     )
     $inv = [System.Globalization.CultureInfo]::InvariantCulture
     $stamp = 'yyyy-MM-ddTHH:mm:ss.fffZ'
-    $w = Get-P20BurnWindows -Now $Now
+    $w = Get-P20BurnWindows -Now $Now -WeekStart $WeekStart
     $hasFiles = [bool]($ProjectsRoot -and (Test-Path -LiteralPath $ProjectsRoot -PathType Container))
     $since = $w.TodayStart
     if ($w.WeekStart -lt $since) { $since = $w.WeekStart }
@@ -653,7 +659,8 @@ function Read-P20BurnSummary {
 
     $others = Read-P20OtherMachineRecords -UsageDir $UsageDir -Machine $Machine
     $othersToday = @($others.Records | Where-Object { $_.Date -eq $w.TodayKey })
-    $othersWeek = @($others.Records | Where-Object { Test-P20RecordInWeek -DayKey $_.Date -WeekStart $w.WeekStart })
+    # Today's and this week's records, up to -Now: a record that starts after it is not yet.
+    $othersWeek = @($others.Records | Where-Object { $_.Date -le $w.TodayKey -and (Test-P20RecordInWeek -DayKey $_.Date -WeekStart $w.WeekStart) })
 
     $today = ConvertTo-P20BurnWindow -Mine $mineToday -Others $othersToday -Machine $Machine -HasSessionFiles $hasFiles `
         -PriceTable $PriceTable -From $w.TodayStart -To $w.Now
@@ -672,7 +679,7 @@ function Read-P20BurnSummary {
         utcOffset      = ($sign + [Math]::Abs($offset.Hours).ToString('00') + ':' + [Math]::Abs($offset.Minutes).ToString('00'))
         asOf           = $w.Now.ToUniversalTime().ToString($stamp, $inv)
         nextBoundaryAt = $w.NextBoundary.ToUniversalTime().ToString($stamp, $inv)
-        weekStarts     = 'Friday 05:00 local'
+        weekStarts     = ($WeekStart.Text + ' local')
         sessionFiles   = $hasFiles
         hub            = [bool]($UsageDir -and (Test-Path -LiteralPath $UsageDir -PathType Container))
         today          = $today

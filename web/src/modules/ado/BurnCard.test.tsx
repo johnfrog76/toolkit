@@ -63,7 +63,7 @@ function answer(o: Partial<BurnResponse> = {}): BurnResponse {
     utcOffset: "+00:00",
     asOf: "2026-11-04T17:00:00.000Z",
     nextBoundaryAt: "2026-11-05T00:00:00.000Z",
-    weekStarts: "Friday 05:00 local",
+    weekStarts: "Monday 09:00 local",
     sessionFiles: true,
     hub: true,
     today: win({ totals: { ...win().totals, messages: 2, costUsdDerived: null }, byModel: [] }),
@@ -106,6 +106,14 @@ describe("the burn tile", () => {
     expect(screen.getByText("claude-haiku-5-5 is priced at its lower rate card.")).toBeTruthy();
     expect(screen.getByText(/not the plan's\s+allocation/)).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/%/);
+  });
+
+  it("names the week start the answer was read under, not a fixed day", () => {
+    render(<BurnCard />);
+    expect(
+      screen.getByText(/The week starts Monday 09:00 local \(burn\.weekStarts\)/),
+    ).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/Friday/);
   });
 
   it("is facts only: no number is coloured", () => {

@@ -477,6 +477,12 @@ $script:ModuleState.Config = @{
     # The provider profile: the model id every model call sends --
     # AddPRReview here, suggest and rewrite in the agent, which reads the same
     # key through its own config loader. The key itself stays in the environment.
+    # When the Claude Code burn's week starts (burn.weekStarts, "<Day> HH:mm"),
+    # as written: Burn reads its shape through Scripts/ConvertFrom-WeekStart.ps1
+    # and refuses one it cannot read, naming the key.
+    BurnWeekStarts = if ($localConfig.burn -and $localConfig.burn.weekStarts) { [string]$localConfig.burn.weekStarts }
+    elseif ($defaultConfig.burn -and $defaultConfig.burn.weekStarts) { [string]$defaultConfig.burn.weekStarts }
+    else { '' }
     AiModel = if ($localConfig.ai -and $localConfig.ai.model) { [string]$localConfig.ai.model }
     elseif ($defaultConfig.ai -and $defaultConfig.ai.model) { [string]$defaultConfig.ai.model }
     else { '' }
@@ -2031,6 +2037,7 @@ function global:Invoke-P20Burn {
         [switch]$Log,
         [string]$Date,
         [switch]$AsJson,
+        [string]$At,
         [switch]$Help
     )
     if ($Help) { Show-CommandHelp 'Burn'; return }

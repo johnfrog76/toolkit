@@ -130,7 +130,7 @@ function Notes({ data }: { data: BurnResponse }) {
     <div className={styles.notes}>
       <Caption1>
         Cost derived from list prices as of {data.cost.priceTableAsOf}; not the plan&apos;s
-        allocation. The week starts Friday 05:00.
+        allocation. The week starts {data.weekStarts} (burn.weekStarts).
       </Caption1>
       {data.cost.priceNotes.map((n) => (
         <Caption1 key={n.model}>

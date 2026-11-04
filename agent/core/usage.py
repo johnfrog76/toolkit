@@ -10,16 +10,19 @@ records the other machines logged into the hub's ``usage/`` -- as the CLI's
 parameter as argv) and serves what the verb printed. The terminal and the System
 page's tile therefore show the same numbers by construction, and the rules that
 are easy to get subtly wrong -- one response counted once across its lines, the
-week starting Friday 05:00, another machine's record counting toward the week it
-starts in -- live in one place, ``Scripts/Read-ClaudeUsage.ps1``.
+week's start (``burn.weekStarts``), another machine's record counting toward the
+week it starts in -- live in one place, ``Scripts/Read-ClaudeUsage.ps1``.
 
 **Kept on disk for an hour.** A read costs a PowerShell start and a pass over a
 week of transcripts (seconds), so the answer is kept in the agent's cache
 (``agent/core/disk_cache.py``, ``burn-1/current.json``) for ``BURN_TTL_SECONDS``,
 the way ``/studio/ledger`` keeps its answer, keyed by the hub it was read
-against. It is also never served past the verb's own ``nextBoundaryAt`` -- the
-next local midnight or the next Friday 05:00, whichever is sooner -- because
-after it the windows themselves are different. ``?refresh=1`` (the tile's
+against and by the config files it was read under -- the bridge's own
+fingerprint of them (``bridge._map_key_now``), so ``Config -Set burn.weekStarts``
+is a miss at once and the agent never reads the key itself. It is also never
+served past the verb's own ``nextBoundaryAt`` -- the next local midnight or the
+next week start (``burn.weekStarts``, Friday 05:00 by default), whichever is
+sooner -- because after it the windows themselves are different. ``?refresh=1`` (the tile's
 Refresh) goes past the cache. A read that failed is not kept.
 
 **Present where on, absent where not.** The gate is ``claude_usage()`` -- the
@@ -83,11 +86,19 @@ def _json_object(stdout: str) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
-def _cached(hub: str, now: float) -> dict | None:
-    """The kept reading, when it is for this hub, under an hour old and not past
-    its own next boundary; else None."""
+def _inputs() -> str:
+    """What the reading depends on besides the session files: the config files
+    and the module, as the bridge fingerprints them for its command table."""
+    return repr(bridge._map_key_now())
+
+
+def _cached(hub: str, inputs: str, now: float) -> dict | None:
+    """The kept reading, when it is for this hub and these config files, under an
+    hour old and not past its own next boundary; else None."""
     entry = disk_cache.get_json(BURN_DIR, BURN_FILE)
-    if not entry or entry.get("hub") != hub or not isinstance(entry.get("burn"), dict):
+    if not entry or entry.get("hub") != hub or entry.get("inputs") != inputs:
+        return None
+    if not isinstance(entry.get("burn"), dict):
         return None
     try:
         fetched = float(entry.get("fetchedAt") or 0)
@@ -132,14 +143,15 @@ def read_burn(refresh: bool = False) -> dict:
     kept. Blocking: PowerShell runs here."""
     with _read_lock:  # two tabs at once run the verb once; the second finds the disk warm
         hub = str(hub_root())
+        inputs = _inputs()
         now = time.time()
         if not refresh:
-            hit = _cached(hub, now)
+            hit = _cached(hub, inputs, now)
             if hit is not None:
                 return hit
         data = _run_burn()
         fetched = time.time()
-        disk_cache.put_json({"hub": hub, "fetchedAt": fetched, "burn": data}, BURN_DIR, BURN_FILE)
+        disk_cache.put_json({"hub": hub, "inputs": inputs, "fetchedAt": fetched, "burn": data}, BURN_DIR, BURN_FILE)
         return {**data, "fetchedAt": _stamp(fetched), "fromCache": False}
 
 

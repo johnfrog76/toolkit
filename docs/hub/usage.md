@@ -147,9 +147,10 @@ grows through the day. It is written through `Write-CardText -New`: UTF-8, no BO
 ## Held by
 
 `tkTestToolkit -Burn`: the windows and the week boundary over
-[`Tests/fixtures/usage/week.json`](../../Tests/fixtures/usage/week.json) -- a Friday-dated record the week
-before's, this machine's lines split at Friday 05:00, this machine's own record never read -- and `Burn` and
-`Burn -AsJson` typed; whether there are session files over
+[`Tests/fixtures/usage/week.json`](../../Tests/fixtures/usage/week.json) -- under Friday 05:00, Monday 09:00
+and Sunday 00:00: a record dated the week's first day the week before's, this machine's lines split at the
+week's start, this machine's own record never read, and the values `burn.weekStarts` takes and refuses -- and
+`Burn` and `Burn -AsJson` typed at a fixed `-At`, with `burn.weekStarts` set through `Config`; whether there are session files over
 [`Tests/fixtures/usage/projects-root.json`](../../Tests/fixtures/usage/projects-root.json), the table
 `Tests/test_usage_burn.py` holds the agent's `claudeUsage` to as well, with the route's hour-long cache. And
 the rule over the table [`Tests/fixtures/usage/cases.json`](../../Tests/fixtures/usage/cases.json)
@@ -166,30 +167,41 @@ re-run's bytes; no path or name in any record; and every file under the projects
 ```powershell
 tkBurn           # today and this week, on the console
 tkBurn -AsJson   # the same, as JSON -- what the agent serves
+tkBurn -At '2026-11-06 04:59'   # as it stood then: that moment's today and week
 ```
 
-- **Today** runs from local midnight to now; **this week** from the latest **Friday 05:00 local** to now,
-  when the allocation resets.
+- **Today** runs from local midnight to now; **this week** from the latest **week start** to now -- the
+  `burn.weekStarts` setting, **Friday 05:00 local by default**, when the allocation resets. A plan that
+  resets at another time says so once: `tkConfig -Set burn.weekStarts="Monday 09:00"`
+  ([Configuration](../CONFIGURATION.md#burnweekstarts----when-the-burns-week-starts)). Every rule below
+  reads the week's start from it; "Friday 05:00" in the examples is the default.
 - **Two readings meet in it.** THIS machine is read from its session files, live, by the same rules as the
   record. Every OTHER machine is read from the day records it logged into the hub's `usage/` -- so another
   machine is only as current as its last `Burn -Log`. This machine's own records in `usage/` are never read
   here, so nothing is counted twice. A file in `usage/` that is not a record is skipped and counted.
-- **The week boundary.** This machine's own lines are read by timestamp and **split at Friday 05:00
-  exactly**. A day record cannot be split, so **another machine's day record counts toward the week it
-  starts in**: a record starts at 00:00 on its date (read on this machine's calendar), so **a record dated
-  Friday counts toward the week that ENDS that Friday at 05:00, not the one that begins then**. One
-  consequence worth knowing: on a Friday after 05:00, another machine's record for that day is in **today**
-  and not in **this week** -- it belongs to the week that just ended.
+- **The week boundary.** This machine's own lines are read by timestamp and **split at the week's start
+  exactly** -- Friday 05:00 by default. A day record cannot be split, so **another machine's day record counts
+  toward the week it starts in**: a record starts at 00:00 on its date (read on this machine's calendar), so
+  with the default **a record dated Friday counts toward the week that ENDS that Friday at 05:00, not the one
+  that begins then** -- and under `Monday 09:00`, a Monday-dated record is the week before's the same way. A
+  week that starts at 00:00 takes its own day's record. One consequence worth knowing: on the week's first day
+  after its start time, another machine's record for that day is in **today** and not in **this week** -- it
+  belongs to the week that just ended.
 - **The same blocks.** Each window has `totals`, `byModel` (tokens by model and a derived cost each) and
   `unpriced` in the record's own field shapes, and `machines`: one row per machine counted, its `source`
   (`session-files` for this one, `usage-records` for another, with the `days` it logged), its messages and
   its derived cost. Every model is priced from the table as it is now, so one answer is one table's
   arithmetic; `cost` is the record's block, `priceNotes` included. No plan percentage, anywhere.
-- **When it stops being right.** `nextBoundaryAt` is the sooner of the next local midnight and the next Friday
-  05:00 -- after it, the windows themselves are different. `asOf` is when it was read; `sessionFiles` and
-  `hub` say whether there were session files here and a `usage/` folder to read.
+- **When it stops being right.** `nextBoundaryAt` is the sooner of the next local midnight and the next week
+  start -- after it, the windows themselves are different. `weekStarts` names the setting it was read under
+  (`Friday 05:00 local`), `asOf` when it was read; `sessionFiles` and `hub` say whether there were session
+  files here and a `usage/` folder to read.
+- **`-At <yyyy-mm-dd HH:mm>`** reads the burn as it stood at a past local time: that moment's today and week,
+  and nothing after it -- no line later than it, no record dated after its day. A time to come is refused.
 - A machine with no session files adds nothing and says so; with no hub, only this machine is read.
-  `-Date` belongs to `-Log` and `-AsJson` to the read: `Burn -Date ...` and `Burn -Log -AsJson` refuse, exit 2.
+  `-Date` belongs to `-Log`, and `-AsJson` and `-At` to the read: `Burn -Date ...`, `Burn -Log -AsJson` and
+  `Burn -Log -At ...` refuse, exit 2. So does a `burn.weekStarts` the verb cannot read, naming the key and the
+  file it is read from.
 
 **In the web UI** it is the **Claude Code burn** tile on the System page: today and this week, a small table
 by model, which machines were counted, the price notes, and when it was read. It is drawn only where `/env`'s

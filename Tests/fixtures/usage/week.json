@@ -1,36 +1,94 @@
 {
-  "_": "The current burn's windows (Burn with no switch; docs/hub/usage.md, \"Today and this week\"), one row per input the rule distinguishes. Every time is LOCAL, yyyy-MM-dd HH:mm, read on the clock of the machine running the suite. windows: at now, Today starts at local midnight, This week at the latest Friday 05:00 at or before now, and the answer is right until nextBoundary, the sooner of the next midnight and the next Friday 05:00. records: whether another machine's day record dated <date> counts toward the week starting weekStart -- the week it STARTS in, a record starting at 00:00 on its date, so a record dated the Friday a week starts on is the week before's. summary: the two halves together at one now -- this machine's lines (t is the offset from now's local midnight) split at Friday 05:00 exactly, the other machine's Friday-dated record in Today and not in This week, and this machine's own record never read. Asserted by tkTestToolkit -Burn.",
+  "_": "The current burn's windows (Burn with no switch; docs/hub/usage.md, \"Today and this week\"), one row per input the rule distinguishes. Every time is LOCAL, yyyy-MM-dd HH:mm, read on the clock of the machine running the suite; weekStarts is the burn.weekStarts value the row is read under -- Friday 05:00 is the shipped default, Monday 09:00 another day and hour. windows: at now, Today starts at local midnight, This week at the latest week start at or before now, and the answer is right until nextBoundary, the sooner of the next midnight and the next week start. records: whether another machine's day record dated <date> counts toward the week starting weekStart -- the week it STARTS in, a record starting at 00:00 on its date, so a record dated the day a week starts on is the week before's (the week starts later that day). summaries: both halves together at one now -- this machine's lines (t is the offset from now's local midnight) split at the week's start exactly, another machine's record dated the week's first day in Today and not in This week, and this machine's own record never read. weekStartsValues: what Config -Set burn.weekStarts accepts (as it reads back) and refuses. Asserted by tkTestToolkit -Burn.",
   "windows": [
-    { "name": "a Wednesday: the week began the Friday before", "now": "2026-11-04 10:00", "weekStart": "2026-10-30 05:00", "nextBoundary": "2026-11-05 00:00" },
-    { "name": "a Thursday night: the next boundary is midnight", "now": "2026-11-05 23:30", "weekStart": "2026-10-30 05:00", "nextBoundary": "2026-11-06 00:00" },
-    { "name": "Friday 04:59: still last week, and the boundary is at 05:00", "now": "2026-11-06 04:59", "weekStart": "2026-10-30 05:00", "nextBoundary": "2026-11-06 05:00" },
-    { "name": "Friday 05:00 exactly: the week starts", "now": "2026-11-06 05:00", "weekStart": "2026-11-06 05:00", "nextBoundary": "2026-11-07 00:00" },
-    { "name": "Saturday: the week began the day before", "now": "2026-11-07 01:00", "weekStart": "2026-11-06 05:00", "nextBoundary": "2026-11-08 00:00" }
+    { "name": "a Wednesday: the week began the Friday before", "weekStarts": "Friday 05:00", "now": "2026-11-04 10:00", "weekStart": "2026-10-30 05:00", "nextBoundary": "2026-11-05 00:00" },
+    { "name": "a Thursday night: the next boundary is midnight", "weekStarts": "Friday 05:00", "now": "2026-11-05 23:30", "weekStart": "2026-10-30 05:00", "nextBoundary": "2026-11-06 00:00" },
+    { "name": "Friday 04:59: still last week, and the boundary is at 05:00", "weekStarts": "Friday 05:00", "now": "2026-11-06 04:59", "weekStart": "2026-10-30 05:00", "nextBoundary": "2026-11-06 05:00" },
+    { "name": "Friday 05:00 exactly: the week starts", "weekStarts": "Friday 05:00", "now": "2026-11-06 05:00", "weekStart": "2026-11-06 05:00", "nextBoundary": "2026-11-07 00:00" },
+    { "name": "Saturday: the week began the day before", "weekStarts": "Friday 05:00", "now": "2026-11-07 01:00", "weekStart": "2026-11-06 05:00", "nextBoundary": "2026-11-08 00:00" },
+    { "name": "Monday 09:00, on a Wednesday: the week began on Monday", "weekStarts": "Monday 09:00", "now": "2026-11-04 10:00", "weekStart": "2026-11-02 09:00", "nextBoundary": "2026-11-05 00:00" },
+    { "name": "Monday 09:00, Monday 08:59: still last week, the boundary at 09:00", "weekStarts": "Monday 09:00", "now": "2026-11-09 08:59", "weekStart": "2026-11-02 09:00", "nextBoundary": "2026-11-09 09:00" },
+    { "name": "Monday 09:00, Monday 09:00 exactly: the week starts", "weekStarts": "Monday 09:00", "now": "2026-11-09 09:00", "weekStart": "2026-11-09 09:00", "nextBoundary": "2026-11-10 00:00" },
+    { "name": "Sunday 00:00: the week starts with the day, so the boundary is that midnight", "weekStarts": "Sunday 00:00", "now": "2026-11-07 22:00", "weekStart": "2026-11-01 00:00", "nextBoundary": "2026-11-08 00:00" }
   ],
-  "records": {
-    "weekStart": "2026-10-30 05:00",
-    "rows": [
-      { "date": "2026-10-29", "inWeek": false, "why": "the Thursday before: the week before's" },
-      { "date": "2026-10-30", "inWeek": false, "why": "the Friday the week starts on: its record starts at 00:00, five hours before the week" },
-      { "date": "2026-10-31", "inWeek": true, "why": "the Saturday after" },
-      { "date": "2026-11-06", "inWeek": true, "why": "the Friday the week ends on: its record starts at 00:00, inside the week" },
-      { "date": "2026-11-07", "inWeek": false, "why": "the Saturday after the week" }
-    ]
-  },
-  "summary": {
-    "now": "2026-11-06 10:00",
-    "lines": [
-      { "t": "+04:59", "id": "msg-before-five", "model": "claude-opus-5-5", "out": 100 },
-      { "t": "+05:01", "id": "msg-after-five", "model": "claude-opus-5-5", "out": 200 }
-    ],
-    "records": [
-      { "machine": "laptop", "date": "2026-11-06", "model": "claude-haiku-5-5", "messages": 3, "out": 30 },
-      { "machine": "laptop", "date": "2026-11-05", "model": "claude-haiku-5-5", "messages": 5, "out": 50 },
-      { "machine": "{this}", "date": "2026-11-06", "model": "claude-opus-5-5", "messages": 100, "out": 1000 }
-    ],
-    "expect": {
-      "today": { "messages": 5, "output": 330, "machines": "{this}=2, laptop=3 [2026-11-06]" },
-      "week": { "messages": 1, "output": 200, "machines": "{this}=1" }
+  "records": [
+    {
+      "weekStarts": "Friday 05:00",
+      "weekStart": "2026-10-30 05:00",
+      "rows": [
+        { "date": "2026-10-29", "inWeek": false, "why": "the Thursday before: the week before's" },
+        { "date": "2026-10-30", "inWeek": false, "why": "the Friday the week starts on: its record starts at 00:00, five hours before the week" },
+        { "date": "2026-10-31", "inWeek": true, "why": "the Saturday after" },
+        { "date": "2026-11-06", "inWeek": true, "why": "the Friday the week ends on: its record starts at 00:00, inside the week" },
+        { "date": "2026-11-07", "inWeek": false, "why": "the Saturday after the week" }
+      ]
+    },
+    {
+      "weekStarts": "Monday 09:00",
+      "weekStart": "2026-11-02 09:00",
+      "rows": [
+        { "date": "2026-11-01", "inWeek": false, "why": "Monday 09:00: the Sunday before" },
+        { "date": "2026-11-02", "inWeek": false, "why": "Monday 09:00: the Monday the week starts on, nine hours before the week" },
+        { "date": "2026-11-03", "inWeek": true, "why": "Monday 09:00: the Tuesday after" },
+        { "date": "2026-11-09", "inWeek": true, "why": "Monday 09:00: the Monday the week ends on" }
+      ]
+    },
+    {
+      "weekStarts": "Sunday 00:00",
+      "weekStart": "2026-11-01 00:00",
+      "rows": [
+        { "date": "2026-11-01", "inWeek": true, "why": "Sunday 00:00: a week starting at midnight takes its own day's record" },
+        { "date": "2026-11-08", "inWeek": false, "why": "Sunday 00:00: the next Sunday is the next week's" }
+      ]
     }
+  ],
+  "summaries": [
+    {
+      "name": "Friday 05:00 at Friday 10:00",
+      "weekStarts": "Friday 05:00",
+      "now": "2026-11-06 10:00",
+      "lines": [
+        { "t": "+04:59", "id": "msg-before-five", "model": "claude-opus-5-5", "out": 100 },
+        { "t": "+05:01", "id": "msg-after-five", "model": "claude-opus-5-5", "out": 200 }
+      ],
+      "records": [
+        { "machine": "laptop", "date": "2026-11-06", "model": "claude-haiku-5-5", "messages": 3, "out": 30 },
+        { "machine": "laptop", "date": "2026-11-05", "model": "claude-haiku-5-5", "messages": 5, "out": 50 },
+        { "machine": "{this}", "date": "2026-11-06", "model": "claude-opus-5-5", "messages": 100, "out": 1000 }
+      ],
+      "expect": {
+        "nextBoundary": "2026-11-07 00:00",
+        "today": { "messages": 5, "output": 330, "machines": "{this}=2, laptop=3 [2026-11-06]" },
+        "week": { "messages": 1, "output": 200, "machines": "{this}=1" }
+      }
+    },
+    {
+      "name": "Monday 09:00 at Tuesday 12:00",
+      "weekStarts": "Monday 09:00",
+      "now": "2026-11-03 12:00",
+      "lines": [
+        { "t": "-15:01", "id": "msg-monday-before-nine", "model": "claude-opus-5-5", "out": 100 },
+        { "t": "-14:59", "id": "msg-monday-after-nine", "model": "claude-opus-5-5", "out": 200 },
+        { "t": "+10:00", "id": "msg-tuesday", "model": "claude-opus-5-5", "out": 400 }
+      ],
+      "records": [
+        { "machine": "laptop", "date": "2026-11-02", "model": "claude-haiku-5-5", "messages": 3, "out": 30 },
+        { "machine": "laptop", "date": "2026-11-03", "model": "claude-haiku-5-5", "messages": 5, "out": 50 },
+        { "machine": "{this}", "date": "2026-11-03", "model": "claude-opus-5-5", "messages": 100, "out": 1000 }
+      ],
+      "expect": {
+        "nextBoundary": "2026-11-04 00:00",
+        "today": { "messages": 6, "output": 450, "machines": "{this}=1, laptop=5 [2026-11-03]" },
+        "week": { "messages": 7, "output": 650, "machines": "{this}=2, laptop=5 [2026-11-03]" }
+      }
+    }
+  ],
+  "weekStartsValues": {
+    "accepted": [
+      { "typed": "Friday 05:00", "reads": "Friday 05:00" },
+      { "typed": "monday 9:00", "reads": "Monday 09:00" },
+      { "typed": "  SUNDAY   23:59 ", "reads": "Sunday 23:59" }
+    ],
+    "refused": ["Funday 05:00", "Friday", "Friday 24:00", "Friday 05:60", "Fri 05:00", "05:00 Friday", ""]
   }
 }
