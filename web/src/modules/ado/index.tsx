@@ -43,6 +43,8 @@ import { ConfigSettings } from "./ConfigSettings";
 import { ConnectAdoCard } from "./ConnectAdoCard";
 import { ToolkitLog } from "./ToolkitLog";
 import { TestHealth } from "./TestHealth";
+import { BurnCard } from "./BurnCard";
+import { USAGE } from "../../shell/consts";
 
 /**
  * The ADO prompt-engineering module -- the always-on core.
@@ -231,6 +233,11 @@ function systemCards(ctx: CardContext): ReactElement[] {
     <ToolkitLog key="log" />,
   ];
   if (env && env.tier <= 2) list.push(<TestHealth key="test-health" />);
+  // The Claude Code burn: where /env says this machine has Claude Code session
+  // files (consts.json usage.envFlag, the Claude Code usage inventory row's
+  // rule) -- absent otherwise, and then nothing asks GET /api/usage/burn.
+  if ((env as Record<string, unknown> | undefined)?.[USAGE.envFlag] === true)
+    list.push(<BurnCard key="burn" />);
   // The Face card lives in the LOUNGE now (spec D-L24, the owner:
   // "face first then games", then: "I was expecting face card now lives in
   // lounge rather than system") -- and only there: with the Lounge off it is

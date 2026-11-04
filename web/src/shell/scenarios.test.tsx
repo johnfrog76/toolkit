@@ -65,7 +65,7 @@ import {
   spaceLifecycleActions,
 } from "../modules/studio/foyer";
 import { visibilityLabel } from "../shared/visibility";
-import { STATUS, VISIBILITY } from "./consts";
+import { STATUS, USAGE, VISIBILITY } from "./consts";
 import { WORKFLOW_ENTRIES, answerLive, answerTarget } from "./settingsWorkflows";
 import type { SpaceBucket, SpaceLifecycleAction } from "../modules/studio/foyer";
 import { promptSets, spaceWorkflow } from "../modules/studio/prompts";
@@ -440,6 +440,22 @@ describe("the scenario grid: what each configuration shows", () => {
     expect(see(off).nav).not.toContain("Lounge");
     expect(see(on).nav).toContain("Lounge");
     expect(see(off).system).toEqual(see(on).system);
+  });
+
+  // The Claude Code burn tile follows /env's claudeUsage (consts.json usage.envFlag,
+  // the CLI's Claude Code usage inventory row): on, it is System's last card on any
+  // Space and tier; off or absent, there is no tile and nothing asks /usage/burn.
+  it("System's Claude Code burn tile is there where the usage flag is on, and absent where not", () => {
+    const withUsage = (e: EnvStatus, on: boolean | undefined) =>
+      ({ ...e, [USAGE.envFlag]: on }) as EnvStatus;
+    const ado1 = env({ status: "active", tier: 1, tracker: "ado" });
+    const local3 = env({ status: "local", tier: 3, tracker: "none" });
+    expect(see(withUsage(ado1, true)).system).toEqual([...SYSTEM, "test-health", "burn"]);
+    expect(see(withUsage(local3, true)).system).toEqual([...SYSTEM, "burn"]);
+    for (const off of [false, undefined]) {
+      expect(see(withUsage(ado1, off)).system).toEqual([...SYSTEM, "test-health"]);
+      expect(see(withUsage(local3, off)).system).toEqual(SYSTEM);
+    }
   });
 
   // The Stats cell on a GitHub Space: the Issue Report, the Milestones
