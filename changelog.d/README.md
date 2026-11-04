@@ -15,9 +15,9 @@ Name the file `<id>.<kind>.md`:
   `fixed`. A change that adds one thing and fixes another writes two files, `214.added.md` and
   `214.fixed.md`.
 
-The file holds the entry exactly as it will read in the changelog: a line that starts `- `, written
+The file holds the entry exactly as it will read in the changelog: a line that starts with a dash and a space, written
 for the person who reads release notes -- what they can now do, or what stopped going wrong, in a
-sentence. Several entries are several `- ` lines. A long entry may wrap onto indented lines; no
+sentence. Several entries are several such lines. A long entry may wrap onto indented lines; no
 blank line and no heading goes inside.
 
 ```markdown

@@ -169,7 +169,7 @@ module and you add a mock line to every one of these files.
 **Four test runners**, one per half plus one for the two together. Run the ones your change touches:
 
 ```powershell
-tkTestToolkit                 # the CLI -- 50 suites, 8954 assertions on this commit
+tkTestToolkit                 # the CLI -- 51 suites, 9042 assertions on this commit
 ```
 
 ```bash
@@ -698,7 +698,7 @@ find the new thing when they go looking, **minor**; nothing, and something stopp
 What every change does: **a change a user would notice adds one file under `changelog.d/`, in the
 same commit**, named `<id>.<kind>.md` -- the card or issue, then `added`, `changed`, `fixed` or
 `removed`, the Keep a Changelog heading it goes under -- holding the entry as it will read, a line
-that starts `- `. Not a line in `CHANGELOG.md`: two pull requests built side by side then never edit
+that starts with a dash and a space. Not a line in `CHANGELOG.md`: two pull requests built side by side then never edit
 the same lines. Written for the user who reads release notes, not for this project: what they
 can now do, or what stopped going wrong, in a sentence. A fix nobody would notice adds nothing.
 `changelog.d/README.md` has the shape, and the CLI suite (`-Changelog`) refuses a file in any other.
