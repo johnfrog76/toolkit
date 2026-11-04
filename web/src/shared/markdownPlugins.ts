@@ -27,6 +27,10 @@ for (const tag of ALIGNED) {
 // An image's size and alt text. A duplicate entry is harmless.
 attributes.img = [...(attributes.img ?? []), "width", "height", "alt"];
 
+// A <picture>'s <source>: the default schema keeps srcSet and media and drops
+// the rest, so the browser could not choose by type or size.
+attributes.source = [...(attributes.source ?? []), "type", "sizes", "width", "height"];
+
 export const markdownSchema: SanitizeSchema = {
   ...defaultSchema,
   tagNames: [...new Set([...(defaultSchema.tagNames ?? []), "details", "summary"])],

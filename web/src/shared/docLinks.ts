@@ -125,3 +125,35 @@ export function resolveImage(src: string | undefined, base?: DocLinkBase): strin
   const target = joinRepoPath(folderOf(base.path), rel);
   return target === null ? src : base.assetFor(target);
 }
+
+/** A `srcset` with each candidate's URL resolved as `resolveImage` resolves one
+ *  `src`. Read the way the HTML spec reads it: a URL runs to whitespace (so a
+ *  comma inside a `data:` URL survives), a trailing comma ends a candidate with
+ *  no descriptor, and otherwise the descriptor (`480w`, `2x`) runs to the next
+ *  comma and is kept as written. */
+export function resolveSrcSet(srcSet: string | undefined, base?: DocLinkBase): string | undefined {
+  if (!base || !srcSet || !srcSet.trim()) return srcSet;
+  const out: string[] = [];
+  const text = srcSet;
+  let i = 0;
+  while (i < text.length) {
+    while (i < text.length && /[\s,]/.test(text[i])) i++;
+    if (i >= text.length) break;
+    let j = i;
+    while (j < text.length && !/\s/.test(text[j])) j++;
+    let url = text.slice(i, j);
+    let descriptor = "";
+    if (url.endsWith(",")) {
+      url = url.replace(/,+$/, "");
+      i = j;
+    } else {
+      let k = j;
+      while (k < text.length && text[k] !== ",") k++;
+      descriptor = text.slice(j, k).trim();
+      i = k + 1;
+    }
+    const resolved = resolveImage(url, base) ?? url;
+    out.push(descriptor ? `${resolved} ${descriptor}` : resolved);
+  }
+  return out.join(", ");
+}
