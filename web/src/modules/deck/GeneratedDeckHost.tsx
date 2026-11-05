@@ -28,8 +28,10 @@ import { VIEWER_ONLY_MODES } from "./offeredModes";
 // A generated deck is an audiobook (decks/types.ts): no baked clip exists for
 // a sentence written this morning, so the voice is the browser's
 // (useSpeechNarration), offered as one voice, and the deck opens in Audiobook
-// mode, narrating, at any width; the viewer's settings sheet offers Sofa
-// instead. No Podium (offeredModes.ts): a presenter's notes window finds its
+// mode, narrating, at any width; the viewer's settings sheet offers Paging
+// instead, and the choice lives as long as the room: a standup is played once,
+// as it was written this morning, so there is no next viewing to remember it
+// for. No Podium (offeredModes.ts): a presenter's notes window finds its
 // deck in DECKS, and this one is not there.
 
 /** What a second resolver hands the host. */
@@ -66,7 +68,7 @@ function centered(child: ReactElement) {
 function GeneratedPlayer({ resolution }: { resolution: DeckResolution }) {
   const { deck, loading, error } = resolution;
   const slides = useMemo(() => deck?.slides() ?? [], [deck]);
-  // Audiobook or Sofa is the host's choice to keep (the player is told, and
+  // Audiobook or Paging is the host's choice to keep (the player is told, and
   // calls back from its settings sheet); here it starts on Audiobook and lives
   // as long as the room does.
   const [audiobook, setAudiobook] = useState(true);

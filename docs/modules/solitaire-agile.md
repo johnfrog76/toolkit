@@ -512,11 +512,12 @@ engine are one lazy chunk fetched when Play is pressed.
 - **Audiobook mode, at any width.** The deck sets the engine's `audiobook` hint (docs/modules/deck.md,
   "Audiobook decks") and its host opens it in Audiobook mode, narrating, on the viewer's bar, with
   **previous and next either side of the play ring**, so a tile can be skipped without leaving the
-  mode; the gear's sheet turns it to Sofa and back.
+  mode; the gear's **Voice** sheet turns it to Paging and back, for as long as the room is open.
 - **The voice.** No clip can exist for a sentence the tracker wrote this morning, so the browser's
   `speechSynthesis` reads each slide's title and `Say` lines (D-TA7's fallback, V1's only voice); with no
   speech API the slide lives for its estimated read time and moves on, silently.
-- **Mute**. The viewer's bar's sound button (at any width, at the bar's right end),
+- **Mute**. The viewer's bar's sound button (at any width, at the bar's right end) -- and the
+  **Voice** sheet's Narration switch, which is the same setting,
   `aria-pressed` when muted, tooltip "Mute narration" / "Unmute narration". Muted, `speechSynthesis` is
   handed nothing -- not even `cancel()` -- and no clip is requested; the bubbles are unchanged and each
   slide keeps the clock it has with no speech API (read time plus the dwell), so the deck still

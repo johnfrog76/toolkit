@@ -19,12 +19,13 @@ import {
 import { AudiobookTransport } from "./AudiobookTransport";
 import { NAV_BG, BORDER, CAN_FULLSCREEN, type DeckChromeProps } from "./deckChromeShared";
 import {
-  CLOSE_SETTINGS_LABEL,
+  CLOSE_VOICE_SHEET_LABEL,
   EXIT_DECK_LABEL,
   MUTE_NARRATION_LABEL,
   NO_NARRATION_TITLE,
   SETTINGS_LABEL,
   UNMUTE_NARRATION_LABEL,
+  VOICE_SHEET_TITLE,
 } from "./narrationConstants";
 import {
   RING_SIZE,
@@ -40,7 +41,7 @@ import {
 // opens, not what goes inside it.
 import { SettingsForm } from "../SettingsForm";
 
-// The viewer's bar: Sofa and Audiobook mode, at every width. Written for
+// The viewer's bar: Paging and Audiobook, at every width. Written for
 // someone watching or listening rather than presenting — on a phone, one
 // person, one thumb, quite possibly not looking at the screen at all.
 //
@@ -49,7 +50,7 @@ import { SettingsForm } from "../SettingsForm";
 //   1. THREE COLUMNS. Exit | the transport | settings, fullscreen, the sound,
 //      laid out so the transport's centre is the screen's centre at every
 //      width (viewerBarLayout.ts holds the rule and the sizes behind it).
-//   2. A GEAR, not a "⋯". The sheet behind it holds the mode, narration and
+//   2. A GEAR, not a "⋯". The sheet behind it holds narration, the mode and
 //      the voice, and in Audiobook mode it is the way back to paging. "⋯"
 //      promises unspecified extras; a gear names what's behind it.
 //   3. THE RING in Audiobook mode. The counter between previous and next gives
@@ -67,14 +68,12 @@ import { SettingsForm } from "../SettingsForm";
 
 const TOUCH = { minHeight: `${TOUCH_TARGET}px`, minWidth: `${TOUCH_TARGET}px` } as const;
 // Paging arrows are the most-pressed controls, so they get extra width and a
-// bigger glyph than the square minimum. Thin chevrons rather than ← →: either
-// side of the ring they read as quiet skip marks, and the ring stays the
-// heaviest thing in the middle.
-const TOUCH_PAGE = { ...TOUCH, minWidth: `${TOUCH_ARROW_WIDTH}px`, fontSize: "20px" } as const;
+// bigger glyph than the square minimum.
+const TOUCH_PAGE = { ...TOUCH, minWidth: `${TOUCH_ARROW_WIDTH}px`, fontSize: "18px" } as const;
 // Exit's glyph is bare TEXT, not an icon component, so a 44px box left it
-// drawing a ~14px ✕ floating in a big empty target. Sized to match the arrows
-// so the bar's glyphs agree.
-const TOUCH_EXIT = { ...TOUCH, fontSize: "20px", lineHeight: 1 } as const;
+// drawing a ~14px ✕ floating in a big empty target. A little larger than the
+// arrows: it is the control reached for one-handed, in a hurry, to get out.
+const TOUCH_EXIT = { ...TOUCH, fontSize: "22px", lineHeight: 1 } as const;
 
 export function DeckChromeViewer({
   slideIndex,
@@ -111,6 +110,21 @@ export function DeckChromeViewer({
   // stays in its paging form.
   const showRing = audiobookMode && !!narration && narration.hasAnyNarration;
 
+  // The arrows' glyph: the text arrows ← → beside the counter on a wide
+  // screen, as the presenter's bar draws them; thin chevrons on a phone, where
+  // they are icon-sized touch targets, and either side of the ring, where they
+  // read as quiet skip marks and the ring stays the heaviest thing there.
+  const chevrons = compact || showRing;
+
+  // ONE sound setting, read by the bar's button and the sheet's Narration
+  // switch alike: the host's mute where it keeps one, else narration itself.
+  // Two controls, never two states.
+  const sound = narration
+    ? mute
+      ? { on: !mute.muted, toggle: mute.onToggle }
+      : { on: narration.enabled, toggle: narration.toggle }
+    : undefined;
+
   const prevButton = (
     <Button
       size={buttonSize}
@@ -118,9 +132,11 @@ export function DeckChromeViewer({
       disabled={slideIndex === 0}
       onClick={stepPrev}
       aria-label="Previous slide"
-      icon={<ChevronLeftRegular />}
+      icon={chevrons ? <ChevronLeftRegular /> : undefined}
       style={compact ? TOUCH_PAGE : undefined}
-    />
+    >
+      {chevrons ? undefined : "←"}
+    </Button>
   );
   const nextButton = (
     <Button
@@ -129,9 +145,11 @@ export function DeckChromeViewer({
       disabled={slideIndex === slides.length - 1}
       onClick={stepNext}
       aria-label="Next slide"
-      icon={<ChevronRightRegular />}
+      icon={chevrons ? <ChevronRightRegular /> : undefined}
       style={compact ? TOUCH_PAGE : undefined}
-    />
+    >
+      {chevrons ? undefined : "→"}
+    </Button>
   );
 
   const gap = `${viewerBarGap(compact)}px`;
@@ -236,14 +254,22 @@ export function DeckChromeViewer({
           )}
           {/* A host-kept mute, where the host keeps one, IS the sound: muted,
               nothing is heard and each slide keeps its clock, so Audiobook
-              mode still advances. Narration on or off is then the sheet's. */}
+              still advances. With nothing to narrate there is nothing to
+              mute, so it reads dead with the same words the speaker would. */}
           {narration && mute && (
             <Button
               size={buttonSize}
               appearance={mute.muted ? "primary" : "subtle"}
               aria-label={MUTE_NARRATION_LABEL}
               aria-pressed={mute.muted}
-              title={mute.muted ? UNMUTE_NARRATION_LABEL : MUTE_NARRATION_LABEL}
+              disabled={!narration.hasAnyNarration}
+              title={
+                !narration.hasAnyNarration
+                  ? NO_NARRATION_TITLE
+                  : mute.muted
+                    ? UNMUTE_NARRATION_LABEL
+                    : MUTE_NARRATION_LABEL
+              }
               icon={mute.muted ? <SpeakerOffRegular /> : <Speaker2Filled />}
               onClick={mute.onToggle}
               style={compact ? TOUCH : undefined}
@@ -286,7 +312,9 @@ export function DeckChromeViewer({
       </div>
 
       {/* Bottom sheet, not a side drawer: it opens under the thumb rather than
-          across the slide, and the same grammar serves a wide window.
+          across the slide, and the same grammar serves a wide window. Short
+          (the drawer's small size): three rows of controls, so it takes the
+          smallest bite of a slide someone was reading.
 
           Mounted only while open, rather than kept hidden: a closed sheet has
           nothing to preserve — every value it shows lives in the player and
@@ -295,12 +323,7 @@ export function DeckChromeViewer({
         <OverlayDrawer
           open={settingsOpen}
           position="bottom"
-          // "small" cut the voice list off mid-way — the last option sat below
-          // the fold behind a scrollbar, which reads as the sheet being broken
-          // rather than scrollable. Capped at 85vh so the slide stays partly
-          // visible behind it: this opens over something you were reading.
-          size="medium"
-          style={{ maxHeight: "85vh" }}
+          size="small"
           onOpenChange={(_, { open }) => {
             if (!open) setSheet(false);
           }}
@@ -310,13 +333,13 @@ export function DeckChromeViewer({
               action={
                 <Button
                   appearance="subtle"
-                  aria-label={CLOSE_SETTINGS_LABEL}
+                  aria-label={CLOSE_VOICE_SHEET_LABEL}
                   icon={<DismissRegular />}
                   onClick={() => setSheet(false)}
                 />
               }
             >
-              {SETTINGS_LABEL}
+              {VOICE_SHEET_TITLE}
             </DrawerHeaderTitle>
           </DrawerHeader>
           <DrawerBody
@@ -327,18 +350,23 @@ export function DeckChromeViewer({
               paddingBottom: "calc(20px + env(safe-area-inset-bottom))",
             }}
           >
-            {/* This module's own form (../SettingsForm.tsx): the mode, where
-                the host offers the choice, Narration and the voice, with no
-                hint under a row. It drives the LIVE player only (narration,
-                voice and mode arrive as props); there is no launch page and no
-                stored viewing preference here. Podium is absent by design: the
-                mode a deck opens in is chosen before it opens. */}
-            {narration && (
+            {/* This module's own form (../SettingsForm.tsx): Narration, the
+                mode where the host offers the choice, and the voice, with no
+                hint under a row. It drives the playing deck (every value
+                arrives as a prop). The Narration row is the bar's sound -- the
+                host's mute where it keeps one. The mode row is dead while
+                narration is off: Audiobook turns the slide when narration
+                ends, so a silent deck has nothing to turn on. A host's mute
+                does not count as off, because a muted slide keeps its clock
+                and Audiobook still advances. Podium is absent by design: it
+                has its own bar. */}
+            {narration && sound && (
               <SettingsForm
                 variant="sheet"
-                narrationValue={narration.enabled}
-                onNarrationChange={narration.toggle}
+                narrationValue={sound.on}
+                onNarrationChange={sound.toggle}
                 narrationDisabled={!narration.hasAnyNarration}
+                audiobookDisabled={!narration.enabled || !narration.hasAnyNarration}
                 voices={narration.voices}
                 voiceId={narration.voiceId}
                 onVoiceChange={narration.onVoiceChange}

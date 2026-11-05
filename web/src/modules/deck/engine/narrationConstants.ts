@@ -40,6 +40,13 @@ export const VOICE_STORAGE_KEY = "toolkit-narration-voice";
  */
 export const NARRATION_MUTED_STORAGE_KEY = "toolkit-narration-muted";
 
+/**
+ * localStorage key for a listed deck's mode choice: "1" Audiobook, absent or
+ * "0" Paging. Per browser, so a viewer who chose Audiobook opens the next deck
+ * the same way.
+ */
+export const DECK_AUDIOBOOK_STORAGE_KEY = "toolkit-deck-audiobook";
+
 /** The mute button's tooltip, by state. Its accessible name stays MUTE_NARRATION_LABEL. */
 export const MUTE_NARRATION_LABEL = "Mute narration";
 export const UNMUTE_NARRATION_LABEL = "Unmute narration";
@@ -60,11 +67,13 @@ export const VOICE_PICKER_TITLE = "Narration voice";
 
 // Control labels, named rather than inlined so the two bars and the viewer's
 // settings sheet can't drift into saying slightly different things about the
-// same switch. The mode names themselves (Sofa, Audiobook, Podium) live with
-// the sheet's form, ../SettingsForm.tsx.
+// same switch. The sheet's mode words (Paging, Audiobook) live with the
+// sheet's form, ../SettingsForm.tsx.
 export const NARRATION_SWITCH_LABEL = "Narration";
 export const SETTINGS_LABEL = "Settings";
-export const CLOSE_SETTINGS_LABEL = "Close settings";
+/** The viewer's sheet: its title, and its close button's label. */
+export const VOICE_SHEET_TITLE = "Voice";
+export const CLOSE_VOICE_SHEET_LABEL = "Close voice controls";
 export const EXIT_DECK_LABEL = "Exit deck";
 export const OPEN_NOTES_LABEL = "Open speaker notes";
 

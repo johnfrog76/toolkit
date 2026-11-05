@@ -216,8 +216,18 @@ function mountPlayer(mode: DeckMode, extra?: MountExtra) {
  * GeneratedDeckHost does: the sheet's mode row calls back, and the player is
  * handed the new choice.
  */
-function HostWithModeChoice({ startInAudiobook = false }: { startInAudiobook?: boolean }) {
-  const [audiobook, setAudiobook] = useState(startInAudiobook);
+function HostWithModeChoice({
+  startInAudiobook = false,
+  onChange,
+}: {
+  startInAudiobook?: boolean;
+  onChange?: (next: boolean) => void;
+}) {
+  const [audiobook, setAudiobookState] = useState(startInAudiobook);
+  const setAudiobook = (next: boolean) => {
+    onChange?.(next);
+    setAudiobookState(next);
+  };
   return (
     <DeckPlayer
       deckId="fake-deck"
@@ -269,23 +279,32 @@ describe("DeckPlayer — two bars, each for its job", () => {
     expect(screen.queryByTitle("Open speaker notes")).toBeNull();
   });
 
-  it("presenter: the presenter's bar — everything inline, no gear", () => {
+  it("presenter: Exit, paging, the counter, the notes — no gear, no sound, no voice", () => {
+    // SAME narration wiring as the audience mount above: the deck window in
+    // Podium is the room's screen, and narration is the notes window's.
     mountPlayer("presenter");
 
     expect(barKind()).toBe("presenter");
     expect(screen.getByTitle("Open speaker notes")).toBeTruthy();
-    expect(screen.getByTitle("Play with narration")).toBeTruthy();
-    expect(screen.getByTitle(VOICE_PICKER_TITLE)).toBeTruthy();
     expect(screen.getByText("1 / 2")).toBeTruthy();
     expect(screen.queryByLabelText("Settings")).toBeNull();
+    expect(screen.queryByTitle("Play with narration")).toBeNull();
+    expect(screen.queryByTitle(VOICE_PICKER_TITLE)).toBeNull();
+    expect(screen.queryByTitle(NO_NARRATION_TITLE)).toBeNull();
   });
 
-  it("presenter: opens silent, even with narrate-by-default on", () => {
-    // The presenter's own voice is usually the point; the sound button is
-    // there for when it isn't.
-    mountPlayer("presenter", { narrateByDefault: true });
+  it("presenter: Exit and the arrows carry their names", () => {
+    mountPlayer("presenter");
 
-    expect(audioInstances.every((a) => a.paused)).toBe(true);
+    expect(screen.getByRole("button", { name: "Exit deck" }).textContent).toBe("✕ Exit");
+    expect(screen.getByRole("button", { name: "Previous slide" }).textContent).toBe("←");
+    expect(screen.getByRole("button", { name: "Next slide" }).textContent).toBe("→");
+  });
+
+  it("presenter: never narrates in the deck window, whatever was wired", () => {
+    mountPlayer("presenter", { narrateByDefault: true, audiobook: true });
+
+    expect(audioInstances.every((a) => a.paused && !a.src)).toBe(true);
   });
 
   it("a host offering the viewer's mode alone gets no Podium, whatever `mode` says", () => {
@@ -314,6 +333,30 @@ describe("DeckPlayer — two bars, each for its job", () => {
     expect(transport.contains(screen.getByText("1 / 2"))).toBe(true);
   });
 
+  it("wide, beside the counter: text arrows; beside the ring and on a phone: chevrons", () => {
+    const { unmount } = mountPlayer("audience");
+    expect(screen.getByLabelText("Previous slide").textContent).toBe("←");
+    expect(screen.getByLabelText("Next slide").textContent).toBe("→");
+    unmount();
+
+    mountPlayer("audience", { audiobook: true }).unmount();
+    mountPlayer("audience", { audiobook: true });
+    expect(ring()).toBeTruthy();
+    expect(screen.getByLabelText("Next slide").textContent).toBe("");
+    expect(screen.getByLabelText("Next slide").querySelector("svg")).toBeTruthy();
+  });
+
+  it("phone: the arrows' glyph is 18px, Exit's 22px, the arrows 48px wide", () => {
+    setViewport("compact");
+    mountPlayer("audience");
+
+    const next = screen.getByLabelText("Next slide") as HTMLElement;
+    expect(next.style.fontSize).toBe("18px");
+    expect(next.style.minWidth).toBe(`${TOUCH_ARROW_WIDTH}px`);
+    expect(next.textContent).toBe("");
+    expect((screen.getByLabelText("Exit deck") as HTMLElement).style.fontSize).toBe("22px");
+  });
+
   it("a host-kept mute IS the viewer's sound: one speaker button, not two", () => {
     const onToggle = jest.fn();
     mountPlayer("audience", { narrateByDefault: true, mute: { muted: false, onToggle } });
@@ -321,7 +364,7 @@ describe("DeckPlayer — two bars, each for its job", () => {
     const right = document.querySelector('[data-bar-column="right"]')!;
     const mute = screen.getByRole("button", { name: "Mute narration" });
     expect(right.contains(mute)).toBe(true);
-    // The narration toggle gives way to it; narration on or off is the sheet's.
+    // The narration speaker gives way to it.
     expect(screen.queryByTitle("Stop narration")).toBeNull();
     fireEvent.click(mute);
     expect(onToggle).toHaveBeenCalledTimes(1);
@@ -552,15 +595,57 @@ describe("DeckChrome — the viewer's bar and its settings sheet", () => {
 
       fireEvent.click(screen.getByLabelText("Settings"));
 
-      expect(screen.getByRole("radiogroup", { name: VOICE_PICKER_TITLE })).toBeTruthy();
+      const sheet = screen.getByRole("dialog");
+      expect(sheet.textContent).toContain("Voice");
+      expect(screen.getByLabelText("Close voice controls")).toBeTruthy();
       expect(screen.getByRole("switch", { name: "Narration" })).toBeTruthy();
       expect(screen.getByRole("radiogroup", { name: "Mode" })).toBeTruthy();
-      expect(screen.getByRole("radio", { name: "Sofa" })).toBeTruthy();
+      expect(screen.getByRole("radio", { name: "Paging" })).toBeTruthy();
       expect(screen.getByRole("radio", { name: "Audiobook" })).toBeTruthy();
+      expect(screen.getByRole("radiogroup", { name: VOICE_PICKER_TITLE })).toBeTruthy();
       // Podium is chosen before a deck opens, and has its own bar.
-      expect(screen.queryByRole("radio", { name: /Podium/ })).toBeNull();
+      expect(screen.queryByRole("radio", { name: /Podium|Sofa/ })).toBeNull();
     });
   }
+
+  it("the sheet's rows in order: Narration, Mode (Paging, Audiobook side by side), the voice; no hints", () => {
+    mountPlayer("audience", { narrateByDefault: true, onAudiobookChange: () => {} });
+    fireEvent.click(screen.getByLabelText("Settings"));
+
+    const sheet = screen.getByRole("dialog");
+    const order = [
+      screen.getByRole("switch", { name: "Narration" }),
+      screen.getByRole("radiogroup", { name: "Mode" }),
+      screen.getByRole("radiogroup", { name: VOICE_PICKER_TITLE }),
+    ];
+    for (let i = 1; i < order.length; i++) {
+      expect(
+        order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+    const modes = screen
+      .getAllByRole("radio")
+      .filter((r) => screen.getByRole("radiogroup", { name: "Mode" }).contains(r))
+      .map((r) => (r as HTMLInputElement).value);
+    expect(modes).toEqual(["paging", "audiobook"]);
+    // Nothing but the controls' own words: title, Narration, Mode, the two
+    // modes, the voices.
+    const voices = NARRATION_VOICES.map((v) => v.name).join("");
+    expect(sheet.textContent).toBe(`VoiceNarrationModePagingAudiobook${voices}`);
+  });
+
+  it("the mode row is dead while narration is off", () => {
+    mountPlayer("audience", { onAudiobookChange: () => {} });
+    fireEvent.click(screen.getByLabelText("Settings"));
+
+    expect((screen.getByRole("radio", { name: "Audiobook" }) as HTMLInputElement).disabled).toBe(
+      true,
+    );
+    fireEvent.click(screen.getByRole("switch", { name: "Narration" }));
+    expect((screen.getByRole("radio", { name: "Audiobook" }) as HTMLInputElement).disabled).toBe(
+      false,
+    );
+  });
 
   it("no mode row when the host fixes the mode itself", () => {
     mountPlayer("audience", { narrateByDefault: true });
@@ -578,7 +663,7 @@ describe("DeckChrome — the viewer's bar and its settings sheet", () => {
     expect(document.body.textContent).not.toMatch(/suitcase/i);
   });
 
-  it("Audiobook in the sheet turns the counter into the ring; Sofa turns it back", () => {
+  it("Audiobook in the sheet turns the counter into the ring; Paging turns it back", () => {
     render(
       <MemoryRouter>
         <HostWithModeChoice />
@@ -588,21 +673,18 @@ describe("DeckChrome — the viewer's bar and its settings sheet", () => {
     expect(screen.getByText("1 / 2")).toBeTruthy();
 
     fireEvent.click(screen.getByLabelText("Settings"));
-    // Over a silent viewing: choosing Audiobook turns narration on with it,
-    // since the mode advances on a clip's end.
+    // Narration first: the mode row is dead until it is on.
+    fireEvent.click(screen.getByRole("switch", { name: "Narration" }));
     fireEvent.click(screen.getByRole("radio", { name: "Audiobook" }));
-    expect((screen.getByRole("switch", { name: "Narration" }) as HTMLInputElement).checked).toBe(
-      true,
-    );
-    fireEvent.click(screen.getByLabelText("Close settings"));
+    fireEvent.click(screen.getByLabelText("Close voice controls"));
 
     expect(ring()).toBeTruthy();
     expect(screen.queryByText("1 / 2")).toBeNull();
     expect(screen.getByLabelText("Next slide")).toBeTruthy();
 
     fireEvent.click(screen.getByLabelText("Settings"));
-    fireEvent.click(screen.getByRole("radio", { name: "Sofa" }));
-    fireEvent.click(screen.getByLabelText("Close settings"));
+    fireEvent.click(screen.getByRole("radio", { name: "Paging" }));
+    fireEvent.click(screen.getByLabelText("Close voice controls"));
 
     expect(ring()).toBeNull();
     expect(screen.getByText("1 / 2")).toBeTruthy();
@@ -619,7 +701,7 @@ describe("DeckChrome — the viewer's bar and its settings sheet", () => {
 
     // Narration on from the sheet → the bar's sound reads on.
     fireEvent.click(narrated());
-    fireEvent.click(screen.getByLabelText("Close settings"));
+    fireEvent.click(screen.getByLabelText("Close voice controls"));
     expect(screen.getByTitle("Stop narration")).toBeTruthy();
   });
 
@@ -634,7 +716,7 @@ describe("DeckChrome — the viewer's bar and its settings sheet", () => {
     // A voice reading over you while you're trying to read a switch is rude.
     expect(audio.paused).toBe(true);
 
-    fireEvent.click(screen.getByLabelText("Close settings"));
+    fireEvent.click(screen.getByLabelText("Close voice controls"));
     // Resumed, and from where it left off rather than restarting the sentence.
     expect(audio.paused).toBe(false);
     expect(audio.currentTime).toBe(3);
@@ -682,7 +764,7 @@ describe("DeckChrome — the viewer's bar and its settings sheet", () => {
     fireEvent.click(screen.getByRole("radio", { name: new RegExp(other.name) }));
     expect(audio.src).toContain(other.id);
 
-    fireEvent.click(screen.getByLabelText("Close settings"));
+    fireEvent.click(screen.getByLabelText("Close voice controls"));
 
     expect(audio.paused).toBe(false);
   });
@@ -706,6 +788,37 @@ describe("DeckChrome — the viewer's bar and its settings sheet", () => {
     expect(screen.getByLabelText("Next slide")).toBeTruthy();
   });
 
+  it("narration off clears the Audiobook choice: it reads Paging when narration returns", () => {
+    const onAudiobookChange = jest.fn();
+    render(
+      <MemoryRouter>
+        <HostWithModeChoice startInAudiobook onChange={onAudiobookChange} />
+      </MemoryRouter>,
+    );
+    expect(ring()).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText("Settings"));
+    fireEvent.click(screen.getByRole("switch", { name: "Narration" })); // off
+    expect(onAudiobookChange).toHaveBeenLastCalledWith(false);
+    fireEvent.click(screen.getByRole("switch", { name: "Narration" })); // on again
+    expect((screen.getByRole("radio", { name: "Paging" }) as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByLabelText("Close voice controls"));
+
+    expect(ring()).toBeNull();
+    expect(screen.getByText("1 / 2")).toBeTruthy();
+  });
+
+  it("the bar's sound off clears it too: the two are one setting", () => {
+    const onAudiobookChange = jest.fn();
+    render(
+      <MemoryRouter>
+        <HostWithModeChoice startInAudiobook onChange={onAudiobookChange} />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByTitle("Stop narration"));
+    expect(onAudiobookChange).toHaveBeenLastCalledWith(false);
+  });
+
   it("switching Narration off in the sheet hands back the counter", () => {
     // The bus repro this pins: Audiobook on, narrated deck, phone width. Flip
     // the sheet's Narration switch off and close. "Requires narration, both
@@ -717,7 +830,7 @@ describe("DeckChrome — the viewer's bar and its settings sheet", () => {
 
     fireEvent.click(screen.getByLabelText("Settings"));
     fireEvent.click(screen.getByRole("switch", { name: "Narration" }));
-    fireEvent.click(screen.getByLabelText("Close settings"));
+    fireEvent.click(screen.getByLabelText("Close voice controls"));
 
     expect(ring()).toBeNull();
     expect(screen.getByText("1 / 2")).toBeTruthy();
@@ -767,7 +880,7 @@ describe("DeckChrome — the viewer's bar and its settings sheet", () => {
     const narrationSwitch = () => screen.getByRole("switch", { name: "Narration" });
     fireEvent.click(narrationSwitch()); // off
     fireEvent.click(narrationSwitch()); // on again
-    fireEvent.click(screen.getByLabelText("Close settings"));
+    fireEvent.click(screen.getByLabelText("Close voice controls"));
 
     expect(audio.paused).toBe(false);
   });
@@ -791,17 +904,15 @@ describe("DeckPlayer — nothing baked, no API: every surface says so", () => {
     expect(sound.hasAttribute("disabled")).toBe(true);
   });
 
-  it("the presenter's bar: the sound and the voice dropdown are both dead", () => {
-    mountPlayer("presenter", { resolveNarrationUrl: nothingBaked });
-
-    const dead = screen.getAllByTitle(NO_NARRATION_TITLE);
-    expect(dead.length).toBeGreaterThanOrEqual(2);
-    dead.forEach((el) => {
-      const control = el.closest("button") ?? el;
-      expect(
-        control.hasAttribute("disabled") || control.getAttribute("aria-disabled") === "true",
-      ).toBe(true);
+  it("a host's mute is dead too, with the same words", () => {
+    mountPlayer("audience", {
+      resolveNarrationUrl: nothingBaked,
+      mute: { muted: false, onToggle: () => {} },
     });
+
+    const mute = screen.getByRole("button", { name: "Mute narration" });
+    expect(mute.hasAttribute("disabled")).toBe(true);
+    expect(mute.getAttribute("title")).toBe(NO_NARRATION_TITLE);
   });
 
   it("the sheet's rows are disabled", () => {
@@ -817,6 +928,62 @@ describe("DeckPlayer — nothing baked, no API: every surface says so", () => {
 
     expect(screen.getByRole("switch", { name: "Narration" }).hasAttribute("disabled")).toBe(true);
     expect(screen.getByRole("radio", { name: "Audiobook" }).hasAttribute("disabled")).toBe(true);
+  });
+});
+
+describe("DeckChrome — a host's mute and the sheet are one setting", () => {
+  /** A host that keeps a mute, the way the played standup does. */
+  function HostWithMute() {
+    const [muted, setMuted] = useState(false);
+    const [audiobook, setAudiobook] = useState(true);
+    return (
+      <DeckPlayer
+        deckId="fake-deck"
+        slides={slides}
+        mode="audience"
+        voices={NARRATION_VOICES}
+        hasApi={false}
+        resolveNarrationUrl={allBaked}
+        narrateByDefault
+        audiobook={audiobook}
+        onAudiobookChange={setAudiobook}
+        mute={{ muted, onToggle: () => setMuted((m) => !m) }}
+      />
+    );
+  }
+  const mount = () =>
+    render(
+      <MemoryRouter>
+        <HostWithMute />
+      </MemoryRouter>,
+    );
+  const muteButton = () => screen.getByRole("button", { name: "Mute narration" });
+  const narrationSwitch = () =>
+    screen.getByRole("switch", { name: "Narration" }) as HTMLInputElement;
+
+  it("the bar's mute and the sheet's Narration read and flip one setting", () => {
+    mount();
+    fireEvent.click(screen.getByLabelText("Settings"));
+    expect(narrationSwitch().checked).toBe(true);
+
+    fireEvent.click(narrationSwitch());
+    expect(muteButton().getAttribute("aria-pressed")).toBe("true");
+    expect(narrationSwitch().checked).toBe(false);
+
+    fireEvent.click(muteButton());
+    expect(narrationSwitch().checked).toBe(true);
+  });
+
+  it("muted, Audiobook keeps its choice and its ring, and the mode row stays live", () => {
+    // A muted slide keeps its clock, so the deck still turns its own slides.
+    mount();
+    fireEvent.click(muteButton());
+
+    expect(ring()).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Settings"));
+    const audiobook = screen.getByRole("radio", { name: "Audiobook" }) as HTMLInputElement;
+    expect(audiobook.checked).toBe(true);
+    expect(audiobook.disabled).toBe(false);
   });
 });
 

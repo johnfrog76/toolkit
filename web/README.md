@@ -1219,15 +1219,15 @@ a flag that shows nothing when it is on was the defect this module was filed ove
 static `DECKS` list; `GeneratedDeckHost.tsx` plays a deck another module BUILT from data and handed
 over as a resolution (deck, loading, error) -- Team Agile's played standup, at its own route
 `/deck/ritual/standup`, which is that module's and works with `features.deck` off. Nothing is ever
-pushed into `DECKS`. Both share `DeckRoom.tsx`. `GeneratedDeckHost` plays its deck in Audiobook mode
-(the player's `audiobook` prop), and a built deck sets the `audiobook` hint on the `Deck` type: the
+pushed into `DECKS`. Both share `DeckRoom.tsx`. `DeckHost` keeps a listed deck's Paging or Audiobook
+per browser; `GeneratedDeckHost` plays its deck in Audiobook (the player's `audiobook` prop), and a built deck sets the `audiobook` hint on the `Deck` type: the
 browser's `speechSynthesis` reading a slide that has no clip (`engine/useSpeechNarration.ts`); a deck
 without the hint is untouched (`DeckPlayer.audiobook.test.tsx`). Where each host offers Podium is
 `offeredModes.ts` ([`docs/modules/deck.md`, "The player's two bars"](../docs/modules/deck.md#the-players-two-bars)).
 
-`modules/deck/engine/` is carried code -- 28 files, matching Connected Deck 0.2.0's engine with this
-module's differences -- and is excluded from nothing: it is type-checked, linted, scanned by
-Portability and its 121 tests run with the rest.
+`modules/deck/engine/` is carried code -- 28 files, Connected Deck 0.2.0's engine with this module's
+own menu and differences -- and is excluded from nothing: it is type-checked, linted, scanned by
+Portability and its 130 tests run with the rest.
 `bakedVoices.ts` finds a deck's audio with `import.meta.glob`, which is why `src/vite-env.d.ts`
 exists; the files sit under `src/`, not `public/`, so the build ships each once.
 

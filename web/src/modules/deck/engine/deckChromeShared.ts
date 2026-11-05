@@ -63,14 +63,15 @@ export interface NarrationControls {
 /**
  * Which bar the player draws: two bars, each for a job, never a third.
  *
- * - `viewer` — Sofa and Audiobook mode, at every width. Exit on the left; the
+ * - `viewer` — Paging and Audiobook, at every width. Exit on the left; the
  *   transport in the middle (previous, the play ring and next in Audiobook
  *   mode, previous, the counter and next otherwise); settings, fullscreen and
  *   the sound on the right; three columns, so the transport sits on the bar's
- *   centre. The gear's sheet holds the mode, narration and the voice.
+ *   centre. The gear's sheet holds narration, the mode and the voice.
  * - `presenter` — Podium, never at the phone width. Everything inline, because
  *   presenting is the one time every control is wanted at hand: Exit,
- *   previous, the counter, next, the sound, the voice, the notes, fullscreen.
+ *   previous, the counter, next, the notes, fullscreen. No sound and no voice:
+ *   the deck window stays silent in Podium.
  */
 export type ChromeBar = "viewer" | "presenter";
 
@@ -118,7 +119,7 @@ export interface DeckChromeProps {
    */
   audiobookMode?: boolean;
   /**
-   * Choose Sofa (false) or Audiobook (true) from the settings sheet. Omitted,
+   * Choose Paging (false) or Audiobook (true) from the settings sheet. Omitted,
    * the sheet has no mode row: the host has locked the player to one mode.
    */
   onAudiobookChange?: (next: boolean) => void;

@@ -23,7 +23,7 @@ export type { NarrationVoice };
 // What a window IS, declared per viewing rather than reconciled from a pile of
 // independent flags — and which of the two bars it gets.
 //
-//   "audience" — the viewer: Sofa, or Audiobook mode when the host turns it
+//   "audience" — the viewer: Paging, or Audiobook when the host turns it
 //     on. The viewer's bar (Exit | the transport | settings, fullscreen, the
 //     sound) at every width; NO notes surface exists. Absent, not hidden: a
 //     link someone shared with you has nothing to escalate to.
@@ -93,7 +93,7 @@ export function DeckPlayer({
    * "/#/decks"). Only meaningful when mode="presenter"; defaults to web's path.
    */
   notesUrlBase?: string;
-  /** Pair with resolveNarrationUrl. Wired, both bars carry the sound and the voice. */
+  /** Pair with resolveNarrationUrl. Wired, the viewer's bar carries the sound and the sheet. */
   voices?: readonly NarrationVoice[];
   /**
    * True when this host has a live /api/narrate (the prompts web UI). Voices are
@@ -112,8 +112,7 @@ export function DeckPlayer({
   /**
    * Start narration ON when this window mounts, instead of the visitor
    * having to reach for the sound control first. The viewer's bar only:
-   * Podium opens silent, since a presenter's own voice is usually the point,
-   * and its sound button is there when it isn't.
+   * Podium never narrates in the deck window (see wantsNarration).
    *
    * Real caveat, not a bug to "fix" here: browser autoplay policy blocks
    * `<audio>.play()` without a prior user gesture, so on a cold page load
@@ -141,7 +140,7 @@ export function DeckPlayer({
    */
   audiobook?: boolean;
   /**
-   * Choose Sofa (false) or Audiobook (true) from the viewer's settings sheet.
+   * Choose Paging (false) or Audiobook (true) from the viewer's settings sheet.
    * The host stores the choice and passes it back as `audiobook`. Omitted, the
    * sheet has no mode row: the host has fixed the mode itself.
    */
@@ -197,10 +196,12 @@ export function DeckPlayer({
     channel.close();
   }, [playMode, deckId]);
 
-  // In-player narration, wherever the host wired it: the viewer's bar carries
-  // the sound and the sheet, and the presenter's bar carries the sound and the
-  // voice dropdown inline.
-  const wantsNarration = !!voices?.length && !!resolveNarrationUrl;
+  // In-player narration is the viewer's bar's alone: it carries the sound and
+  // the sheet. In Podium the deck window is the room's screen and stays silent
+  // whatever the host wired -- narration belongs to the speaker-notes window,
+  // where the presenter hears it -- so the presenter's bar has no sound and no
+  // voice to offer.
+  const wantsNarration = playMode === "audience" && !!voices?.length && !!resolveNarrationUrl;
 
   // Which voices this deck can actually be narrated in, and which is selected —
   // the same hook the notes popout uses, so both surfaces agree by construction.
@@ -244,7 +245,8 @@ export function DeckPlayer({
   // that has no clip (below).
   const audiobookDeck = deck?.audiobook === true;
   // Audiobook mode turns narration on with it: a deck that turns its own
-  // slides on a clip's end needs clips to end. Podium opens silent.
+  // slides on a clip's end needs clips to end. So a viewer who chose Audiobook
+  // last time (a host that remembers it) opens the next deck narrating.
   const narrateOnArrival =
     wantsNarration && playMode === "audience" && (narrateByDefault || audiobook);
   // Held while the viewer's settings sheet is open — see onSettingsOpenChange.
@@ -303,6 +305,17 @@ export function DeckPlayer({
         },
       }
     : audioNarration;
+
+  // Narration off clears the Audiobook choice (the host is called back with
+  // false), so the sheet reads Paging when narration comes back: Audiobook turns
+  // the slide when narration ends, and a choice that silence made meaningless
+  // should not quietly return with the sound. Narration on leaves the mode
+  // alone. A host's mute is not this: muted, each slide keeps its clock, so
+  // Audiobook still advances and keeps its choice.
+  const toggleNarration = () => {
+    if (narration.enabled && audiobook) onAudiobookChange?.(false);
+    narration.toggle();
+  };
 
   if (slides.length === 0) {
     return (
@@ -424,7 +437,7 @@ export function DeckPlayer({
                   available: narration.available,
                   playing: narration.playing,
                   enabled: narration.enabled,
-                  toggle: narration.toggle,
+                  toggle: toggleNarration,
                   paused: narration.paused,
                   togglePause: narration.togglePause,
                   getSlideProgress: narration.getSlideProgress,
