@@ -293,6 +293,11 @@ def stamp_ref() -> str:
     return consts()["stamps"]["ref"]
 
 
+def re_tag_separator() -> re.Pattern:
+    """What splits a card's ``Tags:`` line: a comma, or an Azure DevOps semicolon."""
+    return pattern("regex", "tagSeparator")
+
+
 def re_due_line() -> re.Pattern:
     """``**Due:** YYYY-MM-DD`` or ``YYYY-MM-DDTHH:MM``: group 1 the date, group 2 the time."""
     return pattern("regex", "dueLine")

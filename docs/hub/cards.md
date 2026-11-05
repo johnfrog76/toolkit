@@ -204,15 +204,16 @@ both readings as they were writes nothing. Nothing here writes the tracker: a Gi
 ### The Tags line
 
 `Tags:` under `## Work Item Info`, directly below `Priority:` -- the work item's tags at birth, else the
-template's `Tags: (None)`. It is read split on commas and trimmed, a parenthesised placeholder as none
+template's `Tags: (None)`. It is read split on commas or semicolons and trimmed, a parenthesised placeholder as none
 (`Get-P20CardTags`, `card_tags()`, the same table as the milestone). `Tag <id> <tag>[,<tag>] [-Remove]`
 writes it on a card already made, through `Set-P20CardLine`: tags added after the ones already there,
 joined by a comma and a space, one it already carries (in any case) not added twice; `-Remove` takes
 them off, and the last one off leaves `Tags: (None)`; a card with no line gets one below `Priority:`.
 A call that changes no tag writes nothing. Read by the suggestion (a severity and a size, below), the
-board's Tag filter and the model's `tags`. `tokens.tags`. A line an Azure DevOps work item wrote with
-semicolons (`Tags: enhancement; sev3`) reads as ONE tag today -- the reader splits on commas only
-([Known gaps](../KNOWN-GAPS.md#known-gaps)).
+board's Tag filter and the model's `tags`. `tokens.tags`, and the separator is `regex.tagSeparator`. A line
+written with semicolons (`Tags: enhancement; sev3`) -- as an Azure DevOps work item's tags arrive, and
+as `NewPrompt` and `StartWork` join a GitHub issue's labels -- reads as two tags, and a line
+with both separators reads every tag; `Tag` rewrites the line it changes with commas.
 
 ### A card's pictures -- `<space>/assets/`
 
@@ -408,7 +409,7 @@ The standup's suggestion -- one derived next move ([Team Agile](../modules/solit
 | What | Read from | Rule |
 | --- | --- | --- |
 | its milestone | the first `**Milestone:**` line, else -- a card with none that is not an Azure DevOps card -- the first `**Sprint:**` line ([the rule](#milestone-and-sprint-two-lines)) | the value WHOLE and trimmed -- `M2 -- 1.2.0, the standup sees the work`, `RecipesApp\Sprint 2` -- never the model's `sprint`, which keeps the last segment and cuts it at eighteen characters for the board; a parenthesised placeholder (`(not linked)`, `(none)`) is none |
-| its severity and size | the `Tags:` line | split on commas and trimmed; the first tag that is one of the triage ceremony's severities, and the first that is one of the repo's worker labels |
+| its severity and size | the `Tags:` line | split on commas or semicolons and trimmed; the first tag that is one of the triage ceremony's severities, and the first that is one of the repo's worker labels |
 | who takes it | the `**Assigned:**` line | `me`, or a size; with none, its size |
 | its age | the `**Created:**` day | the oldest first; a card with none after every one with one |
 
@@ -453,7 +454,7 @@ fields, so nothing downstream parses a heading or a filename (`PromptInfo`, `age
 | `progress`, `checked`, `total` | the checkboxes | `--` when there are none |
 | `sprint` | `**Sprint:**`, last segment, cut to 20 | `--` when absent |
 | `milestone` | the milestone, WHOLE, by [the rule](#milestone-and-sprint-two-lines): `**Milestone:**`, else an old card's `**Sprint:**` | `""` for none; on the list and the detail route. The board's Milestone filter reads it |
-| `tags` | the `Tags:` line, split on commas and trimmed | `[]` for none or `(None)`; on the list and the detail route. The board's Tag filter reads it |
+| `tags` | the `Tags:` line, split on commas or semicolons and trimmed | `[]` for none or `(None)`; on the list and the detail route. The board's Tag filter reads it |
 | `ado_url`, `pr_url` | the footer; the `PR URL:` line | `null` when absent |
 | `cover`, `before` | the `**Cover:**` / `**Before:**` lines, by the rule in "A card's pictures" | the URL of `GET /api/assets/{space}/{card key}/{file}`, or `null` -- no line, a missing file, or a path outside the Space's `assets/`. On the list and the detail route. The board draws `cover` as the top of the card's face (16:10, cropped); the list as a thumbnail inside the meta line; the card page under its header, Before and After side by side. The page reads the line itself to say "the image is missing" rather than draw a broken one |
 | `design` | the `> Design:` line, else a hand-written `> Spec:` line, by the rule in the table above | `{ kind, title, link, id, short, note, state, where, path }`, or `null` when the card names none. On the list it is the line as written (`state`, `where`, `path` empty). On the detail route the id is resolved -- the hub's designs from disk, the active GitHub Space's repo through the Design tab's own cached listing when the line's link is a GitHub URL and the tab's gate passes -- and `state` (`Design`, `Spec`, `Complete`, `Archived`), `where` (`hub`, `repo`) and `path` (the document to open) say what was found; a design that cannot be read leaves them empty and the line stands as last written. The card page draws it as a chip that opens the design's reading room |
