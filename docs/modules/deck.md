@@ -115,7 +115,7 @@ rest of the module, so a machine that has dismissed it never downloads it.
 ## The player's two bars
 
 The player draws one of two bars under the slide, by the mode it plays in -- Connected Deck 0.2.0's
-design, carried unchanged:
+design, with the differences listed under "What is different from Connected Deck", below:
 
 | Mode | Bar |
 | --- | --- |

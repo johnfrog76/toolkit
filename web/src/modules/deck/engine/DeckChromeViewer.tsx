@@ -63,7 +63,7 @@ import { SettingsForm } from "../SettingsForm";
 //
 // Everything arrives as props. No breakpoint opinions baked in — lift this file
 // into another stack and it works as long as you hand it the same shape (and
-// mount the sheet's SettingsForm inside its providers; see DeckChrome).
+// bring the sheet's SettingsForm, which here reads only its props; see DeckChrome).
 
 const TOUCH = { minHeight: `${TOUCH_TARGET}px`, minWidth: `${TOUCH_TARGET}px` } as const;
 // Paging arrows are the most-pressed controls, so they get extra width and a
@@ -288,10 +288,9 @@ export function DeckChromeViewer({
       {/* Bottom sheet, not a side drawer: it opens under the thumb rather than
           across the slide, and the same grammar serves a wide window.
 
-          Mounted only while open, rather than kept hidden: the sheet is a
-          whole settings form with its own subscriptions, and a closed one has
-          nothing to preserve — every value it shows lives in the player or a
-          context that outlives it. */}
+          Mounted only while open, rather than kept hidden: a closed sheet has
+          nothing to preserve — every value it shows lives in the player and
+          arrives as a prop. */}
       {settingsOpen && (
         <OverlayDrawer
           open={settingsOpen}
@@ -328,13 +327,12 @@ export function DeckChromeViewer({
               paddingBottom: "calc(20px + env(safe-area-inset-bottom))",
             }}
           >
-            {/* The SAME form the launch page's Settings drawer renders — same
-                rows, same hints, same gating rules — told to present itself as
-                a sheet. It drives the LIVE player here (narration, voice and
-                mode arrive as props) rather than the stored preference for
-                narration, because muting the deck you're watching shouldn't
-                rewrite what every future deck does. Podium is absent by
-                design: the mode a deck opens in is chosen before it opens. */}
+            {/* This module's own form (../SettingsForm.tsx): the mode, where
+                the host offers the choice, Narration and the voice, with no
+                hint under a row. It drives the LIVE player only (narration,
+                voice and mode arrive as props); there is no launch page and no
+                stored viewing preference here. Podium is absent by design: the
+                mode a deck opens in is chosen before it opens. */}
             {narration && (
               <SettingsForm
                 variant="sheet"

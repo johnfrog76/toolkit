@@ -58,8 +58,8 @@ export const NO_NARRATION_TITLE = "No narration available for this deck";
 /** Title/tooltip for the voice picker when narration is available. */
 export const VOICE_PICKER_TITLE = "Narration voice";
 
-// Control labels, named rather than inlined so the two chromes and the
-// Settings drawer can't drift into saying slightly different things about the
+// Control labels, named rather than inlined so the two bars and the viewer's
+// settings sheet can't drift into saying slightly different things about the
 // same switch. The mode names themselves (Sofa, Audiobook, Podium) live with
 // the sheet's form, ../SettingsForm.tsx.
 export const NARRATION_SWITCH_LABEL = "Narration";
