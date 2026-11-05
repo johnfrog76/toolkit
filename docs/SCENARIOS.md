@@ -95,6 +95,17 @@ Environment, Modules, Log -- and **Test Health at Tier 1 and 2 only** (it reads 
 file cache holds). Four cards on a connected machine, three on a Tier 3 one. Never the Face card: it
 lives in the Lounge (spec D-L24). Never a Space switcher: the avatar menu is the one place.
 
+**The Claude Code burn** comes last, on any Space and tier, **only where `/env`'s `claudeUsage` is true** --
+the **Claude Code usage** inventory row's rule, Claude Code's projects folder on the agent's machine. Off or
+absent, there is no tile and nothing asks `GET /api/usage/burn` (which is 404 there). So a connected machine
+with Claude Code shows five cards, a second page of System's pager, and a Tier 3 one four
+(`web/src/shell/scenarios.test.tsx`, "System's Claude Code burn tile").
+
+| `claudeUsage` | Tier 1-2 | Tier 3 |
+| --- | --- | --- |
+| true | Environment, Modules, Log, Test Health, Claude Code burn | Environment, Modules, Log, Claude Code burn |
+| false, or absent | Environment, Modules, Log, Test Health | Environment, Modules, Log |
+
 ### The nav, by module
 
 Home is not a tab: it is the **Space anchor**, one pill at the left after the wordmark --

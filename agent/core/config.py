@@ -1007,3 +1007,25 @@ def start_work_launch() -> bool:
     page's button runs the verb through the bridge, whose child pwsh inherits it.
     """
     return shutil.which("claude") is not None
+
+
+def claude_projects_root() -> Path:
+    """Where Claude Code keeps its session files on this machine: the projects
+    folder of its configuration directory -- ``CLAUDE_CONFIG_DIR``'s (trimmed)
+    when that is set, else ``~/.claude``'s. The CLI's ``Get-P20ClaudeProjectsRoot``
+    (Scripts/Read-ClaudeUsage.ps1) is the same rule; whether it exists or not is
+    the caller's question."""
+    configured = (os.environ.get("CLAUDE_CONFIG_DIR") or "").strip()
+    base = Path(configured) if configured else Path.home() / ".claude"
+    return base / "projects"
+
+
+def claude_usage() -> bool:
+    """Whether this machine has Claude Code session files to read: the projects
+    folder is there, as a folder. The Claude Code usage row in
+    ``Scripts/Get-OptionalSurfaces.ps1`` (keyed by consts.json ``usage.envFlag``)
+    is the same rule, and Tests/fixtures/usage/projects-root.json holds both to
+    one table. ``GET /api/env`` carries it; ``GET /api/usage/burn`` is 404 and the
+    System page draws no burn tile where it is false. Opens nothing in the folder.
+    """
+    return claude_projects_root().is_dir()

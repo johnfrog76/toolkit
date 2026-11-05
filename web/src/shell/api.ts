@@ -127,6 +127,12 @@ export interface EnvStatus {
    *  spelled here, and consts.test.ts holds this to be the one place it is. The hand-off box draws its second
    *  button only when this is true; absent (an agent without the launch) reads off. */
   startWorkLaunch?: boolean;
+  /** Whether this machine has Claude Code session files -- the derived Claude Code
+   *  usage surface (docs/hub/usage.md). The field's name is consts.json usage.envFlag,
+   *  spelled here because an interface cannot take a computed name; consts.test.ts
+   *  holds this to be the one place it is. The System page draws its burn tile, and
+   *  asks GET /api/usage/burn, only when this is true; absent reads off. */
+  claudeUsage?: boolean;
   anthropicConfigured: boolean;
   // The provider profile's model id, ai.model in config.
   aiModel?: string;

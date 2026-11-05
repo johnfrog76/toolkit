@@ -169,7 +169,7 @@ module and you add a mock line to every one of these files.
 **Four test runners**, one per half plus one for the two together. Run the ones your change touches:
 
 ```powershell
-tkTestToolkit                 # the CLI -- 50 suites, 8954 assertions on this commit
+tkTestToolkit                 # the CLI -- 50 suites, 9051 assertions on this commit
 ```
 
 ```bash
@@ -226,7 +226,7 @@ anywhere).
 | AI code review | `ANTHROPIC_API_KEY` | the environment -- a secret never goes in a file this tool writes |
 | Teams delivery | `TEAMS_WEBHOOK_<RECIPIENT>` | the environment, gate 2 of a send |
 | StartWork launch | `startWorkLaunch` | DERIVED, like the webhook row: `on` where `claude` is on the PATH, `not configured` otherwise; `/env` carries it as a top-level boolean so the Team Agile page offers a launch only where it would work. `StartWork <id> -Launch` starts a session on the block in a worktree through `Start-DetachedProcess`; the block works either way. `docs/modules/solitaire-agile.md`, "The launch: the block, handed to a session" |
-| Claude Code usage | `claudeUsage` | DERIVED, like the launch row: `on` where Claude Code's projects folder is on this machine (`CLAUDE_CONFIG_DIR`'s, else `~/.claude/projects`), `not configured` otherwise. `Burn -Log` reads its session files, read-only, and writes the day's record, `usage/<yyyy-mm-dd>-<machine>.json`, into the hub: tokens by model and session, a cost derived from `Config/claude-prices.json`, no path or name. `docs/hub/usage.md` |
+| Claude Code usage | `claudeUsage` | DERIVED, like the launch row: `on` where Claude Code's projects folder is on this machine (`CLAUDE_CONFIG_DIR`'s, else `~/.claude/projects`), `not configured` otherwise. `Burn -Log` reads its session files, read-only, and writes the day's record, `usage/<yyyy-mm-dd>-<machine>.json`, into the hub: tokens by model and session, a cost derived from `Config/claude-prices.json`, no path or name. `Burn` alone shows today and this week; `/env` carries the same rule as `claudeUsage` (`consts.json` `usage.envFlag`), and the System page's burn tile and `GET /api/usage/burn` (404 where it is false) follow it. `docs/hub/usage.md` |
 
 **This refines "off means absent", it does not contradict it.** The two rules answer different
 questions, and the boundary is exact:

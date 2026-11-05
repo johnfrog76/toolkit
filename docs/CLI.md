@@ -609,7 +609,8 @@ of the hub's files.
 | `Start` | The first run. Copies the sample hub (`samples/hub`) to a folder you own -- `-Path`, default `~/toolkit-hub` -- points this machine at it (`promptsRoot`, `activeSpace=demo`, the four opt-in modules on -- growth, communication, deck and organize --, all through `Config`), re-imports, and opens the web UI (`-NoWeb` to skip). The sample org is `local`: no ADO, no login. **Never overwrites**: a machine that already has a hub keeps it; a folder with anything in it, a folder inside the Toolkit, and a configured hub that has gone missing are refusals (exit 2) that change nothing. `-WhatIf` says what it would do |
 | `Update` | Bring this machine's Toolkit up to date: pull it, **fast-forward only**, re-import it into this shell, and say what else moved -- the autoload shim, the web UI's lockfile, the agent's requirements. `-Sync` then syncs the prompt store: software first, then data. `-WhatIf` fetches and reports. Never commits, rebases or pushes the Toolkit. The package must be the **root** of its own checkout; a copy inside another repository is refused rather than fast-forwarding that one |
 | `Log` | Diagnostic log (`-Errors`, `-Today`, `-Days <n>`, `-Count <n>`, `-Command`, `-Type`, `-Clear`; `-Tail` follows live) |
-| `Burn -Log [-Date <yyyy-mm-dd>]` | Write **the day's Claude Code usage** on this machine into the hub: `usage/<yyyy-mm-dd>-<machine>.json`, read from Claude Code's own session files (read-only), with tokens by model and by session and a cost derived from `Config/claude-prices.json`. Today by default; `-Date` logs a past day. A second run that day replaces the record. Without `-Log` it refuses, exit 2, naming `-Log`; a machine with no session files writes nothing and says so. [The day's Claude Code usage](#the-days-claude-code-usage-burn--log) below, and the record's shape in [`hub/usage.md`](hub/usage.md) |
+| `Burn [-AsJson] [-At <yyyy-mm-dd HH:mm>]` | **The current Claude Code burn**: today (from local midnight) and this week (from `burn.weekStarts`, Friday 05:00 local by default), this machine's session files read live plus the day records the other machines logged into the hub's `usage/` -- tokens by model, a cost marked derived, never a plan percentage. `-AsJson` prints the same as one JSON object, what the System page's tile reads through the agent; `-At` reads it as it stood at a past local time. [The current burn](#the-current-burn-burn) below |
+| `Burn -Log [-Date <yyyy-mm-dd>]` | Write **the day's Claude Code usage** on this machine into the hub: `usage/<yyyy-mm-dd>-<machine>.json`, read from Claude Code's own session files (read-only), with tokens by model and by session and a cost derived from `Config/claude-prices.json`. Today by default; `-Date` logs a past day. A second run that day replaces the record. `-Date` without `-Log`, and `-Log` with `-AsJson`, refuse, exit 2; a machine with no session files writes nothing and says so. [The day's Claude Code usage](#the-days-claude-code-usage-burn--log) below, and the record's shape in [`hub/usage.md`](hub/usage.md) |
 
 #### The day's Claude Code usage: `Burn -Log`
 
@@ -630,14 +631,40 @@ this machine into the hub's `usage/`. It never writes in Claude Code's folder. W
 - **The cost is derived, and says so.** `costUsdDerived` is the tokens priced from one table,
   `Config/claude-prices.json` -- list prices, dated in the record as `cost.priceTableAsOf` -- never a share of
   a plan's allocation. A model the table does not price is counted, named under `unpriced`, and has no cost.
+  Haiku is priced at its lower rate card (prompts up to 100K tokens) only, and the record says so in
+  `cost.priceNotes`.
 - **No path and no name.** A session is its id, a project its last folder name (`~` for a home folder), the
   machine its short host name.
 
 It prints where it wrote the record and one line per model. Run it again later the same day and it
 **replaces** the record -- one file per day per machine, and over the same session files the same bytes. The
 inventory names whether this machine has anything to read: **Claude Code usage**, `on` or `not configured`
-(`tkEnv`). Nothing schedules it, and nothing reads the record back yet ([`hub/usage.md`](hub/usage.md), "Not
-yet").
+(`tkEnv`). Nothing schedules it. `Burn` alone reads the records back, below.
+
+#### The current burn: `Burn`
+
+```powershell
+tkBurn           # today and this week
+tkBurn -AsJson   # the same, as one JSON object
+tkBurn -At '2026-11-06 04:59'   # as it stood then
+```
+
+Two blocks, **Today** and **This week**, each with its messages, its derived cost, one line per model
+(messages, input, output, cache write, cache read, cost) and which machines it counted. This machine is read
+from its session files, live; every other machine from the day records it logged into the hub's `usage/`, so
+another machine is as current as its last `Burn -Log`. This machine's own records are not read, so nothing is
+counted twice.
+
+**The week starts at `burn.weekStarts` -- Friday 05:00 local by default**, when the allocation resets; a plan
+that resets at another time sets it once, `tkConfig -Set burn.weekStarts="Monday 09:00"`
+([Configuration](CONFIGURATION.md#burnweekstarts----when-the-burns-week-starts)). A value the verb cannot read
+is refused, exit 2, naming the key. This machine's lines are split at the week's start exactly. **Another
+machine's day record counts toward the week it starts in**: a record starts at 00:00 on its date, so with the
+default a record dated Friday counts toward the week that ends that Friday at 05:00, not the one that begins
+then. `-At <yyyy-mm-dd HH:mm>` reads the burn as it stood at a past local time; it is refused with `-Log`,
+and for a time to come. The long version, and the JSON's fields, are in [`hub/usage.md`](hub/usage.md), "Today
+and this week". The System page's **Claude Code burn** tile shows the same answer -- the agent runs
+`Burn -AsJson` and keeps it for an hour -- and is there only where this machine has Claude Code session files.
 
 #### Navigation shortcuts
 

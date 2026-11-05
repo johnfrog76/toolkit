@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Burn -Log -- the day's Claude Code usage, one record per day per machine, typed.
+    Burn -- the current burn (today and this week), and Burn -Log's day record, typed.
 .DESCRIPTION
     Typed as the VERB in a fresh child shell against a scratch copy of the
     package and of samples/hub (AGENTS.md: a suite that runs a script directly
@@ -29,6 +29,21 @@
     7. Privacy       no record carries a path, the home folder or a user name.
     8. Read-only     every file under the projects folders keeps its bytes and
                      its last write time.
+    9. The gate      Tests/fixtures/usage/projects-root.json, the rule the
+                     inventory row and the agent's /env flag share
+                     (Tests/test_usage_burn.py asserts the same rows).
+   10. The week      Tests/fixtures/usage/week.json: burn.weekStarts' values,
+                     the windows at a given now under Friday 05:00 (the
+                     default), Monday 09:00 and Sunday 00:00, another machine's
+                     record counting toward the week it starts in (a record
+                     dated the week's first day is the week before's), and
+                     both halves at one now.
+   11. The burn      Burn and Burn -AsJson typed at a fixed -At: this machine's
+                     session files plus another machine's records, this
+                     machine's own record not read twice, a file that is not
+                     a record skipped; -At's refusals; burn.weekStarts set
+                     through Config (a bad value refused) and read by Burn,
+                     and one Burn cannot read refused naming the key.
 
     Run:  pwsh -File Tests/Test-Burn.ps1
 #>
@@ -175,7 +190,7 @@ function Test-NoPrivateText([string]$Label, [string]$Text) {
 }
 
 Write-Host ""
-Write-Host "  Burn -Log -- the day's Claude Code usage, typed" -ForegroundColor Cyan
+Write-Host "  Burn -- the current burn, and Burn -Log's day record, typed" -ForegroundColor Cyan
 Write-Host "  ---------------------------------------------------" -ForegroundColor DarkGray
 Write-Host ""
 
@@ -201,7 +216,7 @@ try {
     Write-Host "-- Registration ----------------------------------------" -ForegroundColor Cyan
     $reg = Invoke-Burn "'MAP=' + (Get-P20CommandMap); tkBurn -Help"
     Assert-True 'Burn is in the command table the bridge reads' ($reg.All -match '"Burn":\s*"Invoke-P20Burn"') $reg.All
-    Assert-True '-Help prints the usage from config' ($reg.All.Contains('tkBurn -Log [-Date <yyyy-mm-dd>] [-Help]')) $reg.All
+    Assert-True '-Help prints the usage from config' ($reg.All.Contains('tkBurn [-AsJson] [-At <yyyy-mm-dd HH:mm>] [-Log] [-Date <yyyy-mm-dd>]')) $reg.All
     $manifest = Get-Content (Join-Path $pkgRoot 'Prompt20Toolkit/Prompt20Toolkit.psd1') -Raw
     Assert-True 'the autoload manifest names tkBurn (core, no flag)' ($manifest -match "'tkBurn',")
 
@@ -226,7 +241,8 @@ try {
     New-ProjectsTree $cases.cases[1].files (Join-Path $claudeRoot 'refusals') $dayStart
     $refusalDir = (Join-Path $claudeRoot 'refusals') -replace "'", "''"
     $calls = @(
-        @{ Name = 'nolog'; Call = 'tkBurn' }
+        @{ Name = 'datealone'; Call = 'tkBurn -Date 2026-07-15' }
+        @{ Name = 'logjson'; Call = 'tkBurn -Log -AsJson' }
         @{ Name = 'notaday'; Call = 'tkBurn -Log -Date 2026-7-15' }
         @{ Name = 'impossible'; Call = 'tkBurn -Log -Date 2026-02-30' }
         @{ Name = 'future'; Call = "tkBurn -Log -Date $((Get-Date).AddDays(2).ToString('yyyy-MM-dd', $inv))" }
@@ -235,9 +251,11 @@ try {
     foreach ($c in $calls) { $snippet += "'BEGIN:$($c.Name)'`n$($c.Call)`n'END:$($c.Name)=' + `$LASTEXITCODE`n" }
     $snippet += "`$env:CLAUDE_CONFIG_DIR = '$($noFolder -replace "'", "''")'`n'BEGIN:none'`ntkBurn -Log -Date $dayKey`n'END:none=' + `$LASTEXITCODE`n"
     $r = Invoke-Burn $snippet
-    $s = Get-Section $r.All 'nolog'
-    Assert-True 'no -Log: exit 2, the refusal names -Log' ($s.Exit -eq '2' -and $s.Text.Contains('tkBurn needs -Log')) $s.Text
+    $s = Get-Section $r.All 'datealone'
+    Assert-True '-Date without -Log: exit 2, the refusal names -Log' ($s.Exit -eq '2' -and $s.Text.Contains('-Date names the day -Log writes')) $s.Text
     Assert-True 'one Error block, no generic exit-code block' ((@([regex]::Matches($s.Text, '(?m)^Error: ')).Count -eq 1) -and $s.Text -notmatch 'exit code') $s.Text
+    $s = Get-Section $r.All 'logjson'
+    Assert-True '-Log with -AsJson: exit 2, the refusal says -AsJson is the current burn''s' ($s.Exit -eq '2' -and $s.Text.Contains('-AsJson is the current burn')) $s.Text
     $s = Get-Section $r.All 'notaday'
     Assert-True 'a -Date that is not yyyy-mm-dd: exit 2' ($s.Exit -eq '2' -and $s.Text.Contains('is not a day')) $s.Text
     $s = Get-Section $r.All 'impossible'
@@ -334,6 +352,168 @@ try {
     Assert-True 'every file under the projects folders kept its bytes and its last write time' ($before -eq $after)
     Assert-True 'and nothing was added there' ((@($before -split "`n").Count) -eq (@($after -split "`n").Count))
     Assert-True 'the usage log names the verb' ((@(Get-ChildItem -LiteralPath $logDir -Filter 'usage.*.log' -File | ForEach-Object { [System.IO.File]::ReadAllText($_.FullName) }) -join "`n") -match 'tkBurn')
+
+    # -- 9. The gate: Tests/fixtures/usage/projects-root.json --------------------------------
+    Write-Host ""
+    Write-Host "-- The gate: Tests/fixtures/usage/projects-root.json --" -ForegroundColor Cyan
+    $gate = [System.IO.File]::ReadAllText((Join-Path $fixtures 'projects-root.json')) | ConvertFrom-Json
+    $gateRoot = Join-Path $claudeRoot 'gate'
+    $savedConfigDir = [System.Environment]::GetEnvironmentVariable('CLAUDE_CONFIG_DIR')
+    try {
+        foreach ($row in @($gate.rows)) {
+            $folder = Join-Path $gateRoot ([string]$row.dir)
+            if ([string]$row.projects -ne 'absent') { New-Item -ItemType Directory -Path $folder -Force | Out-Null }
+            if ([string]$row.projects -eq 'folder') { New-Item -ItemType Directory -Path (Join-Path $folder 'projects') -Force | Out-Null }
+            if ([string]$row.projects -eq 'file') { [System.IO.File]::WriteAllText((Join-Path $folder 'projects'), 'not a folder', $utf8) }
+            $value = $folder
+            if ($row.pad) { $value = "  $folder  " }
+            [System.Environment]::SetEnvironmentVariable('CLAUDE_CONFIG_DIR', $value)
+            $state = (@(Get-P20OptionalSurfaces -Prefix 'tk' -PackageRoot $pkgRoot) | Where-Object { $_.key -eq (Get-P20Consts).usage.envFlag }).state
+            $want = 'not configured'
+            if ($row.on) { $want = 'on' }
+            Assert-Equal "the row: $($row.name)" $want $state
+        }
+    }
+    finally { [System.Environment]::SetEnvironmentVariable('CLAUDE_CONFIG_DIR', $savedConfigDir) }
+
+    # -- 10. The week: Tests/fixtures/usage/week.json ---------------------------------------------
+    Write-Host ""
+    Write-Host "-- The week: Tests/fixtures/usage/week.json -----------" -ForegroundColor Cyan
+    $week = [System.IO.File]::ReadAllText((Join-Path $fixtures 'week.json')) | ConvertFrom-Json
+    $local = { param([string]$Text) [DateTime]::SpecifyKind([DateTime]::ParseExact($Text, 'yyyy-MM-dd HH:mm', $inv), [DateTimeKind]::Local) }
+    $fmt = { param([DateTime]$D) $D.ToString('yyyy-MM-dd HH:mm', $inv) }
+    $parseWeek = { param([string]$Text) $p = ConvertFrom-P20WeekStart -Text $Text; if (-not $p.Ok) { throw "week.json names a weekStarts the parser refuses: $Text" }; $p }
+    foreach ($v in @($week.weekStartsValues.accepted)) {
+        $p = ConvertFrom-P20WeekStart -Text ([string]$v.typed)
+        Assert-Equal "burn.weekStarts '$($v.typed)' reads as '$($v.reads)'" ([string]$v.reads) $(if ($p.Ok) { $p.Text } else { "refused: $($p.Reason)" })
+    }
+    foreach ($v in @($week.weekStartsValues.refused)) {
+        $p = ConvertFrom-P20WeekStart -Text ([string]$v)
+        Assert-True "burn.weekStarts '$v' is refused, naming the key" ((-not $p.Ok) -and $p.Reason.Contains('burn.weekStarts')) $p.Reason
+    }
+    foreach ($row in @($week.windows)) {
+        $w = Get-P20BurnWindows -Now (& $local $row.now) -WeekStart (& $parseWeek $row.weekStarts)
+        Assert-Equal "the windows ($($row.weekStarts)): $($row.name)" "$($row.weekStart) / $($row.nextBoundary)" ("$(& $fmt $w.WeekStart) / $(& $fmt $w.NextBoundary)")
+    }
+    foreach ($group in @($week.records)) {
+        $ws = & $local $group.weekStart
+        foreach ($row in @($group.rows)) {
+            Assert-Equal "a record dated $($row.date) ($($group.weekStarts)): $($row.why)" ([string][bool]$row.inWeek) ([string](Test-P20RecordInWeek -DayKey $row.date -WeekStart $ws))
+        }
+    }
+
+    $machinesOf = { param($W) (@($W.machines | ForEach-Object { $t = "$($_.machine)=$($_.messages)"; if (@($_.days).Count) { $t += " [$(@($_.days) -join ', ')]" }; $t }) -join ', ') }
+    $writeRecord = {
+        param([string]$Dir, [string]$Who, [string]$Date, [string]$Model, [long]$Messages, [long]$Out)
+        $body = [ordered]@{ usage = 1; date = $Date; machine = $Who
+            byModel = @([ordered]@{ model = $Model; input = 0; output = $Out; thinking = 0; cacheWrite5m = 0; cacheWrite1h = 0; cacheRead = 0; messages = $Messages })
+        }
+        [System.IO.File]::WriteAllText((Join-Path $Dir "$Date-$Who.json"), ($body | ConvertTo-Json -Depth 6), $utf8)
+    }
+    $si = 0
+    foreach ($sumSpec in @($week.summaries)) {
+        $si++
+        $sumNow = & $local $sumSpec.now
+        $sumDir = Join-Path $claudeRoot "summary$si"
+        $sumLines = @($sumSpec.lines | ForEach-Object {
+                [pscustomobject]@{ t = $_.t; id = $_.id; model = $_.model; out = $_.out; sid = '33333333-cccc-4ccc-8ccc-000000000003'; cwd = '/Users/alex/Repos/demo' }
+            })
+        New-ProjectsTree ([pscustomobject]@{ 'demo/33333333-cccc-4ccc-8ccc-000000000003.jsonl' = $sumLines }) $sumDir $sumNow.Date
+        $sumUsage = Join-Path $root "summary-usage$si"
+        New-Item -ItemType Directory -Path $sumUsage -Force | Out-Null
+        foreach ($rec in @($sumSpec.records)) {
+            & $writeRecord $sumUsage (([string]$rec.machine).Replace('{this}', $machine)) ([string]$rec.date) ([string]$rec.model) ([long]$rec.messages) ([long]$rec.out)
+        }
+        $sum = (Read-P20BurnSummary -ProjectsRoot (Join-Path $sumDir 'projects') -UsageDir $sumUsage -Now $sumNow -WeekStart (& $parseWeek $sumSpec.weekStarts) `
+                -PriceTable (Get-P20ClaudePriceTable -PackageRoot $pkgRoot) -Machine $machine).Summary
+        foreach ($name in @('today', 'week')) {
+            $want = $sumSpec.expect.$name
+            $got = $sum.$name
+            Assert-Equal "$($sumSpec.name), $($name): messages and output" "$($want.messages) / $($want.output)" "$($got.totals.messages) / $($got.totals.output)"
+            Assert-Equal "  and which machine said what (this machine's own record never read)" (([string]$want.machines).Replace('{this}', $machine)) (& $machinesOf $got)
+        }
+        Assert-Equal "  the answer is right until $($sumSpec.expect.nextBoundary)" ([string]$sumSpec.expect.nextBoundary) (& $fmt ([DateTime]::Parse($sum.nextBoundaryAt, $inv)))
+        Assert-Equal '  and names its week start' "$($sumSpec.weekStarts) local" ([string]$sum.weekStarts)
+        Assert-True '  Haiku is priced at its lower rate card, and says so' ((@($sum.cost.priceNotes | Where-Object { $_.model -eq 'claude-haiku-5-5' -and $_.note -match 'lower rate card' })).Count -eq 1) ($sum.cost.priceNotes | ConvertTo-Json -Depth 4)
+        Assert-True '  the cost is marked derived' ($sum.cost.derived -eq $true -and $sum.cost.note -match "not the plan's allocation")
+    }
+
+    # -- 11. The burn, typed: Burn and Burn -AsJson, at a fixed -At --------------------------------
+    # The clock is fixed, so no run straddles a midnight or a week's start:
+    # 14:00 on cases.json's day, a Wednesday. One line of this machine's at 09:00
+    # that day; laptop's records for the Monday before and the day itself; this
+    # machine's own record for the day, which must never be read.
+    Write-Host ""
+    Write-Host "-- The current burn, typed: Burn and Burn -AsJson -----" -ForegroundColor Cyan
+    $liveDir = Join-Path $claudeRoot 'live'
+    $liveLines = @([pscustomobject]@{ t = '+09:00'; id = 'msg-live'; model = 'claude-opus-5-5'; out = 400; sid = '44444444-dddd-4ddd-8ddd-000000000004'; cwd = '/Users/alex/Repos/demo' })
+    New-ProjectsTree ([pscustomobject]@{ 'demo/44444444-dddd-4ddd-8ddd-000000000004.jsonl' = $liveLines }) $liveDir $dayStart
+    & $writeRecord $usageDir 'laptop' '2026-07-13' 'claude-haiku-5-5' 2 20
+    & $writeRecord $usageDir 'laptop' $dayKey 'claude-haiku-5-5' 3 30
+    & $writeRecord $usageDir $machine $dayKey 'claude-opus-5-5' 100 1000
+    [System.IO.File]::WriteAllText((Join-Path $usageDir 'notes.json'), '{ not a record', $utf8)
+    $at = "$dayKey 14:00"
+    $localCfg = (Join-Path $pkgDir 'config.local.json') -replace "'", "''"
+    $before = Get-TreeSnapshot $claudeRoot
+    $snippet = "`$env:CLAUDE_CONFIG_DIR = '$($liveDir -replace "'", "''")'`n"
+    $snippet += "'BEGIN:json'`ntkBurn -AsJson -At '$at'`n'END:json=' + `$LASTEXITCODE`n'BEGIN:console'`ntkBurn -At '$at'`n'END:console=' + `$LASTEXITCODE`n"
+    $snippet += "'BEGIN:atbad'`ntkBurn -At 2026-7-15`n'END:atbad=' + `$LASTEXITCODE`n"
+    $snippet += "'BEGIN:atfuture'`ntkBurn -At '$((Get-Date).AddDays(2).ToString('yyyy-MM-dd HH:mm', $inv))'`n'END:atfuture=' + `$LASTEXITCODE`n"
+    $snippet += "'BEGIN:atlog'`ntkBurn -Log -At '$at'`n'END:atlog=' + `$LASTEXITCODE`n"
+    # burn.weekStarts through the one writer: a bad value refused, a good one written as it reads back.
+    $snippet += "'BEGIN:setbad'`ntkConfig -Set 'burn.weekStarts=Funday 05:00'`n'END:setbad=' + `$LASTEXITCODE`n"
+    $snippet += "'BEGIN:set'`ntkConfig -Set 'burn.weekStarts=monday 9:00'`n'END:set=' + `$LASTEXITCODE`n"
+    $snippet += "'BEGIN:written'`n(Get-Content -Raw '$localCfg' | ConvertFrom-Json).burn.weekStarts`n'END:written=0'`n"
+    $snippet += "'BEGIN:monday'`ntkBurn -AsJson -At '$at'`n'END:monday=' + `$LASTEXITCODE`n"
+    # A value written by hand that Burn cannot read: refused, naming the key and the file.
+    $snippet += "`$c = Get-Content -Raw '$localCfg' | ConvertFrom-Json; `$c.burn.weekStarts = 'Fri 5am'; [System.IO.File]::WriteAllText('$localCfg', (`$c | ConvertTo-Json -Depth 8))`n"
+    $snippet += "Import-Module '$($pkgDir -replace "'", "''")/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null`n"
+    $snippet += "'BEGIN:handbad'`ntkBurn -At '$at'`n'END:handbad=' + `$LASTEXITCODE`n"
+    $snippet += "`$c.burn = `$null; `$c.PSObject.Properties.Remove('burn'); [System.IO.File]::WriteAllText('$localCfg', (`$c | ConvertTo-Json -Depth 8))`n"
+    $r = Invoke-Burn $snippet
+    $after = Get-TreeSnapshot $claudeRoot
+
+    # Instants stay text: PowerShell 7 would read an ISO string as a date.
+    $jsonArgs = @{}
+    if ((Get-Command ConvertFrom-Json).Parameters.ContainsKey('DateKind')) { $jsonArgs['DateKind'] = 'String' }
+    $parseJson = { param($Text) try { $Text | ConvertFrom-Json @jsonArgs } catch { $null } }
+    $s = Get-Section $r.All 'json'
+    $j = & $parseJson $s.Text
+    Assert-True 'Burn -AsJson -At: exit 0 and nothing but one JSON object' ($s.Exit -eq '0' -and $null -ne $j -and $j.burn -eq 1) $s.Text
+    if ($null -ne $j) {
+        Assert-Equal "today: this machine's session files plus laptop's record, this machine's own record not read" "$machine=1, laptop=3 [$dayKey]" (& $machinesOf $j.today)
+        Assert-Equal '  and the totals are the two, once' '4 / 430' "$($j.today.totals.messages) / $($j.today.totals.output)"
+        Assert-Equal 'this week from Friday 05:00 (the default): laptop''s Monday and today' "$machine=1, laptop=5 [2026-07-13, $dayKey]" (& $machinesOf $j.week)
+        Assert-Equal '  and the week is the default''s' 'Friday 05:00 local' ([string]$j.weekStarts)
+        Assert-Equal 'a file in usage/ that is not a record is skipped and counted' '1' ([string]$j.skipped.records)
+        Assert-Equal 'the answer is right until the next midnight after -At' "$((& $local "$dayKey 00:00").AddDays(1).ToString('yyyy-MM-dd HH:mm', $inv))" (& $fmt ([DateTime]::Parse([string]$j.nextBoundaryAt, $inv)))
+        Test-NoPrivateText 'the -AsJson answer' $s.Text
+    }
+    $s = Get-Section $r.All 'console'
+    Assert-True 'Burn -At: exit 0, today and this week, the cost derived, never a share of the plan' ($s.Exit -eq '0' -and $s.Text.Contains("as of $at") -and $s.Text.Contains('Today, ') -and $s.Text.Contains('This week, from ') -and $s.Text.Contains('the week starts Friday 05:00, burn.weekStarts') -and $s.Text.Contains("not the plan's allocation") -and $s.Text -notmatch '\d%') $s.Text
+    Assert-True '  and says Haiku is priced at its lower rate card' ($s.Text.Contains('claude-haiku-5-5 is priced at its lower rate card')) $s.Text
+    $s = Get-Section $r.All 'atbad'
+    Assert-True '-At that is not a time: exit 2, one Error block' ($s.Exit -eq '2' -and $s.Text.Contains('is not a time') -and (@([regex]::Matches($s.Text, '(?m)^Error: ')).Count -eq 1)) $s.Text
+    $s = Get-Section $r.All 'atfuture'
+    Assert-True '-At that has not come: exit 2' ($s.Exit -eq '2' -and $s.Text.Contains('has not happened yet')) $s.Text
+    $s = Get-Section $r.All 'atlog'
+    Assert-True '-At with -Log: exit 2, naming -Date' ($s.Exit -eq '2' -and $s.Text.Contains("-Log's day is -Date")) $s.Text
+    $s = Get-Section $r.All 'setbad'
+    Assert-True 'Config -Set burn.weekStarts=Funday 05:00: refused, exit 2, naming the key' ($s.Exit -eq '2' -and $s.Text.Contains('burn.weekStarts is a day and a 24-hour time')) $s.Text
+    $s = Get-Section $r.All 'set'
+    Assert-True 'Config -Set burn.weekStarts=monday 9:00: written, exit 0' ($s.Exit -eq '0') $s.Text
+    Assert-Equal '  as it reads back, in config.local.json' 'Monday 09:00' ((Get-Section $r.All 'written').Text.Trim())
+    $s = Get-Section $r.All 'monday'
+    $j = & $parseJson $s.Text
+    Assert-True 'Burn -AsJson -At under Monday 09:00: exit 0' ($s.Exit -eq '0' -and $null -ne $j) $s.Text
+    if ($null -ne $j) {
+        Assert-Equal '  the week starts Monday 09:00, the 13th' "Monday 09:00 local / $((& $local '2026-07-13 09:00').ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ', $inv))" "$($j.weekStarts) / $($j.week.from)"
+        Assert-Equal "  laptop's Monday record starts before 09:00, so it is the week before's" "$machine=1, laptop=3 [$dayKey]" (& $machinesOf $j.week)
+        Assert-Equal '  today is the same either way' "$machine=1, laptop=3 [$dayKey]" (& $machinesOf $j.today)
+    }
+    $s = Get-Section $r.All 'handbad'
+    Assert-True 'a burn.weekStarts Burn cannot read: exit 2, naming the key and the file' ($s.Exit -eq '2' -and $s.Text.Contains("burn.weekStarts is a day and a 24-hour time") -and $s.Text.Contains('config.local.json') -and (@([regex]::Matches($s.Text, '(?m)^Error: ')).Count -eq 1)) $s.Text
+    Assert-True 'Burn reads the projects folder and changes nothing in it' ($before -eq $after)
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message

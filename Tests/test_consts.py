@@ -305,6 +305,9 @@ EXPECTED = {
     ("startWork", "howWeWorkNote"): "agentic/how-we-work.md",
     # The line HowWeWork prints for a repository's AGENTS.md; the web finds it by this shape.
     ("startWork", "howWeWorkLine"): "How we work here: {path}",
+    # Claude Code usage: /env's flag (the inventory row's key) and the burn route.
+    ("usage", "envFlag"): "claudeUsage",
+    ("usage", "burnRoute"): "/api/usage/burn",
     ("startWork", "text"): {
         "head": "# Start work: {kind} {id} -- {title}",
         "howWeWork": "## How we work in {space} ({source})",
@@ -484,6 +487,8 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.rituals_corner_shapes(), tuple(EXPECTED[("rituals", "cornerShapes")]))
         self.assertEqual(C.startwork_launch_env_flag(), EXPECTED[("startWork", "launchEnvFlag")])
         self.assertEqual(C.startwork_how_we_work_note(), EXPECTED[("startWork", "howWeWorkNote")])
+        self.assertEqual(C.usage_env_flag(), EXPECTED[("usage", "envFlag")])
+        self.assertEqual(C.usage_burn_route(), EXPECTED[("usage", "burnRoute")])
 
     def test_the_worker_rule_reads_the_contract(self):
         """The pane's worker chips and the standup read one prefix, not two."""
@@ -569,6 +574,9 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("startWork.launchEnvFlag", "startWorkLaunch"),
         # The Space's how-we-work note: read through startwork_how_we_work_note().
         ("startWork.howWeWorkNote", "agentic/how-we-work.md"),
+        # Claude Code usage: served through usage_env_flag() and usage_burn_route().
+        ("usage.envFlag", "claudeUsage"),
+        ("usage.burnRoute", "/api/usage/burn"),
     ]
 
     # The allowlist, and why each entry is on it:
