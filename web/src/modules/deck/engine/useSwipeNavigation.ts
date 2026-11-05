@@ -7,7 +7,7 @@ import { useCallback, useRef } from "react";
 // desktop the hook returns no handlers at all, so a mouse drag over a slide
 // stays a mouse drag over a slide.
 //
-// DUPLICATED FILE — same contract as useSlideNarration and SuitcaseTransport
+// DUPLICATED FILE — same contract as useSlideNarration and AudiobookTransport
 // (see their headers): this file exists byte-identical in prompts
 // web/src/app/deck-components and connected-deck src/deck-engine. The repos
 // share no package; they sync by porting. So: React only, no imports beyond
@@ -28,7 +28,7 @@ import { useCallback, useRef } from "react";
 //
 // ── What this must not disturb ───────────────────────────────────────────────
 //
-// Suitcase Mode's auto-advance. This hook does not touch narration, the dwell
+// Audiobook mode's auto-advance. This hook does not touch narration, the dwell
 // timer, or `paused` — it calls the SAME stepNext/stepPrev the paging arrows and
 // the arrow keys call, so a swipe is indistinguishable from a manual page as
 // far as the rest of the player is concerned. Everything downstream keeps
@@ -65,7 +65,7 @@ const DIRECTION_RATIO = 1.5;
 const MAX_DURATION_MS = 600;
 
 /**
- * A gesture starting on a control belongs to that control. Suitcase Mode's
+ * A gesture starting on a control belongs to that control. Audiobook mode's
  * transport is a big circular button sitting right under the thumb — without
  * this, a slightly-dragged tap on Pause would page the deck as well.
  */

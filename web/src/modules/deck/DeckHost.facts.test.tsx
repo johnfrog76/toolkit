@@ -1,6 +1,7 @@
-import { render } from "@testing-library/react";
+import { act, render } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import DeckHost, { DeckNotesHost } from "./DeckHost";
+import { DECK_AUDIOBOOK_STORAGE_KEY } from "./engine/narrationConstants";
 
 // The player and the notes window narrate from the same baked clips, so both
 // are handed hasApi={false} and a resolver: neither may ask for a service.
@@ -9,6 +10,7 @@ const playerProps: Record<string, unknown>[] = [];
 const notesProps: Record<string, unknown>[] = [];
 
 jest.mock("./engine/DeckPlayer", () => ({
+  ALL_DECK_MODES: ["audience", "presenter"],
   DeckPlayer: (props: Record<string, unknown>) => {
     playerProps.push(props);
     return null;
@@ -32,6 +34,48 @@ jest.mock("./DeckRoom", () => ({
 beforeEach(() => {
   playerProps.length = 0;
   notesProps.length = 0;
+  window.localStorage.clear();
+});
+
+const mountPlayer = () =>
+  render(
+    <MemoryRouter initialEntries={["/deck/x"]}>
+      <Routes>
+        <Route path="/deck/:deckId" element={<DeckHost />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+const last = () => playerProps[playerProps.length - 1];
+
+describe("DeckHost -- a listed deck's Paging or Audiobook, kept per browser", () => {
+  it("opens in Paging by default, with the choice offered", () => {
+    mountPlayer();
+    expect(last().audiobook).toBe(false);
+    expect(typeof last().onAudiobookChange).toBe("function");
+  });
+
+  it("a choice of Audiobook is stored and opens the next deck in Audiobook", () => {
+    const first = mountPlayer();
+    act(() => {
+      (last().onAudiobookChange as (next: boolean) => void)(true);
+    });
+    expect(last().audiobook).toBe(true);
+    expect(window.localStorage.getItem(DECK_AUDIOBOOK_STORAGE_KEY)).toBe("1");
+    first.unmount();
+
+    mountPlayer();
+    expect(last().audiobook).toBe(true);
+  });
+
+  it("Paging chosen back is stored too", () => {
+    window.localStorage.setItem(DECK_AUDIOBOOK_STORAGE_KEY, "1");
+    mountPlayer();
+    act(() => {
+      (last().onAudiobookChange as (next: boolean) => void)(false);
+    });
+    expect(window.localStorage.getItem(DECK_AUDIOBOOK_STORAGE_KEY)).toBe("0");
+    expect(last().audiobook).toBe(false);
+  });
 });
 
 describe("DeckHost -- both windows get the same narration facts", () => {

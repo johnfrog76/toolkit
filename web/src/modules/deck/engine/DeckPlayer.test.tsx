@@ -1,29 +1,42 @@
+import { useState } from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { webDarkTheme } from "@fluentui/react-components";
-import { DeckPlayer } from "./DeckPlayer";
+import { DeckPlayer, type DeckMode } from "./DeckPlayer";
 import { darkTheme } from "../../../shell/theme";
 import { SLIDE_DWELL_SECONDS } from "./deckDuration";
 import { NARRATION_VOICES, NO_NARRATION_TITLE, VOICE_PICKER_TITLE } from "./narrationConstants";
 import type { Slide } from "../decks/types";
+import {
+  RING_SIZE,
+  TOUCH_ARROW_WIDTH,
+  TOUCH_TARGET,
+  counterWidth,
+  resolveViewerBar,
+  viewerBarGap,
+} from "./viewerBarLayout";
 
-// The consolidation contract, pinned at the component seam. DeckPlayer is the
-// ONE player both apps mount (web's PresentationDeck and Wasteland's
-// WastelandDeck) — the two hosts diverge only in the facts they pass, and
-// `mode` owns the differences:
+// The mode contract, pinned at the component seam. DeckPlayer is the one
+// player every surface mounts; what a window IS comes from `mode` and the
+// host's `offeredModes`, never from which props happen to be wired:
 //
-//   presenter — web's only mode. The notes surface is available; in-player
-//     Voice/mute NEVER renders, even when a host wires voices, because the
-//     presenter's own voice is the point and a synthesized one would compete.
-//   audience — Wasteland's sofa. Voice controls render; no notes surface
-//     exists AT ALL (absent, not hidden — nothing to escalate to on a link
-//     someone shared with you).
+//   presenter — the podium, and the presenter's bar: everything inline (Exit,
+//     previous, the counter, next, the sound, the voice, the notes,
+//     fullscreen). Only where the host offers it, never at the phone width,
+//     and it opens silent.
+//   audience — Sofa, or Audiobook mode, on the viewer's bar: Exit | the
+//     transport | settings, fullscreen, the sound, at every width. No notes
+//     surface exists AT ALL (absent, not hidden — nothing to escalate to on a
+//     link someone shared with you).
 //
-// If a future consolidation collapses the hosts onto this player, these tests
-// are what keeps web from silently growing audience controls (or the audience
-// from growing a presenter escalation). The theme test pins the third shared
-// fact: the player's chrome defaults to plain webDarkTheme — neither host's
-// brand follows a deck in.
+// These tests are what keeps the two from bleeding into each other. The theme
+// test pins a third shared fact: the player's chrome defaults to plain
+// webDarkTheme — no host's brand follows a deck in.
+//
+// Carried with Connected Deck 0.2.0's engine (docs/modules/deck.md); the
+// differences from that suite are this product's: stepNext/stepPrev, no
+// launch-page providers, the sheet's own form (../SettingsForm.tsx) and the
+// host-kept mute.
 
 // jsdom has no BroadcastChannel (useDeckController's cross-window sync); a
 // silent stub is enough — cross-window behavior is Playwright's job.
@@ -79,7 +92,7 @@ class AudioStub {
 
 // jsdom has no matchMedia, which is why useCompactLayout reports desktop in
 // tests. This stub lets a test choose a width — and RESIZE mid-mount, which is
-// the only way to exercise Suitcase Mode's breakpoint behaviour.
+// the only way to exercise the phone rules (no Podium, thumb-sized bar).
 //
 // Listeners are keyed by their query and handed a real event-shaped object when
 // fired: useCompactLayout reads `event.matches`, and so does Fluent's own
@@ -168,15 +181,17 @@ const slides: Slide[] = [
 /** Every slide baked in every voice — narration is fully wired and covered. */
 const allBaked = (slide: Slide, voiceId: string) => `/voices/fake-deck/${slide.id}-${voiceId}.mp3`;
 
+interface MountExtra {
+  narrateByDefault?: boolean;
+  audiobook?: boolean;
+  offeredModes?: readonly DeckMode[];
+  onAudiobookChange?: (next: boolean) => void;
+  mute?: { muted: boolean; onToggle: () => void };
+  resolveNarrationUrl?: (slide: Slide, voiceId: string) => string | null;
+}
+
 /** Mount the shared player exactly as a host would, with narration wired. */
-function mountPlayer(
-  mode: "presenter" | "audience",
-  extra?: {
-    narrateByDefault?: boolean;
-    suitcaseMode?: boolean;
-    resolveNarrationUrl?: (slide: Slide, voiceId: string) => string | null;
-  },
-) {
+function mountPlayer(mode: DeckMode, extra?: MountExtra) {
   return render(
     <MemoryRouter>
       <DeckPlayer
@@ -187,60 +202,232 @@ function mountPlayer(
         hasApi={false}
         resolveNarrationUrl={extra?.resolveNarrationUrl ?? allBaked}
         narrateByDefault={extra?.narrateByDefault}
-        suitcaseMode={extra?.suitcaseMode}
+        audiobook={extra?.audiobook}
+        offeredModes={extra?.offeredModes}
+        onAudiobookChange={extra?.onAudiobookChange}
+        mute={extra?.mute}
       />
     </MemoryRouter>,
   );
 }
 
-describe("DeckPlayer — mode owns the host differences", () => {
-  it("audience: voice controls render, the notes surface does not exist", () => {
+/**
+ * A host that keeps the Sofa / Audiobook choice in its own state, the way
+ * GeneratedDeckHost does: the sheet's mode row calls back, and the player is
+ * handed the new choice.
+ */
+function HostWithModeChoice({
+  startInAudiobook = false,
+  onChange,
+}: {
+  startInAudiobook?: boolean;
+  onChange?: (next: boolean) => void;
+}) {
+  const [audiobook, setAudiobookState] = useState(startInAudiobook);
+  const setAudiobook = (next: boolean) => {
+    onChange?.(next);
+    setAudiobookState(next);
+  };
+  return (
+    <DeckPlayer
+      deckId="fake-deck"
+      slides={slides}
+      mode="audience"
+      voices={NARRATION_VOICES}
+      hasApi={false}
+      resolveNarrationUrl={allBaked}
+      audiobook={audiobook}
+      onAudiobookChange={setAudiobook}
+    />
+  );
+}
+
+/** Which bar is drawn: "viewer" or "presenter". */
+const barKind = () => document.querySelector("[data-bar]")?.getAttribute("data-bar") ?? "";
+
+/** The play ring's button, by its label: Pause while playing, Play while held. */
+const ring = () => screen.queryByLabelText(/^(Play|Pause)$/);
+
+/** Which slide the deck is on, read from the live element's src. */
+const currentSlideId = () => {
+  const src = audioInstances[audioInstances.length - 1]?.src ?? "";
+  return src.match(/\/(s\d+)-/)?.[1] ?? "";
+};
+
+/** Fire the live element's "ended", then run out the post-clip dwell. */
+function endCurrentClip() {
+  const audio = audioInstances[audioInstances.length - 1];
+  act(() => {
+    audio.onended?.();
+  });
+  act(() => {
+    jest.advanceTimersByTime(SLIDE_DWELL_SECONDS * 1000);
+  });
+}
+
+describe("DeckPlayer — two bars, each for its job", () => {
+  it("audience: the viewer's bar — sound and gear on the bar, no notes surface", () => {
     mountPlayer("audience");
 
+    expect(barKind()).toBe("viewer");
     expect(screen.getByTitle("Play with narration")).toBeTruthy();
-    expect(screen.getByTitle(VOICE_PICKER_TITLE)).toBeTruthy();
+    expect(screen.getByLabelText("Settings")).toBeTruthy();
+    // The voice moved into the sheet behind the gear; the bar carries the
+    // transport and the sound, nothing more.
+    expect(screen.queryByTitle(VOICE_PICKER_TITLE)).toBeNull();
     // Absent, not disabled — an audience window has nothing to escalate to.
     expect(screen.queryByTitle("Open speaker notes")).toBeNull();
   });
 
-  it("presenter: the notes surface renders, voice controls never do — even fully wired", () => {
-    // SAME narration wiring as the audience mount above. Locking a host into
-    // presenter mode must drop the in-player voice group entirely, not merely
-    // disable it: mode owns this, not the presence of the props.
+  it("presenter: Exit, paging, the counter, the notes — no gear, no sound, no voice", () => {
+    // SAME narration wiring as the audience mount above: the deck window in
+    // Podium is the room's screen, and narration is the notes window's.
     mountPlayer("presenter");
 
+    expect(barKind()).toBe("presenter");
     expect(screen.getByTitle("Open speaker notes")).toBeTruthy();
+    expect(screen.getByText("1 / 2")).toBeTruthy();
+    expect(screen.queryByLabelText("Settings")).toBeNull();
     expect(screen.queryByTitle("Play with narration")).toBeNull();
     expect(screen.queryByTitle(VOICE_PICKER_TITLE)).toBeNull();
-    // Not even the disabled/empty variant of the group:
     expect(screen.queryByTitle(NO_NARRATION_TITLE)).toBeNull();
+  });
+
+  it("presenter: Exit and the arrows carry their names", () => {
+    mountPlayer("presenter");
+
+    expect(screen.getByRole("button", { name: "Exit deck" }).textContent).toBe("✕ Exit");
+    expect(screen.getByRole("button", { name: "Previous slide" }).textContent).toBe("←");
+    expect(screen.getByRole("button", { name: "Next slide" }).textContent).toBe("→");
+  });
+
+  it("presenter: never narrates in the deck window, whatever was wired", () => {
+    mountPlayer("presenter", { narrateByDefault: true, audiobook: true });
+
+    expect(audioInstances.every((a) => a.paused && !a.src)).toBe(true);
+  });
+
+  it("a host offering the viewer's mode alone gets no Podium, whatever `mode` says", () => {
+    mountPlayer("presenter", { offeredModes: ["audience"] });
+
+    expect(barKind()).toBe("viewer");
+    expect(screen.queryByTitle("Open speaker notes")).toBeNull();
+  });
+
+  it("the phone never gets Podium, even when the host asks for it", () => {
+    setViewport("compact");
+    mountPlayer("presenter");
+
+    expect(barKind()).toBe("viewer");
+    expect(screen.queryByTitle("Open speaker notes")).toBeNull();
+  });
+
+  it("the viewer's bar is three columns, the transport in the middle one", () => {
+    mountPlayer("audience");
+
+    const bar = document.querySelector<HTMLElement>('[data-bar="viewer"]')!;
+    expect(bar.style.display).toBe("grid");
+    expect(bar.style.gridTemplateColumns).toBe("1fr auto 1fr");
+    const transport = bar.querySelector('[data-bar-column="transport"]')!;
+    expect(transport.contains(screen.getByLabelText("Next slide"))).toBe(true);
+    expect(transport.contains(screen.getByText("1 / 2"))).toBe(true);
+  });
+
+  it("wide, beside the counter: text arrows; beside the ring and on a phone: chevrons", () => {
+    const { unmount } = mountPlayer("audience");
+    expect(screen.getByLabelText("Previous slide").textContent).toBe("←");
+    expect(screen.getByLabelText("Next slide").textContent).toBe("→");
+    unmount();
+
+    mountPlayer("audience", { audiobook: true }).unmount();
+    mountPlayer("audience", { audiobook: true });
+    expect(ring()).toBeTruthy();
+    expect(screen.getByLabelText("Next slide").textContent).toBe("");
+    expect(screen.getByLabelText("Next slide").querySelector("svg")).toBeTruthy();
+  });
+
+  it("phone: the arrows' glyph is 18px, Exit's 22px, the arrows 48px wide", () => {
+    setViewport("compact");
+    mountPlayer("audience");
+
+    const next = screen.getByLabelText("Next slide") as HTMLElement;
+    expect(next.style.fontSize).toBe("18px");
+    expect(next.style.minWidth).toBe(`${TOUCH_ARROW_WIDTH}px`);
+    expect(next.textContent).toBe("");
+    expect((screen.getByLabelText("Exit deck") as HTMLElement).style.fontSize).toBe("22px");
+  });
+
+  it("a host-kept mute IS the viewer's sound: one speaker button, not two", () => {
+    const onToggle = jest.fn();
+    mountPlayer("audience", { narrateByDefault: true, mute: { muted: false, onToggle } });
+
+    const right = document.querySelector('[data-bar-column="right"]')!;
+    const mute = screen.getByRole("button", { name: "Mute narration" });
+    expect(right.contains(mute)).toBe(true);
+    // The narration speaker gives way to it.
+    expect(screen.queryByTitle("Stop narration")).toBeNull();
+    fireEvent.click(mute);
+    expect(onToggle).toHaveBeenCalledTimes(1);
   });
 });
 
-describe("DeckPlayer — Suitcase Mode", () => {
-  // Which slide the deck is on. Suitcase Mode REPLACES the counter with its
-  // one-button transport (that's the point of the mode), so there's no "1 / 2"
-  // to read — the live element's src is the honest signal, since the player
-  // retargets it per slide from the resolved narration URL.
-  const currentSlideId = () => {
-    const src = audioInstances[audioInstances.length - 1]?.src ?? "";
-    return src.match(/\/(s\d+)-/)?.[1] ?? "";
+describe("viewerBarLayout — the transport sits on the screen's centre", () => {
+  // jsdom cannot lay out a grid, so the rule is held through the grid's own
+  // arithmetic over the bar's real sizes (viewerBarLayout.ts).
+  const compactSides = {
+    left: TOUCH_TARGET, // Exit
+    right: TOUCH_TARGET * 2 + viewerBarGap(true), // gear + sound (no fullscreen)
+  };
+  const compactMiddle = {
+    paging: TOUCH_ARROW_WIDTH * 2 + counterWidth(true) + viewerBarGap(true) * 2,
+    ring: TOUCH_ARROW_WIDTH * 2 + RING_SIZE + viewerBarGap(true) * 2,
+  };
+  // Fluent's small buttons, and the ✕ Exit word.
+  const wideSides = { left: 64, right: 32 * 3 + viewerBarGap(false) * 2 };
+  const wideMiddle = {
+    paging: 32 * 2 + counterWidth(false) + viewerBarGap(false) * 2,
+    ring: 32 * 2 + RING_SIZE + viewerBarGap(false) * 2,
   };
 
-  /** Fire the live element's "ended", then run out the post-clip dwell. */
-  function endCurrentClip() {
-    const audio = audioInstances[audioInstances.length - 1];
-    act(() => {
-      audio.onended?.();
-    });
-    act(() => {
-      jest.advanceTimersByTime(SLIDE_DWELL_SECONDS * 1000);
+  for (const width of [390, 430]) {
+    for (const form of ["paging", "ring"] as const) {
+      it(`phone ${width} wide, ${form}: centred within 2px`, () => {
+        const { centre } = resolveViewerBar({
+          width,
+          compact: true,
+          ...compactSides,
+          middle: compactMiddle[form],
+        });
+        expect(Math.abs(centre - width / 2)).toBeLessThanOrEqual(2);
+      });
+    }
+  }
+
+  for (const form of ["paging", "ring"] as const) {
+    it(`desktop 1440 wide, ${form}: centred within 2px`, () => {
+      const { centre } = resolveViewerBar({
+        width: 1440,
+        compact: false,
+        ...wideSides,
+        middle: wideMiddle[form],
+      });
+      expect(Math.abs(centre - 720)).toBeLessThanOrEqual(2);
     });
   }
 
-  // Suitcase Mode is mobile-only, so these run phone-width unless a test says
-  // otherwise. Asserting auto-advance from a desktop mount would be asserting
-  // behaviour the feature is not supposed to have.
+  it("the check has teeth: a right group wider than its half pushes the transport off", () => {
+    const { centre } = resolveViewerBar({
+      width: 390,
+      compact: true,
+      left: compactSides.left,
+      right: 200,
+      middle: compactMiddle.ring,
+    });
+    expect(Math.abs(centre - 195)).toBeGreaterThan(2);
+  });
+});
+
+describe("DeckPlayer — Audiobook mode advances on narration end", () => {
   beforeEach(() => {
     jest.useFakeTimers();
     setViewport("compact");
@@ -248,7 +435,7 @@ describe("DeckPlayer — Suitcase Mode", () => {
   afterEach(() => jest.useRealTimers());
 
   it("advances to the next slide a dwell after the clip ends", () => {
-    mountPlayer("audience", { narrateByDefault: true, suitcaseMode: true });
+    mountPlayer("audience", { narrateByDefault: true, audiobook: true });
     expect(currentSlideId()).toBe("s1");
 
     endCurrentClip();
@@ -256,8 +443,15 @@ describe("DeckPlayer — Suitcase Mode", () => {
     expect(currentSlideId()).toBe("s2");
   });
 
+  it("turns narration on with it — no narrate-by-default needed", () => {
+    mountPlayer("audience", { audiobook: true });
+
+    expect(audioInstances[0].paused).toBe(false);
+    expect(ring()).toBeTruthy();
+  });
+
   it("waits out the dwell — it does not advance the instant audio stops", () => {
-    mountPlayer("audience", { narrateByDefault: true, suitcaseMode: true });
+    mountPlayer("audience", { narrateByDefault: true, audiobook: true });
 
     act(() => {
       audioInstances[audioInstances.length - 1].onended?.();
@@ -271,7 +465,7 @@ describe("DeckPlayer — Suitcase Mode", () => {
   });
 
   it("stops at the last slide rather than running off the end", () => {
-    mountPlayer("audience", { narrateByDefault: true, suitcaseMode: true });
+    mountPlayer("audience", { narrateByDefault: true, audiobook: true });
 
     endCurrentClip(); // 1 -> 2
     expect(currentSlideId()).toBe("s2");
@@ -288,8 +482,29 @@ describe("DeckPlayer — Suitcase Mode", () => {
     expect(currentSlideId()).toBe("s1");
   });
 
+  it("plays through from any slide, not only the first", () => {
+    render(
+      <MemoryRouter>
+        <DeckPlayer
+          deckId="fake-deck"
+          slides={[...slides, { id: "s3", copy: null }]}
+          mode="audience"
+          voices={NARRATION_VOICES}
+          resolveNarrationUrl={allBaked}
+          audiobook
+          initialSlideIndex={1}
+        />
+      </MemoryRouter>,
+    );
+    expect(currentSlideId()).toBe("s2");
+
+    endCurrentClip();
+
+    expect(currentSlideId()).toBe("s3");
+  });
+
   it("reuses ONE audio element across slides (the iOS gesture blessing)", () => {
-    mountPlayer("audience", { narrateByDefault: true, suitcaseMode: true });
+    mountPlayer("audience", { narrateByDefault: true, audiobook: true });
     endCurrentClip();
 
     // Two slides played, one element — a fresh `new Audio()` per slide would
@@ -298,28 +513,34 @@ describe("DeckPlayer — Suitcase Mode", () => {
     expect(audioInstances[0].src).toContain("s2");
   });
 
-  it("desktop: does not auto-advance, even with the preference on", () => {
-    // Suitcase Mode is a mobile affordance — the desktop chrome shows ordinary
-    // paging arrows, so a deck advancing on its own here would be moving with
-    // nothing on screen explaining why. Widening past the breakpoint has to
-    // stop the advance, not merely re-skin the chrome around it.
+  it("desktop: advances too, with the ring on the bar", () => {
+    // The viewer's bar draws the ring at every width, so a deck moving on its
+    // own always has something on screen saying why.
     setViewport("desktop");
-    mountPlayer("audience", { narrateByDefault: true, suitcaseMode: true });
+    mountPlayer("audience", { narrateByDefault: true, audiobook: true });
 
+    expect(ring()).toBeTruthy();
     endCurrentClip();
 
-    expect(currentSlideId()).toBe("s1");
+    expect(currentSlideId()).toBe("s2");
   });
 
-  it("resized wide mid-slide and back: catches up instead of stranding", () => {
-    // Suitcase Mode on a phone, widen past the breakpoint (which un-arms
-    // auto-advance), the clip finishes while wide, then narrow back. The
-    // "ended" that should have advanced the deck fired into nothing and is
-    // long gone, so re-arming has to act on the slide being SPENT — otherwise
-    // the deck sits on a finished slide showing a Pause button, playing
-    // nothing, advancing never.
-    setViewport("compact");
-    mountPlayer("audience", { narrateByDefault: true, suitcaseMode: true });
+  it("never in Podium: a presenter turns their own slides", () => {
+    setViewport("desktop");
+    mountPlayer("presenter", { narrateByDefault: true, audiobook: true });
+
+    expect(ring()).toBeNull();
+    expect(screen.getByText("1 / 2")).toBeTruthy();
+  });
+
+  it("widened into Podium mid-slide and back: catches up instead of stranding", () => {
+    // Audiobook mode on a phone with a host that presents, widen the window
+    // into Podium (which un-arms auto-advance), the clip finishes while wide,
+    // then narrow back. The "ended" that should have advanced the deck fired
+    // into nothing and is long gone, so re-arming has to act on the slide
+    // being SPENT — otherwise the deck sits on a finished slide showing a
+    // Pause button, playing nothing, advancing never.
+    mountPlayer("presenter", { narrateByDefault: true, audiobook: true });
     expect(currentSlideId()).toBe("s1");
 
     setViewport("desktop");
@@ -329,6 +550,159 @@ describe("DeckPlayer — Suitcase Mode", () => {
     setViewport("compact");
 
     expect(currentSlideId()).toBe("s2");
+  });
+
+  it("previous and next skip a slide without leaving the mode", () => {
+    mountPlayer("audience", { audiobook: true });
+
+    fireEvent.click(screen.getByLabelText("Next slide"));
+    expect(currentSlideId()).toBe("s2");
+    expect(ring()).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText("Previous slide"));
+    expect(currentSlideId()).toBe("s1");
+    expect(ring()).toBeTruthy();
+  });
+
+  it("nothing baked: no ring to strand the reader on", () => {
+    // A deck with no clips and no synthesizer. Audiobook mode asked for the
+    // ring, but with nothing to play it would be a dead button where the
+    // counter used to be.
+    mountPlayer("audience", {
+      narrateByDefault: true,
+      audiobook: true,
+      resolveNarrationUrl: () => null,
+    });
+
+    expect(ring()).toBeNull();
+    expect(screen.getByLabelText("Next slide")).toBeTruthy();
+    expect(audioInstances).toHaveLength(0);
+  });
+});
+
+describe("DeckChrome — the viewer's bar and its settings sheet", () => {
+  // The suspend tests below advance a dwell timer to force a slide change.
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  for (const width of ["desktop", "compact"] as const) {
+    it(`${width}: the gear opens the settings sheet — mode, narration, voice`, () => {
+      setViewport(width);
+      mountPlayer("audience", { narrateByDefault: true, onAudiobookChange: () => {} });
+
+      // Closed by default — the sheet is over a slide someone is reading.
+      expect(screen.queryByRole("radiogroup")).toBeNull();
+
+      fireEvent.click(screen.getByLabelText("Settings"));
+
+      const sheet = screen.getByRole("dialog");
+      expect(sheet.textContent).toContain("Voice");
+      expect(screen.getByLabelText("Close voice controls")).toBeTruthy();
+      expect(screen.getByRole("switch", { name: "Narration" })).toBeTruthy();
+      expect(screen.getByRole("radiogroup", { name: "Mode" })).toBeTruthy();
+      expect(screen.getByRole("radio", { name: "Paging" })).toBeTruthy();
+      expect(screen.getByRole("radio", { name: "Audiobook" })).toBeTruthy();
+      expect(screen.getByRole("radiogroup", { name: VOICE_PICKER_TITLE })).toBeTruthy();
+      // Podium is chosen before a deck opens, and has its own bar.
+      expect(screen.queryByRole("radio", { name: /Podium|Sofa/ })).toBeNull();
+    });
+  }
+
+  it("the sheet's rows in order: Narration, Mode (Paging, Audiobook side by side), the voice; no hints", () => {
+    mountPlayer("audience", { narrateByDefault: true, onAudiobookChange: () => {} });
+    fireEvent.click(screen.getByLabelText("Settings"));
+
+    const sheet = screen.getByRole("dialog");
+    const order = [
+      screen.getByRole("switch", { name: "Narration" }),
+      screen.getByRole("radiogroup", { name: "Mode" }),
+      screen.getByRole("radiogroup", { name: VOICE_PICKER_TITLE }),
+    ];
+    for (let i = 1; i < order.length; i++) {
+      expect(
+        order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+    const modes = screen
+      .getAllByRole("radio")
+      .filter((r) => screen.getByRole("radiogroup", { name: "Mode" }).contains(r))
+      .map((r) => (r as HTMLInputElement).value);
+    expect(modes).toEqual(["paging", "audiobook"]);
+    // Nothing but the controls' own words: title, Narration, Mode, the two
+    // modes, the voices.
+    const voices = NARRATION_VOICES.map((v) => v.name).join("");
+    expect(sheet.textContent).toBe(`VoiceNarrationModePagingAudiobook${voices}`);
+  });
+
+  it("the mode row is dead while narration is off", () => {
+    mountPlayer("audience", { onAudiobookChange: () => {} });
+    fireEvent.click(screen.getByLabelText("Settings"));
+
+    expect((screen.getByRole("radio", { name: "Audiobook" }) as HTMLInputElement).disabled).toBe(
+      true,
+    );
+    fireEvent.click(screen.getByRole("switch", { name: "Narration" }));
+    expect((screen.getByRole("radio", { name: "Audiobook" }) as HTMLInputElement).disabled).toBe(
+      false,
+    );
+  });
+
+  it("no mode row when the host fixes the mode itself", () => {
+    mountPlayer("audience", { narrateByDefault: true });
+
+    fireEvent.click(screen.getByLabelText("Settings"));
+
+    expect(screen.queryByRole("radiogroup", { name: "Mode" })).toBeNull();
+    expect(screen.getByRole("switch", { name: "Narration" })).toBeTruthy();
+  });
+
+  it("no word Suitcase anywhere on the bar or in the sheet", () => {
+    mountPlayer("audience", { audiobook: true, onAudiobookChange: () => {} });
+    fireEvent.click(screen.getByLabelText("Settings"));
+
+    expect(document.body.textContent).not.toMatch(/suitcase/i);
+  });
+
+  it("Audiobook in the sheet turns the counter into the ring; Paging turns it back", () => {
+    render(
+      <MemoryRouter>
+        <HostWithModeChoice />
+      </MemoryRouter>,
+    );
+    expect(ring()).toBeNull();
+    expect(screen.getByText("1 / 2")).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText("Settings"));
+    // Narration first: the mode row is dead until it is on.
+    fireEvent.click(screen.getByRole("switch", { name: "Narration" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Audiobook" }));
+    fireEvent.click(screen.getByLabelText("Close voice controls"));
+
+    expect(ring()).toBeTruthy();
+    expect(screen.queryByText("1 / 2")).toBeNull();
+    expect(screen.getByLabelText("Next slide")).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText("Settings"));
+    fireEvent.click(screen.getByRole("radio", { name: "Paging" }));
+    fireEvent.click(screen.getByLabelText("Close voice controls"));
+
+    expect(ring()).toBeNull();
+    expect(screen.getByText("1 / 2")).toBeTruthy();
+  });
+
+  it("the bar's sound and the sheet's Narration are one setting, both ways", () => {
+    mountPlayer("audience", { narrateByDefault: true });
+    const narrated = () => screen.getByRole("switch", { name: "Narration" }) as HTMLInputElement;
+
+    // Sound off from the bar → the sheet reads off.
+    fireEvent.click(screen.getByTitle("Stop narration"));
+    fireEvent.click(screen.getByLabelText("Settings"));
+    expect(narrated().checked).toBe(false);
+
+    // Narration on from the sheet → the bar's sound reads on.
+    fireEvent.click(narrated());
+    fireEvent.click(screen.getByLabelText("Close voice controls"));
+    expect(screen.getByTitle("Stop narration")).toBeTruthy();
   });
 
   it("opening the settings sheet holds playback, closing resumes", () => {
@@ -353,10 +727,10 @@ describe("DeckPlayer — Suitcase Mode", () => {
     // its `stop` callback is re-created, calling play() each time. The suspend
     // effect has already run by then and won't run again, so a re-render while
     // the sheet is open used to start the voice talking underneath it.
-    // Suitcase Mode reaches this on its own — the deck can auto-advance to a
+    // Audiobook mode reaches this on its own — the deck can auto-advance to a
     // new slide while the sheet sits open.
     setViewport("compact");
-    mountPlayer("audience", { narrateByDefault: true, suitcaseMode: true });
+    mountPlayer("audience", { narrateByDefault: true, audiobook: true });
     const audio = audioInstances[audioInstances.length - 1];
     audio.currentTime = 3;
 
@@ -395,55 +769,94 @@ describe("DeckPlayer — Suitcase Mode", () => {
     expect(audio.paused).toBe(false);
   });
 
-  it("nothing baked: no transport bar to strand the reader on", () => {
-    // A deck with no clips and no synthesizer. Suitcase Mode asked for the
-    // one-button transport, but with nothing to play it would be a dead button
-    // where the paging arrows used to be — leaving no way through the deck.
+  it("the counter until Audiobook mode puts the ring in its place", () => {
     setViewport("compact");
-    mountPlayer("audience", {
-      narrateByDefault: true,
-      suitcaseMode: true,
-      resolveNarrationUrl: () => null,
-    });
+    const { unmount } = mountPlayer("audience", { narrateByDefault: true });
 
-    expect(screen.queryByLabelText(/^(Play|Pause)$/)).toBeNull();
-    expect(audioInstances).toHaveLength(0);
+    expect(screen.getByText("1 / 2")).toBeTruthy();
+    expect(ring()).toBeNull();
+    unmount();
+
+    // Same viewport, Audiobook on: previous and next stay, either side of the
+    // ring — a slide can be skipped without leaving the mode.
+    setViewport("compact");
+    mountPlayer("audience", { narrateByDefault: true, audiobook: true });
+
+    expect(screen.queryByText("1 / 2")).toBeNull();
+    expect(ring()).toBeTruthy();
+    expect(screen.getByLabelText("Previous slide")).toBeTruthy();
+    expect(screen.getByLabelText("Next slide")).toBeTruthy();
   });
 
-  it("switching Narration off in the sheet hands back the paging controls", () => {
-    // The bus repro this pins: Suitcase on, narrated deck, phone width. Flip
+  it("narration off clears the Audiobook choice: it reads Paging when narration returns", () => {
+    const onAudiobookChange = jest.fn();
+    render(
+      <MemoryRouter>
+        <HostWithModeChoice startInAudiobook onChange={onAudiobookChange} />
+      </MemoryRouter>,
+    );
+    expect(ring()).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText("Settings"));
+    fireEvent.click(screen.getByRole("switch", { name: "Narration" })); // off
+    expect(onAudiobookChange).toHaveBeenLastCalledWith(false);
+    fireEvent.click(screen.getByRole("switch", { name: "Narration" })); // on again
+    expect((screen.getByRole("radio", { name: "Paging" }) as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByLabelText("Close voice controls"));
+
+    expect(ring()).toBeNull();
+    expect(screen.getByText("1 / 2")).toBeTruthy();
+  });
+
+  it("the bar's sound off clears it too: the two are one setting", () => {
+    const onAudiobookChange = jest.fn();
+    render(
+      <MemoryRouter>
+        <HostWithModeChoice startInAudiobook onChange={onAudiobookChange} />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByTitle("Stop narration"));
+    expect(onAudiobookChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("switching Narration off in the sheet hands back the counter", () => {
+    // The bus repro this pins: Audiobook on, narrated deck, phone width. Flip
     // the sheet's Narration switch off and close. "Requires narration, both
-    // directions" holds at the SESSION layer too, not just the stored prefs —
-    // a silent viewing has no clip-ends to advance on, so the transport must
-    // give way to the arrows. It used to stay: a play button over a deck that
-    // would never move, with no way to page by hand.
+    // directions" holds at the SESSION layer too — a silent viewing has no
+    // clip-ends to advance on, so the ring must give way to the counter.
     setViewport("compact");
-    mountPlayer("audience", { narrateByDefault: true, suitcaseMode: true });
-    expect(screen.getByLabelText(/^(Play|Pause)$/)).toBeTruthy();
+    mountPlayer("audience", { narrateByDefault: true, audiobook: true });
+    expect(ring()).toBeTruthy();
 
     fireEvent.click(screen.getByLabelText("Settings"));
     fireEvent.click(screen.getByRole("switch", { name: "Narration" }));
     fireEvent.click(screen.getByLabelText("Close voice controls"));
 
-    expect(screen.queryByLabelText(/^(Play|Pause)$/)).toBeNull();
-    expect(screen.getByLabelText("Next slide")).toBeTruthy();
+    expect(ring()).toBeNull();
+    expect(screen.getByText("1 / 2")).toBeTruthy();
   });
 
-  it("transport pause is a hold — the transport stays", () => {
+  it("the ring's pause is a hold — the ring stays, and the slide with it", () => {
     // Pause and silent are different acts on the same quiet. Pause holds
-    // playback with narration still ON, so the bar keeps its one button (now
-    // showing Play) — if pausing flipped the narration mode instead, the
-    // session gate above would swap the transport for paging arrows under the
-    // thumb that pressed it.
+    // playback with narration still ON, so the bar keeps its ring (now showing
+    // Play) — if pausing flipped narration off instead, the session gate above
+    // would swap the ring for the counter under the thumb that pressed it.
     setViewport("compact");
-    mountPlayer("audience", { narrateByDefault: true, suitcaseMode: true });
+    mountPlayer("audience", { narrateByDefault: true, audiobook: true });
     const audio = audioInstances[audioInstances.length - 1];
     audio.currentTime = 3;
     expect(audio.paused).toBe(false);
 
     fireEvent.click(screen.getByLabelText("Pause"));
     expect(audio.paused).toBe(true);
-    expect(screen.queryByLabelText("Next slide")).toBeNull();
+    expect(screen.getByLabelText("Play")).toBeTruthy();
+    expect(screen.queryByText("1 / 2")).toBeNull();
+
+    // A clip end can't arrive while held, and time passing doesn't page.
+    act(() => {
+      jest.advanceTimersByTime(SLIDE_DWELL_SECONDS * 1000 * 3);
+    });
+    expect(audio.src).toContain("s1");
 
     fireEvent.click(screen.getByLabelText("Play"));
     // Resumed from where it was held, not restarted.
@@ -451,13 +864,13 @@ describe("DeckPlayer — Suitcase Mode", () => {
     expect(audio.currentTime).toBe(3);
   });
 
-  it("a paused transport does not survive Narration off → on", () => {
+  it("a paused ring does not survive Narration off → on", () => {
     // Flipping Narration back on is a request to HEAR the deck. A pause
     // pressed during some earlier narrated stretch must not outlive the mode
     // change — honoring it would leave the deck silently stopped behind a
     // switch claiming it reads aloud, with a Play button as the only clue.
     setViewport("compact");
-    mountPlayer("audience", { narrateByDefault: true, suitcaseMode: true });
+    mountPlayer("audience", { narrateByDefault: true, audiobook: true });
     const audio = audioInstances[audioInstances.length - 1];
 
     fireEvent.click(screen.getByLabelText("Pause"));
@@ -471,10 +884,111 @@ describe("DeckPlayer — Suitcase Mode", () => {
 
     expect(audio.paused).toBe(false);
   });
+
+  it("compact: thumb-sized, with no fullscreen button", () => {
+    setViewport("compact");
+    mountPlayer("audience");
+
+    expect(screen.queryByTitle(/Fullscreen/)).toBeNull();
+    expect(screen.getByLabelText("Exit deck").textContent).toBe("✕");
+  });
+});
+
+describe("DeckPlayer — nothing baked, no API: every surface says so", () => {
+  const nothingBaked = () => null;
+
+  it("the viewer's bar: the sound renders but is DEAD — present-but-disabled, not absent", () => {
+    mountPlayer("audience", { resolveNarrationUrl: nothingBaked });
+
+    const sound = screen.getByTitle(NO_NARRATION_TITLE);
+    expect(sound.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("a host's mute is dead too, with the same words", () => {
+    mountPlayer("audience", {
+      resolveNarrationUrl: nothingBaked,
+      mute: { muted: false, onToggle: () => {} },
+    });
+
+    const mute = screen.getByRole("button", { name: "Mute narration" });
+    expect(mute.hasAttribute("disabled")).toBe(true);
+    expect(mute.getAttribute("title")).toBe(NO_NARRATION_TITLE);
+  });
+
+  it("the sheet's rows are disabled", () => {
+    setViewport("compact");
+    mountPlayer("audience", {
+      resolveNarrationUrl: nothingBaked,
+      narrateByDefault: true,
+      audiobook: true,
+      onAudiobookChange: () => {},
+    });
+
+    fireEvent.click(screen.getByLabelText("Settings"));
+
+    expect(screen.getByRole("switch", { name: "Narration" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("radio", { name: "Audiobook" }).hasAttribute("disabled")).toBe(true);
+  });
+});
+
+describe("DeckChrome — a host's mute and the sheet are one setting", () => {
+  /** A host that keeps a mute, the way the played standup does. */
+  function HostWithMute() {
+    const [muted, setMuted] = useState(false);
+    const [audiobook, setAudiobook] = useState(true);
+    return (
+      <DeckPlayer
+        deckId="fake-deck"
+        slides={slides}
+        mode="audience"
+        voices={NARRATION_VOICES}
+        hasApi={false}
+        resolveNarrationUrl={allBaked}
+        narrateByDefault
+        audiobook={audiobook}
+        onAudiobookChange={setAudiobook}
+        mute={{ muted, onToggle: () => setMuted((m) => !m) }}
+      />
+    );
+  }
+  const mount = () =>
+    render(
+      <MemoryRouter>
+        <HostWithMute />
+      </MemoryRouter>,
+    );
+  const muteButton = () => screen.getByRole("button", { name: "Mute narration" });
+  const narrationSwitch = () =>
+    screen.getByRole("switch", { name: "Narration" }) as HTMLInputElement;
+
+  it("the bar's mute and the sheet's Narration read and flip one setting", () => {
+    mount();
+    fireEvent.click(screen.getByLabelText("Settings"));
+    expect(narrationSwitch().checked).toBe(true);
+
+    fireEvent.click(narrationSwitch());
+    expect(muteButton().getAttribute("aria-pressed")).toBe("true");
+    expect(narrationSwitch().checked).toBe(false);
+
+    fireEvent.click(muteButton());
+    expect(narrationSwitch().checked).toBe(true);
+  });
+
+  it("muted, Audiobook keeps its choice and its ring, and the mode row stays live", () => {
+    // A muted slide keeps its clock, so the deck still turns its own slides.
+    mount();
+    fireEvent.click(muteButton());
+
+    expect(ring()).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Settings"));
+    const audiobook = screen.getByRole("radio", { name: "Audiobook" }) as HTMLInputElement;
+    expect(audiobook.checked).toBe(true);
+    expect(audiobook.disabled).toBe(false);
+  });
 });
 
 describe("DeckPlayer — swipe paging", () => {
-  // What the gesture must never do is disturb Suitcase Mode's auto-advance.
+  // What the gesture must never do is disturb Audiobook mode's auto-advance.
   // These pin the seam: a swipe goes through the controller's own stepNext/stepPrev
   // — the same path the arrows and arrow keys use — so the dwell timer, the
   // clip restart and the transport hold all behave exactly as they do for a
@@ -528,7 +1042,7 @@ describe("DeckPlayer — swipe paging", () => {
   afterEach(() => jest.useRealTimers());
 
   it("a left swipe pages forward, a right swipe pages back", () => {
-    mountPlayer("audience", { narrateByDefault: true, suitcaseMode: true });
+    mountPlayer("audience", { narrateByDefault: true, audiobook: true });
     expect(currentSlideId()).toBe("s1");
 
     drag(slideSurface(), { dx: -120 });
@@ -541,7 +1055,7 @@ describe("DeckPlayer — swipe paging", () => {
   it("one target reads BOTH directions — travel decides, not which half was touched", () => {
     // The whole reason there's no left-zone/right-zone: direction is the sign
     // of dx. Both gestures below start at the same x; only the travel differs.
-    mountPlayer("audience", { narrateByDefault: true, suitcaseMode: true });
+    mountPlayer("audience", { narrateByDefault: true, audiobook: true });
     const surface = slideSurface();
 
     drag(surface, { dx: -120 });
@@ -551,7 +1065,7 @@ describe("DeckPlayer — swipe paging", () => {
   });
 
   it("ignores a vertical drag — that's a scroll, not a page turn", () => {
-    mountPlayer("audience", { narrateByDefault: true, suitcaseMode: true });
+    mountPlayer("audience", { narrateByDefault: true, audiobook: true });
 
     drag(slideSurface(), { dx: -60, dy: 200 });
 
@@ -559,7 +1073,7 @@ describe("DeckPlayer — swipe paging", () => {
   });
 
   it("ignores a short drag — that's a tap", () => {
-    mountPlayer("audience", { narrateByDefault: true, suitcaseMode: true });
+    mountPlayer("audience", { narrateByDefault: true, audiobook: true });
 
     drag(slideSurface(), { dx: -20 });
 
@@ -568,7 +1082,7 @@ describe("DeckPlayer — swipe paging", () => {
 
   it("desktop: no swipe handlers at all", () => {
     setViewport("desktop");
-    mountPlayer("audience", { narrateByDefault: true, suitcaseMode: true });
+    mountPlayer("audience", { narrateByDefault: true, audiobook: true });
 
     drag(slideSurface(), { dx: -120 });
 
@@ -579,7 +1093,7 @@ describe("DeckPlayer — swipe paging", () => {
     // THE invariant. The clip ends and a dwell timer is queued to advance the
     // deck; the reader swipes during that gap. Without stop()'s timer cancel
     // the queued stepNext lands on top of the swipe's and the deck jumps two.
-    mountPlayer("audience", { narrateByDefault: true, suitcaseMode: true });
+    mountPlayer("audience", { narrateByDefault: true, audiobook: true });
     expect(currentSlideId()).toBe("s1");
 
     act(() => {
@@ -602,7 +1116,7 @@ describe("DeckPlayer — swipe paging", () => {
     // The other half of the invariant: cancelling the queued advance must not
     // leave the mode dead. The swiped-to slide plays, ends, and advances on
     // its own like any other.
-    mountPlayer("audience", { narrateByDefault: true, suitcaseMode: true });
+    mountPlayer("audience", { narrateByDefault: true, audiobook: true });
 
     drag(slideSurface(), { dx: 120 }); // clamped at the first slide
     expect(currentSlideId()).toBe("s1");
@@ -613,7 +1127,7 @@ describe("DeckPlayer — swipe paging", () => {
   });
 
   it("a swipe restarts the new slide's clip from the beginning", () => {
-    mountPlayer("audience", { narrateByDefault: true, suitcaseMode: true });
+    mountPlayer("audience", { narrateByDefault: true, audiobook: true });
     const audio = audioInstances[0];
     audio.currentTime = 12;
 
@@ -629,9 +1143,9 @@ describe("DeckPlayer — swipe paging", () => {
     // is that control's gesture, not a page turn.
     //
     // Note the player's own chrome is NOT what this protects: DeckChrome is a
-    // SIBLING of the swipe surface, so Suitcase Mode's transport is already
+    // SIBLING of the swipe surface, so Audiobook mode's ring is already
     // out of reach structurally. This guard is for controls in slide content.
-    mountPlayer("audience", { narrateByDefault: true, suitcaseMode: true });
+    mountPlayer("audience", { narrateByDefault: true, audiobook: true });
 
     const link = document.createElement("button");
     link.textContent = "in-slide control";
@@ -661,7 +1175,7 @@ describe("DeckPlayer — swipe paging", () => {
     // Structural guarantee behind the note above — if a refactor ever moved
     // DeckChrome inside the wrapper, a drag off the transport button would
     // start paging the deck and only the guard above would stand between.
-    mountPlayer("audience", { narrateByDefault: true, suitcaseMode: true });
+    mountPlayer("audience", { narrateByDefault: true, audiobook: true });
 
     expect(slideSurface().contains(screen.getByLabelText("Pause"))).toBe(false);
   });
