@@ -95,7 +95,7 @@ export interface PromptInfo {
    *  every card written before the two lines were separate -- its `**Sprint:**` line,
    *  as it always read (docs/hub/cards.md). "" for none. Absent from an older agent. */
   milestone?: string;
-  /** The card's `Tags:` line, split on commas. Absent from an older agent. */
+  /** The card's `Tags:` line, split on commas or semicolons. Absent from an older agent. */
   tags?: string[];
   progress: string;
   checked: number;

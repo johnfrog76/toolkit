@@ -108,6 +108,8 @@ describe("consts.json", () => {
     expect(consts.regex.dueLine).toBe(
       String.raw`(?m)^\*\*Due:\*\*[ \t]*(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?`,
     );
+    // A card's Tags: line splits on a comma or an Azure DevOps semicolon (the agent reads it).
+    expect(consts.regex.tagSeparator).toBe("[,;]");
     expect(REMINDERS.buckets).toEqual(["overdue", "today", "upcoming"]);
     expect(REMINDERS.snooze).toEqual(["1h", "tomorrow", "nextweek"]);
     // The three halves a test run covers, in run order.

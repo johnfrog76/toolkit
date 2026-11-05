@@ -24,6 +24,7 @@ from .consts import (
     re_pr_url_line,
     re_review_line,
     re_started_line,
+    re_tag_separator,
     stamp_assigned,
     stamp_billable,
     stamp_from,
@@ -266,7 +267,8 @@ def card_sprint(content: str) -> str:
 
 
 def card_tags(content: str) -> list[str]:
-    """The card's ``Tags:`` line, split on commas and trimmed, empties dropped;
+    """The card's ``Tags:`` line, split on commas or semicolons (``regex.tagSeparator``:
+    an Azure DevOps work item's tags arrive ``a; b``) and trimmed, empties dropped;
     [] when it has none or a parenthesised placeholder. The suggestion reads a
     card's severity and size from it, and the board's tag filter the whole list.
     ``Tag`` writes it. Mirror: ``Get-P20CardTags``, same table."""
@@ -274,7 +276,7 @@ def card_tags(content: str) -> list[str]:
     value = m.group(1) if m else ""
     if value.startswith("("):
         return []
-    return [t.strip() for t in value.split(",") if t.strip()]
+    return [t.strip() for t in re_tag_separator().split(value) if t.strip()]
 
 
 _ORDER_HEADING = re.compile(r"^##[ \t]+Order[ \t]*$", re.IGNORECASE)
