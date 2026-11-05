@@ -9,6 +9,7 @@ import { usePersistedFlag } from "../../shared/usePersistedState";
 import type { Deck, Slide } from "./decks/types";
 import { DeckRoom } from "./DeckRoom";
 import { EmptyState } from "../../shared/EmptyState";
+import { VIEWER_ONLY_MODES } from "./offeredModes";
 
 // ── The second resolver: a deck BUILT from data ─────────────────────────────
 //
@@ -26,9 +27,10 @@ import { EmptyState } from "../../shared/EmptyState";
 //
 // A generated deck is an audiobook (decks/types.ts): no baked clip exists for
 // a sentence written this morning, so the voice is the browser's
-// (useSpeechNarration), offered as one voice, and the deck opens in Suitcase
-// Mode, narrating, at any width. Always audience: a presenter's notes window
-// finds its deck in DECKS, and this one is not there.
+// (useSpeechNarration), offered as one voice, and the deck opens in Audiobook
+// mode, narrating, at any width; the viewer's settings sheet offers Sofa
+// instead. No Podium (offeredModes.ts): a presenter's notes window finds its
+// deck in DECKS, and this one is not there.
 
 /** What a second resolver hands the host. */
 export interface DeckResolution {
@@ -64,9 +66,10 @@ function centered(child: ReactElement) {
 function GeneratedPlayer({ resolution }: { resolution: DeckResolution }) {
   const { deck, loading, error } = resolution;
   const slides = useMemo(() => deck?.slides() ?? [], [deck]);
-  // Suitcase is the host's preference to keep, as the Wasteland's host keeps
-  // its own; here it starts ON and lives as long as the room does.
-  const [suitcase, setSuitcase] = useState(true);
+  // Audiobook or Sofa is the host's choice to keep (the player is told, and
+  // calls back from its settings sheet); here it starts on Audiobook and lives
+  // as long as the room does.
+  const [audiobook, setAudiobook] = useState(true);
   // Mute: per browser, read before the first slide plays. Default is
   // not muted -- narration on, as it was. Storage refused reads as the default.
   const { value: muted, toggle: toggleMuted } = usePersistedFlag(NARRATION_MUTED_STORAGE_KEY);
@@ -87,13 +90,14 @@ function GeneratedPlayer({ resolution }: { resolution: DeckResolution }) {
       deck={deck}
       slides={slides}
       mode="audience"
+      offeredModes={VIEWER_ONLY_MODES}
       voices={BROWSER_VOICE}
       hasApi
       resolveNarrationUrl={noClip}
       narrateByDefault
       mute={{ muted, onToggle: toggleMuted }}
-      suitcaseMode={suitcase}
-      onToggleSuitcaseMode={() => setSuitcase((on) => !on)}
+      audiobook={audiobook}
+      onAudiobookChange={setAudiobook}
     />
   );
 }

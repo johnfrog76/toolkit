@@ -124,14 +124,12 @@ export interface Deck {
   /**
    * An audiobook: a deck meant to be LISTENED to, end to end, at any width
    * (Team Agile's ritual decks; docs/modules/solitaire-agile.md, "The played view").
-   * Three things follow, all in the engine and none of them for a deck that
-   * leaves this unset, which is every hand-written deck:
-   *   - Suitcase Mode is allowed on the desktop too (DeckPlayer's gate drops
-   *     its phone-width requirement for this deck only);
-   *   - the transport keeps prev and next beside the one big button
-   *     (DeckChrome), so a tile can be skipped without leaving Suitcase;
-   *   - a slide with no baked clip is read by the browser's speechSynthesis
-   *     from its Say text (useSpeechNarration) -- D-TA7's no-key fallback.
+   * One thing follows, in the engine, and not for a deck that leaves this
+   * unset, which is every hand-written deck: a slide with no baked clip is
+   * read by the browser's speechSynthesis from its Say text
+   * (useSpeechNarration) -- D-TA7's no-key fallback. Audiobook MODE (the
+   * player's `audiobook` prop) is the host's to turn on, and runs at every
+   * width for any deck.
    */
   audiobook?: boolean;
 }

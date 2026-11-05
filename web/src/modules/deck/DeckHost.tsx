@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from "react-router";
 import { DeckPlayer } from "./engine/DeckPlayer";
 import { PresenterNotes } from "./engine/PresenterNotes";
 import { BAKED_VOICES, voiceUrl } from "./bakedVoices";
-import { useViewport } from "./viewport";
+import { LISTED_DECK_MODES } from "./offeredModes";
 import { DECKS } from "./decks/index";
 import { DeckRoom } from "./DeckRoom";
 
@@ -16,8 +16,10 @@ import { DeckRoom } from "./DeckRoom";
 // Toolkit has no narration service, and its voices are baked files, which only
 // the AUDIENCE path plays. So the default here is audience -- the deck reads
 // itself aloud, with no key and no server -- and `?present=1` is the podium:
-// notes in a second window, the deck window silent. A phone is always audience;
-// it cannot open the second window presenter mode needs.
+// the presenter's bar, opening silent with the sound and the voice on it, and
+// notes in a second window. A listed deck is offered both (offeredModes.ts); a
+// phone always plays on the viewer's bar, which the engine enforces itself,
+// because it cannot open the second window presenter mode needs.
 //
 // Audio. `hasApi={false}` and a resolver over the baked files (./bakedVoices).
 // A voice is offered for a slide exactly when its file exists.
@@ -29,8 +31,7 @@ import { DeckRoom } from "./DeckRoom";
 function Player() {
   const { deckId } = useParams<{ deckId: string }>();
   const [searchParams] = useSearchParams();
-  const { isMobile } = useViewport();
-  const isPresenter = !isMobile && searchParams.get("present") === "1";
+  const isPresenter = searchParams.get("present") === "1";
 
   const deck = DECKS.find((d) => d.id === deckId);
   const slides = useMemo(() => deck?.slides() ?? [], [deck]);
@@ -41,6 +42,7 @@ function Player() {
       deck={deck}
       slides={slides}
       mode={isPresenter ? "presenter" : "audience"}
+      offeredModes={LISTED_DECK_MODES}
       voices={BAKED_VOICES}
       hasApi={false}
       resolveNarrationUrl={(slide, voice) => voiceUrl(deckId, slide.id, voice)}

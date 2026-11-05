@@ -100,13 +100,13 @@ export function SlideRenderer({
   // Arrive at the top of every slide's copy.
   //
   // The copy panel is a scroll container that PERSISTS across slides — it has
-  // no per-slide key, unlike the content panel below, so React reuses the
-  // same DOM node and the browser keeps its scrollTop. Scroll halfway down a
-  // long slide, advance, and the next slide opens mid-paragraph with its
-  // heading above the fold. Worst in stacked/mobile, where the copy is the
-  // whole read below the art band and auto-advance (Suitcase Mode) can page
-  // for you — but it's the same bug on desktop's right-hand 40%, so this is
-  // not gated on `stacked`.
+  // no per-slide key, unlike the content panel below, so React reuses the same
+  // DOM node and the browser keeps its scrollTop. Scroll halfway down a long
+  // slide, advance, and the next slide opens mid-paragraph with its heading
+  // above the fold. Worst in stacked/mobile, where the copy is the whole read
+  // below the art band and auto-advance (Audiobook mode) can page for you — but
+  // it's the same bug on desktop's right-hand 40%, so this is not gated on
+  // `stacked`.
   //
   // Deliberately NOT fixed by keying the panel per slide the way the content
   // panel is: that remount exists there to reset stateful visuals, and

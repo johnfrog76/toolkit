@@ -28,10 +28,13 @@ How this module relates to it:
   `cat-dev` figure and its 38 baked voice files were copied from `connected-deck` at commit
   `3d8a1a5`.
 - **The engine here and Connected Deck are siblings.** Both come from the predecessor repo this
-  Toolkit grew out of, and they have drifted; neither is a copy of the other: each has pieces the other lacks (that
-  one splits its player chrome for desktop and phone; this one kept parts that one dropped). A deck
-  written for one runs on the other with its import paths changed (`../deck-engine/`
-  there, `../engine/` here) -- which is how the trailer got here.
+  Toolkit grew out of, and neither is a copy of the other. **The player matches Connected Deck
+  [0.2.0](https://github.com/johnfrog76/connected-deck/releases/tag/v0.2.0)**: its two bars, its
+  Audiobook mode and the modes a host offers were taken from that release's engine, file for file,
+  with this module's import paths and the differences listed under "What is different from Connected
+  Deck", below. This one also kept parts that one dropped. A deck written for one runs on the other
+  with its import paths changed (`../deck-engine/` there, `../engine/` here) -- which is how the
+  trailer got here.
 - **Nothing is fetched from it.** There is no dependency on that repo at build time or at run
   time; a fix made there does not arrive here by itself.
 
@@ -59,7 +62,7 @@ are a chunk the browser fetches when a deck is shown, never part of the first lo
 | **The launcher** | a **Decks** card on the **Growth** page -- a presentation is a growth item, and a deck is what a presentation produces. With growth off, the module has a **Decks** tab of its own |
 | **A deck's page** | `/decks/<id>`, inside the shell: what the deck file says about it, **Play**, and this machine's **Archive** -- "A deck's page", below. A click on a row of the Decks card opens it |
 | **A deck** | `/deck/<id>`, full screen: the Toolkit's nav bar is not drawn around it. **Exit** goes back where you came from |
-| **The podium** | `/deck/<id>?present=1` -- presenter mode: notes in a second window (`/deck/<id>/notes`), the deck window silent |
+| **The podium** | `/deck/<id>?present=1` -- Podium: the presenter's bar and notes in a second window (`/deck/<id>/notes`); the deck window opens silent -- "The player's two bars", below |
 | **The landing page** | Introducing ToolKit plays on the GitHub Pages landing page too, from the same engine and baked clips, whatever `features.deck` says: the page is not part of the app, so no flag applies to it ([`web/README.md`, "The landing page"](../../web/README.md#the-landing-page)) |
 
 ## What ships
@@ -108,6 +111,24 @@ renders whatever is in that slot -- so Home, which is the ADO module's page, imp
 The poster is `SlidePoster` (`web/src/modules/deck/SlidePoster.tsx`, also the Wasteland's, unchanged):
 a real slide rendered at its native 1280x720 and scaled to cover its box. The banner is lazy, like the
 rest of the module, so a machine that has dismissed it never downloads it.
+
+## The player's two bars
+
+The player draws one of two bars under the slide, by the mode it plays in -- Connected Deck 0.2.0's
+design, carried unchanged:
+
+| Mode | Bar |
+| --- | --- |
+| **Sofa** (the default) and **Audiobook** | **The viewer's bar**, at every width: **Exit** on the left; previous and next around the slide counter in the middle -- in Audiobook mode the counter gives way to the **play ring**, previous and next still either side of it; then **Settings** (the gear), fullscreen and the **sound** on the right. The gear opens the settings sheet from the bottom: the mode (Sofa or Audiobook, where the host offers the choice), **Narration**, and the voice. The sound and the sheet's Narration are one setting. On a phone the controls are thumb-sized, Exit drops its word and there is no fullscreen button |
+| **Podium** (`?present=1`) | **The presenter's bar**, everything inline: Exit, previous, the counter, next, the sound, the voice dropdown, the speaker notes and fullscreen. It opens silent; the sound is there for when a deck should speak |
+
+**Where Podium is offered** is the host's to say, through the player's `offeredModes`, and the
+module's hosts say it in one file, `web/src/modules/deck/offeredModes.ts`: a deck listed in
+`decks/index.ts` is offered both, so `?present=1` is its podium; a deck built from data
+(`GeneratedDeckHost.tsx`) and the landing page's commercial are offered the viewer's bar only, because
+neither has a notes window to open. **A phone never gets Podium**, even at `?present=1`: the engine
+plays it on the viewer's bar, since the presenter's bar does not fold and a phone cannot open the
+second window.
 
 ## A deck's page
 
@@ -169,6 +190,19 @@ The two copies are kept byte-identical; edit the studio's, then copy.
   app's API and no shipped deck uses them: `ShellEmbed` and its output renderers. The step functions
   are `stepNext` and `stepPrev`, because this repo's portability check reads `go` + a capital as a
   command of the old toolkit.
+- **The bars, as 0.2.0 has them, with these differences.** The settings sheet's form is this module's
+  own (`web/src/modules/deck/SettingsForm.tsx`, at the path the engine imports it from): the same
+  rows -- mode, Narration, voice -- driving the playing deck only, with no hint under a row, because
+  there is no launch page here and no stored viewing preference for a row to explain. Fullscreen is
+  drawn only where the browser has the Fullscreen API. A host may keep a **mute** (the played standup
+  does, `docs/modules/solitaire-agile.md`): where it does, the viewer's bar's sound button is that
+  mute, which keeps each slide's clock so Audiobook mode still advances, and Narration on or off is
+  the sheet's. The notes window and the deck's sync channel keep this product's names. The player
+  does not take 0.2.0's deprecated `suitcase` prop, which no host here ever passed.
+- **Kept here, not in Connected Deck.** The `audiobook` deck hint and the browser's voice
+  (`useSpeechNarration.ts`, "Audiobook decks" below), the deck context and the giveaway button
+  (`deckContext.tsx`, `deckLinks.ts`, `GiveawayButton.tsx`, `borrowSlide.tsx`), and the player's own
+  phone-width question (`useCompactLayout.ts`, the same 575px edge as `viewport.tsx`).
 
 ## Adding a deck
 
@@ -182,13 +216,14 @@ and a voice is offered for a slide exactly when its file is there.
 
 A deck may set **`audiobook: true`** (`decks/types.ts`) -- a deck made to be listened to end to end,
 which today means Team Agile's ritual decks (`docs/modules/solitaire-agile.md`, "The played view").
-Three things follow, in the engine, for that deck only: Suitcase Mode is allowed at **any width** (the
-gate in `DeckPlayer.tsx` drops its phone-width requirement), the bar keeps **prev and next either side
-of the transport** (`DeckChrome.tsx`), and a slide with **no baked clip is read aloud by the browser's
-`speechSynthesis`** from its title and `Say` text (`engine/useSpeechNarration.ts`). With no speech API
-the slide still lives for its estimated read time and then advances, silently. The two shipped decks
-set nothing and play exactly as before; `DeckPlayer.audiobook.test.tsx` holds the hint and that a deck
-without it never reaches `speechSynthesis`.
+**Audiobook mode** is a different thing, and the host's: the player's `audiobook` prop reads the deck
+aloud and turns its slides at any width, with the play ring between previous and next, for any deck
+that has something to read. The hint adds one thing, for that deck only: a slide with **no baked clip
+is read aloud by the browser's `speechSynthesis`** from its title and `Say` text
+(`engine/useSpeechNarration.ts`). With no speech API the slide still lives for its estimated read time
+and then advances, silently. The two shipped decks set nothing and play in Sofa as before;
+`DeckPlayer.audiobook.test.tsx` holds the hint and that a deck without it never reaches
+`speechSynthesis`.
 
 Such a deck is not in `decks/index.ts`: it is **built from data** by the module that owns the data and
 played through the engine's **second resolver**, `GeneratedDeckHost.tsx`, which takes a resolution
@@ -196,7 +231,9 @@ played through the engine's **second resolver**, `GeneratedDeckHost.tsx`, which 
 `DECKS`. Nothing is pushed into the static list, the two share `DeckRoom.tsx` (the dark room, and the
 page's `<main>` landmark, since a chromeless route has no shell around it to give one), and the generated
 deck's route is its own module's -- so it plays with this module's flag off, the engine fetched as a
-chunk by whichever module draws it.
+chunk by whichever module draws it. `GeneratedDeckHost` opens such a deck in Audiobook mode and keeps
+the choice while the room is open: the settings sheet's mode row turns it to Sofa and back, through the
+player's `onAudiobookChange`.
 
 **The deck room is dark on purpose, whatever the app wears** (reversing a change that had it follow the app's theme, at the owner's word).
 `DeckRoom` provides the shell's dark theme and `DeckPlayer` (and the notes window) the engine's default

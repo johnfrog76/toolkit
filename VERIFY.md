@@ -843,11 +843,12 @@ tkWeb -Dev
       Connected Deck Universe*, 19 slides, with an approximate length and the four state filters
 - [ ] The arrow opens `/deck/connected-deck-trailer` **full screen** -- no Toolkit nav bar around it
 - [ ] Arrow keys move through the slides; the counter reads `n / 19`
-- [ ] **It speaks.** Un-mute, and the slide is read aloud; switch **Jenny** to **Brian** and the
-      voice changes. No key, no server, no network call but the mp3
+- [ ] **It speaks.** Press the sound at the bar's right end, and the slide is read aloud; in the
+      gear's **Settings** sheet switch **Jenny** to **Brian** and the voice changes. No key, no
+      server, no network call but the mp3
 - [ ] **Exit** returns to Growth
-- [ ] `/deck/connected-deck-trailer?present=1` is the podium: notes open in a second window and the
-      deck window is silent
+- [ ] `/deck/connected-deck-trailer?present=1` is the podium: the presenter's bar, notes open in a
+      second window, and the deck window opens silent with the sound and the voice on its bar
 - [ ] `tkConfig -Set features.growth=false`: the Growth tab goes and a **Decks** tab appears in its
       place -- the flag never shows nothing. Set it back
 - [ ] `tkConfig -Set features.deck=false`: no Decks card, no Decks tab, and `/deck/connected-deck-trailer`
