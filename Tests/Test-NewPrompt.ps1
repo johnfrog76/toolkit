@@ -778,8 +778,19 @@ try {
     function Get-OutFolderCard([string]$Folder, [string]$Filter) {
         return @(Get-ChildItem $Folder -Filter $Filter -File -ErrorAction SilentlyContinue)
     }
+    # Where the scratch hub and the package share a drive, the card's link is a
+    # relative hop that must resolve from the folder it landed in. Where they do
+    # not -- a Windows runner keeps its temp folder on another drive -- there is
+    # no hop to write, and the card keeps the template's file NAME instead. Each
+    # host asserts the line it should carry, so the row counts the same on both.
+    $oSameDrive = [string]::Equals(
+        [System.IO.Path]::GetPathRoot([System.IO.Path]::GetFullPath($oHub)),
+        [System.IO.Path]::GetPathRoot([System.IO.Path]::GetFullPath($pkgRoot)),
+        [System.StringComparison]::OrdinalIgnoreCase)
     function Test-TemplateLinkResolves([System.IO.FileInfo]$Card) {
-        $m = [regex]::Match([System.IO.File]::ReadAllText($Card.FullName), '(?m)^> Template: \[[^\]]*\]\(([^)]+)\)')
+        $text = [System.IO.File]::ReadAllText($Card.FullName)
+        if (-not $oSameDrive) { return ($text -match '(?m)^> Template: Task\.template\.md\r?$') }
+        $m = [regex]::Match($text, '(?m)^> Template: \[[^\]]*\]\(([^)]+)\)')
         if (-not $m.Success) { return $false }
         return (Test-Path -LiteralPath (Join-Path $Card.DirectoryName $m.Groups[1].Value) -PathType Leaf)
     }
@@ -800,7 +811,7 @@ try {
         Assert-True "$($row.Label): the card is written where it was meant, and exits 0" ($card.Count -eq 1 -and $out -match 'EXIT=0') "$($row.Where)`n$out"
         Assert-Equal "$($row.Label): and not anywhere else" 0 (Get-OutFolderCard $row.NotAt "Task$($row.Id)-*.prompt.md").Count
         if ($card.Count -eq 1) {
-            Assert-True "$($row.Label): its > Template: link resolves from where it landed" (Test-TemplateLinkResolves $card[0]) ([System.IO.File]::ReadAllText($card[0].FullName))
+            Assert-True "$($row.Label): its > Template: line is right for where it landed" (Test-TemplateLinkResolves $card[0]) ([System.IO.File]::ReadAllText($card[0].FullName))
         }
     }
     $out = Invoke-OutFolderVerb "${oPrefix}NewPrompt -Title 'Archive card' -Type Task -Id R7CH -OutputFolder 'Archive/'"
