@@ -57,7 +57,9 @@ all. `corsOrigins` matters only when a browser calls the agent's origin directly
 `GET /api/env` is the single round trip the web shell gates on before it renders anything. It
 answers: `version` (the product's, `consts.json`'s -- the System page's Environment card shows it in
 its footer), machine and OS, `tier` and its label, `spaceStatus`, the `features` map, whether an
-Anthropic key is configured, `displayName`, `cliPrefix`, the `cardTypes` a card may be, `tracker`
+Anthropic key is configured, `displayName`, `cliPrefix`, the `cardTypes` a card may be, two derived booleans named by `consts.json`
+-- `startWorkLaunch` (`claude` on the agent's `PATH`) and `claudeUsage` (Claude Code's session files on
+this machine, the **Claude Code usage** inventory row's rule) --, `tracker`
 (which tracker the active board's address names -- `"ado"`, `"github"` or `"none"`), `howIWork` (the
 active Space's answer to "How do you want to work here?", `answer`, `source`, `tracker`, `locked` and
 Team Agile's `switch` as set -- `features` already carries the gate), `identity`
@@ -99,6 +101,16 @@ agent's disk for 600 s ([`modules/studio.md`](modules/studio.md#the-routes)).
 `/api/config` runs `Config -List`, so the rule that proposes a slug and the rule that says "already a
 Space" exist once, in the CLI. It writes nothing, and it never refuses: with no `gh` it answers
 `available: false` and the verb's sentence. Adding the Space is `POST /api/cmd/NewSpace`.
+
+**A route may read through a verb and keep the answer.** `GET /api/usage/burn` (`consts.json`
+`usage.burnRoute`) is the current Claude Code burn -- today and this week, this machine's session files
+plus the other machines' day records in the hub's `usage/` -- and it is `Burn -AsJson` run through the
+bridge's runner, so the terminal and the System page's tile show the same numbers by construction; there is
+no second reader in Python. The answer is kept on the agent's disk for an hour (`burn-1/current.json`, keyed
+by the hub and the config files' fingerprint) and never past the verb's own `nextBoundaryAt`, the next local
+midnight or week start (`burn.weekStarts`, Friday 05:00 by default);
+`?refresh=1`, the tile's Refresh, goes past it. It is **404 where `/env`'s `claudeUsage` is false**, and the
+web then draws no tile and asks nothing ([`hub/usage.md`](hub/usage.md#today-and-this-week)).
 
 **A route may read the package itself.** `GET /api/studio/prompts` (`consts.json` `studio.promptsRoute`)
 lists the agentic prompts the package ships in `agentic/` -- with `agentic/prompts.json`'s marks, which way
@@ -406,7 +418,7 @@ docs/                   The documentation. The root README is the map; each subj
 agent/                  The FastAPI agent -- see agent/README.md
   app.py                  The app: CORS, the /api router, module mounting, static serving
   core/                   config, config_routes, consts, env, identity, tier, parsers, cards, clock, hosts,
-                          model, surfaces, assets, child, log, log_writer -- always on
+                          model, surfaces, assets, child, log, log_writer, usage -- always on
   ado/                    status, pr_comments, accounting, reporting, sprint, design, docs, bridge
   ado/Get-WeeklyBilling.ps1   Module-private: /billing shells out to it. Not a CLI command
   growth/                 growth, reviews, resume -- one router, gated on features.growth

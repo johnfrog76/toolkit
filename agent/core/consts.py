@@ -638,6 +638,18 @@ def startwork_launch_env_flag() -> str:
     return consts()["startWork"]["launchEnvFlag"]
 
 
+def usage_env_flag() -> str:
+    """``claudeUsage`` -- the name of the top-level boolean ``GET /api/env`` carries for
+    Claude Code usage on this machine, and the inventory row's key; the System page's
+    burn tile reads it by the same name."""
+    return consts()["usage"]["envFlag"]
+
+
+def usage_burn_route() -> str:
+    """The current Claude Code burn, today and this week: ``/api/usage/burn``."""
+    return consts()["usage"]["burnRoute"]
+
+
 def startwork_how_we_work_note() -> str:
     """``agentic/how-we-work.md`` -- the Space's own note, relative to its folder in the
     hub: HowWeWork writes it, StartWork quotes it, the Studio's Prompts card lists it."""

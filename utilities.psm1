@@ -477,6 +477,12 @@ $script:ModuleState.Config = @{
     # The provider profile: the model id every model call sends --
     # AddPRReview here, suggest and rewrite in the agent, which reads the same
     # key through its own config loader. The key itself stays in the environment.
+    # When the Claude Code burn's week starts (burn.weekStarts, "<Day> HH:mm"),
+    # as written: Burn reads its shape through Scripts/ConvertFrom-WeekStart.ps1
+    # and refuses one it cannot read, naming the key.
+    BurnWeekStarts = if ($localConfig.burn -and $localConfig.burn.weekStarts) { [string]$localConfig.burn.weekStarts }
+    elseif ($defaultConfig.burn -and $defaultConfig.burn.weekStarts) { [string]$defaultConfig.burn.weekStarts }
+    else { '' }
     AiModel = if ($localConfig.ai -and $localConfig.ai.model) { [string]$localConfig.ai.model }
     elseif ($defaultConfig.ai -and $defaultConfig.ai.model) { [string]$defaultConfig.ai.model }
     else { '' }
@@ -2020,14 +2026,18 @@ function global:Get-P20ToolkitLog {
         -Name $inv.Name -Prefix $inv.Prefix -NoSuccessLog
 }
 
-# Burn: the day's Claude Code usage on this machine, read from Claude Code's
-# own session files and written as one record in the hub (usage/). Core, no
-# flag: the inventory names whether this machine has session files to read.
+# Burn: Claude Code usage. Alone (or -AsJson, which the agent's
+# GET /api/usage/burn reads), the current burn -- today and this week, this
+# machine's session files plus the other machines' records in the hub; with
+# -Log, the day's record written into the hub (usage/). Core, no flag: the
+# inventory names whether this machine has session files to read.
 function global:Invoke-P20Burn {
     [CmdletBinding()]
     param(
         [switch]$Log,
         [string]$Date,
+        [switch]$AsJson,
+        [string]$At,
         [switch]$Help
     )
     if ($Help) { Show-CommandHelp 'Burn'; return }
@@ -2492,7 +2502,7 @@ $script:ModuleState.CommandMap = [ordered]@{
     'ReplyPR'          = 'Send-P20PRReply'
     'Env'              = 'Get-P20Environment'
     'Log'              = 'Get-P20ToolkitLog'
-    'Burn'             = 'Invoke-P20Burn'          # the day's Claude Code usage, logged once a day
+    'Burn'             = 'Invoke-P20Burn'          # Claude Code usage: the current burn, and the day's record
     'ThreadHash'       = 'Add-P20CommitHash'
     'Land'             = 'Invoke-P20Land'          # merged -> recorded, closed, archived
     'Setup'            = 'Test-P20Prerequisites'

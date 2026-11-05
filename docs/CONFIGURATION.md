@@ -82,7 +82,7 @@ table; this is the shape of it:
 
 | Scope | Keys | Goes to |
 | --- | --- | --- |
-| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `web.agentPort`, `web.corsOrigins`, `limits.inPlay`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display`, `spaceCheckouts.<slug>.path` | `config.local.json`, created as a sparse patch if it is not there |
+| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `web.agentPort`, `web.corsOrigins`, `limits.inPlay`, `burn.weekStarts`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display`, `spaceCheckouts.<slug>.path` | `config.local.json`, created as a sparse patch if it is not there |
 | **org** | `spaces.<slug>.name` / `.status` / `.orgType` / `.org` / `.tenant` / `.promptsFolder` / `.projects` / `.howIWork` / `.features.sprintAwareness` / `.features.suggestions` / `.features.trainingHoursPerQuarter` | the hub's `hub.json` -- or `config.local.json`'s `spaces.<slug>` patch with **`-Local`** |
 | **hub** | `storeSync`, `folders.<name>` | the hub's `hub.json`, and only with **`-Hub`** |
 | **default** | `commands`, `workItemTypes`, `cliVersion`, `managerWorkflow` | nowhere. These are the team's, and a `-Set` on one is refused by name |
@@ -328,6 +328,23 @@ two weeks left": the hours of complete trainings dated in the current calendar q
 number. `tkConfig -Set spaces.<slug>.features.trainingHoursPerQuarter=8 -Hub`, or the Space's section in
 Settings. A number is read off the Space; the merged `features` map (`/api/env`) holds flags only. The
 rules of the sum are in [`docs/modules/growth.md`](modules/growth.md#the-quarter-line).
+
+## `burn.weekStarts` -- when the burn's week starts
+
+A day and a 24-hour time, local: **`Friday 05:00` by default** (`config.default.json`'s `burn` block), when
+the plan's allocation resets. Per machine (`config.local.json`); `tkConfig -Set burn.weekStarts="Monday 09:00"`
+moves it. The day is an English day name in any case and the time `H:mm` or `HH:mm`, written back the way it
+reads -- `monday 9:00` is stored as `Monday 09:00`; anything else (`Fri 05:00`, `Friday 24:00`, `Friday`) is
+refused by `Config -Set` naming the key, and a value written by hand that `Burn` cannot read makes `Burn`
+refuse, exit 2, with a hint naming the key and the file. One parser, `Scripts/ConvertFrom-WeekStart.ps1`,
+serves both.
+
+`Burn`'s **This week** starts there, and so does the rule for another machine's day record -- it counts toward
+the week it starts in ([usage](hub/usage.md#today-and-this-week)). The System page's burn tile and
+`GET /api/usage/burn` show the CLI's answer, which names the setting it was read under (`weekStarts`); the
+agent never reads the key -- its hour-long cache is keyed by the config files, so a change is read at once.
+It is not an optional surface and has no inventory row: it ships with a value and turns nothing on, like
+`ai.model`.
 
 ## `limits.inPlay` -- the WIP line
 
@@ -855,7 +872,11 @@ ledger -- its issue counts, newest runs and repository visibility -- held for 60
 Space's repositories and status, so a foyer opened twice in ten minutes, or after an agent restart, reads
 GitHub once ([the Studio](modules/studio.md#the-routes)). And the standup's dressed sentences, keyed by a hash
 of the model, the register and the facts the model was given, so a sentence is re-dressed only when its facts
-change ([Team Agile](modules/solitaire-agile.md), "The agentic layer"). `agent/core/disk_cache.py` owns the place:
+change ([Team Agile](modules/solitaire-agile.md), "The agentic layer"). And the current Claude Code burn,
+`burn-1/current.json`: one file, `Burn -AsJson`'s last answer with the hub it was read against and when, served
+for an hour, keyed by the hub and the config files (so `Config -Set burn.weekStarts` is a miss at once), and never
+past the answer's own next midnight or week start ([usage](hub/usage.md#today-and-this-week)).
+`agent/core/disk_cache.py` owns the place:
 
 | Where | When |
 | --- | --- |
@@ -875,7 +896,8 @@ All four folders are **capped by one rule**, applied when something is written: 
 was last written or served. In `rows/` a row carries a stamp in its file's `seen` map, refreshed by a warm
 read at most once a day; in `bodies/` and `standup-dress-1/` it is the file's modification time, set by the
 write and touched on a disk hit. `ledger-1/` is held to the Spaces instead: on a write, the file of any
-Space no longer in the config is dropped. A prune that cannot run leaves the cache as it was.
+Space no longer in the config is dropped. `burn-1/` is one file, replaced on every read, so it needs no cap.
+A prune that cannot run leaves the cache as it was.
 Delete the folder whenever you like: the next read fetches what it needs again. `Config` does not know the
 variable; like the other overrides it is a launcher's, not a setting.
 

@@ -76,6 +76,10 @@ const WORDS: Record<string, SettingWords> = {
     label: "Allowed page addresses",
     hint: "For developing the web UI itself: which dev-server addresses may call the agent. Comma separated.",
   },
+  "burn.weekStarts": {
+    label: "When the burn's week starts",
+    hint: "A day and a 24-hour time, like Friday 05:00 or Monday 09:00 -- when your plan's allocation resets. The Claude Code burn's This week starts here.",
+  },
   "ai.model": {
     label: "Model for drafts and reviews",
     hint: "The model id behind Suggest a reply, the notes tidy-up, AddPRReview and the standup's dressed sentences. The key itself stays in your environment as ANTHROPIC_API_KEY.",

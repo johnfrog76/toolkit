@@ -28,6 +28,7 @@ import {
   STUDIO,
   TESTS,
   TOKENS,
+  USAGE,
   VISIBILITY,
   toRegExp,
 } from "./consts";
@@ -370,6 +371,10 @@ describe("consts.json", () => {
         prompt: "## The prompt ({source})",
       },
     });
+    // Claude Code usage: /env's flag (the CLI inventory row's key) and the burn route.
+    const { _: usageDoc, ...usageKeys } = USAGE as typeof USAGE & { _: string };
+    expect(usageDoc).toMatch(/Burn -AsJson/);
+    expect(usageKeys).toEqual({ envFlag: "claudeUsage", burnRoute: "/api/usage/burn" });
   });
 
   // Every key of the contract is stated by this half, so a key added to
@@ -398,6 +403,7 @@ describe("consts.json", () => {
         "studio",
         "tests",
         "tokens",
+        "usage",
         "version",
         "visibility",
       ].sort(),
@@ -524,6 +530,8 @@ describe("no half retypes a contract literal", () => {
     ["rituals.route", RITUALS.route],
     ["studio.promptsRoute", STUDIO.promptsRoute],
     ["studio.ledgerRoute", STUDIO.ledgerRoute],
+    // The burn tile's read: the System page asks the route by the contract's name.
+    ["usage.burnRoute", USAGE.burnRoute],
     ["visibility.publicLine", VISIBILITY.publicLine],
     ["rituals.text.title", RITUALS.text.title],
     ["rituals.text.queueHeading", RITUALS.text.queueHeading],
@@ -569,6 +577,26 @@ describe("no half retypes a contract literal", () => {
   it("startWork.launchEnvFlag is read, not retyped -- but for EnvStatus's one field", () => {
     const value = STARTWORK.launchEnvFlag;
     expect(value).toBe("startWorkLaunch");
+    const found: string[] = [];
+    for (const file of walk(SRC_DIR)) {
+      const rel = path.relative(SRC_DIR, file).split(path.sep).join("/");
+      if (ALLOWED.has(rel)) continue;
+      fs.readFileSync(file, "utf8")
+        .split("\n")
+        .forEach((line) => {
+          const code = line.trim();
+          if (code.startsWith("//") || code.startsWith("*") || code.startsWith("/*")) return;
+          if (line.includes(value)) found.push(`${rel}:${code}`);
+        });
+    }
+    expect(found).toEqual([`shell/api.ts:${value}?: boolean;`]);
+  });
+
+  // The /env field for Claude Code usage (usage.envFlag), the same shape: read as
+  // env[USAGE.envFlag], spelled once, as EnvStatus's field.
+  it("usage.envFlag is read, not retyped -- but for EnvStatus's one field", () => {
+    const value = USAGE.envFlag;
+    expect(value).toBe("claudeUsage");
     const found: string[] = [];
     for (const file of walk(SRC_DIR)) {
       const rel = path.relative(SRC_DIR, file).split(path.sep).join("/");
