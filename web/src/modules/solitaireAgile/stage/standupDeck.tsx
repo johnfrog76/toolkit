@@ -46,7 +46,7 @@ import type { Seat } from "./seats";
 // ritual's plate across the top and the register on it (D-TA13), and its
 // Say lines are generated from the slot text so the engine's narration and
 // its duration estimate work as they do for any deck. The deck is an
-// AUDIOBOOK (decks/types.ts): Suitcase at any width, the browser's voice.
+// AUDIOBOOK (decks/types.ts): played in Audiobook mode, the browser's voice.
 //
 // Every fixed word of the standup is the contract's (consts.json
 // rituals.text, through RITUALS); the words below are this view's own --

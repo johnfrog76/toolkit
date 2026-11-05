@@ -10,7 +10,7 @@ import type { SlideNarration } from "./useSlideNarration";
 // The same SlideNarration shape as useSlideNarration, so DeckPlayer and the
 // chrome cannot tell which one is speaking: enabled / paused / playing mean the
 // same three things, onEnded fires SLIDE_DWELL_SECONDS after the voice stops
-// (Suitcase Mode's advance), and getSlideProgress reports the slide's life as
+// (Audiobook mode's advance), and getSlideProgress reports the slide's life as
 // read time + dwell -- deckDuration's model, so the ring and the deck's length
 // estimate agree.
 //
@@ -45,7 +45,7 @@ export function useSpeechNarration({
   /** The current slide's spoken text, or null: nothing to say (and inert). */
   text: string | null;
   enabledDefault?: boolean;
-  /** Called a dwell after the voice finishes (Suitcase Mode's advance). */
+  /** Called a dwell after the voice finishes (Audiobook mode's advance). */
   onEnded?: () => void;
   /** The player's own hold (the compact settings sheet is open). */
   suspended?: boolean;
@@ -124,7 +124,7 @@ export function useSpeechNarration({
       u.onstart = () => setPlaying(true);
       u.onend = finishSpeaking;
       // An utterance that cannot be spoken still ends the slide, rather than
-      // stranding a Suitcase deck on it.
+      // stranding an Audiobook-mode deck on it.
       u.onerror = finishSpeaking;
       utteranceRef.current = u;
       s.speak(u);
