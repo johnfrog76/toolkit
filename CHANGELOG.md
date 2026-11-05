@@ -6,6 +6,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 intends to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) from its first
 release.
 
+Entries for the next release also wait as files of their own in [`changelog.d/`](changelog.d/README.md)
+until the release folds them in here.
+
 ## [Unreleased]
 
 ### Added

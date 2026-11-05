@@ -40,6 +40,7 @@ param(
     [switch]$Parsers,
     [switch]$PRComments,
     [switch]$BackfillStamps,
+    [switch]$Changelog,
     [switch]$Update,
     [switch]$Start,
     [switch]$PullRequest,
@@ -273,7 +274,7 @@ foreach ($entry in $suites.GetEnumerator()) {
 # together a few minutes. Everything else types a verb in a fresh pwsh per
 # case, which is where the time goes on Windows.
 $fastSuites = @('Consts', 'Compat', 'Menu', 'Environment', 'PRComments', 'PullRequest', 'CloseWorkItem',
-    'PromptStatus', 'HubJson', 'Portability', 'Review', 'BackfillStamps', 'Sync', 'DocCounts')
+    'PromptStatus', 'HubJson', 'Portability', 'Review', 'BackfillStamps', 'Changelog', 'Sync', 'DocCounts')
 if ($Fast) { $selectedSuites += @($suites.Keys | Where-Object { $fastSuites -contains $_ }) }
 if ($Slow) { $selectedSuites += @($suites.Keys | Where-Object { $fastSuites -notcontains $_ }) }
 if ($Failed) {
