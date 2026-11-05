@@ -169,7 +169,8 @@ function Get-P20CardSprint {
 
 function Get-P20CardTags {
     <#
-      The card's `Tags:` line, split on commas and trimmed, empties dropped; none
+      The card's `Tags:` line, split on commas or semicolons (regex.tagSeparator --
+      an Azure DevOps work item's tags arrive `a; b`) and trimmed, empties dropped; none
       for no line or a parenthesised placeholder. The suggestion reads a card's
       severity and size from it. card_tags in the agent; the same table.
       Returns an array -- callers wrap it in @().
@@ -179,5 +180,5 @@ function Get-P20CardTags {
     $value = ''
     if ($m.Success) { $value = $m.Groups[1].Value }
     if ($value.StartsWith('(')) { return @() }
-    return @($value -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    return @($value -split ([string](Get-P20Consts).regex.tagSeparator) | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 }

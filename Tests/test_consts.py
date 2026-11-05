@@ -96,6 +96,8 @@ EXPECTED = {
     ("assets", "coverExtensions"): ["png", "jpg", "jpeg", "webp", "gif"],
     ("assets", "coverMaxBytes"): 5242880,
     ("regex", "dueLine"): r"(?m)^\*\*Due:\*\*[ \t]*(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?",
+    # A card's Tags: line splits on a comma or an Azure DevOps semicolon.
+    ("regex", "tagSeparator"): "[,;]",
     ("reminders", "buckets"): ["overdue", "today", "upcoming"],
     ("reminders", "snooze"): ["1h", "tomorrow", "nextweek"],
     # The three halves a test run covers: Test writes them, log.py serves them.
