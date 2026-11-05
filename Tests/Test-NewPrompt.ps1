@@ -732,6 +732,85 @@ catch {
 }
 finally { if (Test-Path $tBase) { Remove-Item -Path $tBase -Recurse -Force -ErrorAction SilentlyContinue } }
 
+# -- -OutputFolder: a bare card-folder name is the active Space's -------------
+# Issue #207. A bare `backlog` used to be joined onto the store root, where no
+# Space looks, while the default built `<promptsFolder>/backlog`. Now a bare
+# current, backlog or archive is the active Space's folder; `<space>/<folder>`
+# stays relative to the store, a rooted path is taken as given, and with no
+# Space active a bare name keeps the store root. TYPED as the verb, in a fresh
+# shell, against a scratch hub; every row also follows the card's > Template:
+# link, which is computed from the folder the card actually landed in.
+
+Write-Host ""
+Write-Host "-- -OutputFolder: a bare folder name is the active Space's, typed as the verb ---" -ForegroundColor Cyan
+
+$oBase = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-np-outfolder-" + [System.Guid]::NewGuid().Guid.Substring(0, 8))
+try {
+    . (Join-Path $pkgRoot 'Scripts/Get-Consts.ps1')
+    $utf8 = New-Object System.Text.UTF8Encoding($false)
+    $oHub = Join-Path $oBase 'hub'
+    $oLog = Join-Path $oBase 'log'
+    $oAbs = Join-Path $oBase 'elsewhere'
+    New-Item -ItemType Directory -Path $oHub, $oLog -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $oHub 'hub.json'), (@'
+{
+  "hub": 1,
+  "spaces": [
+    { "slug": "example", "name": "Example", "status": "local", "promptsFolder": "example", "org": "" },
+    { "slug": "other", "name": "Other", "status": "local", "promptsFolder": "other", "org": "" }
+  ]
+}
+'@), $utf8)
+    $oPrefix = (Get-Content (Join-Path $pkgRoot 'config.default.json') -Raw | ConvertFrom-Json).commandPrefix
+    $oFolders = (Get-P20Consts).folders
+    function Invoke-OutFolderVerb {
+        # -NoSpace stands the config in for a hub with no Space active: the shipped
+        # config always resolves one, so the module's own answer is blanked after import.
+        param([string]$Commands, [switch]$NoSpace)
+        $ErrorActionPreference = 'Continue'
+        $q = { param([string]$s) $s -replace "'", "''" }
+        $pre = "`$env:PSModulePath = '$(& $q $pkgRoot)'; `$env:PROMPTS_ROOT = '$(& $q $oHub)'; `$env:P20_ACTIVE_SPACE = 'example'; " +
+            "`$env:P20_USAGE_LOG_DIR = '$(& $q $oLog)'; Set-Location '$(& $q $oBase)'; " +
+            "Import-Module '$(& $q $pkgRoot)/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; "
+        if ($NoSpace) { $pre += "`$global:P20Config.PromptsFolder = ''; " }
+        return ((& pwsh -NoProfile -NonInteractive -Command ($pre + $Commands + "; 'EXIT=' + `$LASTEXITCODE") 2>&1 | ForEach-Object { "$_" }) -join "`n")
+    }
+    function Get-OutFolderCard([string]$Folder, [string]$Filter) {
+        return @(Get-ChildItem $Folder -Filter $Filter -File -ErrorAction SilentlyContinue)
+    }
+    function Test-TemplateLinkResolves([System.IO.FileInfo]$Card) {
+        $m = [regex]::Match([System.IO.File]::ReadAllText($Card.FullName), '(?m)^> Template: \[[^\]]*\]\(([^)]+)\)')
+        if (-not $m.Success) { return $false }
+        return (Test-Path -LiteralPath (Join-Path $Card.DirectoryName $m.Groups[1].Value) -PathType Leaf)
+    }
+
+    $rows = @(
+        @{ Label = "a bare 'backlog'"; Arg = 'backlog'; Id = 'C4RK'; Where = (Join-Path $oHub "example/$($oFolders.backlog)"); NotAt = (Join-Path $oHub $oFolders.backlog) }
+        @{ Label = "a bare 'current'"; Arg = 'current'; Id = 'C4RR'; Where = (Join-Path $oHub "example/$($oFolders.current)"); NotAt = (Join-Path $oHub $oFolders.current) }
+        @{ Label = "'other/backlog', relative to the store"; Arg = 'other/backlog'; Id = 'R3MT'; Where = (Join-Path $oHub "other/$($oFolders.backlog)"); NotAt = (Join-Path $oHub "example/other/$($oFolders.backlog)") }
+        @{ Label = 'an absolute path'; Arg = $oAbs; Id = 'A6XT'; Where = $oAbs; NotAt = (Join-Path $oHub "example/$($oFolders.backlog)") }
+        @{ Label = "a bare 'backlog' with no Space active"; Arg = 'backlog'; Id = 'N7CK'; NoSpace = $true; Where = (Join-Path $oHub $oFolders.backlog); NotAt = (Join-Path $oHub "example/$($oFolders.backlog)") }
+        @{ Label = "a bare 'current' with no Space active"; Arg = 'current'; Id = 'N7CR'; NoSpace = $true; Where = (Join-Path $oHub $oFolders.current); NotAt = (Join-Path $oHub "example/$($oFolders.current)") }
+    )
+    foreach ($row in $rows) {
+        $q = { param([string]$s) $s -replace "'", "''" }
+        $cmd = "${oPrefix}NewPrompt -Title 'Out folder card' -Type Task -Id $($row.Id) -OutputFolder '$(& $q $row.Arg)'"
+        $out = if ($row.NoSpace) { Invoke-OutFolderVerb $cmd -NoSpace } else { Invoke-OutFolderVerb $cmd }
+        $card = Get-OutFolderCard $row.Where "Task$($row.Id)-*.prompt.md"
+        Assert-True "$($row.Label): the card is written where it was meant, and exits 0" ($card.Count -eq 1 -and $out -match 'EXIT=0') "$($row.Where)`n$out"
+        Assert-Equal "$($row.Label): and not anywhere else" 0 (Get-OutFolderCard $row.NotAt "Task$($row.Id)-*.prompt.md").Count
+        if ($card.Count -eq 1) {
+            Assert-True "$($row.Label): its > Template: link resolves from where it landed" (Test-TemplateLinkResolves $card[0]) ([System.IO.File]::ReadAllText($card[0].FullName))
+        }
+    }
+    $out = Invoke-OutFolderVerb "${oPrefix}NewPrompt -Title 'Archive card' -Type Task -Id R7CH -OutputFolder 'Archive/'"
+    Assert-True "a bare 'Archive/' in another case, with a slash, is the Space's archive/ too" ((Get-OutFolderCard (Join-Path $oHub "example/$($oFolders.archive)") 'TaskR7CH-*.prompt.md').Count -eq 1 -and $out -match 'EXIT=0') $out
+}
+catch {
+    Assert-True 'the -OutputFolder cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally { if (Test-Path $oBase) { Remove-Item -Path $oBase -Recurse -Force -ErrorAction SilentlyContinue } }
+
 # -- The work item's comments cannot be read: no token ------------------------
 # The comments are fetched with a bearer token from `az account get-access-token`.
 # An empty token used to skip the fetch with no message and write a card without
