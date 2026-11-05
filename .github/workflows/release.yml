@@ -22,6 +22,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # An entry still waiting in changelog.d/ is one the notes would miss: the
+      # release pull request folds the folder into CHANGELOG.md first
+      # (Scripts/Fold-Changelog.ps1, changelog.d/README.md). Its README stays.
+      - name: Every changelog entry is folded
+        run: |
+          left="$(find changelog.d -maxdepth 1 -type f ! -name README.md ! -name '.*' | sort)"
+          if [ -n "$left" ]; then
+            echo "changelog.d/ still holds entries this release did not fold:" >&2
+            echo "$left" >&2
+            exit 1
+          fi
+
       # The tag's section of the changelog: from its "## [x.y.z]" heading to
       # the next "## [" heading. A tag with no section stops here, so a
       # release never ships with empty notes.

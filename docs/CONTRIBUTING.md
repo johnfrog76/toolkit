@@ -131,8 +131,10 @@ how the halves fit in [the agent and the web UI](ARCHITECTURE.md); an add-on in
 The [README's Documentation table](../README.md#documentation) is the map, and
 [`AGENTS.md`, "Documentation is part of the change"](../AGENTS.md#documentation-is-part-of-the-change) holds the full table. Something left
 open on purpose is a row in [Known gaps](KNOWN-GAPS.md), not a comment in the code. A change a user
-would notice also gets a line under `[Unreleased]` in [`CHANGELOG.md`](../CHANGELOG.md); how that
-section becomes a release is [`AGENTS.md`, "A release is a tag on main"](../AGENTS.md#a-release-is-a-tag-on-main).
+would notice also gets its changelog entry, as one file of its own under
+[`changelog.d/`](../changelog.d/README.md) named `<id>.<kind>.md`, rather than a line in
+[`CHANGELOG.md`](../CHANGELOG.md), so two pull requests never edit the same lines; how those files
+become a release is [`AGENTS.md`, "A release is a tag on main"](../AGENTS.md#a-release-is-a-tag-on-main).
 
 ## How a pull request is reviewed
 
