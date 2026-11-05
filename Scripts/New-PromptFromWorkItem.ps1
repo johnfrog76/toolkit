@@ -164,8 +164,8 @@ if (-not $OutputFolder) {
 elseif (-not [System.IO.Path]::IsPathRooted($OutputFolder) -and $cfg.PromptsFolder) {
     # A bare card-folder name -- current, backlog or archive, consts.json's -- is
     # the ACTIVE SPACE's folder of that name, the same folder the default above
-    # builds; it used to be joined onto the store root, where no Space looks
-    # (issue #207). A path with more than one segment (`example/backlog`) stays
+    # builds; it used to be joined onto the store root, where no Space looks.
+    # A path with more than one segment (`example/backlog`) stays
     # relative to the store, and a rooted path is taken as given. With no Space
     # active there is no Space folder to mean, so a bare name keeps the store
     # root -- where a hub with no Spaces keeps its cards.

@@ -733,7 +733,7 @@ catch {
 finally { if (Test-Path $tBase) { Remove-Item -Path $tBase -Recurse -Force -ErrorAction SilentlyContinue } }
 
 # -- -OutputFolder: a bare card-folder name is the active Space's -------------
-# Issue #207. A bare `backlog` used to be joined onto the store root, where no
+# A bare `backlog` used to be joined onto the store root, where no
 # Space looks, while the default built `<promptsFolder>/backlog`. Now a bare
 # current, backlog or archive is the active Space's folder; `<space>/<folder>`
 # stays relative to the store, a rooted path is taken as given, and with no
