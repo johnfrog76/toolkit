@@ -254,7 +254,7 @@ report a weakness; this is the long one, with the file that holds each part.
 
 ### Who may call the agent
 
-Any process on the same machine, and nothing else. **The agent binds to the loopback address and
+Any process on the same machine, and the product's own pages in a browser on it. **The agent binds to the loopback address and
 nowhere else.** `Scripts/Start-Agent.ps1` -- the one place the agent is started, by `tkAgent` and by
 `tkWeb -Dev` through it -- passes uvicorn `--host` with the value of `consts.json` `agent.bindHost`,
 which is `127.0.0.1`. It is deliberately not a setting: the launcher has no host parameter,
@@ -272,6 +272,25 @@ the loopback. Setting the default to `0.0.0.0` fails them.
 verb the bridge exposes, with your credentials. If you need it from elsewhere, put a layer you trust
 that authenticates in front of it and keep the agent on the loopback; widening the bind is not the
 answer.
+
+### What a browser may ask of the agent
+
+A browser on this machine can reach the loopback, and it will send requests there on behalf of
+whatever page is open. So one piece of middleware, `RequestGate` in `agent/core/request_gate.py`,
+meets every request first, ahead of routing and before a body is read, and answers a refusal with a
+plain 403 naming the setting:
+
+- **The `Host`** must be a loopback name (`localhost`, `127.0.0.1`, `::1`) or the host of an origin
+  in `web.corsOrigins`, on every path.
+- **`Sec-Fetch-Site: cross-site`** is refused for anything under `/api`. Following a link to the page
+  itself is not.
+- **A state-changing request carrying an `Origin`** must be `Sec-Fetch-Site: same-origin`, or come from
+  an origin in `web.corsOrigins`, or from the agent's own origin. Same-origin is how a page behind
+  the dev server's proxy or the Docker image's nginx is recognised on any port. A request with no
+  `Origin` passes, because browsers send one and a script on this machine is not a browser.
+
+`Tests/test_request_gate.py` is the table, one row for each input the rule tells apart. Picture
+uploads are also limited as they are read, not after, and an upload nobody attached is swept hourly.
 
 ### The web UI is served to the same machine
 
@@ -301,8 +320,9 @@ it.
 The agent accepts cross-origin requests from the origins in `web.corsOrigins`, which defaults to the
 two dev-server origins (`http://localhost:5173` and `http://localhost:5174`), for the methods its
 routes use (`GET`, `POST`, `PUT`). It is not a wildcard. CORS is a browser's rule about which pages
-may read a response, so it is a second fence for the browser case and **not authentication**: a
-process on the machine is not a browser and is not subject to it. Adding an origin to
+may read a response, so it does not stop a request being sent, which is the request gate's job
+(above), and it is **not authentication**: a process on the machine is not a browser and is not
+subject to it. Adding an origin to
 `web.corsOrigins` lets a page from that origin read the agent's answers and run the bridge as you, so
 add only an origin you serve yourself. The production image needs none: it serves the page and proxies
 `/api/` from one origin.
@@ -416,7 +436,7 @@ docs/                   The documentation. The root README is the map; each subj
   hub/reminders.md        The file contract for reminders/
   hub/design.md           The file contract for design/, the Studio's seed drawer
 agent/                  The FastAPI agent -- see agent/README.md
-  app.py                  The app: CORS, the /api router, module mounting, static serving
+  app.py                  The app: the request gate, CORS, the /api router, module mounting, static serving
   core/                   config, config_routes, consts, env, identity, tier, parsers, cards, clock, hosts,
                           model, surfaces, assets, child, log, log_writer, usage -- always on
   ado/                    status, pr_comments, accounting, reporting, sprint, design, docs, bridge

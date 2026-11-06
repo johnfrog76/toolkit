@@ -32,7 +32,8 @@ The Toolkit is tooling for one person's own machine, and it has no accounts or s
 That is why the boundary is where each half listens: the agent binds to the loopback address
 (`127.0.0.1`) and nowhere else, the development server for the web UI listens on localhost, and the
 Docker image publishes its port on the loopback only. A process on the same machine can reach them;
-another machine cannot. Do not put the agent behind a proxy or publish its port to a network:
+another machine cannot. A browser on the machine can reach them too, so the agent also checks where
+a request comes from, and answers only its own pages and the origins you configure. Do not put the agent behind a proxy or publish its port to a network:
 nothing in it would ask who is calling.
 
 Everything that changes a card goes through the CLI. The agent's bridge runs only the verbs in the

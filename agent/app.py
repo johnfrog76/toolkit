@@ -1,4 +1,4 @@
-"""The FastAPI application: CORS, the /api router, and module mounting.
+"""The FastAPI application: the request gate, CORS, the /api router, and module mounting.
 
 Run it from the package root:
 
@@ -27,6 +27,7 @@ Nothing here reaches outside the package for code, and nothing derives the
 prompt store from where this file happens to live -- see core/config.py.
 """
 
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -39,6 +40,7 @@ from .ado import accounting, bridge, design, docs, pr_comments, reporting, sprin
 from .communication import api as communication_router
 from .core import assets, config_routes, env, hub_sync, log, surfaces, usage
 from .core.config import API_PREFIX, REPO_ROOT, cors_origins
+from .core.request_gate import RequestGate
 from .growth import growth_router
 from .organize import api as organize_router
 from .solitaire import api as solitaire_router
@@ -102,15 +104,25 @@ def mount_client(app: FastAPI, client_dir: Path) -> None:
         return FileResponse(str(client_dir / "index.html"))
 
 
+async def sweep_uploads_hourly() -> None:
+    while True:
+        await asyncio.sleep(assets.UPLOAD_SWEEP_SECONDS)
+        await asyncio.to_thread(assets.sweep_stale_uploads)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    """On start, drop picture uploads nobody attached (``p20-upload-*`` in the temp folder, a day old)."""
+    """Drop picture uploads nobody attached (``p20-upload-*`` in the temp folder, a day old): on start, then hourly."""
     assets.sweep_stale_uploads()
-    yield
+    sweeper = asyncio.create_task(sweep_uploads_hourly())
+    try:
+        yield
+    finally:
+        sweeper.cancel()
 
 
 def create_app(client_dir: Path | None = CLIENT_DIR) -> FastAPI:
-    """The app: CORS, the router, and the built client when there is one."""
+    """The app: the request gate, CORS, the router, and the built client when there is one."""
     app = FastAPI(title="Toolkit Agent", version="0.1.0", lifespan=lifespan)
 
     # Dev-server origins come from config (web.corsOrigins) with the same defaults
@@ -119,12 +131,15 @@ def create_app(client_dir: Path | None = CLIENT_DIR) -> FastAPI:
     # are every one a route is registered with: PUT is /config and
     # /manager/{filename}, and a browser that calls the agent directly (the case
     # web.corsOrigins exists for) fails their preflight without it.
+    origins = cors_origins()
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=cors_origins(),
+        allow_origins=origins,
         allow_methods=CORS_METHODS,
         allow_headers=["*"],
     )
+    # Added last, so it runs first: nothing is routed or read past a refusal.
+    app.add_middleware(RequestGate, origins=origins, api_prefix=API_PREFIX)
 
     app.include_router(build_api())
 
