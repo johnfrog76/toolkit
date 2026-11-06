@@ -991,6 +991,7 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   works, which proves a write passes through nginx. Open `http://127.0.0.1:5174` and do the same. `curl -si -H "Host:
   example.test" http://localhost:5174/` should drop the connection, and `curl -sI http://localhost:5174/` should show
   `Content-Security-Policy` and `X-Frame-Options: DENY`. The browser console shows no policy violation.
+
 - [ ] **The agent's reads on Windows, gh and az.** On the Windows PC, with the agent up and a GitHub Space active,
   `python Tests/test_child_windows.py` passes all three (the Windows CI job runs the same file), then open the Design
   tab and search for `a&b` and for `"quoted"`, and you should see an ordinary result or none, with the tab still
