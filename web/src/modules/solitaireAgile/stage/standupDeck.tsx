@@ -375,7 +375,7 @@ function StageView({
   );
 }
 
-// ── The copy panel (the engine's right 40%) ─────────────────────────────────
+// ── The copy panel (the engine's right-hand column) ─────────────────────────────────
 // Who is speaking, not what they said: the bubble shows the sentence and
 // the voice reads it, so a third copy beside the stage was noise. The panel is
 // the speaker's character: the title, the persona with the worker's label beside

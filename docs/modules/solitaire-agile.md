@@ -466,7 +466,7 @@ engine are one lazy chunk fetched when Play is pressed.
   (`SPEECH_MAX_LINES`), no scrollbar, "because it is real" -- four lines always fit below the face, so the
   bubble never covers the speaker. Nothing is lost: the voice (the slide's Say lines) and the thought
   cloud still carry every line. It carries that tile's slot lines -- the sentence the voice reads.
-  The **copy panel** beside the stage (the deck engine's right 40%) does not repeat them: it is the
+  The **copy panel** beside the stage (the deck engine's right-hand column, what the stage leaves) does not repeat them: it is the
   speaker's character -- the title, the persona and the motto, the Wasteland's own words carried in
   `CAST` -- and, on a worker's slide, the worker's label, the one real noun. The motto is who the
   character is, never a status, so nothing on the slide claims work the tracker did not say.
