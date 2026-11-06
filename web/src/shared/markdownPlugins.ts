@@ -40,7 +40,11 @@ export const markdownSchema: SanitizeSchema = {
 };
 
 export const remarkPlugins: PluggableList = [remarkGfm];
-export const rehypePlugins: PluggableList = [rehypeRaw, [rehypeSanitize, markdownSchema], rehypeNoAgentImages];
+export const rehypePlugins: PluggableList = [
+  rehypeRaw,
+  [rehypeSanitize, markdownSchema],
+  rehypeNoAgentImages,
+];
 
 /** Spread onto every <ReactMarkdown>: `<ReactMarkdown {...markdownPlugins}>`. */
 export const markdownPlugins = { remarkPlugins, rehypePlugins };
