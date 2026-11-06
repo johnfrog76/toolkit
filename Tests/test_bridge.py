@@ -240,12 +240,12 @@ class TheTableFollowsTheFlags(unittest.TestCase):
 
     def test_the_key_names_every_input(self):
         key = bridge._map_key_now()
-        self.assertEqual(len(key), 4)
+        self.assertEqual(len(key), 5)
         self.assertIsNotNone(key[0], "utilities.psm1")
         self.assertIsNotNone(key[1], "config.default.json")
         self.assertIsNone(key[2], "config.local.json is not there yet")
         self.assertEqual(
-            sorted(name for name, _ in key[3]),
+            sorted(name for name, _ in key[4]),
             sorted(f.name for f in (self.pkg / "Config").iterdir() if f.name.endswith(".commands.psd1")),
         )
         self._flip(True)

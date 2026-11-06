@@ -510,7 +510,7 @@ route list.
 | `GET /engagement/{slug}/summary` | `ado/reporting` | Tier 2+ | `archive/`, config | — |
 | `GET /engagement/{slug}/work-breakdown` | `ado/reporting` | Tier 2+ | `archive/` | — |
 | `GET /engagement/{slug}/skills` | `ado/reporting` | Tier 2+ | `archive/`, reviews | — |
-| `GET /engagement/{slug}/reviews` | `ado/reporting` | Tier 2+ | review folders in the hub, never `reviews/archive/`; `?archived=true` reads only that | — |
+| `GET /engagement/{slug}/reviews` | `ado/reporting` | Tier 2+, `features.growth` | review folders in the hub, never `reviews/archive/`; `?archived=true` reads only that | — |
 | `GET /stress-status` | `ado/sprint` | `features.sprintAwareness` | `stress-log*.json` | — |
 | `GET /stress-sprint-activity` | `ado/sprint` | `features.sprintAwareness` | `stress-log*.json`, `git log` | — |
 | `GET /stress-repos` | `ado/sprint` | `features.sprintAwareness` | config aliases, local checkouts | — |
