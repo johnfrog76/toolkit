@@ -84,6 +84,18 @@ EXPECTED = {
     ("env", "teamsWebhookPrefix"): "TEAMS_WEBHOOK_",
     ("env", "testRunMarker"): "P20_TEST_RUN",
     ("agent", "bindHost"): "127.0.0.1",
+    ("agent", "apiPrefix"): "/api",
+    ("agent", "responseHeaders"): {
+        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob:; frame-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'",  # noqa: E501
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer",
+    },
+    ("agent", "framablePrefix"): "/lounge/",
+    ("agent", "framableHeaders"): {
+        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob:; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'none'",  # noqa: E501
+        "X-Frame-Options": "SAMEORIGIN",
+    },
     ("stamps", "sent"): "Sent to",
     ("stamps", "due"): "**Due:**",
     ("stamps", "source"): "**Source:**",
@@ -604,6 +616,34 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
                     if value in line and re.search(r"[=(\[]|\bin\b|re\.", line):
                         offenders.append(f"{rel}:{i}  ({key})  {code[:80]}")
         self.assertEqual(offenders, [], "\n".join(offenders))
+
+
+class TheDockerPageCarriesTheAgentsHeaders(unittest.TestCase):
+    """The agent adds consts.json's headers itself; nginx repeats them for the
+    page the Docker image serves, in a template that cannot read the file."""
+
+    def test_the_nginx_template_states_each_one_word_for_word(self):
+        template = (PKG_ROOT / "web" / "nginx.conf.template").read_text(encoding="utf-8")
+        for name, value in C.consts()["agent"]["responseHeaders"].items():
+            self.assertIn(f'add_header {name} "{value}" always;', template)
+
+    def test_a_skin_is_framable_by_its_own_origin_and_the_page_by_nothing(self):
+        """Skins are only drawn in an iframe; everything else refuses to be framed."""
+        template = (PKG_ROOT / "web" / "nginx.conf.template").read_text(encoding="utf-8")
+        agent = C.consts()["agent"]
+        start = template.index(f"location {agent['framablePrefix']} {{")
+        skin = template[start : template.index("}", start)]
+        page = template[template.index("location / {") :]
+        for name, value in {**agent["responseHeaders"], **agent["framableHeaders"]}.items():
+            self.assertIn(f'add_header {name} "{value}" always;', skin)
+        self.assertIn("frame-ancestors 'self'", agent["framableHeaders"]["Content-Security-Policy"])
+        self.assertEqual(agent["framableHeaders"]["X-Frame-Options"], "SAMEORIGIN")
+        self.assertIn('add_header X-Frame-Options "DENY" always;', page)
+        self.assertIn("frame-ancestors 'none'", page)
+
+    def test_the_template_drops_a_name_that_is_not_this_machine(self):
+        template = (PKG_ROOT / "web" / "nginx.conf.template").read_text(encoding="utf-8")
+        self.assertIn("listen 5173 default_server;\n    return 444;", template)
 
 
 class TheAgentListensOnTheLoopbackOnly(unittest.TestCase):

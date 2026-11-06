@@ -24,6 +24,9 @@ import consts from "@consts";
  * `backlog` and `done` are FOLDER states: a card in `backlog/` is planned, not in
  * play; one in `archive/` is done (docs/hub/cards.md, "State is derived, never stored").
  */
+/** Where the agent's routes are mounted, and what its responses carry. */
+export const AGENT = consts.agent as { apiPrefix: string; responseHeaders: Record<string, string> };
+
 export const STATUS = consts.status as {
   backlog: string;
   active: string;
