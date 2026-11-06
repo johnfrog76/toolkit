@@ -1,7 +1,7 @@
 import { act, render } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import DeckHost, { DeckNotesHost } from "./DeckHost";
-import { DECK_AUDIOBOOK_STORAGE_KEY } from "./engine/narrationConstants";
+import { DECK_AUDIOBOOK_STORAGE_KEY, DECK_PODIUM_STORAGE_KEY } from "./engine/narrationConstants";
 
 // The player and the notes window narrate from the same baked clips, so both
 // are handed hasApi={false} and a resolver: neither may ask for a service.
@@ -102,5 +102,39 @@ describe("DeckHost -- both windows get the same narration facts", () => {
     expect(notesProps[0].hasApi).toBe(false);
     expect(typeof notesProps[0].resolveNarrationUrl).toBe("function");
     expect(notesProps[0].voices).toBeDefined();
+  });
+});
+
+describe("DeckHost -- Podium, chosen on the deck's page and kept per browser", () => {
+  const mountAt = (entry: string) =>
+    render(
+      <MemoryRouter initialEntries={[entry]}>
+        <Routes>
+          <Route path="/deck/:deckId" element={<DeckHost />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+  it("opens on the viewer's bar when nothing is remembered", () => {
+    mountAt("/deck/x");
+    expect(last().mode).toBe("audience");
+  });
+
+  it("opens in Podium when the page's choice was Podium", () => {
+    window.localStorage.setItem(DECK_PODIUM_STORAGE_KEY, "1");
+    mountAt("/deck/x");
+    expect(last().mode).toBe("presenter");
+  });
+
+  it("?present=0 wins over a remembered Podium, for that viewing", () => {
+    window.localStorage.setItem(DECK_PODIUM_STORAGE_KEY, "1");
+    mountAt("/deck/x?present=0");
+    expect(last().mode).toBe("audience");
+    expect(window.localStorage.getItem(DECK_PODIUM_STORAGE_KEY)).toBe("1");
+  });
+
+  it("?present=1 is Podium with nothing remembered, as it always was", () => {
+    mountAt("/deck/x?present=1");
+    expect(last().mode).toBe("presenter");
   });
 });

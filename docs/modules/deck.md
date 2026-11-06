@@ -62,7 +62,7 @@ are a chunk the browser fetches when a deck is shown, never part of the first lo
 | **The launcher** | a **Decks** card on the **Growth** page -- a presentation is a growth item, and a deck is what a presentation produces. With growth off, the module has a **Decks** tab of its own |
 | **A deck's page** | `/decks/<id>`, inside the shell: what the deck file says about it, **Play**, and this machine's **Archive** -- "A deck's page", below. A click on a row of the Decks card opens it |
 | **A deck** | `/deck/<id>`, full screen: the Toolkit's nav bar is not drawn around it. **Exit** goes back where you came from |
-| **The podium** | `/deck/<id>?present=1` -- Podium: the presenter's bar and notes in a second window (`/deck/<id>/notes`); the deck window is silent -- "The player's two bars", below |
+| **The podium** | `/deck/<id>?present=1`, or any deck once its page's **Deck settings** says Podium -- Podium: the presenter's bar and notes in a second window (`/deck/<id>/notes`); the deck window is silent -- "The player's two bars", below |
 | **The landing page** | Introducing ToolKit plays on the GitHub Pages landing page too, from the same engine and baked clips, whatever `features.deck` says: the page is not part of the app, so no flag applies to it ([`web/README.md`, "The landing page"](../../web/README.md#the-landing-page)) |
 
 ## What ships
@@ -122,7 +122,7 @@ Connected Deck", below.
 | Mode | Bar |
 | --- | --- |
 | **Paging** (the default) and **Audiobook** | **The viewer's bar**, at every width: **Exit** on the left; in the middle, the text arrows ← → either side of the slide counter in Paging, or chevrons either side of the **play ring** in Audiobook; on the right **Settings** (the gear), fullscreen and the **sound**. The gear opens a short sheet from the bottom, titled **Voice**: the **Narration** switch; **Mode**, with **Paging** and **Audiobook** side by side, where the host offers the choice; and the voice. No hint text. The sound and the sheet's Narration are one setting. On a phone the controls are thumb-sized, the arrows are chevrons, Exit drops its word and there is no fullscreen button |
-| **Podium** (`?present=1`) | **The presenter's bar**: Exit, previous, the counter, next, the speaker notes and fullscreen. No sound and no voice: the deck window is the room's screen and stays silent, and narration is the notes window's |
+| **Podium** (chosen on a deck's page, or `?present=1`) | **The presenter's bar**: Exit, previous, the counter, next, the speaker notes and fullscreen. No sound and no voice: the deck window is the room's screen and stays silent, and narration is the notes window's |
 
 **The mode row and narration.** Audiobook turns the slide when narration ends, so the mode row is dead
 while Narration is off, and turning Narration off -- from the sheet or from the bar's sound -- sets
@@ -133,7 +133,11 @@ the choice back to Paging. A deck opened in Audiobook narrates on arrival.
 - **A deck listed in `decks/index.ts`** (`DeckHost.tsx`): Paging or Audiobook, chosen in the sheet
   and **kept per browser** (`localStorage` key `toolkit-deck-audiobook`,
   `DECK_AUDIOBOOK_STORAGE_KEY`), so a viewer who chose Audiobook opens the next deck reading itself
-  aloud. Podium at `?present=1`, because its notes window finds the deck in the same list.
+  aloud. Podium too, because its notes window finds the deck in the same list: chosen on the deck's
+  page and kept per browser beside it (`toolkit-deck-podium`, `DECK_PODIUM_STORAGE_KEY`), or asked
+  for at `?present=1`. The address wins for one viewing, either way: `?present=1` opens Podium and
+  `?present=0` the viewer's bar, whatever is kept. One hook reads both keys, `deckOpening.ts`, for
+  the page and for the player.
 - **A deck built from data** (`GeneratedDeckHost.tsx`, the played standup): opens in Audiobook every
   time, and the sheet's choice lives only as long as the room -- a standup is played once, as it was
   written that morning, so there is no next viewing to remember it for. No Podium: its notes window
@@ -156,8 +160,22 @@ same estimate the card's clock chip shows) and the path of its **played copy**,
 `web/src/modules/deck/decks/<id>.tsx` -- a deck file is named for its id, and `deckList.test.ts` holds
 that for every file in `decks/`.
 
-**Play** is the page's one exposed action and opens the player, unchanged. Its `...` holds
-**Archive**, and on an archived deck **Unarchive** in its place.
+**A still of the first slide** sits beside the facts: to their right from 768 px wide, above them on
+anything narrower. It is the deck's own first slide drawn small and held still (`SlidePoster.tsx`,
+frozen as every poster here is, `stillPosters.tsx`), in a 16:9 box the stylesheet sizes before the
+slide draws, so the page does not move as it loads. A deck with no slide to show has no box, and its
+page reads as it did before there was one.
+
+**Play** is the page's one exposed action and opens the player. Its `...` holds **Archive**, and on
+an archived deck **Unarchive** in its place.
+
+**Deck settings**, the gear at the page's foot on the right, opens a small dialog -- a dialog, not a
+drawer, so it stays apart from the app's own Settings -- with one row in the viewer's sheet's words:
+**Mode**, with **Paging**, **Audiobook** and **Podium**. The choice is kept in the browser and is how
+every listed deck opens from then on (Paging and Audiobook are the same setting the sheet keeps; see
+"Who offers what", above). A phone is not offered Podium, which it could not open, and a Podium kept
+from a wider screen reads there as the viewer's choice. `?present=1` and `?present=0` still win for
+one viewing.
 
 **Archive is this machine's, not the deck's.** The decks are built in the studio and shipped here as
 files, so nothing in the product edits one -- not its state, not its tags, not its summary. Archive
@@ -226,8 +244,8 @@ The two copies are kept byte-identical; edit the studio's, then copy.
     keeps its clock, so Audiobook still advances, keeps its choice and keeps its mode row live. With
     nothing to narrate the mute reads dead, like the speaker.
   - **Fullscreen** is drawn only where the browser has the Fullscreen API.
-  - **What is remembered**: a listed deck's Paging or Audiobook, per browser. Not the voice, not
-    narration on or off, and not Podium, which only `?present=1` asks for.
+  - **What is remembered**: a listed deck's Paging or Audiobook, and whether it opens in Podium, per
+    browser. Not the voice, and not narration on or off.
   - The notes window and the deck's sync channel keep this product's names, and the player does not
     take 0.2.0's deprecated `suitcase` prop, which no host here ever passed.
 - **Kept here, not in Connected Deck.** The `audiobook` deck hint and the browser's voice

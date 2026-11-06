@@ -47,6 +47,16 @@ export const NARRATION_MUTED_STORAGE_KEY = "toolkit-narration-muted";
  */
 export const DECK_AUDIOBOOK_STORAGE_KEY = "toolkit-deck-audiobook";
 
+/**
+ * localStorage key for a listed deck opening in Podium: "1" Podium, absent or
+ * "0" the viewer's bar. Chosen on a deck's page (its settings dialog); the
+ * address's `?present=1` or `?present=0` wins for one viewing.
+ */
+export const DECK_PODIUM_STORAGE_KEY = "toolkit-deck-podium";
+
+/** The deck page's gear, and the title of the dialog it opens. */
+export const DECK_SETTINGS_LABEL = "Deck settings";
+
 /** The mute button's tooltip, by state. Its accessible name stays MUTE_NARRATION_LABEL. */
 export const MUTE_NARRATION_LABEL = "Mute narration";
 export const UNMUTE_NARRATION_LABEL = "Unmute narration";

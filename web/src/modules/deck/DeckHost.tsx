@@ -4,8 +4,7 @@ import { DeckPlayer } from "./engine/DeckPlayer";
 import { PresenterNotes } from "./engine/PresenterNotes";
 import { BAKED_VOICES, voiceUrl } from "./bakedVoices";
 import { LISTED_DECK_MODES } from "./offeredModes";
-import { DECK_AUDIOBOOK_STORAGE_KEY } from "./engine/narrationConstants";
-import { usePersistedFlag } from "../../shared/usePersistedState";
+import { isPodiumViewing, useDeckOpening } from "./deckOpening";
 import { DECKS } from "./decks/index";
 import { DeckRoom } from "./DeckRoom";
 
@@ -17,7 +16,8 @@ import { DeckRoom } from "./DeckRoom";
 // /api/narrate, so the notes window spoke and the deck window never did. The
 // Toolkit has no narration service, and its voices are baked files, which only
 // the AUDIENCE path plays. So the default here is audience -- the deck reads
-// itself aloud, with no key and no server -- and `?present=1` is the podium:
+// itself aloud, with no key and no server -- and Podium, chosen on the deck's
+// page or asked for by `?present=1`, is the presenter's window:
 // the presenter's bar (no sound, no voice: the deck window stays silent) and
 // notes in a second window. A listed deck is offered both (offeredModes.ts); a
 // phone always plays on the viewer's bar, which the engine enforces itself,
@@ -33,11 +33,12 @@ import { DeckRoom } from "./DeckRoom";
 function Player() {
   const { deckId } = useParams<{ deckId: string }>();
   const [searchParams] = useSearchParams();
-  const isPresenter = searchParams.get("present") === "1";
-  // Paging or Audiobook, chosen in the viewer's sheet and kept per browser, so
-  // a viewer who chose Audiobook opens the next deck reading itself aloud.
-  // Storage refused reads as Paging, the default.
-  const { value: audiobook, setValue: setAudiobook } = usePersistedFlag(DECK_AUDIOBOOK_STORAGE_KEY);
+  // How the deck opens, kept per browser (deckOpening.ts): Paging or
+  // Audiobook, chosen in the viewer's sheet or on the deck's page, and Podium,
+  // chosen on the deck's page. `?present=1` or `?present=0` wins for one
+  // viewing. Storage refused reads as Paging, the default.
+  const { audiobook, setAudiobook, podium } = useDeckOpening();
+  const isPresenter = isPodiumViewing(searchParams.get("present"), podium);
 
   const deck = DECKS.find((d) => d.id === deckId);
   const slides = useMemo(() => deck?.slides() ?? [], [deck]);
