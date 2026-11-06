@@ -155,11 +155,22 @@ function expectDefaultSizeInputs(dialog: HTMLElement) {
   }
 }
 
+// The open reminder dialog, once it can be used. Fluent's modal layer can keep
+// the surface aria-hidden for a moment after it mounts -- longest when the row
+// menu has just closed -- and a synchronous getByRole inside it then finds
+// nothing. Waiting for its textboxes to be reachable waits that out, so every
+// query after this one can stay synchronous.
+async function openedDialog(): Promise<HTMLElement> {
+  const dialog = await screen.findByRole("dialog");
+  await within(dialog).findAllByRole("textbox");
+  return dialog;
+}
+
 describe("the Ref field", () => {
   it("is in the New Reminder dialog, and what is typed there goes to NewReminder as -Ref", async () => {
     draw();
     fireEvent.click(screen.getByRole("button", { name: "New Reminder" }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await openedDialog();
     fireEvent.change(within(dialog).getByRole("textbox", { name: /What/ }), {
       target: { value: "Chase the review" },
     });
@@ -177,7 +188,7 @@ describe("the Ref field", () => {
   it("is as wide as the New Reminder dialog's other inputs: a field of its own, not half a row", async () => {
     draw();
     fireEvent.click(screen.getByRole("button", { name: "New Reminder" }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await openedDialog();
     const fieldOf = (name: RegExp) =>
       within(dialog).getByRole("textbox", { name }).closest(".fui-Field") as HTMLElement;
     const what = fieldOf(/What/);
@@ -192,7 +203,7 @@ describe("the Ref field", () => {
     draw();
     fireEvent.click(screen.getByRole("button", { name: "Actions for Reminder Q4TN" }));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Edit" }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await openedDialog();
     const fieldOf = (name: RegExp) =>
       within(dialog).getByRole("textbox", { name }).closest(".fui-Field") as HTMLElement;
     const what = fieldOf(/What/);
@@ -205,14 +216,14 @@ describe("the Ref field", () => {
     items = [reminder("Q4TN", { ref: "41" })];
     draw();
     fireEvent.click(screen.getByRole("button", { name: "New Reminder" }));
-    let dialog = await screen.findByRole("dialog");
+    let dialog = await openedDialog();
     expect(dialog.querySelectorAll(".fui-Input").length).toBeGreaterThan(0);
     expectDefaultSizeInputs(dialog);
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     fireEvent.click(screen.getByRole("button", { name: "Actions for Reminder Q4TN" }));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Edit" }));
-    dialog = await screen.findByRole("dialog");
+    dialog = await openedDialog();
     expect(dialog.querySelectorAll(".fui-Input").length).toBeGreaterThan(0);
     expectDefaultSizeInputs(dialog);
   });
@@ -222,7 +233,7 @@ describe("the Ref field", () => {
     draw();
     fireEvent.click(screen.getByRole("button", { name: "Actions for Reminder Q4TN" }));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Edit" }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await openedDialog();
     const ref = within(dialog).getByRole("textbox", { name: /Ref/ }) as HTMLInputElement;
     expect(ref.value).toBe("41");
     fireEvent.change(ref, { target: { value: "" } });
