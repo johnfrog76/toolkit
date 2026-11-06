@@ -40,6 +40,7 @@ from .ado import accounting, bridge, design, docs, pr_comments, reporting, sprin
 from .communication import api as communication_router
 from .core import assets, config_routes, env, hub_sync, log, surfaces, usage
 from .core.config import API_PREFIX, REPO_ROOT, cors_origins
+from .core.consts import consts
 from .core.request_gate import RequestGate
 from .growth import growth_router
 from .organize import api as organize_router
@@ -123,7 +124,15 @@ async def lifespan(_app: FastAPI):
 
 def create_app(client_dir: Path | None = CLIENT_DIR) -> FastAPI:
     """The app: the request gate, CORS, the router, and the built client when there is one."""
-    app = FastAPI(title="Toolkit Agent", version="0.1.0", lifespan=lifespan)
+    # No generated API pages: /docs is the Docs tab's, and they load scripts from a CDN.
+    app = FastAPI(
+        title="Toolkit Agent",
+        version="0.1.0",
+        lifespan=lifespan,
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+    )
 
     # Dev-server origins come from config (web.corsOrigins) with the same defaults
     # as before. A fixed pair of port numbers in source is a portability bug: the
@@ -139,7 +148,9 @@ def create_app(client_dir: Path | None = CLIENT_DIR) -> FastAPI:
         allow_headers=["*"],
     )
     # Added last, so it runs first: nothing is routed or read past a refusal.
-    app.add_middleware(RequestGate, origins=origins, api_prefix=API_PREFIX)
+    app.add_middleware(
+        RequestGate, origins=origins, api_prefix=API_PREFIX, headers=consts()["agent"]["responseHeaders"]
+    )
 
     app.include_router(build_api())
 

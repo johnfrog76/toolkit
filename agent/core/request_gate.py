@@ -2,13 +2,16 @@
 
 The agent binds to the loopback and has no accounts, so a request from another
 machine never arrives. A browser on this machine is different: it will send
-requests to the agent on behalf of whatever page is open. Three checks keep
+requests to the agent on behalf of whatever page is open. Four checks keep
 those to the product's own pages, ahead of routing and before a body is read:
 
 - **Host.** The name the request was addressed to is a loopback name, or the
   host of an origin in ``web.corsOrigins``. Every path.
 - **Sec-Fetch-Site.** A browser that sends it and says ``cross-site`` is refused
   for anything under the API prefix. A navigation to the page itself is not.
+- **Sec-Fetch-Dest.** The API answers ``fetch``. A browser loading it as anything
+  else -- an image, a frame, a tab -- is refused, except the two routes that
+  serve pictures. So a picture in a document can only ever be a picture.
 - **Origin.** A state-changing method carrying an ``Origin`` must carry one in
   ``web.corsOrigins``, or the agent's own: the one the request's ``Host`` names.
   ``Sec-Fetch-Site: same-origin`` also passes, which is how a page behind a
@@ -17,6 +20,10 @@ those to the product's own pages, ahead of routing and before a body is read:
   check has already run, so a page cannot earn that by renaming itself. A missing
   ``Origin`` passes: browsers send one on such a request, and the CLI's own
   calls (``SendTeams``, ``Agent -Status``) are not browsers.
+
+Every response also carries the headers in ``consts.json`` ``agent``: the page
+cannot be framed, and it loads only what its own policy lists. A response that
+sets its own policy (a document's asset, stricter) keeps it.
 
 A refusal is a plain 403 naming the setting. It is not a module gate, so "off
 means absent" does not apply here. The allowed origins are bound at startup, as
@@ -27,6 +34,7 @@ from __future__ import annotations
 
 from urllib.parse import urlsplit
 
+from starlette.datastructures import MutableHeaders
 from starlette.responses import JSONResponse
 
 # Not a frozenset: Tests/conftest.py adds the test client's own name.
@@ -35,8 +43,15 @@ READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 CROSS_SITE = "cross-site"
 SAME_ORIGIN = "same-origin"
 
+# What a browser sends for fetch(), and for a client with no Sec-Fetch-Dest at all.
+API_DESTS = frozenset({"", "empty"})
+# The API paths a page draws as a picture, or a person opens from one.
+PICTURE_ROUTES = ("/assets/", "/docs/asset/")
+PICTURE_DESTS = frozenset({"image", "document"})
+
 REFUSED_HOST = "This agent answers only to its loopback names and the hosts in web.corsOrigins."
 REFUSED_SITE = "This agent does not take requests from another site."
+REFUSED_DEST = "This route answers the app's own calls, not a page loading it."
 REFUSED_ORIGIN = "This agent takes changes only from its own pages and the origins in web.corsOrigins."
 
 
@@ -56,6 +71,13 @@ def allowed_hosts(origins: list[str]) -> set[str]:
     return LOOPBACK_HOSTS | (named - {""})
 
 
+def allowed_dests(path: str, api_prefix: str) -> frozenset[str]:
+    """The ``Sec-Fetch-Dest`` values an API path answers."""
+    if path.startswith(tuple(f"{api_prefix}{route}" for route in PICTURE_ROUTES)):
+        return API_DESTS | PICTURE_DESTS
+    return API_DESTS
+
+
 def refusal(
     method: str,
     path: str,
@@ -64,6 +86,7 @@ def refusal(
     site: str | None,
     origins: list[str],
     api_prefix: str,
+    dest: str | None = None,
 ) -> str | None:
     """Why this request is refused, or None. The whole rule, as one table can
     hold it: Tests/test_request_gate.py has a row for each input it tells apart."""
@@ -72,6 +95,8 @@ def refusal(
     under_api = path == api_prefix or path.startswith(f"{api_prefix}/")
     if under_api and (site or "").lower() == CROSS_SITE:
         return REFUSED_SITE
+    if under_api and (dest or "").lower() not in allowed_dests(path, api_prefix):
+        return REFUSED_DEST
     if method.upper() in READ_METHODS or origin is None or (site or "").lower() == SAME_ORIGIN:
         return None
     key = origin_key(origin)
@@ -84,10 +109,11 @@ def refusal(
 class RequestGate:
     """Pure ASGI, so a refused request's body is never read."""
 
-    def __init__(self, app, origins: list[str], api_prefix: str):
+    def __init__(self, app, origins: list[str], api_prefix: str, headers: dict[str, str] | None = None):
         self.app = app
         self.origins = origins
         self.api_prefix = api_prefix
+        self.headers = headers or {}
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -102,8 +128,17 @@ class RequestGate:
             headers.get("sec-fetch-site"),
             self.origins,
             self.api_prefix,
+            headers.get("sec-fetch-dest"),
         )
+
+        async def with_headers(message):
+            if message["type"] == "http.response.start":
+                out = MutableHeaders(scope=message)
+                for name, value in self.headers.items():
+                    out.setdefault(name, value)
+            await send(message)
+
         if why is None:
-            await self.app(scope, receive, send)
+            await self.app(scope, receive, with_headers)
             return
-        await JSONResponse({"detail": why}, status_code=403)(scope, receive, send)
+        await JSONResponse({"detail": why}, status_code=403)(scope, receive, with_headers)

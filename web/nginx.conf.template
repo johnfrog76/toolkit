@@ -8,8 +8,16 @@
 #
 # Only P20_* names are substituted (NGINX_ENVSUBST_FILTER in the Dockerfile), so
 # nginx's own $host, $remote_addr and $uri are left exactly as written.
+
+# The name the page is opened by must be this machine's. Anything else ends here.
+server {
+    listen 5173 default_server;
+    return 444;
+}
+
 server {
     listen 5173;
+    server_name localhost 127.0.0.1 [::1];
     root /usr/share/nginx/html;
     index index.html;
 
@@ -21,8 +29,13 @@ server {
         proxy_read_timeout 300s;
     }
 
-    # SPA fallback
+    # SPA fallback. The agent sets these on what it answers; this is the page.
+    # consts.json agent.responseHeaders, held to this file by Tests/test_consts.py.
     location / {
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob:; frame-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "no-referrer" always;
         try_files $uri $uri/ /index.html;
     }
 }

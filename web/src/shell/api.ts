@@ -1,3 +1,4 @@
+import { AGENT } from "./consts";
 import type { WorkflowEntry } from "./settingsWorkflows";
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
@@ -214,7 +215,7 @@ export interface SpaceVisibility {
 /** Where the agent's routes are mounted (agent/core/config.py API_PREFIX). The
  *  slice's base, and the one prefix a URL built outside it -- an image the
  *  reading room serves through /docs/asset -- starts with. */
-export const API_BASE = "/api";
+export const API_BASE = AGENT.apiPrefix;
 
 export const api = createApi({
   reducerPath: "api",

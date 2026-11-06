@@ -19,10 +19,12 @@ try:
     from agent.app import create_app
     from agent.core import assets, request_gate
     from agent.core.config import API_PREFIX, DEFAULT_CORS_ORIGINS
+    from agent.core.consts import consts
 except ImportError as e:
     skip_module(f"cannot import the app ({type(e).__name__}: {e})")
 
 H, S, F = request_gate.REFUSED_HOST, request_gate.REFUSED_SITE, request_gate.REFUSED_ORIGIN
+D = request_gate.REFUSED_DEST
 API = f"{API_PREFIX}/status"
 OWN = "localhost:4100"
 
@@ -79,7 +81,35 @@ TABLE = [
 ]
 
 
+# path, Sec-Fetch-Dest, why -- a same-origin GET, as a page drawing a picture sends it.
+DESTS = [
+    (API, "empty", None),
+    (API, None, None),
+    (API, "image", D),
+    (API, "document", D),
+    (API, "iframe", D),
+    (API, "script", D),
+    (API, "style", D),
+    (f"{API_PREFIX}/design/search", "image", D),
+    (f"{API_PREFIX}/assets/space/key/a.png", "image", None),
+    (f"{API_PREFIX}/assets/space/key/a.png", "document", None),
+    (f"{API_PREFIX}/assets/space/key/a.png", "script", D),
+    (f"{API_PREFIX}/docs/asset/docs/a.png", "image", None),
+    (f"{API_PREFIX}/docs/assets", "image", D),
+    ("/", "document", None),
+    ("/assets/index.js", "script", None),
+]
+
+
 class TheRule(unittest.TestCase):
+    def test_every_destination(self):
+        for path, dest, why in DESTS:
+            with self.subTest(path=path, dest=dest):
+                got = request_gate.refusal(
+                    "GET", path, OWN, None, "same-origin", DEFAULT_CORS_ORIGINS, API_PREFIX, dest
+                )
+                self.assertEqual(got, why)
+
     def test_every_row(self):
         for method, path, host, origin, site, why in TABLE:
             with self.subTest(method=method, path=path, host=host, origin=origin, site=site):
@@ -140,6 +170,22 @@ class TheRunningApp(unittest.TestCase):
         asyncio.run(gate(scope, receive, send))
         self.assertEqual(received, [])
         self.assertEqual(sent[0]["status"], 403)
+
+    def test_every_answer_carries_the_headers_a_refusal_too(self):
+        wanted = consts()["agent"]["responseHeaders"]
+        for reply in (
+            self.client.get(f"{API_PREFIX}/health"),
+            self.client.get(f"{API_PREFIX}/health", headers={"Host": "example.test"}),
+        ):
+            for name, value in wanted.items():
+                self.assertEqual(reply.headers[name], value)
+
+    def test_a_picture_of_the_api_runs_nothing(self):
+        reply = self.client.get(
+            f"{API_PREFIX}/design/search?q=word",
+            headers={"Sec-Fetch-Site": "same-origin", "Sec-Fetch-Dest": "image"},
+        )
+        self.assertEqual((reply.status_code, reply.json()["detail"]), (403, D))
 
     def test_a_dev_server_page_passes(self):
         reply = self.client.get(f"{API_PREFIX}/health", headers={"Origin": DEFAULT_CORS_ORIGINS[0]})

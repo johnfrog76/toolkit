@@ -139,6 +139,7 @@ $expected = [ordered]@{
     'env.teamsWebhookPrefix'  = 'TEAMS_WEBHOOK_'
     'env.testRunMarker'       = 'P20_TEST_RUN'
     'agent.bindHost'          = '127.0.0.1'
+    'agent.apiPrefix'         = '/api'
     'stamps.sent'             = 'Sent to'
     'stamps.due'              = '**Due:**'
     'stamps.source'           = '**Source:**'

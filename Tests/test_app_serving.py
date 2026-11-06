@@ -44,6 +44,13 @@ class SpaFallbackTests(unittest.TestCase):
         (self.client_dir / "assets" / "app.js").write_text("console.log('scratch');\n", encoding="utf-8")
         self.client = TestClient(app_module.create_app(self.client_dir))
 
+    def test_the_docs_tab_is_the_apps_not_a_generated_page(self):
+        for path in ("/docs", "/redoc"):
+            reply = self.client.get(path)
+            self.assertEqual(reply.status_code, 200)
+            self.assertEqual(reply.text, INDEX_HTML)
+        self.assertEqual(self.client.get("/openapi.json").text, INDEX_HTML)
+
     def tearDown(self):
         self._tmp.cleanup()
 

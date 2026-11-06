@@ -284,6 +284,9 @@ plain 403 naming the setting:
   in `web.corsOrigins`, on every path.
 - **`Sec-Fetch-Site: cross-site`** is refused for anything under `/api`. Following a link to the page
   itself is not.
+- **`Sec-Fetch-Dest`** must be a call, not a load: under `/api`, a browser asking for an image, a
+  frame or a tab is refused, except the two routes that serve pictures (`/api/assets/` and
+  `/api/docs/asset/`).
 - **A state-changing request carrying an `Origin`** must be `Sec-Fetch-Site: same-origin`, or come from
   an origin in `web.corsOrigins`, or from the agent's own origin. Same-origin is how a page behind
   the dev server's proxy or the Docker image's nginx is recognised on any port. A request with no
@@ -291,6 +294,15 @@ plain 403 naming the setting:
 
 `Tests/test_request_gate.py` is the table, one row for each input the rule tells apart. Picture
 uploads are also limited as they are read, not after, and an upload nobody attached is swept hourly.
+
+The gate also puts `consts.json` `agent.responseHeaders` on every response, so the app cannot be
+framed and loads only what its policy lists; the Docker image's nginx repeats them for the page, and
+drops any request addressed to a name that is not this machine. The agent generates no API pages of
+its own, because `/docs` is the Docs tab's.
+
+Markdown is text from elsewhere, so it gets the same rule from the other side:
+`web/src/shared/noAgentImages.ts` runs after the sanitiser on every document and drops a picture
+aimed at the API or at this machine.
 
 ### The web UI is served to the same machine
 

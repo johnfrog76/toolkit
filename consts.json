@@ -127,8 +127,15 @@
   },
 
   "agent": {
-    "_": "Where the agent listens. bindHost is the one interface Scripts/Start-Agent.ps1 hands uvicorn as --host: the loopback, so the agent answers the machine it runs on and nothing else. The agent has no authentication of its own, so this literal IS the boundary; docs/ARCHITECTURE.md, Trust model. Tests/test_consts.py (TheAgentListensOnTheLoopbackOnly) holds the script, the compose file and the settings to it, and the three consts suites state the value.",
-    "bindHost": "127.0.0.1"
+    "_": "Where the agent listens, and what it sends. apiPrefix is the one path every route is mounted under: the agent mounts there and the web's markdown never draws a picture from there. responseHeaders go on every response: the agent's request gate adds them, and web/nginx.conf.template repeats them for the page the Docker image serves (Tests/test_consts.py holds the template to these). bindHost is the one interface Scripts/Start-Agent.ps1 hands uvicorn as --host: the loopback, so the agent answers the machine it runs on and nothing else. The agent has no authentication of its own, so this literal IS the boundary; docs/ARCHITECTURE.md, Trust model. Tests/test_consts.py (TheAgentListensOnTheLoopbackOnly) holds the script, the compose file and the settings to it, and the three consts suites state the value.",
+    "bindHost": "127.0.0.1",
+    "apiPrefix": "/api",
+    "responseHeaders": {
+      "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob:; frame-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'",
+      "X-Frame-Options": "DENY",
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "no-referrer"
+    }
   },
 
   "tests": {

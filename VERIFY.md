@@ -986,6 +986,12 @@ names the command, what you should see, and the issue it closes. A row stays unt
 it and records that on the issue. Then the row moves into the gate it belongs to, or goes if a suite
 now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on the verifying host: it prints each `verify-close` issue with the row below that names it, by issue number.
 
+- [ ] **The Docker image behind the agent's request gate.** Docker Desktop running, `tkWeb` with the agent up. Open
+  `http://localhost:5174` and walk Home, the Board and a card: pages load, and creating a card from the web UI
+  works, which proves a write passes through nginx. Open `http://127.0.0.1:5174` and do the same. `curl -si -H "Host:
+  example.test" http://localhost:5174/` should drop the connection, and `curl -sI http://localhost:5174/` should show
+  `Content-Security-Policy` and `X-Frame-Options: DENY`. The browser console shows no policy violation.
+
 - [ ] **`npm ci` asks nothing about install scripts on Windows.** On the Windows PC, in `web/`, `git diff package.json`
   first: a local `allowScripts` edit from approving `@parcel/watcher` or `unrs-resolver` by hand is thrown away with
   `git checkout -- package.json` before the pull. Then delete `node_modules`, run `npm ci`, and you should see no
