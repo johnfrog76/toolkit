@@ -28,6 +28,7 @@ prompt store from where this file happens to live -- see core/config.py.
 """
 
 import asyncio
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -95,7 +96,7 @@ def mount_client(app: FastAPI, client_dir: Path) -> None:
     that names the path.
     """
     api_prefix = API_PREFIX.strip("/") + "/"
-    root = client_dir.resolve()
+    root = os.path.realpath(client_dir)
 
     app.mount("/assets", StaticFiles(directory=str(client_dir / "assets")), name="assets")
 
@@ -105,10 +106,10 @@ def mount_client(app: FastAPI, client_dir: Path) -> None:
             raise HTTPException(status_code=404, detail=f"No such API route: /{path}")
         # A file the build put there (a Lounge skin, a deck's picture) is that
         # file; resolved first, so no spelling of `..` leaves the build.
-        file = (root / path).resolve()
-        if file.is_file() and file.is_relative_to(root):
-            return FileResponse(str(file))
-        return FileResponse(str(root / "index.html"))
+        file = os.path.realpath(os.path.join(root, path))
+        if file.startswith(root + os.sep) and os.path.isfile(file):
+            return FileResponse(file)
+        return FileResponse(os.path.join(root, "index.html"))
 
 
 async def sweep_uploads_hourly() -> None:
