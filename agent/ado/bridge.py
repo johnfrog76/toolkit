@@ -56,6 +56,7 @@ from pydantic import BaseModel, Field
 from ..core import config as _config
 from ..core import hub_sync
 from ..core.assets import remove_upload
+from ..core.child import run_tree
 from ..core.config import ACTIVE_LEDGER_KEY, REPO_ROOT, TRACKER_WRITE_VERBS, load_config
 from ..core.hosts import NO_HOST_ERROR, host_argv, resolve_host
 from ..core.log_writer import write_log
@@ -150,7 +151,8 @@ def _map_key_now() -> tuple:
 
     ``utilities.psm1`` defines the core verbs; the two config files decide
     which module flags are on, and a module's verbs are in the table only while
-    its flag is; ``Config/*.commands.psd1`` is where a module declares them. A
+    its flag is; the hub's ``hub.json`` holds a Space's ``howIWork``, which gates
+    Team Agile's; ``Config/*.commands.psd1`` is where a module declares them. A
     file that is not there is ``None``, so its appearance is a change too.
     """
     modules: list[tuple[str, tuple | None]] = []
@@ -164,6 +166,7 @@ def _map_key_now() -> tuple:
         _mtime(UTILITIES),
         _mtime(_config.DEFAULT_CONFIG_PATH),
         _mtime(_config.LOCAL_CONFIG_PATH),
+        _mtime(_config.hub_root() / _config.HUB_MANIFEST_NAME),
         tuple(modules),
     )
 
@@ -317,16 +320,14 @@ def _run(
     argv = host_argv(str(BRIDGE_PS1), function, *params)
     if argv is None:
         raise OSError(NO_HOST_ERROR)
-    return subprocess.run(
+    return run_tree(
         argv,
-        capture_output=True,
+        timeout,
         text=True,
         encoding="utf-8",
         errors="replace",
-        timeout=timeout,
         cwd=str(REPO_ROOT),
         env={**_child_env(), **(extra_env or {})},
-        check=False,
     )
 
 
