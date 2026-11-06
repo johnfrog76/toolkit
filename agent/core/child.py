@@ -24,10 +24,14 @@ caller, as a reason and never a run.
 
 from __future__ import annotations
 
+import os
 import platform
+import signal
 import subprocess
 
 CHILD_ENCODING = "utf-8"
+# How long ending a tree may take, on top of the timeout that started it.
+TREE_KILL_SECONDS = 5
 
 # The tools that need the shell on Windows: each is a .cmd, not an executable.
 SHELL_TOOLS = frozenset({"az"})
@@ -93,6 +97,47 @@ def run_read(
         tool = cmd[0] if cmd else "the child"
         raise ChildReadError(f"{tool}'s output could not be read (exit code {result.returncode})")
     return result
+
+
+def kill_tree(process: subprocess.Popen) -> None:
+    """End a child started by :func:`run_tree`, and everything it started."""
+    try:
+        if platform.system() == "Windows":
+            subprocess.run(
+                ["taskkill", "/T", "/F", "/PID", str(process.pid)],
+                capture_output=True,
+                timeout=TREE_KILL_SECONDS,
+                check=False,
+            )
+        else:
+            os.killpg(process.pid, signal.SIGKILL)
+    except (OSError, subprocess.SubprocessError):
+        process.kill()
+
+
+def run_tree(argv: list[str], timeout: float, **popen: object) -> subprocess.CompletedProcess:
+    """``subprocess.run`` for a child that starts children of its own.
+
+    The child leads its own process group, so a timeout ends the whole tree
+    rather than the direct child alone: what it started would carry on, and on
+    Windows would hold the pipes open past the timeout, so the reply would hang.
+    Raises ``TimeoutExpired`` as ``subprocess.run`` does.
+    """
+    if platform.system() == "Windows":
+        popen["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        popen["start_new_session"] = True
+    process = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **popen)
+    try:
+        stdout, stderr = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        kill_tree(process)
+        try:
+            process.communicate(timeout=TREE_KILL_SECONDS)
+        except subprocess.TimeoutExpired:
+            process.kill()
+        raise
+    return subprocess.CompletedProcess(argv, process.returncode, stdout, stderr)
 
 
 def did_not_answer(tool: str, exc: BaseException) -> str:

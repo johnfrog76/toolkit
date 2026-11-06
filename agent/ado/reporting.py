@@ -28,7 +28,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..core import log_writer
@@ -40,6 +40,7 @@ from ..core.consts import (
     review_slug_separator,
 )
 from ..core.hosts import NO_HOST_ERROR, host_argv
+from ..growth import growth_enabled, require_growth
 
 api = APIRouter()
 
@@ -730,7 +731,8 @@ async def get_engagement_summary(slug: str):
     if org is None:
         raise HTTPException(status_code=404, detail=f"Unknown Space slug: {slug}")
 
-    review_count, _ = _count_org_reviews(slug)
+    # The module's own data: with growth off there are no reviews to count.
+    review_count = _count_org_reviews(slug)[0] if growth_enabled() else 0
     closed_count = _count_archive_items(org)
     start_date, end_date, days_billed = _read_billing_data(org)
     prs_reviewed = _count_pr_comments(org)
@@ -751,7 +753,11 @@ async def get_engagement_summary(slug: str):
     )
 
 
-@api.get("/engagement/{slug}/reviews", response_model=list[EngagementReviewItem])
+@api.get(
+    "/engagement/{slug}/reviews",
+    response_model=list[EngagementReviewItem],
+    dependencies=[Depends(require_growth)],
+)
 async def get_engagement_reviews(slug: str, archived: bool = False):
     # "all" is a cross-org view, not a real org — skip the org-config check.
     if slug != "all":

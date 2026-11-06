@@ -131,7 +131,7 @@ EXAMPLES:
     $(Get-CliPrefix)GetPRComments 140123                        # Fetch + append to matching prompt
     $(Get-CliPrefix)GetPRComments                               # Auto-detect PR from current branch
     $(Get-CliPrefix)GetPRComments 140123 -OutputFile .\x.md     # Write to specific file
-    $(Get-CliPrefix)GetPRComments 140123 -Project "Learning Coaches Everywhere" -Repository CoachWebApp
+    $(Get-CliPrefix)GetPRComments 140123 -Project "Acme Project" -Repository widget-api
     $(Get-CliPrefix)GetPRComments 12 -Repository acme/widgets     # GitHub, when no card names PR 12
 
 "@ -ForegroundColor Cyan

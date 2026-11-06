@@ -290,7 +290,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **51 suites, 9198 assertions** with a `config.local.json`, every one
+findings. On this commit that is **51 suites, 9290 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -998,6 +998,11 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `python Tests/test_child_windows.py` passes all three (the Windows CI job runs the same file), then open the Design
   tab and search for `a&b` and for `"quoted"`, and you should see an ordinary result or none, with the tab still
   answering. On an Azure DevOps Space, `tkDashboard` and the web UI's work items list as before; `az` still answers.
+
+- [ ] **`Land` and `az.cmd` on Windows.** On the Windows PC, on an Azure DevOps Space, `tkTestToolkit -Land` passes,
+  including its two `.cmd` rows, which run only there. Then `tkEditItem <id> -Title "R&D work"` with `-WhatIf` off on a test
+  item: the title arrives whole, because an argument with a space is quoted. And `tkLand` on a real merged pull request of
+  this Space still works.
 
 - [ ] **`npm ci` asks nothing about install scripts on Windows.** On the Windows PC, in `web/`, `git diff package.json`
   first: a local `allowScripts` edit from approving `@parcel/watcher` or `unrs-resolver` by hand is thrown away with
