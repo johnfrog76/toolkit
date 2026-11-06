@@ -308,9 +308,9 @@ So a byte that is not UTF-8 becomes U+FFFD and the read goes on, and an output t
 arrive raises `ChildReadError`. Each caller states that as its reason, the way it states a timeout
 (`<repo>: gh's output could not be read (exit code 0)`), and never as rows. The standup's and
 triage's shared reader, `read_tracker` in `solitaire/tracker.py`, also turns any exception out of a reader into `tracker.ok: false` with the
-reason. The shell rule is unchanged: on Windows `gh` and `az` run through the shell (`az.cmd`
-needs it), so a `&` in an argument is cmd's, and `accounting.unsafe_for_shell` refuses one before
-it reaches the helper. A `git` read passes `shell=False`. The bridge and `/surfaces` read their
+reason. The shell rule lives in the helper: on Windows only `az` runs through the shell (`az.cmd` needs
+it), and `gh` and `git` run without one. A shell-bound argv holding a character the shell reads as
+syntax is refused there, as a reason, for every caller. The bridge and `/surfaces` read their
 PowerShell children with an explicit `encoding="utf-8"` too. `Tests/test_child_reads.py` holds the
 rule: each read under a stand-in for a cp1252 console keeps a title with an em dash, curly quotes
 and `Ï` (UTF-8 `C3 8F`) whole, a dead reader is a reason everywhere, and no `text=True` call in

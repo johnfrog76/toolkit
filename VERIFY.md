@@ -986,6 +986,11 @@ names the command, what you should see, and the issue it closes. A row stays unt
 it and records that on the issue. Then the row moves into the gate it belongs to, or goes if a suite
 now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on the verifying host: it prints each `verify-close` issue with the row below that names it, by issue number.
 
+- [ ] **The agent's reads on Windows, gh and az.** On the Windows PC, with the agent up and a GitHub Space active,
+  `python Tests/test_child_windows.py` passes all three (the Windows CI job runs the same file), then open the Design
+  tab and search for `a&b` and for `"quoted"`, and you should see an ordinary result or none, with the tab still
+  answering. On an Azure DevOps Space, `tkDashboard` and the web UI's work items list as before; `az` still answers.
+
 - [ ] **`npm ci` asks nothing about install scripts on Windows.** On the Windows PC, in `web/`, `git diff package.json`
   first: a local `allowScripts` edit from approving `@parcel/watcher` or `unrs-resolver` by hand is thrown away with
   `git checkout -- package.json` before the pull. Then delete `node_modules`, run `npm ci`, and you should see no
