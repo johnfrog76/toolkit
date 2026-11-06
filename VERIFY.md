@@ -991,6 +991,11 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   tab and search for `a&b` and for `"quoted"`, and you should see an ordinary result or none, with the tab still
   answering. On an Azure DevOps Space, `tkDashboard` and the web UI's work items list as before; `az` still answers.
 
+- [ ] **`Land` and `az.cmd` on Windows.** On the Windows PC, on an Azure DevOps Space, `tkTestToolkit -Land` passes,
+  including its two `.cmd` rows, which run only there. Then `tkEditItem <id> -Title "R&D work"` with `-WhatIf` off on a test
+  item: the title arrives whole, because an argument with a space is quoted. And `tkLand` on a real merged pull request of
+  this Space still works.
+
 - [ ] **`npm ci` asks nothing about install scripts on Windows.** On the Windows PC, in `web/`, `git diff package.json`
   first: a local `allowScripts` edit from approving `@parcel/watcher` or `unrs-resolver` by hand is thrown away with
   `git checkout -- package.json` before the pull. Then delete `node_modules`, run `npm ci`, and you should see no

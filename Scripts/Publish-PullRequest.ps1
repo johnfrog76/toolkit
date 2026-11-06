@@ -101,6 +101,7 @@ NOTES:
 . (Join-Path $PSScriptRoot 'Resolve-CardName.ps1')
 . (Join-Path $PSScriptRoot 'Get-AdoToken.ps1')
 . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
+. (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
 
 # The line this verb writes. CLI-only: nothing in the agent or the web reads it, and
 # it is not state -- the PR URL: line above it is the gate into Code Review.
@@ -205,7 +206,14 @@ if (-not $ado.Success) {
         -Hint "${p}PublishPR reads <organisation>/<project>/_git/<repository>/pullrequest/<id>, the address ${p}NewPR writes."
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
-$org = $ado.Groups['org'].Value
+# The token is the Space's, so it goes to the Space's organisation. The card's line
+# is text: one that names another address is refused before anything is sent.
+if (-not (Test-P20UrlInOrg -Url $prUrl -Org $cfg.Org)) {
+    Write-CliError -Message "$prUrl is not on this Space's organisation ($($cfg.Org)), so ${p}PublishPR will not send your token there." `
+        -Hint "Run ${p}PublishPR from the Space that holds it, or correct the card's $($c.tokens.prUrl) line."
+    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+}
+$org = ([string]$cfg.Org).TrimEnd('/')
 $project = $ado.Groups['project'].Value
 $repo = $ado.Groups['repo'].Value
 $prId = $ado.Groups['id'].Value

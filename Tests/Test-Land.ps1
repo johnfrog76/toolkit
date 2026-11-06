@@ -272,6 +272,26 @@ try {
     Assert-True 'the issue step is skipped, and said' ($r.Text -match '\[2/3\] Skipped: this Space has no tracker') $r.Text
     Assert-True 'and the card is recorded and archived' ((Test-Path (Join-Path $hubDir "solo/archive/$nameS")) -and ([System.IO.File]::ReadAllText((Join-Path $hubDir "solo/archive/$nameS")) -match '- c84c6e3 #178 squash-merged to main 2026-10-30')) $r.Text
 
+    # -- The card's line names the pull request, never where to go -------------
+    Set-ActiveSpace 'board'
+    $n = 5100
+    foreach ($bad in @(
+            'https://x&calc&.visualstudio.com/pullrequest/1',
+            'https://dev.azure.com/x&calc&/pullrequest/1',
+            'https://dev.azure.com/other-org/p/_git/r/pullrequest/1',
+            'https://evil.example/acme-org/_git/r/pullrequest/1',
+            'https://evil.example#.visualstudio.com/pullrequest/1',
+            'https://dev.azure.com/acme-org.evil.example/p/_git/r/pullrequest/1',
+            'https://github.com/o/r/pull/1'
+        )) {
+        $n++
+        $name = "$n-a-forged-line.prompt.md"
+        New-Card -Space 'board' -FileName $name -Heading "Bug ${n}: A forged line" -PrUrl $bad | Out-Null
+        $r = Invoke-Land "tkLand $n"
+        Assert-True "a line off this Space's tracker is refused: $bad" ($r.Text -match 'EXIT=2' -and $r.Text -match "not on this Space's tracker") $r.Text
+        Assert-True 'and nothing was asked' (@($r.Calls | Where-Object { $_ -match '^(az repos|gh pr|REST)' }).Count -eq 0) ($r.Calls -join ' | ')
+    }
+
     # -- Azure DevOps, merged ---------------------------------------------------
     Set-ActiveSpace 'board'
     $nameA = '4242-a-board-bug.prompt.md'
@@ -297,6 +317,47 @@ try {
     $bB = Get-Bytes64 $pB
     $r = Invoke-Land 'tkLand 4243' -AdoStatus 'abandoned'
     Assert-True 'an abandoned Azure DevOps pull request is refused (exit 2), named, nothing written' ($r.Text -match 'is abandoned, not merged' -and $r.Text -match 'EXIT=2' -and (Get-Bytes64 $pB) -eq $bB -and -not (@($r.Calls) -match '^REST ')) $r.Text
+
+    # -- What reaches a .cmd ------------------------------------------------------
+    # PowerShell quotes an argument holding a space, and nothing else. One row each.
+    . (Join-Path $pkgRoot 'Scripts/Invoke-TrackerRead.ps1')
+    foreach ($row in @(
+            @{ Arg = 'plain'; Ok = $true }
+            @{ Arg = 'https://dev.azure.com/acme-org'; Ok = $true }
+            @{ Arg = 'System.Tags=a; b'; Ok = $true }
+            @{ Arg = 'R&D work'; Ok = $true }
+            @{ Arg = '100% of it'; Ok = $true }
+            @{ Arg = "[State] <> 'Closed'"; Ok = $true }
+            @{ Arg = ''; Ok = $true }
+            @{ Arg = 'https://x&calc&.visualstudio.com'; Ok = $false }
+            @{ Arg = 'a|b'; Ok = $false }
+            @{ Arg = 'a<b'; Ok = $false }
+            @{ Arg = 'a>b'; Ok = $false }
+            @{ Arg = 'a^b'; Ok = $false }
+            @{ Arg = '%PATH%'; Ok = $false }
+            @{ Arg = 'say "hi" there'; Ok = $false }
+            @{ Arg = '"'; Ok = $false }
+            @{ Arg = "two`nlines"; Ok = $false }
+        )) {
+        Assert-True "a .cmd may take [$($row.Arg)]: $($row.Ok)" ($row.Ok -eq (Test-P20CmdArgument $row.Arg))
+    }
+    if ($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop') {
+        # The real thing: a .cmd on the PATH, a value that would write a marker.
+        $cmdDir = Join-Path $root 'cmdtool'
+        New-Item -ItemType Directory -Path $cmdDir -Force | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $cmdDir 'p20tool.cmd'), "@echo ran %*`r`n")
+        $marker = Join-Path $cmdDir 'marker.txt'
+        $before = $env:PATH
+        try {
+            $env:PATH = "$cmdDir;$before"
+            $ok = Invoke-P20TrackerRead 'p20tool' @('--name', 'a b')
+            Assert-True 'a .cmd still runs' ($ok.Code -eq 0 -and ($ok.Out -join ' ') -match 'ran --name') ($ok.Lines -join ' | ')
+            $no = Invoke-P20TrackerRead 'p20tool' @("x&echo hit>$marker&")
+            Assert-True 'and takes no bare syntax' ($no.Code -eq 2) ($no.Lines -join ' | ')
+            Assert-True 'and nothing ran' (-not (Test-Path -LiteralPath $marker)) ($no.Lines -join ' | ')
+        }
+        finally { $env:PATH = $before }
+    }
 
     # -- The help --------------------------------------------------------------
     $r = Invoke-Land 'tkLand -Help'
