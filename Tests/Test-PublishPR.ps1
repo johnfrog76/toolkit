@@ -184,6 +184,19 @@ try {
     Assert-True 'and the card is not written' ((Get-Bytes $shipped) -eq $once)
     Assert-True 'and the refusal is said once, not wrapped in a generic error' ((@([regex]::Matches($r.Text, '(?m)^Error: ')).Count -eq 1) -and -not ($r.Text -match 'exit code 2')) $r.Text
 
+    # -- Refusal: a line that is not this Space's organisation --------------------
+    # The token goes to the Space's organisation or nowhere.
+    foreach ($row in @(
+            @{ Id = 'Q3AX'; Url = 'https://evil.example/p/_git/r/pullrequest/1' }
+            @{ Id = 'Q4AX'; Url = 'https://dev.azure.com/other-org/p/_git/r/pullrequest/1' }
+            @{ Id = 'Q6AX'; Url = 'https://dev.azure.com/acme-org.evil.example/p/_git/r/pullrequest/1' }
+        )) {
+        New-ShippedCard -Space 'board' -FileName "Task$($row.Id)-a-forged-line.prompt.md" -Heading "Task $($row.Id): A forged line" -PrUrl $row.Url | Out-Null
+        $r = Invoke-Publish "${cfgPrefix}PublishPR $($row.Id)"
+        Assert-True "not this Space's organisation is refused: $($row.Url)" ($r.Text -match "not on this Space's organisation" -and $r.Text -match 'EXIT=2') $r.Text
+        Assert-True 'and no token is asked for and no REST call made' ((Get-TokenCalls $r.Calls).Count -eq 0 -and (Get-RestCalls $r.Calls).Count -eq 0) ($r.Calls -join ' | ')
+    }
+
     # -- Refusal: no PR URL: line -------------------------------------------------
     $noPrBytes = Get-Bytes $noPr
     $r = Invoke-Publish "${cfgPrefix}PublishPR M3PX"

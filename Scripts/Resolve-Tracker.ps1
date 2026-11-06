@@ -44,6 +44,21 @@ function Resolve-P20Tracker {
  path -- a blank address, or the legacy *.visualstudio.com shape whose org
  lives in the host.
 #>
+function Test-P20UrlInOrg {
+    <#
+        Whether a URL lies under the organisation address a Space declares: the
+        whole authority and path prefix, ignoring case. The test for a URL read
+        from a card, before a credential or a command goes anywhere near it.
+    #>
+    param(
+        [AllowEmptyString()][string]$Url,
+        [AllowEmptyString()][string]$Org
+    )
+    $root = "$Org".TrimEnd('/')
+    if (-not $root) { return $false }
+    return "$Url".StartsWith("$root/", [System.StringComparison]::OrdinalIgnoreCase)
+}
+
 function Get-P20TrackerOwner {
     param(
         [AllowEmptyString()][AllowNull()][string]$OrgUrl

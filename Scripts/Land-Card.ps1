@@ -159,7 +159,7 @@ $prHost = ''
 $ghRepo = ''
 $adoOrg = ''
 $prNumber = $Pr
-$ghPr = [regex]::Match($prUrl, '(?i)github\.com/([^/\s]+)/([^/\s]+)/pull/(\d+)')
+$ghPr = [regex]::Match($prUrl, '(?i)^https://github\.com/([^/\s]+)/([^/\s]+)/pull/(\d+)')
 $adoPr = [regex]::Match($prUrl, '(?i)/pullrequest/(\d+)')
 if ($ghPr.Success) {
     $prHost = 'github'
@@ -168,8 +168,7 @@ if ($ghPr.Success) {
 }
 elseif ($adoPr.Success) {
     $prHost = 'ado'
-    $orgMatch = [regex]::Match($prUrl, '(?i)^(https://dev\.azure\.com/[^/]+|https://[^/]+\.visualstudio\.com)/')
-    $adoOrg = if ($orgMatch.Success) { $orgMatch.Groups[1].Value } else { [string]$cfg.Org }
+    $adoOrg = [string]$cfg.Org
     if (-not $prNumber) { $prNumber = [int]$adoPr.Groups[1].Value }
 }
 
@@ -181,6 +180,16 @@ if (-not $prNumber) {
 
 $spaceTracker = Resolve-P20Tracker -OrgUrl $cfg.Org
 Write-P20TrackerHeader -Name $cfg.ActiveOrgName -OrgUrl $cfg.Org
+# The card's line says which pull request, and it is text: an Azure DevOps one must
+# lie in this Space's organisation, and a Space on Azure DevOps takes no other.
+# A Space with no tracker may still land a GitHub pull request by its line.
+$offTracker = ($prHost -eq 'ado' -and -not (Test-P20UrlInOrg -Url $prUrl -Org $cfg.Org)) -or
+    ($prHost -eq 'github' -and $spaceTracker -eq 'ado')
+if ($offTracker) {
+    Write-CliError -Message "$leaf's $prToken line is not on this Space's tracker ($prUrl), so ${p}Land will not ask there." `
+        -Hint "Run ${p}Land from the Space that holds it, or correct the line. Nothing was read or written."
+    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+}
 if (-not $prHost) {
     $prHost = $spaceTracker
     if ($prHost -eq 'github') {

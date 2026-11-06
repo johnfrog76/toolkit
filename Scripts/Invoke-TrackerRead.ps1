@@ -19,6 +19,23 @@
 # stderr cannot corrupt it); Err is stderr alone. $LASTEXITCODE is left at Code.
 # PowerShell 5.1 clean; reads no module state.
 #
+# On Windows a tool can be a .cmd (az is), and then cmd.exe parses the command
+# line. PowerShell quotes an argument holding a space and nothing else, so an
+# argument with no space reaches cmd.exe bare. Test-P20CmdArgument is the rule, and
+# a read it refuses never starts: Code 2, with the sentence in Lines and Err. Quoting
+# stops & and | but not %, so a variable's shape is refused with or without a space.
+# Past that, a % that starts a percent-encoded byte (%2F) passes, because a URL path
+# carries them: gh's branch path does, and gh can be a .cmd shim. Two such bytes with
+# a letter first (%C3%A9) have a variable's shape and are refused, on a rare path.
+#
+function Test-P20CmdArgument {
+    param([AllowEmptyString()][string]$Argument)
+    if ($Argument -match '["\r\n]') { return $false }
+    if ($Argument -match '%[A-Za-z_][^%]*%') { return $false }
+    if ($Argument -match '\s') { return $true }
+    return ($Argument -notmatch '[&|<>^]|%(?![0-9A-Fa-f]{2})')
+}
+
 function Invoke-P20TrackerRead {
     [CmdletBinding()]
     param(
@@ -26,6 +43,15 @@ function Invoke-P20TrackerRead {
         [Parameter(Position = 1)][string[]]$Arguments = @()
     )
     $ErrorActionPreference = 'Continue'
+    $resolved = Get-Command $Tool -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($resolved -and "$($resolved.Source)" -match '\.(cmd|bat)$') {
+        foreach ($argument in $Arguments) {
+            if (Test-P20CmdArgument $argument) { continue }
+            $said = "$Tool was not run: the argument '$argument' holds a character cmd.exe would read."
+            $global:LASTEXITCODE = 2
+            return [PSCustomObject]@{ Code = 2; Lines = @($said); Out = @(); Err = @($said) }
+        }
+    }
     $global:LASTEXITCODE = 0
     $raw = @(& $Tool @Arguments 2>&1)
     $code = $LASTEXITCODE
