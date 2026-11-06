@@ -220,6 +220,12 @@ jobs:
         if: ${{ !cancelled() }}
         run: python -m pip install -r agent/requirements.txt
 
+      # What run_read hands to a real Windows console. Plain unittest: this job
+      # installs no pytest.
+      - name: The agent's child reads, on Windows
+        if: ${{ !cancelled() }}
+        run: python Tests/test_child_windows.py
+
       - name: Versions
         if: ${{ !cancelled() }}
         run: |

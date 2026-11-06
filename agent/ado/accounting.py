@@ -561,10 +561,8 @@ def github_milestone_rows(repo: str) -> tuple[list[Milestone], str | None]:
     """One repo's milestones, every state, in ONE ``gh api`` call: (rows, None),
     or ([], the reason). The one reader both ``GET /api/milestones`` and Team
     Agile's ``GET /api/ritual/milestones`` (agent/solitaire/milestones.py) use."""
-    # Query parameters go as flags, never in the URL: on Windows the call runs
-    # through cmd.exe (shell=True, for az.cmd), and an unquoted `&` splits the
-    # command -- "'per_page' is not recognized as an internal or external
-    # command". _gh_json refuses such an argument before it runs.
+    # Query parameters go as flags, never in the URL. _gh_json refuses such an
+    # argument before it runs.
     rows, why = _gh_json(
         ["gh", "api", "--method", "GET", f"repos/{repo}/milestones", "-f", "state=all", "-F", "per_page=100"]
     )
@@ -658,9 +656,8 @@ CMD_METACHARS = "&|<>"
 
 
 def unsafe_for_shell(cmd: list[str]) -> str | None:
-    """The first argument cmd.exe would split, or None. The gh calls run
-    through a shell on Windows (az.cmd needs it), so a `&` in a URL is a
-    second command there. Query parameters travel as -f/-F flags."""
+    """The first argument that puts a query in a URL, or None. Query parameters
+    travel as -f/-F flags, on every host."""
     for arg in cmd:
         if any(ch in arg for ch in CMD_METACHARS):
             return arg
@@ -672,7 +669,7 @@ def _gh_json(cmd: list[str], timeout: int = 30):
     failure sentences every gh read in this file speaks."""
     bad = unsafe_for_shell(cmd)
     if bad is not None:
-        return None, f"refused before running: argument {bad!r} would be split by cmd.exe on Windows"
+        return None, f"refused before running: argument {bad!r} belongs in a -f field, not the URL"
     try:
         result = run_read(cmd, timeout)
     except Exception as exc:  # noqa: BLE001 -- gh missing, the clock ran out, or its output unreadable: a reason, never a raise
