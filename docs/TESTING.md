@@ -73,7 +73,7 @@ python3 -m pip install -r agent/requirements-dev.txt   # once -- runtime deps pl
 python3 -m pytest Tests/     # 1370 passed, 3 skipped -- the agent
 cd web && npm ci             # once
 cd web && npx playwright install chromium   # once -- for `npm run smoke` only
-cd web && npm test           # 5 build-contract checks, then 156 suites, 1852 tests -- the shell
+cd web && npm test           # 5 build-contract checks, then 157 suites, 1854 tests -- the shell
 cd web && npm run smoke              # 23 checks, flags off -- the browser; needs two servers up
 cd web && npm run smoke -- --modules=on  # 30 checks, both module flags on
 cd web && npm run smoke -- --studio      # the Studio's contract -- starts and stops its own servers
@@ -108,7 +108,7 @@ a passing `pytest:` line may end `(via <python>)`, which is information and not 
   Consts 204, Compat 1717, Menu 2062, Environment 62, Archive 217, PRComments 230, BackfillStamps 50, Changelog 88, Update 58, Start 87, PullRequest 10, CloseWorkItem 36, PromptStatus 125, ThreadHash 76, Setup 82, Move 51, Billable 36, Plan 110, Tag 34, Cover 106, Design 177, NewPrompt 135, ExitCodes 130, Autoload 86, GitRoot 17, Sync 56, Connect 62, NewSpace 149, HowWeWork 42, EditItem 69, Land 59, Burn 125, PublishPR 31, Config 247, HubJson 186, Portability 91, Web 165, Agent 129, TestAll 167, ModuleCommands 84, Reminders 71, Rituals 653, StandupRemind 85, Triage 121, StartWork 72, Review 69, WorkReview 36, SendTeams 43, NewMeeting 63, MeetingAgenda 175, DocCounts 148
   51 suites, 9184 assertions
   pytest: 1370 passed, 3 skipped
-  web: 156 suites, 1852 tests
+  web: 157 suites, 1854 tests
 ```
 
 **Which lines the paste owns.** The per-suite line is the `tkTestToolkit` row's list in the table below; the
