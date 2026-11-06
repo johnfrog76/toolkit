@@ -115,7 +115,7 @@ class EnvDoesNotHoldTheEventLoop(unittest.TestCase):
             # whole point: a handler that blocks blocks this loop, exactly as it
             # blocks uvicorn's.
             transport = httpx.ASGITransport(app=app)
-            async with httpx.AsyncClient(transport=transport, base_url="http://agent") as ac:
+            async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
                 env_task = asyncio.create_task(ac.get("/api/env"))
                 await asyncio.sleep(0.05)  # let /env get as far as the probe
                 health = await ac.get("/api/health")

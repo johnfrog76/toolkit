@@ -58,6 +58,17 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # Tests/, for _rmtree
 from _rmtree import remove_tree
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # the package root, for agent
+try:
+    from agent.core import request_gate
+except ImportError:  # no web packages here: each suite says so through _skipguard
+    request_gate = None
+
+# The test client addresses every request to this name. Here, at import, because
+# the app reads its allowed hosts per request and collection already builds apps.
+if request_gate is not None:
+    request_gate.LOOPBACK_HOSTS.add("testserver")
+
 # The two names the runners and the engine share, read from the contract file
 # rather than retyped: conftest is imported before the agent package is, so it
 # reads the JSON itself.

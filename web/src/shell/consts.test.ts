@@ -82,6 +82,10 @@ describe("consts.json", () => {
     expect(consts.env.testRunMarker).toBe("P20_TEST_RUN");
     // Where the agent listens: Start-Agent.ps1 reads it, the web only states it.
     expect(consts.agent.bindHost).toBe("127.0.0.1");
+    expect(consts.agent.apiPrefix).toBe("/api");
+    expect(consts.agent.responseHeaders["X-Frame-Options"]).toBe("DENY");
+    expect(consts.agent.framablePrefix).toBe("/lounge/");
+    expect(consts.agent.framableHeaders["X-Frame-Options"]).toBe("SAMEORIGIN");
     // The two per-process stand-ins for config.local.json that `Web -Dev -Fixture`
     // hands the agent. The web never reads them -- it reads /api/env -- but
     // the contract is stated on all three sides.

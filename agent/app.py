@@ -1,4 +1,4 @@
-"""The FastAPI application: CORS, the /api router, and module mounting.
+"""The FastAPI application: the request gate, CORS, the /api router, and module mounting.
 
 Run it from the package root:
 
@@ -27,6 +27,8 @@ Nothing here reaches outside the package for code, and nothing derives the
 prompt store from where this file happens to live -- see core/config.py.
 """
 
+import asyncio
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -39,6 +41,8 @@ from .ado import accounting, bridge, design, docs, pr_comments, reporting, sprin
 from .communication import api as communication_router
 from .core import assets, config_routes, env, hub_sync, log, surfaces, usage
 from .core.config import API_PREFIX, REPO_ROOT, cors_origins
+from .core.consts import consts
+from .core.request_gate import RequestGate
 from .growth import growth_router
 from .organize import api as organize_router
 from .solitaire import api as solitaire_router
@@ -81,8 +85,8 @@ def build_api() -> APIRouter:
 
 
 def mount_client(app: FastAPI, client_dir: Path) -> None:
-    """Serve a built web UI from ``client_dir``: its assets, and ``index.html``
-    for every path the API router did not claim.
+    """Serve a built web UI from ``client_dir``: its assets and any other file it
+    holds, and ``index.html`` for every path the API router did not claim.
 
     Registered AFTER the router, so a real route always wins. The one thing
     the catch-all must not do is answer for a route that does not exist: a
@@ -92,6 +96,7 @@ def mount_client(app: FastAPI, client_dir: Path) -> None:
     that names the path.
     """
     api_prefix = API_PREFIX.strip("/") + "/"
+    root = os.path.realpath(client_dir)
 
     app.mount("/assets", StaticFiles(directory=str(client_dir / "assets")), name="assets")
 
@@ -99,19 +104,42 @@ def mount_client(app: FastAPI, client_dir: Path) -> None:
     async def spa_fallback(path: str):
         if path.startswith(api_prefix) or path == API_PREFIX.strip("/"):
             raise HTTPException(status_code=404, detail=f"No such API route: /{path}")
-        return FileResponse(str(client_dir / "index.html"))
+        # A file the build put there (a Lounge skin, a deck's picture) is that
+        # file; resolved first, so no spelling of `..` leaves the build.
+        file = os.path.realpath(os.path.join(root, path))
+        if file.startswith(root + os.sep) and os.path.isfile(file):
+            return FileResponse(file)
+        return FileResponse(os.path.join(root, "index.html"))
+
+
+async def sweep_uploads_hourly() -> None:
+    while True:
+        await asyncio.sleep(assets.UPLOAD_SWEEP_SECONDS)
+        await asyncio.to_thread(assets.sweep_stale_uploads)
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    """On start, drop picture uploads nobody attached (``p20-upload-*`` in the temp folder, a day old)."""
+    """Drop picture uploads nobody attached (``p20-upload-*`` in the temp folder, a day old): on start, then hourly."""
     assets.sweep_stale_uploads()
-    yield
+    sweeper = asyncio.create_task(sweep_uploads_hourly())
+    try:
+        yield
+    finally:
+        sweeper.cancel()
 
 
 def create_app(client_dir: Path | None = CLIENT_DIR) -> FastAPI:
-    """The app: CORS, the router, and the built client when there is one."""
-    app = FastAPI(title="Toolkit Agent", version="0.1.0", lifespan=lifespan)
+    """The app: the request gate, CORS, the router, and the built client when there is one."""
+    # No generated API pages: /docs is the Docs tab's, and they load scripts from a CDN.
+    app = FastAPI(
+        title="Toolkit Agent",
+        version="0.1.0",
+        lifespan=lifespan,
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+    )
 
     # Dev-server origins come from config (web.corsOrigins) with the same defaults
     # as before. A fixed pair of port numbers in source is a portability bug: the
@@ -119,11 +147,22 @@ def create_app(client_dir: Path | None = CLIENT_DIR) -> FastAPI:
     # are every one a route is registered with: PUT is /config and
     # /manager/{filename}, and a browser that calls the agent directly (the case
     # web.corsOrigins exists for) fails their preflight without it.
+    origins = cors_origins()
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=cors_origins(),
+        allow_origins=origins,
         allow_methods=CORS_METHODS,
         allow_headers=["*"],
+    )
+    # Added last, so it runs first: nothing is routed or read past a refusal.
+    agent_consts = consts()["agent"]
+    app.add_middleware(
+        RequestGate,
+        origins=origins,
+        api_prefix=API_PREFIX,
+        headers=agent_consts["responseHeaders"],
+        framable_prefix=agent_consts["framablePrefix"],
+        framable_headers=agent_consts["framableHeaders"],
     )
 
     app.include_router(build_api())

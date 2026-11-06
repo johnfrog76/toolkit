@@ -7,13 +7,15 @@
 // executes survives -- no script, style, iframe, no on* handler, no
 // javascript: URL. Raw HTML in a card is untrusted text; it is never trusted.
 //
-// Order matters: sanitise runs AFTER raw, so it sees the HTML raw produced.
+// Order matters: sanitise runs AFTER raw, so it sees the HTML raw produced, and
+// the agent's pictures go last (noAgentImages.ts).
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import type { Options as SanitizeSchema } from "rehype-sanitize";
 import type { PluggableList } from "unified";
 import { remarkIssueLinks } from "./issueLinks";
+import { rehypeNoAgentImages } from "./noAgentImages";
 
 // Elements whose `align` GitHub honours; the default schema drops it.
 const ALIGNED = ["p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "img", "td", "th"];
@@ -38,7 +40,11 @@ export const markdownSchema: SanitizeSchema = {
 };
 
 export const remarkPlugins: PluggableList = [remarkGfm];
-export const rehypePlugins: PluggableList = [rehypeRaw, [rehypeSanitize, markdownSchema]];
+export const rehypePlugins: PluggableList = [
+  rehypeRaw,
+  [rehypeSanitize, markdownSchema],
+  rehypeNoAgentImages,
+];
 
 /** Spread onto every <ReactMarkdown>: `<ReactMarkdown {...markdownPlugins}>`. */
 export const markdownPlugins = { remarkPlugins, rehypePlugins };
