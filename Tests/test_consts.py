@@ -139,7 +139,7 @@ EXPECTED = {
         "design",
         "cardLineRegex",
     ): r"(?m)^>[ \t]*(Design|Spec):[ \t]*(?:\[([^\]\r\n]*)\]\(([^)\r\n]*)\))?[ \t]*([^\r\n]*?)[ \t]*\r?$",
-    ("studio", "threadRegex"): r"(?m)^>\s*GitHub:\s*(https://github\.com/([^/\s]+)/([^/\s]+)/issues/(\d+))\s*$",
+    ("studio", "threadRegex"): r"(?m)^>\s*GitHub:\s*(https://github\.com/([^/\s]+)/([^/\s]+)/issues/([0-9]{1,9}))\s*$",
     ("rituals", "route"): "/api/ritual/standup",
     ("rituals", "triageRoute"): "/api/ritual/triage",
     ("rituals", "milestonesRoute"): "/api/ritual/milestones",
@@ -173,7 +173,7 @@ EXPECTED = {
         "twelve",
     ],
     ("rituals", "workHeadRegex"): r"^(?:[A-Za-z]+:\s+)?(.+?)(?:\s+--\s+|:\s+|$)",
-    ("rituals", "workThreadRegex"): r"(?m)^>\s*GitHub:\s*<?(?:https://github\.com/[^/\s>]+/[^/\s>]+/issues/|#)(\d+)",
+    ("rituals", "workThreadRegex"): r"(?m)^>\s*GitHub:\s*<?(?:https://github\.com/[^/\s>]+/[^/\s>]+/issues/|#)([0-9]{1,9})(?![0-9])",
     ("rituals", "workDesignRegex"): r"design/([A-Za-z0-9][A-Za-z0-9_-]*)\.md",
     ("rituals", "workSmallWordRegex"): r"^[a-z]{1,3}$",
     # The also-ons fold (D-SA9): the most groups a folded sentence names.
