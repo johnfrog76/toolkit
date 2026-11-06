@@ -336,19 +336,38 @@ try {
     $snapshot = Join-Path $base 'snapshot'
     $snapOrigin = Join-Path $base 'snapshot-origin.git'
     New-Item -ItemType Directory -Path $snapshot -Force | Out-Null
-    foreach ($rel in @(& git -C $pkgRoot ls-files --cached --others --exclude-standard)) {
+    # Each step that builds the clone is checked where it runs, with git's own
+    # words, so a failure here names its step -- not a missing module two steps
+    # later, which reads as a failure of the verb. An empty listing is the
+    # quiet way in: nothing is copied, the commit has nothing to commit, and
+    # the clone of an empty repository succeeds with no module in it.
+    $manifestRel = 'Prompt20Toolkit/Prompt20Toolkit.psd1'
+    $step = {
+        param([string]$Name, [scriptblock]$Run)
+        $said = @(& $Run 2>&1 | ForEach-Object { "$_" })
+        $code = $LASTEXITCODE
+        Assert-True "the clone is built: $Name exits 0" ($code -eq 0) "exit $code`n$($said -join "`n")"
+        return $said
+    }
+    $listed = @(& $step 'listing the working tree' { & git -C $pkgRoot ls-files --cached --others --exclude-standard })
+    Assert-True 'the clone is built: the listing names the module manifest' ($listed -contains $manifestRel) "$($listed.Count) path(s) listed"
+    $copyErrors = @()
+    foreach ($rel in $listed) {
         $src = Join-Path $pkgRoot $rel
         if (-not (Test-Path $src -PathType Leaf)) { continue }
         $dst = Join-Path $snapshot $rel
         New-Item -ItemType Directory -Path (Split-Path $dst -Parent) -Force | Out-Null
-        Copy-Item $src $dst
+        Copy-Item $src $dst -ErrorAction SilentlyContinue -ErrorVariable +copyErrors
     }
-    & git init -q -b main $snapshot 2>&1 | Out-Null
-    [void](Invoke-Git $snapshot @('add', '-A'))
-    [void](Invoke-Git $snapshot @('commit', '-q', '-m', 'a snapshot of the working tree'))
-    & git clone -q --bare $snapshot $snapOrigin 2>&1 | Out-Null
+    Assert-True 'the clone is built: every listed file is copied' ($copyErrors.Count -eq 0) (@($copyErrors | ForEach-Object { "$_" }) -join "`n")
+    Assert-True 'the clone is built: the snapshot has the module manifest' (Test-Path -LiteralPath (Join-Path $snapshot $manifestRel) -PathType Leaf) $snapshot
+    [void](& $step 'git init' { & git init -q -b main $snapshot })
+    [void](& $step 'git add' { Invoke-Git $snapshot @('add', '-A') })
+    [void](& $step 'the snapshot commit' { Invoke-Git $snapshot @('commit', '-q', '-m', 'a snapshot of the working tree') })
+    [void](& $step 'the bare clone' { & git clone -q --bare $snapshot $snapOrigin })
     $real = Join-Path $base 'c-real'
-    & git clone -q $snapOrigin $real 2>&1 | Out-Null
+    [void](& $step 'the clone' { & git clone -q $snapOrigin $real })
+    Assert-True 'the clone is built: the clone has the module manifest' (Test-Path -LiteralPath (Join-Path $real $manifestRel) -PathType Leaf) "$real`n$(@(Invoke-Git $real @('status', '--short')) -join "`n")"
 
     # A hub that is a plain folder: storeSync is 'none' by default, so Sync has
     # nothing to do and SAYS so -- which is all this case needs it to do.
@@ -359,7 +378,7 @@ try {
     $logDir = Join-Path $base 'log'
     New-Item -ItemType Directory -Path $logDir -Force | Out-Null
     $command = "`$env:PSModulePath = '$real'; `$env:PROMPTS_ROOT = '$plainHub'; `$env:P20_USAGE_LOG_DIR = '$logDir'; " +
-        "Import-Module '$real/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null; $verb -Sync; exit `$LASTEXITCODE"
+        "Import-Module '$real/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null; if (-not (Get-Command $verb -ErrorAction SilentlyContinue)) { exit 3 }; $verb -Sync; exit `$LASTEXITCODE"
     Push-Location $base
     try { $realOut = & pwsh -NoProfile -Command $command 2>&1 | Out-String }
     finally { Pop-Location }
