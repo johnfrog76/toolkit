@@ -11,6 +11,7 @@ report "no log yet" until one exists; nothing raises either way.
 """
 
 import json
+import os
 import re
 from datetime import date
 from pathlib import Path
@@ -250,6 +251,26 @@ def _stress_context(log: dict) -> StressContext:
     )
 
 
+def _file_in(folder: Path, name: str) -> Path | None:
+    """The file ``name`` directly inside ``folder``, or None if it would land
+    anywhere else. A caller has already held the name to a key; this is the
+    check at the read itself."""
+    root = os.path.realpath(folder)
+    full = os.path.realpath(os.path.join(root, name))
+    return Path(full) if full.startswith(root + os.sep) else None
+
+
+def _read_history(folder: Path, repo: str) -> list[dict]:
+    """A repo's committed history rows; none if the file is missing or unreadable."""
+    path = _file_in(folder, f"stress-history.{repo}.json")
+    if path is None or not path.exists():
+        return []
+    try:
+        return _history_rows(json.loads(path.read_text(encoding="utf-8-sig")))
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
 def _history_rows(raw: object) -> list[dict]:
     """A history file's rows: what is an object, of what is a list."""
     return [row for row in raw if isinstance(row, dict)] if isinstance(raw, list) else []
@@ -274,15 +295,10 @@ def _config_sprint_context(org: dict, repo: str | None = None) -> StressContext:
     if not name and repo:
         folder = org.get("promptsFolder", "")
         org_dir = (hub_root() / folder) if folder else hub_root()
-        hist_path = org_dir / f"stress-history.{repo}.json"
-        if hist_path.exists():
-            try:
-                raw = _history_rows(json.loads(hist_path.read_text(encoding="utf-8-sig")))
-                if raw:
-                    latest = max(raw, key=lambda e: e.get("date", ""))
-                    name = latest.get("sprint")
-            except (json.JSONDecodeError, OSError):
-                pass
+        raw = _read_history(org_dir, repo)
+        if raw:
+            latest = max(raw, key=lambda e: e.get("date", ""))
+            name = latest.get("sprint")
     name = str(name or "Sprint")
     end_date_str = sprint.get("endDate")
     days_remaining: int | None
@@ -314,8 +330,8 @@ def _stress_log_path(repo: str | None) -> Path:
     """Resolve the stress-log path for an optional repo key, falling back to
     the unnamespaced file when repo is omitted or its namespaced file is absent."""
     if repo:
-        namespaced = hub_root() / f"stress-log.{repo}.json"
-        if namespaced.exists():
+        namespaced = _file_in(hub_root(), f"stress-log.{repo}.json")
+        if namespaced is not None and namespaced.exists():
             return namespaced
     return _stress_log_default()
 
@@ -473,20 +489,15 @@ async def get_sprint_activity(repo: str | None = None):
     folder = org_config.get("promptsFolder", "")
     org_dir = (hub_root() / folder) if folder else hub_root()
     repo_name = _repo_key(repo or repo_key or (_repo_name_from_url(source_repo) if source_repo else "")) or "default"
-    hist_path = org_dir / f"stress-history.{repo_name}.json"
+    raw = _read_history(org_dir, repo_name)
 
     # If the live log didn't give us a sprint name (missing/stale/wrong repo),
     # fall back to the committed history file's own latest sprint label so
     # view-only machines still see data — no ephemeral log required.
-    if not sprint_name and hist_path.exists():
-        try:
-            raw_probe = _history_rows(json.loads(hist_path.read_text(encoding="utf-8-sig")))
-            if raw_probe:
-                latest = max(raw_probe, key=lambda e: e.get("date", ""))
-                sprint_name = latest.get("sprint")
-                end_date = max((e.get("date", "") for e in raw_probe), default=end_date) or end_date
-        except (json.JSONDecodeError, OSError):
-            pass
+    if not sprint_name and raw:
+        latest = max(raw, key=lambda e: e.get("date", ""))
+        sprint_name = latest.get("sprint")
+        end_date = max((e.get("date", "") for e in raw), default=end_date) or end_date
 
     # No sprint name means we can't scope history — return empty shell
     if not sprint_name:
@@ -498,13 +509,7 @@ async def get_sprint_activity(repo: str | None = None):
         return SprintActivityResponse(startDate=start_date, endDate=end_date, mine=[], team=[])
 
     # Read history — file is already scoped to org+repo; filter to current sprint only
-    history: list[dict] = []
-    if hist_path.exists():
-        try:
-            raw = _history_rows(json.loads(hist_path.read_text(encoding="utf-8-sig")))
-            history = [e for e in raw if e.get("sprint") == sprint_name]
-        except (json.JSONDecodeError, OSError):
-            pass
+    history = [e for e in raw if e.get("sprint") == sprint_name]
 
     # Deduplicate by date (safety net; full rewrite should already be clean)
     by_date: dict[str, dict] = {}

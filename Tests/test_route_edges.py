@@ -150,6 +150,25 @@ class ARepoKeyIsAName(unittest.TestCase):
         path.assert_called_once_with(None)
         self.assertIsNone(context.call_args.args[1])
 
+    def test_a_file_read_stays_in_its_folder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "hub"
+            folder.mkdir()
+            for name in ("../outside.json", "a/../../outside.json", str(Path(tmp) / "outside.json"), "."):
+                with self.subTest(name=name):
+                    self.assertIsNone(sprint._file_in(folder, name))
+            self.assertEqual(sprint._file_in(folder, "stress-log.widget.json").name, "stress-log.widget.json")
+
+    def test_a_history_file_is_read_and_a_bad_one_is_no_rows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            self.assertEqual(sprint._read_history(folder, "widget"), [])
+            path = folder / "stress-history.widget.json"
+            path.write_text('[{"date": "2026-01-02"}]', encoding="utf-8")
+            self.assertEqual(sprint._read_history(folder, "widget"), [{"date": "2026-01-02"}])
+            path.write_text("not json", encoding="utf-8")
+            self.assertEqual(sprint._read_history(folder, "widget"), [])
+
     def test_history_rows_are_objects_of_a_list(self):
         self.assertEqual(sprint._history_rows([{"a": 1}, 2, "x", None]), [{"a": 1}])
         self.assertEqual(sprint._history_rows({"a": 1}), [])
