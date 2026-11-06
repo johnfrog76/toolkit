@@ -166,10 +166,6 @@ async function openedDialog(): Promise<HTMLElement> {
   return dialog;
 }
 
-// These tests open real dialogs and find fields by role, which is slow in jsdom, and
-// one opens two: Jest's 5 seconds is not enough on a loaded runner.
-jest.setTimeout(20_000);
-
 describe("the Ref field", () => {
   it("is in the New Reminder dialog, and what is typed there goes to NewReminder as -Ref", async () => {
     draw();
@@ -230,7 +226,9 @@ describe("the Ref field", () => {
     dialog = await openedDialog();
     expect(dialog.querySelectorAll(".fui-Input").length).toBeGreaterThan(0);
     expectDefaultSizeInputs(dialog);
-  });
+    // Two real dialogs, and every wait a by-role query, which walks the whole tree
+    // in jsdom: Jest's 5 seconds is not enough on a loaded runner. Past 20 is a bug.
+  }, 20_000);
 
   it("is in the Edit dialog, filled in, and an emptied ref is sent as an empty -Ref", async () => {
     items = [reminder("Q4TN", { ref: "41" })];

@@ -137,6 +137,29 @@ class ARepoKeyIsAName(unittest.TestCase):
                 with self.subTest(repo=repo):
                     self.assertEqual(sprint._stress_log_path(repo).name, name)
 
+    def test_a_route_holds_its_repo_to_a_name_before_it_names_a_file(self):
+        for repo, want in (("toolkit", "toolkit"), ("../x", None), ("a/b", None), (".x", None), (None, None)):
+            with self.subTest(repo=repo):
+                self.assertEqual(sprint._repo_key(repo), want)
+        with (
+            mock.patch.object(sprint, "_active_space_feature", return_value=True),
+            mock.patch.object(sprint, "_stress_log_path", return_value=self.hub / "absent.json") as path,
+            mock.patch.object(sprint, "_config_sprint_context", return_value=None) as context,
+        ):
+            TestClient(create_app(client_dir=None)).get("/api/stress-status?repo=../x")
+        path.assert_called_once_with(None)
+        self.assertIsNone(context.call_args.args[1])
+
+    def test_history_rows_are_objects_of_a_list(self):
+        self.assertEqual(sprint._history_rows([{"a": 1}, 2, "x", None]), [{"a": 1}])
+        self.assertEqual(sprint._history_rows({"a": 1}), [])
+
+    def test_the_repo_list_is_empty_with_sprint_awareness_off(self):
+        client = TestClient(create_app(client_dir=None))
+        with mock.patch.object(sprint, "_active_space_feature", return_value=False):
+            body = client.get("/api/stress-repos").json()
+        self.assertEqual(body, {"repos": [], "defaultRepo": None})
+
     def test_a_log_that_is_not_an_object_is_a_reason_not_an_error(self):
         client = TestClient(create_app(client_dir=None))
         path = Path(self.tmp.name) / "list.json"

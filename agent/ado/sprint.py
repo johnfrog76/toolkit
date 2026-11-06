@@ -250,6 +250,11 @@ def _stress_context(log: dict) -> StressContext:
     )
 
 
+def _history_rows(raw: object) -> list[dict]:
+    """A history file's rows: what is an object, of what is a list."""
+    return [row for row in raw if isinstance(row, dict)] if isinstance(raw, list) else []
+
+
 def _config_sprint_context(org: dict, repo: str | None = None) -> StressContext:
     """Fallback context built from org config alone — no live stress-log.json
     required. `sprint.name`/`sprint.endDate` are manually-maintained config, not
@@ -272,8 +277,8 @@ def _config_sprint_context(org: dict, repo: str | None = None) -> StressContext:
         hist_path = org_dir / f"stress-history.{repo}.json"
         if hist_path.exists():
             try:
-                raw = json.loads(hist_path.read_text(encoding="utf-8-sig"))
-                if isinstance(raw, list) and raw:
+                raw = _history_rows(json.loads(hist_path.read_text(encoding="utf-8-sig")))
+                if raw:
                     latest = max(raw, key=lambda e: e.get("date", ""))
                     name = latest.get("sprint")
             except (json.JSONDecodeError, OSError):
@@ -299,11 +304,16 @@ def _config_sprint_context(org: dict, repo: str | None = None) -> StressContext:
 _REPO_KEY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
 
+def _repo_key(repo: str | None) -> str | None:
+    """A repo key if it is one, else None. Every route takes its ``repo`` through
+    this, and a key read from a log does too, before either names a file."""
+    return repo if repo and _REPO_KEY.fullmatch(repo) else None
+
+
 def _stress_log_path(repo: str | None) -> Path:
     """Resolve the stress-log path for an optional repo key, falling back to
-    the unnamespaced file when repo is omitted, is not a name, or its namespaced
-    file is absent."""
-    if repo and _REPO_KEY.fullmatch(repo):
+    the unnamespaced file when repo is omitted or its namespaced file is absent."""
+    if repo:
         namespaced = hub_root() / f"stress-log.{repo}.json"
         if namespaced.exists():
             return namespaced
@@ -312,6 +322,7 @@ def _stress_log_path(repo: str | None) -> Path:
 
 @api.get("/stress-status", response_model=StressStatusResponse)
 async def get_stress_status(repo: str | None = None):
+    repo = _repo_key(repo)
     cfg = load_config()
     active = cfg.get("activeSpace", "")
 
@@ -425,6 +436,7 @@ class SprintActivityResponse(BaseModel):
 
 @api.get("/stress-sprint-activity", response_model=SprintActivityResponse)
 async def get_sprint_activity(repo: str | None = None):
+    repo = _repo_key(repo)
     from datetime import timedelta
 
     cfg = load_config()
@@ -443,7 +455,7 @@ async def get_sprint_activity(repo: str | None = None):
     if log_path.exists():
         try:
             log = json.loads(log_path.read_text(encoding="utf-8-sig"))
-            if log.get("org") == active:
+            if isinstance(log, dict) and log.get("org") == active:
                 sprint = log.get("sprint") or {}
                 end_date = sprint.get("endDate") or today
                 sprint_name = sprint.get("name")
@@ -460,7 +472,7 @@ async def get_sprint_activity(repo: str | None = None):
     org_config = next((o for o in (load_config().get("spaces") or []) if o.get("slug") == active), {})
     folder = org_config.get("promptsFolder", "")
     org_dir = (hub_root() / folder) if folder else hub_root()
-    repo_name = repo or repo_key or (_repo_name_from_url(source_repo) if source_repo else "default")
+    repo_name = _repo_key(repo or repo_key or (_repo_name_from_url(source_repo) if source_repo else "")) or "default"
     hist_path = org_dir / f"stress-history.{repo_name}.json"
 
     # If the live log didn't give us a sprint name (missing/stale/wrong repo),
@@ -468,8 +480,8 @@ async def get_sprint_activity(repo: str | None = None):
     # view-only machines still see data — no ephemeral log required.
     if not sprint_name and hist_path.exists():
         try:
-            raw_probe = json.loads(hist_path.read_text(encoding="utf-8-sig"))
-            if isinstance(raw_probe, list) and raw_probe:
+            raw_probe = _history_rows(json.loads(hist_path.read_text(encoding="utf-8-sig")))
+            if raw_probe:
                 latest = max(raw_probe, key=lambda e: e.get("date", ""))
                 sprint_name = latest.get("sprint")
                 end_date = max((e.get("date", "") for e in raw_probe), default=end_date) or end_date
@@ -489,9 +501,8 @@ async def get_sprint_activity(repo: str | None = None):
     history: list[dict] = []
     if hist_path.exists():
         try:
-            raw = json.loads(hist_path.read_text(encoding="utf-8-sig"))
-            if isinstance(raw, list):
-                history = [e for e in raw if e.get("sprint") == sprint_name]
+            raw = _history_rows(json.loads(hist_path.read_text(encoding="utf-8-sig")))
+            history = [e for e in raw if e.get("sprint") == sprint_name]
         except (json.JSONDecodeError, OSError):
             pass
 
@@ -574,6 +585,9 @@ async def get_stress_repos():
     on the gitignored, machine-local stress-log.json for repo identity: this
     endpoint's job is just to say what's known and what of that is
     viewable/runnable on this machine."""
+    if not _active_space_feature("sprintAwareness"):
+        return StressReposResponse(repos=[], defaultRepo=None)
+
     cfg = load_config()
     active = cfg.get("activeSpace", "")
     org = next((o for o in (cfg.get("spaces") or []) if o.get("slug") == active), {})
@@ -617,7 +631,7 @@ async def get_stress_repos():
             # stress-log.json is a single global file — only trust its repoKey
             # when it was actually written for the active Space, else a stale
             # run from a different org leaks its selection in here.
-            if log.get("org") == active:
+            if isinstance(log, dict) and log.get("org") == active:
                 default_repo = log.get("repoKey") or None
         except (json.JSONDecodeError, OSError):
             pass
