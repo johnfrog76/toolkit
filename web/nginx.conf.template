@@ -29,6 +29,16 @@ server {
         proxy_read_timeout 300s;
     }
 
+    # The Lounge's skins are only ever drawn in an iframe: framed by this origin,
+    # never by another. consts.json agent.framableHeaders.
+    location /lounge/ {
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob:; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'none'" always;
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "no-referrer" always;
+        try_files $uri $uri/ /index.html;
+    }
+
     # SPA fallback. The agent sets these on what it answers; this is the page.
     # consts.json agent.responseHeaders, held to this file by Tests/test_consts.py.
     location / {

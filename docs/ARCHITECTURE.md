@@ -297,7 +297,9 @@ uploads are also limited as they are read, not after, and an upload nobody attac
 
 The gate also puts `consts.json` `agent.responseHeaders` on every response, so the app cannot be
 framed and loads only what its policy lists; the Docker image's nginx repeats them for the page, and
-drops any request addressed to a name that is not this machine. The agent generates no API pages of
+drops any request addressed to a name that is not this machine. The Lounge's skins are only ever drawn
+in an iframe, so under `/lounge/` two of those headers relax to `agent.framableHeaders`: framed by this
+origin, never by another. The agent generates no API pages of
 its own, because `/docs` is the Docs tab's.
 
 Markdown is text from elsewhere, so it gets the same rule from the other side:

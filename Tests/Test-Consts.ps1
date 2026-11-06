@@ -141,6 +141,8 @@ $expected = [ordered]@{
     'agent.bindHost'          = '127.0.0.1'
     'agent.apiPrefix'         = '/api'
     'agent.responseHeaders'   = 'Content-Security-Policy=default-src ''self''; script-src ''self''; style-src ''self'' ''unsafe-inline''; img-src ''self'' data: blob: https:; media-src ''self'' blob:; frame-src ''self''; frame-ancestors ''none''; object-src ''none''; base-uri ''none'',X-Frame-Options=DENY,X-Content-Type-Options=nosniff,Referrer-Policy=no-referrer'
+    'agent.framablePrefix'    = '/lounge/'
+    'agent.framableHeaders'   = 'Content-Security-Policy=default-src ''self''; script-src ''self''; style-src ''self'' ''unsafe-inline''; img-src ''self'' data: blob: https:; media-src ''self'' blob:; frame-src ''self''; frame-ancestors ''self''; object-src ''none''; base-uri ''none'',X-Frame-Options=SAMEORIGIN'
     'stamps.sent'             = 'Sent to'
     'stamps.due'              = '**Due:**'
     'stamps.source'           = '**Source:**'

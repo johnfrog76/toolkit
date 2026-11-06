@@ -84,8 +84,8 @@ def build_api() -> APIRouter:
 
 
 def mount_client(app: FastAPI, client_dir: Path) -> None:
-    """Serve a built web UI from ``client_dir``: its assets, and ``index.html``
-    for every path the API router did not claim.
+    """Serve a built web UI from ``client_dir``: its assets and any other file it
+    holds, and ``index.html`` for every path the API router did not claim.
 
     Registered AFTER the router, so a real route always wins. The one thing
     the catch-all must not do is answer for a route that does not exist: a
@@ -95,6 +95,7 @@ def mount_client(app: FastAPI, client_dir: Path) -> None:
     that names the path.
     """
     api_prefix = API_PREFIX.strip("/") + "/"
+    root = client_dir.resolve()
 
     app.mount("/assets", StaticFiles(directory=str(client_dir / "assets")), name="assets")
 
@@ -102,7 +103,12 @@ def mount_client(app: FastAPI, client_dir: Path) -> None:
     async def spa_fallback(path: str):
         if path.startswith(api_prefix) or path == API_PREFIX.strip("/"):
             raise HTTPException(status_code=404, detail=f"No such API route: /{path}")
-        return FileResponse(str(client_dir / "index.html"))
+        # A file the build put there (a Lounge skin, a deck's picture) is that
+        # file; resolved first, so no spelling of `..` leaves the build.
+        file = (root / path).resolve()
+        if file.is_file() and file.is_relative_to(root):
+            return FileResponse(str(file))
+        return FileResponse(str(root / "index.html"))
 
 
 async def sweep_uploads_hourly() -> None:
@@ -148,8 +154,14 @@ def create_app(client_dir: Path | None = CLIENT_DIR) -> FastAPI:
         allow_headers=["*"],
     )
     # Added last, so it runs first: nothing is routed or read past a refusal.
+    agent_consts = consts()["agent"]
     app.add_middleware(
-        RequestGate, origins=origins, api_prefix=API_PREFIX, headers=consts()["agent"]["responseHeaders"]
+        RequestGate,
+        origins=origins,
+        api_prefix=API_PREFIX,
+        headers=agent_consts["responseHeaders"],
+        framable_prefix=agent_consts["framablePrefix"],
+        framable_headers=agent_consts["framableHeaders"],
     )
 
     app.include_router(build_api())

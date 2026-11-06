@@ -23,7 +23,9 @@ those to the product's own pages, ahead of routing and before a body is read:
 
 Every response also carries the headers in ``consts.json`` ``agent``: the page
 cannot be framed, and it loads only what its own policy lists. A response that
-sets its own policy (a document's asset, stricter) keeps it.
+sets its own policy (a document's asset, stricter) keeps it. The Lounge's skins are
+only ever drawn in an iframe, so under ``agent.framablePrefix`` two of those
+headers relax to ``framableHeaders``: framed by this origin, never by another.
 
 A refusal is a plain 403 naming the setting. It is not a module gate, so "off
 means absent" does not apply here. The allowed origins are bound at startup, as
@@ -109,11 +111,21 @@ def refusal(
 class RequestGate:
     """Pure ASGI, so a refused request's body is never read."""
 
-    def __init__(self, app, origins: list[str], api_prefix: str, headers: dict[str, str] | None = None):
+    def __init__(
+        self,
+        app,
+        origins: list[str],
+        api_prefix: str,
+        headers: dict[str, str] | None = None,
+        framable_prefix: str = "",
+        framable_headers: dict[str, str] | None = None,
+    ):
         self.app = app
         self.origins = origins
         self.api_prefix = api_prefix
         self.headers = headers or {}
+        self.framable_prefix = framable_prefix
+        self.framable_headers = framable_headers or {}
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -134,7 +146,8 @@ class RequestGate:
         async def with_headers(message):
             if message["type"] == "http.response.start":
                 out = MutableHeaders(scope=message)
-                for name, value in self.headers.items():
+                framable = self.framable_prefix and scope["path"].startswith(self.framable_prefix)
+                for name, value in {**self.headers, **(self.framable_headers if framable else {})}.items():
                     out.setdefault(name, value)
             await send(message)
 

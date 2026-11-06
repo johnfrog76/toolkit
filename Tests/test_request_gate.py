@@ -180,6 +180,18 @@ class TheRunningApp(unittest.TestCase):
             for name, value in wanted.items():
                 self.assertEqual(reply.headers[name], value)
 
+    def test_only_a_skin_may_be_framed_and_only_by_this_origin(self):
+        agent = consts()["agent"]
+        client = TestClient(create_app(client_dir=None), raise_server_exceptions=False)
+        skin = client.get("/lounge/temple.html")
+        self.assertEqual(skin.headers["X-Frame-Options"], "SAMEORIGIN")
+        self.assertEqual(skin.headers["Content-Security-Policy"], agent["framableHeaders"]["Content-Security-Policy"])
+        self.assertIn("frame-ancestors 'self'", skin.headers["Content-Security-Policy"])
+        for path in ("/lounge", "/", f"{API_PREFIX}/health"):
+            reply = client.get(path)
+            self.assertEqual(reply.headers["X-Frame-Options"], "DENY", path)
+            self.assertIn("frame-ancestors 'none'", reply.headers["Content-Security-Policy"], path)
+
     def test_a_picture_of_the_api_runs_nothing(self):
         reply = self.client.get(
             f"{API_PREFIX}/design/search?q=word",

@@ -990,7 +990,9 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `http://localhost:5174` and walk Home, the Board and a card: pages load, and creating a card from the web UI
   works, which proves a write passes through nginx. Open `http://127.0.0.1:5174` and do the same. `curl -si -H "Host:
   example.test" http://localhost:5174/` should drop the connection, and `curl -sI http://localhost:5174/` should show
-  `Content-Security-Policy` and `X-Frame-Options: DENY`. The browser console shows no policy violation.
+  `Content-Security-Policy` and `X-Frame-Options: DENY`, and `curl -sI http://localhost:5174/lounge/temple.html` should show
+  `X-Frame-Options: SAMEORIGIN`. In the Lounge, open the Skins dialog and see every thumbnail drawn, and wear a skin and see it
+  drawn behind the app. The browser console shows no policy violation.
 
 - [ ] **The agent's reads on Windows, gh and az.** On the Windows PC, with the agent up and a GitHub Space active,
   `python Tests/test_child_windows.py` passes all three (the Windows CI job runs the same file), then open the Design
