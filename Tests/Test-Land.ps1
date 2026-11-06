@@ -328,6 +328,10 @@ try {
             @{ Arg = 'R&D work'; Ok = $true }
             @{ Arg = '100% of it'; Ok = $true }
             @{ Arg = 'repos/acme/widgets/branches/you%2Fa-widget'; Ok = $true }
+            @{ Arg = 'a%2Fb%2Fc'; Ok = $true }
+            @{ Arg = '%2F%2F'; Ok = $true }
+            @{ Arg = '100% of 50% done'; Ok = $true }
+            @{ Arg = 'about 50% done'; Ok = $true }
             @{ Arg = "[State] <> 'Closed'"; Ok = $true }
             @{ Arg = ''; Ok = $true }
             @{ Arg = 'https://x&calc&.visualstudio.com'; Ok = $false }
@@ -337,6 +341,11 @@ try {
             @{ Arg = 'a^b'; Ok = $false }
             @{ Arg = '%PATH%'; Ok = $false }
             @{ Arg = '%CD%'; Ok = $false }
+            @{ Arg = '%CD%00'; Ok = $false }
+            @{ Arg = '%ADO_PAT%00'; Ok = $false }
+            @{ Arg = 'a b %PATH%'; Ok = $false }
+            @{ Arg = '%ProgramFiles(x86)%'; Ok = $false }
+            @{ Arg = '%C3%A9'; Ok = $false }
             @{ Arg = '100%'; Ok = $false }
             @{ Arg = 'say "hi" there'; Ok = $false }
             @{ Arg = '"'; Ok = $false }
@@ -361,9 +370,41 @@ try {
             $no = Invoke-P20TrackerRead 'p20tool' @('x&echo.hit>marker.txt&')
             Assert-True 'and takes no bare syntax' ($no.Code -eq 2) ($no.Lines -join ' | ')
             Assert-True 'and nothing ran' (-not (Test-Path -LiteralPath $marker)) ($no.Lines -join ' | ')
+
+            # What arrives. Called directly, a .cmd shows a variable's value in the
+            # argument, which is why the shape is refused; through the read, nothing
+            # starts. An argument the rule passes arrives as it was written.
+            $arrived = Join-Path $cmdDir 'arrived.log'
+            [System.IO.File]::WriteAllText((Join-Path $cmdDir 'p20arrive.cmd'), "@>>`"$arrived`" echo %*`r`n")
+            $env:AD_P20_PROBE = 'probe-value'
+            $env:P20_PROBE_VAR = 'probe-value'
+            foreach ($value in @('%AD_P20_PROBE%00', 'a b %P20_PROBE_VAR%')) {
+                Remove-Item -LiteralPath $arrived -ErrorAction SilentlyContinue
+                & p20arrive $value
+                $direct = if (Test-Path -LiteralPath $arrived) { [System.IO.File]::ReadAllText($arrived) } else { '' }
+                Assert-True "called directly, [$value] arrives with the variable's value" ($direct -match 'probe-value') $direct
+                Remove-Item -LiteralPath $arrived -ErrorAction SilentlyContinue
+                $read = Invoke-P20TrackerRead 'p20arrive' @($value)
+                Assert-True "through the read, [$value] is refused and nothing starts" ($read.Code -eq 2 -and -not (Test-Path -LiteralPath $arrived)) ($read.Lines -join ' | ')
+            }
+            $cwdValue = '%CD%00'
+            Remove-Item -LiteralPath $arrived -ErrorAction SilentlyContinue
+            & p20arrive $cwdValue
+            $direct = if (Test-Path -LiteralPath $arrived) { [System.IO.File]::ReadAllText($arrived) } else { '' }
+            Assert-True "called directly, [$cwdValue] arrives with the folder in it" ($direct -match 'cmdtool') $direct
+            Remove-Item -LiteralPath $arrived -ErrorAction SilentlyContinue
+            $read = Invoke-P20TrackerRead 'p20arrive' @($cwdValue)
+            Assert-True "through the read, [$cwdValue] is refused and nothing starts" ($read.Code -eq 2 -and -not (Test-Path -LiteralPath $arrived)) ($read.Lines -join ' | ')
+            foreach ($value in @('a%2Fb%2Fc', '%2F%2F', 'about 50% done', '100% of 50% done')) {
+                Remove-Item -LiteralPath $arrived -ErrorAction SilentlyContinue
+                $read = Invoke-P20TrackerRead 'p20arrive' @($value)
+                $got = if (Test-Path -LiteralPath $arrived) { [System.IO.File]::ReadAllText($arrived) } else { '' }
+                Assert-True "[$value] arrives as it was written" ($read.Code -eq 0 -and $got.Contains($value)) "$($read.Code): $got"
+            }
         }
         finally {
             $env:PATH = $before
+            Remove-Item Env:AD_P20_PROBE, Env:P20_PROBE_VAR -ErrorAction SilentlyContinue
             Pop-Location
         }
     }
