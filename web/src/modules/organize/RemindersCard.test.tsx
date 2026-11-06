@@ -166,6 +166,10 @@ async function openedDialog(): Promise<HTMLElement> {
   return dialog;
 }
 
+// These tests open real dialogs and find fields by role, which is slow in jsdom, and
+// one opens two: Jest's 5 seconds is not enough on a loaded runner.
+jest.setTimeout(20_000);
+
 describe("the Ref field", () => {
   it("is in the New Reminder dialog, and what is typed there goes to NewReminder as -Ref", async () => {
     draw();
