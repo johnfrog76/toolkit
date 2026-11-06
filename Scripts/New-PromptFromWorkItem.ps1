@@ -161,6 +161,18 @@ if (-not $OutputFolder) {
     $OutputFolder = if ($startsInPlay) { "$pf/$($folderNames.current)" } else { "$pf/$($folderNames.backlog)" }
     $script:SpaceCardFolders = @("$pf/$($folderNames.current)", "$pf/$($folderNames.backlog)")
 }
+elseif (-not [System.IO.Path]::IsPathRooted($OutputFolder) -and $cfg.PromptsFolder) {
+    # A bare card-folder name -- current, backlog or archive, consts.json's -- is
+    # the ACTIVE SPACE's folder of that name, the same folder the default above
+    # builds; it used to be joined onto the store root, where no Space looks.
+    # A path with more than one segment (`example/backlog`) stays
+    # relative to the store, and a rooted path is taken as given. With no Space
+    # active there is no Space folder to mean, so a bare name keeps the store
+    # root -- where a hub with no Spaces keeps its cards.
+    $bare = $OutputFolder.Trim().TrimEnd('/', '\')
+    $named = @($folderNames.current, $folderNames.backlog, $folderNames.archive) | Where-Object { $_ -ieq $bare } | Select-Object -First 1
+    if ($named) { $OutputFolder = "$($cfg.PromptsFolder)/$named" }
+}
 
 # Terminal escape sequences for clickable links (OSC 8)
 $esc = [char]27
@@ -187,7 +199,10 @@ PARAMETERS:
                            <activeOrg>/backlog, until Move -To Active, its first
                            ThreadHash or its NewPR pulls it into current/. On an
                            Azure DevOps Space it is always in play: no Backlog lane
-    -OutputFolder <name>   Target folder (default: <activeOrg>/backlog; current/ on Azure DevOps)
+    -OutputFolder <name>   Target folder (default: <activeOrg>/backlog; current/ on Azure DevOps).
+                           A bare current, backlog or archive is the active
+                           Space's folder of that name; <space>/<folder> is under
+                           the prompt store; an absolute path is used as given
     -Cover <image>         Attach a cover picture as the card is made (as Cover does)
     -Before <image>        Attach the 'before' picture of a before/after proof
     -Design <name|id>      Bind the card to the design it is worked against: a
@@ -207,7 +222,7 @@ EXAMPLES:
     $(Get-CliPrefix)NewPrompt 123456 -ReadOnly                        # Don't modify ADO
     $(Get-CliPrefix)NewPrompt 123456 -Force                           # Reassign from someone else
     $(Get-CliPrefix)NewPrompt 123456 -AssignTo "other@contoso.com"    # Assign to specific user
-    $(Get-CliPrefix)NewPrompt 123456 -OutputFolder "archive"          # Output to archive folder
+    $(Get-CliPrefix)NewPrompt 123456 -OutputFolder "archive"          # Into the active Space's archive/
 
   OFFLINE (no az, no ADO -- works at Tier 2):
     $(Get-CliPrefix)NewPrompt -Title "Spike the cache layer"          # Task, next free local id
