@@ -44,6 +44,26 @@ class SpaFallbackTests(unittest.TestCase):
         (self.client_dir / "assets" / "app.js").write_text("console.log('scratch');\n", encoding="utf-8")
         self.client = TestClient(app_module.create_app(self.client_dir))
 
+    def test_a_file_in_the_build_is_that_file(self):
+        (self.client_dir / "lounge").mkdir()
+        (self.client_dir / "lounge" / "skin.html").write_text("<p>a skin</p>", encoding="utf-8")
+        reply = self.client.get("/lounge/skin.html")
+        self.assertEqual(reply.text, "<p>a skin</p>")
+        self.assertEqual(reply.headers["X-Frame-Options"], "SAMEORIGIN")
+
+    def test_no_spelling_of_a_path_leaves_the_build(self):
+        (self.client_dir.parent / "outside.txt").write_text("outside", encoding="utf-8")
+        for path in ("/..%2Foutside.txt", "/%2e%2e/outside.txt", "/lounge/..%2F..%2Foutside.txt"):
+            with self.subTest(path=path):
+                self.assertNotIn("outside", self.client.get(path).text.replace("Outside", ""))
+
+    def test_the_docs_tab_is_the_apps_not_a_generated_page(self):
+        for path in ("/docs", "/redoc"):
+            reply = self.client.get(path)
+            self.assertEqual(reply.status_code, 200)
+            self.assertEqual(reply.text, INDEX_HTML)
+        self.assertEqual(self.client.get("/openapi.json").text, INDEX_HTML)
+
     def tearDown(self):
         self._tmp.cleanup()
 

@@ -421,7 +421,7 @@ class EnvReportsIt(unittest.TestCase):
 
         async def run():
             transport = httpx.ASGITransport(app=app)
-            async with httpx.AsyncClient(transport=transport, base_url="http://agent") as ac:
+            async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
                 env_task = asyncio.create_task(ac.get("/api/env"))
                 await asyncio.sleep(0.05)
                 started = time.monotonic()
