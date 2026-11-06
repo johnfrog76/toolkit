@@ -123,8 +123,7 @@ There are no severity or routing labels here. Severity is the Severity section o
 wants them makes its own: the Standup and Triage rules read a repository's severity and size labels when
 it has them (`docs/modules/solitaire-agile.md`).
 
-- **`verify-close`** -- not on this repository yet, so create it the first time a fix needs it
-  (`gh label create verify-close`). Merged, but only another host (Windows, or a real org, or a browser) can
+- **`verify-close`** -- merged, but only another host (Windows, or a real org, or a browser) can
   prove it: the fix has a `VERIFY.md` Gate 12 row, and the issue stays open until that row is
   walked. The person who merges closes everything else at merge, so a closed issue means merged and
   pushed, and what verification finds afterwards is a new issue. A closing label, not a filing one.
