@@ -424,6 +424,10 @@ function Resolve-P20SchemaKey {
             $result.Reason = "'$field' is not a field of a nav alias. Known: $known."
             return $result
         }
+        if (-not (Test-P20CommandName $name)) {
+            $result.Reason = "'$name' cannot be a nav alias: a name is a letter, then letters, digits, '-' or '_'."
+            return $result
+        }
         $bare = ConvertTo-P20BareAliasKey -Key $name -Prefix (Get-P20SchemaPrefix)
         if ($name -ne $bare) {
             $result.Reason = "'$name' carries the command prefix. A nav alias key is bare -- set aliases.$bare.$field instead; the prefix is added when the alias is registered."
@@ -492,6 +496,11 @@ function Test-P20ConfigValue {
 
     $result = @{ Ok = $false; Value = $null; Reason = '' }
     $raw = [string]$Value
+
+    if ($Row.key -eq 'commandPrefix' -and -not (Test-P20CommandName $raw)) {
+        $result.Reason = "commandPrefix is a letter, then letters, digits, '-' or '_' -- got '$raw'."
+        return $result
+    }
 
     switch ($Row.type) {
         'bool' {

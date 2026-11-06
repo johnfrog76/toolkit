@@ -295,6 +295,10 @@ command table, parameters as argv. There is no second `pwsh -Command` builder
 beside the bridge with its own quoting: a comma-separated slug list needs no
 hand-added quotes to survive argv.
 
+**`GET /api/engagement/{slug}/reviews` is in `agent/ado/reporting.py`, and gated all the same.** It
+carries the module's own dependency, so with the flag off it is a 404, and the engagement summary's
+review count is 0.
+
 **`GET /api/engagement/{slug}/skills` is NOT here.** It counts tags across one
 org's `archive/` -- card data -- and it already lives in `agent/ado/reporting.py`.
 Moving it would buy a tidier folder and a worse boundary. `SkillsSnapshot`
