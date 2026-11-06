@@ -24,9 +24,9 @@
 # argument with no space reaches cmd.exe bare. Test-P20CmdArgument is the rule, and
 # a read it refuses never starts: Code 2, with the sentence in Lines and Err. Quoting
 # stops & and | but not %, so a variable's shape is refused with or without a space.
-# cmd.exe's own names start with = (%=ExitCode%). Past that, a % that starts a percent-encoded byte (%2F) passes, because a URL path
-# carries them: gh's branch path does, and gh can be a .cmd shim. Two such bytes with
-# a letter first (%C3%A9) have a variable's shape and are refused, on a rare path.
+# cmd.exe's own names start with = (%=ExitCode%). Past that, a % that starts a
+# percent-encoded byte (%2F) passes, because a URL path carries them: gh's branch
+# path does, and gh can be a .cmd shim. Two such bytes with a letter first (%C3%A9) have a variable's shape and are refused, on a rare path.
 #
 function Test-P20CmdArgument {
     param([AllowEmptyString()][string]$Argument)
