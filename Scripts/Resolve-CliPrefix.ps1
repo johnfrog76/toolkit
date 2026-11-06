@@ -39,6 +39,17 @@ function Get-P20DefaultPrefix {
     return $script:P20DefaultCommandPrefix
 }
 
+function Test-P20CommandName {
+    <#
+        Whether a config value may become part of a command's name: a letter,
+        then letters, digits, '-' or '_'. The one rule for a commandPrefix and a
+        nav alias key. The schema refuses anything else as it is set, and every
+        reader checks again, because a file can already hold one.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Name)
+    return ($Name -cmatch '^[A-Za-z][A-Za-z0-9_-]*\z')
+}
+
 function ConvertTo-P20BareAliasKey {
     <#
         The bare spelling of a navigation alias key.
@@ -71,6 +82,21 @@ function ConvertTo-P20BareAliasKey {
 
 if (-not (Get-Command Write-P20ConfigParseWarning -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Write-ConfigParseWarning.ps1') }
 
+function Select-P20CommandPrefix {
+    <#
+        A configured prefix, if it may be one; otherwise the fallback, with a
+        warning that names the file and the rule.
+    #>
+    param(
+        [AllowEmptyString()][AllowNull()][string]$Value,
+        [Parameter(Mandatory = $true)][string]$Fallback,
+        [string]$Path = 'config'
+    )
+    if (Test-P20CommandName $Value) { return $Value }
+    Write-Warning "commandPrefix in $Path is not a command name (a letter, then letters, digits, '-' or '_'); using '$Fallback'."
+    return $Fallback
+}
+
 function Resolve-P20ConfigPrefix {
     <#
         The prefix this package registers: config.default.json, then
@@ -84,7 +110,7 @@ function Resolve-P20ConfigPrefix {
         if (-not (Test-Path $path)) { continue }
         try {
             $cfg = Get-Content $path -Raw -Encoding UTF8 | ConvertFrom-Json
-            if ($cfg.commandPrefix) { $prefix = [string]$cfg.commandPrefix }
+            if ($cfg.commandPrefix) { $prefix = Select-P20CommandPrefix -Value ([string]$cfg.commandPrefix) -Fallback $prefix -Path $path }
         }
         catch { if ($name -eq 'config.local.json') { $null = Write-P20ConfigParseWarning -Path $path -Message $_.Exception.Message } }
     }

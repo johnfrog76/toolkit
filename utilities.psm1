@@ -605,8 +605,9 @@ if ($script:ModuleState.Config.WsRoot) {
 # came to print 'tktkHub'.
 #
 $script:ModuleState.CommandPrefix = Get-P20DefaultPrefix
-if ($defaultConfig -and $defaultConfig.commandPrefix) { $script:ModuleState.CommandPrefix = $defaultConfig.commandPrefix }
-if ($localConfig   -and $localConfig.commandPrefix)   { $script:ModuleState.CommandPrefix = $localConfig.commandPrefix }
+if ($defaultConfig -and $defaultConfig.commandPrefix) { $script:ModuleState.CommandPrefix = Select-P20CommandPrefix -Value $defaultConfig.commandPrefix -Fallback $script:ModuleState.CommandPrefix -Path 'config.default.json' }
+if ($localConfig   -and $localConfig.commandPrefix)   { $script:ModuleState.CommandPrefix = Select-P20CommandPrefix -Value $localConfig.commandPrefix -Fallback $script:ModuleState.CommandPrefix -Path 'config.local.json' }
+$global:P20Config.CommandPrefix = $script:ModuleState.CommandPrefix
 
 # -- Build navigation aliases from config -------------------------------------
 # A nav alias key is stored BARE -- 'Home', never 'tkHome' -- exactly as a
@@ -779,7 +780,6 @@ function global:Update-P20StaleConfig {
 # data (Register-PromptAlias), and declared BEFORE the import-time call below --
 # a module body runs top to bottom, so the order here is the contract.
 function script:Register-P20NavAliases {
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingInvokeExpression', '', Justification = 'Generates one navigation function per configured shortcut; the path is the only value spliced in, and it is single-quoted with its quotes doubled.')]
     param([Parameter(Mandatory = $true)][string]$Prefix)
     foreach ($alias in $script:ModuleState.NavAliases.GetEnumerator()) {
         if (-not $alias.Value.display) { continue }
@@ -790,15 +790,17 @@ function script:Register-P20NavAliases {
         # Get-P20Menu's 'nav' empty state.
         if ([string]::IsNullOrWhiteSpace($targetPath)) { continue }
 
+        # A key is a name, never code: a closure holds the path, and a key that is
+        # not a command name is skipped, by name. Config -Set refuses one, but a
+        # file can already hold it.
+        if (-not (Test-P20CommandName $alias.Key)) {
+            Write-Warning "aliases.$($alias.Key) is not a command name (a letter, then letters, digits, '-' or '_'); skipped."
+            continue
+        }
+
         $aliasName = $Prefix + $alias.Key
         $funcName = "Navigate-$aliasName"
-        $funcBody = @"
-function global:$funcName {
-    Set-Location -Path '$($targetPath -replace "'", "''")'
-    Get-ChildItem
-}
-"@
-        Invoke-Expression $funcBody
+        Set-Item -Path "function:global:$funcName" -Value { Set-Location -LiteralPath $targetPath; Get-ChildItem }.GetNewClosure()
         Set-Alias -Name $aliasName -Value $funcName -Scope Global
     }
 }
