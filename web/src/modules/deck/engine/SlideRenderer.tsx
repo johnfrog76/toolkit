@@ -180,7 +180,12 @@ export function SlideRenderer({
       <div
         ref={copyRef}
         style={{
-          flex: hasContent && !stacked ? "0 0 40%" : "1",
+          // What the content panel leaves, never a fixed 40%: that panel is 60%
+          // PLUS its inset padding and border (its style object is the
+          // authored one, above), so a 40% copy panel overflowed the stage by
+          // 2 x CONTENT_PANEL_INSET + 1 and pushed its text past the window.
+          flex: "1 1 0",
+          minWidth: 0,
           overflow: "auto",
           backgroundColor: COPY_BG,
           display: "flex",
