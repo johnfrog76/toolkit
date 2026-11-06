@@ -89,15 +89,74 @@ class TheHelper(unittest.TestCase):
             child.run_read(["gh", "label", "list"], 30)
         self.assertEqual(str(cm.exception), "gh's output could not be read (exit code 0)")
 
-    def test_the_shell_rule_is_unchanged(self):
+    def test_only_az_takes_the_shell_on_windows(self):
         run = _cp1252_console(b"")
         with (
             mock.patch.object(subprocess, "run", side_effect=run),
             mock.patch.object(child.platform, "system", return_value="Windows"),
         ):
-            child.run_read(["gh"], 30)
-            child.run_read(["git"], 5, shell=False)
-        self.assertEqual([k["shell"] for k in run.seen], [True, False])
+            child.run_read(["az", "account", "show"], 30)
+            child.run_read(["gh", "api", "user"], 30)
+            child.run_read(["git", "status"], 5)
+            child.run_read(["az", "account", "show"], 5, shell=False)
+        self.assertEqual([k["shell"] for k in run.seen], [True, False, False, False])
+
+    def test_no_tool_takes_the_shell_elsewhere(self):
+        run = _cp1252_console(b"")
+        with (
+            mock.patch.object(subprocess, "run", side_effect=run),
+            mock.patch.object(child.platform, "system", return_value="Darwin"),
+        ):
+            child.run_read(["az", "account", "show"], 30)
+            child.run_read(["gh", "api", "user"], 30)
+        self.assertEqual([k["shell"] for k in run.seen], [False, False])
+
+    # Every character the shell reads as syntax, in a value shaped the way a
+    # search reaches a child. One row each.
+    VALUES = (
+        ('"', 'q="word" repo:o/r'),
+        ("&", "q=a&b repo:o/r"),
+        ("|", "q=a|b repo:o/r"),
+        ("<", "q=a<b repo:o/r"),
+        (">", "q=a>b repo:o/r"),
+        ("^", "q=a^b repo:o/r"),
+        ("%", "q=100%path% repo:o/r"),
+        ("\n", "q=a\nb repo:o/r"),
+        ("\r", "q=a\rb repo:o/r"),
+    )
+
+    def test_a_shell_bound_argv_with_shell_syntax_never_runs(self):
+        for ch, value in self.VALUES:
+            with (
+                self.subTest(ch=ch),
+                mock.patch.object(subprocess, "run") as run,
+                mock.patch.object(child.platform, "system", return_value="Windows"),
+                self.assertRaises(child.ChildReadError) as cm,
+            ):
+                child.run_read(["az", "boards", "query", "--wiql", value], 30)
+            run.assert_not_called()
+            self.assertIn(repr(ch), str(cm.exception))
+            self.assertEqual(child.did_not_answer("az", cm.exception), str(cm.exception))
+
+    def test_the_same_values_reach_gh_whole_as_one_argument(self):
+        for ch, value in self.VALUES:
+            with self.subTest(ch=ch):
+                run = _cp1252_console(b"")
+                with (
+                    mock.patch.object(subprocess, "run", side_effect=run),
+                    mock.patch.object(child.platform, "system", return_value="Windows"),
+                ):
+                    child.run_read(["gh", "api", "search/code", "-f", value], 30)
+                self.assertEqual(run.seen[0]["shell"], False)
+
+    def test_the_boards_query_the_agent_sends_passes(self):
+        """A shell-bound read the product really makes must not be refused."""
+        wiql = (
+            "SELECT [System.Id] FROM WorkItems WHERE [System.AssignedTo] = @Me "
+            "AND [System.State] NOT IN ('Closed','Done','Removed','Resolved')"
+        )
+        org = "https://dev.azure.com/example"
+        self.assertIsNone(child.shell_syntax_in(["az", "boards", "query", "--org", org, "--wiql", wiql]))
 
     def test_did_not_answer_keeps_the_old_sentence_for_a_timeout(self):
         self.assertEqual(

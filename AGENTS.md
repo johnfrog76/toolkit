@@ -412,11 +412,11 @@ Each step already done is skipped, so it is safe to re-run.
   verb can look in `<hub>/<org>/` and see no cards at all -- as it does when the module's own
   `Get-PromptFolders` reads the folder names through a `$script:` name (the trap above). Every workflow verb needs at least one
   assertion that imports the module in a fresh shell and types the verb.
-- **On Windows the agent runs `gh` through the shell, so a `&` in a query string is cmd's, not `gh`'s.**
-  A query put in the URL (`...?q=...&per_page=50`)
-  fails on Windows: everything after the `&` is a second command. A query travels as `gh api -f`
-  / `-F` fields (`agent/ado/design.py`), and `Tests/test_design.py`'s stub asserts that no `&` reaches the
-  argv -- which is the only way a suite with `gh` stubbed can catch it.
+- **On Windows only `az` runs through the shell.** `az` is a `.cmd`, so it needs one; `gh` and `git` are executables and run
+  without. `run_read` (`agent/core/child.py`) decides, and refuses a shell-bound argv holding a character the shell reads as
+  syntax, for every caller, so such a read answers with a reason. A query still travels as `gh api -f` / `-F` fields
+  (`agent/ado/design.py`), never in the URL, and `Tests/test_design.py`'s stub asserts that no `&` reaches the argv.
+  `Tests/test_child_windows.py` runs the rule on a real console, in the Windows CI job.
 - **Windows PowerShell 5.1 turns a redirected native stderr under `Stop` into a throw.** `gh x 2>&1` or `2>$null` in a script
   running with `$ErrorActionPreference = 'Stop'` throws a NativeCommandError on the first stderr line, before `$LASTEXITCODE` can be
   read, so the verb prints gh's sentence through the generic block instead of its own answer; pwsh 7 reads it as text, so

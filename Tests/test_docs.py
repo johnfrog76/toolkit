@@ -90,7 +90,7 @@ class FakeRepo:
 
     def __call__(self, argv, **_kw):
         self.calls.append(list(argv))
-        # On Windows gh runs through the shell, so an `&` in an argument is cmd's.
+        # A query travels as a field, never in the URL.
         assert "&" not in " ".join(argv), argv
         if self.fail:
             return subprocess.CompletedProcess(argv, 1, stdout="", stderr=self.fail)
