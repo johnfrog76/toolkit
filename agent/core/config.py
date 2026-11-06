@@ -32,6 +32,7 @@ from typing import Any
 
 from . import log_writer
 from .consts import (
+    consts,
     docs_readme,
     docs_root,
     env_active_space,
@@ -160,7 +161,7 @@ DEFAULT_CORS_ORIGINS = [
 # The one prefix every route is mounted under. app.py builds the router with
 # it, and the SPA fallback refuses a path that starts with it, so a request
 # for a route that does not exist answers 404 rather than 200 HTML.
-API_PREFIX = "/api"
+API_PREFIX = consts()["agent"]["apiPrefix"]
 
 # How far one ``gh issue list`` reads, per state: an open backlog is short, a
 # closed history longer, so the ``all`` read goes further. ``accounting._gh_issues``

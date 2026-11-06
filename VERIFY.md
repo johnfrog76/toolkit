@@ -290,7 +290,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **51 suites, 9194 assertions** with a `config.local.json`, every one
+findings. On this commit that is **51 suites, 9198 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -985,6 +985,14 @@ the same commit (AGENTS.md, "A fix its own host cannot confirm leaves its check 
 names the command, what you should see, and the issue it closes. A row stays until a verification run confirms
 it and records that on the issue. Then the row moves into the gate it belongs to, or goes if a suite
 now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on the verifying host: it prints each `verify-close` issue with the row below that names it, by issue number.
+
+- [ ] **The Docker image behind the agent's request gate.** Docker Desktop running, `tkWeb` with the agent up. Open
+  `http://localhost:5174` and walk Home, the Board and a card: pages load, and creating a card from the web UI
+  works, which proves a write passes through nginx. Open `http://127.0.0.1:5174` and do the same. `curl -si -H "Host:
+  example.test" http://localhost:5174/` should drop the connection, and `curl -sI http://localhost:5174/` should show
+  `Content-Security-Policy` and `X-Frame-Options: DENY`, and `curl -sI http://localhost:5174/lounge/temple.html` should show
+  `X-Frame-Options: SAMEORIGIN`. In the Lounge, open the Skins dialog and see every thumbnail drawn, and wear a skin and see it
+  drawn behind the app. The browser console shows no policy violation.
 
 - [ ] **The agent's reads on Windows, gh and az.** On the Windows PC, with the agent up and a GitHub Space active,
   `python Tests/test_child_windows.py` passes all three (the Windows CI job runs the same file), then open the Design

@@ -1,0 +1,1 @@
+- The local agent now accepts requests only from its own pages and the origins you configure, and picture uploads are limited as they arrive.
