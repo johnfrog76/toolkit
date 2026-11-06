@@ -319,6 +319,72 @@ try {
     [void](Invoke-Config $box @('-Set', 'aliases.Bowling.display=false'))
     Assert-Contains 'display false is kept when set on purpose' (Get-LocalConfigText $box) '"display": false'
 
+    # A name becomes part of a command, so it has to be one. Every row is refused
+    # by name, and nothing reaches the file.
+    #
+    $before = Get-LocalConfigText $box
+    foreach ($bad in @('x y', 'x;y', 'x{y', 'x$y', 'x`y', '1x', '-x', "x'y", 'x(y)', 'x|y')) {
+        $r = Invoke-Config $box @('-Set', "aliases.$bad.path=/somewhere")
+        Assert-Equal "alias name '$bad' is a stated refusal" 2 $r.ExitCode
+        Assert-Contains "and it says why" $r.Output 'cannot be a nav alias'
+    }
+    foreach ($bad in @('t k', 't;k', '1k', 't$k', "t'k", 't(k)')) {
+        $r = Invoke-Config $box @('-Set', "commandPrefix=$bad")
+        Assert-Equal "prefix '$bad' is a stated refusal" 2 $r.ExitCode
+        Assert-Contains 'and it says what a prefix is' $r.Output 'commandPrefix is a letter'
+    }
+    Assert-Equal 'a refused name writes nothing' $before (Get-LocalConfigText $box)
+    foreach ($good in @('Home2', 'my-repo', 'a_b')) {
+        Assert-Equal "alias name '$good' is accepted" 0 (Invoke-Config $box @('-Set', "aliases.$good.path=/somewhere")).ExitCode
+    }
+    Assert-Equal 'a prefix may carry a dash or a digit' 0 (Invoke-Config $box @('-Set', 'commandPrefix=my-tk2')).ExitCode
+    [void](Invoke-Config $box @('-Unset', 'commandPrefix'))
+
+    # A file can already hold a name the schema would refuse, so the readers check
+    # too. A scratch copy of the package, imported in a fresh shell: the key says
+    # to write a marker, and the marker must never appear.
+    #
+    $nameBox = Join-Path ([System.IO.Path]::GetTempPath()) "p20-names-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
+    try {
+        New-Item -ItemType Directory -Path $nameBox -Force | Out-Null
+        foreach ($item in @('Prompt20Toolkit', 'Scripts', 'Config', 'utilities.psm1', 'config.default.json', 'consts.json')) {
+            Copy-Item -LiteralPath (Join-Path $pkgRoot $item) -Destination $nameBox -Recurse
+        }
+        $marker = Join-Path $nameBox 'marker.txt'
+        $hub = Join-Path $nameBox 'hub'
+        New-Item -ItemType Directory -Path $hub -Force | Out-Null
+        $hostile = "x {};New-Item -Path '$marker';function y"
+        $safePath = Join-Path $nameBox 'it''s here'
+        New-Item -ItemType Directory -Path $safePath -Force | Out-Null
+        $local = [ordered]@{
+            promptsRoot = $hub
+            aliases     = [ordered]@{
+                $hostile = @{ path = $nameBox; display = $true }
+                Good     = @{ path = $safePath; display = $true }
+            }
+        }
+        $writeLocal = { [System.IO.File]::WriteAllText((Join-Path $nameBox 'config.local.json'), ($local | ConvertTo-Json -Depth 6)) }
+        & $writeLocal
+        $probe = "`$env:PSModulePath = '$nameBox'; `$env:TOOLKIT_QUIET_STARTUP = '1'; Import-Module '$nameBox/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force"
+        $out = (& pwsh -NoProfile -Command "$probe; tkGood | Out-Null; (Get-Location).Path" 2>&1 3>&1 | Out-String)
+        Assert-True 'a hostile alias key in the file runs nothing' (-not (Test-Path -LiteralPath $marker)) $out
+        Assert-Contains 'and is skipped, by name' $out 'is not a command name'
+        Assert-Contains 'and a good shortcut beside it still goes where it says, quote and all' $out "it's here"
+
+        $local.Remove('aliases')
+        $local.commandPrefix = "x;New-Item -Path '$marker'"
+        & $writeLocal
+        $out = (& pwsh -NoProfile -Command "$probe; (Get-Command tkStatus -ErrorAction SilentlyContinue).Name" 2>&1 3>&1 | Out-String)
+        Assert-True 'a hostile prefix in the file runs nothing' (-not (Test-Path -LiteralPath $marker)) $out
+        Assert-Contains 'and is named in a warning' $out 'commandPrefix in'
+        Assert-Contains 'and the shipped prefix answers' $out 'tkStatus'
+        $resolved = (& pwsh -NoProfile -Command ". '$nameBox/Scripts/Resolve-CliPrefix.ps1'; Resolve-P20ConfigPrefix -PackageRoot '$nameBox' 3>`$null" 2>$null | Out-String).Trim()
+        Assert-Equal 'and the script-side reader falls back the same way' 'tk' $resolved
+    }
+    finally {
+        Remove-Item -LiteralPath $nameBox -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
     # A Space's checkout (spaceCheckouts.<slug>.path, #146): this machine's, so
     # config.local.json and never hub.json; keyed by a Space that exists; one
     # shape. And -List names the Space you are in, so the drawer has its field.
