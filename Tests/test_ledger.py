@@ -12,7 +12,7 @@ kept on disk per Space for the visibility cache's 600 s. What is pinned here:
 - a Space whose read did not fully answer is not kept;
 - the report counts what ``accounting._github_issue_report`` counts, from the
   same issues;
-- no argv carries a character cmd.exe would split (the Windows ``&`` trap).
+- no argv puts a query in a URL.
 
 No network: ``subprocess.run`` is stubbed and answers like gh.
 
@@ -466,7 +466,7 @@ class TheRepoRecord(LedgerCase):
 
 
 class TheArgv(LedgerCase):
-    def test_no_argument_carries_what_cmd_exe_would_split(self):
+    def test_no_argument_puts_a_query_in_a_url(self):
         page = {"data": {"repository": {"page": {"pageInfo": {"hasNextPage": False}, "nodes": []}}}}
         gh = FakeGh(
             {"johnfrog76/a": repo_node(ISSUES, open_total=6, has_next=True), "johnfrog76/b": repo_node([])},

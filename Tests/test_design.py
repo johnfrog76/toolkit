@@ -92,7 +92,7 @@ class FakeRepo:
     that is absent is a null object (GraphQL) or a 404 (contents). A name in
     ``null_text`` is a blob GitHub will not inline: its GraphQL text is null.
 
-    Every call is asserted free of ``&`` (cmd's on Windows), and a GraphQL query
+    Every call is asserted free of ``&`` (a query is a field), and a GraphQL query
     must arrive as ``-F query=@<file>``, never as argv text."""
 
     def __init__(self, folders: dict[str, dict[str, str]], fail: str = "", null_text: tuple[str, ...] = ()):
@@ -180,8 +180,7 @@ class FakeRepo:
     def search(self, argv):
         """``gh api -X GET -H <accept> search/code -f q=<words> repo:<r> path:<root>
         -F per_page=50``: the files under that root whose text carries every
-        word, with a fragment. The query travels as a field, never in the URL
-        (an `&` there is cmd's on Windows)."""
+        word, with a fragment. The query travels as a field, never in the URL."""
         assert argv[2:4] == ["-X", "GET"] and argv[4] == "-H", argv
         assert argv[5].startswith("Accept: application/vnd.github.text-match+json"), argv
         assert argv[6] == "search/code" and "&" not in " ".join(argv), argv
