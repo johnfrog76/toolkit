@@ -11,6 +11,7 @@ report "no log yet" until one exists; nothing raises either way.
 """
 
 import json
+import re
 from datetime import date
 from pathlib import Path
 
@@ -294,10 +295,15 @@ def _config_sprint_context(org: dict, repo: str | None = None) -> StressContext:
     return StressContext(sprintName=name, sprintFullName=name, daysRemaining=days_remaining)
 
 
+# A repo key names a file beside the hub's others, so it is a name, never a path.
+_REPO_KEY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+
+
 def _stress_log_path(repo: str | None) -> Path:
     """Resolve the stress-log path for an optional repo key, falling back to
-    the unnamespaced file when repo is omitted or its namespaced file is absent."""
-    if repo:
+    the unnamespaced file when repo is omitted, is not a name, or its namespaced
+    file is absent."""
+    if repo and _REPO_KEY.fullmatch(repo):
         namespaced = hub_root() / f"stress-log.{repo}.json"
         if namespaced.exists():
             return namespaced
@@ -335,7 +341,14 @@ async def get_stress_status(repo: str | None = None):
         return StressStatusResponse(
             enabled=True,
             org=active,
-            detail=f"could not read stress-log.json: {exc}",
+            detail=f"could not read stress-log.json: {exc.__class__.__name__}",
+            context=_config_sprint_context(org, repo),
+        )
+    if not isinstance(log, dict):
+        return StressStatusResponse(
+            enabled=True,
+            org=active,
+            detail="could not read stress-log.json: it is not an object",
             context=_config_sprint_context(org, repo),
         )
 

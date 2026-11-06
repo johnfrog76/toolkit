@@ -314,7 +314,7 @@ add only an origin you serve yourself. The production image needs none: it serve
 `status: rejected` and nothing runs; so is a request with more than 32 parameters or a parameter
 longer than 4,096 characters, and so is a verb of a module that is switched off, because it is not in
 the table. Parameters travel as process argv, with no command string built or parsed on either side,
-so a parameter cannot become a second command. A verb that runs past its timeout is killed. The
+so a parameter cannot become a second command. A verb that runs past its timeout is killed, with everything it started. The
 bridge is a way to type a verb, not a way to run a script: it cannot be given a file to run, and a
 verb that refuses (a card in `current/` is never overwritten) refuses in the browser with the same
 sentence it prints in a terminal.
