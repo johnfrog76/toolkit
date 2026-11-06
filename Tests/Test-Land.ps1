@@ -327,6 +327,7 @@ try {
             @{ Arg = 'System.Tags=a; b'; Ok = $true }
             @{ Arg = 'R&D work'; Ok = $true }
             @{ Arg = '100% of it'; Ok = $true }
+            @{ Arg = 'repos/acme/widgets/branches/you%2Fa-widget'; Ok = $true }
             @{ Arg = "[State] <> 'Closed'"; Ok = $true }
             @{ Arg = ''; Ok = $true }
             @{ Arg = 'https://x&calc&.visualstudio.com'; Ok = $false }
@@ -335,6 +336,8 @@ try {
             @{ Arg = 'a>b'; Ok = $false }
             @{ Arg = 'a^b'; Ok = $false }
             @{ Arg = '%PATH%'; Ok = $false }
+            @{ Arg = '%CD%'; Ok = $false }
+            @{ Arg = '100%'; Ok = $false }
             @{ Arg = 'say "hi" there'; Ok = $false }
             @{ Arg = '"'; Ok = $false }
             @{ Arg = "two`nlines"; Ok = $false }
@@ -348,15 +351,21 @@ try {
         [System.IO.File]::WriteAllText((Join-Path $cmdDir 'p20tool.cmd'), "@echo ran %*`r`n")
         $marker = Join-Path $cmdDir 'marker.txt'
         $before = $env:PATH
+        # No whitespace in the value, or PowerShell quotes it: the marker is named
+        # from the folder it lands in, so a temp path with a space changes nothing.
+        Push-Location $cmdDir
         try {
             $env:PATH = "$cmdDir;$before"
             $ok = Invoke-P20TrackerRead 'p20tool' @('--name', 'a b')
             Assert-True 'a .cmd still runs' ($ok.Code -eq 0 -and ($ok.Out -join ' ') -match 'ran --name') ($ok.Lines -join ' | ')
-            $no = Invoke-P20TrackerRead 'p20tool' @("x&echo hit>$marker&")
+            $no = Invoke-P20TrackerRead 'p20tool' @('x&echo.hit>marker.txt&')
             Assert-True 'and takes no bare syntax' ($no.Code -eq 2) ($no.Lines -join ' | ')
             Assert-True 'and nothing ran' (-not (Test-Path -LiteralPath $marker)) ($no.Lines -join ' | ')
         }
-        finally { $env:PATH = $before }
+        finally {
+            $env:PATH = $before
+            Pop-Location
+        }
     }
 
     # -- The help --------------------------------------------------------------
