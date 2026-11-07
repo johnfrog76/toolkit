@@ -328,7 +328,7 @@ try {
         Write-CliError -Message $tokenRead.Message -Hint $tokenRead.Hint
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
-    $headers = Get-P20AdoHeaders -Token $tokenRead.Token
+    $headers = Get-P20AdoHeaders -Token $tokenRead.Token -OrgUrl $org
 
     # Auto-resolve project/repo from PR ID if user didn't specify
     if (-not $userSpecifiedProject -and -not $userSpecifiedRepo) {

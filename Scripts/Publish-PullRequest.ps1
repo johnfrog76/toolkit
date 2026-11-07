@@ -206,10 +206,11 @@ if (-not $ado.Success) {
         -Hint "${p}PublishPR reads <organisation>/<project>/_git/<repository>/pullrequest/<id>, the address ${p}NewPR writes."
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
-# The token is the Space's, so it goes to the Space's organisation. The card's line
-# is text: one that names another address is refused before anything is sent.
-if (-not (Test-P20UrlInOrg -Url $prUrl -Org $cfg.Org)) {
-    Write-CliError -Message "$prUrl is not on this Space's organisation ($($cfg.Org)), so ${p}PublishPR will not send your token there." `
+# The token is the Space's Azure DevOps token, so it goes to that organisation. The
+# card's line is text: one that is not on this Space's tracker is refused before
+# anything is sent, and a GitHub Space has no Azure DevOps token to send.
+if ((Resolve-P20Tracker -OrgUrl $cfg.Org) -ne 'ado' -or -not (Test-P20UrlOnTracker -Url $prUrl -OrgUrl $cfg.Org -Projects $cfg.Projects)) {
+    Write-CliError -Message "$prUrl is not on this Space's tracker ($($cfg.Org)), so ${p}PublishPR will not send your token there." `
         -Hint "Run ${p}PublishPR from the Space that holds it, or correct the card's $($c.tokens.prUrl) line."
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
@@ -238,7 +239,7 @@ if (-not $tokenRead.Ok) {
     Write-CliError -Message $tokenRead.Message -Hint $tokenRead.Hint
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
-$headers = Get-P20AdoHeaders -Token $tokenRead.Token
+$headers = Get-P20AdoHeaders -Token $tokenRead.Token -OrgUrl $org
 
 # Azure DevOps puts the reason in the response body; the exception only says the status.
 $adoSentence = {

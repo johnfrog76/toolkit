@@ -193,7 +193,7 @@ try {
         )) {
         New-ShippedCard -Space 'board' -FileName "Task$($row.Id)-a-forged-line.prompt.md" -Heading "Task $($row.Id): A forged line" -PrUrl $row.Url | Out-Null
         $r = Invoke-Publish "${cfgPrefix}PublishPR $($row.Id)"
-        Assert-True "not this Space's organisation is refused: $($row.Url)" ($r.Text -match "not on this Space's organisation" -and $r.Text -match 'EXIT=2') $r.Text
+        Assert-True "not this Space's organisation is refused: $($row.Url)" ($r.Text -match "not on this Space's tracker" -and $r.Text -match 'EXIT=2') $r.Text
         Assert-True 'and no token is asked for and no REST call made' ((Get-TokenCalls $r.Calls).Count -eq 0 -and (Get-RestCalls $r.Calls).Count -eq 0) ($r.Calls -join ' | ')
     }
 
@@ -218,6 +218,13 @@ try {
     Assert-True 'and the hint is gh pr ready <url>' ($r.Text.Contains("gh pr ready $ghPrUrl")) $r.Text
     Assert-True 'and nothing is called on either tracker' ((Get-RestCalls $r.Calls).Count -eq 0 -and -not (@($r.Calls) -match '^gh pr ')) ($r.Calls -join ' | ')
     Assert-True 'and the card is not written' ((Get-Bytes $gh) -eq $ghBytes)
+
+    # An Azure DevOps address under a GitHub Space's own owner: the Space has no
+    # Azure DevOps token to send, so no token is read and nothing goes to github.com.
+    New-ShippedCard -Space 'widgets' -FileName 'TaskQ7AX-a-forged-line.prompt.md' -Heading 'Task Q7AX: A forged line' -PrUrl 'https://github.com/acme/p/_git/r/pullrequest/1' | Out-Null
+    $r = Invoke-Publish "${cfgPrefix}PublishPR Q7AX"
+    Assert-True "an Azure DevOps address on a GitHub Space is refused" ($r.Text -match "not on this Space's tracker" -and $r.Text -match 'EXIT=2') $r.Text
+    Assert-True 'and no token is asked for and no REST call made' ((Get-TokenCalls $r.Calls).Count -eq 0 -and (Get-RestCalls $r.Calls).Count -eq 0) ($r.Calls -join ' | ')
 
     # -- The help -----------------------------------------------------------------
     $r = Invoke-Publish "${cfgPrefix}PublishPR -Help"

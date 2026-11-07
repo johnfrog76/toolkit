@@ -105,13 +105,22 @@ if (-not $Card) {
 $folders = Get-PromptFolders
 $backlogDir = Get-P20BacklogFolder -Folders $folders
 $archiveDir = $folders.Archive
+# No -AllowPath: every step below acts on the active Space's tracker, so a card is
+# named the way Route and StartWork name one, by id or name in this Space. A path
+# could name a card in another Space and close this Space's issue of the same
+# number, so one is refused, said once, rather than read as a name.
+if ($Card -match '[\\/]') {
+    Write-CliError -Message "${p}Land takes a card's ID or filename in this Space, not a path ('$Card')." `
+        -Hint "Switch to the card's Space (${p}SwitchSpace), then '${p}Land <id>'. Nothing was read or written."
+    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+}
 $inPlay = Resolve-P20CardArgument -Argument $Card -Folder @($folders.Current, $backlogDir) `
-    -WorkItemTypes $types -AllowPath -PromptsRoot $promptsRoot
+    -WorkItemTypes $types
 $found = @($inPlay.Match | Where-Object { $_.Name -like '*.prompt.md' })
 $resolved = $inPlay
 if ($found.Count -eq 0) {
     $resolved = Resolve-P20CardArgument -Argument $Card -Folder @($archiveDir) `
-        -WorkItemTypes $types -AllowPath -PromptsRoot $promptsRoot
+        -WorkItemTypes $types
     $found = @($resolved.Match | Where-Object { $_.Name -like '*.prompt.md' })
 }
 if ($found.Count -eq 0) {
@@ -121,14 +130,14 @@ if ($found.Count -eq 0) {
     }
     else {
         Write-CliError -Message "No card matching '$Card' in current/, backlog/ or archive/." `
-            -Hint "Pass the card's ID, its filename, or a path. Run '${p}Status' to see the cards."
+            -Hint "Pass the card's ID or its filename. Run '${p}Status' to see the cards."
     }
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
 if ($found.Count -gt 1) {
     Write-Host "Matches for '$Card':" -ForegroundColor Yellow
     $found | ForEach-Object { Write-Host "  $($_.Name)" }
-    Write-CliError -Message "'$Card' matches $($found.Count) cards." -Hint "Pass the full filename, or the path, of the one you mean."
+    Write-CliError -Message "'$Card' matches $($found.Count) cards." -Hint "Pass the full filename of the one you mean."
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
 if ($resolved.Fuzzy) {
@@ -180,17 +189,16 @@ if (-not $prNumber) {
 
 $spaceTracker = Resolve-P20Tracker -OrgUrl $cfg.Org
 Write-P20TrackerHeader -Name $cfg.ActiveOrgName -OrgUrl $cfg.Org
-# The card's line says which pull request, and it is text: an Azure DevOps one must
-# lie in this Space's organisation, and a Space on Azure DevOps takes no other.
-# A Space with no tracker may still land a GitHub pull request by its line.
-$offTracker = ($prHost -eq 'ado' -and -not (Test-P20UrlInOrg -Url $prUrl -Org $cfg.Org)) -or
-    ($prHost -eq 'github' -and $spaceTracker -eq 'ado')
-if ($offTracker) {
+# The card's line says which pull request, and it is text: Test-P20UrlOnTracker is
+# the one rule for what it may name. A line that is no pull request at all has no
+# host; -Pr then names the number, and the line goes no further.
+if ($prHost -and -not (Test-P20UrlOnTracker -Url $prUrl -OrgUrl $cfg.Org -Projects $cfg.Projects)) {
     Write-CliError -Message "$leaf's $prToken line is not on this Space's tracker ($prUrl), so ${p}Land will not ask there." `
         -Hint "Run ${p}Land from the Space that holds it, or correct the line. Nothing was read or written."
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
 if (-not $prHost) {
+    $prUrl = ''
     $prHost = $spaceTracker
     if ($prHost -eq 'github') {
         $repoAnswer = Resolve-P20TrackerRepo -OrgUrl $cfg.Org -Projects $cfg.Projects -CliPrefix $p
@@ -319,9 +327,13 @@ $issueId = 0
 $link = [regex]::Match($original, '(?m)^\s*\*{0,2}ADO Link:\*{0,2}\s*(https://\S+)')
 if ($link.Success) {
     $linkUrl = $link.Groups[1].Value
-    $linkNum = [regex]::Match($linkUrl, '/edit/(\d+)')
-    if (-not $linkNum.Success) { $linkNum = [regex]::Match($linkUrl, '/(\d+)/?$') }
-    if ($linkNum.Success) { $issueId = [int]$linkNum.Groups[1].Value }
+    # The number is only this Space's if the link is: on GitHub, one of the
+    # Space's repositories, not only its owner.
+    if (Test-P20UrlOnTracker -Url $linkUrl -OrgUrl $cfg.Org -Projects $cfg.Projects -Kind issue) {
+        $linkNum = [regex]::Match($linkUrl, '/edit/(\d+)')
+        if (-not $linkNum.Success) { $linkNum = [regex]::Match($linkUrl, '/(\d+)/?$') }
+        if ($linkNum.Success) { $issueId = [int]$linkNum.Groups[1].Value }
+    }
 }
 if (-not $issueId -and (Test-P20IsWorkItemId $cardId)) { $issueId = [int]$cardId }
 

@@ -1218,7 +1218,7 @@ try {
     }
     try {
         $commentsUri = "$org/$([Uri]::EscapeDataString($project))/_apis/wit/workItems/$WorkItemId/comments?api-version=7.1-preview"
-        $commentsHeaders = Get-P20AdoHeaders -Token $tokenRead.Token
+        $commentsHeaders = Get-P20AdoHeaders -Token $tokenRead.Token -OrgUrl $org
         $commentsResponse = Invoke-RestMethod -Uri $commentsUri -Headers $commentsHeaders -Method Get
         if ($commentsResponse.comments) {
             $adoComments = $commentsResponse.comments | ForEach-Object {

@@ -657,7 +657,7 @@ if (-not $tokenRead.Ok) {
 }
 $adoToken = $tokenRead.Token
 
-$headers = Get-P20AdoHeaders -Token $adoToken -ContentType 'application/json-patch+json'
+$headers = Get-P20AdoHeaders -Token $adoToken -OrgUrl $org -ContentType 'application/json-patch+json'
 
 # -- Build patch body ----------------------------------------------------------
 $patches = @()
