@@ -193,7 +193,7 @@ $expected = [ordered]@{
     'studio.promptsRoute'     = '/api/studio/prompts'
     # The Spaces card's one read of every GitHub Space's ledger.
     'studio.ledgerRoute'      = '/api/studio/ledger'
-    'studio.threadRegex'      = '(?m)^>\s*GitHub:\s*(https://github\.com/([^/\s]+)/([^/\s]+)/issues/(\d+))\s*$'
+    'studio.threadRegex'      = '(?m)^>\s*GitHub:\s*(https://github\.com/([^/\s]+)/([^/\s]+)/issues/([0-9]{1,9}))\s*$'
     # The design lifecycle's identity (L1): the frontmatter key, the id's shape and
     # the state and outcome words. NewDesign and StampDesign write them; lists
     # travel comma-joined.
@@ -230,7 +230,7 @@ $expected = [ordered]@{
     'rituals.grains'             = 'detail,work,brief'
     'rituals.numberWords'        = 'zero,one,two,three,four,five,six,seven,eight,nine,ten,eleven,twelve'
     'rituals.workHeadRegex'      = '^(?:[A-Za-z]+:\s+)?(.+?)(?:\s+--\s+|:\s+|$)'
-    'rituals.workThreadRegex'    = '(?m)^>\s*GitHub:\s*<?(?:https://github\.com/[^/\s>]+/[^/\s>]+/issues/|#)(\d+)'
+    'rituals.workThreadRegex'    = '(?m)^>\s*GitHub:\s*<?(?:https://github\.com/[^/\s>]+/[^/\s>]+/issues/|#)([0-9]{1,9})(?![0-9])'
     'rituals.workDesignRegex'    = 'design/([A-Za-z0-9][A-Za-z0-9_-]*)\.md'
     'rituals.workSmallWordRegex' = '^[a-z]{1,3}$'
     # The also-ons fold (D-SA9): the most groups a folded sentence names.

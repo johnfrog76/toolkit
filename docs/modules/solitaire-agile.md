@@ -1206,7 +1206,7 @@ is one, in both halves (`Group-P20StandupWork` and `Format-P20StandupWork` in `S
 | Step | An item belongs to | `by` |
 | --- | --- | --- |
 | 1 | its milestone's title | `milestone` |
-| 2 | the design card its body names: a `> GitHub:` thread (`rituals.workThreadRegex`), named by that issue's head when the read has it, else `#<n>`; else a `design/<note>.md` (`rituals.workDesignRegex`), its stem title-cased (`team-agile` is `Team Agile`) | `design` |
+| 2 | the design card its body names: a `> GitHub:` thread of up to nine digits (`rituals.workThreadRegex`), named by that issue's head when the read has it, else `#<n>`; else a `design/<note>.md` (`rituals.workDesignRegex`), its stem title-cased (`team-agile` is `Team Agile`) | `design` |
 | 3 | a card's type, from its heading (`# Task 139: ...` is `Task`) -- a card's row only | `type` |
 | 4 | what is left in the slot, by the titles' common stem: each title's head (`rituals.workHeadRegex` -- a one-word tag like `Bug:` dropped, cut at ` -- ` or `: `); heads that share their first two words or more group under the words they all share (`Design lifecycle L1: ...` and `Design lifecycle L2: ...` are `Design lifecycle`), a trailing small word (`rituals.workSmallWordRegex`: `the`, `of`) not counted; a head alone names itself | `stem` <!-- markdownlint-disable-line MD038 -- the span shows a separator with the spaces the pattern cuts at --> |
 

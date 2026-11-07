@@ -104,7 +104,7 @@ def _parse_pr_comments(content: str) -> tuple[int, int, list[dict]]:
     round_num = 1
     # The heading is the contract (consts.json); the round and PR-id suffix
     # after it are this half's own reading of the CLI's section.
-    header = re.escape(token_pr_review_heading()) + r"(?:\s*--\s*Round\s*(\d+))?\s*\(PR\s*(\d+)\)"
+    header = re.escape(token_pr_review_heading()) + r"(?:\s*--\s*Round\s*(\d{1,9}))?\s*\(PR\s*(\d{1,18})\)"
     for m in re.finditer(header, content):
         pr_id = int(m.group(2))
         if m.group(1):
@@ -118,7 +118,7 @@ def _parse_pr_comments(content: str) -> tuple[int, int, list[dict]]:
     comments: list[dict] = []
 
     for block in blocks:
-        header_m = re.match(r"### Comment (\d+) \(Thread (\d+)\)", block)
+        header_m = re.match(r"### Comment (\d{1,18}) \(Thread (\d{1,18})\)", block)
         if not header_m:
             continue
 

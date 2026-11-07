@@ -536,7 +536,9 @@ foreach ($row in @($workTable.heads)) {
 foreach ($row in @($workTable.keys)) {
     $threads = @{}
     if ($row.threads) { foreach ($p in $row.threads.PSObject.Properties) { $threads[[string]$p.Name] = [string]$p.Value } }
-    $got = Get-P20StandupWorkKey -Milestone $row.milestone -Body ([string]$row.body) -Type ([string]$row.type) -Threads $threads
+    $keyBody = [string]$row.body
+    if ($row.digits) { $keyBody += ('9' * [int]$row.digits) }
+    $got = Get-P20StandupWorkKey -Milestone $row.milestone -Body $keyBody -Type ([string]$row.type) -Threads $threads
     Assert-True "work key: milestone '$($row.milestone)', body '$(([string]$row.body).Trim())', type '$($row.type)' -> '$($row.name)' by '$($row.by)'" ($got.name -ceq [string]$row.name -and $got.by -ceq [string]$row.by) "got '$($got.name)' by '$($got.by)'"
 }
 foreach ($row in @($workTable.types)) {
