@@ -497,8 +497,8 @@ function Test-P20ConfigValue {
     $result = @{ Ok = $false; Value = $null; Reason = '' }
     $raw = [string]$Value
 
-    if ($Row.key -eq 'commandPrefix' -and -not (Test-P20CommandName $raw)) {
-        $result.Reason = "commandPrefix is a letter, then letters, digits, '-' or '_' -- got '$raw'."
+    if ($Row.key -eq 'commandPrefix' -and -not (Test-P20CommandPrefix $raw)) {
+        $result.Reason = "commandPrefix is a letter, then letters or digits -- got '$raw'."
         return $result
     }
 

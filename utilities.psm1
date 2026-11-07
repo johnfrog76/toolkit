@@ -2604,8 +2604,8 @@ function global:Register-PromptAlias {
     )
     # The one rule, the one Config and every reader of commandPrefix apply, so
     # what Config accepts here always registers.
-    if (-not (Test-P20CommandName $Prefix)) {
-        throw "Register-PromptAlias: '$Prefix' is not a command name (a letter, then letters, digits, '-' or '_')."
+    if (-not (Test-P20CommandPrefix $Prefix)) {
+        throw "Register-PromptAlias: '$Prefix' is not a command prefix (a letter, then letters or digits)."
     }
     $s = Get-P20ModuleState
 
