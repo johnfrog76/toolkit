@@ -13,7 +13,8 @@ Every command is `{prefix}{Command}` -- `tkStatus`, `tkNewPrompt`, `tkArchive`. 
 data, not code.** It comes from `commandPrefix` in config and defaults to `tk`.
 
 Change it by setting `commandPrefix` in `config.local.json`, or register additional prefixes at
-runtime:
+runtime. A prefix is a letter, then letters or digits; `Config` and `Register-PromptAlias` refuse
+anything else, and a file that holds one falls back to `tk` with a warning:
 
 ```powershell
 Register-PromptAlias -Prefix gt                            # gtStatus, gtNewPrompt, ... every command

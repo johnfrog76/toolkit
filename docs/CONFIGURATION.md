@@ -248,10 +248,11 @@ config file, and a build that asked for the port would refuse.
   half -- `Scripts/Select-OfferedSpaces.ps1` and `offered_orgs` in `agent/core/config.py` -- held to one
   table, `Tests/fixtures/offered-orgs/table.json`. `tkStart` does not set it. Not an opt-in surface, so
   it has no row in the inventory.
-- **`commandPrefix`, and the name in `aliases.<name>`** -- become part of a command, so each is a
-  letter, then letters, digits, `-` or `_`. `{prefix}Config -Set` refuses anything else, and names it.
-  A file edited by hand is checked when it is read: a bad prefix falls back to the shipped one and a bad
-  alias is skipped, each with a warning.
+- **`commandPrefix`, and the name in `aliases.<name>`** -- become part of a command. A prefix is a
+  letter, then letters or digits (`tk`, `ab2`): it starts every verb, so it takes no `-` or `_`. An
+  alias name is a letter, then letters, digits, `-` or `_`. `{prefix}Config -Set` refuses anything else,
+  and names it. A file edited by hand is checked when it is read: a bad prefix falls back to the shipped
+  one and a bad alias is skipped, each with a warning.
 - **`branchUser`** -- branch name prefix. Defaults to your OS username.
 - **`email`** -- who "me" is, for the ADO lookups that filter by a person:
   `MyPRs`, `Dashboard`, `MyWork`, and the agent's `/api/prs`, `/api/dashboard` and
