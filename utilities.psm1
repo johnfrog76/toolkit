@@ -2596,13 +2596,17 @@ function global:Register-PromptAlias {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true, Position = 0)]
-        [ValidatePattern('^[A-Za-z][A-Za-z0-9]*$')]
         [string]$Prefix,
 
         [string[]]$Commands,
 
         [switch]$Force
     )
+    # The one rule, the one Config and every reader of commandPrefix apply, so
+    # what Config accepts here always registers.
+    if (-not (Test-P20CommandName $Prefix)) {
+        throw "Register-PromptAlias: '$Prefix' is not a command name (a letter, then letters, digits, '-' or '_')."
+    }
     $s = Get-P20ModuleState
 
     $names = $Commands

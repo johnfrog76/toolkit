@@ -380,6 +380,23 @@ try {
         Assert-Contains 'and the shipped prefix answers' $out 'tkStatus'
         $resolved = (& pwsh -NoProfile -Command ". '$nameBox/Scripts/Resolve-CliPrefix.ps1'; Resolve-P20ConfigPrefix -PackageRoot '$nameBox' 3>`$null" 2>$null | Out-String).Trim()
         Assert-Equal 'and the script-side reader falls back the same way' 'tk' $resolved
+
+        # What Config accepts has to register: a new shell with no verbs has no
+        # Config to put it right with. Typed, in a fresh shell, one row per mark.
+        foreach ($prefix in @('my-tk2', 'a_b', 'ab2')) {
+            $local.commandPrefix = $prefix
+            & $writeLocal
+            $typedVerbs = "$probe; ${prefix}Config -Help | Out-Null; 'config=' + `$?; ${prefix}Menu | Out-Null; 'menu=' + `$?; (Get-Command ${prefix}Status).Name"
+            $out = (& pwsh -NoProfile -Command $typedVerbs 2>&1 3>&1 | Out-String)
+            Assert-True "a prefix of '$prefix' registers with nothing refused" ($out -notmatch 'Cannot validate|not recognized|not a command name') $out
+            Assert-Contains "and ${prefix}Config runs in a new shell" $out 'config=True'
+            Assert-Contains "and ${prefix}Menu" $out 'menu=True'
+            Assert-Contains "and ${prefix}Status answers" $out "${prefix}Status"
+        }
+        $local.commandPrefix = 'tk'
+        & $writeLocal
+        $refused = (& pwsh -NoProfile -Command "$probe; try { Register-PromptAlias -Prefix 'x;y' -Commands Status; 'took it' } catch { `$_.Exception.Message }" 2>&1 3>&1 | Out-String)
+        Assert-Contains 'and Register-PromptAlias reads the same rule' $refused 'is not a command name'
     }
     finally {
         Remove-Item -LiteralPath $nameBox -Recurse -Force -ErrorAction SilentlyContinue

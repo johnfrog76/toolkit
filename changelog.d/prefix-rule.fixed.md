@@ -1,0 +1,1 @@
+- A `commandPrefix` with a dash or an underscore now registers: `Config` accepted one, and a new shell then had no commands at all.
