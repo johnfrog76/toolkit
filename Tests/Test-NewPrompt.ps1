@@ -351,6 +351,33 @@ try {
     Assert-True 'the card is byte for byte what it was' ([System.Linq.Enumerable]::SequenceEqual($before, $after))
     Assert-Equal 'and it is still the only card' 1 @(Get-ChildItem (Join-Path $sandbox 'current') -Filter '*.prompt.md').Count
 
+    # A name no id reads: a Bug titled like a date. The scan by id cannot see it,
+    # so the write asks the file itself.
+    $dated = Invoke-NewPrompt $sandbox @('-Title', '11-06 outage', '-Type', 'Bug', '-Id', '2026')
+    $datedPath = Join-Path (Join-Path $sandbox 'current') $dated.Created
+    Add-FixtureText $datedPath "`nA day of notes.`n"
+    $datedBefore = [System.IO.File]::ReadAllBytes($datedPath)
+    $datedAgain = Invoke-NewPrompt $sandbox @('-Title', '11-06 outage', '-Type', 'Bug', '-Id', '2026')
+    Assert-Equal 'a date-shaped card is not written over: a stated refusal' 2 $datedAgain.ExitCode
+    Assert-True 'and names it' ($datedAgain.Output -match 'already exists') $datedAgain.Output
+    Assert-True 'and the card is byte for byte what it was' ([System.Linq.Enumerable]::SequenceEqual($datedBefore, [System.IO.File]::ReadAllBytes($datedPath)))
+
+    # Every create asks the file, on the tracker paths too: nothing here stubs az,
+    # so the source says so.
+    $promptSource = [System.IO.File]::ReadAllText($targetScript)
+    Assert-Equal 'each of the three writes that create a card checks first' 3 ([regex]::Matches($promptSource, '(?m)^\s+Stop-P20IfCardExists -Path \$filePath')).Count
+    Assert-Equal 'and -Force cannot talk past it' 0 ([regex]::Matches($promptSource, 'Test-Path \$filePath')).Count
+
+    # A hub path holding a bracket: read as a pattern, the scan finds nothing.
+    $bracket = Join-Path $sandbox 'Work [old]'
+    New-Item -ItemType Directory -Path (Join-Path $bracket 'current') -Force | Out-Null
+    $inBracket = Invoke-NewPrompt $bracket @('-Title', 'In a bracketed hub', '-Type', 'Bug', '-Id', '141')
+    $bracketPath = Join-Path (Join-Path $bracket 'current') $inBracket.Created
+    [System.IO.File]::WriteAllText($bracketPath, "# Worked on`n`nA day of notes.`n", [System.Text.UTF8Encoding]::new($false))
+    $bracketAgain = Invoke-NewPrompt $bracket @('141')
+    Assert-True 'a bracket in the path does not hide the card: it is returned' ($bracketAgain.ExitCode -eq 0 -and $bracketAgain.Output -match 'already in') $bracketAgain.Output
+    Assert-True 'and it is not written over' ([System.IO.File]::ReadAllText($bracketPath) -match 'A day of notes') $bracketAgain.Output
+
     # -Force means "reassign from another user" on this path. It must not become
     # a way to overwrite.
     $forced = Invoke-NewPrompt $sandbox @('140', '-Force')

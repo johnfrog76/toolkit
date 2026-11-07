@@ -557,6 +557,14 @@ try {
         New-Item -ItemType Directory -Path $outDir -Force | Out-Null
     }
     $outFile = Join-Path $outDir $script:Consts.reviews.fileName
+    # The prose pass writes into this same file, so one already here may be a
+    # finished review, and nothing overwrites it. There is no switch: to start a
+    # range over, a person moves or deletes the file, as with a card.
+    if (Test-Path -LiteralPath $outFile) {
+        $relExisting = "$reviewsFolder/$slugSetStr/$year/$folderRange/$($script:Consts.reviews.fileName)"
+        @{ error = "A review for this range already exists at $relExisting. Nothing was written; move or delete it to start over." } | ConvertTo-Json
+        return
+    }
     # The one byte contract (Write-CardText -New): UTF-8, no BOM, LF. Under
     # Windows PowerShell 5.1 Set-Content -Encoding UTF8 wrote a BOM ahead of the
     # first heading.

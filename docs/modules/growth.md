@@ -179,6 +179,10 @@ groups by folder, and writes
 the output folder is the **sorted** set joined by `+`, so `"b,a"` and `"a,b"`
 write to the same place. Omitted, it uses the active Space.
 
+**It never writes over a review.** The prose pass writes into this same `review.md`, so a
+second run for a range answers `{ error }`, a 400 from the route, and the file is left as
+it is. There is no switch: to start a range over, move or delete the file, as with a card.
+
 Answers in JSON on stdout -- `{ review, file_path, files_scanned, files_included }`
 or `{ error }` -- because the agent parses it. It therefore never prints prose
 on the success path and never exits non-zero for a user error.

@@ -238,6 +238,16 @@ try {
     Assert-True 'the combined review is written to the combined folder' `
         (Test-Path (Join-Path $hub 'reviews/first+second/2026/2026-05-11_2026-05-13/review.md'))
 
+    # The prose pass writes into review.md, so a second run for a range must not
+    # write over it. The refusal is JSON, which the route answers as a 400.
+    $writtenUp = Join-Path $hub 'reviews/first/2026/2026-05-11_2026-05-13/review.md'
+    $prose = "# A finished review`n`nWritten up by hand, and not a scaffold.`n"
+    [System.IO.File]::WriteAllText($writtenUp, $prose, [System.Text.UTF8Encoding]::new($false))
+    $second = & $reviewScript -StartDate '2026-05-11' -EndDate '2026-05-13' | ConvertFrom-Json
+    Assert-Contains 'a second run for a range is refused, naming the file' "$($second.error)" 'already exists'
+    Assert-True 'and the written review is untouched' ([System.IO.File]::ReadAllText($writtenUp) -ceq $prose)
+    Remove-Item -LiteralPath $writtenUp -Force
+
     $singleViaSlugs = & $reviewScript -StartDate '2026-05-11' -EndDate '2026-05-13' -Slugs 'first' | ConvertFrom-Json
     Assert-Contains 'one slug via -Slugs writes the plain org folder' $singleViaSlugs.file_path 'reviews/first/'
     Assert-NotContains 'and a one-org review does not label its bullets' $singleViaSlugs.review '**[first]**'

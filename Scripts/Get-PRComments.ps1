@@ -471,7 +471,7 @@ try {
         # issue the body names.
         if ($OutputFile) { $targetFile = $OutputFile }
         elseif ($cardByUrl) { $targetFile = $cardByUrl; Write-Host "Matched prompt file: $(Split-Path $cardByUrl -Leaf)" -ForegroundColor Green }
-        elseif ($currentDir -and (Test-Path $currentDir)) {
+        elseif ($currentDir -and (Test-Path -LiteralPath $currentDir)) {
             if ($BranchName) {
                 . (Join-Path $PSScriptRoot 'Resolve-CardForBranch.ps1')
                 $byBranch = Resolve-P20CardForBranch -Branch $BranchName -CurrentDir $currentDir
@@ -636,7 +636,7 @@ try {
         $folders = Get-PromptFolders
         $currentDir = $folders.Current
 
-        if ($currentDir -and (Test-Path $currentDir)) {
+        if ($currentDir -and (Test-Path -LiteralPath $currentDir)) {
             $workItemIds = @()
             try {
                 $wiUri = "$org/$encodedProject/_apis/git/repositories/$Repository/pullRequests/$PullRequestId/workitems?api-version=7.1"
@@ -677,8 +677,8 @@ try {
         # Design: writing "PR URL:" to the prompt file is what causes {cliPrefix}Status to flip the card
         # from In Progress → Code Review. Clicking fetch after creating a PR is the intentional
         # trigger for that transition — even with no comments yet. The PR URL is the state gate.
-        if ($targetFile -and (Test-Path $targetFile)) {
-            $fileContent = Get-Content -Path $targetFile -Raw
+        if ($targetFile -and (Test-Path -LiteralPath $targetFile)) {
+            $fileContent = [System.IO.File]::ReadAllText($targetFile)
             if ($fileContent -notmatch [regex]::Escape($script:Consts.tokens.prUrl)) {
                 # Through the one card writer: it keeps the file's line endings.
                 Write-CardText -Path $targetFile -Content ($fileContent.TrimEnd("`r", "`n") + "`n`n$($script:Consts.tokens.prUrl) $prUrl`n")
@@ -695,8 +695,8 @@ try {
     # written, even when its thread is an old one. Get-P20RecordedComments reads what the card
     # has; Get-P20ThreadDelta says what each thread adds.
     $fileContent = ""
-    if ($targetFile -and (Test-Path $targetFile)) {
-        $fileContent = Get-Content -Path $targetFile -Raw
+    if ($targetFile -and (Test-Path -LiteralPath $targetFile)) {
+        $fileContent = [System.IO.File]::ReadAllText($targetFile)
     }
     $recordedComments = Get-P20RecordedComments -FileContent $fileContent
     $existingThreadIds = @($recordedComments.Keys | ForEach-Object { [long]$_ } | Sort-Object -Unique)
@@ -880,7 +880,9 @@ try {
         # Appended through the one card writer -- Add-Content wrote a bare-LF
         # tail onto a CRLF card.
         $existingText = ''
-        if (Test-Path $targetFile) { $existingText = [System.IO.File]::ReadAllText($targetFile) }
+        # Literal: a '[' in the path read as a pattern says "no file", and the card
+        # would be replaced by the new comments alone.
+        if (Test-Path -LiteralPath $targetFile) { $existingText = [System.IO.File]::ReadAllText($targetFile) }
         if ($existingText -and -not $existingText.EndsWith("`n")) { $existingText += "`n" }
         Write-CardText -Path $targetFile -Content ($existingText + $output + "`n")
         Write-Host ""

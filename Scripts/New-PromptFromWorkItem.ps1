@@ -878,8 +878,8 @@ if ($WorkItemId) {
     $existingIn = $OutputFolder
     foreach ($relFolder in $existingFolders) {
         $existingFolder = Resolve-TargetFolder $relFolder
-        if (-not (Test-Path $existingFolder)) { continue }
-        $existingCards = @(Get-ChildItem -Path $existingFolder -Filter '*.prompt.md' -File -ErrorAction SilentlyContinue |
+        if (-not (Test-Path -LiteralPath $existingFolder)) { continue }
+        $existingCards = @(Get-ChildItem -LiteralPath $existingFolder -Filter '*.prompt.md' -File -ErrorAction SilentlyContinue |
             Where-Object { (Get-P20CardId -Name $_.Name -Pattern $idPattern) -eq [string]$WorkItemId } |
             Sort-Object Name)
         if ($existingCards.Count -gt 0) { $existingIn = $relFolder; break }
@@ -910,6 +910,16 @@ if ($WorkItemId) {
         Write-Host ""
         exit 0
     }
+}
+
+# The last word before a create. The scan above answers by id, and a file can be
+# here that no id reads (a Bug titled like a date has a name Get-P20CardId skips),
+# so every write asks the file itself. No switch overwrites.
+function Stop-P20IfCardExists {
+    param([string]$Path, [string]$Hint)
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    Write-CliError -Message "$(Split-Path $Path -Leaf) already exists in $OutputFolder/. Nothing was written." -Hint $Hint
+    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
 
 # Main execution
@@ -972,11 +982,7 @@ if ($script:LocalMode) {
 
     $content = Build-PromptContent -workItem $workItemData -cardDir $targetFolder
     $filePath = Join-Path $targetFolder $fileName
-    if ((Test-Path $filePath) -and -not $Force) {
-        Write-CliError -Message "$fileName already exists in $OutputFolder/." `
-            -Hint 'Pick another title, pass -Id, or delete the file.'
-        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
-    }
+    Stop-P20IfCardExists -Path $filePath -Hint 'Pick another title, pass -Id, or delete the file.'
     # The one writer, and -New because this CREATES: UTF-8 with no BOM (5.1's
     # Set-Content -Encoding UTF8 writes one and 7's does not, so the stamp
     # Archive adds later used to rewrite the whole file on one host only) and
@@ -1145,6 +1151,7 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
 
     $content = Build-PromptContent -workItem $workItemData -cardDir $targetFolder
     $filePath = Join-Path $targetFolder $fileName
+    Stop-P20IfCardExists -Path $filePath -Hint 'To start it over, move or delete that file first.'
     # Created, so no BOM and LF -- the one byte contract for a card.
     Write-CardText -Path $filePath -Content $content -New
     Add-BirthPictures -CardPath $filePath
@@ -1352,6 +1359,7 @@ try {
     $content = Build-PromptContent -workItem $workItemData -cardDir $targetFolder
 
     $filePath = Join-Path $targetFolder $fileName
+    Stop-P20IfCardExists -Path $filePath -Hint 'To start it over, move or delete that file first.'
     # Same contract as the offline path above: created, so no BOM and LF.
     Write-CardText -Path $filePath -Content $content -New
     Add-BirthPictures -CardPath $filePath
