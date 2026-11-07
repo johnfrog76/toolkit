@@ -132,6 +132,39 @@ if (-not ($cfg | Get-Member -Name 'Orgs' -MemberType Properties -ErrorAction Sil
 . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
 . (Join-Path $PSScriptRoot 'Write-CardText.ps1')
 . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
+
+# A scaffold says it is one, and carries a fingerprint of its own body, so a
+# second run can tell a scaffold nobody has touched -- which it may write again,
+# with fresh history -- from a review someone has edited or written up, which
+# nothing overwrites. The body is everything after the frontmatter, read with
+# LF line ends and no trailing space, so a sync that turned it CRLF still reads
+# as unchanged.
+function Get-P20ScaffoldBodyHash {
+    param([string]$Body)
+    $norm = ($Body -replace "`r`n", "`n").TrimEnd()
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = $sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($norm))
+    }
+    finally { $sha.Dispose() }
+    return (($bytes | ForEach-Object { $_.ToString('x2') }) -join '')
+}
+
+# $true only for a file this verb wrote and nobody has changed since: frontmatter
+# with `generator: scaffold` and a `scaffold:` fingerprint that its body still
+# matches. A review from before the fingerprint, edited by hand, or written up
+# by the prose pass is $false, and is never written over.
+function Test-P20PureScaffold {
+    param([string]$Text)
+    $m = [regex]::Match(($Text -replace "`r`n", "`n"), '\A---\n((?:[^\n]*\n)*?)---\n')
+    if (-not $m.Success) { return $false }
+    $front = $m.Groups[1].Value
+    if ($front -notmatch '(?m)^generator: scaffold$') { return $false }
+    $stamp = [regex]::Match($front, '(?m)^scaffold: ([0-9a-f]{64})$')
+    if (-not $stamp.Success) { return $false }
+    $body = ($Text -replace "`r`n", "`n").Substring($m.Length)
+    return ((Get-P20ScaffoldBodyHash $body) -ceq $stamp.Groups[1].Value)
+}
 $script:Consts = Get-P20Consts
 $promptsRoot = Get-P20PromptsRoot -PackageRoot (Split-Path -Parent $PSScriptRoot)
 if (-not $promptsRoot -or -not (Test-Path $promptsRoot)) {
@@ -543,6 +576,10 @@ try {
     [void]$sb.AppendLine("*$([char]::ConvertFromUtf32(0x1F916)) A scaffold, from local history. Edit it, then run ``$(Get-CliPrefix)PublishWorkReview`` to commit.*")
 
     $reviewMd = $sb.ToString().TrimEnd()
+    # The fingerprint goes in the frontmatter, over the body it heads.
+    $fmEnd = [regex]::Match($reviewMd, '\A---\r?\n(?:[^\n]*\n)*?(?=---\r?\n)')
+    $bodyText = $reviewMd.Substring($fmEnd.Length) -replace '\A---\r?\n', ''
+    $reviewMd = $reviewMd.Substring(0, $fmEnd.Length) + "scaffold: $(Get-P20ScaffoldBodyHash $bodyText)`n" + $reviewMd.Substring($fmEnd.Length)
 
     # -- Write output file ---------------------------------------------------
 
@@ -558,12 +595,18 @@ try {
     }
     $outFile = Join-Path $outDir $script:Consts.reviews.fileName
     # The prose pass writes into this same file, so one already here may be a
-    # finished review, and nothing overwrites it. There is no switch: to start a
-    # range over, a person moves or deletes the file, as with a card.
+    # finished review, and nothing overwrites it. The one exception is a scaffold
+    # nobody has touched (Test-P20PureScaffold): it is written again, with the
+    # history as it reads now. There is no switch: to start an edited review
+    # over, a person moves or deletes the file, as with a card.
     if (Test-Path -LiteralPath $outFile) {
-        $relExisting = "$reviewsFolder/$slugSetStr/$year/$folderRange/$($script:Consts.reviews.fileName)"
-        @{ error = "A review for this range already exists at $relExisting. Nothing was written; move or delete it to start over." } | ConvertTo-Json
-        return
+        $existing = $null
+        try { $existing = [System.IO.File]::ReadAllText($outFile) } catch { $existing = $null }
+        if ($null -eq $existing -or -not (Test-P20PureScaffold $existing)) {
+            $relExisting = "$reviewsFolder/$slugSetStr/$year/$folderRange/$($script:Consts.reviews.fileName)"
+            @{ error = "A review for this range already exists at $relExisting, and it has been edited or written up since it was made. Nothing was written; move or delete it to start over." } | ConvertTo-Json
+            return
+        }
     }
     # The one byte contract (Write-CardText -New): UTF-8, no BOM, LF. Under
     # Windows PowerShell 5.1 Set-Content -Encoding UTF8 wrote a BOM ahead of the

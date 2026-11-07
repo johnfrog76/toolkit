@@ -241,6 +241,29 @@ try {
     # The prose pass writes into review.md, so a second run for a range must not
     # write over it. The refusal is JSON, which the route answers as a 400.
     $writtenUp = Join-Path $hub 'reviews/first/2026/2026-05-11_2026-05-13/review.md'
+
+    # A scaffold nobody has touched is the one exception: it carries a fingerprint
+    # of its own body, and a second run writes it again.
+    $fresh = & $reviewScript -StartDate '2026-05-11' -EndDate '2026-05-13' -Slugs 'first' | ConvertFrom-Json
+    $scaffoldText = if (Test-Path -LiteralPath $writtenUp) { [System.IO.File]::ReadAllText($writtenUp) } else { '' }
+    Assert-True 'the scaffold carries a fingerprint of its body in the frontmatter' ($scaffoldText -match '(?m)^scaffold: [0-9a-f]{64}$' -and $scaffoldText -match '(?s)\A---\n.*generator: scaffold\n.*scaffold: ') $scaffoldText
+    $again = & $reviewScript -StartDate '2026-05-11' -EndDate '2026-05-13' -Slugs 'first' | ConvertFrom-Json
+    Assert-True 'a second run over an untouched scaffold writes it again, with no error' (-not $again.error -and $again.file_path -match 'reviews/first/') "$($again.error)"
+    [System.IO.File]::WriteAllText($writtenUp, ($scaffoldText -replace "`n", "`r`n"), [System.Text.UTF8Encoding]::new($false))
+    $crlf = & $reviewScript -StartDate '2026-05-11' -EndDate '2026-05-13' -Slugs 'first' | ConvertFrom-Json
+    Assert-True 'and one a sync turned CRLF still reads as untouched' (-not $crlf.error) "$($crlf.error)"
+    $touched = @(
+        @{ Why = 'a line added to its body'; Text = $scaffoldText.TrimEnd() + "`n`nOne thing I want to say about this.`n" },
+        @{ Why = 'a word changed in its body'; Text = ($scaffoldText -replace '# ', '# Edited ') },
+        @{ Why = 'one from before the fingerprint'; Text = ($scaffoldText -replace '(?m)^scaffold: [0-9a-f]{64}\n', '') },
+        @{ Why = 'its generator changed'; Text = ($scaffoldText -replace 'generator: scaffold', 'generator: prose') }
+    )
+    foreach ($row in $touched) {
+        [System.IO.File]::WriteAllText($writtenUp, $row.Text, [System.Text.UTF8Encoding]::new($false))
+        $r = & $reviewScript -StartDate '2026-05-11' -EndDate '2026-05-13' -Slugs 'first' | ConvertFrom-Json
+        Assert-Contains "a scaffold with $($row.Why) is refused" "$($r.error)" 'edited or written up'
+        Assert-True 'and left exactly as it was' ([System.IO.File]::ReadAllText($writtenUp) -ceq $row.Text)
+    }
     $prose = "# A finished review`n`nWritten up by hand, and not a scaffold.`n"
     [System.IO.File]::WriteAllText($writtenUp, $prose, [System.Text.UTF8Encoding]::new($false))
     $second = & $reviewScript -StartDate '2026-05-11' -EndDate '2026-05-13' | ConvertFrom-Json

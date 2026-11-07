@@ -181,7 +181,11 @@ write to the same place. Omitted, it uses the active Space.
 
 **It never writes over a review.** The prose pass writes into this same `review.md`, so a
 second run for a range answers `{ error }`, a 400 from the route, and the file is left as
-it is. There is no switch: to start a range over, move or delete the file, as with a card.
+it is -- unless it is still the scaffold this verb wrote, untouched: the frontmatter carries
+`generator: scaffold` and a `scaffold:` fingerprint of the body, and a file whose body still
+matches is written again with the history as it reads now. An edit, a write-up, or a scaffold
+from before the fingerprint is refused. There is no switch: to start an edited range over,
+move or delete the file, as with a card.
 
 Answers in JSON on stdout -- `{ review, file_path, files_scanned, files_included }`
 or `{ error }` -- because the agent parses it. It therefore never prints prose

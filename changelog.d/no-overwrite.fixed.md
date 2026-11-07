@@ -1,1 +1,1 @@
-- `NewWorkReview` no longer writes over a finished review when a date range is run twice, from the terminal or the web, and `NewPrompt` and `GetPRComments` no longer risk replacing a card when its name reads like a date or a path holds `[`.
+- `NewWorkReview` no longer writes over a review someone has edited or written up when a date range is run twice, from the terminal or the web; an untouched scaffold is still written again with fresh history. `NewPrompt` and `GetPRComments` no longer risk replacing a card when its name reads like a date or a path holds `[`.
