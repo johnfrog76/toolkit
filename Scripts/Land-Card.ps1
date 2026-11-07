@@ -142,6 +142,15 @@ if ($resolved.Fuzzy) {
 
 $cardFile = $found[0].FullName
 $leaf = $found[0].Name
+# A path can name a card in any Space, and every step below acts on the active
+# Space's tracker, so a card from another one would close the wrong issue.
+$cardSpace = Split-Path (Split-Path (Split-Path $cardFile -Parent) -Parent) -Leaf
+$activeSpace = Split-Path (Split-Path $folders.Current -Parent) -Leaf
+if ($cardSpace -ne $activeSpace) {
+    Write-CliError -Message "$leaf is in '$cardSpace', and this Space is '$activeSpace', so ${p}Land will not act on it." `
+        -Hint "Switch to that Space (${p}SwitchSpace), then '${p}Land' again. Nothing was read or written."
+    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+}
 $archived = ((Split-Path (Split-Path $cardFile -Parent) -Leaf) -eq [string]$c.folders.archive)
 $original = [System.IO.File]::ReadAllText($cardFile)
 $cardId = Get-P20CardId -Name ($leaf -replace '-r\d+(?=\.prompt\.md$)', '') -Pattern (Get-P20CardIdPattern -WorkItemTypes $types)
@@ -180,17 +189,16 @@ if (-not $prNumber) {
 
 $spaceTracker = Resolve-P20Tracker -OrgUrl $cfg.Org
 Write-P20TrackerHeader -Name $cfg.ActiveOrgName -OrgUrl $cfg.Org
-# The card's line says which pull request, and it is text: an Azure DevOps one must
-# lie in this Space's organisation, and a Space on Azure DevOps takes no other.
-# A Space with no tracker may still land a GitHub pull request by its line.
-$offTracker = ($prHost -eq 'ado' -and -not (Test-P20UrlInOrg -Url $prUrl -Org $cfg.Org)) -or
-    ($prHost -eq 'github' -and $spaceTracker -eq 'ado')
-if ($offTracker) {
+# The card's line says which pull request, and it is text: Test-P20UrlOnTracker is
+# the one rule for what it may name. A line that is no pull request at all has no
+# host; -Pr then names the number, and the line goes no further.
+if ($prHost -and -not (Test-P20UrlOnTracker -Url $prUrl -OrgUrl $cfg.Org -Projects $cfg.Projects)) {
     Write-CliError -Message "$leaf's $prToken line is not on this Space's tracker ($prUrl), so ${p}Land will not ask there." `
         -Hint "Run ${p}Land from the Space that holds it, or correct the line. Nothing was read or written."
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
 if (-not $prHost) {
+    $prUrl = ''
     $prHost = $spaceTracker
     if ($prHost -eq 'github') {
         $repoAnswer = Resolve-P20TrackerRepo -OrgUrl $cfg.Org -Projects $cfg.Projects -CliPrefix $p
@@ -319,9 +327,12 @@ $issueId = 0
 $link = [regex]::Match($original, '(?m)^\s*\*{0,2}ADO Link:\*{0,2}\s*(https://\S+)')
 if ($link.Success) {
     $linkUrl = $link.Groups[1].Value
-    $linkNum = [regex]::Match($linkUrl, '/edit/(\d+)')
-    if (-not $linkNum.Success) { $linkNum = [regex]::Match($linkUrl, '/(\d+)/?$') }
-    if ($linkNum.Success) { $issueId = [int]$linkNum.Groups[1].Value }
+    # The number is only this Space's if the link is.
+    if (Test-P20UrlInOrg -Url $linkUrl -Org $cfg.Org) {
+        $linkNum = [regex]::Match($linkUrl, '/edit/(\d+)')
+        if (-not $linkNum.Success) { $linkNum = [regex]::Match($linkUrl, '/(\d+)/?$') }
+        if ($linkNum.Success) { $issueId = [int]$linkNum.Groups[1].Value }
+    }
 }
 if (-not $issueId -and (Test-P20IsWorkItemId $cardId)) { $issueId = [int]$cardId }
 

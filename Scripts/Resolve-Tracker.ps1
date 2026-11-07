@@ -101,6 +101,35 @@ function Get-P20TrackerRepos {
 }
 
 <#
+ Whether a pull request URL read from a card is on the Space's tracker. The one
+ test a verb makes before it asks that address anything or sends a credential:
+ the card is text, so its line names a pull request and never says where to go.
+
+   a GitHub Space        a GitHub pull request in one of the Space's repositories,
+                         or under its owner when it declares none
+   an Azure DevOps Space an Azure DevOps pull request under its organisation
+   a Space with no       a GitHub pull request, by its line: there is no tracker
+   tracker               to hold it to, and nothing of the Space's goes there
+#>
+function Test-P20UrlOnTracker {
+    param(
+        [AllowEmptyString()][AllowNull()][string]$Url,
+        [AllowEmptyString()][AllowNull()][string]$OrgUrl,
+        $Projects
+    )
+    $github = [regex]::Match("$Url", '(?i)^https://github\.com/([^/\s]+)/([^/\s]+)/pull/\d+(?:[/?#]\S*)?$')
+    $tracker = Resolve-P20Tracker -OrgUrl $OrgUrl
+    if ($tracker -eq 'none') { return $github.Success }
+    if ($tracker -eq 'ado') {
+        return (("$Url" -match '(?i)/pullrequest/\d+') -and (Test-P20UrlInOrg -Url $Url -Org $OrgUrl))
+    }
+    if (-not $github.Success) { return $false }
+    $repos = @(Get-P20TrackerRepos -OrgUrl $OrgUrl -Projects $Projects)
+    if ($repos.Count -gt 0) { return ($repos -contains "$($github.Groups[1].Value)/$($github.Groups[2].Value)") }
+    return ($github.Groups[1].Value -ieq (Get-P20TrackerOwner -OrgUrl $OrgUrl))
+}
+
+<#
  One header line, every tracker verb, before it acts: which space, which
  tracker. Found live: with the machine's active space quietly back on
  a real ADO org, `NewPrompt 55` -- meant for a GitHub issue -- fetched ADO work item

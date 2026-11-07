@@ -1,0 +1,1 @@
+- On a GitHub Space, `Land` refuses a `PR URL:` line from another repository, and it refuses a card from another Space rather than closing the active Space's issue of that number. `PublishPR` no longer reads a token on a GitHub Space.
