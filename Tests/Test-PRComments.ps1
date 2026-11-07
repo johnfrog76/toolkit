@@ -1386,6 +1386,17 @@ try {
     $r = Invoke-GhVerb "${cfgPrefix}GetPRComments 99"
     Assert-True 'a PR GitHub does not have is refused, exit 2, in one block' ($r.Text -match 'Error: PR #99 not found on acme/widgets' -and $r.Text -match 'EXIT=2' -and ([regex]::Matches($r.Text, '(?m)^Error: ')).Count -eq 1 -and -not ($r.Text -match 'exit code 2')) $r.Text
 
+    # -- 5b. A bracket in the path is a name, not a pattern ----------------------
+    # Read as a pattern it says "no file", and the file would be replaced by the
+    # new comments alone.
+    $bracketed = Join-Path $ghRoot 'notes[1].md'
+    [System.IO.File]::WriteAllText($bracketed, "# Worked on`n`nA day of notes.`n", $utf8NoBom)
+    Set-GhSpace 'widgets'
+    $r = Invoke-GhVerb "${cfgPrefix}GetPRComments 12 -OutputFile '$($bracketed -replace "'", "''")'"
+    $bracketedAfter = [System.IO.File]::ReadAllText($bracketed)
+    Assert-True 'a bracket in the path keeps the file: what it held is still there' ($bracketedAfter -match 'A day of notes') $bracketedAfter
+    Assert-True 'and the comments are added to it' ($bracketedAfter -match 'PR Review Comments') $r.Text
+
     # -- 6. An owner-grained Space with two repositories --------------------------
     Set-GhSpace 'acme'
     $gCard = New-GhCard -Space 'acme' -FileName '7-gadget-fix.prompt.md' -Heading 'Bug 7: Gadget fix' -PrUrl 'https://github.com/acme/gadgets/pull/12'

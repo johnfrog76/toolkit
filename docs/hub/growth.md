@@ -298,7 +298,11 @@ than a group with no label. The path is data; the section is a contract.
 A review is a **folder**, `reviews/<slug-set>/<year>/<start>_<end>/`, not one file: `review.md` is
 written when the review is generated, and `summary.md` joins it once the prose pass has run. It is
 put away by `{cliPrefix}WorkReview <slug-set>/<start>_<end>`, or by the Reviews card's row menu,
-which runs the same verb through the bridge:
+which runs the same verb through the bridge. `review.md`'s frontmatter says what wrote it
+(`generator: scaffold`) and, since the fingerprint was added, `scaffold: <sha256>` of the body below
+it: a body that still matches is a scaffold nobody has touched, and the only `review.md`
+`NewWorkReview` writes again. No reader needs the line, and a file without it reads as before.
+The folders:
 
 ```text
 <promptsRoot>/reviews/
