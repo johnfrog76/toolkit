@@ -23,6 +23,7 @@
 # PowerShell 5.1 clean; reads no module state.
 #
 . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
+. (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
 
 # Returns @{ Ok; Token; Said; Message; Hint }. Token is the trimmed bearer token,
 # or $null when Ok is $false. Said is what az printed (stdout and stderr, joined),
@@ -52,12 +53,15 @@ function Get-P20AdoToken {
     }
 }
 
-# Whether an address may be sent an Azure DevOps token: https, with a host. The
-# address is the Space's own (spaces[].org); on any other scheme the token would
-# cross the network readable, so it is never put in a header for one. The host is
-# not listed: Azure DevOps Server answers on a company's own name.
+# Whether an address may be sent an Azure DevOps token: the Space's own address
+# (spaces[].org), which the tracker rule reads as Azure DevOps, over https, with a
+# host and no user name in it. On any other scheme the token would cross the
+# network readable, so it is never put in a header for one. The host is not
+# listed: Azure DevOps Server answers on a company's own name, and the tracker
+# rule already sends github.com elsewhere.
 function Test-P20AdoTokenUrl {
     param([AllowEmptyString()][AllowNull()][string]$Url)
+    if ((Resolve-P20Tracker -OrgUrl $Url) -ne 'ado') { return $false }
     $uri = $null
     if (-not [Uri]::TryCreate("$Url".Trim(), [UriKind]::Absolute, [ref]$uri)) { return $false }
     return ($uri.Scheme -eq 'https' -and -not [string]::IsNullOrEmpty($uri.Host) -and -not $uri.UserInfo)
@@ -76,6 +80,9 @@ function Get-P20AdoHeaders {
         [string]$ContentType = 'application/json'
     )
     if (-not (Test-P20AdoTokenUrl $OrgUrl)) {
+        if ((Resolve-P20Tracker -OrgUrl $OrgUrl) -ne 'ado') {
+            throw "The Space's address ('$OrgUrl') is not an Azure DevOps organisation, so your Azure DevOps token is not sent to it."
+        }
         throw "The Space's Azure DevOps address ('$OrgUrl') is not an https address, so your token is not sent to it. Set the Space's org to its https:// address."
     }
     return @{ Authorization = "Bearer $Token"; 'Content-Type' = $ContentType }

@@ -44,6 +44,8 @@ if ($Help) {
   Clause 15 No gh, az or git call with a redirected stderr outside Invoke-TrackerRead.ps1
   Clause 16 No script in Scripts/ carries its own Get-CliPrefix or Write-CliError fallback;
             Scripts/Initialize-CliFallbacks.ps1 is the one copy
+  Clause 18 Every Azure DevOps request takes its headers from Get-P20AdoHeaders -OrgUrl `$org
+            and an address built on `$org: the token goes to the Space's organisation only
 
   Scope: all three halves -- *.psm1 at the root, Scripts/, Prompt20Toolkit/,
   web/src, web/tests and agent/ -- plus root JSON and Markdown, and Tests/
@@ -1413,6 +1415,83 @@ Assert-True "Clause 16: the sweep finds an inline definition, indented or global
     ('function global:Get-CliPrefix {' -match $fbPattern) -and
     (-not ('    Write-CliError -Message "x"' -match $fbPattern)) -and
     (-not ('function Get-CliPrefixes {' -match $fbPattern))) ''
+
+# -- Clause 18: an Azure DevOps token goes to the Space's organisation only -----
+# Two conditions keep the token at home, and this holds both at every request a
+# script makes: the headers come from Get-P20AdoHeaders (which refuses an address
+# the tracker rule does not read as Azure DevOps, or one that is not https), and
+# the address is built on the Space's own $org, so nothing read from a card can
+# choose the host. A call with no -Headers, or the model call with its own key,
+# carries no Azure DevOps token and is not this clause's.
+
+function Get-AdoRequestHits {
+    param([string]$Text, [string]$Name = 'body')
+    $tokens = $null; $errs = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$tokens, [ref]$errs)
+    $assigns = @{}
+    foreach ($a in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true)) {
+        if ($a.Left -is [System.Management.Automation.Language.VariableExpressionAst]) {
+            $key = $a.Left.VariablePath.UserPath.ToLowerInvariant()
+            if (-not $assigns.ContainsKey($key)) { $assigns[$key] = @() }
+            $assigns[$key] += $a.Right.Extent.Text.Trim()
+        }
+    }
+    $hits = @()
+    foreach ($c in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and $n.GetCommandName() -eq 'Invoke-RestMethod' }, $true)) {
+        $uri = $null; $headers = $null
+        $els = $c.CommandElements
+        for ($i = 1; $i -lt $els.Count - 1; $i++) {
+            if ($els[$i] -is [System.Management.Automation.Language.CommandParameterAst]) {
+                if ($els[$i].ParameterName -eq 'Uri') { $uri = $els[$i + 1] }
+                if ($els[$i].ParameterName -eq 'Headers') { $headers = $els[$i + 1] }
+            }
+        }
+        if (-not $headers) { continue }
+        $line = $c.Extent.StartLineNumber
+        if ($uri -and $uri.Extent.Text -match '^["'']https://api\.anthropic\.com/') { continue }
+        $hText = $headers.Extent.Text
+        $hOk = $false
+        if ($hText -match '^\(\s*Get-P20AdoHeaders\s.*-OrgUrl\s+\$org\b') { $hOk = $true }
+        elseif ($headers -is [System.Management.Automation.Language.VariableExpressionAst]) {
+            $vals = @($assigns[$headers.VariablePath.UserPath.ToLowerInvariant()])
+            $hOk = ($vals.Count -gt 0) -and (@($vals | Where-Object { $_ -notmatch '^Get-P20AdoHeaders\s.*-OrgUrl\s+\$org\b' }).Count -eq 0)
+        }
+        if (-not $hOk) { $hits += "${Name}:$line headers not from Get-P20AdoHeaders -OrgUrl `$org ($hText)" }
+        $uOk = $false
+        if ($uri -is [System.Management.Automation.Language.VariableExpressionAst]) {
+            $vals = @($assigns[$uri.VariablePath.UserPath.ToLowerInvariant()])
+            $uOk = ($vals.Count -gt 0) -and (@($vals | Where-Object { $_ -notmatch '^(?:"\$org/|\$org \+ ''/'')' }).Count -eq 0)
+        }
+        if (-not $uOk) { $hits += "${Name}:$line address not built on `$org ($(if ($uri) { $uri.Extent.Text } else { 'no -Uri' }))" }
+    }
+    foreach ($t in $tokens) {
+        if (($t.Kind -eq 'StringExpandable' -or $t.Kind -eq 'StringLiteral') -and $t.Text -match 'Bearer ') {
+            $hits += "${Name}:$($t.Extent.StartLineNumber) a Bearer header built by hand"
+        }
+    }
+    return $hits
+}
+
+$adoHits = @()
+$adoRequests = 0
+foreach ($f in @(Get-ChildItem (Join-Path $pkgRoot 'Scripts') -Filter '*.ps1' -File)) {
+    if ($f.Name -eq 'Get-AdoToken.ps1') { continue }
+    $text = [System.IO.File]::ReadAllText($f.FullName)
+    $adoRequests += ([regex]::Matches($text, 'Invoke-RestMethod[^\r\n]*-Headers')).Count
+    $adoHits += @(Get-AdoRequestHits -Text $text -Name $f.Name)
+}
+Assert-True "Clause 18: every Azure DevOps request in Scripts/ takes Get-P20AdoHeaders -OrgUrl `$org and an address built on `$org ($adoRequests)" (
+    ($adoHits.Count -eq 0) -and ($adoRequests -ge 20)) ($adoHits -join '; ')
+foreach ($case in @(
+        @{ Hit = $true;  Why = 'a hand-built Bearer header'; Body = '$u = "$org/_apis/x"; Invoke-RestMethod -Uri $u -Headers @{ Authorization = "Bearer $t" }' },
+        @{ Hit = $true;  Why = 'an address read from a card'; Body = '$h = Get-P20AdoHeaders -Token $t -OrgUrl $org; $u = $prUrl + "/x"; Invoke-RestMethod -Uri $u -Headers $h' },
+        @{ Hit = $true;  Why = 'headers for another address'; Body = '$h = Get-P20AdoHeaders -Token $t -OrgUrl $cardOrg; $u = "$org/_apis/x"; Invoke-RestMethod -Uri $u -Headers $h' },
+        @{ Hit = $false; Why = 'the house shape'; Body = '$h = Get-P20AdoHeaders -Token $t -OrgUrl $org; $u = "$org/_apis/x"; Invoke-RestMethod -Uri $u -Headers $h -Method Get' },
+        @{ Hit = $false; Why = 'the model call with its own key'; Body = 'Invoke-RestMethod -Uri "https://api.anthropic.com/v1/messages" -Headers @{ "x-api-key" = $k }' }
+    )) {
+    $caseHits = @(Get-AdoRequestHits -Text $case.Body).Count
+    Assert-True "Clause 18: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
+}
 
 # ── The scan exclusions are relative to the package root ─────────────────────
 # A checkout whose own path runs through an excluded name (an agent worktree
