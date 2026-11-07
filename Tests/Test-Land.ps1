@@ -501,7 +501,7 @@ try {
         Set-ActiveSpace 'widgets' -StoreSync 'git'
         $r = Invoke-Land 'tkLand B3QN -Pr 190'
         Assert-True 'a backlog card in a git hub lands: exit 0, committed' ($r.Text -match 'EXIT=0' -and $r.Text -match 'Committed\.') $r.Text
-        $porcelain = @(& git -C $hubDir status --porcelain 2>&1 | ForEach-Object { "$_" })
+        $porcelain = @(& git -C $hubDir status --porcelain --untracked-files=all 2>&1 | ForEach-Object { "$_" })
         Assert-True 'and the hub is clean but for a card the verb never touched' (($porcelain -join '|') -ceq '?? widgets/backlog/TaskC4RT-not-this-card.prompt.md') ($porcelain -join ' | ')
         $last = (& git -C $hubDir show --stat --format=%s HEAD 2>&1 | ForEach-Object { "$_" }) -join "`n"
         Assert-True 'the archive commit records the card leaving backlog/' ($last -match [regex]::Escape("widgets/{backlog => archive}/$nameB") -or ($last -match "backlog/$nameB" -and $last -match "archive/$nameB")) $last
