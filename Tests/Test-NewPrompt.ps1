@@ -362,12 +362,6 @@ try {
     Assert-True 'and names it' ($datedAgain.Output -match 'already exists') $datedAgain.Output
     Assert-True 'and the card is byte for byte what it was' ([System.Linq.Enumerable]::SequenceEqual($datedBefore, [System.IO.File]::ReadAllBytes($datedPath)))
 
-    # Every create asks the file, on the tracker paths too: nothing here stubs az,
-    # so the source says so.
-    $promptSource = [System.IO.File]::ReadAllText($targetScript)
-    Assert-Equal 'each of the three writes that create a card checks first' 3 ([regex]::Matches($promptSource, '(?m)^\s+Stop-P20IfCardExists -Path \$filePath')).Count
-    Assert-Equal 'and -Force cannot talk past it' 0 ([regex]::Matches($promptSource, 'Test-Path \$filePath')).Count
-
     # A hub path holding a bracket: read as a pattern, the scan finds nothing.
     $bracket = Join-Path $sandbox 'Work [old]'
     New-Item -ItemType Directory -Path (Join-Path $bracket 'current') -Force | Out-Null
@@ -945,6 +939,89 @@ catch {
     Assert-True 'the -Description cases ran to the end without a terminating error' $false $_.Exception.Message
 }
 finally { Remove-PromptSandbox $sandbox }
+
+# -- The tracker paths: a card no id reads, typed as the verb, trackers stubbed ----
+# A Bug titled like a date gets a name Get-P20CardId skips, so the scan by id says
+# no card, the tracker is asked, and the create is the only thing left to stop it.
+# `gh`, `az` and the REST call are functions in the child that write down what they
+# were asked, Test-Land.ps1's shape; the refusal has to come before any tracker write.
+
+Write-Host "-- A tracker's card is not written over -----------------" -ForegroundColor Cyan
+
+$trackerRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-newprompt-tracker-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+try {
+    $trackerPkg = Join-Path $trackerRoot 'pkg'
+    $trackerHub = Join-Path $trackerRoot 'hub'
+    $trackerCalls = Join-Path $trackerRoot 'calls.log'
+    New-Item -ItemType Directory -Path $trackerPkg, (Join-Path $trackerHub 'widgets/current'), (Join-Path $trackerHub 'board/current') -Force | Out-Null
+    foreach ($item in @('Prompt20Toolkit', 'Scripts', 'Config', 'templates', 'utilities.psm1', 'config.default.json', 'consts.json')) {
+        Copy-Item -LiteralPath (Join-Path $pkgRoot $item) -Destination $trackerPkg -Recurse
+    }
+    $hubText = '{ "hub": 1, "spaces": [ { "slug": "widgets", "name": "Widgets", "status": "active", "promptsFolder": "widgets", "org": "https://github.com/acme/widgets" }, { "slug": "board", "name": "Board", "status": "active", "promptsFolder": "board", "org": "https://dev.azure.com/acme-org" } ] }'
+    Write-FixtureText (Join-Path $trackerHub 'hub.json') $hubText
+    $issueJson = '{"number":2026,"title":"11-06 outage","body":"It stopped.","state":"OPEN","assignees":[],"labels":[{"name":"bug"}],"url":"https://github.com/acme/widgets/issues/2026","comments":[],"milestone":null}'
+    $itemJson = '{"id":2026,"fields":{"System.WorkItemType":"Bug","System.Title":"11-06 outage","System.State":"Active","System.TeamProject":"Acme Project"},"url":"https://dev.azure.com/acme-org/_apis/wit/workItems/2026"}'
+
+    $runTracker = {
+        param([string]$Space, [string]$Verb)
+        Write-FixtureText (Join-Path $trackerPkg 'config.local.json') (@{ quietStart = $true; promptsRoot = $trackerHub; activeSpace = $Space; email = 'you@example.test' } | ConvertTo-Json)
+        Remove-Item -LiteralPath $trackerCalls -ErrorAction SilentlyContinue
+        $preamble = @"
+`$env:PSModulePath = '$($trackerPkg -replace "'", "''")'
+`$env:PROMPTS_ROOT = '$($trackerHub -replace "'", "''")'
+Get-ChildItem Env: | Where-Object { `$_.Name -like 'TEAMS_WEBHOOK_*' } | ForEach-Object { Remove-Item "Env:\`$(`$_.Name)" -ErrorAction SilentlyContinue }
+function global:gh {
+    Add-Content -LiteralPath '$($trackerCalls -replace "'", "''")' -Value ("gh " + (`$args -join ' '))
+    `$global:LASTEXITCODE = 0
+    if (`$args[0] -eq 'issue' -and `$args[1] -eq 'view') { return '$issueJson' }
+    if (`$args[0] -eq 'api') { return 'you' }
+}
+function global:az {
+    Add-Content -LiteralPath '$($trackerCalls -replace "'", "''")' -Value ("az " + (`$args -join ' '))
+    `$global:LASTEXITCODE = 0
+    if (`$args[0] -eq 'account' -and `$args[1] -eq 'get-access-token') { return 'stub-token' }
+    if (`$args[0] -eq 'boards' -and `$args[2] -eq 'show') { return '$itemJson' }
+}
+function global:Invoke-RestMethod {
+    param(`$Uri, `$Headers, `$Method, `$Body)
+    Add-Content -LiteralPath '$($trackerCalls -replace "'", "''")' -Value "REST `$Method `$Uri"
+    return [pscustomobject]@{ comments = @() }
+}
+Import-Module '$($trackerPkg -replace "'", "''")/utilities.psm1' -Force -DisableNameChecking *>`$null
+`$global:P20Env = @{ Tier = 1; OrgStatus = 'active'; ActiveSpace = '$Space'; GitInstalled = `$true; RepoFound = `$true }
+"@
+        $child = Join-Path $trackerRoot 'child.ps1'
+        Write-FixtureText $child ($preamble + "`n" + $Verb + "`n'EXIT=' + `$LASTEXITCODE`n")
+        $ErrorActionPreference = 'Continue'
+        $text = (& pwsh -NoProfile -NonInteractive -File $child 2>&1 | ForEach-Object { "$_" }) -join "`n"
+        $calls = @()
+        if (Test-Path -LiteralPath $trackerCalls) { $calls = @(Get-Content -LiteralPath $trackerCalls) }
+        return [pscustomobject]@{ Text = $text; Calls = $calls }
+    }
+
+    foreach ($row in @(
+            @{ Space = 'widgets'; Name = 'GitHub'; Write = '^gh issue (edit|reopen|close)' }
+            @{ Space = 'board'; Name = 'Azure DevOps'; Write = '^az boards work-item update|^REST (Patch|Post)' }
+        )) {
+        $first = & $runTracker $row.Space "tkNewPrompt 2026 -ReadOnly"
+        $made = @(Get-ChildItem -LiteralPath (Join-Path $trackerHub $row.Space) -Recurse -Filter '2026-11-06-outage.prompt.md')
+        Assert-True "$($row.Name): the tracker's card is made, under a name no id reads" ($made.Count -eq 1) $first.Text
+        if ($made.Count -ne 1) { continue }
+        Add-FixtureText $made[0].FullName "`nA day of notes.`n"
+        $held = [System.IO.File]::ReadAllBytes($made[0].FullName)
+        $again = & $runTracker $row.Space "tkNewPrompt 2026"
+        Assert-True "$($row.Name): the tracker was asked, so this is the tracker path" (@($again.Calls | Where-Object { $_ -match 'issue view|work-item show' }).Count -gt 0) ($again.Calls -join ' | ')
+        Assert-True "$($row.Name): a second run is a stated refusal" ($again.Text -match 'already exists' -and $again.Text -match 'EXIT=2') $again.Text
+        Assert-True "$($row.Name): and the card is byte for byte what it was" ([System.Linq.Enumerable]::SequenceEqual($held, [System.IO.File]::ReadAllBytes($made[0].FullName)))
+        Assert-True "$($row.Name): and nothing changed on the tracker" (@($again.Calls | Where-Object { $_ -match $row.Write }).Count -eq 0) ($again.Calls -join ' | ')
+    }
+}
+catch {
+    Assert-True 'the tracker cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally {
+    Remove-Item -LiteralPath $trackerRoot -Recurse -Force -ErrorAction SilentlyContinue
+}
 
 Write-Host ""
 Write-Host "=======================================================" -ForegroundColor Cyan

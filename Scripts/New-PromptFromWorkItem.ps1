@@ -1067,6 +1067,10 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
     $assignedWord = if ($assigneeLogins.Count -gt 0) { $assigneeLogins -join ', ' } else { 'Unassigned' }
     Write-Host "    State: $($issueState.ToLowerInvariant()) | Assigned: $assignedWord | Card type: $resolvedType" -ForegroundColor Gray
 
+    # Before anything changes on the tracker: a refused card assigns nothing.
+    $plannedName = Get-FileName -workItemType $resolvedType -id $WorkItemId -title $title
+    Stop-P20IfCardExists -Path (Join-Path (Resolve-TargetFolder $OutputFolder) $plannedName) -Hint 'To start it over, move or delete that file first.'
+
     if (-not $ReadOnly) {
         if ($assigneeLogins.Count -eq 0) {
             Write-Host ""
@@ -1151,7 +1155,6 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
 
     $content = Build-PromptContent -workItem $workItemData -cardDir $targetFolder
     $filePath = Join-Path $targetFolder $fileName
-    Stop-P20IfCardExists -Path $filePath -Hint 'To start it over, move or delete that file first.'
     # Created, so no BOM and LF -- the one byte contract for a card.
     Write-CardText -Path $filePath -Content $content -New
     Add-BirthPictures -CardPath $filePath
@@ -1254,6 +1257,10 @@ try {
     $assignedLabel = if ($assignedTo) { $assignedTo } else { "Unassigned" }
     Write-Host "[+] Found: $workItemType $WorkItemId - $title" -ForegroundColor Green
     Write-Host "    State: $state | Assigned: $assignedLabel" -ForegroundColor Gray
+
+    # Before anything changes on the tracker: a refused card assigns nothing.
+    $plannedName = Get-FileName -workItemType $workItemType -id $WorkItemId -title $title
+    Stop-P20IfCardExists -Path (Join-Path (Resolve-TargetFolder $OutputFolder) $plannedName) -Hint 'To start it over, move or delete that file first.'
 
     # Handle assignment and state changes unless ReadOnly
     if (-not $ReadOnly) {
@@ -1359,7 +1366,6 @@ try {
     $content = Build-PromptContent -workItem $workItemData -cardDir $targetFolder
 
     $filePath = Join-Path $targetFolder $fileName
-    Stop-P20IfCardExists -Path $filePath -Hint 'To start it over, move or delete that file first.'
     # Same contract as the offline path above: created, so no BOM and LF.
     Write-CardText -Path $filePath -Content $content -New
     Add-BirthPictures -CardPath $filePath
