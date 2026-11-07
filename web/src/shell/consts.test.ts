@@ -114,6 +114,18 @@ describe("consts.json", () => {
     );
     // A card's Tags: line splits on a comma or an Azure DevOps semicolon (the agent reads it).
     expect(consts.regex.tagSeparator).toBe("[,;]");
+    // Read by the CLI and the agent; stated here so all three sides name them.
+    expect(consts.regex.taskChecked).toBe(String.raw`(?m)^[^\S\n]*-\s*\[x\]`);
+    expect(consts.regex.taskAny).toBe(String.raw`(?m)^[^\S\n]*-\s*\[[x ]\]`);
+    expect(consts.regex.lineValue).toBe(
+      String.raw`[ \t]*(?:([^ \t\r\n](?:[^\r\n]*[^ \t\r\n])?)[ \t]*)?\r?$`,
+    );
+    expect(consts.regex.lineValueFilled).toBe(
+      String.raw`[ \t]*(\S(?:[^\r\n]*[^ \t\r\n])?)[ \t]*\r?$`,
+    );
+    expect(consts.regex.stampValue).toBe(String.raw`\s*((?:.*\S)?)\s*$`);
+    expect(DESIGN.headingRegex).toBe(String.raw`^(#{1,6})(?:[ \t]+(?:(.*[^ \t\n]))?)?[ \t]*$`);
+    expect(consts.regex.commitBullet).toBe("(?m)^[^\\S\\n]*-\\s+`?([0-9a-f]{7,})`?");
     expect(REMINDERS.buckets).toEqual(["overdue", "today", "upcoming"]);
     expect(REMINDERS.snooze).toEqual(["1h", "tomorrow", "nextweek"]);
     // The three halves a test run covers, in run order.
@@ -173,7 +185,7 @@ describe("consts.json", () => {
     expect(toRegExp(DESIGN.idRegex).test("EE925272-9564-4816-8944-e6b39c86339c")).toBe(false);
     // The design a card names: the same four groups .NET and Python read, CRLF included.
     expect(DESIGN.cardLineRegex).toBe(
-      "(?m)^>[ \\t]*(Design|Spec):[ \\t]*(?:\\[([^\\]\\r\\n]*)\\]\\(([^)\\r\\n]*)\\))?[ \\t]*([^\\r\\n]*?)[ \\t]*\\r?$",
+      "(?m)^>[ \\t]*(Design|Spec):[ \\t]*(?:\\[([^\\]\\r\\n]*)\\]\\(([^)\\r\\n]*)\\)[ \\t]*)?(?:([^ \\t\\r\\n](?:[^\\r\\n]*[^ \\t\\r\\n])?)[ \\t]*)?\\r?$",
     );
     expect(
       toRegExp(DESIGN.cardLineRegex)

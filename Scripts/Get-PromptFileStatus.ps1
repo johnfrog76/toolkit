@@ -94,7 +94,7 @@ function Get-P20CardAssigned {
     #>
     param([AllowEmptyString()][AllowNull()][string]$Content)
     $stamp = [string](Get-P20Consts).stamps.assigned
-    $m = [regex]::Match("$Content", '(?m)^' + [regex]::Escape($stamp) + '[ \t]*([^\r\n]*?)[ \t]*\r?$')
+    $m = [regex]::Match("$Content", '(?m)^' + [regex]::Escape($stamp) + [string](Get-P20Consts).regex.lineValue)
     if ($m.Success) { return $m.Groups[1].Value }
     return ''
 }
@@ -108,7 +108,7 @@ function Get-P20CardLineValue {
       read by one rule.
     #>
     param([AllowEmptyString()][AllowNull()][string]$Content, [string]$Stamp)
-    $m = [regex]::Match("$Content", '(?m)^' + [regex]::Escape($Stamp) + '[ \t]*([^\r\n]*?)[ \t]*\r?$')
+    $m = [regex]::Match("$Content", '(?m)^' + [regex]::Escape($Stamp) + [string](Get-P20Consts).regex.lineValue)
     if (-not $m.Success) { return @{ Present = $false; Value = '' } }
     $value = $m.Groups[1].Value
     if ($value.StartsWith('(')) { $value = '' }
@@ -176,7 +176,7 @@ function Get-P20CardTags {
       Returns an array -- callers wrap it in @().
     #>
     param([AllowEmptyString()][AllowNull()][string]$Content)
-    $m = [regex]::Match("$Content", '(?m)^' + [regex]::Escape([string](Get-P20Consts).tokens.tags) + '[ \t]*([^\r\n]*?)[ \t]*\r?$')
+    $m = [regex]::Match("$Content", '(?m)^' + [regex]::Escape([string](Get-P20Consts).tokens.tags) + [string](Get-P20Consts).regex.lineValue)
     $value = ''
     if ($m.Success) { $value = $m.Groups[1].Value }
     if ($value.StartsWith('(')) { return @() }

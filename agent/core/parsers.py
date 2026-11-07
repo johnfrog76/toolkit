@@ -18,6 +18,8 @@ from .consts import (
     card_id_shape,
     folder_archive,
     folder_backlog,
+    line_value,
+    line_value_filled,
     re_card_design_line,
     re_commit_bullet,
     re_design_id,
@@ -25,6 +27,8 @@ from .consts import (
     re_review_line,
     re_started_line,
     re_tag_separator,
+    re_task_any,
+    re_task_checked,
     stamp_assigned,
     stamp_billable,
     stamp_from,
@@ -195,8 +199,8 @@ def card_assigned(content: str) -> str:
     a size (D-AR10). The one reader of ``stamps.assigned`` in this half; the CLI's
     mirror is ``Get-P20CardAssigned`` in ``Scripts/Get-PromptFileStatus.ps1``,
     and ``Tests/fixtures/parsers/assigned-lines.json`` holds the two to one table."""
-    m = re.search(r"(?m)^" + re.escape(stamp_assigned()) + r"[ \t]*([^\r\n]*?)[ \t]*\r?$", content or "")
-    return m.group(1) if m else ""
+    m = re.search(r"(?m)^" + re.escape(stamp_assigned()) + line_value(), content or "")
+    return (m.group(1) or "") if m else ""
 
 
 def card_from_record(content: str) -> str | None:
@@ -208,7 +212,7 @@ def card_from_record(content: str) -> str | None:
     (docs/modules/communication.md). The one reader of ``stamps.from`` in this
     half; ``Tests/fixtures/parsers/from-lines.json`` is its table, the same shape
     as the ``**Assigned:**`` one."""
-    m = re.search(r"(?m)^" + re.escape(stamp_from()) + r"[ \t]*([^\r\n]*?)[ \t]*\r?$", content or "")
+    m = re.search(r"(?m)^" + re.escape(stamp_from()) + line_value(), content or "")
     return (m.group(1) or None) if m else None
 
 
@@ -217,10 +221,10 @@ def _card_line(content: str, stamp: str) -> tuple[bool, str]:
     and "" for a parenthesised template placeholder (``(not linked)``, ``(none)``)
     as for an empty line. The milestone and sprint readers share it, so the two
     lines are read by one rule. Mirror: ``Get-P20CardLineValue``."""
-    m = re.search(r"(?m)^" + re.escape(stamp) + r"[ \t]*([^\r\n]*?)[ \t]*\r?$", content or "")
+    m = re.search(r"(?m)^" + re.escape(stamp) + line_value(), content or "")
     if not m:
         return False, ""
-    value = m.group(1)
+    value = m.group(1) or ""
     return True, ("" if value.startswith("(") else value)
 
 
@@ -272,8 +276,8 @@ def card_tags(content: str) -> list[str]:
     [] when it has none or a parenthesised placeholder. The suggestion reads a
     card's severity and size from it, and the board's tag filter the whole list.
     ``Tag`` writes it. Mirror: ``Get-P20CardTags``, same table."""
-    m = re.search(r"(?m)^" + re.escape(token_tags()) + r"[ \t]*([^\r\n]*?)[ \t]*\r?$", content or "")
-    value = m.group(1) if m else ""
+    m = re.search(r"(?m)^" + re.escape(token_tags()) + line_value(), content or "")
+    value = (m.group(1) or "") if m else ""
     if value.startswith("("):
         return []
     return [t.strip() for t in re_tag_separator().split(value) if t.strip()]
@@ -359,8 +363,8 @@ def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES, folder:
         if len(title) > 60:
             title = title[:57] + "..."
 
-    checked = len(re.findall(r"(?m)^\s*-\s*\[x\]", content))
-    total = len(re.findall(r"(?m)^\s*-\s*\[[x ]\]", content))
+    checked = len(re_task_checked().findall(content))
+    total = len(re_task_any().findall(content))
     progress = f"{checked}/{total}" if total > 0 else "--"
 
     ado_url = card_ado_url(content)
@@ -377,7 +381,7 @@ def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES, folder:
     # latest earlier round, relative to the card's own folder (docs/hub/cards.md).
     # The CLI's reader is Get-P20PreviousRoundPath; one fixture holds the two.
     previous_round = None
-    m = re.search(r"(?m)^" + re.escape(token_previous_round()) + r"[ \t]*(\S[^\r\n]*?)[ \t]*\r?$", content)
+    m = re.search(r"(?m)^" + re.escape(token_previous_round()) + line_value_filled(), content)
     if m:
         previous_round = m.group(1)
 

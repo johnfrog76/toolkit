@@ -62,10 +62,15 @@
   },
 
   "regex": {
-    "_": "The state machine, which exists once per half on purpose and must not drift. Get-PromptStatus.ps1 and agent/core/parsers.py were the two copies. commitBullet captures the hash in group 1, so the lane rule and the standup's commit count read the bullet through one pattern (a findall with one group returns the hashes, and their number is the count). -- cardId: The shape of a card's id, WITHOUT anchors -- each reader composes '^(prefix)?(<cardId>)-' around it. Two shapes: a work item number (all digits), or a card with no work item: four characters from an alphabet with no look-alikes (no 0 O 1 I L B 8 S 5 Z), at least one digit AND at least one letter -- so it can never read as a work item number, and never as a type prefix (TASK, FEAT). Uppercase, and matched case-SENSITIVELY, so a lowercase slug can never read as an id. The two lookaheads are the subset .NET, Python and JS share. -- tagSeparator: what splits a card's Tags: line into tags -- a comma, or a semicolon -- the separator of an Azure DevOps work item's tags, and the one NewPrompt and StartWork join a GitHub issue's labels with; each tag is trimmed after the split.",
+    "_": "The state machine, which exists once per half on purpose and must not drift. Patterns that read card text must be linear on a long run of spaces or blank lines: a leading [^\\S\\n]* rather than \\s*, which crosses lines from every line start, and a value that runs greedily to the last non-space rather than lazily. lineValue and lineValueFilled are the tail of a `<stamp> value` line, stampValue the tail of a design file's stamp, each joined to an escaped stamp by the half that reads it; lineValue's group is empty, or unset, on an empty line. Get-PromptStatus.ps1 and agent/core/parsers.py were the two copies. commitBullet captures the hash in group 1, so the lane rule and the standup's commit count read the bullet through one pattern (a findall with one group returns the hashes, and their number is the count). -- cardId: The shape of a card's id, WITHOUT anchors -- each reader composes '^(prefix)?(<cardId>)-' around it. Two shapes: a work item number (all digits), or a card with no work item: four characters from an alphabet with no look-alikes (no 0 O 1 I L B 8 S 5 Z), at least one digit AND at least one letter -- so it can never read as a work item number, and never as a type prefix (TASK, FEAT). Uppercase, and matched case-SENSITIVELY, so a lowercase slug can never read as an id. The two lookaheads are the subset .NET, Python and JS share. -- tagSeparator: what splits a card's Tags: line into tags -- a comma, or a semicolon -- the separator of an Azure DevOps work item's tags, and the one NewPrompt and StartWork join a GitHub issue's labels with; each tag is trimmed after the split.",
     "prUrlLine": "(?m)^PR URL:\\s*https://",
     "prReviewHeading": "(?m)^##\\s+PR Review Comments",
-    "commitBullet": "(?m)^\\s*-\\s+`?([0-9a-f]{7,})`?",
+    "commitBullet": "(?m)^[^\\S\\n]*-\\s+`?([0-9a-f]{7,})`?",
+    "taskChecked": "(?m)^[^\\S\\n]*-\\s*\\[x\\]",
+    "taskAny": "(?m)^[^\\S\\n]*-\\s*\\[[x ]\\]",
+    "lineValue": "[ \\t]*(?:([^ \\t\\r\\n](?:[^\\r\\n]*[^ \\t\\r\\n])?)[ \\t]*)?\\r?$",
+    "lineValueFilled": "[ \\t]*(\\S(?:[^\\r\\n]*[^ \\t\\r\\n])?)[ \\t]*\\r?$",
+    "stampValue": "\\s*((?:.*\\S)?)\\s*$",
     "startedLine": "(?m)^\\*\\*Started:\\*\\*",
     "reviewLine": "(?m)^\\*\\*Review:\\*\\*",
     "sessionName": "^(?:([a-z0-9]+(?:-[a-z0-9]+)*)-)?(\\d{4}-\\d{2}-\\d{2})\\.md$",
@@ -187,8 +192,9 @@
     "states": ["Design", "Spec", "Complete", "Archived"],
     "outcomes": ["shipped", "dropped"],
     "docsLine": "> Docs:",
-    "docsRegex": "(?m)^>\\s*Docs:\\s*(\\S.*?)\\s*$",
-    "cardLineRegex": "(?m)^>[ \\t]*(Design|Spec):[ \\t]*(?:\\[([^\\]\\r\\n]*)\\]\\(([^)\\r\\n]*)\\))?[ \\t]*([^\\r\\n]*?)[ \\t]*\\r?$"
+    "docsRegex": "(?m)^>\\s*Docs:\\s*(\\S(?:.*\\S)?)\\s*$",
+    "headingRegex": "^(#{1,6})(?:[ \\t]+(?:(.*[^ \\t\\n]))?)?[ \\t]*$",
+    "cardLineRegex": "(?m)^>[ \\t]*(Design|Spec):[ \\t]*(?:\\[([^\\]\\r\\n]*)\\]\\(([^)\\r\\n]*)\\)[ \\t]*)?(?:([^ \\t\\r\\n](?:[^\\r\\n]*[^ \\t\\r\\n])?)[ \\t]*)?\\r?$"
   },
 
   "rituals": {

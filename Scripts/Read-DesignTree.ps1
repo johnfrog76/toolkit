@@ -86,7 +86,7 @@ function Get-P20DesignTitle {
         3. else the file's name.
     #>
     param([string]$Text, [string]$Name)
-    $heading = '^(#{1,6})(?:[ \t]+(.*?))?[ \t]*$'
+    $heading = [string](Get-P20Consts).design.headingRegex
     $lines = $Text -split "`n"
     $start = (Get-P20FrontEnd -Lines $lines) + 1
     $first = $true
@@ -113,7 +113,7 @@ function Get-P20DesignTitle {
 function Get-P20StampValue {
     # The text after a `**Stamp:**` line, '' when the file has none.
     param([string]$Text, [string]$Stamp)
-    $m = [regex]::Match($Text, '(?m)^' + [regex]::Escape($Stamp) + '\s*(.*?)\s*$')
+    $m = [regex]::Match($Text, '(?m)^' + [regex]::Escape($Stamp) + [string](Get-P20Consts).regex.stampValue)
     if ($m.Success) { return $m.Groups[1].Value.Trim() }
     return ''
 }

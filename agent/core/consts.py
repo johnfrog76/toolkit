@@ -172,6 +172,32 @@ def re_commit_bullet() -> re.Pattern:
     return pattern("regex", "commitBullet")
 
 
+def re_task_checked() -> re.Pattern:
+    """A ticked checkbox, for a card's progress."""
+    return pattern("regex", "taskChecked")
+
+
+def re_task_any() -> re.Pattern:
+    """Any checkbox, for a card's progress."""
+    return pattern("regex", "taskAny")
+
+
+def line_value() -> str:
+    """The tail of a ``<stamp> value`` line, for a pattern built from an escaped
+    stamp. Group 1 is the trimmed value, and None on an empty line."""
+    return consts()["regex"]["lineValue"]
+
+
+def line_value_filled() -> str:
+    """``line_value``, for a line that only counts with a value on it."""
+    return consts()["regex"]["lineValueFilled"]
+
+
+def stamp_value() -> str:
+    """The tail of a design file's stamp line; it may cross to the next line."""
+    return consts()["regex"]["stampValue"]
+
+
 def re_started_line() -> re.Pattern:
     """``**Started:**`` -- a person's In Progress, for a card with nothing checked in."""
     return pattern("regex", "startedLine")
@@ -440,6 +466,11 @@ def token_design() -> str:
 def token_spec() -> str:
     """``> Spec:`` -- the corpus's hand-written form of the same line, read as written."""
     return consts()["tokens"]["spec"]
+
+
+def re_design_heading() -> re.Pattern:
+    """A markdown heading line, one line at a time: group 1 the hashes, 2 the words."""
+    return pattern("design", "headingRegex")
 
 
 def re_card_design_line() -> re.Pattern:

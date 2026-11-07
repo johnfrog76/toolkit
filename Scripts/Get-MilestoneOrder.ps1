@@ -99,7 +99,7 @@ function Get-P20MilestoneOrderIds {
 function Get-P20MilestoneTitle {
     # The title a milestone file names: its first `# ` heading, trimmed; '' for none.
     param([AllowEmptyString()][AllowNull()][string]$Text)
-    $m = [regex]::Match("$Text", '(?m)^#[ \t]+([^\r\n]*?)[ \t]*\r?$')
+    $m = [regex]::Match("$Text", '(?m)^#[ \t]' + [string](Get-P20Consts).regex.lineValue)
     if ($m.Success) { return $m.Groups[1].Value }
     return ''
 }

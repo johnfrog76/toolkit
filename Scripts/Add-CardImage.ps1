@@ -88,7 +88,7 @@ function Get-P20CardImageLine {
         [Parameter(Mandatory = $true)][string]$Stamp
     )
     if (-not $Text) { return $null }
-    $m = [regex]::Match($Text, '(?m)^' + [regex]::Escape($Stamp) + '[ \t]*(\S[^\r\n]*?)[ \t]*\r?$')
+    $m = [regex]::Match($Text, '(?m)^' + [regex]::Escape($Stamp) + [string](Get-P20Consts).regex.lineValueFilled)
     if (-not $m.Success) { return $null }
     return $m.Groups[1].Value
 }

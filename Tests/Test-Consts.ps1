@@ -114,7 +114,12 @@ $expected = [ordered]@{
     'tokens.tags'             = 'Tags:'
     'regex.prUrlLine'        = '(?m)^PR URL:\s*https://'
     'regex.prReviewHeading'   = '(?m)^##\s+PR Review Comments'
-    'regex.commitBullet'      = '(?m)^\s*-\s+`?([0-9a-f]{7,})`?'
+    'regex.commitBullet'      = '(?m)^[^\S\n]*-\s+`?([0-9a-f]{7,})`?'
+    'regex.taskChecked'       = '(?m)^[^\S\n]*-\s*\[x\]'
+    'regex.taskAny'           = '(?m)^[^\S\n]*-\s*\[[x ]\]'
+    'regex.lineValue'         = '[ \t]*(?:([^ \t\r\n](?:[^\r\n]*[^ \t\r\n])?)[ \t]*)?\r?$'
+    'regex.lineValueFilled'   = '[ \t]*(\S(?:[^\r\n]*[^ \t\r\n])?)[ \t]*\r?$'
+    'regex.stampValue'        = '\s*((?:.*\S)?)\s*$'
     'regex.startedLine'       = '(?m)^\*\*Started:\*\*'
     'regex.reviewLine'        = '(?m)^\*\*Review:\*\*'
     'regex.sessionName'       = '^(?:([a-z0-9]+(?:-[a-z0-9]+)*)-)?(\d{4}-\d{2}-\d{2})\.md$'
@@ -202,8 +207,9 @@ $expected = [ordered]@{
     'design.states'           = 'Design,Spec,Complete,Archived'
     'design.outcomes'         = 'shipped,dropped'
     'design.docsLine'         = '> Docs:'
-    'design.docsRegex'        = '(?m)^>\s*Docs:\s*(\S.*?)\s*$'
-    'design.cardLineRegex'    = '(?m)^>[ \t]*(Design|Spec):[ \t]*(?:\[([^\]\r\n]*)\]\(([^)\r\n]*)\))?[ \t]*([^\r\n]*?)[ \t]*\r?$'
+    'design.docsRegex'        = '(?m)^>\s*Docs:\s*(\S(?:.*\S)?)\s*$'
+    'design.headingRegex'     = '^(#{1,6})(?:[ \t]+(?:(.*[^ \t\n]))?)?[ \t]*$'
+    'design.cardLineRegex'    = '(?m)^>[ \t]*(Design|Spec):[ \t]*(?:\[([^\]\r\n]*)\]\(([^)\r\n]*)\)[ \t]*)?(?:([^ \t\r\n](?:[^\r\n]*[^ \t\r\n])?)[ \t]*)?\r?$'
     # Solitaire Agile's Ritual Engine: the standup the CLI's Standup and
     # the agent's GET /api/ritual/standup both render, word for word. text is a
     # map and travels as its key=value pairs joined with a comma, so the table
@@ -398,6 +404,57 @@ Assert-True "prReviewHeading matches a round heading" ("## PR Review Comments --
 $dm = [regex]::Match("# T`r`n> Design: [Board ideas](../../design/board-ideas.md) ee925272-9564-4816-8944-e6b39c86339c`r`n", $c.design.cardLineRegex)
 Assert-True "cardLineRegex reads a Design line's word, title, link and id in .NET" ($dm.Success -and $dm.Groups[1].Value -ceq 'Design' -and $dm.Groups[2].Value -eq 'Board ideas' -and $dm.Groups[3].Value -eq '../../design/board-ideas.md' -and $dm.Groups[4].Value -eq 'ee925272-9564-4816-8944-e6b39c86339c')
 Assert-True "and a hand-written Spec line's words" ([regex]::Match('> Spec: [P.spec.md](../spec/P.spec.md) (D4)', $c.design.cardLineRegex).Groups[4].Value -eq '(D4)')
+
+Write-Host ""
+Write-Host "-- The patterns over card text: what they read, and what it costs --" -ForegroundColor Cyan
+
+# Tests/fixtures/parsers/long-runs.json, the table the agent's suite reads too.
+$runs = Get-Content (Join-Path $PSScriptRoot 'fixtures/parsers/long-runs.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$stampRx = [regex]::Escape([string]$runs.stamp)
+foreach ($row in $runs.values) {
+    $m = [regex]::Match([string]$row.text, '(?m)^' + $stampRx + [string]$c.regex.($row.key))
+    $got = if ($m.Success) { $m.Groups[1].Value } else { $null }
+    Assert-True "$($row.key): $($row.why)" ($got -ceq $row.want) "got [$got]"
+}
+foreach ($row in $runs.bullets) {
+    Assert-True "bullets: $($row.why)" (
+        [regex]::Matches([string]$row.text, $c.regex.commitBullet).Count -eq $row.commits -and
+        [regex]::Matches([string]$row.text, $c.regex.taskChecked).Count -eq $row.checked -and
+        [regex]::Matches([string]$row.text, $c.regex.taskAny).Count -eq $row.any)
+}
+foreach ($row in $runs.headings) {
+    $m = [regex]::Match([string]$row.text, $c.design.headingRegex)
+    $hashes = if ($m.Success) { $m.Groups[1].Value } else { $null }
+    $words = if ($m.Success) { $m.Groups[2].Value } else { $null }
+    Assert-True "heading [$($row.text)]" ($hashes -ceq $row.hashes -and $words -ceq $row.words) "got [$hashes] [$words]"
+}
+foreach ($row in $runs.docs) {
+    $m = [regex]::Match([string]$row.text, $c.design.docsRegex)
+    $got = if ($m.Success) { $m.Groups[1].Value } else { $null }
+    Assert-True "docs [$($row.text.Trim())]" ($got -ceq $row.want) "got [$got]"
+}
+$run = [int]$runs.longRun
+$spaces = ' ' * $run
+$blank = "`n" * $run
+$costs = @(
+    @{ Name = 'commitBullet'; Rx = $c.regex.commitBullet; Text = "x$blank" + 'y' }
+    @{ Name = 'taskChecked'; Rx = $c.regex.taskChecked; Text = "x$blank" + 'y' }
+    @{ Name = 'taskAny'; Rx = $c.regex.taskAny; Text = "x$blank" + 'y' }
+    @{ Name = 'lineValue'; Rx = "(?m)^$stampRx$($c.regex.lineValue)"; Text = "**X:** a$spaces" + 'b' }
+    @{ Name = 'lineValue, a bare CR'; Rx = "(?m)^$stampRx$($c.regex.lineValue)"; Text = "**X:**$spaces`rb" }
+    @{ Name = 'lineValueFilled'; Rx = "(?m)^$stampRx$($c.regex.lineValueFilled)"; Text = "**X:** a$spaces`rb" }
+    @{ Name = 'stampValue'; Rx = "(?m)^$stampRx$($c.regex.stampValue)"; Text = "**X:** a$spaces" + 'b' }
+    @{ Name = 'docsRegex'; Rx = $c.design.docsRegex; Text = "> Docs: a$spaces" + 'b' }
+    @{ Name = 'headingRegex'; Rx = $c.design.headingRegex; Text = "# a$spaces" + 'b' }
+    @{ Name = 'cardLineRegex'; Rx = $c.design.cardLineRegex; Text = "> Design: a$spaces" + 'b' }
+    @{ Name = 'cardLineRegex, a bare CR'; Rx = $c.design.cardLineRegex; Text = "> Design:$spaces`rb" }
+)
+foreach ($cost in $costs) {
+    $clock = [System.Diagnostics.Stopwatch]::StartNew()
+    [void][regex]::Matches($cost.Text, $cost.Rx).Count
+    $clock.Stop()
+    Assert-True "$($cost.Name) stays cheap on a $run-character run" ($clock.Elapsed.TotalSeconds -lt 1) "$($clock.Elapsed.TotalSeconds)s"
+}
 
 Write-Host ""
 Write-Host "-- The state machine reads the contract ---------------" -ForegroundColor Cyan

@@ -1,0 +1,1 @@
+- A card with a very long run of spaces or blank lines no longer stalls the Board and every other page of the web UI while it is read.

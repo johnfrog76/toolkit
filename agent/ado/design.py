@@ -55,10 +55,12 @@ from ..core.consts import (
     folder_archive,
     folder_current,
     re_design_docs,
+    re_design_heading,
     re_design_id,
     re_studio_thread,
     stamp_closed,
     stamp_outcome,
+    stamp_value,
     status_done,
 )
 from ..core.parsers import _parse_status_metadata, card_design, card_id
@@ -387,7 +389,7 @@ def _front(text: str) -> tuple[dict[str, str], int]:
 
 # A markdown heading line, and the section the design contract template puts
 # a note's title under (its text on the next line, not on the heading's).
-_HEADING = re.compile(r"^(#{1,6})(?:[ \t]+(.*?))?[ \t]*$")
+_HEADING = re_design_heading()
 _TITLE_SECTION = "Title"
 
 
@@ -432,7 +434,7 @@ def parse_doc(text: str, name: str) -> tuple[str, str, str, int | None, str]:
 
 def _stamp(text: str, stamp: str) -> str:
     """The text after a ``**Stamp:**`` line, "" when the file has none."""
-    m = re.search(r"(?m)^" + re.escape(stamp) + r"\s*(.*?)\s*$", text or "")
+    m = re.search(r"(?m)^" + re.escape(stamp) + stamp_value(), text or "")
     return m.group(1).strip() if m else ""
 
 

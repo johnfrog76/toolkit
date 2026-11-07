@@ -201,7 +201,7 @@ function Get-P20GitHubLinkedIssues {
     # "#n" anywhere in prose is not a link to a card and is not read.
     param([AllowEmptyString()][AllowNull()][string]$Body)
     $ids = @()
-    foreach ($m in [regex]::Matches("$Body", '(?im)^\s*Issue:\s*#(\d+)\b')) { $ids += $m.Groups[1].Value }
+    foreach ($m in [regex]::Matches("$Body", '(?im)^[^\S\n]*Issue:\s*#(\d+)\b')) { $ids += $m.Groups[1].Value }
     foreach ($m in [regex]::Matches("$Body", '(?i)\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)\b')) { $ids += $m.Groups[1].Value }
     return @($ids | Select-Object -Unique)
 }

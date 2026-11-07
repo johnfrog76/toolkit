@@ -1,0 +1,184 @@
+{
+  "_": "The patterns that read card and design text, one row per shape they tell apart. A rewrite for cost must keep reading what these say. Both suites assert every row (Tests/test_parsers.py, tkTestToolkit -Consts), and both time the same long inputs.",
+  "stamp": "**X:**",
+  "values": [
+    {
+      "key": "lineValue",
+      "text": "**X:** a b  \t",
+      "want": "a b",
+      "why": "trailing space"
+    },
+    {
+      "key": "lineValue",
+      "text": "**X:**",
+      "want": "",
+      "why": "nothing on the line"
+    },
+    {
+      "key": "lineValue",
+      "text": "**X:**   ",
+      "want": "",
+      "why": "only spaces"
+    },
+    {
+      "key": "lineValue",
+      "text": "**X:** a\r\nnext",
+      "want": "a",
+      "why": "CRLF"
+    },
+    {
+      "key": "lineValue",
+      "text": "**X:** a\rb",
+      "want": null,
+      "why": "a bare CR is not a line end"
+    },
+    {
+      "key": "lineValue",
+      "text": "**X:**\u00a0a\u00a0",
+      "want": "\u00a0a\u00a0",
+      "why": "only space and tab are trimmed"
+    },
+    {
+      "key": "lineValueFilled",
+      "text": "**X:** a b  ",
+      "want": "a b",
+      "why": "trailing space"
+    },
+    {
+      "key": "lineValueFilled",
+      "text": "**X:**   \n**X:** later",
+      "want": "later",
+      "why": "an empty line is skipped"
+    },
+    {
+      "key": "stampValue",
+      "text": "**X:**  a b  \n",
+      "want": "a b",
+      "why": "trailing space"
+    },
+    {
+      "key": "stampValue",
+      "text": "**X:**\n\nnext line",
+      "want": "next line",
+      "why": "a stamp's value may sit on a later line, as it always could"
+    },
+    {
+      "key": "stampValue",
+      "text": "**X:**",
+      "want": "",
+      "why": "nothing there"
+    }
+  ],
+  "bullets": [
+    {
+      "text": "Commits:\n- 80e2168 add grid",
+      "commits": 1,
+      "checked": 0,
+      "any": 0,
+      "why": "a bullet"
+    },
+    {
+      "text": "  - 80e2168 indented",
+      "commits": 1,
+      "checked": 0,
+      "any": 0,
+      "why": "indented"
+    },
+    {
+      "text": "\u00a0- 80e2168 odd indent",
+      "commits": 1,
+      "checked": 0,
+      "any": 0,
+      "why": "any whitespace still indents a line"
+    },
+    {
+      "text": "\n\n\n- 80e2168 after blanks",
+      "commits": 1,
+      "checked": 0,
+      "any": 0,
+      "why": "blank lines above"
+    },
+    {
+      "text": "\r\n\r\n- 80e2168 crlf",
+      "commits": 1,
+      "checked": 0,
+      "any": 0,
+      "why": "CRLF blank lines above"
+    },
+    {
+      "text": "\r- 80e2168 after a bare CR",
+      "commits": 1,
+      "checked": 0,
+      "any": 0,
+      "why": "a bare CR is whitespace, as it always was"
+    },
+    {
+      "text": "-\n  80e2168 split",
+      "commits": 1,
+      "checked": 0,
+      "any": 0,
+      "why": "the dash and the hash may sit on two lines"
+    },
+    {
+      "text": "text - 80e2168 inline",
+      "commits": 0,
+      "checked": 0,
+      "any": 0,
+      "why": "mid-line is not a bullet"
+    },
+    {
+      "text": "- [x] done\n  - [ ] open\n-[x] tight",
+      "commits": 0,
+      "checked": 2,
+      "any": 3,
+      "why": "checkboxes"
+    }
+  ],
+  "headings": [
+    {
+      "text": "# Title  ",
+      "hashes": "#",
+      "words": "Title"
+    },
+    {
+      "text": "#",
+      "hashes": "#",
+      "words": ""
+    },
+    {
+      "text": "##   ",
+      "hashes": "##",
+      "words": ""
+    },
+    {
+      "text": "#Title",
+      "hashes": null,
+      "words": null
+    },
+    {
+      "text": "### a  b",
+      "hashes": "###",
+      "words": "a  b"
+    },
+    {
+      "text": "####### seven",
+      "hashes": null,
+      "words": null
+    }
+  ],
+  "docs": [
+    {
+      "text": "> Docs: docs/a.md  ",
+      "want": "docs/a.md"
+    },
+    {
+      "text": ">Docs:\n  docs/a.md\n",
+      "want": "docs/a.md"
+    },
+    {
+      "text": "> Docs:",
+      "want": null
+    }
+  ],
+  "longRun": 65000
+}

@@ -316,7 +316,7 @@ if (-not $hasBullet) {
 # NewItem -FromCard keeps its short id and gains a link), else the card's id
 # when it is a number. A card with neither has no issue to close.
 $issueId = 0
-$link = [regex]::Match($original, '(?m)^\s*\*{0,2}ADO Link:\*{0,2}\s*(https://\S+)')
+$link = [regex]::Match($original, '(?m)^[^\S\n]*\*{0,2}ADO Link:\*{0,2}\s*(https://\S+)')
 if ($link.Success) {
     $linkUrl = $link.Groups[1].Value
     $linkNum = [regex]::Match($linkUrl, '/edit/(\d+)')

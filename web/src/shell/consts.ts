@@ -176,6 +176,8 @@ export const DESIGN = consts.design as {
   outcomes: string[];
   docsLine: string;
   docsRegex: string;
+  /** A markdown heading line. Read by the CLI and the agent. */
+  headingRegex: string;
   /** A card's `> Design:` / `> Spec:` line: group 1 the
    *  word, 2 the link's text, 3 its target, 4 the id or a person's words. The
    *  agent serves it parsed as the card's `design`; this half states it. */

@@ -226,7 +226,7 @@ function Get-P20PreviousRoundPath {
     #>
     param([AllowNull()][string]$Content)
     if (-not $Content) { return $null }
-    $m = [regex]::Match($Content, '(?m)^' + [regex]::Escape((Get-P20Consts).tokens.previousRound) + '[ \t]*([^\r\n]*?)[ \t]*\r?$')
+    $m = [regex]::Match($Content, '(?m)^' + [regex]::Escape((Get-P20Consts).tokens.previousRound) + [string](Get-P20Consts).regex.lineValue)
     if (-not $m.Success) { return $null }
     $v = $m.Groups[1].Value
     if ($v) { return $v }

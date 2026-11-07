@@ -484,7 +484,7 @@ if (-not $prTitle) {
 # Work item ID: from the ADO Link line (tolerate **bold** markdown around the label) or
 # the filename prefix (digits, optionally after a US-/Bug-/Task- prefix).
 $workItemId = $null
-if ($promptContent -match '(?m)^\s*\*{0,2}ADO Link:\*{0,2}\s*(https://\S+)') {
+if ($promptContent -match '(?m)^[^\S\n]*\*{0,2}ADO Link:\*{0,2}\s*(https://\S+)') {
     $adoUrl = $Matches[1]
     if ($adoUrl -match '/edit/(\d+)' -or $adoUrl -match '/(\d+)/?$') {
         $workItemId = [int]$Matches[1]

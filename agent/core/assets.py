@@ -33,7 +33,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from .config import API_PREFIX, hub_root, load_config
-from .consts import cover_extensions, cover_max_bytes, folder_assets, stamp_before, stamp_cover
+from .consts import cover_extensions, cover_max_bytes, folder_assets, line_value_filled, stamp_before, stamp_cover
 
 api = APIRouter()
 
@@ -49,7 +49,7 @@ _CONTENT_TYPES = {
 
 def _image_line(content: str, stamp: str) -> str | None:
     """The value of the card's line for ``stamp`` as written, or None."""
-    m = re.search(r"(?m)^" + re.escape(stamp) + r"[ \t]*(\S[^\r\n]*?)[ \t]*\r?$", content or "")
+    m = re.search(r"(?m)^" + re.escape(stamp) + line_value_filled(), content or "")
     return m.group(1) if m else None
 
 

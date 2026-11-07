@@ -280,8 +280,8 @@ foreach ($file in $files) {
     }
 
     # Checklist progress
-    $checked = ([regex]::Matches($content, '(?m)^\s*-\s*\[x\]')).Count
-    $total = ([regex]::Matches($content, '(?m)^\s*-\s*\[[x ]\]')).Count
+    $checked = ([regex]::Matches($content, $script:Consts.regex.taskChecked)).Count
+    $total = ([regex]::Matches($content, $script:Consts.regex.taskAny)).Count
     if ($total -gt 0) {
         $progress = "$checked/$total"
     }
