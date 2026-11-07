@@ -41,13 +41,25 @@ function Get-P20DefaultPrefix {
 
 function Test-P20CommandName {
     <#
-        Whether a config value may become part of a command's name: a letter,
-        then letters, digits, '-' or '_'. The one rule for a commandPrefix and a
-        nav alias key. The schema refuses anything else as it is set, and every
-        reader checks again, because a file can already hold one.
+        Whether a nav alias key may become a command's name: a letter, then
+        letters, digits, '-' or '_'. The schema refuses anything else as it is
+        set, and every reader checks again, because a file can already hold one.
+        A commandPrefix has its own, narrower rule: Test-P20CommandPrefix.
     #>
     param([AllowEmptyString()][AllowNull()][string]$Name)
     return ($Name -cmatch '^[A-Za-z][A-Za-z0-9_-]*\z')
+}
+
+function Test-P20CommandPrefix {
+    <#
+        Whether a value may be the commandPrefix: a letter, then letters or
+        digits. Narrower than an alias key on purpose: the prefix starts every
+        verb, and 'my-tkStatus' is a name nobody wants to type. The one rule for
+        the schema, the readers and Register-PromptAlias, so what Config accepts
+        always registers.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Name)
+    return ($Name -cmatch '^[A-Za-z][A-Za-z0-9]*\z')
 }
 
 function ConvertTo-P20BareAliasKey {
@@ -92,8 +104,8 @@ function Select-P20CommandPrefix {
         [Parameter(Mandatory = $true)][string]$Fallback,
         [string]$Path = 'config'
     )
-    if (Test-P20CommandName $Value) { return $Value }
-    Write-Warning "commandPrefix in $Path is not a command name (a letter, then letters, digits, '-' or '_'); using '$Fallback'."
+    if (Test-P20CommandPrefix $Value) { return $Value }
+    Write-Warning "commandPrefix in $Path is not a command prefix (a letter, then letters or digits); using '$Fallback'."
     return $Fallback
 }
 
