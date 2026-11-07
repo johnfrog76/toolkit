@@ -158,7 +158,7 @@ GH_PINNED_QUERY = (
     "query($owner:String!,$name:String!){repository(owner:$owner,name:$name)"
     "{pinnedIssues(first:3){nodes{issue{number}}}}}"
 )
-_GH_ISSUE_URL = re.compile(r"github\.com/([^/]+)/([^/]+)/issues/(\d+)", re.IGNORECASE)
+_GH_ISSUE_URL = re.compile(r"github\.com/([^/]+)/([^/]+)/issues/([0-9]{1,9})(?![0-9])", re.IGNORECASE)
 _pinned_cache: dict[str, tuple[float, set[int]]] = {}
 _pinned_lock = threading.Lock()
 

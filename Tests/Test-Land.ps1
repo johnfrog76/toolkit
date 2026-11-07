@@ -344,6 +344,8 @@ try {
             @{ Arg = '%CD%00'; Ok = $false }
             @{ Arg = '%ADO_PAT%00'; Ok = $false }
             @{ Arg = 'a b %PATH%'; Ok = $false }
+            @{ Arg = 'a b %=ExitCode%'; Ok = $false }
+            @{ Arg = 'a b %=C:%'; Ok = $false }
             @{ Arg = '%ProgramFiles(x86)%'; Ok = $false }
             @{ Arg = '%C3%A9'; Ok = $false }
             @{ Arg = '100%'; Ok = $false }
@@ -395,6 +397,13 @@ try {
             Remove-Item -LiteralPath $arrived -ErrorAction SilentlyContinue
             $read = Invoke-P20TrackerRead 'p20arrive' @($cwdValue)
             Assert-True "through the read, [$cwdValue] is refused and nothing starts" ($read.Code -eq 2 -and -not (Test-Path -LiteralPath $arrived)) ($read.Lines -join ' | ')
+            # cmd.exe's own =names are set only once it has run something, so what a
+            # direct call shows here varies. The rule is the same either way.
+            foreach ($value in @('a b %=ExitCode%', 'a b %=C:%')) {
+                Remove-Item -LiteralPath $arrived -ErrorAction SilentlyContinue
+                $read = Invoke-P20TrackerRead 'p20arrive' @($value)
+                Assert-True "through the read, [$value] is refused and nothing starts" ($read.Code -eq 2 -and -not (Test-Path -LiteralPath $arrived)) ($read.Lines -join ' | ')
+            }
             foreach ($value in @('a%2Fb%2Fc', '%2F%2F', 'about 50% done', '100% of 50% done')) {
                 Remove-Item -LiteralPath $arrived -ErrorAction SilentlyContinue
                 $read = Invoke-P20TrackerRead 'p20arrive' @($value)

@@ -401,7 +401,7 @@ def _count_org_reviews(slug: str | None, archived: bool = False) -> tuple[int, l
         except OSError:
             text = ""
         artifacts = 0
-        m = re.search(r"Total work items[^\d]*(\d+)", text)
+        m = re.search(r"Total work items[^\d]*(\d{1,9})(?!\d)", text)
         if m:
             artifacts = int(m.group(1))
 
@@ -478,10 +478,10 @@ def _infer_work_type(text: str, filename: str) -> str:
 
 def _extract_sprint(text: str) -> str:
     """Extract sprint label from prompt file content."""
-    m = re.search(r"sprint[:\s]+sprint\s+(\d+)", text, re.IGNORECASE)
+    m = re.search(r"sprint[:\s]+sprint\s+(\d{1,9})(?!\d)", text, re.IGNORECASE)
     if m:
         return f"Sprint {m.group(1)}"
-    m = re.search(r"\bsprint[:\s]+(\d+)\b", text, re.IGNORECASE)
+    m = re.search(r"\bsprint[:\s]+(\d{1,9})\b", text, re.IGNORECASE)
     if m:
         return f"Sprint {m.group(1)}"
     return ""
@@ -537,7 +537,7 @@ def _build_work_breakdown(archive_dir: Path) -> WorkBreakdownResponse:
 
     # Sort sprints: numeric sprints first (ascending), then "Unsorted"
     def sprint_sort_key(s: str) -> tuple:
-        m = re.search(r"(\d+)", s)
+        m = re.search(r"(\d{1,9})(?!\d)", s)
         return (0, int(m.group(1))) if m else (1, 0)
 
     by_sprint = [WorkBreakdownSprintEntry(sprint=s, **sprint_map[s]) for s in sorted(sprint_map, key=sprint_sort_key)]

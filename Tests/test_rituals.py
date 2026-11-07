@@ -654,8 +654,9 @@ class TheWorkTable(unittest.TestCase):
     def test_what_an_item_belongs_to(self):
         for row in WORK_TABLE["keys"]:
             with self.subTest(milestone=row["milestone"], body=row["body"], type=row["type"]):
+                body = row["body"] + "9" * row.get("digits", 0)
                 self.assertEqual(
-                    standup.work_key(row["milestone"], row["body"], row["type"], row["threads"]),
+                    standup.work_key(row["milestone"], body, row["type"], row["threads"]),
                     (row["name"], row["by"]),
                 )
 
