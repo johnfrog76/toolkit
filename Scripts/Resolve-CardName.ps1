@@ -243,7 +243,7 @@ function Resolve-P20CardArgument {
         current/ and backlog/ is not handed a card in archive/ by its path.
         Off by default, because some callers read a folder of their own
         whose leaf is also current/ (Reminders) or act on the active
-        Space's tracker (Route, StartWork): for them a path into another
+        Space's tracker (Route, StartWork, Land): for them a path into another
         Space would be the wrong card or the wrong Space.
 
         And the path must be INSIDE the hub (-PromptsRoot, the verb's resolved

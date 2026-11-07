@@ -226,12 +226,12 @@ if (-not $tokenRead.Ok) {
 }
 $adoToken = $tokenRead.Token
 
-$headers = Get-P20AdoHeaders -Token $adoToken -ContentType 'application/json-patch+json'
+$headers = Get-P20AdoHeaders -Token $adoToken -OrgUrl $org -ContentType 'application/json-patch+json'
 
 # --- Fetch current work item state ---
 try {
     $wiUri = "$org/_apis/wit/workitems/$($Id)?api-version=7.1"
-    $wi = Invoke-RestMethod -Uri $wiUri -Headers @{ Authorization = "Bearer $adoToken" } -Method Get
+    $wi = Invoke-RestMethod -Uri $wiUri -Headers (Get-P20AdoHeaders -Token $adoToken -OrgUrl $org) -Method Get
     $currentState = $wi.fields.'System.State'
     $title = $wi.fields.'System.Title'
     $workItemType = $wi.fields.'System.WorkItemType'
@@ -350,10 +350,7 @@ else {
 }
 
 # --- Post comment ---
-$commentHeaders = @{
-    Authorization  = "Bearer $adoToken"
-    "Content-Type" = "application/json"
-}
+$commentHeaders = Get-P20AdoHeaders -Token $adoToken -OrgUrl $org
 
 try {
     $project = $wi.fields.'System.TeamProject'

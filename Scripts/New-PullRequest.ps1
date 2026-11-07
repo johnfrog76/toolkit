@@ -687,8 +687,8 @@ try {
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
     $token = $tokenRead.Token
-    $headers = Get-P20AdoHeaders -Token $token
-    $patchHeaders = Get-P20AdoHeaders -Token $token -ContentType 'application/json-patch+json'
+    $headers = Get-P20AdoHeaders -Token $token -OrgUrl $org
+    $patchHeaders = Get-P20AdoHeaders -Token $token -OrgUrl $org -ContentType 'application/json-patch+json'
 } catch {
     Write-CliError -Message "Auth failed -- $($_.Exception.Message)"
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
@@ -791,7 +791,7 @@ if (-not $SkipWorkItem -and $workItemId) {
 
     try {
         $wiUri = "$org/_apis/wit/workitems/$($workItemId)?api-version=7.1"
-        $wi = Invoke-RestMethod -Uri $wiUri -Headers @{ Authorization = "Bearer $token" } -Method Get
+        $wi = Invoke-RestMethod -Uri $wiUri -Headers $headers -Method Get
         $currentState = $wi.fields.'System.State'
 
         if ($currentState -eq 'Code Review' -or $currentState -eq 'Resolved' -or $currentState -eq 'Closed') {
@@ -808,7 +808,7 @@ if (-not $SkipWorkItem -and $workItemId) {
             $codeReviewIsValid = $true
             try {
                 $statesUri = "$org/$wiProject/_apis/wit/workitemtypes/$([Uri]::EscapeDataString($wiType))/states?api-version=7.1"
-                $states = Invoke-RestMethod -Uri $statesUri -Headers @{ Authorization = "Bearer $token" } -Method Get
+                $states = Invoke-RestMethod -Uri $statesUri -Headers $headers -Method Get
                 $codeReviewIsValid = [bool]($states.value | Where-Object { $_.name -eq 'Code Review' })
             } catch {
                 # Couldn't determine valid states -- fall back to attempting.

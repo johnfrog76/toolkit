@@ -312,7 +312,8 @@
       "notes": [
         "Asks the tracker first: only a MERGED pull request is landed. Open, closed unmerged or abandoned is refused, and nothing is written.",
         "Then, in order: the bullet '- <hash> #<n> squash-merged to <base> <date>' in the card's Git section, the issue closed through CloseItem with a comment naming the commit, and Archive. A card with no issue, or a Space with no tracker, skips the close and says so.",
-        "A step already done is skipped -- the bullet on the card, the issue closed, the card in archive/ -- so running it again changes nothing."
+        "A step already done is skipped -- the bullet on the card, the issue closed, the card in archive/ -- so running it again changes nothing.",
+        "The card is named by its ID or filename in the active Space, never a path: every step acts on this Space's tracker."
       ]
     },
     "Env": {

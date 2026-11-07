@@ -223,9 +223,14 @@ foreach ($mode in @('ok', 'fail', 'empty', 'warnonly')) {
 $env:P20_TEST_AZ_MODE = 'ok'
 $null = Get-P20AdoToken
 "NOTENANT=$global:AzArgs"
-$h = Get-P20AdoHeaders -Token 'a-token'
-$p = Get-P20AdoHeaders -Token 'a-token' -ContentType 'application/json-patch+json'
+$h = Get-P20AdoHeaders -Token 'a-token' -OrgUrl 'https://dev.azure.com/acme-org'
+$p = Get-P20AdoHeaders -Token 'a-token' -OrgUrl 'https://ado.example.internal/tfs/Coll' -ContentType 'application/json-patch+json'
 "HEADERS=$($h.Authorization)|$($h['Content-Type'])|$($p['Content-Type'])"
+# The address a token may go to: https with a host, and nothing else.
+foreach ($row in @('http://dev.azure.com/acme-org', 'ftp://dev.azure.com/acme-org', 'dev.azure.com/acme-org', 'https://user:pw@dev.azure.com/acme-org', 'https://', '', 'https://github.com/acme', 'https://www.github.com/acme')) {
+    $said = try { $null = Get-P20AdoHeaders -Token 'a-token' -OrgUrl $row; 'SENT' } catch { 'REFUSED ' + $_.Exception.Message }
+    "ADDR[$row]=$said"
+}
 foreach ($code in @(401, 403, 404)) {
     $ex = New-Object System.Exception 'stubbed REST failure'
     $ex | Add-Member -NotePropertyName Response -NotePropertyValue ([pscustomobject]@{ StatusCode = $code })
@@ -252,7 +257,13 @@ try {
         Assert-True "token helper, ${exe}: only WARNING lines and blanks is a failure" ($to -match 'warnonly ok=False token=\[\]') $to
         Assert-True "token helper, ${exe}: asks for the Azure DevOps resource with the tenant given" ($to -match 'ARGS=account get-access-token --tenant tenant-1 --resource 499b84ac-1321-427f-aa17-267ca6975798 --query accessToken -o tsv') $to
         Assert-True "token helper, ${exe}: no tenant, no --tenant" ($to -match 'NOTENANT=account get-access-token --resource ') $to
-        Assert-True "token helper, ${exe}: the headers carry the bearer token and the content type asked for" ($to -match 'HEADERS=Bearer a-token\|application/json\|application/json-patch\+json') $to
+        Assert-True "token helper, ${exe}: the headers carry the bearer token and the content type asked for, for dev.azure.com and for an https host of a company's own" ($to -match 'HEADERS=Bearer a-token\|application/json\|application/json-patch\+json') $to
+        foreach ($row in @('http://dev.azure.com/acme-org', 'ftp://dev.azure.com/acme-org', 'dev.azure.com/acme-org', 'https://user:pw@dev.azure.com/acme-org', 'https://')) {
+            Assert-True "token helper, ${exe}: no header is built for '$row', and the refusal says the token is not sent" ($to -match ('ADDR\[' + [regex]::Escape($row) + '\]=REFUSED .*is not an https address, so your token is not sent')) $to
+        }
+        foreach ($row in @('', 'https://github.com/acme', 'https://www.github.com/acme')) {
+            Assert-True "token helper, ${exe}: no header for a Space whose tracker is not Azure DevOps: '$row'" ($to -match ('ADDR\[' + [regex]::Escape($row) + '\]=REFUSED .*is not an Azure DevOps organisation, so your Azure DevOps token is not sent')) $to
+        }
         Assert-True "token helper, ${exe}: 401 and 403 get the access advice naming az login and the org" ($to -match 'HINT401=True' -and $to -match 'HINT403=True' -and $to -match 'Access denied \(HTTP 401\)' -and $to -match 'Access denied \(HTTP 403\)' -and $to -match "run 'az login'" -and $to -match 'az devops login --organization https://dev\.azure\.com/acme-org') $to
         Assert-True "token helper, ${exe}: any other status is left to the caller" ($to -match 'HINT404=False' -and $to -notmatch 'HTTP 404') $to
         Assert-True "token helper, ${exe}: the caller's ErrorActionPreference is still Stop after the calls" ($to -match 'PREF=Stop') $to
