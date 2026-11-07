@@ -60,8 +60,9 @@ function New-LandSandbox {
     foreach ($f in @('widgets', 'board', 'solo')) { New-Item -ItemType Directory -Path (Join-Path $hubDir "$f/current") -Force | Out-Null }
 }
 
-function Set-ActiveSpace([string]$slug) {
+function Set-ActiveSpace([string]$slug, [string]$StoreSync = '') {
     $local = [ordered]@{ quietStart = $true; promptsRoot = $hubDir; activeSpace = $slug }
+    if ($StoreSync) { $local.storeSync = $StoreSync }
     [System.IO.File]::WriteAllText((Join-Path $pkgDir 'config.local.json'), ($local | ConvertTo-Json -Depth 4), $utf8)
 }
 
@@ -479,6 +480,35 @@ try {
             Remove-Item Env:AD_P20_PROBE, Env:P20_PROBE_VAR -ErrorAction SilentlyContinue
             Pop-Location
         }
+    }
+
+    # -- A backlog card, in a hub that is a git repository ------------------------
+    # The bullet puts a backlog card in play (backlog/ to current/), then Archive
+    # moves it on and commits: the commit has to carry the whole move, so the hub
+    # is clean after a verb that said "Committed.".
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        $gitIn = { param([string[]]$GitArgs) $null = & git -C $hubDir @GitArgs 2>&1 }
+        & $gitIn @('init', '-q')
+        & $gitIn @('config', 'user.email', 'land@example.test')
+        & $gitIn @('config', 'user.name', 'Land Test')
+        & $gitIn @('config', 'commit.gpgsign', 'false')
+        $nameB = 'TaskB3QN-a-planned-card.prompt.md'
+        New-Card -Space 'widgets' -FileName $nameB -Heading 'Task B3QN: A planned card' -Folder 'backlog' | Out-Null
+        & $gitIn @('add', '-A')
+        & $gitIn @('commit', '-q', '-m', 'the hub before Land')
+        $unrelated = Join-Path $hubDir 'widgets/backlog/TaskC4RT-not-this-card.prompt.md'
+        [System.IO.File]::WriteAllText($unrelated, "# Task C4RT: Not this card`n", $utf8)
+        Set-ActiveSpace 'widgets' -StoreSync 'git'
+        $r = Invoke-Land 'tkLand B3QN -Pr 190'
+        Assert-True 'a backlog card in a git hub lands: exit 0, committed' ($r.Text -match 'EXIT=0' -and $r.Text -match 'Committed\.') $r.Text
+        $porcelain = @(& git -C $hubDir status --porcelain 2>&1 | ForEach-Object { "$_" })
+        Assert-True 'and the hub is clean but for a card the verb never touched' (($porcelain -join '|') -ceq '?? widgets/backlog/TaskC4RT-not-this-card.prompt.md') ($porcelain -join ' | ')
+        $last = (& git -C $hubDir show --stat --format=%s HEAD 2>&1 | ForEach-Object { "$_" }) -join "`n"
+        Assert-True 'the archive commit records the card leaving backlog/' ($last -match [regex]::Escape("widgets/{backlog => archive}/$nameB") -or ($last -match "backlog/$nameB" -and $last -match "archive/$nameB")) $last
+        Set-ActiveSpace 'widgets'
+    }
+    else {
+        Write-Host '  SKIP  git is not on PATH: the backlog card in a git hub' -ForegroundColor Yellow
     }
 
     # -- The help --------------------------------------------------------------

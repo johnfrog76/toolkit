@@ -437,13 +437,32 @@ if ($PSCmdlet.ShouldProcess("$fileName", "Move to archive and commit")) {
         }
         else {
             $gitFailure = $null
-            $add = Invoke-P20TrackerRead 'git' @('add', '-A', '--', $currentDirRel, $archiveDirRel)
+            # The card may have crossed a lane just before this, uncommitted: Land
+            # puts a backlog card in play (backlog/ to current/) and then archives
+            # it. Its old path in the other lane is staged too, so the commit
+            # records the whole move and leaves the hub clean -- only that path,
+            # only when git still tracks it and it is gone from disk, so no other
+            # card's change rides along.
+            $pathspecs = @($currentDirRel, $archiveDirRel)
+            foreach ($lane in @($currentDir, $backlogDir)) {
+                if (-not $lane) { continue }
+                $laneRel = $lane.Replace('\', '/')
+                if ($laneRel.StartsWith($rootNorm, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $laneRel = $laneRel.Substring($rootNorm.Length).TrimStart('/')
+                }
+                if ($laneRel -eq $currentDirRel) { continue }
+                $oldPath = "$laneRel/$fileName"
+                if (Test-Path -LiteralPath (Join-Path $lane $fileName)) { continue }
+                $tracked = Invoke-P20TrackerRead 'git' @('ls-files', '--', $oldPath)
+                if ($tracked.Code -eq 0 -and ($tracked.Out -join '').Trim()) { $pathspecs += $oldPath }
+            }
+            $add = Invoke-P20TrackerRead 'git' (@('add', '-A', '--') + $pathspecs)
             if ($add.Code -ne 0) {
                 $gitFailure = "git add failed: $(@($add.Lines | Where-Object { $_ })[0])"
             }
             else {
                 # Nothing staged (the move left no difference git can see) is not a failure.
-                $staged = Invoke-P20TrackerRead 'git' @('diff', '--cached', '--quiet', '--', $currentDirRel, $archiveDirRel)
+                $staged = Invoke-P20TrackerRead 'git' (@('diff', '--cached', '--quiet', '--') + $pathspecs)
                 if ($staged.Code -eq 0) {
                     Write-Host "Nothing to commit." -ForegroundColor DarkGray
                 }
