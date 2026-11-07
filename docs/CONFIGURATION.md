@@ -71,6 +71,12 @@ is `Scripts/Resolve-Tracker.ps1` and the agent's `tracker()`, held together by o
 and `/env` serves the answer. Whether the tracker is CONTACTED is a separate question -- the Space's
 `status` and the tier decide that.
 
+**An Azure DevOps address is `https://`.** Your Azure DevOps token goes only to the Space's own
+address, and only over https: a verb that would send it anywhere else (an `http://` address, one with
+no scheme, or one carrying a user name and password) stops with that sentence and sends nothing. The
+host is not checked, so Azure DevOps Server on your company's own name works. The rule is
+`Test-P20AdoTokenUrl` in `Scripts/Get-AdoToken.ps1`, which every request's headers go through.
+
 The patch is sparse -- name any field you want to change and the rest of the shipped entry stands.
 This is enforced, not just convention: the Portability suite fails the build if a real org URL,
 tenant id or email reaches `config.default.json`.

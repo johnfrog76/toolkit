@@ -169,14 +169,6 @@ if ($PSBoundParameters.ContainsKey('Rank') -and "$Rank".Trim() -notmatch '^(?i:t
         -Hint "Pass '-Rank top', '-Rank up', '-Rank down' or a position counted from 1, as in '-Rank 3'."
     exit 2  # stated refusal
 }
-# On an Azure DevOps Space the board owns the order, and ToolKit keeps none: -Rank
-# refuses, and no order file is written by any switch (docs/hub/milestones.md).
-$keepsOrder = (Resolve-P20Tracker -OrgUrl ([string]$cfg.Org)) -ne 'ado'
-if ($Rank -and -not $keepsOrder) {
-    Write-CliError -Message "ranking lives in Azure DevOps; ${p}MyWork lists what is assigned to you." `
-        -Hint "On an Azure DevOps Space the board keeps a milestone's order. '${p}Plan <id> -Milestone' still writes the card's line."
-    exit 2  # stated refusal
-}
 if (($Milestone -or $Sprint) -and $Remove) {
     Write-CliError -Message "'-Remove' and '-Milestone' / '-Sprint' do not go together." `
         -Hint "Plan the card into a milestone or a sprint, or take it out of one -- not both in the same call."
@@ -222,6 +214,28 @@ if (-not $label) { $label = $file.Name }
 # A milestone's order lives beside the card folders of the card's own Space.
 $spaceDir = Split-Path (Split-Path $file.FullName -Parent) -Parent
 $milestonesDir = Get-P20MilestoneFolder -SpaceDir $spaceDir
+
+# On an Azure DevOps Space the board owns the order, and ToolKit keeps none: -Rank
+# refuses, and no order file is written by any switch (docs/hub/milestones.md).
+# The rule is the card's own Space's, because the order is written beside it: a
+# path into another Space reads that Space's tracker, not the active one's.
+$cardOrg = [string]$cfg.Org
+$cardFolder = Split-Path $spaceDir -Leaf
+foreach ($space in @($cfg.Spaces)) {
+    if (-not $space) { continue }
+    $folder = [string]$space.promptsFolder
+    if (-not $folder) { $folder = [string]$space.slug }
+    if ($folder -and [string]::Equals((Split-Path $folder -Leaf), $cardFolder, [System.StringComparison]::OrdinalIgnoreCase)) {
+        $cardOrg = [string]$space.org
+        break
+    }
+}
+$keepsOrder = (Resolve-P20Tracker -OrgUrl $cardOrg) -ne 'ado'
+if ($Rank -and -not $keepsOrder) {
+    Write-CliError -Message "ranking lives in Azure DevOps; ${p}MyWork lists what is assigned to you." `
+        -Hint "On an Azure DevOps Space the board keeps a milestone's order. '${p}Plan <id> -Milestone' still writes the card's line."
+    exit 2  # stated refusal
+}
 $cardId = Get-P20CardId -Name $file.Name -Pattern (Get-P20CardIdPattern -WorkItemTypes $types)
 
 function Get-OrderPath {

@@ -319,20 +319,40 @@ try {
     Assert-True 'a stray line asks the Space''s own repository' (@($r.Calls) -match 'gh pr view 9 --repo acme/widgets') ($r.Calls -join ' | ')
     Assert-True 'and never reaches the closing comment' ($r.Text -notmatch 'stray\.example' -and -not (@($r.Calls) -match 'stray\.example')) (($r.Calls -join ' | ') + $r.Text)
 
-    # A card's link gives the issue number only when it is this Space's.
-    New-Card -Space 'widgets' -FileName 'Task5302-a-linked-card.prompt.md' -Heading 'Task 5302: A linked card' `
-        -PrUrl 'https://github.com/acme/widgets/pull/12' -Link 'https://github.com/someone/else/issues/77' | Out-Null
-    $r = Invoke-Land 'tkLand 5302'
-    Assert-True 'a link elsewhere does not name the issue' (-not (@($r.Calls) -match 'gh issue \w+ 77')) ($r.Calls -join ' | ')
+    # A card's link gives the issue number only when it is this Space's: on GitHub,
+    # one of the Space's repositories, not another repository of the same owner.
+    $k = 0
+    foreach ($elsewhereLink in @(
+            'https://github.com/someone/else/issues/77',
+            'https://github.com/acme/other/issues/77',
+            'https://github.com/acme/widgets.evil/issues/77',
+            'https://github.com/acme/widgets/pull/77'
+        )) {
+        $k++
+        New-Card -Space 'widgets' -FileName "Task530$k-a-linked-card.prompt.md" -Heading "Task 530${k}: A linked card" `
+            -PrUrl 'https://github.com/acme/widgets/pull/12' -Link $elsewhereLink | Out-Null
+        $r = Invoke-Land "tkLand 530$k"
+        Assert-True "a link off the Space's repositories does not name the issue: $elsewhereLink" (-not (@($r.Calls) -match 'gh issue \w+ 77')) ($r.Calls -join ' | ')
+    }
+    New-Card -Space 'widgets' -FileName 'Task5309-a-linked-card.prompt.md' -Heading 'Task 5309: A linked card' `
+        -PrUrl 'https://github.com/acme/widgets/pull/12' -Link 'https://github.com/acme/widgets/issues/78' | Out-Null
+    $r = Invoke-Land 'tkLand 5309'
+    Assert-True "and a link on the Space's repository does" (@($r.Calls) -match 'gh issue \w+ 78') ($r.Calls -join ' | ')
 
-    # A path names a card in any Space; Land acts on the active one.
-    $elsewhere = New-Card -Space 'board' -FileName '5303-in-another-space.prompt.md' -Heading 'Bug 5303: In another Space' `
+    # Land takes an id or a filename in the active Space, never a path: a path could
+    # name another Space's card and close this Space's issue of the same number.
+    $elsewhere = New-Card -Space 'board' -FileName '5310-in-another-space.prompt.md' -Heading 'Bug 5310: In another Space' `
         -PrUrl 'https://github.com/acme/widgets/pull/12'
-    $beforeElsewhere = Get-Bytes64 $elsewhere
-    Set-ActiveSpace 'widgets'
-    $r = Invoke-Land "tkLand '$elsewhere'"
-    Assert-True 'a card in another Space is refused' ($r.Text -match 'EXIT=2' -and $r.Text -match "is in 'board'") $r.Text
-    Assert-True 'and nothing was asked, closed or written' (@($r.Calls | Where-Object { $_ -match '^(az repos|gh pr|gh issue|REST)' }).Count -eq 0 -and (Get-Bytes64 $elsewhere) -eq $beforeElsewhere) ($r.Calls -join ' | ')
+    $here = New-Card -Space 'widgets' -FileName '5311-in-this-space.prompt.md' -Heading 'Bug 5311: In this Space' `
+        -PrUrl 'https://github.com/acme/widgets/pull/12'
+    foreach ($cardPath in @($elsewhere, $here)) {
+        $before = Get-Bytes64 $cardPath
+        $r = Invoke-Land "tkLand '$cardPath'"
+        Assert-True "a path is refused, said once: $(Split-Path $cardPath -Leaf)" ($r.Text -match 'EXIT=2' -and $r.Text -match 'not a path' -and ([regex]::Matches($r.Text, 'Error:')).Count -eq 1) $r.Text
+        Assert-True 'and nothing was asked, closed or written' (@($r.Calls | Where-Object { $_ -match '^(az repos|gh pr|gh issue|REST)' }).Count -eq 0 -and (Get-Bytes64 $cardPath) -eq $before) ($r.Calls -join ' | ')
+    }
+    $r = Invoke-Land 'tkLand 5311-in-this-space.prompt.md'
+    Assert-True 'the same card by its filename lands' ($r.Text -match 'EXIT=0') $r.Text
     Set-ActiveSpace 'board'
 
     # -- Azure DevOps, merged ---------------------------------------------------

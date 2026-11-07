@@ -9,7 +9,7 @@
 #         Write-CliError -Message $tokenRead.Message -Hint $tokenRead.Hint
 #         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 #     }
-#     $headers = Get-P20AdoHeaders -Token $tokenRead.Token
+#     $headers = Get-P20AdoHeaders -Token $tokenRead.Token -OrgUrl $cfg.Org
 #
 # The failure contract, one for every caller: az exiting non-zero, OR az printing
 # no token (nothing, or only blank lines and WARNING: lines), is a failure. The
@@ -52,14 +52,32 @@ function Get-P20AdoToken {
     }
 }
 
-# The REST headers for a token. -ContentType is application/json unless the call
-# is a work item PATCH, which takes application/json-patch+json.
+# Whether an address may be sent an Azure DevOps token: https, with a host. The
+# address is the Space's own (spaces[].org); on any other scheme the token would
+# cross the network readable, so it is never put in a header for one. The host is
+# not listed: Azure DevOps Server answers on a company's own name.
+function Test-P20AdoTokenUrl {
+    param([AllowEmptyString()][AllowNull()][string]$Url)
+    $uri = $null
+    if (-not [Uri]::TryCreate("$Url".Trim(), [UriKind]::Absolute, [ref]$uri)) { return $false }
+    return ($uri.Scheme -eq 'https' -and -not [string]::IsNullOrEmpty($uri.Host) -and -not $uri.UserInfo)
+}
+
+# The REST headers for a token, for the one address it goes to. -ContentType is
+# application/json unless the call is a work item PATCH, which takes
+# application/json-patch+json. Every Azure DevOps request a script makes takes its
+# headers here, so the address rule above has no second copy to miss: an address
+# outside it throws, and nothing is sent.
 function Get-P20AdoHeaders {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)][string]$Token,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$OrgUrl,
         [string]$ContentType = 'application/json'
     )
+    if (-not (Test-P20AdoTokenUrl $OrgUrl)) {
+        throw "The Space's Azure DevOps address ('$OrgUrl') is not an https address, so your token is not sent to it. Set the Space's org to its https:// address."
+    }
     return @{ Authorization = "Bearer $Token"; 'Content-Type' = $ContentType }
 }
 

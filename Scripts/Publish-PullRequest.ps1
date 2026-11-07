@@ -239,7 +239,7 @@ if (-not $tokenRead.Ok) {
     Write-CliError -Message $tokenRead.Message -Hint $tokenRead.Hint
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
-$headers = Get-P20AdoHeaders -Token $tokenRead.Token
+$headers = Get-P20AdoHeaders -Token $tokenRead.Token -OrgUrl $org
 
 # Azure DevOps puts the reason in the response body; the exception only says the status.
 $adoSentence = {

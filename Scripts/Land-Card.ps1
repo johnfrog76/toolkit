@@ -105,13 +105,22 @@ if (-not $Card) {
 $folders = Get-PromptFolders
 $backlogDir = Get-P20BacklogFolder -Folders $folders
 $archiveDir = $folders.Archive
+# No -AllowPath: every step below acts on the active Space's tracker, so a card is
+# named the way Route and StartWork name one, by id or name in this Space. A path
+# could name a card in another Space and close this Space's issue of the same
+# number, so one is refused, said once, rather than read as a name.
+if ($Card -match '[\\/]') {
+    Write-CliError -Message "${p}Land takes a card's ID or filename in this Space, not a path ('$Card')." `
+        -Hint "Switch to the card's Space (${p}SwitchSpace), then '${p}Land <id>'. Nothing was read or written."
+    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+}
 $inPlay = Resolve-P20CardArgument -Argument $Card -Folder @($folders.Current, $backlogDir) `
-    -WorkItemTypes $types -AllowPath -PromptsRoot $promptsRoot
+    -WorkItemTypes $types
 $found = @($inPlay.Match | Where-Object { $_.Name -like '*.prompt.md' })
 $resolved = $inPlay
 if ($found.Count -eq 0) {
     $resolved = Resolve-P20CardArgument -Argument $Card -Folder @($archiveDir) `
-        -WorkItemTypes $types -AllowPath -PromptsRoot $promptsRoot
+        -WorkItemTypes $types
     $found = @($resolved.Match | Where-Object { $_.Name -like '*.prompt.md' })
 }
 if ($found.Count -eq 0) {
@@ -121,14 +130,14 @@ if ($found.Count -eq 0) {
     }
     else {
         Write-CliError -Message "No card matching '$Card' in current/, backlog/ or archive/." `
-            -Hint "Pass the card's ID, its filename, or a path. Run '${p}Status' to see the cards."
+            -Hint "Pass the card's ID or its filename. Run '${p}Status' to see the cards."
     }
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
 if ($found.Count -gt 1) {
     Write-Host "Matches for '$Card':" -ForegroundColor Yellow
     $found | ForEach-Object { Write-Host "  $($_.Name)" }
-    Write-CliError -Message "'$Card' matches $($found.Count) cards." -Hint "Pass the full filename, or the path, of the one you mean."
+    Write-CliError -Message "'$Card' matches $($found.Count) cards." -Hint "Pass the full filename of the one you mean."
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
 if ($resolved.Fuzzy) {
@@ -142,15 +151,6 @@ if ($resolved.Fuzzy) {
 
 $cardFile = $found[0].FullName
 $leaf = $found[0].Name
-# A path can name a card in any Space, and every step below acts on the active
-# Space's tracker, so a card from another one would close the wrong issue.
-$cardSpace = Split-Path (Split-Path (Split-Path $cardFile -Parent) -Parent) -Leaf
-$activeSpace = Split-Path (Split-Path $folders.Current -Parent) -Leaf
-if ($cardSpace -ne $activeSpace) {
-    Write-CliError -Message "$leaf is in '$cardSpace', and this Space is '$activeSpace', so ${p}Land will not act on it." `
-        -Hint "Switch to that Space (${p}SwitchSpace), then '${p}Land' again. Nothing was read or written."
-    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
-}
 $archived = ((Split-Path (Split-Path $cardFile -Parent) -Leaf) -eq [string]$c.folders.archive)
 $original = [System.IO.File]::ReadAllText($cardFile)
 $cardId = Get-P20CardId -Name ($leaf -replace '-r\d+(?=\.prompt\.md$)', '') -Pattern (Get-P20CardIdPattern -WorkItemTypes $types)
@@ -327,8 +327,9 @@ $issueId = 0
 $link = [regex]::Match($original, '(?m)^\s*\*{0,2}ADO Link:\*{0,2}\s*(https://\S+)')
 if ($link.Success) {
     $linkUrl = $link.Groups[1].Value
-    # The number is only this Space's if the link is.
-    if (Test-P20UrlInOrg -Url $linkUrl -Org $cfg.Org) {
+    # The number is only this Space's if the link is: on GitHub, one of the
+    # Space's repositories, not only its owner.
+    if (Test-P20UrlOnTracker -Url $linkUrl -OrgUrl $cfg.Org -Projects $cfg.Projects -Kind issue) {
         $linkNum = [regex]::Match($linkUrl, '/edit/(\d+)')
         if (-not $linkNum.Success) { $linkNum = [regex]::Match($linkUrl, '/(\d+)/?$') }
         if ($linkNum.Success) { $issueId = [int]$linkNum.Groups[1].Value }
