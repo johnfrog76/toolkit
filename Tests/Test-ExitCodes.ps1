@@ -347,7 +347,9 @@ Write-Host ""
 
 Write-Host "── The PR scripts refuse with ONE block and exit 2 ────" -ForegroundColor Cyan
 
-$tier1Env = "`$global:P20Env = @{ Tier = 1; OrgStatus = 'active'; ActiveSpace = 'azure-demo'; GitInstalled = `$true; RepoFound = `$true; AzCliInstalled = `$true; AzAuthenticated = `$true; AdoReachable = `$true }"
+# Tier 1 is a connected Azure DevOps org, so the Space gets an organisation address
+# too: the shipped azure-demo has none, and a token is never built for a blank one.
+$tier1Env = "`$global:P20Env = @{ Tier = 1; OrgStatus = 'active'; ActiveSpace = 'azure-demo'; GitInstalled = `$true; RepoFound = `$true; AzCliInstalled = `$true; AzAuthenticated = `$true; AdoReachable = `$true }; `$global:P20Config.Org = 'https://dev.azure.com/YOUR-ADO-ORG'"
 $outside = [System.IO.Path]::GetTempPath() -replace "'", "''"
 
 $reply = Invoke-ChildRun "$tier1Env`n${cfgPrefix}ReplyPR`n'LASTEXITCODE=' + `$LASTEXITCODE`nexit `$LASTEXITCODE"
