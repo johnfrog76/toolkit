@@ -328,7 +328,7 @@ try {
         Assert-Equal "alias name '$bad' is a stated refusal" 2 $r.ExitCode
         Assert-Contains "and it says why" $r.Output 'cannot be a nav alias'
     }
-    foreach ($bad in @('t k', 't;k', '1k', 't$k', "t'k", 't(k)')) {
+    foreach ($bad in @('t k', 't;k', '1k', 't$k', "t'k", 't(k)', 'my-tk2', 'a_b', '-tk')) {
         $r = Invoke-Config $box @('-Set', "commandPrefix=$bad")
         Assert-Equal "prefix '$bad' is a stated refusal" 2 $r.ExitCode
         Assert-Contains 'and it says what a prefix is' $r.Output 'commandPrefix is a letter'
@@ -337,7 +337,8 @@ try {
     foreach ($good in @('Home2', 'my-repo', 'a_b')) {
         Assert-Equal "alias name '$good' is accepted" 0 (Invoke-Config $box @('-Set', "aliases.$good.path=/somewhere")).ExitCode
     }
-    Assert-Equal 'a prefix may carry a dash or a digit' 0 (Invoke-Config $box @('-Set', 'commandPrefix=my-tk2')).ExitCode
+    Assert-Equal 'a prefix may carry a digit' 0 (Invoke-Config $box @('-Set', 'commandPrefix=ab2')).ExitCode
+    Assert-Contains 'and it is written' (Get-LocalConfigText $box) '"commandPrefix": "ab2"'
     [void](Invoke-Config $box @('-Unset', 'commandPrefix'))
 
     # A file can already hold a name the schema would refuse, so the readers check
@@ -380,6 +381,37 @@ try {
         Assert-Contains 'and the shipped prefix answers' $out 'tkStatus'
         $resolved = (& pwsh -NoProfile -Command ". '$nameBox/Scripts/Resolve-CliPrefix.ps1'; Resolve-P20ConfigPrefix -PackageRoot '$nameBox' 3>`$null" 2>$null | Out-String).Trim()
         Assert-Equal 'and the script-side reader falls back the same way' 'tk' $resolved
+
+        # What Config accepts has to register: a new shell with no verbs has no
+        # Config to put it right with. A prefix set in the file, the module
+        # imported in a fresh shell, and the verbs typed there.
+        $local.commandPrefix = 'ab2'
+        & $writeLocal
+        $typedVerbs = "$probe; ab2Config -Help | Out-Null; 'config=' + `$?; ab2Menu | Out-Null; 'menu=' + `$?; (Get-Command ab2Status).Name; (Get-Command tkStatus -ErrorAction SilentlyContinue).Name"
+        $out = (& pwsh -NoProfile -Command $typedVerbs 2>&1 3>&1 | Out-String)
+        Assert-True "a prefix of 'ab2' registers with nothing refused" ($out -notmatch 'Cannot validate|not recognized|not a command prefix') $out
+        Assert-Contains 'and ab2Config runs in a new shell' $out 'config=True'
+        Assert-Contains 'and ab2Menu' $out 'menu=True'
+        Assert-Contains 'and ab2Status answers' $out 'ab2Status'
+        Assert-True 'and the shipped prefix is not registered beside it' ($out -notmatch '(?m)^tkStatus') $out
+        # A dash or an underscore Config refuses; a file that already holds one
+        # falls back to the shipped prefix, named in a warning, and the shell
+        # still has its verbs.
+        foreach ($prefix in @('my-tk2', 'a_b')) {
+            $local.commandPrefix = $prefix
+            & $writeLocal
+            $out = (& pwsh -NoProfile -Command "$probe; tkConfig -Help | Out-Null; 'config=' + `$?; (Get-Command tkStatus).Name; (Get-Command ${prefix}Status -ErrorAction SilentlyContinue).Name" 2>&1 3>&1 | Out-String)
+            Assert-Contains "a prefix of '$prefix' in the file is named in a warning" $out 'is not a command prefix'
+            Assert-Contains 'and the shipped prefix answers, Config included' $out 'config=True'
+            Assert-Contains 'and Status is there' $out 'tkStatus'
+            Assert-True "and nothing is registered under '$prefix'" ($out -notmatch "(?m)^${prefix}Status") $out
+        }
+        $local.commandPrefix = 'tk'
+        & $writeLocal
+        foreach ($bad in @('x;y', 'my-tk')) {
+            $refused = (& pwsh -NoProfile -Command "$probe; try { Register-PromptAlias -Prefix '$bad' -Commands Status; 'took it' } catch { `$_.Exception.Message }" 2>&1 3>&1 | Out-String)
+            Assert-Contains "and Register-PromptAlias reads the same rule: '$bad'" $refused 'is not a command prefix'
+        }
     }
     finally {
         Remove-Item -LiteralPath $nameBox -Recurse -Force -ErrorAction SilentlyContinue

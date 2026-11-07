@@ -22,7 +22,12 @@
     { "milestone": null, "body": "> GitHub: #12", "type": "Task", "threads": {}, "name": "#12", "by": "design" },
     { "milestone": null, "body": "Card `design/toolkit-studio.md`, D-S13.", "type": "Task", "threads": {}, "name": "Toolkit Studio", "by": "design" },
     { "milestone": null, "body": "Notes go in the design/ folder.", "type": "Task", "threads": {}, "name": "Task", "by": "type" },
-    { "milestone": null, "body": "", "type": "", "threads": {}, "name": "", "by": "" }
+    { "milestone": null, "body": "", "type": "", "threads": {}, "name": "", "by": "" },
+    { "milestone": null, "body": "> GitHub: #123456789", "type": "", "threads": {}, "name": "#123456789", "by": "design" },
+    { "milestone": null, "body": "> GitHub: #1234567890", "type": "", "threads": {}, "name": "", "by": "" },
+    { "milestone": null, "body": "> GitHub: #1234567890", "type": "bug", "threads": {}, "name": "bug", "by": "type" },
+    { "milestone": null, "body": "> GitHub: #", "digits": 5000, "type": "", "threads": {}, "name": "", "by": "" },
+    { "milestone": null, "body": "> GitHub: #\u0663", "type": "", "threads": { "3": "Real thing" }, "name": "", "by": "" }
   ],
   "types": [
     { "content": "# Task 139: Write the docs\n", "id": "139", "type": "Task" },

@@ -150,7 +150,7 @@ describe("consts.json", () => {
     // The Spaces card: every GitHub Space's ledger in one read.
     expect(STUDIO.ledgerRoute).toBe("/api/studio/ledger");
     expect(STUDIO.threadRegex).toBe(
-      String.raw`(?m)^>\s*GitHub:\s*(https://github\.com/([^/\s]+)/([^/\s]+)/issues/(\d+))\s*$`,
+      String.raw`(?m)^>\s*GitHub:\s*(https://github\.com/([^/\s]+)/([^/\s]+)/issues/([0-9]{1,9}))\s*$`,
     );
     expect(toRegExp(STUDIO.noteName).test("board-ideas.md")).toBe(true);
     expect(toRegExp(STUDIO.noteName).test("../hub.json")).toBe(false);
@@ -230,7 +230,7 @@ describe("consts.json", () => {
       ],
       workHeadRegex: "^(?:[A-Za-z]+:\\s+)?(.+?)(?:\\s+--\\s+|:\\s+|$)",
       workThreadRegex:
-        "(?m)^>\\s*GitHub:\\s*<?(?:https://github\\.com/[^/\\s>]+/[^/\\s>]+/issues/|#)(\\d+)",
+        "(?m)^>\\s*GitHub:\\s*<?(?:https://github\\.com/[^/\\s>]+/[^/\\s>]+/issues/|#)([0-9]{1,9})(?![0-9])",
       workDesignRegex: "design/([A-Za-z0-9][A-Za-z0-9_-]*)\\.md",
       workSmallWordRegex: "^[a-z]{1,3}$",
       proseFoldNames: 4,

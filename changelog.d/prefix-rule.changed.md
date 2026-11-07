@@ -1,0 +1,1 @@
+- A `commandPrefix` is a letter, then letters or digits, and `Config` now refuses a dash or an underscore in one. A shell with such a prefix used to register no commands at all, so nothing that worked is lost: it now starts with the shipped `tk` prefix and a warning naming the setting.
