@@ -92,6 +92,31 @@ Push-Location -LiteralPath $promptsRoot -ErrorAction Stop
 try {
     Write-Host "Syncing prompts repo ($promptsRoot)..." -ForegroundColor Cyan
 
+    # A hub in the middle of a rebase, a merge or a cherry-pick is a person's
+    # work in progress. `add -A` would mark every conflict resolved, markers and
+    # all, and the commit and the push would publish them; so nothing is staged,
+    # and the person finishes or abandons it first. git names the state's files
+    # (`rev-parse --git-path`), wherever the repository keeps them.
+    $inProgress = {
+        foreach ($state in @(
+                @{ Path = 'rebase-merge'; Word = 'a rebase' },
+                @{ Path = 'rebase-apply'; Word = 'a rebase' },
+                @{ Path = 'MERGE_HEAD'; Word = 'a merge' },
+                @{ Path = 'CHERRY_PICK_HEAD'; Word = 'a cherry-pick' },
+                @{ Path = 'REVERT_HEAD'; Word = 'a revert' })) {
+            $where = Invoke-P20TrackerRead 'git' @('rev-parse', '--git-path', $state.Path)
+            $at = "$(@($where.Out)[0])".Trim()
+            if ($where.Code -eq 0 -and $at -and (Test-Path -LiteralPath $at)) { return $state.Word }
+        }
+        return ''
+    }
+    $before = & $inProgress
+    if ($before) {
+        Write-CliError -Message "The hub is in the middle of $before, so nothing was synced." `
+            -Hint "Finish it or abort it in a terminal (git status says which), then run Sync again. Nothing was staged, committed or pushed."
+        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+    }
+
     # Auto-commit usage.log (and any other tracked changes) before rebase.
     # Without this, Write-ToolkitLog entries from previous commands leave the
     # working tree dirty, which causes git pull --rebase to fail (exit 128).
@@ -110,9 +135,12 @@ try {
         # user most wants preserved when a runaway tree trips the guard.
         $preStaged = @((Invoke-P20TrackerRead 'git' @('diff', '--cached', '--name-only')).Out)
 
-        $null = Invoke-P20TrackerRead 'git' @('add', '-A')
-        $commit = Invoke-P20TrackerRead 'git' @('commit', '-m', 'auto-commit before sync')
-        if ($commit.Code -ne 0) {
+        $add = Invoke-P20TrackerRead 'git' @('add', '-A')
+        $commit = $null
+        if ($add.Code -eq 0) { $commit = Invoke-P20TrackerRead 'git' @('commit', '-m', 'auto-commit before sync') }
+        if ($add.Code -ne 0 -or $commit.Code -ne 0) {
+            $failed = if ($add.Code -ne 0) { $add } else { $commit }
+            $step = if ($add.Code -ne 0) { 'git add' } else { 'git commit' }
             $null = Invoke-P20TrackerRead 'git' @('reset')
             if ($preStaged.Count -gt 0) {
                 # Re-stage exactly what was staged before, nothing more. -- ends
@@ -120,9 +148,16 @@ try {
                 $null = Invoke-P20TrackerRead 'git' (@('add', '--') + $preStaged)
                 Write-Host "  Restored $($preStaged.Count) previously staged file(s)." -ForegroundColor DarkGray
             }
-            Write-Warning "Pre-commit hook blocked auto-commit - aborting sync to leave repo unchanged."
-            $commit.Lines | ForEach-Object { Write-Host $_ }
-            return
+            $failed.Lines | ForEach-Object { Write-Host $_ }
+            # A failure to commit is a failure, said as one: the browser and a script
+            # read the exit code, and 0 would tell them the hub was synced. A hook is
+            # named only when git named one -- an unset user.email or a lock file is
+            # not a hook.
+            $said = @($failed.Lines | Where-Object { "$_".Trim() })[0]
+            $why = if (($failed.Lines -join ' ') -match '(?i)hook') { "A hook refused the auto-commit" } else { "$step failed" }
+            Write-CliError -Message "$why, so nothing was synced$(if ($said) { ": $said" } else { '.' })" `
+                -Hint "The hub is as it was. Fix what git said, then run Sync again."
+            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
         }
         Write-Host "  Committed pending changes before pull." -ForegroundColor DarkGray
     }
@@ -144,9 +179,18 @@ try {
     $pullCode = $LASTEXITCODE
     $ErrorActionPreference = 'Stop'
     if ($pullCode -ne 0) {
-        $null = Invoke-P20TrackerRead 'git' @('rebase', '--abort')
-        Write-CliError -Message "git pull --rebase failed in '$promptsRoot'; the rebase was aborted and nothing was synced." `
-            -Hint "Resolve the conflict in a terminal, or check the remote, then run Sync again."
+        # Abort only the rebase this pull started: none was running before it (the
+        # check above), so one running now is this pull's.
+        $after = & $inProgress
+        if ($after -eq 'a rebase') {
+            $null = Invoke-P20TrackerRead 'git' @('rebase', '--abort')
+            Write-CliError -Message "git pull --rebase failed in '$promptsRoot'; the rebase was aborted and nothing was synced." `
+                -Hint "Resolve the conflict in a terminal, or check the remote, then run Sync again."
+        }
+        else {
+            Write-CliError -Message "git pull --rebase failed in '$promptsRoot', and nothing was synced." `
+                -Hint "git's own words are above. Check the remote, then run Sync again."
+        }
         exit 2  # stated refusal
     }
 
