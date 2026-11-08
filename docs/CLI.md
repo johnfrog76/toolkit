@@ -105,7 +105,10 @@ on the current branch that is not yet on the project's `defaultBranch` -- the sa
 will target -- and writes each as its own `- {short-hash} {message}` bullet under `Commits:`, oldest
 first. Run it once after the last commit, not once per commit: a hash the card already carries is
 skipped, so re-running adds nothing and the `- (pending)` placeholder goes the moment a real commit
-lands. The card is found from the branch name when you do not name one.
+lands. The card is found from the branch name when you do not name one. A `[commit]` placeholder in a
+review reply takes the **newest** commit the run adds -- in a second review round, the fix, not the
+branch's first commit -- or the hash `-Hash` names. A run that adds nothing leaves the placeholder and
+says so: commit the fix and run it again, or fill it in by hand.
 
 The hub is **not** the code repo -- it need not even be a git repository (`storeSync: none`) -- and
 reading the hub's history here would record the hub's own commits as the work's and report success.
@@ -1191,6 +1194,8 @@ switch to a script and its help, and that suite tells you the wrapper is missing
 | Archiving a name that matches several | `'<name>' matches <n> files in current/.` -- be more specific |
 | Archiving a partial name through the bridge | `'<name>' is not a card in current/; it matches '<file>' only by partial name.` -- pass the ID or the full filename |
 | Hub not found | `Hub not found: '<root>' -- is the drive connected? promptsRoot in config.local.json` -- said once at import, and by every verb that reads the hub |
+| A tracker tool is missing, or will not start | `<tool> is not installed, or not on the PATH, so it was not run.` (code `127`), or `<tool> could not be started: <reason>` (code `126`; a command line longer than the host will start is the usual reason) -- `Invoke-P20TrackerRead`'s answer, and nothing runs. Each verb then says it in its own words instead of reporting a write: `EditItem` and `CloseItem` refuse, exit 2 (`EditItem`'s hint carries the sentence); `NewPR` warns that the issue comment failed and goes on, the pull request made; `MyPRs` names the project that did not answer, with the sentence (Azure DevOps), or refuses, exit 2 (GitHub); `MyWork` and `Dashboard` warn for the read that failed |
+| `MyWork`'s query fails on Azure DevOps | `Azure DevOps did not answer the work item query in <org>: <what az said> <prefix>Env shows the tier.` -- a warning, exit 0, as the GitHub path says its own; never read as `No assigned work items found.` |
 
 Ambiguity is never guessed at.
 

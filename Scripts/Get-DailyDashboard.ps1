@@ -127,9 +127,10 @@ $bel = [char]7
 Write-P20TrackerHeader -Name $cfg.ActiveOrgName -OrgUrl $org
 if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
     foreach ($repoFull in (Get-P20TrackerRepos -OrgUrl $org -Projects $cfg.Projects)) {
-        $runs = gh run list --repo $repoFull --limit 5 `
-            --json 'workflowName,conclusion,status,headBranch,updatedAt,url' 2>$null | ConvertFrom-Json
-        if ($LASTEXITCODE -ne 0) {
+        $runRead = Invoke-P20TrackerRead 'gh' @('run', 'list', '--repo', $repoFull, '--limit', '5', '--json', 'workflowName,conclusion,status,headBranch,updatedAt,url')
+        $runs = $null
+        if ($runRead.Code -eq 0 -and ($runRead.Out -join '').Trim()) { $runs = ($runRead.Out -join "`n") | ConvertFrom-Json }
+        if ($runRead.Code -ne 0) {
             Write-Host "`n  $repoFull -- GitHub did not answer for its runs." -ForegroundColor Yellow
             continue
         }
@@ -167,12 +168,10 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
 $projects = @($cfg.Projects | ForEach-Object { $_.name } | Select-Object -Unique)
 
 foreach ($proj in $projects) {
-    $runs = az pipelines runs list `
-        --org $org `
-        --project $proj `
-        --top 5 `
-        --output json 2>$null | ConvertFrom-Json
-    if ($LASTEXITCODE -ne 0) {
+    $runRead = Invoke-P20TrackerRead 'az' @('pipelines', 'runs', 'list', '--org', $org, '--project', $proj, '--top', '5', '--output', 'json')
+    $runs = $null
+    if ($runRead.Code -eq 0 -and ($runRead.Out -join '').Trim()) { $runs = ($runRead.Out -join "`n") | ConvertFrom-Json }
+    if ($runRead.Code -ne 0) {
         Write-Host "`n  $proj -- did not answer in $org; its pipeline runs are not shown." -ForegroundColor Yellow
         continue
     }

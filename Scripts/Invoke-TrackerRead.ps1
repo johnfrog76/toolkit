@@ -17,6 +17,8 @@
 # Returns @{ Code; Lines; Out; Err }: Lines is stdout and stderr in the order they
 # came, as strings; Out is stdout alone (what to parse as JSON, so a warning on
 # stderr cannot corrupt it); Err is stderr alone. $LASTEXITCODE is left at Code.
+# A tool that is not found is Code 127, one that cannot be started (a command line
+# past what Windows takes, say) Code 126, each with its sentence in Lines and Err.
 # PowerShell 5.1 clean; reads no module state.
 #
 # On Windows a tool can be a .cmd (az is), and then cmd.exe parses the command
@@ -52,8 +54,23 @@ function Invoke-P20TrackerRead {
             return [PSCustomObject]@{ Code = 2; Lines = @($said); Out = @(); Err = @($said) }
         }
     }
+    # A tool that is not there, or that will not start, is a failure with its own
+    # code, never the 0 set just below: a write that never ran must not read as
+    # done. 127 and 126 are the shell's own numbers for the two.
+    if (-not $resolved) {
+        $said = "$Tool is not installed, or not on the PATH, so it was not run."
+        $global:LASTEXITCODE = 127
+        return [PSCustomObject]@{ Code = 127; Lines = @($said); Out = @(); Err = @($said) }
+    }
     $global:LASTEXITCODE = 0
-    $raw = @(& $Tool @Arguments 2>&1)
+    try {
+        $raw = @(& $Tool @Arguments 2>&1)
+    }
+    catch {
+        $said = "$Tool could not be started: $($_.Exception.Message)"
+        $global:LASTEXITCODE = 126
+        return [PSCustomObject]@{ Code = 126; Lines = @($said); Out = @(); Err = @($said) }
+    }
     $code = $LASTEXITCODE
     $out = @()
     $err = @()
