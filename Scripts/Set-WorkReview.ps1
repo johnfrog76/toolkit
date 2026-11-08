@@ -180,7 +180,7 @@ $storeSync = 'none'
 if ($global:P20Config -and $global:P20Config.StoreSync) { $storeSync = [string]$global:P20Config.StoreSync }
 $sourceTracked = $false
 if ($storeSync -eq 'git') {
-    Push-Location $promptsRoot
+    Push-Location -LiteralPath $promptsRoot
     try {
         $listed = Invoke-P20TrackerRead 'git' @('ls-files', '--', $sourceRel)
         $sourceTracked = ($listed.Code -eq 0) -and (@($listed.Lines | Where-Object { $_ }).Count -gt 0)
@@ -218,7 +218,7 @@ if ($paths.Count -eq 0) {
     exit 0
 }
 $gitFailure = $null
-Push-Location $promptsRoot
+Push-Location -LiteralPath $promptsRoot
 try {
     $add = Invoke-P20TrackerRead 'git' (@('add', '-A', '--') + $paths)
     if ($add.Code -ne 0) {

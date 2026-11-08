@@ -178,7 +178,7 @@ $writeInPlay = {
     Write-Host "`n$($inPlay.Line)" -ForegroundColor $colour
 }
 
-if (-not (Test-Path $currentDir)) {
+if (-not (Test-Path -LiteralPath $currentDir)) {
     & $writeInPlay 0
     if ($backlogNames.Count -gt 0) {
         Write-Host "`nNo active prompts in current/." -ForegroundColor Yellow
@@ -192,7 +192,7 @@ if (-not (Test-Path $currentDir)) {
 
 # Not sorted here -- there is exactly one ordering point, below, and a first
 # sort whose result the second one discards was the whole bug.
-$files = Get-ChildItem -Path $currentDir -File |
+$files = Get-ChildItem -LiteralPath $currentDir -File |
 Where-Object { $_.Name -notlike '.*' }
 if ($files.Count -eq 0) {
     & $writeInPlay 0
@@ -245,7 +245,7 @@ $unquoteGitPath = {
     return $utf8.GetString($bytes.ToArray())
 }
 $cardDays = New-Object 'System.Collections.Generic.Dictionary[string,string]' ([System.StringComparer]::Ordinal)
-Push-Location $currentDir
+Push-Location -LiteralPath $currentDir
 try {
     $gitLog = Invoke-P20TrackerRead 'git' @('-c', 'core.quotepath=on', 'log', '--format=@@%at', '--name-only', '--relative', '--', '.')
     if ($gitLog.Code -eq 0) {
@@ -267,7 +267,7 @@ finally { Pop-Location }
 
 $rows = @()
 foreach ($file in $files) {
-    $content = Get-Content $file.FullName -Raw -ErrorAction SilentlyContinue -Encoding UTF8
+    $content = Get-Content -LiteralPath $file.FullName -Raw -ErrorAction SilentlyContinue -Encoding UTF8
     if (-not $content) { $content = '' }
 
     # Title from first H1

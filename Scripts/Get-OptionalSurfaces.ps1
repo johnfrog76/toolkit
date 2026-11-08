@@ -117,11 +117,11 @@ function Get-P20ModuleSurfaces {
 
     $found = @{}
     $configDir = Join-Path $PackageRoot 'Config'
-    if (Test-Path $configDir) {
-        foreach ($psd1 in (Get-ChildItem $configDir -Filter '*.commands.psd1' -File -ErrorAction SilentlyContinue)) {
+    if (Test-Path -LiteralPath $configDir) {
+        foreach ($psd1 in (Get-ChildItem -LiteralPath $configDir -Filter '*.commands.psd1' -File -ErrorAction SilentlyContinue)) {
             # Import-PowerShellDataFile and nothing else, the same reader the
             # module loader uses: a data file in Config/ must never run code.
-            try { $data = Import-PowerShellDataFile -Path $psd1.FullName -ErrorAction Stop }
+            try { $data = Import-PowerShellDataFile -LiteralPath $psd1.FullName -ErrorAction Stop }
             catch { continue }
             if ($data -and $data.Feature) { $found[[string]$data.Feature] = $true }
         }
@@ -139,7 +139,7 @@ function Get-P20ModuleSurfaces {
         # for the others; without this the report said "specified, not built"
         # about a module that was on the screen.
         $webModule = Join-Path (Join-Path (Join-Path (Join-Path $PackageRoot 'web') 'src') 'modules') $name
-        if (Test-Path (Join-Path $webModule 'index.tsx')) {
+        if (Test-Path -LiteralPath (Join-Path $webModule 'index.tsx')) {
             $rows += @{ Feature = $name; Built = $true; WebOnly = $true }
             continue
         }

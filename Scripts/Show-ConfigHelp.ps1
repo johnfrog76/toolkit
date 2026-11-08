@@ -39,9 +39,9 @@ function Get-P20HelpPorts {
     $agentPort = 4100
     foreach ($name in @('config.default.json', 'config.local.json')) {
         $path = Join-Path $RepoRoot $name
-        if (-not (Test-Path $path)) { continue }
+        if (-not (Test-Path -LiteralPath $path)) { continue }
         try {
-            $cfg = Get-Content $path -Raw -Encoding UTF8 | ConvertFrom-Json
+            $cfg = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
             if ($cfg.web -and $cfg.web.agentPort) { $agentPort = [int]$cfg.web.agentPort }
         }
         catch { if ($name -eq 'config.local.json') { $null = Write-P20ConfigParseWarning -Path $path -Message $_.Exception.Message } }
@@ -49,8 +49,8 @@ function Get-P20HelpPorts {
 
     $devPort = 5174
     $viteConfig = Join-Path $RepoRoot 'web/vite.config.ts'
-    if (Test-Path $viteConfig) {
-        $m = [regex]::Match((Get-Content $viteConfig -Raw -ErrorAction SilentlyContinue -Encoding UTF8), 'port:\s*(\d+)')
+    if (Test-Path -LiteralPath $viteConfig) {
+        $m = [regex]::Match((Get-Content -LiteralPath $viteConfig -Raw -ErrorAction SilentlyContinue -Encoding UTF8), 'port:\s*(\d+)')
         if ($m.Success) { $devPort = [int]$m.Groups[1].Value }
     }
 
@@ -79,8 +79,8 @@ function Show-P20ConfigHelp {
 
     $meta = $null
     $path = Join-Path $RepoRoot 'config.default.json'
-    if (Test-Path $path) {
-        try { $meta = (Get-Content $path -Raw -Encoding UTF8 | ConvertFrom-Json).commands.$CommandName } catch { $meta = $null }
+    if (Test-Path -LiteralPath $path) {
+        try { $meta = (Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json).commands.$CommandName } catch { $meta = $null }
     }
     $ports = Get-P20HelpPorts -RepoRoot $RepoRoot
 

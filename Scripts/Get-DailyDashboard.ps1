@@ -40,8 +40,8 @@ if ($tier -ge 2) {
     Write-Host "  == Active Prompts =="  -ForegroundColor Magenta
     $folders = Get-PromptFolders
     $currentDir = $folders.Current
-    if (Test-Path $currentDir) {
-        $prompts = Get-ChildItem -Path $currentDir -File | Sort-Object LastWriteTime -Descending
+    if (Test-Path -LiteralPath $currentDir) {
+        $prompts = Get-ChildItem -LiteralPath $currentDir -File | Sort-Object LastWriteTime -Descending
         if ($prompts.Count -eq 0) {
             Write-Host "  (none)" -ForegroundColor DarkGray
         } else {
@@ -60,7 +60,7 @@ if ($tier -ge 2) {
     # Repo status
     Write-Host ""
     Write-Host "  == Repo Status ==" -ForegroundColor Magenta
-    Push-Location $cfg.PromptsRoot
+    Push-Location -LiteralPath $cfg.PromptsRoot
     try {
         # %at on this machine's clock, not %ai in the author's zone
         $lastLog = (Invoke-P20TrackerRead 'git' @('log', '-1', '--format=%at%x09%an')).Out

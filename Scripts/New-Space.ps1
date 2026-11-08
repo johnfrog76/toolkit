@@ -211,7 +211,7 @@ if ($global:P20Config -and $global:P20Config.Spaces) {
     $hubRoot = [string]$global:P20Config.PromptsRoot
 }
 else {
-    $defaultCfg = ConvertTo-P20SpaceKeys (Get-Content (Join-Path $packageRoot 'config.default.json') -Raw -Encoding UTF8 | ConvertFrom-Json)
+    $defaultCfg = ConvertTo-P20SpaceKeys (Get-Content -LiteralPath (Join-Path $packageRoot 'config.default.json') -Raw -Encoding UTF8 | ConvertFrom-Json)
     $spaces = @($defaultCfg.spaces)
     $hubRoot = Get-P20PromptsRoot -PackageRoot $packageRoot
     if ($hubRoot -and (Test-P20HubRoot $hubRoot)) {

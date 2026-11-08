@@ -183,7 +183,7 @@ else {
 
 # ── config.local.json ────────────────────────────────────────────────────────
 $localConfigPath = Join-Path $toolkitFolder 'config.local.json'
-if (Test-Path $localConfigPath) {
+if (Test-Path -LiteralPath $localConfigPath) {
     Write-ReportOk "config.local.json exists"
     if (-not (Get-Command Read-P20LocalConfigJson -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Write-ConfigParseWarning.ps1') }
     $localCfg = Read-P20LocalConfigJson -Path $localConfigPath
@@ -215,7 +215,7 @@ else {
 }
 
 # ── PromptsRoot ──────────────────────────────────────────────────────────────
-if ($cfg.PromptsRoot -and (Test-Path $cfg.PromptsRoot)) {
+if ($cfg.PromptsRoot -and (Test-Path -LiteralPath $cfg.PromptsRoot)) {
     Write-ReportOk "PromptsRoot: $($cfg.PromptsRoot)"
 }
 elseif ($cfg.PromptsRoot) {
@@ -243,8 +243,8 @@ else {
 # next time Config or Sync writes it. Never a failure -- a note, so a machine can
 # say which of its files has not been written since the rename.
 foreach ($spelledFile in @($localConfigPath, $cfg.HubManifestPath)) {
-    if (-not $spelledFile -or -not (Test-Path $spelledFile)) { continue }
-    $spelledRaw = Get-Content $spelledFile -Raw -ErrorAction SilentlyContinue -Encoding UTF8
+    if (-not $spelledFile -or -not (Test-Path -LiteralPath $spelledFile)) { continue }
+    $spelledRaw = Get-Content -LiteralPath $spelledFile -Raw -ErrorAction SilentlyContinue -Encoding UTF8
     if ($spelledRaw -match '"(orgs|activeOrg)"\s*:') {
         Write-ReportNote "$(Split-Path -Leaf $spelledFile) still says orgs/activeOrg -- read the same; written as spaces/activeSpace the next time $(Get-CliPrefix)Config or $(Get-CliPrefix)Sync writes it"
     }
@@ -297,8 +297,8 @@ foreach ($shim in $shims) {
 $profileImports = $false
 $profileOther = ''
 foreach ($profilePath in @($PROFILE)) {
-    if ($profilePath -and (Test-Path $profilePath)) {
-        $profileText = Get-Content $profilePath -Raw -Encoding UTF8
+    if ($profilePath -and (Test-Path -LiteralPath $profilePath)) {
+        $profileText = Get-Content -LiteralPath $profilePath -Raw -Encoding UTF8
         foreach ($hit in [regex]::Matches($profileText, '[^\s''"]*utilities\.psm1')) {
             if ((ConvertTo-ComparablePath $hit.Value) -eq $thisModule) { $profileImports = $true }
             elseif (-not $profileOther) { $profileOther = $hit.Value }
@@ -324,7 +324,7 @@ if ($profileOther) {
 # The assistant's copy of AGENTS.md: generated per machine, outside the tree, so
 # only the machine can say it is behind. Silent when no copy was ever generated.
 $agentDocs = Join-Path $PSScriptRoot 'Update-AgentDocs.ps1'
-if (Test-Path $agentDocs) {
+if (Test-Path -LiteralPath $agentDocs) {
     $agentDocsOut = & $agentDocs -Check 6>&1 | Out-String
     if ($LASTEXITCODE -eq 1) {
         Write-ReportWarn "the agent guidance on this machine is behind AGENTS.md - run 'pwsh ./Scripts/Update-AgentDocs.ps1'"
@@ -375,7 +375,7 @@ $missingTemplates = @()
 $typeTable = Get-P20WorkItemTypes -Config $cfg
 foreach ($typeName in $typeTable.Keys) {
     $tpl = $typeTable[$typeName].Template
-    if ($tpl -and -not (Test-Path (Join-Path $templatesDir $tpl))) { $missingTemplates += "$typeName ($tpl)" }
+    if ($tpl -and -not (Test-Path -LiteralPath (Join-Path $templatesDir $tpl))) { $missingTemplates += "$typeName ($tpl)" }
 }
 if ($missingTemplates.Count -gt 0) {
     Write-ReportFail "card template(s) missing from $templatesDir -- $($missingTemplates -join ', '); '$(Get-CliPrefix)NewPrompt' cannot scaffold that type"
@@ -395,7 +395,7 @@ if ($logDirForCheck) {
         $logWritable = $true
     }
     catch { $logWritable = $false }
-    finally { Remove-Item $logProbe -Force -ErrorAction SilentlyContinue }
+    finally { Remove-Item -LiteralPath $logProbe -Force -ErrorAction SilentlyContinue }
     if ($logWritable) { Write-ReportOk "log path writable: $logDirForCheck" }
     else { Write-ReportFail "log path is not writable: $logDirForCheck -- every verb records itself there ('$(Get-CliPrefix)Log'); P20_USAGE_LOG_DIR moves it" }
 }

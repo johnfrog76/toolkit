@@ -107,10 +107,10 @@ $cfgLocal = Join-Path $pkgRoot 'config.local.json'
 $defaults = $null; $local = $null
 # -Encoding UTF8: Windows PowerShell 5.1 reads the machine's code page by default,
 # and the shipped file is UTF-8 with no BOM -- a type's label is free text.
-if (Test-Path $cfgDefault) { $defaults = Get-Content -LiteralPath $cfgDefault -Raw -Encoding UTF8 | ConvertFrom-Json }
+if (Test-Path -LiteralPath $cfgDefault) { $defaults = Get-Content -LiteralPath $cfgDefault -Raw -Encoding UTF8 | ConvertFrom-Json }
 if (-not (Get-Command Read-P20LocalConfigJson -ErrorAction SilentlyContinue)) { . (Join-Path $pkgRoot 'Scripts/Write-ConfigParseWarning.ps1') }
 $local = Read-P20LocalConfigJson -Path $cfgLocal
-if (-not $PromptsRoot -or -not (Test-Path $PromptsRoot)) {
+if (-not $PromptsRoot -or -not (Test-Path -LiteralPath $PromptsRoot)) {
     # Stated on stderr and exit 2: the agent puts the sentence in the response's
     # `error`, and Daily shows it. It used to `return` with exit 0, so a missing
     # hub and a quiet week were the same answer.
@@ -636,7 +636,7 @@ try {
     $deletedIds = @()
     foreach ($entry in $itemInfo.GetEnumerator()) {
         $fn = $entry.Value.FileName
-        if (-not (Test-Path "${pfx}current/$fn") -and -not (Test-Path "${pfx}archive/$fn")) {
+        if (-not (Test-Path -LiteralPath "${pfx}current/$fn") -and -not (Test-Path -LiteralPath "${pfx}archive/$fn")) {
             $deletedIds += $entry.Key
         }
         # Safety net: a file live in current/ cannot be resolved. The parse loop
@@ -644,7 +644,7 @@ try {
         # but guard the invariant here so any stale ResolvedDate can't drop a live
         # item from carry-forward (line ~463). Truly resolved items live in
         # archive/, never current/, so this cannot re-activate a closed item.
-        elseif ($entry.Value.ResolvedDate -and (Test-Path "${pfx}current/$fn")) {
+        elseif ($entry.Value.ResolvedDate -and (Test-Path -LiteralPath "${pfx}current/$fn")) {
             $entry.Value.ResolvedDate = $null
         }
     }

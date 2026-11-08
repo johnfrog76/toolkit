@@ -698,6 +698,70 @@ catch {
 }
 finally { if (Test-Path $fBase) { Remove-Item -Path $fBase -Recurse -Force -ErrorAction SilentlyContinue } }
 
+# -- A hub under a folder whose name holds [ and ] ----------------------------
+# "Work [old]" is a folder name. Handed to a cmdlet as -Path it is a wildcard
+# pattern that matches nothing: hub.json reads as absent (the Space is unknown),
+# Status finds no folder, Archive cannot move. TYPED as the verbs, in a fresh
+# shell that imports this package alone, against a hub inside such a folder.
+
+Write-Host ""
+Write-Host "-- A hub under a bracketed folder, typed as the verbs ---" -ForegroundColor Cyan
+
+$bBase = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-np-bracket-" + [System.Guid]::NewGuid().Guid.Substring(0, 8))
+try {
+    $utf8 = New-Object System.Text.UTF8Encoding($false)
+    $bHub = Join-Path (Join-Path $bBase 'Work [old]') 'hub'
+    $bLog = Join-Path $bBase 'log'
+    foreach ($d in @($bLog, (Join-Path $bHub 'solo/current'), (Join-Path $bHub 'solo/backlog'), (Join-Path $bHub 'solo/archive'))) {
+        [void][System.IO.Directory]::CreateDirectory($d)
+    }
+    [System.IO.File]::WriteAllText((Join-Path $bHub 'hub.json'), (@'
+{
+  "hub": 1,
+  "spaces": [
+    { "slug": "solo", "name": "Solo Bracket", "status": "local", "promptsFolder": "solo", "org": "" }
+  ]
+}
+'@), $utf8)
+    $bPrefix = (Get-Content -LiteralPath (Join-Path $pkgRoot 'config.default.json') -Raw -Encoding UTF8 | ConvertFrom-Json).commandPrefix
+    function Invoke-BracketVerb {
+        param([string]$Commands)
+        $ErrorActionPreference = 'Continue'
+        $q = { param([string]$s) $s -replace "'", "''" }
+        $pre = "`$env:PSModulePath = '$(& $q $pkgRoot)'; `$env:PROMPTS_ROOT = '$(& $q $bHub)'; `$env:P20_ACTIVE_SPACE = 'solo'; " +
+            "`$env:P20_USAGE_LOG_DIR = '$(& $q $bLog)'; Set-Location -LiteralPath '$(& $q $bBase)'; " +
+            "Import-Module '$(& $q $pkgRoot)/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; "
+        return ((Invoke-P20TestHost -NonInteractive -Command ($pre + $Commands + "; 'EXIT=' + `$LASTEXITCODE") | ForEach-Object { "$_" }) -join "`n")
+    }
+
+    $out = Invoke-BracketVerb "${bPrefix}NewPrompt -Now -Title 'Inside brackets' -Type Bug"
+    $bCard = @(Get-ChildItem -LiteralPath (Join-Path $bHub 'solo/current') -Filter '*inside-brackets.prompt.md' -File -ErrorAction SilentlyContinue)
+    Assert-True 'in a bracketed hub, NewPrompt -Title writes the card into the Space hub.json declares' ($out -match 'EXIT=0' -and $bCard.Count -eq 1) $out
+    $bId = if ($bCard.Count -eq 1) { [regex]::Match($bCard[0].Name, '^([A-Z0-9]{4})-').Groups[1].Value } else { '' }
+    if ($bCard.Count -eq 1) { [System.IO.File]::AppendAllText($bCard[0].FullName, "`nA day of notes.`n", $utf8) }
+    $bHeld = if ($bCard.Count -eq 1) { [System.IO.File]::ReadAllText($bCard[0].FullName) } else { '' }
+
+    $out = Invoke-BracketVerb "${bPrefix}Env"
+    Assert-True 'Env reads the hub.json there: hub.json read, and the Space it declares named' ($out -match 'hub\.json\s+read, 1 Space declared' -and $out -match 'solo \(Solo Bracket\)') $out
+
+    $out = Invoke-BracketVerb "${bPrefix}Status"
+    Assert-True 'Status lists the card in current/' ($bId -and $out -match [regex]::Escape($bId) -and $out -match 'EXIT=0' -and $out -notmatch 'not found') $out
+
+    $out = Invoke-BracketVerb "${bPrefix}NewPrompt $bId -Title 'Inside brackets' -Type Bug"
+    Assert-True 'NewPrompt <id> returns the card already there, exit 0' ($out -match 'EXIT=0' -and $out -match "already in") $out
+    Assert-True 'and does not write over it' ($bCard.Count -eq 1 -and [System.IO.File]::ReadAllText($bCard[0].FullName) -ceq $bHeld) $out
+
+    $out = Invoke-BracketVerb "${bPrefix}Archive $bId"
+    $bArchived = @(Get-ChildItem -LiteralPath (Join-Path $bHub 'solo/archive') -Filter '*inside-brackets.prompt.md' -File -ErrorAction SilentlyContinue)
+    Assert-True 'Archive <id> moves the card from current/ to archive/' (
+        $out -match 'EXIT=0' -and $bArchived.Count -eq 1 -and @(Get-ChildItem -LiteralPath (Join-Path $bHub 'solo/current') -File).Count -eq 0) $out
+    Assert-True 'and the archived card is the one that was written, notes and all' ($bArchived.Count -eq 1 -and [System.IO.File]::ReadAllText($bArchived[0].FullName) -match 'A day of notes') $out
+}
+catch {
+    Assert-True 'the bracketed-hub cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally { if (Test-Path -LiteralPath $bBase) { Remove-Item -LiteralPath $bBase -Recurse -Force -ErrorAction SilentlyContinue } }
+
 # -- A new card on an Azure DevOps Space starts in play -----------------------
 # The team's backlog lives in Azure DevOps and that Space's board draws no Backlog
 # lane (issue #178), so NewPrompt writes current/. TYPED as the verb, in a fresh

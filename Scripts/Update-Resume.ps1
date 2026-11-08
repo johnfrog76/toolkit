@@ -62,11 +62,11 @@ $promptsRoot = Get-P20PromptsRoot -PackageRoot $repoRoot
 $resumeFolder = (Get-P20HubFolderNames -PromptsRoot $promptsRoot -PackageRoot $repoRoot)['resume']
 $resumePathspec = "${resumeFolder}/"
 if ($Preview) {
-    if (-not $promptsRoot -or -not (Test-Path $promptsRoot)) {
+    if (-not $promptsRoot -or -not (Test-Path -LiteralPath $promptsRoot)) {
         @{ error = "the prompt store is not configured" } | ConvertTo-Json -Compress
         exit 0
     }
-    Push-Location $promptsRoot
+    Push-Location -LiteralPath $promptsRoot
     try {
         # --untracked-files=all, not the default: the default reports a brand
         # new folder as one entry ending in '/', and a folder is not a file --
@@ -84,8 +84,8 @@ if ($Preview) {
             }
             foreach ($rel in $changedPaths) {
                 $full = Join-Path $promptsRoot $rel
-                if (Test-Path $full -PathType Leaf) {
-                    $content = Get-Content $full -Raw -Encoding UTF8
+                if (Test-Path -LiteralPath $full -PathType Leaf) {
+                    $content = Get-Content -LiteralPath $full -Raw -Encoding UTF8
                     if ($null -eq $content) { $content = '' }
                     $files += @{ file = $rel; content = $content }
                 }
@@ -99,20 +99,20 @@ if ($Preview) {
     exit 0
 }
 
-if (-not $promptsRoot -or -not (Test-Path $promptsRoot)) {
+if (-not $promptsRoot -or -not (Test-Path -LiteralPath $promptsRoot)) {
     Write-Host "Error: the prompt store is not configured or does not exist: '$promptsRoot'" -ForegroundColor Red
     Write-Host "Hint:  set promptsRoot in config.local.json." -ForegroundColor Yellow
     exit 1
 }
 
 $resumePath = Join-Path (Join-Path $promptsRoot $resumeFolder) 'resume.md'
-if (-not (Test-Path $resumePath)) {
+if (-not (Test-Path -LiteralPath $resumePath)) {
     Write-Host "Error: there is no $resumeFolder/resume.md at '$resumePath'." -ForegroundColor Red
     Write-Host "Hint:  the hub owns this file -- create it and it will be picked up." -ForegroundColor Yellow
     exit 1
 }
 
-Push-Location $promptsRoot
+Push-Location -LiteralPath $promptsRoot
 try {
     $status = (Invoke-P20TrackerRead 'git' @('status', '--porcelain', '--', $resumePathspec)).Lines
     if ([string]::IsNullOrWhiteSpace($status)) {

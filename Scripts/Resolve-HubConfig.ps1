@@ -354,9 +354,9 @@ function Get-P20PromptsRoot {
         # Same order the module merges in: the shipped file, then this machine's.
         foreach ($name in @('config.default.json', 'config.local.json')) {
             $path = Join-Path $PackageRoot $name
-            if (-not (Test-Path $path)) { continue }
+            if (-not (Test-Path -LiteralPath $path)) { continue }
             try {
-                $cfg = Get-Content $path -Raw -Encoding UTF8 | ConvertFrom-Json
+                $cfg = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
                 if ($cfg -and $cfg.promptsRoot) { $configured = [string]$cfg.promptsRoot }
             }
             catch { if ($name -eq 'config.local.json') { $null = Write-P20ConfigParseWarning -Path $path -Message $_.Exception.Message } }
@@ -567,11 +567,11 @@ function Read-P20HubManifest {
     if (-not (Test-P20HubRoot $Root)) { return $result }
     $path = Join-Path $Root (Get-P20HubManifestName)
     $result.Path = $path
-    if (-not (Test-Path $path -PathType Leaf)) { return $result }
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $result }
 
     $data = $null
     try {
-        $data = Get-Content $path -Raw -ErrorAction Stop -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+        $data = Get-Content -LiteralPath $path -Raw -ErrorAction Stop -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
     }
     catch {
         Write-P20HubWarning "$path`: not valid JSON ($($_.Exception.Message)) -- the hub declared nothing. Fix the file or delete it."

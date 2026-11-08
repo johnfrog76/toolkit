@@ -67,7 +67,7 @@ $cfg = $global:P20Config
 $promptsFolder = ''
 if ($cfg -and $cfg.PromptsFolder) { $promptsFolder = $cfg.PromptsFolder }
 
-if (-not $promptsRoot -or -not (Test-Path $promptsRoot)) {
+if (-not $promptsRoot -or -not (Test-Path -LiteralPath $promptsRoot)) {
     Write-CliError -Message "the prompt store is not configured or does not exist: '$promptsRoot'" -Hint 'set promptsRoot in config.local.json.'
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
@@ -83,6 +83,35 @@ New-Item -ItemType Directory -Force -Path $prCommentsDir | Out-Null
 $date = (Get-Date).ToString('yyyy-MM-dd')
 $recordFile = Join-Path $prCommentsDir "reviewed-$date-PR$PullRequestId.md"
 
+$recordName = "pr-comments/reviewed-$date-PR$PullRequestId.md"
+. (Join-Path $PSScriptRoot 'Write-CardText.ps1')
+
+# One record per PR per day, and nothing overwrites it: a second log the same day
+# ADDS to the record that is there -- its notes, and a title the first one did
+# not have -- rather than replacing the first one's notes. The year-end review
+# counts these files, so a second file for the same review would count it twice.
+if (Test-Path -LiteralPath $recordFile -PathType Leaf) {
+    try { $existing = [System.IO.File]::ReadAllText($recordFile) }
+    catch {
+        Write-CliError -Message "the peer review already logged today could not be read, so nothing was written: $recordName ($($_.Exception.Message))" -Hint 'check the file is readable, then log the review again.'
+        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+    }
+    $added = @()
+    if ($Title -and $existing -notmatch '(?m)^# Reviewed PR \d+ - ') { $added += "Title: $Title" }
+    if ($Notes) { $added += "Notes: $Notes" }
+    if ($added.Count -eq 0) {
+        Write-Host "Already logged today, and kept as it is: $recordName" -ForegroundColor Yellow
+        exit 0
+    }
+    $text = $existing
+    if ($text.Length -gt 0 -and -not $text.EndsWith("`n")) { $text += "`n" }
+    $text += ($added -join "`n") + "`n"
+    # An edit, not a create: no -New, so the record keeps the line ending it has.
+    Write-CardText -Path $recordFile -Content $text
+    Write-Host "Added to the peer review already logged today: $recordName" -ForegroundColor Green
+    exit 0
+}
+
 $heading = "# Reviewed PR $PullRequestId"
 if ($Title) { $heading = "$heading - $Title" }
 $lines = @($heading, "", "Date: $date")
@@ -90,8 +119,7 @@ if ($Notes) { $lines += "Notes: $Notes" }
 $body = ($lines -join "`n") + "`n"
 
 # The one writer, and -New because this CREATES the record: UTF-8 no BOM, LF.
-. (Join-Path $PSScriptRoot 'Write-CardText.ps1')
 Write-CardText -Path $recordFile -Content $body -New
 
-Write-Host "Logged peer review: pr-comments/reviewed-$date-PR$PullRequestId.md" -ForegroundColor Green
+Write-Host "Logged peer review: $recordName" -ForegroundColor Green
 exit 0

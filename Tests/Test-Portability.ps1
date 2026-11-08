@@ -49,6 +49,9 @@ if ($Help) {
             and every request -Body is UTF-8 bytes from ConvertTo-P20Utf8Body
   Clause 19 Every Get-Content in shipped PowerShell names its -Encoding: 5.1 reads a
             file with no BOM as ANSI, and every file the package reads is UTF-8
+  Clause 20 Every path a cmdlet resolves in shipped PowerShell is handed over as
+            -LiteralPath, unless it is a constant: -Path reads a folder named
+            "Work [old]" as a wildcard pattern that matches nothing
 
   Scope: all three halves -- *.psm1 at the root, Scripts/, Prompt20Toolkit/,
   web/src, web/tests and agent/ -- plus root JSON and Markdown, and Tests/
@@ -1600,6 +1603,68 @@ foreach ($case in @(
     )) {
     $caseHits = @(Get-BareGetContentHits -Text $case.Body).Count
     Assert-True "Clause 19: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
+}
+
+# -- Clause 20: a path the package computes is read literally -----------------
+# -Path is a wildcard pattern. A hub, a package or a home folder whose name holds
+# [ or ] -- "Work [old]" -- is then a pattern that matches nothing: Test-Path says
+# false of a card that is there, Get-ChildItem lists no cards, Move-Item throws,
+# and a writer that asked "is there a file?" first writes over it. Every path in
+# Scripts/ is computed from configuration or a card, never a pattern a person
+# typed, so every cmdlet that resolves one is handed it as -LiteralPath. The bind
+# is PowerShell's own (StaticParameterBinder), so a positional path counts and an
+# alias resolves; a constant path, and a provider path such as env:, cannot hold
+# a stranger's bracket and are left alone. A real wildcard enumerates instead:
+# Get-ChildItem -LiteralPath <folder> -Filter <pattern>.
+$literalResolving = @('Test-Path', 'Get-Content', 'Get-ChildItem', 'Get-Item', 'Resolve-Path', 'Convert-Path',
+    'Import-PowerShellDataFile', 'Set-Content', 'Add-Content', 'Clear-Content', 'Copy-Item', 'Move-Item', 'Rename-Item',
+    'Remove-Item', 'Set-Location', 'Push-Location', 'Out-File', 'Get-FileHash', 'Select-String', 'Get-ItemProperty', 'Invoke-Item')
+function Get-NonLiteralPathHits {
+    param([string]$Text, [string]$Name = 'body')
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$null, [ref]$null)
+    $hits = @()
+    foreach ($c in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)) {
+        $cn = $c.GetCommandName()
+        if (-not $cn) { continue }
+        $cmd = Get-Command $cn -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($cmd -and $cmd.CommandType -eq 'Alias') { $cmd = $cmd.ResolvedCommand }
+        if (-not $cmd -or $literalResolving -notcontains $cmd.Name) { continue }
+        $bound = [System.Management.Automation.Language.StaticParameterBinder]::BindCommand($c, $true).BoundParameters
+        if ($bound.ContainsKey('LiteralPath')) { continue }
+        $key = @('Path', 'FilePath') | Where-Object { $bound.ContainsKey($_) } | Select-Object -First 1
+        if (-not $key) { continue }
+        $value = $bound[$key].Value
+        if ($value -is [System.Management.Automation.Language.StringConstantExpressionAst]) { continue }
+        if ($value -is [System.Management.Automation.Language.ExpandableStringExpressionAst] -and
+            $value.Value -match '^(?i:env|function|variable|alias):') { continue }
+        $hits += "${Name}:$($c.Extent.StartLineNumber) $(($c.Extent.Text -replace '\s+', ' '))"
+    }
+    return $hits
+}
+
+$litHits = @()
+foreach ($f in $gcFiles) {
+    $litHits += @(Get-NonLiteralPathHits -Text ([System.IO.File]::ReadAllText($f.FullName)) -Name $f.Name)
+}
+Assert-True "Clause 20: every computed path in shipped PowerShell is handed over as -LiteralPath ($($gcFiles.Count) files)" (
+    ($litHits.Count -eq 0) -and ($gcFiles.Count -ge 80)) ($litHits -join '; ')
+foreach ($case in @(
+        @{ Hit = $true;  Why = 'a positional variable path'; Body = 'if (Test-Path $card) { }' },
+        @{ Hit = $true;  Why = 'a named -Path'; Body = '$c = Get-Content -Path $card -Raw -Encoding UTF8' },
+        @{ Hit = $true;  Why = 'a path built by Join-Path'; Body = 'Get-ChildItem (Join-Path $hub ''current'') -Filter ''*.md''' },
+        @{ Hit = $true;  Why = 'an expandable string holding a folder'; Body = 'Move-Item "$current/$name" $dest' },
+        @{ Hit = $true;  Why = 'an alias'; Body = 'del $pidFile -Force' },
+        @{ Hit = $true;  Why = 'Out-File''s -FilePath'; Body = '$x | Out-File $log' },
+        @{ Hit = $true;  Why = 'a wildcard built on a computed folder'; Body = 'Copy-Item (Join-Path $Source ''*'') $Destination -Recurse' },
+        @{ Hit = $false; Why = 'a -LiteralPath'; Body = 'if (Test-Path -LiteralPath $card) { }' },
+        @{ Hit = $false; Why = 'the -LP alias of -LiteralPath'; Body = 'Remove-Item -LP $pidFile -Force' },
+        @{ Hit = $false; Why = 'a constant path'; Body = 'Test-Path ''./config.local.json''' },
+        @{ Hit = $false; Why = 'a provider path'; Body = 'if (Test-Path "env:$name") { }' },
+        @{ Hit = $false; Why = 'the words in a string'; Body = '$hint = "Test-Path $card"' },
+        @{ Hit = $false; Why = 'a path cmdlet that does not resolve one'; Body = '$p = Join-Path $hub ''current''; New-Item -ItemType Directory -Path $p -Force' }
+    )) {
+    $caseHits = @(Get-NonLiteralPathHits -Text $case.Body).Count
+    Assert-True "Clause 20: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
 }
 
 # ── The scan exclusions are relative to the package root ─────────────────────

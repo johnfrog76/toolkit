@@ -42,7 +42,7 @@ $toolkitDir = Split-Path $here -Parent
 $utilities  = Join-Path $toolkitDir 'utilities.psm1'
 $configPath = Join-Path $toolkitDir 'config.default.json'
 
-if (-not (Test-Path $utilities)) {
+if (-not (Test-Path -LiteralPath $utilities)) {
     throw "Cannot find utilities.psm1 (expected at $utilities)"
 }
 
@@ -121,7 +121,7 @@ if (-not $content.EndsWith("`n")) { $content += "`n" }
 # A refresh that changes nothing must touch nothing: compare the bytes on disk
 # first, so a no-op install leaves the tree exactly as clean as it found it.
 # ShouldProcess runs first so -WhatIf still reports the operation it would perform.
-$existing = if (Test-Path $manifestPath) { [System.IO.File]::ReadAllText($manifestPath) } else { $null }
+$existing = if (Test-Path -LiteralPath $manifestPath) { [System.IO.File]::ReadAllText($manifestPath) } else { $null }
 if ($PSCmdlet.ShouldProcess($manifestPath, 'write manifest')) {
     if ($existing -eq $content) {
         Write-Host "[OK] Manifest already current: $manifestPath" -ForegroundColor Green

@@ -120,8 +120,8 @@ foreach ($dotEnvPath in @(
     (Join-Path $toolkitRoot '.env')
 )) {
     if ($dotEnvSkip) { break }
-    if (-not (Test-Path $dotEnvPath)) { continue }
-    Get-Content $dotEnvPath -Encoding UTF8 | Where-Object { $_ -match '^\s*[^#]\S+=.+' } | ForEach-Object {
+    if (-not (Test-Path -LiteralPath $dotEnvPath)) { continue }
+    Get-Content -LiteralPath $dotEnvPath -Encoding UTF8 | Where-Object { $_ -match '^\s*[^#]\S+=.+' } | ForEach-Object {
         $parts = $_ -split '=', 2
         $key   = $parts[0].Trim()
         $value = $parts[1].Trim().Trim('"').Trim("'")
@@ -183,15 +183,15 @@ $script:ModuleState = @{
 }
 $script:ModuleState.PackageRoot = $toolkitRoot
 
-$defaultConfig = Get-Content (Join-Path $toolkitRoot 'config.default.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$defaultConfig = Get-Content -LiteralPath (Join-Path $toolkitRoot 'config.default.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $localConfigPath = Join-Path $toolkitRoot 'config.local.json'
 # The one warning for a config.local.json that will not parse, said once per
 # process; the readers below and in Scripts/ call it too.
 . (Join-Path $toolkitRoot 'Scripts/Write-ConfigParseWarning.ps1')
 
-if (Test-Path $localConfigPath) {
+if (Test-Path -LiteralPath $localConfigPath) {
     try {
-        $localConfig = Get-Content $localConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $localConfig = Get-Content -LiteralPath $localConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
     }
     catch {
         $msg = $_.Exception.Message
@@ -860,7 +860,7 @@ foreach ($alias in $mergedAliases.GetEnumerator()) {
 # the log by its own entries wants.
 function global:Get-P20CommandScores {
     param([string[]]$CommandNames = @(), [string]$Prefix = '')
-    $logFiles = Get-ChildItem -Path (Get-P20ToolkitLogDir) -Filter 'usage.*.log' -ErrorAction SilentlyContinue
+    $logFiles = Get-ChildItem -LiteralPath (Get-P20ToolkitLogDir) -Filter 'usage.*.log' -ErrorAction SilentlyContinue
     if (-not $logFiles) { return @{} }
 
     $now = Get-Date
@@ -869,9 +869,9 @@ function global:Get-P20CommandScores {
     # Check for reset marker in config.local.json
     $localCfgPath = Join-Path $PSScriptRoot 'config.local.json'
     $resetTimestamp = $null
-    if (Test-Path $localCfgPath) {
+    if (Test-Path -LiteralPath $localCfgPath) {
         try {
-            $localCfg = Get-Content $localCfgPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            $localCfg = Get-Content -LiteralPath $localCfgPath -Raw -Encoding UTF8 | ConvertFrom-Json
         }
         catch { $null = Write-P20ConfigParseWarning -Path $localCfgPath -Message $_.Exception.Message; $localCfg = $null }
         # The file parsed; a value that is not a date says which key it is.
@@ -881,7 +881,7 @@ function global:Get-P20CommandScores {
     }
 
     $logFiles | ForEach-Object {
-        Get-Content $_.FullName -Encoding UTF8 | ForEach-Object {
+        Get-Content -LiteralPath $_.FullName -Encoding UTF8 | ForEach-Object {
             $parts = $_ -split "`t"
             if ($parts.Count -lt 4) { return }
             if ($parts[1] -ne 'CMD') { return }
@@ -983,15 +983,15 @@ function script:Test-AdoAvailable {
 }
 
 function script:Get-RecentErrors {
-    $logFiles = Get-ChildItem -Path (Get-P20ToolkitLogDir) -Filter 'usage.*.log' -ErrorAction SilentlyContinue
+    $logFiles = Get-ChildItem -LiteralPath (Get-P20ToolkitLogDir) -Filter 'usage.*.log' -ErrorAction SilentlyContinue
     if (-not $logFiles) { return 0 }
     $cutoff = (Get-Date).AddHours(-24).ToString('yyyy-MM-ddTHH:mm:ss')
 
     # If errors were acknowledged, use the ack timestamp as a floor
     $localCfgPath = Join-Path $PSScriptRoot 'config.local.json'
-    if (Test-Path $localCfgPath) {
+    if (Test-Path -LiteralPath $localCfgPath) {
         try {
-            $localCfg = Get-Content $localCfgPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            $localCfg = Get-Content -LiteralPath $localCfgPath -Raw -Encoding UTF8 | ConvertFrom-Json
         }
         catch { $null = Write-P20ConfigParseWarning -Path $localCfgPath -Message $_.Exception.Message; $localCfg = $null }
         # The file parsed; a value that is not a date says which key it is.
@@ -1006,7 +1006,7 @@ function script:Get-RecentErrors {
 
     $count = 0
     $logFiles | ForEach-Object {
-        Get-Content $_.FullName -Encoding UTF8 | ForEach-Object {
+        Get-Content -LiteralPath $_.FullName -Encoding UTF8 | ForEach-Object {
             $parts = $_ -split "`t"
             if ($parts.Count -ge 2 -and $parts[1] -eq 'ERR' -and $parts[0] -gt $cutoff) { $count++ }
         }
@@ -1078,21 +1078,21 @@ function global:Resolve-P20PackageLink {
         [string]$Fallback = ''
     )
     if (-not $TargetPath -or -not $FromDirectory) { return $Fallback }
-    if (-not (Test-Path $TargetPath) -or -not (Test-Path $FromDirectory)) { return $Fallback }
+    if (-not (Test-Path -LiteralPath $TargetPath) -or -not (Test-Path -LiteralPath $FromDirectory)) { return $Fallback }
     # No relative path exists between two drives, or onto a network share, and
     # Resolve-Path -Relative then answers with the ABSOLUTE path (spelled
     # ".\<drive>:\..." by Windows PowerShell 5.1). That names a machine, and a
     # card is synced to others, so it is the caller's -Fallback instead: the
     # roots are compared first, and the answer is checked after.
     try {
-        $targetRoot = [System.IO.Path]::GetPathRoot((Convert-Path $TargetPath))
-        $fromRoot = [System.IO.Path]::GetPathRoot((Convert-Path $FromDirectory))
+        $targetRoot = [System.IO.Path]::GetPathRoot((Convert-Path -LiteralPath $TargetPath))
+        $fromRoot = [System.IO.Path]::GetPathRoot((Convert-Path -LiteralPath $FromDirectory))
     }
     catch { return $Fallback }
     if (-not [string]::Equals($targetRoot, $fromRoot, [System.StringComparison]::OrdinalIgnoreCase)) { return $Fallback }
-    Push-Location $FromDirectory
+    Push-Location -LiteralPath $FromDirectory
     try {
-        $rel = (Resolve-Path $TargetPath -Relative -ErrorAction Stop).Replace([char]92, [char]47)
+        $rel = (Resolve-Path -LiteralPath $TargetPath -Relative -ErrorAction Stop).Replace([char]92, [char]47)
         if ($rel.StartsWith('./')) { $rel = $rel.Substring(2) }
         if ($rel -match '^(?:[A-Za-z]:/|/)') { return $Fallback }
         return $rel
@@ -1199,8 +1199,8 @@ function script:Get-HelpPorts {
     if ($script:ModuleState.Config -and $script:ModuleState.Config.AgentPort) { $agentPort = [int]$script:ModuleState.Config.AgentPort }
     $devPort = 5174
     $viteConfig = Join-Path $toolkitRoot 'web/vite.config.ts'
-    if (Test-Path $viteConfig) {
-        $m = [regex]::Match((Get-Content $viteConfig -Raw -ErrorAction SilentlyContinue -Encoding UTF8), 'port:\s*(\d+)')
+    if (Test-Path -LiteralPath $viteConfig) {
+        $m = [regex]::Match((Get-Content -LiteralPath $viteConfig -Raw -ErrorAction SilentlyContinue -Encoding UTF8), 'port:\s*(\d+)')
         if ($m.Success) { $devPort = [int]$m.Groups[1].Value }
     }
     return @{ AgentPort = $agentPort; DevPort = $devPort }
@@ -1430,10 +1430,10 @@ function global:Reset-P20MenuScoring {
     if (-not $Name) { $Name = "$($s.CommandPrefix)Menu" }
     $root = $s.PackageRoot
     $localCfgPath = Join-Path $root 'config.local.json'
-    if (Test-Path $localCfgPath) {
+    if (Test-Path -LiteralPath $localCfgPath) {
         # A file that will not parse is left exactly as it is: writing the marker
         # into what was read (nothing) would replace the person's settings.
-        try { $null = Get-Content $localCfgPath -Raw -Encoding UTF8 | ConvertFrom-Json }
+        try { $null = Get-Content -LiteralPath $localCfgPath -Raw -Encoding UTF8 | ConvertFrom-Json }
         catch {
             $null = Write-P20ConfigParseWarning -Path $localCfgPath -Message $_.Exception.Message
             Write-WrapperRefusal -Name $Name -Message "config.local.json will not parse, so the menu scores were not reset." `
@@ -2711,7 +2711,7 @@ $script:repoRoot = $toolkitRoot
 $script:ModuleState.ModuleCommandsLoaded = [ordered]@{}
 
 $moduleCommandDir = Join-Path $toolkitRoot 'Config'
-if (Test-Path $moduleCommandDir) {
+if (Test-Path -LiteralPath $moduleCommandDir) {
     # In the autoload discovery shell, read the COMMITTED config only. The
     # manifest that shell produces is committed and shared between machines, so
     # a module verb may only be in it when config.default.json itself turns the
@@ -2720,11 +2720,11 @@ if (Test-Path $moduleCommandDir) {
     # whichever machine did not last generate it. Exactly the fix the personal
     # nav aliases already have, applied to the same question one level up.
     $enabledFeatures = Get-P20Features -CommittedOnly:$script:ModuleState.SkipNavAliases
-    $moduleFiles = @(Get-ChildItem -Path $moduleCommandDir -Filter '*.commands.psd1' -File -ErrorAction SilentlyContinue | Sort-Object Name)
+    $moduleFiles = @(Get-ChildItem -LiteralPath $moduleCommandDir -Filter '*.commands.psd1' -File -ErrorAction SilentlyContinue | Sort-Object Name)
     foreach ($moduleFile in $moduleFiles) {
         $moduleData = $null
         try {
-            $moduleData = Import-PowerShellDataFile -Path $moduleFile.FullName -ErrorAction Stop
+            $moduleData = Import-PowerShellDataFile -LiteralPath $moduleFile.FullName -ErrorAction Stop
         }
         catch {
             Write-Warning "Module commands: $($moduleFile.FullName) is not a readable data file ($($_.Exception.Message)) -- module skipped"
@@ -2737,7 +2737,7 @@ if (Test-Path $moduleCommandDir) {
         if (-not $enabledFeatures[$moduleData.Feature]) { continue }
 
         $moduleScript = Join-Path $moduleFile.DirectoryName ($moduleFile.BaseName + '.ps1')
-        if (-not (Test-Path $moduleScript)) {
+        if (-not (Test-Path -LiteralPath $moduleScript)) {
             Write-Warning "Module commands: $($moduleFile.FullName) has no wrapper file at $moduleScript -- module skipped"
             continue
         }

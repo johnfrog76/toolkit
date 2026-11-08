@@ -75,8 +75,8 @@ function Show-ConfigHelp {
 }
 
 function Get-AgentProcessId {
-    if (-not (Test-Path $pidFile)) { return 0 }
-    $raw = (Get-Content $pidFile -Raw -Encoding UTF8).Trim()
+    if (-not (Test-Path -LiteralPath $pidFile)) { return 0 }
+    $raw = (Get-Content -LiteralPath $pidFile -Raw -Encoding UTF8).Trim()
     if (-not $raw) { return 0 }
     try {
         $proc = Get-Process -Id $raw -ErrorAction Stop
@@ -85,7 +85,7 @@ function Get-AgentProcessId {
     }
     catch {
         # The PID is gone -- the file is stale, not evidence of anything.
-        Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
         return 0
     }
 }
@@ -323,7 +323,7 @@ if ($Stop) {
         catch {
             Write-Host "  Agent process $running had already gone." -ForegroundColor Yellow
         }
-        Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
         $stopped += $running
         Wait-PortReleased -Port $Port -Ids @($running)
     }
@@ -376,7 +376,7 @@ if ($already -gt 0) {
         if (-not $was) { $was = '(no hub)' }
         Write-Host "  Agent (PID $already) is serving $was; this shell asks for $(Get-ConfiguredHubRoot) -- restarting it." -ForegroundColor Yellow
         try { Stop-AgentProcess -ProcessId $already } catch { $null = $_ }
-        Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
         Wait-PortReleased -Port $Port -Ids @($already)
         Write-AgentLog 'CMD' "restart (PID $already served $was)"
         $already = 0
@@ -503,7 +503,7 @@ catch {
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
 
-$proc.Id | Set-Content $pidFile -Encoding UTF8
+$proc.Id | Set-Content -LiteralPath $pidFile -Encoding UTF8
 
 Start-Sleep -Seconds 2
 if ((Get-AgentProcessId) -gt 0) {
@@ -515,5 +515,5 @@ if ((Get-AgentProcessId) -gt 0) {
 Write-CliError -Message 'The agent exited immediately after starting.' `
     -Hint "Read agent.err.log at the repository root, or run it by hand: cd $repoRoot; $($python.Display) -m uvicorn agent.app:app --port $Port"
 Write-AgentLog 'ERR' 'exited immediately'
-Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
 exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"

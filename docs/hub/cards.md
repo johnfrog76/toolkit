@@ -479,7 +479,7 @@ keeps the same edit rule -- the card's own line ending, no BOM.
 | `ThreadHash` | adds commit bullets under `Commits:`; fills `[commit]` placeholders in PR replies with the newest commit it adds, or the `-Hash` named, and leaves them when it adds none. A card in `backlog/` is moved to `current/` first |
 | `NewPR` | writes `PR URL:`. A card in `backlog/` is moved to `current/` first |
 | `PublishPR` | writes `PR published: <url>` on the line under `PR URL:`, once -- a record, not state |
-| `GetPRComments` | writes `PR URL:` if absent; appends review rounds under `## PR Review Comments`. Append-only, safe to re-run. It also writes a side record, `pr-comments/<date>-PR<id>.md` in the Space (read at archive time for `prsReviewed`), except with `-OutputFile`, which writes only the file it names ([CLI](../CLI.md)) |
+| `GetPRComments` | writes `PR URL:` if absent; appends review rounds under `## PR Review Comments`. Append-only, safe to re-run. It also writes a side record, `pr-comments/<date>-<repository>-PR<id>.md` in the Space, added to rather than replaced by a second fetch the same day, except with `-OutputFile`, which writes only the file it names ([CLI](../CLI.md)) |
 | `Billable` | adds or removes `**Billable:** no` |
 | `Route <id> -Assign` | writes `**Assigned:** me` or `**Assigned:** <size>` on a card with no issue behind it -- a card with an id of its own, or any card in a Space with no tracker or a local one; nothing else in the file moves (Team Agile) |
 | `NewItem -FromCard` | files the card as a GitHub issue -- its name and Summary, the body ending `Toolkit card: <id>` -- and writes the issue's URL into `**ADO Link:**`; refuses a card that is already linked |

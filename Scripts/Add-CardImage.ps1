@@ -398,7 +398,7 @@ function Save-P20CardImageCommit {
     }
     if ($rels.Count -eq 0) { return @{ Ok = $true; Note = 'Nothing to commit.' } }
     $hint = 'The picture and the card are already written. Commit them yourself (git add -A; git commit) or sync the store.'
-    Push-Location $PromptsRoot
+    Push-Location -LiteralPath $PromptsRoot
     try {
         # One path at a time: a picture deleted before git ever saw it is not a
         # pathspec git knows, and one unknown path would fail the whole add.

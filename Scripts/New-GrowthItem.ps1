@@ -127,7 +127,7 @@ if (-not $displayName) {
     $cfgLocalPath   = Join-Path $repoRoot 'config.local.json'
     $defaults = $null
     $local = $null
-    if (Test-Path $cfgDefaultPath) { $defaults = Get-Content $cfgDefaultPath -Raw -Encoding UTF8 | ConvertFrom-Json }
+    if (Test-Path -LiteralPath $cfgDefaultPath) { $defaults = Get-Content -LiteralPath $cfgDefaultPath -Raw -Encoding UTF8 | ConvertFrom-Json }
     if (-not (Get-Command Read-P20LocalConfigJson -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Write-ConfigParseWarning.ps1') }
     $local = Read-P20LocalConfigJson -Path $cfgLocalPath
     if ($local -and $local.branchUser)        { $displayName = $local.branchUser }
@@ -147,7 +147,7 @@ if ($Close -and $Complete) {
 }
 $target = if ($Close) { $Close } else { $Complete }
 if ($target) {
-    if (-not $promptsRoot -or -not (Test-Path $promptsRoot)) {
+    if (-not $promptsRoot -or -not (Test-Path -LiteralPath $promptsRoot)) {
         Write-CliError -Message (Get-P20HubMissingMessage $promptsRoot)
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
@@ -157,7 +157,7 @@ if ($target) {
     $wanted = [System.IO.Path]::GetFileName($target)
     if ($wanted -notmatch '\.prompt\.md$') { $wanted = "$wanted.prompt.md" }
     $hits = @()
-    if (Test-Path $growthCurrent) {
+    if (Test-Path -LiteralPath $growthCurrent) {
         $hits = @(Get-ChildItem -LiteralPath $growthCurrent -Filter '*.prompt.md' -File | Where-Object { $_.Name -eq $wanted })
         if ($hits.Count -eq 0) {
             $stem = $wanted -replace '\.prompt\.md$', ''
@@ -165,7 +165,7 @@ if ($target) {
         }
     }
     if ($hits.Count -eq 0) {
-        $archived = (Test-Path $growthArchive) -and (Test-Path (Join-Path $growthArchive $wanted))
+        $archived = (Test-Path -LiteralPath $growthArchive) -and (Test-Path -LiteralPath (Join-Path $growthArchive $wanted))
         # Idempotent: already archived is a report, not an error -- the state is
         # where the file is, exactly as a card's and a session's are.
         if ($Close -and $archived) {
@@ -254,7 +254,7 @@ if ($target) {
 
     $source = $hits[0].FullName
     $dest = Join-Path $growthArchive $hits[0].Name
-    if (Test-Path $dest) {
+    if (Test-Path -LiteralPath $dest) {
         Write-CliError -Message "growth/archive/$($hits[0].Name) already exists. Not overwriting it." `
             -Hint "The archived copy is the record. Compare the two and delete whichever is the duplicate."
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
@@ -265,7 +265,7 @@ if ($target) {
         Write-Host "  [WhatIf] No changes were made."
         exit 0
     }
-    if (-not (Test-Path $growthArchive)) { New-Item -ItemType Directory -Path $growthArchive -Force | Out-Null }
+    if (-not (Test-Path -LiteralPath $growthArchive)) { New-Item -ItemType Directory -Path $growthArchive -Force | Out-Null }
     Move-Item -LiteralPath $source -Destination $dest -ErrorAction Stop
     # Stamped AFTER the move, on the archived copy: the move is the promise and
     # the stamp is the record, so a stamp that fails must not leave the file in current/.
@@ -321,7 +321,7 @@ else {
 $currentDir = Join-Path (Get-P20HubFolder -Name 'growth' -PromptsRoot $promptsRoot -PackageRoot $repoRoot) ([string](Get-P20Consts).folders.current)
 $filePath = Join-Path $currentDir $fileName
 
-if (Test-Path $filePath) {
+if (Test-Path -LiteralPath $filePath) {
     Write-Host "Already there: $filePath" -ForegroundColor Yellow
     Write-Host "    FILE: $filePath"
     exit 0
@@ -332,7 +332,7 @@ if ($WhatIf) {
     Write-Host "  [WhatIf] No changes were made."
     exit 0
 }
-if (-not (Test-Path $currentDir)) {
+if (-not (Test-Path -LiteralPath $currentDir)) {
     New-Item -Path $currentDir -ItemType Directory -Force | Out-Null
 }
 

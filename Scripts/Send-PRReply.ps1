@@ -408,7 +408,7 @@ try {
     $card = $null
     $currentDir = $null
     if (Get-Command Get-PromptFolders -ErrorAction SilentlyContinue) { $currentDir = (Get-PromptFolders).Current }
-    if ($currentDir -and (Test-Path $currentDir)) {
+    if ($currentDir -and (Test-Path -LiteralPath $currentDir)) {
         # The PR URL line's shape is the contract's (consts.json regex.prUrlLine), not retyped here.
         . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
         if ($trackerKind -eq 'github') {
@@ -419,7 +419,7 @@ try {
         else {
             $prNeedle = "pullrequest/$PullRequestId"
             $prLineRx = (Get-P20Consts).regex.prUrlLine + '\S*' + [regex]::Escape($prNeedle) + '\b'
-            $hits = @(Get-ChildItem -Path $currentDir -Filter '*.prompt.md' -File | Where-Object {
+            $hits = @(Get-ChildItem -LiteralPath $currentDir -Filter '*.prompt.md' -File | Where-Object {
                 ([System.IO.File]::ReadAllText($_.FullName)) -match $prLineRx
             })
         }

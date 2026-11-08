@@ -31,8 +31,8 @@ $localPath = Join-Path $toolkitDir "config.local.json"
 $defaultCfgPath = Join-Path $toolkitDir "config.default.json"
 $defaultCfg = $null
 $spaces = @()
-if (Test-Path $defaultCfgPath) {
-    $defaultCfg = ConvertTo-P20SpaceKeys (Get-Content $defaultCfgPath -Raw -Encoding UTF8 | ConvertFrom-Json)
+if (Test-Path -LiteralPath $defaultCfgPath) {
+    $defaultCfg = ConvertTo-P20SpaceKeys (Get-Content -LiteralPath $defaultCfgPath -Raw -Encoding UTF8 | ConvertFrom-Json)
     if ($defaultCfg.spaces) { $spaces = @($defaultCfg.spaces) }
 }
 
@@ -51,9 +51,9 @@ $localUnreadable = $false
 # and the writer below would put it back in another format. 5.1 never does.
 $localJsonArgs = @{}
 if ((Get-Command ConvertFrom-Json).Parameters.ContainsKey('DateKind')) { $localJsonArgs['DateKind'] = 'String' }
-if (Test-Path $localPath) {
+if (Test-Path -LiteralPath $localPath) {
     try {
-        $localRaw = Get-Content $localPath -Raw -Encoding UTF8
+        $localRaw = Get-Content -LiteralPath $localPath -Raw -Encoding UTF8
         # A zero-byte or whitespace-only file is an empty object, not a parse failure.
         if ([string]::IsNullOrWhiteSpace($localRaw)) { $localRaw = '{}' }
         $localCfg = ConvertTo-P20SpaceKeys ($localRaw | ConvertFrom-Json @localJsonArgs)

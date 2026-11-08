@@ -834,8 +834,8 @@ function Get-NextLocalId {
     $parent = Split-Path $Folder -Parent
     if ($parent) { $roots += (Join-Path $parent $folderNames.archive), (Join-Path $parent $folderNames.current), (Join-Path $parent $folderNames.backlog) }
     foreach ($r in ($roots | Select-Object -Unique)) {
-        if (-not (Test-Path $r)) { continue }
-        foreach ($f in (Get-ChildItem -Path $r -Filter '*.prompt.md' -File -ErrorAction SilentlyContinue)) {
+        if (-not (Test-Path -LiteralPath $r)) { continue }
+        foreach ($f in (Get-ChildItem -LiteralPath $r -Filter '*.prompt.md' -File -ErrorAction SilentlyContinue)) {
             # Get-P20CardId returns a STRING. Only a number takes
             # part in highest-plus-one: "99" -gt "100" is true for strings.
             $n = Get-P20CardId -Name $f.Name -Pattern $pattern
@@ -933,7 +933,7 @@ if ($script:LocalMode) {
     }
 
     $targetFolder = Resolve-TargetFolder $OutputFolder
-    if (-not (Test-Path $targetFolder)) {
+    if (-not (Test-Path -LiteralPath $targetFolder)) {
         New-Item -Path $targetFolder -ItemType Directory -Force | Out-Null
     }
 
@@ -1149,7 +1149,7 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
     }
 
     $targetFolder = Resolve-TargetFolder $OutputFolder
-    if (-not (Test-Path $targetFolder)) {
+    if (-not (Test-Path -LiteralPath $targetFolder)) {
         New-Item -Path $targetFolder -ItemType Directory -Force | Out-Null
     }
 
@@ -1359,7 +1359,7 @@ try {
     # template link is computed relative to where the card will actually sit,
     # so the directory has to exist first.
     $targetFolder = Resolve-TargetFolder $OutputFolder
-    if (-not (Test-Path $targetFolder)) {
+    if (-not (Test-Path -LiteralPath $targetFolder)) {
         New-Item -Path $targetFolder -ItemType Directory -Force | Out-Null
     }
 

@@ -54,7 +54,7 @@ function Get-ToolkitAliases {
         [Parameter(Mandatory)][string]$DefaultConfigPath
     )
 
-    if (-not (Test-Path $UtilitiesPath)) {
+    if (-not (Test-Path -LiteralPath $UtilitiesPath)) {
         throw "Cannot find utilities.psm1 (expected at $UtilitiesPath)"
     }
 
@@ -83,7 +83,7 @@ Import-Module '$escaped' -Force -DisableNameChecking -WarningAction SilentlyCont
         $probeExit = $LASTEXITCODE
     }
     finally {
-        Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
     }
 
     if ($probeExit -ne 0) {
@@ -109,8 +109,8 @@ Import-Module '$escaped' -Force -DisableNameChecking -WarningAction SilentlyCont
     # Scripts/Resolve-CliPrefix.ps1.
     $config = $null
     $prefix = Get-P20DefaultPrefix
-    if (Test-Path $DefaultConfigPath) {
-        $config = Get-Content $DefaultConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if (Test-Path -LiteralPath $DefaultConfigPath) {
+        $config = Get-Content -LiteralPath $DefaultConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
         if ($config.commandPrefix) { $prefix = $config.commandPrefix }
     }
     $prefixPattern = '^' + [regex]::Escape($prefix) + '[A-Za-z0-9_-]*$'

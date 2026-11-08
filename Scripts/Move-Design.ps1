@@ -437,12 +437,12 @@ function Move-P20DesignFile {
     if (-not (Test-Path -LiteralPath $toDir -PathType Container)) { New-Item -ItemType Directory -Path $toDir -Force | Out-Null }
     $tracked = $false
     if ($inRepo) {
-        Push-Location $base
+        Push-Location -LiteralPath $base
         try { $tracked = ((Invoke-P20TrackerRead 'git' @('ls-files', '--error-unmatch', '--', $FromRel)).Code -eq 0) }
         finally { Pop-Location }
     }
     if ($tracked) {
-        Push-Location $base
+        Push-Location -LiteralPath $base
         try { $null = Invoke-P20TrackerRead 'git' @('mv', '--', $FromRel, $ToRel) } finally { Pop-Location }
         if (-not (Test-Path -LiteralPath $to)) { Move-Item -LiteralPath $from -Destination $to }
     }
@@ -457,7 +457,7 @@ function Complete-P20Staging {
     param([string]$Summary)
     $paths = @($staged | Select-Object -Unique)
     if ($inRepo) {
-        Push-Location $base
+        Push-Location -LiteralPath $base
         try { foreach ($p in $paths) { $null = Invoke-P20TrackerRead 'git' @('add', '-A', '--', $p) } } finally { Pop-Location }
         Write-Host "Staged, not committed. Suggested:" -ForegroundColor DarkGray
         Write-Host "  git commit -m `"design: $Summary`"" -ForegroundColor DarkGray
@@ -470,7 +470,7 @@ function Complete-P20Staging {
         return
     }
     $gitFailure = $null
-    Push-Location $promptsRoot
+    Push-Location -LiteralPath $promptsRoot
     try {
         # Stage by directory: a moved file's old path is gone from disk, and a
         # pathspec git no longer knows would fail a per-file add.
