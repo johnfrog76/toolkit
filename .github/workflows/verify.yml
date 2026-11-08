@@ -260,12 +260,28 @@ jobs:
       # The CLI from Windows PowerShell 5.1, the floor: powershell.exe, not pwsh, with
       # PSModulePath set inside that shell before anything loads, so a module path
       # PowerShell 7 handed down cannot answer for a name (AGENTS.md, "One toolkit
-      # per shell"); then tkTest's CLI half. The runner starts every suite in pwsh,
-      # as it does on every host. The runner's Total line.
+      # per shell"); then tkTest's CLI half. tkTest starts the runner in pwsh, as it
+      # does on every host, so every suite runs in pwsh here. The runner's Total line.
       - name: The CLI from Windows PowerShell 5.1 -- tkTest -Half cli
         if: ${{ !cancelled() }}
         run: |
           $log = Join-Path $env:RUNNER_TEMP 'cli.log'
           powershell.exe -NoProfile -Command '$env:PSModulePath = (Resolve-Path .); Import-Module ./Prompt20Toolkit/Prompt20Toolkit.psd1 -Force; tkTest -Half cli; exit $LASTEXITCODE' 2>&1 | Tee-Object -FilePath $log
+          $code = $LASTEXITCODE
+          pwsh -NoProfile -File Scripts/Test-CiHalf.ps1 -Half cli -Path $log -ExitCode $code
+
+      # The same floor, with nothing handed to pwsh: the runner itself runs in
+      # powershell.exe and starts each suite, and each suite starts the verbs it
+      # types, in the host it is running in (Tests/Get-TestHost.ps1). The step above
+      # proves the module loads and the suites' own code runs on 5.1; this one runs
+      # the verbs that read and rewrite a card, a session and the config on 5.1 --
+      # NewPR's and GetPRComments' reads, MeetingAgenda's stage change, a hub path
+      # with a non-ASCII character, Route -Assign -- which pwsh read correctly
+      # whatever the code did.
+      - name: The card and config suites on Windows PowerShell 5.1 itself
+        if: ${{ !cancelled() }}
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'cli-floor.log'
+          powershell.exe -NoProfile -Command '$env:PSModulePath = (Resolve-Path .); & ./Tests/Test-Toolkit.ps1 -PRComments -MeetingAgenda -NewPrompt -Triage; exit $LASTEXITCODE' 2>&1 | Tee-Object -FilePath $log
           $code = $LASTEXITCODE
           pwsh -NoProfile -File Scripts/Test-CiHalf.ps1 -Half cli -Path $log -ExitCode $code

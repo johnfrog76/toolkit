@@ -99,3 +99,33 @@ function Write-CardText {
     # byte for byte -- the shape the Archive suite pins for this edge.
     [System.IO.File]::WriteAllText($Path, $text, (New-Object System.Text.UTF8Encoding($false)))
 }
+
+function Read-CardText {
+    <#
+        The read half of the same contract: a hub file is UTF-8, so it is read
+        as UTF-8, on every host.
+
+        Get-Content with no -Encoding reads a file with no BOM in the system's
+        ANSI code page under Windows PowerShell 5.1 and as UTF-8 under 7. A
+        caller that read a card that way and wrote it back through
+        Write-CardText turned every non-ASCII character into two or three,
+        permanently, and only on the floor. A BOM, where a file has one, still
+        wins and is not part of the text.
+
+        -Lines returns the lines, split on LF or CRLF and nothing else -- a bare
+        CR inside a line stays in it, where Get-Content made it a line break --
+        with no empty last element for the file's final newline. Always an
+        array, so a one-line file indexes as a line and not as its characters.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [switch]$Lines
+    )
+    $text = [System.IO.File]::ReadAllText($Path, (New-Object System.Text.UTF8Encoding($false)))
+    if (-not $Lines) { return $text }
+    $parts = [string[]]($text -split "`r?`n")
+    if ($parts.Length -gt 0 -and $parts[$parts.Length - 1] -eq '') {
+        if ($parts.Length -eq 1) { $parts = [string[]]@() } else { $parts = [string[]]$parts[0..($parts.Length - 2)] }
+    }
+    return , $parts
+}

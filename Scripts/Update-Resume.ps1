@@ -85,7 +85,7 @@ if ($Preview) {
             foreach ($rel in $changedPaths) {
                 $full = Join-Path $promptsRoot $rel
                 if (Test-Path $full -PathType Leaf) {
-                    $content = Get-Content $full -Raw
+                    $content = Get-Content $full -Raw -Encoding UTF8
                     if ($null -eq $content) { $content = '' }
                     $files += @{ file = $rel; content = $content }
                 }

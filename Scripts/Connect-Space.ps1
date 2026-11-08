@@ -103,7 +103,7 @@ if ($global:P20Config -and $global:P20Config.Spaces) {
     $hubRoot = [string]$global:P20Config.PromptsRoot
 }
 else {
-    $defaultCfg = ConvertTo-P20SpaceKeys (Get-Content (Join-Path $packageRoot 'config.default.json') -Raw | ConvertFrom-Json)
+    $defaultCfg = ConvertTo-P20SpaceKeys (Get-Content (Join-Path $packageRoot 'config.default.json') -Raw -Encoding UTF8 | ConvertFrom-Json)
     $localPath = Join-Path $packageRoot 'config.local.json'
     $localCfg = $null
     if (-not (Get-Command Read-P20LocalConfigJson -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Write-ConfigParseWarning.ps1') }

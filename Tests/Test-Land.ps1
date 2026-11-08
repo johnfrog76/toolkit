@@ -431,6 +431,60 @@ try {
     $fine = Invoke-P20TrackerRead 'git' @('--version')
     Assert-True 'and the same tool with a normal argument runs, Code 0' ($fine.Code -eq 0 -and "$($fine.Out)" -match 'git version') "$($fine.Code): $($fine.Lines)"
 
+    # -- The bytes a tool writes ---------------------------------------------------
+    # gh writes UTF-8 to a pipe, and PowerShell decodes a native command's output
+    # with the console's encoding: on Windows the OEM code page, so a review
+    # comment's em dash reached the card as three other characters. The console is
+    # set to Latin-1 for this call, which is what that code page does to the same
+    # bytes, so the row bites on every host; the tool is this host, writing raw
+    # UTF-8 to its stdout.
+    $u8Words = 'caf' + [char]0x00E9 + ' ' + [char]0x2014 + ' ok'
+    $u8B64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($u8Words))
+    $emit = "`$b = [Convert]::FromBase64String('$u8B64'); `$o = [Console]::OpenStandardOutput(); `$o.Write(`$b, 0, `$b.Length); `$o.Flush()"
+    $emitArgs = @('-NoProfile', '-NonInteractive', '-EncodedCommand', [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($emit)))
+    $thisHost = [string](Get-Process -Id $PID).Path
+    $savedConsole = $null
+    $consoleSet = $false
+    $afterName = ''
+    $decoded = $null
+    try { $savedConsole = [Console]::OutputEncoding; [Console]::OutputEncoding = [System.Text.Encoding]::GetEncoding(28591); $consoleSet = $true } catch { $consoleSet = $false }
+    try {
+        if ($consoleSet) {
+            $decoded = Invoke-P20TrackerRead $thisHost $emitArgs
+            $afterName = [Console]::OutputEncoding.WebName
+        }
+    }
+    finally { if ($consoleSet) { [Console]::OutputEncoding = $savedConsole } }
+    Assert-True 'the console takes Latin-1 for the row' $consoleSet
+    Assert-True "a tool's UTF-8 output is read as UTF-8 under a Latin-1 console (PowerShell $($PSVersionTable.PSVersion.Major))" ($null -ne $decoded -and ((@($decoded.Out) -join '') -ceq $u8Words)) "$(if ($decoded) { @($decoded.Lines) -join '|' })"
+    Assert-True "and the console's own encoding is put back after the call" ($afterName -eq 'iso-8859-1') $afterName
+
+    # az is Python, which encodes a pipe in the locale's code page unless
+    # PYTHONIOENCODING says otherwise. A stub az first on the PATH says what it
+    # was handed; the caller's own value is put back after.
+    $azDir = Join-Path $root 'aztool'
+    New-Item -ItemType Directory -Path $azDir -Force | Out-Null
+    $onWindows = ($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop')
+    if ($onWindows) { [System.IO.File]::WriteAllText((Join-Path $azDir 'az.cmd'), "@echo %PYTHONIOENCODING%`r`n") }
+    else {
+        [System.IO.File]::WriteAllText((Join-Path $azDir 'az'), "#!/bin/sh`necho `"`$PYTHONIOENCODING`"`n")
+        & chmod +x (Join-Path $azDir 'az')
+    }
+    $savedPath = $env:PATH
+    $savedPython = $env:PYTHONIOENCODING
+    $env:PYTHONIOENCODING = 'p20-caller-value'
+    try {
+        $env:PATH = $azDir + [System.IO.Path]::PathSeparator + $savedPath
+        $azRead = Invoke-P20TrackerRead 'az' @('version')
+        $pythonAfter = $env:PYTHONIOENCODING
+    }
+    finally {
+        $env:PATH = $savedPath
+        if ($null -eq $savedPython) { Remove-Item Env:\PYTHONIOENCODING -ErrorAction SilentlyContinue } else { $env:PYTHONIOENCODING = $savedPython }
+    }
+    Assert-True 'az is handed PYTHONIOENCODING=utf-8' ($azRead.Code -eq 0 -and ((@($azRead.Out) -join '').Trim() -eq 'utf-8')) "$($azRead.Code): $(@($azRead.Lines) -join '|')"
+    Assert-True "and the caller's own value is back after the call" ($pythonAfter -eq 'p20-caller-value') $pythonAfter
+
     if ($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop') {
         # The real thing: a .cmd on the PATH, a value that would write a marker.
         $cmdDir = Join-Path $root 'cmdtool'

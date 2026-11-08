@@ -121,7 +121,7 @@ foreach ($dotEnvPath in @(
 )) {
     if ($dotEnvSkip) { break }
     if (-not (Test-Path $dotEnvPath)) { continue }
-    Get-Content $dotEnvPath | Where-Object { $_ -match '^\s*[^#]\S+=.+' } | ForEach-Object {
+    Get-Content $dotEnvPath -Encoding UTF8 | Where-Object { $_ -match '^\s*[^#]\S+=.+' } | ForEach-Object {
         $parts = $_ -split '=', 2
         $key   = $parts[0].Trim()
         $value = $parts[1].Trim().Trim('"').Trim("'")
@@ -183,7 +183,7 @@ $script:ModuleState = @{
 }
 $script:ModuleState.PackageRoot = $toolkitRoot
 
-$defaultConfig = Get-Content (Join-Path $toolkitRoot 'config.default.json') -Raw | ConvertFrom-Json
+$defaultConfig = Get-Content (Join-Path $toolkitRoot 'config.default.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $localConfigPath = Join-Path $toolkitRoot 'config.local.json'
 # The one warning for a config.local.json that will not parse, said once per
 # process; the readers below and in Scripts/ call it too.
@@ -191,7 +191,7 @@ $localConfigPath = Join-Path $toolkitRoot 'config.local.json'
 
 if (Test-Path $localConfigPath) {
     try {
-        $localConfig = Get-Content $localConfigPath -Raw | ConvertFrom-Json
+        $localConfig = Get-Content $localConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
     }
     catch {
         $msg = $_.Exception.Message
@@ -871,7 +871,7 @@ function global:Get-P20CommandScores {
     $resetTimestamp = $null
     if (Test-Path $localCfgPath) {
         try {
-            $localCfg = Get-Content $localCfgPath -Raw | ConvertFrom-Json
+            $localCfg = Get-Content $localCfgPath -Raw -Encoding UTF8 | ConvertFrom-Json
         }
         catch { $null = Write-P20ConfigParseWarning -Path $localCfgPath -Message $_.Exception.Message; $localCfg = $null }
         # The file parsed; a value that is not a date says which key it is.
@@ -991,7 +991,7 @@ function script:Get-RecentErrors {
     $localCfgPath = Join-Path $PSScriptRoot 'config.local.json'
     if (Test-Path $localCfgPath) {
         try {
-            $localCfg = Get-Content $localCfgPath -Raw | ConvertFrom-Json
+            $localCfg = Get-Content $localCfgPath -Raw -Encoding UTF8 | ConvertFrom-Json
         }
         catch { $null = Write-P20ConfigParseWarning -Path $localCfgPath -Message $_.Exception.Message; $localCfg = $null }
         # The file parsed; a value that is not a date says which key it is.
@@ -1200,7 +1200,7 @@ function script:Get-HelpPorts {
     $devPort = 5174
     $viteConfig = Join-Path $toolkitRoot 'web/vite.config.ts'
     if (Test-Path $viteConfig) {
-        $m = [regex]::Match((Get-Content $viteConfig -Raw -ErrorAction SilentlyContinue), 'port:\s*(\d+)')
+        $m = [regex]::Match((Get-Content $viteConfig -Raw -ErrorAction SilentlyContinue -Encoding UTF8), 'port:\s*(\d+)')
         if ($m.Success) { $devPort = [int]$m.Groups[1].Value }
     }
     return @{ AgentPort = $agentPort; DevPort = $devPort }
@@ -1433,7 +1433,7 @@ function global:Reset-P20MenuScoring {
     if (Test-Path $localCfgPath) {
         # A file that will not parse is left exactly as it is: writing the marker
         # into what was read (nothing) would replace the person's settings.
-        try { $null = Get-Content $localCfgPath -Raw | ConvertFrom-Json }
+        try { $null = Get-Content $localCfgPath -Raw -Encoding UTF8 | ConvertFrom-Json }
         catch {
             $null = Write-P20ConfigParseWarning -Path $localCfgPath -Message $_.Exception.Message
             Write-WrapperRefusal -Name $Name -Message "config.local.json will not parse, so the menu scores were not reset." `

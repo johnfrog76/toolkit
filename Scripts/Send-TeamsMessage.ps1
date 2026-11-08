@@ -89,7 +89,7 @@ function Read-CommunicationConfig {
     $localPath = Join-Path $Root 'config.local.json'
     # The container's keys in both spellings (ConvertTo-P20SpaceKeys, stage 2).
     . (Join-Path $PSScriptRoot 'Resolve-HubConfig.ps1')
-    if (Test-Path $defaultPath) { $defaults = ConvertTo-P20SpaceKeys (Get-Content $defaultPath -Raw | ConvertFrom-Json) }
+    if (Test-Path $defaultPath) { $defaults = ConvertTo-P20SpaceKeys (Get-Content $defaultPath -Raw -Encoding UTF8 | ConvertFrom-Json) }
     if (-not (Get-Command Read-P20LocalConfigJson -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Write-ConfigParseWarning.ps1') }
     $local = ConvertTo-P20SpaceKeys (Read-P20LocalConfigJson -Path $localPath)
 

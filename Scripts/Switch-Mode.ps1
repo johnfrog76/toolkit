@@ -32,7 +32,7 @@ $defaultCfgPath = Join-Path $toolkitDir "config.default.json"
 $defaultCfg = $null
 $spaces = @()
 if (Test-Path $defaultCfgPath) {
-    $defaultCfg = ConvertTo-P20SpaceKeys (Get-Content $defaultCfgPath -Raw | ConvertFrom-Json)
+    $defaultCfg = ConvertTo-P20SpaceKeys (Get-Content $defaultCfgPath -Raw -Encoding UTF8 | ConvertFrom-Json)
     if ($defaultCfg.spaces) { $spaces = @($defaultCfg.spaces) }
 }
 

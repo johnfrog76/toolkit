@@ -193,6 +193,11 @@ foreach ($mode in @('matrix', 'a11y')) {
 Assert-True 'verify.yml has a Windows job' ($workflow -match '(?m)^\s+runs-on: windows-latest\s*$')
 Assert-True 'the Windows job runs the CLI from Windows PowerShell 5.1, the module path set inside that shell' `
     ($workflow -match "powershell\.exe -NoProfile -Command '\`$env:PSModulePath = \(Resolve-Path \.\); Import-Module \./Prompt20Toolkit/Prompt20Toolkit\.psd1 -Force; tkTest -Half cli; exit \`$LASTEXITCODE'")
+# tkTest starts the runner in pwsh, so the step above runs every suite on 7. The
+# floor step starts the runner in powershell.exe, which starts its suites, and
+# they their verbs, in 5.1 (Tests/Get-TestHost.ps1), read through the same gate.
+Assert-True 'the Windows job also runs the card and config suites with the runner itself in Windows PowerShell 5.1' `
+    ($workflow -match "powershell\.exe -NoProfile -Command '\`$env:PSModulePath = \(Resolve-Path \.\); & \./Tests/Test-Toolkit\.ps1 -PRComments -MeetingAgenda -NewPrompt -Triage; exit \`$LASTEXITCODE' 2>&1 \| Tee-Object -FilePath \`$log\r?\n[^\r\n]*\r?\n[^\r\n]*Test-CiHalf\.ps1 -Half cli\b")
 $jobCount = [regex]::Matches($workflow, '(?m)^\s+runs-on:').Count
 Assert-True 'verify.yml runs on pull requests (default types: labeled is NOT a trigger), pushes to main, the button, and a weekday schedule' `
     (($workflow -match '(?m)^\s+workflow_dispatch:') -and ($workflow -notmatch '(?m)^\s+types:') -and ($workflow -notmatch '(?m)^\s+if: .*labeled') -and ($workflow -match '(?ms)^\s+push:\s*\r?\n\s+branches: \[main\]') -and ($workflow -match '(?m)^\s+- cron: "[^"]+"'))
@@ -706,7 +711,7 @@ try {
     Copy-Item (Join-Path $pkgRoot 'utilities.psm1'), (Join-Path $pkgRoot 'consts.json'), (Join-Path $pkgRoot 'config.default.json') $missBase
     Copy-Item (Join-Path $pkgRoot 'Scripts') (Join-Path $missBase 'Scripts') -Recurse
     if (Test-Path (Join-Path $pkgRoot 'Config')) { Copy-Item (Join-Path $pkgRoot 'Config') (Join-Path $missBase 'Config') -Recurse }
-    Copy-Item (Join-Path $scriptDir 'Test-Toolkit.ps1'), (Join-Path $scriptDir 'Get-ToolkitSuiteRegistry.ps1') (Join-Path $missBase 'Tests')
+    Copy-Item (Join-Path $scriptDir 'Test-Toolkit.ps1'), (Join-Path $scriptDir 'Get-ToolkitSuiteRegistry.ps1'), (Join-Path $scriptDir 'Get-TestHost.ps1') (Join-Path $missBase 'Tests')
     $missHost = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     $missOut = (& $missHost -NoProfile -ExecutionPolicy Bypass -File (Join-Path $missBase 'Tests/Test-Toolkit.ps1') -Consts 2>&1 | ForEach-Object { [string]$_ }) -join "`n"
     $missExit = $LASTEXITCODE
@@ -746,7 +751,7 @@ try {
     Copy-Item (Join-Path $pkgRoot 'utilities.psm1'), (Join-Path $pkgRoot 'consts.json'), (Join-Path $pkgRoot 'config.default.json') $quietBase
     Copy-Item (Join-Path $pkgRoot 'Scripts') (Join-Path $quietBase 'Scripts') -Recurse
     if (Test-Path (Join-Path $pkgRoot 'Config')) { Copy-Item (Join-Path $pkgRoot 'Config') (Join-Path $quietBase 'Config') -Recurse }
-    Copy-Item (Join-Path $scriptDir 'Test-Toolkit.ps1'), (Join-Path $scriptDir 'Get-ToolkitSuiteRegistry.ps1') (Join-Path $quietBase 'Tests')
+    Copy-Item (Join-Path $scriptDir 'Test-Toolkit.ps1'), (Join-Path $scriptDir 'Get-ToolkitSuiteRegistry.ps1'), (Join-Path $scriptDir 'Get-TestHost.ps1') (Join-Path $quietBase 'Tests')
     $quietProbe = Join-Path $quietBase 'probe.txt'
     $quietPkg = $pkgRoot -replace "'", "''"
     $quietProbeQ = $quietProbe -replace "'", "''"
@@ -797,7 +802,7 @@ try {
     Copy-Item (Join-Path $pkgRoot 'utilities.psm1'), (Join-Path $pkgRoot 'consts.json'), (Join-Path $pkgRoot 'config.default.json') $ovBase
     Copy-Item (Join-Path $pkgRoot 'Scripts') (Join-Path $ovBase 'Scripts') -Recurse
     if (Test-Path (Join-Path $pkgRoot 'Config')) { Copy-Item (Join-Path $pkgRoot 'Config') (Join-Path $ovBase 'Config') -Recurse }
-    Copy-Item (Join-Path $scriptDir 'Test-Toolkit.ps1'), (Join-Path $scriptDir 'Get-ToolkitSuiteRegistry.ps1') (Join-Path $ovBase 'Tests')
+    Copy-Item (Join-Path $scriptDir 'Test-Toolkit.ps1'), (Join-Path $scriptDir 'Get-ToolkitSuiteRegistry.ps1'), (Join-Path $scriptDir 'Get-TestHost.ps1') (Join-Path $ovBase 'Tests')
     $ovProbe = Join-Path $ovBase 'probe.txt'
     $ovSpaceName = $consts.env.activeSpace
     $ovRootName = $consts.env.promptsRoot

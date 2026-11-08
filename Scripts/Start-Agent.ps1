@@ -76,7 +76,7 @@ function Show-ConfigHelp {
 
 function Get-AgentProcessId {
     if (-not (Test-Path $pidFile)) { return 0 }
-    $raw = (Get-Content $pidFile -Raw).Trim()
+    $raw = (Get-Content $pidFile -Raw -Encoding UTF8).Trim()
     if (-not $raw) { return 0 }
     try {
         $proc = Get-Process -Id $raw -ErrorAction Stop

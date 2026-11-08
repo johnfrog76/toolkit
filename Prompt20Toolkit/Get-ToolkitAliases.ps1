@@ -110,7 +110,7 @@ Import-Module '$escaped' -Force -DisableNameChecking -WarningAction SilentlyCont
     $config = $null
     $prefix = Get-P20DefaultPrefix
     if (Test-Path $DefaultConfigPath) {
-        $config = Get-Content $DefaultConfigPath -Raw | ConvertFrom-Json
+        $config = Get-Content $DefaultConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
         if ($config.commandPrefix) { $prefix = $config.commandPrefix }
     }
     $prefixPattern = '^' + [regex]::Escape($prefix) + '[A-Za-z0-9_-]*$'

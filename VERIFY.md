@@ -290,7 +290,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **51 suites, 9451 assertions** with a `config.local.json`, every one
+findings. On this commit that is **51 suites, 9476 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -1182,6 +1182,34 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `%USERPROFILE%\.claude\projects` with each file's last write time before and after the two runs, from a
   plain `powershell` window with no Claude Code session open: the two lists are the same. Refs the pull
   request that adds `Burn`.
+- [ ] **NewPR and GetPRComments keep a card's non-ASCII text under Windows PowerShell 5.1 (review finding
+  G2 f3).** In `powershell` (5.1), on a GitHub Space with a scratch repository, a card whose title and
+  Described Changes hold `café — naïve`: `tkNewPR`, then `tkGetPRComments`. The pull request's title and body show
+  the words as typed, and the card's text is unchanged apart from the `PR URL:` line and the comments section:
+  `git diff` on the hub shows no other line. The Windows job's floor step runs the reader on 5.1; this is the
+  real pull request.
+- [ ] **A hub under a folder with a non-ASCII name is found under Windows PowerShell 5.1 (review finding G3 f1).**
+  On a Windows account or folder named with an accent (`C:\Users\José\toolkit-hub`, or any folder with `é` in
+  it), `tkConfig -Set promptsRoot=<that folder>`, then a new `powershell` (5.1) window: `tkStatus` lists the
+  hub's cards, with no `Hub not found` at import, and `tkEnv` names the same path. The floor step proves it on a
+  scratch package; this is the real profile and autoload.
+- [ ] **A session's non-ASCII text survives its stage changes under Windows PowerShell 5.1 (review finding G4
+  f2).** With `features.communication` on, in `powershell` (5.1): `tkMeetingAgenda -Plan`, add a line with
+  `Zoë — “fine”` to the session, then `-Prep` and `-Retro`. The line reads as typed after both, in an editor and
+  in the web UI's session view. The floor step runs the same on a sandbox.
+- [ ] **gh and az output keeps its non-ASCII text in a Windows terminal (review finding G2 f4).** In a plain
+  `powershell` window and in `pwsh`, both on the console's default code page (`chcp` shows 437 or 850, not 65001):
+  `tkGetPRComments` on a GitHub Space, on a pull request with a review comment holding `—` and `é`: the card shows both as
+  written, not `ΓÇö` or `Ã©`. On an Azure DevOps Space, `tkNewPrompt <id>` for a work item whose title holds an
+  `é`: the card's heading spells it. Afterwards `chcp` still shows the code page it showed before.
+- [ ] **A lone Build Service comment is not triaged under Windows PowerShell 5.1 (review finding G2 f19).** On an
+  Azure DevOps Space, in `powershell` (5.1), `tkGetPRComments` on a pull request with a thread that holds one
+  Build Service comment on a file: that thread is not among the actionable ones the command counts. The PRComments
+  suite runs the filter on 5.1 in the floor step; this is a real thread.
+- [ ] **Route -Assign takes a size under Windows PowerShell 5.1 (review finding G4 f4).** On a connected GitHub
+  Space with worker labels, in `powershell` (5.1): `tkRoute <card> -Assign <size>` with `-WhatIf` off on a test
+  issue. The size label is set, and the hint never says `is neither me nor a size`. The Triage suite runs the
+  same against a stub on 5.1 in the floor step.
 
 ## Recording a run
 

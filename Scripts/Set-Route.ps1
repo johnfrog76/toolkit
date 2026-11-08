@@ -262,7 +262,16 @@ if ($cardMode) {
         }
         $got = Invoke-P20TrackerRead 'gh' @('label', 'list', '--repo', $target.Repo, '--limit', '500', '--json', 'name,description')
         $labels = @()
-        if ($got.Code -eq 0) { try { $labels = @((@($got.Out) -join "`n") | ConvertFrom-Json) } catch { $labels = @() } }
+        # Enumerated, as Read-P20RouteJson does below: 5.1's ConvertFrom-Json hands
+        # a JSON array on as ONE object, so @(... | ConvertFrom-Json) was an array
+        # holding the array, and every size read as one label named all of them.
+        if ($got.Code -eq 0) {
+            try {
+                $parsed = ConvertFrom-Json -InputObject (@($got.Out) -join "`n")
+                $labels = @(foreach ($x in $parsed) { if ($null -ne $x) { $x } })
+            }
+            catch { $labels = @() }
+        }
         else {
             $why = @($got.Err | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ }) | Select-Object -First 1
             if (-not $why) { $why = 'gh returned an error' }

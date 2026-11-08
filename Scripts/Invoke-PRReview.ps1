@@ -401,7 +401,7 @@ try {
         Write-CliError -Message "Review prompt not found at $promptPath"
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
-    $promptTemplate = Get-Content $promptPath -Raw
+    $promptTemplate = Get-Content $promptPath -Raw -Encoding UTF8
     # The frontmatter and everything above the --- fence are for a person, not
     # instruction (Get-P20PromptInstruction, beside the resolver).
     $promptTemplate = Get-P20PromptInstruction -Text $promptTemplate

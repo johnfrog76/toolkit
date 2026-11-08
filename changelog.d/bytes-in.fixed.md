@@ -1,0 +1,1 @@
+- On Windows PowerShell 5.1, `NewPR` and `MeetingAgenda` no longer garble the accented letters and dashes in a card or a session they update, a hub in a folder whose name has an accent is found, and `Route -Assign` takes a size. In a Windows terminal, a review comment `GetPRComments` fetches keeps its punctuation.
