@@ -1149,7 +1149,9 @@ $rawTrackerAllowed = @{
         Lines  = @('git -c merge.directoryRenames=false pull --rebase 2>', 'git push 2>')
     }
 }
-$rawTrackerPattern = '(?<![\w$-])(gh|az|git)\s[^|\r\n]*(2>|\*>)'
+# A call may run on over backtick continuations (` at a line's end), and the
+# redirection then sits lines below the tool's name: the run is read across them.
+$rawTrackerPattern = '(?<![\w$-])(gh|az|git)\s(?:[^|\r\n`]|`[^\r\n]|`\r?\n)*(2>|\*>)'
 function Get-RawTrackerCalls {
     # Every match of the pattern that starts outside a comment and a string --
     # except inside an expandable string's own $(...), which is code, not text.
@@ -1183,7 +1185,7 @@ function Get-RawTrackerCalls {
         }
         if ($inside) { continue }
         $lineNo = ([regex]::Matches($Text.Substring(0, $m.Index), "`n")).Count + 1
-        $found += "${lineNo}: $($m.Value.Trim())"
+        $found += "${lineNo}: $(($m.Value -replace '`\r?\n\s*', ' ').Trim())"
     }
     return $found
 }
@@ -1231,6 +1233,8 @@ $rawTrackerCases = @(
     @{ Hit = $false; Why = 'a hint string that names a call';          Body = 'Write-Host "run: gh auth status 2>&1"' }
     @{ Hit = $false; Why = 'a variable that only ends in the name';    Body = '$gh 2>$null' }
     @{ Hit = $true;  Why = 'a raw call inside an expandable string''s $(...)'; Body = 'Write-Host "$(git rev-parse HEAD 2>$null)"' }
+    @{ Hit = $true;  Why = 'a raw call continued over backticks, its redirection lines below'; Body = "`$r = az boards query ```n    --org `$org ```n    --output json 2>`$null | ConvertFrom-Json" }
+    @{ Hit = $false; Why = 'a helper call continued over a backtick';  Body = "`$r = Invoke-P20TrackerRead 'az' ```n    @('boards', 'query')" }
 )
 foreach ($case in $rawTrackerCases) {
     $caseHits = @(Get-RawTrackerCalls $case.Body).Count
