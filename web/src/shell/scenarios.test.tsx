@@ -39,6 +39,7 @@ import type { CardContext } from "./registry";
 import type { EnvStatus, HowIWork, SpaceInfo } from "./api";
 import { drawerSections } from "../modules/ado/homeTabs";
 import { cardActions } from "../modules/ado/cardActions";
+import { summaryTiles } from "../modules/ado/summaryTiles";
 import {
   LANES,
   laneFor,
@@ -1046,6 +1047,33 @@ describe("the scenario grid: a card's menu, by the Organize flag", () => {
     expect(menu.filter((l) => l === "Remind me about this")).toHaveLength(
       e.features?.organize ? 1 : 0,
     );
+  });
+});
+
+// The Space summary's tiles, by the growth flag (docs/SCENARIOS.md, "The Space summary's tiles,
+// by the growth flag"): Reviews are growth's work reviews, so off -- or never configured -- the
+// tile is absent, not a 0 that reads as "no reviews". The card draws summaryTiles().
+describe("the scenario grid: the Space summary's tiles, by the growth flag", () => {
+  const stats = { daysBilled: 0, workItemsClosed: 4, reviewsGenerated: 0, prsReviewed: 2 };
+  it.each<[string, EnvStatus, string[]]>([
+    [
+      "growth not configured",
+      env({ status: "active", tier: 1, tracker: "ado", features: {} }),
+      ["Items closed", "PRs reviewed", "Repos"],
+    ],
+    [
+      "growth off",
+      env({ status: "active", tier: 1, tracker: "ado", features: { growth: false } }),
+      ["Items closed", "PRs reviewed", "Repos"],
+    ],
+    [
+      "growth on",
+      env({ status: "active", tier: 1, tracker: "ado", features: { growth: true } }),
+      ["Items closed", "Reviews", "PRs reviewed", "Repos"],
+    ],
+  ])("%s", (_why, e, labels) => {
+    const tiles = summaryTiles(stats, 3, { growth: Boolean(e.features?.growth) });
+    expect(tiles.map((t) => t.label)).toEqual(labels);
   });
 });
 

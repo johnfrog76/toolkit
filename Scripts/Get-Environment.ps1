@@ -25,7 +25,7 @@ if ($Help) {
     Write-Host "  $(Get-CliPrefix)Env -Startup   Silent on Tier 1, one-liner on Tier 2/3" -ForegroundColor Cyan
     Write-Host "  $(Get-CliPrefix)Env -Help      Show this help" -ForegroundColor Cyan
     Write-Host ""
-    return
+    exit 0
 }
 
 $cfg = $global:P20Config
@@ -181,7 +181,7 @@ if ($Startup) {
         if (-not $Quiet) { Write-Host "  [!] Minimal mode -- repo not found or git missing  ($(Get-CliPrefix)Env for details)" -ForegroundColor Red }
         Write-ToolkitLog -Type INFO -Source "$(Get-CliPrefix)Env" -Detail "$machine -- Tier 3 (minimal mode)"
     }
-    return
+    exit 0
 }
 
 # -- Full report ---------------------------------------------------------------
@@ -357,3 +357,8 @@ if ($tier -ge 2) {
 }
 
 Write-Host ""
+
+# Env reports and refuses nothing, so it always succeeds. Every end of this script says so: without
+# it, $LASTEXITCODE is whatever the last native probe left -- 128 from a git asked for a repository
+# where there is none -- and a caller that reads the code sees a failure that did not happen (#248).
+exit 0

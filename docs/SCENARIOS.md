@@ -151,6 +151,16 @@ The board's card and the list's row draw one action model (`cardActions.ts`), so
 | off, or not configured | the billable toggle, then **Plan milestone**, **Plan sprint** and **Tag** (on a card in play or planned) -- ending on **Tag**; no reminder item, and nothing of Organize is fetched |
 | on | the same, then **Remind me about this**: Organize's New Reminder dialog, the card's title as what and its id as the ref (`docs/modules/organize.md`, "The web UI") |
 
+### The Space summary's tiles, by the growth flag (`scenarios.test.tsx`; the model is `summaryTiles.ts`, the card `EngagementSummary.test.tsx`)
+
+The Space card on Home counts the Space's cards. Reviews are the growth module's work reviews, so
+that tile follows the flag; the agent counts 0 for it with growth off either way.
+
+| Growth | The Space card's tiles |
+| --- | --- |
+| off, or not configured | **Items closed**, then **PRs reviewed** and **Repos** where each is above 0; no Reviews tile |
+| on | **Items closed**, **Reviews** (0 included), then **PRs reviewed** and **Repos** where each is above 0 |
+
 ### A card's menu, by its pull request (`scenarios.test.tsx`; the dialog is `useLandCard.test.tsx`)
 
 The same one action model, by the card's lane alone. The board's data is the files and asks no

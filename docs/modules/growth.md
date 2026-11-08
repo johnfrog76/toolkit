@@ -335,7 +335,10 @@ and two components by name, `ReviewArchive` and `SkillsSnapshot`, which the ADO
 module's archive-mode home imports (`web/src/modules/ado/index.tsx`). A module
 may import another module's card; it may not fork one. They are gated there on
 the same flag their routes are, so an install without growth shows the two ADO
-cards and nothing breaks.
+cards and nothing breaks. The ADO module's **Space** card on Home follows the same flag for its
+**Reviews** tile: work reviews are growth's, so with growth off, or not configured, the card draws
+no Reviews tile rather than one that can only read 0 (`summaryTiles.ts`; [`docs/SCENARIOS.md`](../SCENARIOS.md),
+"The Space summary's tiles, by the growth flag").
 
 `api.growth.ts` injects the endpoints into the shell's single slice and adds its
 tag types -- `Growth`, `Resume`, `Reviews` -- with `enhanceEndpoints`, so the

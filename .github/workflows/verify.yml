@@ -17,8 +17,9 @@
 # cancel the checks already running there.
 # A local run on each host remains the proof for a change.
 #
-# A scheduled failure is filed as an issue carrying the run's URL, and the run is not
-# re-run: the next morning's first merge carries the fix.
+# A scheduled failure is not re-run, and nothing here files it: the job's token has no
+# `issues: write`. GitHub's own notification is what reports a red run, and a person
+# files the issue by hand, with the run's URL; the next morning's first merge carries the fix.
 #
 # Each runner's output is teed to a transcript and read by Scripts/Test-CiHalf.ps1,
 # which parses the summary line the runner prints last -- the rule tkTest reads it

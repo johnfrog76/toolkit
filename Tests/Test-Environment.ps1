@@ -566,6 +566,19 @@ tkMenu -All
 '@
 Assert-True 'the question names the Space you are in ({space})' ($questionOut -match 'How do you want to work in Env GitHub\?') $questionOut
 
+# The refusal contract: exit 0 is success and nothing else is. Env reports and refuses nothing, so
+# typed from a folder that is not a git repository -- where its git probe answers 128 -- it still
+# leaves $LASTEXITCODE at 0, as it does inside one -- and so does the import, which runs Env -Startup (#248).
+$exitOut = Invoke-InChild @"
+Set-Location -LiteralPath '$($sandboxRoot -replace "'", "''")'
+Import-Module "`$env:PSModulePath/utilities.psm1" -Force -DisableNameChecking
+"IMPORT-EXIT=`$LASTEXITCODE"
+tkEnv | Out-Null
+"ENV-EXIT=`$LASTEXITCODE"
+"@
+Assert-True 'importing the module outside a git repository (Env -Startup) leaves $LASTEXITCODE at 0' ($exitOut -match '(?m)^IMPORT-EXIT=0\s*$') (($exitOut -split "`r?`n" | Select-String 'IMPORT-EXIT') -join ' ')
+Assert-True 'Env typed outside a git repository leaves $LASTEXITCODE at 0' ($exitOut -match '(?m)^ENV-EXIT=0\s*$') (($exitOut -split "`r?`n" | Select-String 'ENV-EXIT') -join ' ')
+
 $total = $script:passed + $script:failed
 
 }
