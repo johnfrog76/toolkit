@@ -1499,6 +1499,67 @@ foreach ($case in @(
     Assert-True "Clause 18: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
 }
 
+# And every request BODY a script sends is UTF-8 bytes from one helper,
+# ConvertTo-P20Utf8Body: Windows PowerShell 5.1 encodes a string -Body in the
+# content type's charset and, with none named, as ISO-8859-1, so a title with an
+# accent reached the organisation altered. The model call and the agent call are
+# held to it too: they carry no token, but they carry the same text.
+function Get-RestBodyHits {
+    param([string]$Text, [string]$Name = 'body')
+    $tokens = $null; $errs = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$tokens, [ref]$errs)
+    $assigns = @{}
+    foreach ($a in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true)) {
+        if ($a.Left -is [System.Management.Automation.Language.VariableExpressionAst]) {
+            $key = $a.Left.VariablePath.UserPath.ToLowerInvariant()
+            if (-not $assigns.ContainsKey($key)) { $assigns[$key] = @() }
+            $assigns[$key] += $a.Right.Extent.Text.Trim()
+        }
+    }
+    $hits = @()
+    $bodies = 0
+    foreach ($c in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and @('Invoke-RestMethod', 'Invoke-WebRequest', 'irm', 'iwr') -contains $n.GetCommandName() }, $true)) {
+        $els = $c.CommandElements
+        for ($i = 1; $i -lt $els.Count; $i++) {
+            if (-not ($els[$i] -is [System.Management.Automation.Language.CommandParameterAst] -and $els[$i].ParameterName -eq 'Body')) { continue }
+            $bodies++
+            $arg = $els[$i].Argument
+            if (-not $arg -and $i + 1 -lt $els.Count) { $arg = $els[$i + 1] }
+            $bText = if ($arg) { $arg.Extent.Text.Trim() } else { '' }
+            $ok = $false
+            if ($bText -match '^\(\s*ConvertTo-P20Utf8Body\s') { $ok = $true }
+            elseif ($arg -is [System.Management.Automation.Language.VariableExpressionAst]) {
+                $vals = @($assigns[$arg.VariablePath.UserPath.ToLowerInvariant()])
+                $ok = ($vals.Count -gt 0) -and (@($vals | Where-Object { $_ -notmatch '^ConvertTo-P20Utf8Body\s' }).Count -eq 0)
+            }
+            if (-not $ok) { $hits += "${Name}:$($c.Extent.StartLineNumber) -Body is not ConvertTo-P20Utf8Body ($bText)" }
+        }
+    }
+    return [PSCustomObject]@{ Hits = $hits; Bodies = $bodies }
+}
+
+$bodyHits = @()
+$bodyCount = 0
+foreach ($f in @(Get-ChildItem (Join-Path $pkgRoot 'Scripts') -Filter '*.ps1' -File)) {
+    $read = Get-RestBodyHits -Text ([System.IO.File]::ReadAllText($f.FullName)) -Name $f.Name
+    $bodyHits += @($read.Hits)
+    $bodyCount += $read.Bodies
+}
+Assert-True "Clause 18: every request body in Scripts/ is UTF-8 bytes from ConvertTo-P20Utf8Body ($bodyCount)" (
+    ($bodyHits.Count -eq 0) -and ($bodyCount -ge 14)) ($bodyHits -join '; ')
+foreach ($case in @(
+        @{ Hit = $true;  Why = 'a string body'; Body = '$b = @{ a = 1 } | ConvertTo-Json; Invoke-RestMethod -Uri $u -Headers $h -Method Post -Body $b' },
+        @{ Hit = $true;  Why = 'a body built inline'; Body = 'Invoke-RestMethod -Uri $u -Method Post -Body (@{ a = 1 } | ConvertTo-Json)' },
+        @{ Hit = $true;  Why = 'a body on a continued line of the model call'; Body = "Invoke-RestMethod ``n    -Uri 'https://api.anthropic.com/v1/messages' ``n    -Body `$requestBody" },
+        @{ Hit = $true;  Why = 'one assignment of the body variable not through the helper'; Body = '$b = ConvertTo-P20Utf8Body $j; if ($x) { $b = $j }; Invoke-RestMethod -Uri $u -Body $b' },
+        @{ Hit = $false; Why = 'the helper inline'; Body = 'Invoke-RestMethod -Uri $u -Headers $h -Method Post -Body (ConvertTo-P20Utf8Body $json)' },
+        @{ Hit = $false; Why = 'a variable the helper filled'; Body = '$b = ConvertTo-P20Utf8Body $json; Invoke-WebRequest -Uri $u -Body $b' },
+        @{ Hit = $false; Why = 'a GET with no body'; Body = 'Invoke-RestMethod -Uri $u -Headers $h -Method Get' }
+    )) {
+    $caseHits = @((Get-RestBodyHits -Text $case.Body).Hits).Count
+    Assert-True "Clause 18: the body sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
+}
+
 # -- Clause 19: every Get-Content names its encoding ---------------------------
 # Windows PowerShell 5.1 reads a file with no BOM in the system's ANSI code page
 # when Get-Content is given no -Encoding; 7 reads it as UTF-8. Every file this

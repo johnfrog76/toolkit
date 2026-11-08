@@ -261,6 +261,7 @@ try {
         foreach ($row in @('http://dev.azure.com/acme-org', 'ftp://dev.azure.com/acme-org', 'dev.azure.com/acme-org', 'https://user:pw@dev.azure.com/acme-org', 'https://')) {
             Assert-True "token helper, ${exe}: no header is built for '$row', and the refusal says the token is not sent" ($to -match ('ADDR\[' + [regex]::Escape($row) + '\]=REFUSED .*is not an https address, so your token is not sent')) $to
         }
+        Assert-True "token helper, ${exe}: the refusal names the address without the user name and password in it" ($to -match 'ADDR\[https://user:pw@dev\.azure\.com/acme-org\]=REFUSED [^\n]*https://dev\.azure\.com/acme-org' -and $to -notmatch 'REFUSED [^\n]*user:pw') $to
         foreach ($row in @('', 'https://github.com/acme', 'https://www.github.com/acme')) {
             Assert-True "token helper, ${exe}: no header for a Space whose tracker is not Azure DevOps: '$row'" ($to -match ('ADDR\[' + [regex]::Escape($row) + '\]=REFUSED .*is not an Azure DevOps organisation, so your Azure DevOps token is not sent')) $to
         }
@@ -274,6 +275,92 @@ catch {
 }
 finally {
     if (Test-Path $tokenRoot) { Remove-Item $tokenRoot -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+Write-Host ""
+
+# -- A request body on the wire ------------------------------------------------
+# What a REST call actually sends, read off a listener on this machine's own
+# loopback address: no tracker, no Azure DevOps organisation and no model API is
+# contacted, and the bearer token is a stand-in. Windows PowerShell 5.1 encodes a
+# string -Body with the charset of the request's content type and, when it names
+# none, as ISO-8859-1, so 'é' reached the organisation as one byte that is not
+# UTF-8 and anything past U+00FF as '?'. The rows send the text each verb sends,
+# the way it sends it, from a child of each host on the machine.
+
+Write-Host "-- A request body on the wire --------------------------" -ForegroundColor Cyan
+
+$wireCases = @'
+. '__HELPER__'
+$ErrorActionPreference = 'Stop'
+# Text built from code points, so this file's own encoding cannot decide the row.
+$text = 'Caf' + [char]0x00E9 + ' ' + [char]0x2014 + ' na' + [char]0x00EF + 've ' + [char]0x2713
+$json = (@{ title = $text } | ConvertTo-Json -Compress)
+"RAW=$([bool]($json -match '[^\x00-\x7F]'))"
+$probe = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, 0)
+$probe.Start(); $port = $probe.LocalEndpoint.Port; $probe.Stop()
+$listener = New-Object System.Net.HttpListener
+$listener.Prefixes.Add("http://127.0.0.1:$port/")
+$listener.Start()
+$seen = [hashtable]::Synchronized(@{})
+$serve = [powershell]::Create()
+$null = $serve.AddScript({
+    param($l, $seen)
+    while ($l.IsListening) {
+        try { $c = $l.GetContext() } catch { break }
+        $ms = New-Object System.IO.MemoryStream
+        $c.Request.InputStream.CopyTo($ms)
+        $seen[$c.Request.Url.AbsolutePath.Trim('/')] = @([string]$c.Request.ContentType, $ms.ToArray())
+        $reply = [System.Text.Encoding]::UTF8.GetBytes('{}')
+        $c.Response.ContentType = 'application/json'
+        $c.Response.OutputStream.Write($reply, 0, $reply.Length)
+        $c.Response.Close()
+    }
+}).AddArgument($listener).AddArgument($seen)
+$handle = $serve.BeginInvoke()
+$utf8 = New-Object System.Text.UTF8Encoding($false, $true)
+$send = {
+    param([string]$Name, [hashtable]$Headers, $Body)
+    try {
+        $null = Invoke-RestMethod -Uri "http://127.0.0.1:$port/$Name" -Method Post -Headers $Headers -Body $Body -TimeoutSec 20
+        $got = $seen[$Name]
+        $decoded = try { $utf8.GetString([byte[]]$got[1]) } catch { 'NOT-UTF8' }
+        "WIRE[$Name]=$($decoded -ceq $json)|$($got[0])"
+    } catch { "WIRE[$Name]=ERROR $($_.Exception.Message)" }
+}
+$ado = Get-P20AdoHeaders -Token 'a-token' -OrgUrl 'https://dev.azure.com/acme-org'
+$patch = Get-P20AdoHeaders -Token 'a-token' -OrgUrl 'https://dev.azure.com/acme-org' -ContentType 'application/json-patch+json'
+& $send 'ado-string' $ado $json
+& $send 'ado-patch-string' $patch $json
+$bytes = try { ConvertTo-P20Utf8Body $json } catch { $null }
+if ($null -eq $bytes) { "WIRE[ado-bytes]=ERROR no ConvertTo-P20Utf8Body" } else { & $send 'ado-bytes' $ado $bytes }
+if ($null -eq $bytes) { "WIRE[patch-bytes]=ERROR no ConvertTo-P20Utf8Body" } else { & $send 'patch-bytes' $patch $bytes }
+$listener.Stop(); $listener.Close()
+try { $null = $serve.EndInvoke($handle) } catch { $null = $_ }
+$serve.Dispose()
+'@.Replace('__HELPER__', $tokenHelperPath)
+$wireRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-wire-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+try {
+    New-Item -ItemType Directory -Path $wireRoot -Force | Out-Null
+    $wireScript = Join-Path $wireRoot 'wire-cases.ps1'
+    [System.IO.File]::WriteAllText($wireScript, $wireCases, (New-Object System.Text.UTF8Encoding($false)))
+    foreach ($exe in @('pwsh', 'powershell.exe')) {
+        if (-not (Get-Command $exe -ErrorAction SilentlyContinue)) { continue }
+        $savedPref = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        $wo = (& $exe -NoProfile -File $wireScript 2>&1 | ForEach-Object { $_.ToString() }) -join "`n"
+        $ErrorActionPreference = $savedPref
+        foreach ($name in @('ado-string', 'ado-patch-string', 'ado-bytes', 'patch-bytes')) {
+            Assert-True "request body, ${exe}: '$name' reaches the server as the UTF-8 of the text sent" ($wo -match ('WIRE\[' + [regex]::Escape($name) + '\]=True\|')) $wo
+        }
+        Assert-True "request body, ${exe}: the Azure DevOps headers say charset=utf-8, for JSON and for a work item patch" ($wo -match 'WIRE\[ado-string\]=[^|]*\|application/json; charset=utf-8(\n|$)' -and $wo -match 'WIRE\[ado-patch-string\]=[^|]*\|application/json-patch\+json; charset=utf-8(\n|$)') $wo
+    }
+}
+catch {
+    Assert-True "the request body cases ran to the end without a terminating error" $false $_.Exception.Message
+}
+finally {
+    if (Test-Path $wireRoot) { Remove-Item $wireRoot -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
 Write-Host ""
