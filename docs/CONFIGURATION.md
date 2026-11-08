@@ -74,7 +74,8 @@ and `/env` serves the answer. Whether the tracker is CONTACTED is a separate que
 **An Azure DevOps address is `https://`.** Your Azure DevOps token goes only to the Space's own
 address, only when the address reads as Azure DevOps by the rule above, and only over https. A verb
 that would send it anywhere else (a GitHub or blank address, an `http://` one, one with no scheme, or
-one carrying a user name and password) stops with that sentence and sends nothing. The host is not
+one carrying a user name and password) stops with that sentence and sends nothing; the sentence names
+the address with any user name and password taken out. The host is not
 listed, so Azure DevOps Server on your company's own name works. The rule is `Test-P20AdoTokenUrl` in
 `Scripts/Get-AdoToken.ps1`, and every request's headers go through it; every request's address is built
 on the Space's address, so nothing read from a card chooses where the token goes. `Test-Portability`'s

@@ -353,7 +353,7 @@ try {
     $commentBody = @{ content = $Reply; parentCommentId = 1 } | ConvertTo-Json
     $commentUri = "$org/$encodedProject/_apis/git/repositories/$Repository/pullRequests/$PullRequestId/threads/$ThreadId/comments?api-version=7.1"
     try {
-        $result = Invoke-RestMethod -Uri $commentUri -Headers $headers -Method Post -Body $commentBody
+        $result = Invoke-RestMethod -Uri $commentUri -Headers $headers -Method Post -Body (ConvertTo-P20Utf8Body $commentBody)
         Write-Host "Reply posted to thread $ThreadId (comment ID: $($result.id))" -ForegroundColor Green
     } catch {
         if ($_.Exception.Response.StatusCode -eq 404) {
@@ -381,7 +381,7 @@ try {
             $statusBody = @{ status = $numericStatus } | ConvertTo-Json
             $threadUri = "$org/$encodedProject/_apis/git/repositories/$Repository/pullRequests/$PullRequestId/threads/$($ThreadId)?api-version=7.1"
             try {
-                Invoke-RestMethod -Uri $threadUri -Headers $headers -Method Patch -Body $statusBody | Out-Null
+                Invoke-RestMethod -Uri $threadUri -Headers $headers -Method Patch -Body (ConvertTo-P20Utf8Body $statusBody) | Out-Null
                 Write-Host "Thread $ThreadId status set to '$Status'" -ForegroundColor Green
             } catch {
                 Write-Host "Warning: Reply posted, but failed to update thread status to '$Status'." -ForegroundColor Yellow

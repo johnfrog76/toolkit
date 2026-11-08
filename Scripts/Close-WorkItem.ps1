@@ -333,7 +333,7 @@ else {
 
     try {
         $patchUri = "$org/_apis/wit/workitems/$($Id)?api-version=7.1"
-        Invoke-RestMethod -Uri $patchUri -Headers $headers -Method Patch -Body $patchBody | Out-Null
+        Invoke-RestMethod -Uri $patchUri -Headers $headers -Method Patch -Body (ConvertTo-P20Utf8Body $patchBody) | Out-Null
         Write-Host "[+] Set state to $targetState ($adoReason)" -ForegroundColor Green
     }
     catch {
@@ -356,7 +356,7 @@ try {
     $project = $wi.fields.'System.TeamProject'
     $commentUri = "$org/$([Uri]::EscapeDataString($project))/_apis/wit/workItems/$Id/comments?api-version=7.1-preview"
     $commentBody = @{ text = $Comment } | ConvertTo-Json -Depth 3
-    Invoke-RestMethod -Uri $commentUri -Headers $commentHeaders -Method Post -Body $commentBody | Out-Null
+    Invoke-RestMethod -Uri $commentUri -Headers $commentHeaders -Method Post -Body (ConvertTo-P20Utf8Body $commentBody) | Out-Null
     Write-Host "[+] Posted comment to discussion" -ForegroundColor Green
 }
 catch {

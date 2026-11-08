@@ -737,7 +737,7 @@ $jsonBody = $prBody | ConvertTo-Json -Depth 3
 
 try {
     $uri = "$org/$encodedProject/_apis/git/repositories/$Repository/pullrequests?api-version=7.1"
-    $pr = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -Body $jsonBody
+    $pr = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -Body (ConvertTo-P20Utf8Body $jsonBody)
 } catch {
     # ONE block: this used to print a red [!] line and then an Error: under it.
     $statusCode = $_.Exception.Response.StatusCode
@@ -777,7 +777,7 @@ if ($AutoComplete -and $prId) {
         } | ConvertTo-Json -Depth 3
 
         $acUri = "$org/$encodedProject/_apis/git/repositories/$Repository/pullrequests/$($prId)?api-version=7.1"
-        Invoke-RestMethod -Uri $acUri -Headers $headers -Method Patch -Body $acBody | Out-Null
+        Invoke-RestMethod -Uri $acUri -Headers $headers -Method Patch -Body (ConvertTo-P20Utf8Body $acBody) | Out-Null
         Write-Host "[+] Auto-complete enabled (squash, delete branch)" -ForegroundColor Green
     } catch {
         Write-Host "[~] PR created but auto-complete failed -- $($_.Exception.Message)" -ForegroundColor Yellow
@@ -828,7 +828,7 @@ if (-not $SkipWorkItem -and $workItemId) {
                     @{ op = "add"; path = "/fields/System.Reason"; value = "Work started" }
                 ) | ConvertTo-Json -Depth 3
 
-                Invoke-RestMethod -Uri $wiUri -Headers $patchHeaders -Method Patch -Body $statePatch | Out-Null
+                Invoke-RestMethod -Uri $wiUri -Headers $patchHeaders -Method Patch -Body (ConvertTo-P20Utf8Body $statePatch) | Out-Null
                 Write-Host "[+] Work item moved to Code Review" -ForegroundColor Green
             }
         }
@@ -874,7 +874,7 @@ if (-not $SkipWorkItem -and $workItemId) {
 
         $commentUri = "$org/$encodedWiProject/_apis/wit/workItems/$workItemId/comments?api-version=7.1-preview"
         $commentBody = @{ text = $commentText } | ConvertTo-Json -Depth 3
-        Invoke-RestMethod -Uri $commentUri -Headers $headers -Method Post -Body $commentBody | Out-Null
+        Invoke-RestMethod -Uri $commentUri -Headers $headers -Method Post -Body (ConvertTo-P20Utf8Body $commentBody) | Out-Null
         Write-Host "[+] Comment posted to work item" -ForegroundColor Green
     } catch {
         $msg = $_.Exception.Message

@@ -127,7 +127,8 @@ function global:az {
 function global:Invoke-RestMethod {
     param(`$Uri, `$Headers, `$Method, `$Body)
     `$line = "REST `$Method `$Uri"
-    if (`$Body) { `$line += " " + (`$Body -replace '\s+', ' ') }
+    `$text = if (`$Body -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString(`$Body) } else { [string]`$Body }
+    if (`$Body) { `$line += " " + (`$text -replace '\s+', ' ') }
     Add-Content -Path '$calls' -Value `$line
     if ("`$Method" -eq 'Get') {
         `$st = if (Test-Path (Join-Path '$state' 'wi-closed')) { 'Closed' } else { 'Active' }

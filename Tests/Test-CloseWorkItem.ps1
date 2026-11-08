@@ -257,10 +257,11 @@ try {
         Assert-True "token helper, ${exe}: only WARNING lines and blanks is a failure" ($to -match 'warnonly ok=False token=\[\]') $to
         Assert-True "token helper, ${exe}: asks for the Azure DevOps resource with the tenant given" ($to -match 'ARGS=account get-access-token --tenant tenant-1 --resource 499b84ac-1321-427f-aa17-267ca6975798 --query accessToken -o tsv') $to
         Assert-True "token helper, ${exe}: no tenant, no --tenant" ($to -match 'NOTENANT=account get-access-token --resource ') $to
-        Assert-True "token helper, ${exe}: the headers carry the bearer token and the content type asked for, for dev.azure.com and for an https host of a company's own" ($to -match 'HEADERS=Bearer a-token\|application/json\|application/json-patch\+json') $to
+        Assert-True "token helper, ${exe}: the headers carry the bearer token and the content type asked for, with charset=utf-8, for dev.azure.com and for an https host of a company's own" ($to -match 'HEADERS=Bearer a-token\|application/json; charset=utf-8\|application/json-patch\+json; charset=utf-8') $to
         foreach ($row in @('http://dev.azure.com/acme-org', 'ftp://dev.azure.com/acme-org', 'dev.azure.com/acme-org', 'https://user:pw@dev.azure.com/acme-org', 'https://')) {
             Assert-True "token helper, ${exe}: no header is built for '$row', and the refusal says the token is not sent" ($to -match ('ADDR\[' + [regex]::Escape($row) + '\]=REFUSED .*is not an https address, so your token is not sent')) $to
         }
+        Assert-True "token helper, ${exe}: the refusal names the address without the user name and password in it" ($to -match 'ADDR\[https://user:pw@dev\.azure\.com/acme-org\]=REFUSED [^\n]*https://dev\.azure\.com/acme-org' -and $to -notmatch 'REFUSED [^\n]*user:pw') $to
         foreach ($row in @('', 'https://github.com/acme', 'https://www.github.com/acme')) {
             Assert-True "token helper, ${exe}: no header for a Space whose tracker is not Azure DevOps: '$row'" ($to -match ('ADDR\[' + [regex]::Escape($row) + '\]=REFUSED .*is not an Azure DevOps organisation, so your Azure DevOps token is not sent')) $to
         }
@@ -274,6 +275,104 @@ catch {
 }
 finally {
     if (Test-Path $tokenRoot) { Remove-Item $tokenRoot -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+Write-Host ""
+
+# -- A request body on the wire ------------------------------------------------
+# What a REST call actually sends, read off a listener on this machine's own
+# loopback address: no tracker, no Azure DevOps organisation and no model API is
+# contacted, and the bearer token is a stand-in. Windows PowerShell 5.1 does not
+# send a string -Body as UTF-8, with or without charset=utf-8 in the headers, so an
+# accented letter reached the organisation as a byte that is not UTF-8. The rows
+# send the text each verb sends, the way it sends it, from a child of each host on
+# the machine.
+
+Write-Host "-- A request body on the wire --------------------------" -ForegroundColor Cyan
+
+$wireCases = @'
+. '__HELPER__'
+$ErrorActionPreference = 'Stop'
+# Text built from code points, so this file's own encoding cannot decide the row.
+$text = 'Caf' + [char]0x00E9 + ' ' + [char]0x2014 + ' na' + [char]0x00EF + 've ' + [char]0x2713
+$json = (@{ title = $text } | ConvertTo-Json -Compress)
+"RAW=$([bool]($json -match '[^\x00-\x7F]'))"
+"EDITION=$($PSVersionTable.PSEdition)"
+$probe = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, 0)
+$probe.Start(); $port = $probe.LocalEndpoint.Port; $probe.Stop()
+$listener = New-Object System.Net.HttpListener
+$listener.Prefixes.Add("http://127.0.0.1:$port/")
+$listener.Start()
+$seen = [hashtable]::Synchronized(@{})
+$serve = [powershell]::Create()
+$null = $serve.AddScript({
+    param($l, $seen)
+    while ($l.IsListening) {
+        try { $c = $l.GetContext() } catch { break }
+        $ms = New-Object System.IO.MemoryStream
+        $c.Request.InputStream.CopyTo($ms)
+        $seen[$c.Request.Url.AbsolutePath.Trim('/')] = @([string]$c.Request.ContentType, $ms.ToArray())
+        $reply = [System.Text.Encoding]::UTF8.GetBytes('{}')
+        $c.Response.ContentType = 'application/json'
+        $c.Response.OutputStream.Write($reply, 0, $reply.Length)
+        $c.Response.Close()
+    }
+}).AddArgument($listener).AddArgument($seen)
+$handle = $serve.BeginInvoke()
+$utf8 = New-Object System.Text.UTF8Encoding($false, $true)
+$send = {
+    param([string]$Name, [hashtable]$Headers, $Body)
+    try {
+        $null = Invoke-RestMethod -Uri "http://127.0.0.1:$port/$Name" -Method Post -Headers $Headers -Body $Body -TimeoutSec 20
+        $got = $seen[$Name]
+        $decoded = try { $utf8.GetString([byte[]]$got[1]) } catch { 'NOT-UTF8' }
+        "WIRE[$Name]=$($decoded -ceq $json)|$($got[0])"
+    } catch { "WIRE[$Name]=ERROR $($_.Exception.Message)" }
+}
+$ado = Get-P20AdoHeaders -Token 'a-token' -OrgUrl 'https://dev.azure.com/acme-org'
+$patch = Get-P20AdoHeaders -Token 'a-token' -OrgUrl 'https://dev.azure.com/acme-org' -ContentType 'application/json-patch+json'
+& $send 'ado-string' $ado $json
+& $send 'ado-patch-string' $patch $json
+$bytes = try { ConvertTo-P20Utf8Body $json } catch { $null }
+if ($null -eq $bytes) { "WIRE[ado-bytes]=ERROR no ConvertTo-P20Utf8Body" } else { & $send 'ado-bytes' $ado $bytes }
+if ($null -eq $bytes) { "WIRE[patch-bytes]=ERROR no ConvertTo-P20Utf8Body" } else { & $send 'patch-bytes' $patch $bytes }
+$listener.Stop(); $listener.Close()
+try { $null = $serve.EndInvoke($handle) } catch { $null = $_ }
+$serve.Dispose()
+'@.Replace('__HELPER__', $tokenHelperPath)
+$wireRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-wire-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+try {
+    New-Item -ItemType Directory -Path $wireRoot -Force | Out-Null
+    $wireScript = Join-Path $wireRoot 'wire-cases.ps1'
+    [System.IO.File]::WriteAllText($wireScript, $wireCases, (New-Object System.Text.UTF8Encoding($false)))
+    foreach ($exe in @('pwsh', 'powershell.exe')) {
+        if (-not (Get-Command $exe -ErrorAction SilentlyContinue)) { continue }
+        $savedPref = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        $wo = (& $exe -NoProfile -File $wireScript 2>&1 | ForEach-Object { $_.ToString() }) -join "`n"
+        $ErrorActionPreference = $savedPref
+        foreach ($name in @('ado-bytes', 'patch-bytes')) {
+            Assert-True "request body, ${exe}: '$name' reaches the server as the UTF-8 of the text sent" ($wo -match ('WIRE\[' + [regex]::Escape($name) + '\]=True\|')) $wo
+        }
+        # The host fact the helper exists for, pinned both ways: Windows PowerShell
+        # 5.1 does not send a STRING body as UTF-8 even when the content type says
+        # charset=utf-8, and pwsh 7.4 and later does. So no script sends a string.
+        $desktop = ($wo -match 'EDITION=Desktop')
+        foreach ($name in @('ado-string', 'ado-patch-string')) {
+            if ($desktop) {
+                Assert-True "request body, ${exe}: a string '$name' body is NOT sent as UTF-8 by Windows PowerShell 5.1, charset or no -- the reason every body is bytes" ($wo -match ('WIRE\[' + [regex]::Escape($name) + '\]=False\|')) $wo
+            } else {
+                Assert-True "request body, ${exe}: a string '$name' body is sent as UTF-8 by PowerShell 7" ($wo -match ('WIRE\[' + [regex]::Escape($name) + '\]=True\|')) $wo
+            }
+        }
+        Assert-True "request body, ${exe}: the Azure DevOps headers say charset=utf-8, for JSON and for a work item patch" ($wo -match 'WIRE\[ado-string\]=[^|]*\|application/json; charset=utf-8(\n|$)' -and $wo -match 'WIRE\[ado-patch-string\]=[^|]*\|application/json-patch\+json; charset=utf-8(\n|$)') $wo
+    }
+}
+catch {
+    Assert-True "the request body cases ran to the end without a terminating error" $false $_.Exception.Message
+}
+finally {
+    if (Test-Path $wireRoot) { Remove-Item $wireRoot -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
 Write-Host ""
@@ -314,8 +413,11 @@ function global:az {
 function global:Invoke-RestMethod {
     param(`$Uri, `$Headers, `$Method, `$Body)
     `$line = "REST `$Method `$Uri"
-    if (`$Body) { `$line += " " + (`$Body -replace '\s+', ' ') }
+    # The body is sent as UTF-8 bytes; the stub reads it back the way a server does.
+    `$text = if (`$Body -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString(`$Body) } else { [string]`$Body }
+    if (`$Body) { `$line += " " + (`$text -replace '\s+', ' ') }
     Add-Content -Path '$calls' -Value `$line
+    if (`$Body -and -not (`$Body -is [byte[]])) { Add-Content -Path '$calls' -Value "BODY-NOT-BYTES `$Method `$Uri" }
     if ("`$Method" -eq 'Get') {
         return [pscustomobject]@{ fields = [pscustomobject]@{ 'System.State' = `$env:P20_TEST_WI_STATE; 'System.Title' = 'A scratch item'; 'System.WorkItemType' = `$env:P20_TEST_WI_TYPE; 'System.TeamProject' = 'Acme Project' } }
     }
@@ -365,6 +467,7 @@ try {
     Assert-True "the PATCH sets System.State to Closed" (@($ops | Where-Object { $_.path -eq '/fields/System.State' -and $_.value -eq 'Closed' -and $_.op -eq 'add' }).Count -eq 1) ($patches -join ' | ')
     Assert-True "the PATCH sets System.Reason to Completed" (@($ops | Where-Object { $_.path -eq '/fields/System.Reason' -and $_.value -eq 'Completed' }).Count -eq 1) ($patches -join ' | ')
     Assert-True "the comment is POSTed once, with the text given" ($posts.Count -eq 1 -and $posts[0].StartsWith("REST Post $commentUri ") -and $posts[0].Contains('Shipped in the scratch branch')) ($posts -join ' | ')
+    Assert-True "typed CloseItem sends every body as UTF-8 bytes, the patch and the comment alike" (@($r.Calls | Where-Object { $_ -match '^BODY-NOT-BYTES ' }).Count -eq 0 -and ($patches.Count + $posts.Count) -ge 2) ($r.Calls -join ' | ')
     Assert-True "typed CloseItem reports the result line" ($r.Text -match '\[RESULT\] workItemType=Task targetState=Closed reason=Completed') $r.Text
 
     # A Bug goes to Resolved / Fixed, and an item already closed is left alone.

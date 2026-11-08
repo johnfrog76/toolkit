@@ -1605,7 +1605,7 @@ try {
     $fxq = $ghFx -replace "'", "''"
     $modelStub = @"
 `$env:ANTHROPIC_API_KEY = 'sk-test-not-a-key'
-function global:Invoke-RestMethod { param(`$Uri, `$Method, `$Headers, `$Body) [System.IO.File]::WriteAllText('$fxq/model-request.json', [string]`$Body); return [pscustomobject]@{ content = @([pscustomobject]@{ text = [System.IO.File]::ReadAllText('$fxq/model-reply.json') }) } }
+function global:Invoke-RestMethod { param(`$Uri, `$Method, `$Headers, `$Body) `$isBytes = (`$Body -is [byte[]]); [System.IO.File]::WriteAllText('$fxq/model-request.json', `$(if (`$isBytes) { [System.Text.Encoding]::UTF8.GetString(`$Body) } else { [string]`$Body })); [System.IO.File]::WriteAllText('$fxq/model-body-type.txt', `$(if (`$isBytes) { 'bytes' } else { 'string' })); return [pscustomobject]@{ content = @([pscustomobject]@{ text = [System.IO.File]::ReadAllText('$fxq/model-reply.json') }) } }
 "@
     $r = Invoke-GhVerb "$modelStub`n${cfgPrefix}AddPRReview 12"
     $paths = @(Get-GhCalls $r | ForEach-Object { @($_ | Where-Object { $_ -like 'repos/*' })[0] } | Where-Object { $_ })
@@ -1615,6 +1615,8 @@ function global:Invoke-RestMethod { param(`$Uri, `$Method, `$Headers, `$Body) [S
         (($paths -join ',') -eq 'repos/acme/widgets/pulls/12,repos/acme/widgets/pulls/12,repos/acme/widgets,repos/acme/widgets/pulls/12/reviews' -and (@(Get-GhCalls $r)[1] -contains 'Accept: application/vnd.github.diff')) (Format-Calls $r)
     $modelSent = [System.IO.File]::ReadAllText((Join-Path $ghFx 'model-request.json'))
     Assert-True 'the model is sent the diff GitHub gave' ($modelSent -match [regex]::Escape('+  use(x);')) $modelSent
+    $modelBodyType = [System.IO.File]::ReadAllText((Join-Path $ghFx 'model-body-type.txt'))
+    Assert-True 'and the model request goes as UTF-8 bytes, so a diff with an accent is valid JSON text on every host' ($modelBodyType -eq 'bytes') $modelBodyType
     $sent = @($r.Inputs)
     Assert-True 'the review is event COMMENT, sent as a file' ($sent.Count -eq 1 -and $sent[0].event -eq 'COMMENT' -and (@(Get-GhCalls $r)[3] -contains '--input')) ((@($r.Inputs) | ConvertTo-Json -Compress -Depth 5))
     Assert-True 'the finding on a diff line is inline: path, new-side line, RIGHT, the marker' `
