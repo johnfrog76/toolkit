@@ -908,7 +908,9 @@ start `tkWeb -Dev`"; a Ctrl+C in that terminal reaches both servers; and a serve
 tool call dies when the tool call's shell is reaped, still being in its session. `Start-Detached.ps1`
 wraps the command, off Windows, in a session leader (`Resolve-SessionLeader`): a perl one-liner
 that starts a new session, opens `/dev/null` as stdin -- or the file a launch names (`-StdInFile`,
-how `StartWork -Launch` hands a session its prompt) -- opens the two log files as its stdout and stderr,
+how `StartWork -Launch` hands a session its prompt, and with `-RemoveStdInFile` unlinks that file as soon
+as it is open, so the session reads it whole and nothing of it stays on disk) -- opens the two log files as
+its stdout and stderr,
 and execs the command in place, so the PID the launcher records is the server's own. The log files are
 opened by the child on purpose: `Start-Process`'s redirection off Windows is a pipe that pwsh copies
 into the file only while pwsh lives, so everything a server wrote after `tkAgent` or `tkWeb -Dev`

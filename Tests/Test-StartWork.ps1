@@ -43,11 +43,16 @@
                 card); never a launch on the owner's seat -- fable on a card and on an issue
                 refused, and no size refused, as are me, a size with no model,
                 -Clip with -Launch, -WhatIf alone, no git repository, another
-                repository's origin, a failed worktree add and no claude. Off Windows the launch itself: read
-                through a pipe it returns while the stub session lives on, the
-                worktree is under .claude/worktrees/, the log at the root, and
-                the log's first message is the block StartWork prints, whole.
-                Windows walks the launch from VERIFY.md, Gate 12.
+                repository's origin, a failed worktree add and no claude. The
+                block, the log and the stderr log go in the clone's git folder
+                (a linked worktree's own, through rev-parse --git-path); the
+                worktrees folder goes in its local exclude, once. The launch
+                itself, on every host: the block is removed once the session has
+                it, and after a launch that failed; git status shows nothing;
+                StartWork alone writes nothing. Off Windows also: through a pipe
+                it returns while the stub session lives on, and the log's first
+                message is the block StartWork prints, whole. A Windows session
+                that lives on is VERIFY.md's, Gate 12.
 
     Run:  pwsh -File Tests/Test-StartWork.ps1
 #>
@@ -362,10 +367,19 @@ try {
     # runs; the launch itself is a VERIFY.md row there.
     $bin = Join-Path $scratch 'bin'
     New-Item -ItemType Directory -Path $bin -Force | Out-Null
+    # A second folder holds a claude that cannot start the session: on Windows a
+    # claude.exe that is not a program, so Start-Process throws; elsewhere a
+    # claude that exits at once without reading its stdin.
+    $badBin = Join-Path $scratch 'bad-bin'
+    New-Item -ItemType Directory -Path $badBin -Force | Out-Null
     if ($onWindows) {
         Copy-Item (Join-Path $env:SystemRoot 'System32\whoami.exe') (Join-Path $bin 'claude.exe')
+        [System.IO.File]::WriteAllText((Join-Path $badBin 'claude.exe'), "not a program`n", $utf8)
     }
     else {
+        $badStub = Join-Path $badBin 'claude'
+        [System.IO.File]::WriteAllText($badStub, "#!/bin/sh`nexit 3`n", $utf8)
+        & chmod +x $badStub
         $stubText = @'
 #!/bin/sh
 cat
@@ -393,13 +407,30 @@ exec sleep 30
     [System.IO.File]::WriteAllText((Join-Path $scratch 'issue-45.json'), '{ "number": 45, "labels": [{ "name": "bug" }, { "name": "sonnet" }] }', $utf8)
     [System.IO.File]::WriteAllText((Join-Path $scratch 'issue-46.json'), '{ "number": 46, "title": "Sized fable", "state": "OPEN", "labels": [{ "name": "Fable" }], "milestone": null, "body": "", "url": "https://github.com/acme/widgets/issues/46" }', $utf8)
     $worktreeShape = '[\\/]\.claude[\\/]worktrees[\\/]startwork-k2n4-\d{8}-\d{6}'
+    $runShape = '[\\/]\.git[\\/]startwork[\\/]startwork-k2n4-\d{8}-\d{6}'
     function Get-LaunchLeftovers {
-        # What a launch would leave in a clone: a worktree, a log.
+        # What a launch would leave in a clone: a worktree, a log, the run folder
+        # in its git folder, the exclude rule.
         param([string]$Dir)
         $found = @()
         if (Test-Path -LiteralPath (Join-Path $Dir '.claude')) { $found += '.claude' }
         $found += @(Get-ChildItem -LiteralPath $Dir -Filter '*.log' -File -ErrorAction SilentlyContinue | ForEach-Object { $_.Name })
+        if (Test-Path -LiteralPath (Join-Path $Dir '.git/startwork')) { $found += '.git/startwork' }
+        $exclude = Join-Path $Dir '.git/info/exclude'
+        if ((Test-Path -LiteralPath $exclude) -and ([System.IO.File]::ReadAllText($exclude) -match 'claude/worktrees')) { $found += 'the exclude rule' }
         return ($found -join ', ')
+    }
+    function Get-GitStatus {
+        # Every path git would show, untracked files one by one.
+        param([string]$Dir)
+        $o = & git -C $Dir status --porcelain --untracked-files=all 2>&1
+        return ((@($o) | ForEach-Object { [string]$_ }) -join ' | ')
+    }
+    function Wait-Gone {
+        param([string]$Path, [int]$Seconds = 10)
+        $deadline = (Get-Date).AddSeconds($Seconds)
+        while ((Test-Path -LiteralPath $Path) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }
+        return (-not (Test-Path -LiteralPath $Path))
     }
 
     # -WhatIf: every check, the commands, nothing added or started.
@@ -408,8 +439,18 @@ exec sleep 30
     Assert-True 'it prints the worktree add it would run, under the clone''s .claude/worktrees/' ($w.Inner -match ('worktree add --detach "[^"]*' + $worktreeShape + '"')) $w.Inner
     Assert-True 'it prints where the block would be written, at the repository root' ($w.Inner -match 'Would write the block \(\d+ lines, as ''tkStartWork K2N4'' prints it\) to [^\n]*[\\/]startwork-k2n4-\d{8}-\d{6}\.block\.log') $w.Inner
     Assert-True 'it prints the exact claude command, the block as its stdin' ($w.Inner -match 'Would start, in that worktree: claude --print --model sonnet --output-format stream-json --verbose < "[^"]*startwork-k2n4-\d{8}-\d{6}\.block\.log"') $w.Inner
+    Assert-True 'the block, the log and the stderr log are in the clone''s git folder, never its working tree' ($w.Inner -match ('Would write the block \(\d+ lines.*\) to [^\r\n]*' + $runShape + '\.block\.log, and remove it once the session has it open') -and $w.Inner -match ('Its output would go to [^\r\n]*' + $runShape + '\.log \(stderr: [^\r\n]*' + $runShape + '\.err\.log\)')) $w.Inner
+    Assert-True 'and it names the exclude rule that keeps the worktree out of git status' ($w.Inner -match 'Would add /\.claude/worktrees/ to [^\r\n]*[\\/]\.git[\\/]info[\\/]exclude') $w.Inner
     Assert-True 'and the log at the repository root' ($w.Inner -match 'output would go to [^\n]*[\\/]startwork-k2n4-\d{8}-\d{6}\.log') $w.Inner
     Assert-True '-WhatIf adds no worktree and writes no log' ((Get-LaunchLeftovers $clone) -eq '') (Get-LaunchLeftovers $clone)
+
+    # A linked worktree of the clone: rev-parse --git-path names ITS git folder.
+    $linked = Join-Path $scratch 'widgets-linked'
+    $null = Invoke-Git @('-C', $clone, 'worktree', 'add', '-q', '--detach', $linked)
+    $lw = Invoke-Verb ("Set-Location '$(& $esc $linked)'; tkStartWork K2N4 -Launch -WhatIf") -PathPrefix $bin
+    Assert-True 'from a linked worktree, the block goes to that worktree''s own git folder (rev-parse --git-path)' ($lw.Exit -eq '0' -and $lw.Inner -match 'Would write the block \(\d+ lines.*\) to [^\r\n]*[\\/]widgets-clone[\\/]\.git[\\/]worktrees[\\/]widgets-linked[\\/]startwork[\\/]startwork-k2n4-\d{8}-\d{6}\.block\.log') $lw.Inner
+    Assert-True 'and its worktree goes under the linked worktree''s .claude/worktrees/' ($lw.Inner -match ('worktree add --detach "[^"]*[\\/]widgets-linked' + $worktreeShape + '"')) $lw.Inner
+    $null = Invoke-Git @('-C', $clone, 'worktree', 'remove', '--force', $linked)
 
     $tags = Invoke-Verb ($inClone + 'tkStartWork P9TC -Launch -WhatIf') -PathPrefix $bin
     Assert-True 'a size in the card''s Tags picks the model' ($tags.Exit -eq '0' -and $tags.Inner.Contains('Task P9TC is sized opus (its Tags): model opus.') -and $tags.Inner.Contains('--model opus')) $tags.All
@@ -457,27 +498,55 @@ exec sleep 30
     Assert-True 'the hub is untouched through every launch refusal' ((Get-HubSnapshot) -ceq $before)
     Assert-True 'and the clone has no worktree and no log' ((Get-LaunchLeftovers $clone) -eq '') (Get-LaunchLeftovers $clone)
 
-    # The launch: through a pipe, back at once, the session alive, its first
-    # message the block. The proof the Windows host repeats is VERIFY.md's.
+    # A launch that cannot start the session still leaves no block behind: on
+    # Windows Start-Process throws and the verb refuses; elsewhere the session
+    # exits at once, after the leader has opened and removed the block.
+    $bad = Invoke-Verb ($inClone + 'tkStartWork K2N4 -Launch') -PathPrefix $badBin
+    $runDir = Join-Path $clone '.git/startwork'
+    $blocksLeft = { @(@($runDir, $clone) | ForEach-Object { Get-ChildItem -LiteralPath $_ -Filter '*.block.log' -File -ErrorAction SilentlyContinue } | ForEach-Object { $_.FullName }) }
     if ($onWindows) {
-        Write-Host "  SKIP  the launch itself: Windows walks it from VERIFY.md, Gate 12 (StartWork -Launch rows)" -ForegroundColor Yellow
+        Assert-True 'a claude that cannot start: refused once, and it says the block was removed' ((Test-OneRefusal $bad) -and $bad.All.Contains('claude did not start') -and $bad.All.Contains('The block was removed.')) $bad.All
     }
     else {
-        $plain = Invoke-Verb 'tkStartWork K2N4'
-        $launched = Invoke-Verb ($inClone + 'tkStartWork K2N4 -Launch') -PathPrefix $bin
-        $pidMatch = [regex]::Match($launched.Inner, 'Launched Task K2N4 on sonnet: PID (\d+)\.')
-        $childPid = 0
-        if ($pidMatch.Success) { $childPid = [int]$pidMatch.Groups[1].Value }
-        try {
-            Assert-True '-Launch exits 0 and prints the PID' ($launched.Exit -eq '0' -and $childPid -gt 0) $launched.All
+        Assert-True 'a claude that exits at once: the launch itself returns 0' ($bad.Exit -eq '0') $bad.All
+    }
+    $deadline = (Get-Date).AddSeconds(10)
+    while ((& $blocksLeft).Count -gt 0 -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }
+    Assert-True 'and after a launch that failed, no block is left, in the git folder or the working tree' ((& $blocksLeft).Count -eq 0) ((& $blocksLeft) -join ', ')
+    Assert-True 'the git folder held the run, and git status shows nothing: no block, no log, no worktree' ((Test-Path -LiteralPath $runDir) -and (Get-GitStatus $clone) -eq '') (Get-GitStatus $clone)
+    $excludeText = [System.IO.File]::ReadAllText((Join-Path $clone '.git/info/exclude'))
+    Assert-True 'the worktrees folder is in the clone''s local exclude, once' (@([regex]::Matches($excludeText, '(?m)^/\.claude/worktrees/$')).Count -eq 1) $excludeText
+    $again = Invoke-Verb ($inClone + 'tkStartWork K2N4 -Launch -WhatIf') -PathPrefix $bin
+    Assert-True 'and a later launch does not add it again' ($again.Exit -eq '0' -and -not $again.Inner.Contains('Would add /.claude/worktrees/')) $again.Inner
+
+    # The launch: through a pipe, back at once, the session alive, its first
+    # message the block, and the block gone once the session has it. On Windows
+    # the stub is a program that exits at once, so the rows there are the
+    # launch's: the PID, the paths, the block removed and git status clean; the
+    # session's stream is VERIFY.md's.
+    $plain = Invoke-Verb ($inClone + 'tkStartWork K2N4')
+    Assert-True 'StartWork alone, in the clone, prints the block and leaves git status clean' ($plain.Exit -eq '0' -and $plain.Inner.Length -gt 0 -and (Get-GitStatus $clone) -eq '') (Get-GitStatus $clone)
+    $before = @(Get-ChildItem -LiteralPath $runDir -File -ErrorAction SilentlyContinue).Count
+    $plainAgain = Invoke-Verb ($inClone + 'tkStartWork K2N4')
+    Assert-True 'and a second StartWork alone adds no file to the git folder, and prints the same block' ($plainAgain.Inner -ceq $plain.Inner -and @(Get-ChildItem -LiteralPath $runDir -File -ErrorAction SilentlyContinue).Count -eq $before) "$before files before"
+    $launched = Invoke-Verb ($inClone + 'tkStartWork K2N4 -Launch') -PathPrefix $bin
+    $pidMatch = [regex]::Match($launched.Inner, 'Launched Task K2N4 on sonnet: PID (\d+)\.')
+    $childPid = 0
+    if ($pidMatch.Success) { $childPid = [int]$pidMatch.Groups[1].Value }
+    try {
+        Assert-True '-Launch exits 0 and prints the PID' ($launched.Exit -eq '0' -and $childPid -gt 0) $launched.All
+        $wtMatch = [regex]::Match($launched.Inner, '(?m)^\s+worktree:\s+(.+?)\s*$')
+        $logMatch = [regex]::Match($launched.Inner, '(?m)^\s+log:\s+(.+?)\s*$')
+        Assert-True 'it prints the worktree, under the clone''s .claude/worktrees/' ($wtMatch.Success -and $wtMatch.Groups[1].Value -match $worktreeShape -and (Test-Path -LiteralPath (Join-Path $wtMatch.Groups[1].Value 'README.md'))) $launched.Inner
+        $logPath = ''
+        if ($logMatch.Success) { $logPath = $logMatch.Groups[1].Value }
+        Assert-True 'and the log, in the clone''s git folder' ($logPath -match ('[\\/]widgets-clone' + $runShape + '\.log$')) $launched.Inner
+        $blockPath = $logPath -replace '\.log$', '.block.log'
+        Assert-True 'the block is removed once the session has it' ($logPath -and (Wait-Gone $blockPath)) $blockPath
+        Assert-True 'and git status in the clone shows nothing: the block, the logs and the worktree are all out of it' ((Get-GitStatus $clone) -eq '') (Get-GitStatus $clone)
+        if (-not $onWindows) {
             Assert-True ("through a pipe it returns while the session lives on ({0:N1}s; the stub lives 30s)" -f $launched.Seconds) ($launched.Seconds -lt 20) $launched.All
             Assert-True 'the session is still running after the verb returned' ($childPid -gt 0 -and $null -ne (Get-Process -Id $childPid -ErrorAction SilentlyContinue))
-            $wtMatch = [regex]::Match($launched.Inner, '(?m)^\s+worktree:\s+(.+?)\s*$')
-            $logMatch = [regex]::Match($launched.Inner, '(?m)^\s+log:\s+(.+?)\s*$')
-            Assert-True 'it prints the worktree, under the clone''s .claude/worktrees/' ($wtMatch.Success -and $wtMatch.Groups[1].Value -match $worktreeShape -and (Test-Path -LiteralPath (Join-Path $wtMatch.Groups[1].Value 'README.md'))) $launched.Inner
-            $logPath = ''
-            if ($logMatch.Success) { $logPath = $logMatch.Groups[1].Value }
-            Assert-True 'and the log, at the repository root' ($logPath -match '[\\/]widgets-clone[\\/]startwork-k2n4-\d{8}-\d{6}\.log$') $launched.Inner
             $logText = ''
             $deadline = (Get-Date).AddSeconds(10)
             while ((Get-Date) -lt $deadline) {
@@ -487,7 +556,7 @@ exec sleep 30
                 }
                 Start-Sleep -Milliseconds 200
             }
-            Assert-True 'the session''s first message is the block, whole -- the one StartWork prints' ($plain.Exit -eq '0' -and $logText -ceq $plain.Inner) ("log $($logText.Length) chars, block $($plain.Inner.Length)")
+            Assert-True 'the session''s first message is the block, whole -- the one StartWork prints -- though the file is gone' ($plain.Exit -eq '0' -and $logText -ceq $plain.Inner) ("log $($logText.Length) chars, block $($plain.Inner.Length)")
             $errText = ''
             if ($logPath) {
                 $errPath = $logPath -replace '\.log$', '.err.log'
@@ -499,9 +568,9 @@ exec sleep 30
             }
             Assert-True 'the model is the size''s, on the claude command line' ($errText -ceq '--print --model sonnet --output-format stream-json --verbose') $errText
         }
-        finally {
-            if ($childPid -gt 0) { Stop-Process -Id $childPid -Force -ErrorAction SilentlyContinue }
-        }
+    }
+    finally {
+        if ($childPid -gt 0) { Stop-Process -Id $childPid -Force -ErrorAction SilentlyContinue }
     }
 }
 catch {

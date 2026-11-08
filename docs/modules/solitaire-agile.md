@@ -701,13 +701,24 @@ starts nothing:
 4. **`git worktree add --detach .claude/worktrees/startwork-<ref>-<stamp>`** succeeds (a repository with no
    commit has nothing to check out).
 
-Then it writes the block to `startwork-<ref>-<stamp>.block.log` at the repository root and starts
-`claude --print --model <size> --output-format stream-json --verbose` in the worktree **with that file as
-its stdin** -- `claude --print` reads its prompt there, and a prompt of many lines does not cross a joined
-command line whole on any host. Its output goes to `startwork-<ref>-<stamp>.log` and its stderr to
-`.err.log` beside it: three files, all under the `*.log` ignore pattern. It prints the PID, the worktree
-and the log, and **returns without waiting**. `-WhatIf` runs every check and prints the worktree add, the
-block file, the exact `claude` command and the log, and adds and starts nothing. `-Clip` with `-Launch`,
+Then it writes the block to `startwork-<ref>-<stamp>.block.log` **in the repository's own git folder**
+-- `git rev-parse --git-path startwork`, so `.git/startwork/` in a clone and `.git/worktrees/<name>/startwork/`
+from a linked worktree -- and starts `claude --print --model <size> --output-format stream-json --verbose`
+in the worktree **with that file as its stdin**: `claude --print` reads its prompt there, and a prompt of
+many lines does not cross a joined command line whole on any host. Its output goes to
+`startwork-<ref>-<stamp>.log` and its stderr to `.err.log` beside the block. None of the three is ever in
+the working tree, whatever the repository's own `.gitignore` says: the block is the card whole and the log
+is the session's stream, and the repository is any product's. **The block is removed once the session has
+it open**: on macOS and Linux the launcher's session leader unlinks it right after opening it, so the
+session reads every byte through its descriptor; on Windows the launcher removes it as soon as Windows
+allows, and where a running session still holds it, the launch says so and the next launch removes it
+after that session ends. A launch that fails to start removes it at once. The worktrees folder is kept
+out of `git status` by one line, `/.claude/worktrees/`, added to the repository's LOCAL exclude file
+(`git rev-parse --git-path info/exclude`, never the committed `.gitignore`) unless a rule already ignores
+it. It prints the PID, the worktree and the log, and **returns without waiting**. `-WhatIf` runs every
+check and prints the exclude line it would add, the worktree add, the block file, the exact `claude`
+command and the log, and adds, writes and starts nothing. `StartWork` without `-Launch` writes nothing
+anywhere, as before. `-Clip` with `-Launch`,
 and `-WhatIf` without it, are refused. The session's environment is the shell's, minus any
 `TEAMS_WEBHOOK_*`: a session never sends.
 
