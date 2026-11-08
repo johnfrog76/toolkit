@@ -784,6 +784,24 @@ Assert-True "#9: Dashboard completes and exits 0 when a project does not answer 
 Assert-True "#9: ...with no generic 'exit code' block after it" ($r.Output -notmatch 'exit code \d')
 Assert-True "#9: ...and the pipeline section names the project it could not read" ($r.Output -match 'YourProject -- did not answer')
 
+# Below Tier 1 the dashboard is the local view, and it asks no tracker: the tier
+# is the one $global:P20Env holds. Its error count reads the log the toolkit
+# writes, usage.<machine>.log in the log directory.
+$dashLog = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-dashlog-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+New-Item -ItemType Directory -Path $dashLog -Force | Out-Null
+try {
+    $recent = (Get-Date).AddHours(-1).ToString('yyyy-MM-ddTHH:mm:ss')
+    $old = (Get-Date).AddDays(-3).ToString('yyyy-MM-ddTHH:mm:ss')
+    [System.IO.File]::WriteAllText((Join-Path $dashLog 'usage.elsewhere.log'), "$recent`tERR`tme`ttkNewPR`tsomething failed`n$old`tERR`tme`ttkNewPR`tlong ago`n$recent`tCMD`tme`ttkStatus`tran`n")
+    $tier2Env = "`$global:P20Env = @{ Tier = 2; OrgStatus = 'local'; ActiveSpace = 'azure-demo'; GitInstalled = `$true; RepoFound = `$true; AzCliInstalled = `$false; AzAuthenticated = `$false; AdoReachable = `$false }"
+    $askNothing = "function global:az { 'AZ-WAS-ASKED' }`nfunction global:gh { 'GH-WAS-ASKED' }"
+    $r = Invoke-ChildRun "$tier2Env`n$askNothing`n${cfgPrefix}Dashboard`n'LASTEXITCODE=' + `$LASTEXITCODE`nexit `$LASTEXITCODE" -Environment @{ P20_USAGE_LOG_DIR = $dashLog }
+    Assert-True "Dashboard at Tier 2, typed: the local view, exit 0 (got $($r.ExitCode))" ($r.Output -match '\[Local Mode\]' -and $r.Output -match 'ADO unavailable' -and $r.Output -match 'Dashboard complete' -and $r.ExitCode -eq 0)
+    Assert-True "...and no tracker is asked" ($r.Output -notmatch 'AZ-WAS-ASKED|GH-WAS-ASKED' -and $r.Output -notmatch '\[Pull Requests\]')
+    Assert-True "...and the error count is the log's: one in the last 24 hours, the older one left out" ($r.Output -match '1 error in last 24h')
+}
+finally { Remove-Item -LiteralPath $dashLog -Recurse -Force -ErrorAction SilentlyContinue }
+
 Write-Host ""
 
 # -- A script run with no module states its reason the module's way -----------

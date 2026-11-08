@@ -14,7 +14,13 @@ param()
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $cfg = $global:P20Config
-$tier = if ($global:ToolkitEnv) { $global:ToolkitEnv.Tier } else { 1 }
+# The tier is $global:P20Env's, which Get-Environment fills; when nothing has
+# filled it yet, ask it the way the module's own tier check does, so a machine
+# below Tier 1 gets the local view and not a full view of answers that look true.
+if (-not ($global:P20Env -and $global:P20Env.Tier)) {
+    try { & (Join-Path $PSScriptRoot 'Get-Environment.ps1') -Startup -Quiet | Out-Null } catch { $null = $_ }
+}
+$tier = if ($global:P20Env -and $global:P20Env.Tier) { [int]$global:P20Env.Tier } else { 1 }
 
 $modeTag = if ($tier -ge 2) { '  [Local Mode]  [*]' } else { '' }
 
@@ -71,11 +77,13 @@ if ($tier -ge 2) {
         Pop-Location
     }
 
-    # Recent errors from log
-    $logPath = Join-Path (Split-Path $scriptDir -Parent) 'usage.log'
-    if (Test-Path $logPath) {
+    # Recent errors, from the log the toolkit writes: usage.<machine>.log files
+    # in Get-P20ToolkitLogDir, one per machine, as Log reads them.
+    $logDir = if (Get-Command Get-P20ToolkitLogDir -ErrorAction SilentlyContinue) { Get-P20ToolkitLogDir } else { '' }
+    $logFiles = if ($logDir) { @(Get-ChildItem -LiteralPath $logDir -Filter 'usage.*.log' -File -ErrorAction SilentlyContinue) } else { @() }
+    if ($logFiles.Count -gt 0) {
         $cutoff = (Get-Date).AddHours(-24).ToString('yyyy-MM-ddTHH:mm:ss')
-        $recentErrors = @(Get-Content $logPath -Encoding UTF8 | Where-Object {
+        $recentErrors = @($logFiles | ForEach-Object { [System.IO.File]::ReadAllLines($_.FullName) } | Where-Object {
             $parts = $_ -split "`t"
             $parts.Count -ge 2 -and $parts[1] -eq 'ERR' -and $parts[0] -gt $cutoff
         })

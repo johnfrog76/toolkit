@@ -140,11 +140,20 @@ if ($renamedTo -ne $slug) {
     Write-Host "  $(Get-P20RenamedSlugNote -From $slug -To $renamedTo)" -ForegroundColor Yellow
     $slug = $renamedTo
 }
-$spaceEntry = $spaces | Where-Object { $_.slug -eq $slug }
+$spaceEntry = $spaces | Where-Object { $_.slug -eq $slug } | Select-Object -First 1
 if (-not $spaceEntry) {
-    # Try matching by name (case-insensitive)
-    $spaceEntry = $spaces | Where-Object { $_.name -like $Mode }
-    if ($spaceEntry) { $slug = $spaceEntry.slug }
+    # By display name, exactly (ignoring case) -- never a wildcard -- and only
+    # when one Space answers: two Spaces may share a name, and picking one for
+    # the person files their work into a Space they did not choose.
+    $byName = @($spaces | Where-Object { [string]$_.name -eq $Mode })
+    if ($byName.Count -gt 1) {
+        $why = "'$Mode' is the name of $($byName.Count) Spaces: $(($byName | ForEach-Object { $_.slug }) -join ', ')."
+        $fix = "Name the one you mean by its slug: '$(Get-CliPrefix)SwitchSpace <slug>'."
+        if (Get-Command Write-CliError -ErrorAction SilentlyContinue) { Write-CliError -Message $why -Hint $fix }
+        else { Write-Host "Error: $why" -ForegroundColor Red; Write-Host "Hint:  $fix" -ForegroundColor Yellow }
+        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+    }
+    if ($byName.Count -eq 1) { $spaceEntry = $byName[0]; $slug = [string]$spaceEntry.slug }
 }
 
 if (-not $spaceEntry) {
@@ -167,13 +176,24 @@ if ($localUnreadable) {
     else { Write-Host "Error: $why" -ForegroundColor Red; Write-Host "Hint:  $fix" -ForegroundColor Yellow }
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
-if ($localCfg) {
-    if ($localCfg.PSObject.Properties['activeOrg']) { $localCfg.PSObject.Properties.Remove('activeOrg') }
-    $localCfg | Add-Member -NotePropertyName 'activeSpace' -NotePropertyValue $slug -Force
-    Write-ConfigJson -Path $localPath -Value (ConvertTo-P20SpaceSpelling $localCfg)
+# Written by Config, the one writer (AGENTS.md: "Configuration is written by
+# Config, and by nothing else"), so its schema checks the value too. Config's own
+# line is kept back on success, because this verb says what it did below; a
+# refusal is printed as Config stated it, with its exit code.
+$configScript = Join-Path $PSScriptRoot 'Set-ToolkitConfig.ps1'
+$global:LASTEXITCODE = 0
+$configOut = ''
+try { $configOut = & $configScript -Set "activeSpace=$slug" *>&1 | Out-String }
+catch {
+    $why = "The Space was not switched: $($_.Exception.Message)"
+    if (Get-Command Write-CliError -ErrorAction SilentlyContinue) { Write-CliError -Message $why -Hint "'$(Get-CliPrefix)Config -List' shows what is set." }
+    else { Write-Host "Error: $why" -ForegroundColor Red }
+    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
-else {
-    Write-ConfigJson -Path $localPath -Value ([PSCustomObject]@{ activeSpace = $slug })
+if ($LASTEXITCODE) {
+    $code = $LASTEXITCODE
+    Write-Host $configOut.TrimEnd()
+    exit $code
 }
 
 # Reload the module so in-memory config picks up the new org
