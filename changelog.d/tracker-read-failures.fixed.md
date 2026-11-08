@@ -1,0 +1,1 @@
+- A tracker verb no longer reports success when `gh` or `az` is missing or cannot be started: `EditItem`, `CloseItem`, `NewPR`'s issue comment and `MyPRs` now say so instead of printing a result for a call that never ran. `MyWork` and `Dashboard` on Azure DevOps, and `Dashboard` and `MyPRs` on GitHub, read their answers the same way.

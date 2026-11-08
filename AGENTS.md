@@ -421,8 +421,8 @@ Each step already done is skipped, so it is safe to re-run.
   running with `$ErrorActionPreference = 'Stop'` throws a NativeCommandError on the first stderr line, before `$LASTEXITCODE` can be
   read, so the verb prints gh's sentence through the generic block instead of its own answer; pwsh 7 reads it as text, so
   a run under pwsh 7 alone is green either way. `Invoke-P20TrackerRead` (`Scripts/Invoke-TrackerRead.ps1`, dot-sourced; it refuses a `.cmd` tool an argument cmd.exe would read, `Test-P20CmdArgument`) is the one way a
-  script calls `gh`, `az` or `git`: it returns `Code`, `Lines`, `Out` and `Err`, and a raw `gh ... 2>&1` in a script is the bug --
-  `Test-Portability`'s Clause 15 fails naming the line. Its allow-list only shrinks: three ritual and helper files by reason, and `Sync-Prompts.ps1` at entry level -- only its two deliberate output-passthrough lines (the pull and the push) are allowed, so any other raw `git` call in that file is a hit.
+  script calls `gh`, `az` or `git`: it returns `Code`, `Lines`, `Out` and `Err` (`127` when the tool is not found, `126` when it cannot be started, each with its sentence, so a write that never ran never reads as done), and a raw `gh ... 2>&1` in a script is the bug --
+  `Test-Portability`'s Clause 15 fails naming the line, a call continued over backticks included. Its allow-list only shrinks: three ritual and helper files by reason, and `Sync-Prompts.ps1` at entry level -- only its two deliberate output-passthrough lines (the pull and the push) are allowed, so any other raw `git` call in that file is a hit.
 - **On Windows a child inherits every inheritable handle its launcher holds, not only the std ones.** Windows
   PowerShell 5.1 keeps a second inheritable copy of its stdout (the .NET Framework's, at startup), so clearing
   `GetStdHandle`'s is not enough and `powershell -c tkAgent | ...` waits for the agent. A long-lived
