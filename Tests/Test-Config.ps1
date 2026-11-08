@@ -841,7 +841,10 @@ try {
     Invoke-LockRetry 'scratch copy' { Copy-Item (Join-Path $pkgRoot 'Config')  $switchPkg -Recurse -Force }
     $defaultPath = Join-Path $switchPkg 'config.default.json'
     $shipped = (Invoke-LockRetry 'read of a scratch file' { Get-Content $defaultPath -Raw }) | ConvertFrom-Json
-    $shipped.spaces = @($shipped.spaces) + @([pscustomobject]@{ slug = 'other'; name = 'Other'; status = 'local'; promptsFolder = 'other' })
+    $shipped.spaces = @($shipped.spaces) + @([pscustomobject]@{ slug = 'other'; name = 'Other'; status = 'local'; promptsFolder = 'other' }) +
+        @([pscustomobject]@{ slug = 'twin-a'; name = 'Twin'; status = 'local'; promptsFolder = 'twin-a' }) +
+        @([pscustomobject]@{ slug = 'twin-b'; name = 'Twin'; status = 'local'; promptsFolder = 'twin-b' }) +
+        @([pscustomobject]@{ slug = 'named-one'; name = 'Named One'; status = 'local'; promptsFolder = 'named-one' })
     Invoke-LockRetry 'write of a scratch file' { Set-Content -Path $defaultPath -Value ($shipped | ConvertTo-Json -Depth 20) -Encoding utf8 }
     $prefix = $shipped.commandPrefix
     $localPath = Join-Path $switchPkg 'config.local.json'
@@ -864,6 +867,23 @@ try {
     $written2 = (Invoke-LockRetry 'read of a scratch file' { Get-Content $localPath -Raw }) | ConvertFrom-Json
     Assert-Equal 'an activeOrg file is written as activeSpace, with the new Space' 'other' $written2.activeSpace
     Assert-True 'and activeOrg is gone' (-not $written2.PSObject.Properties['activeOrg'])
+
+    # A name is matched exactly, ignoring case, and only when one Space has it:
+    # a wildcard or a shared name never picks a Space for the person.
+    $switchTo = { param([string]$What) "`$env:PSModulePath = '$($switchPkg -replace "'", "''")'; `$env:PROMPTS_ROOT = '$hubPath'; " +
+        "Import-Module '$module' -Force -DisableNameChecking 3>`$null 6>`$null; ${prefix}SwitchSpace '$What'; 'SWITCH-CODE=' + `$LASTEXITCODE" }
+    Invoke-LockRetry 'write of a scratch file' { Set-Content -Path $localPath -Value "{ `"promptsRoot`": `"$hubPath`", `"quietStart`": true, `"activeSpace`": `"other`" }" -Encoding UTF8 }
+    $held = Invoke-LockRetry 'read of a scratch file' { Get-Content $localPath -Raw }
+    $twin = & pwsh -NoProfile -Command (& $switchTo 'Twin') 2>&1 | Out-String
+    Assert-True 'a name two Spaces share is a stated refusal' ($twin -match 'SWITCH-CODE=2' -and $twin -match "'Twin' is the name of 2 Spaces: twin-a, twin-b") $twin
+    Assert-Equal 'and the file is not touched' $held (Invoke-LockRetry 'read of a scratch file' { Get-Content $localPath -Raw })
+    $star = & pwsh -NoProfile -Command (& $switchTo '*') 2>&1 | Out-String
+    Assert-True 'a wildcard matches no Space: Unknown Space, exit 2' ($star -match 'SWITCH-CODE=2' -and $star -match 'Unknown Space: \*') $star
+    Assert-Equal 'and the file is not touched either' $held (Invoke-LockRetry 'read of a scratch file' { Get-Content $localPath -Raw })
+    $one = & pwsh -NoProfile -Command (& $switchTo 'NAMED one') 2>&1 | Out-String
+    $written3 = (Invoke-LockRetry 'read of a scratch file' { Get-Content $localPath -Raw }) | ConvertFrom-Json
+    Assert-True 'a name only one Space has switches to it, whatever its case' ($one -match 'SWITCH-CODE=0' -and $written3.activeSpace -eq 'named-one') "$one $($written3.activeSpace)"
+    Assert-True 'and activeSpace is written as one string, never an array' ($written3.activeSpace -is [string])
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
