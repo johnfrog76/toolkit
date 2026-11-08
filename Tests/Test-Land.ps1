@@ -419,6 +419,18 @@ try {
         )) {
         Assert-True "a .cmd may take [$($row.Arg)]: $($row.Ok)" ($row.Ok -eq (Test-P20CmdArgument $row.Arg))
     }
+    # A tool that is not there, or will not start, is a failure with its own
+    # code -- never the 0 a write that never ran would read as done.
+    $missing = Invoke-P20TrackerRead 'p20-no-such-tool' @('issue', 'close', '5')
+    Assert-True 'a tool that is not found is Code 127, with a sentence' ($missing.Code -eq 127 -and "$($missing.Lines)" -match 'not installed, or not on the PATH' -and $LASTEXITCODE -eq 127) "$($missing.Code): $($missing.Lines)"
+    Assert-True 'and its sentence is in Err, with no Out' (@($missing.Out).Count -eq 0 -and "$($missing.Err)" -match 'not installed') "$($missing.Err)"
+    # Past every host's limit for one argument (Linux 128 KB, macOS 1 MB in all,
+    # Windows 32 KB for the line): the process never starts.
+    $tooLong = Invoke-P20TrackerRead 'git' @('--version', ('x' * 1500000))
+    Assert-True 'a tool that cannot be started is Code 126, with the reason' ($tooLong.Code -eq 126 -and "$($tooLong.Lines)" -match 'could not be started' -and $LASTEXITCODE -eq 126) "$($tooLong.Code): $(("$($tooLong.Lines)").Substring(0, [Math]::Min(200, "$($tooLong.Lines)".Length)))"
+    $fine = Invoke-P20TrackerRead 'git' @('--version')
+    Assert-True 'and the same tool with a normal argument runs, Code 0' ($fine.Code -eq 0 -and "$($fine.Out)" -match 'git version') "$($fine.Code): $($fine.Lines)"
+
     if ($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop') {
         # The real thing: a .cmd on the PATH, a value that would write a marker.
         $cmdDir = Join-Path $root 'cmdtool'
