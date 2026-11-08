@@ -1501,8 +1501,8 @@ foreach ($case in @(
 }
 
 # And every request BODY a script sends is UTF-8 bytes from one helper,
-# ConvertTo-P20Utf8Body: Windows PowerShell 5.1 encodes a string -Body in the
-# content type's charset and, with none named, as ISO-8859-1, so a title with an
+# ConvertTo-P20Utf8Body: Windows PowerShell 5.1 does not send a string -Body as
+# UTF-8, even with charset=utf-8 in the headers, so a title with an
 # accent reached the organisation altered. The model call and the agent call are
 # held to it too: they carry no token, but they carry the same text.
 function Get-RestBodyHits {

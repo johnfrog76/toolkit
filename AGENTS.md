@@ -523,8 +523,8 @@ here-string to the writer as CRLF. A card is READ the same way: `Read-CardText`,
 reads it as UTF-8, because `Get-Content` with no `-Encoding` reads a BOM-less file as ANSI on 5.1 and a
 verb that wrote that back corrupted the card -- every `Get-Content` in shipped code names its `-Encoding`
 (`Test-Portability`'s Clause 19). What a verb SENDS is bytes too: every request `-Body` is
-`ConvertTo-P20Utf8Body`'s UTF-8, because 5.1 encodes a string body as ISO-8859-1 when the content type
-names no charset (Clause 18). Every reader tolerates both endings, and both sides assert it
+`ConvertTo-P20Utf8Body`'s UTF-8, because 5.1 does not send a string body as UTF-8 even when the content
+type says `charset=utf-8` (Clause 18). Every reader tolerates both endings, and both sides assert it
 (`tkTestToolkit -Archive`, `Tests/test_parsers.py`). `docs/CLI.md`, "The bytes a card is written
 with", is the long version.
 

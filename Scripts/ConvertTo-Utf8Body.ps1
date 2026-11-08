@@ -7,10 +7,11 @@
 #     . (Join-Path $PSScriptRoot 'ConvertTo-Utf8Body.ps1')
 #     Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -Body (ConvertTo-P20Utf8Body $json)
 #
-# Why bytes and not a string: Windows PowerShell 5.1 (and pwsh before 7.4)
-# encodes a string -Body in the charset of the request's content type, and with
-# none named, as ISO-8859-1 -- so an accented letter reached the server as one
-# byte that is not UTF-8, and anything past U+00FF as '?'. ConvertTo-Json on 5.1
+# Why bytes and not a string: Windows PowerShell 5.1 does not send a string
+# -Body as UTF-8 -- not with no charset in the content type, and not with
+# charset=utf-8 in the -Headers either (the CloseWorkItem suite reads it off a
+# loopback listener) -- so an accented letter reached the server as a byte that
+# is not UTF-8, and anything past U+00FF as '?'. ConvertTo-Json on 5.1
 # leaves such characters unescaped, so the text of a title or a comment was
 # altered on its way out. A byte array is sent as it is, on every host. The
 # headers still say charset=utf-8, so the server reads the bytes as what they are.

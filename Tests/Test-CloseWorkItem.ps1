@@ -282,11 +282,11 @@ Write-Host ""
 # -- A request body on the wire ------------------------------------------------
 # What a REST call actually sends, read off a listener on this machine's own
 # loopback address: no tracker, no Azure DevOps organisation and no model API is
-# contacted, and the bearer token is a stand-in. Windows PowerShell 5.1 encodes a
-# string -Body with the charset of the request's content type and, when it names
-# none, as ISO-8859-1, so 'é' reached the organisation as one byte that is not
-# UTF-8 and anything past U+00FF as '?'. The rows send the text each verb sends,
-# the way it sends it, from a child of each host on the machine.
+# contacted, and the bearer token is a stand-in. Windows PowerShell 5.1 does not
+# send a string -Body as UTF-8, with or without charset=utf-8 in the headers, so an
+# accented letter reached the organisation as a byte that is not UTF-8. The rows
+# send the text each verb sends, the way it sends it, from a child of each host on
+# the machine.
 
 Write-Host "-- A request body on the wire --------------------------" -ForegroundColor Cyan
 
@@ -297,6 +297,7 @@ $ErrorActionPreference = 'Stop'
 $text = 'Caf' + [char]0x00E9 + ' ' + [char]0x2014 + ' na' + [char]0x00EF + 've ' + [char]0x2713
 $json = (@{ title = $text } | ConvertTo-Json -Compress)
 "RAW=$([bool]($json -match '[^\x00-\x7F]'))"
+"EDITION=$($PSVersionTable.PSEdition)"
 $probe = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, 0)
 $probe.Start(); $port = $probe.LocalEndpoint.Port; $probe.Stop()
 $listener = New-Object System.Net.HttpListener
@@ -350,8 +351,19 @@ try {
         $ErrorActionPreference = 'Continue'
         $wo = (& $exe -NoProfile -File $wireScript 2>&1 | ForEach-Object { $_.ToString() }) -join "`n"
         $ErrorActionPreference = $savedPref
-        foreach ($name in @('ado-string', 'ado-patch-string', 'ado-bytes', 'patch-bytes')) {
+        foreach ($name in @('ado-bytes', 'patch-bytes')) {
             Assert-True "request body, ${exe}: '$name' reaches the server as the UTF-8 of the text sent" ($wo -match ('WIRE\[' + [regex]::Escape($name) + '\]=True\|')) $wo
+        }
+        # The host fact the helper exists for, pinned both ways: Windows PowerShell
+        # 5.1 does not send a STRING body as UTF-8 even when the content type says
+        # charset=utf-8, and pwsh 7.4 and later does. So no script sends a string.
+        $desktop = ($wo -match 'EDITION=Desktop')
+        foreach ($name in @('ado-string', 'ado-patch-string')) {
+            if ($desktop) {
+                Assert-True "request body, ${exe}: a string '$name' body is NOT sent as UTF-8 by Windows PowerShell 5.1, charset or no -- the reason every body is bytes" ($wo -match ('WIRE\[' + [regex]::Escape($name) + '\]=False\|')) $wo
+            } else {
+                Assert-True "request body, ${exe}: a string '$name' body is sent as UTF-8 by PowerShell 7" ($wo -match ('WIRE\[' + [regex]::Escape($name) + '\]=True\|')) $wo
+            }
         }
         Assert-True "request body, ${exe}: the Azure DevOps headers say charset=utf-8, for JSON and for a work item patch" ($wo -match 'WIRE\[ado-string\]=[^|]*\|application/json; charset=utf-8(\n|$)' -and $wo -match 'WIRE\[ado-patch-string\]=[^|]*\|application/json-patch\+json; charset=utf-8(\n|$)') $wo
     }

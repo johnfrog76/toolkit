@@ -547,7 +547,8 @@ file in the hub:
   turns the JSON into its UTF-8 bytes, and every `-Body` a script hands `Invoke-RestMethod` is one: the
   Azure DevOps writes (`NewItem`, `NewPR`, `PublishPR`, `ReplyPR`, `CloseItem`, `AddPRReview`'s threads),
   the model call `AddPRReview` makes, and `SendTeams`' call to the agent. Windows PowerShell 5.1 (and
-  pwsh before 7.4) encodes a string body as ISO-8859-1 when the content type names no charset, so a
+  pwsh before 7.4) does not send a string body as UTF-8 -- with no charset in the content type, and on
+  5.1 not with `charset=utf-8` in the headers either -- so a
   title, a description or a comment with an accent reached the organisation altered, and the model call
   carried text that was not UTF-8. Every content type the tool sends says `charset=utf-8`
   (`Get-P20AdoHeaders` for Azure DevOps). `Test-Portability`'s Clause 18 refuses any other `-Body`, and
