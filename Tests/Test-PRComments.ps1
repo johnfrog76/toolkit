@@ -1321,7 +1321,15 @@ Import-Module '$p/utilities.psm1' -Force -DisableNameChecking *>`$null
     $out = Invoke-P20TestHost -File $runner
     $text = (($out | ForEach-Object { $_.ToString() }) -join "`n")
     $argv = @()
-    if (Test-Path $ghCalls) { $argv = @(Get-Content $ghCalls | ForEach-Object { , @($_ | ConvertFrom-Json) }) }
+    # Each call's argv, enumerated: Windows PowerShell 5.1's ConvertFrom-Json hands a
+    # JSON array on as ONE object, so @($_ | ConvertFrom-Json) was an array holding
+    # the array, and every call read as one argument named System.Object[].
+    if (Test-Path $ghCalls) {
+        $argv = @(Get-Content $ghCalls -Encoding UTF8 | ForEach-Object {
+                $parsed = ConvertFrom-Json -InputObject $_
+                , @(foreach ($x in $parsed) { $x })
+            })
+    }
     $sentBodies = @()
     if (Test-Path $ghInputs) { $sentBodies = @(Get-Content $ghInputs | Where-Object { $_ } | ForEach-Object { $_ | ConvertFrom-Json }) }
     return [pscustomobject]@{ Text = $text; Calls = $argv; Inputs = $sentBodies }
