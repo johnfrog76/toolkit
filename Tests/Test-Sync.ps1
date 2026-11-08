@@ -225,8 +225,10 @@ function Invoke-Sync {
     param([string]$Sandbox)
     $prevErr = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
+    $global:LASTEXITCODE = 0
     try {
         $out = & $syncScript *>&1 | Out-String
+        $script:syncExit = $LASTEXITCODE
     }
     finally {
         $ErrorActionPreference = $prevErr
@@ -282,7 +284,8 @@ try {
 
     Assert-True "Sandbox has real history to abort against" ($beforeCommits -gt 0)
     Assert-Equal "No commit created" 0 ($afterCommits - $beforeCommits)
-    Assert-Contains "Output warns sync was aborted" $output 'aborting sync'
+    Assert-Contains "Output says nothing was synced, as a stated refusal" $output 'nothing was synced'
+    Assert-Equal "and exits 2, not 0 (a blocked commit is not a sync)" 2 $script:syncExit
     Assert-Contains "Hook error surfaces in output" $output '.gitignore is missing'
     Assert-True "usage.log left dirty (unstaged), not committed" ($status -like '*usage.log*')
 }
@@ -312,7 +315,8 @@ try {
     $status = Get-SandboxStatus $sandbox
 
     Assert-Equal "No commit created" 0 ($afterCommits - $beforeCommits)
-    Assert-Contains "Output warns sync was aborted" $output 'aborting sync'
+    Assert-Contains "Output says nothing was synced, as a stated refusal" $output 'nothing was synced'
+    Assert-Equal "and exits 2, not 0 (a blocked commit is not a sync)" 2 $script:syncExit
     Assert-Contains "Hook error names the guard limit" $output 'guard limit'
     Assert-True "bulk/ files left dirty, not committed" ($status -like '*bulk*')
 }
@@ -601,7 +605,8 @@ try {
 
     Assert-Contains "Sync names the failed pull" $output "git pull --rebase failed in"
     Assert-Contains "and says nothing was synced" $output 'nothing was synced'
-    Assert-Contains "and hints at the next step" $output 'Resolve the conflict in a terminal'
+    Assert-Contains "and hints at the next step" $output 'Check the remote'
+    Assert-True "and does not say it aborted a rebase it never started" ($output -notmatch 'rebase was aborted')
     Assert-Contains "exits 2, the stated-refusal code" $output 'SYNC-EXITCODE=2'
     Assert-True "exactly one Error: block" (@([regex]::Matches($output, 'Error:')).Count -eq 1)
     Assert-True "no generic exit-code block on top" ($output -notmatch 'Error: exit code \d+')
@@ -825,6 +830,95 @@ catch {
     Assert-True "the cases ran to the end without a terminating error -- $($_.Exception.Message)" $false
 }
 finally { Remove-SyncSandbox $rs9.Base }
+
+Write-Host ""
+
+# ── Test 10: A hub in the middle of a rebase, a merge or a cherry-pick ──────
+#
+# Sync stages everything, commits and pushes; in the middle of a conflict that
+# would mark the conflict resolved, markers and all, and publish it. So each
+# state is a stated refusal before anything is staged. The states are written
+# where git keeps them (`rev-parse --git-path`), with a card changed so the old
+# code would have committed it.
+
+Write-Host "── A hub mid-rebase, mid-merge or mid-cherry-pick ─────" -ForegroundColor Cyan
+
+foreach ($state in @(
+        @{ Path = 'rebase-merge'; Dir = $true; Word = 'a rebase' },
+        @{ Path = 'rebase-apply'; Dir = $true; Word = 'a rebase' },
+        @{ Path = 'MERGE_HEAD'; Dir = $false; Word = 'a merge' },
+        @{ Path = 'CHERRY_PICK_HEAD'; Dir = $false; Word = 'a cherry-pick' })) {
+    $hubJson10 = '{ "hub": 1, "storeSync": "git", "spaces": [ { "slug": "test", "name": "Test", "status": "local", "promptsFolder": "test" } ] }'
+    $rs10 = New-RemoteSandbox -HubJson $hubJson10
+    try {
+        $head = "$(git -C $rs10.Hub rev-parse HEAD 2>$null)".Trim()
+        $at = "$(git -C $rs10.Hub rev-parse --git-path $state.Path 2>$null)".Trim()
+        if (-not [System.IO.Path]::IsPathRooted($at)) { $at = Join-Path $rs10.Hub $at }
+        if ($state.Dir) { New-Item -ItemType Directory -Path $at -Force | Out-Null }
+        else { [System.IO.File]::WriteAllText($at, "$head`n") }
+        New-Item -ItemType Directory -Path (Join-Path $rs10.Hub 'test/current') -Force | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $rs10.Hub 'test/current/Task9PQR-in-conflict.prompt.md'), "<<<<<<< ours`nmine`n=======`ntheirs`n>>>>>>> theirs`n")
+
+        $output = Invoke-SyncWrapperInModule -Sandbox $rs10 -LocalJson "{ `"promptsRoot`": `"$($rs10.Hub -replace '\\', '/')`" }"
+        Assert-Contains "$($state.Path): Sync refuses, naming the state" $output "in the middle of $($state.Word), so nothing was synced"
+        Assert-Contains "$($state.Path): exits 2" $output 'SYNC-EXITCODE=2'
+        Assert-Equal "$($state.Path): no commit was made" $head "$(git -C $rs10.Hub rev-parse HEAD 2>$null)".Trim()
+        Assert-Equal "$($state.Path): nothing was staged" 0 @(git -C $rs10.Hub diff --cached --name-only 2>$null).Count
+        Assert-True "$($state.Path): the state is left as it was" (Test-Path -LiteralPath $at)
+    }
+    catch {
+        Assert-True "the cases ran to the end without a terminating error -- $($_.Exception.Message)" $false
+    }
+    finally { Remove-SyncSandbox $rs10.Base }
+}
+
+# A refused `git commit` (here a hub's own pre-commit hook, which needs nothing
+# from this package) is said as one, the hub left as it was.
+$hubJson12 = '{ "hub": 1, "storeSync": "git", "spaces": [ { "slug": "test", "name": "Test", "status": "local", "promptsFolder": "test" } ] }'
+$rs12 = New-RemoteSandbox -HubJson $hubJson12
+try {
+    $hooks12 = Join-Path $rs12.Base 'refusing-hooks'
+    New-Item -ItemType Directory -Path $hooks12 -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $hooks12 'pre-commit'), "#!/bin/sh`necho 'a check refused this commit' >&2`nexit 1`n")
+    if (-not ($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop')) { & chmod +x (Join-Path $hooks12 'pre-commit') }
+    git -C $rs12.Hub config core.hooksPath ($hooks12 -replace '\\', '/') 2>&1 | Out-Null
+    $head12 = "$(git -C $rs12.Hub rev-parse HEAD 2>$null)".Trim()
+    New-Item -ItemType Directory -Path (Join-Path $rs12.Hub 'test/current') -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $rs12.Hub 'test/current/Task3RTV-a-change.prompt.md'), "# Task 3RTV: A change`n")
+    $output = Invoke-SyncWrapperInModule -Sandbox $rs12 -LocalJson "{ `"promptsRoot`": `"$($rs12.Hub -replace '\\', '/')`" }"
+    Assert-Contains "a refused git commit is a stated refusal, with git's own line" $output "git commit failed, so nothing was synced: a check refused this commit"
+    Assert-Contains "and exits 2, not 0" $output 'SYNC-EXITCODE=2'
+    Assert-True "exactly one Error: block" (@([regex]::Matches($output, 'Error:')).Count -eq 1)
+    Assert-Equal "no commit was made" $head12 "$(git -C $rs12.Hub rev-parse HEAD 2>$null)".Trim()
+    Assert-Equal "and the change is left unstaged" 0 @(git -C $rs12.Hub diff --cached --name-only 2>$null).Count
+}
+catch {
+    Assert-True "the cases ran to the end without a terminating error -- $($_.Exception.Message)" $false
+}
+finally { Remove-SyncSandbox $rs12.Base }
+
+# A failed `git add` (a lock git cannot take) is said as one, not read as synced.
+$hubJson11 = '{ "hub": 1, "storeSync": "git", "spaces": [ { "slug": "test", "name": "Test", "status": "local", "promptsFolder": "test" } ] }'
+$rs11 = New-RemoteSandbox -HubJson $hubJson11
+try {
+    $lock = "$(git -C $rs11.Hub rev-parse --git-path index.lock 2>$null)".Trim()
+    if (-not [System.IO.Path]::IsPathRooted($lock)) { $lock = Join-Path $rs11.Hub $lock }
+    New-Item -ItemType Directory -Path (Join-Path $rs11.Hub 'test/current') -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $rs11.Hub 'test/current/Task7WXY-a-change.prompt.md'), "# Task 7WXY: A change`n")
+    [System.IO.File]::WriteAllText($lock, '')
+    $output = Invoke-SyncWrapperInModule -Sandbox $rs11 -LocalJson "{ `"promptsRoot`": `"$($rs11.Hub -replace '\\', '/')`" }"
+    Assert-Contains "a failed git add is a stated refusal" $output 'git add failed, so nothing was synced'
+    Assert-True "and names no hook, because git named none" ($output -notmatch '(?i)a hook refused')
+    Assert-Contains "and exits 2" $output 'SYNC-EXITCODE=2'
+    Assert-True "exactly one Error: block" (@([regex]::Matches($output, 'Error:')).Count -eq 1)
+}
+catch {
+    Assert-True "the cases ran to the end without a terminating error -- $($_.Exception.Message)" $false
+}
+finally {
+    if ($lock -and (Test-Path -LiteralPath $lock)) { Remove-Item -LiteralPath $lock -Force -ErrorAction SilentlyContinue }
+    Remove-SyncSandbox $rs11.Base
+}
 
 Write-Host ""
 
