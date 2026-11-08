@@ -47,16 +47,21 @@
     as its origin, claude is on the PATH, and the item has a crew size this
     launch has a model for: sonnet or opus. fable -- the owner's own seat --
     and an item with no size are refused with the hint to route it. Then it
-    adds a detached worktree of that repository under its .claude/worktrees/,
-    writes the block to <repo>/startwork-<ref>-<stamp>.block.log, and starts
+    adds a detached worktree of that repository under its .claude/worktrees/
+    (kept out of git status by /.claude/worktrees/ in the repository's local
+    info/exclude, unless a rule already ignores it), writes the block to
+    startwork-<ref>-<stamp>.block.log in the repository's own git folder
+    (git rev-parse --git-path startwork: never the working tree), and starts
     `claude --print --model <size> --output-format stream-json --verbose` in
     the worktree with that file as its stdin (claude --print reads its prompt
     there; a prompt of many lines does not cross a joined command line whole),
     through Start-Detached.ps1's Start-DetachedProcess -- the one launcher
     that keeps the caller's pipes from crossing, so
     `pwsh -c 'StartWork <id> -Launch' | cat` returns at once -- with its output
-    to <repo>/startwork-<ref>-<stamp>.log (and .err.log), all three under the
-    *.log ignore pattern. Prints the PID, the worktree and the log,
+    to startwork-<ref>-<stamp>.log (and .err.log) beside the block. The block
+    is removed once the session has it open (on Windows, as soon as Windows
+    allows; a block a running session still holds goes at the next launch),
+    and at once when the launch fails. Prints the PID, the worktree and the log,
     and returns without waiting. -WhatIf runs every check and prints the
     commands it would run, and adds and starts nothing. The size is read the
     way the rituals read it: a card's **Assigned:** line, else a size in its
@@ -588,25 +593,52 @@ if ($Launch) {
         exit 2  # stated refusal
     }
 
-    # 4. Where: a detached worktree under the repository's .claude/worktrees/;
-    # the block, the log and the stderr log at the repository root, all three
-    # *.log, which is ignored. The block is the session's STDIN -- claude
-    # --print reads its prompt there -- because a prompt of many lines does
-    # not cross a joined command line whole on any host.
+    # 4. Where: a detached worktree under the repository's .claude/worktrees/,
+    # and the block, the log and the stderr log in the repository's OWN git
+    # folder, never in its working tree: the block is the card whole, the log
+    # is the session's stream, and the repository is any product's, whose
+    # ignore rules are its own. `git rev-parse --git-path` names the folder,
+    # so a linked worktree gets its private one (.git/worktrees/<name>/).
+    # The block is the session's STDIN -- claude --print reads its prompt
+    # there, because a prompt of many lines does not cross a joined command
+    # line whole on any host -- and it is removed once the session has it open.
     $refWord = (([string]$item.Ref).TrimStart('#').ToLowerInvariant() -replace '[^a-z0-9]+', '-').Trim('-')
     $runName = "startwork-$refWord-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
     $worktree = Join-Path (Join-Path (Join-Path $repoTop '.claude') 'worktrees') $runName
-    $blockPath = Join-Path $repoTop "$runName.block.log"
-    $logPath = Join-Path $repoTop "$runName.log"
-    $errPath = Join-Path $repoTop "$runName.err.log"
+    $gitPath = {
+        param([string]$Name)
+        $read = Invoke-P20TrackerRead 'git' @('-C', $repoTop, 'rev-parse', '--git-path', $Name)
+        $said = ''
+        if ($read.Code -eq 0) { $said = ([string](@($read.Out | Where-Object { "$_".Trim() }) | Select-Object -First 1)).Trim() }
+        if (-not $said) { return '' }
+        if (-not [System.IO.Path]::IsPathRooted($said)) { $said = Join-Path $repoTop $said }
+        return [System.IO.Path]::GetFullPath($said)
+    }
+    $runDir = & $gitPath 'startwork'
+    $excludeFile = & $gitPath 'info/exclude'
+    if (-not $runDir -or -not $excludeFile) {
+        Write-CliError -Message "git did not name the git folder of $repoTop, so there is nowhere outside the working tree to put the block." `
+            -Hint "'git -C `"$repoTop`" rev-parse --git-path startwork' should print it. The block works without a launch: '${p}StartWork $wanted'."
+        exit 2  # stated refusal
+    }
+    $blockPath = Join-Path $runDir "$runName.block.log"
+    $logPath = Join-Path $runDir "$runName.log"
+    $errPath = Join-Path $runDir "$runName.err.log"
+    # The worktrees folder is kept out of `git status` too, by the repository's
+    # own local exclude file (never its committed .gitignore), unless a rule
+    # already ignores it.
+    $worktreesRule = '/.claude/worktrees/'
+    $ignoredRead = Invoke-P20TrackerRead 'git' @('-C', $repoTop, 'check-ignore', '-q', '--no-index', '.claude/worktrees/x')
+    $needsExclude = ($ignoredRead.Code -ne 0)
     $claudeArgs = @('--print', '--model', $model, '--output-format', 'stream-json', '--verbose')
     $blockLines = @($block -split "`n").Count
     $shownCommand = "claude $($claudeArgs -join ' ') < `"$blockPath`""
 
     if ($WhatIf) {
         Write-Output "  [WhatIf] $what is sized $size ($sizeFrom): model $model."
+        if ($needsExclude) { Write-Output "  [WhatIf] Would add $worktreesRule to $excludeFile, so the worktree stays out of git status." }
         Write-Output "  [WhatIf] Would run: git -C `"$repoTop`" worktree add --detach `"$worktree`""
-        Write-Output "  [WhatIf] Would write the block ($blockLines lines, as '${p}StartWork $wanted' prints it) to $blockPath"
+        Write-Output "  [WhatIf] Would write the block ($blockLines lines, as '${p}StartWork $wanted' prints it) to $blockPath, and remove it once the session has it open"
         Write-Output "  [WhatIf] Would start, in that worktree: $shownCommand"
         Write-Output "  [WhatIf] Its output would go to $logPath (stderr: $errPath)."
         Write-Output '  [WhatIf] Nothing was added or started.'
@@ -622,25 +654,53 @@ if ($Launch) {
         exit 2  # stated refusal
     }
 
+    if ($needsExclude) {
+        try {
+            $excludeDir = Split-Path -Parent $excludeFile
+            if (-not (Test-Path -LiteralPath $excludeDir)) { New-Item -ItemType Directory -Path $excludeDir -Force | Out-Null }
+            $had = ''
+            if (Test-Path -LiteralPath $excludeFile) { $had = [System.IO.File]::ReadAllText($excludeFile, (New-Object System.Text.UTF8Encoding($false))) }
+            $sep = ''
+            if ($had -and -not $had.EndsWith("`n")) { $sep = "`n" }
+            [System.IO.File]::WriteAllText($excludeFile, ($had + $sep + $worktreesRule + "`n"), (New-Object System.Text.UTF8Encoding($false)))
+        }
+        catch {
+            Write-CliError -Message "Could not add $worktreesRule to ${excludeFile}: $($_.Exception.Message)" `
+                -Hint "Nothing was started. The worktree is at $worktree and would show in git status without the rule; the block works without a launch: '${p}StartWork $wanted'."
+            exit 2  # stated refusal
+        }
+    }
     # The child's environment is this one's, without a Teams webhook: a session
     # never sends (AGENTS.md, "The webhook variables").
     $childEnv = @{}
     $hookPrefix = [string]$c.env.teamsWebhookPrefix
     foreach ($var in @(Get-ChildItem Env: -ErrorAction SilentlyContinue | Where-Object { $hookPrefix -and $_.Name.StartsWith($hookPrefix) })) { $childEnv[$var.Name] = $null }
     try {
+        if (-not (Test-Path -LiteralPath $runDir)) { New-Item -ItemType Directory -Path $runDir -Force | Out-Null }
+        # A block an earlier launch could not remove (on Windows a running
+        # session holds its stdin) goes once its session has let go of it. A
+        # block younger than a minute may be a launch starting beside this one.
+        foreach ($old in @(Get-ChildItem -LiteralPath $runDir -Filter '*.block.log' -File -ErrorAction SilentlyContinue)) {
+            if ($old.LastWriteTime -lt (Get-Date).AddMinutes(-1)) { try { [System.IO.File]::Delete($old.FullName) } catch { $null = $_ } }
+        }
         # UTF-8 with no BOM, LF: the bytes StartWork prints.
         [System.IO.File]::WriteAllText($blockPath, $block, (New-Object System.Text.UTF8Encoding($false)))
         $proc = Start-DetachedProcess -FilePath $claude -ArgumentList $claudeArgs -WorkingDirectory $worktree `
-            -StdOutLog $logPath -StdErrLog $errPath -Environment $childEnv -StdInFile $blockPath
+            -StdOutLog $logPath -StdErrLog $errPath -Environment $childEnv -StdInFile $blockPath -RemoveStdInFile
     }
     catch {
+        if (Test-Path -LiteralPath $blockPath) { Remove-Item -LiteralPath $blockPath -Force -ErrorAction SilentlyContinue }
         Write-CliError -Message "claude did not start: $($_.Exception.Message)" `
-            -Hint "The worktree is at $worktree; 'git worktree remove `"$worktree`"' takes it away."
+            -Hint "The worktree is at $worktree; 'git worktree remove `"$worktree`"' takes it away. The block was removed."
         exit 2  # stated refusal
     }
     Write-Output "Launched $what on ${model}: PID $($proc.Id)."
     Write-Output "  worktree: $worktree"
     Write-Output "  log:      $logPath"
+    if (Test-Path -LiteralPath $blockPath) {
+        $onWin = ($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows
+        if ($onWin) { Write-Output "  block:    the session holds it open; it is removed by the next launch after the session ends ($blockPath)." }
+    }
     exit 0
 }
 

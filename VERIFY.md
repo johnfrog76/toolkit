@@ -290,7 +290,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **51 suites, 9511 assertions** with a `config.local.json`, every one
+findings. On this commit that is **51 suites, 9524 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -1094,8 +1094,8 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   Space answered `agents`, and a card in `current/` whose `**Assigned:**` line says `sonnet`, `cd` into your clone
   of the Space's repository and run `powershell -NoProfile -Command "tkStartWork <id> -Launch" | findstr /n "^"`,
   then the same with `pwsh -NoProfile -c`. You should see each return within a second or two with
-  `Launched ... on sonnet: PID <n>.`, the worktree under `.claude\worktrees\startwork-...` and the log at the
-  repository root -- never a wait for the session to end -- and `Get-Process -Id <n>` still running afterwards.
+  `Launched ... on sonnet: PID <n>.`, the worktree under `.claude\worktrees\startwork-...` and the log under
+  `.git\startwork\` -- never a wait for the session to end -- and `Get-Process -Id <n>` still running afterwards.
   Repeat with an npm-installed `claude.cmd` first on the PATH if you have one: it starts the same way (the prompt
   is the session's stdin, never an argument cmd.exe would cut at a newline). Then `tkTestToolkit -StartWork` on
   that host: green, its launch half named as a skip. Closes Feature MA6P (StartWork -Launch).
@@ -1105,9 +1105,9 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   route the card to `opus` (`tkRoute <id> -Assign opus`) and it says `model opus`; `tkRoute <id> -Assign fable` and
   `-Launch` refuses, naming the owner's own seat. Then launch the `sonnet` card for real and open the log once
   the session has written: its `system`/`init` event names a Sonnet model, and the first user message in the
-  stream is the hand-off block `tkStartWork <id>` prints, whole (compare it with the `.block.log` beside the
-  log). If `stream-json` does not echo the prompt, record what the log does open with and file it -- the
-  `.block.log` is then the record of what the session was handed. Closes Feature MA6P (StartWork -Launch).
+  stream is the hand-off block `tkStartWork <id>` prints, whole (compare it with `tkStartWork <id>`'s own output:
+  the `.block.log` is removed once the session has it). If `stream-json` does not echo the prompt, record what the
+  log does open with and file it. Closes Feature MA6P (StartWork -Launch).
 - [ ] **A server's log keeps filling after the launcher returns, on macOS and Linux.** `tkAgent` (or
   `tkWeb -Dev`), then load a page that makes the agent log a request, then read `agent.log` at the package root:
   you should see request lines written after `tkAgent` returned, not only its startup lines. Proved on macOS
@@ -1220,6 +1220,13 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   "Livré — ✓"`. The pull request's title and description, the reply and the work item comment read as typed. And
   with `ANTHROPIC_API_KEY` set, `tkAddPRReview <pr> -DryRun` on a branch whose diff holds `é` gets the model's
   answer, not a 400.
+- [ ] **StartWork -Launch leaves nothing of the card in the repository, on Windows with a real session (review
+  finding G4 f11).** In a clone of a GitHub Space's repository whose `.gitignore` has no `*.log` line, in
+  `powershell` (5.1) and in `pwsh`: `tkStartWork <id> -Launch` for a card sized `sonnet`. `git status
+  --untracked-files=all` shows nothing new, and `dir .git\startwork` holds the `.log` and `.err.log`. Note
+  whether the `.block.log` is already gone, or whether the launch printed `block: the session holds it open`.
+  Once the session has ended, a second launch removes it. The StartWork suite runs the launch on the Windows job
+  with a stub that exits at once; this row is a session that lives on.
 
 ## Recording a run
 
