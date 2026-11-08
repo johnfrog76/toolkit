@@ -800,6 +800,9 @@ try {
     Assert-True "...and no tracker is asked" ($r.Output -notmatch 'AZ-WAS-ASKED|GH-WAS-ASKED' -and $r.Output -notmatch '\[Pull Requests\]')
     Assert-True "...and the error count is the log's: one in the last 24 hours, the older one left out" ($r.Output -match '1 error in last 24h')
 }
+catch {
+    Assert-True "the Tier 2 Dashboard cases ran to the end without a terminating error: $($_.Exception.Message)" $false
+}
 finally { Remove-Item -LiteralPath $dashLog -Recurse -Force -ErrorAction SilentlyContinue }
 
 Write-Host ""
