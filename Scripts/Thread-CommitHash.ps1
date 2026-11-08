@@ -138,7 +138,7 @@ function Resolve-P20BaseBranch {
 
 # -- The bullets this run wants to add -----------------------------------------
 $wanted = @()   # ordered list of "- <hash> <subject>" lines
-$firstHash = $null
+$namedHash = $null   # -Hash: the commit a person named, which a placeholder takes
 
 if ($Hash) {
     $subject = ''
@@ -149,7 +149,7 @@ if ($Hash) {
     }
     $subject = "$subject".Trim()
     if ($subject) { $wanted = @("- $Hash $subject") } else { $wanted = @("- $Hash") }
-    $firstHash = $Hash
+    $namedHash = $Hash
 }
 else {
     $currentBranch = "$((Invoke-P20TrackerRead 'git' @('-C', $codeRepoRoot, 'rev-parse', '--abbrev-ref', 'HEAD')).Out)".Trim()
@@ -175,7 +175,6 @@ else {
             -Hint "Commit first, or pass -Hash <hash> to thread one explicitly."
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
-    $firstHash = Get-P20BulletHash $wanted[0]
 }
 
 # -- Which card ----------------------------------------------------------------
@@ -262,12 +261,8 @@ $original = [System.IO.File]::ReadAllText($File)
 $wasCrlf = $original -match "`r`n"
 $content = $original -replace "`r`n", "`n"
 
-# [commit] placeholders in PR replies take the first hash this run threads.
-$replacements = ([regex]::Matches($content, '\[commit\]')).Count
-if ($replacements -gt 0 -and $firstHash) {
-    $content = $content -replace '\[commit\]', $firstHash
-}
-
+# What this run adds, asked first: Add-P20CommitBullets is pure, so this reads
+# the card and writes nothing.
 $bulletEdit = Add-P20CommitBullets -Content $content -Bullets $wanted
 if (-not $bulletEdit.Ok) {
     Write-CliError -Message "No '## Git' section in $(Split-Path $File -Leaf)." `
@@ -276,6 +271,20 @@ if (-not $bulletEdit.Ok) {
 }
 $toAdd = @($bulletEdit.Added)
 $added = $toAdd.Count
+
+# [commit] placeholders in PR replies name the fix: the commit a person named
+# with -Hash, else the NEWEST commit this run adds. Not the branch's first: its
+# log also holds every commit an earlier round threaded, and the oldest of those
+# is not the fix. When nothing new is added there is no commit to name, so the
+# placeholder stays, and the output says so. Filled in the card as it was, and
+# the bullets added after, so a commit subject that says [commit] is kept.
+$replacements = ([regex]::Matches($content, '\[commit\]')).Count
+$fillHash = $namedHash
+if (-not $fillHash -and $added -gt 0) { $fillHash = Get-P20BulletHash $toAdd[$added - 1] }
+if ($replacements -gt 0 -and $fillHash) {
+    $content = $content -replace '\[commit\]', $fillHash
+    $bulletEdit = Add-P20CommitBullets -Content $content -Bullets $wanted
+}
 $content = $bulletEdit.Content
 if ($wasCrlf) { $content = $content -replace "`n", "`r`n" }
 
@@ -302,8 +311,11 @@ if ($added -gt 0) {
 else {
     Write-Host "  $leaf already carries every commit on this branch -- nothing to add." -ForegroundColor DarkGray
 }
-if ($replacements -gt 0 -and $firstHash) {
-    Write-Host "  Replaced $replacements [commit] placeholder$(if ($replacements -ne 1) { 's' })" -ForegroundColor Gray
+if ($replacements -gt 0 -and $fillHash) {
+    Write-Host "  Replaced $replacements [commit] placeholder$(if ($replacements -ne 1) { 's' }) with $fillHash" -ForegroundColor Gray
+}
+elseif ($replacements -gt 0) {
+    Write-Host "  Left $replacements [commit] placeholder$(if ($replacements -ne 1) { 's' }): no new commit to name. Commit the fix and run $(Get-CliPrefix)ThreadHash again, or fill it in by hand." -ForegroundColor Yellow
 }
 Write-Host ""
 if (Get-Command Write-ToolkitLog -ErrorAction SilentlyContinue) {

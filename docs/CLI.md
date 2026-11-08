@@ -105,7 +105,10 @@ on the current branch that is not yet on the project's `defaultBranch` -- the sa
 will target -- and writes each as its own `- {short-hash} {message}` bullet under `Commits:`, oldest
 first. Run it once after the last commit, not once per commit: a hash the card already carries is
 skipped, so re-running adds nothing and the `- (pending)` placeholder goes the moment a real commit
-lands. The card is found from the branch name when you do not name one.
+lands. The card is found from the branch name when you do not name one. A `[commit]` placeholder in a
+review reply takes the **newest** commit the run adds -- in a second review round, the fix, not the
+branch's first commit -- or the hash `-Hash` names. A run that adds nothing leaves the placeholder and
+says so: commit the fix and run it again, or fill it in by hand.
 
 The hub is **not** the code repo -- it need not even be a git repository (`storeSync: none`) -- and
 reading the hub's history here would record the hub's own commits as the work's and report success.

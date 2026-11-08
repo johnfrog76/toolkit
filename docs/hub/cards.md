@@ -476,7 +476,7 @@ keeps the same edit rule -- the card's own line ending, no BOM.
 | Verb | Does to the file |
 | --- | --- |
 | `NewPrompt <id>` / `-Title` | creates it from the type's template, in `backlog/`; `-Now` in `current/`. For a card already in `current/` or `backlog/` it RETURNS that card and writes nothing. `-Design <name\|id>` adds the `> Design:` header line; `-From <record>` adds the `**From:**` footer line |
-| `ThreadHash` | adds commit bullets under `Commits:`; fills `[commit]` placeholders in PR replies. A card in `backlog/` is moved to `current/` first |
+| `ThreadHash` | adds commit bullets under `Commits:`; fills `[commit]` placeholders in PR replies with the newest commit it adds, or the `-Hash` named, and leaves them when it adds none. A card in `backlog/` is moved to `current/` first |
 | `NewPR` | writes `PR URL:`. A card in `backlog/` is moved to `current/` first |
 | `PublishPR` | writes `PR published: <url>` on the line under `PR URL:`, once -- a record, not state |
 | `GetPRComments` | writes `PR URL:` if absent; appends review rounds under `## PR Review Comments`. Append-only, safe to re-run. It also writes a side record, `pr-comments/<date>-PR<id>.md` in the Space (read at archive time for `prsReviewed`), except with `-OutputFile`, which writes only the file it names ([CLI](../CLI.md)) |
