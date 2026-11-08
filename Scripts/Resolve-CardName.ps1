@@ -85,7 +85,7 @@ function Get-P20CardIdShape {
     try {
         if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) {
             $constsScript = Join-Path $PSScriptRoot 'Get-Consts.ps1'
-            if (Test-Path $constsScript) { . $constsScript }
+            if (Test-Path -LiteralPath $constsScript) { . $constsScript }
         }
         if (Get-Command Get-P20Consts -ErrorAction SilentlyContinue) {
             $fromFile = (Get-P20Consts).regex.cardId

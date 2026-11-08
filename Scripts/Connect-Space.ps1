@@ -103,7 +103,7 @@ if ($global:P20Config -and $global:P20Config.Spaces) {
     $hubRoot = [string]$global:P20Config.PromptsRoot
 }
 else {
-    $defaultCfg = ConvertTo-P20SpaceKeys (Get-Content (Join-Path $packageRoot 'config.default.json') -Raw -Encoding UTF8 | ConvertFrom-Json)
+    $defaultCfg = ConvertTo-P20SpaceKeys (Get-Content -LiteralPath (Join-Path $packageRoot 'config.default.json') -Raw -Encoding UTF8 | ConvertFrom-Json)
     $localPath = Join-Path $packageRoot 'config.local.json'
     $localCfg = $null
     if (-not (Get-Command Read-P20LocalConfigJson -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Write-ConfigParseWarning.ps1') }
@@ -292,7 +292,7 @@ if ($As) {
     . $loadHelpers
     $oldFolder = Join-Path $hubRoot ([string]$space.promptsFolder)
     $newFolder = Join-Path $hubRoot $As
-    if ((Test-Path $oldFolder) -and -not (Test-Path $newFolder)) {
+    if ((Test-Path -LiteralPath $oldFolder) -and -not (Test-Path -LiteralPath $newFolder)) {
         if ($WhatIf) { Write-Host "  [WhatIf] move $oldFolder -> $newFolder" -ForegroundColor Yellow }
         else { Move-Item -LiteralPath $oldFolder -Destination $newFolder }
     }

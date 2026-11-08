@@ -35,9 +35,9 @@ function Get-P20AgentPort {
     $resolved = 0
     foreach ($name in @('config.default.json', 'config.local.json')) {
         $path = Join-Path $RepoRoot $name
-        if (-not (Test-Path $path)) { continue }
+        if (-not (Test-Path -LiteralPath $path)) { continue }
         try {
-            $cfg = Get-Content $path -Raw -Encoding UTF8 | ConvertFrom-Json
+            $cfg = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
             if ($cfg.web -and $cfg.web.agentPort) { $resolved = [int]$cfg.web.agentPort }
         }
         catch {

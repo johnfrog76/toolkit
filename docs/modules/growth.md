@@ -263,7 +263,10 @@ tkLogPeerReview <PullRequestId> [-Title <string>] [-Notes <string>] [-Help]
 Writes `pr-comments/reviewed-YYYY-MM-DD-PR<id>.md` under the active Space. This is
 the half of review work that otherwise leaves no trace in your own record: the
 PR carries your comments, and nothing else says you spent the afternoon on it.
-The year-end review reads these. A missing id or an unusable prompt store is a
+The year-end review reads these, and counts one file as one review. **Nothing
+overwrites a record:** a second `LogPeerReview` of the same PR the same day adds
+its `Notes:` (and a `Title:`, where the first had none) to the record already
+there, and one with nothing to add leaves it as it is. A missing id or an unusable prompt store is a
 stated refusal (exit 2). Script: `Scripts/Write-PeerReviewLog.ps1` --
 a script rather than a function body in `utilities.psm1`, so file writing stays
 out of the command table's own file and within reach of the suites.

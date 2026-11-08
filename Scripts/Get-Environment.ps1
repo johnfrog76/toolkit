@@ -37,7 +37,7 @@ elseif ($PSVersionTable.PSEdition -ne 'Desktop' -and $IsMacOS) { 'macOS' }
 else { 'Linux' }
 
 $gitInstalled = [bool](Get-Command git -ErrorAction SilentlyContinue)
-$repoFound = [bool]($cfg.PromptsRoot -and (Test-Path $cfg.PromptsRoot))
+$repoFound = [bool]($cfg.PromptsRoot -and (Test-Path -LiteralPath $cfg.PromptsRoot))
 
 # WHICH tracker the board's address names (D-G2): the probes, the tier's inputs and the report's rows all follow it. An
 # ADO board (and a local one, whose rows keep their exact words) walks the az

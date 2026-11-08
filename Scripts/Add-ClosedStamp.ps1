@@ -54,7 +54,7 @@ function Add-ClosedDate {
         # this function writes back everything it read.
         $stamp = (Get-P20Consts).stamps.closed
 
-        $content = Get-Content -Path $Path -Raw -Encoding UTF8 -ErrorAction Stop
+        $content = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 -ErrorAction Stop
         if ($content -match ('(?m)^' + [regex]::Escape($stamp))) { return }
 
         # Append in the terminator the file already uses. The stamp used to be

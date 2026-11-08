@@ -99,7 +99,7 @@ if (-not $cfg) {
     $defaults = $null; $local = $null
     # The container's keys in both spellings (ConvertTo-P20SpaceKeys, stage 2).
     . (Join-Path $PSScriptRoot 'Resolve-HubConfig.ps1')
-    if (Test-Path $cfgDefault) { $defaults = ConvertTo-P20SpaceKeys (Get-Content $cfgDefault -Raw -Encoding UTF8 | ConvertFrom-Json) }
+    if (Test-Path -LiteralPath $cfgDefault) { $defaults = ConvertTo-P20SpaceKeys (Get-Content -LiteralPath $cfgDefault -Raw -Encoding UTF8 | ConvertFrom-Json) }
     if (-not (Get-Command Read-P20LocalConfigJson -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Write-ConfigParseWarning.ps1') }
     $local = ConvertTo-P20SpaceKeys (Read-P20LocalConfigJson -Path $cfgLocal)
     $spaces = if ($defaults.spaces) { @($defaults.spaces) } else { @() }
@@ -121,7 +121,7 @@ if (-not ($cfg | Get-Member -Name 'Orgs' -MemberType Properties -ErrorAction Sil
     $cfgDefault2 = Join-Path $repoRoot2 'config.default.json'
     $defaults2 = $null
     . (Join-Path $PSScriptRoot 'Resolve-HubConfig.ps1')
-    if (Test-Path $cfgDefault2) { $defaults2 = ConvertTo-P20SpaceKeys (Get-Content $cfgDefault2 -Raw -Encoding UTF8 | ConvertFrom-Json) }
+    if (Test-Path -LiteralPath $cfgDefault2) { $defaults2 = ConvertTo-P20SpaceKeys (Get-Content -LiteralPath $cfgDefault2 -Raw -Encoding UTF8 | ConvertFrom-Json) }
     $cfg | Add-Member -NotePropertyName 'Orgs' -NotePropertyValue (@($defaults2.spaces)) -Force
 }
 # Dot-sourced HERE rather than below, because the root has to be resolved before
@@ -167,7 +167,7 @@ function Test-P20PureScaffold {
 }
 $script:Consts = Get-P20Consts
 $promptsRoot = Get-P20PromptsRoot -PackageRoot (Split-Path -Parent $PSScriptRoot)
-if (-not $promptsRoot -or -not (Test-Path $promptsRoot)) {
+if (-not $promptsRoot -or -not (Test-Path -LiteralPath $promptsRoot)) {
     @{ error = "PromptsRoot not configured" } | ConvertTo-Json
     return
 }
@@ -249,7 +249,7 @@ else {
 # Build the output slug-set string (sorted asc, joined by the contract's separator)
 $slugSetStr = ($selectedSlugs | Sort-Object) -join $script:Consts.reviews.slugSetSeparator
 
-Push-Location $promptsRoot
+Push-Location -LiteralPath $promptsRoot
 try {
     # -- Per-slug scan loop --------------------------------------------------
     # For each selected slug run the scan (including the legacy-path fallback)
@@ -303,11 +303,11 @@ try {
         if ($folderPrefix) {
             foreach ($kindFolder in @('archive', 'current')) {
                 $cardDir = Join-Path (Join-Path $promptsRoot $folderPrefix) $kindFolder
-                if (-not (Test-Path $cardDir)) { continue }
-                foreach ($cardFile in (Get-ChildItem -Path $cardDir -Filter '*.md' -File -ErrorAction SilentlyContinue)) {
+                if (-not (Test-Path -LiteralPath $cardDir)) { continue }
+                foreach ($cardFile in (Get-ChildItem -LiteralPath $cardDir -Filter '*.md' -File -ErrorAction SilentlyContinue)) {
                     if ($cardFile.Name -eq 'README.md') { continue }
                     $cardRel = "$folderPrefix/$kindFolder/$($cardFile.Name)"
-                    $cardText = Get-Content $cardFile.FullName -Raw -Encoding UTF8
+                    $cardText = Get-Content -LiteralPath $cardFile.FullName -Raw -Encoding UTF8
                     if ($null -eq $cardText) { $cardText = '' }
                     $verdicts[$cardRel] = Test-P20CardInWindow `
                         -Created (Get-P20StampDate $cardText $script:Consts.stamps.created) `
@@ -367,7 +367,7 @@ try {
         if ($matchedPrefix) {
             # Path already has the slug prefix
             $candidate = Join-Path $promptsRoot $rel
-            if (Test-Path $candidate) {
+            if (Test-Path -LiteralPath $candidate) {
                 $resolvedFull = $candidate
                 $resolvedRel  = $rel
             }
@@ -376,7 +376,7 @@ try {
         if (-not $resolvedFull) {
             # Try to resolve relative to root (legacy/bare paths)
             $candidate = Join-Path $promptsRoot $rel
-            if (Test-Path $candidate) {
+            if (Test-Path -LiteralPath $candidate) {
                 $resolvedFull = $candidate
                 $resolvedRel  = $rel
             }
@@ -386,7 +386,7 @@ try {
                 $resolved = $false
                 foreach ($sub in @("$growthFolder/archive/", "$growthFolder/current/")) {
                     $c2 = Join-Path $promptsRoot "$sub$basename"
-                    if (Test-Path $c2) {
+                    if (Test-Path -LiteralPath $c2) {
                         $resolvedFull = $c2
                         $resolvedRel  = "$sub$basename"
                         $resolved = $true
@@ -398,7 +398,7 @@ try {
         }
 
         if (-not $seenPaths.Add($resolvedRel)) { continue }
-        $content = Get-Content $resolvedFull -Raw -Encoding UTF8
+        $content = Get-Content -LiteralPath $resolvedFull -Raw -Encoding UTF8
 
         # Parse YAML frontmatter
         $fm = @{}
@@ -590,7 +590,7 @@ try {
     # scratch hub without touching a real one; unset, nothing changes.
     $reviewsRoot = if ($env:PROMPTS_REVIEWS_DIR) { $env:PROMPTS_REVIEWS_DIR } else { Join-Path $promptsRoot $reviewsFolder }
     $outDir = Join-Path $reviewsRoot "$slugSetStr/$year/$folderRange"
-    if (-not (Test-Path $outDir)) {
+    if (-not (Test-Path -LiteralPath $outDir)) {
         New-Item -ItemType Directory -Path $outDir -Force | Out-Null
     }
     $outFile = Join-Path $outDir $script:Consts.reviews.fileName

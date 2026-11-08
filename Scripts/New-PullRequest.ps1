@@ -339,7 +339,7 @@ if ($trackerKind -eq 'github') {
 # may be a different repo entirely, e.g. the prompts orchestration repo.
 if ($trackerKind -ne 'github' -and $File -and (Test-Path -LiteralPath $File) -and
     (-not $PSBoundParameters.ContainsKey('Project') -or -not $PSBoundParameters.ContainsKey('Repository'))) {
-    $adoLinkLine = Select-String -Path $File -Pattern 'ADO Link.*dev\.azure\.com/[^/]+/([^/]+)/_workitems' | Select-Object -First 1
+    $adoLinkLine = Select-String -LiteralPath $File -Pattern 'ADO Link.*dev\.azure\.com/[^/]+/([^/]+)/_workitems' | Select-Object -First 1
     if ($adoLinkLine) {
         $linkProject = [Uri]::UnescapeDataString($adoLinkLine.Matches[0].Groups[1].Value)
         $linkEntries = @($allProjects | Where-Object { $_.Name -eq $linkProject })

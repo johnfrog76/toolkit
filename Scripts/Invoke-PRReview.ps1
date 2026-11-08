@@ -397,11 +397,11 @@ try {
     $resolvedPrompt = Resolve-P20AgenticPrompt -Name 'pr-review.prompt.md'
     $promptPath = $resolvedPrompt.Path
     Write-Host "  Prompt: $promptPath ($($resolvedPrompt.Source) copy)" -ForegroundColor DarkGray
-    if (-not (Test-Path $promptPath)) {
+    if (-not (Test-Path -LiteralPath $promptPath)) {
         Write-CliError -Message "Review prompt not found at $promptPath"
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
-    $promptTemplate = Get-Content $promptPath -Raw -Encoding UTF8
+    $promptTemplate = Get-Content -LiteralPath $promptPath -Raw -Encoding UTF8
     # The frontmatter and everything above the --- fence are for a person, not
     # instruction (Get-P20PromptInstruction, beside the resolver).
     $promptTemplate = Get-P20PromptInstruction -Text $promptTemplate

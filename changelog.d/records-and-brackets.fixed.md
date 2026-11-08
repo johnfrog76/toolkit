@@ -1,0 +1,4 @@
+- A hub, a package or a home folder whose name holds `[` or `]` now works: before, the Spaces in its `hub.json` went unknown, `Status` found no cards and `Archive` could not move one.
+- A second `LogPeerReview` of the same pull request on the same day adds its notes to the record instead of replacing the first one's.
+- `GetPRComments` keeps one side record per pull request and repository, so the same PR number in two repositories no longer collides, and a second fetch the same day adds to the record instead of replacing it.
+- `GetPRComments` now says plainly that it wrote nothing when the card it would add to cannot be read, instead of a generic error.

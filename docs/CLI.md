@@ -172,10 +172,13 @@ name, before anything is asked or posted**, exit 2 -- say it in the reply instea
 comment or a review summary there is no thread to resolve: the reply is posted and the line says
 `-Status` was not applied. The card's `Status:` line reads `resolved` or `unresolved` afterwards.
 
-**The side record.** Besides the card, a run writes one small file per PR fetch,
-`<promptsRoot>/<promptsFolder>/pr-comments/<date>-PR<id>.md` (the PR title, its URL, the fetch time, the
-repository and the count of new comments). It exists so `prsReviewed` is countable at archive time; nothing
-else reads it. **With `-OutputFile <path>` it is not written at all** -- the named file is the only file
+**The side record.** Besides the card, a run writes one small file per PR, repository and day,
+`<promptsRoot>/<promptsFolder>/pr-comments/<date>-<repository>-PR<id>.md` (the PR title, its URL, the fetch
+time, the repository and the count of new comments; the repository is made safe for a file name, so
+`acme/widgets` is `acme-widgets`). The repository is in the name because a PR number is per repository.
+**Nothing overwrites one:** a second fetch the same day adds its own `Fetched:` and `Comments:` lines to
+the record already there. Nothing reads it today: the review count, `prsReviewed`, counts `LogPeerReview`'s
+`reviewed-` records. **With `-OutputFile <path>` it is not written at all** -- the named file is the only file
 that run writes, and the verb prints one line saying the side record was skipped -- so a run aimed at a
 scratch file leaves nothing behind in the hub.
 
@@ -543,6 +546,13 @@ file in the hub:
   and wrote it back -- `NewPR`, a `MeetingAgenda` stage change -- turned every accented letter and
   dash into two or three characters, for good, on 5.1 alone. Every `Get-Content` in shipped code
   names its `-Encoding` (`tkTestToolkit -Portability`, Clause 19).
+- **A path is a name, never a pattern.** `-Path` reads `[` and `]` as a wildcard, so a hub, a package or
+  a home folder named `Work [old]` matched nothing: `hub.json` read as absent and the Space went unknown,
+  `Status` found no folder, `Archive` threw, and a creator that asked "is a card there?" first was told
+  no. Every path a script computes is handed to a cmdlet as `-LiteralPath`; a real pattern enumerates a
+  folder literally, `Get-ChildItem -LiteralPath <folder> -Filter <pattern>`. `Test-Portability`'s
+  Clause 20 walks shipped PowerShell by AST, with PowerShell's own parameter binding, and fails naming
+  the line; `tkTestToolkit -NewPrompt` types the verbs against a hub under such a folder.
 - **A request body is SENT as UTF-8 bytes** -- `ConvertTo-P20Utf8Body` (`Scripts/ConvertTo-Utf8Body.ps1`)
   turns the JSON into its UTF-8 bytes, and every `-Body` a script hands `Invoke-RestMethod` is one: the
   Azure DevOps writes (`NewItem`, `NewPR`, `PublishPR`, `ReplyPR`, `CloseItem`, `AddPRReview`'s threads),

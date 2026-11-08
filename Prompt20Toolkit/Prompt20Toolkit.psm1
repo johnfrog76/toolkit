@@ -35,7 +35,7 @@
 # default.
 $utilities = Join-Path (Split-Path $PSScriptRoot -Parent) 'utilities.psm1'
 
-if (-not (Test-Path $utilities)) {
+if (-not (Test-Path -LiteralPath $utilities)) {
     $wsRoot = if ($env:WS_ROOT) {
         $env:WS_ROOT
     }
@@ -50,7 +50,7 @@ if (-not (Test-Path $utilities)) {
     $utilities = Join-Path (Join-Path $wsRoot 'toolkit') 'utilities.psm1'
 }
 
-if (-not (Test-Path $utilities)) {
+if (-not (Test-Path -LiteralPath $utilities)) {
     # A warning, not a throw: auto-loading fires on ANY unrecognized prefixed
     # command, so throwing here would turn a typo into a stack trace that looks
     # like the toolkit is broken.

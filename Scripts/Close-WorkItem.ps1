@@ -86,14 +86,14 @@ if ($Help) { Show-Help; return }
 if ($Id -eq 0) {
     $folders = Get-PromptFolders
     $currentDir = $folders.Current
-    if (Test-Path $currentDir) {
+    if (Test-Path -LiteralPath $currentDir) {
         # The one id rule (Scripts/Resolve-CardName.ps1), not a private regex: this
         # used to know about "US-" and "Task" and nothing a team had configured.
         # Only a NUMBER is a work item -- a card with no work item (K7M2) has
         # nothing on a board to close, so it is not a candidate here.
         . (Join-Path $PSScriptRoot 'Resolve-CardName.ps1')
         $idPattern = Get-P20CardIdPattern -WorkItemTypes (Get-P20WorkItemTypes -Config $global:P20Config)
-        $candidates = @(Get-ChildItem -Path $currentDir -Filter "*.prompt.md" |
+        $candidates = @(Get-ChildItem -LiteralPath $currentDir -Filter "*.prompt.md" |
             ForEach-Object { Get-P20CardId -Name $_.Name -Pattern $idPattern } |
             Where-Object { Test-P20IsWorkItemId $_ } |
             ForEach-Object { [int]$_ })

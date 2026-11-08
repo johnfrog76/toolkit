@@ -868,6 +868,19 @@ try {
     Assert-Equal 'an activeOrg file is written as activeSpace, with the new Space' 'other' $written2.activeSpace
     Assert-True 'and activeOrg is gone' (-not $written2.PSObject.Properties['activeOrg'])
 
+    # A file holding BOTH spellings -- an old activeOrg left beside a newer activeSpace --
+    # goes through ConvertTo-P20SpaceSpelling's merge: it comes out as ONE activeSpace,
+    # a string naming the new Space, never an array of the two and never the old key.
+    Invoke-LockRetry 'write of a scratch file' { Set-Content -Path $localPath -Value "{ `"promptsRoot`": `"$hubPath`", `"quietStart`": true, `"activeOrg`": `"test`", `"activeSpace`": `"twin-a`", `"email`": `"both@example.com`" }" -Encoding UTF8 }
+    $outBoth = & pwsh -NoProfile -Command $typed 2>&1 | Out-String
+    $bothRaw = Invoke-LockRetry 'read of a scratch file' { Get-Content $localPath -Raw -Encoding UTF8 }
+    $writtenBoth = $bothRaw | ConvertFrom-Json
+    Assert-True 'a file with both activeOrg and activeSpace: SwitchSpace writes one activeSpace string, the new Space' (
+        $writtenBoth.activeSpace -is [string] -and $writtenBoth.activeSpace -eq 'other' -and
+        ([regex]::Matches($bothRaw, '"activeSpace"').Count -eq 1)) "$outBoth $bothRaw"
+    Assert-True 'and no activeOrg is left beside it' (-not $writtenBoth.PSObject.Properties['activeOrg']) $bothRaw
+    Assert-Equal 'and the machine keys it carried are kept' 'both@example.com' $writtenBoth.email
+
     # A name is matched exactly, ignoring case, and only when one Space has it:
     # a wildcard or a shared name never picks a Space for the person.
     $switchTo = { param([string]$What) "`$env:PSModulePath = '$($switchPkg -replace "'", "''")'; `$env:PROMPTS_ROOT = '$hubPath'; " +

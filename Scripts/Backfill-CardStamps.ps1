@@ -171,11 +171,11 @@ if (-not $PromptsRoot) {
     $pkgRoot = Split-Path -Parent $PSScriptRoot
     $PromptsRoot = Get-P20PromptsRoot -PackageRoot $pkgRoot
 }
-if (-not $PromptsRoot -or -not (Test-Path $PromptsRoot)) {
+if (-not $PromptsRoot -or -not (Test-Path -LiteralPath $PromptsRoot)) {
     Write-BackfillError -Message "Hub not found: '$PromptsRoot'." -Hint 'Pass -PromptsRoot, or set promptsRoot with the Config verb.'
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
-$PromptsRoot = (Resolve-Path $PromptsRoot).Path
+$PromptsRoot = (Resolve-Path -LiteralPath $PromptsRoot).Path
 
 . (Join-Path $PSScriptRoot 'Test-GitRoot.ps1')
 
@@ -214,13 +214,13 @@ else {
     # owns their shape and their dates.
     $declared = @()
     $defaultConfig = Join-Path (Split-Path -Parent $PSScriptRoot) 'config.default.json'
-    if (Test-Path $defaultConfig) {
-        $shipped = ConvertTo-P20SpaceKeys (Get-Content $defaultConfig -Raw -Encoding UTF8 | ConvertFrom-Json)
+    if (Test-Path -LiteralPath $defaultConfig) {
+        $shipped = ConvertTo-P20SpaceKeys (Get-Content -LiteralPath $defaultConfig -Raw -Encoding UTF8 | ConvertFrom-Json)
         foreach ($o in @($shipped.spaces)) { if ($o.promptsFolder) { $declared += [string]$o.promptsFolder } }
     }
     $manifest = Read-P20HubManifest -Root $PromptsRoot -WarningAction SilentlyContinue
     foreach ($o in @($manifest.Spaces)) { if ($o.promptsFolder) { $declared += [string]$o.promptsFolder } }
-    $orgFolders = @($declared | Sort-Object -Unique | Where-Object { Test-Path (Join-Path $PromptsRoot $_) })
+    $orgFolders = @($declared | Sort-Object -Unique | Where-Object { Test-Path -LiteralPath (Join-Path $PromptsRoot $_) })
 }
 if ($orgFolders.Count -eq 0) {
     Write-BackfillError -Message "No declared org has a folder under '$PromptsRoot'." -Hint 'Pass -Org <folder>, or declare the org in hub.json.'
@@ -240,18 +240,18 @@ foreach ($orgFolder in $orgFolders) {
     $orgCards = 0
     foreach ($kind in @('current', 'archive')) {
         $dir = Join-Path (Join-Path $PromptsRoot $orgFolder) $kind
-        if (-not (Test-Path $dir)) { continue }
+        if (-not (Test-Path -LiteralPath $dir)) { continue }
         # Every work item the review generator lists, not only *.prompt.md: an
         # org's archive/ also holds plans and explorations saved as plain .md,
         # and a review dates them the same way it dates a card. Not README.md,
         # not a dated PR record, and not a dotfile (Get-ChildItem skips hidden
         # files on its own; the name test makes that explicit on Windows too).
-        $files = @(Get-ChildItem -Path $dir -Filter '*.md' -File -ErrorAction SilentlyContinue |
+        $files = @(Get-ChildItem -LiteralPath $dir -Filter '*.md' -File -ErrorAction SilentlyContinue |
                 Where-Object { $_.Name -ne 'README.md' -and $_.Name -notmatch '^\d{4}-\d{2}-\d{2}-' -and $_.Name -notmatch '^\.' } | Sort-Object Name)
         foreach ($file in $files) {
             $orgCards++
             $totals.Cards++
-            $content = Get-Content -Path $file.FullName -Raw -Encoding UTF8
+            $content = Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8
             if ($null -eq $content) { $content = '' }
             $hasCreated = $content -match ('(?m)^' + [regex]::Escape($createdStamp))
             $hasClosed = $content -match ('(?m)^' + [regex]::Escape($closedStamp))

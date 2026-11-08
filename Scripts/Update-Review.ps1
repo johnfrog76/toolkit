@@ -63,11 +63,11 @@ $reviewsFolder = (Get-P20HubFolderNames -PromptsRoot $promptsRoot -PackageRoot $
 $reviewsPathspec = "${reviewsFolder}/"
 # -- Preview: the web UI's read, so it answers in JSON and never in prose -----
 if ($Preview) {
-    if (-not $promptsRoot -or -not (Test-Path $promptsRoot)) {
+    if (-not $promptsRoot -or -not (Test-Path -LiteralPath $promptsRoot)) {
         @{ error = "the prompt store is not configured" } | ConvertTo-Json -Compress
         exit 0
     }
-    Push-Location $promptsRoot
+    Push-Location -LiteralPath $promptsRoot
     try {
         # --untracked-files=all, not the default: the default reports a brand
         # new folder as one entry ending in '/', and a folder is not a file --
@@ -85,8 +85,8 @@ if ($Preview) {
             }
             foreach ($rel in $changedPaths) {
                 $full = Join-Path $promptsRoot $rel
-                if (Test-Path $full -PathType Leaf) {
-                    $content = Get-Content $full -Raw -Encoding UTF8
+                if (Test-Path -LiteralPath $full -PathType Leaf) {
+                    $content = Get-Content -LiteralPath $full -Raw -Encoding UTF8
                     if ($null -eq $content) { $content = '' }
                     $files += @{ file = $rel; content = $content }
                 }
@@ -100,20 +100,20 @@ if ($Preview) {
     exit 0
 }
 
-if (-not $promptsRoot -or -not (Test-Path $promptsRoot)) {
+if (-not $promptsRoot -or -not (Test-Path -LiteralPath $promptsRoot)) {
     Write-Host "Error: the prompt store is not configured or does not exist: '$promptsRoot'" -ForegroundColor Red
     Write-Host "Hint:  set promptsRoot in config.local.json." -ForegroundColor Yellow
     exit 1
 }
 
 $reviewsDir = Join-Path $promptsRoot $reviewsFolder
-if (-not (Test-Path $reviewsDir)) {
+if (-not (Test-Path -LiteralPath $reviewsDir)) {
     Write-Host "Error: there is no $reviewsPathspec folder at '$reviewsDir'." -ForegroundColor Red
     Write-Host "Hint:  run '$(Get-CliPrefix)NewWorkReview -StartDate <d> -EndDate <d>' to write the first one." -ForegroundColor Yellow
     exit 1
 }
 
-Push-Location $promptsRoot
+Push-Location -LiteralPath $promptsRoot
 try {
     $status = (Invoke-P20TrackerRead 'git' @('status', '--porcelain', '--', $reviewsPathspec)).Lines
     if ([string]::IsNullOrWhiteSpace($status)) {

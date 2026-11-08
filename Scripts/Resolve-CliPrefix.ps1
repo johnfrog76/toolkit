@@ -119,9 +119,9 @@ function Resolve-P20ConfigPrefix {
     $prefix = $script:P20DefaultCommandPrefix
     foreach ($name in @('config.default.json', 'config.local.json')) {
         $path = Join-Path $PackageRoot $name
-        if (-not (Test-Path $path)) { continue }
+        if (-not (Test-Path -LiteralPath $path)) { continue }
         try {
-            $cfg = Get-Content $path -Raw -Encoding UTF8 | ConvertFrom-Json
+            $cfg = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
             if ($cfg.commandPrefix) { $prefix = Select-P20CommandPrefix -Value ([string]$cfg.commandPrefix) -Fallback $prefix -Path $path }
         }
         catch { if ($name -eq 'config.local.json') { $null = Write-P20ConfigParseWarning -Path $path -Message $_.Exception.Message } }

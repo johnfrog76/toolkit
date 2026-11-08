@@ -290,7 +290,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **51 suites, 9524 assertions** with a `config.local.json`, every one
+findings. On this commit that is **51 suites, 9559 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -1227,6 +1227,13 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   whether the `.block.log` is already gone, or whether the launch printed `block: the session holds it open`.
   Once the session has ended, a second launch removes it. The StartWork suite runs the launch on the Windows job
   with a stub that exits at once; this row is a session that lives on.
+- [ ] **A hub under a folder whose name holds brackets works from Windows PowerShell 5.1 (review findings G1 f6,
+  G2 f10 and G3 f12).** Copy a hub to `C:\Work [old]\hub` and, in `powershell` (5.1), set `PROMPTS_ROOT` to it in
+  that shell. `tkEnv` says `hub.json read`, with the Spaces it declares; `tkStatus` lists the cards; `tkNewPrompt
+  <id>` for a card in `current/` returns it unchanged; `tkArchive <id>` moves it. Then with `promptsRoot` set to
+  `~/...` in `config.local.json` and no `PROMPTS_ROOT`, `tkStatus` still finds the hub: `-LiteralPath` expands a
+  leading `~` on pwsh 7, and this row is the check on 5.1. The NewPrompt suite types the same verbs against a
+  scratch hub in such a folder on the Windows job, under both hosts; this row is a real hub and the `~` path.
 
 ## Recording a run
 

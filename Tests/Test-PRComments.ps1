@@ -355,7 +355,26 @@ try {
         Assert-True "the record has no byte-order mark" (-not ($recBytes.Length -ge 3 -and $recBytes[0] -eq 0xEF -and $recBytes[1] -eq 0xBB -and $recBytes[2] -eq 0xBF))
         Assert-True "the record has no carriage return" (-not ($recBytes -contains 13))
         Assert-True "the record carries the fetched count" ([System.Text.Encoding]::UTF8.GetString($recBytes) -match 'Comments: 3')
+        Assert-True "the record's name carries the repository, since a PR number is per repository" ($recFiles[0].Name -match '^\d{4}-\d{2}-\d{2}-repo-PR42\.md$') $recFiles[0].Name
     }
+    # Nothing overwrites a record: a second fetch the same day adds to it.
+    Write-P20PRCommentsRecord -PullRequestId 42 -Title 'A title' -Url 'https://example.test/pr/42' -Repository 'repo' -Count 5 | Out-Null
+    $recFiles = @(Get-ChildItem -LiteralPath (Join-Path $recHub 'org/pr-comments') -Filter '*-PR42.md' -ErrorAction SilentlyContinue)
+    $recAgain = if ($recFiles.Count -eq 1) { [System.IO.File]::ReadAllText($recFiles[0].FullName) } else { '' }
+    Assert-True "a second fetch the same day adds to the record: one file, the first count kept and the second added" (
+        $recFiles.Count -eq 1 -and $recAgain -match 'Comments: 3' -and $recAgain -match 'Comments: 5' -and
+        ([regex]::Matches($recAgain, '(?m)^Fetched: ').Count -eq 2) -and $recAgain -match '(?m)^# PR 42 - A title$') $recAgain
+    $recAgainBytes = if ($recFiles.Count -eq 1) { [System.IO.File]::ReadAllBytes($recFiles[0].FullName) } else { [byte[]]@() }
+    Assert-True "and the record is still LF only, no byte-order mark" (
+        $recAgainBytes.Length -gt 0 -and -not ($recAgainBytes -contains 13) -and
+        -not ($recAgainBytes.Length -ge 3 -and $recAgainBytes[0] -eq 0xEF -and $recAgainBytes[1] -eq 0xBB -and $recAgainBytes[2] -eq 0xBF))
+    # The same PR number in another repository is another record.
+    Write-P20PRCommentsRecord -PullRequestId 42 -Title 'Other' -Url 'https://example.test/other/pr/42' -Repository 'acme/other' -Count 1 | Out-Null
+    $recNames = @(Get-ChildItem -LiteralPath (Join-Path $recHub 'org/pr-comments') -Filter '*-PR42.md' | ForEach-Object { $_.Name } | Sort-Object)
+    Assert-True "PR 42 in a second repository the same day is a second record, named for that repository" (
+        $recNames.Count -eq 2 -and @($recNames | Where-Object { $_ -match '-acme-other-PR42\.md$' }).Count -eq 1) ($recNames -join ', ')
+    $firstAfter = [System.IO.File]::ReadAllText((Join-Path (Join-Path $recHub 'org/pr-comments') ($recNames | Where-Object { $_ -match '-repo-PR42\.md$' })))
+    Assert-True "and the first repository's record is untouched by it" ($firstAfter -eq $recAgain)
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
@@ -1466,6 +1485,17 @@ try {
     $bracketedAfter = [System.IO.File]::ReadAllText($bracketed)
     Assert-True 'a bracket in the path keeps the file: what it held is still there' ($bracketedAfter -match 'A day of notes') $bracketedAfter
     Assert-True 'and the comments are added to it' ($bracketedAfter -match 'PR Review Comments') $r.Text
+
+    # -- 5c. A card that is there and cannot be read is a stated refusal ----------
+    # Before, the read threw into the generic block. Nothing is written either way;
+    # now the verb says so, once, with exit 2.
+    $unreadable = Join-Path $ghRoot 'notes-folder.md'
+    [void][System.IO.Directory]::CreateDirectory($unreadable)
+    $r = Invoke-GhVerb "${cfgPrefix}GetPRComments 12 -OutputFile '$($unreadable -replace "'", "''")'"
+    Assert-True 'a card that cannot be read: refused once, exit 2, saying nothing was written' (
+        $r.Text -match 'EXIT=2' -and $r.Text -match 'could not be read, so nothing was written' -and
+        $r.Text -notmatch 'exit code' -and ([regex]::Matches($r.Text, 'Error:').Count -eq 1)) $r.Text
+    Assert-True 'and nothing was written into it' (@(Get-ChildItem -LiteralPath $unreadable -Force).Count -eq 0)
 
     # -- 6. An owner-grained Space with two repositories --------------------------
     Set-GhSpace 'acme'

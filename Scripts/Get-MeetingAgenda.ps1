@@ -123,14 +123,14 @@ if ($Date -notmatch '^\d{4}-\d{2}-\d{2}$') {
 # One writer for the "**Closed:**" stamp, shared with Archive -- see
 # Scripts/Add-ClosedStamp.ps1 for why it is a dot-source and not a module call.
 $closedStampPath = Join-Path $PSScriptRoot 'Add-ClosedStamp.ps1'
-if (Test-Path $closedStampPath) { . $closedStampPath }
+if (Test-Path -LiteralPath $closedStampPath) { . $closedStampPath }
 
 # ... and the byte contract underneath it, which this script's own writers need
 # whether or not the stamp is there: UTF-8 with no BOM, LF when a session is
 # created, the file's own terminator when one is edited.
 # See Scripts/Write-CardText.ps1.
 $cardWriterPath = Join-Path $PSScriptRoot 'Write-CardText.ps1'
-if (Test-Path $cardWriterPath) { . $cardWriterPath }
+if (Test-Path -LiteralPath $cardWriterPath) { . $cardWriterPath }
 
 $managerRoot = Join-Path $promptsRoot $managerFolder
 $currentDir = Join-Path $managerRoot ([string](Get-P20Consts).folders.current)
@@ -191,8 +191,8 @@ function Get-PriorSessionDate {
     # never carries from the 1:1.
     $all = @()
     foreach ($dir in @($currentDir, $archiveDir)) {
-        if (-not (Test-Path $dir)) { continue }
-        foreach ($f in (Get-ChildItem -Path $dir -Filter '*.md' -File)) {
+        if (-not (Test-Path -LiteralPath $dir)) { continue }
+        foreach ($f in (Get-ChildItem -LiteralPath $dir -Filter '*.md' -File)) {
             $r = Get-SessionSeries $f.Name
             if ($r -and $r.Series -eq $Type -and $r.Date -lt $Date) { $all += $r.Date }
         }
@@ -202,7 +202,7 @@ function Get-PriorSessionDate {
 
 function Get-SessionStage {
     param([string]$Path)
-    if (-not (Test-Path $Path)) { return $null }
+    if (-not (Test-Path -LiteralPath $Path)) { return $null }
     $inStage = $false
     foreach ($line in (Read-CardText -Path $Path -Lines)) {
         if ($inStage) {
@@ -242,13 +242,13 @@ function Get-SectionValue {
 }
 
 function New-SessionFile {
-    if (-not (Test-Path $currentDir)) { New-Item -Path $currentDir -ItemType Directory -Force | Out-Null }
-    if (-not (Test-Path $archiveDir)) { New-Item -Path $archiveDir -ItemType Directory -Force | Out-Null }
+    if (-not (Test-Path -LiteralPath $currentDir)) { New-Item -Path $currentDir -ItemType Directory -Force | Out-Null }
+    if (-not (Test-Path -LiteralPath $archiveDir)) { New-Item -Path $archiveDir -ItemType Directory -Force | Out-Null }
 
     $filePath = Join-Path $currentDir $sessionName
-    if (Test-Path $filePath) { return $filePath }
+    if (Test-Path -LiteralPath $filePath) { return $filePath }
 
-    if (-not (Test-Path $templatePath)) {
+    if (-not (Test-Path -LiteralPath $templatePath)) {
         Write-Error "Template not found: $templatePath"
         return $null
     }
@@ -256,7 +256,7 @@ function New-SessionFile {
     $prior = Get-PriorSessionDate
     if (-not $prior) { $prior = '(none)' }
 
-    $content = Get-Content -Path $templatePath -Raw -Encoding UTF8
+    $content = Get-Content -LiteralPath $templatePath -Raw -Encoding UTF8
     # The heading names the series where there is one; the 1:1 keeps the bare date.
     $content = $content -replace '^# \{\{DATE\}\}', ('# ' + $(if ($isDefaultSeries) { $Date } else { "$Type $Date" }))
     $content = $content -replace '\{\{DATE\}\}', $Date
@@ -313,9 +313,9 @@ if (-not $Plan -and -not $Prep -and -not $Retro -and -not $Close) {
     # with its stage and the exact next command -- the three lines a person
     # types this verb to read.
     # With one series it is the block it always was.
-    if (-not $PSBoundParameters.ContainsKey('Date') -and -not $PSBoundParameters.ContainsKey('Type') -and (Test-Path $currentDir)) {
+    if (-not $PSBoundParameters.ContainsKey('Date') -and -not $PSBoundParameters.ContainsKey('Type') -and (Test-Path -LiteralPath $currentDir)) {
         $open = @()
-        foreach ($f in (Get-ChildItem -Path $currentDir -Filter '*.md' -File)) {
+        foreach ($f in (Get-ChildItem -LiteralPath $currentDir -Filter '*.md' -File)) {
             $r = Get-SessionSeries $f.Name
             if ($r) { $open += $r }
         }
@@ -338,7 +338,7 @@ if (-not $Plan -and -not $Prep -and -not $Retro -and -not $Close) {
     }
 
     $filePath = Join-Path $currentDir $sessionName
-    if (-not (Test-Path $filePath)) {
+    if (-not (Test-Path -LiteralPath $filePath)) {
         Write-Host ""
         Write-Host "  No session for $Date." -ForegroundColor DarkGray
         Write-Host "  Run: $(Get-CliPrefix)MeetingAgenda -Plan" -ForegroundColor DarkGray
@@ -393,7 +393,7 @@ if ($Plan) {
         $priorPath = $null
         foreach ($dir in @($currentDir, $archiveDir)) {
             $p = Join-Path $dir $priorName
-            if (Test-Path $p) { $priorPath = $p; break }
+            if (Test-Path -LiteralPath $p) { $priorPath = $p; break }
         }
         if ($priorPath) {
             $retroText = Get-SectionValue -Lines (Read-CardText -Path $priorPath -Lines) -Heading 'Retro'
@@ -428,7 +428,7 @@ if ($Plan) {
 
 if ($Prep) {
     $filePath = Join-Path $currentDir $sessionName
-    if (-not (Test-Path $filePath)) {
+    if (-not (Test-Path -LiteralPath $filePath)) {
         Write-Host "No session for $Date. Run '$(Get-CliPrefix)MeetingAgenda -Plan' first." -ForegroundColor Yellow
         return
     }
@@ -450,7 +450,7 @@ if ($Prep) {
 
 if ($Retro) {
     $filePath = Join-Path $currentDir $sessionName
-    if (-not (Test-Path $filePath)) {
+    if (-not (Test-Path -LiteralPath $filePath)) {
         Write-Host "No session for $Date. Run '$(Get-CliPrefix)MeetingAgenda -Plan' first." -ForegroundColor Yellow
         return
     }
@@ -481,11 +481,11 @@ if ($Close) {
     $filePath = Join-Path $currentDir $sessionName
     $destPath = Join-Path $archiveDir $sessionName
 
-    if (-not (Test-Path $filePath)) {
+    if (-not (Test-Path -LiteralPath $filePath)) {
         # Idempotent: a second -Close on a session already retired is a report,
         # not an error. The state is derived from where the file is, exactly as
         # a prompt card's is.
-        if (Test-Path $destPath) {
+        if (Test-Path -LiteralPath $destPath) {
             Write-Host "Already closed: $managerFolder/archive/$sessionName" -ForegroundColor DarkGray
             return
         }
@@ -505,11 +505,11 @@ if ($Close) {
         # against a hub whose session file arrived some other way -- and an archive
         # verb that fails because its own destination is missing is a bug this
         # package has already had once, in Archive.
-        if (-not (Test-Path $archiveDir)) {
+        if (-not (Test-Path -LiteralPath $archiveDir)) {
             New-Item -Path $archiveDir -ItemType Directory -Force | Out-Null
         }
 
-        if (Test-Path $destPath) {
+        if (Test-Path -LiteralPath $destPath) {
             # A refusal the caller can see: this used to report in yellow and
             # return, leaving $LASTEXITCODE 0, so a duplicate in current/ read as
             # a successful close.
@@ -518,7 +518,7 @@ if ($Close) {
             exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
         }
 
-        Move-Item -Path $filePath -Destination $destPath -ErrorAction Stop
+        Move-Item -LiteralPath $filePath -Destination $destPath -ErrorAction Stop
 
         # Stamped AFTER the move, on the archived copy, for the same reason
         # Archive does it that way: the move is the promise and the stamp is the

@@ -85,8 +85,8 @@ function Show-ConfigHelp {
 }
 
 function Get-DevServerProcessId {
-    if (-not (Test-Path $pidFile)) { return 0 }
-    $raw = (Get-Content $pidFile -Raw -Encoding UTF8).Trim()
+    if (-not (Test-Path -LiteralPath $pidFile)) { return 0 }
+    $raw = (Get-Content -LiteralPath $pidFile -Raw -Encoding UTF8).Trim()
     if (-not $raw) { return 0 }
     try {
         $proc = Get-Process -Id $raw -ErrorAction Stop
@@ -94,7 +94,7 @@ function Get-DevServerProcessId {
         return 0
     }
     catch {
-        Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
         return 0
     }
 }
@@ -102,8 +102,8 @@ function Get-DevServerProcessId {
 # Vite asks for 5174 and takes the next free port if it is busy, so the URL is
 # read back out of its own output rather than assumed.
 function Get-DevServerUrl {
-    if (-not (Test-Path $logFile)) { return '' }
-    $line = Get-Content $logFile -ErrorAction SilentlyContinue -Encoding UTF8 |
+    if (-not (Test-Path -LiteralPath $logFile)) { return '' }
+    $line = Get-Content -LiteralPath $logFile -ErrorAction SilentlyContinue -Encoding UTF8 |
         Where-Object { $_ -match 'https?://localhost:\d+' } |
         Select-Object -Last 1
     if (-not $line) { return '' }
@@ -193,8 +193,8 @@ function Open-WebUi {
 # file that decides is the file that is read.
 function Get-ProductionPort {
     $compose = Join-Path $webPath 'docker-compose.yml'
-    if (Test-Path $compose) {
-        $m = [regex]::Match((Get-Content $compose -Raw -ErrorAction SilentlyContinue -Encoding UTF8), '"(?:[\d.]+:)?(\d+):\d+"')
+    if (Test-Path -LiteralPath $compose) {
+        $m = [regex]::Match((Get-Content -LiteralPath $compose -Raw -ErrorAction SilentlyContinue -Encoding UTF8), '"(?:[\d.]+:)?(\d+):\d+"')
         if ($m.Success) { return [int]$m.Groups[1].Value }
     }
     return $script:DefaultDevPort
@@ -206,8 +206,8 @@ function Get-ProductionPort {
 function Get-DevServerPorts {
     $ports = @()
     $viteConfig = Join-Path $webPath 'vite.config.ts'
-    if (Test-Path $viteConfig) {
-        $m = [regex]::Match((Get-Content $viteConfig -Raw -ErrorAction SilentlyContinue -Encoding UTF8), 'port:\s*(\d+)')
+    if (Test-Path -LiteralPath $viteConfig) {
+        $m = [regex]::Match((Get-Content -LiteralPath $viteConfig -Raw -ErrorAction SilentlyContinue -Encoding UTF8), 'port:\s*(\d+)')
         if ($m.Success) { $ports += [int]$m.Groups[1].Value }
     }
     if ($ports.Count -eq 0) { $ports += $script:DefaultDevPort }
@@ -378,7 +378,7 @@ if (-not (Get-Command Test-DockerAvailable -ErrorAction SilentlyContinue)) {
 # One definition of "take the container down", called by -Stop and -Restart.
 if (-not (Get-Command Invoke-WebComposeDown -ErrorAction SilentlyContinue)) {
     function Invoke-WebComposeDown {
-        Push-Location $webPath
+        Push-Location -LiteralPath $webPath
         try { docker compose down 2>$null | Out-Null }
         finally { Pop-Location }
     }
@@ -408,7 +408,7 @@ function Stop-DevServer {
         $ours = @($running) + (Get-WebDescendantIds -ProcessId $running)
         Stop-WebProcessTree -ProcessId $running
         Write-Host "  Dev server stopped (PID $running and its children)." -ForegroundColor Green
-        Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
         $stopped = $true
         Start-Sleep -Milliseconds 200
     }
@@ -442,7 +442,7 @@ function Stop-DevServer {
 
 if ($Help) { Show-ConfigHelp; exit 0 }
 
-if (-not (Test-Path $webPath)) {
+if (-not (Test-Path -LiteralPath $webPath)) {
     Write-CliError -Message "No web/ directory at $webPath." `
         -Hint 'The web UI ships in this repo; a checkout missing it is incomplete.'
     Write-WebLog 'ERR' 'web/ not found'
@@ -507,7 +507,7 @@ if ($Status) {
     }
 
     if (Test-DockerAvailable) {
-        Push-Location $webPath
+        Push-Location -LiteralPath $webPath
         try {
             # -q prints ids and nothing else, so there is no header row to
             # mistake for a running container.
@@ -574,7 +574,7 @@ if ($Dev) {
         Write-WebLog 'ERR' 'npm not found'
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
-    if (-not (Test-Path (Join-Path $webPath 'node_modules'))) {
+    if (-not (Test-Path -LiteralPath (Join-Path $webPath 'node_modules'))) {
         Write-CliError -Message 'web/node_modules is missing -- the dev server has nothing to run.' `
             -Hint "Run: cd $webPath; npm ci"
         Write-WebLog 'ERR' 'node_modules missing'
@@ -649,7 +649,7 @@ if ($Dev) {
             exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
         }
 
-        $proc.Id | Set-Content $pidFile -Encoding UTF8
+        $proc.Id | Set-Content -LiteralPath $pidFile -Encoding UTF8
 
         # Wait for Vite to print its port rather than guessing 5174: it takes the
         # next free one, and a URL that is merely probable is worse than none.
@@ -665,7 +665,7 @@ if ($Dev) {
             Write-CliError -Message 'The dev server exited immediately after starting.' `
                 -Hint 'Read web.err.log at the repository root.'
             Write-WebLog 'ERR' 'dev server exited immediately'
-            Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
             exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
         }
 
@@ -712,7 +712,7 @@ Write-Host "  Building and starting the web container ..." -ForegroundColor Cyan
 # to the container, where nginx's entrypoint writes it into the proxy_pass.
 $agentPort = Export-AgentPortForProxies
 Write-Host "  The container proxies /api to the agent on port $agentPort." -ForegroundColor Gray
-Push-Location $webPath
+Push-Location -LiteralPath $webPath
 try {
     docker compose up --build -d
     if ($LASTEXITCODE -ne 0) {

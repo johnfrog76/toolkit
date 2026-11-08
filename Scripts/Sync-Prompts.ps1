@@ -252,7 +252,7 @@ try {
 
     # Ensure current/ directory exists (Git drops empty directories)
     $currentDir = $folders.Current
-    if (-not (Test-Path $currentDir)) {
+    if (-not (Test-Path -LiteralPath $currentDir)) {
         New-Item -Path $currentDir -ItemType Directory -Force | Out-Null
         Write-Host "Recreated empty current/ directory." -ForegroundColor Yellow
     }

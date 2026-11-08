@@ -160,7 +160,7 @@ if ($Id) {
     }
     if ($hits.Count -eq 0) {
         $archivedAlready = @()
-        if (Test-Path $archiveDir) {
+        if (Test-Path -LiteralPath $archiveDir) {
             $archivedAlready = @((Resolve-P20CardArgument -Argument $Id -Folder $archiveDir -WorkItemTypes @{}).Match)
         }
         if ($archivedAlready.Count -gt 0 -and $Archive) {
@@ -227,9 +227,9 @@ if ($Id) {
     }
 
     # -Archive
-    if (-not (Test-Path $archiveDir)) { New-Item -ItemType Directory -Path $archiveDir -Force | Out-Null }
+    if (-not (Test-Path -LiteralPath $archiveDir)) { New-Item -ItemType Directory -Path $archiveDir -Force | Out-Null }
     $dest = Join-Path $archiveDir $file.Name
-    if (Test-Path $dest) {
+    if (Test-Path -LiteralPath $dest) {
         Write-CliError -Message "$folderName/$($consts.folders.archive)/$($file.Name) already exists. Not overwriting it." `
             -Hint 'The archived copy is the record. Compare the two and delete whichever is the duplicate.'
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
@@ -243,7 +243,7 @@ if ($Id) {
 
 # -- The ledger ------------------------------------------------------------------
 $open = @()
-if (Test-Path $currentDir) {
+if (Test-Path -LiteralPath $currentDir) {
     $open = @(Get-ChildItem -LiteralPath $currentDir -Filter '*.md' -File | ForEach-Object { Read-P20Reminder -File $_ })
 }
 $order = @($consts.reminders.buckets)
@@ -271,7 +271,7 @@ foreach ($bucket in $order) {
 }
 if ($All) {
     $done = @()
-    if (Test-Path $archiveDir) {
+    if (Test-Path -LiteralPath $archiveDir) {
         $done = @(Get-ChildItem -LiteralPath $archiveDir -Filter '*.md' -File | ForEach-Object { Read-P20Reminder -File $_ })
     }
     Write-Host ("  ARCHIVED ({0})" -f $done.Count) -ForegroundColor DarkGray
