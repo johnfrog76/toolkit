@@ -273,7 +273,7 @@ if (-not [bool]$pr.isDraft) {
 
 # -- Publish -----------------------------------------------------------------------
 try {
-    Invoke-RestMethod -Uri $apiUri -Headers $headers -Method Patch -Body $body | Out-Null
+    Invoke-RestMethod -Uri $apiUri -Headers $headers -Method Patch -Body (ConvertTo-P20Utf8Body $body) | Out-Null
 }
 catch {
     Write-CliError -Message "Publishing pull request $prId failed -- $(& $adoSentence $_)" -Hint "Check ${p}Log -Errors."

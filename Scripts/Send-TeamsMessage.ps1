@@ -60,6 +60,9 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $script:SendConsts = Get-P20Consts
 
 . (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
+# The request body goes as UTF-8 bytes, so a message with an accent reaches the
+# agent as written on Windows PowerShell 5.1 too.
+. (Join-Path $PSScriptRoot 'ConvertTo-Utf8Body.ps1')
 
 if ($Help) {
     $p = Get-CliPrefix
@@ -229,7 +232,7 @@ $body = @{
 
 # -- POST to the engine; degrade with a readable message if the agent is down ----
 try {
-    $result = Invoke-RestMethod -Uri $uri -Method Post -Body $body -ContentType "application/json" -TimeoutSec 15
+    $result = Invoke-RestMethod -Uri $uri -Method Post -Body (ConvertTo-P20Utf8Body $body) -ContentType "application/json; charset=utf-8" -TimeoutSec 15
 }
 catch {
     throw "Could not reach the agent at $uri -- start it with '$(Get-CliPrefix)Agent', then retry ($($_.Exception.Message))."

@@ -543,6 +543,16 @@ file in the hub:
   and wrote it back -- `NewPR`, a `MeetingAgenda` stage change -- turned every accented letter and
   dash into two or three characters, for good, on 5.1 alone. Every `Get-Content` in shipped code
   names its `-Encoding` (`tkTestToolkit -Portability`, Clause 19).
+- **A request body is SENT as UTF-8 bytes** -- `ConvertTo-P20Utf8Body` (`Scripts/ConvertTo-Utf8Body.ps1`)
+  turns the JSON into its UTF-8 bytes, and every `-Body` a script hands `Invoke-RestMethod` is one: the
+  Azure DevOps writes (`NewItem`, `NewPR`, `PublishPR`, `ReplyPR`, `CloseItem`, `AddPRReview`'s threads),
+  the model call `AddPRReview` makes, and `SendTeams`' call to the agent. Windows PowerShell 5.1 (and
+  pwsh before 7.4) encodes a string body as ISO-8859-1 when the content type names no charset, so a
+  title, a description or a comment with an accent reached the organisation altered, and the model call
+  carried text that was not UTF-8. Every content type the tool sends says `charset=utf-8`
+  (`Get-P20AdoHeaders` for Azure DevOps). `Test-Portability`'s Clause 18 refuses any other `-Body`, and
+  `tkTestToolkit -CloseWorkItem` reads what a request puts on the wire off a listener on the loopback
+  address, from a child of each host on the machine.
 - **The agent has one writer too.** `agent/core/cards.py`'s `write_card_text` is the edit half of
   this contract in Python: it reads the card's terminator and writes with it, UTF-8, no BOM. No
   route in the ADO core edits a card today -- the PR comments `save` that did was retired,

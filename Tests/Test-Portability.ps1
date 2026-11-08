@@ -45,7 +45,8 @@ if ($Help) {
   Clause 16 No script in Scripts/ carries its own Get-CliPrefix or Write-CliError fallback;
             Scripts/Initialize-CliFallbacks.ps1 is the one copy
   Clause 18 Every Azure DevOps request takes its headers from Get-P20AdoHeaders -OrgUrl `$org
-            and an address built on `$org: the token goes to the Space's organisation only
+            and an address built on `$org: the token goes to the Space's organisation only;
+            and every request -Body is UTF-8 bytes from ConvertTo-P20Utf8Body
   Clause 19 Every Get-Content in shipped PowerShell names its -Encoding: 5.1 reads a
             file with no BOM as ANSI, and every file the package reads is UTF-8
 

@@ -1,0 +1,2 @@
+- On Windows PowerShell 5.1, a work item, a pull request, a comment or a reply with an accent or a dash in it reaches Azure DevOps as you wrote it, and an AI code review of a diff holding one no longer fails: every request body is now sent as UTF-8.
+- When a Space's Azure DevOps address carries a user name and password, the refusal that stops the token being sent no longer prints them.

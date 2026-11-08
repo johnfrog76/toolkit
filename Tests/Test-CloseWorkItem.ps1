@@ -257,7 +257,7 @@ try {
         Assert-True "token helper, ${exe}: only WARNING lines and blanks is a failure" ($to -match 'warnonly ok=False token=\[\]') $to
         Assert-True "token helper, ${exe}: asks for the Azure DevOps resource with the tenant given" ($to -match 'ARGS=account get-access-token --tenant tenant-1 --resource 499b84ac-1321-427f-aa17-267ca6975798 --query accessToken -o tsv') $to
         Assert-True "token helper, ${exe}: no tenant, no --tenant" ($to -match 'NOTENANT=account get-access-token --resource ') $to
-        Assert-True "token helper, ${exe}: the headers carry the bearer token and the content type asked for, for dev.azure.com and for an https host of a company's own" ($to -match 'HEADERS=Bearer a-token\|application/json\|application/json-patch\+json') $to
+        Assert-True "token helper, ${exe}: the headers carry the bearer token and the content type asked for, with charset=utf-8, for dev.azure.com and for an https host of a company's own" ($to -match 'HEADERS=Bearer a-token\|application/json; charset=utf-8\|application/json-patch\+json; charset=utf-8') $to
         foreach ($row in @('http://dev.azure.com/acme-org', 'ftp://dev.azure.com/acme-org', 'dev.azure.com/acme-org', 'https://user:pw@dev.azure.com/acme-org', 'https://')) {
             Assert-True "token helper, ${exe}: no header is built for '$row', and the refusal says the token is not sent" ($to -match ('ADDR\[' + [regex]::Escape($row) + '\]=REFUSED .*is not an https address, so your token is not sent')) $to
         }
@@ -401,8 +401,11 @@ function global:az {
 function global:Invoke-RestMethod {
     param(`$Uri, `$Headers, `$Method, `$Body)
     `$line = "REST `$Method `$Uri"
-    if (`$Body) { `$line += " " + (`$Body -replace '\s+', ' ') }
+    # The body is sent as UTF-8 bytes; the stub reads it back the way a server does.
+    `$text = if (`$Body -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString(`$Body) } else { [string]`$Body }
+    if (`$Body) { `$line += " " + (`$text -replace '\s+', ' ') }
     Add-Content -Path '$calls' -Value `$line
+    if (`$Body -and -not (`$Body -is [byte[]])) { Add-Content -Path '$calls' -Value "BODY-NOT-BYTES `$Method `$Uri" }
     if ("`$Method" -eq 'Get') {
         return [pscustomobject]@{ fields = [pscustomobject]@{ 'System.State' = `$env:P20_TEST_WI_STATE; 'System.Title' = 'A scratch item'; 'System.WorkItemType' = `$env:P20_TEST_WI_TYPE; 'System.TeamProject' = 'Acme Project' } }
     }
@@ -452,6 +455,7 @@ try {
     Assert-True "the PATCH sets System.State to Closed" (@($ops | Where-Object { $_.path -eq '/fields/System.State' -and $_.value -eq 'Closed' -and $_.op -eq 'add' }).Count -eq 1) ($patches -join ' | ')
     Assert-True "the PATCH sets System.Reason to Completed" (@($ops | Where-Object { $_.path -eq '/fields/System.Reason' -and $_.value -eq 'Completed' }).Count -eq 1) ($patches -join ' | ')
     Assert-True "the comment is POSTed once, with the text given" ($posts.Count -eq 1 -and $posts[0].StartsWith("REST Post $commentUri ") -and $posts[0].Contains('Shipped in the scratch branch')) ($posts -join ' | ')
+    Assert-True "typed CloseItem sends every body as UTF-8 bytes, the patch and the comment alike" (@($r.Calls | Where-Object { $_ -match '^BODY-NOT-BYTES ' }).Count -eq 0 -and ($patches.Count + $posts.Count) -ge 2) ($r.Calls -join ' | ')
     Assert-True "typed CloseItem reports the result line" ($r.Text -match '\[RESULT\] workItemType=Task targetState=Closed reason=Completed') $r.Text
 
     # A Bug goes to Resolved / Fixed, and an item already closed is left alone.

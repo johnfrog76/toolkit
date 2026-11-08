@@ -290,7 +290,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **51 suites, 9476 assertions** with a `config.local.json`, every one
+findings. On this commit that is **51 suites, 9511 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -1210,6 +1210,16 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   Space with worker labels, in `powershell` (5.1): `tkRoute <card> -Assign <size>` with `-WhatIf` off on a test
   issue. The size label is set, and the hint never says `is neither me nor a size`. The Triage suite runs the
   same against a stub on 5.1 in the floor step.
+- [ ] **A work item created from Windows PowerShell 5.1 keeps its accents (review finding G1 f15).** On an Azure
+  DevOps Space with a scratch project, in `powershell` (5.1): `tkNewItem -Title "Café — naïve ✓" -Type Task`.
+  The work item's title in the browser reads exactly as typed, with no `?` and no `Ã`. The CloseWorkItem suite
+  reads the bytes a request sends off a loopback listener under 5.1; this is the organisation reading them.
+- [ ] **A pull request, a comment and a reply from Windows PowerShell 5.1 keep their accents (review finding G2
+  f5).** On the same Space, in `powershell` (5.1), on a card whose title and Described Changes hold `café — naïve`:
+  `tkNewPR`, then `tkReplyPR <pr> <thread> -Reply "Fixed — merci" -Status fixed`, then `tkCloseItem <id> -Comment
+  "Livré — ✓"`. The pull request's title and description, the reply and the work item comment read as typed. And
+  with `ANTHROPIC_API_KEY` set, `tkAddPRReview <pr> -DryRun` on a branch whose diff holds `é` gets the model's
+  answer, not a 400.
 
 ## Recording a run
 

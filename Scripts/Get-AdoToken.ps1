@@ -24,6 +24,7 @@
 #
 . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
+. (Join-Path $PSScriptRoot 'ConvertTo-Utf8Body.ps1')
 
 # Returns @{ Ok; Token; Said; Message; Hint }. Token is the trimmed bearer token,
 # or $null when Ok is $false. Said is what az printed (stdout and stderr, joined),
@@ -69,9 +70,11 @@ function Test-P20AdoTokenUrl {
 
 # The REST headers for a token, for the one address it goes to. -ContentType is
 # application/json unless the call is a work item PATCH, which takes
-# application/json-patch+json. Every Azure DevOps request a script makes takes its
-# headers here, so the address rule above has no second copy to miss: an address
-# outside it throws, and nothing is sent.
+# application/json-patch+json; either way it names charset=utf-8, because the body
+# goes as UTF-8 bytes (ConvertTo-P20Utf8Body). Every Azure DevOps request a script
+# makes takes its headers here, so the address rule above has no second copy to
+# miss: an address outside it throws, and nothing is sent. The refusal names the
+# address without any user name or password written into it.
 function Get-P20AdoHeaders {
     [CmdletBinding()]
     param(
@@ -80,12 +83,13 @@ function Get-P20AdoHeaders {
         [string]$ContentType = 'application/json'
     )
     if (-not (Test-P20AdoTokenUrl $OrgUrl)) {
+        $shown = "$OrgUrl" -replace '^([A-Za-z][A-Za-z0-9+.-]*://)[^/@?#]*@', '$1'
         if ((Resolve-P20Tracker -OrgUrl $OrgUrl) -ne 'ado') {
-            throw "The Space's address ('$OrgUrl') is not an Azure DevOps organisation, so your Azure DevOps token is not sent to it."
+            throw "The Space's address ('$shown') is not an Azure DevOps organisation, so your Azure DevOps token is not sent to it."
         }
-        throw "The Space's Azure DevOps address ('$OrgUrl') is not an https address, so your token is not sent to it. Set the Space's org to its https:// address."
+        throw "The Space's Azure DevOps address ('$shown') is not an https address, so your token is not sent to it. Set the Space's org to its https:// address."
     }
-    return @{ Authorization = "Bearer $Token"; 'Content-Type' = $ContentType }
+    return @{ Authorization = "Bearer $Token"; 'Content-Type' = "$ContentType; charset=utf-8" }
 }
 
 # The HTTP status of a failed Invoke-RestMethod, as a number. Windows PowerShell

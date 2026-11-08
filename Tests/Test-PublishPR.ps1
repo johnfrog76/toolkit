@@ -105,7 +105,8 @@ function global:gh {
 function global:Invoke-RestMethod {
     param(`$Uri, `$Headers, `$Method, `$Body)
     `$line = "REST `$Method `$Uri"
-    if (`$Body) { `$line += " `$Body" }
+    `$text = if (`$Body -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString(`$Body) } else { [string]`$Body }
+    if (`$Body) { `$line += " `$text" }
     Add-Content -Path '$calls' -Value `$line
     if ("`$Method" -eq 'Get') { return [pscustomobject]@{ pullRequestId = 77; status = 'active'; isDraft = (-not `$env:P20_TEST_PR_READY) } }
     return [pscustomobject]@{ pullRequestId = 77; status = 'active'; isDraft = `$false }

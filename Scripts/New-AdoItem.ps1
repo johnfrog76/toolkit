@@ -706,7 +706,7 @@ $projEncoded = [Uri]::EscapeDataString($selectedProject)
 $createUri   = $org + '/' + $projEncoded + '/_apis/wit/workitems/$' + [Uri]::EscapeDataString($adoType) + '?api-version=7.1'
 
 try {
-    $result  = Invoke-RestMethod -Uri $createUri -Headers $headers -Method Post -Body $body
+    $result  = Invoke-RestMethod -Uri $createUri -Headers $headers -Method Post -Body (ConvertTo-P20Utf8Body $body)
     $newId   = $result.id
     $newUrl  = "$org/$projEncoded/_workitems/edit/$newId"
     Write-Host "[+] Created: $adoType #$newId -- $($result.fields.'System.Title')" -ForegroundColor Green
