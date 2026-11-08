@@ -30,6 +30,8 @@ param([switch]$Help)
 if ($Help) { Get-Help $MyInvocation.MyCommand.Path -Detailed; return }
 
 $ErrorActionPreference = 'Stop'
+# Children start in the host this suite runs in (Tests/Get-TestHost.ps1).
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pkgRoot = Split-Path -Parent $scriptDir
 
@@ -186,7 +188,7 @@ $Snippet
 "@
     $runner = Join-Path $scratch ("run-" + [guid]::NewGuid().ToString('N').Substring(0, 8) + '.ps1')
     [System.IO.File]::WriteAllText($runner, $body, $utf8)
-    $out = (& pwsh -NoProfile -NonInteractive -File $runner 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    $out = (Invoke-P20TestHost -NonInteractive -File $runner | ForEach-Object { "$_" }) -join "`n"
     $inner = ''
     $m = [regex]::Match($out, '(?s)<<<\n(.*?)\n?>>>')
     if ($m.Success) { $inner = $m.Groups[1].Value }

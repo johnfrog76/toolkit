@@ -46,6 +46,8 @@ if ($Help) {
             Scripts/Initialize-CliFallbacks.ps1 is the one copy
   Clause 18 Every Azure DevOps request takes its headers from Get-P20AdoHeaders -OrgUrl `$org
             and an address built on `$org: the token goes to the Space's organisation only
+  Clause 19 Every Get-Content in shipped PowerShell names its -Encoding: 5.1 reads a
+            file with no BOM as ANSI, and every file the package reads is UTF-8
 
   Scope: all three halves -- *.psm1 at the root, Scripts/, Prompt20Toolkit/,
   web/src, web/tests and agent/ -- plus root JSON and Markdown, and Tests/
@@ -1495,6 +1497,47 @@ foreach ($case in @(
     )) {
     $caseHits = @(Get-AdoRequestHits -Text $case.Body).Count
     Assert-True "Clause 18: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
+}
+
+# -- Clause 19: every Get-Content names its encoding ---------------------------
+# Windows PowerShell 5.1 reads a file with no BOM in the system's ANSI code page
+# when Get-Content is given no -Encoding; 7 reads it as UTF-8. Every file this
+# package reads is UTF-8 -- the config Config writes, a card, a session -- so a
+# bare Get-Content was the same file read two ways, and a non-ASCII hub path or a
+# card's em dash came back altered on the floor alone. Walked by AST, so a
+# Get-Content in a string or a comment is not a call; an alias is.
+function Get-BareGetContentHits {
+    param([string]$Text, [string]$Name = 'body')
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$null, [ref]$null)
+    $hits = @()
+    foreach ($c in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and $n.GetCommandName() -in @('Get-Content', 'gc', 'cat', 'type') }, $true)) {
+        $named = @($c.CommandElements | Where-Object { $_ -is [System.Management.Automation.Language.CommandParameterAst] -and $_.ParameterName -like 'Enc*' })
+        if ($named.Count -eq 0) { $hits += "${Name}:$($c.Extent.StartLineNumber) $(($c.Extent.Text -replace '\s+', ' '))" }
+    }
+    return $hits
+}
+
+$gcHits = @()
+$gcFiles = @()
+foreach ($dir in @('Scripts', 'Prompt20Toolkit', 'Config', 'agent')) {
+    $full = Join-Path $pkgRoot $dir
+    if (-not (Test-Path -LiteralPath $full)) { continue }
+    $gcFiles += @(Get-ChildItem -LiteralPath $full -Recurse -File -Include '*.ps1', '*.psm1' | Where-Object { $_.FullName -notmatch '[\\/]node_modules[\\/]' })
+}
+$gcFiles += @(Get-ChildItem -LiteralPath $pkgRoot -Filter '*.psm1' -File)
+foreach ($f in $gcFiles) {
+    $gcHits += @(Get-BareGetContentHits -Text ([System.IO.File]::ReadAllText($f.FullName)) -Name $f.Name)
+}
+Assert-True "Clause 19: every Get-Content in shipped PowerShell names its -Encoding ($($gcFiles.Count) files)" (
+    ($gcHits.Count -eq 0) -and ($gcFiles.Count -ge 80)) ($gcHits -join '; ')
+foreach ($case in @(
+        @{ Hit = $true;  Why = 'a bare read of a JSON file'; Body = '$c = Get-Content $path -Raw | ConvertFrom-Json' },
+        @{ Hit = $true;  Why = 'a bare read through an alias'; Body = '$lines = gc $card' },
+        @{ Hit = $false; Why = 'a read that names UTF-8'; Body = '$c = Get-Content -LiteralPath $path -Raw -Encoding UTF8' },
+        @{ Hit = $false; Why = 'the words in a string'; Body = '$hint = "Get-Content $path"' }
+    )) {
+    $caseHits = @(Get-BareGetContentHits -Text $case.Body).Count
+    Assert-True "Clause 19: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
 }
 
 # ── The scan exclusions are relative to the package root ─────────────────────

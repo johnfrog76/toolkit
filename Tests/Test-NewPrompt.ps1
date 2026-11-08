@@ -33,6 +33,8 @@
 param()
 
 $ErrorActionPreference = 'Stop'
+# Children start in the host this suite runs in (Tests/Get-TestHost.ps1).
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 
 $testDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pkgRoot = Split-Path $testDir -Parent
@@ -110,7 +112,7 @@ function Invoke-NewPrompt {
     $ErrorActionPreference = 'Continue'
     $target = Join-Path $Sandbox 'current'
     $all = @('-OutputFolder', $target) + $ScriptArgs
-    $output = (& pwsh -NoProfile -File $targetScript @all 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    $output = (Invoke-P20TestHost -File $targetScript -Arguments $all | ForEach-Object { "$_" }) -join "`n"
     $exitCode = $LASTEXITCODE
     $created = ''
     $m = [regex]::Match($output, 'Created (\S+\.prompt\.md)')
@@ -532,7 +534,7 @@ try {
         $pre = "`$env:PSModulePath = '$(& $q $pkgRoot)'; `$env:PROMPTS_ROOT = '$(& $q $dHub)'; `$env:P20_ACTIVE_SPACE = '$Space'; " +
             "`$env:P20_USAGE_LOG_DIR = '$(& $q $dLog)'; Set-Location '$(& $q $Where)'; " +
             "Import-Module '$(& $q $pkgRoot)/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; "
-        $out = (& pwsh -NoProfile -NonInteractive -Command ($pre + $Commands + "; 'EXIT=' + `$LASTEXITCODE") 2>&1 | ForEach-Object { "$_" }) -join "`n"
+        $out = (Invoke-P20TestHost -NonInteractive -Command ($pre + $Commands + "; 'EXIT=' + `$LASTEXITCODE") | ForEach-Object { "$_" }) -join "`n"
         return $out
     }
     function Get-NewCard([string]$Space, [string]$Filter) {
@@ -639,7 +641,7 @@ try {
             "`$env:PSModulePath = '$(& $q $pkgRoot)'; `$env:PROMPTS_ROOT = '$(& $q $fHub)'; `$env:P20_ACTIVE_SPACE = 'solo'; " +
             "`$env:P20_USAGE_LOG_DIR = '$(& $q $fLog)'; Set-Location '$(& $q $fBase)'; " +
             "Import-Module '$(& $q $pkgRoot)/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; "
-        return ((& pwsh -NoProfile -NonInteractive -Command ($pre + $Commands + "; 'EXIT=' + `$LASTEXITCODE") 2>&1 | ForEach-Object { "$_" }) -join "`n")
+        return ((Invoke-P20TestHost -NonInteractive -Command ($pre + $Commands + "; 'EXIT=' + `$LASTEXITCODE") | ForEach-Object { "$_" }) -join "`n")
     }
     function Get-FromCard([string]$Folder, [string]$Filter) {
         return @(Get-ChildItem (Join-Path $fHub "solo/$Folder") -Filter $Filter -File -ErrorAction SilentlyContinue)
@@ -732,7 +734,7 @@ try {
         $pre = "`$env:PSModulePath = '$(& $q $pkgRoot)'; `$env:PROMPTS_ROOT = '$(& $q $tHub)'; `$env:P20_ACTIVE_SPACE = '$Space'; " +
             "`$env:P20_USAGE_LOG_DIR = '$(& $q $tLog)'; Set-Location '$(& $q $tBase)'; " +
             "Import-Module '$(& $q $pkgRoot)/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; "
-        return ((& pwsh -NoProfile -NonInteractive -Command ($pre + $Commands + "; 'EXIT=' + `$LASTEXITCODE") 2>&1 | ForEach-Object { "$_" }) -join "`n")
+        return ((Invoke-P20TestHost -NonInteractive -Command ($pre + $Commands + "; 'EXIT=' + `$LASTEXITCODE") | ForEach-Object { "$_" }) -join "`n")
     }
     function Get-TrackerCard([string]$Space, [string]$Folder, [string]$Filter) {
         return @(Get-ChildItem (Join-Path $tHub "$Space/$Folder") -Filter $Filter -File -ErrorAction SilentlyContinue)
@@ -794,7 +796,7 @@ try {
             "`$env:P20_USAGE_LOG_DIR = '$(& $q $oLog)'; Set-Location '$(& $q $oBase)'; " +
             "Import-Module '$(& $q $pkgRoot)/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; "
         if ($NoSpace) { $pre += "`$global:P20Config.PromptsFolder = ''; " }
-        return ((& pwsh -NoProfile -NonInteractive -Command ($pre + $Commands + "; 'EXIT=' + `$LASTEXITCODE") 2>&1 | ForEach-Object { "$_" }) -join "`n")
+        return ((Invoke-P20TestHost -NonInteractive -Command ($pre + $Commands + "; 'EXIT=' + `$LASTEXITCODE") | ForEach-Object { "$_" }) -join "`n")
     }
     function Get-OutFolderCard([string]$Folder, [string]$Filter) {
         return @(Get-ChildItem $Folder -Filter $Filter -File -ErrorAction SilentlyContinue)
@@ -880,7 +882,7 @@ exit $LASTEXITCODE
     [System.IO.File]::WriteAllText($driver, $driverText, (New-Object System.Text.UTF8Encoding $false))
 
     $ErrorActionPreference = 'Continue'
-    $out = (& pwsh -NoProfile -File $driver -Sandbox $sandbox -Script $targetScript -Mode NoToken 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    $out = (Invoke-P20TestHost -File $driver -Arguments @('-Sandbox', $sandbox, '-Script', $targetScript, '-Mode', 'NoToken') | ForEach-Object { "$_" }) -join "`n"
     $code = $LASTEXITCODE
     $ErrorActionPreference = 'Stop'
 
@@ -891,12 +893,12 @@ exit $LASTEXITCODE
     $azCalls = if (Test-Path $azLog) { [System.IO.File]::ReadAllText($azLog) } else { '' }
     Assert-True 'and the work item was never assigned or moved' ($azCalls -notmatch 'work-item update') $azCalls
 
-    $empty = (& pwsh -NoProfile -File $driver -Sandbox $sandbox -Script $targetScript -Mode EmptyToken 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    $empty = (Invoke-P20TestHost -File $driver -Arguments @('-Sandbox', $sandbox, '-Script', $targetScript, '-Mode', 'EmptyToken') | ForEach-Object { "$_" }) -join "`n"
     Assert-True 'az printing nothing and exiting 0 is refused the same way' ($LASTEXITCODE -eq 2 -and $empty -match 'no ADO token was available') $empty
     Assert-Equal 'and that wrote no card either' 0 @(Get-ChildItem (Join-Path $sandbox 'current') -Filter '*.prompt.md').Count
 
     # The same stand-in with a token gets past the check: the refusal is the token, not the harness.
-    $ok = (& pwsh -NoProfile -File $driver -Sandbox $sandbox -Script $targetScript -Mode Token 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    $ok = (Invoke-P20TestHost -File $driver -Arguments @('-Sandbox', $sandbox, '-Script', $targetScript, '-Mode', 'Token') | ForEach-Object { "$_" }) -join "`n"
     Assert-True 'with a token the same run does not refuse for it' ($ok -notmatch 'no ADO token was available') $ok
 }
 catch {
@@ -993,7 +995,7 @@ Import-Module '$($trackerPkg -replace "'", "''")/utilities.psm1' -Force -Disable
         $child = Join-Path $trackerRoot 'child.ps1'
         Write-FixtureText $child ($preamble + "`n" + $Verb + "`n'EXIT=' + `$LASTEXITCODE`n")
         $ErrorActionPreference = 'Continue'
-        $text = (& pwsh -NoProfile -NonInteractive -File $child 2>&1 | ForEach-Object { "$_" }) -join "`n"
+        $text = (Invoke-P20TestHost -NonInteractive -File $child | ForEach-Object { "$_" }) -join "`n"
         $calls = @()
         if (Test-Path -LiteralPath $trackerCalls) { $calls = @(Get-Content -LiteralPath $trackerCalls) }
         return [pscustomobject]@{ Text = $text; Calls = $calls }
@@ -1021,6 +1023,44 @@ catch {
 }
 finally {
     Remove-Item -LiteralPath $trackerRoot -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# -- A hub path with a non-ASCII character ----------------------------------------
+# Config writes config.local.json as UTF-8 with the character as itself. The module
+# read it back with no encoding, which Windows PowerShell 5.1 takes as ANSI, so a
+# hub under a user folder whose name has an accent resolved to a path that is not
+# there and every verb said "Hub not found". The module is imported in this suite's own host
+# (Tests/Get-TestHost.ps1), with PROMPTS_ROOT unset so the file is what answers.
+
+Write-Host "-- A hub path with a non-ASCII character ---------------" -ForegroundColor Cyan
+
+$accentRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-newprompt-accent-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+try {
+    $accentPkg = Join-Path $accentRoot 'pkg'
+    $accentHub = Join-Path $accentRoot ('hub-Jos' + [char]0x00E9)
+    New-Item -ItemType Directory -Path $accentPkg, $accentHub -Force | Out-Null
+    foreach ($item in @('Prompt20Toolkit', 'Scripts', 'Config', 'templates', 'utilities.psm1', 'config.default.json', 'consts.json')) {
+        Copy-Item -LiteralPath (Join-Path $pkgRoot $item) -Destination $accentPkg -Recurse
+    }
+    Write-FixtureText (Join-Path $accentHub 'hub.json') '{ "hub": 1, "spaces": [ { "slug": "solo", "name": "Solo", "status": "local", "promptsFolder": "solo", "org": "" } ] }'
+    $accentJson = '{ "quietStart": true, "promptsRoot": "' + ($accentHub -replace '\\', '/') + '", "activeSpace": "solo" }'
+    Write-FixtureText (Join-Path $accentPkg 'config.local.json') $accentJson
+    $accentPrefix = (Get-Content (Join-Path $pkgRoot 'config.default.json') -Raw -Encoding UTF8 | ConvertFrom-Json).commandPrefix
+    $q = { param([string]$s) $s -replace "'", "''" }
+    $accentCmd = "`$env:PSModulePath = '$(& $q $accentPkg)'; `$env:PROMPTS_ROOT = ''; Set-Location '$(& $q $accentRoot)'; " +
+        "Get-ChildItem Env: | Where-Object { `$_.Name -like 'TEAMS_WEBHOOK_*' } | ForEach-Object { Remove-Item `"Env:\`$(`$_.Name)`" -ErrorAction SilentlyContinue }; " +
+        "Import-Module '$(& $q $accentPkg)/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; " +
+        "${accentPrefix}NewPrompt -Title 'Accents in the path' -Type Task; 'EXIT=' + `$LASTEXITCODE"
+    $accentOut = (Invoke-P20TestHost -NonInteractive -Command $accentCmd | ForEach-Object { "$_" }) -join "`n"
+    $accentCards = @(Get-ChildItem -LiteralPath $accentHub -Recurse -Filter '*.prompt.md' -File -ErrorAction SilentlyContinue)
+    Assert-True "a hub path with a non-ASCII character is found (PowerShell $($PSVersionTable.PSVersion.Major))" ($accentOut -notmatch 'Hub not found') $accentOut
+    Assert-True "and NewPrompt -Title writes its card there" (($accentCards.Count -eq 1) -and ($accentOut -match 'EXIT=0')) $accentOut
+}
+catch {
+    Assert-True 'the non-ASCII hub path cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally {
+    Remove-Item -LiteralPath $accentRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 Write-Host ""

@@ -202,6 +202,7 @@ if (Test-Path $utilitiesPath) {
 # Test-DocCounts.ps1 reads the SAME list this runner does, rather than a count
 # retyped a second place.
 . (Join-Path $testDir 'Get-ToolkitSuiteRegistry.ps1')
+. (Join-Path $testDir 'Get-TestHost.ps1')
 $suites = Get-P20ToolkitSuiteRegistry
 # The summary file's name and its merge rule are {cliPrefix}Test's too:
 # one file holds both, so this runner and the verb that runs all three halves
@@ -344,8 +345,9 @@ foreach ($suiteName in $selectedSuites) {
 
     $suiteStart = Get-Date
 
-    # Run in a subprocess to get isolated exit code
-    $result = & pwsh -NoProfile -File $file 2>&1
+    # Run in a subprocess to get isolated exit code, in the host this runner is
+    # running in (Tests/Get-TestHost.ps1): a runner started under 5.1 runs its suites on 5.1.
+    $result = Invoke-P20TestHost -File $file
     $exitCode = $LASTEXITCODE
 
     $suiteTime = ((Get-Date) - $suiteStart).TotalSeconds

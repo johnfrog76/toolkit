@@ -33,6 +33,8 @@
 param()
 
 $ErrorActionPreference = 'Stop'
+# Children start in the host this suite runs in (Tests/Get-TestHost.ps1).
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 # Package root is the parent of Tests/, from this file's own location:
@@ -223,6 +225,26 @@ Assert-True "Vote-event thread (921, human name) is dropped" (-not (Test-IsActio
 Assert-True "Policy-status thread (922, human name) is dropped" (-not (Test-IsActionableThread $policyThread))
 Assert-True "PR-status thread (923, human name) is dropped" (-not (Test-IsActionableThread $statusThread))
 
+# One matching comment is one object, not a list, and Windows PowerShell 5.1 gives
+# a lone object no .Count: these two read "no match" there unless the filter
+# counts a list. Each is a case where that count alone decides.
+$buildServiceOnFile = [PSCustomObject]@{
+    id            = 903
+    status        = 'closed'
+    threadContext = [PSCustomObject]@{ filePath = '/src/build.yml' }
+    properties    = $null
+    comments      = @(New-Comment -DisplayName 'Project Collection Build Service (Org)' -Content 'Build succeeded.')
+}
+$botReviewMarked = [PSCustomObject]@{
+    id            = 904
+    status        = 'active'
+    threadContext = $null
+    properties    = [PSCustomObject]@{ CodeReviewThreadType = [PSCustomObject]@{ '$type' = 'System.String'; '$value' = 'Review' } }
+    comments      = @(New-Comment -DisplayName 'PR Assistant' -Content '<small>PR Assistant / AI Code Review</small> found an issue.')
+}
+Assert-True "a one-comment Build Service thread on a file is dropped (PowerShell $($PSVersionTable.PSVersion.Major))" (-not (Test-IsActionableThread $buildServiceOnFile))
+Assert-True "a one-comment bot review on a marked thread is kept (PowerShell $($PSVersionTable.PSVersion.Major))" (Test-IsActionableThread $botReviewMarked)
+
 $allThreads = @($fileAnchoredThread, $fileLessHumanThread, $systemThread, $buildServiceThread, $botReviewThread, $voteThread, $policyThread, $statusThread)
 $actionable = @($allThreads | Where-Object { Test-IsActionableThread $_ })
 Assert-True "End-to-end filter keeps exactly 3 of 8 threads" ($actionable.Count -eq 3)
@@ -270,6 +292,46 @@ Assert-True "Re-run skips the write (guard returns false)"             (-not $wr
 Assert-True "Re-running does not duplicate PR URL: line (idempotent)"   (($repeatContent -split 'PR URL:').Count -eq 2)
 
 Remove-Item $tmpFile -ErrorAction SilentlyContinue
+
+# A card is read as UTF-8 on every host. Get-Content with no -Encoding reads a
+# file with no BOM in the ANSI code page under Windows PowerShell 5.1, and NewPR
+# wrote what it read back through the card writer, so an accented name or an em
+# dash became two or three characters for good. The first row is the host's own
+# default, stated so the reason stays visible; the rest are the reader every
+# card read goes through. The text is built from code points, so this file's own
+# encoding is not what is tested.
+. (Join-Path $pkgRoot 'Scripts/Write-CardText.ps1')
+$u8Text = '# Bug 7: caf' + [char]0x00E9 + ' ' + [char]0x2014 + ' na' + [char]0x00EF + 've' + "`n`n## Summary`nr" + [char]0x00E9 + 'sum' + [char]0x00E9 + "`n"
+$u8Card = Join-Path ([System.IO.Path]::GetTempPath()) ("cardread-" + [guid]::NewGuid().ToString('N') + '.prompt.md')
+try {
+    [System.IO.File]::WriteAllText($u8Card, $u8Text, (New-Object System.Text.UTF8Encoding($false)))
+    $bare = Get-Content -LiteralPath $u8Card -Raw
+    if ($PSVersionTable.PSEdition -eq 'Desktop') {
+        Assert-True "PowerShell 5.1: Get-Content with no -Encoding misreads a UTF-8 card (the reason for the reader)" ($bare -ne $u8Text)
+    }
+    else {
+        Assert-True "PowerShell $($PSVersionTable.PSVersion.Major): Get-Content with no -Encoding reads a UTF-8 card as UTF-8" ($bare -eq $u8Text)
+    }
+    Assert-True "Read-CardText reads a UTF-8 card as itself (PowerShell $($PSVersionTable.PSVersion.Major))" ((Read-CardText -Path $u8Card) -ceq $u8Text)
+    $before = [System.IO.File]::ReadAllBytes($u8Card)
+    Write-CardText -Path $u8Card -Content (Read-CardText -Path $u8Card)
+    $after = [System.IO.File]::ReadAllBytes($u8Card)
+    Assert-True "and a card read and written back keeps every byte" (($before.Length -eq $after.Length) -and (@(for ($i = 0; $i -lt $before.Length; $i++) { if ($before[$i] -ne $after[$i]) { $i } }).Count -eq 0))
+    $lines = Read-CardText -Path $u8Card -Lines
+    Assert-True "Read-CardText -Lines gives the lines, with no empty last one" (($lines.Count -eq 4) -and ($lines[0] -ceq ('# Bug 7: caf' + [char]0x00E9 + ' ' + [char]0x2014 + ' na' + [char]0x00EF + 've')) -and ($lines[3] -ceq ('r' + [char]0x00E9 + 'sum' + [char]0x00E9)))
+    [System.IO.File]::WriteAllText($u8Card, "one`r`ntwo`rstill two`r`n", (New-Object System.Text.UTF8Encoding($false)))
+    $crLines = Read-CardText -Path $u8Card -Lines
+    Assert-True "Read-CardText -Lines splits CRLF and keeps a bare CR inside its line" (($crLines.Count -eq 2) -and ($crLines[1] -ceq "two`rstill two"))
+    [System.IO.File]::WriteAllText($u8Card, 'only', (New-Object System.Text.UTF8Encoding($false)))
+    $oneLine = Read-CardText -Path $u8Card -Lines
+    Assert-True "a one-line card is an array of one line, not its characters" (($oneLine.Count -eq 1) -and ($oneLine[0] -ceq 'only'))
+    [System.IO.File]::WriteAllText($u8Card, ('caf' + [char]0x00E9), (New-Object System.Text.UTF8Encoding($true)))
+    Assert-True "Read-CardText leaves a BOM out of the text" ((Read-CardText -Path $u8Card) -ceq ('caf' + [char]0x00E9))
+}
+catch {
+    Assert-True 'the card reader rows ran to the end' $false $_.Exception.Message
+}
+finally { Remove-Item -LiteralPath $u8Card -Force -ErrorAction SilentlyContinue }
 
 # The side record a fetch leaves in pr-comments/ is a hub file the tool creates, so it
 # carries the card byte contract: UTF-8 with no byte-order mark, LF. Run the real
@@ -916,7 +978,7 @@ else {
         $cmd = "`$env:PSModulePath = '$pkg'; `$env:PROMPTS_ROOT = '$verbHub'; " +
             "Import-Module '$pkg/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; " +
             "${prefix}Archive -Relink; 'EXIT=' + `$LASTEXITCODE"
-        $verbOut = (& pwsh -NoProfile -NonInteractive -Command $cmd 2>&1 | ForEach-Object { "$_" }) -join "`n"
+        $verbOut = (Invoke-P20TestHost -NonInteractive -Command $cmd | ForEach-Object { "$_" }) -join "`n"
         Assert-True 'Archive -Relink as a verb exits 0 on the other drive' ($verbOut -match 'EXIT=0') $verbOut
         $verbTpl = [regex]::Match([System.IO.File]::ReadAllText($absCard), '(?m)^> Template: [^\r\n]*').Value
         Assert-True "and the card's absolute template link became the file's name ($verbTpl)" ($verbTpl -eq $wantTpl)
@@ -968,7 +1030,7 @@ try {
     $cmd = "`$env:PSModulePath = '$pkg'; `$env:PROMPTS_ROOT = '$allOrgHub'; " +
         "Import-Module '$pkg/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; " +
         "${prefix}Archive -Relink; 'EXIT=' + `$LASTEXITCODE"
-    $out = (& pwsh -NoProfile -NonInteractive -Command $cmd 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    $out = (Invoke-P20TestHost -NonInteractive -Command $cmd | ForEach-Object { "$_" }) -join "`n"
     Assert-True "Archive -Relink as a verb exits 0" ($out -match 'EXIT=0') $out
     foreach ($c in @('alpha/archive/1-legacy.prompt.md', 'beta/archive/2-legacy.prompt.md')) {
         $cardDir = Split-Path (Join-Path $allOrgHub $c) -Parent
@@ -1256,7 +1318,7 @@ Import-Module '$p/utilities.psm1' -Force -DisableNameChecking *>`$null
 "@
     $runner = Join-Path $ghRoot ("run-" + [guid]::NewGuid().ToString('N').Substring(0, 8) + ".ps1")
     [System.IO.File]::WriteAllText($runner, ($pre + "`n" + $Snippet + "`n; `"EXIT=`$LASTEXITCODE`"`n"), $utf8NoBom)
-    $out = & pwsh -NoProfile -File $runner 2>&1
+    $out = Invoke-P20TestHost -File $runner
     $text = (($out | ForEach-Object { $_.ToString() }) -join "`n")
     $argv = @()
     if (Test-Path $ghCalls) { $argv = @(Get-Content $ghCalls | ForEach-Object { , @($_ | ConvertFrom-Json) }) }

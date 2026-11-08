@@ -1365,6 +1365,8 @@ try {
     # The suite table lives beside the runner now; a copy of
     # the runner without it dies before -Help prints a line.
     Copy-Item (Join-Path $toolkitRoot 'Tests/Get-ToolkitSuiteRegistry.ps1') (Join-Path $runnerScratch 'Tests') -Force
+    # ...and so is the host helper it starts each suite through.
+    Copy-Item (Join-Path $toolkitRoot 'Tests/Get-TestHost.ps1') (Join-Path $runnerScratch 'Tests') -Force
     $runnerLocalJson = @{ quietStart = $true; commandPrefix = 'zz' } | ConvertTo-Json
     [System.IO.File]::WriteAllText((Join-Path $runnerScratch 'config.local.json'), $runnerLocalJson, (New-Object System.Text.UTF8Encoding $false))
 
