@@ -244,7 +244,7 @@ else {
 # say which of its files has not been written since the rename.
 foreach ($spelledFile in @($localConfigPath, $cfg.HubManifestPath)) {
     if (-not $spelledFile -or -not (Test-Path $spelledFile)) { continue }
-    $spelledRaw = Get-Content $spelledFile -Raw -ErrorAction SilentlyContinue
+    $spelledRaw = Get-Content $spelledFile -Raw -ErrorAction SilentlyContinue -Encoding UTF8
     if ($spelledRaw -match '"(orgs|activeOrg)"\s*:') {
         Write-ReportNote "$(Split-Path -Leaf $spelledFile) still says orgs/activeOrg -- read the same; written as spaces/activeSpace the next time $(Get-CliPrefix)Config or $(Get-CliPrefix)Sync writes it"
     }
@@ -298,7 +298,7 @@ $profileImports = $false
 $profileOther = ''
 foreach ($profilePath in @($PROFILE)) {
     if ($profilePath -and (Test-Path $profilePath)) {
-        $profileText = Get-Content $profilePath -Raw
+        $profileText = Get-Content $profilePath -Raw -Encoding UTF8
         foreach ($hit in [regex]::Matches($profileText, '[^\s''"]*utilities\.psm1')) {
             if ((ConvertTo-ComparablePath $hit.Value) -eq $thisModule) { $profileImports = $true }
             elseif (-not $profileOther) { $profileOther = $hit.Value }

@@ -407,6 +407,12 @@ Each step already done is skipped, so it is safe to re-run.
   falls back to the package's parent folder -- which exists on every machine. A check for "does this
   machine have a hub" must ask whether someone SAID where it is (`PROMPTS_ROOT`, or `promptsRoot` in
   a config file), as `Scripts/Start-Toolkit.ps1` does.
+- **A suite that types `pwsh` for its children proves nothing on 5.1.** Run under Windows PowerShell
+  5.1, such a suite runs its own code on 5.1 and every verb it drives on PowerShell 7, which reads a
+  BOM-less UTF-8 file correctly whatever the verb asked for. A suite's children start through
+  `Invoke-P20TestHost` (`Tests/Get-TestHost.ps1`), in the host it is running in, with a `-Command`
+  passed as `-EncodedCommand` because 5.1 drops a bare `"` from a native argument; the runner starts each
+  suite the same way, and the Windows job's last step starts the runner in `powershell.exe`.
 - **A suite that runs a script directly does not test the verb.** A suite that drives
   `Move-PromptToArchive.ps1` with a stubbed `Get-PromptFolders` stays green while `Archive` typed as a
   verb can look in `<hub>/<org>/` and see no cards at all -- as it does when the module's own
@@ -513,7 +519,10 @@ caller never works out the ending itself. `Add-Content` and `Set-Content` on a c
 gets one bare-LF line, and the tool uses neither. If you add a path that creates a hub file, it calls
 this function with `-New`: writing your own `WriteAllText` breaks the create half
 on Windows, where `* text=auto` plus `core.autocrlf=true` hands every template and every
-here-string to the writer as CRLF. Every reader tolerates both endings, and both sides assert it
+here-string to the writer as CRLF. A card is READ the same way: `Read-CardText`, beside the writer,
+reads it as UTF-8, because `Get-Content` with no `-Encoding` reads a BOM-less file as ANSI on 5.1 and a
+verb that wrote that back corrupted the card -- every `Get-Content` in shipped code names its `-Encoding`
+(`Test-Portability`'s Clause 19). Every reader tolerates both endings, and both sides assert it
 (`tkTestToolkit -Archive`, `Tests/test_parsers.py`). `docs/CLI.md`, "The bytes a card is written
 with", is the long version.
 

@@ -536,6 +536,13 @@ file in the hub:
 - **Every reader tolerates both.** The PowerShell parsers, `agent/core/parsers.py` and
   `agent/ado/reporting.py`'s stamp parse are multiline regexes, asserted CRLF-against-LF on both
   sides (`tkTestToolkit -Archive`, `Tests/test_parsers.py`).
+- **A card is READ as UTF-8 too** -- `Read-CardText`, beside the writer, reads a hub file as UTF-8
+  (a BOM, where a file has one, still wins and is not part of the text), and `-Lines` splits on LF
+  or CRLF and nothing else. `Get-Content` with no `-Encoding` reads a file with no BOM in the ANSI
+  code page under Windows PowerShell 5.1 and as UTF-8 under 7, so a verb that read a card that way
+  and wrote it back -- `NewPR`, a `MeetingAgenda` stage change -- turned every accented letter and
+  dash into two or three characters, for good, on 5.1 alone. Every `Get-Content` in shipped code
+  names its `-Encoding` (`tkTestToolkit -Portability`, Clause 19).
 - **The agent has one writer too.** `agent/core/cards.py`'s `write_card_text` is the edit half of
   this contract in Python: it reads the card's terminator and writes with it, UTF-8, no BOM. No
   route in the ADO core edits a card today -- the PR comments `save` that did was retired,

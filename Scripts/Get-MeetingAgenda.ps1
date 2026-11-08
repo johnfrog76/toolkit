@@ -204,7 +204,7 @@ function Get-SessionStage {
     param([string]$Path)
     if (-not (Test-Path $Path)) { return $null }
     $inStage = $false
-    foreach ($line in (Get-Content $Path)) {
+    foreach ($line in (Read-CardText -Path $Path -Lines)) {
         if ($inStage) {
             $v = $line.Trim()
             if ($v) { return $v }
@@ -218,7 +218,7 @@ function Get-SessionStage {
 function Set-SessionStage {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Inner helper; the caller owns the ShouldProcess decision.')]
     param([string]$Path, [string]$Stage)
-    $content = Get-Content $Path -Raw
+    $content = Read-CardText -Path $Path
     $content = $content -replace '(?m)(^## Stage\r?\n)\S[^\r\n]*', "`${1}$Stage"
     # EDITING: the file keeps the terminator it already has, and gains no BOM.
     # This rewrites the whole file on every stage change, so writing a BOM here
@@ -353,7 +353,7 @@ if (-not $Plan -and -not $Prep -and -not $Retro -and -not $Close) {
     $check = Get-P20CarriedFromCheck -Path $filePath -Folders @($currentDir, $archiveDir)
     $carried = ''
     if ($check.Verdict -ne 'absent' -and $check.Named -ne '(none)') {
-        $carried = Get-SectionValue -Lines (Get-Content $filePath -Encoding UTF8) -Heading "Carried from $($check.Named)"
+        $carried = Get-SectionValue -Lines (Read-CardText -Path $filePath -Lines) -Heading "Carried from $($check.Named)"
     }
     $carriedNote = Format-P20CarriedFromNote $check
 
@@ -396,7 +396,7 @@ if ($Plan) {
             if (Test-Path $p) { $priorPath = $p; break }
         }
         if ($priorPath) {
-            $retroText = Get-SectionValue -Lines (Get-Content $priorPath) -Heading 'Retro'
+            $retroText = Get-SectionValue -Lines (Read-CardText -Path $priorPath -Lines) -Heading 'Retro'
             if ($retroText) {
                 $indented = $retroText -replace "`n", "`n  "
                 $context = "  Carry-forward from ${prior}:`n  $indented"

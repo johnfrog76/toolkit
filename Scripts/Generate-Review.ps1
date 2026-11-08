@@ -99,7 +99,7 @@ if (-not $cfg) {
     $defaults = $null; $local = $null
     # The container's keys in both spellings (ConvertTo-P20SpaceKeys, stage 2).
     . (Join-Path $PSScriptRoot 'Resolve-HubConfig.ps1')
-    if (Test-Path $cfgDefault) { $defaults = ConvertTo-P20SpaceKeys (Get-Content $cfgDefault -Raw | ConvertFrom-Json) }
+    if (Test-Path $cfgDefault) { $defaults = ConvertTo-P20SpaceKeys (Get-Content $cfgDefault -Raw -Encoding UTF8 | ConvertFrom-Json) }
     if (-not (Get-Command Read-P20LocalConfigJson -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Write-ConfigParseWarning.ps1') }
     $local = ConvertTo-P20SpaceKeys (Read-P20LocalConfigJson -Path $cfgLocal)
     $spaces = if ($defaults.spaces) { @($defaults.spaces) } else { @() }
@@ -121,7 +121,7 @@ if (-not ($cfg | Get-Member -Name 'Orgs' -MemberType Properties -ErrorAction Sil
     $cfgDefault2 = Join-Path $repoRoot2 'config.default.json'
     $defaults2 = $null
     . (Join-Path $PSScriptRoot 'Resolve-HubConfig.ps1')
-    if (Test-Path $cfgDefault2) { $defaults2 = ConvertTo-P20SpaceKeys (Get-Content $cfgDefault2 -Raw | ConvertFrom-Json) }
+    if (Test-Path $cfgDefault2) { $defaults2 = ConvertTo-P20SpaceKeys (Get-Content $cfgDefault2 -Raw -Encoding UTF8 | ConvertFrom-Json) }
     $cfg | Add-Member -NotePropertyName 'Orgs' -NotePropertyValue (@($defaults2.spaces)) -Force
 }
 # Dot-sourced HERE rather than below, because the root has to be resolved before

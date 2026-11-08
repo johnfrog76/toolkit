@@ -127,7 +127,7 @@ if (-not $displayName) {
     $cfgLocalPath   = Join-Path $repoRoot 'config.local.json'
     $defaults = $null
     $local = $null
-    if (Test-Path $cfgDefaultPath) { $defaults = Get-Content $cfgDefaultPath -Raw | ConvertFrom-Json }
+    if (Test-Path $cfgDefaultPath) { $defaults = Get-Content $cfgDefaultPath -Raw -Encoding UTF8 | ConvertFrom-Json }
     if (-not (Get-Command Read-P20LocalConfigJson -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Write-ConfigParseWarning.ps1') }
     $local = Read-P20LocalConfigJson -Path $cfgLocalPath
     if ($local -and $local.branchUser)        { $displayName = $local.branchUser }

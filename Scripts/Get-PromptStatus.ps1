@@ -267,7 +267,7 @@ finally { Pop-Location }
 
 $rows = @()
 foreach ($file in $files) {
-    $content = Get-Content $file.FullName -Raw -ErrorAction SilentlyContinue
+    $content = Get-Content $file.FullName -Raw -ErrorAction SilentlyContinue -Encoding UTF8
     if (-not $content) { $content = '' }
 
     # Title from first H1

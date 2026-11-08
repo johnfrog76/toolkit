@@ -161,7 +161,7 @@ function Test-IsActionableThread {
             -not [string]::IsNullOrWhiteSpace($_.content)
         })
     $hasHumanComment = $humanComments.Count -gt 0
-    $hasBotReview = ($Thread.comments | Where-Object { $_.content -match 'PR Assistant|AI Code Review' }).Count -gt 0
+    $hasBotReview = @($Thread.comments | Where-Object { $_.content -match 'PR Assistant|AI Code Review' }).Count -gt 0
 
     # System/activity threads carry a CodeReviewThreadType property: policy threads
     # (no human content), but ALSO vote / policy-status / PR-status events. ADO stamps the
@@ -172,7 +172,7 @@ function Test-IsActionableThread {
     # Verified against live PR payloads: real review comments never carry this property
     # (vote=VoteUpdate, policy=PolicyStatusUpdate, status=StatusUpdate; real comments=none).
     $isSystemThread = [bool]($Thread.properties -and $Thread.properties.CodeReviewThreadType) -and -not $hasBotReview
-    $isBuildService = ($Thread.comments | Where-Object { $_.author.displayName -match 'Build Service' }).Count -gt 0
+    $isBuildService = @($Thread.comments | Where-Object { $_.author.displayName -match 'Build Service' }).Count -gt 0
 
     return ($hasFileContext -or $hasHumanComment -or $hasBotReview) -and -not $isSystemThread -and -not $isBuildService
 }
@@ -678,7 +678,7 @@ try {
         # from In Progress → Code Review. Clicking fetch after creating a PR is the intentional
         # trigger for that transition — even with no comments yet. The PR URL is the state gate.
         if ($targetFile -and (Test-Path -LiteralPath $targetFile)) {
-            $fileContent = [System.IO.File]::ReadAllText($targetFile)
+            $fileContent = Read-CardText -Path $targetFile
             if ($fileContent -notmatch [regex]::Escape($script:Consts.tokens.prUrl)) {
                 # Through the one card writer: it keeps the file's line endings.
                 Write-CardText -Path $targetFile -Content ($fileContent.TrimEnd("`r", "`n") + "`n`n$($script:Consts.tokens.prUrl) $prUrl`n")
@@ -696,7 +696,7 @@ try {
     # has; Get-P20ThreadDelta says what each thread adds.
     $fileContent = ""
     if ($targetFile -and (Test-Path -LiteralPath $targetFile)) {
-        $fileContent = [System.IO.File]::ReadAllText($targetFile)
+        $fileContent = Read-CardText -Path $targetFile
     }
     $recordedComments = Get-P20RecordedComments -FileContent $fileContent
     $existingThreadIds = @($recordedComments.Keys | ForEach-Object { [long]$_ } | Sort-Object -Unique)
@@ -882,7 +882,7 @@ try {
         $existingText = ''
         # Literal: a '[' in the path read as a pattern says "no file", and the card
         # would be replaced by the new comments alone.
-        if (Test-Path -LiteralPath $targetFile) { $existingText = [System.IO.File]::ReadAllText($targetFile) }
+        if (Test-Path -LiteralPath $targetFile) { $existingText = Read-CardText -Path $targetFile }
         if ($existingText -and -not $existingText.EndsWith("`n")) { $existingText += "`n" }
         Write-CardText -Path $targetFile -Content ($existingText + $output + "`n")
         Write-Host ""

@@ -215,7 +215,7 @@ else {
     $declared = @()
     $defaultConfig = Join-Path (Split-Path -Parent $PSScriptRoot) 'config.default.json'
     if (Test-Path $defaultConfig) {
-        $shipped = ConvertTo-P20SpaceKeys (Get-Content $defaultConfig -Raw | ConvertFrom-Json)
+        $shipped = ConvertTo-P20SpaceKeys (Get-Content $defaultConfig -Raw -Encoding UTF8 | ConvertFrom-Json)
         foreach ($o in @($shipped.spaces)) { if ($o.promptsFolder) { $declared += [string]$o.promptsFolder } }
     }
     $manifest = Read-P20HubManifest -Root $PromptsRoot -WarningAction SilentlyContinue

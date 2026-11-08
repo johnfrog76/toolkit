@@ -50,7 +50,7 @@ function Get-P20HelpPorts {
     $devPort = 5174
     $viteConfig = Join-Path $RepoRoot 'web/vite.config.ts'
     if (Test-Path $viteConfig) {
-        $m = [regex]::Match((Get-Content $viteConfig -Raw -ErrorAction SilentlyContinue), 'port:\s*(\d+)')
+        $m = [regex]::Match((Get-Content $viteConfig -Raw -ErrorAction SilentlyContinue -Encoding UTF8), 'port:\s*(\d+)')
         if ($m.Success) { $devPort = [int]$m.Groups[1].Value }
     }
 

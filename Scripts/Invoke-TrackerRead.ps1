@@ -62,6 +62,19 @@ function Invoke-P20TrackerRead {
         $global:LASTEXITCODE = 127
         return [PSCustomObject]@{ Code = 127; Lines = @($said); Out = @(); Err = @($said) }
     }
+    # gh and git write UTF-8 to a pipe, and PowerShell decodes a native
+    # command's output with [Console]::OutputEncoding -- on Windows the console's
+    # OEM code page unless something changed it, so a comment's em dash came back
+    # as three other characters, in a terminal and not from the web, whose bridge
+    # sets it. UTF-8 for this one call, put back after. az is Python, which
+    # encodes a pipe in the locale's code page unless PYTHONIOENCODING says
+    # otherwise, so it is told too. Setting the console's encoding can throw where
+    # there is no console; then nothing was changed and nothing is put back.
+    $savedOutput = $null
+    try { $savedOutput = [Console]::OutputEncoding; [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch { $savedOutput = $null }
+    $isAz = ([System.IO.Path]::GetFileNameWithoutExtension($Tool) -eq 'az')
+    $savedPython = [System.Environment]::GetEnvironmentVariable('PYTHONIOENCODING')
+    if ($isAz) { [System.Environment]::SetEnvironmentVariable('PYTHONIOENCODING', 'utf-8') }
     $global:LASTEXITCODE = 0
     try {
         $raw = @(& $Tool @Arguments 2>&1)
@@ -70,6 +83,10 @@ function Invoke-P20TrackerRead {
         $said = "$Tool could not be started: $($_.Exception.Message)"
         $global:LASTEXITCODE = 126
         return [PSCustomObject]@{ Code = 126; Lines = @($said); Out = @(); Err = @($said) }
+    }
+    finally {
+        if ($null -ne $savedOutput) { try { [Console]::OutputEncoding = $savedOutput } catch { $null = $_ } }
+        if ($isAz) { [System.Environment]::SetEnvironmentVariable('PYTHONIOENCODING', $savedPython) }
     }
     $code = $LASTEXITCODE
     $out = @()

@@ -457,7 +457,7 @@ if (-not $promptFile) {
 Write-Host "[*] Prompt: $(Split-Path $promptFile -Leaf)" -ForegroundColor DarkGray
 
 # -- Parse prompt file --------------------------------------------------------
-$promptContent = Get-Content -Path $promptFile -Raw
+$promptContent = Read-CardText -Path $promptFile
 
 # Title: first heading line. Tolerant of "# Bug 232127: ...", "# User Story 452: ...",
 # or a plain "# <title>". (?m) so ^/$ match per-line in the raw multi-line content.
@@ -905,7 +905,7 @@ if ($pull.Ok) { $promptFile = $pull.Path }
 
 try {
     if (-not $pull.Ok) { throw $pull.Message }
-    $lines = Get-Content -Path $promptFile
+    $lines = Read-CardText -Path $promptFile -Lines
     $insertIndex = -1
 
     # Insert after the last Git commit line, before ## Work Item Info
@@ -929,7 +929,7 @@ try {
         Write-Host "[+] PR URL written to prompt file" -ForegroundColor Green
     } else {
         Write-Host "[~] Could not find insertion point -- appending to end" -ForegroundColor Yellow
-                Write-CardText -Path $promptFile -Content ((Get-Content -Path $promptFile -Raw).TrimEnd("`r", "`n") + "`n`n$($script:Consts.tokens.prUrl) $prUrl`n")
+                Write-CardText -Path $promptFile -Content ((Read-CardText -Path $promptFile).TrimEnd("`r", "`n") + "`n`n$($script:Consts.tokens.prUrl) $prUrl`n")
     }
 } catch {
     Write-Host "[~] Failed to update prompt file -- $($_.Exception.Message)" -ForegroundColor Yellow

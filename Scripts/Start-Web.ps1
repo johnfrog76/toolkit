@@ -86,7 +86,7 @@ function Show-ConfigHelp {
 
 function Get-DevServerProcessId {
     if (-not (Test-Path $pidFile)) { return 0 }
-    $raw = (Get-Content $pidFile -Raw).Trim()
+    $raw = (Get-Content $pidFile -Raw -Encoding UTF8).Trim()
     if (-not $raw) { return 0 }
     try {
         $proc = Get-Process -Id $raw -ErrorAction Stop
@@ -103,7 +103,7 @@ function Get-DevServerProcessId {
 # read back out of its own output rather than assumed.
 function Get-DevServerUrl {
     if (-not (Test-Path $logFile)) { return '' }
-    $line = Get-Content $logFile -ErrorAction SilentlyContinue |
+    $line = Get-Content $logFile -ErrorAction SilentlyContinue -Encoding UTF8 |
         Where-Object { $_ -match 'https?://localhost:\d+' } |
         Select-Object -Last 1
     if (-not $line) { return '' }
@@ -194,7 +194,7 @@ function Open-WebUi {
 function Get-ProductionPort {
     $compose = Join-Path $webPath 'docker-compose.yml'
     if (Test-Path $compose) {
-        $m = [regex]::Match((Get-Content $compose -Raw -ErrorAction SilentlyContinue), '"(?:[\d.]+:)?(\d+):\d+"')
+        $m = [regex]::Match((Get-Content $compose -Raw -ErrorAction SilentlyContinue -Encoding UTF8), '"(?:[\d.]+:)?(\d+):\d+"')
         if ($m.Success) { return [int]$m.Groups[1].Value }
     }
     return $script:DefaultDevPort
@@ -207,7 +207,7 @@ function Get-DevServerPorts {
     $ports = @()
     $viteConfig = Join-Path $webPath 'vite.config.ts'
     if (Test-Path $viteConfig) {
-        $m = [regex]::Match((Get-Content $viteConfig -Raw -ErrorAction SilentlyContinue), 'port:\s*(\d+)')
+        $m = [regex]::Match((Get-Content $viteConfig -Raw -ErrorAction SilentlyContinue -Encoding UTF8), 'port:\s*(\d+)')
         if ($m.Success) { $ports += [int]$m.Groups[1].Value }
     }
     if ($ports.Count -eq 0) { $ports += $script:DefaultDevPort }

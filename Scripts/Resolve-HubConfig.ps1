@@ -571,7 +571,7 @@ function Read-P20HubManifest {
 
     $data = $null
     try {
-        $data = Get-Content $path -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        $data = Get-Content $path -Raw -ErrorAction Stop -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
     }
     catch {
         Write-P20HubWarning "$path`: not valid JSON ($($_.Exception.Message)) -- the hub declared nothing. Fix the file or delete it."
