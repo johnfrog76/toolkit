@@ -229,7 +229,7 @@ describe("the Ref field", () => {
     // (jest.config.mjs) gives it the time a loaded runner needs.
   });
 
-  // #254. Closing New Reminder queues a pass of Fluent's focus layer (Tabster)
+  // Closing New Reminder queues a pass of Fluent's focus layer (Tabster)
   // that hides whatever is outside the active modal, 250 ms on. The Edit
   // dialog opened inside that window must be the active modal by then: its
   // focus on a control inside it, and its fields still reachable once the

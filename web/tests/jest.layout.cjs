@@ -8,7 +8,7 @@
 // active modal (it activates a modal when focus lands INSIDE it, not on it),
 // and the next pass that hides what lies outside the active modal marks the
 // open dialog aria-hidden -- for good. A test that opens a second dialog
-// within 250 ms of closing the first meets that pass (#254).
+// within 250 ms of closing the first meets that pass.
 //
 // So the test window answers the two questions as a browser would: an element
 // has an offsetParent unless it, or an ancestor, is display:none, it is
