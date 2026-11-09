@@ -226,9 +226,9 @@ describe("the Ref field", () => {
     dialog = await openedDialog();
     expect(dialog.querySelectorAll(".fui-Input").length).toBeGreaterThan(0);
     expectDefaultSizeInputs(dialog);
-    // Two real dialogs, and every wait a by-role query, which walks the whole tree
-    // in jsdom: Jest's 5 seconds is not enough on a loaded runner. Past 20 is a bug.
-  }, 20_000);
+    // Two real dialogs, and every wait a by-role query: the suite's testTimeout
+    // (jest.config.mjs) gives it the time a loaded runner needs.
+  });
 
   it("is in the Edit dialog, filled in, and an emptied ref is sent as an empty -Ref", async () => {
     items = [reminder("Q4TN", { ref: "41" })];
