@@ -104,11 +104,11 @@ describe("planning a card from its row menu", () => {
     draw();
     const dialog = await choose("Plan milestone");
     // The milestone it has is the box's starting value; no "Now:" line repeats it.
-    const box = within(dialog).getByRole<HTMLInputElement>("textbox", { hidden: true });
+    const box = within(dialog).getByRole<HTMLInputElement>("textbox");
     expect(box.value).toBe("M2 -- 1.2.0");
     expect(within(dialog).queryByText(/^Now:/)).toBeNull();
     fireEvent.change(box, { target: { value: "M3" } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Save", hidden: true }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
     await waitFor(() =>
       expect(planCard).toHaveBeenCalledWith({ file: card.file, line: "milestone", title: "M3" }),
     );
@@ -118,7 +118,7 @@ describe("planning a card from its row menu", () => {
   it("Plan sprint's Clear takes the card out of its sprint only", async () => {
     draw();
     const dialog = await choose("Plan sprint");
-    fireEvent.click(within(dialog).getByRole("button", { name: "Clear sprint", hidden: true }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Clear sprint" }));
     await waitFor(() =>
       expect(planCard).toHaveBeenCalledWith({ file: card.file, line: "sprint", remove: true }),
     );
@@ -127,10 +127,10 @@ describe("planning a card from its row menu", () => {
   it("Tag adds the tags typed, split on commas, through Tag", async () => {
     draw();
     const dialog = await choose("Tag");
-    fireEvent.change(within(dialog).getByRole("textbox", { hidden: true }), {
+    fireEvent.change(within(dialog).getByRole("textbox"), {
       target: { value: "sev3, sonnet" },
     });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Add", hidden: true }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add" }));
     await waitFor(() =>
       expect(tagCard).toHaveBeenCalledWith({ file: card.file, tags: ["sev3", "sonnet"] }),
     );
@@ -150,10 +150,10 @@ describe("planning a card from its row menu", () => {
     }));
     draw();
     const dialog = await choose("Tag");
-    fireEvent.change(within(dialog).getByRole("textbox", { hidden: true }), {
+    fireEvent.change(within(dialog).getByRole("textbox"), {
       target: { value: "x" },
     });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Take off", hidden: true }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Take off" }));
     expect(await within(dialog).findByText(/No card with id '401'/)).toBeTruthy();
     expect(tagCard).toHaveBeenCalledWith({ file: card.file, tags: ["x"], remove: true });
   });
