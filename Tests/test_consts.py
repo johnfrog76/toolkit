@@ -648,6 +648,19 @@ class TheDockerPageCarriesTheAgentsHeaders(unittest.TestCase):
         template = (PKG_ROOT / "web" / "nginx.conf.template").read_text(encoding="utf-8")
         self.assertIn("listen 5173 default_server;\n    return 444;", template)
 
+    def test_a_refresh_of_a_route_that_is_also_a_folder_draws_the_app(self):
+        """/lounge is a route and a real folder (the skins). A try_files that
+        names $uri/ redirects it to add a slash, then refuses the folder; and an
+        absolute redirect names the port nginx listens on in the container, not
+        the one the host publishes. No route is a folder with an index."""
+        template = (PKG_ROOT / "web" / "nginx.conf.template").read_text(encoding="utf-8")
+        code = "\n".join(line.split("#", 1)[0] for line in template.splitlines())
+        rules = re.findall(r"try_files[^;]*;", code)
+        self.assertEqual(rules, ["try_files $uri /index.html;"] * 2)
+        self.assertIn("absolute_redirect off;", code)
+        public = PKG_ROOT / "web" / "public"
+        self.assertEqual(sorted(str(p.relative_to(public)) for p in public.rglob("index.html")), [])
+
 
 class TheAgentListensOnTheLoopbackOnly(unittest.TestCase):
     """The agent has no authentication of its own: its bind address is the boundary.

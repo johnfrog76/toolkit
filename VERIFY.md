@@ -1242,6 +1242,10 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   letter (`# écrire le guide`). `tkBacklog` lists all four with their titles intact: the emoji and the symbol
   dropped, the accented letter kept, and no `is not valid` error. The Windows job runs the Backlog suite on 5.1 itself
   and prints the code page it ran on; this row is a real console and a real hub.
+- [ ] **A refresh of the Lounge in the Docker image draws the app (#226).** With Docker Desktop running, on the merged
+  head, `tkWeb -Restart`, then open the Lounge and refresh the page: the room draws again, and the address bar still
+  says `localhost:5174`, not `5173` (a browser that met the old redirect keeps it: refresh with Cmd+Shift+R). Then
+  the four `curl` lines of Gate 12b for `/system`, `/lounge`, `/lounge/` and `/lounge/temple.html` each print `200`. `Tests/test_consts.py` holds the template to it; this row is the image.
 
 ## Recording a run
 
@@ -1260,12 +1264,16 @@ cd web && npm run build                 # dist/client is the real output path
 cd web && docker compose up -d --build
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5174/          # 200, the built index.html
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5174/system    # 200 -- the SPA, not an nginx 404
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5174/lounge    # 200 -- a route that is also a folder: the SPA, no redirect
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5174/lounge/   # 200 -- the SPA too: try_files tests a folder only for a name ending in /
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5174/lounge/temple.html  # 200 -- the skin itself
 diff <(curl -s localhost:5174/api/env) <(curl -s localhost:4100/api/env)  # same payload
 docker compose ps                                                        # healthy within ~10s
 ```
 
 - [ ] The image builds and the container serves the hashed asset the build emitted
-- [ ] A deep link returns the app, not a 404 -- `try_files ... /index.html` works
+- [ ] A deep link returns the app, not a 404 -- `try_files ... /index.html` works -- and so does `/lounge`, a route
+      that is also a folder: no redirect to the container's own port 5173, no 403
 - [ ] `/api/env` through the container equals `/api/env` straight to 4100 --
       `host.docker.internal:host-gateway` reaches an agent on the host
 - [ ] **The rebuild claim, demonstrated not inferred.** Change a source file, reload: nothing.

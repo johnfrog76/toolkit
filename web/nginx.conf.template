@@ -20,6 +20,14 @@ server {
     server_name localhost 127.0.0.1 [::1];
     root /usr/share/nginx/html;
     index index.html;
+    # A redirect nginx makes names a path only. An absolute one names the port
+    # nginx listens on here, 5173, not the one the host publishes, and a browser
+    # sent there finds nothing.
+    absolute_redirect off;
+
+    # No route is a folder with an index, so no try_files names $uri/: a request
+    # whose path is a real folder -- /lounge, where the skins live -- would be
+    # redirected to add a slash and then refused, where the app should answer.
 
     # API calls -> FastAPI on the host, on the configured agent port
     location /api/ {
@@ -36,7 +44,7 @@ server {
         add_header X-Frame-Options "SAMEORIGIN" always;
         add_header X-Content-Type-Options "nosniff" always;
         add_header Referrer-Policy "no-referrer" always;
-        try_files $uri $uri/ /index.html;
+        try_files $uri /index.html;
     }
 
     # SPA fallback. The agent sets these on what it answers; this is the page.
@@ -46,6 +54,6 @@ server {
         add_header X-Frame-Options "DENY" always;
         add_header X-Content-Type-Options "nosniff" always;
         add_header Referrer-Policy "no-referrer" always;
-        try_files $uri $uri/ /index.html;
+        try_files $uri /index.html;
     }
 }
