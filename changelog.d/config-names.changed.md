@@ -1,1 +1,0 @@
-- A command prefix or a shortcut's name must now be a plain name: a letter, then letters, digits, `-` or `_`. `Config -Set` refuses anything else, and a name already in your file is skipped with a warning.

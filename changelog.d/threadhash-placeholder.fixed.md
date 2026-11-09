@@ -1,1 +1,0 @@
-- `ThreadHash` fills a review reply's `[commit]` with the newest commit it adds, so a second review round names the fix instead of the branch's first commit, and it leaves the placeholder, and says so, when there is no new commit to name.

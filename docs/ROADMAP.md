@@ -62,7 +62,9 @@ M4  1.4.0  Ten minutes to your own board   cut 2026-10-24: the first run, the wo
         |
 M4c 1.5.0  Team Agile says what it is   cut 2026-10-26: the Agenda, the Milestones tab and the award, every theme its own accent
         |
-M4b 1.6.0  The tour                    Kit's narrated tour, and the ten-minute walk on a machine that has never seen the product
+M1b 1.6.0  The bar, held again   cut 2026-11-09: the request gate, names are names, 5.1 reads every script, the Docker refresh, and the Backlog
+        |
+M4b 1.7.0  The tour                    Kit's narrated tour, and the ten-minute walk on a machine that has never seen the product
         |
 M5         The rename                 a cards core and an ado module; no version
         :
@@ -155,7 +157,7 @@ the release is not held on a deck.
 ### M4c -- 1.5.0, Team Agile says what it is -- cut 2026-10-26
 
 Team Agile's page says what it is for, and what it shows has a place of its own. **Cut 2026-10-26** with all
-three on main and green, ahead of the tour, which carries to 1.6.0 unchanged.
+three on main and green, ahead of the tour, which carries to 1.7.0 unchanged.
 
 - The standup page opens on an **Agenda**: what moved since the last standup, and what is waiting on you,
   as cards with one action, Work it now; the suggestion's row above them; the text stays on its own tabs (C6VH).
@@ -164,7 +166,24 @@ three on main and green, ahead of the tour, which carries to 1.6.0 unchanged.
 - **Every theme keeps its own accent** again; the product's rose and wine are the landing page's and the
   wordmark's default only (U6FU).
 
-### M4b -- 1.6.0, the tour
+### M1b -- 1.6.0, the bar held again -- cut 2026-11-09
+
+The second release on the bar: the security and Windows review passes, worked to the end.
+**Done when:** each finding from the two review passes is a card, worked or closed with a reason, and every
+fix is proved on the host that broke it, Windows-1252 included. **Cut 2026-11-09.**
+
+- **The request gate:** the agent accepts requests only from its own pages and the origins you configure.
+- **Names are names:** a command prefix and a shortcut's name are each a plain name, read by one rule, and
+  a hub, package or home folder whose name holds `[` or `]` works.
+- **5.1 reads every script:** request bodies and card text are UTF-8 on Windows PowerShell 5.1, and no
+  shipped script holds a byte that 5.1 could misread.
+- **The Docker refresh:** a page refreshed in the Docker image stays on the page.
+- **The Backlog:** `Backlog` and `GET /api/backlog`, a Space's waiting cards as one ranked table.
+
+Carries to the next quality release: every CLI suite proved on Windows PowerShell 5.1 itself (#261), and
+the rest of the review queue.
+
+### M4b -- 1.7.0, the tour
 
 **Done when:** Kit's guided tour is narrated and in the launcher, and the ten-minute walk has been timed on a
 machine that has never seen the product (the `VERIFY.md` Gate 12 row 4D77 added, with the time on it).

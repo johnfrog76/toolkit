@@ -1,1 +1,0 @@
-- One issue with a very long number in its text can no longer stop the standup: the number is read as no thread, and the standup goes on.

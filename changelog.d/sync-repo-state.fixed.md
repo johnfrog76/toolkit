@@ -1,1 +1,0 @@
-- `Sync` no longer commits and pushes a hub that is in the middle of a rebase, merge or cherry-pick, where it could publish conflict markers inside cards, and it no longer reports success when its auto-commit was refused: both are now stated refusals that leave the hub as it was.
