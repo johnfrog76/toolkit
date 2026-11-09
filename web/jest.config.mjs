@@ -20,6 +20,11 @@ export default {
   setupFiles: ["<rootDir>/tests/jest.setup.cjs"],
   // Testing Library's wait for an element, raised for the whole suite.
   setupFilesAfterEnv: ["<rootDir>/tests/jest.afterEnv.cjs"],
+  // A test's own limit, well above that 5 s wait, so a slow wait fails with
+  // Testing Library's message -- the element it was waiting for -- and not with
+  // Jest's "Exceeded timeout", which names nothing. One number for every test:
+  // none sets its own (docs/TESTING.md, "How long a web test waits").
+  testTimeout: 20000,
   // The @consts alias, third of three resolvers (vite.config.ts and tsconfig's
   // `paths` are the others). The contract file is real JSON on disk and jest
   // requires it directly -- nothing is stubbed, so a test reads exactly what

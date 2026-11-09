@@ -97,6 +97,27 @@ Assert-True 'jest: Tests: and Test Suites:' ($c.Found -and $c.Passed -eq 1229 -a
 $c = ConvertFrom-P20JestOutput -Text "> node tests/viteconfig.mjs`nviteconfig: 1 failed"
 Assert-True 'jest: npm test stopped before jest reported -- not found' (-not $c.Found)
 
+# A worker jest force-exited (#238): every test passed and a test still left a timer or a handle
+# open. The same transcript with and without the sentence, through Test's reader and CI's.
+$jestClean = "Test Suites: 159 passed, 159 total`nTests:       1891 passed, 1891 total`nSnapshots:   0 total"
+$jestLeak = "Test Suites: 159 passed, 159 total`nTests:       1891 passed, 1891 total`nSnapshots:   0 total`nTime:        49.9 s`nA worker process has failed to exit gracefully and has been force exited. This is likely caused by tests leaking due to improper teardown. Try running with --detectOpenHandles to find leaks. Active timers can also cause this, ensure that .unref() was called on them."
+$leakTable = @(
+    # transcript, exit, result
+    @($jestClean, 0, 'pass'),
+    @($jestLeak, 0, 'fail')
+)
+foreach ($row in $leakTable) {
+    $c = ConvertFrom-P20JestOutput -Text $row[0]
+    $label = if ($row[2] -eq 'fail') { 'with the force-exit sentence' } else { 'without it' }
+    $test = Get-P20HalfVerdict -Counts $c -ExitCode $row[1]
+    Assert-True "jest $label`: Test's verdict is $($row[2])" ($c.Found -and $c.Passed -eq 1891 -and $test.Result -eq $row[2]) "got $($test.Result) '$($test.Detail)'"
+    $ci = Get-P20CiHalfVerdict -Half 'web' -Text $row[0] -ExitCode $row[1]
+    Assert-True "jest $label`: CI's verdict is $($row[2]), the same as Test's" ($ci.Result -eq $row[2] -and $ci.Detail -eq $test.Detail) "got $($ci.Result) '$($ci.Detail)'"
+    if ($row[2] -eq 'fail') {
+        Assert-True 'and the failure names --detectOpenHandles as the next step' ($test.Detail -like '*--detectOpenHandles*') $test.Detail
+    }
+}
+
 $c = ConvertFrom-P20ToolkitOutput -Text "  |  Total: 6150/6153 passed           2100.0s |"
 Assert-True 'CLI: the Total line, whatever frames it' ($c.Found -and $c.Passed -eq 6150 -and $c.Total -eq 6153 -and $c.Failed -eq 3)
 

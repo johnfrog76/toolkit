@@ -12,7 +12,8 @@
       Get-P20TestSummaryPath       test-summary.<machine>.json -- the one place
                                    the file's name and the machine rule live.
       ConvertFrom-P20PytestOutput  pytest's closing summary line -> counts.
-      ConvertFrom-P20JestOutput    jest's `Tests:` and `Test Suites:` lines -> counts.
+      ConvertFrom-P20JestOutput    jest's `Tests:` and `Test Suites:` lines -> counts,
+                                   and whether jest force-exited a worker (Leaked).
       ConvertFrom-P20ToolkitOutput the CLI runner's `Total: n/m passed` line -> counts.
       Get-P20HalfVerdict           counts + exit code -> pass / fail.
       ConvertFrom-P20SmokeOutput   the browser smoke's closing `smoke:` line and
@@ -64,7 +65,7 @@ function Get-P20TestSummaryPath {
 }
 
 function New-P20Counts {
-    return @{ Found = $false; Passed = 0; Failed = 0; Skipped = 0; Total = 0; Suites = 0; SuitesFailed = 0; Subtests = 0; Line = '' }
+    return @{ Found = $false; Passed = 0; Failed = 0; Skipped = 0; Total = 0; Suites = 0; SuitesFailed = 0; Subtests = 0; Line = ''; Leaked = $false }
 }
 
 function ConvertFrom-P20PytestOutput {
@@ -110,12 +111,17 @@ function ConvertFrom-P20JestOutput {
         Tests:       2 failed, 1 skipped, 1229 passed, 1232 total
       The LAST of each, so a watch-mode rerun or a nested print cannot win.
       No `Tests:` line: Found is false -- npm test stopped before jest reported.
+      Leaked: jest printed that it force-exited a worker ("A worker process has
+      failed to exit gracefully and has been force exited"), which it does when a
+      test left a timer or a handle open. Every test can pass and the run still
+      leaked, so the verdict reads it on its own (Get-P20HalfVerdict).
     #>
     param([string]$Text)
     $c = New-P20Counts
     if (-not $Text) { return $c }
     $testsLine = ''
     $suitesLine = ''
+    $c.Leaked = ($Text -match 'worker process has failed to exit gracefully')
     foreach ($l in @($Text -split "`r?`n")) {
         $t = $l.Trim()
         if ($t -match '^Tests:\s+\d') { $testsLine = $t }
@@ -209,11 +215,17 @@ function Get-P20HalfVerdict {
       A half passed when it printed its summary, exited 0 and counted no
       failure. No summary line is a failure -- the runner stopped before it
       reported -- and so is a non-zero exit after a clean-looking line: the
-      CLI runner's own rule for a suite (Get-P20SuiteVerdict).
+      CLI runner's own rule for a suite (Get-P20SuiteVerdict). A web run in
+      which jest force-exited a worker fails too, with every test passed: a test
+      left a timer or a handle open, and a leak that passes quietly stops being
+      noticed. The detail names the run that finds it.
     #>
     param($Counts, [int]$ExitCode)
     if (-not $Counts.Found) { return @{ Result = 'fail'; Detail = "no summary line (exit $ExitCode)" } }
     if ($Counts.Failed -gt 0) { return @{ Result = 'fail'; Detail = "$($Counts.Failed) failed" } }
+    if ($Counts.Leaked) {
+        return @{ Result = 'fail'; Detail = 'jest force-exited a worker: a test left a timer or a handle open -- run npx jest --runInBand --detectOpenHandles in web/ to name it' }
+    }
     if ($ExitCode -ne 0) { return @{ Result = 'fail'; Detail = "exit $ExitCode" } }
     return @{ Result = 'pass'; Detail = 'ok' }
 }
