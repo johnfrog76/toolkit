@@ -169,7 +169,7 @@ module and you add a mock line to every one of these files.
 **Four test runners**, one per half plus one for the two together. Run the ones your change touches:
 
 ```powershell
-tkTestToolkit                 # the CLI -- 52 suites, 9692 assertions on this commit
+tkTestToolkit                 # the CLI -- 52 suites, 9696 assertions on this commit
 ```
 
 ```bash
@@ -412,7 +412,7 @@ Each step already done is skipped, so it is safe to re-run.
   BOM-less UTF-8 file correctly whatever the verb asked for. A suite's children start through
   `Invoke-P20TestHost` (`Tests/Get-TestHost.ps1`), in the host it is running in, with a `-Command`
   passed as `-EncodedCommand` because 5.1 drops a bare `"` from a native argument; the runner starts each
-  suite the same way, and the Windows job's last step starts the runner in `powershell.exe`.
+  suite the same way, and the Windows `ps51` job starts the runner in `powershell.exe`, so every suite runs on 5.1.
 - **A suite that runs a script directly does not test the verb.** A suite that drives
   `Move-PromptToArchive.ps1` with a stubbed `Get-PromptFolders` stays green while `Archive` typed as a
   verb can look in `<hub>/<org>/` and see no cards at all -- as it does when the module's own

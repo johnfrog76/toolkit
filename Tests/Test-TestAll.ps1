@@ -214,17 +214,30 @@ foreach ($mode in @('matrix', 'a11y')) {
 Assert-True 'verify.yml has a Windows job' ($workflow -match '(?m)^\s+runs-on: windows-latest\s*$')
 Assert-True 'the Windows job runs the CLI from Windows PowerShell 5.1, the module path set inside that shell' `
     ($workflow -match "powershell\.exe -NoProfile -Command '\`$env:PSModulePath = \(Resolve-Path \.\); Import-Module \./Prompt20Toolkit/Prompt20Toolkit\.psd1 -Force; tkTest -Half cli; exit \`$LASTEXITCODE'")
-# tkTest starts the runner in pwsh, so the step above runs every suite on 7. The
-# floor step starts the runner in powershell.exe, which starts its suites, and
-# they their verbs, in 5.1 (Tests/Get-TestHost.ps1), read through the same gate.
-Assert-True 'the Windows job also runs the card and config suites with the runner itself in Windows PowerShell 5.1' `
-    ($workflow -match "powershell\.exe -NoProfile -Command '\`$env:PSModulePath = \(Resolve-Path \.\); & \./Tests/Test-Toolkit\.ps1 -PRComments -MeetingAgenda -NewPrompt -Triage -Backlog; exit \`$LASTEXITCODE' 2>&1 \| Tee-Object -FilePath \`$log\r?\n[^\r\n]*\r?\n[^\r\n]*Test-CiHalf\.ps1 -Half cli\b")
-Assert-True 'the 5.1 step says which ANSI code page 5.1 reads a script without a BOM in, before it runs the suites' `
-    ($workflow -match "powershell\.exe -NoProfile -Command '[^'\r\n]*\[System\.Text\.Encoding\]::Default\.CodePage'\r?\n[^\r\n]*-Triage -Backlog;")
+# tkTest starts the runner in pwsh, so the step above runs every suite on 7, and
+# its name says so. The ps51 job starts the runner in powershell.exe with no suite
+# switch, which starts every suite, and they their verbs, in 5.1
+# (Tests/Get-TestHost.ps1), read through the same gate.
+Assert-True 'the smoke job''s CLI step says it runs the suites in PowerShell 7' `
+    ($workflow -match "(?m)^\s+- name: The CLI in PowerShell 7 on Windows -- tkTest -Half cli\s*$")
+$ps51At = $workflow.IndexOf("`n  ps51:")
+$ps51Job = ''
+if ($ps51At -ge 0) { $ps51Job = $workflow.Substring($ps51At) }
+Assert-True 'verify.yml has a ps51 job on Windows with a timeout of its own' `
+    (($ps51Job -match '(?m)^\s+runs-on: windows-latest\s*$') -and ($ps51Job -match '(?m)^\s+timeout-minutes: \d+\s*$'))
+Assert-True 'the ps51 job runs every CLI suite with the runner itself in Windows PowerShell 5.1, no suite switch, read by the CLI gate' `
+    ($ps51Job -match "powershell\.exe -NoProfile -Command '\`$env:PSModulePath = \(Resolve-Path \.\); & \./Tests/Test-Toolkit\.ps1; exit \`$LASTEXITCODE' 2>&1 \| Tee-Object -FilePath \`$log\r?\n[^\r\n]*\r?\n[^\r\n]*Test-CiHalf\.ps1 -Half cli\b")
+Assert-True 'the ps51 job says which ANSI code page 5.1 reads a script without a BOM in' `
+    ($ps51Job -match "powershell\.exe -NoProfile -Command '[^'\r\n]*\[System\.Text\.Encoding\]::Default\.CodePage'")
+Assert-True 'no step runs a hand-picked list of suites on 5.1: the ps51 job runs them all' `
+    (($workflow -notmatch 'on Windows PowerShell 5\.1 itself') -and ($workflow -notmatch "Test-Toolkit\.ps1 -[A-Z]"))
 $jobCount = [regex]::Matches($workflow, '(?m)^\s+runs-on:').Count
 Assert-True 'verify.yml runs on pull requests (default types: labeled is NOT a trigger), pushes to main, the button, and a weekday schedule' `
     (($workflow -match '(?m)^\s+workflow_dispatch:') -and ($workflow -notmatch '(?m)^\s+types:') -and ($workflow -notmatch '(?m)^\s+if: .*labeled') -and ($workflow -match '(?ms)^\s+push:\s*\r?\n\s+branches: \[main\]') -and ($workflow -match '(?m)^\s+- cron: "[^"]+"'))
 $windowsJob = $workflow.Substring($workflow.IndexOf('  windows:'))
+$windowsIf = [regex]::Match($windowsJob, "(?m)^\s+if: \$\{\{ github\.event_name == 'schedule'.*$").Value.Trim()
+Assert-True 'the ps51 job runs on exactly the triggers of the other Windows job' `
+    (($windowsIf -ne '') -and ($ps51Job.Contains($windowsIf)))
 Assert-True 'the Windows job runs on the schedule, the button and the ci label, and not on a push to main' `
     (($windowsJob -match "(?m)^\s+if: .*github\.event_name == 'schedule'") -and ($windowsJob -match "(?m)^\s+if: .*github\.event_name == 'workflow_dispatch'") -and ($windowsJob -match "(?m)^\s+if: .*labels\.\*\.name, 'ci'") -and ($windowsJob -notmatch "(?m)^\s+if: .*'push'"))
 Assert-True 'a scheduled run has a concurrency group of its own and cancel-in-progress is only for pull requests' `

@@ -63,7 +63,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `Billable` | `Billable` (typed) | neither |
 | `Plan` | `Plan` (typed) | neither |
 | `Tag` | `Tag` (typed) | neither |
-| `Backlog` | `Backlog` (typed; on the Windows job also on Windows PowerShell 5.1 itself) | 12 (a Western code page: the row under "Rows added by a fix") |
+| `Backlog` | `Backlog` (typed) | 12 (a Western code page: the row under "Rows added by a fix") |
 | `Cover` | `Cover` (typed) | 12 (the reader's paths on Windows and 5.1, and a picture on the board) |
 | `NewPrompt` | `NewPrompt` (`-Title` offline form; `-Design` and `-From` typed in a fresh shell) | 6 (the ADO form); 12 (`-Design` and its chip on Windows) |
 | `NewItem` | `EditItem` (typed, `-FromCard` only, with `gh` stubbed); `Tests/test_studio.py` (typed, `-FromDesign` only) | 6; 12 (`-FromCard` against the GitHub demo) |
@@ -291,7 +291,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **52 suites, 9692 assertions** with a `config.local.json`, every one
+findings. On this commit that is **52 suites, 9696 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -318,10 +318,10 @@ A skip is not a pass. Read the summary line, not just the total.
 **What CI covers of this gate.** A pull request's check (`.github/workflows/verify.yml`, the Ubuntu job) runs these three
 runners on Ubuntu, reads each one's summary line and fails a step on a failure, a skipped half or a run
 that counted nothing ([docs/TESTING.md](docs/TESTING.md), "In CI"). That is this gate on Linux under
-`pwsh` 7. Its Windows job, which runs on a weekday-evening schedule against `main`, from the Actions tab's button and on a pull request labelled `ci` (the label takes effect on the next push or reopen, and a label alone starts nothing, so it never cancels running checks; for a branch right away, `gh workflow run verify.yml --ref <branch>`), not on an ordinary pull request or a push to `main`, adds the CLI half on Windows: `tkTest -Half cli` typed in Windows PowerShell 5.1
-after the one-manifest import, read the same way, with the runner starting each suite in `pwsh` 7. Nothing
-more: each suite run as a file under 5.1, and the agent's and the web UI's runners on Windows, are still
-walked here and in Gate 12.
+`pwsh` 7. Its Windows job, which runs on a weekday-evening schedule against `main`, from the Actions tab's button and on a pull request labelled `ci` (the label takes effect on the next push or reopen, and a label alone starts nothing, so it never cancels running checks; for a branch right away, `gh workflow run verify.yml --ref <branch>`), not on an ordinary pull request or a push to `main`, adds the CLI half on Windows twice, in two jobs side by side: `tkTest -Half cli` typed in Windows PowerShell 5.1
+after the one-manifest import, with the runner starting each suite in `pwsh` 7; and `Tests/Test-Toolkit.ps1`
+started by `powershell.exe`, so every suite and every verb a suite types runs in 5.1. Both are read the same way.
+The agent's and the web UI's runners on Windows are still walked here and in Gate 12.
 
 ---
 
@@ -1187,17 +1187,17 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   G2 f3).** In `powershell` (5.1), on a GitHub Space with a scratch repository, a card whose title and
   Described Changes hold `café — naïve`: `tkNewPR`, then `tkGetPRComments`. The pull request's title and body show
   the words as typed, and the card's text is unchanged apart from the `PR URL:` line and the comments section:
-  `git diff` on the hub shows no other line. The Windows job's floor step runs the reader on 5.1; this is the
+  `git diff` on the hub shows no other line. The `ps51` job runs the reader on 5.1; this is the
   real pull request.
 - [ ] **A hub under a folder with a non-ASCII name is found under Windows PowerShell 5.1 (review finding G3 f1).**
   On a Windows account or folder named with an accent (`C:\Users\José\toolkit-hub`, or any folder with `é` in
   it), `tkConfig -Set promptsRoot=<that folder>`, then a new `powershell` (5.1) window: `tkStatus` lists the
-  hub's cards, with no `Hub not found` at import, and `tkEnv` names the same path. The floor step proves it on a
+  hub's cards, with no `Hub not found` at import, and `tkEnv` names the same path. The `ps51` job proves it on a
   scratch package; this is the real profile and autoload.
 - [ ] **A session's non-ASCII text survives its stage changes under Windows PowerShell 5.1 (review finding G4
   f2).** With `features.communication` on, in `powershell` (5.1): `tkMeetingAgenda -Plan`, add a line with
   `Zoë — “fine”` to the session, then `-Prep` and `-Retro`. The line reads as typed after both, in an editor and
-  in the web UI's session view. The floor step runs the same on a sandbox.
+  in the web UI's session view. The `ps51` job runs the same on a sandbox.
 - [ ] **gh and az output keeps its non-ASCII text in a Windows terminal (review finding G2 f4).** In a plain
   `powershell` window and in `pwsh`, both on the console's default code page (`chcp` shows 437 or 850, not 65001):
   `tkGetPRComments` on a GitHub Space, on a pull request with a review comment holding `—` and `é`: the card shows both as
@@ -1206,11 +1206,11 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
 - [ ] **A lone Build Service comment is not triaged under Windows PowerShell 5.1 (review finding G2 f19).** On an
   Azure DevOps Space, in `powershell` (5.1), `tkGetPRComments` on a pull request with a thread that holds one
   Build Service comment on a file: that thread is not among the actionable ones the command counts. The PRComments
-  suite runs the filter on 5.1 in the floor step; this is a real thread.
+  suite runs the filter on 5.1 in the `ps51` job; this is a real thread.
 - [ ] **Route -Assign takes a size under Windows PowerShell 5.1 (review finding G4 f4).** On a connected GitHub
   Space with worker labels, in `powershell` (5.1): `tkRoute <card> -Assign <size>` with `-WhatIf` off on a test
   issue. The size label is set, and the hint never says `is neither me nor a size`. The Triage suite runs the
-  same against a stub on 5.1 in the floor step.
+  same against a stub on 5.1 in the `ps51` job.
 - [ ] **A work item created from Windows PowerShell 5.1 keeps its accents (review finding G1 f15).** On an Azure
   DevOps Space with a scratch project, in `powershell` (5.1): `tkNewItem -Title "Café — naïve ✓" -Type Task`.
   The work item's title in the browser reads exactly as typed, with no `?` and no `Ã`. The CloseWorkItem suite
@@ -1240,8 +1240,8 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   1252. On a local Space, put four cards in `backlog/` whose headings are plain (`# Task K7M2: Plain`), start with an
   emoji outside the BMP (U+1F52C), start with a BMP symbol (U+2705 or U+26A0), and start with a lowercase accented
   letter (`# écrire le guide`). `tkBacklog` lists all four with their titles intact: the emoji and the symbol
-  dropped, the accented letter kept, and no `is not valid` error. The Windows job runs the Backlog suite on 5.1 itself
-  and prints the code page it ran on; this row is a real console and a real hub.
+  dropped, the accented letter kept, and no `is not valid` error. The `ps51` job runs the Backlog suite on 5.1 and
+  prints the code page it ran on; this row is a real console and a real hub.
 - [ ] **A refresh of the Lounge in the Docker image draws the app (#226).** With Docker Desktop running, on the merged
   head, `tkWeb -Restart`, then open the Lounge and refresh the page: the room draws again, and the address bar still
   says `localhost:5174`, not `5173` (a browser that met the old redirect keeps it: refresh with Cmd+Shift+R). Then
