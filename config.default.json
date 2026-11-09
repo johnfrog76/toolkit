@@ -266,6 +266,20 @@
         "Found in current/ or backlog/, like Plan. The suggestion reads a card's severity and size from this line, and the board filters by it."
       ]
     },
+    "Backlog": {
+      "category": "prompt",
+      "description": "The Space's waiting cards as one ranked table",
+      "usage": "{cliPrefix}Backlog [-Milestone <title>] [-Tag <tag>] [-Type <type>] [-Help]",
+      "examples": [
+        "{cliPrefix}Backlog",
+        "{cliPrefix}Backlog -Milestone \"M2 -- 1.2.0\"",
+        "{cliPrefix}Backlog -Tag docs -Type Bug"
+      ],
+      "notes": [
+        "Prints the cards in backlog/ -- rank, id, type, milestone, tags, age and title -- milestone by milestone: milestones with an order file (milestones/<slug>.md) first, by the day the file was made, then the rest by title; inside each, its order, then the cards it does not list yet, oldest first; then the cards with no milestone, oldest first. Rank is the card's place in its milestone's order, the count Plan -Rank uses. docs/hub/milestones.md, \"The Backlog: the order as a table\".",
+        "-Milestone, -Tag and -Type go together and match ignoring case (-Type ignoring spaces too, so UserStory is User Story); a filtered row keeps its rank. Read-only and a folder read: it works offline and with no tracker. On an Azure DevOps Space it refuses and names MyWork: the backlog is the board's there."
+      ]
+    },
     "GetPRComments": {
       "category": "pr",
       "description": "Fetch PR review comments into the card",

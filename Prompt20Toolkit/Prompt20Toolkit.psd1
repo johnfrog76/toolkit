@@ -26,6 +26,7 @@
         'tkAddPRReview',
         'tkAgent',
         'tkArchive',
+        'tkBacklog',
         'tkBillable',
         'tkBurn',
         'tkCloseItem',

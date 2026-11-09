@@ -10,6 +10,7 @@ caller supplies the file name and modified date.
 """
 
 import re
+from datetime import date
 
 # The ONE tracker rule (D-G2): a pure
 # function of an address, shared with the Space's own derivation.
@@ -27,6 +28,7 @@ from .consts import (
     re_tag_separator,
     stamp_assigned,
     stamp_billable,
+    stamp_created,
     stamp_from,
     stamp_milestone,
     stamp_sprint,
@@ -339,6 +341,152 @@ def milestone_order(text: str, title: str, cards: list[dict]) -> dict:
     return {"ranked": ranked, "unranked": [str(c.get("id", "")) for c in rest], "stale": stale}
 
 
+def card_heading(content: str) -> str:
+    """A card's ``# `` heading, whole and trimmed, a leading emoji dropped; "" for none.
+    ``_split_heading`` reads its type and name. Mirror: ``Get-P20CardHeading``
+    in ``Scripts/Read-Backlog.ps1``."""
+    m = re.search(r"(?m)^#\s+(.+)", content or "")
+    if not m:
+        return ""
+    return re.sub(r"^[\U00002600-\U0001FFFF]\s*", "", m.group(1).strip())
+
+
+_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}")
+
+
+def card_created(content: str) -> str:
+    """The yyyy-MM-dd a card's (or a milestone file's) first ``**Created:**`` line
+    starts with; "" for none or a placeholder. The same read
+    ``Get-P20SpaceOpenCards`` makes."""
+    m = _DAY.match(_card_line(content, stamp_created())[1])
+    return m.group(0) if m else ""
+
+
+def milestone_file_title(text: str) -> str:
+    """The title a milestone file names: its first ``# `` heading, trimmed; "" for
+    none. Mirror: ``Get-P20MilestoneTitle``."""
+    m = re.search(r"(?m)^#[ \t]+([^\r\n]*?)[ \t]*\r?$", text or "")
+    return m.group(1) if m else ""
+
+
+def backlog_card(name: str, folder: str, content: str, type_names, prefixes) -> dict | None:
+    """One open card as the Backlog reads it: ``{id, title, type, milestone, tags,
+    created, folder, file}``, or None for a file with no id. ``title`` is the
+    heading's name -- the heading whole when it names no known type -- and
+    ``type`` "" for none. Mirror: ``ConvertTo-P20BacklogCard``."""
+    cid = card_id(name, prefixes)
+    if not cid:
+        return None
+    heading = card_heading(content)
+    card_type, title = _split_heading(heading, type_names) if heading else (None, "")
+    return {
+        "id": cid,
+        "title": title,
+        "type": card_type or "",
+        "milestone": card_milestone(content),
+        "tags": card_tags(content),
+        "created": card_created(content),
+        "folder": folder,
+        "file": name,
+    }
+
+
+def _age(created: str, today: str) -> int | None:
+    try:
+        days = (date.fromisoformat(today) - date.fromisoformat(created)).days
+    except ValueError:
+        return None
+    return max(0, days)
+
+
+def _fold(value: str, spaces: bool = False) -> str:
+    v = (value or "").lower()
+    return re.sub(r"\s+", "", v) if spaces else v
+
+
+def backlog_rows(
+    cards: list[dict],
+    milestone_files: dict[str, str],
+    today: str,
+    milestone: str = "",
+    tag: str = "",
+    card_type: str = "",
+) -> list[dict]:
+    """The Backlog: the cards in ``backlog/`` as ranked rows (docs/hub/milestones.md,
+    "The Backlog: the order as a table"). The one reader in this half.
+
+    ``cards`` are the Space's open cards (``backlog_card``; current/ and backlog/).
+    A milestone is a group when a card in backlog/ names it, and every member of
+    a group is a row in its place -- a card in play too, ``in_play`` True -- so
+    the ranks read 1, 2, 3. A card in play with no milestone, or in a milestone
+    with no waiting card, is no row. ``milestone_files`` maps a file's name in ``milestones/``
+    to its text. Milestones with a file -- at the title's slug, its heading the
+    title exactly -- go first, by the file's created day (none after the
+    dated), ties by title; then milestones with no file, by title; inside each,
+    ``milestone_order``'s ranked ids then its unranked; then the cards with no
+    milestone, oldest first, no date last, ties by id. ``rank`` is the place among
+    the ranked ids (Plan -Rank's count), None when unranked; ``age`` the days since
+    created, 0 for a future day, None for none. The filters AND, matched ignoring
+    case (``card_type`` ignoring spaces too), and never change a rank.
+
+    Mirror: ``Get-P20BacklogRows`` in ``Scripts/Read-Backlog.ps1``;
+    ``Tests/fixtures/parsers/backlog-order.json`` holds the two to one table."""
+    waiting = [c for c in cards if c.get("folder") == folder_backlog()]
+    # Every open card by id: a group's rows are its members, in play or waiting.
+    by_id = {c["id"]: c for c in cards}
+    titles: list[str] = []
+    for c in waiting:
+        if c["milestone"] and c["milestone"] not in titles:
+            titles.append(c["milestone"])
+
+    groups = []
+    for t in titles:
+        text = milestone_files.get(f"{milestone_slug(t)}.md")
+        exists = text is not None and milestone_file_title(text) == t
+        created = card_created(text) if exists else ""
+        key = (0, created == "", created, t) if exists else (1, False, "", t)
+        groups.append((key, t, text if exists else ""))
+    groups.sort(key=lambda g: g[0])
+
+    rows: list[dict] = []
+
+    def add(c: dict, rank: int | None) -> None:
+        rows.append(
+            {
+                "rank": rank,
+                "id": c["id"],
+                "title": c["title"],
+                "type": c["type"],
+                "milestone": c["milestone"],
+                "tags": list(c["tags"]),
+                "age": _age(c["created"], today) if c["created"] else None,
+                "created": c["created"],
+                "file": c.get("file", ""),
+                "in_play": c.get("folder") != folder_backlog(),
+            }
+        )
+
+    for _, t, text in groups:
+        order = milestone_order(text, t, cards)
+        for i, cid in enumerate(order["ranked"]):
+            if cid in by_id:
+                add(by_id[cid], i + 1)
+        for cid in order["unranked"]:
+            if cid in by_id:
+                add(by_id[cid], None)
+    loose = [c for c in waiting if not c["milestone"]]
+    for c in sorted(loose, key=lambda c: (c["created"] == "", c["created"], c["id"])):
+        add(c, None)
+
+    if milestone:
+        rows = [r for r in rows if _fold(r["milestone"]) == _fold(milestone)]
+    if tag:
+        rows = [r for r in rows if any(_fold(t) == _fold(tag) for t in r["tags"])]
+    if card_type:
+        rows = [r for r in rows if r["type"] and _fold(r["type"], True) == _fold(card_type, True)]
+    return rows
+
+
 def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES, folder: str = "") -> dict:
     """Extract the file-content-derived fields of PromptInfo.
 
@@ -348,16 +496,10 @@ def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES, folder:
     ``id`` comes from the FILENAME (``card_id``), so the caller adds it. Fields that need filesystem access (file
     name, modified date) are filled in by the caller.
     """
-    title = ""
-    card_type = None
-    name = ""
-    m = re.search(r"(?m)^#\s+(.+)", content)
-    if m:
-        title = m.group(1).strip()
-        title = re.sub(r"^[\U00002600-\U0001FFFF]\s*", "", title)
-        card_type, name = _split_heading(title, type_names)
-        if len(title) > 60:
-            title = title[:57] + "..."
+    title = card_heading(content)
+    card_type, name = _split_heading(title, type_names) if title else (None, "")
+    if len(title) > 60:
+        title = title[:57] + "..."
 
     checked = len(re.findall(r"(?m)^\s*-\s*\[x\]", content))
     total = len(re.findall(r"(?m)^\s*-\s*\[[x ]\]", content))

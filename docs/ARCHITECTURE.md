@@ -87,10 +87,10 @@ what is deliberately absent (a route named but not built, or retired outright) i
 [the section under it](../agent/README.md#deliberately-absent).
 
 **A route about the active Space can be asked about another.** `GET /api/issue-report`, `/api/deploys`, `/api/visibility`,
-`/api/issue/{n}` and `GET /api/status` take an optional `?space=<slug>`: absent, the active Space as
+`/api/issue/{n}`, `GET /api/status` and `GET /api/backlog` take an optional `?space=<slug>`: absent, the active Space as
 always; present, that Space's own entry in `spaces[]` (one lookup, `space_entry()` behind `space_scope()`
 in `agent/ado/accounting.py`), an undeclared slug a 404 naming it. `/api/visibility` also takes `?refresh=1`, past its per-repository cache, as `/api/env?refresh=1` goes past the probe's -- the Spaces card's Refresh. The tracker reads probe that Space's
-tier; `/api/status` reads that Space's `current/` and `backlog/` and asks no tracker. The Studio's Spaces card
+tier; `/api/status` and `/api/backlog` read that Space's `current/` and `backlog/` and ask no tracker. The Studio's Spaces card
 reads its non-GitHub rows through `/api/status?space=` -- one row per Space, none switched into -- and every
 GitHub row through ONE read, `GET /api/studio/ledger` (`consts.json` `studio.ledgerRoute`): the three answers
 above for every GitHub Space, from one `gh api graphql` call plus a `gh run list` per repository, kept on the

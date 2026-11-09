@@ -1,0 +1,2153 @@
+{
+  "_": "ONE table, read by both readers of the Backlog's rows (docs/hub/milestones.md, \"The Backlog: the order as a table\"). A milestone is a group when a card in backlog/ names it; inside a group every member is a row -- a card in current/ too, in its place, in_play true -- so the ranks read 1, 2, 3. A card in current/ with no milestone, or whose milestone has no waiting card, is no row. Groups go milestone by milestone: milestones that have a file -- milestones/<slug of the title>.md whose # heading names the title exactly -- by the file's **Created:** day (a file with none after the dated ones), ties by title; then milestones with no file, by title (ordinal). Inside a group: the order's ranked ids, then its unranked ones (milestone-order.json's rule). Then the cards in backlog/ with no milestone: oldest **Created:** first, no date last, ties by id (ordinal). rank is the card's place among the milestone's ranked ids, 1-based, the same count Plan -Rank uses; null when unranked. title and type come from the card's # heading (a configured type name, any id, a colon; an emoji first is dropped); no known type is type \"\" and the whole heading is the title. age is whole days from **Created:** to today, 0 for a future day, null for no date or an impossible one. filter: milestone and type match ignoring case (type ignoring spaces too, so userstory is User Story), tag is one of the card's tags ignoring case; filters AND, and a filtered row keeps its rank. Each case's files are joined with LF, or CRLF when crlf is true. typeNames and prefixes are the shipped workItemTypes in config order. Scripts/Read-Backlog.ps1 Get-P20BacklogRows (tkTestToolkit -Backlog) and agent/core/parsers.py backlog_rows() (Tests/test_backlog.py).",
+  "typeNames": [
+    "User Story",
+    "Task",
+    "Feature",
+    "Bug",
+    "Spike"
+  ],
+  "prefixes": [
+    "US-",
+    "Task",
+    "Feat-",
+    "",
+    "Spike-"
+  ],
+  "cases": [
+    {
+      "name": "milestones with a file first, by their Created; then the rest by title; then no milestone",
+      "today": "2026-11-09",
+      "crlf": false,
+      "filter": {
+        "milestone": "",
+        "tag": "",
+        "type": ""
+      },
+      "milestones": [
+        {
+          "file": "m3.md",
+          "lines": [
+            "# M3",
+            "",
+            "**Theme:** (not set)",
+            "**Created:** 2026-10-01",
+            "",
+            "## Order",
+            "",
+            ""
+          ]
+        },
+        {
+          "file": "m2.md",
+          "lines": [
+            "# M2",
+            "",
+            "**Theme:** (not set)",
+            "**Created:** 2026-10-20",
+            "",
+            "## Order",
+            "",
+            ""
+          ]
+        }
+      ],
+      "cards": [
+        {
+          "file": "TaskK7M2-bench-reading.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task K7M2: Bench reading",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "TaskQ4R9-write-the-guide.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task Q4R9: Write the guide",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** M3",
+            "**Created:** 2026-11-02",
+            ""
+          ]
+        },
+        {
+          "file": "TaskH3RE-beta-work.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task H3RE: Beta work",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** Beta",
+            "**Created:** 2026-11-03",
+            ""
+          ]
+        },
+        {
+          "file": "TaskP7NX-alpha-work.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task P7NX: Alpha work",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** Alpha",
+            "**Created:** 2026-11-04",
+            ""
+          ]
+        },
+        {
+          "file": "141-recipe-search.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Bug 141: Recipe search",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Created:** 2026-10-30",
+            ""
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "rank": null,
+          "id": "Q4R9",
+          "title": "Write the guide",
+          "type": "Task",
+          "milestone": "M3",
+          "tags": [],
+          "age": 7,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "K7M2",
+          "title": "Bench reading",
+          "type": "Task",
+          "milestone": "M2",
+          "tags": [],
+          "age": 8,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "P7NX",
+          "title": "Alpha work",
+          "type": "Task",
+          "milestone": "Alpha",
+          "tags": [],
+          "age": 5,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "H3RE",
+          "title": "Beta work",
+          "type": "Task",
+          "milestone": "Beta",
+          "tags": [],
+          "age": 6,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "141",
+          "title": "Recipe search",
+          "type": "Bug",
+          "milestone": "",
+          "tags": [],
+          "age": 10,
+          "in_play": false
+        }
+      ]
+    },
+    {
+      "name": "ranked by the file, then unranked by created; a card in play is a row in its ranked place, marked in play",
+      "today": "2026-11-09",
+      "crlf": false,
+      "filter": {
+        "milestone": "",
+        "tag": "",
+        "type": ""
+      },
+      "milestones": [
+        {
+          "file": "m2.md",
+          "lines": [
+            "# M2",
+            "",
+            "**Theme:** (not set)",
+            "**Created:** 2026-10-20",
+            "",
+            "## Order",
+            "",
+            "- Q4R9",
+            "- K7M2",
+            "- 141",
+            ""
+          ]
+        }
+      ],
+      "cards": [
+        {
+          "file": "TaskQ4R9-in-play.prompt.md",
+          "folder": "current",
+          "lines": [
+            "# Task Q4R9: In play",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-10-02",
+            ""
+          ]
+        },
+        {
+          "file": "TaskK7M2-second.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task K7M2: Second",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-10-01",
+            ""
+          ]
+        },
+        {
+          "file": "141-third.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Bug 141: Third",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-09-01",
+            ""
+          ]
+        },
+        {
+          "file": "TaskH3RE-later.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task H3RE: Later",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-10-05",
+            ""
+          ]
+        },
+        {
+          "file": "TaskP7NX-earlier.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task P7NX: Earlier",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-10-01",
+            ""
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "rank": 1,
+          "id": "Q4R9",
+          "title": "In play",
+          "type": "Task",
+          "milestone": "M2",
+          "tags": [],
+          "age": 38,
+          "in_play": true
+        },
+        {
+          "rank": 2,
+          "id": "K7M2",
+          "title": "Second",
+          "type": "Task",
+          "milestone": "M2",
+          "tags": [],
+          "age": 39,
+          "in_play": false
+        },
+        {
+          "rank": 3,
+          "id": "141",
+          "title": "Third",
+          "type": "Bug",
+          "milestone": "M2",
+          "tags": [],
+          "age": 69,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "P7NX",
+          "title": "Earlier",
+          "type": "Task",
+          "milestone": "M2",
+          "tags": [],
+          "age": 39,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "H3RE",
+          "title": "Later",
+          "type": "Task",
+          "milestone": "M2",
+          "tags": [],
+          "age": 35,
+          "in_play": false
+        }
+      ]
+    },
+    {
+      "name": "a stale id, and a card naming another milestone, are skipped: the rank counts live ids only",
+      "today": "2026-11-09",
+      "crlf": false,
+      "filter": {
+        "milestone": "",
+        "tag": "",
+        "type": ""
+      },
+      "milestones": [
+        {
+          "file": "m2.md",
+          "lines": [
+            "# M2",
+            "",
+            "**Theme:** (not set)",
+            "**Created:** 2026-10-20",
+            "",
+            "## Order",
+            "",
+            "- W9W9",
+            "- A2D4",
+            "- K7M2",
+            ""
+          ]
+        }
+      ],
+      "cards": [
+        {
+          "file": "TaskK7M2-kept.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task K7M2: Kept",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "TaskA2D4-moved.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task A2D4: Moved",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** M9",
+            "**Created:** 2026-11-02",
+            ""
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "rank": 1,
+          "id": "K7M2",
+          "title": "Kept",
+          "type": "Task",
+          "milestone": "M2",
+          "tags": [],
+          "age": 8,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "A2D4",
+          "title": "Moved",
+          "type": "Task",
+          "milestone": "M9",
+          "tags": [],
+          "age": 7,
+          "in_play": false
+        }
+      ]
+    },
+    {
+      "name": "a file whose heading names another milestone, or that is not at the title's slug, is no file",
+      "today": "2026-11-09",
+      "crlf": false,
+      "filter": {
+        "milestone": "",
+        "tag": "",
+        "type": ""
+      },
+      "milestones": [
+        {
+          "file": "m2.md",
+          "lines": [
+            "# M2 -- old",
+            "",
+            "**Theme:** (not set)",
+            "**Created:** 2026-01-01",
+            "",
+            "## Order",
+            "",
+            "- K7M2",
+            ""
+          ]
+        },
+        {
+          "file": "other.md",
+          "lines": [
+            "# M5",
+            "",
+            "**Theme:** (not set)",
+            "**Created:** 2026-01-01",
+            "",
+            "## Order",
+            "",
+            "- Q4R9",
+            ""
+          ]
+        },
+        {
+          "file": "m4.md",
+          "lines": [
+            "# M4",
+            "",
+            "**Theme:** (not set)",
+            "**Created:** 2026-10-30",
+            "",
+            "## Order",
+            "",
+            "- H3RE",
+            ""
+          ]
+        }
+      ],
+      "cards": [
+        {
+          "file": "TaskK7M2-a.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task K7M2: A",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "TaskQ4R9-b.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task Q4R9: B",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** M5",
+            "**Created:** 2026-11-02",
+            ""
+          ]
+        },
+        {
+          "file": "TaskH3RE-c.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task H3RE: C",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** M4",
+            "**Created:** 2026-10-30",
+            ""
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "rank": 1,
+          "id": "H3RE",
+          "title": "C",
+          "type": "Task",
+          "milestone": "M4",
+          "tags": [],
+          "age": 10,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "K7M2",
+          "title": "A",
+          "type": "Task",
+          "milestone": "M2",
+          "tags": [],
+          "age": 8,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "Q4R9",
+          "title": "B",
+          "type": "Task",
+          "milestone": "M5",
+          "tags": [],
+          "age": 7,
+          "in_play": false
+        }
+      ]
+    },
+    {
+      "name": "milestone files with the same Created go by title, and a file with no Created comes after the dated ones",
+      "today": "2026-11-09",
+      "crlf": false,
+      "filter": {
+        "milestone": "",
+        "tag": "",
+        "type": ""
+      },
+      "milestones": [
+        {
+          "file": "b.md",
+          "lines": [
+            "# B",
+            "",
+            "**Theme:** (not set)",
+            "**Created:** 2026-10-01",
+            "",
+            "## Order",
+            "",
+            "- Q4R9",
+            ""
+          ]
+        },
+        {
+          "file": "a.md",
+          "lines": [
+            "# A",
+            "",
+            "**Theme:** (not set)",
+            "**Created:** 2026-10-01",
+            "",
+            "## Order",
+            "",
+            "- H3RE",
+            ""
+          ]
+        },
+        {
+          "file": "c.md",
+          "lines": [
+            "# C",
+            "",
+            "**Theme:** (not set)",
+            "",
+            "## Order",
+            "",
+            "- K7M2",
+            ""
+          ]
+        }
+      ],
+      "cards": [
+        {
+          "file": "TaskK7M2-c.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task K7M2: In C",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** C",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "TaskQ4R9-b.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task Q4R9: In B",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** B",
+            "**Created:** 2026-11-02",
+            ""
+          ]
+        },
+        {
+          "file": "TaskH3RE-a.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task H3RE: In A",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** A",
+            "**Created:** 2026-11-03",
+            ""
+          ]
+        },
+        {
+          "file": "TaskP7NX-d.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task P7NX: In D",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** D",
+            "**Created:** 2026-11-04",
+            ""
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "rank": 1,
+          "id": "H3RE",
+          "title": "In A",
+          "type": "Task",
+          "milestone": "A",
+          "tags": [],
+          "age": 6,
+          "in_play": false
+        },
+        {
+          "rank": 1,
+          "id": "Q4R9",
+          "title": "In B",
+          "type": "Task",
+          "milestone": "B",
+          "tags": [],
+          "age": 7,
+          "in_play": false
+        },
+        {
+          "rank": 1,
+          "id": "K7M2",
+          "title": "In C",
+          "type": "Task",
+          "milestone": "C",
+          "tags": [],
+          "age": 8,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "P7NX",
+          "title": "In D",
+          "type": "Task",
+          "milestone": "D",
+          "tags": [],
+          "age": 5,
+          "in_play": false
+        }
+      ]
+    },
+    {
+      "name": "no milestone: oldest first, ties by id, no date last; an impossible date has no age, a future one is 0",
+      "today": "2026-11-09",
+      "crlf": false,
+      "filter": {
+        "milestone": "",
+        "tag": "",
+        "type": ""
+      },
+      "milestones": [],
+      "cards": [
+        {
+          "file": "TaskK7M2-k.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task K7M2: K",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Created:** 2026-10-01",
+            ""
+          ]
+        },
+        {
+          "file": "141-one.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Bug 141: One",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Created:** 2026-10-01",
+            ""
+          ]
+        },
+        {
+          "file": "TaskQ4R9-q.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task Q4R9: Q",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            ""
+          ]
+        },
+        {
+          "file": "TaskH3RE-h.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task H3RE: H",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Created:** 2026-13-45",
+            ""
+          ]
+        },
+        {
+          "file": "TaskP7NX-p.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task P7NX: P",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Created:** (not set)",
+            ""
+          ]
+        },
+        {
+          "file": "TaskA2D4-a.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task A2D4: Ahead",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Created:** 2026-11-12",
+            ""
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "rank": null,
+          "id": "141",
+          "title": "One",
+          "type": "Bug",
+          "milestone": "",
+          "tags": [],
+          "age": 39,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "K7M2",
+          "title": "K",
+          "type": "Task",
+          "milestone": "",
+          "tags": [],
+          "age": 39,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "A2D4",
+          "title": "Ahead",
+          "type": "Task",
+          "milestone": "",
+          "tags": [],
+          "age": 0,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "H3RE",
+          "title": "H",
+          "type": "Task",
+          "milestone": "",
+          "tags": [],
+          "age": null,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "P7NX",
+          "title": "P",
+          "type": "Task",
+          "milestone": "",
+          "tags": [],
+          "age": null,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "Q4R9",
+          "title": "Q",
+          "type": "Task",
+          "milestone": "",
+          "tags": [],
+          "age": null,
+          "in_play": false
+        }
+      ]
+    },
+    {
+      "name": "type and title from the heading: a heading with no known type has none, an emoji is dropped; an old card's Sprint line is its milestone",
+      "today": "2026-11-09",
+      "crlf": false,
+      "filter": {
+        "milestone": "",
+        "tag": "",
+        "type": ""
+      },
+      "milestones": [],
+      "cards": [
+        {
+          "file": "US-144-log-in.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# User Story 144: Log in",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "Feat-402-reports.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Feature 402: Reports",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Created:** 2026-11-02",
+            ""
+          ]
+        },
+        {
+          "file": "TaskK7M2-notes.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Notes on the bench",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Sprint:** M2",
+            "**Created:** 2026-11-05",
+            ""
+          ]
+        },
+        {
+          "file": "Spike-Q4R9-probe.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# 🔬 Spike Q4R9: Probe",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Created:** 2026-11-03",
+            ""
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "rank": null,
+          "id": "K7M2",
+          "title": "Notes on the bench",
+          "type": "",
+          "milestone": "M2",
+          "tags": [],
+          "age": 4,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "144",
+          "title": "Log in",
+          "type": "User Story",
+          "milestone": "",
+          "tags": [],
+          "age": 8,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "402",
+          "title": "Reports",
+          "type": "Feature",
+          "milestone": "",
+          "tags": [],
+          "age": 7,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "Q4R9",
+          "title": "Probe",
+          "type": "Spike",
+          "milestone": "",
+          "tags": [],
+          "age": 6,
+          "in_play": false
+        }
+      ]
+    },
+    {
+      "name": "no filter: every row",
+      "today": "2026-11-09",
+      "crlf": false,
+      "filter": {
+        "milestone": "",
+        "tag": "",
+        "type": ""
+      },
+      "milestones": [
+        {
+          "file": "m2.md",
+          "lines": [
+            "# M2",
+            "",
+            "**Theme:** (not set)",
+            "**Created:** 2026-10-20",
+            "",
+            "## Order",
+            "",
+            "- Q4R9",
+            "- 144",
+            "- H3RE",
+            ""
+          ]
+        }
+      ],
+      "cards": [
+        {
+          "file": "TaskQ4R9-guide.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task Q4R9: Guide",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: docs, sev2",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "US-144-profile.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# User Story 144: Profile",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: sev2",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "TaskH3RE-readme.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task H3RE: Readme",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: Docs",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "141-typo.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Bug 141: Typo",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: docs; sev3",
+            "",
+            "---",
+            "",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "rank": 1,
+          "id": "Q4R9",
+          "title": "Guide",
+          "type": "Task",
+          "milestone": "M2",
+          "tags": [
+            "docs",
+            "sev2"
+          ],
+          "age": 8,
+          "in_play": false
+        },
+        {
+          "rank": 2,
+          "id": "144",
+          "title": "Profile",
+          "type": "User Story",
+          "milestone": "M2",
+          "tags": [
+            "sev2"
+          ],
+          "age": 8,
+          "in_play": false
+        },
+        {
+          "rank": 3,
+          "id": "H3RE",
+          "title": "Readme",
+          "type": "Task",
+          "milestone": "M2",
+          "tags": [
+            "Docs"
+          ],
+          "age": 8,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "141",
+          "title": "Typo",
+          "type": "Bug",
+          "milestone": "",
+          "tags": [
+            "docs",
+            "sev3"
+          ],
+          "age": 8,
+          "in_play": false
+        }
+      ]
+    },
+    {
+      "name": "filter by milestone, ignoring case: the rank stays the milestone's",
+      "today": "2026-11-09",
+      "crlf": false,
+      "filter": {
+        "milestone": "m2",
+        "tag": "",
+        "type": ""
+      },
+      "milestones": [
+        {
+          "file": "m2.md",
+          "lines": [
+            "# M2",
+            "",
+            "**Theme:** (not set)",
+            "**Created:** 2026-10-20",
+            "",
+            "## Order",
+            "",
+            "- Q4R9",
+            "- 144",
+            "- H3RE",
+            ""
+          ]
+        }
+      ],
+      "cards": [
+        {
+          "file": "TaskQ4R9-guide.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task Q4R9: Guide",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: docs, sev2",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "US-144-profile.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# User Story 144: Profile",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: sev2",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "TaskH3RE-readme.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task H3RE: Readme",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: Docs",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "141-typo.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Bug 141: Typo",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: docs; sev3",
+            "",
+            "---",
+            "",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "rank": 1,
+          "id": "Q4R9",
+          "title": "Guide",
+          "type": "Task",
+          "milestone": "M2",
+          "tags": [
+            "docs",
+            "sev2"
+          ],
+          "age": 8,
+          "in_play": false
+        },
+        {
+          "rank": 2,
+          "id": "144",
+          "title": "Profile",
+          "type": "User Story",
+          "milestone": "M2",
+          "tags": [
+            "sev2"
+          ],
+          "age": 8,
+          "in_play": false
+        },
+        {
+          "rank": 3,
+          "id": "H3RE",
+          "title": "Readme",
+          "type": "Task",
+          "milestone": "M2",
+          "tags": [
+            "Docs"
+          ],
+          "age": 8,
+          "in_play": false
+        }
+      ]
+    },
+    {
+      "name": "filter by tag: one of the card's tags, ignoring case",
+      "today": "2026-11-09",
+      "crlf": false,
+      "filter": {
+        "milestone": "",
+        "tag": "DOCS",
+        "type": ""
+      },
+      "milestones": [
+        {
+          "file": "m2.md",
+          "lines": [
+            "# M2",
+            "",
+            "**Theme:** (not set)",
+            "**Created:** 2026-10-20",
+            "",
+            "## Order",
+            "",
+            "- Q4R9",
+            "- 144",
+            "- H3RE",
+            ""
+          ]
+        }
+      ],
+      "cards": [
+        {
+          "file": "TaskQ4R9-guide.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task Q4R9: Guide",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: docs, sev2",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "US-144-profile.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# User Story 144: Profile",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: sev2",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "TaskH3RE-readme.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task H3RE: Readme",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: Docs",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "141-typo.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Bug 141: Typo",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: docs; sev3",
+            "",
+            "---",
+            "",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "rank": 1,
+          "id": "Q4R9",
+          "title": "Guide",
+          "type": "Task",
+          "milestone": "M2",
+          "tags": [
+            "docs",
+            "sev2"
+          ],
+          "age": 8,
+          "in_play": false
+        },
+        {
+          "rank": 3,
+          "id": "H3RE",
+          "title": "Readme",
+          "type": "Task",
+          "milestone": "M2",
+          "tags": [
+            "Docs"
+          ],
+          "age": 8,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "141",
+          "title": "Typo",
+          "type": "Bug",
+          "milestone": "",
+          "tags": [
+            "docs",
+            "sev3"
+          ],
+          "age": 8,
+          "in_play": false
+        }
+      ]
+    },
+    {
+      "name": "filter by type, ignoring case and spaces",
+      "today": "2026-11-09",
+      "crlf": false,
+      "filter": {
+        "milestone": "",
+        "tag": "",
+        "type": "userstory"
+      },
+      "milestones": [
+        {
+          "file": "m2.md",
+          "lines": [
+            "# M2",
+            "",
+            "**Theme:** (not set)",
+            "**Created:** 2026-10-20",
+            "",
+            "## Order",
+            "",
+            "- Q4R9",
+            "- 144",
+            "- H3RE",
+            ""
+          ]
+        }
+      ],
+      "cards": [
+        {
+          "file": "TaskQ4R9-guide.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task Q4R9: Guide",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: docs, sev2",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "US-144-profile.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# User Story 144: Profile",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: sev2",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "TaskH3RE-readme.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task H3RE: Readme",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: Docs",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "141-typo.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Bug 141: Typo",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: docs; sev3",
+            "",
+            "---",
+            "",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "rank": 2,
+          "id": "144",
+          "title": "Profile",
+          "type": "User Story",
+          "milestone": "M2",
+          "tags": [
+            "sev2"
+          ],
+          "age": 8,
+          "in_play": false
+        }
+      ]
+    },
+    {
+      "name": "filter by type: a bug",
+      "today": "2026-11-09",
+      "crlf": false,
+      "filter": {
+        "milestone": "",
+        "tag": "",
+        "type": "Bug"
+      },
+      "milestones": [
+        {
+          "file": "m2.md",
+          "lines": [
+            "# M2",
+            "",
+            "**Theme:** (not set)",
+            "**Created:** 2026-10-20",
+            "",
+            "## Order",
+            "",
+            "- Q4R9",
+            "- 144",
+            "- H3RE",
+            ""
+          ]
+        }
+      ],
+      "cards": [
+        {
+          "file": "TaskQ4R9-guide.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task Q4R9: Guide",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: docs, sev2",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "US-144-profile.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# User Story 144: Profile",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: sev2",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "TaskH3RE-readme.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task H3RE: Readme",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: Docs",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "141-typo.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Bug 141: Typo",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: docs; sev3",
+            "",
+            "---",
+            "",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "rank": null,
+          "id": "141",
+          "title": "Typo",
+          "type": "Bug",
+          "milestone": "",
+          "tags": [
+            "docs",
+            "sev3"
+          ],
+          "age": 8,
+          "in_play": false
+        }
+      ]
+    },
+    {
+      "name": "filters AND: milestone and tag",
+      "today": "2026-11-09",
+      "crlf": false,
+      "filter": {
+        "milestone": "M2",
+        "tag": "docs",
+        "type": ""
+      },
+      "milestones": [
+        {
+          "file": "m2.md",
+          "lines": [
+            "# M2",
+            "",
+            "**Theme:** (not set)",
+            "**Created:** 2026-10-20",
+            "",
+            "## Order",
+            "",
+            "- Q4R9",
+            "- 144",
+            "- H3RE",
+            ""
+          ]
+        }
+      ],
+      "cards": [
+        {
+          "file": "TaskQ4R9-guide.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task Q4R9: Guide",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: docs, sev2",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "US-144-profile.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# User Story 144: Profile",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: sev2",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "TaskH3RE-readme.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task H3RE: Readme",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: Docs",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "141-typo.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Bug 141: Typo",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: docs; sev3",
+            "",
+            "---",
+            "",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "rank": 1,
+          "id": "Q4R9",
+          "title": "Guide",
+          "type": "Task",
+          "milestone": "M2",
+          "tags": [
+            "docs",
+            "sev2"
+          ],
+          "age": 8,
+          "in_play": false
+        },
+        {
+          "rank": 3,
+          "id": "H3RE",
+          "title": "Readme",
+          "type": "Task",
+          "milestone": "M2",
+          "tags": [
+            "Docs"
+          ],
+          "age": 8,
+          "in_play": false
+        }
+      ]
+    },
+    {
+      "name": "a filter nothing matches: no rows",
+      "today": "2026-11-09",
+      "crlf": false,
+      "filter": {
+        "milestone": "M7",
+        "tag": "",
+        "type": ""
+      },
+      "milestones": [
+        {
+          "file": "m2.md",
+          "lines": [
+            "# M2",
+            "",
+            "**Theme:** (not set)",
+            "**Created:** 2026-10-20",
+            "",
+            "## Order",
+            "",
+            "- Q4R9",
+            "- 144",
+            "- H3RE",
+            ""
+          ]
+        }
+      ],
+      "cards": [
+        {
+          "file": "TaskQ4R9-guide.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task Q4R9: Guide",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: docs, sev2",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "US-144-profile.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# User Story 144: Profile",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: sev2",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "TaskH3RE-readme.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task H3RE: Readme",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: Docs",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "141-typo.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Bug 141: Typo",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: docs; sev3",
+            "",
+            "---",
+            "",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        }
+      ],
+      "rows": []
+    },
+    {
+      "name": "CRLF: a card and a milestone file read the same",
+      "today": "2026-11-09",
+      "crlf": true,
+      "filter": {
+        "milestone": "",
+        "tag": "",
+        "type": ""
+      },
+      "milestones": [
+        {
+          "file": "m2.md",
+          "lines": [
+            "# M2",
+            "",
+            "**Theme:** (not set)",
+            "**Created:** 2026-10-20",
+            "",
+            "## Order",
+            "",
+            "- Q4R9",
+            "- K7M2",
+            ""
+          ]
+        }
+      ],
+      "cards": [
+        {
+          "file": "TaskK7M2-k.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task K7M2: K",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "TaskQ4R9-q.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task Q4R9: Q",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-02",
+            ""
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "rank": 1,
+          "id": "Q4R9",
+          "title": "Q",
+          "type": "Task",
+          "milestone": "M2",
+          "tags": [],
+          "age": 7,
+          "in_play": false
+        },
+        {
+          "rank": 2,
+          "id": "K7M2",
+          "title": "K",
+          "type": "Task",
+          "milestone": "M2",
+          "tags": [],
+          "age": 8,
+          "in_play": false
+        }
+      ]
+    },
+    {
+      "name": "a card in play the order does not list is unranked and in play; a card in play with no milestone is no row",
+      "today": "2026-11-09",
+      "crlf": false,
+      "filter": {
+        "milestone": "",
+        "tag": "",
+        "type": ""
+      },
+      "milestones": [
+        {
+          "file": "m2.md",
+          "lines": [
+            "# M2",
+            "",
+            "**Theme:** (not set)",
+            "**Created:** 2026-10-20",
+            "",
+            "## Order",
+            "",
+            "- K7M2",
+            ""
+          ]
+        }
+      ],
+      "cards": [
+        {
+          "file": "TaskK7M2-waiting.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task K7M2: Waiting",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "TaskQ4R9-started.prompt.md",
+          "folder": "current",
+          "lines": [
+            "# Task Q4R9: Started",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-10-01",
+            ""
+          ]
+        },
+        {
+          "file": "TaskH3RE-loose.prompt.md",
+          "folder": "current",
+          "lines": [
+            "# Task H3RE: Loose",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Created:** 2026-10-01",
+            ""
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "rank": 1,
+          "id": "K7M2",
+          "title": "Waiting",
+          "type": "Task",
+          "milestone": "M2",
+          "tags": [],
+          "age": 8,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "Q4R9",
+          "title": "Started",
+          "type": "Task",
+          "milestone": "M2",
+          "tags": [],
+          "age": 39,
+          "in_play": true
+        }
+      ]
+    },
+    {
+      "name": "a milestone whose cards are all in play is no group; only cards in play: no rows",
+      "today": "2026-11-09",
+      "crlf": false,
+      "filter": {
+        "milestone": "",
+        "tag": "",
+        "type": ""
+      },
+      "milestones": [
+        {
+          "file": "m2.md",
+          "lines": [
+            "# M2",
+            "",
+            "**Theme:** (not set)",
+            "**Created:** 2026-10-20",
+            "",
+            "## Order",
+            "",
+            "- Q4R9",
+            ""
+          ]
+        }
+      ],
+      "cards": [
+        {
+          "file": "TaskQ4R9-q.prompt.md",
+          "folder": "current",
+          "lines": [
+            "# Task Q4R9: Q",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Milestone:** M2",
+            "**Created:** 2026-11-02",
+            ""
+          ]
+        }
+      ],
+      "rows": []
+    },
+    {
+      "name": "an empty Space: no rows",
+      "today": "2026-11-09",
+      "crlf": false,
+      "filter": {
+        "milestone": "",
+        "tag": "",
+        "type": ""
+      },
+      "milestones": [],
+      "cards": [],
+      "rows": []
+    }
+  ]
+}
