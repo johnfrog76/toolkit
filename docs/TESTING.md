@@ -73,7 +73,7 @@ python3 -m pip install -r agent/requirements-dev.txt   # once -- runtime deps pl
 python3 -m pytest Tests/     # 1415 passed, 6 skipped -- the agent
 cd web && npm ci             # once
 cd web && npx playwright install chromium   # once -- for `npm run smoke` only
-cd web && npm test           # 5 build-contract checks, then 161 suites, 1909 tests -- the shell
+cd web && npm test           # 5 build-contract checks, then 161 suites, 1910 tests -- the shell
 cd web && npm run smoke              # 23 checks, flags off -- the browser; needs two servers up
 cd web && npm run smoke -- --modules=on  # 30 checks, both module flags on
 cd web && npm run smoke -- --studio      # the Studio's contract -- starts and stops its own servers
@@ -97,6 +97,17 @@ in `web/jest.config.mjs`), well above the wait, so a slow wait fails with Testin
 the element it was waiting for, rather than with Jest's timeout, which names nothing. That is one number for
 every test; no test sets a timeout of its own.
 
+**jsdom answers Fluent's focus layer as a browser would.** jsdom lays nothing out: every element's
+`offsetParent` is null and `<body>` measures 0 by 0. Tabster, the focus layer under Fluent's dialogs and menus,
+reads those two facts to decide what can take focus, so under jsdom it found nothing focusable. A dialog that
+opened focused its own surface instead of its first control, never became the active modal, and the pass that
+hides everything outside the active modal, 250 ms after the last one closed, marked the open dialog
+`aria-hidden` for good. A second dialog opened soon after a first then failed a by-role wait with
+`Unable to find role="textbox"`. `web/tests/jest.layout.cjs` gives an element an `offsetParent` unless it or an
+ancestor is `display: none`, it is `position: fixed`, or it is not in the document, and gives `<body>` a size.
+Nothing else about layout is faked. `RemindersCard.test.tsx`, "keeps the Edit dialog reachable when it opens
+just after New Reminder closes", fails without it.
+
 **A web run that leaks fails.** When a test leaves a timer or a handle open, Jest force-exits the
 worker after the run and prints "A worker process has failed to exit gracefully and has been force
 exited". Every test can pass and the run still leaked, so `tkTest` and CI both read that sentence as
@@ -118,7 +129,7 @@ a passing `pytest:` line may end `(via <python>)`, which is information and not 
   Consts 208, Compat 1730, Menu 2068, Environment 64, Archive 217, PRComments 249, BackfillStamps 50, Changelog 88, Update 68, Start 87, PullRequest 10, CloseWorkItem 51, PromptStatus 125, ThreadHash 86, Setup 82, Move 51, Billable 36, Plan 114, Tag 34, Cover 106, Design 177, NewPrompt 159, ExitCodes 133, Autoload 86, GitRoot 17, Sync 86, Connect 62, NewSpace 149, HowWeWork 42, EditItem 69, Land 139, Burn 125, PublishPR 39, Config 322, HubJson 186, Portability 126, Web 165, Agent 129, TestAll 173, ModuleCommands 88, Reminders 71, Rituals 658, StandupRemind 85, Triage 121, StartWork 85, Review 82, WorkReview 36, SendTeams 43, NewMeeting 63, MeetingAgenda 178, DocCounts 148
   51 suites, 9566 assertions
   pytest: 1415 passed, 6 skipped
-  web: 161 suites, 1909 tests
+  web: 161 suites, 1910 tests
 ```
 
 **Which lines the paste owns.** The per-suite line is the `tkTestToolkit` row's list in the table below; the

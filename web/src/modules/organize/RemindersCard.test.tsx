@@ -155,11 +155,10 @@ function expectDefaultSizeInputs(dialog: HTMLElement) {
   }
 }
 
-// The open reminder dialog, once it can be used. Fluent's modal layer can keep
-// the surface aria-hidden for a moment after it mounts -- longest when the row
-// menu has just closed -- and a synchronous getByRole inside it then finds
-// nothing. Waiting for its textboxes to be reachable waits that out, so every
-// query after this one can stay synchronous.
+// The open reminder dialog, once it can be used: its textboxes reachable by
+// role, so every query after this one can stay synchronous. Why a Fluent
+// dialog could stay aria-hidden under jsdom, and what stops it, is in
+// web/tests/jest.layout.cjs.
 async function openedDialog(): Promise<HTMLElement> {
   const dialog = await screen.findByRole("dialog");
   await within(dialog).findAllByRole("textbox");
@@ -228,6 +227,29 @@ describe("the Ref field", () => {
     expectDefaultSizeInputs(dialog);
     // Two real dialogs, and every wait a by-role query: the suite's testTimeout
     // (jest.config.mjs) gives it the time a loaded runner needs.
+  });
+
+  // Closing New Reminder queues a pass of Fluent's focus layer (Tabster)
+  // that hides whatever is outside the active modal, 250 ms on. The Edit
+  // dialog opened inside that window must be the active modal by then: its
+  // focus on a control inside it, and its fields still reachable once the
+  // pass has run. Under jsdom without web/tests/jest.layout.cjs the dialog
+  // focused its own surface, never became active, and the pass hid it.
+  it("keeps the Edit dialog reachable when it opens just after New Reminder closes", async () => {
+    items = [reminder("Q4TN", { ref: "41" })];
+    draw();
+    fireEvent.click(screen.getByRole("button", { name: "New Reminder" }));
+    const added = await openedDialog();
+    fireEvent.click(within(added).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "Actions for Reminder Q4TN" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Edit" }));
+    const dialog = await openedDialog();
+    expect(document.activeElement).not.toBe(dialog);
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    await new Promise((settled) => setTimeout(settled, 300));
+    expect(dialog.getAttribute("aria-hidden")).toBeNull();
+    expect(within(dialog).getAllByRole("textbox").length).toBeGreaterThan(0);
   });
 
   it("is in the Edit dialog, filled in, and an emptied ref is sent as an empty -Ref", async () => {
