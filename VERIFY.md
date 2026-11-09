@@ -63,7 +63,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `Billable` | `Billable` (typed) | neither |
 | `Plan` | `Plan` (typed) | neither |
 | `Tag` | `Tag` (typed) | neither |
-| `Backlog` | `Backlog` (typed) | neither |
+| `Backlog` | `Backlog` (typed; on the Windows job also on Windows PowerShell 5.1 itself) | 12 (a Western code page: the row under "Rows added by a fix") |
 | `Cover` | `Cover` (typed) | 12 (the reader's paths on Windows and 5.1, and a picture on the board) |
 | `NewPrompt` | `NewPrompt` (`-Title` offline form; `-Design` and `-From` typed in a fresh shell) | 6 (the ADO form); 12 (`-Design` and its chip on Windows) |
 | `NewItem` | `EditItem` (typed, `-FromCard` only, with `gh` stubbed); `Tests/test_studio.py` (typed, `-FromDesign` only) | 6; 12 (`-FromCard` against the GitHub demo) |
@@ -291,7 +291,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **52 suites, 9677 assertions** with a `config.local.json`, every one
+findings. On this commit that is **52 suites, 9692 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -1235,6 +1235,13 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `~/...` in `config.local.json` and no `PROMPTS_ROOT`, `tkStatus` still finds the hub: `-LiteralPath` expands a
   leading `~` on pwsh 7, and this row is the check on 5.1. The NewPrompt suite types the same verbs against a
   scratch hub in such a folder on the Windows job, under both hosts; this row is a real hub and the `~` path.
+- [ ] **Backlog reads every heading on a Western code page, from Windows PowerShell 5.1 (#260).** On the Windows
+  PC, in `powershell` (5.1), check `[System.Text.Encoding]::Default.CodePage` first and note it: the row means most on
+  1252. On a local Space, put four cards in `backlog/` whose headings are plain (`# Task K7M2: Plain`), start with an
+  emoji outside the BMP (U+1F52C), start with a BMP symbol (U+2705 or U+26A0), and start with a lowercase accented
+  letter (`# écrire le guide`). `tkBacklog` lists all four with their titles intact: the emoji and the symbol
+  dropped, the accented letter kept, and no `is not valid` error. The Windows job runs the Backlog suite on 5.1 itself
+  and prints the code page it ran on; this row is a real console and a real hub.
 
 ## Recording a run
 

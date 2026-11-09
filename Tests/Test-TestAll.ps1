@@ -218,7 +218,9 @@ Assert-True 'the Windows job runs the CLI from Windows PowerShell 5.1, the modul
 # floor step starts the runner in powershell.exe, which starts its suites, and
 # they their verbs, in 5.1 (Tests/Get-TestHost.ps1), read through the same gate.
 Assert-True 'the Windows job also runs the card and config suites with the runner itself in Windows PowerShell 5.1' `
-    ($workflow -match "powershell\.exe -NoProfile -Command '\`$env:PSModulePath = \(Resolve-Path \.\); & \./Tests/Test-Toolkit\.ps1 -PRComments -MeetingAgenda -NewPrompt -Triage; exit \`$LASTEXITCODE' 2>&1 \| Tee-Object -FilePath \`$log\r?\n[^\r\n]*\r?\n[^\r\n]*Test-CiHalf\.ps1 -Half cli\b")
+    ($workflow -match "powershell\.exe -NoProfile -Command '\`$env:PSModulePath = \(Resolve-Path \.\); & \./Tests/Test-Toolkit\.ps1 -PRComments -MeetingAgenda -NewPrompt -Triage -Backlog; exit \`$LASTEXITCODE' 2>&1 \| Tee-Object -FilePath \`$log\r?\n[^\r\n]*\r?\n[^\r\n]*Test-CiHalf\.ps1 -Half cli\b")
+Assert-True 'the 5.1 step says which ANSI code page 5.1 reads a script without a BOM in, before it runs the suites' `
+    ($workflow -match "powershell\.exe -NoProfile -Command '[^'\r\n]*\[System\.Text\.Encoding\]::Default\.CodePage'\r?\n[^\r\n]*-Triage -Backlog;")
 $jobCount = [regex]::Matches($workflow, '(?m)^\s+runs-on:').Count
 Assert-True 'verify.yml runs on pull requests (default types: labeled is NOT a trigger), pushes to main, the button, and a weekday schedule' `
     (($workflow -match '(?m)^\s+workflow_dispatch:') -and ($workflow -notmatch '(?m)^\s+types:') -and ($workflow -notmatch '(?m)^\s+if: .*labeled') -and ($workflow -match '(?ms)^\s+push:\s*\r?\n\s+branches: \[main\]') -and ($workflow -match '(?m)^\s+- cron: "[^"]+"'))

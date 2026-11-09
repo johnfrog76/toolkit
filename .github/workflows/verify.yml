@@ -277,12 +277,15 @@ jobs:
       # proves the module loads and the suites' own code runs on 5.1; this one runs
       # the verbs that read and rewrite a card, a session and the config on 5.1 --
       # NewPR's and GetPRComments' reads, MeetingAgenda's stage change, a hub path
-      # with a non-ASCII character, Route -Assign -- which pwsh read correctly
-      # whatever the code did.
+      # with a non-ASCII character, Route -Assign, Backlog's titles -- which pwsh
+      # read correctly whatever the code did. 5.1 reads a script without a BOM in
+      # the ANSI code page, so the step says which one it is: a pass is a pass on
+      # that page.
       - name: The card and config suites on Windows PowerShell 5.1 itself
         if: ${{ !cancelled() }}
         run: |
           $log = Join-Path $env:RUNNER_TEMP 'cli-floor.log'
-          powershell.exe -NoProfile -Command '$env:PSModulePath = (Resolve-Path .); & ./Tests/Test-Toolkit.ps1 -PRComments -MeetingAgenda -NewPrompt -Triage; exit $LASTEXITCODE' 2>&1 | Tee-Object -FilePath $log
+          powershell.exe -NoProfile -Command '"Windows PowerShell 5.1 reads a script without a BOM in code page " + [System.Text.Encoding]::Default.CodePage'
+          powershell.exe -NoProfile -Command '$env:PSModulePath = (Resolve-Path .); & ./Tests/Test-Toolkit.ps1 -PRComments -MeetingAgenda -NewPrompt -Triage -Backlog; exit $LASTEXITCODE' 2>&1 | Tee-Object -FilePath $log
           $code = $LASTEXITCODE
           pwsh -NoProfile -File Scripts/Test-CiHalf.ps1 -Half cli -Path $log -ExitCode $code

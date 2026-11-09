@@ -982,7 +982,7 @@
           "file": "Spike-Q4R9-probe.prompt.md",
           "folder": "backlog",
           "lines": [
-            "# 🔬 Spike Q4R9: Probe",
+            "# \ud83d\udd2c Spike Q4R9: Probe",
             "",
             "## Work Item Info",
             "Priority: (Not set)",
@@ -1034,6 +1034,125 @@
           "milestone": "",
           "tags": [],
           "age": 6,
+          "in_play": false
+        }
+      ]
+    },
+    {
+      "name": "a BMP symbol before the heading is dropped like an emoji; a heading that starts with an accented letter keeps it",
+      "today": "2026-11-09",
+      "crlf": false,
+      "filter": {
+        "milestone": "",
+        "tag": "",
+        "type": ""
+      },
+      "milestones": [],
+      "cards": [
+        {
+          "file": "TaskH3RE-ship.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# \u2705 Task H3RE: Ship it",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Created:** 2026-11-01",
+            ""
+          ]
+        },
+        {
+          "file": "141-warn.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# \u26a0 Bug 141: Warn on save",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Created:** 2026-11-02",
+            ""
+          ]
+        },
+        {
+          "file": "TaskK7M2-ecrire.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# \u00e9crire le guide",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Created:** 2026-11-03",
+            ""
+          ]
+        },
+        {
+          "file": "TaskP7NX-ete.prompt.md",
+          "folder": "backlog",
+          "lines": [
+            "# Task P7NX: \u00e9t\u00e9 notes",
+            "",
+            "## Work Item Info",
+            "Priority: (Not set)",
+            "Tags: (None)",
+            "",
+            "---",
+            "",
+            "**Created:** 2026-11-04",
+            ""
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "rank": null,
+          "id": "H3RE",
+          "title": "Ship it",
+          "type": "Task",
+          "milestone": "",
+          "tags": [],
+          "age": 8,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "141",
+          "title": "Warn on save",
+          "type": "Bug",
+          "milestone": "",
+          "tags": [],
+          "age": 7,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "K7M2",
+          "title": "\u00e9crire le guide",
+          "type": "",
+          "milestone": "",
+          "tags": [],
+          "age": 6,
+          "in_play": false
+        },
+        {
+          "rank": null,
+          "id": "P7NX",
+          "title": "\u00e9t\u00e9 notes",
+          "type": "Task",
+          "milestone": "",
+          "tags": [],
+          "age": 5,
           "in_play": false
         }
       ]

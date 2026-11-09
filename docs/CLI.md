@@ -554,6 +554,13 @@ file in the hub:
   folder literally, `Get-ChildItem -LiteralPath <folder> -Filter <pattern>`. `Test-Portability`'s
   Clause 20 walks shipped PowerShell by AST, with PowerShell's own parameter binding, and fails naming
   the line; `tkTestToolkit -NewPrompt` types the verbs against a hub under such a folder.
+- **A script is plain ASCII, or carries a BOM.** Windows PowerShell 5.1 reads a `.ps1` with no BOM in
+  the ANSI code page too, so a raw symbol in one is a different script on 5.1: `Backlog`'s emoji class,
+  written as raw characters, read on a Western code page as ranges in reverse order, and the pattern threw
+  on every card. A character a script needs is written as an escape -- `\u2600` in a regex, `[char]0x2014`
+  in a string. `Test-Portability`'s Clause 21 fails on any `.ps1`, `.psm1` or `.psd1` in the package,
+  `Tests/` included, that holds a non-ASCII byte without a BOM, and on any shipped one that holds one at
+  all but the four it names, which carry a BOM and print the characters.
 - **A request body is SENT as UTF-8 bytes** -- `ConvertTo-P20Utf8Body` (`Scripts/ConvertTo-Utf8Body.ps1`)
   turns the JSON into its UTF-8 bytes, and every `-Body` a script hands `Invoke-RestMethod` is one: the
   Azure DevOps writes (`NewItem`, `NewPR`, `PublishPR`, `ReplyPR`, `CloseItem`, `AddPRReview`'s threads),
