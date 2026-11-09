@@ -52,6 +52,9 @@ if ($Help) {
   Clause 20 Every path a cmdlet resolves in shipped PowerShell is handed over as
             -LiteralPath, unless it is a constant: -Path reads a folder named
             "Work [old]" as a wildcard pattern that matches nothing
+  Clause 21 No script without a BOM holds a non-ASCII byte, Tests/ included, and no
+            shipped script holds one at all but the four named: 5.1 reads a BOM-less
+            script in the ANSI code page
 
   Scope: all three halves -- *.psm1 at the root, Scripts/, Prompt20Toolkit/,
   web/src, web/tests and agent/ -- plus root JSON and Markdown, and Tests/
@@ -1666,6 +1669,73 @@ foreach ($case in @(
     $caseHits = @(Get-NonLiteralPathHits -Text $case.Body).Count
     Assert-True "Clause 20: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
 }
+
+# -- Clause 21: a script without a BOM is ASCII --------------------------------
+# Windows PowerShell 5.1 reads a .ps1, .psm1 or .psd1 that has no byte-order mark
+# in the system's ANSI code page; 7 reads it as UTF-8. A non-ASCII character in
+# such a file is two different scripts: a regex class written with raw symbols
+# read, on a Western code page, as ranges in reverse order, and the pattern threw
+# on every card. An escape -- a regex's backslash-u, a string's [char]0x2014 --
+# reads the same on every host. Two rules. No script anywhere in the package,
+# Tests/ included, holds a non-ASCII byte without a BOM. And no SHIPPED script
+# holds one at all, except the files named below: each carries a BOM, and its
+# non-ASCII is text it prints. The list only shrinks; an entry that has become
+# ASCII fails until it is taken off.
+$nonAsciiAllowed = @(
+    'Scripts/Get-PRComments.ps1',
+    'Scripts/Resolve-TierDecision.ps1',
+    'Scripts/Send-PRReply.ps1',
+    'Scripts/Test-Prerequisites.ps1'
+)
+$latin1 = [System.Text.Encoding]::GetEncoding(28591)
+function Get-NonAsciiScriptState {
+    # @{ Bom; Line } for a script's bytes: whether it opens with a UTF-8 BOM, and
+    # the first line holding a non-ASCII byte after it (0 for none).
+    param([byte[]]$Bytes)
+    $bom = ($Bytes.Length -ge 3 -and $Bytes[0] -eq 0xEF -and $Bytes[1] -eq 0xBB -and $Bytes[2] -eq 0xBF)
+    $start = 0
+    if ($bom) { $start = 3 }
+    $text = $latin1.GetString($Bytes, $start, $Bytes.Length - $start)
+    $m = [regex]::Match($text, '[^\x00-\x7F]')
+    $line = 0
+    if ($m.Success) { $line = 1 + @([regex]::Matches($text.Substring(0, $m.Index), "`n")).Count }
+    return @{ Bom = $bom; Line = $line }
+}
+
+$scriptFiles = @(Get-ChildItem -LiteralPath $pkgRoot -Recurse -File -Include '*.ps1', '*.psm1', '*.psd1' | Select-ScannableFile)
+$noBomHits = @()
+$shippedHits = @()
+$allowedSeen = @{}
+foreach ($f in $scriptFiles) {
+    $rel = $f.FullName.Substring($pkgRoot.Length).TrimStart('\', '/') -replace '\\', '/'
+    $state = Get-NonAsciiScriptState -Bytes ([System.IO.File]::ReadAllBytes($f.FullName))
+    if ($state.Line -eq 0) { continue }
+    if (-not $state.Bom) { $noBomHits += "${rel}:$($state.Line)" }
+    $shipped = ($rel -notmatch '^(Tests|samples)/')
+    if ($nonAsciiAllowed -contains $rel) { $allowedSeen[$rel] = $state.Bom; continue }
+    if ($shipped) { $shippedHits += "${rel}:$($state.Line)" }
+}
+Assert-True "Clause 21: no script in the package holds a non-ASCII byte without a BOM ($($scriptFiles.Count) files)" (
+    ($noBomHits.Count -eq 0) -and ($scriptFiles.Count -ge 150)) ($noBomHits -join '; ')
+Assert-True "Clause 21: no shipped script holds a non-ASCII byte, but the $($nonAsciiAllowed.Count) named" (
+    $shippedHits.Count -eq 0) ($shippedHits -join '; ')
+foreach ($rel in $nonAsciiAllowed) {
+    Assert-True "Clause 21: $rel still holds non-ASCII, and carries a BOM" ($allowedSeen.ContainsKey($rel) -and $allowedSeen[$rel]) $(
+        if ($allowedSeen.ContainsKey($rel)) { 'no BOM' } else { 'ASCII now, or gone: take it off the list' })
+}
+$e9 = [System.Text.Encoding]::UTF8.GetBytes("'" + [char]0xE9 + "'")
+foreach ($case in @(
+        @{ Hit = $false; Why = 'an ASCII script'; Bytes = [System.Text.Encoding]::ASCII.GetBytes("`$a = 1`n`$b = 2") },
+        @{ Hit = $false; Why = 'an escape in place of the character'; Bytes = [System.Text.Encoding]::ASCII.GetBytes("'^[\u2600-\uD7FF]'") },
+        @{ Hit = $true;  Why = 'a raw accented letter with no BOM'; Bytes = [byte[]](@(0x23, 0x0A) + $e9) },
+        @{ Hit = $false; Why = 'the same letter after a BOM'; Bytes = [byte[]](@(0xEF, 0xBB, 0xBF) + $e9) }
+    )) {
+    $state = Get-NonAsciiScriptState -Bytes $case.Bytes
+    $hit = ($state.Line -gt 0 -and -not $state.Bom)
+    Assert-True "Clause 21: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" ($hit -eq $case.Hit) "line $($state.Line), BOM $($state.Bom)"
+}
+$rawCase = Get-NonAsciiScriptState -Bytes ([byte[]](@(0x23, 0x0A) + $e9))
+Assert-True "Clause 21: the sweep names the line" ($rawCase.Line -eq 2) "line $($rawCase.Line)"
 
 # ── The scan exclusions are relative to the package root ─────────────────────
 # A checkout whose own path runs through an excluded name (an agent worktree

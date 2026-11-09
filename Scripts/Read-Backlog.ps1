@@ -43,7 +43,7 @@ function Get-P20CardHeading {
     param([AllowEmptyString()][AllowNull()][string]$Content)
     $m = [regex]::Match("$Content", '(?m)^#\s+(.+)')
     if (-not $m.Success) { return '' }
-    return ($m.Groups[1].Value.Trim() -replace '^(?:[☀-퟿-￿]|[\uD800-\uD83F][\uDC00-\uDFFF])\s*', '')
+    return ($m.Groups[1].Value.Trim() -replace '^(?:[\u2600-\uD7FF\uE000-\uFFFF]|[\uD800-\uD83F][\uDC00-\uDFFF])\s*', '')
 }
 
 function Split-P20CardHeading {

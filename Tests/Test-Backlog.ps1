@@ -92,7 +92,7 @@ foreach ($case in $table.cases) {
 }
 $names = (@($table.cases | ForEach-Object { [string]$_.name })) -join ' | '
 foreach ($shape in @('with a file first', 'a card in play is a row in its ranked place', 'a card in play the order does not list', 'stale id', "not at the title's slug", 'no Created',
-        'no milestone', 'impossible date', 'emoji', 'Sprint line', 'filter by milestone', 'filter by tag', 'filter by type',
+        'no milestone', 'impossible date', 'emoji', 'BMP symbol', 'accented letter', 'Sprint line', 'filter by milestone', 'filter by tag', 'filter by type',
         'filters AND', 'CRLF', 'cards are all in play is no group', 'an empty Space')) {
     Assert-True "the table has a case for: $shape" ($names.Contains($shape))
 }

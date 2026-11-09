@@ -73,6 +73,8 @@ class TheSharedTable(unittest.TestCase):
             "no milestone",
             "impossible date",
             "emoji",
+            "BMP symbol",
+            "accented letter",
             "Sprint line",
             "filter by milestone",
             "filter by tag",
