@@ -85,15 +85,61 @@ way to rank.
 Who may rank is the team lead's and the PM's call on a local or GitHub Space; a builder does not. Until a
 Space has seats, whoever runs the verb ranks.
 
+## The Backlog: the order as a table
+
+The Backlog is the cards in a Space's `backlog/` as one table -- rank, id, type, milestone, tags, age and
+title -- and its order is the milestones' order. A milestone's cards already in play sit in the same table, in
+their ranked place and marked **in play**, so a milestone reads 1, 2, 3 from its top. `Backlog` prints it and `GET /api/backlog` serves it, from
+the same rule:
+
+1. **Milestone by milestone.** A milestone is in the table when a card in `backlog/` names it. Milestones that have a file go first, by the file's `**Created:**` day (a
+   file with none after the dated ones), a tie by title. Then the milestones that have no file yet, by
+   title. A milestone has a file when `milestones/<slug>.md` exists and its `#` heading names the title
+   exactly -- the same lookup `Plan` makes.
+2. **Inside a milestone**, every member in its order -- the ranked cards, then the unranked, as "How the
+   order is read" says -- the ones in `current/` among them, marked in play.
+3. **Then the cards in `backlog/` with no milestone**, oldest `**Created:**` first, no date last, a tie by id.
+
+**Rank** is the card's place among its milestone's ranked cards, from 1 -- the count `Plan <id> -Rank <n>`
+uses, and the `#2 of 3` it prints. Because a card in play is shown in its place, the numbers on the page are
+the numbers `Plan` takes. An unranked card, and a card with no milestone, has no rank. A card in play is
+there to be seen, not worked: the table's actions are for the waiting cards. **Age** is the whole days since `**Created:**`,
+0 for a day in the future, none for no date or an impossible one. **Type** and **title** are read from the
+card's `#` heading: a configured type name, the id, a colon, then the title; a heading that names no type
+has none, and the whole heading is the title.
+
+The filters -- `-Milestone`, `-Tag`, `-Type` on the verb, `?milestone=`, `?tag=`, `?type=` on the route --
+go together (AND) and match ignoring case; the type ignores spaces too, so `UserStory` is `User Story`. A
+filtered row keeps its rank, because the rank is the milestone's and not the table's. Sorting a column is
+a view: nothing about the table ever writes a file, and only `Plan` changes the order.
+
+| Input | Read as |
+| --- | --- |
+| a card in `backlog/` | a row |
+| a card in `current/` naming a milestone that a waiting card names | a row in its place, marked in play |
+| a card in `current/` whose milestone no waiting card names, or with no milestone | not a row |
+| a milestone file at the title's slug whose heading names the title | the milestone has a file: sorted by its `**Created:**` |
+| a file elsewhere, or whose heading names another title | no file for that milestone |
+| a milestone file with no `**Created:**` | after the dated files, before the milestones with no file |
+| a card the order does not list | after the ranked ones, by created; no rank |
+| a card with no milestone | after every milestone, by created; no rank |
+| no date, or `2026-13-45` | sorted as written; no age |
+
+`Get-P20BacklogRows` (`Scripts/Read-Backlog.ps1`) and `backlog_rows()` (`agent/core/parsers.py`) are the
+readers, one per half, held to one table, `Tests/fixtures/parsers/backlog-order.json`
+(`tkTestToolkit -Backlog` and `Tests/test_backlog.py`).
+
 ## Not on an Azure DevOps Space
 
 On a Space whose tracker is Azure DevOps the board belongs to the organisation and keeps its own order, so
 ToolKit keeps none: `Plan -Rank` refuses (exit 2, "ranking lives in Azure DevOps; `MyWork` lists what is
 assigned to you"), `Plan -Milestone` writes the card's line and no order file, and the disk reader returns
-nothing there.
+nothing there. There is no Backlog either: the company's backlog is in Azure DevOps, and a card there is work
+assigned to you, in `current/` until it is archived. `Backlog` refuses (exit 2, "this Space's backlog is in
+Azure DevOps; `MyWork` lists what is assigned to you") and `GET /api/backlog` is a 404 with the same sentence.
 
 ## Not yet
 
-The order is read by the CLI and the agent, and nothing draws it yet: Team Agile's Milestones tab shows no
-order, and a Backlog view that does is a later piece of work. `Plan` never writes the tracker -- a
+The order is read by the CLI and the agent, and `Backlog` prints it, but no page draws it yet: Team
+Agile's Milestones tab shows no order, and the Backlog page on Home is a later piece of work. `Plan` never writes the tracker -- a
 GitHub milestone's description is not the order, and mirroring the file into it is not built.

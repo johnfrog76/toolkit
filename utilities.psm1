@@ -2128,6 +2128,20 @@ function global:Set-P20CardTags {
         -Name $inv.Name -Prefix $inv.Prefix
 }
 
+function global:Get-P20Backlog {
+    <# Backlog -- the Space's waiting cards as one ranked table: backlog/, milestone by milestone, in each milestone's order. -Milestone, -Tag and -Type filter. Read-only; refuses on an Azure DevOps Space. #>
+    [CmdletBinding()]
+    param(
+        [string]$Milestone,
+        [string]$Tag,
+        [string]$Type,
+        [switch]$Help
+    )
+    $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'Backlog'
+    Invoke-ToolkitScript -Path "$toolkitRoot\Scripts\Get-Backlog.ps1" -Parameters $PSBoundParameters `
+        -Name $inv.Name -Prefix $inv.Prefix
+}
+
 # The Studio's two verbs. The Studio is core, from day one (D-S13): there is no features.studio, so these are registered like every
 # other core verb -- in the command table below, the autoload manifest and the
 # bridge -- rather than contributed by a module data file under a flag.
@@ -2500,6 +2514,7 @@ $script:ModuleState.CommandMap = [ordered]@{
     'Move'             = 'Move-P20CardLane'
     'Plan'             = 'Set-P20CardSprint'
     'Tag'              = 'Set-P20CardTags'
+    'Backlog'          = 'Get-P20Backlog'
     'GetPRComments'    = 'Get-P20PRComments'
     'ReplyPR'          = 'Send-P20PRReply'
     'Env'              = 'Get-P20Environment'

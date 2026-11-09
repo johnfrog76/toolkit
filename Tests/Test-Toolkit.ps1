@@ -50,6 +50,7 @@ param(
     [switch]$Billable,
     [switch]$Plan,
     [switch]$Tag,
+    [switch]$Backlog,
     [switch]$Cover,
     [switch]$Design,
     [switch]$Move,
