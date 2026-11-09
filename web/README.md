@@ -1451,7 +1451,8 @@ empty page looks empty rather than half finished.
 -- **81** Items closed, **4** Reviews, **6** Repos: the number beside its caption in a hairline box, in a wrapping, centred `<StatTiles>` row.
 
 - **`<StatTile count label color? />`** -- `count` arrives formatted (`3/5`, `42%`,
-  `toLocaleString()`); `color` is for a count that is a VERDICT (Test Health's pass ratio, the sprint's
+  `toLocaleString()`; a count that can run to thousands goes through `shared/formatCount.ts`, exact and
+  grouped by the reader's locale, as Test Health's tiles, suite rows and y-axis all do); `color` is for a count that is a VERDICT (Test Health's pass ratio, the sprint's
   days left, velocity) and nothing else. It forwards its ref, so a `Tooltip` wraps one directly.
 - Every card that counts uses it: the Space summary, the Issue Report, Test Health, Sprint Velocity,
   Milestones. A new counting card does too -- never a `Title3` over a `Caption1`.
