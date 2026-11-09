@@ -4,6 +4,8 @@ import { useGetEngagementSummaryQuery } from "./api.ado";
 import { BuildingRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
 import { StatTile, StatTiles } from "../../shared/StatTile";
+import { useGetEnvQuery } from "../../shell/api";
+import { summaryTiles } from "./summaryTiles";
 
 const useStyles = makeStyles({
   meta: {
@@ -16,6 +18,9 @@ const useStyles = makeStyles({
 export function EngagementSummary({ slug, isArchived }: { slug: string; isArchived?: boolean }) {
   const styles = useStyles();
   const { data, isLoading } = useGetEngagementSummaryQuery(slug);
+  // Reviews are the growth module's: off, or not configured, the tile is absent (summaryTiles.ts).
+  const { data: env } = useGetEnvQuery();
+  const growth = Boolean(env?.features?.growth);
 
   return (
     <PageCard
@@ -54,12 +59,9 @@ export function EngagementSummary({ slug, isArchived }: { slug: string; isArchiv
           </div>
 
           <StatTiles>
-            <StatTile count={data.stats.workItemsClosed} label="Items closed" />
-            <StatTile count={data.stats.reviewsGenerated} label="Reviews" />
-            {data.stats.prsReviewed > 0 && (
-              <StatTile count={data.stats.prsReviewed} label="PRs reviewed" />
-            )}
-            {data.projects.length > 0 && <StatTile count={data.projects.length} label="Repos" />}
+            {summaryTiles(data.stats, data.projects.length, { growth }).map((tile) => (
+              <StatTile key={tile.label} count={tile.count} label={tile.label} />
+            ))}
           </StatTiles>
         </>
       )}
