@@ -36,6 +36,7 @@ import { ChartWrapper } from "../../shared/ChartWrapper";
 import { BeakerRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
 import { StatTile, StatTiles } from "../../shared/StatTile";
+import { countAxisWidth, countTicks, formatCount, formatRatio } from "../../shared/formatCount";
 import type { EmptyMessage } from "../../shared/EmptyState";
 
 const useStyles = makeStyles({
@@ -141,8 +142,10 @@ function ChartTooltipContent({
       }}
     >
       <div style={{ fontWeight: 600 }}>{label}</div>
-      <div style={{ color: tokens.colorPaletteGreenForeground1 }}>Pass: {pass}</div>
-      {fail > 0 && <div style={{ color: tokens.colorPaletteRedForeground1 }}>Fail: {fail}</div>}
+      <div style={{ color: tokens.colorPaletteGreenForeground1 }}>Pass: {formatCount(pass)}</div>
+      {fail > 0 && (
+        <div style={{ color: tokens.colorPaletteRedForeground1 }}>Fail: {formatCount(fail)}</div>
+      )}
     </div>
   );
 }
@@ -162,6 +165,11 @@ export function TestHealth() {
 
   const chartData = useMemo(() => (data ? buildChartData(data.days) : []), [data]);
   const halves = useMemo(() => halfTiles(data), [data]);
+  // The y-axis is given its ticks, so it can be as wide as its widest label (formatCount.ts).
+  const yTicks = useMemo(
+    () => countTicks(chartData.reduce((m, d) => Math.max(m, d.pass + d.fail), 0)),
+    [chartData],
+  );
 
   const latestDay = data?.days.length ? data.days[data.days.length - 1] : null;
   const totalPassed = latestDay?.passed ?? 0;
@@ -267,7 +275,7 @@ export function TestHealth() {
           {/* Summary tiles */}
           <StatTiles>
             <StatTile
-              count={`${totalPassed}/${totalTotal}`}
+              count={formatRatio(totalPassed, totalTotal)}
               label="Passed"
               color={
                 allGreen
@@ -326,7 +334,15 @@ export function TestHealth() {
                       textAnchor="end"
                       height={34}
                     />
-                    <YAxis tick={{ fontSize: 10 }} width={30} height={128} allowDecimals={false} />
+                    <YAxis
+                      tick={{ fontSize: 10 }}
+                      width={countAxisWidth(yTicks, 10)}
+                      height={128}
+                      allowDecimals={false}
+                      ticks={yTicks}
+                      domain={[0, yTicks[yTicks.length - 1]]}
+                      tickFormatter={(v: number) => formatCount(v)}
+                    />
                     <RechartsTooltip
                       content={<ChartTooltipContent />}
                       cursor={{ fill: "transparent" }}
@@ -364,7 +380,7 @@ export function TestHealth() {
                     <Body1 className={styles.suiteName}>{s.suite}</Body1>
                   </Tooltip>
                   <Caption1 className={styles.suiteCount}>
-                    {s.passed}/{s.total}
+                    {formatRatio(s.passed, s.total)}
                   </Caption1>
                   <Badge
                     color={
