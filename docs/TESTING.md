@@ -70,7 +70,7 @@ tkTestToolkit -GitRoot   # a folder inside someone else's repository is not a ch
 
 ```bash
 python3 -m pip install -r agent/requirements-dev.txt   # once -- runtime deps plus pytest, httpx and ruff
-python3 -m pytest Tests/     # 1425 passed, 6 skipped -- the agent
+python3 -m pytest Tests/     # 1426 passed, 6 skipped -- the agent
 cd web && npm ci             # once
 cd web && npx playwright install chromium   # once -- for `npm run smoke` only
 cd web && npm test           # 5 build-contract checks, then 161 suites, 1910 tests -- the shell
@@ -128,7 +128,7 @@ a passing `pytest:` line may end `(via <python>)`, which is information and not 
   Counts for docs/TESTING.md's paste block, from this run:
   Consts 208, Compat 1756, Menu 2098, Environment 64, Archive 217, PRComments 249, BackfillStamps 50, Changelog 88, Update 68, Start 87, PullRequest 10, CloseWorkItem 51, PromptStatus 125, ThreadHash 86, Setup 82, Move 51, Billable 36, Plan 114, Tag 34, Backlog 56, Cover 106, Design 177, NewPrompt 159, ExitCodes 133, Autoload 86, GitRoot 17, Sync 86, Connect 62, NewSpace 149, HowWeWork 42, EditItem 69, Land 139, Burn 125, PublishPR 39, Config 322, HubJson 186, Portability 137, Web 165, Agent 129, TestAll 174, ModuleCommands 88, Reminders 71, Rituals 658, StandupRemind 85, Triage 121, StartWork 85, Review 82, WorkReview 36, SendTeams 43, NewMeeting 63, MeetingAgenda 178, DocCounts 150
   52 suites, 9692 assertions
-  pytest: 1425 passed, 6 skipped
+  pytest: 1426 passed, 6 skipped
   web: 161 suites, 1910 tests
 ```
 
