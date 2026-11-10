@@ -198,7 +198,7 @@ dynamic expressions"*), and the loader reads with nothing else on purpose. The w
 | `GET /manager` | `manager/{current,archive}/` | Every session, newest first |
 | `GET /manager/{f}` | one session | Split into the sections the form owns, plus the raw content, and the `## Carried from` check: `carried_from`, `carried_from_expected`, `carried_from_verdict`, and `carried_from_note` -- the sentence to show, `""` when the heading is right. `PUT` answers with the same four. Read, never rewritten |
 | `POST /manager` | runs `NewMeeting` through the bridge, then reads the file it wrote | `{date, series}` only -- notes are an edit, through `PUT`, and a body with more is 422. 409 rather than overwrite, for a session in `current/` **or** already closed into `archive/`; 400 on a date that is not one; 503 naming the verb when the module is not in the CLI's table. The verb is the one writer of a new session |
-| `PUT /manager/{f}` | rewrites one session | **The only PUT in the API** |
+| `PUT /manager/{f}` | rewrites one session | **The only write in the API that does not go through the CLI** |
 | `POST /comms/send` | outbound webhook | A thin wrapper over the engine |
 | `POST /rewrite` | a model | Tidies a raw notes textarea. Declines with a reason when there is no key |
 | `POST /cmd/MeetingAgenda` | the bridge | Not this module's route -- the CLI bridge, with this module's verb in the argv. The web's **Close** and its stage buttons are `-Date <d> [-Type <series>] -<Plan\|Prep\|Retro\|Close>`, built by `buildMeetingAgendaParams` in `web/src/modules/ado/cliBridge.ts` and pinned by `cliBridge.test.ts`; a stated refusal (exit 2) comes back as `status: error` and is the page's message |
@@ -207,11 +207,12 @@ The whole router carries a dependency that raises 404 when the flag is off — a
 than a conditional mount, so the answer is re-read per request and a flag flipped in another
 terminal does not need a restart of the agent or the web UI (an open shell is another matter: [Configuration](../CONFIGURATION.md), "A module flag and an open shell"). `/env` gains a `communication` block, and only when the flag is on.
 
-**Why `POST`/`PUT` here rather than through the CLI bridge.** The rest of the app has one write
-path, and it is the CLI. These two bend it, for a stated reason: they save a form someone is typing
-into, and round-tripping keystrokes through a PowerShell process start would make the editor
-unusable. There is no second implementation to drift from — `_build_session_file` is the only thing
-on either side that writes a session. Closing a session does **not** bend it: the file move and the
+**Why `PUT` here rather than through the CLI bridge.** The rest of the app has one write
+path, and it is the CLI -- `POST /manager` included, which runs `NewMeeting`. `PUT` bends it, for a
+stated reason: it saves a form someone is typing into, and round-tripping keystrokes through a
+PowerShell process start would make the editor unusable. There is no second implementation to drift
+from — `_build_session_file` is the one thing in Python that writes a session, and it never creates
+one: a new session is the verb's. Closing a session does **not** bend it: the file move and the
 `**Closed:**` stamp are `MeetingAgenda -Close`, and the web's Close button runs that verb through
 the bridge rather than reimplementing either half.
 
