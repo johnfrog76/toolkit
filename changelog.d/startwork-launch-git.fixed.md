@@ -1,1 +1,0 @@
-- `StartWork -Launch` no longer leaves the card's text in the repository it launches from: the hand-off block and the session's logs go in the repository's own git folder, the block is removed once the session has read it, and the session's worktree stays out of `git status`.

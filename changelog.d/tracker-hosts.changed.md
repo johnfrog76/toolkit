@@ -1,1 +1,0 @@
-- `Land` and `PublishPR` read the pull request from your Space's own tracker: a card's `PR URL:` line that names another organisation is refused, with the reason.

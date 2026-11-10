@@ -1,1 +1,0 @@
-- On Windows, the agent now runs `gh` directly rather than through the command shell.

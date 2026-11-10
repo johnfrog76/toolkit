@@ -1,1 +1,0 @@
-- `Dashboard` shows its local view below Tier 1 instead of a full view of empty answers, and counts recent errors from the log the toolkit actually writes. `SwitchSpace` matches a Space's name exactly and refuses a name two Spaces share, where a shared name or a `*` could leave the active Space unreadable.

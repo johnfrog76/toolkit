@@ -1,1 +1,0 @@
-- A changelog entry for the next release is now a file of its own under `changelog.d/`, named `<id>.<kind>.md`, so pull requests built side by side no longer conflict on `CHANGELOG.md`; the release folds the folder into `## [Unreleased]` with `Scripts/Fold-Changelog.ps1`. Entries already under `## [Unreleased]` stay where they are.
