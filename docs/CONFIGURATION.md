@@ -97,7 +97,7 @@ table; this is the shape of it:
 | **hub** | `storeSync`, `folders.<name>` | the hub's `hub.json`, and only with **`-Hub`** |
 | **default** | `commands`, `workItemTypes`, `cliVersion`, `managerWorkflow` | nowhere. These are the team's, and a `-Set` on one is refused by name |
 
-Five things worth knowing before you use it:
+Things worth knowing before you use it:
 
 - **A slug nobody has declared is how you add an org** -- and `tkNewSpace` is the easy way to do it
   ([Adding a Space](#adding-a-space), below), writing these same keys. `tkConfig -Set spaces.acme.name=Acme` appends
@@ -236,7 +236,8 @@ config file, and a build that asked for the port would refuse.
 - **`promptsRoot`** -- where your prompt files live. This is *not* this repo. Point it at your own
   prompt store: another git repo, a synced folder, anywhere on disk. The tool reads and writes
   `current/` and `archive/` beneath it.
-- **`activeSpace`** -- which org entry in `config.default.json` every command scopes to. Change it
+- **`activeSpace`** -- which Space every command scopes to: any declared slug, whether `config.default.json`
+  ships it or the hub's `hub.json` declares it ([The hub declares its orgs](#the-hub-declares-its-orgs)). Change it
   with `tkSwitchSpace <slug>`; check it with `tkSwitchSpace Status`.
 - **`isDemoDismissed`** -- `false` shipped. Every org that SHIPS is marked `"example": true` -- a
   property, not its slug: `azure-demo` / "Azure demo" (once "Example", and slug `test`) in `config.default.json`, and the sample hub's
@@ -246,7 +247,7 @@ config file, and a build that asked for the port would refuse.
   person picks an org from: the web's switcher, Settings, the Reviews page's org chips (all read `/env`'s
   `config.spaces`, which the agent filters), and `tkSwitchSpace Status`. It is **never removed from
   config**, `tkSwitchSpace azure-demo` still works, and the org you are IN is always shown. One rule in each
-  half -- `Scripts/Select-OfferedSpaces.ps1` and `offered_orgs` in `agent/core/config.py` -- held to one
+  half -- `Scripts/Select-OfferedSpaces.ps1` and `offered_spaces` in `agent/core/config.py` -- held to one
   table, `Tests/fixtures/offered-orgs/table.json`. `tkStart` does not set it. Not an opt-in surface, so
   it has no row in the inventory.
 - **`commandPrefix`, and the name in `aliases.<name>`** -- become part of a command. A prefix is a
@@ -258,7 +259,7 @@ config file, and a build that asked for the port would refuse.
 - **`email`** -- who "me" is, for the ADO lookups that filter by a person:
   `MyPRs`, `Dashboard`, `MyWork`, and the agent's `/api/prs`, `/api/dashboard` and
   `/api/work-items`. **Set it, and you will not depend on the fallback.** With it empty, both
-  halves ask `az account show --query user.name -o tsv` instead -- which is right when you are
+  halves take `branchUser` when it is an address, and otherwise ask `az account show --query user.name -o tsv` -- which is right when you are
   signed in and slow when you are not, and a machine that has never run `az login` then has no
   identity at all. It is per machine by construction: `config.local.json` is gitignored and
   `config.default.json` ships `""` and must (the Portability suite fails the build over a real
@@ -334,7 +335,7 @@ for a fetch of its own.
 
 ## `spaces[].features.trainingHoursPerQuarter` -- the quarter's training requirement
 
-A whole number of hours, and the second key a Space may set under `features` (with `sprintAwareness`; the
+A whole number of hours, and one of the keys a Space may set under `features` (the
 list is `consts.json` `features.spaceScoped`). Org-scoped because it is a fact about one engagement: a
 client may require eight hours a quarter and another nothing. **Unset means no requirement, and nothing is
 shown** -- the Growth page has no line, `GET /api/growth` answers `trainingQuarter: null`, and `tkEnv`
@@ -444,7 +445,8 @@ and this list is only where this machine keeps the ones it is done with. `/env` 
 ## `features.studio` -- retired: the Studio has no switch
 
 The Studio is part of the core, from the first run (D-S13, which
-amends D-S1): its tab, its two routes and its verbs `NewDesign` and `StampDesign` are there on every
+amends D-S1): its tab, its agent routes and its verbs -- `NewDesign`, `StampDesign`, `MoveDesign`, `NewSpace`,
+`RetireSpace`, `RemoveSpace` and `HowWeWork` -- are there on every
 machine, like the cards. There is no `features.studio` any more. A line left in a machine's
 `config.local.json` -- `true` or `false` -- is ignored by all three halves and is never an error.
 `tkConfig -Set features.studio=...` (and `-Unset`) is refused, exit 2, with one sentence: `The Studio is
@@ -519,8 +521,8 @@ table in the package, `Config/claude-prices.json`, dated.
 ## `spaces[].howIWork` -- how you work in this Space
 
 **How do you want to work in `<Space>`?** is the Space's answer, not the person's: nobody works one
-way all the time, so a learning Space is worked alone and a product Space with agents. It is the second
-Space-scoped switch after `sprintAwareness`, and the tracker the Space's address names
+way all the time, so a learning Space is worked alone and a product Space with agents. It is a
+Space-scoped switch, like `sprintAwareness`, and the tracker the Space's address names
 (`Scripts/Resolve-Tracker.ps1`) says which answers there are:
 
 | The Space's tracker | The answer | Asked? |
@@ -558,7 +560,7 @@ carries the note, and shows its `How we work here: <path>` line or its refusal
 
 ## `spaces[].features.suggestions` -- whether Team Agile suggests your next move
 
-A boolean, and the third Space-scoped switch (with `sprintAwareness` and `howIWork`): whether the chair's
+A boolean, and a Space-scoped switch (like `sprintAwareness` and `howIWork`): whether the chair's
 reading ends on one derived next move -- the item, the rule that chose it and the command that acts on it
 -- in place of `Next: nothing is waiting on you.` It rides Team Agile, so it means something only where
 Team Agile is on, and there **unset is on**; `false` turns the line back to today's
@@ -613,7 +615,7 @@ characters, uppercase; see [The workflow](CLI.md#the-workflow) and [the card](hu
 and **which feature flags are the org's** (`features.spaceScoped`, today `["sprintAwareness", "trainingHoursPerQuarter", "suggestions"]`: the
 flags read from `spaces[].features` rather than the top-level block -- `SpaceScopedFeatures` in
 `utilities.psm1`, `SPACE_FEATURES` in `agent/core/config.py` and `FEATURES.spaceScoped` in
-`web/src/shell/consts.ts` all read this list, so the second org-scoped flag is added in one place
+`web/src/shell/consts.ts` all read this list, so a new org-scoped flag is added in one place
 and the three consts suites say so), and **which repo files a GitHub Space's Docs tab reads**
 (`docs.readme`, `docs.root`, `docs.segment`: `README.md`, the markdown under `docs/`, and what one
 path segment may look like -- the agent's `/api/docs` routes refuse every other path and the web's
@@ -805,8 +807,8 @@ schema above is what the verb will accept.
 
 **There is no `config.local.example.json`, and "copy config.default.json" is the wrong advice.**
 The shipped file is the whole table -- every org, every command, every help string -- and a private
-copy of it silently stops tracking the committed one. The import warning on a machine with no local
-config prints the four-line patch above instead.
+copy of it silently stops tracking the committed one. On a machine with no local config, the import prints a two-line note instead -- not set up yet, then
+`tkStart` for a sample hub or this document for your own -- and no patch.
 
 Confirm the machine is set up correctly:
 
@@ -859,7 +861,7 @@ applies.
 
 | Variable | Stands in for | Value |
 | --- | --- | --- |
-| `PROMPTS_ROOT` | `promptsRoot` | A path; relative resolves against the package, as in the file. On Windows the CLI reads an 8.3 short path (`C:\Users\RUNNER~1\...`) in its long form, from either source |
+| `PROMPTS_ROOT` (`consts.json` `env.promptsRoot`) | `promptsRoot` | A path; relative resolves against the package, as in the file. On Windows the CLI reads an 8.3 short path (`C:\Users\RUNNER~1\...`) in its long form, from either source |
 | `P20_ACTIVE_SPACE` (`consts.json` `env.activeSpace`) | `config.local.json`'s `activeSpace` | A Space slug. One nobody declared falls back the way an unknown slug in the file does |
 | `P20_FEATURES` (`consts.json` `env.features`) | `config.local.json`'s top-level `features` block -- **replaced, not patched** | A JSON object: `{"growth":true,"communication":true}`. `{}` is "no flag set", the file with no `features` block; `config.default.json`'s flags still stand under it. Anything that is not a JSON object is a warning and is ignored, so a typo falls back to the file rather than switching every module off |
 
@@ -871,14 +873,14 @@ children inherit them, so a verb the browser runs reads the same Space and flags
 `/api/surfaces` -- the CLI resolver in a child `pwsh` -- agrees with `/api/env`. Nothing writes them
 and `Config` does not know them: they are a launcher's, not a setting. One consequence to know: while
 `P20_ACTIVE_SPACE` is set, a Space switch still writes `activeSpace` to the file but does not take
-effect in that process -- the override wins, which is what it is for. Without it, a shell that was open when another one wrote `activeSpace` (the GUI's switch, `Config -Set`) acts on the new Space from its next verb: the module compares the write times of `config.local.json` and `hub.json` before each verb and re-imports when either moved. `PROMPTS_ROOT` and `P20_ACTIVE_SPACE` are part of the same comparison, so one exported into a shell that had already loaded the toolkit (a profile that imports it at startup) is seen on the next verb exactly as a changed file is -- `Env`'s `Hub` check and its `Your hub` row then name one hub, and the verb acts on it, saying `Hub changed to <path> since this shell loaded (it was <path>); re-read.` once. The two new names are the
-contract's (`env.activeSpace`, `env.features`) because both halves type them; `PROMPTS_ROOT` predates
-the contract file and is typed where it is read.
+effect in that process -- the override wins, which is what it is for. Without it, a shell that was open when another one wrote `activeSpace` (the GUI's switch, `Config -Set`) acts on the new Space from its next verb: the module compares the write times of `config.local.json` and `hub.json` before each verb and re-imports when either moved. `PROMPTS_ROOT` and `P20_ACTIVE_SPACE` are part of the same comparison, so one exported into a shell that had already loaded the toolkit (a profile that imports it at startup) is seen on the next verb exactly as a changed file is -- `Env`'s `Hub` check and its `Your hub` row then name one hub, and the verb acts on it, saying `Hub changed to <path> since this shell loaded (it was <path>); re-read.` once. All three names are in the
+contract (`env.promptsRoot`, `env.activeSpace`, `env.features`): the two newer ones because both halves
+type them, and `PROMPTS_ROOT` because every test runner removes it for the run by that name.
 
 ## The agent's cache
 
 The agent keeps one thing on disk that is not a setting and not the hub's: what it has already read
-through the tracker and can prove has not changed, or that it holds for a stated time. Three readers write
+through the tracker and can prove has not changed, or that it holds for a stated time. These readers write
 there. The Design tab's: each design or spec file's parsed row (id, title, description, its stamps, its Docs
 and thread lines; never the body), and the body of a note once it has been opened -- each keyed by the file's
 **blob sha**, a hash of its bytes, so nothing in it can go stale: a note that changes has a new sha and is
@@ -905,7 +907,7 @@ tree `Update` refuses to move while it is dirty. Under it, `rows/<reader>.json` 
 reader's name carries a version, bumped when what it parses changes), `bodies/<sha>` the opened bodies, and
 `ledger-1/<slug>.json` each GitHub Space's ledger with the time it was read (the folder's version is bumped
 when the ledger's shape changes), and `standup-dress-1/<hash>.json` the dressed replies.
-All four folders are **capped by one rule**, applied when something is written: a record or file unseen for
+`rows/`, `bodies/` and `standup-dress-1/` are **capped by one rule**, applied when something is written: a record or file unseen for
 30 days goes, and past 3000 records the oldest-unseen go first (`AGENT_CACHE_MAX_AGE_DAYS` and
 `AGENT_CACHE_MAX_RECORDS` in `agent/core/config.py`; not settings -- nothing to configure). "Seen" is when it
 was last written or served. In `rows/` a row carries a stamp in its file's `seen` map, refreshed by a warm
