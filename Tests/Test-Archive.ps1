@@ -162,6 +162,12 @@ function Get-CommitSubjects {
     finally { Pop-Location }
 }
 
+# Out-String lays text out at the host's width unless told otherwise, and a
+# refusal sentence longer than that can come back split across lines, so a
+# phrase the assertions look for is no longer one substring. Wide enough for
+# any line the script prints.
+$captureWidth = 4096
+
 function Invoke-Archive {
     # Runs the script and captures all streams as a single string.
     # Returns the captured output; callers inspect it for warnings/errors.
@@ -173,7 +179,7 @@ function Invoke-Archive {
     $ErrorActionPreference = 'Continue'
     try {
         $global:LASTEXITCODE = 0
-        $out = & $archiveScript @BoundArgs *>&1 | Out-String
+        $out = & $archiveScript @BoundArgs *>&1 | Out-String -Width $captureWidth
         $script:LastArchiveExit = $LASTEXITCODE
     }
     finally {
@@ -197,7 +203,7 @@ function Invoke-ArchiveCapture {
         $ErrorActionPreference = $prevErr
     }
     return [pscustomobject]@{
-        Text   = ($records | Out-String)
+        Text   = ($records | Out-String -Width $captureWidth)
         Errors = @($records | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] })
     }
 }
