@@ -42,6 +42,8 @@ if ($Help) {
   Clause 14 No comment carries a date, a name, an agent, a nickname for a host, a tracker
             number, an archive pointer, a private repository or a machine path
   Clause 15 No gh, az or git call with a redirected stderr outside Invoke-TrackerRead.ps1
+  Clause 22 Every suite starts its children through Invoke-P20TestHost (ratchet: the
+            allow-list only shrinks)
   Clause 16 No script in Scripts/ carries its own Get-CliPrefix or Write-CliError fallback;
             Scripts/Initialize-CliFallbacks.ps1 is the one copy
   Clause 18 Every Azure DevOps request takes its headers from Get-P20AdoHeaders -OrgUrl `$org
@@ -80,6 +82,12 @@ $script:errors = @()
 # A bare file name stopped being enough when the scan grew to three halves:
 # there is more than one __init__.py and more than one index.ts. Report the path
 # a reader can open.
+function Write-ClauseProgress {
+    # A line before each clause, with the time, so a run that stops says where.
+    param([string]$Label)
+    Write-Host ("  .. {0}  {1}" -f $Label, (Get-Date).ToString('HH:mm:ss')) -ForegroundColor DarkGray
+}
+
 function Get-RelPath {
     param($File)
     $full = $File.FullName
@@ -225,6 +233,7 @@ Write-Host "  ──────────────────────
 Write-Host ""
 
 $runtimeFiles = Get-RuntimeFiles
+Write-ClauseProgress 'Clauses 1 to 4 and 10'
 Assert-True "Found runtime files to scan" ($runtimeFiles.Count -gt 0)
 
 # ── Clause 1: no real email addresses ────────────────────────────────────────
@@ -369,6 +378,7 @@ if ($prefixCount -lt $PrefixDebtBaseline) {
 }
 
 # -- Clause 5: no secrets ------------------------------------------------------
+Write-ClauseProgress 'Clause 5'
 # The highest-severity thing that can reach a commit. Matches the shapes of real
 # credentials rather than the word "key", because a variable NAMED apiKey is
 # correct code -- a literal sk-ant-... next to it is not.
@@ -426,6 +436,7 @@ foreach ($f in $runtimeFiles) {
 Assert-True "Clause 4: no absolute machine paths in shipped scripts" ($absHits.Count -eq 0) ($absHits -join '; ')
 
 # -- Clause 6: nothing vendor-shaped is committed -------------------------------
+Write-ClauseProgress 'Clause 6'
 # The client picks the assistant, not us, so the repo must not favour one. The
 # knowledge lives in AGENTS.md, which is neutral; each assistant's own discovery
 # file is generated per machine and gitignored. A committed .claude/ or
@@ -459,6 +470,7 @@ Assert-True "Clause 6c: the adapter generator ships" (Test-Path $genScript) `
     'Scripts/Update-AgentDocs.ps1 is what makes a vendor-neutral source usable'
 
 # -- Clause 6d: every generated copy is checked on its own ---------------------
+Write-ClauseProgress 'Clause 6d'
 # The home copy of the Claude skill was written only when the CHECKOUT copy
 # drifted, so the checkout read [ok] while the skill an assistant loads was weeks
 # behind.
@@ -500,6 +512,7 @@ catch {
 finally { Remove-Item $adScratch -Recurse -Force -ErrorAction SilentlyContinue }
 
 # -- Clause 6e: the generator reads and writes UTF-8 whatever the host ----------
+Write-ClauseProgress 'Clause 6e'
 # Get-Content -Raw with no -Encoding read AGENTS.md as the ANSI code page under Windows
 # PowerShell 5.1, so an em dash was written garbled and 5.1 and 7 disagreed about drift
 # for good. A macOS machine has no 5.1, so the test holds what it can: a source with an
@@ -540,6 +553,7 @@ Assert-True "Clause 6e: the generator reads its source with an explicit UTF-8 re
     ($genSrc -match 'ReadAllText\(\$sourcePath, \[System\.Text\.Encoding\]::UTF8\)' -and $genSrc -notmatch 'Get-Content\s+\$sourcePath')
 
 # -- Clause 8: the README's logo matches its source -----------------------------
+Write-ClauseProgress 'Clause 8'
 # The mark lives in docs/logo.txt and is inlined into the README as a fenced
 # block. Two copies drift: the README carried an older version for a day after
 # the art was redrawn, and nothing noticed.
@@ -553,6 +567,7 @@ if ((Test-Path $logoPath) -and (Test-Path $readmePath2)) {
 }
 
 # -- Clause 7: shipped docs do not link outside the package ---------------------
+Write-ClauseProgress 'Clause 7'
 # A relative link that resolved in the repo something was carved from arrives
 # broken. That is not hypothetical: GetPRComments writes a link to an agentic
 # prompt into every card it touches, and for a while that folder had not come
@@ -620,6 +635,7 @@ Assert-True "Clause 10: no `$script: read inside a global function body" ($scope
 Assert-True "Clause 10: the scan saw the global functions it is guarding" ($scopeBodies.Count -ge 40) "saw $($scopeBodies.Count)"
 
 # -- Clauses 11 and 12: a suite cannot under-count in silence -----------
+Write-ClauseProgress 'Clauses 11 and 12'
 # A suite's count is the proof, so a suite that can finish short without saying
 # so is a proof with a hole in it. Two shapes did exactly that: a
 # top-level `try { cases } finally { summary }` with no catch, where a
@@ -710,6 +726,7 @@ if ($unresolvedAsserts.Count -gt 0) {
 Assert-True "Clause 12: every Assert- call in a suite resolves to a helper it defines or loads" (($unresolvedAsserts.Count -eq 0) -and ($suiteFiles.Count -ge 30)) $assertDetail
 
 # -- Clause 17: a suite ends with its own verdict -----------------------------
+Write-ClauseProgress 'Clause 17'
 # A suite's exit code is its verdict. One that ends without an `exit` hands its
 # caller the code of the last child process it ran, so a green run can report 1
 # (a pwsh -Command wrapper, the PowerShell tool) and a red one 0. The last
@@ -742,6 +759,7 @@ if ($noVerdict.Count -gt 0) {
 Assert-True "Clause 17: every suite ends with its own exit verdict" (($noVerdict.Count -eq 0) -and ($suiteFiles.Count -ge 30)) $verdictDetail
 
 # -- Clause 13: no work-marker comment ships ------------------------------
+Write-ClauseProgress 'Clause 13'
 # A seam the code leaves open is a roadmap row in docs/KNOWN-GAPS.md, not a
 # comment in the source: a stranger reading the tree should find what is
 # unfinished in one place, with what they see when they hit it. The four marker
@@ -802,6 +820,7 @@ Assert-True "Clause 13: the marker pattern matches a word, case-sensitively, and
     (-not [regex]::IsMatch($markerWords[1].ToLower(), $markerPattern))) ''
 
 # -- Clause 14: no comment carries what a public tree cannot ship -----------
+Write-ClauseProgress 'Clause 14'
 # A comment is read by whoever opens the file, so it is written for a stranger:
 # no date, no person's name, no agent's name, no tracker number as the subject of
 # a sentence, no pointer into a private archive, no private repository, no machine
@@ -1126,6 +1145,7 @@ finally {
 }
 
 # -- Clause 15: a script calls gh or az through Invoke-P20TrackerRead ----------
+Write-ClauseProgress 'Clause 15'
 # AGENTS.md, "Traps worth knowing": under Windows PowerShell 5.1 a native call
 # whose stderr is redirected (2>&1, 2>$null, *> $null) while the preference is
 # 'Stop' throws on the first stderr line, before the exit code can be read, so a
@@ -1169,7 +1189,7 @@ function Get-RawTrackerCalls {
     # exactly those $(...) spans, wherever they sit (bare in code or nested in
     # a string), so a match inside one is read even though it is also inside
     # the string token that contains it.
-    param([string]$Text)
+    param([string]$Text, [string]$Pattern = $rawTrackerPattern)
     $tokens = $null; $parseErrors = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$tokens, [ref]$parseErrors)
     $skip = @($tokens | Where-Object {
@@ -1181,7 +1201,7 @@ function Get-RawTrackerCalls {
             ForEach-Object { $_.Extent })
     }
     $found = @()
-    foreach ($m in [regex]::Matches($Text, $rawTrackerPattern)) {
+    foreach ($m in [regex]::Matches($Text, $Pattern)) {
         $inside = $false
         foreach ($t in $skip) {
             if ($m.Index -ge $t.Extent.StartOffset -and $m.Index -lt $t.Extent.EndOffset) {
@@ -1259,7 +1279,113 @@ Assert-True "Clause 15: an entry-level file lets its listed call through" (@(Get
 Assert-True "Clause 15: a whole-file reason string allows every raw call in the file" (@(Get-UnlistedRawTrackerCalls $entryBody 'reason').Count -eq 0) 'a string entry reported a call'
 Assert-True "Clause 15: no allow-list entry is left marked D3J7 follow-up" (-not (($rawTrackerAllowed.Values | ForEach-Object { if ($_ -is [hashtable]) { $_.Reason } else { $_ } }) -match 'D3J7 follow-up')) 'a follow-up entry remains'
 
+# -- Clause 22: a suite starts its children through Invoke-P20TestHost --------
+# AGENTS.md, "Traps worth knowing": a suite's children start through
+# Invoke-P20TestHost (Tests/Get-TestHost.ps1), in the host the suite runs in.
+# A suite that types `& pwsh ... 2>&1` instead does two things wrong on Windows
+# PowerShell 5.1: under 'Stop' the child's first stderr line is a terminating
+# NativeCommandError, so the suite stops there; and the verbs it types run on
+# PowerShell 7, so the 5.1 job proves the suite's own code and not the verbs.
+# Read with Clause 15's reader, so a comment or a string naming such a call is
+# not one.
+#
+# The allow-list is the suites not yet moved, each with what it costs. It only
+# shrinks: no name outside the first list may join it, a name moved off it goes
+# in $childPwshMoved and may not come back, and a listed suite with no raw call
+# left is a stale entry. docs/TESTING.md and docs/KNOWN-GAPS.md state how many
+# suites start every child in their own host, and the count is held to this list.
+$childPwshPattern = '(?<![\w$-])pwsh\s(?:[^|\r\n`]|`[^\r\n]|`\r?\n)*(2>|\*>)'
+$childPwshReason = 'starts pwsh by name: under the 5.1 job its verbs run on 7'
+$childPwshAllowed = @{
+    'Tests/Test-Agent.ps1'                  = $childPwshReason
+    'Tests/Test-Archive.ps1'                = $childPwshReason
+    'Tests/Test-Autoload.ps1'               = $childPwshReason
+    'Tests/Test-BackfillStamps.ps1'         = $childPwshReason
+    'Tests/Test-Billable.ps1'               = $childPwshReason
+    'Tests/Test-CloseWorkItem.ps1'          = $childPwshReason
+    'Tests/Test-Config.ps1'                 = $childPwshReason
+    'Tests/Test-Cover.ps1'                  = $childPwshReason
+    'Tests/Test-DocCounts.ps1'              = $childPwshReason
+    'Tests/Test-EditItem.ps1'               = $childPwshReason
+    'Tests/Test-Environment.ps1'            = $childPwshReason
+    'Tests/Test-ExitCodes.ps1'              = $childPwshReason
+    'Tests/Test-GitRoot.ps1'                = $childPwshReason
+    'Tests/Test-HubJson.ps1'                = $childPwshReason
+    'Tests/Test-Menu.ps1'                   = $childPwshReason
+    'Tests/Test-ModuleCommands.ps1'         = $childPwshReason
+    'Tests/Test-Move.ps1'                   = $childPwshReason
+    'Tests/Test-NewMeeting.ps1'             = $childPwshReason
+    'Tests/Test-Plan.ps1'                   = $childPwshReason
+    'Tests/Test-Portability.ps1'            = $childPwshReason
+    'Tests/Test-PublishPR.ps1'              = $childPwshReason
+    'Tests/Test-Reminders.ps1'              = $childPwshReason
+    'Tests/Test-Rituals.ps1'                = $childPwshReason
+    'Tests/Test-SendTeams.ps1'              = $childPwshReason
+    'Tests/Test-Setup.ps1'                  = $childPwshReason
+    'Tests/Test-StandupRemind.ps1'          = $childPwshReason
+    'Tests/Test-Start.ps1'                  = $childPwshReason
+    'Tests/Test-StartWork.ps1'              = $childPwshReason
+    'Tests/Test-Status.ps1'                 = $childPwshReason
+    'Tests/Test-Sync.ps1'                   = $childPwshReason
+    'Tests/Test-Tag.ps1'                    = $childPwshReason
+    'Tests/Test-TestAll.ps1'                = $childPwshReason
+    'Tests/Test-ThreadHash.ps1'             = $childPwshReason
+    'Tests/Test-Update.ps1'                 = $childPwshReason
+    'Tests/Test-Web.ps1'                    = $childPwshReason
+    'Tests/Test-WorkReview.ps1'             = $childPwshReason
+}
+$childPwshFirstList = @('Tests/Test-Agent.ps1', 'Tests/Test-Archive.ps1', 'Tests/Test-Autoload.ps1', 'Tests/Test-BackfillStamps.ps1', 'Tests/Test-Billable.ps1', 'Tests/Test-CloseWorkItem.ps1', 'Tests/Test-Config.ps1', 'Tests/Test-Cover.ps1', 'Tests/Test-DocCounts.ps1', 'Tests/Test-EditItem.ps1', 'Tests/Test-Environment.ps1', 'Tests/Test-ExitCodes.ps1', 'Tests/Test-GitRoot.ps1', 'Tests/Test-HubJson.ps1', 'Tests/Test-Menu.ps1', 'Tests/Test-ModuleCommands.ps1', 'Tests/Test-Move.ps1', 'Tests/Test-NewMeeting.ps1', 'Tests/Test-Plan.ps1', 'Tests/Test-Portability.ps1', 'Tests/Test-PublishPR.ps1', 'Tests/Test-Reminders.ps1', 'Tests/Test-Rituals.ps1', 'Tests/Test-SendTeams.ps1', 'Tests/Test-Setup.ps1', 'Tests/Test-StandupRemind.ps1', 'Tests/Test-Start.ps1', 'Tests/Test-StartWork.ps1', 'Tests/Test-Status.ps1', 'Tests/Test-Sync.ps1', 'Tests/Test-Tag.ps1', 'Tests/Test-TestAll.ps1', 'Tests/Test-ThreadHash.ps1', 'Tests/Test-Update.ps1', 'Tests/Test-Web.ps1', 'Tests/Test-WorkReview.ps1')
+$childPwshMoved = @('Tests/Test-HowWeWork.ps1', 'Tests/Test-Land.ps1')
+$childPwshSuites = @(Get-ChildItem (Join-Path $pkgRoot 'Tests') -Filter 'Test-*.ps1' -File | Where-Object { $_.Name -ne 'Test-Toolkit.ps1' })
+$childPwshHits = @()
+$childPwshStale = @()
+foreach ($f in $childPwshSuites) {
+    $rel = Get-RelPath $f
+    $calls = @(Get-RawTrackerCalls ([System.IO.File]::ReadAllText($f.FullName)) $childPwshPattern)
+    if ($childPwshAllowed.ContainsKey($rel)) {
+        if ($calls.Count -eq 0) { $childPwshStale += $rel }
+    }
+    else {
+        foreach ($hit in $calls) { $childPwshHits += "${rel}:$hit" }
+    }
+}
+$childPwshDetail = "read $($childPwshSuites.Count) suites"
+if ($childPwshHits.Count -gt 0) {
+    $childPwshDetail = "start the child with Invoke-P20TestHost -File/-Command (Tests/Get-TestHost.ps1): " + ($childPwshHits -join '; ')
+}
+Assert-True "Clause 22: no suite off the allow-list starts pwsh by name with its stderr redirected" (($childPwshHits.Count -eq 0) -and ($childPwshSuites.Count -ge 50)) $childPwshDetail
+Assert-True "Clause 22: every suite on the allow-list still starts pwsh by name (a moved one leaves the list)" ($childPwshStale.Count -eq 0) ("stale: " + ($childPwshStale -join ', '))
+$childPwshNew = @($childPwshAllowed.Keys | Where-Object { $childPwshFirstList -notcontains $_ })
+Assert-True "Clause 22: the allow-list only shrinks: no name outside its first list" ($childPwshNew.Count -eq 0) ("added: " + ($childPwshNew -join ', '))
+$childPwshBack = @($childPwshMoved | Where-Object { $childPwshAllowed.ContainsKey($_) })
+Assert-True "Clause 22: a suite moved off the allow-list does not come back" ($childPwshBack.Count -eq 0) ("back: " + ($childPwshBack -join ', '))
+$childPwshMovedRaw = @($childPwshMoved | Where-Object { @(Get-RawTrackerCalls ([System.IO.File]::ReadAllText((Join-Path $pkgRoot $_))) $childPwshPattern).Count -gt 0 })
+Assert-True "Clause 22: a moved suite starts no pwsh by name" ($childPwshMovedRaw.Count -eq 0) ("raw again: " + ($childPwshMovedRaw -join ', '))
+Assert-True "Clause 22: every entry gives what it costs" (@($childPwshAllowed.Values | Where-Object { $_ -ne $childPwshReason }).Count -eq 0) 'an entry carries another reason'
+
+# The count the documents state: suites that start every child in their own host.
+$childPwshInHost = $childPwshSuites.Count - $childPwshAllowed.Count
+$childPwshSentence = "$childPwshInHost of $($childPwshSuites.Count) CLI suites start every child in the host they run in"
+foreach ($doc in @('docs/TESTING.md', 'docs/KNOWN-GAPS.md')) {
+    $docText = [System.IO.File]::ReadAllText((Join-Path $pkgRoot $doc))
+    Assert-True "Clause 22: $doc says $childPwshSentence" ($docText.Contains($childPwshSentence)) "write: $childPwshSentence"
+}
+
+# The sweep's own cases.
+$childPwshCases = @(
+    @{ Hit = $true;  Why = 'a child started by name, stderr kept';       Body = '$out = & pwsh -NoProfile -File $runner 2>&1' }
+    @{ Hit = $true;  Why = 'a child started by name, stderr dropped';    Body = '$null = & pwsh -NoProfile -Command $cmd 2>$null' }
+    @{ Hit = $false; Why = 'a child through the one helper';             Body = '$out = Invoke-P20TestHost -File $runner -NonInteractive' }
+    @{ Hit = $false; Why = 'a comment that names the trap';              Body = '# & pwsh -File x 2>&1 throws under Stop on 5.1' }
+    @{ Hit = $false; Why = 'a string that names a call';                 Body = 'Write-Host "run: pwsh -File x 2>&1"' }
+)
+foreach ($case in $childPwshCases) {
+    $caseHits = @(Get-RawTrackerCalls $case.Body $childPwshPattern).Count
+    Assert-True "Clause 22: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
+}
+
 # -- Clause 9: the documented config shape is the implemented one --------------
+Write-ClauseProgress 'Clause 9'
 # Two failures of the same kind, both found on a cold start: the no-config
 # warning told a reader to copy the whole shipped table, and docs/CONFIGURATION.md
 # told them to patch `orgs` as an ARRAY, which the merge ignores in silence. A
@@ -1389,6 +1515,7 @@ finally {
 }
 
 # -- Clause 16: one copy of the standalone fallbacks ---------------------------
+Write-ClauseProgress 'Clause 16'
 # A script run with no module loaded takes Get-CliPrefix and Write-CliError from
 # Scripts/Initialize-CliFallbacks.ps1, which it dot-sources. Every script used to
 # carry its own pair, and copies drift: some of them stopped recording the stated
@@ -1430,6 +1557,7 @@ Assert-True "Clause 16: the sweep finds an inline definition, indented or global
     (-not ('function Get-CliPrefixes {' -match $fbPattern))) ''
 
 # -- Clause 18: an Azure DevOps token goes to the Space's organisation only -----
+Write-ClauseProgress 'Clause 18'
 # Two conditions keep the token at home, and this holds both at every request a
 # script makes: the headers come from Get-P20AdoHeaders (which refuses an address
 # the tracker rule does not read as Azure DevOps, or one that is not https), and
@@ -1568,6 +1696,7 @@ foreach ($case in @(
 }
 
 # -- Clause 19: every Get-Content names its encoding ---------------------------
+Write-ClauseProgress 'Clause 19'
 # Windows PowerShell 5.1 reads a file with no BOM in the system's ANSI code page
 # when Get-Content is given no -Encoding; 7 reads it as UTF-8. Every file this
 # package reads is UTF-8 -- the config Config writes, a card, a session -- so a
@@ -1590,7 +1719,7 @@ $gcFiles = @()
 foreach ($dir in @('Scripts', 'Prompt20Toolkit', 'Config', 'agent')) {
     $full = Join-Path $pkgRoot $dir
     if (-not (Test-Path -LiteralPath $full)) { continue }
-    $gcFiles += @(Get-ChildItem -LiteralPath $full -Recurse -File -Include '*.ps1', '*.psm1' | Where-Object { $_.FullName -notmatch '[\\/]node_modules[\\/]' })
+    $gcFiles += @(Get-ScanFile -Path $full -Extension '.ps1', '.psm1' -Recurse)
 }
 $gcFiles += @(Get-ChildItem -LiteralPath $pkgRoot -Filter '*.psm1' -File)
 foreach ($f in $gcFiles) {
@@ -1609,6 +1738,7 @@ foreach ($case in @(
 }
 
 # -- Clause 20: a path the package computes is read literally -----------------
+Write-ClauseProgress 'Clause 20'
 # -Path is a wildcard pattern. A hub, a package or a home folder whose name holds
 # [ or ] -- "Work [old]" -- is then a pattern that matches nothing: Test-Path says
 # false of a card that is there, Get-ChildItem lists no cards, Move-Item throws,
@@ -1622,6 +1752,21 @@ foreach ($case in @(
 $literalResolving = @('Test-Path', 'Get-Content', 'Get-ChildItem', 'Get-Item', 'Resolve-Path', 'Convert-Path',
     'Import-PowerShellDataFile', 'Set-Content', 'Add-Content', 'Clear-Content', 'Copy-Item', 'Move-Item', 'Rename-Item',
     'Remove-Item', 'Set-Location', 'Push-Location', 'Out-File', 'Get-FileHash', 'Select-String', 'Get-ItemProperty', 'Invoke-Item')
+# Get-Command for a name that is not a command searches every folder on PATH,
+# and Clause 20 asks it of every command name in every file, so each answer is
+# kept: by the exact name (ordinal, so 'Del' and 'del' are asked separately, as
+# Get-Command would be asked), a hit resolved through its alias, and a miss as
+# $null, so a repeated unknown is not searched for again.
+$sweepCommandCache = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([System.StringComparer]::Ordinal)
+function Resolve-SweepCommand {
+    param([string]$Name)
+    $found = $null
+    if ($sweepCommandCache.TryGetValue($Name, [ref]$found)) { return $found }
+    $found = Get-Command $Name -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($found -and $found.CommandType -eq 'Alias') { $found = $found.ResolvedCommand }
+    $sweepCommandCache[$Name] = $found
+    return $found
+}
 function Get-NonLiteralPathHits {
     param([string]$Text, [string]$Name = 'body')
     $ast = [System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$null, [ref]$null)
@@ -1629,8 +1774,7 @@ function Get-NonLiteralPathHits {
     foreach ($c in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)) {
         $cn = $c.GetCommandName()
         if (-not $cn) { continue }
-        $cmd = Get-Command $cn -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($cmd -and $cmd.CommandType -eq 'Alias') { $cmd = $cmd.ResolvedCommand }
+        $cmd = Resolve-SweepCommand $cn
         if (-not $cmd -or $literalResolving -notcontains $cmd.Name) { continue }
         $bound = [System.Management.Automation.Language.StaticParameterBinder]::BindCommand($c, $true).BoundParameters
         if ($bound.ContainsKey('LiteralPath')) { continue }
@@ -1669,8 +1813,25 @@ foreach ($case in @(
     $caseHits = @(Get-NonLiteralPathHits -Text $case.Body).Count
     Assert-True "Clause 20: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
 }
+# The cache answers as Get-Command would: a body read twice reports the same
+# hits, a name that is no command is kept as a miss, and a hit as the command.
+$cacheBody = "if (Test-Path `$card) { }`nNo-SuchSweepCommand `$card`nif (Test-Path `$other) { }`nNo-SuchSweepCommand `$other"
+$cacheFirst = @(Get-NonLiteralPathHits -Text $cacheBody)
+$cacheSecond = @(Get-NonLiteralPathHits -Text $cacheBody)
+Assert-True "Clause 20: a body read twice reports the same hits from the cache" (($cacheFirst.Count -eq 2) -and (($cacheFirst -join '|') -eq ($cacheSecond -join '|'))) "first: $($cacheFirst -join '; ') second: $($cacheSecond -join '; ')"
+$cachedMiss = $null; $cachedHit = $null
+$missKept = $sweepCommandCache.TryGetValue('No-SuchSweepCommand', [ref]$cachedMiss)
+$hitKept = $sweepCommandCache.TryGetValue('Test-Path', [ref]$cachedHit)
+Assert-True "Clause 20: the cache keeps a miss as a miss and a hit as the command" ($missKept -and ($null -eq $cachedMiss) -and $hitKept -and ($cachedHit.Name -eq 'Test-Path')) "miss kept: $missKept; hit: $($cachedHit.Name)"
+Assert-True "Clause 20: the cache keys on the exact name, not a folded one" (-not $sweepCommandCache.ContainsKey('test-path')) 'a lowercase key was found without being asked'
+
+# Each sweep's file set holds only its own kinds of file, on the host running it
+# (Windows PowerShell 5.1 once let every file into the Clause 19 set).
+$gcStray = @($gcFiles | Where-Object { @('.ps1', '.psm1') -notcontains $_.Extension.ToLowerInvariant() })
+Assert-True "Clause 19 and 20: the file set holds only .ps1 and .psm1 files ($($gcFiles.Count))" ($gcStray.Count -eq 0) ("stray: " + (($gcStray | Select-Object -First 5 | ForEach-Object { $_.Name }) -join ', '))
 
 # -- Clause 21: a script without a BOM is ASCII --------------------------------
+Write-ClauseProgress 'Clause 21'
 # Windows PowerShell 5.1 reads a .ps1, .psm1 or .psd1 that has no byte-order mark
 # in the system's ANSI code page; 7 reads it as UTF-8. A non-ASCII character in
 # such a file is two different scripts: a regex class written with raw symbols
@@ -1702,7 +1863,7 @@ function Get-NonAsciiScriptState {
     return @{ Bom = $bom; Line = $line }
 }
 
-$scriptFiles = @(Get-ChildItem -LiteralPath $pkgRoot -Recurse -File -Include '*.ps1', '*.psm1', '*.psd1' | Select-ScannableFile)
+$scriptFiles = @(Get-ScanFile -Path $pkgRoot -Extension '.ps1', '.psm1', '.psd1' -Recurse)
 $noBomHits = @()
 $shippedHits = @()
 $allowedSeen = @{}
@@ -1715,6 +1876,9 @@ foreach ($f in $scriptFiles) {
     if ($nonAsciiAllowed -contains $rel) { $allowedSeen[$rel] = $state.Bom; continue }
     if ($shipped) { $shippedHits += "${rel}:$($state.Line)" }
 }
+$scriptStray = @($scriptFiles | Where-Object { @('.ps1', '.psm1', '.psd1') -notcontains $_.Extension.ToLowerInvariant() })
+$scriptExcluded = @($scriptFiles | Where-Object { Test-ScanExcluded -Path $_.FullName })
+Assert-True "Clause 21: the file set holds only scripts, and nothing under an excluded folder ($($scriptFiles.Count))" (($scriptStray.Count -eq 0) -and ($scriptExcluded.Count -eq 0)) ("stray: " + ((@($scriptStray) + @($scriptExcluded) | Select-Object -First 5 | ForEach-Object { $_.FullName }) -join ', '))
 Assert-True "Clause 21: no script in the package holds a non-ASCII byte without a BOM ($($scriptFiles.Count) files)" (
     ($noBomHits.Count -eq 0) -and ($scriptFiles.Count -ge 150)) ($noBomHits -join '; ')
 Assert-True "Clause 21: no shipped script holds a non-ASCII byte, but the $($nonAsciiAllowed.Count) named" (
