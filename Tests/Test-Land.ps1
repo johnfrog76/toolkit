@@ -40,6 +40,9 @@ $logDir = Join-Path $root 'log'
 $stateDir = Join-Path $root 'tracker'
 $callLog = Join-Path $root 'calls.log'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
+# Children start in the host this suite runs in, with stderr read as text on 5.1
+# (Tests/Get-TestHost.ps1).
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 
 function New-LandSandbox {
     New-Item -ItemType Directory -Path $pkgDir, $hubDir, $logDir, $stateDir -Force | Out-Null
@@ -149,7 +152,7 @@ function Invoke-Land {
     if ($PrState) { $pre = "`$env:P20_TEST_PR_STATE = '$PrState'`n" + $pre }
     if ($AdoStatus) { $pre = "`$env:P20_TEST_ADO_STATUS = '$AdoStatus'`n" + $pre }
     [System.IO.File]::WriteAllText($runner, ($pre + "`n" + $Snippet + "`n; `"EXIT=`$LASTEXITCODE`"`n"), $utf8)
-    $out = & pwsh -NoProfile -File $runner 2>&1
+    $out = Invoke-P20TestHost -File $runner
     $text = (($out | ForEach-Object { $_.ToString() }) -join "`n")
     $calls = if (Test-Path $callLog) { @(Get-Content $callLog) } else { @() }
     return [pscustomobject]@{ Text = $text; Calls = $calls }

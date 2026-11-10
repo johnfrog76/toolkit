@@ -42,6 +42,8 @@ if ($Help) {
   Clause 14 No comment carries a date, a name, an agent, a nickname for a host, a tracker
             number, an archive pointer, a private repository or a machine path
   Clause 15 No gh, az or git call with a redirected stderr outside Invoke-TrackerRead.ps1
+  Clause 22 Every suite starts its children through Invoke-P20TestHost (ratchet: the
+            allow-list only shrinks)
   Clause 16 No script in Scripts/ carries its own Get-CliPrefix or Write-CliError fallback;
             Scripts/Initialize-CliFallbacks.ps1 is the one copy
   Clause 18 Every Azure DevOps request takes its headers from Get-P20AdoHeaders -OrgUrl `$org
@@ -1187,7 +1189,7 @@ function Get-RawTrackerCalls {
     # exactly those $(...) spans, wherever they sit (bare in code or nested in
     # a string), so a match inside one is read even though it is also inside
     # the string token that contains it.
-    param([string]$Text)
+    param([string]$Text, [string]$Pattern = $rawTrackerPattern)
     $tokens = $null; $parseErrors = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$tokens, [ref]$parseErrors)
     $skip = @($tokens | Where-Object {
@@ -1199,7 +1201,7 @@ function Get-RawTrackerCalls {
             ForEach-Object { $_.Extent })
     }
     $found = @()
-    foreach ($m in [regex]::Matches($Text, $rawTrackerPattern)) {
+    foreach ($m in [regex]::Matches($Text, $Pattern)) {
         $inside = $false
         foreach ($t in $skip) {
             if ($m.Index -ge $t.Extent.StartOffset -and $m.Index -lt $t.Extent.EndOffset) {
@@ -1276,6 +1278,111 @@ Assert-True "Clause 15: an entry-level file reports the raw call its Lines do no
 Assert-True "Clause 15: an entry-level file lets its listed call through" (@(Get-UnlistedRawTrackerCalls "git push 2>&1 | Out-Null" $entryAllow).Count -eq 0) 'the listed call was reported'
 Assert-True "Clause 15: a whole-file reason string allows every raw call in the file" (@(Get-UnlistedRawTrackerCalls $entryBody 'reason').Count -eq 0) 'a string entry reported a call'
 Assert-True "Clause 15: no allow-list entry is left marked D3J7 follow-up" (-not (($rawTrackerAllowed.Values | ForEach-Object { if ($_ -is [hashtable]) { $_.Reason } else { $_ } }) -match 'D3J7 follow-up')) 'a follow-up entry remains'
+
+# -- Clause 22: a suite starts its children through Invoke-P20TestHost --------
+# AGENTS.md, "Traps worth knowing": a suite's children start through
+# Invoke-P20TestHost (Tests/Get-TestHost.ps1), in the host the suite runs in.
+# A suite that types `& pwsh ... 2>&1` instead does two things wrong on Windows
+# PowerShell 5.1: under 'Stop' the child's first stderr line is a terminating
+# NativeCommandError, so the suite stops there; and the verbs it types run on
+# PowerShell 7, so the 5.1 job proves the suite's own code and not the verbs.
+# Read with Clause 15's reader, so a comment or a string naming such a call is
+# not one.
+#
+# The allow-list is the suites not yet moved, each with what it costs. It only
+# shrinks: no name outside the first list may join it, a name moved off it goes
+# in $childPwshMoved and may not come back, and a listed suite with no raw call
+# left is a stale entry. docs/TESTING.md and docs/KNOWN-GAPS.md state how many
+# suites start every child in their own host, and the count is held to this list.
+$childPwshPattern = '(?<![\w$-])pwsh\s(?:[^|\r\n`]|`[^\r\n]|`\r?\n)*(2>|\*>)'
+$childPwshReason = 'starts pwsh by name: under the 5.1 job its verbs run on 7'
+$childPwshAllowed = @{
+    'Tests/Test-Agent.ps1'                  = $childPwshReason
+    'Tests/Test-Archive.ps1'                = $childPwshReason
+    'Tests/Test-Autoload.ps1'               = $childPwshReason
+    'Tests/Test-BackfillStamps.ps1'         = $childPwshReason
+    'Tests/Test-Billable.ps1'               = $childPwshReason
+    'Tests/Test-CloseWorkItem.ps1'          = $childPwshReason
+    'Tests/Test-Config.ps1'                 = $childPwshReason
+    'Tests/Test-Cover.ps1'                  = $childPwshReason
+    'Tests/Test-DocCounts.ps1'              = $childPwshReason
+    'Tests/Test-EditItem.ps1'               = $childPwshReason
+    'Tests/Test-Environment.ps1'            = $childPwshReason
+    'Tests/Test-ExitCodes.ps1'              = $childPwshReason
+    'Tests/Test-GitRoot.ps1'                = $childPwshReason
+    'Tests/Test-HubJson.ps1'                = $childPwshReason
+    'Tests/Test-Menu.ps1'                   = $childPwshReason
+    'Tests/Test-ModuleCommands.ps1'         = $childPwshReason
+    'Tests/Test-Move.ps1'                   = $childPwshReason
+    'Tests/Test-NewMeeting.ps1'             = $childPwshReason
+    'Tests/Test-Plan.ps1'                   = $childPwshReason
+    'Tests/Test-Portability.ps1'            = $childPwshReason
+    'Tests/Test-PublishPR.ps1'              = $childPwshReason
+    'Tests/Test-Reminders.ps1'              = $childPwshReason
+    'Tests/Test-Rituals.ps1'                = $childPwshReason
+    'Tests/Test-SendTeams.ps1'              = $childPwshReason
+    'Tests/Test-Setup.ps1'                  = $childPwshReason
+    'Tests/Test-StandupRemind.ps1'          = $childPwshReason
+    'Tests/Test-Start.ps1'                  = $childPwshReason
+    'Tests/Test-StartWork.ps1'              = $childPwshReason
+    'Tests/Test-Status.ps1'                 = $childPwshReason
+    'Tests/Test-Sync.ps1'                   = $childPwshReason
+    'Tests/Test-Tag.ps1'                    = $childPwshReason
+    'Tests/Test-TestAll.ps1'                = $childPwshReason
+    'Tests/Test-ThreadHash.ps1'             = $childPwshReason
+    'Tests/Test-Update.ps1'                 = $childPwshReason
+    'Tests/Test-Web.ps1'                    = $childPwshReason
+    'Tests/Test-WorkReview.ps1'             = $childPwshReason
+}
+$childPwshFirstList = @('Tests/Test-Agent.ps1', 'Tests/Test-Archive.ps1', 'Tests/Test-Autoload.ps1', 'Tests/Test-BackfillStamps.ps1', 'Tests/Test-Billable.ps1', 'Tests/Test-CloseWorkItem.ps1', 'Tests/Test-Config.ps1', 'Tests/Test-Cover.ps1', 'Tests/Test-DocCounts.ps1', 'Tests/Test-EditItem.ps1', 'Tests/Test-Environment.ps1', 'Tests/Test-ExitCodes.ps1', 'Tests/Test-GitRoot.ps1', 'Tests/Test-HubJson.ps1', 'Tests/Test-Menu.ps1', 'Tests/Test-ModuleCommands.ps1', 'Tests/Test-Move.ps1', 'Tests/Test-NewMeeting.ps1', 'Tests/Test-Plan.ps1', 'Tests/Test-Portability.ps1', 'Tests/Test-PublishPR.ps1', 'Tests/Test-Reminders.ps1', 'Tests/Test-Rituals.ps1', 'Tests/Test-SendTeams.ps1', 'Tests/Test-Setup.ps1', 'Tests/Test-StandupRemind.ps1', 'Tests/Test-Start.ps1', 'Tests/Test-StartWork.ps1', 'Tests/Test-Status.ps1', 'Tests/Test-Sync.ps1', 'Tests/Test-Tag.ps1', 'Tests/Test-TestAll.ps1', 'Tests/Test-ThreadHash.ps1', 'Tests/Test-Update.ps1', 'Tests/Test-Web.ps1', 'Tests/Test-WorkReview.ps1')
+$childPwshMoved = @('Tests/Test-HowWeWork.ps1', 'Tests/Test-Land.ps1')
+$childPwshSuites = @(Get-ChildItem (Join-Path $pkgRoot 'Tests') -Filter 'Test-*.ps1' -File | Where-Object { $_.Name -ne 'Test-Toolkit.ps1' })
+$childPwshHits = @()
+$childPwshStale = @()
+foreach ($f in $childPwshSuites) {
+    $rel = Get-RelPath $f
+    $calls = @(Get-RawTrackerCalls ([System.IO.File]::ReadAllText($f.FullName)) $childPwshPattern)
+    if ($childPwshAllowed.ContainsKey($rel)) {
+        if ($calls.Count -eq 0) { $childPwshStale += $rel }
+    }
+    else {
+        foreach ($hit in $calls) { $childPwshHits += "${rel}:$hit" }
+    }
+}
+$childPwshDetail = "read $($childPwshSuites.Count) suites"
+if ($childPwshHits.Count -gt 0) {
+    $childPwshDetail = "start the child with Invoke-P20TestHost -File/-Command (Tests/Get-TestHost.ps1): " + ($childPwshHits -join '; ')
+}
+Assert-True "Clause 22: no suite off the allow-list starts pwsh by name with its stderr redirected" (($childPwshHits.Count -eq 0) -and ($childPwshSuites.Count -ge 50)) $childPwshDetail
+Assert-True "Clause 22: every suite on the allow-list still starts pwsh by name (a moved one leaves the list)" ($childPwshStale.Count -eq 0) ("stale: " + ($childPwshStale -join ', '))
+$childPwshNew = @($childPwshAllowed.Keys | Where-Object { $childPwshFirstList -notcontains $_ })
+Assert-True "Clause 22: the allow-list only shrinks: no name outside its first list" ($childPwshNew.Count -eq 0) ("added: " + ($childPwshNew -join ', '))
+$childPwshBack = @($childPwshMoved | Where-Object { $childPwshAllowed.ContainsKey($_) })
+Assert-True "Clause 22: a suite moved off the allow-list does not come back" ($childPwshBack.Count -eq 0) ("back: " + ($childPwshBack -join ', '))
+$childPwshMovedRaw = @($childPwshMoved | Where-Object { @(Get-RawTrackerCalls ([System.IO.File]::ReadAllText((Join-Path $pkgRoot $_))) $childPwshPattern).Count -gt 0 })
+Assert-True "Clause 22: a moved suite starts no pwsh by name" ($childPwshMovedRaw.Count -eq 0) ("raw again: " + ($childPwshMovedRaw -join ', '))
+Assert-True "Clause 22: every entry gives what it costs" (@($childPwshAllowed.Values | Where-Object { $_ -ne $childPwshReason }).Count -eq 0) 'an entry carries another reason'
+
+# The count the documents state: suites that start every child in their own host.
+$childPwshInHost = $childPwshSuites.Count - $childPwshAllowed.Count
+$childPwshSentence = "$childPwshInHost of $($childPwshSuites.Count) CLI suites start every child in the host they run in"
+foreach ($doc in @('docs/TESTING.md', 'docs/KNOWN-GAPS.md')) {
+    $docText = [System.IO.File]::ReadAllText((Join-Path $pkgRoot $doc))
+    Assert-True "Clause 22: $doc says $childPwshSentence" ($docText.Contains($childPwshSentence)) "write: $childPwshSentence"
+}
+
+# The sweep's own cases.
+$childPwshCases = @(
+    @{ Hit = $true;  Why = 'a child started by name, stderr kept';       Body = '$out = & pwsh -NoProfile -File $runner 2>&1' }
+    @{ Hit = $true;  Why = 'a child started by name, stderr dropped';    Body = '$null = & pwsh -NoProfile -Command $cmd 2>$null' }
+    @{ Hit = $false; Why = 'a child through the one helper';             Body = '$out = Invoke-P20TestHost -File $runner -NonInteractive' }
+    @{ Hit = $false; Why = 'a comment that names the trap';              Body = '# & pwsh -File x 2>&1 throws under Stop on 5.1' }
+    @{ Hit = $false; Why = 'a string that names a call';                 Body = 'Write-Host "run: pwsh -File x 2>&1"' }
+)
+foreach ($case in $childPwshCases) {
+    $caseHits = @(Get-RawTrackerCalls $case.Body $childPwshPattern).Count
+    Assert-True "Clause 22: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
+}
 
 # -- Clause 9: the documented config shape is the implemented one --------------
 Write-ClauseProgress 'Clause 9'
