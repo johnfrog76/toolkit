@@ -169,7 +169,7 @@ module and you add a mock line to every one of these files.
 **Four test runners**, one per half plus one for the two together. Run the ones your change touches:
 
 ```powershell
-tkTestToolkit                 # the CLI -- 52 suites, 9864 assertions on this commit
+tkTestToolkit                 # the CLI -- 52 suites, 9873 assertions on this commit
 ```
 
 ```bash
@@ -413,6 +413,14 @@ Each step already done is skipped, so it is safe to re-run.
   `Invoke-P20TestHost` (`Tests/Get-TestHost.ps1`), in the host it is running in, with a `-Command`
   passed as `-EncodedCommand` because 5.1 drops a bare `"` from a native argument; the runner starts each
   suite the same way, and the Windows job's last step starts the runner in `powershell.exe`.
+- **A suite calls git through `Invoke-P20TestGit`, never raw.** A suite builds its fixture repositories
+  with git, and on Windows git warns on stderr about line endings. Under 5.1, `git add -A 2>&1 | Out-Null`
+  with `Stop` in force throws on that warning, so the suite stops part-way there and passes on 7.
+  `Invoke-P20TestGit` (`Tests/Get-TestHost.ps1`) runs git with `Continue` for the one call and returns
+  `Code`, `Lines`, `Out` and `Err`, the shape `Invoke-P20TrackerRead` gives a script. A fixture's
+  `core.autocrlf false` stays, because it decides the bytes a card gets on Windows, but it is not what
+  keeps stderr quiet. `Test-Portability`'s Clause 23 fails on a raw redirected git call anywhere under
+  `Tests/`, the runner included, and allows nothing but the helper's own.
 - **A suite that runs a script directly does not test the verb.** A suite that drives
   `Move-PromptToArchive.ps1` with a stubbed `Get-PromptFolders` stays green while `Archive` typed as a
   verb can look in `<hub>/<org>/` and see no cards at all -- as it does when the module's own

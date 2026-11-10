@@ -37,6 +37,7 @@
 param()
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 # Package root is the parent of Tests/, from this file's own location:
@@ -145,12 +146,12 @@ function New-SyncSandbox {
 
     Push-Location $base
     try {
-        git init --quiet 2>&1 | Out-Null
-        git checkout -B main --quiet 2>&1 | Out-Null
-        git config user.email 'test@example.com' 2>&1 | Out-Null
-        git config user.name 'Sync Test' 2>&1 | Out-Null
-        git config commit.gpgsign false 2>&1 | Out-Null
-        git config core.hooksPath 'hooks' 2>&1 | Out-Null
+        $null = Invoke-P20TestGit init --quiet
+        $null = Invoke-P20TestGit checkout -B main --quiet
+        $null = Invoke-P20TestGit config user.email 'test@example.com'
+        $null = Invoke-P20TestGit config user.name 'Sync Test'
+        $null = Invoke-P20TestGit config commit.gpgsign false
+        $null = Invoke-P20TestGit config core.hooksPath 'hooks'
 
         # The baseline commit always includes .gitignore, so it lands even in
         # the -SkipGitignore case -- otherwise the hook blocks the sandbox's own
@@ -165,16 +166,16 @@ function New-SyncSandbox {
         # which these tests stage deliberately.
         Set-Content -Path (Join-Path $base '.gitignore') -Value "toolkit/*.log`n" -Encoding UTF8
         Set-Content -Path (Join-Path $base '.gitkeep') -Value '' -Encoding UTF8
-        git add -A 2>&1 | Out-Null
-        git commit -m 'init' --quiet 2>&1 | Out-Null
+        $null = Invoke-P20TestGit add -A
+        $null = Invoke-P20TestGit commit -m 'init' --quiet
 
         if ($SkipGitignore) {
             # Committed above, now deleted and the deletion committed with
             # --no-verify (the documented bypass) so the repo has real history
             # and a genuinely absent .gitignore before the test begins.
             Remove-Item -Path (Join-Path $base '.gitignore') -Force
-            git add -A 2>&1 | Out-Null
-            git commit -m 'remove gitignore' --quiet --no-verify 2>&1 | Out-Null
+            $null = Invoke-P20TestGit add -A
+            $null = Invoke-P20TestGit commit -m 'remove gitignore' --quiet --no-verify
         }
     }
     finally {
@@ -205,7 +206,7 @@ function Get-SandboxStatus {
     param([string]$Sandbox)
     Push-Location $Sandbox
     try {
-        return (git status --porcelain 2>&1 | Out-String)
+        return ((Invoke-P20TestGit status --porcelain).Lines | Out-String)
     }
     finally { Pop-Location }
 }
@@ -214,7 +215,7 @@ function Get-StagedPaths {
     param([string]$Sandbox)
     Push-Location $Sandbox
     try {
-        return @(git diff --cached --name-only 2>$null)
+        return @((Invoke-P20TestGit diff --cached --name-only).Out)
     }
     finally { Pop-Location }
 }
@@ -340,11 +341,11 @@ try {
     Set-Content -Path (Join-Path $sandbox 'doomed.txt') -Value 'bye' -Encoding UTF8
     Push-Location $sandbox
     try {
-        git add -A 2>&1 | Out-Null
-        git commit -m 'add fixtures' --quiet 2>&1 | Out-Null
+        $null = Invoke-P20TestGit add -A
+        $null = Invoke-P20TestGit commit -m 'add fixtures' --quiet
         Set-Content -Path (Join-Path $sandbox 'staged.txt') -Value 'v2' -Encoding UTF8
-        git add staged.txt 2>&1 | Out-Null
-        git rm --quiet doomed.txt 2>&1 | Out-Null
+        $null = Invoke-P20TestGit add staged.txt
+        $null = Invoke-P20TestGit rm --quiet doomed.txt
     }
     finally { Pop-Location }
 
@@ -399,14 +400,11 @@ function New-RemoteSandbox {
     $other  = Join-Path $base 'other'
     $pkg    = Join-Path $base 'pkg'
 
-    git init --bare --quiet --initial-branch=main $remote 2>&1 | Out-Null
+    $null = Invoke-P20TestGit init --bare --quiet --initial-branch=main $remote
     # Cloning an empty bare repository prints 'You appear to have cloned an empty
     # repository' on stderr, which 5.1 turns into a terminating error under Stop;
-    # --quiet does not silence it. A function-local Continue reads it as text.
-    $prevErr = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    try { git clone --quiet $remote $hub 2>&1 | Out-Null }
-    finally { $ErrorActionPreference = $prevErr }
+    # --quiet does not silence it. Invoke-P20TestGit reads it as text.
+    $null = Invoke-P20TestGit clone --quiet $remote $hub
     Set-RepoIdentity $hub
 
     # The hub's own declaration, and the card folders the active Space reads.
@@ -416,14 +414,14 @@ function New-RemoteSandbox {
     Set-Content -Path (Join-Path $hub 'test/current/.gitkeep') -Value '' -Encoding UTF8
     Push-Location $hub
     try {
-        git checkout -B main --quiet 2>&1 | Out-Null
-        git add -A 2>&1 | Out-Null
-        git commit -m 'hub' --quiet 2>&1 | Out-Null
-        git push --quiet --set-upstream origin main 2>&1 | Out-Null
+        $null = Invoke-P20TestGit checkout -B main --quiet
+        $null = Invoke-P20TestGit add -A
+        $null = Invoke-P20TestGit commit -m 'hub' --quiet
+        $null = Invoke-P20TestGit push --quiet --set-upstream origin main
     }
     finally { Pop-Location }
 
-    git clone --quiet $remote $other 2>&1 | Out-Null
+    $null = Invoke-P20TestGit clone --quiet $remote $other
     Set-RepoIdentity $other
 
     # Enough of the package to import: the module, its Scripts/ and the shipped
@@ -443,10 +441,10 @@ function Set-RepoIdentity {
     param([string]$Repo)
     Push-Location $Repo
     try {
-        git config user.email 'test@example.com' 2>&1 | Out-Null
-        git config user.name 'Sync Test' 2>&1 | Out-Null
-        git config commit.gpgsign false 2>&1 | Out-Null
-        git config core.autocrlf false 2>&1 | Out-Null
+        $null = Invoke-P20TestGit config user.email 'test@example.com'
+        $null = Invoke-P20TestGit config user.name 'Sync Test'
+        $null = Invoke-P20TestGit config commit.gpgsign false
+        $null = Invoke-P20TestGit config core.autocrlf false
     }
     finally { Pop-Location }
 }
@@ -513,7 +511,7 @@ Write-Host "SYNC-EXITCODE=`$LASTEXITCODE"
 function Get-RemoteSubjects {
     param([string]$Remote)
     Push-Location $Remote
-    try { return @(git log main --format='%s' 2>$null) }
+    try { return @((Invoke-P20TestGit log main --format='%s').Out) }
     finally { Pop-Location }
 }
 
@@ -526,9 +524,9 @@ try {
     Set-Content -Path (Join-Path $rs.Other 'from-the-other-machine.md') -Value 'hello' -Encoding UTF8
     Push-Location $rs.Other
     try {
-        git add -A 2>&1 | Out-Null
-        git commit -m 'card written on the other machine' --quiet 2>&1 | Out-Null
-        git push --quiet 2>&1 | Out-Null
+        $null = Invoke-P20TestGit add -A
+        $null = Invoke-P20TestGit commit -m 'card written on the other machine' --quiet
+        $null = Invoke-P20TestGit push --quiet
     }
     finally { Pop-Location }
 
@@ -543,7 +541,7 @@ try {
     Assert-True "the other machine's commit was pulled in" (Test-Path (Join-Path $rs.Hub 'from-the-other-machine.md'))
     $remoteSubjects = Get-RemoteSubjects $rs.Remote
     Assert-True "this machine's auto-commit reached the remote" (@($remoteSubjects | Where-Object { $_ -like '*auto-commit before sync*' }).Count -eq 1)
-    Assert-True "and it carried the card with it" ((git -C $rs.Remote show 'main:test/current/local-card.md' 2>$null) -join '' -like '*# local*')
+    Assert-True "and it carried the card with it" (((Invoke-P20TestGit -C $rs.Remote show 'main:test/current/local-card.md').Out) -join '' -like '*# local*')
 
     $manifestAfter = Get-Content (Join-Path $rs.Hub 'hub.json') -Raw | ConvertFrom-Json
     Assert-True "hub.json now says spaces" ($null -ne $manifestAfter.PSObject.Properties['spaces'])
@@ -598,7 +596,7 @@ try {
     # race to arrange -- the repro's own wording: "whose remote cannot be
     # reached".
     Push-Location $rs6.Hub
-    try { git remote set-url origin (Join-Path $rs6.Base 'does-not-exist.git') 2>&1 | Out-Null }
+    try { $null = Invoke-P20TestGit remote set-url origin (Join-Path $rs6.Base 'does-not-exist.git') }
     finally { Pop-Location }
 
     $output = Invoke-SyncWrapperInModule -Sandbox $rs6 -LocalJson "{ `"promptsRoot`": `"$($rs6.Hub -replace '\\', '/')`" }"
@@ -643,8 +641,8 @@ else {
         Write-FixtureText (Join-Path $rs7.Hub 'test/current/local-card.md') '# local'
         Push-Location $rs7.Hub
         try {
-            git add -A 2>&1 | Out-Null
-            git commit -m 'local change before push' --quiet 2>&1 | Out-Null
+            $null = Invoke-P20TestGit add -A
+            $null = Invoke-P20TestGit commit -m 'local change before push' --quiet
         }
         finally { Pop-Location }
 
@@ -709,23 +707,23 @@ try {
     Push-Location $rs8.Other
     try {
         Write-FixtureText (Join-Path $rs8.Other "test/current/$archivedName") (New-TemplateCard 'K7M2' 'Fix login' 'fix-login')
-        git rm --quiet 'test/current/.gitkeep' 2>&1 | Out-Null
-        git add -A 2>&1 | Out-Null
-        git commit -m 'card in play' --quiet 2>&1 | Out-Null
-        git push --quiet 2>&1 | Out-Null
+        $null = Invoke-P20TestGit rm --quiet 'test/current/.gitkeep'
+        $null = Invoke-P20TestGit add -A
+        $null = Invoke-P20TestGit commit -m 'card in play' --quiet
+        $null = Invoke-P20TestGit push --quiet
     }
     finally { Pop-Location }
     Push-Location $rs8.Hub
-    try { git pull --quiet 2>&1 | Out-Null }
+    try { $null = Invoke-P20TestGit pull --quiet }
     finally { Pop-Location }
 
     # The other machine archives it and pushes.
     Push-Location $rs8.Other
     try {
         New-Item -ItemType Directory -Path (Join-Path $rs8.Other 'test/archive') -Force | Out-Null
-        git mv "test/current/$archivedName" "test/archive/$archivedName" 2>&1 | Out-Null
-        git commit -m 'archive the card' --quiet 2>&1 | Out-Null
-        git push --quiet 2>&1 | Out-Null
+        $null = Invoke-P20TestGit mv "test/current/$archivedName" "test/archive/$archivedName"
+        $null = Invoke-P20TestGit commit -m 'archive the card' --quiet
+        $null = Invoke-P20TestGit push --quiet
     }
     finally { Pop-Location }
 
@@ -742,7 +740,7 @@ try {
     Assert-True "and no longer in current/" (-not (Test-Path (Join-Path $rs8.Hub "test/current/$archivedName")))
     Assert-True "the new card stays in current/" (Test-Path (Join-Path $rs8.Hub "test/current/$createdName"))
     Assert-True "and was not carried into archive/" (-not (Test-Path (Join-Path $rs8.Hub "test/archive/$createdName")))
-    $remoteFiles = @(git -C $rs8.Remote ls-tree -r --name-only main 2>$null)
+    $remoteFiles = @((Invoke-P20TestGit -C $rs8.Remote ls-tree -r --name-only main).Out)
     Assert-True "the remote has the archived card in archive/" ($remoteFiles -contains "test/archive/$archivedName")
     Assert-True "and the new card in current/" ($remoteFiles -contains "test/current/$createdName")
 }
@@ -776,26 +774,26 @@ try {
     Push-Location $rs9.Other
     try {
         Write-FixtureText (Join-Path $rs9.Other "test/current/$archivedName") (New-TemplateCard 'K7M2' 'Fix login' 'fix-login')
-        git rm --quiet 'test/current/.gitkeep' 2>&1 | Out-Null
-        git add -A 2>&1 | Out-Null
-        git commit -m 'card in play' --quiet 2>&1 | Out-Null
-        git push --quiet 2>&1 | Out-Null
+        $null = Invoke-P20TestGit rm --quiet 'test/current/.gitkeep'
+        $null = Invoke-P20TestGit add -A
+        $null = Invoke-P20TestGit commit -m 'card in play' --quiet
+        $null = Invoke-P20TestGit push --quiet
     }
     finally { Pop-Location }
     Push-Location $rs9.Hub
-    try { git pull --quiet 2>&1 | Out-Null }
+    try { $null = Invoke-P20TestGit pull --quiet }
     finally { Pop-Location }
 
     # The other machine archives it, threads a bullet onto it there, and pushes.
     Push-Location $rs9.Other
     try {
         New-Item -ItemType Directory -Path (Join-Path $rs9.Other 'test/archive') -Force | Out-Null
-        git mv "test/current/$archivedName" "test/archive/$archivedName" 2>&1 | Out-Null
+        $null = Invoke-P20TestGit mv "test/current/$archivedName" "test/archive/$archivedName"
         $moved = Join-Path $rs9.Other "test/archive/$archivedName"
         Add-FixtureText $moved "$bulletLine`n"
-        git add -A 2>&1 | Out-Null
-        git commit -m 'archive the card' --quiet 2>&1 | Out-Null
-        git push --quiet 2>&1 | Out-Null
+        $null = Invoke-P20TestGit add -A
+        $null = Invoke-P20TestGit commit -m 'archive the card' --quiet
+        $null = Invoke-P20TestGit push --quiet
     }
     finally { Pop-Location }
 
@@ -820,10 +818,10 @@ try {
     Assert-True "and the bullet the other machine threaded" ($archivedText.Contains($bulletLine))
     Assert-True "the new card stays in current/" (Test-Path (Join-Path $rs9.Hub "test/current/$createdName"))
     Assert-True "and was not carried into archive/" (-not (Test-Path (Join-Path $rs9.Hub "test/archive/$createdName")))
-    $remoteFiles = @(git -C $rs9.Remote ls-tree -r --name-only main 2>$null)
+    $remoteFiles = @((Invoke-P20TestGit -C $rs9.Remote ls-tree -r --name-only main).Out)
     Assert-True "the remote has the archived card in archive/" ($remoteFiles -contains "test/archive/$archivedName")
     Assert-True "and the new card in current/" ($remoteFiles -contains "test/current/$createdName")
-    $remoteText = (git -C $rs9.Remote show "main:test/archive/$archivedName" 2>$null) -join "`n"
+    $remoteText = ((Invoke-P20TestGit -C $rs9.Remote show "main:test/archive/$archivedName").Out) -join "`n"
     Assert-True "and the remote's archived card carries the edit" ($remoteText.Contains($editLine))
 }
 catch {
@@ -851,8 +849,8 @@ foreach ($state in @(
     $hubJson10 = '{ "hub": 1, "storeSync": "git", "spaces": [ { "slug": "test", "name": "Test", "status": "local", "promptsFolder": "test" } ] }'
     $rs10 = New-RemoteSandbox -HubJson $hubJson10
     try {
-        $head = "$(git -C $rs10.Hub rev-parse HEAD 2>$null)".Trim()
-        $at = "$(git -C $rs10.Hub rev-parse --git-path $state.Path 2>$null)".Trim()
+        $head = "$((Invoke-P20TestGit -C $rs10.Hub rev-parse HEAD).Out)".Trim()
+        $at = "$((Invoke-P20TestGit -C $rs10.Hub rev-parse --git-path $state.Path).Out)".Trim()
         if (-not [System.IO.Path]::IsPathRooted($at)) { $at = Join-Path $rs10.Hub $at }
         if ($state.Dir) { New-Item -ItemType Directory -Path $at -Force | Out-Null }
         else { [System.IO.File]::WriteAllText($at, "$head`n") }
@@ -862,8 +860,8 @@ foreach ($state in @(
         $output = Invoke-SyncWrapperInModule -Sandbox $rs10 -LocalJson "{ `"promptsRoot`": `"$($rs10.Hub -replace '\\', '/')`" }"
         Assert-Contains "$($state.Path): Sync refuses, naming the state" $output "in the middle of $($state.Word), so nothing was synced"
         Assert-Contains "$($state.Path): exits 2" $output 'SYNC-EXITCODE=2'
-        Assert-Equal "$($state.Path): no commit was made" $head "$(git -C $rs10.Hub rev-parse HEAD 2>$null)".Trim()
-        Assert-Equal "$($state.Path): nothing was staged" 0 @(git -C $rs10.Hub diff --cached --name-only 2>$null).Count
+        Assert-Equal "$($state.Path): no commit was made" $head "$((Invoke-P20TestGit -C $rs10.Hub rev-parse HEAD).Out)".Trim()
+        Assert-Equal "$($state.Path): nothing was staged" 0 @((Invoke-P20TestGit -C $rs10.Hub diff --cached --name-only).Out).Count
         Assert-True "$($state.Path): the state is left as it was" (Test-Path -LiteralPath $at)
     }
     catch {
@@ -881,16 +879,16 @@ try {
     New-Item -ItemType Directory -Path $hooks12 -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $hooks12 'pre-commit'), "#!/bin/sh`necho 'a check refused this commit' >&2`nexit 1`n")
     if (-not ($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop')) { & chmod +x (Join-Path $hooks12 'pre-commit') }
-    git -C $rs12.Hub config core.hooksPath ($hooks12 -replace '\\', '/') 2>&1 | Out-Null
-    $head12 = "$(git -C $rs12.Hub rev-parse HEAD 2>$null)".Trim()
+    $null = Invoke-P20TestGit -C $rs12.Hub config core.hooksPath ($hooks12 -replace '\\', '/')
+    $head12 = "$((Invoke-P20TestGit -C $rs12.Hub rev-parse HEAD).Out)".Trim()
     New-Item -ItemType Directory -Path (Join-Path $rs12.Hub 'test/current') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $rs12.Hub 'test/current/Task3RTV-a-change.prompt.md'), "# Task 3RTV: A change`n")
     $output = Invoke-SyncWrapperInModule -Sandbox $rs12 -LocalJson "{ `"promptsRoot`": `"$($rs12.Hub -replace '\\', '/')`" }"
     Assert-Contains "a refused git commit is a stated refusal, with git's own line" $output "git commit failed, so nothing was synced: a check refused this commit"
     Assert-Contains "and exits 2, not 0" $output 'SYNC-EXITCODE=2'
     Assert-True "exactly one Error: block" (@([regex]::Matches($output, 'Error:')).Count -eq 1)
-    Assert-Equal "no commit was made" $head12 "$(git -C $rs12.Hub rev-parse HEAD 2>$null)".Trim()
-    Assert-Equal "and the change is left unstaged" 0 @(git -C $rs12.Hub diff --cached --name-only 2>$null).Count
+    Assert-Equal "no commit was made" $head12 "$((Invoke-P20TestGit -C $rs12.Hub rev-parse HEAD).Out)".Trim()
+    Assert-Equal "and the change is left unstaged" 0 @((Invoke-P20TestGit -C $rs12.Hub diff --cached --name-only).Out).Count
 }
 catch {
     Assert-True "the cases ran to the end without a terminating error -- $($_.Exception.Message)" $false
@@ -901,7 +899,7 @@ finally { Remove-SyncSandbox $rs12.Base }
 $hubJson11 = '{ "hub": 1, "storeSync": "git", "spaces": [ { "slug": "test", "name": "Test", "status": "local", "promptsFolder": "test" } ] }'
 $rs11 = New-RemoteSandbox -HubJson $hubJson11
 try {
-    $lock = "$(git -C $rs11.Hub rev-parse --git-path index.lock 2>$null)".Trim()
+    $lock = "$((Invoke-P20TestGit -C $rs11.Hub rev-parse --git-path index.lock).Out)".Trim()
     if (-not [System.IO.Path]::IsPathRooted($lock)) { $lock = Join-Path $rs11.Hub $lock }
     New-Item -ItemType Directory -Path (Join-Path $rs11.Hub 'test/current') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $rs11.Hub 'test/current/Task7WXY-a-change.prompt.md'), "# Task 7WXY: A change`n")

@@ -23,6 +23,7 @@
 #>
 
 $pkgRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 $targetScript = Join-Path (Join-Path $pkgRoot 'Scripts') 'Update-Toolkit.ps1'
 # Update-Toolkit.ps1 dot-sources this, so a sandbox standing in for a package
 # has to carry it: a copy-install has the whole Scripts/ folder, and a sandbox
@@ -77,7 +78,7 @@ $publisher = Join-Path $base 'publisher'
 
 function Invoke-Git {
     param([string]$Repo, [string[]]$GitArgs)
-    return @(& git -C $Repo -c user.name=Test -c user.email=test@example.com -c commit.gpgsign=false -c core.autocrlf=false @GitArgs 2>&1 | ForEach-Object { "$_" })
+    return @((Invoke-P20TestGit -C $Repo -c user.name=Test -c user.email=test@example.com -c commit.gpgsign=false -c core.autocrlf=false @GitArgs).Lines)
 }
 
 function Write-RepoFile {
@@ -99,7 +100,7 @@ function New-Consumer {
     # A fresh clone with the REAL script dropped in, untracked.
     param([string]$Name)
     $path = Join-Path $base $Name
-    & git clone -q $origin $path 2>&1 | Out-Null
+    $null = Invoke-P20TestGit clone -q $origin $path
     New-Item -ItemType Directory -Path (Join-Path $path 'Scripts') -Force | Out-Null
     Copy-Item $targetScript (Join-Path (Join-Path $path 'Scripts') 'Update-Toolkit.ps1')
     foreach ($h in $helperScripts) {
@@ -122,8 +123,8 @@ function Invoke-Update {
 function Get-Head { param([string]$Repo) return (Invoke-Git $Repo @('rev-parse', 'HEAD') | Select-Object -First 1) }
 
 try {
-    & git init -q --bare -b main $origin 2>&1 | Out-Null
-    & git clone -q $origin $publisher 2>&1 | Out-Null
+    $null = Invoke-P20TestGit init -q --bare -b main $origin
+    $null = Invoke-P20TestGit clone -q $origin $publisher
     [void](Invoke-Git $publisher @('checkout', '-q', '-b', 'main'))
     Publish-Commit 'utilities.psm1' "# v1`n" 'first'
 

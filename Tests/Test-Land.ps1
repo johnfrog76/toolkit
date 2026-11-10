@@ -557,7 +557,7 @@ try {
     # moves it on and commits: the commit has to carry the whole move, so the hub
     # is clean after a verb that said "Committed.".
     if (Get-Command git -ErrorAction SilentlyContinue) {
-        $gitIn = { param([string[]]$GitArgs) $null = & git -C $hubDir @GitArgs 2>&1 }
+        $gitIn = { param([string[]]$GitArgs) $null = Invoke-P20TestGit -C $hubDir @GitArgs }
         & $gitIn @('init', '-q')
         & $gitIn @('config', 'user.email', 'land@example.test')
         & $gitIn @('config', 'user.name', 'Land Test')
@@ -571,9 +571,9 @@ try {
         Set-ActiveSpace 'widgets' -StoreSync 'git'
         $r = Invoke-Land 'tkLand B3QN -Pr 190'
         Assert-True 'a backlog card in a git hub lands: exit 0, committed' ($r.Text -match 'EXIT=0' -and $r.Text -match 'Committed\.') $r.Text
-        $porcelain = @(& git -C $hubDir status --porcelain --untracked-files=all 2>&1 | ForEach-Object { "$_" })
+        $porcelain = @((Invoke-P20TestGit -C $hubDir status --porcelain --untracked-files=all).Lines)
         Assert-True 'and the hub is clean but for a card the verb never touched' (($porcelain -join '|') -ceq '?? widgets/backlog/TaskC4RT-not-this-card.prompt.md') ($porcelain -join ' | ')
-        $last = (& git -C $hubDir show --stat --format=%s HEAD 2>&1 | ForEach-Object { "$_" }) -join "`n"
+        $last = (Invoke-P20TestGit -C $hubDir show --stat --format=%s HEAD).Lines -join "`n"
         Assert-True 'the archive commit records the card leaving backlog/' ($last -match [regex]::Escape("widgets/{backlog => archive}/$nameB") -or ($last -match "backlog/$nameB" -and $last -match "archive/$nameB")) $last
         Set-ActiveSpace 'widgets'
     }
