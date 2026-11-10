@@ -182,7 +182,8 @@ jobs:
     name: The browser smoke and the CLI in PowerShell 7 on Windows
     # The schedule, the button, or a pull request that carries the `ci` label. A push
     # to main and an ordinary pull request skip it.
-    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci')) }}
+    # DIAGNOSTIC BRANCH ONLY: off, so the label runs the 5.1 diagnosis alone.
+    if: ${{ false }}
     runs-on: windows-latest
     # The CLI runner starts a shell per case, which Windows does more slowly.
     timeout-minutes: 120
@@ -282,9 +283,8 @@ jobs:
     # The same triggers as the job above, beside it.
     if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci')) }}
     runs-on: windows-latest
-    # Every suite, and every verb a suite types, in 5.1, which starts a process
-    # more slowly than 7 does.
-    timeout-minutes: 150
+    # DIAGNOSTIC BRANCH ONLY: Portability alone, to find where it stalls on 5.1.
+    timeout-minutes: 45
     defaults:
       run:
         shell: pwsh
@@ -319,13 +319,17 @@ jobs:
           powershell.exe -NoProfile -Command '"powershell " + $PSVersionTable.PSVersion.ToString()'
           powershell.exe -NoProfile -Command '"Windows PowerShell 5.1 reads a script without a BOM in code page " + [System.Text.Encoding]::Default.CodePage'
 
-      # The runner itself in powershell.exe, with no suite switch: it starts every
-      # suite in the host it is running in, and each suite starts the verbs it
-      # types the same way (Tests/Get-TestHost.ps1), so nothing is handed to pwsh.
-      # PSModulePath is set inside that shell. The runner's Total line.
-      - name: The CLI in Windows PowerShell 5.1 -- Tests/Test-Toolkit.ps1
+      # DIAGNOSTIC: the suite file itself in powershell.exe, not through the
+      # runner, so each assertion's line reaches the log as it is printed and
+      # its timestamp says where the time goes.
+      - name: Portability alone, the suite file in Windows PowerShell 5.1
+        timeout-minutes: 20
         run: |
-          $log = Join-Path $env:RUNNER_TEMP 'cli-51.log'
-          powershell.exe -NoProfile -Command '$env:PSModulePath = (Resolve-Path .); & ./Tests/Test-Toolkit.ps1; exit $LASTEXITCODE' 2>&1 | Tee-Object -FilePath $log
-          $code = $LASTEXITCODE
-          pwsh -NoProfile -File Scripts/Test-CiHalf.ps1 -Half cli -Path $log -ExitCode $code
+          powershell.exe -NoProfile -Command '$env:PSModulePath = (Resolve-Path .); $t = [Diagnostics.Stopwatch]::StartNew(); & ./Tests/Test-Portability.ps1; "Portability direct: exit $LASTEXITCODE after $([int]$t.Elapsed.TotalSeconds)s"; exit $LASTEXITCODE'
+
+      # DIAGNOSTIC: the same suite through the runner, which is how it stalled.
+      - name: Portability alone, through the runner, in Windows PowerShell 5.1
+        if: ${{ !cancelled() }}
+        timeout-minutes: 20
+        run: |
+          powershell.exe -NoProfile -Command '$env:PSModulePath = (Resolve-Path .); & ./Tests/Test-Toolkit.ps1 -Portability; exit $LASTEXITCODE'
