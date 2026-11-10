@@ -26,6 +26,14 @@ export default {
   // Jest's "Exceeded timeout", which names nothing. One number for every test:
   // none sets its own (docs/TESTING.md, "How long a web test waits").
   testTimeout: 20000,
+  // A worker that has grown past this between suites is replaced by a fresh
+  // one. Jest gives a worker 500 ms to exit after the run and calls one that
+  // takes longer a leak, which tkTest fails the web half on. A worker that
+  // has run many suites carries a heap of 600-900 MB, and on a busy machine
+  // its exit can stall past that deadline holding no timer or handle at all.
+  // Kept small, it exits in milliseconds, and the deadline still catches a
+  // real leak (docs/TESTING.md, "A web run that leaks fails").
+  workerIdleMemoryLimit: "512MB",
   // The @consts alias, third of three resolvers (vite.config.ts and tsconfig's
   // `paths` are the others). The contract file is real JSON on disk and jest
   // requires it directly -- nothing is stubbed, so a test reads exactly what

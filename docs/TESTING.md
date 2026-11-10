@@ -115,6 +115,15 @@ a failure of the web half. The rule is `Get-P20HalfVerdict` in `Scripts/TestAll-
 two readers cannot disagree. The failure names the next step: `npx jest --runInBand --detectOpenHandles`
 in `web/`, which names the suite and the handle.
 
+A worker can also miss Jest's 500 ms with nothing open. One that has run many suites carries a large heap,
+and on a busy machine its exit can stall past the deadline. Under four full runs at once, a worker
+holding only its pipes, with heaps of 600 to 900 MB, was force-exited every time. So `web/jest.config.mjs` sets
+`workerIdleMemoryLimit` to 512 MB: a worker past that between suites is replaced by a fresh one,
+and every worker exits in milliseconds. That makes an unloaded run about two seconds slower and a loaded one
+several times faster. The deadline stays at Jest's default, so a timer or a handle a test really leaves open
+still fails the run. `workerGracefulExitTimeout` is not raised for the same reason: a longer wait would also
+let through a test that holds a timer for a second or two.
+
 **The counts, after a merge.** The paste block is the one record of a run's figures, and it is three
 figures: the CLI's per-suite line and total, a `pytest:` line and a `web:` line. `tkTest` (the
 all-halves runner, every half and no `-Fast`) prints all three under its summary. `tkTestToolkit`
