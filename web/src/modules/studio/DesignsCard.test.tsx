@@ -15,7 +15,6 @@ import type { DesignNote } from "./api.studio";
 // the verb's bytes there too. The viewer is mocked (react-markdown is ESM).
 // The pager's rules do not depend on how many rows a page holds, and these
 // suites build their lists for five; the shipped size is pinned in foyer.test.ts.
-jest.mock("./paths", () => ({ ...jest.requireActual("./paths"), STUDIO_PAGE_SIZE: 5 }));
 
 jest.mock("../../shared/MarkdownViewer", () => ({
   MarkdownViewer: ({ content }: { content: string }) => <pre data-testid="viewer">{content}</pre>,
@@ -210,11 +209,17 @@ describe("the Designs card", () => {
     ).toBeTruthy();
   });
 
+  // The Space a note names is a move in the row's menu, Go into <Space>.
+  const switchFromMenu = async (title: string, space: string) => {
+    fireEvent.click(screen.getByRole("button", { name: `Actions for ${title}` }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: `Go into ${space}` }));
+  };
+
   it("a note that names a Space shows it as a chip; a note with none shows no chip", () => {
     mount();
-    const chips = screen.getAllByRole("button", { name: /^Switch to / });
-    expect(chips.map((c) => c.textContent)).toEqual(["Toolkit"]);
-    expect(chips[0].getAttribute("aria-label")).toBe("Switch to Toolkit");
+    // A badge, not a button: the switch is in the row's menu.
+    expect(screen.queryAllByRole("button", { name: /^Switch to / })).toEqual([]);
+    expect(screen.getAllByText("Toolkit").length).toBeGreaterThan(0);
   });
 
   it("the chip names the Space by its display name, the slug when none is declared", () => {
@@ -229,10 +234,8 @@ describe("the Designs card", () => {
       },
     };
     mount();
-    expect(screen.getByRole("button", { name: "Switch to The Wasteland" }).textContent).toBe(
-      "The Wasteland",
-    );
-    expect(screen.getByRole("button", { name: "Switch to nowhere" })).toBeTruthy();
+    expect(screen.getByText("The Wasteland")).toBeTruthy();
+    expect(screen.getByText("nowhere")).toBeTruthy();
   });
 
   it("the chip switches into its Space and lands on that Space's first tab", async () => {
@@ -241,7 +244,7 @@ describe("the Designs card", () => {
     listAnswer = { data: { folder: "design", count: 1, items: [{ ...NOTE, space: "wasteland" }] } };
     mount();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Switch to The Wasteland" }));
+      await switchFromMenu("Board ideas", "The Wasteland");
     });
     expect(switched).toEqual(["wasteland"]);
     expect(screen.getByTestId("where").textContent).toBe("/");
@@ -251,7 +254,7 @@ describe("the Designs card", () => {
     switched.length = 0;
     mount();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Switch to Toolkit" }));
+      await switchFromMenu("Board ideas", "Toolkit");
     });
     expect(switched).toEqual([]);
     expect(screen.getByTestId("where").textContent).toBe("/");
@@ -263,7 +266,7 @@ describe("the Designs card", () => {
     listAnswer = { data: { folder: "design", count: 1, items: [{ ...NOTE, space: "wasteland" }] } };
     mount();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Switch to The Wasteland" }));
+      await switchFromMenu("Board ideas", "The Wasteland");
     });
     switchFails = false;
     expect(screen.getByRole("alert").textContent).toBe(
@@ -526,7 +529,7 @@ describe("the Designs card's groups (L2)", () => {
 
   it("a row keeps the Space chip and the thread, and wears its state and id", () => {
     mount();
-    expect(screen.getByRole("button", { name: "Switch to Toolkit" })).toBeTruthy();
+    expect(screen.getAllByText("Toolkit").length).toBeGreaterThan(0);
     expect(screen.getByText("#90")).toBeTruthy();
     expect(screen.getByText("b0a4d1de").getAttribute("title")).toBe(
       "b0a4d1de-5c3e-4f7a-8b21-9d0e6f3a2c11",
@@ -585,6 +588,7 @@ describe("the Designs card's moves (L3)", () => {
     fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
     expect(await menuOf("Board ideas")).toEqual([
       "Open the spec",
+      "Go into Toolkit",
       "Complete",
       "Archive as dropped",
       "Open on GitHub",

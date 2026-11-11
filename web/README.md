@@ -450,7 +450,8 @@ flow card actions etc"), converged on this:
   row reads the same. The exposed action goes somewhere in the app (Open the card, Open the issue, Open
   the goal, Open the review, Open the resume); where the tracker has no page of ours for the thing -- an
   ADO work item or PR -- it is the tracker's page; a reminder has no page, so it is the act it exists
-  for, **Archive**. The external link is LAST in the menu, behind a divider. The trigger's name is
+  for, **Archive**. The external link is LAST in the menu, behind a divider. A row's title is plain text, never a link
+  or a button: opening goes through Open, and the Studio's three cards hold it (`rowShapeAssert.ts`). The trigger's name is
   `Actions for <the row's title>`. Every word, icon and tooltip comes from one vocabulary --
   [One vocabulary for row actions](#one-vocabulary-for-row-actions).
 - **A card that makes something has one +.** `shared/CreateButton`: the footer's subtle **+**, its
@@ -547,7 +548,7 @@ row that draws them, and listed here. Two kinds, both named:
 | `resume.howItWorks` | How resume updates work | `InfoRegular` | one record | the resume |
 | `design.graduate` | Graduate to a spec | `HatGraduationRegular` | one record | a hub design (Studio), and a product design (the Design tab) where its Space's checkout is named |
 | `design.promote` | Promote | `ShareRegular` | one record | a design note's page |
-| `space.enter` | Go into *the Space* | `ArrowEnterRegular` | one record | the Studio's Spaces |
+| `space.enter` | Go into *the Space* | `ArrowEnterRegular` | one record | the Studio's Hub Designs rows (a note's Space) |
 | `space.connect` | Connect *the Space* | `LinkRegular` | one record | the Studio's Spaces |
 | `space.retire` | Retire *the Space* | `HistoryRegular` | different move: a status written through `Config`, no file moved | the Studio's Spaces |
 | `space.remove` | Remove *the Space* | `SubtractCircleRegular` | different move: un-declared, nothing deleted | the Studio's Spaces |

@@ -23,7 +23,7 @@ import {
   spacesFilterEmpty,
 } from "./foyer";
 import type { SpaceBucket, SpaceLifecycleAction, SpacesFilter } from "./foyer";
-import { STUDIO_PAGE_SIZE } from "./paths";
+import { LIST_PAGE_SIZE } from "../../shell/cardHeight";
 import { visibilityLabel } from "../../shared/visibility";
 import type { EnvStatus, SpaceInfo } from "../../shell/api";
 import type { DeploysResponse, IssueReport, StatusResponse } from "../ado/api.ado";
@@ -310,8 +310,8 @@ describe("which rows ask their visibility", () => {
     expect(githubRowLine("", CONNECT_GITHUB)).toBe(CONNECT_GITHUB);
   });
 
-  it("the three Studio cards page three at a time", () => {
-    expect(STUDIO_PAGE_SIZE).toBe(3);
+  it("the Studio cards page five at a time, the shared list setting", () => {
+    expect(LIST_PAGE_SIZE).toBe(5);
   });
 });
 

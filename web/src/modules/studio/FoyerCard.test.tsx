@@ -33,7 +33,6 @@ let unsupportedReport: string[] = [];
 let envAnswer: unknown;
 // The pager's rules do not depend on how many rows a page holds, and these
 // suites build their lists for five; the shipped size is pinned in foyer.test.ts.
-jest.mock("./paths", () => ({ ...jest.requireActual("./paths"), STUDIO_PAGE_SIZE: 5 }));
 
 jest.mock("../../shell/api", () => ({
   useGetEnvQuery: () => ({ data: envAnswer, isLoading: false }),
@@ -410,7 +409,7 @@ describe("the foyer", () => {
   it("a row is the switch into its Space, landing on its Issues", async () => {
     mount();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Go into Wasteland" }));
+      fireEvent.click(screen.getByRole("button", { name: "Open Wasteland" }));
     });
     expect(switched).toEqual(["wasteland"]);
     expect(screen.getByTestId("where").textContent).toBe("/");
@@ -431,7 +430,7 @@ describe("the foyer", () => {
     switchFails = true;
     mount();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Go into Toolkit" }));
+      fireEvent.click(screen.getByRole("button", { name: "Open Toolkit" }));
     });
     expect(screen.getByRole("alert").textContent).toContain("Could not switch to Toolkit");
     expect(screen.getByTestId("where").textContent).toBe("/studio");

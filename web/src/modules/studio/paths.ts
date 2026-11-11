@@ -1,10 +1,6 @@
 /** This module's route paths, in one place (see communication/paths.ts for why). */
 export const STUDIO_HOME = "/studio";
 
-/** How many rows each Studio card shows a page: the Foyer, Hub Designs and
- *  Prompts page alike, the shared pager in the foot's centre. */
-export const STUDIO_PAGE_SIZE = 3;
-
 export const ROUTES = {
   home: STUDIO_HOME,
   /** One hub design's reading room: a bare note name (the live note, as the

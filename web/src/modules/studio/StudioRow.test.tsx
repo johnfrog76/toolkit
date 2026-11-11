@@ -55,30 +55,18 @@ describe("StudioRow", () => {
     expect(description.textContent).toBe(LONG_TEXT);
   });
 
-  it("the full title and description appear on keyboard focus", async () => {
+  it("the title is plain text: no link, no button, not focusable, and no tooltip on it or the description", async () => {
     const { container } = render(row({ title: LONG_TITLE, description: LONG_TEXT }));
+    const text = container.querySelector("[data-row-text]")!;
+    expect(text.querySelector("a, button, [role='link'], [role='button']")).toBeNull();
+    expect(text.querySelector("[tabindex]")).toBeNull();
+    for (const el of [text, container.querySelector("[data-row-description]")!]) {
+      await act(async () => {
+        fireEvent.mouseEnter(el);
+        fireEvent.focus(el);
+      });
+    }
     expect(screen.queryByRole("tooltip")).toBeNull();
-    const stop = container.querySelector<HTMLElement>("[data-row-text] [tabindex='0']")!;
-    expect(stop).not.toBeNull();
-    await act(async () => {
-      stop.focus();
-      fireEvent.focus(stop);
-    });
-    const tip = await screen.findByRole("tooltip");
-    expect(tip.textContent).toContain(LONG_TITLE);
-    expect(tip.textContent).toContain(LONG_TEXT);
-  });
-
-  it("a row that opens takes focus on its title button, which carries the tooltip too", async () => {
-    const { container } = render(row({ onOpen: () => {}, description: LONG_TEXT }));
-    const button = container.querySelector<HTMLElement>("[data-row-text] button")!;
-    expect(button).not.toBeNull();
-    // No second tab stop beside the button.
-    expect(container.querySelector("[data-row-text] [tabindex='0']")).toBeNull();
-    await act(async () => {
-      fireEvent.focus(button);
-    });
-    expect((await screen.findByRole("tooltip")).textContent).toContain(LONG_TEXT);
   });
 
   it("badges sit in the title line, controls at its right, the bottom line apart", () => {
