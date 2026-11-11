@@ -267,12 +267,15 @@ Assert-True 'that one step diffs against the base sha and runs Get-CiScope.ps1 o
 Assert-True 'that step hands the rule the -U0 diff of the three count-line documents and their text at the base' `
     (($jChanges -match 'git diff -U0 --no-renames "\$BASE\.\.\.HEAD" -- docs/TESTING\.md AGENTS\.md VERIFY\.md > "\$RUNNER_TEMP/counts\.diff"') -and ($jChanges -match 'git show "\$from:\$f" > "\$RUNNER_TEMP/base/\$f"'))
 
-# The contract set: the CLI's four suites with the module path set inside pwsh, the
-# agent's three files, the carried paste lines -- each gated on its half not running.
-Assert-True 'the contract job runs Consts, Portability, Menu and DocCounts with the module path set inside pwsh, read through the gate, when the cli job did not run' `
-    (($jContract -match "pwsh -NoProfile -Command '\`$env:PSModulePath = \(Resolve-Path \.\); & \./Tests/Test-Toolkit\.ps1 -Consts -Portability -Menu -DocCounts; exit \`$LASTEXITCODE' 2>&1 \| tee [^\r\n]+\r?\n[^\r\n]*\r?\n[^\r\n]*Test-CiHalf\.ps1 -Half cli\b") -and ($jContract -match "needs\.changes\.outputs\.cli != 'true'"))
+# The contract set: the CLI's five suites with the module path set inside pwsh, the
+# agent's three files, the markdown lint, the carried paste lines -- each gated on
+# its half not running.
+Assert-True 'the contract job runs Consts, Portability, Menu, DocCounts and Changelog with the module path set inside pwsh, read through the gate, when the cli job did not run' `
+    (($jContract -match "pwsh -NoProfile -Command '\`$env:PSModulePath = \(Resolve-Path \.\); & \./Tests/Test-Toolkit\.ps1 -Consts -Portability -Menu -DocCounts -Changelog; exit \`$LASTEXITCODE' 2>&1 \| tee [^\r\n]+\r?\n[^\r\n]*\r?\n[^\r\n]*Test-CiHalf\.ps1 -Half cli\b") -and ($jContract -match "needs\.changes\.outputs\.cli != 'true'"))
 Assert-True 'the contract job runs the agent''s three contract files, read through the gate, when the agent job did not run' `
     (($jContract -match 'python -m pytest Tests/test_consts\.py Tests/test_pr_comments\.py Tests/test_third_party_notices\.py 2>&1 \| tee [^\r\n]+\r?\n[^\r\n]*\r?\n[^\r\n]*Test-CiHalf\.ps1 -Half agent\b') -and ($jContract -match "needs\.changes\.outputs\.agent != 'true'"))
+Assert-True 'the contract job runs the markdown lint, after its own npm ci, when the web job did not run' `
+    (($jContract -match "(?m)^\s+run: npm run lint:md\s*$") -and ($jContract -match "(?m)^\s+run: npm ci\s*$") -and ($jContract -match "needs\.changes\.outputs\.web != 'true' && steps\.npm\.outcome == 'success'"))
 Assert-True 'the contract job holds the carried paste lines to main''s, from the base sha' `
     (($jContract -match 'git show "\$BASE:docs/TESTING\.md"') -and ($jContract -match 'Scripts/Test-CarriedCounts\.ps1 -BasePath [^\r\n]+ -HeadPath docs/TESTING\.md -Ran ') -and ($jContract -match 'fetch-depth: 0'))
 
@@ -375,6 +378,8 @@ foreach ($row in @($scopeFixture.rows)) {
 }
 Assert-True 'scope: each path is reported with its class' `
     (((@((Get-P20CiScope -Event 'pull_request' -Paths @('web/a.ts', 'CHANGELOG.md', 'consts.json', 'x.txt')).Paths) | ForEach-Object { $_[1] }) -join ',') -eq 'web,changelog,shared,unclassified')
+Assert-True 'scope: a module document, the scenario grid and the known gaps are prose, a changelog fragment is changelog' `
+    (((@((Get-P20CiScope -Event 'pull_request' -Paths @('docs/modules/studio.md', 'docs/SCENARIOS.md', 'docs/KNOWN-GAPS.md', 'changelog.d/1.fixed.md', 'docs/CLI.md')).Paths) | ForEach-Object { $_[1] }) -join ',') -eq 'prose,prose,prose,changelog,shared')
 
 # Count lines alone reach no half. The classifier first: the line numbers it reads
 # as count lines, a -U0 diff's changed lines, and a removed line that starts `--`.
@@ -497,7 +502,7 @@ $carriedTable = @(
     @('a typed pytest count on a web-only change', (New-PasteDoc -Pytest 'pytest: 13 passed, 1 skipped'), @('web'), 1, "the agent half's paste line 'pytest: 13 passed, 1 skipped' is not main's 'pytest: 12 passed, 1 skipped'"),
     @('a typed CLI total on a web-only change', (New-PasteDoc -Total '2 suites, 31 assertions'), @('web'), 1, "the cli half's paste line '2 suites, 31 assertions' is not main's '2 suites, 30 assertions'"),
     @('a new web count on a web-only change: the web half ran, so it is not compared', (New-PasteDoc -Web 'web: 7 suites, 56 tests'), @('web'), 0, ''),
-    @('a new CLI count on a changelog-only change: the CLI ran', (New-PasteDoc -Cli 'Consts 10, Compat 21' -Total '2 suites, 31 assertions'), @('cli'), 0, ''),
+    @('a new CLI count where the CLI ran', (New-PasteDoc -Cli 'Consts 10, Compat 21' -Total '2 suites, 31 assertions'), @('cli'), 0, ''),
     @('every half ran: nothing is compared', (New-PasteDoc -Pytest 'pytest: 99 passed' -Web 'web: 1 suites, 1 tests'), @('cli', 'agent', 'web'), 0, ''),
     @('two typed lines, two halves named', (New-PasteDoc -Pytest 'pytest: 13 passed, 1 skipped' -Cli 'Consts 11, Compat 20'), @('web'), 2, "the cli half's paste line 'Consts 11, Compat 20'"),
     @('a change with no paste block', "# Testing`n", @('web'), 1, "this change's docs/TESTING.md has no paste block")

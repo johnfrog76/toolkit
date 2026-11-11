@@ -9,8 +9,9 @@
 #   agent     the agent half,    ) side by side, each with its own installs and lints,
 #   web       the web UI half,   ) each when `changes` says the change can reach it.
 #   contract  a pull request that leaves a half out: the cross-half suites of the
-#             halves that did not run, and the check that their paste lines in
-#             docs/TESTING.md are main's (Scripts/Test-CarriedCounts.ps1).
+#             halves that did not run, the markdown lint when the web job did not,
+#             and the check that their paste lines in docs/TESTING.md are main's
+#             (Scripts/Test-CarriedCounts.ps1).
 #   verify    the one check that sums the run up: green when every job the
 #             change needed passed, whatever the filter skipped.
 #   windows   the browser smoke and the CLI in PowerShell 7 on Windows.
@@ -23,10 +24,12 @@
 #             behind Verify.
 #
 # A push to main and the button run every Ubuntu half. A pull request runs the
-# half each changed path can reach: web/ the web job, changelog.d/ and CHANGELOG.md
-# the CLI job, and a shared path -- or one the rule does not know -- all three. A
-# change to the count lines of docs/TESTING.md, AGENTS.md or VERIFY.md and nothing
-# else in them reaches no half by itself.
+# half each changed path can reach: web/ the web job; changelog.d/, CHANGELOG.md,
+# docs/modules/*.md, docs/SCENARIOS.md and docs/KNOWN-GAPS.md no half, only the
+# contract job, which runs every suite that reads them; and a shared path -- or one
+# the rule does not know -- all three. A change to the count lines of
+# docs/TESTING.md, AGENTS.md or VERIFY.md and nothing else in them reaches no half
+# by itself.
 #
 # Windows runs against main once each weekday evening, so a change that only 5.1 or
 # the browser would show is caught the same day. A pull request that is heavy on
@@ -270,8 +273,8 @@ jobs:
 
       # The documentation lints: markdownlint over the root README.md and the other
       # root documents, docs/, web/README.md and agent/README.md, with the tree's
-      # own settings (.markdownlint-cli2.jsonc). Every documentation path is shared
-      # or under web/, so a change to any of them runs this job.
+      # own settings (.markdownlint-cli2.jsonc). A documentation path that reaches
+      # no half is linted by the contract job's copy of this step instead.
       - name: The documentation -- npm run lint:md
         if: ${{ !cancelled() && steps.npm.outcome == 'success' }}
         working-directory: web
@@ -287,9 +290,11 @@ jobs:
     name: The contracts between the halves
     # A pull request that leaves a half out. The suites in the other halves that
     # read what this change touched, for each half whose job did not run, and the
-    # carried paste lines. The CLI's set runs Portability's sweeps over web/,
-    # Menu's parity over every document, the constants and DocCounts; the agent's
-    # reads the web UI's agreed string, the artwork notices and the constants.
+    # carried paste lines. The CLI's set runs Portability's sweeps over web/ and
+    # the documents, Menu's parity over every document, the constants, DocCounts
+    # and the changelog fragments' shape; the agent's reads the web UI's agreed
+    # string, the artwork notices and the constants; and the web job's markdown
+    # lint, when that job did not run.
     needs: changes
     if: ${{ needs.changes.outputs.contract == 'true' }}
     runs-on: ubuntu-latest
@@ -323,11 +328,11 @@ jobs:
 
       # The CLI's contract suites, in a shell with exactly one toolkit in it, read
       # through the same gate as the CLI half; the runner's Total line.
-      - name: The CLI's contract suites -- Consts, Portability, Menu, DocCounts
+      - name: The CLI's contract suites -- Consts, Portability, Menu, DocCounts, Changelog
         if: ${{ !cancelled() && needs.changes.outputs.cli != 'true' }}
         run: |
           set +e
-          pwsh -NoProfile -Command '$env:PSModulePath = (Resolve-Path .); & ./Tests/Test-Toolkit.ps1 -Consts -Portability -Menu -DocCounts; exit $LASTEXITCODE' 2>&1 | tee "$RUNNER_TEMP/cli-contract.log"
+          pwsh -NoProfile -Command '$env:PSModulePath = (Resolve-Path .); & ./Tests/Test-Toolkit.ps1 -Consts -Portability -Menu -DocCounts -Changelog; exit $LASTEXITCODE' 2>&1 | tee "$RUNNER_TEMP/cli-contract.log"
           code=${PIPESTATUS[0]}
           pwsh -NoProfile -File Scripts/Test-CiHalf.ps1 -Half cli -Path "$RUNNER_TEMP/cli-contract.log" -ExitCode "$code"
 
@@ -339,6 +344,26 @@ jobs:
           python -m pytest Tests/test_consts.py Tests/test_pr_comments.py Tests/test_third_party_notices.py 2>&1 | tee "$RUNNER_TEMP/agent-contract.log"
           code=${PIPESTATUS[0]}
           pwsh -NoProfile -File Scripts/Test-CiHalf.ps1 -Half agent -Path "$RUNNER_TEMP/agent-contract.log" -ExitCode "$code"
+
+      # The documentation lint, the web job's step, for a change the web job did
+      # not run on: a prose document or a changelog edit reaches no half.
+      - uses: actions/setup-node@v7
+        if: ${{ !cancelled() && needs.changes.outputs.web != 'true' }}
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: npm ci (web)
+        id: npm
+        if: ${{ !cancelled() && needs.changes.outputs.web != 'true' }}
+        working-directory: web
+        run: npm ci
+
+      - name: The documentation -- npm run lint:md
+        if: ${{ !cancelled() && needs.changes.outputs.web != 'true' && steps.npm.outcome == 'success' }}
+        working-directory: web
+        run: npm run lint:md
 
       # A half that did not run here cannot have a new count: its paste lines in
       # docs/TESTING.md must be main's, as they stand. One that differs was typed.
