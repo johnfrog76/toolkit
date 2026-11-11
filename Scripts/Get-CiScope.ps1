@@ -7,7 +7,10 @@
     changed and calls this with the list:
 
         git diff --name-only --no-renames "$BASE...HEAD" > changed.txt
-        pwsh -NoProfile -File Scripts/Get-CiScope.ps1 -Event pull_request -PathsFile changed.txt
+        git diff -U0 --no-renames "$BASE...HEAD" -- docs/TESTING.md AGENTS.md VERIFY.md > counts.diff
+        # and each of those three files as it stood at the base, under base/
+        pwsh -NoProfile -File Scripts/Get-CiScope.ps1 -Event pull_request -PathsFile changed.txt `
+            -CountDiffFile counts.diff -BaseRoot base
 
     The rule is Get-P20CiScope (Scripts/TestAll-Rules.ps1): every event but a
     pull request runs the three halves; a pull request runs the half each path
@@ -15,12 +18,18 @@
     a shared path or one the rule does not know all three -- and the contract
     job wherever a half is left out.
 
+    -CountDiffFile is the -U0 diff of docs/TESTING.md, AGENTS.md and VERIFY.md,
+    -BaseRoot a folder holding those files as they stood at the base, and
+    -HeadRoot the tree after (the checkout, by default). A file whose changed
+    lines are all count lines -- the lines {cliPrefix}TestToolkit -DocCounts
+    checks (Get-P20CountOnlyPaths) -- reaches no half by itself.
+
     It prints one line per job and one per path with its class. Under GitHub
     Actions it writes `cli`, `agent`, `web` and `contract` (true or false) to
     GITHUB_OUTPUT, and the same lines to the job's step summary.
 
-    Exit 0 with the answer; 2, after an Error: line, when -PathsFile names no
-    file.
+    Exit 0 with the answer; 2, after an Error: line, when -PathsFile or
+    -CountDiffFile names no file.
 
 .NOTES
     PowerShell 5.1 compatible: ASCII only, no ternary, no null-coalescing.
@@ -29,7 +38,10 @@
 param(
     [Parameter(Mandatory)][string]$Event,
     [string]$PathsFile,
-    [string[]]$Paths = @()
+    [string[]]$Paths = @(),
+    [string]$CountDiffFile,
+    [string]$BaseRoot,
+    [string]$HeadRoot = '.'
 )
 
 . (Join-Path $PSScriptRoot 'TestAll-Rules.ps1')
@@ -44,7 +56,32 @@ if ($PathsFile) {
     $all += @([System.IO.File]::ReadAllLines((Resolve-Path -LiteralPath $PathsFile).Path))
 }
 
-$scope = Get-P20CiScope -Event $Event -Paths $all
+$countOnly = @()
+if ($CountDiffFile) {
+    if (-not (Test-Path -LiteralPath $CountDiffFile -PathType Leaf)) {
+        Write-Host "Error: no diff of the count-line files at $CountDiffFile."
+        Write-Host "Hint:  the step writes it with git diff -U0 before calling this (docs/TESTING.md, `"In CI`")."
+        exit 2
+    }
+    $diff = [System.IO.File]::ReadAllText((Resolve-Path -LiteralPath $CountDiffFile).Path)
+    $baseTexts = @{}
+    $headTexts = @{}
+    foreach ($f in @((Get-P20CountLineRules).Keys)) {
+        foreach ($pair in @(@($baseTexts, $BaseRoot), @($headTexts, $HeadRoot))) {
+            $pair[0][$f] = ''
+            if (-not $pair[1]) { continue }
+            $full = Join-Path $pair[1] $f
+            if (Test-Path -LiteralPath $full -PathType Leaf) { $pair[0][$f] = [System.IO.File]::ReadAllText((Resolve-Path -LiteralPath $full).Path) }
+        }
+    }
+    $changes = Get-P20CountOnlyPaths -Diff $diff -BaseTexts $baseTexts -HeadTexts $headTexts
+    foreach ($k in $changes.Keys) {
+        if ($changes[$k].CountOnly) { $countOnly += $k }
+        else { Write-Host "  $k changes more than its count lines -- $($changes[$k].Other)" }
+    }
+}
+
+$scope = Get-P20CiScope -Event $Event -Paths $all -CountOnly $countOnly
 $jobs = @('cli', 'agent', 'web', 'contract')
 
 $report = @()

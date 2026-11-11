@@ -25,13 +25,15 @@
                        and every job behind the one switch with a timeout;
                        each half in a job of its own with its own installs
                        and lints, the filter, the contract job, the one
-                       required check, and no action past the three named;
+                       check that sums them up, and no action past the three named;
                        and pages.yml, the landing page's deploy, on the
                        button alone, with no secret, the Pages permissions
                        and a read, and its actions pinned to a major version.
       1c. CI's scope   which jobs a change runs, one row per path class
-                       (Tests/fixtures/ci-scope/table.json), the script as the
-                       changes job runs it, and the carried paste lines:
+                       (Tests/fixtures/ci-scope/table.json), count lines alone
+                       reaching no half (count-lines.json) and the classifier
+                       under it, the script as the changes job runs it, and
+                       the carried paste lines:
                        identical, typed, and a half that ran not compared.
       2. The merge     a half written replaces only that half's entries; a file
                        from before the halves reads as the CLI's alone.
@@ -261,7 +263,9 @@ Assert-True 'the changes job sets cli, agent, web and contract from one step' `
     (@('cli', 'agent', 'web', 'contract' | Where-Object { $jChanges -notmatch ("(?m)^\s+" + $_ + ": \`$\{\{ steps\.scope\.outputs\." + $_ + " \}\}\s*$") }).Count -eq 0)
 $scopeSteps = @([regex]::Matches($jChanges, '(?m)^\s+- name: '))
 Assert-True 'that one step diffs against the base sha and runs Get-CiScope.ps1 over the list' `
-    (($scopeSteps.Count -eq 1) -and ($jChanges -match 'github\.event\.pull_request\.base\.sha') -and ($jChanges -match 'git diff --name-only --no-renames "\$BASE\.\.\.HEAD" > "\$RUNNER_TEMP/changed\.txt"') -and ($jChanges -match 'Scripts/Get-CiScope\.ps1 -Event "\$EVENT" -PathsFile "\$RUNNER_TEMP/changed\.txt"')) "$($scopeSteps.Count) named step(s)"
+    (($scopeSteps.Count -eq 1) -and ($jChanges -match 'github\.event\.pull_request\.base\.sha') -and ($jChanges -match 'git diff --name-only --no-renames "\$BASE\.\.\.HEAD" > "\$RUNNER_TEMP/changed\.txt"') -and ($jChanges -match 'Scripts/Get-CiScope\.ps1 -Event "\$EVENT" -PathsFile "\$RUNNER_TEMP/changed\.txt" -CountDiffFile "\$RUNNER_TEMP/counts\.diff" -BaseRoot "\$RUNNER_TEMP/base"')) "$($scopeSteps.Count) named step(s)"
+Assert-True 'that step hands the rule the -U0 diff of the three count-line documents and their text at the base' `
+    (($jChanges -match 'git diff -U0 --no-renames "\$BASE\.\.\.HEAD" -- docs/TESTING\.md AGENTS\.md VERIFY\.md > "\$RUNNER_TEMP/counts\.diff"') -and ($jChanges -match 'git show "\$from:\$f" > "\$RUNNER_TEMP/base/\$f"'))
 
 # The contract set: the CLI's four suites with the module path set inside pwsh, the
 # agent's three files, the carried paste lines -- each gated on its half not running.
@@ -272,7 +276,7 @@ Assert-True 'the contract job runs the agent''s three contract files, read throu
 Assert-True 'the contract job holds the carried paste lines to main''s, from the base sha' `
     (($jContract -match 'git show "\$BASE:docs/TESTING\.md"') -and ($jContract -match 'Scripts/Test-CarriedCounts\.ps1 -BasePath [^\r\n]+ -HeadPath docs/TESTING\.md -Ran ') -and ($jContract -match 'fetch-depth: 0'))
 
-# The one required check: every job behind it, always run, each needed job held to success.
+# The one check that sums the run up: every job behind it, always run, each needed job held to success.
 Assert-True 'the verify job is named Verify, needs every Ubuntu job and runs always, but not on the schedule' `
     (($jVerify -match '(?m)^\s+name: Verify\s*$') -and ($jVerify -match '(?m)^\s+needs: \[changes, cli, agent, web, contract\]\s*$') -and ($jVerify -match "(?m)^\s+if: \`$\{\{ always\(\) && github\.event_name != 'schedule' \}\}\s*$"))
 Assert-True 'the verify job reads the filter''s answer and every job''s result' `
@@ -322,6 +326,64 @@ foreach ($row in @($scopeFixture.rows)) {
 Assert-True 'scope: each path is reported with its class' `
     (((@((Get-P20CiScope -Event 'pull_request' -Paths @('web/a.ts', 'CHANGELOG.md', 'consts.json', 'x.txt')).Paths) | ForEach-Object { $_[1] }) -join ',') -eq 'web,changelog,shared,unclassified')
 
+# Count lines alone reach no half. The classifier first: the line numbers it reads
+# as count lines, a -U0 diff's changed lines, and a removed line that starts `--`.
+Write-Host ""
+Write-Host "-- CI's scope: count lines alone --" -ForegroundColor Cyan
+$countFixture = [System.IO.File]::ReadAllText((Join-Path $scriptDir 'fixtures/ci-scope/count-lines.json')) | ConvertFrom-Json
+$countBase = @{}
+foreach ($pr in $countFixture.base.PSObject.Properties) { $countBase[$pr.Name] = (@($pr.Value) -join "`n") + "`n" }
+$nums = Get-P20CountLineNumbers -Path 'docs/TESTING.md' -Text $countBase['docs/TESTING.md']
+Assert-True 'count lines in docs/TESTING.md: the command block''s three, the paste block''s five, the table row' `
+    ((@($nums.Keys | Sort-Object) -join ',') -eq '4,8,9,17,18,19,20,21,26') (@($nums.Keys | Sort-Object) -join ',')
+Assert-True 'count lines in AGENTS.md and VERIFY.md: the one line each that DocCounts reads' `
+    (((@((Get-P20CountLineNumbers -Path 'AGENTS.md' -Text $countBase['AGENTS.md']).Keys) -join ',') -eq '4') -and ((@((Get-P20CountLineNumbers -Path 'VERIFY.md' -Text $countBase['VERIFY.md']).Keys) -join ',') -eq '3'))
+Assert-True 'a file with no rule has no count lines' ((Get-P20CountLineNumbers -Path 'README.md' -Text "tkTestToolkit # 3 suites, 60 assertions`n").Count -eq 0)
+$handDiff = "diff --git a/VERIFY.md b/VERIFY.md`nindex 1..2 100644`n--- a/VERIFY.md`n+++ b/VERIFY.md`n@@ -3 +3 @@ ## Gate 4`n-old three`n+new three`n@@ -5,2 +4,0 @@`n--- a dash line`n-five`n@@ -9,0 +8,2 @@`n+++ a plus line`n+eight`n\ No newline at end of file`n"
+$changed = @(Get-P20DiffChangedLines -Diff $handDiff)
+$changedSaid = @($changed | ForEach-Object { "$($_.Path):$($_.Side)$($_.Line)=$($_.Text)" }) -join ' | '
+Assert-True 'a -U0 diff''s changed lines, each with its side and number, a `--` or `++` line read as a line' `
+    ($changedSaid -eq 'VERIFY.md:old3=old three | VERIFY.md:new3=new three | VERIFY.md:old5=-- a dash line | VERIFY.md:old6=five | VERIFY.md:new8=++ a plus line | VERIFY.md:new9=eight') $changedSaid
+
+# A -U0 diff of a case's edits, in git's shape: one hunk per edited line.
+function New-CountCase {
+    param($Case, [hashtable]$Base)
+    $head = @{}
+    foreach ($k in $Base.Keys) { $head[$k] = [System.Collections.Generic.List[string]]@(($Base[$k].TrimEnd("`n")) -split "`n") }
+    $hunks = @{}
+    foreach ($e in @($Case.edits)) {
+        $lines = $head[$e.path]
+        if (-not $hunks.ContainsKey($e.path)) { $hunks[$e.path] = @() }
+        if ($e.PSObject.Properties.Name -contains 'find') {
+            $n = $lines.IndexOf([string]$e.find) + 1
+            $lines[$n - 1] = [string]$e.replace
+            $hunks[$e.path] += , @($n, "@@ -$n +$n @@`n-$($e.find)`n+$($e.replace)")
+        }
+        else {
+            $n = $lines.IndexOf([string]$e.after) + 1
+            $lines.Insert($n, [string]$e.insert)
+            $hunks[$e.path] += , @($n, "@@ -$n,0 +$($n + 1) @@`n+$($e.insert)")
+        }
+    }
+    $diff = ''
+    foreach ($k in @($hunks.Keys | Sort-Object)) {
+        $diff += "diff --git a/$k b/$k`n--- a/$k`n+++ b/$k`n"
+        foreach ($h in @($hunks[$k] | Sort-Object { $_[0] })) { $diff += $h[1] + "`n" }
+    }
+    $headText = @{}
+    foreach ($k in $head.Keys) { $headText[$k] = ($head[$k] -join "`n") + "`n" }
+    return @{ Diff = $diff; Head = $headText; Edited = @($hunks.Keys) }
+}
+foreach ($case in @($countFixture.cases)) {
+    $built = New-CountCase -Case $case -Base $countBase
+    $only = Get-P20CountOnlyPaths -Diff $built.Diff -BaseTexts $countBase -HeadTexts $built.Head
+    $onlyPaths = @($only.Keys | Where-Object { $only[$_].CountOnly } | Sort-Object)
+    $sc = Get-P20CiScope -Event 'pull_request' -Paths (@($case.paths) + @($built.Edited)) -CountOnly $onlyPaths
+    $want = "countOnly=$(@($case.countOnly | Sort-Object) -join ',') cli=$($case.cli) agent=$($case.agent) web=$($case.web) contract=$($case.contract)"
+    $got = "countOnly=$($onlyPaths -join ',') cli=$($sc.cli) agent=$($sc.agent) web=$($sc.web) contract=$($sc.contract)"
+    Assert-True "count lines: $($case.why)" ($want -eq $got) "want $want, got $got"
+}
+
 . (Join-Path $scriptDir 'Get-TestHost.ps1')
 $scopeScript = Join-Path $pkgRoot 'Scripts/Get-CiScope.ps1'
 $scopeScratch = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-ci-scope-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -338,7 +400,29 @@ try {
     $written = [System.IO.File]::ReadAllText($outFile) -replace "`r", ''
     Assert-True 'Get-CiScope.ps1, run as the changes job runs it: exit 0 and the four outputs for a web-only list' `
         (($code -eq 0) -and ($written -eq "cli=false`nagent=false`nweb=true`ncontract=true`n")) "exit $code, wrote '$written' -- $said"
+    # The same call with the count-line files: a web change that pastes its web line.
+    $built = New-CountCase -Case @($countFixture.cases)[0] -Base $countBase
+    $baseDir = Join-Path $scopeScratch 'base'
+    $headDir = Join-Path $scopeScratch 'head'
+    foreach ($pair in @(@($baseDir, $countBase), @($headDir, $built.Head))) {
+        foreach ($k in $pair[1].Keys) {
+            $dest = Join-Path $pair[0] $k
+            New-Item -ItemType Directory -Path (Split-Path -Parent $dest) -Force | Out-Null
+            [System.IO.File]::WriteAllText($dest, $pair[1][$k])
+        }
+    }
+    $diffFile = Join-Path $scopeScratch 'counts.diff'
+    [System.IO.File]::WriteAllText($diffFile, $built.Diff)
+    [System.IO.File]::WriteAllText($listFile, "web/src/App.tsx`ndocs/TESTING.md`n")
+    [System.IO.File]::WriteAllText($outFile, '')
+    $said = (Invoke-P20TestHost -File $scopeScript -Arguments @('-Event', 'pull_request', '-PathsFile', $listFile, '-CountDiffFile', $diffFile, '-BaseRoot', $baseDir, '-HeadRoot', $headDir) | ForEach-Object { [string]$_ }) -join "`n"
+    $code = $LASTEXITCODE
+    $written = [System.IO.File]::ReadAllText($outFile) -replace "`r", ''
+    Assert-True 'Get-CiScope.ps1 with the count-line diff: a pasted web line beside a web change is web plus contract' `
+        (($code -eq 0) -and ($written -eq "cli=false`nagent=false`nweb=true`ncontract=true`n") -and ($said -match 'count lines: docs/TESTING\.md')) "exit $code, wrote '$written' -- $said"
     $env:GITHUB_ACTIONS = ''; $env:GITHUB_OUTPUT = ''
+    $null = Invoke-P20TestHost -File $scopeScript -Arguments @('-Event', 'pull_request', '-PathsFile', $listFile, '-CountDiffFile', (Join-Path $scopeScratch 'absent.diff'))
+    Assert-True 'Get-CiScope.ps1 with no diff at the path it was given exits 2' ($LASTEXITCODE -eq 2) "exit $LASTEXITCODE"
     $null = Invoke-P20TestHost -File $scopeScript -Arguments @('-Event', 'pull_request', '-PathsFile', (Join-Path $scopeScratch 'absent.txt'))
     Assert-True 'Get-CiScope.ps1 with no list at the path it was given exits 2' ($LASTEXITCODE -eq 2) "exit $LASTEXITCODE"
 }

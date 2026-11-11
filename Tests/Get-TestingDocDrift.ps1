@@ -22,7 +22,7 @@
     Returns an array of findings (empty when everything agrees); each names the stale line,
     and for the table row the first suite whose number differs.
 #>
-if (-not (Get-Command Get-P20PasteBlock -ErrorAction SilentlyContinue)) {
+if (-not (Get-Command Get-P20CountLinePatterns -ErrorAction SilentlyContinue)) {
     . (Join-Path (Split-Path -Parent $PSScriptRoot) 'Scripts/TestAll-Rules.ps1')
 }
 
@@ -48,7 +48,8 @@ function Get-P20TestingDocDrift {
     foreach ($l in @($block.web)) { if ($l -match '^web: (.+)$') { $pasteWeb = $Matches[1] } }
 
     # 1. the table row's list
-    $row = @($Text -split "\r?\n" | Where-Object { $_ -match '^\|\s*`tkTestToolkit`\s*\|' })
+    $countPatterns = Get-P20CountLinePatterns
+    $row = @($Text -split "\r?\n" | Where-Object { $_ -match $countPatterns.TestingRow })
     if ($row.Count -ne 1) { $findings += "the tkTestToolkit table row was not found exactly once ($($row.Count))" }
     else {
         $rm = [regex]::Match($row[0], 'per suite: (.*?)\.(?: |$)')
@@ -68,20 +69,20 @@ function Get-P20TestingDocDrift {
     }
 
     # 2. the command block's CLI line
-    $cmdTotal = [regex]::Match($Text, 'tkTestToolkit\s+#\s*(\d+ suites, \d+ assertions)')
+    $cmdTotal = [regex]::Match($Text, $countPatterns.TestingCliTotal)
     if (-not $pasteTotal) { $findings += 'the paste block has no "N suites, M assertions" line' }
     elseif (-not $cmdTotal.Success) { $findings += 'the command block has no "tkTestToolkit # N suites, M assertions" line' }
     elseif ($cmdTotal.Groups[1].Value -ne $pasteTotal) { $findings += "the command block's tkTestToolkit line is stale: it says '$($cmdTotal.Groups[1].Value)', the paste block says '$pasteTotal'" }
 
     # 3. pytest
-    $cmdPytest = [regex]::Match($Text, 'pytest Tests/\s+#\s*(.+?)\s+--')
+    $cmdPytest = [regex]::Match($Text, $countPatterns.TestingPytest)
     if (-not $pastePytest) { $findings += 'the paste block has no "pytest: ..." line' }
     elseif ($pastePytest -notmatch '^\d+ passed(, \d+ skipped)?(, \d+ subtests)?$') { $findings += "the paste block's pytest line is not a count ('$pastePytest'): paste from a tkTest run that ran the agent half" }
     elseif (-not $cmdPytest.Success) { $findings += 'the command block has no pytest totals line' }
     elseif ($cmdPytest.Groups[1].Value -ne $pastePytest) { $findings += "the command block's pytest line is stale: it says '$($cmdPytest.Groups[1].Value)', the paste block says '$pastePytest'" }
 
     # 4. web
-    $cmdWeb = [regex]::Match($Text, 'npm test\s+#\s*(?:.*?then\s+)?(\d+ suites, \d+ tests)')
+    $cmdWeb = [regex]::Match($Text, $countPatterns.TestingWeb)
     if (-not $pasteWeb) { $findings += 'the paste block has no "web: ..." line' }
     elseif ($pasteWeb -notmatch '^\d+ suites, \d+ tests$') { $findings += "the paste block's web line is not a count ('$pasteWeb'): paste from a tkTest run that ran the web half" }
     elseif (-not $cmdWeb.Success) { $findings += 'the command block has no web totals line' }

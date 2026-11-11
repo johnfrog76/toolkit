@@ -11,14 +11,16 @@
 #   contract  a pull request that leaves a half out: the cross-half suites of the
 #             halves that did not run, and the check that their paste lines in
 #             docs/TESTING.md are main's (Scripts/Test-CarriedCounts.ps1).
-#   verify    the one check branch protection requires: green when every job the
+#   verify    the one check that sums the run up: green when every job the
 #             change needed passed, whatever the filter skipped.
 #   windows   a schedule, the button, and a pull request that carries the `ci` label.
 #             A push to main does not run it, nor does an ordinary pull request.
 #
 # A push to main and the button run every Ubuntu half. A pull request runs the
 # half each changed path can reach: web/ the web job, changelog.d/ and CHANGELOG.md
-# the CLI job, and a shared path -- or one the rule does not know -- all three.
+# the CLI job, and a shared path -- or one the rule does not know -- all three. A
+# change to the count lines of docs/TESTING.md, AGENTS.md or VERIFY.md and nothing
+# else in them reaches no half by itself.
 #
 # Windows runs against main once each weekday evening, so a change that only 5.1 or
 # the browser would show is caught the same day. A pull request that is heavy on
@@ -94,20 +96,29 @@ jobs:
 
       # One step: the changed files, then the rule over them (Get-P20CiScope in
       # Scripts/TestAll-Rules.ps1). --no-renames lists a moved file at both ends, so
-      # a file moved out of a shared folder still counts as a change there. Any other
-      # event lists nothing, and the script answers every half.
+      # a file moved out of a shared folder still counts as a change there. The
+      # three documents that carry counts also go in as their changed lines and
+      # their text at the base, so a change to their count lines alone reaches no
+      # half (Get-P20CountOnlyPaths). Any other event lists nothing, and the script
+      # answers every half.
       - name: The files changed, and the jobs they need
         id: scope
         env:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
+          : > "$RUNNER_TEMP/changed.txt"
+          : > "$RUNNER_TEMP/counts.diff"
+          mkdir -p "$RUNNER_TEMP/base/docs"
           if [ "$EVENT" = "pull_request" ]; then
             git diff --name-only --no-renames "$BASE...HEAD" > "$RUNNER_TEMP/changed.txt"
-          else
-            : > "$RUNNER_TEMP/changed.txt"
+            git diff -U0 --no-renames "$BASE...HEAD" -- docs/TESTING.md AGENTS.md VERIFY.md > "$RUNNER_TEMP/counts.diff"
+            from=$(git merge-base "$BASE" HEAD)
+            for f in docs/TESTING.md AGENTS.md VERIFY.md; do
+              git show "$from:$f" > "$RUNNER_TEMP/base/$f" 2>/dev/null || : > "$RUNNER_TEMP/base/$f"
+            done
           fi
-          pwsh -NoProfile -File Scripts/Get-CiScope.ps1 -Event "$EVENT" -PathsFile "$RUNNER_TEMP/changed.txt"
+          pwsh -NoProfile -File Scripts/Get-CiScope.ps1 -Event "$EVENT" -PathsFile "$RUNNER_TEMP/changed.txt" -CountDiffFile "$RUNNER_TEMP/counts.diff" -BaseRoot "$RUNNER_TEMP/base"
 
   cli:
     name: The CLI on Ubuntu
@@ -338,7 +349,7 @@ jobs:
           pwsh -NoProfile -File Scripts/Test-CarriedCounts.ps1 -BasePath "$RUNNER_TEMP/base-TESTING.md" -HeadPath docs/TESTING.md -Ran "${ran#,}"
 
   verify:
-    # The one required check. A job the filter skipped is fine; a job the change
+    # The one check that sums the run up. A job the filter skipped is fine; a job the change
     # needed that failed, was cancelled or never started fails this one, and so
     # does a filter that did not answer.
     name: Verify

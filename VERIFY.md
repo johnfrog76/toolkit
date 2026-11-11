@@ -316,7 +316,7 @@ cd web && npm test           # the shell; the current counts are in docs/TESTING
 A skip is not a pass. Read the summary line, not just the total.
 
 **What CI covers of this gate.** A pull request's check (`.github/workflows/verify.yml`, the Ubuntu jobs, one per half,
-behind the one required check, `Verify`) runs these three
+summed up by one check, `Verify`) runs these three
 runners on Ubuntu, reads each one's summary line and fails a step on a failure, a skipped half or a run
 that counted nothing ([docs/TESTING.md](docs/TESTING.md), "In CI"). A pull request runs only the halves
 its files can reach, and the cross-half contract suites for the rest; a push to `main` runs all three. That is this gate on Linux under

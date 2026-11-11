@@ -74,7 +74,7 @@ Write-Host "  Registry:  $realCount suites (Get-ToolkitSuiteRegistry.ps1)" -Fore
 # A file whose wording changes has to change the anchor here too -- that is the
 # point: a silent rewording is a silent way to stop being checked.
 function Get-DocSuiteCount {
-    param([string]$Path, [string]$Pattern, [string]$Label)
+    param([string]$Path, [string]$Pattern, [string]$Label, [int]$Group = 1)
     if (-not (Test-Path -LiteralPath $Path)) {
         Assert-True "$Label exists" $false "not found: $Path"
         return $null
@@ -84,19 +84,20 @@ function Get-DocSuiteCount {
     Assert-True "$Label states its CLI suite count in the expected shape" $m.Success `
         "pattern not found in $Path -- has the sentence been reworded?"
     if (-not $m.Success) { return $null }
-    return [int]$m.Groups[1].Value
+    return [int]$m.Groups[$Group].Value
 }
 
 $agentsPath = Join-Path $pkgRoot 'AGENTS.md'
 $testingPath = Join-Path $pkgRoot 'docs/TESTING.md'
 $verifyPath = Join-Path $pkgRoot 'VERIFY.md'
 
-$agentsCount = Get-DocSuiteCount -Path $agentsPath -Label 'AGENTS.md' `
-    -Pattern 'tkTestToolkit\s+#\s*the CLI -- (\d+) suites,'
-$testingCount = Get-DocSuiteCount -Path $testingPath -Label 'docs/TESTING.md' `
-    -Pattern 'tkTestToolkit\s+#\s*(\d+) suites,'
-$verifyCount = Get-DocSuiteCount -Path $verifyPath -Label 'VERIFY.md' `
-    -Pattern 'is \*\*(\d+) suites,'
+# The patterns are Get-P20CountLinePatterns (Scripts/TestAll-Rules.ps1): the count
+# lines CI's count-line exemption reads, so the two cannot drift apart.
+. (Join-Path $pkgRoot 'Scripts/TestAll-Rules.ps1')
+$countPatterns = Get-P20CountLinePatterns
+$agentsCount = Get-DocSuiteCount -Path $agentsPath -Label 'AGENTS.md' -Pattern $countPatterns.AgentsCli
+$testingCount = Get-DocSuiteCount -Path $testingPath -Label 'docs/TESTING.md' -Pattern $countPatterns.TestingCliTotal -Group 2
+$verifyCount = Get-DocSuiteCount -Path $verifyPath -Label 'VERIFY.md' -Pattern $countPatterns.VerifyCli
 
 if ($null -ne $agentsCount) { Write-Host "  AGENTS.md:       $agentsCount suites" -ForegroundColor DarkGray }
 if ($null -ne $testingCount) { Write-Host "  docs/TESTING.md: $testingCount suites" -ForegroundColor DarkGray }
@@ -125,7 +126,7 @@ $testingText = ''
 if (Test-Path -LiteralPath $testingPath) { $testingText = Get-Content -LiteralPath $testingPath -Raw -Encoding UTF8 }
 $testingRows = @($testingText -split "\r?\n")
 
-$combinedRow = @($testingRows | Where-Object { $_ -match '^\|\s*`tkTestToolkit`\s*\|' })
+$combinedRow = @($testingRows | Where-Object { $_ -match $countPatterns.TestingRow })
 Assert-True 'docs/TESTING.md has one combined `tkTestToolkit` row' ($combinedRow.Count -eq 1) "$($combinedRow.Count) rows"
 if ($combinedRow.Count -eq 1) {
     # The names in the row, in order, are the registry's -- the same line the

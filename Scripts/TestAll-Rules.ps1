@@ -27,6 +27,10 @@
       Get-P20PasteBlock            docs/TESTING.md's paste block, each line given
                                    to the half it belongs to -- the one rule the
                                    drift check and CI's carried-lines check read.
+      Get-P20CountLinePatterns     the count lines {cliPrefix}TestToolkit -DocCounts
+                                   reads in docs/TESTING.md, AGENTS.md and VERIFY.md.
+      Get-P20CountOnlyPaths        which of those files a diff changes in its
+                                   count lines and nowhere else.
       Get-P20CiScope               which of CI's jobs a change runs, from the
                                    event and the files it changed.
       Get-P20CarriedCountFindings  a pull request's paste lines for the halves
@@ -313,6 +317,165 @@ function Read-P20ExpectedCounts {
     return $out
 }
 
+function Get-P20PasteBlockMatch {
+    <#
+      Where docs/TESTING.md's paste block is: the regex match whose first group
+      is the block's text, between its ```text fence and the closing one. $null
+      when there is none. Get-P20PasteBlock reads its lines from it, and
+      Get-P20CountLineNumbers its line numbers.
+    #>
+    param([AllowEmptyString()][string]$Text)
+    if (-not $Text) { return $null }
+    $m = [regex]::Match($Text, '(?s)\*\*The counts, after a merge\.\*\*.*?```text\r?\n(.*?)\r?\n```')
+    if (-not $m.Success) { return $null }
+    return $m
+}
+
+function Get-P20CountLinePatterns {
+    <#
+      The count lines the documents state, one regex each -- the patterns
+      Tests/Test-DocCounts.ps1 and Tests/Get-TestingDocDrift.ps1 read them
+      with, so CI's count-line exemption (Get-P20CountOnlyPaths) cannot cover a
+      line they do not check:
+        TestingRow       docs/TESTING.md's `tkTestToolkit` table row
+        TestingCliTotal  its command block's `tkTestToolkit # N suites, M assertions`
+                         (group 1 the figure, group 2 the suite count)
+        TestingPytest    its command block's pytest totals (group 1)
+        TestingWeb       its command block's npm test totals (group 1)
+        AgentsCli        AGENTS.md's `tkTestToolkit # the CLI -- N suites, ...`
+        VerifyCli        VERIFY.md's Gate 4 `On this commit that is **N suites, ...`
+      docs/TESTING.md's paste block is the seventh, found by Get-P20PasteBlockMatch.
+    #>
+    return [ordered]@{
+        TestingRow      = '^\|\s*`tkTestToolkit`\s*\|'
+        TestingCliTotal = 'tkTestToolkit\s+#\s*((\d+) suites, \d+ assertions)'
+        TestingPytest   = 'pytest Tests/\s+#\s*(.+?)\s+--'
+        TestingWeb      = 'npm test\s+#\s*(?:.*?then\s+)?(\d+ suites, \d+ tests)'
+        AgentsCli       = 'tkTestToolkit\s+#\s*the CLI -- (\d+) suites,'
+        VerifyCli       = 'is \*\*(\d+) suites,'
+    }
+}
+
+function Get-P20CountLineRules {
+    <# The files that carry count lines, each with its patterns and whether it holds the paste block. #>
+    $p = Get-P20CountLinePatterns
+    return [ordered]@{
+        'docs/TESTING.md' = @{ Patterns = @($p.TestingRow, $p.TestingCliTotal, $p.TestingPytest, $p.TestingWeb); PasteBlock = $true }
+        'AGENTS.md'       = @{ Patterns = @($p.AgentsCli); PasteBlock = $false }
+        'VERIFY.md'       = @{ Patterns = @($p.VerifyCli); PasteBlock = $false }
+    }
+}
+
+function Get-P20CountLineNumbers {
+    <#
+      The 1-based numbers of the count lines in one file's text: every line a
+      pattern of its rule matches, and for docs/TESTING.md every line inside the
+      paste block's fence. A file with no rule has none.
+    #>
+    param([string]$Path, [AllowEmptyString()][string]$Text)
+    $nums = @{}
+    $rules = Get-P20CountLineRules
+    if (-not $rules.Contains($Path) -or -not $Text) { return $nums }
+    $rule = $rules[$Path]
+    $lines = @($Text -split "\r?\n")
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        foreach ($pat in $rule.Patterns) {
+            if ($lines[$i] -match $pat) { $nums[$i + 1] = $true; break }
+        }
+    }
+    if ($rule.PasteBlock) {
+        $m = Get-P20PasteBlockMatch -Text $Text
+        if ($null -ne $m) {
+            $g = $m.Groups[1]
+            $first = ([regex]::Matches($Text.Substring(0, $g.Index), "\n")).Count + 1
+            $count = ([regex]::Matches($g.Value, "\n")).Count + 1
+            for ($n = $first; $n -lt $first + $count; $n++) { $nums[$n] = $true }
+        }
+    }
+    return $nums
+}
+
+function Get-P20DiffChangedLines {
+    <#
+      The changed lines of a `git diff -U0`: one @{ Path; Side; Line; Text } per
+      removed line (Side old, its number in the old file) and per added line
+      (Side new, its number in the new file). Each hunk is read by the counts
+      its header states, so a removed line that itself starts with `--` is
+      still a line.
+    #>
+    param([AllowEmptyString()][string]$Diff)
+    $out = @()
+    if (-not $Diff) { return $out }
+    $lines = @($Diff -split "\r?\n")
+    $path = ''; $oldPath = ''
+    $i = 0
+    while ($i -lt $lines.Count) {
+        $l = $lines[$i]
+        if ($l.StartsWith('diff --git ')) { $path = ''; $oldPath = ''; $i++; continue }
+        if ($l.StartsWith('--- ')) { $oldPath = $l.Substring(4) -replace '^a/', ''; $i++; continue }
+        if ($l.StartsWith('+++ ')) {
+            $path = $l.Substring(4) -replace '^b/', ''
+            if ($path -eq '/dev/null') { $path = $oldPath }
+            $i++; continue
+        }
+        $h = [regex]::Match($l, '^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@')
+        if (-not $h.Success) { $i++; continue }
+        $oldAt = [int]$h.Groups[1].Value; $oldLeft = 1; if ($h.Groups[2].Success) { $oldLeft = [int]$h.Groups[2].Value }
+        $newAt = [int]$h.Groups[3].Value; $newLeft = 1; if ($h.Groups[4].Success) { $newLeft = [int]$h.Groups[4].Value }
+        $i++
+        while (($oldLeft + $newLeft) -gt 0 -and $i -lt $lines.Count) {
+            $c = $lines[$i]
+            if ($c.StartsWith('-') -and $oldLeft -gt 0) {
+                $out += @{ Path = $path; Side = 'old'; Line = $oldAt; Text = $c.Substring(1) }
+                $oldAt++; $oldLeft--
+            }
+            elseif ($c.StartsWith('+') -and $newLeft -gt 0) {
+                $out += @{ Path = $path; Side = 'new'; Line = $newAt; Text = $c.Substring(1) }
+                $newAt++; $newLeft--
+            }
+            elseif (-not $c.StartsWith('\')) { break }
+            $i++
+        }
+    }
+    return $out
+}
+
+function Get-P20CountOnlyPaths {
+    <#
+      Which files a diff changes in their count lines alone. -Diff is
+      `git diff -U0` over docs/TESTING.md, AGENTS.md and VERIFY.md; -BaseTexts
+      and -HeadTexts map each path to its text before and after. A removed line
+      is a count line when its number is one in the base text, an added line
+      when its number is one in the head text (Get-P20CountLineNumbers).
+      Returns path -> @{ CountOnly; Other }, Other the first changed line that
+      is not a count line. A path with no rule is never count-only.
+    #>
+    param(
+        [AllowEmptyString()][string]$Diff,
+        [hashtable]$BaseTexts = @{},
+        [hashtable]$HeadTexts = @{}
+    )
+    $out = [ordered]@{}
+    $nums = @{}
+    foreach ($c in @(Get-P20DiffChangedLines -Diff $Diff)) {
+        $key = $c.Side + '|' + $c.Path
+        if (-not $nums.ContainsKey($key)) {
+            $t = ''
+            if ($c.Side -eq 'old' -and $BaseTexts.ContainsKey($c.Path)) { $t = [string]$BaseTexts[$c.Path] }
+            if ($c.Side -eq 'new' -and $HeadTexts.ContainsKey($c.Path)) { $t = [string]$HeadTexts[$c.Path] }
+            $nums[$key] = Get-P20CountLineNumbers -Path $c.Path -Text $t
+        }
+        if (-not $out.Contains($c.Path)) { $out[$c.Path] = @{ CountOnly = $true; Other = '' } }
+        if ($out[$c.Path].CountOnly -and -not $nums[$key].ContainsKey($c.Line)) {
+            $out[$c.Path].CountOnly = $false
+            $said = $c.Text.Trim()
+            if ($said.Length -gt 100) { $said = $said.Substring(0, 100) + '...' }
+            $out[$c.Path].Other = "$($c.Side) line $($c.Line): $said"
+        }
+    }
+    return $out
+}
+
 function Get-P20PasteLineHalf {
     <#
       The half one trimmed paste-block line belongs to: `N suites, M assertions`
@@ -338,9 +501,8 @@ function Get-P20PasteBlock {
       block through this, so the two cannot find different lines.
     #>
     param([AllowEmptyString()][string]$Text)
-    if (-not $Text) { return $null }
-    $m = [regex]::Match($Text, '(?s)\*\*The counts, after a merge\.\*\*.*?```text\r?\n(.*?)\r?\n```')
-    if (-not $m.Success) { return $null }
+    $m = Get-P20PasteBlockMatch -Text $Text
+    if ($null -eq $m) { return $null }
     $lines = @($m.Groups[1].Value -split "\r?\n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
     $out = [ordered]@{ Lines = $lines; cli = @(); agent = @(); web = @() }
     foreach ($l in $lines) {
@@ -385,13 +547,16 @@ function Get-P20CiScope {
       Which of verify.yml's Ubuntu jobs a run needs. Every event but a pull
       request runs the three halves. A pull request runs the half each changed
       path can affect (Get-P20CiPathClass), the union over its paths; a pull
-      request that lists no path runs everything. The contract job runs on a
+      request that lists no path runs everything. A path in -CountOnly
+      (Get-P20CountOnlyPaths: docs/TESTING.md, AGENTS.md or VERIFY.md changed
+      in its count lines alone) reaches no half by itself; a pull request whose
+      every path is one runs everything. The contract job runs on a
       pull request where a half is left out: the cross-half suites of the halves
       that did not run, and the carried-lines check.
       Returns cli, agent, web and contract as booleans, and Paths: each path
       with its class, in the order given.
     #>
-    param([string]$Event, [string[]]$Paths = @())
+    param([string]$Event, [string[]]$Paths = @(), [string[]]$CountOnly = @())
     $out = [ordered]@{ cli = $false; agent = $false; web = $false; contract = $false; Paths = @() }
     $all = @(Get-P20TestHalves)
     $clean = @($Paths | ForEach-Object { ([string]$_).Trim() -replace '\\', '/' } | Where-Object { $_ })
@@ -401,11 +566,18 @@ function Get-P20CiScope {
     }
     $rows = @()
     foreach ($p in $clean) {
+        if (@($CountOnly) -ccontains $p) { $rows += , @($p, 'count lines'); continue }
         $c = Get-P20CiPathClass -Path $p
         foreach ($h in $c.Halves) { $out[$h] = $true }
         $rows += , @($p, $c.Class)
     }
     $out.Paths = $rows
+    # Count lines alone reach no half; a change of nothing else runs every half,
+    # so a paste of all three lines is held by the runs it pastes from.
+    if (@($all | Where-Object { $out[$_] }).Count -eq 0) {
+        foreach ($h in $all) { $out[$h] = $true }
+        return $out
+    }
     $out.contract = (@($all | Where-Object { -not $out[$_] }).Count -gt 0)
     return $out
 }
