@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { expectOneRowShape } from "./rowShapeAssert";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { DesignsCard } from "./DesignsCard";
 import { DesignNotePage, promoteBlocked } from "./DesignNotePage";
@@ -12,6 +13,10 @@ import type { DesignNote } from "./api.studio";
 // writes one through NewDesign (the bridge -- never a native write), and one
 // note's reading room. The agent's reads are pinned in Tests/test_studio.py,
 // the verb's bytes there too. The viewer is mocked (react-markdown is ESM).
+// The pager's rules do not depend on how many rows a page holds, and these
+// suites build their lists for five; the shipped size is pinned in foyer.test.ts.
+jest.mock("./paths", () => ({ ...jest.requireActual("./paths"), STUDIO_PAGE_SIZE: 5 }));
+
 jest.mock("../../shared/MarkdownViewer", () => ({
   MarkdownViewer: ({ content }: { content: string }) => <pre data-testid="viewer">{content}</pre>,
 }));
@@ -954,5 +959,52 @@ describe("Promote", () => {
     noteAnswer = { data: { ...NOTE, body: "# Board ideas" } };
     mount("/studio/design/board-ideas.md");
     expect(screen.queryByRole("button", { name: "Promote" })).toBeNull();
+  });
+});
+
+describe("the Designs card's row shape", () => {
+  it("a long title, a long description and no description draw one shape", () => {
+    window.localStorage.clear();
+    const long = "A very long design title that cannot fit on one line of the card "
+      .repeat(3)
+      .trim();
+    const longText = "A description that goes on well past two lines of the card. "
+      .repeat(12)
+      .trim();
+    listAnswer = {
+      data: {
+        ...GROUPED,
+        notShown: [],
+        designs: [
+          row({
+            id: "aaaaaaaa-0000-4000-8000-000000000011",
+            short: "aaaaaaaa",
+            title: long,
+            description: "short",
+            note: doc("design", "one.md", long),
+          }),
+          row({
+            id: "aaaaaaaa-0000-4000-8000-000000000012",
+            short: "bbbbbbbb",
+            title: "Long text",
+            description: longText,
+            note: doc("design", "two.md", "Long text"),
+          }),
+          row({
+            id: "aaaaaaaa-0000-4000-8000-000000000013",
+            short: "cccccccc",
+            title: "Bare",
+            note: doc("design", "three.md", "Bare"),
+          }),
+        ],
+      },
+    };
+    const { container } = mount();
+    const rows = expectOneRowShape(container, "design", [long, "Long text", "Bare"]);
+    // The state badge, the hash and the file name are all on the bottom line.
+    const meta = rows[2].querySelector("[data-row-meta]")!.textContent;
+    expect(meta).toContain("Design");
+    expect(meta).toContain("cccccccc");
+    expect(meta).toContain("three.md");
   });
 });

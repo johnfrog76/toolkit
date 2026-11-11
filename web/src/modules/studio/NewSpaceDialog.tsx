@@ -95,12 +95,12 @@ function RepoLabel({ c }: { c: SpaceCandidate }) {
       <Caption1 className={styles.quiet}>{c.owner}</Caption1>
       <VisibilityBadge visibility={c.visibility} />
       {c.isArchived ? (
-        <Badge appearance="outline" size="small" color="subtle">
+        <Badge appearance="tint" size="small" color="subtle">
           Archived
         </Badge>
       ) : null}
       {c.readOnly ? (
-        <Badge appearance="outline" size="small" color="subtle">
+        <Badge appearance="tint" size="small" color="subtle">
           Read-only
         </Badge>
       ) : null}
@@ -135,12 +135,12 @@ function TypedLabel({
         <>
           <VisibilityBadge visibility={row.visibility} />
           {row.isArchived ? (
-            <Badge appearance="outline" size="small" color="subtle">
+            <Badge appearance="tint" size="small" color="subtle">
               Archived
             </Badge>
           ) : null}
           {row.readOnly ? (
-            <Badge appearance="outline" size="small" color="subtle">
+            <Badge appearance="tint" size="small" color="subtle">
               Read-only
             </Badge>
           ) : null}

@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { expectOneRowShape } from "./rowShapeAssert";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -27,6 +28,10 @@ import type { PromptRow, PromptSpace } from "./api.studio";
 // row's one action Copy reference (Copy prompt in its menu), the name opening
 // the reading room. The agent's reads are pinned in Tests/test_studio_prompts.py.
 // The viewer is mocked (react-markdown is ESM).
+// The pager's rules do not depend on how many rows a page holds, and these
+// suites build their lists for five; the shipped size is pinned in foyer.test.ts.
+jest.mock("./paths", () => ({ ...jest.requireActual("./paths"), STUDIO_PAGE_SIZE: 5 }));
+
 jest.mock("../../shared/MarkdownViewer", () => ({
   MarkdownViewer: ({ content }: { content: string }) => <pre data-testid="viewer">{content}</pre>,
 }));
@@ -614,14 +619,15 @@ describe("the Prompts card's rows", () => {
     envAnswer = how("team");
   });
 
-  // The row is ONE record: title, purpose, owner, category, and the one action.
+  // The row is ONE record: title, purpose, owner, category, file name, and the one action.
   // Its text, every piece of it, is those four; the index's fields are the reading room's.
   const rowText = (card: HTMLElement) =>
-    Array.from(card.querySelectorAll("strong, .fui-Caption1, .fui-Badge")).map(
-      (e) => e.textContent,
-    );
+    // An empty description keeps its two lines but has no text to list.
+    Array.from(card.querySelectorAll("strong, .fui-Caption1, .fui-Badge"))
+      .map((e) => e.textContent)
+      .filter(Boolean);
 
-  it("each row shows title, purpose, owner and category, and nothing else", () => {
+  it("each row shows title, purpose, owner, category and file name, and nothing else", () => {
     listAnswer = {
       data: {
         count: 4,
@@ -647,10 +653,21 @@ describe("the Prompts card's rows", () => {
       "Ship-it flow, stage 1",
       "ToolKit",
       "ship",
+      "pr-ship.prompt.md",
     ]);
     // A prompt with no purpose draws no line for it, and the tools' prompt is no different.
-    expect(rowText(card("PR review"))).toEqual(["PR review", "ToolKit", "review"]);
-    expect(rowText(card("New Training"))).toEqual(["New Training", "ToolKit", "growth"]);
+    expect(rowText(card("PR review"))).toEqual([
+      "PR review",
+      "ToolKit",
+      "review",
+      "pr-review.prompt.md",
+    ]);
+    expect(rowText(card("New Training"))).toEqual([
+      "New Training",
+      "ToolKit",
+      "growth",
+      "growth-create-training.prompt.md",
+    ]);
     // None of the index's other fields, nor where it lives or when it changed.
     for (const gone of [
       "sent by ToolKit: AddPRReview",
@@ -667,6 +684,7 @@ describe("the Prompts card's rows", () => {
       "Reconstruct a week",
       "Your hub",
       "uncategorized",
+      "bench-billing.prompt.md",
     ]);
     fireEvent.click(radio("Wasteland Studio"));
     expect(rowText(card("Deck contract"))).toEqual([
@@ -674,6 +692,7 @@ describe("the Prompts card's rows", () => {
       "What a deck must carry",
       "Wasteland Studio",
       "design",
+      "deck-contract.prompt.md",
     ]);
     // One exposed action, the rest in the menu.
     const deck = card("Deck contract");
@@ -961,5 +980,30 @@ describe("a prompt's reading room", () => {
     mount(promptPath("generate-review"));
     expect(screen.getByText("No prompt generate-review")).toBeTruthy();
     expect(screen.getByText(/belongs to the growth module/)).toBeTruthy();
+  });
+});
+
+describe("the Prompts card's row shape", () => {
+  it("a long title, a long description and no description draw one shape", () => {
+    const long = "A very long title that cannot fit on one line of the card ".repeat(4).trim();
+    const longText = "A purpose that goes on well past two lines of the card. ".repeat(12).trim();
+    listAnswer = {
+      data: {
+        count: 3,
+        prompts: [
+          row({ name: "long-title", title: long, description: "short" }),
+          row({ name: "long-text", title: "Long text", description: longText }),
+          row({ name: "bare", title: "Bare" }),
+        ],
+        space: LOCAL,
+        categories: ["ship"],
+      },
+    };
+    const { container } = mount();
+    expectOneRowShape(container, "prompt", [long, "Long text", "Bare"]);
+    // The badges and the file name are on the bottom line, the controls beside the title.
+    const bare = container.querySelectorAll("[data-studio-row]")[2];
+    expect(bare.querySelector("[data-row-meta]")!.textContent).toContain("ToolKit");
+    expect(bare.querySelector("[data-row-meta]")!.textContent).toContain("bare.prompt.md");
   });
 });

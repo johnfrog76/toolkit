@@ -100,7 +100,7 @@ export function PromptPage() {
                   >
                     {groupLabel(data.group)}
                   </Badge>
-                  <Badge appearance="outline" size="small" color="subtle">
+                  <Badge appearance="tint" size="small" color="subtle">
                     {data.category}
                   </Badge>
                   <Badge appearance="outline" size="small" color="informative">

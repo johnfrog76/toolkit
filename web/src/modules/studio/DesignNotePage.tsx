@@ -159,7 +159,7 @@ export function DesignNotePage() {
                     {(data.kind ?? "note") === "note" ? "design note" : "spec"}
                   </Badge>
                   {data.archived ? (
-                    <Badge appearance="outline" size="small" color="subtle">
+                    <Badge appearance="tint" size="small" color="subtle">
                       archived
                     </Badge>
                   ) : null}
