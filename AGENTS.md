@@ -169,7 +169,7 @@ module and you add a mock line to every one of these files.
 **Four test runners**, one per half plus one for the two together. Run the ones your change touches:
 
 ```powershell
-tkTestToolkit                 # the CLI -- 52 suites, 9873 assertions on this commit
+tkTestToolkit                 # the CLI -- 52 suites, 9887 assertions on this commit
 ```
 
 ```bash
@@ -412,7 +412,7 @@ Each step already done is skipped, so it is safe to re-run.
   BOM-less UTF-8 file correctly whatever the verb asked for. A suite's children start through
   `Invoke-P20TestHost` (`Tests/Get-TestHost.ps1`), in the host it is running in, with a `-Command`
   passed as `-EncodedCommand` because 5.1 drops a bare `"` from a native argument; the runner starts each
-  suite the same way, and the Windows job's last step starts the runner in `powershell.exe`.
+  suite the same way, and the Windows `ps51` job starts the runner in `powershell.exe`, so every suite runs on 5.1.
 - **A suite calls git through `Invoke-P20TestGit`, never raw.** A suite builds its fixture repositories
   with git, and on Windows git warns on stderr about line endings. Under 5.1, `git add -A 2>&1 | Out-Null`
   with `Stop` in force throws on that warning, so the suite stops part-way there and passes on 7.

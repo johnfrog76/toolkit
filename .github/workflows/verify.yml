@@ -1,7 +1,7 @@
 # The three halves' suites on Ubuntu, each in a job of its own, and what only
-# Windows proves -- the CLI from Windows PowerShell 5.1 and the browser smoke --
-# on Windows. They run on different triggers, because Windows is slow and the
-# Ubuntu jobs are the merge gate:
+# Windows proves -- the CLI on Windows, in PowerShell 7 and in Windows PowerShell
+# 5.1, and the browser smoke -- on Windows. They run on different triggers,
+# because Windows is slow and the Ubuntu jobs are the merge gate:
 #
 #   changes   every pull request, every push to main, and the Actions tab's button:
 #             which of the jobs below this run needs (Scripts/Get-CiScope.ps1).
@@ -13,8 +13,14 @@
 #             docs/TESTING.md are main's (Scripts/Test-CarriedCounts.ps1).
 #   verify    the one check that sums the run up: green when every job the
 #             change needed passed, whatever the filter skipped.
-#   windows   a schedule, the button, and a pull request that carries the `ci` label.
-#             A push to main does not run it, nor does an ordinary pull request.
+#   windows   the browser smoke and the CLI in PowerShell 7 on Windows.
+#   ps51      every CLI suite in Windows PowerShell 5.1, the floor.
+#             The two Windows jobs run side by side, on a schedule, the button, and
+#             a pull request that carries the `ci` label -- ps51 on such a pull
+#             request only when `changes` says the CLI half is in scope. A push to
+#             main does not run them, nor does an ordinary pull request. Verify
+#             waits for ps51 on the runs that start it; the windows job is not
+#             behind Verify.
 #
 # A push to main and the button run every Ubuntu half. A pull request runs the
 # half each changed path can reach: web/ the web job, changelog.d/ and CHANGELOG.md
@@ -351,9 +357,12 @@ jobs:
   verify:
     # The one check that sums the run up. A job the filter skipped is fine; a job the change
     # needed that failed, was cancelled or never started fails this one, and so
-    # does a filter that did not answer.
+    # does a filter that did not answer. ps51 is needed on exactly the runs its own
+    # `if` starts it on -- the same expression, in WANT_PS51 -- so the button and a
+    # `ci`-labelled pull request that reaches the CLI wait for it, and any other
+    # run reads it as not needed. The windows job is not behind this check.
     name: Verify
-    needs: [changes, cli, agent, web, contract]
+    needs: [changes, cli, agent, web, contract, ps51]
     if: ${{ always() && github.event_name != 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -368,17 +377,19 @@ jobs:
           WANT_AGENT: ${{ needs.changes.outputs.agent }}
           WANT_WEB: ${{ needs.changes.outputs.web }}
           WANT_CONTRACT: ${{ needs.changes.outputs.contract }}
+          WANT_PS51: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci') && needs.changes.outputs.cli == 'true') }}
           GOT_CLI: ${{ needs.cli.result }}
           GOT_AGENT: ${{ needs.agent.result }}
           GOT_WEB: ${{ needs.web.result }}
           GOT_CONTRACT: ${{ needs.contract.result }}
+          GOT_PS51: ${{ needs.ps51.result }}
         run: |
           fail=0
           if [ "$CHANGES" != "success" ]; then
             echo "::error title=The filter did not answer::changes is $CHANGES"
             fail=1
           fi
-          for job in cli agent web contract; do
+          for job in cli agent web contract ps51; do
             up=$(echo "$job" | tr '[:lower:]' '[:upper:]')
             want_var="WANT_$up"
             got_var="GOT_$up"
@@ -398,7 +409,7 @@ jobs:
           exit $fail
 
   windows:
-    name: Windows PowerShell 5.1 and the browser smoke
+    name: The browser smoke and the CLI in PowerShell 7 on Windows
     # The schedule, the button, or a pull request that carries the `ci` label. A push
     # to main and an ordinary pull request skip it.
     if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci')) }}
@@ -481,12 +492,14 @@ jobs:
           $code = $LASTEXITCODE
           pwsh -NoProfile -File ../Scripts/Test-CiHalf.ps1 -Half smoke -Path $log -ExitCode $code
 
-      # The CLI from Windows PowerShell 5.1, the floor: powershell.exe, not pwsh, with
-      # PSModulePath set inside that shell before anything loads, so a module path
-      # PowerShell 7 handed down cannot answer for a name (AGENTS.md, "One toolkit
-      # per shell"); then tkTest's CLI half. tkTest starts the runner in pwsh, as it
-      # does on every host, so every suite runs in pwsh here. The runner's Total line.
-      - name: The CLI from Windows PowerShell 5.1 -- tkTest -Half cli
+      # The CLI in PowerShell 7 on Windows. The module is imported and tkTest typed
+      # in powershell.exe, with PSModulePath set inside that shell before anything
+      # loads, so a module path PowerShell 7 handed down cannot answer for a name
+      # (AGENTS.md, "One toolkit per shell"): that much is 5.1. tkTest then starts
+      # the runner in pwsh, as it does on every host, so every suite runs in pwsh
+      # here -- Windows paths, consoles and processes under 7. The ps51 job runs
+      # every suite in 5.1. The runner's Total line.
+      - name: The CLI in PowerShell 7 on Windows -- tkTest -Half cli
         if: ${{ !cancelled() }}
         run: |
           $log = Join-Path $env:RUNNER_TEMP 'cli.log'
@@ -494,21 +507,60 @@ jobs:
           $code = $LASTEXITCODE
           pwsh -NoProfile -File Scripts/Test-CiHalf.ps1 -Half cli -Path $log -ExitCode $code
 
-      # The same floor, with nothing handed to pwsh: the runner itself runs in
-      # powershell.exe and starts each suite, and each suite starts the verbs it
-      # types, in the host it is running in (Tests/Get-TestHost.ps1). The step above
-      # proves the module loads and the suites' own code runs on 5.1; this one runs
-      # the verbs that read and rewrite a card, a session and the config on 5.1 --
-      # NewPR's and GetPRComments' reads, MeetingAgenda's stage change, a hub path
-      # with a non-ASCII character, Route -Assign, Backlog's titles -- which pwsh
-      # read correctly whatever the code did. 5.1 reads a script without a BOM in
-      # the ANSI code page, so the step says which one it is: a pass is a pass on
-      # that page.
-      - name: The card and config suites on Windows PowerShell 5.1 itself
-        if: ${{ !cancelled() }}
+  ps51:
+    name: Every CLI suite in Windows PowerShell 5.1
+    # The Windows triggers -- the schedule, the button, or a pull request that
+    # carries the `ci` label -- and on that pull request only when the filter says
+    # the CLI half is in scope. The filter does not run on the schedule, so the
+    # job asks !cancelled() rather than its success: a skipped filter does not
+    # skip the scheduled run.
+    needs: changes
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci') && needs.changes.outputs.cli == 'true')) }}
+    runs-on: windows-latest
+    # Every suite, and every verb a suite types, in 5.1, which starts a process
+    # more slowly than 7 does.
+    timeout-minutes: 150
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: npm ci (web)
+        working-directory: web
+        run: npm ci
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            agent/requirements.txt
+            agent/requirements-dev.txt
+
+      - name: pip install (agent)
+        run: python -m pip install -r agent/requirements.txt
+
+      # 5.1 reads a script without a BOM in the ANSI code page, so the job says
+      # which one it is: a pass is a pass on that page.
+      - name: Versions and the code page
         run: |
-          $log = Join-Path $env:RUNNER_TEMP 'cli-floor.log'
+          powershell.exe -NoProfile -Command '"powershell " + $PSVersionTable.PSVersion.ToString()'
           powershell.exe -NoProfile -Command '"Windows PowerShell 5.1 reads a script without a BOM in code page " + [System.Text.Encoding]::Default.CodePage'
-          powershell.exe -NoProfile -Command '$env:PSModulePath = (Resolve-Path .); & ./Tests/Test-Toolkit.ps1 -PRComments -MeetingAgenda -NewPrompt -Triage -Backlog; exit $LASTEXITCODE' 2>&1 | Tee-Object -FilePath $log
+
+      # The runner itself in powershell.exe, with no suite switch: it starts every
+      # suite in the host it is running in, and each suite starts the verbs it
+      # types the same way (Tests/Get-TestHost.ps1), so nothing is handed to pwsh.
+      # PSModulePath is set inside that shell. The runner's Total line.
+      - name: The CLI in Windows PowerShell 5.1 -- Tests/Test-Toolkit.ps1
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'cli-51.log'
+          powershell.exe -NoProfile -Command '$env:PSModulePath = (Resolve-Path .); & ./Tests/Test-Toolkit.ps1; exit $LASTEXITCODE' 2>&1 | Tee-Object -FilePath $log
           $code = $LASTEXITCODE
           pwsh -NoProfile -File Scripts/Test-CiHalf.ps1 -Half cli -Path $log -ExitCode $code

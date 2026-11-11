@@ -230,8 +230,8 @@ if ($jobsAt -ge 0) {
     }
 }
 function Get-WfJob { param([string]$Name) if ($wfJobs.Contains($Name)) { return [string]$wfJobs[$Name] } return '' }
-Assert-True 'verify.yml has the jobs changes, cli, agent, web, contract, verify and windows, in that order' `
-    ((@($wfJobs.Keys) -join ',') -eq 'changes,cli,agent,web,contract,verify,windows') (@($wfJobs.Keys) -join ',')
+Assert-True 'verify.yml has the jobs changes, cli, agent, web, contract, verify, windows and ps51, in that order' `
+    ((@($wfJobs.Keys) -join ',') -eq 'changes,cli,agent,web,contract,verify,windows,ps51') (@($wfJobs.Keys) -join ',')
 $jCli = Get-WfJob 'cli'; $jAgent = Get-WfJob 'agent'; $jWeb = Get-WfJob 'web'
 $jChanges = Get-WfJob 'changes'; $jContract = Get-WfJob 'contract'; $jVerify = Get-WfJob 'verify'
 
@@ -277,10 +277,13 @@ Assert-True 'the contract job holds the carried paste lines to main''s, from the
     (($jContract -match 'git show "\$BASE:docs/TESTING\.md"') -and ($jContract -match 'Scripts/Test-CarriedCounts\.ps1 -BasePath [^\r\n]+ -HeadPath docs/TESTING\.md -Ran ') -and ($jContract -match 'fetch-depth: 0'))
 
 # The one check that sums the run up: every job behind it, always run, each needed job held to success.
-Assert-True 'the verify job is named Verify, needs every Ubuntu job and runs always, but not on the schedule' `
-    (($jVerify -match '(?m)^\s+name: Verify\s*$') -and ($jVerify -match '(?m)^\s+needs: \[changes, cli, agent, web, contract\]\s*$') -and ($jVerify -match "(?m)^\s+if: \`$\{\{ always\(\) && github\.event_name != 'schedule' \}\}\s*$"))
+Assert-True 'the verify job is named Verify, needs every Ubuntu job and ps51, and runs always, but not on the schedule' `
+    (($jVerify -match '(?m)^\s+name: Verify\s*$') -and ($jVerify -match '(?m)^\s+needs: \[changes, cli, agent, web, contract, ps51\]\s*$') -and ($jVerify -match "(?m)^\s+if: \`$\{\{ always\(\) && github\.event_name != 'schedule' \}\}\s*$"))
 Assert-True 'the verify job reads the filter''s answer and every job''s result' `
     (($jVerify -match 'needs\.changes\.result') -and (@('cli', 'agent', 'web', 'contract' | Where-Object { ($jVerify -notmatch ("needs\.changes\.outputs\." + $_ + " \}\}")) -or ($jVerify -notmatch ("needs\." + $_ + "\.result")) }).Count -eq 0))
+Assert-True 'the verify job reads ps51''s result and holds it in the same loop as the Ubuntu jobs' `
+    (($jVerify -match '(?m)^\s+GOT_PS51: \$\{\{ needs\.ps51\.result \}\}\s*$') -and ($jVerify -match '(?m)^\s+for job in cli agent web contract ps51; do\s*$'))
+Assert-True 'the verify job does not wait for the windows job' ($jVerify -notmatch 'needs\.windows\.|, windows')
 
 $wfUses = @([regex]::Matches($workflow, '(?m)^\s+(?:- )?uses: (\S+)\s*$') | ForEach-Object { $_.Groups[1].Value })
 Assert-True 'verify.yml uses no action but actions/checkout, actions/setup-node and actions/setup-python, each pinned to a major version' `
@@ -292,13 +295,21 @@ foreach ($mode in @('matrix', 'a11y')) {
 Assert-True 'verify.yml has a Windows job' ($workflow -match '(?m)^\s+runs-on: windows-latest\s*$')
 Assert-True 'the Windows job runs the CLI from Windows PowerShell 5.1, the module path set inside that shell' `
     ($workflow -match "powershell\.exe -NoProfile -Command '\`$env:PSModulePath = \(Resolve-Path \.\); Import-Module \./Prompt20Toolkit/Prompt20Toolkit\.psd1 -Force; tkTest -Half cli; exit \`$LASTEXITCODE'")
-# tkTest starts the runner in pwsh, so the step above runs every suite on 7. The
-# floor step starts the runner in powershell.exe, which starts its suites, and
-# they their verbs, in 5.1 (Tests/Get-TestHost.ps1), read through the same gate.
-Assert-True 'the Windows job also runs the card and config suites with the runner itself in Windows PowerShell 5.1' `
-    ($workflow -match "powershell\.exe -NoProfile -Command '\`$env:PSModulePath = \(Resolve-Path \.\); & \./Tests/Test-Toolkit\.ps1 -PRComments -MeetingAgenda -NewPrompt -Triage -Backlog; exit \`$LASTEXITCODE' 2>&1 \| Tee-Object -FilePath \`$log\r?\n[^\r\n]*\r?\n[^\r\n]*Test-CiHalf\.ps1 -Half cli\b")
-Assert-True 'the 5.1 step says which ANSI code page 5.1 reads a script without a BOM in, before it runs the suites' `
-    ($workflow -match "powershell\.exe -NoProfile -Command '[^'\r\n]*\[System\.Text\.Encoding\]::Default\.CodePage'\r?\n[^\r\n]*-Triage -Backlog;")
+# tkTest starts the runner in pwsh, so the step above runs every suite on 7, and
+# its name says so. The ps51 job starts the runner in powershell.exe with no suite
+# switch, which starts every suite, and they their verbs, in 5.1
+# (Tests/Get-TestHost.ps1), read through the same gate.
+Assert-True 'the smoke job''s CLI step says it runs the suites in PowerShell 7' `
+    ($workflow -match "(?m)^\s+- name: The CLI in PowerShell 7 on Windows -- tkTest -Half cli\s*$")
+$ps51Job = Get-WfJob 'ps51'
+Assert-True 'verify.yml has a ps51 job on Windows with a timeout of its own' `
+    (($ps51Job -match '(?m)^\s+runs-on: windows-latest\s*$') -and ($ps51Job -match '(?m)^\s+timeout-minutes: \d+\s*$'))
+Assert-True 'the ps51 job runs every CLI suite with the runner itself in Windows PowerShell 5.1, no suite switch, read by the CLI gate' `
+    ($ps51Job -match "powershell\.exe -NoProfile -Command '\`$env:PSModulePath = \(Resolve-Path \.\); & \./Tests/Test-Toolkit\.ps1; exit \`$LASTEXITCODE' 2>&1 \| Tee-Object -FilePath \`$log\r?\n[^\r\n]*\r?\n[^\r\n]*Test-CiHalf\.ps1 -Half cli\b")
+Assert-True 'the ps51 job says which ANSI code page 5.1 reads a script without a BOM in' `
+    ($ps51Job -match "powershell\.exe -NoProfile -Command '[^'\r\n]*\[System\.Text\.Encoding\]::Default\.CodePage'")
+Assert-True 'no step runs a hand-picked list of suites on 5.1: the ps51 job runs them all' `
+    (($workflow -notmatch 'on Windows PowerShell 5\.1 itself') -and ($ps51Job -notmatch "Test-Toolkit\.ps1 -[A-Z]") -and ($workflow -notmatch "powershell\.exe [^\r\n]*Test-Toolkit\.ps1 -[A-Z]"))
 $jobCount = [regex]::Matches($workflow, '(?m)^\s+runs-on:').Count
 Assert-True 'verify.yml runs on pull requests (default types: labeled is NOT a trigger), pushes to main, the button, and a weekday schedule' `
     (($workflow -match '(?m)^\s+workflow_dispatch:') -and ($workflow -notmatch '(?m)^\s+types:') -and ($workflow -notmatch '(?m)^\s+if: .*labeled') -and ($workflow -match '(?ms)^\s+push:\s*\r?\n\s+branches: \[main\]') -and ($workflow -match '(?m)^\s+- cron: "[^"]+"'))
@@ -306,6 +317,45 @@ $windowsJob = Get-WfJob 'windows'
 Assert-True 'the Windows job runs on the schedule, the button and the ci label, and not on a push to main' `
     (($windowsJob -match "(?m)^\s+if: .*github\.event_name == 'schedule'") -and ($windowsJob -match "(?m)^\s+if: .*github\.event_name == 'workflow_dispatch'") -and ($windowsJob -match "(?m)^\s+if: .*labels\.\*\.name, 'ci'") -and ($windowsJob -notmatch "(?m)^\s+if: .*'push'"))
 Assert-True 'the Windows job waits on no other job, so the filter cannot skip it' (($windowsJob -ne '') -and ($windowsJob -notmatch '(?m)^\s+needs:'))
+# ps51: the Windows triggers, and on a pull request the CLI scope too. It needs the
+# filter, which does not run on the schedule, so it asks !cancelled() and not the
+# filter's success. Verify's WANT_PS51 is the same expression, so the job and the
+# aggregate cannot disagree about whether a run needed it.
+$ps51Rule = [regex]::Match($ps51Job, "(?m)^\s+if: \`$\{\{ !cancelled\(\) && \((.+)\) \}\}\s*$").Groups[1].Value
+$verifyRule = [regex]::Match($jVerify, "(?m)^\s+WANT_PS51: \`$\{\{ (.+) \}\}\s*$").Groups[1].Value
+Assert-True 'the ps51 job runs on the Windows triggers: the schedule, the button and the ci label, not a push' `
+    (($ps51Rule -match "github\.event_name == 'schedule'") -and ($ps51Rule -match "github\.event_name == 'workflow_dispatch'") -and ($ps51Rule -match "github\.event_name == 'pull_request' && contains\(github\.event\.pull_request\.labels\.\*\.name, 'ci'\)") -and ($ps51Rule -notmatch "'push'")) $ps51Rule
+Assert-True 'on a pull request the ps51 job is gated on the CLI scope: needs changes, and the ci clause asks for outputs.cli' `
+    (($ps51Job -match '(?m)^\s+needs: changes\s*$') -and ($ps51Rule -match "contains\(github\.event\.pull_request\.labels\.\*\.name, 'ci'\) && needs\.changes\.outputs\.cli == 'true'\)"))
+Assert-True 'Verify reads ps51 as needed by the very expression that starts it' (($ps51Rule -ne '') -and ($verifyRule -eq $ps51Rule)) "if: $ps51Rule / WANT_PS51: $verifyRule"
+# The rule, evaluated: the expression rewritten into PowerShell and run over one row
+# per case, the CLI scope taken from Get-P20CiScope where the row names paths. The
+# scope table has no label column, so the label is the row's here.
+$ps51Ps = $ps51Rule -replace "contains\(github\.event\.pull_request\.labels\.\*\.name, 'ci'\)", '($labels -contains ''ci'')' `
+    -replace 'github\.event_name', '$ev' -replace "needs\.changes\.outputs\.cli", '$cliOut' -replace '==', '-eq' -replace '&&', '-and' -replace '\|\|', '-or'
+$ps51Cases = @(
+    @{ ev = 'schedule'; labels = @(); paths = $null; cli = ''; want = $true; why = 'the schedule runs ps51, though the filter does not run' }
+    @{ ev = 'workflow_dispatch'; labels = @(); paths = $null; cli = 'true'; want = $true; why = 'the button runs ps51' }
+    @{ ev = 'push'; labels = @(); paths = $null; cli = 'true'; want = $false; why = 'a push to main does not' }
+    @{ ev = 'pull_request'; labels = @('ci'); paths = @('Scripts/Get-Status.ps1'); cli = $null; want = $true; why = 'a ci-labelled pull request that reaches the CLI runs ps51' }
+    @{ ev = 'pull_request'; labels = @('ci'); paths = @('web/src/App.tsx'); cli = $null; want = $false; why = 'a ci-labelled pull request that is web-only starts no ps51, and Verify reads it as not needed' }
+    @{ ev = 'pull_request'; labels = @(); paths = @('Scripts/Get-Status.ps1'); cli = $null; want = $false; why = 'a pull request with no ci label does not' }
+)
+try {
+    $ps51Eval = [scriptblock]::Create("param(`$ev, `$labels, `$cliOut) [bool]($ps51Ps)")
+    foreach ($c in $ps51Cases) {
+        $cliOut = $c.cli
+        if ($null -ne $c.paths) {
+            $sc = Get-P20CiScope -Event $c.ev -Paths $c.paths
+            $cliOut = ([string]([bool]$sc.cli)).ToLowerInvariant()
+        }
+        $got = & $ps51Eval $c.ev $c.labels $cliOut
+        Assert-True "ps51's rule: $($c.why)" ($got -eq $c.want) "got $got, cli=$cliOut"
+    }
+}
+catch {
+    Assert-True 'ps51''s rule evaluates as PowerShell' $false "$($_.Exception.Message) / $ps51Ps"
+}
 Assert-True 'a scheduled run has a concurrency group of its own and cancel-in-progress is only for pull requests' `
     (($workflow -match "group: verify-\$\{\{ github\.event_name == 'schedule'") -and ($workflow -match "cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}"))
 Assert-True 'every job in verify.yml has a timeout' (($jobCount -eq $wfJobs.Count) -and ([regex]::Matches($workflow, '(?m)^\s+timeout-minutes: \d+').Count -eq $jobCount)) "$jobCount runs-on, $($wfJobs.Count) jobs"

@@ -254,12 +254,12 @@ not affected: its reply is a real reply and comes back inside it.
 **What you see:** 16 of 52 CLI suites start every child in the host they run in. The rest start `pwsh`
 by name, so a run of the CLI suites in Windows PowerShell 5.1 proves their own code on 5.1 but the verbs
 they type on PowerShell 7, and a defect only 5.1 shows can pass there; Clause 22 of
-`Tests/Test-Portability.ps1` lists them and holds this count to its list. And the Windows CI
-job starts the runner in PowerShell 7, so only the suites of its last step run on 5.1.
+`Tests/Test-Portability.ps1` lists them and holds this count to its list. The `ps51` CI job runs every
+suite in 5.1, so it proves every suite's own code there and the verbs of those 16.
 
 **Where you meet it:** [Testing](TESTING.md#in-ci), "In CI"
 
-**Issue:** [#271](https://github.com/johnfrog76/toolkit/issues/271), [#261](https://github.com/johnfrog76/toolkit/issues/261)
+**Issue:** [#271](https://github.com/johnfrog76/toolkit/issues/271)
 
 ### The web UI is on TypeScript 6
 
