@@ -47,6 +47,8 @@ failing.
 `TEAMS_WEBHOOK_MANAGER`; a recipient that names no variable falls back to the convention
 `TEAMS_WEBHOOK_<KEY>`, and `TEAMS_WEBHOOK_URL` is a catch-all the engine accepts for any recipient.
 
+Known gap: [A webhook set after the agent started is not seen](../KNOWN-GAPS.md#a-webhook-set-after-the-agent-started-is-not-seen).
+
 ## Getting a webhook URL
 
 Nothing in Teams says where this lives, so the path, once:
@@ -67,19 +69,20 @@ Nothing in Teams says where this lives, so the path, once:
 
 **A second recipient is declared by hand.** `TEAMS_WEBHOOK_<KEY>` only supplies the variable name for a
 recipient that is already declared under `managerWorkflow.communication.recipients`; an undeclared
-one is refused (`unknown recipient key 'mom'`). `Config -Set` cannot declare one -- the schema is built
-from the shipped keys, where `manager` is the only recipient -- so edit `config.local.json`
-(top-level, gitignored) yourself:
+one is refused (`unknown recipient key 'mom'`). `Config -Set` cannot declare one -- `managerWorkflow` is the
+team's block in `config.default.json`, and `Config` never writes it, so any key under it answers
+`Unknown setting` -- so edit `config.local.json` (top-level, gitignored) yourself:
 
 ```json
 { "managerWorkflow": { "communication": { "recipients": {
     "demo_channel": { "type": "channel", "display": "Demo channel" } } } } }
 ```
 
-`"type"` is `"channel"` **even for a person**: `"chat"` is refused as `unsupported type`, and the shipped
-`manager` entry is itself a `"channel"` whose display says "DM via Workflow". Then
-`TEAMS_WEBHOOK_DEMO_CHANNEL` is the variable. Both limits are in
-[Known gaps](../KNOWN-GAPS.md) until Teams becomes a connection.
+`"type"` is `"channel"` **even for a person**: `"chat"` is refused as `unsupported type`, `"person"` as
+`DM deferred`, and the shipped `manager` entry is itself a `"channel"` whose display says "DM via
+Workflow". Then `TEAMS_WEBHOOK_DEMO_CHANNEL` is the variable.
+
+Known gap: [`Config -Set` cannot declare a Teams recipient](../KNOWN-GAPS.md#config--set-cannot-declare-a-teams-recipient).
 
 ## The verbs
 
@@ -243,9 +246,11 @@ appended server-side so the caller never has to read the file back in order to a
 ```
 
 `configured` is gate 2, answered before the click. `scope` says which config block the entry came
-from, which is gap C7 answered by rendering rather than by moving: the `manager` recipient is
-top-level and every other recipient is the active Space's, and that difference is *why* switching org
-changes one list and not the other. A UI that flattened the two could not explain it.
+from: `managerWorkflow` for a recipient declared under `managerWorkflow.communication.recipients`,
+the same in every Space, or `org` for one declared on the active Space's `communication.recipients`.
+Switching Space changes only the second, and `scope` is what can explain that. No page draws it.
+
+Known gap: [No page shows where a Teams recipient came from](../KNOWN-GAPS.md#no-page-shows-where-a-teams-recipient-came-from).
 
 `core/env.py` does not import this module. It asks a module that is **switched on** to describe
 itself, lazily and inside the flag check, so a checkout without the module still serves `/env`.
@@ -310,6 +315,8 @@ the three keys and labels both pages read.
 
 The `--modules=on` smoke asserts the button's **presence** on exactly one of the three fixture
 sessions and never presses it: a press moves a file in the committed fixture hub.
+
+Known gap: [A meeting row draws its actions side by side](../KNOWN-GAPS.md#a-meeting-row-draws-its-actions-side-by-side).
 
 ### Advancing a stage, from the browser
 
@@ -424,7 +431,7 @@ The three PowerShell suites are registered in `Tests/Test-Toolkit.ps1` (`-SendTe
 
 | # | Gap |
 | --- | --- |
-| — | C7: `managerWorkflow` is top-level while every other recipient lives on an org. Answered by rendering both honestly (`scope` in `/env`) rather than by moving one. A config wizard has to show both |
+| — | Recipients are read from two blocks, `managerWorkflow` and the active Space's, and `/env` says which (`scope`); no page draws it ([No page shows where a Teams recipient came from](../KNOWN-GAPS.md#no-page-shows-where-a-teams-recipient-came-from)). A config wizard has to show both |
 | — | Prep has no agent pass: the shipped prompt has two passes (Plan and Retro), not three |
 | — | An agenda line becomes a card from the terminal only (`NewPrompt -From`): the Meetings page has no "make a card" action on an agenda line, which belongs to the record's reading room, not yet built |
 | — | A card made from an agenda line names its record; the record does not name the card. Whether the agenda gets a line back (`-> card K7M2`) is undecided |

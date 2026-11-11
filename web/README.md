@@ -861,7 +861,7 @@ wordmark's default blob, and by no theme.
   `DocsDocPage.tsx`, one document's room, its repo path after the prefix (`/docs/docs/CLI.md`); the
   same frame with `BackButton`. Between documents the room keeps the one it has until the next
   arrives, then swaps the text in place -- no spinner, no jump -- and starts at the top unless the
-  address carries an anchor.
+  address carries an anchor. Known gap: [The Docs tab reads one repository, and only reads](../docs/KNOWN-GAPS.md#the-docs-tab-reads-one-repository-and-only-reads).
 - **Where a link in a repo's document goes is decided ONCE**, in `shared/docLinks.ts`, used by
   the shared viewer's `a` and `img` (`shared/DocLink.tsx`). A page that mounts the viewer for a repo
   file passes `links` -- a `DocLinkBase`: the document's own repo path and three answers about a repo
@@ -1333,7 +1333,8 @@ gets a reply box; **Suggest a reply** calls the agent's `suggest` route (offered
 says `anthropicConfigured`; otherwise the box names the variable) and fills the draft and the status
 from the recommendation; **Post reply** is `ReplyPR` through `runCommand`, the one writer of the
 card's `Reply:` slot, and the page re-reads the card. The page calls no native save route -- there is
-none -- and `PRCommentsDetail.reply.test.tsx` holds all of it.
+none -- and `PRCommentsDetail.reply.test.tsx` holds all of it. On a GitHub Space the status box still
+offers every Azure DevOps status. Known gap: [PR Comments offers statuses GitHub refuses](../docs/KNOWN-GAPS.md#pr-comments-offers-statuses-github-refuses).
 
 The home cards have three branches, one per org status (`homeTabPlan` in `modules/ado/homeTabs.ts`
 also places each on a Home tab, and plans a GitHub Space's cards -- see "The shell's frame"). Which
@@ -1485,9 +1486,11 @@ these exist for.
 queries an archived org's cards need, so the grid gates once instead of flickering card by card.
 `AdoSystem` renders the grid and nothing else.
 
-**This module's known gaps** -- Create PR reading the card rather than its checkout, the repo filter
-hiding cards with no Azure DevOps link, and the ADO verbs hidden rather than gone -- are listed once,
-in [`docs/KNOWN-GAPS.md`](../docs/KNOWN-GAPS.md), rather than twice. Two things here that look like gaps are not:
+**This module's known gaps** --
+[Create PR on Azure DevOps needs the branch pushed](../docs/KNOWN-GAPS.md#create-pr-on-azure-devops-needs-the-branch-pushed)
+and [Azure DevOps verbs are hidden, not gone](../docs/KNOWN-GAPS.md#azure-devops-verbs-are-hidden-not-gone) --
+are listed once, in Known gaps, rather than twice. The repo filter never hides a card with no Azure
+DevOps link: such a card stays in view under every repository. Two things here that look like gaps are not:
 `ReviewPage` is mounted **and** fed, by the growth module's `/api/reviews*` and
 `/api/review-preview`. With growth off those 404 and the page reads "No reviews yet" -- which is the
 design, not a missing route. And `SprintVelocity` offers no "Run"
@@ -1833,7 +1836,8 @@ reachable from the container through that route. This is how Docker's own bridge
 not something that needed a Linux host to discover -- nobody has run this image on one. On native
 Linux, run the agent and the web UI directly on the host instead: `tkWeb -Dev`, which already works
 there (`docs/QUICKSTART.md`, "Supported platforms"). An opt-in, non-default bind address that would
-let the Docker path work on native Linux too is a known gap, not built (`docs/KNOWN-GAPS.md`).
+let the Docker path work on native Linux too is not built. Known gap:
+[Docker does not reach the agent on native Linux](../docs/KNOWN-GAPS.md#docker-does-not-reach-the-agent-on-native-linux).
 
 **Verified by a run (2026-09-16).** On a Mac with Docker Desktop 28.3.0 and Compose 2.38.1: the image builds (104 MB),
 `http://localhost:5174/` serves the built `index.html` with the hashed asset the build emitted, the
@@ -1856,7 +1860,7 @@ holds it with a scratch `dist/client`.
 
 React 19 · Fluent UI v9 (`@fluentui/react-components`, `makeStyles`/`tokens`) · Redux Toolkit +
 RTK Query · React Router 8 (`react-router`) · Recharts · react-markdown 10 + remark-gfm + rehype-raw + rehype-sanitize · Vite 8 · Jest 30 +
-ts-jest + Testing Library · Playwright (the raw package) · TypeScript 6.0, because ts-jest and typescript-eslint do not yet accept 7 ([Known gaps](../docs/KNOWN-GAPS.md)). Node 24, the active LTS, from 24.22.0 (`.nvmrc`, `engines`): on 24.21 a jest worker is sometimes killed by a crash in V8 ([Contributing](../docs/CONTRIBUTING.md)); verified on 24.22.0. Lint is ESLint 10 with typescript-eslint; `eslint-plugin-react` still declares a peer range that ends at ESLint 9, so `package.json` `overrides` hands it the root's ESLint, and `eslint.config.js` reads React's version from its package because the plugin's `"detect"` calls an API ESLint 10 removed. `overrides` also pins `re2js` to 2.8.7, a patch release with a security fix, because `markdownlint` 0.42.0 (under `markdownlint-cli2`) pins 2.8.6 exactly; drop it when a `markdownlint` release allows 2.8.7. `minimatch` has no override: 11, the fixed release, is a major version, and `eslint-plugin-react` calls 3.x's default export as a function, which 11 does not have, so five of its rules would crash ESLint the day one is turned on.
+ts-jest + Testing Library · Playwright (the raw package) · TypeScript 6.0, because ts-jest and typescript-eslint do not accept 7 ([The web UI is on TypeScript 6](../docs/KNOWN-GAPS.md#the-web-ui-is-on-typescript-6)). Node 24, the active LTS, from 24.22.0 (`.nvmrc`, `engines`): on 24.21 a jest worker is sometimes killed by a crash in V8 ([Contributing](../docs/CONTRIBUTING.md)); verified on 24.22.0. Lint is ESLint 10 with typescript-eslint; `eslint-plugin-react` still declares a peer range that ends at ESLint 9, so `package.json` `overrides` hands it the root's ESLint, and `eslint.config.js` reads React's version from its package because the plugin's `"detect"` calls an API ESLint 10 removed. `overrides` also pins `re2js` to 2.8.7, a patch release with a security fix, because `markdownlint` 0.42.0 (under `markdownlint-cli2`) pins 2.8.6 exactly; drop it when a `markdownlint` release allows 2.8.7. `minimatch` has no override: 11, the fixed release, is a major version, and `eslint-plugin-react` calls 3.x's default export as a function, which 11 does not have, so five of its rules would crash ESLint the day one is turned on.
 
 Fluent and RTK Query are whole-app dependencies, not per-card ones. A fork that wanted a different
 stack would be rewriting the views, not relocating files.

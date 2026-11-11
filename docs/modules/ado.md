@@ -195,7 +195,7 @@ and `hub.json`), or the first `az` call that failed, as one sentence naming the 
   reachable. Where ADO is not in use there are no tabs at all.
 - **On a card** -- an **ado** badge first in its meta line (a GitHub-born card wears **gh**, a custom card
   nothing: the card model's `tracker`, from the card's own link), *Open on Azure DevOps* (last in the menu), *Create PR*, the project tag, and the repo filter (which matches on the
-  ADO link, so it hides every unlinked card and SAYS how many). The first two are ABSENT on a card with
+  ADO link; a card with no Azure DevOps link stays in view under every repository). The first two are ABSENT on a card with
   no work item, and on every card while ADO is off; *Create PR* is disabled, with the reason, until the
   card records a commit (`web/src/modules/ado/cardActions.ts`, [the web README](../../web/README.md#the-board)).
   **Land** is on every Code Review card, on this board and on a GitHub one alike, and absent on every
@@ -259,6 +259,8 @@ and `hub.json`), or the first `az` call that failed, as one sentence naming the 
 - **Settings** -- the org's address, tenant and status; the **Azure DevOps** row (`features.ado`), whose
   switch shows what is in effect when unset.
 
+Known gap: [Create PR on Azure DevOps needs the branch pushed](../KNOWN-GAPS.md#create-pr-on-azure-devops-needs-the-branch-pushed).
+
 ## What it writes into a card
 
 Four things, and only these ([the card](../hub/cards.md) is the whole model):
@@ -302,6 +304,8 @@ stated refusal naming `az login`, before anything is read or written. A 401 or 4
 gets the same sign-in advice wherever it is explained. The messages are in [the CLI
 reference](../CLI.md#errors), under "Not authenticated" and "Access denied".
 
+Known gap: [Azure DevOps verbs are hidden, not gone](../KNOWN-GAPS.md#azure-devops-verbs-are-hidden-not-gone).
+
 ## The tests
 
 | Suite | Holds |
@@ -321,8 +325,8 @@ must not be able to pass a failing assertion.
 ## Known gaps
 
 - **Hidden, not gone.** With ADO not in use its verbs leave `Menu` but stay registered; the bridge will
-  still run them and the routes still exist. Unregistering is phase 8 of
-  [`docs/ROADMAP.md`](../ROADMAP.md).
+  still run them and the routes still exist. Unregistering belongs to M5 -- the rename, in
+  [the roadmap](../ROADMAP.md). Known gap: [Azure DevOps verbs are hidden, not gone](../KNOWN-GAPS.md#azure-devops-verbs-are-hidden-not-gone).
 
 [Known gaps](../KNOWN-GAPS.md) is the list for the whole
 product; these are the ones that belong to this add-on.
