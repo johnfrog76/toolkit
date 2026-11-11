@@ -73,7 +73,7 @@ python3 -m pip install -r agent/requirements-dev.txt   # once -- runtime deps pl
 python3 -m pytest Tests/     # 1429 passed, 6 skipped -- the agent
 cd web && npm ci             # once
 cd web && npx playwright install chromium   # once -- for `npm run smoke` only
-cd web && npm test           # 5 build-contract checks, then 163 suites, 1922 tests -- the shell
+cd web && npm test           # 5 build-contract checks, then 164 suites, 1925 tests -- the shell
 cd web && npm run smoke              # 23 checks, flags off -- the browser; needs two servers up
 cd web && npm run smoke -- --modules=on  # 30 checks, both module flags on
 cd web && npm run smoke -- --studio      # the Studio's contract -- starts and stops its own servers

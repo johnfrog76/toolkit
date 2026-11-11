@@ -455,8 +455,7 @@ config names the variable, the environment holds the value.
 `scope` says which config block each entry came from: `managerWorkflow` for a recipient declared
 under `managerWorkflow.communication.recipients`, the same in every Space, or `org` for one declared
 on the active Space -- which is *why* switching Space changes one list and not the other. A UI that
-flattened the two could not explain the difference, and no page draws it
-([No page shows where a Teams recipient came from](../docs/KNOWN-GAPS.md#no-page-shows-where-a-teams-recipient-came-from)).
+flattened the two could not explain the difference; the web's Environment card draws `scope` as *Every Space* or *This Space*.
 
 ## The route table
 

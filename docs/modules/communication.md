@@ -248,9 +248,7 @@ appended server-side so the caller never has to read the file back in order to a
 `configured` is gate 2, answered before the click. `scope` says which config block the entry came
 from: `managerWorkflow` for a recipient declared under `managerWorkflow.communication.recipients`,
 the same in every Space, or `org` for one declared on the active Space's `communication.recipients`.
-Switching Space changes only the second, and `scope` is what can explain that. No page draws it.
-
-Known gap: [No page shows where a Teams recipient came from](../KNOWN-GAPS.md#no-page-shows-where-a-teams-recipient-came-from).
+Switching Space changes only the second, and `scope` is what explains that. The System page's Environment card draws one row per recipient from this block (`EnvRecipients`, a lazy part of this module): the display name, *Every Space* for `managerWorkflow` or *This Space* for `org`, and whether the webhook variable is set. An unset variable is named, in the send button's words. The rows come from the `/env` the card already reads, so they cost no request, and with the flag off the block is absent and nothing is drawn or fetched. The URL is never shown.
 
 `core/env.py` does not import this module. It asks a module that is **switched on** to describe
 itself, lazily and inside the flag check, so a checkout without the module still serves `/env`.
@@ -431,7 +429,7 @@ The three PowerShell suites are registered in `Tests/Test-Toolkit.ps1` (`-SendTe
 
 | # | Gap |
 | --- | --- |
-| — | Recipients are read from two blocks, `managerWorkflow` and the active Space's, and `/env` says which (`scope`); no page draws it ([No page shows where a Teams recipient came from](../KNOWN-GAPS.md#no-page-shows-where-a-teams-recipient-came-from)). A config wizard has to show both |
+| — | Recipients are read from two blocks, `managerWorkflow` and the active Space's, and `/env` says which (`scope`); the Environment card draws it. A config wizard has to show both |
 | — | Prep has no agent pass: the shipped prompt has two passes (Plan and Retro), not three |
 | — | An agenda line becomes a card from the terminal only (`NewPrompt -From`): the Meetings page has no "make a card" action on an agenda line, which belongs to the record's reading room, not yet built |
 | — | A card made from an agenda line names its record; the record does not name the card. Whether the agenda gets a line back (`-> card K7M2`) is undecided |
