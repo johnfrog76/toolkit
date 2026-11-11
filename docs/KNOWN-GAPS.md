@@ -21,16 +21,6 @@ finds the repository's clone on this machine and works from it, an unpushed bran
 
 **Issue:** [#285](https://github.com/johnfrog76/toolkit/issues/285)
 
-### No page shows where a Teams recipient came from
-
-**What you see:** `GET /api/env` carries each Teams recipient's `scope` -- `managerWorkflow` or `org`,
-the config block it was declared in -- but no page draws it, so nothing in the browser explains why
-switching Space changes some recipients and not others.
-
-**Where you meet it:** [Communication](modules/communication.md#envs-communication-block), "`/env`'s `communication` block"
-
-**Issue:** [#286](https://github.com/johnfrog76/toolkit/issues/286)
-
 ### A meeting row draws its actions side by side
 
 **What you see:** A complete meeting's row on the Meetings card shows Close, Edit / send and View details
