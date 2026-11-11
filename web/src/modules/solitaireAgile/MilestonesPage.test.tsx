@@ -29,7 +29,7 @@ import { MilestonesPage, STAGE_WORDS, countWords } from "./MilestonesPage";
 // dialog throws through useConfetti() and the burst is drawn at that root.
 const render = (ui: ReactElement) => rtlRender(ui, { wrapper: ConfettiProvider });
 
-// The Milestones tab (docs/modules/solitaire-agile.md, "Milestones: the tab and the
+// The Releases tab (docs/modules/solitaire-agile.md, "Milestones: the tab and the
 // award"): one row per milestone with the tracker's own numbers on its bar, and the
 // award dialog -- once per Space and milestone per browser -- the one place the
 // module throws confetti. The rows are the SHARED fixture's `expected`
@@ -170,7 +170,7 @@ describe("the award's rule (award.ts), over the shared table", () => {
   });
 });
 
-describe("the Milestones tab", () => {
+describe("the Releases tab", () => {
   it("asks about the Space you are in", () => {
     localStorage.setItem(
       AWARD_SEEN_KEY,
@@ -178,6 +178,19 @@ describe("the Milestones tab", () => {
     );
     render(<MilestonesPage />);
     expect(asked[0]).toBe(SPACE);
+  });
+
+  it("the heading is Releases, the subtitle and every row say GitHub milestone", () => {
+    localStorage.setItem(
+      AWARD_SEEN_KEY,
+      JSON.stringify(table.expected.map((m) => awardKey(SPACE, m))),
+    );
+    render(<MilestonesPage />);
+    expect(screen.getByRole("heading", { name: "Releases" })).toBeTruthy();
+    expect(screen.getByTestId("releases-subtitle").textContent).toMatch(/^GitHub milestones/);
+    const sources = screen.getAllByTestId("milestone-source");
+    expect(sources).toHaveLength(screen.getAllByTestId("milestone-row").length);
+    expect(sources.every((s) => s.textContent === "GitHub milestone")).toBe(true);
   });
 
   it("one row per milestone, in the Stats card's order, each bar the tracker's own numbers", () => {
@@ -328,7 +341,13 @@ describe("the Milestones tab", () => {
   it("no milestones: says so, as a fact rather than an error", () => {
     response = { isLoading: false, data: ok([]) };
     render(<MilestonesPage />);
-    expect(screen.getByText("No milestones yet")).toBeTruthy();
+    expect(screen.getByText("No GitHub milestones yet")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "GitHub milestones are made on the tracker; each one shows here with its progress.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Releases" })).toBeTruthy();
   });
 
   it("the agent away: an error, never an empty list", () => {

@@ -1,11 +1,12 @@
+import { Navigate } from "react-router";
 import type { ToolkitModule } from "../../shell/registry";
 import { lazyPart } from "../../shell/lazy";
 import { ROUTES } from "./paths";
 
 // The pages are chunks fetched when first drawn (shell/lazy.tsx): this file is
 // the module's DESCRIPTOR and imports no component of its own.
-// Standup, Triage and Milestones share one chunk: the tab's Standup | Triage |
-// Milestones strip and the page under it. StandupPage itself is drawn unchanged
+// Standup, Triage and Releases share one chunk: the tab's Standup | Triage |
+// Releases strip and the page under it. StandupPage itself is drawn unchanged
 // inside it; the award dialog and its confetti are a chunk of their own.
 const RitualPage = lazyPart(
   () => import("./RitualPage"),
@@ -43,7 +44,7 @@ const StandupRemindSettings = lazyPart(
  * through the bridge -- the module's first write, to the tracker (a card with no
  * issue behind it takes one **Assigned:** line, through the same verb).
  *
- * Milestones is the third: one row per tracker milestone with its bar, and
+ * Releases is the third: one row per GitHub milestone with its bar, and
  * the award dialog when one is reached -- the module's one confetti
  * (docs/modules/solitaire-agile.md, "Milestones: the tab and the award").
  *
@@ -57,7 +58,8 @@ export const solitaireAgileModule: ToolkitModule = {
   routes: [
     { path: ROUTES.home, element: <RitualPage ceremony="standup" /> },
     { path: ROUTES.triage, element: <RitualPage ceremony="triage" /> },
-    { path: ROUTES.milestones, element: <RitualPage ceremony="milestones" /> },
+    { path: ROUTES.releases, element: <RitualPage ceremony="releases" /> },
+    { path: ROUTES.legacyMilestones, element: <Navigate to={ROUTES.releases} replace /> },
     { path: ROUTES.play, element: <StandupPlay /> },
   ],
   nav: [

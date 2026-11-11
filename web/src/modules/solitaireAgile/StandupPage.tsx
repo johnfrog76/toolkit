@@ -110,7 +110,7 @@ export const startWorkArg = (i: RitualItem): string =>
 // The PM Corner (AR-4; docs/modules/solitaire-agile.md, "The PM Corner: the line,
 // the chevron, the confetti") sits at the head of the page: the response's `corner.line`
 // verbatim, its chevron -- the same hand-off box every Start work opens -- and, when it
-// reads reached, a link to the Milestones tab, where the award is (PmCorner.tsx). The agent puts
+// reads reached, a link to the Releases tab, where the award is (PmCorner.tsx). The agent puts
 // the same line last in the brief; the page draws it at the head instead, so the brief
 // below stops above it, and Copy still copies the brief as the agent rendered it.
 //

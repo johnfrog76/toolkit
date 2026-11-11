@@ -5,18 +5,18 @@ import { TriagePage } from "./TriagePage";
 import { MilestonesPage } from "./MilestonesPage";
 import { ROUTES } from "./paths";
 
-// The Team Agile tab's pages, Standup | Triage | Milestones: one nav entry,
+// The Team Agile tab's pages, Standup | Triage | Releases: one nav entry,
 // and under it a strip of in-page tabs, each an ADDRESS -- the shape Home's
 // Focus | Board | Sprint | Actions strip has, so a tab can be linked and
 // Back walks between them. The pages themselves know nothing about the strip:
 // StandupPage is drawn exactly as it was, Play and the attend call with it.
 
-export type Ceremony = "standup" | "triage" | "milestones";
+export type Ceremony = "standup" | "triage" | "releases";
 
 const CEREMONIES: { id: Ceremony; label: string; to: string }[] = [
   { id: "standup", label: "Standup", to: ROUTES.home },
   { id: "triage", label: "Triage", to: ROUTES.triage },
-  { id: "milestones", label: "Milestones", to: ROUTES.milestones },
+  { id: "releases", label: "Releases", to: ROUTES.releases },
 ];
 
 const useStyles = makeStyles({
@@ -60,7 +60,7 @@ export function RitualPage({ ceremony }: { ceremony: Ceremony }) {
       <RitualTabs current={ceremony} />
       {ceremony === "triage" ? (
         <TriagePage />
-      ) : ceremony === "milestones" ? (
+      ) : ceremony === "releases" ? (
         <MilestonesPage />
       ) : (
         <StandupPage />
