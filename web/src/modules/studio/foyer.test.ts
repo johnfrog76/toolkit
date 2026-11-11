@@ -310,8 +310,8 @@ describe("which rows ask their visibility", () => {
     expect(githubRowLine("", CONNECT_GITHUB)).toBe(CONNECT_GITHUB);
   });
 
-  it("the three Studio cards page five at a time", () => {
-    expect(STUDIO_PAGE_SIZE).toBe(5);
+  it("the three Studio cards page three at a time", () => {
+    expect(STUDIO_PAGE_SIZE).toBe(3);
   });
 });
 

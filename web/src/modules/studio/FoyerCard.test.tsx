@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { expectOneRowShape } from "./rowShapeAssert";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { FoyerCard, SPACES_FILTER_KEY } from "./FoyerCard";
 
@@ -30,6 +31,10 @@ let refreshedLedger = 0;
 let unsupportedReport: string[] = [];
 
 let envAnswer: unknown;
+// The pager's rules do not depend on how many rows a page holds, and these
+// suites build their lists for five; the shipped size is pinned in foyer.test.ts.
+jest.mock("./paths", () => ({ ...jest.requireActual("./paths"), STUDIO_PAGE_SIZE: 5 }));
+
 jest.mock("../../shell/api", () => ({
   useGetEnvQuery: () => ({ data: envAnswer, isLoading: false }),
   useSwitchModeMutation: () => [
@@ -747,5 +752,46 @@ describe("the Spaces card's load, Refresh and pager", () => {
     failingVisibility = ["toolkit"];
     mount();
     expect(screen.getByText("Visibility unknown; 4 open; no deploys yet")).toBeTruthy();
+  });
+});
+
+describe("the Spaces card's row shape", () => {
+  it("a long name, a long line and a bare row draw one shape", () => {
+    window.localStorage.clear();
+    const long = "A Space with a name that is much too long for one line ".repeat(3).trim();
+    envAnswer = {
+      config: {
+        activeSpace: "acme",
+        spaces: [
+          {
+            slug: "one",
+            name: long,
+            status: "active",
+            tracker: "ado",
+            org: "https://dev.azure.com/acme",
+          },
+          {
+            slug: "two",
+            name: "Two",
+            status: "archive",
+            tracker: "ado",
+            org: "https://dev.azure.com/acme",
+          },
+          {
+            slug: "acme",
+            name: "Acme",
+            status: "active",
+            tracker: "ado",
+            org: "https://dev.azure.com/acme",
+          },
+        ],
+      },
+    };
+    const { container } = mount();
+    const rows = expectOneRowShape(container, "space", [long, "Two", "Acme"]);
+    // Status badges beside the name, the kind and slug on the bottom line.
+    expect(rows[1].querySelector("[data-row-text]")!.textContent).toContain("archived");
+    expect(rows[2].querySelector("[data-row-text]")!.textContent).toContain("you are here");
+    expect(rows[2].querySelector("[data-row-meta]")!.textContent).toContain("acme");
   });
 });
