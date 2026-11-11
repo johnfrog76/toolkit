@@ -110,6 +110,12 @@ EXPECTED = {
     ("regex", "dueLine"): r"(?m)^\*\*Due:\*\*[ \t]*(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?",
     # A card's Tags: line splits on a comma or an Azure DevOps semicolon.
     ("regex", "tagSeparator"): "[,;]",
+    # The shapes of an Azure DevOps git remote and of its address (the checkout resolver, both halves).
+    ("regex", "adoOriginHttps"): r"^https://(?:[^/@\s]+@)?dev\.azure\.com/([^/\s]+)/([^/\s]+)/_git/([^/\s?#]+?)(?:\.git)?/?$",
+    ("regex", "adoOriginVisualStudio"): r"^https://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com/(?:DefaultCollection/)?([^/\s]+)/_git/([^/\s?#]+?)(?:\.git)?/?$",
+    ("regex", "adoOriginSsh"): r"^(?:ssh://)?[^/@\s]+@(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com):v3/([^/\s]+)/([^/\s]+)/([^/\s]+?)(?:\.git)?/?$",
+    ("regex", "adoOrgDev"): r"^https?://(?:[^/@\s]+@)?dev\.azure\.com/([^/\s]+)",
+    ("regex", "adoOrgVisualStudio"): r"^https?://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com(?:[/:]|$)",
     ("reminders", "buckets"): ["overdue", "today", "upcoming"],
     ("reminders", "snooze"): ["1h", "tomorrow", "nextweek"],
     # The three halves a test run covers: Test writes them, log.py serves them.

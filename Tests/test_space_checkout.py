@@ -56,6 +56,23 @@ class TheSharedTable(unittest.TestCase):
             with self.subTest(url=row["url"]):
                 self.assertEqual(checkout.origin_repo(row["url"]), row["repo"])
 
+    def test_the_repository_an_azure_devops_remote_names(self):
+        for row in TABLE["adoOrigins"]:
+            with self.subTest(url=row["url"]):
+                self.assertEqual(checkout.ado_origin_repo(row["url"]), row["repo"])
+
+    def test_the_one_repository_a_space_names(self):
+        for row in TABLE["targets"]:
+            with self.subTest(org=row["org"], projects=row["projects"]):
+                self.assertEqual(checkout.checkout_target(row["org"], row["projects"]), row["repo"])
+
+    def test_a_clone_answers_for_the_space_whose_repository_it_is(self):
+        for row in TABLE["clones"]:
+            with self.subTest(org=row["org"], origin=row["origin"]):
+                target = checkout.checkout_target(row["org"], row["projects"])
+                hit = bool(target) and checkout.any_origin_repo(row["origin"], target).lower() == target.lower()
+                self.assertEqual(hit, row["match"])
+
     def test_a_match_ignores_case(self):
         for row in TABLE["matches"]:
             with self.subTest(row=row):
@@ -109,6 +126,21 @@ class TheConfiguredCheckout(unittest.TestCase):
         self.assertIn("is a clone of o/r, not o/other", got.reason)
         _git(self.clone, "remote", "set-url", "origin", "https://gitlab.com/o/r.git")
         self.assertIn("its origin is not on GitHub", self.ask(str(self.clone)).reason)
+
+    def test_a_clone_of_an_azure_devops_repo_is_ready(self):
+        for url in (
+            "https://dev.azure.com/acme/proj/_git/repo",
+            "git@ssh.dev.azure.com:v3/acme/proj/repo",
+            "https://acme.visualstudio.com/DefaultCollection/proj/_git/repo.git",
+        ):
+            _git(self.clone, "remote", "set-url", "origin", url)
+            got = self.ask(str(self.clone), repo="acme/proj/repo")
+            self.assertTrue(got.ready, got.reason)
+        got = self.ask(str(self.clone), repo="acme/proj/other")
+        self.assertFalse(got.ready)
+        self.assertIn("is a clone of acme/proj/repo, not acme/proj/other", got.reason)
+        _git(self.clone, "remote", "set-url", "origin", "git@github.com:o/r.git")
+        self.assertIn("its origin is not on Azure DevOps", self.ask(str(self.clone), repo="acme/proj/repo").reason)
 
 
 class TheConfigLayer(unittest.TestCase):

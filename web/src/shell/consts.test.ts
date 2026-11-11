@@ -114,6 +114,20 @@ describe("consts.json", () => {
     );
     // A card's Tags: line splits on a comma or an Azure DevOps semicolon (the agent reads it).
     expect(consts.regex.tagSeparator).toBe("[,;]");
+    // The shapes of an Azure DevOps git remote and of its address (the checkout resolver, both halves).
+    expect(consts.regex.adoOriginHttps).toBe(
+      String.raw`^https://(?:[^/@\s]+@)?dev\.azure\.com/([^/\s]+)/([^/\s]+)/_git/([^/\s?#]+?)(?:\.git)?/?$`,
+    );
+    expect(consts.regex.adoOriginVisualStudio).toBe(
+      String.raw`^https://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com/(?:DefaultCollection/)?([^/\s]+)/_git/([^/\s?#]+?)(?:\.git)?/?$`,
+    );
+    expect(consts.regex.adoOriginSsh).toBe(
+      String.raw`^(?:ssh://)?[^/@\s]+@(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com):v3/([^/\s]+)/([^/\s]+)/([^/\s]+?)(?:\.git)?/?$`,
+    );
+    expect(consts.regex.adoOrgDev).toBe(String.raw`^https?://(?:[^/@\s]+@)?dev\.azure\.com/([^/\s]+)`);
+    expect(consts.regex.adoOrgVisualStudio).toBe(
+      String.raw`^https?://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com(?:[/:]|$)`,
+    );
     expect(REMINDERS.buckets).toEqual(["overdue", "today", "upcoming"]);
     expect(REMINDERS.snooze).toEqual(["1h", "tomorrow", "nextweek"]);
     // The three halves a test run covers, in run order.
