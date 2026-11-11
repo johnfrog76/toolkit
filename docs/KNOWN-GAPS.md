@@ -272,6 +272,18 @@ leave ts-jest, which is a decision of its own.
 
 **Issue:** [#305](https://github.com/johnfrog76/toolkit/issues/305)
 
+### Milestones appear on two pages
+
+**What you see:** a GitHub Space's milestones appear on the Stats tab's Milestones card and on Team Agile's
+Milestones tab. Both build their rows from the same reader and order and word them by the same rules, so they
+agree. But each page has its own route and cache and draws its own row, so for a moment the two can show a
+different read, and a milestone can look different in each place.
+
+**Where you meet it:** [Scenarios](SCENARIOS.md#stats-on-a-github-space), "Stats, on a GitHub Space", and
+[Team Agile](modules/solitaire-agile.md#milestones-the-tab-and-the-award), "Milestones: the tab and the award"
+
+**Issue:** [#321](https://github.com/johnfrog76/toolkit/issues/321)
+
 ### The plan's weekly usage is typed, not read
 
 **What you see:** `Burn`'s weekly burndown shows only the readings someone typed with
