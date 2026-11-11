@@ -39,8 +39,8 @@ halves talking to each other, and the flag that makes a whole module appear and 
 three halves at once. A check that can be automated belongs in a suite; one that cannot is a gate here,
 or it is not verified.
 
-Every verb `config.default.json` defines is in the table below -- 48 always-on, and the 15 the modules
-contribute through `Config/*.commands.psd1` (63 in all; `docs/CLI.md` prints both counts) -- with the
+Every verb `config.default.json` defines is in the table below -- 49 always-on, and the 15 the modules
+contribute through `Config/*.commands.psd1` (64 in all; `docs/CLI.md` prints both counts) -- with the
 suite that types it and the gate that walks it. `Tests/Test-DocCounts.ps1` reads the table back, so a
 verb added without a row fails a suite. **A row that says "neither" is a verb nothing verifies**; it is
 left in the table rather than dropped, because a verb the reader cannot see in it is indistinguishable
@@ -61,6 +61,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `Sync` | `Sync` (typed, against a bare repo; hook cases skip where there is no `hooks/pre-commit`, and a skip is not a pass) | 6, 12 |
 | `Move` | `Move` (typed) | neither |
 | `Billable` | `Billable` (typed) | neither |
+| `Daily` | `Billable` (typed: a past window byte for byte against the billing script's `raw`, `-Compact`, and the three refusals) | 12 (Windows PowerShell 5.1 and a real hub: the row under "Rows added by a fix") |
 | `Plan` | `Plan` (typed) | neither |
 | `Tag` | `Tag` (typed) | neither |
 | `Backlog` | `Backlog` (typed) | 12 (a Western code page: the row under "Rows added by a fix") |
@@ -1257,6 +1258,12 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   in the main checkout before the upgrade and no folder yet, the card's first read shows that old record, not "not
   run". `tkTestToolkit -TestAll` holds the rule over `Tests/fixtures/test-history/paths.json`, whose Windows rows
   only a Windows host reads live.
+- [ ] **Daily prints any week from Windows PowerShell 5.1 (#291).** On the Windows PC, in `powershell` (5.1), on a
+  Space with cards, run `tkDaily -LastWeek`: the days print, with no `Error:` and nothing copied to the clipboard.
+  Open the web UI's Daily page, step back three weeks with *Earlier week*, press Copy All, and compare it with
+  `tkDaily -Since <that Monday> -Until <that Friday>`: the same text. `tkDaily -Since 2026-01-05` prints one
+  `Error:` naming `-Since and -Until go together`, and `$LASTEXITCODE` is 2. The `ps51` job runs the Billable
+  suite on 5.1; this row is a real console, a real hub and the page.
 
 ## Recording a run
 

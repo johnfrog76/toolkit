@@ -71,15 +71,6 @@ Azure DevOps routes still exist.
 
 **Issue:** [#290](https://github.com/johnfrog76/toolkit/issues/290)
 
-### Daily reads two weeks, in the browser only
-
-**What you see:** Daily offers this week and last week, in the browser. A timesheet three weeks late has
-no page, and no CLI verb prints a week.
-
-**Where you meet it:** [CLI](CLI.md#the-third-line-billable), "The third line: Billable"
-
-**Issue:** [#291](https://github.com/johnfrog76/toolkit/issues/291)
-
 ### The Docs tab reads one repository, and only reads
 
 **What you see:** The filter drawer narrows the `docs/` tree by title and path; there is no search inside

@@ -15,6 +15,7 @@ import consts from "@consts";
 
 import {
   ASSETS,
+  BILLING,
   DESIGN,
   DOCS,
   FEATURES,
@@ -431,6 +432,17 @@ describe("consts.json", () => {
       "closed",
     ]);
     expect(REPLY_STATUSES_BY_TRACKER.github).toEqual(["fixed", "closed", "active"]);
+    // Daily's window: the sentences a window is refused with, in all three halves.
+    const { _: billingDoc, ...billingKeys } = BILLING as typeof BILLING & { _: string };
+    expect(billingDoc).toMatch(/Resolve-BillingWindow/);
+    expect(billingKeys).toEqual({
+      text: {
+        halfWindow:
+          "-Since and -Until go together: pass both (YYYY-MM-DD), or neither for this week.",
+        notADay: "{name} '{value}' is not a day: yyyy-MM-dd.",
+        backwards: "-Since {since} is after -Until {until}.",
+      },
+    });
   });
 
   // Every key of the contract is stated by this half, so a key added to
@@ -442,6 +454,7 @@ describe("consts.json", () => {
         "_README",
         "agent",
         "assets",
+        "billing",
         "design",
         "docs",
         "env",

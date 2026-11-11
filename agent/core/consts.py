@@ -691,6 +691,13 @@ def usage_readings_folder() -> str:
     return consts()["usage"]["readingsFolder"]
 
 
+def billing_text() -> dict[str, str]:
+    """Daily's window sentences -- ``halfWindow``, ``notADay`` ({name}, {value}) and
+    ``backwards`` ({since}, {until}): the billing script, the CLI's Daily and
+    ``GET /api/billing`` refuse a window in the same words."""
+    return dict(consts()["billing"]["text"])
+
+
 def startwork_how_we_work_note() -> str:
     """``agentic/how-we-work.md`` -- the Space's own note, relative to its folder in the
     hub: HowWeWork writes it, StartWork quotes it, the Studio's Prompts card lists it."""

@@ -657,6 +657,9 @@ which `NewPrompt -Design` writes, and the corpus's hand-written `> Spec:` form, 
 and **the Studio's Prompts card's read** (`studio.promptsRoute`, which the agent mounts and the web asks,
 see [the Studio](modules/studio.md#the-web-ui)), and **the Spaces card's one read of every GitHub Space's
 ledger** (`studio.ledgerRoute`, the same, see [the Studio](modules/studio.md#the-routes)),
+and **the sentences Daily refuses a window with** (`billing.text`: `halfWindow`, `notADay` and
+`backwards` -- the billing script, the CLI's `Daily` and `GET /api/billing` say the same one, see
+[the CLI](CLI.md#the-third-line-billable)),
 and **the halves a test run
 covers** (`tests.halves`, `agent`, `cli`, `web` in the order `tkTest` runs them, and `tests.legacyHalf`,
 what a `test-summary.<machine>.json` entry with no `half` is read as: the CLI runner and `tkTest` write
