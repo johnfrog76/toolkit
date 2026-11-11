@@ -100,7 +100,7 @@ This file is the front door. Each subject has one document that owns it; the oth
 | **[Testing](docs/TESTING.md)** | `tkSetup`, the four runners, every suite and its count, one toolkit per shell |
 | **[The agent and the web UI](docs/ARCHITECTURE.md)** | How the three halves fit, and the overview of the other two: routes, `/env`, the bridge, the shell, Docker, the repo layout |
 | **[The modules](docs/modules/README.md)** | The add-ons -- Azure DevOps, growth, communication, organize, deck, lounge -- and the Studio, which is core; what each one's document must contain, "off means absent", how a module contributes commands (D-CM) |
-| **[Known gaps](docs/KNOWN-GAPS.md)** | What it does not do yet, what you see if you try, and the issue that carries each |
+| **[Known gaps](docs/KNOWN-GAPS.md)** | What it does not do, what you see if you try, where you meet it, and the issue that carries each |
 | [`agent/README.md`](agent/README.md) | The agent in detail: layout, tier, identity, the route table, the bridge contract |
 | [`web/README.md`](web/README.md) | The web UI in detail: the `ToolkitModule` interface, cards and writes, the smoke test, production |
 | [`docs/modules/ado.md`](docs/modules/ado.md), [`growth.md`](docs/modules/growth.md), [`communication.md`](docs/modules/communication.md), [`organize.md`](docs/modules/organize.md), [`studio.md`](docs/modules/studio.md), [`solitaire-agile.md`](docs/modules/solitaire-agile.md), [`lounge.md`](docs/modules/lounge.md) | **Each add-on end to end (and the Studio, core), written to stand alone** -- the switch, what it owns, the verbs, routes and pages, what it writes into the hub and how its status is read, the tests, its known gaps |

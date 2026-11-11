@@ -44,8 +44,9 @@ A feature flag has a scope, and the default scope is the person. A training you
 took does not stop having happened when you switch org, and a resume is not an
 engagement's -- so if this flag lived on an org, Growth would appear and
 disappear as you moved between an active engagement and an archived one. The
-exception is the ADO core's own flags, which describe one org's board:
-`sprintAwareness` is read from `spaces[].features` and is the only one.
+exceptions are the Space-scoped switches, which describe one Space:
+`sprintAwareness`, the ADO core's own flag for one org's board, and
+`suggestions`, both read from `spaces[].features`.
 
 One more key lives on the Space, and it is a number rather than a flag:
 `spaces[].features.trainingHoursPerQuarter`, the hours of training a Space's
@@ -58,7 +59,7 @@ Both halves answer this the same way and are held to it:
 | Half | Implementation |
 | --- | --- |
 | CLI | `Get-P20Features` in `utilities.psm1` |
-| Agent | `ORG_FEATURES` / `effective_features` in `agent/core/config.py` |
+| Agent | `SPACE_FEATURES` / `effective_features` in `agent/core/config.py` |
 | Web UI | `/api/env`'s `features` map, which the agent builds with the above |
 
 `Get-P20Features -CommittedOnly` answers the same question about
@@ -515,14 +516,15 @@ be invisible until it mattered:
 
 | # | Gap | What you see |
 | --- | --- | --- |
-| GR4 | The quarter line reads `growth/current/` only, shows the current quarter only, and has no history of the last four quarters | A training moved to `growth/archive/` stops counting toward the quarter it was dated in. Nothing archives a growth item from the UI yet |
+| GR4 | The quarter line reads `growth/current/` only, shows the current quarter only, and has no history of the last four quarters | A training moved to `growth/archive/` stops counting toward the quarter it was dated in, and *Archive* in the UI (`NewGrowth -Close`) moves it there |
 | GR3 | `ReviewPage` ownership settled as (a): it stays an ADO card and this module serves its routes | `/review` says "No reviews yet" when growth is off. Not an error, and not a bug |
 
 ---
 
 ## D-CM: how any module contributes commands
 
-Growth contributes its five verbs the way every module does:
+Growth contributes its verbs (`NewGrowth`, `NewWorkReview`, `PublishWorkReview`,
+`WorkReview`, `LogPeerReview`, `UpdateResume`) the way every module does:
 `Config/growth.commands.psd1` is the data file (`Feature = 'growth'`, the
 `Commands` rows, `Order`, `Help`), and `Config/growth.commands.ps1` holds one
 wrapper per row, in the pattern of the core wrappers in `utilities.psm1`:
@@ -530,15 +532,26 @@ wrapper per row, in the pattern of the core wrappers in `utilities.psm1`:
 ```powershell
 function global:New-P20GrowthItem {
     [CmdletBinding()]
-    param([string]$Title, [switch]$Help)
+    param(
+        [ValidateSet('training', 'presentation', 'goal')]
+        [string]$Type = 'training',
+        [string]$Title,
+        # ... the rest of the verb's parameters ...
+        [switch]$Help
+    )
     $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'NewGrowth'
     if ($Help) { Show-CommandHelp 'NewGrowth'; return }
-    & "$repoRoot/Scripts/New-GrowthItem.ps1" @PSBoundParameters
+    $pkgRoot = (Get-P20ModuleState).PackageRoot
+    Invoke-ToolkitScript -Path "$($pkgRoot)/Scripts/New-GrowthItem.ps1" -Parameters $PSBoundParameters `
+        -Name $inv.Name -Prefix $inv.Prefix -Detail $Type
 }
 ```
 
-`$repoRoot` and `$toolkitRoot` both resolve to the package root; the loader sets
-`$repoRoot` before dot-sourcing. `Resolve-InvokedCommand` reads the prefix back
+The package root is read inside the function, from `(Get-P20ModuleState).PackageRoot`,
+never from a free `$repoRoot`: a `function global:` reached from a script the module
+launched resolves a free name against that script (AGENTS.md, "Traps worth knowing").
+`Invoke-ToolkitScript` is the one guard every wrapper goes through, so the refusal
+contract holds for a module verb as it does for a core one. `Resolve-InvokedCommand` reads the prefix back
 off the alias the user actually typed, so nothing names it. The contract -- the
 data file's keys, why it is a plain hashtable, what the loader does and in which
 order, and how to add a module -- is

@@ -69,7 +69,7 @@ Space re-evaluates it -- per request in the agent and the web UI, at `SwitchSpac
 The word on the flag is the working id; the owner locks it with the tab's name (the spec's open items).
 
 **Off means absent**, in every half -- switched off, or on in a Space that does not work with agents: no
-`Standup`, `Triage` or `Route` verb, no row in `Menu`, no `-Help`, no bridge entry, no route (**404, not
+`Standup`, `Triage`, `Route` or `StartWork` verb, no row in `Menu`, no `-Help`, no bridge entry, no route (**404, not
 403**, its detail naming whichever is off), no tab, no nav entry, nothing fetched and no bytes. The one
 thing visible is its NAME, in the `Opt in by configuration` block of `Menu -All` and `Env`, under the
 question "How do you want to work in \<Space>?": `Team Agile module  on (chosen: with agents in <slug>)`,
@@ -156,7 +156,7 @@ every module is off), so it answers once any `tk*` command has loaded the module
 | `Standup [-Space <slug>] [-AsJson] [-Brief] [-Grain <detail\|work\|brief>] [-Since <yyyy-MM-dd>] [-Remind <HH:mm>] [-Days <Mon,Tue,...>] [-Walk]` | prints today's standup for the Space you are in, or the declared Space `-Space` names, read without switching into it. `-AsJson` prints the response the agent serves, `text`, `work` and `brief` included -- the bridge's shape and the parity test's. `-Brief` prints only the chair's reading (below) and, being a read, does not re-arm the reminder. `-Grain` picks the register of detail ([the work grain](#the-work-grain)): `detail`, the default, is the text as it always printed; `work` is the ritual's grain, spoken as standup prose ([the prose](#the-prose)); `brief` is `-Brief`. A word that is not a grain, or `-Brief` with another grain, is a stated refusal (exit 2). `-Since <yyyy-MM-dd>` widens yesterday back to that day ([what moved](#what-moved-and-the-window)) -- not `-Days`, which is the reminder's cadence; a day that is not one, or is after today, or `-Since` with `-Remind`, is a stated refusal. With nothing waiting on you, the brief's last line is [the suggestion](#the-suggestion-one-next-move-derived), and `-AsJson` carries every candidate as `suggestions` and the first as `suggestion` | none |
 | `Triage [-Space <slug>] [-AsJson]` | prints the Space's open issues grouped by milestone -- no milestone first, then most open first -- each milestone under its context line, each issue one line: number, title, who has it ([who](#who-takes-it)) -- `me`, `@<login>`, its worker (its size), or `nobody` -- severity or `--`, `deep-water` marked. `-AsJson` is the route's shape | none |
 | `Route <n\|id> [-Size <label>] [-Assign <me\|size>] [-Milestone <title>] [-Severity <sev>] [-DeepWater] [-Space <slug>] [-WhatIf]` | answers triage's questions for issue `<n>`: **one `gh issue edit` per switch given**, in that order. `-Assign` says who takes it ([who](#who-takes-it)); on a card with no issue behind it, `-Assign` is the one switch and writes the card's `**Assigned:**` line. `-WhatIf` prints every write and makes none | none for an issue -- it writes the tracker; a card's `**Assigned:**` line |
-| `StartWork <id> [-Clip] [-Prompt <path>] [-Space <slug>] [-Launch] [-WhatIf]` | prints the hand-off block for a card in `current/`, or for the Space's GitHub issue `<id>` when no card carries it ([below](#startwork-the-hand-off-block)). `-Clip` puts it on the clipboard and says so in one line; `-Prompt` carries another prompt for this call. `-Launch` hands the same block to a session in a new worktree of the Space's repository, the model from the item's size, and returns with its PID and log ([-Launch](#the-launch-the-block-handed-to-a-session)); `-WhatIf` prints what a launch would run | none -- it reads. With `-Launch`, in the repository you stand in: a worktree under `.claude/worktrees/` and three `*.log` files at its root |
+| `StartWork <id> [-Clip] [-Prompt <path>] [-Space <slug>] [-Launch] [-WhatIf]` | prints the hand-off block for a card in `current/`, or for the Space's GitHub issue `<id>` when no card carries it ([below](#startwork-the-hand-off-block)). `-Clip` puts it on the clipboard and says so in one line; `-Prompt` carries another prompt for this call. `-Launch` hands the same block to a session in a new worktree of the Space's repository, the model from the item's size, and returns with its PID and log ([-Launch](#the-launch-the-block-handed-to-a-session)); `-WhatIf` prints what a launch would run | none -- it reads. With `-Launch`, in the repository you stand in: a worktree under `.claude/worktrees/`, three `*.log` files in its git folder (`git rev-parse --git-path startwork`, never the working tree), and `/.claude/worktrees/` added to its local exclude file unless a rule already ignores it |
 
 **The walk list** (`Standup -Walk`). The PC's morning as one printout: the standup's title line, then
 one block per open `verify-close` issue by number, each the line the standup prints (`  Walk       #<n> <title>`) <!-- markdownlint-disable-line MD038 -- the span shows the printed line with its indent, which is the point -->
@@ -168,7 +168,8 @@ a tracker that does not answer prints the `Tracker` line, exit 0. `-AsJson` carr
 attending: it does not re-arm the reminder, and `-Walk -Remind` is a stated refusal (exit 2). It writes nothing.
 
 Two `gh` reads on the Space's ONE repo (the same rule every GitHub verb uses -- a repo-grained address,
-or exactly one repo in the Space's projects):
+or exactly one repo in the Space's projects), and, while [the suggestion](#the-suggestion-one-next-move-derived)
+is on, a third, `gh api user -q .login` -- who "me" is, best effort, the read Triage makes:
 
 ```text
 gh label list --repo <repo> --limit 500 --json name,description
@@ -259,7 +260,7 @@ The one stated refusal (`Error:`, `Hint:`, exit 2) is a `-Space` nobody declared
 
 | Route | Gate | Reads | Writes |
 | --- | --- | --- | --- |
-| `GET /api/ritual/standup?space=<slug>&since=<yyyy-MM-dd>&refresh=1` | `features.solitaireAgile` per request, with the active Space's answer applied (**404** unless the switch is on and the Space you are in works with agents; the detail names which is off); `space` scoped like `/api/issue-report` (an undeclared slug 404); `since` widens yesterday's window as `Standup -Since` does, and a `since` that is not a day, or is after today, is a **422** naming it; `refresh=1` reads the tracker again past the kept read ([below](#one-tracker-read-kept-a-minute)) | the same two `gh` reads (the issues with `milestone`, `body` and `createdAt`), through the same data files, kept a minute -- or, for a local Space, its cards | nothing |
+| `GET /api/ritual/standup?space=<slug>&since=<yyyy-MM-dd>&refresh=1` | `features.solitaireAgile` per request, with the active Space's answer applied (**404** unless the switch is on and the Space you are in works with agents; the detail names which is off); `space` scoped like `/api/issue-report` (an undeclared slug 404); `since` widens yesterday's window as `Standup -Since` does, and a `since` that is not a day, or is after today, is a **422** naming it; `refresh=1` reads the tracker again past the kept read ([below](#one-tracker-read-kept-a-minute)) | the same two `gh` reads as `Standup` (the issues with `milestone`, `body` and `createdAt`), and `gh api user` while the suggestion is on, through the same data files, kept a minute -- or, for a local Space, its cards. The limits are not yet the CLI's: the agent reads up to 300 issues in every state, 100 open, and 200 labels, where the CLI reads up to 500 issues for each read and 500 labels, so above those the terminal and the page can differ ([issue #276](https://github.com/johnfrog76/toolkit/issues/276)) | nothing |
 | `GET /api/ritual/triage?space=<slug>&refresh=1` | the same | `gh label list`, `gh issue list --state open` with `milestone` and `assignees`, and `gh api user` (who "me" is, best effort), kept a minute and shared with the standup | nothing |
 | `GET /api/ritual/milestones?space=<slug>&refresh=1` | the same | one `gh api --method GET repos/{owner}/{repo}/milestones -f state=all -F per_page=100` per repo -- the ado core's own reader -- kept a minute ([Milestones](#milestones-the-tab-and-the-award)) | nothing |
 | `POST /api/cmd/Route` | the bridge: `Route` is in the CLI's command table only while the flag resolves on -- the switch on and the Space answered `agents` | -- | what `Route` writes, and nothing else |
@@ -680,7 +681,7 @@ crew builder is given. Run it from a clone of that repository:
 > tkStartWork 4 -Launch
 Launched Issue #4 on sonnet: PID 48213.
   worktree: /src/widgets/.claude/worktrees/startwork-4-20261021-142807
-  log:      /src/widgets/startwork-4-20261021-142807.log
+  log:      /src/widgets/.git/startwork/startwork-4-20261021-142807.log
 ```
 
 It checks, in this order, and each check that fails is a stated refusal (`Error:`, `Hint:`, exit 2) that
@@ -820,6 +821,8 @@ milestone pick the older; one left beats three left; no milestone sorts last; a 
 `agents` Space is a delegation and a `fable`-sized one a start; a sized item with no milestone is placed in
 one; an unrouted item is a route; in flight, not billable, waiting-on-you and someone else's excluded; the empty Space; a dismissed item yields the next), the switch, and three chair's readings
 end to end whose goldens (`suggestion-<case>.brief.txt`) `Tests/regenerate_joined_goldens.py` writes.
+
+Known gap: [The suggestion hands off, it does not launch](../KNOWN-GAPS.md#the-suggestion-hands-off-it-does-not-launch).
 
 ## The PM Corner: the line, the chevron, the confetti
 
@@ -1053,7 +1056,7 @@ already says, so a line does not repeat them:
 
 **Began** is the card's `**Started:**` day (`Move -To InProgress` writes it), else its `**Created:**` day
 -- the card's own footer, read with its lane. An issue alone cannot say `started`: the read
-(`number,title,state,labels,closedAt,url,milestone,body`) carries no time its work began -- not when a
+(`number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees`) carries no time its work began -- not when a
 worker label was added, not whether a branch exists -- and finding out is a timeline read per issue that
 the standup does not make. So an issue with no card is closed or in progress, said plainly; a team whose
 work runs on cards gets the three words from the cards.
@@ -1094,6 +1097,8 @@ a hash two cards thread counted once), `not-billable-counts` (a not-billable car
 counts) and `window-three-days` (a three-day window with a close on each day, listed and counted once, and a
 close the day before the window not), with `expected.motions` and `expected.counts`; card rows carry
 `begun` and `commits`, as `read_cards` / `Get-P20StandupCards` read them.
+
+Known gap: [What moved is counted from the cards](../KNOWN-GAPS.md#what-moved-is-counted-from-the-cards).
 
 ### The two sources, joined
 
@@ -1474,7 +1479,7 @@ repository", is the real write).
 - **The suggestion's delegation does not launch.** The launch exists (`StartWork <n> -Launch`, [a
   session in a worktree](#the-launch-the-block-handed-to-a-session)), and the copy box offers it where `/env`
   says so, but the chair's Next line still names `StartWork <n>`, the block carried by hand; the command
-  gaining `-Launch` where the launch is on is not built.
+  gaining `-Launch` where the launch is on is not built ([The suggestion hands off, it does not launch](../KNOWN-GAPS.md#the-suggestion-hands-off-it-does-not-launch)).
 - **A launch is proved on macOS here, and walked on Windows.** The pipe returning on Windows PowerShell
   5.1, the model a real `claude` runs, and a real session's first message being the block are `VERIFY.md`
   rows (Gate 12, "StartWork -Launch"); the suite's launch half runs off Windows only.
@@ -1487,7 +1492,9 @@ repository", is the real write).
   yesterday's window (or the one `-Since` widens); after it, the line moves on to the next milestone.
 - **The celebration's mark is per browser.** Another browser, or one whose site data was cleared, celebrates a
   reached milestone once more on first sight.
-- **Only the issue read's 500 are candidates.** The suggestion reads the standup's read, capped like it.
+- **Only the issue read's rows are candidates.** The suggestion reads the standup's read, capped like it:
+  up to 500 issues in the CLI, up to 300 in every state and 100 open in the agent, so above those the
+  terminal and the page can suggest differently ([issue #276](https://github.com/johnfrog76/toolkit/issues/276)).
 - **Only the played view is dressed** (why, and what the reader sees when it is off, under
   [the agentic layer](#the-agentic-layer), "Where the dressed text shows"). `spoken` is the agent's and the stage's: `Standup -Grain work`
   and the page's Work grain show the prose, Copy copies it, and the queue's sentences, "Nothing blocked."
@@ -1549,12 +1556,13 @@ repository", is the real write).
 - **The card read is every file in `archive/`.** Each archived card is read for its `**Closed:**` day on
   every standup; a hub with thousands of archived cards pays for it.
 - **`decide` and `look` are always empty.** Their labels are an open item of the spec; only `walk` is
-  filled.
+  filled ([The standup's decide and look queues are empty](../KNOWN-GAPS.md#the-standups-decide-and-look-queues-are-empty)).
 - **One repo per Space.** A Space spanning several repos says so on its `Tracker` line rather than
   merging them.
-- **500 issues and 500 labels.** Both reads are capped at 500; a repo past that loses its oldest
-  issues from the read.
-- **No reminder yet.** `Standup -Remind` and Organize's bell are V1.
+- **The reads are capped, and not alike.** The CLI reads up to 500 issues for each read and 500
+  labels; the agent reads up to 300 issues in every state, 100 open, and 200 labels. A repo past a
+  cap loses its oldest issues from that read, and above the agent's caps the terminal and the page can
+  give different standups and triage lists ([The terminal and the page can read different issues](../KNOWN-GAPS.md#the-terminal-and-the-page-can-read-different-issues)).
 - **A live refusal reads differently in the two halves.** The fixture pins the `Tracker` line only for
   the reason it is GIVEN; the sentence each half writes for a live failure -- a Space that is not GitHub,
   a tier below 1, `gh` not answering -- is its own. The Azure DevOps sentence is now the contract's
@@ -1563,3 +1571,6 @@ repository", is the real write).
 - **Several repos in one Space.** The verb says so on its `Tracker` line; the route merges labels by name
   and concatenates issues, and fails the whole read if any repo's read fails. Issue numbers from two
   repos could collide. Both are M0 choices; one rule belongs in the contract.
+
+Known gaps: [The standup's decide and look queues are empty](../KNOWN-GAPS.md#the-standups-decide-and-look-queues-are-empty) and
+[The terminal and the page can read different issues](../KNOWN-GAPS.md#the-terminal-and-the-page-can-read-different-issues).

@@ -230,7 +230,7 @@ link ([The web UI](#the-web-ui)).
 | `Tests/test_reminders.py` | the same table from the agent's side; the route over the fixture hub against a fixed clock; a file with no id skipped; a hub with no `reminders/` answering empty; the folder renamed through `hub.json`; off is 404; a ref resolved -- a number, a number with a leading zero, a lettered id, an archived card, `current/` over `archive/` -- and not resolved: prose, an id no card carries, a card in another Space, no ref |
 | `tkTestToolkit -Consts`, `Tests/test_consts.py`, `web/src/shell/consts.test.ts` | its six contract values, stated from all three halves; `**Due:**` never retyped in the CLI or the agent |
 | `tkTestToolkit -HubJson`, `Tests/test_hub_json.py` | `reminders` is a hub-root folder, and the CLI's and the agent's folder tables agree key for key |
-| `web`: `registry.organize.test.tsx`, `registry.communication.test.tsx` | its flag, nothing when off, its own tab and no card elsewhere; Meetings fills the `organize` slot and hides its own tab only when organize is on; every registry test mocks all five modules |
+| `web`: `registry.organize.test.tsx`, `registry.communication.test.tsx` | its flag, nothing when off, its own tab and no card elsewhere; Meetings fills the `organize` slot and hides its own tab only when organize is on; every registry test mocks every module |
 | `web`: `ReminderBell.test.tsx` | the overdue slice of an answer (checking, unknown, a count, the last answer kept when a poll fails); the label in every state; asleep with no badge at zero or unknown, awake with the count, a click handed off; the registry test holds that the bell is the header's one organize item and absent when off |
 | `web`: `cliBridge.test.ts` | the exact argv of the four reminder builders -- an edit sends only what changed, an emptied due as `-NoDue`, an emptied ref as an empty `-Ref`, nothing changed as `null`; a new reminder's ref as `-Ref` |
 | `web`: `reminderEntry.test.ts` | a stored due split into date and time and joined back unchanged; a day keeps no invented time |
@@ -250,9 +250,9 @@ belongs to a module that is off.
   times are stored local with no offset. Named on purpose, not fixed.
 - **No recurrence.** Out of scope.
 - **No delivery.** It reminds you, on screen. Reminding someone else is a later issue with its own gate.
-- **Nothing drops a reminder in from another module yet.** A meeting's follow-up becoming a reminder
-  (`MeetingAgenda` calling `NewReminder`, a no-op when organize is off) is the one link between two
-  modules, and it waits for its own small issue.
+- **A meeting's follow-up does not become a reminder yet.** Team Agile's `Standup -Remind` writes one
+  (above), but `MeetingAgenda` calling `NewReminder` (a no-op when organize is off) waits for its own
+  small issue.
 - **A ref to an archived card is named, not linked.** The card page reads the active Space's `current/`
   only, so there is nowhere in the web UI to open an archived card; the row says `(done)` instead.
 - **A card does not say it has a reminder.** Decided against for now -- see

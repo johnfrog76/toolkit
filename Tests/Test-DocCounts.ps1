@@ -25,7 +25,8 @@
 
     It also holds the root README to its job as the front door: at most
     120 lines, no build-history phrases, every relative link resolving, and the
-    known gaps one link down in docs/KNOWN-GAPS.md.
+    known gaps one link down in docs/KNOWN-GAPS.md -- each gap a block tied to
+    the heading where a reader meets it, which links back, and to its issue.
 
     Run:  pwsh -File Tests/Test-DocCounts.ps1
     Or:   {cliPrefix}TestToolkit -DocCounts
@@ -271,6 +272,270 @@ $gapsText = ''
 if (Test-Path -LiteralPath $gapsPath) { $gapsText = Get-Content -LiteralPath $gapsPath -Raw -Encoding UTF8 }
 Assert-True 'docs/KNOWN-GAPS.md carries the heading "Known gaps"' `
     ($gapsText -match '(?m)^#+\s+Known gaps\s*$')
+
+# -- Each known gap is tied to where a reader meets it, and to its issue ------
+# docs/KNOWN-GAPS.md is one '### <title>' block per gap under '## Known gaps', each with
+# a '**Where you meet it:**' link to a document and heading, and an '**Issue:**' line.
+# The heading the Where line names links back to the gap, and every link into the
+# page's anchors lands on a gap. A table row has no anchor, which is how the list
+# drifted from the documents before; the anchor is the GitHub slug of the heading.
+Write-Host ""
+Write-Host "  Each known gap names where you meet it and its issue, and is linked back" -ForegroundColor Cyan
+
+function ConvertTo-P20HeadingSlug {
+    # GitHub's rule: lowercase; a link keeps its text; drop everything but letters,
+    # digits, underscores, hyphens and spaces; each space becomes a hyphen.
+    param([string]$Heading)
+    $s = [regex]::Replace($Heading.Trim(), '\[([^\]]*)\]\([^)]*\)', '$1').ToLowerInvariant()
+    $s = [regex]::Replace($s, '[^\p{L}\p{M}\p{N}\p{Pc} \-]', '')
+    return $s.Replace(' ', '-')
+}
+
+function Get-P20DocLines {
+    # The document's lines with every fenced line blanked, so a '#' in a code block
+    # is not a heading and a link in one is not a link. Line numbers are kept.
+    param([string]$Text)
+    $lines = @(([string]$Text) -split "`r?`n")
+    $fence = ''
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        $m = [regex]::Match($lines[$i], '^\s{0,3}(`{3,}|~{3,})')
+        if ($fence) {
+            if ($m.Success -and $m.Groups[1].Value.StartsWith($fence)) { $fence = '' }
+            $lines[$i] = ''
+        }
+        elseif ($m.Success) {
+            $fence = $m.Groups[1].Value
+            $lines[$i] = ''
+        }
+    }
+    return $lines
+}
+
+function Get-P20DocSections {
+    # One row per heading: its level, title, slug (a repeat gets -1, -2 the way
+    # GitHub numbers them), and its body -- up to the next heading at its level or above.
+    param([string]$Text)
+    $lines = @(Get-P20DocLines -Text $Text)
+    $heads = @()
+    $seen = @{}
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        $m = [regex]::Match($lines[$i], '^(#{1,6})\s+(.+?)\s*#*\s*$')
+        if (-not $m.Success) { continue }
+        $base = ConvertTo-P20HeadingSlug $m.Groups[2].Value
+        $slug = $base
+        if ($seen.ContainsKey($base)) { $seen[$base] = $seen[$base] + 1; $slug = "$base-$($seen[$base])" }
+        else { $seen[$base] = 0 }
+        $heads += [pscustomobject]@{ Level = $m.Groups[1].Value.Length; Title = $m.Groups[2].Value; Slug = $slug; Line = $i; End = $lines.Count; Body = '' }
+    }
+    for ($h = 0; $h -lt $heads.Count; $h++) {
+        for ($k = $h + 1; $k -lt $heads.Count; $k++) {
+            if ($heads[$k].Level -le $heads[$h].Level) { $heads[$h].End = $heads[$k].Line; break }
+        }
+        $first = $heads[$h].Line + 1
+        $last = $heads[$h].End - 1
+        if ($last -ge $first) { $heads[$h].Body = ($lines[$first..$last] -join "`n") }
+    }
+    return $heads
+}
+
+function Get-P20DocLinks {
+    # Every markdown link target outside a fence; a code span is no link.
+    param([string]$Text)
+    $out = @()
+    foreach ($line in @(Get-P20DocLines -Text $Text)) {
+        $bare = [regex]::Replace($line, '`[^`]*`', '')
+        foreach ($m in [regex]::Matches($bare, '\]\(([^)\s]+)\)')) { $out += $m.Groups[1].Value }
+    }
+    return $out
+}
+
+function Resolve-P20DocLink {
+    # A relative link from one document to a package path and an anchor; $null for
+    # an external link. Paths are package-relative, with forward slashes.
+    param([string]$From, [string]$Link)
+    if ($Link -match '^[A-Za-z][A-Za-z0-9+.-]*:') { return $null }
+    $anchor = ''
+    $path = $Link
+    $hash = $Link.IndexOf('#')
+    if ($hash -ge 0) { $anchor = $Link.Substring($hash + 1); $path = $Link.Substring(0, $hash) }
+    if (-not $path) { return [pscustomobject]@{ Path = $From; Anchor = $anchor } }
+    $parts = New-Object System.Collections.ArrayList
+    if (-not $path.StartsWith('/')) {
+        $dir = @($From -split '/')
+        if ($dir.Count -gt 1) { foreach ($d in $dir[0..($dir.Count - 2)]) { [void]$parts.Add($d) } }
+    }
+    foreach ($seg in ($path -split '/')) {
+        if ($seg -eq '' -or $seg -eq '.') { continue }
+        if ($seg -eq '..') { if ($parts.Count -gt 0) { $parts.RemoveAt($parts.Count - 1) }; continue }
+        [void]$parts.Add($seg)
+    }
+    return [pscustomobject]@{ Path = ($parts -join '/'); Anchor = $anchor }
+}
+
+function Get-P20GapLinkFindings {
+    # $Docs maps a package-relative path to its text. Returns one row per finding:
+    # Kind (gaps, where, issue, backlink, inbound, outbound) and the sentence.
+    param([hashtable]$Docs, [string]$GapsPath = 'docs/KNOWN-GAPS.md')
+    $found = @()
+    $sectionCache = @{}
+    $getSections = {
+        param($p)
+        if (-not $sectionCache.ContainsKey($p)) { $sectionCache[$p] = @(Get-P20DocSections -Text $Docs[$p]) }
+        return $sectionCache[$p]
+    }
+    if (-not $Docs.ContainsKey($GapsPath)) {
+        return @([pscustomobject]@{ Kind = 'gaps'; Text = "$GapsPath is not read" })
+    }
+    $sections = @(& $getSections $GapsPath)
+    $parent = @($sections | Where-Object { $_.Level -eq 2 -and $_.Title -eq 'Known gaps' }) | Select-Object -First 1
+    if (-not $parent) {
+        return @([pscustomobject]@{ Kind = 'gaps'; Text = "$GapsPath has no '## Known gaps' section" })
+    }
+    $gaps = @($sections | Where-Object { $_.Level -eq 3 -and $_.Line -gt $parent.Line -and $_.Line -lt $parent.End })
+    if ($gaps.Count -eq 0) { $found += [pscustomobject]@{ Kind = 'gaps'; Text = "'## Known gaps' holds no '### ' gap" } }
+    $gapSlugs = @($gaps | ForEach-Object { $_.Slug })
+
+    foreach ($g in $gaps) {
+        $where = [regex]::Match($g.Body, '(?m)^\*\*Where you meet it:\*\*\s*(.*)$')
+        if (-not $where.Success) {
+            $found += [pscustomobject]@{ Kind = 'where'; Text = "'$($g.Title)' has no **Where you meet it:** line" }
+        }
+        else {
+            $wl = [regex]::Match($where.Groups[1].Value, '\]\(([^)\s]+)\)')
+            $target = $null
+            if ($wl.Success) { $target = Resolve-P20DocLink -From $GapsPath -Link $wl.Groups[1].Value }
+            if (-not $target) {
+                $found += [pscustomobject]@{ Kind = 'where'; Text = "'$($g.Title)': its Where line has no relative link" }
+            }
+            elseif (-not $Docs.ContainsKey($target.Path)) {
+                $found += [pscustomobject]@{ Kind = 'where'; Text = "'$($g.Title)': $($target.Path) is not a document that is read" }
+            }
+            elseif (-not $target.Anchor) {
+                $found += [pscustomobject]@{ Kind = 'where'; Text = "'$($g.Title)': its Where link names no heading" }
+            }
+            else {
+                $section = @(& $getSections $target.Path | Where-Object { $_.Slug -eq $target.Anchor }) | Select-Object -First 1
+                if (-not $section) {
+                    $found += [pscustomobject]@{ Kind = 'where'; Text = "'$($g.Title)': $($target.Path)#$($target.Anchor) does not resolve" }
+                }
+                else {
+                    $back = @(@(Get-P20DocLinks -Text $section.Body) | Where-Object {
+                            $r = Resolve-P20DocLink -From $target.Path -Link $_
+                            $r -and $r.Path -eq $GapsPath -and $r.Anchor -eq $g.Slug })
+                    if ($back.Count -eq 0) {
+                        $found += [pscustomobject]@{ Kind = 'backlink'; Text = "$($target.Path), ""$($section.Title)"", does not link back to #$($g.Slug)" }
+                    }
+                }
+            }
+        }
+        $issue = [regex]::Match($g.Body, '(?m)^\*\*Issue:\*\*\s*(.*)$')
+        if (-not $issue.Success) {
+            $found += [pscustomobject]@{ Kind = 'issue'; Text = "'$($g.Title)' has no **Issue:** line" }
+        }
+        elseif (-not [regex]::IsMatch($issue.Groups[1].Value, '\[#\d+\]\(https://github\.com/[^/\s)]+/[^/\s)]+/issues/\d+\)')) {
+            $found += [pscustomobject]@{ Kind = 'issue'; Text = "'$($g.Title)': its Issue line has no issue link" }
+        }
+    }
+
+    foreach ($p in @($Docs.Keys)) {
+        foreach ($link in @(Get-P20DocLinks -Text $Docs[$p])) {
+            $r = Resolve-P20DocLink -From $p -Link $link
+            if (-not $r) { continue }
+            if ($r.Path -eq $GapsPath -and $r.Anchor -and ($gapSlugs -notcontains $r.Anchor)) {
+                $found += [pscustomobject]@{ Kind = 'inbound'; Text = "$p links $link, which is not a gap heading" }
+            }
+        }
+    }
+
+    # The page's other links -- a Where line's is the 'where' check's, above.
+    $rest = [regex]::Replace([string]$Docs[$GapsPath], '(?m)^\*\*Where you meet it:\*\*.*$', '')
+    foreach ($link in @(Get-P20DocLinks -Text $rest)) {
+        $r = Resolve-P20DocLink -From $GapsPath -Link $link
+        if (-not $r -or $r.Path -eq $GapsPath) { continue }
+        if (-not $Docs.ContainsKey($r.Path)) {
+            $found += [pscustomobject]@{ Kind = 'outbound'; Text = "$GapsPath links $link, which is not a document that is read" }
+        }
+        elseif ($r.Anchor -and -not (@(& $getSections $r.Path | Where-Object { $_.Slug -eq $r.Anchor }).Count)) {
+            $found += [pscustomobject]@{ Kind = 'outbound'; Text = "$GapsPath links $link, which does not resolve" }
+        }
+    }
+    return $found
+}
+
+# The check's own cases.
+$slugCases = @(
+    @('`Config -Set` cannot declare a Teams recipient', 'config--set-cannot-declare-a-teams-recipient'),
+    @("``/env``'s ``communication`` block", 'envs-communication-block'),
+    @("``spaceCheckouts.<slug>.path`` -- a Space's checkout on this machine", 'spacecheckoutsslugpath----a-spaces-checkout-on-this-machine'),
+    @('Tiers: what happens when ADO does not answer', 'tiers-what-happens-when-ado-does-not-answer'),
+    @('Most CLI suites run their verbs on PowerShell 7 under 5.1', 'most-cli-suites-run-their-verbs-on-powershell-7-under-51')
+)
+foreach ($c in $slugCases) {
+    Assert-Equal "known gaps: the slug of '$($c[0])'" $c[1] (ConvertTo-P20HeadingSlug $c[0])
+}
+$dupSlugs = @(Get-P20DocSections -Text "## Known gaps`n`n## Known gaps`n" | ForEach-Object { $_.Slug })
+Assert-Equal 'known gaps: a repeated heading is numbered the way GitHub numbers it' 'known-gaps|known-gaps-1' ($dupSlugs -join '|')
+$crossDir = Resolve-P20DocLink -From 'web/README.md' -Link '../docs/KNOWN-GAPS.md#x'
+Assert-Equal 'known gaps: a link from web/ resolves into docs/' 'docs/KNOWN-GAPS.md#x' "$($crossDir.Path)#$($crossDir.Anchor)"
+
+$caseGap = "# Gaps`n`n## Known gaps`n`n### A thing is missing`n`n**What you see:** it is.`n`n" +
+    "**Where you meet it:** [A](a.md#the-place), ""The place""`n`n**ISSUE**`n`n## True by design`n`nProse.`n"
+$caseIssue = '**Issue:** [#1](https://github.com/o/r/issues/1)'
+$caseA = "# A`n`n## The place`n`nText. Known gap: [A thing is missing](KNOWN-GAPS.md#a-thing-is-missing).`n`n## Elsewhere`n`nMore.`n"
+$caseWeb = "# Web`n`nSee [the gap](../docs/KNOWN-GAPS.md#a-thing-is-missing).`n"
+$gapCases = @(
+    @{ Why = 'a gap with its Where, its Issue and a link back'; Kind = ''; Gaps = $caseGap.Replace('**ISSUE**', $caseIssue); A = $caseA; Web = $caseWeb }
+    @{ Why = 'a gap with no Issue line'; Kind = 'issue'; Gaps = $caseGap.Replace('**ISSUE**', ''); A = $caseA; Web = $caseWeb }
+    @{ Why = 'an Issue line with no issue link'; Kind = 'issue'; Gaps = $caseGap.Replace('**ISSUE**', '**Issue:** to be filed'); A = $caseA; Web = $caseWeb }
+    @{ Why = 'a Where anchor no heading has'; Kind = 'where'; Gaps = $caseGap.Replace('**ISSUE**', $caseIssue).Replace('#the-place', '#the-plaice'); A = $caseA; Web = $caseWeb }
+    @{ Why = 'a heading inside a code fence'; Kind = 'where'; Gaps = $caseGap.Replace('**ISSUE**', $caseIssue); A = $caseA.Replace('## The place', "``````text`n## The place`n``````"); Web = $caseWeb }
+    @{ Why = 'a section that does not link back'; Kind = 'backlink'; Gaps = $caseGap.Replace('**ISSUE**', $caseIssue); A = "# A`n`n## The place`n`nText.`n`n## Elsewhere`n`n[x](KNOWN-GAPS.md#a-thing-is-missing)`n"; Web = $caseWeb }
+    @{ Why = 'a link on the page to a heading that is not there'; Kind = 'outbound'; Gaps = $caseGap.Replace('**ISSUE**', $caseIssue).Replace('it is.', 'it is ([A](a.md#nowhere)).'); A = $caseA; Web = $caseWeb }
+    @{ Why = 'a document linking an anchor that is no gap'; Kind = 'inbound'; Gaps = $caseGap.Replace('**ISSUE**', $caseIssue); A = $caseA; Web = $caseWeb.Replace('#a-thing-is-missing', '#a-thing-was-missing') }
+)
+try {
+    foreach ($case in $gapCases) {
+        $caseDocs = @{ 'docs/KNOWN-GAPS.md' = $case.Gaps; 'docs/a.md' = $case.A; 'web/README.md' = $case.Web }
+        $got = @(Get-P20GapLinkFindings -Docs $caseDocs)
+        if ($case.Kind) {
+            $ok = ($got.Count -eq 1) -and ($got[0].Kind -eq $case.Kind)
+            Assert-True "known gaps: the check finds $($case.Why)" $ok (($got | ForEach-Object { "$($_.Kind): $($_.Text)" }) -join ' | ')
+        }
+        else {
+            Assert-True "known gaps: the check passes $($case.Why)" ($got.Count -eq 0) (($got | ForEach-Object { "$($_.Kind): $($_.Text)" }) -join ' | ')
+        }
+    }
+}
+catch {
+    Assert-True 'known gaps: the check cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+
+# The real documents: every Markdown file a reader can follow a link from.
+$gapDocs = @{}
+$gapDocFiles = @(Get-ChildItem -LiteralPath $pkgRoot -Filter '*.md' -File)
+$gapDocFiles += @(Get-ChildItem -LiteralPath (Join-Path $pkgRoot 'docs') -Filter '*.md' -File -Recurse)
+foreach ($sub in @('web', 'agent', 'agentic')) {
+    $subDir = Join-Path $pkgRoot $sub
+    if (Test-Path -LiteralPath $subDir) { $gapDocFiles += @(Get-ChildItem -LiteralPath $subDir -Filter '*.md' -File) }
+}
+foreach ($f in $gapDocFiles) {
+    $rel = $f.FullName.Substring($pkgRoot.Length).TrimStart('\', '/').Replace('\', '/')
+    $gapDocs[$rel] = [string](Get-Content -LiteralPath $f.FullName -Raw -Encoding UTF8)
+}
+$gapFindings = @(Get-P20GapLinkFindings -Docs $gapDocs)
+$gapCount = @(Get-P20DocSections -Text $gapDocs['docs/KNOWN-GAPS.md'] | Where-Object { $_.Level -eq 3 }).Count
+$gapChecks = @(
+    @('gaps', "docs/KNOWN-GAPS.md holds its gaps as '### ' blocks under '## Known gaps' ($gapCount read)"),
+    @('where', 'every gap has a **Where you meet it:** link that resolves, file and heading'),
+    @('issue', 'every gap has an **Issue:** line with an issue link'),
+    @('backlink', "the heading each gap's Where names links back to that gap"),
+    @('inbound', 'every link into docs/KNOWN-GAPS.md#... from a document lands on a gap heading'),
+    @('outbound', 'every relative link in docs/KNOWN-GAPS.md resolves, file and heading')
+)
+foreach ($gc in $gapChecks) {
+    $hits = @($gapFindings | Where-Object { $_.Kind -eq $gc[0] } | ForEach-Object { $_.Text })
+    Assert-True "known gaps: $($gc[1])" (($hits.Count -eq 0) -and ($gc[0] -ne 'gaps' -or $gapCount -gt 0)) ($hits -join ' | ')
+}
 
 # -- The runner counts a suite that did not report as a failure -------------
 # Test-Toolkit.ps1 reads each child's score through Get-P20SuiteVerdict. A suite

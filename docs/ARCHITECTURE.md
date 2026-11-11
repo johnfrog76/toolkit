@@ -325,9 +325,10 @@ on a real Linux host -- nobody has run this combination on one, but the reason i
 already known. **The Docker path in this repository is for Docker Desktop.** On native Linux, skip
 Docker and run the agent and the web UI directly on the host instead -- `tkWeb -Dev`, which already
 works there ([Quickstart](QUICKSTART.md), "Supported platforms"). An opt-in, non-default bind
-address that would let the Docker path work on native Linux too is a known gap, not built
-([Known gaps](KNOWN-GAPS.md)). Do not rebind the agent to a wider address to make the container reach
-it.
+address that would let the Docker path work on native Linux too is not built. Do not rebind the
+agent to a wider address to make the container reach it.
+
+Known gap: [Docker does not reach the agent on native Linux](KNOWN-GAPS.md#docker-does-not-reach-the-agent-on-native-linux).
 
 ### CORS
 

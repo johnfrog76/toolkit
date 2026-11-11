@@ -104,7 +104,8 @@ component import creeps back in. The smoke test's off mode asserts that no modul
 `spaces[]` entry -- and an org cannot override them. A training you took does not stop having
 happened when you switch org, and a 1:1 history spans engagements, so a module that flickered as
 you moved between an active engagement and an archived one would be wrong. The exceptions are the
-ADO core's own flags, which describe one org's board: `sprintAwareness` is the only one. The
+Space-scoped switches, which describe one Space: `sprintAwareness`, the ADO core's own flag for
+one org's board, and `suggestions`, both read from `spaces[].features`. The
 rule, and where each half reads it, is
 [Flags have a scope](../ARCHITECTURE.md#the-shell-owns-the-chrome-a-module-owns-the-rest) in [the web UI overview](../ARCHITECTURE.md#the-web-ui);
 `Tests/test_features.py` pins it.
@@ -170,8 +171,9 @@ webhook URL itself is never in config -- config names the variable, the environm
 
 > **`POST /api/comms/send` and `SendTeams` post for real.** Exercise the path with `-WhatIf` or
 > `"dryRun": true`: every gate runs and the payload comes back unsent (AGENTS.md, "The webhook
-> variables"). Two of the module's six routes -- `POST`/`PUT /manager` -- are the only writes in the
-> whole API that do not go through the CLI, because they save a form someone is typing into;
+> variables"). One of the module's routes -- `PUT /manager/{f}` -- is the only write in the whole API
+> that does not go through the CLI, because it saves a form someone is typing into (`POST /manager`
+> runs `NewMeeting` through the bridge);
 > [`docs/modules/communication.md`](communication.md#the-backend) says why that is not a second
 > implementation to drift from, and has the full route and page tables, the `/env` shape, and the
 > fixtures.
@@ -263,8 +265,8 @@ time, so the same entry reads correctly under any prefix and under two at once.
 
 A help entry has five keys, and the last two are optional: `category`, `description`, `usage`,
 `examples`, plus **`switches`** (a map of switch name to one line) and **`notes`** (free text under
-the examples). `Web` and `Agent` carry both, because they are the verbs with real switch surface, and
-a script's comment-based help is not where `-Help` looks.
+the examples). A verb with real switch surface carries `switches` -- `Web` and `Agent` among the core verbs, and
+module verbs too -- because a script's comment-based help is not where `-Help` looks.
 Two more tokens are expanded alongside `{cliPrefix}`: **`{agentPort}`** and **`{devPort}`**, read
 from `web.agentPort` and `web/vite.config.ts`, so a URL in a help line is right on a machine that
 moved the port. The `Menu` suite asserts that every switch the script declares is described, that
@@ -282,11 +284,14 @@ the core wrappers in `utilities.psm1` -- resolve the invoked name, answer `-Help
    **with the path** and skip the module;
 2. if `(Get-P20Features).<Feature>` is not `$true`: do nothing at all -- no row, no alias, no help,
    no menu line;
-3. if any name in `Commands` is already in `$script:ModuleState.CommandMap`: warn with the colliding name and
+3. if the sibling `.ps1` is missing: warn **with its path** and skip the module. This is checked
+   before collisions, so a module with both faults is reported for the missing file alone;
+4. if any name in `Commands` is already in `$script:ModuleState.CommandMap`: warn with the colliding name and
    skip **the whole module**. A core command is never overwritten, and a half-merged module is worse
    than an unloaded one;
-4. if the sibling `.ps1` is missing: warn and skip;
-5. dot-source the `.ps1`, append the rows to `$script:ModuleState.CommandMap` in `Order`, and merge `Help` into
+5. dot-source the `.ps1`. If it throws while loading: warn with its path and the error, and skip
+   the module;
+6. append the rows to `$script:ModuleState.CommandMap` in `Order`, and merge `Help` into
    the in-memory table.
 
 A wrapper in the `.ps1` is a `function global:` body, so it finds the package root with
@@ -300,7 +305,7 @@ so a module verb gets its prefixed alias, its menu line and its **bridge entry**
 its allowlist from that and nothing else -- so a module verb is callable from the browser with no
 backend change. `Get-P20ModuleCommands` reports which modules contributed what, as JSON; with
 growth and communication on it answers
-`{"communication":["SendTeams","NewMeeting","MeetingAgenda"],"growth":["NewGrowth","NewWorkReview","PublishWorkReview","LogPeerReview","UpdateResume"]}`.
+`{"communication":["SendTeams","NewMeeting","MeetingAgenda"],"growth":["NewGrowth","NewWorkReview","PublishWorkReview","WorkReview","LogPeerReview","UpdateResume"]}`.
 Its two readers are the `ModuleCommands` suite and `Test-Menu`'s
 orphan check, which compares registered aliases against `config.default.json` and would otherwise
 flag every module verb as an orphan on a machine that has a module switched on.

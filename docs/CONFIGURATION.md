@@ -394,7 +394,7 @@ Space's repository, a product design's menu offers the same moves a hub design's
 **Archive as shipped**, **Archive as dropped**, **Complete**), each running `MoveDesign -Space <slug>` through
 the bridge. The verb **stages the move in that clone and never commits**: a product's history is the engineer's.
 The dialog shows what was staged and the commit line the verb suggests, and the tab re-reads -- though a row
-moves only once the commit is pushed, because the tab reads GitHub ([Known gaps](KNOWN-GAPS.md)).
+moves only once the commit is pushed, because the tab reads GitHub ([A repository's designs move only through a named checkout](KNOWN-GAPS.md#a-repositorys-designs-move-only-through-a-named-checkout)).
 
 **One resolver.** `Resolve-P20SpaceCheckout` (`Scripts/Resolve-SpaceCheckout.ps1`) is the one thing that finds a
 Space's clone, and this setting is its first candidate, before the folder you stand in and the nav shortcuts'
