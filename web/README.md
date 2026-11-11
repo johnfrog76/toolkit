@@ -1884,3 +1884,5 @@ What changed under a name, an address or a stored key that someone may still hol
 - **2026-09-28** -- Home's List | Boards toggle, remembered in `localStorage["toolkit-home-view"]`,
   became the Focus and Board tabs; that key is no longer read. The Environment card's foot of
   add-on rows became `ModulesCard`, and `FacePicker` moved to the Lounge.
+
+<!-- A throwaway line that checks the web-only CI path; never merged. -->
