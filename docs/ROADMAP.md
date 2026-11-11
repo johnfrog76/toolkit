@@ -180,8 +180,7 @@ fix is proved on the host that broke it, Windows-1252 included. **Cut 2026-11-09
 - **The Docker refresh:** a page refreshed in the Docker image stays on the page.
 - **The Backlog:** `Backlog` and `GET /api/backlog`, a Space's waiting cards as one ranked table.
 
-Carries to the next quality release: every CLI suite proved on Windows PowerShell 5.1 itself (#261), and
-the rest of the review queue.
+Carries to the next quality release: the rest of the review queue.
 
 ### M4b -- 1.7.0, the tour
 
