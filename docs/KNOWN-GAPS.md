@@ -272,6 +272,17 @@ leave ts-jest, which is a decision of its own.
 
 **Issue:** [#305](https://github.com/johnfrog76/toolkit/issues/305)
 
+### The plan's weekly usage is typed, not read
+
+**What you see:** `Burn`'s weekly burndown shows only the readings someone typed with
+`Burn -Reading general=<n>,premium=<n>`, copied from Claude's usage page. Nothing reads the plan's
+percentages automatically, because nothing documented carries them per bucket. With no reading this week,
+`Burn` says how to record one, and a reading older than `burn.cacheHours` says its renewal is due.
+
+**Where you meet it:** [Usage](hub/usage.md#not-yet), "Not yet"
+
+**Issue:** [#320](https://github.com/johnfrog76/toolkit/issues/320)
+
 ## True by design
 
 Some things are true by design rather than by omission, and are not on that list. The deck narration

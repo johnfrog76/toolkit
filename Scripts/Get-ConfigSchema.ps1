@@ -54,6 +54,10 @@ if (-not (Get-Command ConvertTo-P20BareAliasKey -ErrorAction SilentlyContinue)) 
 if (-not (Get-Command ConvertFrom-P20WeekStart -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'ConvertFrom-WeekStart.ps1')
 }
+# burn.cacheHours' range: the one reader, shared with Burn.
+if (-not (Get-Command Get-P20BurnCacheHours -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Read-BurnReadings.ps1')
+}
 
 function Get-P20SchemaPrefix {
     # What this package registers under, read from the package this file sits
@@ -232,6 +236,7 @@ function Get-P20ConfigSchema {
     $rows += New-P20SchemaRow -Key 'web.corsOrigins' -Scope 'machine' -Type 'array' -Help 'Dev-server origins allowed to call the agent, as a JSON array. Empty accepts the two defaults (5173, 5174).'
     $rows += New-P20SchemaRow -Key 'limits.inPlay' -Scope 'machine' -Type 'int' -Help 'How many cards in play (current/, every lane) before Status and the board say so: a whole number of 1 or more. A line the product says, never a gate -- nothing refuses and nothing is hidden. Unset: no line.'
     $rows += New-P20SchemaRow -Key 'burn.weekStarts' -Scope 'machine' -Type 'weekstart' -Help 'When the Claude Code burn''s week starts, local time: a day and a 24-hour time, like Friday 05:00 (the default) or Monday 09:00 -- when your plan''s allocation resets. Burn''s This week, the System page''s burn tile and another machine''s day record (it counts toward the week it starts in) all read it.'
+    $rows += New-P20SchemaRow -Key 'burn.cacheHours' -Scope 'machine' -Type 'int' -Help 'How long a plan reading you typed with Burn -Reading is taken as current, in whole hours from 1 to 168: 4 by default. Burn and the System page say "cached as of" the reading and "renews" this many hours after it; nothing is hidden or coloured when it is due.'
     $rows += New-P20SchemaRow -Key 'ai.model' -Scope 'machine' -Type 'string' -Help 'The model id every model call sends: AddPRReview, and the agent''s suggest and rewrite routes. The key stays in the environment (ANTHROPIC_API_KEY), never in a file this tool writes.'
 
     # A navigation shortcut's fields, as a PATTERN: the name is whatever the
@@ -497,6 +502,15 @@ function Test-P20ConfigValue {
     $result = @{ Ok = $false; Value = $null; Reason = '' }
     $raw = [string]$Value
 
+    if ($Row.key -eq 'burn.cacheHours') {
+        # The range is Burn's own reader's, so a value -Set accepts is one Burn reads.
+        $hours = Get-P20BurnCacheHours -Value $raw
+        if (-not $raw.Trim() -or -not $hours.Ok) {
+            $result.Reason = "burn.cacheHours is a whole number of hours from 1 to 168 -- got '$raw'."
+            return $result
+        }
+        $result.Ok = $true; $result.Value = [int]$hours.Hours; return $result
+    }
     if ($Row.key -eq 'commandPrefix' -and -not (Test-P20CommandPrefix $raw)) {
         $result.Reason = "commandPrefix is a letter, then letters or digits -- got '$raw'."
         return $result

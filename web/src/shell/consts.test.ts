@@ -380,7 +380,11 @@ describe("consts.json", () => {
     // Claude Code usage: /env's flag (the CLI inventory row's key) and the burn route.
     const { _: usageDoc, ...usageKeys } = USAGE as typeof USAGE & { _: string };
     expect(usageDoc).toMatch(/Burn -AsJson/);
-    expect(usageKeys).toEqual({ envFlag: "claudeUsage", burnRoute: "/api/usage/burn" });
+    expect(usageKeys).toEqual({
+      envFlag: "claudeUsage",
+      burnRoute: "/api/usage/burn",
+      readingsFolder: "readings",
+    });
   });
 
   // Every key of the contract is stated by this half, so a key added to

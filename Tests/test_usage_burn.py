@@ -10,6 +10,8 @@ docs/hub/usage.md, "Today and this week"; agent/core/usage.py. Holds:
    by the function the CLI's command table names, and serves what it printed.
 3. The cache: an hour on disk, keyed by the hub and the config files; never past the verb's own
    ``nextBoundaryAt``; ``?refresh=1`` goes past it; a failed read is not kept.
+4. The burndown: served as the verb answered it; a new typed reading in
+   ``usage/<readingsFolder>/`` is a miss at once; never served past its ``renewsAt``.
 """
 
 from __future__ import annotations
@@ -33,7 +35,7 @@ try:
     from agent.app import app
     from agent.core import config as config_mod
     from agent.core import usage
-    from agent.core.consts import usage_burn_route, usage_env_flag
+    from agent.core.consts import usage_burn_route, usage_env_flag, usage_readings_folder
 except Exception as e:  # pragma: no cover - environment without the deps
     skip_module(f"cannot import the app ({type(e).__name__}: {e})")
 
@@ -45,7 +47,7 @@ def _iso(dt: datetime) -> str:
     return dt.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
-def _answer(boundary_in: timedelta = timedelta(hours=6)) -> dict:
+def _answer(boundary_in: timedelta = timedelta(hours=6), renews_in: timedelta = timedelta(hours=3)) -> dict:
     now = datetime.now(UTC)
     return {
         "burn": 1,
@@ -56,6 +58,14 @@ def _answer(boundary_in: timedelta = timedelta(hours=6)) -> dict:
         "today": {"totals": {"messages": 3, "costUsdDerived": 0.5}, "byModel": [], "machines": []},
         "week": {"totals": {"messages": 9, "costUsdDerived": 1.5}, "byModel": [], "machines": []},
         "cost": {"derived": True, "priceNotes": []},
+        "burndown": {
+            "product": "claude",
+            "cacheHours": 4,
+            "cachedAt": _iso(now - timedelta(hours=1)),
+            "renewsAt": _iso(now + renews_in),
+            "due": False,
+            "buckets": [{"key": "general", "label": "General", "percent": 43, "pace": 60, "gap": -17}],
+        },
     }
 
 
@@ -169,6 +179,35 @@ class TheRoute(unittest.TestCase):
         # reads the key, it notices the file changed.
         self.client.get(self.path)
         with mock.patch("agent.core.usage._inputs", return_value="another config"):
+            self.client.get(self.path)
+        self.assertEqual(len(self.calls), 2)
+
+    def test_the_burndown_is_the_verbs(self):
+        body = self.client.get(self.path).json()
+        self.assertEqual(body["burndown"]["buckets"][0]["gap"], -17)
+        self.assertEqual(body["burndown"]["cacheHours"], 4)
+
+    def test_a_new_reading_is_a_miss(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            usage_dir = Path(tmp)
+            readings = usage_dir / usage_readings_folder()
+            with mock.patch("agent.core.usage.hub_folder", return_value=usage_dir):
+                self.client.get(self.path)
+                self.client.get(self.path)
+                self.assertEqual(len(self.calls), 1, "nothing changed: the disk's")
+                readings.mkdir()
+                (readings / "2026-11-06-build-box.json").write_text('{"readings": 1, "entries": []}\n', encoding="utf-8")
+                self.assertIs(self.client.get(self.path).json()["fromCache"], False)
+                self.assertEqual(len(self.calls), 2)
+
+    def test_never_served_past_its_renewal(self):
+        # The kept answer said "not due"; once renewsAt passes, that is no longer true.
+        self.reply = _answer(renews_in=timedelta(minutes=1))
+        self.client.get(self.path)
+        later = time.time() + 120
+        with mock.patch("agent.core.usage.time.time", return_value=later):
             self.client.get(self.path)
         self.assertEqual(len(self.calls), 2)
 
