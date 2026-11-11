@@ -93,7 +93,7 @@ in `agent/ado/accounting.py`), an undeclared slug a 404 naming it. `/api/visibil
 tier; `/api/status` and `/api/backlog` read that Space's `current/` and `backlog/` and ask no tracker. The Studio's Spaces card
 reads its non-GitHub rows through `/api/status?space=` -- one row per Space, none switched into -- and every
 GitHub row through ONE read, `GET /api/studio/ledger` (`consts.json` `studio.ledgerRoute`): the three answers
-above for every GitHub Space, from one `gh api graphql` call plus a `gh run list` per repository, kept on the
+above for every GitHub Space, and its product's design counts, from one `gh api graphql` call plus a `gh run list` per repository, kept on the
 agent's disk for 600 s ([`modules/studio.md`](modules/studio.md#the-routes)).
 
 **A route may read through a verb.** `GET /api/spaces/candidates` -- the repositories the Spaces card's

@@ -351,6 +351,7 @@ kind -- `GitHub`, `Azure DevOps`, `Your own cards`.
 | none at all | `No Spaces yet`, "A Space is where you work on one piece of software: your cards on a board, and the tracker's issues, designs and stats beside them once it is connected." under it, and the **+** at the foot |
 | a cold `Start` (the three demo Spaces, no `gh`, no `az`) | Azure demo, Demo and GitHub demo, each with a line that teaches; nothing reads as an error |
 | GitHub Spaces, connected, `gh` signed in | one row each: `Public; 4 open, 2 closed this week, 1 sev1 open; last deploy 3 days ago, green`; the Space you are in marked `you are here` |
+| ...its repository keeps designs (`design/`) | the line ends `; 3 designs in flight, 1 spec`, and `; 2 files not stamped with an id` when any have no `id:`; no `design/`, nothing about designs |
 | ...its repository public | the line leads `Public;` |
 | ...its repository private, or `INTERNAL` | the line leads `Private;` |
 | ...the tracker did not answer its visibility (below Tier 1, `gh` signed out, a failed read) | the line leads `Visibility unknown;` -- said, never guessed or left out |

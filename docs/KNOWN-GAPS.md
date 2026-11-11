@@ -134,15 +134,6 @@ neither says its read was cut short.
 
 **Issue:** [#276](https://github.com/johnfrog76/toolkit/issues/276)
 
-### The foyer counts no designs or specs
-
-**What you see:** A GitHub row in the Studio's foyer says how a product's ledger stands and its last
-deploy, with no count of the designs in flight or of the specs.
-
-**Where you meet it:** [the Studio](modules/studio.md#known-gaps), "Known gaps"
-
-**Issue:** [#296](https://github.com/johnfrog76/toolkit/issues/296)
-
 ### Promote files only into the Space you are in
 
 **What you see:** A hub note for another Space shows Promote disabled with "switch to it first".

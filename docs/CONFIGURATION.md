@@ -938,14 +938,14 @@ past its burndown's `renewsAt` ([usage](hub/usage.md#today-and-this-week)).
 Never the hub -- it is your record, and it may be synced between machines -- and never the package, whose
 tree `Update` refuses to move while it is dirty. Under it, `rows/<reader>.json` holds the parsed rows (the
 reader's name carries a version, bumped when what it parses changes), `bodies/<sha>` the opened bodies, and
-`ledger-1/<slug>.json` each GitHub Space's ledger with the time it was read (the folder's version is bumped
+`ledger-2/<slug>.json` each GitHub Space's ledger with the time it was read (the folder's version is bumped
 when the ledger's shape changes), and `standup-dress-1/<hash>.json` the dressed replies.
 `rows/`, `bodies/` and `standup-dress-1/` are **capped by one rule**, applied when something is written: a record or file unseen for
 30 days goes, and past 3000 records the oldest-unseen go first (`AGENT_CACHE_MAX_AGE_DAYS` and
 `AGENT_CACHE_MAX_RECORDS` in `agent/core/config.py`; not settings -- nothing to configure). "Seen" is when it
 was last written or served. In `rows/` a row carries a stamp in its file's `seen` map, refreshed by a warm
 read at most once a day; in `bodies/` and `standup-dress-1/` it is the file's modification time, set by the
-write and touched on a disk hit. `ledger-1/` is held to the Spaces instead: on a write, the file of any
+write and touched on a disk hit. `ledger-2/` is held to the Spaces instead: on a write, the file of any
 Space no longer in the config is dropped. `burn-1/` is one file, replaced on every read, so it needs no cap.
 A prune that cannot run leaves the cache as it was.
 Delete the folder whenever you like: the next read fetches what it needs again. `Config` does not know the
