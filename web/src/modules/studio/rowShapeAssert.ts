@@ -25,10 +25,19 @@ export function expectOneRowShape(card: HTMLElement, kind: string, titles: strin
   const rows = Array.from(card.querySelectorAll<HTMLElement>(`[data-studio-row="${kind}"]`));
   expect(rows).toHaveLength(titles.length);
   expect(rows.length).toBeLessThanOrEqual(LIST_PAGE_SIZE);
-  // Any filter chips on the card sit in one row that never wraps.
-  for (const group of Array.from(
+  // No inline group subhead in the body: a card that splits its items does it
+  // with the one chip row, never a headed section.
+  expect(card.querySelectorAll("section, [role='region']")).toHaveLength(0);
+  // The filter chips exist and at least one carries its count.
+  const groups = Array.from(
     card.querySelectorAll<HTMLElement>("[role='group'][aria-label^='Filter']"),
-  )) {
+  );
+  expect(groups.length).toBeGreaterThan(0);
+  const radios = Array.from(groups[0].querySelectorAll<HTMLElement>("[role='radio']"));
+  expect(radios.length).toBeGreaterThan(0);
+  expect(radios.some((r) => /\d/.test(r.textContent ?? ""))).toBe(true);
+  // Any filter chips on the card sit in one row that never wraps.
+  for (const group of groups) {
     const rules = clampRules(group);
     expect(rules).toMatch(/flex-wrap:\s*nowrap/);
     expect(rules).toMatch(/overflow-x:\s*auto/);
@@ -71,4 +80,18 @@ export function expectOneRowShape(card: HTMLElement, kind: string, titles: strin
     expect(clampRules(description)).toMatch(/display:\s*-webkit-box/);
   }
   return rows;
+}
+
+/** A helper sentence lives in the header's info tip, never in the body: the
+ *  icon's description is the sentence, and the card's own body and foot hold no copy of it. */
+export function expectSentenceInInfoTip(card: HTMLElement, label: string, sentence: string) {
+  const icon = card.querySelector<HTMLElement>(`[role='img'][aria-label='${label}']`);
+  expect(icon).not.toBeNull();
+  const described = document.getElementById(icon!.getAttribute("aria-describedby") ?? "");
+  expect(described?.textContent).toBe(sentence);
+  const drawn = Array.from(card.querySelectorAll("*")).filter(
+    (el) => el.children.length === 0 && el.textContent === sentence,
+  );
+  // The tip is portalled out of the card: the card itself holds no copy.
+  expect(drawn).toEqual([]);
 }

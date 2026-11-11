@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { expectOneRowShape } from "./rowShapeAssert";
+import { expectOneRowShape, expectSentenceInInfoTip } from "./rowShapeAssert";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { DesignsCard } from "./DesignsCard";
 import { DesignNotePage, promoteBlocked } from "./DesignNotePage";
@@ -201,12 +201,14 @@ describe("the Designs card", () => {
     expect(screen.getByText("no thread yet")).toBeTruthy();
   });
 
-  it("says what it is: Hub Designs, your private files", () => {
-    mount();
+  it("says what it is: Hub Designs, with the sentence in its info tip", () => {
+    const { container } = mount();
     expect(screen.getByText("Hub Designs")).toBeTruthy();
-    expect(
-      screen.getByText("Your private files. Notes that belong to no product yet."),
-    ).toBeTruthy();
+    expectSentenceInInfoTip(
+      container,
+      "About Hub Designs",
+      "Your private files. Notes that belong to no product yet.",
+    );
   });
 
   // The Space a note names is a move in the row's menu, Go into <Space>.
@@ -420,6 +422,9 @@ const GROUPED = {
   ],
 };
 
+const chip = (name: string) => screen.getByRole("radio", { name: new RegExp(`^${name}\\b`) });
+const pick = (name: string) => fireEvent.click(chip(name));
+
 describe("the Designs card's pager", () => {
   const notes = (n: number) =>
     Array.from({ length: n }, (_, i) => ({
@@ -437,7 +442,7 @@ describe("the Designs card's pager", () => {
     expect(screen.getByText("Note 5")).toBeTruthy();
     expect(screen.queryByText("Note 6")).toBeNull();
     expect(screen.getByText("1 / 2")).toBeTruthy();
-    expect(screen.getByLabelText("Design designs").textContent).toContain("6");
+    expect(chip("Design").textContent).toContain("6");
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
     expect(screen.getByText("Note 6")).toBeTruthy();
     expect(screen.queryByText("Note 1")).toBeNull();
@@ -489,7 +494,7 @@ describe("the Designs card's Docs line", () => {
   it("opens the document in the Docs tab when the design names the Space you are in", () => {
     listAnswer = { data: complete("toolkit") };
     mount();
-    fireEvent.click(screen.getByRole("button", { name: "Show Complete" }));
+    pick("Complete");
     fireEvent.click(screen.getByText("docs/x.md"));
     expect(screen.getByTestId("where").textContent).toBe("/docs/docs/x.md");
   });
@@ -498,7 +503,7 @@ describe("the Designs card's Docs line", () => {
     for (const space of ["wasteland", ""]) {
       listAnswer = { data: complete(space) };
       const { unmount } = mount();
-      fireEvent.click(screen.getByRole("button", { name: "Show Complete" }));
+      pick("Complete");
       expect(screen.getByText("Docs: docs/x.md")).toBeTruthy();
       expect(screen.queryByRole("link", { name: "docs/x.md" })).toBeNull();
       unmount();
@@ -511,24 +516,66 @@ describe("the Designs card's groups (L2)", () => {
     listAnswer = { data: GROUPED };
   });
 
-  it("draws the same groups the Design tab draws, in road order, the archive collapsed", () => {
-    mount();
-    expect(screen.getAllByRole("region").map((r) => r.getAttribute("aria-label"))).toEqual([
-      "Design designs",
-      "Spec designs",
-      "Complete designs",
-      "Archived designs",
-    ]);
+  it("filters by state with one chip row, in road order, the first state showing", () => {
+    const { container } = mount();
+    const chips = Array.from(
+      screen.getByRole("group", { name: "Filter designs" }).querySelectorAll("[role='radio']"),
+    );
+    expect(chips.map((c) => c.textContent)).toEqual(["Design1", "Spec1", "Complete1", "Archived1"]);
+    // No inline subhead: no headed section anywhere in the card.
+    expect(container.querySelectorAll("section, [role='region']")).toHaveLength(0);
+    expect(chip("Design").getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByText("Offline specs")).toBeTruthy();
     expect(screen.queryByText("A second room")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Show Archived" }));
+    pick("Archived");
     expect(screen.getByText("A second room")).toBeTruthy();
-    // The row's outcome badge, beside the group's outcome chip of the same word (L2b).
+    expect(screen.queryByText("Offline specs")).toBeNull();
+    // The row's outcome badge, beside the outcome chip of the same word (L2b).
     expect(screen.getAllByText("dropped").length).toBeGreaterThan(1);
     expect(screen.getByText("Closed 2026-11-20")).toBeTruthy();
   });
 
+  it("the Archived chip adds the outcome chips, and a pick filters the list", () => {
+    mount();
+    expect(screen.queryByRole("group", { name: "Filter archived by outcome" })).toBeNull();
+    pick("Archived");
+    const outcomes = within(screen.getByRole("group", { name: "Filter archived by outcome" }));
+    fireEvent.click(outcomes.getByRole("radio", { name: "shipped" }));
+    expect(screen.queryByText("A second room")).toBeNull();
+    expect(screen.getByText("No archived design with that outcome.")).toBeTruthy();
+    fireEvent.click(outcomes.getByRole("radio", { name: "dropped" }));
+    expect(screen.getByText("A second room")).toBeTruthy();
+  });
+
+  it("choosing a chip restarts the pager at page 1", () => {
+    listAnswer = {
+      data: {
+        ...GROUPED,
+        designs: [
+          ...Array.from({ length: 7 }, (_, i) =>
+            row({
+              id: `aaaaaaaa-0000-4000-8000-0000000001${i}`,
+              state: "Spec",
+              title: `Spec ${i + 1}`,
+              note: doc("design", `s${i}.md`, `Spec ${i + 1}`),
+            }),
+          ),
+          ...GROUPED.designs,
+        ],
+      },
+    };
+    mount();
+    pick("Spec");
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(screen.getByText("2 / 2")).toBeTruthy();
+    pick("Design");
+    expect(screen.queryByText("2 / 2")).toBeNull();
+    expect(screen.getByText("Offline specs")).toBeTruthy();
+  });
+
   it("a row keeps the Space chip and the thread, and wears its state and id", () => {
     mount();
+    pick("Spec");
     expect(screen.getAllByText("Toolkit").length).toBeGreaterThan(0);
     expect(screen.getByText("#90")).toBeTruthy();
     expect(screen.getByText("b0a4d1de").getAttribute("title")).toBe(
@@ -541,15 +588,15 @@ describe("the Designs card's groups (L2)", () => {
 
   it("a note with its spec opens the note; the spec is in the menu", async () => {
     mount();
-    fireEvent.click(screen.getAllByRole("button", { name: "Open the note" })[1]);
+    pick("Spec");
+    fireEvent.click(screen.getByRole("button", { name: "Open the note" }));
     expect(screen.getByTestId("where").textContent).toBe("/studio/design/design/board-ideas.md");
   });
 
   it("an archived note opens by its hub path", () => {
     mount();
-    fireEvent.click(screen.getByRole("button", { name: "Show Archived" }));
-    const archived = within(screen.getByRole("region", { name: "Archived designs" }));
-    fireEvent.click(archived.getByRole("button", { name: "Open the note" }));
+    pick("Archived");
+    fireEvent.click(screen.getByRole("button", { name: "Open the note" }));
     expect(screen.getByTestId("where").textContent).toBe(
       "/studio/design/design/archive/a-second-room.md",
     );
@@ -586,6 +633,7 @@ describe("the Designs card's moves (L3)", () => {
       "Archive as dropped",
     ]);
     fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    pick("Spec");
     expect(await menuOf("Board ideas")).toEqual([
       "Open the spec",
       "Go into Toolkit",
@@ -594,7 +642,7 @@ describe("the Designs card's moves (L3)", () => {
       "Open on GitHub",
     ]);
     fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
-    fireEvent.click(screen.getByRole("button", { name: "Show Complete" }));
+    pick("Complete");
     expect(screen.queryByRole("button", { name: "Actions for Built (spec)" })).toBeNull();
   });
 
@@ -638,6 +686,7 @@ describe("the Designs card's moves (L3)", () => {
 
   it("a completion asks where the docs landed, and carries the design's Space", async () => {
     mount();
+    pick("Spec");
     await menuOf("Board ideas");
     fireEvent.click(screen.getByRole("menuitem", { name: "Complete" }));
     expect(screen.getByRole("button", { name: "Complete" }).hasAttribute("disabled")).toBe(true);
@@ -680,18 +729,19 @@ describe("the Designs card's search (L2b)", () => {
     hubSearchAnswer = {};
   });
 
-  it("the box narrows the groups, opens the archive that matches, and the chip counts what is shown", () => {
+  it("the box narrows the chips, lands on the state that matches, and the count chip counts what is shown", () => {
     mount();
-    expect(screen.queryByText("A second room")).toBeNull();
     fireEvent.change(screen.getByRole("searchbox", { name: "Search the hub's designs" }), {
       target: { value: "second" },
     });
     expect(screen.getByText("A second room")).toBeTruthy();
     expect(screen.queryByText("Board ideas")).toBeNull();
     // Only the group that matches is drawn, and it is open although it is the archive.
-    expect(screen.getAllByRole("region").map((r) => r.getAttribute("aria-label"))).toEqual([
-      "Archived designs",
-    ]);
+    expect(
+      Array.from(
+        screen.getByRole("group", { name: "Filter designs" }).querySelectorAll("[role='radio']"),
+      ).map((c) => c.textContent),
+    ).toEqual(["Archived1"]);
     fireEvent.change(screen.getByRole("searchbox", { name: "Search the hub's designs" }), {
       target: { value: "nothing here" },
     });
@@ -1005,6 +1055,11 @@ describe("the Designs card's row shape", () => {
     };
     const { container } = mount();
     const rows = expectOneRowShape(container, "design", [long, "Long text", "Bare"]);
+    expectSentenceInInfoTip(
+      container,
+      "About Hub Designs",
+      "Your private files. Notes that belong to no product yet.",
+    );
     // The state badge, the hash and the file name are all on the bottom line.
     const meta = rows[2].querySelector("[data-row-meta]")!.textContent;
     expect(meta).toContain("Design");

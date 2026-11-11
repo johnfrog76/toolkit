@@ -34,7 +34,18 @@ import { RefreshButton } from "../../shared/RefreshButton";
 import { StatusMessage } from "../../shared/StatusMessage";
 import { useGetEnvQuery } from "../../shell/api";
 import { buildNewDesignParams, commandResultMessage } from "../ado/cliBridge";
-import { DesignGroups, LearnMoreLink, groupByState, stateColor } from "../ado/DesignGroups";
+import {
+  ALL_OUTCOMES,
+  LearnMoreLink,
+  NO_OUTCOME,
+  NotShownLine,
+  archivedByOutcome,
+  groupByState,
+  stateColor,
+} from "../ado/DesignGroups";
+import { DESIGN } from "../../shell/consts";
+import { FilterBadge } from "../../shared/FilterBadge";
+import { InfoTip } from "../../shared/InfoTip";
 import { BoundCards, DesignDocsLine } from "../ado/DesignBindings";
 import { DesignSearchInside, SearchInsideButton } from "../ado/DesignSearchInside";
 import { ALL, designMatches } from "../ado/docFilters";
@@ -50,15 +61,17 @@ import { ROADS, roadsFor } from "../ado/designRoads";
 import type { MoveRoad } from "../ado/designRoads";
 import { notePath } from "./paths";
 import { SPACE_MOVES } from "./spaceMoves";
-import { RowMetaText, StudioRow, useStudioCardClass } from "./StudioRow";
+import { RowMetaText, StudioRow, useStudioCardClass, useStudioChipRowClass } from "./StudioRow";
 import { LIST_PAGE_SIZE } from "../../shell/cardHeight";
 import { useEnterSpace } from "./useEnterSpace";
 
 // The seed drawer (Studio S2b, D-S3): the hub's designs -- the ones that belong
 // to no product yet. Since the design lifecycle's reader (L2, D-DL12) the
 // hub keeps the same four folders a product does, and the drawer draws the same
-// groups the Design tab draws: one list by state, Complete and Archived
-// collapsed to a count. Each row is the house row: the title is text, the one
+// states the Design tab draws, but as the Prompts card filters: one chip per
+// state (Design, Spec, Complete, Archived, in road order) with its count, the
+// first present one chosen when it opens, and the Archived chip adding a row of
+// outcome chips. Each row is the house row: the title is text, the one
 // exposed action opens the reading room, the menu holds the thread. The +
 // writes a note through NewDesign (the bridge), so the file is the record from
 // its first minute.
@@ -197,6 +210,7 @@ function DesignRow({
 
 export function DesignsCard() {
   const cardClass = useStudioCardClass();
+  const chipRow = useStudioChipRowClass();
   const styles = useStyles();
   const navigate = useNavigate();
   const { data, isLoading, isFetching, error, refetch } = useGetDesignNotesQuery();
@@ -262,10 +276,25 @@ export function DesignsCard() {
   const notShown = data?.notShown ?? [];
   const shown = designs.filter((d) => designMatches(d, search.value, ALL));
   const folder = data?.folder || "design";
-  // One pager over the list as the card draws it: the search applies first,
-  // then the groups' order (state, in road order), then five a page.
-  const ordered = groupByState(shown).flatMap((g) => g.designs);
+  // The chips are the states the search leaves, in road order. The chosen one
+  // is the person's pick while it still has designs, else the first present.
+  const groups = groupByState(shown);
+  const [picked, setPicked] = useState<string | null>(null);
+  const [outcomeFilter, setOutcomeFilter] = useState(ALL_OUTCOMES);
+  const current = groups.find((g) => g.state === picked)?.state ?? groups[0]?.state ?? "";
+  const archived = current === DESIGN.states[3];
+  const inState = groups.find((g) => g.state === current)?.designs ?? [];
+  const ordered = archived ? archivedByOutcome(inState, outcomeFilter) : inState;
+  // One pager over the chosen state's list, five a page.
   const { page, totalPages, pageItems, setPage } = usePagination(ordered, LIST_PAGE_SIZE);
+  const chooseState = (state: string) => {
+    setPicked(state);
+    setPage(0);
+  };
+  const chooseOutcome = (o: string) => {
+    setOutcomeFilter(o);
+    setPage(0);
+  };
 
   const reset = () => {
     setTitle("");
@@ -331,6 +360,10 @@ export function DesignsCard() {
           <>
             {icon}
             <Subtitle2>Hub Designs</Subtitle2>
+            <InfoTip
+              label="About Hub Designs"
+              content="Your private files. Notes that belong to no product yet."
+            />
           </>
         }
         headerRight={
@@ -357,7 +390,6 @@ export function DesignsCard() {
             </Badge>
           </>
         }
-        footerLeft={<Caption1>Your private files. Notes that belong to no product yet.</Caption1>}
         footerCenter={
           totalPages > 1 ? (
             <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
@@ -384,22 +416,59 @@ export function DesignsCard() {
                 onClear={() => setAsked(null)}
               />
             ) : null}
-            <DesignGroups
-              designs={pageItems}
-              counted={shown}
-              notShown={notShown}
-              stampHint="StampDesign -Hub"
-              searching={searching}
-              renderRow={(d) => (
-                <DesignRow
-                  key={d.id}
-                  design={d}
-                  spaceName={spaceName}
-                  activeSpace={activeSpace}
-                  onMove={(road) => setMove({ design: d, road })}
+            {groups.length > 0 ? (
+              <div className={chipRow} role="group" aria-label="Filter designs">
+                {groups.map((g) => (
+                  <FilterBadge
+                    key={g.state}
+                    label={g.state}
+                    count={g.designs.length}
+                    active={current === g.state}
+                    onClick={() => chooseState(g.state)}
+                  />
+                ))}
+              </div>
+            ) : null}
+            {archived ? (
+              <div className={chipRow} role="group" aria-label="Filter archived by outcome">
+                <FilterBadge
+                  label="any outcome"
+                  appearance="pink"
+                  active={outcomeFilter === ALL_OUTCOMES}
+                  onClick={() => chooseOutcome(ALL_OUTCOMES)}
                 />
-              )}
-            />
+                {DESIGN.outcomes.map((o) => (
+                  <FilterBadge
+                    key={o}
+                    label={o}
+                    appearance="pink"
+                    active={outcomeFilter === o}
+                    onClick={() => chooseOutcome(outcomeFilter === o ? ALL_OUTCOMES : o)}
+                  />
+                ))}
+                <FilterBadge
+                  label="nothing said"
+                  appearance="pink"
+                  active={outcomeFilter === NO_OUTCOME}
+                  onClick={() =>
+                    chooseOutcome(outcomeFilter === NO_OUTCOME ? ALL_OUTCOMES : NO_OUTCOME)
+                  }
+                />
+              </div>
+            ) : null}
+            {archived && inState.length > 0 && ordered.length === 0 ? (
+              <Caption1 role="status">No archived design with that outcome.</Caption1>
+            ) : null}
+            {pageItems.map((d) => (
+              <DesignRow
+                key={d.id}
+                design={d}
+                spaceName={spaceName}
+                activeSpace={activeSpace}
+                onMove={(road) => setMove({ design: d, road })}
+              />
+            ))}
+            <NotShownLine notShown={notShown} stampHint="StampDesign -Hub" />
             {designs.length > 0 && shown.length === 0 ? (
               <Caption1 role="status">No design matches the search.</Caption1>
             ) : null}
