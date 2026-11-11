@@ -12,8 +12,8 @@
     printing. Two reads, both on the Space's ONE repo (Resolve-P20TrackerRepo, the
     rule every GitHub verb uses):
 
-        gh label list --repo <repo> --limit 500 --json name,description
-        gh issue list --repo <repo> --state all --limit 500 --json number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees
+        gh label list --repo <repo> --limit <n> --json name,description
+        gh issue list --repo <repo> --state all --limit <n> --json number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees
 
     milestone and body are the work grain's: an item groups by its
     milestone, else by the design card its body names. createdAt and
@@ -265,10 +265,10 @@ elseif ($choice.source -eq 'both') {
     else {
         # -- The thin layer: two gh reads (Scripts/Ritual-Common.ps1) --------
         $repo = $target.Repo
-        $got = Invoke-P20RitualGh -Repo $repo -Arguments @('label', 'list', '--repo', $repo, '--limit', '500', '--json', 'name,description')
+        $got = Invoke-P20RitualGh -Repo $repo -Arguments @('label', 'list', '--repo', $repo, '--limit', [string](Get-P20Consts).ghReads.labels, '--json', 'name,description')
         if ($got.ok) {
             $labels = $got.value
-            $got = Invoke-P20RitualGh -Repo $repo -Arguments @('issue', 'list', '--repo', $repo, '--state', 'all', '--limit', '500',
+            $got = Invoke-P20RitualGh -Repo $repo -Arguments @('issue', 'list', '--repo', $repo, '--state', 'all', '--limit', [string](Get-P20Consts).ghReads.allIssues,
                 '--json', 'number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees')
         }
         if ($got.ok) {

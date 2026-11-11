@@ -353,6 +353,10 @@ EXPECTED = {
     # The line HowWeWork prints for a repository's AGENTS.md; the web finds it by this shape.
     ("startWork", "howWeWorkLine"): "How we work here: {path}",
     # Claude Code usage: /env's flag (the inventory row's key) and the burn route.
+    # The gh read limits both halves share (Standup/Triage and their routes).
+    ("ghReads", "openIssues"): 500,
+    ("ghReads", "allIssues"): 500,
+    ("ghReads", "labels"): 500,
     ("usage", "envFlag"): "claudeUsage",
     ("usage", "burnRoute"): "/api/usage/burn",
     # The statuses a reply may set, per tracker.
@@ -379,6 +383,7 @@ class TheFileParses(unittest.TestCase):
             "regex",
             "status",
             "folders",
+            "ghReads",
             "reviews",
             "features",
             "reminders",
@@ -539,6 +544,9 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.rituals_corner_shapes(), tuple(EXPECTED[("rituals", "cornerShapes")]))
         self.assertEqual(C.startwork_launch_env_flag(), EXPECTED[("startWork", "launchEnvFlag")])
         self.assertEqual(C.startwork_how_we_work_note(), EXPECTED[("startWork", "howWeWorkNote")])
+        self.assertEqual(C.gh_read_limit_open_issues(), EXPECTED[("ghReads", "openIssues")])
+        self.assertEqual(C.gh_read_limit_all_issues(), EXPECTED[("ghReads", "allIssues")])
+        self.assertEqual(C.gh_read_limit_labels(), EXPECTED[("ghReads", "labels")])
         self.assertEqual(C.usage_env_flag(), EXPECTED[("usage", "envFlag")])
         self.assertEqual(C.usage_burn_route(), EXPECTED[("usage", "burnRoute")])
         self.assertEqual(C.reply_statuses("ado"), tuple(EXPECTED[("replyStatuses", "ado")]))
@@ -631,6 +639,10 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("startWork.howWeWorkNote", "agentic/how-we-work.md"),
         # Claude Code usage: served through usage_env_flag() and usage_burn_route().
         ("usage.envFlag", "claudeUsage"),
+        # The gh read limits: served through gh_read_limit_*(), never typed as a --limit.
+        ("ghReads.labels", '"--limit", "200"'),
+        ("ghReads.openIssues", '"--limit", "100"'),
+        ("ghReads.allIssues", '"--limit", "300"'),
         ("usage.burnRoute", "/api/usage/burn"),
     ]
 

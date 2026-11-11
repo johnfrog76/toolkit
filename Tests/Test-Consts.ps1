@@ -269,6 +269,9 @@ $expected = [ordered]@{
     'startWork.howWeWorkNote'   = 'agentic/how-we-work.md'
     'startWork.howWeWorkLine'   = 'How we work here: {path}'
     # Claude Code usage: /env's flag (and the inventory row's key), and the burn route.
+    'ghReads.openIssues'        = '500'
+    'ghReads.allIssues'         = '500'
+    'ghReads.labels'            = '500'
     'usage.envFlag'             = 'claudeUsage'
     'usage.burnRoute'           = '/api/usage/burn'
     # The statuses a reply may set, per tracker: ReplyPR's GitHub refusal and the PR Comments status box read them.
@@ -511,6 +514,8 @@ $guarded = [ordered]@{
     # The Claude Code usage row's key IS /env's flag: Get-OptionalSurfaces.ps1
     # reads (Get-P20Consts).usage.envFlag.
     'usage.envFlag'              = 'claudeUsage'
+    # The gh read limits: Get-Standup.ps1 and Get-Triage.ps1 read (Get-P20Consts).ghReads.
+    'ghReads.limitArgument'      = "'--limit', '500'"
 }
 $allowed = @('Scripts/Get-Consts.ps1')
 
