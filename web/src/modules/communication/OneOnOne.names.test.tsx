@@ -17,7 +17,7 @@ jest.mock("./api.communication", () => ({
   }),
   useCreateManagerSessionMutation: () => [jest.fn(), { isLoading: false }],
 }));
-jest.mock("./CloseMeeting", () => ({ CloseMeetingButton: () => null }));
+jest.mock("./CloseMeeting", () => ({ CloseMeetingConfirm: () => null }));
 
 describe("the Meetings card's filter", () => {
   it("is named Sessions", () => {

@@ -18,20 +18,30 @@ import { ConfirmDialog } from "../../shared/ConfirmDialog";
 import { buildMeetingAgendaParams, commandResultMessage } from "../ado/cliBridge";
 import { useRunMeetingAgendaMutation } from "./api.communication";
 
-interface Props {
+interface ConfirmProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   filename: string;
   /** The record's date, as the agent serves it. */
   date: string;
   /** "" for the 1:1. */
   series?: string;
-  /** Icon only (a card row) or with its word (a page header). */
-  compact?: boolean;
   /** After a successful close -- the list is already invalidated. */
   onClosed?: () => void;
 }
 
-export function CloseMeetingButton({ filename, date, series, compact, onClosed }: Props) {
-  const [open, setOpen] = useState(false);
+/**
+ * The confirm and the bridge call, controlled by whoever draws the trigger: the
+ * header button below, or a row's `...` menu.
+ */
+export function CloseMeetingConfirm({
+  open,
+  onOpenChange,
+  filename,
+  date,
+  series,
+  onClosed,
+}: ConfirmProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [run, { isLoading }] = useRunMeetingAgendaMutation();
 
@@ -42,7 +52,7 @@ export function CloseMeetingButton({ filename, date, series, compact, onClosed }
         params: buildMeetingAgendaParams({ date, series, action: "Close" }),
       }).unwrap();
       if (result.status === "success") {
-        setOpen(false);
+        onOpenChange(false);
         onClosed?.();
         return;
       }
@@ -54,6 +64,38 @@ export function CloseMeetingButton({ filename, date, series, compact, onClosed }
   };
 
   return (
+    <ConfirmDialog
+      open={open}
+      what={
+        <>
+          Close this meeting. <code>{filename}</code> moves to the archive, stamped with the date it
+          closed -- a closed session is the record, and is not edited or sent from here again.
+        </>
+      }
+      busy={isLoading}
+      message={message}
+      onCancel={() => {
+        setMessage(null);
+        onOpenChange(false);
+      }}
+      onConfirm={confirm}
+    />
+  );
+}
+
+interface Props {
+  filename: string;
+  date: string;
+  series?: string;
+  /** Icon only or with its word (a page header). */
+  compact?: boolean;
+  onClosed?: () => void;
+}
+
+export function CloseMeetingButton({ filename, date, series, compact, onClosed }: Props) {
+  const [open, setOpen] = useState(false);
+
+  return (
     <>
       <Button
         icon={<ArchiveRegular />}
@@ -61,25 +103,17 @@ export function CloseMeetingButton({ filename, date, series, compact, onClosed }
         appearance={compact ? "subtle" : "secondary"}
         title="Close this meeting"
         aria-label={compact ? "Close this meeting" : undefined}
-        onClick={() => {
-          setMessage(null);
-          setOpen(true);
-        }}
+        onClick={() => setOpen(true)}
       >
         {compact ? undefined : "Close"}
       </Button>
-      <ConfirmDialog
+      <CloseMeetingConfirm
         open={open}
-        what={
-          <>
-            Close this meeting. <code>{filename}</code> moves to the archive, stamped with the date
-            it closed -- a closed session is the record, and is not edited or sent from here again.
-          </>
-        }
-        busy={isLoading}
-        message={message}
-        onCancel={() => setOpen(false)}
-        onConfirm={confirm}
+        onOpenChange={setOpen}
+        filename={filename}
+        date={date}
+        series={series}
+        onClosed={onClosed}
       />
     </>
   );

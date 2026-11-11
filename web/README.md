@@ -488,9 +488,9 @@ takes one, follows the word: **Open the note**, **Archive as shipped**, **Move t
 | `copy` | Copy *what* | `CopyRegular` | Copy the {detail} to the clipboard |
 | `external` | Open on *the system's name* | `OpenRegular` | Open it on {detail}, outside ToolKit |
 
-Where each one is drawn: **Open** -- the card (list and board), an issue, a design's note, spec,
+Where each one is drawn: **Open** -- the card (list and board), a meeting (the Meetings card's exposed action), an issue, a design's note, spec,
 document and thread, a goal, a review, the resume, a prompt, the Space you are in, a deck's page. **Archive** -- a
-goal (it said Retire), a deck on this machine (its page; `deck.archived` through `Config`, the deck
+goal (it said Retire), a complete meeting on the Meetings card (it said Close; the verb is `MeetingAgenda -Close`, behind `shared/ConfirmDialog`), a deck on this machine (its page; `deck.archived` through `Config`, the deck
 file untouched), a reminder (it said Done; the verb is `Reminders <id> -Archive`), a card's Done
 lane (**Archive (move to Done)**), and a hub design, **Archive as shipped** and **Archive as dropped**
 (it said Drop), a review (`WorkReview <review> -Archive`; at once, no confirm), and a product design
@@ -541,6 +541,7 @@ row that draws them, and listed here. Two kinds, both named:
 | `issue.unpin` | Unpin | `PinOffRegular` | one record | the Issues tab |
 | `reminder.snooze` | Snooze: *when* | `SnoozeRegular` | one record | Reminders |
 | `reminder.edit` | Edit | `EditRegular` | one record | Reminders |
+| `meeting.editSend` | Edit / send | `EditRegular` | one record | a meeting row on the Meetings card: the session page, where notes are edited and the retro is sent |
 | `deck.play` | Play | `PlayRegular` | one record | a deck, its row's menu and its page's exposed action |
 | `deck.unarchive` | Unarchive | `ArchiveArrowBackRegular` | one record | a deck's page, once it is archived on this machine |
 | `resume.generate` | Generate resume scaffold | `AddRegular` | one record | the resume |

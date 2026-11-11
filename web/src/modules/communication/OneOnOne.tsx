@@ -30,7 +30,7 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
-import { ArrowRightRegular, EditRegular } from "@fluentui/react-icons";
+import { EditRegular } from "@fluentui/react-icons";
 import { DialogDismiss } from "../../shared/DialogDismiss";
 import { Pagination } from "../../shared/Pagination";
 import { usePagination } from "../../hooks/usePagination";
@@ -41,7 +41,8 @@ import { useGetManagerQuery, useCreateManagerSessionMutation } from "./api.commu
 import { oneOnOnePath, sessionPath } from "./paths";
 import type { ManagerItem } from "./api.communication";
 import { FOLDERS } from "../../shell/consts";
-import { CloseMeetingButton } from "./CloseMeeting";
+import { CloseMeetingConfirm } from "./CloseMeeting";
+import { CardActions, ROW, defineRowMoves } from "../../shared/CardActions";
 import { stageAfter, stageOf } from "./stages";
 import { PeopleCommunityRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
@@ -72,6 +73,11 @@ function formatSessionDate(iso: string): string {
   });
 }
 
+/** A meeting row's own move: the session page, where notes are edited and the retro is sent. */
+const MEETING_MOVES = defineRowMoves("meeting", {
+  editSend: { word: "Edit / send", icon: EditRegular },
+});
+
 const useStyles = makeStyles({
   itemCard: {
     marginTop: tokens.spacingVerticalS,
@@ -89,11 +95,6 @@ const useStyles = makeStyles({
     minWidth: 0,
   },
   itemHeading: {
-    display: "flex",
-    alignItems: "center",
-    gap: tokens.spacingHorizontalXS,
-  },
-  itemActions: {
     display: "flex",
     alignItems: "center",
     gap: tokens.spacingHorizontalXS,
@@ -117,6 +118,8 @@ function SessionRow({ item }: { item: ManagerItem }) {
   const stage = stageOf(item.stage);
   const nextStage = stageAfter(item.stage);
   const isClosed = item.folder === FOLDERS.archive;
+  const [closing, setClosing] = useState(false);
+  const title = `${item.series || "1:1"} — ${formatSessionDate(item.date)}`;
 
   return (
     <Card className={styles.itemCard} size="small" appearance="outline">
@@ -126,13 +129,11 @@ function SessionRow({ item }: { item: ManagerItem }) {
             <Badge color={stage.color} appearance="outline" size="small">
               {stage.label}
             </Badge>
-            <Body1Strong>
-              {item.series || "1:1"} — {formatSessionDate(item.date)}
-            </Body1Strong>
+            <Body1Strong>{title}</Body1Strong>
           </div>
           <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
-            {/* A closed session says so; a complete one is offered the Close
-                button beside it, which runs MeetingAgenda -Close through the
+            {/* A closed session says so; a complete one is offered Archive in the
+                row's menu, which asks first and runs MeetingAgenda -Close through the
                 bridge -- the verb that moves the file to manager/archive/ AND
                 writes the closed stamp. This line used to name the CLI
                 command instead, and the last step of the flow needed a terminal. */}
@@ -140,39 +141,33 @@ function SessionRow({ item }: { item: ManagerItem }) {
               ? "Closed"
               : nextStage
                 ? `Next up: ${nextStage.label}`
-                : "Complete — close it to move it to the archive"}
+                : "Complete — archive it from the menu"}
           </Caption1>
         </div>
-        <div className={styles.itemActions}>
-          {!isClosed && !nextStage && (
-            <CloseMeetingButton
-              compact
-              filename={item.filename}
-              date={item.date}
-              series={item.series}
-            />
-          )}
-          {/* Two destinations, and both are named: the read view, and the session
-              page where the notes are edited and the retro is sent.
-              Nothing in the UI once led to the second one -- the send
-              button was reachable by typing its URL. */}
-          <Button
-            icon={<EditRegular />}
-            size="small"
-            appearance="subtle"
-            title="Edit / send"
-            aria-label="Edit / send"
-            onClick={() => navigate(sessionPath(item.filename))}
+        <CardActions
+          menuLabel={`Actions for ${title}`}
+          primaryAction={ROW.open.action({
+            detail: "the meeting",
+            onClick: () => navigate(oneOnOnePath(item.filename)),
+          })}
+          secondaryActions={[
+            MEETING_MOVES.editSend.action({
+              onClick: () => navigate(sessionPath(item.filename)),
+            }),
+            ...(!isClosed && !nextStage
+              ? [ROW.archive.action({ onClick: () => setClosing(true) })]
+              : []),
+          ]}
+        />
+        {!isClosed && !nextStage && (
+          <CloseMeetingConfirm
+            open={closing}
+            onOpenChange={setClosing}
+            filename={item.filename}
+            date={item.date}
+            series={item.series}
           />
-          <Button
-            icon={<ArrowRightRegular />}
-            size="small"
-            appearance="subtle"
-            title="View details"
-            aria-label="View details"
-            onClick={() => navigate(oneOnOnePath(item.filename))}
-          />
-        </div>
+        )}
       </div>
     </Card>
   );

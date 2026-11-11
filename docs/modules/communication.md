@@ -261,7 +261,7 @@ Export: **`communicationModule`** from `web/src/modules/communication/index.tsx`
 
 | Route | Renders |
 | --- | --- |
-| `/communication` | `OneOnOne` — the one-card landing page the `Meetings` nav points at. A complete session's row offers **Close**. **With `features.organize` on it redirects to `/organize`**, where the same card sits beside Reminders |
+| `/communication` | `OneOnOne` — the one-card landing page the `Meetings` nav points at. Each row draws one button, **Open the meeting**, and a `...` menu named `Actions for <the row's title>` holding **Edit / send** and, on a complete session, **Archive**. **With `features.organize` on it redirects to `/organize`**, where the same card sits beside Reminders |
 | `/communication/1on1/:filename` | `ManagerDetailPage` — read view, with an `Edit / send` button to the session page, and **Close** on a complete session; under the title, the agent's `carried_from_note` as a quiet line when `carried_from_verdict` is `stale`, `missing` or `absent`, and nothing when it is `ok` or an older agent sends none |
 | `/communication/sessions/new` | `ManagerSessionPage` — scaffold and edit |
 | `/communication/sessions/:filename` | `ManagerSessionPage` — edit, the stage ahead (Plan / Prep / Retro through the bridge), Close on a complete session, and the send. Reached from `Edit / send` on a meeting row and on the read view |
@@ -295,9 +295,11 @@ tag type with `enhanceEndpoints`. `/env`'s communication block is typed here, no
 
 ### Close, from the browser
 
-A session at Retro reads "Complete — close it to move it to the archive", and beside it, on the
-Meetings card's row and in the read view's header, a **Close** button, so the last step of the flow
-needs no terminal either. It is `CloseMeetingButton` in `CloseMeeting.tsx`, and it is the one action on
+A session at Retro reads "Complete — archive it from the menu", and it can be closed from the
+Meetings card's row menu (as **Archive**, the row vocabulary's word for a move to the archive) and in the
+read view's header (a **Close** button), so the last step of the flow needs no terminal either. The
+confirm and the call are `CloseMeetingConfirm` in `CloseMeeting.tsx`, which the header's `CloseMeetingButton` and the row's menu both
+draw, and it is the one action on
 these pages behind a confirm, because it moves a file -- the house's one confirm, `shared/ConfirmDialog`
 ("Are you sure?", the act named, Cancel and Submit; a refusal stays in it). The confirm runs `POST /api/cmd/MeetingAgenda`
 with `-Date <date> [-Type <series>] -Close` — the argv is `buildMeetingAgendaParams` in
@@ -314,9 +316,7 @@ header read "Closed" and offer nothing. The stage list the rule reads is `stages
 the three keys and labels both pages read.
 
 The `--modules=on` smoke asserts the button's **presence** on exactly one of the three fixture
-sessions and never presses it: a press moves a file in the committed fixture hub.
-
-Known gap: [A meeting row draws its actions side by side](../KNOWN-GAPS.md#a-meeting-row-draws-its-actions-side-by-side).
+sessions and never presses it (it opens the row menus and reads them): a press moves a file in the committed fixture hub.
 
 ### Advancing a stage, from the browser
 
@@ -423,7 +423,7 @@ the engine takes whatever is in that variable at face value. Use `-WhatIf` from 
 | `web/.../cliBridge.test.ts` (three of its cases) | `MeetingAgenda`'s argv: `-Date`, `-Type` only for a series that is not the 1:1, then the one switch spelt the script's way |
 | `web/.../sendButton.test.ts` | The send button's three states, including that it is absent rather than disabled when the workflow has no send, and that what goes out is the Agenda and never the self-assessment |
 | `web/.../registry.communication.test.tsx` | The registry contract from this module's side: off contributes no route, nav or card; on contributes exactly these seven routes |
-| `npm run smoke -- --modules=on` | In a browser: lists the three fixture sessions, reads their stages, finds the retro session's send button disabled and naming its variable, reaches the session page through `Edit / send`, and finds Close on exactly one session without pressing it |
+| `npm run smoke -- --modules=on` | In a browser: lists the three fixture sessions, reads their stages, finds the retro session's send button disabled and naming its variable, reaches the session page through `Edit / send`, and finds Close (as Archive in the row menu) on exactly one session without pressing it |
 
 The three PowerShell suites are registered in `Tests/Test-Toolkit.ps1` (`-SendTeams`, `-NewMeeting`, `-MeetingAgenda`) and run in the full `tkTestToolkit` pass; they can also be run directly. Each suite's count is in [Testing](../TESTING.md).
 

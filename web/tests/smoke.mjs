@@ -556,11 +556,35 @@ async function runViewport(viewportName) {
     // read view both went elsewhere, and a built, tested feature was findable
     // only by typing its URL. The row carries an "Edit / send" control, and the
     // read view's own "Edit / send" lands on the session page.
+    // Each row draws one button and a "..." menu named for it; Edit / send and
+    // Close (as Archive) live in the menu. Opened, read, never pressed.
+    const menuItemsOfRows = async () => {
+      const count = await page.evaluate(
+        () => document.querySelectorAll('button[aria-label^="Actions for"]').length,
+      );
+      const rows = [];
+      for (let i = 0; i < count; i++) {
+        await page.evaluate((n) => {
+          document.querySelectorAll('button[aria-label^="Actions for"]')[n].click();
+        }, i);
+        await page.waitForSelector('[role="menuitem"]', { timeout: 10000 }).catch(() => {});
+        rows.push(
+          await page.evaluate(() =>
+            Array.from(document.querySelectorAll('[role="menuitem"]')).map((m) => m.textContent ?? ""),
+          ),
+        );
+        await page.keyboard.press("Escape");
+        await page.waitForFunction(() => !document.querySelector('[role="menuitem"]'), null, { timeout: 10000 }).catch(() => {});
+      }
+      return rows;
+    };
     await open("/communication");
-    const rowEditSend = await page.evaluate(
-      () => document.querySelectorAll('button[aria-label="Edit / send"]').length,
+    const rowMenus = await menuItemsOfRows();
+    check(
+      "each meeting row offers Edit / send in its menu",
+      rowMenus.length >= 3 && rowMenus.every((m) => m.some((t) => /Edit \/ send/.test(t))),
+      JSON.stringify(rowMenus),
     );
-    check("each meeting row offers Edit / send", rowEditSend >= 3, `found ${rowEditSend}`);
     await open("/communication/1on1/2026-02-05.md");
     const clicked = await page.evaluate(() => {
       const el = Array.from(document.querySelectorAll("button")).find((b) => /Edit \/ send/.test(b.textContent ?? ""));
@@ -581,10 +605,8 @@ async function runViewport(viewportName) {
     // file into manager/archive/, and the fixture hub is the committed one.
     // The retro session is the only complete one of the three.
     await open("/communication");
-    const closeButtons = await page.evaluate(
-      () => document.querySelectorAll('button[aria-label="Close this meeting"]').length,
-    );
-    check("exactly the complete session offers Close", closeButtons === 1, `found ${closeButtons}`);
+    const closeMenus = (await menuItemsOfRows()).filter((m) => m.some((t) => /^Archive/.test(t))).length;
+    check("exactly the complete session offers Close", closeMenus === 1, `found ${closeMenus}`);
   }
 
   check(`no page errors across the ${routesVisited.length} routes`, pageErrors.length === 0, pageErrors.join(" | "));
