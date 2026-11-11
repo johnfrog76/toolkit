@@ -245,9 +245,13 @@ config file, and a build that asked for the port would refuse.
   "whatever ships ... follow the same pattern"; the demo Spaces are
   [the add-on's](modules/ado.md#the-demo-spaces-one-per-grain)). Set this `true` (Settings: **Hide Demo**) and those orgs are left out of every list a
   person picks an org from: the web's switcher, Settings, the Reviews page's org chips (all read `/env`'s
-  `config.spaces`, which the agent filters), and `tkSwitchSpace Status`. It is **never removed from
-  config**, `tkSwitchSpace azure-demo` still works, and the org you are IN is always shown. One rule in each
-  half -- `Scripts/Select-OfferedSpaces.ps1` and `offered_spaces` in `agent/core/config.py` -- held to one
+  `config.spaces`, which the agent filters). The switcher leaves off one more: a **retired** Space (`status: archive`,
+  `tkRetireSpace`), whatever this is set to. That list is `/env`'s `config.switcherSpaces` (slugs) and
+  `tkSwitchSpace Status`; `config.spaces` keeps the retired Space, so its cards, reviews and row under
+  Archive stay. Nothing is **removed from config**, `tkSwitchSpace azure-demo` (or a retired Space) still
+  works, and the org you are IN is always shown. The switcher rule is `Select-P20SwitcherSpaces`
+  (`Scripts/Select-OfferedSpaces.ps1`) and `switcher_spaces` in `agent/core/config.py`, on top of the offered
+  rule (`Select-P20OfferedSpaces`, `offered_spaces`); the switcher rule is held to one
   table, `Tests/fixtures/offered-orgs/table.json`. `tkStart` does not set it. Not an opt-in surface, so
   it has no row in the inventory.
 - **`commandPrefix`, and the name in `aliases.<name>`** -- become part of a command. A prefix is a

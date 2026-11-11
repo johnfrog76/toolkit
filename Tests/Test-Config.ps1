@@ -761,16 +761,21 @@ finally { Remove-Item $box.Root -Recurse -Force -ErrorAction SilentlyContinue }
 # ONE table, two readers: Tests/test_offered_orgs.py runs the agent's copy of the
 # rule over the same file.
 Write-Host ''
-Write-Host '-- Select-P20OfferedSpaces: a dismissed Example org is not offered --' -ForegroundColor Cyan
+Write-Host '-- Select-P20SwitcherSpaces: a dismissed Example org and a retired Space are not offered --' -ForegroundColor Cyan
 . (Join-Path $pkgRoot 'Scripts/Select-OfferedSpaces.ps1')
 $offeredTable = (Get-Content (Join-Path $PSScriptRoot 'fixtures/offered-orgs/table.json') -Raw | ConvertFrom-Json).rows
 foreach ($row in $offeredTable) {
     $org = [pscustomobject]@{ slug = 'test'; example = [bool]$row.example }
+    if ($row.retired) { $org | Add-Member -NotePropertyName status -NotePropertyValue 'archive' }
     $active = 'other'
     if ($row.active) { $active = 'test' }
-    $got = Select-P20OfferedSpaces -Spaces @($org) -ActiveSpace $active -Dismissed ([bool]$row.dismissed)
+    $got = Select-P20SwitcherSpaces -Spaces @($org) -ActiveSpace $active -Dismissed ([bool]$row.dismissed)
     Assert-True $row.why ((@($got).Count -eq 1) -eq [bool]$row.offered) "got $(@($got).Count) org(s)"
 }
+$retiredOrg = [pscustomobject]@{ slug = 'gone'; status = 'archive' }
+Assert-True 'the offered list keeps a retired Space; only the switcher drops it' (
+    @(Select-P20OfferedSpaces -Spaces @($retiredOrg) -ActiveSpace 'other' -Dismissed $false).Count -eq 1 -and
+    @(Select-P20SwitcherSpaces -Spaces @($retiredOrg) -ActiveSpace 'other' -Dismissed $false).Count -eq 0)
 
 # -- spaces.<slug>.projects: the field discovery writes (settings by workflow W2) --
 Write-Host ''
@@ -809,7 +814,8 @@ try {
     # config: give the sandbox's a second org, and make it the active one.
     $defaultPath = Join-Path $box.Pkg 'config.default.json'
     $shipped = (Invoke-LockRetry 'read of a scratch file' { Get-Content $defaultPath -Raw }) | ConvertFrom-Json
-    $shipped.spaces = @($shipped.spaces) + @([pscustomobject]@{ slug = 'other'; name = 'Other'; status = 'local'; promptsFolder = 'other' })
+    $shipped.spaces = @($shipped.spaces) + @([pscustomobject]@{ slug = 'other'; name = 'Other'; status = 'local'; promptsFolder = 'other' }) +
+        @([pscustomobject]@{ slug = 'retired-one'; name = 'Retired One'; status = 'archive'; promptsFolder = 'retired-one' })
     $shipped.activeSpace = 'other'
     Invoke-LockRetry 'write of a scratch file' { Set-Content -Path $defaultPath -Value ($shipped | ConvertTo-Json -Depth 20) -Encoding utf8 }
     $before = & pwsh -NoProfile -File $switch 'Status' 2>&1 | Out-String
@@ -819,6 +825,7 @@ try {
     $after = & pwsh -NoProfile -File $switch 'Status' 2>&1 | Out-String
     Assert-True 'and then it is not offered' ($after -notmatch '(?m)^\s+azure-demo\s+Azure demo') $after
     Assert-True 'while the org you are in still is' ($after -match '->\s*other') $after
+    Assert-True 'a retired Space is not offered while you are in another' ($after -notmatch 'Retired One' -and $before -notmatch 'Retired One') $after
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
@@ -844,7 +851,8 @@ try {
     $shipped.spaces = @($shipped.spaces) + @([pscustomobject]@{ slug = 'other'; name = 'Other'; status = 'local'; promptsFolder = 'other' }) +
         @([pscustomobject]@{ slug = 'twin-a'; name = 'Twin'; status = 'local'; promptsFolder = 'twin-a' }) +
         @([pscustomobject]@{ slug = 'twin-b'; name = 'Twin'; status = 'local'; promptsFolder = 'twin-b' }) +
-        @([pscustomobject]@{ slug = 'named-one'; name = 'Named One'; status = 'local'; promptsFolder = 'named-one' })
+        @([pscustomobject]@{ slug = 'named-one'; name = 'Named One'; status = 'local'; promptsFolder = 'named-one' }) +
+        @([pscustomobject]@{ slug = 'retired-one'; name = 'Retired One'; status = 'archive'; promptsFolder = 'retired-one' })
     Invoke-LockRetry 'write of a scratch file' { Set-Content -Path $defaultPath -Value ($shipped | ConvertTo-Json -Depth 20) -Encoding utf8 }
     $prefix = $shipped.commandPrefix
     $localPath = Join-Path $switchPkg 'config.local.json'
@@ -897,6 +905,14 @@ try {
     $written3 = (Invoke-LockRetry 'read of a scratch file' { Get-Content $localPath -Raw }) | ConvertFrom-Json
     Assert-True 'a name only one Space has switches to it, whatever its case' ($one -match 'SWITCH-CODE=0' -and $written3.activeSpace -eq 'named-one') "$one $($written3.activeSpace)"
     Assert-True 'and activeSpace is written as one string, never an array' ($written3.activeSpace -is [string])
+
+    # A retired Space is left off the switcher but is still reachable by slug, and once
+    # you are in it the switcher lists it.
+    $switchScript = Join-Path $switchPkg 'Scripts/Switch-Mode.ps1'
+    $listed = & pwsh -NoProfile -File $switchScript 'Status' 2>&1 | Out-String
+    $retiredIn = & pwsh -NoProfile -Command (& $switchTo 'retired-one') 2>&1 | Out-String
+    $written4 = (Invoke-LockRetry 'read of a scratch file' { Get-Content $localPath -Raw }) | ConvertFrom-Json
+    Assert-True 'SwitchSpace <slug> to a retired Space still switches' ($retiredIn -match 'SWITCH-CODE=0' -and $written4.activeSpace -eq 'retired-one') "$retiredIn $($written4.activeSpace)"
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message

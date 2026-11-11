@@ -509,8 +509,6 @@ back: the room then shows the note and its thread, and the list shows `#<n>`.
   on purpose -- a read per visit for work that is done is not worth it.
 - **An archived Space still has a row**, marked `archived`, under All and Archive -- that is what
   retiring it means; removing it is what takes the row away.
-- **A retired Space is still on the avatar menu's Space list** -- the switcher's offered rule was not
-  changed when retiring was built ([A retired Space stays on the Space list](../KNOWN-GAPS.md#a-retired-space-stays-on-the-space-list)).
 - **Every Space is read by the one `gh` login.** A second GitHub login (a work account beside a
   personal one) is not built: a repository only the other login can see reads `Visibility unknown` and
   `not visible to this login` in the **Add owner/name** row, and can still be added
@@ -526,5 +524,4 @@ back: the room then shows the note and its thread, and the list shows `#<n>`.
 Known gaps: [The foyer counts no designs or specs](../KNOWN-GAPS.md#the-foyer-counts-no-designs-or-specs),
 [Promote files only into the Space you are in](../KNOWN-GAPS.md#promote-files-only-into-the-space-you-are-in),
 [A repository's designs move only through a named checkout](../KNOWN-GAPS.md#a-repositorys-designs-move-only-through-a-named-checkout),
-[A retired Space stays on the Space list](../KNOWN-GAPS.md#a-retired-space-stays-on-the-space-list) and
 [Every Space is read by one gh login](../KNOWN-GAPS.md#every-space-is-read-by-one-gh-login).

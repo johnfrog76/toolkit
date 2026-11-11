@@ -153,17 +153,6 @@ a thread is read, not answered, in the room.
 
 **Issue:** [#297](https://github.com/johnfrog76/toolkit/issues/297)
 
-### A retired Space stays on the Space list
-
-**What you see:** `RetireSpace` sets `status: archive`: the Spaces card files the Space under Archive and
-nothing asks its tracker, but the avatar menu's Space switcher still offers it. The rule for what the
-switcher offers (`Select-OfferedSpaces.ps1`, `offered_spaces`) hides only the dismissed demos. To take a
-Space off every list, `RemoveSpace` it: the folder and its cards stay.
-
-**Where you meet it:** [the Studio](modules/studio.md#known-gaps), "Known gaps"
-
-**Issue:** [#298](https://github.com/johnfrog76/toolkit/issues/298)
-
 ### Every Space is read by one gh login
 
 **What you see:** New Space, the Spaces card and every GitHub read ask `gh` as whoever it is signed in

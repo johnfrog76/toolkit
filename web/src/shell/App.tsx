@@ -8,7 +8,7 @@ import {
 import { fluentThemeFor, noiseSvgUrl } from "./theme";
 import { BootSpinner } from "./BootSpinner";
 import { ThemePicker } from "./ThemePicker";
-import { AvatarMenu } from "./AvatarMenu";
+import { AvatarMenu, switcherChoices } from "./AvatarMenu";
 import { SpaceAnchor } from "./SpaceAnchor";
 import { PageHeading } from "./PageHeading";
 
@@ -526,10 +526,7 @@ export function App() {
                   .filter(Boolean)
                   .join(" · ")}
                 unsaved={unsaved}
-                spaces={(env?.config?.spaces ?? []).map((o) => ({
-                  slug: o.slug,
-                  name: o.name ?? o.slug,
-                }))}
+                spaces={switcherChoices(env?.config)}
                 activeSpace={env?.config?.activeSpace ?? ""}
                 onSwitchSpace={(slug) => void switchMode({ mode: slug })}
                 links={settingsLinks}
