@@ -1,0 +1,1 @@
+- A throwaway entry that checks the changelog-only CI path; never merged.
