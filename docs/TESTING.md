@@ -138,7 +138,7 @@ a passing `pytest:` line may end `(via <python>)`, which is information and not 
   Consts 209, Compat 1795, Menu 2116, Environment 64, Archive 217, PRComments 249, BackfillStamps 50, Changelog 88, Update 68, Start 87, PullRequest 10, CloseWorkItem 51, PromptStatus 125, ThreadHash 86, Setup 82, Move 51, Billable 36, Plan 114, Tag 34, Backlog 56, Cover 106, Design 177, NewPrompt 159, ExitCodes 133, Autoload 86, GitRoot 17, Sync 86, Connect 62, NewSpace 149, HowWeWork 42, EditItem 69, Land 139, Burn 193, PublishPR 39, Config 322, HubJson 186, Portability 164, Web 165, Agent 129, TestAll 296, ModuleCommands 88, Reminders 71, Rituals 658, StandupRemind 85, Triage 121, StartWork 85, Review 82, WorkReview 36, SendTeams 43, NewMeeting 63, MeetingAgenda 178, DocCounts 171
   52 suites, 9988 assertions
   pytest: 1429 passed, 6 skipped
-  web: 163 suites, 1922 tests
+  web: 164 suites, 1925 tests
 ```
 
 **Which lines the paste owns.** The per-suite line is the `tkTestToolkit` row's list in the table below; the
