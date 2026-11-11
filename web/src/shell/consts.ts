@@ -74,6 +74,17 @@ export const REMINDERS = consts.reminders as {
 };
 
 /**
+ * The words a Teams recipient's type may be: channel and chat post through
+ * their webhook alike; person is accepted and never posts. The web shows the
+ * type /env carries and branches on none of them, so this is the contract
+ * stated, not a rule this half applies.
+ */
+export const COMMUNICATION = consts.communication as {
+  webhookRecipientTypes: string[];
+  deferredRecipientTypes: string[];
+};
+
+/**
  * The three halves a test run covers, in the order `{cliPrefix}Test` runs
  * them, and what a summary entry with no `half` is read as. The Health card
  * draws a machine's halves in this order.

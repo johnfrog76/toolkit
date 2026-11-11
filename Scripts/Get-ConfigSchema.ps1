@@ -58,6 +58,10 @@ if (-not (Get-Command ConvertFrom-P20WeekStart -ErrorAction SilentlyContinue)) {
 if (-not (Get-Command Get-P20BurnCacheHours -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Read-BurnReadings.ps1')
 }
+# A Teams recipient's type words and the webhook variable's prefix: the contract's.
+if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
+}
 
 function Get-P20SchemaPrefix {
     # What this package registers under, read from the package this file sits
@@ -73,6 +77,11 @@ $script:P20ConfigSpacePrefix = 'spaces'
 # mapped onto the row it means, and answered with the new name in the hint.
 $script:P20ConfigLegacySpacePrefix = 'orgs'
 $script:P20ConfigLegacyActiveKey = 'activeOrg'
+# Where a Teams recipient is declared: under the engineer's managerWorkflow block
+# (config.local.json), or under a Space's own communication block (hub.json).
+# The rest of managerWorkflow is the team's table and stays unwritable.
+$script:P20ConfigTeamWorkflowKey = 'managerWorkflow'
+$script:P20ConfigRecipientPath = 'communication.recipients'
 
 function Get-P20MachineOnlyKeys {
     <#
@@ -135,6 +144,61 @@ function Get-P20AliasFieldSchema {
     $fields += [PSCustomObject]@{ key = 'description'; type = 'string'; help = 'The line Menu prints beside it.' }
     $fields += [PSCustomObject]@{ key = 'display';     type = 'bool';   help = 'Whether the shortcut is registered and listed at all. True for the shipped three.' }
     return $fields
+}
+
+function Get-P20RecipientTypeValues {
+    # The words a recipient's type may be: the ones that post through a webhook,
+    # then the ones accepted and never posted -- consts.json's communication block.
+    $c = (Get-P20Consts).communication
+    return @(@($c.webhookRecipientTypes) + @($c.deferredRecipientTypes))
+}
+
+function Get-P20RecipientFieldSchema {
+    <#
+      The fields one TEAMS RECIPIENT carries, wherever it is declared. The key is
+      the engineer's name for it -- what SendTeams takes -- and the URL is never
+      one of them: webhookEnv names the environment variable that holds it.
+    #>
+    $prefix = (Get-P20Consts).env.teamsWebhookPrefix
+    $fields = @()
+    $fields += [PSCustomObject]@{ key = 'type';       type = 'enum';       allowed = (Get-P20RecipientTypeValues); help = 'How the recipient is reached: channel for a Teams channel, chat for a Teams chat -- both post through a Workflows webhook, the same way. person is a direct message, which is not built: it is accepted and never posts.' }
+    $fields += [PSCustomObject]@{ key = 'display';    type = 'string';     allowed = @();                          help = 'The name the Meetings page and a dry run show for the recipient.' }
+    $fields += [PSCustomObject]@{ key = 'webhookEnv'; type = 'webhookenv'; allowed = @();                          help = "The NAME of the environment variable that holds the recipient's webhook URL -- $($prefix)<NAME>, set in .env. Never the URL: a URL is a secret and does not go in a file this tool writes. Unset, it is $($prefix)<KEY>, the key in capitals." }
+    return $fields
+}
+
+function Test-P20RecipientKeyName {
+    # A recipient's key: a letter, then letters, digits, '-' or '_' -- the shape
+    # the webhook variable's name is derived from (TEAMS_WEBHOOK_<KEY>).
+    param([string]$Name)
+    return ($Name -cmatch '^[A-Za-z][A-Za-z0-9_-]*$')
+}
+
+function Resolve-P20RecipientField {
+    <#
+      Read `<key>.<field>` -- the part of a recipient path after
+      communication.recipients. -- into @{ Field = <row>; Reason = '' }. $Shape
+      is the whole pattern, for the refusal.
+    #>
+    param([string]$Rest, [string]$Typed, [string]$Shape)
+    $out = @{ Field = $null; Reason = '' }
+    $parts = @($Rest.Split('.'))
+    if (-not $Rest -or $parts.Count -ne 2 -or -not $parts[0] -or -not $parts[1]) {
+        $out.Reason = "'$Typed' is not a Teams recipient setting. The shape is $Shape -- for example $($Shape.Replace('<key>', 'mom').Replace('<field>', 'type'))."
+        return $out
+    }
+    if (-not (Test-P20RecipientKeyName $parts[0])) {
+        $out.Reason = "'$($parts[0])' cannot be a recipient's key: a key is a letter, then letters, digits, '-' or '_'."
+        return $out
+    }
+    $match = @(Get-P20RecipientFieldSchema | Where-Object { $_.key -eq $parts[1] })
+    if ($match.Count -eq 0) {
+        $known = ((Get-P20RecipientFieldSchema | ForEach-Object { $_.key }) -join ', ')
+        $out.Reason = "'$($parts[1])' is not a field of a Teams recipient. Known: $known."
+        return $out
+    }
+    $out.Field = $match[0]
+    return $out
 }
 
 function Get-P20SpaceCheckoutHelp {
@@ -251,6 +315,14 @@ function Get-P20ConfigSchema {
     # never the hub's (Scripts/Resolve-SpaceCheckout.ps1).
     $rows += New-P20SchemaRow -Key 'spaceCheckouts.<slug>.path' -Scope 'machine' -Type 'path' -Help (Get-P20SpaceCheckoutHelp)
 
+    # A Teams recipient of the engineer's own, as a PATTERN keyed by its name:
+    # managerWorkflow's recipients hold steady across Spaces, so they are this
+    # machine's. The rest of managerWorkflow is the team's (below).
+    foreach ($field in (Get-P20RecipientFieldSchema)) {
+        $rows += New-P20SchemaRow -Key "$($script:P20ConfigTeamWorkflowKey).$($script:P20ConfigRecipientPath).<key>.$($field.key)" -Scope 'machine' `
+            -Type $field.type -Allowed $field.allowed -Help $field.help
+    }
+
     # StartWork's prompt table (the Team Agile add-on): one row per kind the
     # shipped config names, read from it rather than listed here, and a pattern
     # row for a kind it does not -- a team's prompts are its own (D-AR4).
@@ -288,18 +360,20 @@ function Get-P20ConfigSchema {
     # can type. -Set resolves a path against the pattern either way: a slug that
     # is not there yet is how a NEW org is added.
     $orgFields = Get-P20SpaceFieldSchema
-    if ($IncludeOrgRows) {
-        foreach ($slug in $slugs) {
-            foreach ($field in $orgFields) {
-                $rows += New-P20SchemaRow -Key "spaces.$slug.$($field.key)" -Scope $field.scope -Type $field.type `
-                    -Allowed $field.allowed -Help $field.help -Required:$field.required
-            }
-        }
-    }
-    else {
+    # A Space's own Teams recipients: a pattern within the pattern, kept out of
+    # Get-P20SpaceFieldSchema because that list is also -List's row per field,
+    # and a <key> has nothing to resolve against there.
+    $recipientFields = Get-P20RecipientFieldSchema
+    $spaceNames = @('<slug>')
+    if ($IncludeOrgRows) { $spaceNames = $slugs }
+    foreach ($slug in $spaceNames) {
         foreach ($field in $orgFields) {
-            $rows += New-P20SchemaRow -Key "spaces.<slug>.$($field.key)" -Scope $field.scope -Type $field.type `
+            $rows += New-P20SchemaRow -Key "spaces.$slug.$($field.key)" -Scope $field.scope -Type $field.type `
                 -Allowed $field.allowed -Help $field.help -Required:$field.required
+        }
+        foreach ($field in $recipientFields) {
+            $rows += New-P20SchemaRow -Key "spaces.$slug.$($script:P20ConfigRecipientPath).<key>.$($field.key)" -Scope 'org' -Type $field.type `
+                -Allowed $field.allowed -Help "$($field.help) This Space's: it goes to hub.json, or with -Local to this machine's patch."
         }
     }
 
@@ -308,7 +382,12 @@ function Get-P20ConfigSchema {
     # the schema so a refusal can name what the key IS rather than call it
     # unknown, and they are scope 'default' so nothing can write one.
     if ($DefaultConfig) {
-        $machineNames = @($rows | Where-Object { $_.scope -eq 'machine' } | ForEach-Object { ($_.key -split '\.')[0] })
+        # A recipient row is machine-scoped and starts with managerWorkflow, but
+        # it claims only the recipients: the block's other keys stay the team's,
+        # so that row is left out by name here -- not every pattern row, which
+        # would turn the bare `aliases` key into a team row.
+        $recipientPrefix = "$($script:P20ConfigTeamWorkflowKey).$($script:P20ConfigRecipientPath)."
+        $machineNames = @($rows | Where-Object { $_.scope -eq 'machine' -and -not $_.key.StartsWith($recipientPrefix) } | ForEach-Object { ($_.key -split '\.')[0] })
         foreach ($prop in $DefaultConfig.PSObject.Properties) {
             $name = $prop.Name
             if ($name.StartsWith('_')) { continue }
@@ -400,10 +479,23 @@ function Resolve-P20SchemaKey {
         }
         $slug = $parts[1]
         $field = ($parts[2..($parts.Count - 1)] -join '.')
+        # A Space's Teams recipient: the field is the whole nested path, and the
+        # writer nests it under the Space's entry like laneNames.<lane>.
+        $recipientHead = "$($script:P20ConfigRecipientPath)."
+        if ($field.StartsWith($recipientHead) -or $field -eq $script:P20ConfigRecipientPath) {
+            $rest = ''
+            if ($field.Length -gt $recipientHead.Length) { $rest = $field.Substring($recipientHead.Length) }
+            $hit = Resolve-P20RecipientField -Rest $rest -Typed $key -Shape "spaces.<slug>.$($script:P20ConfigRecipientPath).<key>.<field>"
+            if ($hit.Reason) { $result.Reason = $hit.Reason; return $result }
+            $result.Row = New-P20SchemaRow -Key $key -Scope 'org' -Type $hit.Field.type -Allowed $hit.Field.allowed -Help $hit.Field.help
+            $result.Slug = $slug
+            $result.Field = $field
+            return $result
+        }
         $match = @(Get-P20SpaceFieldSchema | Where-Object { $_.key -eq $field })
         if ($match.Count -eq 0) {
             $known = ((Get-P20SpaceFieldSchema | ForEach-Object { $_.key }) -join ', ')
-            $result.Reason = "'$field' is not a field of a Space. Known: $known."
+            $result.Reason = "'$field' is not a field of a Space. Known: $known, $($script:P20ConfigRecipientPath).<key>.<field>."
             return $result
         }
         $f = $match[0]
@@ -411,6 +503,28 @@ function Resolve-P20SchemaKey {
         $result.Slug = $slug
         $result.Field = $field
         return $result
+    }
+
+    # A Teams recipient of the engineer's own:
+    # managerWorkflow.communication.recipients.<key>.<field>, machine-scoped.
+    # Every OTHER managerWorkflow.* path is the team's table, answered with the
+    # team's row so the refusal says whose it is rather than "unknown".
+    $workflowHead = "$($script:P20ConfigTeamWorkflowKey)."
+    if ($key.StartsWith($workflowHead)) {
+        $recipientHead = "$workflowHead$($script:P20ConfigRecipientPath)"
+        if ($key -eq $recipientHead -or $key.StartsWith("$recipientHead.")) {
+            $rest = ''
+            if ($key.Length -gt ($recipientHead.Length + 1)) { $rest = $key.Substring($recipientHead.Length + 1) }
+            $hit = Resolve-P20RecipientField -Rest $rest -Typed $key -Shape "$recipientHead.<key>.<field>"
+            if ($hit.Reason) { $result.Reason = $hit.Reason; return $result }
+            $result.Row = New-P20SchemaRow -Key $key -Scope 'machine' -Type $hit.Field.type -Allowed $hit.Field.allowed -Help $hit.Field.help
+            return $result
+        }
+        $team = @($Schema | Where-Object { $_.key -eq $script:P20ConfigTeamWorkflowKey -and $_.scope -eq 'default' })
+        if ($team.Count -gt 0) {
+            $result.Row = $team[0]
+            return $result
+        }
     }
 
     # A navigation shortcut, the same shape as an org: `aliases.<name>.<field>`,
@@ -586,6 +700,21 @@ function Test-P20ConfigValue {
             }
             $result.Ok = $true; $result.Value = @($list); return $result
         }
+        'webhookenv' {
+            # The NAME of a webhook variable, never its value: a URL typed here
+            # would put a secret in a file. The prefix is what the test runners
+            # clear by pattern, so a name without it could outlive a run.
+            $trimmed = $raw.Trim()
+            if (-not $trimmed) { $result.Ok = $true; $result.Value = ''; return $result }
+            $prefix = (Get-P20Consts).env.teamsWebhookPrefix
+            if ($trimmed -cnotmatch ('^' + [regex]::Escape($prefix) + '[A-Z0-9_]+$')) {
+                $shown = $trimmed
+                if ($trimmed -match '://') { $shown = '<a URL>' }
+                $result.Reason = "$($Row.key) names an environment variable -- $($prefix)<NAME>, in capitals, digits and '_' -- and holds no URL: got '$shown'. The URL goes in .env, under that name."
+                return $result
+            }
+            $result.Ok = $true; $result.Value = $trimmed; return $result
+        }
         'weekstart' {
             # "<Day> HH:mm" -- Scripts/ConvertFrom-WeekStart.ps1, the reader Burn uses.
             $week = ConvertFrom-P20WeekStart -Text $raw
@@ -601,7 +730,9 @@ function Test-P20ConfigValue {
                 $result.Ok = $true; $result.Value = $trimmed; return $result
             }
             $hit = @($allowed | Where-Object { $_ -eq $trimmed })
-            if ($hit.Count -eq 1) { $result.Ok = $true; $result.Value = $trimmed; return $result }
+            # The value is written as the schema spells it: a reader that
+            # compares exactly (the engine's recipient type) must find it.
+            if ($hit.Count -eq 1) { $result.Ok = $true; $result.Value = [string]$hit[0]; return $result }
             $result.Reason = "$($Row.key) is one of: $($allowed -join ', ') -- got '$trimmed'."
             return $result
         }

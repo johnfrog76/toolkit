@@ -47,18 +47,6 @@ so, and a search that cannot run says why in its row.
 
 **Issue:** [#288](https://github.com/johnfrog76/toolkit/issues/288)
 
-### `Config -Set` cannot declare a Teams recipient
-
-**What you see:** `tkConfig -Set managerWorkflow.communication.recipients.<key>.display=...` answers
-`Unknown setting`: `managerWorkflow` is the team's block in `config.default.json`, and `Config` never
-writes it. A second recipient is hand-edited into `config.local.json`, and its `"type"` must be
-`"channel"` even for a person: `"chat"` is refused as `unsupported type`, and `"person"` as
-`DM deferred`.
-
-**Where you meet it:** [Communication](modules/communication.md#getting-a-webhook-url), "Getting a webhook URL"
-
-**Issue:** [#289](https://github.com/johnfrog76/toolkit/issues/289)
-
 ### Azure DevOps verbs are hidden, not gone
 
 **What you see:** On a machine with no Azure DevOps in use, `Menu`, `Setup`, the New card dialog and

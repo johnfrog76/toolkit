@@ -15,6 +15,7 @@ import consts from "@consts";
 
 import {
   ASSETS,
+  COMMUNICATION,
   DESIGN,
   DOCS,
   FEATURES,
@@ -136,6 +137,9 @@ describe("consts.json", () => {
     );
     expect(REMINDERS.buckets).toEqual(["overdue", "today", "upcoming"]);
     expect(REMINDERS.snooze).toEqual(["1h", "tomorrow", "nextweek"]);
+    // A Teams recipient's type: channel and chat post through their webhook, person never posts.
+    expect(COMMUNICATION.webhookRecipientTypes).toEqual(["channel", "chat"]);
+    expect(COMMUNICATION.deferredRecipientTypes).toEqual(["person"]);
     // The three halves a test run covers, in run order.
     expect(TESTS.halves).toEqual(["agent", "cli", "web"]);
     expect(TESTS.legacyHalf).toBe("cli");
@@ -442,6 +446,7 @@ describe("consts.json", () => {
         "_README",
         "agent",
         "assets",
+        "communication",
         "design",
         "docs",
         "env",

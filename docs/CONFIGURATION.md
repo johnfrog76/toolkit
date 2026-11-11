@@ -92,12 +92,21 @@ table; this is the shape of it:
 
 | Scope | Keys | Goes to |
 | --- | --- | --- |
-| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `web.agentPort`, `web.corsOrigins`, `limits.inPlay`, `burn.weekStarts`, `burn.cacheHours`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display`, `spaceCheckouts.<slug>.path` | `config.local.json`, created as a sparse patch if it is not there |
-| **org** | `spaces.<slug>.name` / `.status` / `.orgType` / `.org` / `.tenant` / `.promptsFolder` / `.projects` / `.howIWork` / `.features.sprintAwareness` / `.features.suggestions` / `.features.trainingHoursPerQuarter` | the hub's `hub.json` -- or `config.local.json`'s `spaces.<slug>` patch with **`-Local`** |
+| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `web.agentPort`, `web.corsOrigins`, `limits.inPlay`, `burn.weekStarts`, `burn.cacheHours`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display`, `spaceCheckouts.<slug>.path`, `managerWorkflow.communication.recipients.<key>.type` / `.display` / `.webhookEnv` | `config.local.json`, created as a sparse patch if it is not there |
+| **org** | `spaces.<slug>.name` / `.status` / `.orgType` / `.org` / `.tenant` / `.promptsFolder` / `.projects` / `.howIWork` / `.features.sprintAwareness` / `.features.suggestions` / `.features.trainingHoursPerQuarter` / `.communication.recipients.<key>.type` / `.display` / `.webhookEnv` | the hub's `hub.json` -- or `config.local.json`'s `spaces.<slug>` patch with **`-Local`** |
 | **hub** | `storeSync`, `folders.<name>` | the hub's `hub.json`, and only with **`-Hub`** |
-| **default** | `commands`, `workItemTypes`, `cliVersion`, `managerWorkflow` | nowhere. These are the team's, and a `-Set` on one is refused by name |
+| **default** | `commands`, `workItemTypes`, `cliVersion`, `managerWorkflow` (all of it but its recipients) | nowhere. These are the team's, and a `-Set` on one is refused by name |
 
 Things worth knowing before you use it:
+
+- **A Teams recipient is declared here, a field at a time** -- `type` (`channel`, `chat` or `person`,
+  from `consts.json`'s `communication` block; any other word is refused naming the three), `display`, and
+  `webhookEnv`, the NAME of the variable that holds the webhook (`TEAMS_WEBHOOK_<NAME>`, never a URL,
+  which is refused and not echoed). `managerWorkflow.communication.recipients.<key>.*` is the engineer's,
+  the same in every Space; `spaces.<slug>.communication.recipients.<key>.*` is one Space's. Every other
+  `managerWorkflow` key stays the team's and is refused as such, not as unknown. `-Unset` of a
+  recipient's last field removes the recipient. [Communication](modules/communication.md#getting-a-webhook-url)
+  has the walk.
 
 - **A slug nobody has declared is how you add an org** -- and `tkNewSpace` is the easy way to do it
   ([Adding a Space](#adding-a-space), below), writing these same keys. `tkConfig -Set spaces.acme.name=Acme` appends
