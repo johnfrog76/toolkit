@@ -341,6 +341,7 @@ EXPECTED = {
         "countsClosed": "{n} closed",
         "countsStarted": "{n} started",
         "countsInProgress": "{n} in progress",
+        "countsUndated": "({n} undated)",
     },
     # StartWork's hand-off block (D-AR5): the CLI types these four, the web's copy
     # box finds the block's title by the first; Tests/fixtures/start-work/ holds
