@@ -198,7 +198,9 @@ class TheRoute(unittest.TestCase):
                 self.client.get(self.path)
                 self.assertEqual(len(self.calls), 1, "nothing changed: the disk's")
                 readings.mkdir()
-                (readings / "2026-11-06-build-box.json").write_text('{"readings": 1, "entries": []}\n', encoding="utf-8")
+                (readings / "2026-11-06-build-box.json").write_text(
+                    '{"readings": 1, "entries": []}\n', encoding="utf-8"
+                )
                 self.assertIs(self.client.get(self.path).json()["fromCache"], False)
                 self.assertEqual(len(self.calls), 2)
 
