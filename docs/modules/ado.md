@@ -190,7 +190,7 @@ and `hub.json`), or the first `az` call that failed, as one sentence naming the 
   the tracker gets the reply, the card's `Reply:` slot gets it through `Write-CardText`, and the
   page re-reads the card. The agent writes no card here; the native `save` route was retired.
   For an org with no ADO, Home is the board alone and these are absent; `ConnectAdoCard` and the quiet
-  line under the board are the way in (`homeViewFor`, [the web README](../../web/README.md#the-board)).
+  line under the board are the way in (`homeTabPlan` in `web/src/modules/ado/homeTabs.ts`, [the web README](../../web/README.md#the-board)).
 - **The New card dialog** -- a *From a work item* tab beside *New card*, and the default where ADO is
   reachable. Where ADO is not in use there are no tabs at all.
 - **On a card** -- an **ado** badge first in its meta line (a GitHub-born card wears **gh**, a custom card
@@ -310,9 +310,9 @@ reference](../CLI.md#errors), under "Not authenticated" and "Access denied".
 | `Tests/test_ado_enabled.py` | the agent's copy of the rule over the SAME table; what `/env` serves |
 | `Tests/test_env_org_state.py` | "never asked" is not a failure |
 | `Tests/test_identity.py`, `test_env_probe.py` | who "me" is, with `az` stubbed; `/env` neither blocks on the probe nor repeats it |
-| `tkTestToolkit -PullRequest -CloseItem -PRComments` | the PR description parser, the transition rule and ADO's error messages, the actionable-thread filter; `-CloseItem` also holds the token helper on both PowerShells -- `az` failing with error text, or printing nothing, is a refusal and never a token |
+| `tkTestToolkit -PullRequest -CloseWorkItem -PRComments` | the PR description parser, the transition rule and ADO's error messages, the actionable-thread filter; `-CloseWorkItem` also holds the token helper on both PowerShells -- `az` failing with error text, or printing nothing, is a refusal and never a token |
 | `tkTestToolkit -Land` (`Tests/Test-Land.ps1`) | `Land` typed with `gh`, `az` and the REST calls stubbed: a merged Azure DevOps pull request read through `az repos pr show`, the work item closed through `CloseItem`'s PATCH with a comment naming the commit, a re-run that asks first and posts nothing, an abandoned pull request refused; the GitHub path the same way |
-| `web`: `cliBridge.test.ts`, `homeView.test.ts`, `cardActions.test.ts`, `useLandCard.test.tsx` | the exact argv each dialog sends; which view of Home an org gets; Land on every Code Review card, and what it runs |
+| `web`: `cliBridge.test.ts`, `homeTabs.test.ts`, `cardActions.test.ts`, `useLandCard.test.tsx` | the exact argv each dialog sends; which view of Home an org gets; Land on every Code Review card, and what it runs |
 | `VERIFY.md` | the verbs that cannot be automated, because they need a real board -- the manual runbook |
 
 **No suite calls Azure DevOps.** `az` is stubbed or absent in every one, by design: a signed-in machine
