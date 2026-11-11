@@ -279,21 +279,42 @@ Four workflows. `release.yml` runs on a tag push alone: it reads the tag's secti
 `CHANGELOG.md` and publishes the GitHub Release with it, refusing a tag with no section or one cut while `changelog.d/` still holds an unfolded entry, with the
 default token and the one permission a release needs. `pages.yml` deploys the landing page.
 `codeql.yml` runs CodeQL's default queries over the web (JavaScript and TypeScript) and the agent (Python) on every push to `main`, on every pull request and weekly, with `contents: read` and `security-events: write`; PowerShell is not a CodeQL language, and the CLI half's scanner is the PSScriptAnalyzer lint that `docs/CONTRIBUTING.md` ("Lint") names.
-`.github/workflows/verify.yml` has two jobs, an Ubuntu one and a Windows one, and they run on different triggers. **The Ubuntu job** runs on every pull request, on every push to `main` and from the Actions tab's button; it is the check a pull request has to pass to merge. **The Windows job** is slower and runs on a schedule (once each weekday evening, against `main`), from the same button, and on a pull request that carries the `ci` label, for a change heavy on PowerShell that wants the proof before it merges. The label takes effect on the pull request's next push (or reopen); to run Windows on a branch right away, use the button on that branch (`gh workflow run verify.yml --ref <branch>`). A label added to an open pull request starts nothing by itself, on purpose: a label must never cancel the running checks. An ordinary pull request and a push to `main` do not run it. A scheduled failure is not re-run, and the workflow files nothing (its token has no `issues: write`): GitHub's notification reports it, a person files the issue with the run's URL, and the next morning's first merge carries the fix.
+`.github/workflows/verify.yml` runs the Ubuntu jobs and a Windows one, and they run on different triggers. **The Ubuntu jobs** -- `changes`, `cli`, `agent`, `web`, `contract` and `verify` -- run on every pull request, on every push to `main` and from the Actions tab's button, and the one named **Verify** is the check a pull request has to pass to merge. **The Windows job** is slower and runs on a schedule (once each weekday evening, against `main`), from the same button, and on a pull request that carries the `ci` label, for a change heavy on PowerShell that wants the proof before it merges. The label takes effect on the pull request's next push (or reopen); to run Windows on a branch right away, use the button on that branch (`gh workflow run verify.yml --ref <branch>`). A label added to an open pull request starts nothing by itself, on purpose: a label must never cancel the running checks. An ordinary pull request and a push to `main` do not run it, and it waits on no other job, so the filter below never skips it. A scheduled failure is not re-run, and the workflow files nothing (its token has no `issues: write`): GitHub's notification reports it, a person files the issue with the run's URL, and the next morning's first merge carries the fix.
 
-**On `ubuntu-latest`, the three halves**, in one job: the checkout; Node from `.nvmrc` with npm's cache and `npm ci` in `web/`; Python 3.12 with
-pip's cache and `python -m pip install -r agent/requirements-dev.txt`; the runner's own `pwsh`. Then three
-steps, in `tkTest`'s order, then the Python lint, the web lint, the documentation and the dependencies:
+**On `ubuntu-latest`, the three halves, side by side.** Each half is a job of its own with only the installs it needs, so a full run takes about as long as the slowest half, and a change runs only the halves it can reach:
 
-| Step | Runs | Read from |
-| --- | --- | --- |
-| The agent | `python -m pytest Tests/` | pytest's closing line |
-| The CLI | `tkTest -Half cli`, in a shell with exactly one toolkit in it ("One toolkit per shell", below) | the CLI runner's `Total:` line |
-| The web UI | `npm test` in `web/` | jest's `Tests:` line |
-| The Python lint (the agent and `Tests/`) | `ruff check` and `ruff format --check` from the root, with `ruff.toml` | each command's exit code |
-| The web lint | `npm run lint` in `web/`: eslint, then `prettier --check`, over `web/src` | the command's exit code |
-| The documentation | `npm run lint:md` in `web/`: markdownlint-cli2 over the root `README.md` and the other root documents, `docs/`, the `design/` and `spec/` READMEs, `web/README.md` and `agent/README.md`, with `.markdownlint-cli2.jsonc` | the linter's exit code; it prints every finding |
-| The dependencies (Ubuntu) | `npm audit --omit=dev --audit-level=high` in `web/`, and `pip-audit` over `agent/requirements-dev.txt` in a throwaway environment (`docs/CONTRIBUTING.md`, "Dependencies and the audit") | each audit's exit code: an advisory at high or above in what ships, or any known vulnerability in the agent's requirements, fails the run the day it is published, before Dependabot's weekly pull request |
+| Job | Installs | Runs | Read from |
+| --- | --- | --- | --- |
+| `changes` | the checkout, with the whole history | one step: `git diff --name-only --no-renames <base>...HEAD` against the pull request's base, then `Scripts/Get-CiScope.ps1` over the list, which sets `cli`, `agent`, `web` and `contract` | the outputs it sets |
+| `cli` | the runner's own `pwsh` | `tkTest -Half cli`, in a shell with exactly one toolkit in it ("One toolkit per shell", below) | the CLI runner's `Total:` line |
+| `agent` | Python 3.12 with pip's cache, `python -m pip install -r agent/requirements-dev.txt` | `python -m pytest Tests/`; the Python lint (the agent and `Tests/`), `ruff check` and `ruff format --check` from the root with `ruff.toml`; `pip-audit` over `agent/requirements-dev.txt` in a throwaway environment | pytest's closing line; each lint's and the audit's exit code |
+| `web` | Node from `.nvmrc` with npm's cache, `npm ci` in `web/` | `npm test` in `web/`; the web lint, `npm run lint` (eslint, then `prettier --check`, over `web/src`); the documentation, `npm run lint:md` (markdownlint-cli2 over the root `README.md` and the other root documents, `docs/`, the `design/` and `spec/` READMEs, `web/README.md` and `agent/README.md`, with `.markdownlint-cli2.jsonc`); `npm audit --omit=dev --audit-level=high` | jest's `Tests:` line; each lint's and the audit's exit code |
+| `contract` | the checkout with the whole history; Python and the agent's requirements when the `agent` job did not run | on a pull request that leaves a half out: the contract set for each half whose job did not run, and the carried paste lines (below) | the CLI runner's `Total:` line, pytest's closing line, the check's exit code |
+| `verify` | nothing | the one required check: it needs every job above, runs whatever they did, and fails unless the filter answered and every job it said the change needs passed | each job's result |
+
+The audits (`docs/CONTRIBUTING.md`, "Dependencies and the audit") fail a run the day an advisory at high or above in what ships, or any known vulnerability in the agent's requirements, is published, before Dependabot's weekly pull request. The workflow uses no action beyond `actions/checkout`, `actions/setup-node` and `actions/setup-python`: the filter is a `git diff` and a script in this tree.
+
+**Which paths run which job.** A push to `main` and the button run all three halves. A pull request runs the job for every half a changed file can reach, the union over its files (`Get-P20CiScope` in `Scripts/TestAll-Rules.ps1`):
+
+| A changed path | Runs |
+| --- | --- |
+| anything under `web/`, `web/README.md` included | `web`, and `contract` for the other two |
+| `changelog.d/` and `CHANGELOG.md` | `cli` alone (its Changelog suite), and `contract` for the other two |
+| `consts.json`, `config.default.json`, `agent/` (its README included), `Scripts/`, `Prompt20Toolkit/`, `Config/`, `Tests/`, `.github/`, `samples/hub/`, `agentic/`, `templates/`, all of `docs/`, and every root document (`README.md`, `AGENTS.md`, `VERIFY.md`, any other root `*.md`) | all three |
+| any path not named above | all three: a path the rule does not know runs more, never less |
+
+A pull request that lists no file runs everything, and a moved file counts at both ends. `Tests/fixtures/ci-scope/table.json` is the rule as a table, one row per path class, unknown paths and mixes included.
+
+**The contract set.** A change that leaves a half out can still break a suite in that half, because suites in the other halves read `web/` directly. So the `contract` job runs, for each half whose job did not run:
+
+| Half not run | The contract set |
+| --- | --- |
+| the CLI | `Tests/Test-Toolkit.ps1 -Consts -Portability -Menu -DocCounts`, with `PSModulePath` set inside `pwsh`: the constants, Portability's sweeps over `web/src` and `web/tests`, Menu's documentation parity (which reads `web/README.md`, `agent/README.md` and every document under `docs/`), and the counts |
+| the agent | `python -m pytest Tests/test_consts.py Tests/test_pr_comments.py Tests/test_third_party_notices.py`: the constants, the agreed string in `web/src/modules/ado/PRCommentsDetail.tsx`, and a notice for every artwork file under `web/public` |
+
+The web side of the contracts, `src/shell/consts.test.ts` and `src/shell/scenarios.test.tsx`, runs in the `web` job's `npm test`. `-DocCounts` reads only this page's text, so it holds the table row and the command block to the paste block without a run of its own.
+
+**The paste rule for a one-half pull request.** A pull request that runs one half pastes that half's line from its own run and carries the other halves' lines from `main`, which it could not have moved. The `contract` job holds that: `Scripts/Test-CarriedCounts.ps1` reads `main`'s `docs/TESTING.md` (the base, through `git show`) and the change's, through `Get-P20PasteBlock`, the rule `-DocCounts` reads the block with, and the paste lines of every half that did not run must be `main`'s, line for line. A line that differs was typed, and the step fails naming it. Since any change to `docs/` runs all three halves, the check is a backstop for the path rule rather than a gate a pull request meets every day.
 
 **On `windows-latest`, what only Windows proves** (on the schedule, the button or the `ci` label, above), in one job with a timeout: the same checkout and `npm ci`,
 `npx playwright install chromium`, and Python 3.12 with `python -m pip install -r agent/requirements.txt` (the
@@ -336,12 +357,17 @@ failed -- the runners' own rule, above. The smoke is read the same way, with `-H
 its `PASS` and `FAIL` lines, the a11y mode counts the pages it audited and fails on a serious or critical finding,
 and a run that never launched a browser has no closing line and fails. Each verdict is also a line in the run's summary.
 `tkTestToolkit -TestAll` holds the rule with one row per shape, runs the gate as the workflow calls it,
-and fails if the workflow stops reading any half or either smoke mode through it, if the Windows job stops
+and fails if the workflow stops reading any half or either smoke mode through it, if a half leaves its own job
+or picks up another half's install, if a lint or an audit leaves its half's job, if the filter stops being one
+step over the base or a job stops waiting on it, if the contract set or the `Verify` check changes shape, if an
+action past the three named arrives, if the Windows job stops
 importing under 5.1 or stops running the five suites with the runner itself in 5.1, or if the Windows job stops running on the schedule, the button and the `ci` label (or starts running on a push to `main`), or if a job loses its timeout.
+It also runs the path rule over its table, `Get-CiScope.ps1` as the `changes` job calls it, and the carried-lines
+check: identical lines pass, a typed count fails naming the line, and a half that ran is not compared.
 
-The steps of each job run whatever the one before them did, so one red half cannot hide the others' answers;
+The steps of each job run whatever the one before them did, so one red step cannot hide the others' answers;
 a step whose install failed does not run. The agent and the web UI run their runners directly rather than
-through `tkTest` for the same reason: a CLI that does not import on a host cannot take their results with
+through `tkTest`: a CLI that does not import on a host cannot take their results with
 it. pytest sets its own environment (`Tests/conftest.py`); `npm test` sets none, and the job holds no
 `TEAMS_WEBHOOK_*` for it to strip.
 
@@ -363,8 +389,9 @@ major version.
 (`powershell -NoProfile -File Tests/Test-X.ps1`, above) -- `tkTest` starts the runner in `pwsh`, and only the five suites of the last step run on 5.1 (#261) -- and the
 5.1 rows of [`VERIFY.md`](../VERIFY.md), Gate 12; the smoke's default, `--modules=on` and `--viewport`
 modes, which run against servers someone started (Gate 8 and 9b), and its `--studio` and `--first-run` modes; the agent's and the web UI's suites on Windows;
-a live tracker (Gates 6 and 8c). Nor does it compare counts: the counts at the top of this page are those of the host that
-built the change, pasted after a merge, and a Linux or Windows run reads differently on purpose.
+a live tracker (Gates 6 and 8c). Nor does it compare counts with a run: the counts at the top of this page are those of the host that
+built the change, pasted after a merge, and a Linux or Windows run reads differently on purpose. The one
+comparison it makes is between texts, the carried paste lines against `main`'s, above.
 
 ## The scenario grid
 
@@ -383,7 +410,7 @@ pytest rows carry the count of the file they name, and a jest row names its file
 | Suite | Count | Guards |
 | --- | --- | --- |
 | `tkTestToolkit -ModuleCommands` | in the `tkTestToolkit` row | D-CM end to end: off means absent, the prefix is data, help comes from the module's own file, a colliding name refuses the module whole, a malformed or `[ordered]` data file is skipped **by path**, `Order` decides registration order, a data file cannot run code, and a module enabled only in `config.local.json` stays out of the autoload manifest |
-| `tkTestToolkit -TestAll` | in the `tkTestToolkit` row | `tkTest` with all three halves STUBBED -- it never runs a real suite, which would recurse: a scratch package with a fake CLI runner and a `docs/TESTING.md` of known counts, a fake `python` and `npm` on a scratch PATH. The pytest, jest and CLI-runner parsers, the expected counts read from the REAL `docs/TESTING.md` (so an edit that moves those lines fails here), the summary merge, the order, `-Half`, `-Fast` reaching the runner, every stated skip (no Python, no `httpx`, no `npm`, no `node_modules`, and no `pwsh` with Windows PowerShell as the host), exit 0 and 2, the `npm test` child with no webhook and the run marker set, and the CLI entries left exactly as the runner wrote them; and the two workflows' switches -- `verify.yml`'s and `pages.yml`'s ("In CI") |
+| `tkTestToolkit -TestAll` | in the `tkTestToolkit` row | `tkTest` with all three halves STUBBED -- it never runs a real suite, which would recurse: a scratch package with a fake CLI runner and a `docs/TESTING.md` of known counts, a fake `python` and `npm` on a scratch PATH. The pytest, jest and CLI-runner parsers, the expected counts read from the REAL `docs/TESTING.md` (so an edit that moves those lines fails here), the summary merge, the order, `-Half`, `-Fast` reaching the runner, every stated skip (no Python, no `httpx`, no `npm`, no `node_modules`, and no `pwsh` with Windows PowerShell as the host), exit 0 and 2, the `npm test` child with no webhook and the run marker set, and the CLI entries left exactly as the runner wrote them; and the two workflows' switches -- `verify.yml`'s and `pages.yml`'s; and `verify.yml`'s path rule over `Tests/fixtures/ci-scope/table.json`, its contract job and its `Verify` check, and the carried paste lines ("In CI") |
 | `tkTestToolkit -Changelog` | in the `tkTestToolkit` row | `Scripts/Fold-Changelog.ps1`, the release step that folds `changelog.d/` into `CHANGELOG.md`'s `## [Unreleased]` (AGENTS.md, "A release is a tag on main"), over scratch copies of `Tests/fixtures/changelog/`, never the package's own changelog: one fragment of each kind folded under its heading in Keep a Changelog order, a missing heading added in its place and the entries written by hand kept first, compared byte for byte with `expected.md` (and `expected-empty.md` for the empty section a release leaves); UTF-8 with no BOM and LF from a CRLF, BOM input; the folded files deleted and `README.md` never an entry; an empty folder, no folder and a second fold writing nothing; an unknown kind, a name that is not `<id>.<kind>.md`, an empty file, a heading, a first line that is not an entry and a blank line inside each refusing the whole fold, exit 2 naming the file, nothing written or deleted, the same exit from a child `pwsh`; `-WhatIf` and `-Check` writing nothing; `release.yml`'s own awk reader, lifted out of the workflow, finding the folded section after the release rename, and its unfolded-entry guard run in a scratch folder (each skipped by name with no `awk` or `bash`); and `-Check` over the committed tree, so a misnamed fragment fails its own pull request |
 | `tkTestToolkit -Review` | in the `tkTestToolkit` row | `Generate-Review.ps1` against a throwaway git hub: the bare-date regression (`git log --after=2026-05-11` means "after that date at the current wall-clock time", so the same scan returned different files morning and evening -- the script pins `T00:00:00`/`T23:59:59` and this asserts it still does), what the scan includes and excludes, the scaffold's sections, multi-org slug sets, and the publish preview |
 | `tkTestToolkit -WorkReview` | in the `tkTestToolkit` row | `WorkReview`, typed in a fresh shell against a scratch package and a scratch git hub with `storeSync: git`: off means no verb and nothing for the bridge; `-Help` names both moves; `-WhatIf` on either names the folder and writes and commits nothing; `-Archive` moves the folder under `reviews/archive/`, stamps `**Closed:**` into `review.md` (LF, no BOM, frontmatter kept, once) with `summary.md` moved untouched, and commits only that review's paths while a person's other staged file stays staged; `-Delete` (the slug-set read as a set) removes the folder and commits the removal, an archived one by `archive/<slug-set>/<range>`, a never-committed one with nothing to commit; and seven refusals, each exit 2 in one block, writing nothing |

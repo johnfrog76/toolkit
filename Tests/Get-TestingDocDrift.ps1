@@ -22,25 +22,30 @@
     Returns an array of findings (empty when everything agrees); each names the stale line,
     and for the table row the first suite whose number differs.
 #>
+if (-not (Get-Command Get-P20PasteBlock -ErrorAction SilentlyContinue)) {
+    . (Join-Path (Split-Path -Parent $PSScriptRoot) 'Scripts/TestAll-Rules.ps1')
+}
+
 function Get-P20TestingDocDrift {
     [CmdletBinding()]
     param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
 
     $findings = @()
-    $paste = [regex]::Match($Text, '(?s)\*\*The counts, after a merge\.\*\*.*?```text\r?\n(.*?)\r?\n```')
-    if (-not $paste.Success) { return @('the paste block under "The counts, after a merge" was not found') }
-    $lines = @($paste.Groups[1].Value -split "\r?\n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    # The block and which half each line belongs to: Get-P20PasteBlock, the rule CI's
+    # carried-lines check reads it with too (Scripts/TestAll-Rules.ps1).
+    $block = Get-P20PasteBlock -Text $Text
+    if ($null -eq $block) { return @('the paste block under "The counts, after a merge" was not found') }
 
     $pasteSuites = @()
     $pasteTotal = $null; $pastePytest = $null; $pasteWeb = $null
-    foreach ($l in $lines) {
+    foreach ($l in @($block.cli)) {
         if ($l -match '^(\d+ suites, \d+ assertions)$') { $pasteTotal = $Matches[1]; continue }
-        # `pytest: 12 passed (via ~/.venv-toolkit/bin/python)`: which python ran it is
-        # information for the person pasting, not part of the count.
-        if ($l -match '^pytest: (.+)$') { $pastePytest = ($Matches[1] -replace '\s+\(via [^)]*\)$', ''); continue }
-        if ($l -match '^web: (.+)$') { $pasteWeb = $Matches[1]; continue }
         foreach ($pm in [regex]::Matches($l, '(?<=^|,\s)([A-Z][A-Za-z]+) (\d+)(?=,|$)')) { $pasteSuites += , @($pm.Groups[1].Value, $pm.Groups[2].Value) }
     }
+    # `pytest: 12 passed (via ~/.venv-toolkit/bin/python)`: which python ran it is
+    # information for the person pasting, not part of the count.
+    foreach ($l in @($block.agent)) { if ($l -match '^pytest: (.+)$') { $pastePytest = ($Matches[1] -replace '\s+\(via [^)]*\)$', '') } }
+    foreach ($l in @($block.web)) { if ($l -match '^web: (.+)$') { $pasteWeb = $Matches[1] } }
 
     # 1. the table row's list
     $row = @($Text -split "\r?\n" | Where-Object { $_ -match '^\|\s*`tkTestToolkit`\s*\|' })

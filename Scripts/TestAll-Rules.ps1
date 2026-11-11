@@ -24,6 +24,13 @@
                                    The smoke is read by it too, though it is
                                    not one of Test's halves.
       Read-P20ExpectedCounts       the three totals docs/TESTING.md prints.
+      Get-P20PasteBlock            docs/TESTING.md's paste block, each line given
+                                   to the half it belongs to -- the one rule the
+                                   drift check and CI's carried-lines check read.
+      Get-P20CiScope               which of CI's jobs a change runs, from the
+                                   event and the files it changed.
+      Get-P20CarriedCountFindings  a pull request's paste lines for the halves
+                                   that did not run, against main's.
       Read-P20TestSummary          the summary file, as nested hashtables.
       Merge-P20TestSummary         write some halves into the summary file and
                                    keep the others' entries as they were.
@@ -304,6 +311,141 @@ function Read-P20ExpectedCounts {
     $m = [regex]::Match($text, '(?m)npm test\s+#[^\r\n]*?(\d+) suites, (\d+) tests')
     if ($m.Success) { $out.web = @{ Suites = [int]$m.Groups[1].Value; Total = [int]$m.Groups[2].Value } }
     return $out
+}
+
+function Get-P20PasteLineHalf {
+    <#
+      The half one trimmed paste-block line belongs to: `N suites, M assertions`
+      and the per-suite line (`Consts 208, Compat 1756, ...`) are the CLI's,
+      `pytest: ...` the agent's, `web: ...` the web UI's. Any other line -- the
+      block's own heading -- is no half's, and the answer is ''.
+    #>
+    param([string]$Line)
+    if ($Line -match '^\d+ suites, \d+ assertions$') { return 'cli' }
+    if ($Line -match '^pytest: ') { return 'agent' }
+    if ($Line -match '^web: ') { return 'web' }
+    if ($Line -match '(?<=^|,\s)[A-Z][A-Za-z]+ \d+(?=,|$)') { return 'cli' }
+    return ''
+}
+
+function Get-P20PasteBlock {
+    <#
+      docs/TESTING.md's paste block: the first ```text fence after
+      "**The counts, after a merge.**", each line trimmed and blank lines
+      dropped. Lines holds them all in order; cli, agent and web hold each
+      half's own lines (Get-P20PasteLineHalf). $null when there is no block.
+      Tests/Get-TestingDocDrift.ps1 and CI's carried-lines check read the
+      block through this, so the two cannot find different lines.
+    #>
+    param([AllowEmptyString()][string]$Text)
+    if (-not $Text) { return $null }
+    $m = [regex]::Match($Text, '(?s)\*\*The counts, after a merge\.\*\*.*?```text\r?\n(.*?)\r?\n```')
+    if (-not $m.Success) { return $null }
+    $lines = @($m.Groups[1].Value -split "\r?\n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    $out = [ordered]@{ Lines = $lines; cli = @(); agent = @(); web = @() }
+    foreach ($l in $lines) {
+        $h = Get-P20PasteLineHalf -Line $l
+        if ($h) { $out[$h] = @($out[$h]) + @($l) }
+    }
+    return $out
+}
+
+function Get-P20CiPathClass {
+    <#
+      What one changed path can affect, for CI's filter (Get-P20CiScope). The
+      path is git's: relative to the root, forward slashes, case as committed.
+        changelog   changelog.d/ and CHANGELOG.md: the CLI's Changelog suite
+                    alone reads them.
+        web         anything under web/, its README included: the web job, and
+                    the contract set beside it.
+        shared      a path more than one half reads: consts.json,
+                    config.default.json, agent/, Scripts/, Prompt20Toolkit/,
+                    Config/, Tests/, .github/, samples/hub/, agentic/,
+                    templates/, docs/ and every root document.
+        unclassified anything else, read as shared: a path the rule has never
+                    heard of runs every job rather than none.
+      Returns @{ Class; Halves }.
+    #>
+    param([string]$Path)
+    $all = @(Get-P20TestHalves)
+    if ($Path -cmatch '^changelog\.d/' -or $Path -ceq 'CHANGELOG.md') { return @{ Class = 'changelog'; Halves = @('cli') } }
+    if ($Path -cmatch '^web/') { return @{ Class = 'web'; Halves = @('web') } }
+    $sharedFiles = @('consts.json', 'config.default.json')
+    $sharedDirs = @('agent/', 'Scripts/', 'Prompt20Toolkit/', 'Config/', 'Tests/', '.github/', 'samples/hub/', 'agentic/', 'templates/', 'docs/')
+    if ($sharedFiles -ccontains $Path) { return @{ Class = 'shared'; Halves = $all } }
+    foreach ($d in $sharedDirs) {
+        if ($Path.StartsWith($d, [System.StringComparison]::Ordinal)) { return @{ Class = 'shared'; Halves = $all } }
+    }
+    if ($Path -cmatch '^[^/]+\.md$') { return @{ Class = 'shared'; Halves = $all } }
+    return @{ Class = 'unclassified'; Halves = $all }
+}
+
+function Get-P20CiScope {
+    <#
+      Which of verify.yml's Ubuntu jobs a run needs. Every event but a pull
+      request runs the three halves. A pull request runs the half each changed
+      path can affect (Get-P20CiPathClass), the union over its paths; a pull
+      request that lists no path runs everything. The contract job runs on a
+      pull request where a half is left out: the cross-half suites of the halves
+      that did not run, and the carried-lines check.
+      Returns cli, agent, web and contract as booleans, and Paths: each path
+      with its class, in the order given.
+    #>
+    param([string]$Event, [string[]]$Paths = @())
+    $out = [ordered]@{ cli = $false; agent = $false; web = $false; contract = $false; Paths = @() }
+    $all = @(Get-P20TestHalves)
+    $clean = @($Paths | ForEach-Object { ([string]$_).Trim() -replace '\\', '/' } | Where-Object { $_ })
+    if ($Event -ne 'pull_request' -or $clean.Count -eq 0) {
+        foreach ($h in $all) { $out[$h] = $true }
+        return $out
+    }
+    $rows = @()
+    foreach ($p in $clean) {
+        $c = Get-P20CiPathClass -Path $p
+        foreach ($h in $c.Halves) { $out[$h] = $true }
+        $rows += , @($p, $c.Class)
+    }
+    $out.Paths = $rows
+    $out.contract = (@($all | Where-Object { -not $out[$_] }).Count -gt 0)
+    return $out
+}
+
+function Get-P20CarriedCountFindings {
+    <#
+      A pull request that did not run a half carries that half's paste lines
+      from main: it cannot have a new count for a half it never ran. So the
+      paste-block lines of each half not in -Ran must be main's, line for line
+      and case for case; a difference is a count somebody typed. -BaseText is
+      main's docs/TESTING.md, -HeadText the change's. Returns one finding per
+      half that differs, naming the line; empty when they agree, and empty when
+      every half ran.
+    #>
+    param(
+        [AllowEmptyString()][string]$BaseText,
+        [AllowEmptyString()][string]$HeadText,
+        [string[]]$Ran = @()
+    )
+    $carried = @(Get-P20TestHalves | Where-Object { @($Ran) -notcontains $_ })
+    if ($carried.Count -eq 0) { return @() }
+    $base = Get-P20PasteBlock -Text $BaseText
+    $head = Get-P20PasteBlock -Text $HeadText
+    if ($null -eq $base) { return @("main's docs/TESTING.md has no paste block under `"The counts, after a merge`"") }
+    if ($null -eq $head) { return @("this change's docs/TESTING.md has no paste block under `"The counts, after a merge`"") }
+    $findings = @()
+    foreach ($h in $carried) {
+        $b = @($base[$h])
+        $t = @($head[$h])
+        $n = [Math]::Max($b.Count, $t.Count)
+        for ($i = 0; $i -lt $n; $i++) {
+            $bl = '(none)'; if ($i -lt $b.Count) { $bl = $b[$i] }
+            $tl = '(none)'; if ($i -lt $t.Count) { $tl = $t[$i] }
+            if ($bl -cne $tl) {
+                $findings += "the $h half's paste line '$tl' is not main's '$bl': the $h job did not run on this pull request, so the line is carried from main as it stands"
+                break
+            }
+        }
+    }
+    return $findings
 }
 
 function Get-P20PasteLines {

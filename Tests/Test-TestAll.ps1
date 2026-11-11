@@ -23,9 +23,16 @@
                        reading each half and the smoke through it, its
                        Windows job importing under Windows PowerShell 5.1,
                        and every job behind the one switch with a timeout;
+                       each half in a job of its own with its own installs
+                       and lints, the filter, the contract job, the one
+                       required check, and no action past the three named;
                        and pages.yml, the landing page's deploy, on the
                        button alone, with no secret, the Pages permissions
                        and a read, and its actions pinned to a major version.
+      1c. CI's scope   which jobs a change runs, one row per path class
+                       (Tests/fixtures/ci-scope/table.json), the script as the
+                       changes job runs it, and the carried paste lines:
+                       identical, typed, and a half that ran not compared.
       2. The merge     a half written replaces only that half's entries; a file
                        from before the halves reads as the CLI's alone.
       3. The verb      all three green; one failed (exit 2, stated); a half with
@@ -206,7 +213,74 @@ if (Test-Path -LiteralPath $workflowPath) { $workflow = [System.IO.File]::ReadAl
 foreach ($h in (Get-P20TestHalves)) {
     Assert-True "verify.yml reads the $h half through Test-CiHalf.ps1" ($workflow -match ("Test-CiHalf\.ps1 -Half " + $h + "\b"))
 }
-Assert-True 'verify.yml audits what ships: npm audit --omit=dev at high, and pip-audit over the agent requirements' (($workflow -match 'npm audit --omit=dev --audit-level=high') -and ($workflow -match 'pip_audit -r agent/requirements-dev\.txt'))
+
+# Each job's own text, from its two-space key under jobs: to the next one.
+$wfJobs = [ordered]@{}
+$jobsAt = $workflow.IndexOf("`njobs:")
+if ($jobsAt -ge 0) {
+    $jobsText = $workflow.Substring($jobsAt)
+    $keys = @([regex]::Matches($jobsText, '(?m)^  ([a-z][a-z0-9-]*):\s*$'))
+    for ($i = 0; $i -lt $keys.Count; $i++) {
+        $from = $keys[$i].Index
+        $to = $jobsText.Length
+        if ($i + 1 -lt $keys.Count) { $to = $keys[$i + 1].Index }
+        $wfJobs[$keys[$i].Groups[1].Value] = $jobsText.Substring($from, $to - $from)
+    }
+}
+function Get-WfJob { param([string]$Name) if ($wfJobs.Contains($Name)) { return [string]$wfJobs[$Name] } return '' }
+Assert-True 'verify.yml has the jobs changes, cli, agent, web, contract, verify and windows, in that order' `
+    ((@($wfJobs.Keys) -join ',') -eq 'changes,cli,agent,web,contract,verify,windows') (@($wfJobs.Keys) -join ',')
+$jCli = Get-WfJob 'cli'; $jAgent = Get-WfJob 'agent'; $jWeb = Get-WfJob 'web'
+$jChanges = Get-WfJob 'changes'; $jContract = Get-WfJob 'contract'; $jVerify = Get-WfJob 'verify'
+
+# Each half in a job of its own, with only the installs it needs, waiting on the filter.
+Assert-True 'the cli job runs tkTest -Half cli in a shell with the module path set inside it, read through the gate' `
+    ($jCli -match "pwsh -NoProfile -Command '\`$env:PSModulePath = \(Resolve-Path \.\); Import-Module \./Prompt20Toolkit/Prompt20Toolkit\.psd1 -Force; tkTest -Half cli; exit \`$LASTEXITCODE' 2>&1 \| tee [^\r\n]+\r?\n[^\r\n]*\r?\n[^\r\n]*Test-CiHalf\.ps1 -Half cli\b")
+Assert-True 'the agent job runs python -m pytest Tests/, read through the gate' `
+    ($jAgent -match 'python -m pytest Tests/ 2>&1 \| tee [^\r\n]+\r?\n[^\r\n]*\r?\n[^\r\n]*Test-CiHalf\.ps1 -Half agent\b')
+Assert-True 'the web job runs npm test, read through the gate' `
+    ($jWeb -match 'npm test 2>&1 \| tee [^\r\n]+\r?\n[^\r\n]*\r?\n[^\r\n]*Test-CiHalf\.ps1 -Half web\b')
+Assert-True 'the cli job installs neither Node nor Python' (($jCli -ne '') -and ($jCli -notmatch 'setup-node|setup-python|npm ci|pip install'))
+Assert-True 'the agent job installs Python and not Node' (($jAgent -match 'actions/setup-python@') -and ($jAgent -match 'pip install -r agent/requirements-dev\.txt') -and ($jAgent -notmatch 'setup-node|npm ci'))
+Assert-True 'the web job installs Node and not Python' (($jWeb -match 'actions/setup-node@') -and ($jWeb -match 'npm ci') -and ($jWeb -notmatch 'setup-python|pip install'))
+Assert-True 'the agent job carries its lints and its audit: ruff check, ruff format --check, pip-audit' `
+    (($jAgent -match '(?m)^\s+ruff check\s*$') -and ($jAgent -match '(?m)^\s+ruff format --check\s*$') -and ($jAgent -match 'pip_audit -r agent/requirements-dev\.txt'))
+Assert-True 'the web job carries its lints and its audit: npm run lint, npm run lint:md, npm audit --omit=dev at high' `
+    (($jWeb -match '(?m)^\s+run: npm run lint\s*$') -and ($jWeb -match '(?m)^\s+run: npm run lint:md\s*$') -and ($jWeb -match 'npm audit --omit=dev --audit-level=high'))
+foreach ($j in @('cli', 'agent', 'web', 'contract')) {
+    $jt = Get-WfJob $j
+    Assert-True "the $j job waits on the filter and runs only when it says so" `
+        (($jt -match '(?m)^\s+needs: changes\s*$') -and ($jt -match ("(?m)^\s+if: \`$\{\{ needs\.changes\.outputs\." + $j + " == 'true' \}\}\s*$")))
+}
+
+# The filter: one step that diffs against the pull request's base and hands the list
+# to the rule, with no action of its own beyond the checkout.
+Assert-True 'the changes job is not on the schedule, and checks out the whole history' `
+    (($jChanges -match "(?m)^\s+if: \`$\{\{ github\.event_name != 'schedule' \}\}\s*$") -and ($jChanges -match '(?m)^\s+fetch-depth: 0\s*$'))
+Assert-True 'the changes job sets cli, agent, web and contract from one step' `
+    (@('cli', 'agent', 'web', 'contract' | Where-Object { $jChanges -notmatch ("(?m)^\s+" + $_ + ": \`$\{\{ steps\.scope\.outputs\." + $_ + " \}\}\s*$") }).Count -eq 0)
+$scopeSteps = @([regex]::Matches($jChanges, '(?m)^\s+- name: '))
+Assert-True 'that one step diffs against the base sha and runs Get-CiScope.ps1 over the list' `
+    (($scopeSteps.Count -eq 1) -and ($jChanges -match 'github\.event\.pull_request\.base\.sha') -and ($jChanges -match 'git diff --name-only --no-renames "\$BASE\.\.\.HEAD" > "\$RUNNER_TEMP/changed\.txt"') -and ($jChanges -match 'Scripts/Get-CiScope\.ps1 -Event "\$EVENT" -PathsFile "\$RUNNER_TEMP/changed\.txt"')) "$($scopeSteps.Count) named step(s)"
+
+# The contract set: the CLI's four suites with the module path set inside pwsh, the
+# agent's three files, the carried paste lines -- each gated on its half not running.
+Assert-True 'the contract job runs Consts, Portability, Menu and DocCounts with the module path set inside pwsh, read through the gate, when the cli job did not run' `
+    (($jContract -match "pwsh -NoProfile -Command '\`$env:PSModulePath = \(Resolve-Path \.\); & \./Tests/Test-Toolkit\.ps1 -Consts -Portability -Menu -DocCounts; exit \`$LASTEXITCODE' 2>&1 \| tee [^\r\n]+\r?\n[^\r\n]*\r?\n[^\r\n]*Test-CiHalf\.ps1 -Half cli\b") -and ($jContract -match "needs\.changes\.outputs\.cli != 'true'"))
+Assert-True 'the contract job runs the agent''s three contract files, read through the gate, when the agent job did not run' `
+    (($jContract -match 'python -m pytest Tests/test_consts\.py Tests/test_pr_comments\.py Tests/test_third_party_notices\.py 2>&1 \| tee [^\r\n]+\r?\n[^\r\n]*\r?\n[^\r\n]*Test-CiHalf\.ps1 -Half agent\b') -and ($jContract -match "needs\.changes\.outputs\.agent != 'true'"))
+Assert-True 'the contract job holds the carried paste lines to main''s, from the base sha' `
+    (($jContract -match 'git show "\$BASE:docs/TESTING\.md"') -and ($jContract -match 'Scripts/Test-CarriedCounts\.ps1 -BasePath [^\r\n]+ -HeadPath docs/TESTING\.md -Ran ') -and ($jContract -match 'fetch-depth: 0'))
+
+# The one required check: every job behind it, always run, each needed job held to success.
+Assert-True 'the verify job is named Verify, needs every Ubuntu job and runs always, but not on the schedule' `
+    (($jVerify -match '(?m)^\s+name: Verify\s*$') -and ($jVerify -match '(?m)^\s+needs: \[changes, cli, agent, web, contract\]\s*$') -and ($jVerify -match "(?m)^\s+if: \`$\{\{ always\(\) && github\.event_name != 'schedule' \}\}\s*$"))
+Assert-True 'the verify job reads the filter''s answer and every job''s result' `
+    (($jVerify -match 'needs\.changes\.result') -and (@('cli', 'agent', 'web', 'contract' | Where-Object { ($jVerify -notmatch ("needs\.changes\.outputs\." + $_ + " \}\}")) -or ($jVerify -notmatch ("needs\." + $_ + "\.result")) }).Count -eq 0))
+
+$wfUses = @([regex]::Matches($workflow, '(?m)^\s+(?:- )?uses: (\S+)\s*$') | ForEach-Object { $_.Groups[1].Value })
+Assert-True 'verify.yml uses no action but actions/checkout, actions/setup-node and actions/setup-python, each pinned to a major version' `
+    (($wfUses.Count -gt 0) -and (@($wfUses | Where-Object { $_ -notmatch '^actions/(checkout|setup-node|setup-python)@v\d+$' }).Count -eq 0)) ($wfUses -join ', ')
 Assert-True 'verify.yml asks for no secret and reads with contents: read' (($workflow -notmatch 'secrets\.') -and ($workflow -match '(?m)^permissions:\s*\r?\n\s+contents: read'))
 foreach ($mode in @('matrix', 'a11y')) {
     Assert-True "verify.yml reads the browser smoke's $mode mode through Test-CiHalf.ps1" ($workflow -match ('npm run smoke:' + $mode + ' 2>&1 \| Tee-Object[^\r\n]*\r?\n[^\r\n]*\r?\n[^\r\n]*Test-CiHalf\.ps1 -Half smoke\b'))
@@ -224,12 +298,110 @@ Assert-True 'the 5.1 step says which ANSI code page 5.1 reads a script without a
 $jobCount = [regex]::Matches($workflow, '(?m)^\s+runs-on:').Count
 Assert-True 'verify.yml runs on pull requests (default types: labeled is NOT a trigger), pushes to main, the button, and a weekday schedule' `
     (($workflow -match '(?m)^\s+workflow_dispatch:') -and ($workflow -notmatch '(?m)^\s+types:') -and ($workflow -notmatch '(?m)^\s+if: .*labeled') -and ($workflow -match '(?ms)^\s+push:\s*\r?\n\s+branches: \[main\]') -and ($workflow -match '(?m)^\s+- cron: "[^"]+"'))
-$windowsJob = $workflow.Substring($workflow.IndexOf('  windows:'))
+$windowsJob = Get-WfJob 'windows'
 Assert-True 'the Windows job runs on the schedule, the button and the ci label, and not on a push to main' `
     (($windowsJob -match "(?m)^\s+if: .*github\.event_name == 'schedule'") -and ($windowsJob -match "(?m)^\s+if: .*github\.event_name == 'workflow_dispatch'") -and ($windowsJob -match "(?m)^\s+if: .*labels\.\*\.name, 'ci'") -and ($windowsJob -notmatch "(?m)^\s+if: .*'push'"))
+Assert-True 'the Windows job waits on no other job, so the filter cannot skip it' (($windowsJob -ne '') -and ($windowsJob -notmatch '(?m)^\s+needs:'))
 Assert-True 'a scheduled run has a concurrency group of its own and cancel-in-progress is only for pull requests' `
     (($workflow -match "group: verify-\$\{\{ github\.event_name == 'schedule'") -and ($workflow -match "cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}"))
-Assert-True 'every job in verify.yml has a timeout' ([regex]::Matches($workflow, '(?m)^\s+timeout-minutes: \d+').Count -eq $jobCount)
+Assert-True 'every job in verify.yml has a timeout' (($jobCount -eq $wfJobs.Count) -and ([regex]::Matches($workflow, '(?m)^\s+timeout-minutes: \d+').Count -eq $jobCount)) "$jobCount runs-on, $($wfJobs.Count) jobs"
+
+# -- 1c. CI's scope and the carried paste lines ---------------------------------
+# Get-P20CiScope over one row per path class (Tests/fixtures/ci-scope/table.json),
+# the script as the changes job calls it, and the carried-lines check.
+Write-Host ""
+Write-Host "-- CI's scope: which jobs a change runs --" -ForegroundColor Cyan
+$scopeFixture = [System.IO.File]::ReadAllText((Join-Path $scriptDir 'fixtures/ci-scope/table.json')) | ConvertFrom-Json
+Assert-True 'the scope table has rows' (@($scopeFixture.rows).Count -gt 0)
+foreach ($row in @($scopeFixture.rows)) {
+    $sc = Get-P20CiScope -Event $row.event -Paths @($row.paths)
+    $want = "cli=$($row.cli) agent=$($row.agent) web=$($row.web) contract=$($row.contract)"
+    $got = "cli=$($sc.cli) agent=$($sc.agent) web=$($sc.web) contract=$($sc.contract)"
+    Assert-True "scope: $($row.why)" ($want -eq $got) "want $want, got $got"
+}
+Assert-True 'scope: each path is reported with its class' `
+    (((@((Get-P20CiScope -Event 'pull_request' -Paths @('web/a.ts', 'CHANGELOG.md', 'consts.json', 'x.txt')).Paths) | ForEach-Object { $_[1] }) -join ',') -eq 'web,changelog,shared,unclassified')
+
+. (Join-Path $scriptDir 'Get-TestHost.ps1')
+$scopeScript = Join-Path $pkgRoot 'Scripts/Get-CiScope.ps1'
+$scopeScratch = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-ci-scope-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+$heldActions = $env:GITHUB_ACTIONS; $heldOutput = $env:GITHUB_OUTPUT; $heldSummary = $env:GITHUB_STEP_SUMMARY
+try {
+    New-Item -ItemType Directory -Path $scopeScratch -Force | Out-Null
+    $listFile = Join-Path $scopeScratch 'changed.txt'
+    $outFile = Join-Path $scopeScratch 'output.txt'
+    [System.IO.File]::WriteAllText($listFile, "web/src/App.tsx`nweb/README.md`n")
+    [System.IO.File]::WriteAllText($outFile, '')
+    $env:GITHUB_ACTIONS = 'true'; $env:GITHUB_OUTPUT = $outFile; $env:GITHUB_STEP_SUMMARY = ''
+    $said = (Invoke-P20TestHost -File $scopeScript -Arguments @('-Event', 'pull_request', '-PathsFile', $listFile) | ForEach-Object { [string]$_ }) -join "`n"
+    $code = $LASTEXITCODE
+    $written = [System.IO.File]::ReadAllText($outFile) -replace "`r", ''
+    Assert-True 'Get-CiScope.ps1, run as the changes job runs it: exit 0 and the four outputs for a web-only list' `
+        (($code -eq 0) -and ($written -eq "cli=false`nagent=false`nweb=true`ncontract=true`n")) "exit $code, wrote '$written' -- $said"
+    $env:GITHUB_ACTIONS = ''; $env:GITHUB_OUTPUT = ''
+    $null = Invoke-P20TestHost -File $scopeScript -Arguments @('-Event', 'pull_request', '-PathsFile', (Join-Path $scopeScratch 'absent.txt'))
+    Assert-True 'Get-CiScope.ps1 with no list at the path it was given exits 2' ($LASTEXITCODE -eq 2) "exit $LASTEXITCODE"
+}
+catch {
+    Assert-True 'the scope script cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally {
+    $env:GITHUB_ACTIONS = $heldActions; $env:GITHUB_OUTPUT = $heldOutput; $env:GITHUB_STEP_SUMMARY = $heldSummary
+    Remove-Item -LiteralPath $scopeScratch -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host ""
+Write-Host "-- CI's carried paste lines --" -ForegroundColor Cyan
+function New-PasteDoc {
+    param([string]$Cli = 'Consts 10, Compat 20', [string]$Total = '2 suites, 30 assertions', [string]$Pytest = 'pytest: 12 passed, 1 skipped', [string]$Web = 'web: 7 suites, 55 tests')
+    return "# Testing`n`n**The counts, after a merge.** The block:`n`n``````text`n  Counts for docs/TESTING.md's paste block, from this run:`n  $Cli`n  $Total`n  $Pytest`n  $Web`n```````n"
+}
+$carriedBase = New-PasteDoc
+$carriedTable = @(
+    # why, head, ran, finding count, a fragment the finding must contain
+    @('identical, a web-only change', (New-PasteDoc), @('web'), 0, ''),
+    @('a typed pytest count on a web-only change', (New-PasteDoc -Pytest 'pytest: 13 passed, 1 skipped'), @('web'), 1, "the agent half's paste line 'pytest: 13 passed, 1 skipped' is not main's 'pytest: 12 passed, 1 skipped'"),
+    @('a typed CLI total on a web-only change', (New-PasteDoc -Total '2 suites, 31 assertions'), @('web'), 1, "the cli half's paste line '2 suites, 31 assertions' is not main's '2 suites, 30 assertions'"),
+    @('a new web count on a web-only change: the web half ran, so it is not compared', (New-PasteDoc -Web 'web: 7 suites, 56 tests'), @('web'), 0, ''),
+    @('a new CLI count on a changelog-only change: the CLI ran', (New-PasteDoc -Cli 'Consts 10, Compat 21' -Total '2 suites, 31 assertions'), @('cli'), 0, ''),
+    @('every half ran: nothing is compared', (New-PasteDoc -Pytest 'pytest: 99 passed' -Web 'web: 1 suites, 1 tests'), @('cli', 'agent', 'web'), 0, ''),
+    @('two typed lines, two halves named', (New-PasteDoc -Pytest 'pytest: 13 passed, 1 skipped' -Cli 'Consts 11, Compat 20'), @('web'), 2, "the cli half's paste line 'Consts 11, Compat 20'"),
+    @('a change with no paste block', "# Testing`n", @('web'), 1, "this change's docs/TESTING.md has no paste block")
+)
+foreach ($row in $carriedTable) {
+    $got = @(Get-P20CarriedCountFindings -BaseText $carriedBase -HeadText $row[1] -Ran $row[2])
+    $okRow = ($got.Count -eq $row[3]) -and (($row[3] -eq 0) -or (@($got | Where-Object { $_ -like "*$($row[4])*" }).Count -gt 0))
+    Assert-True "carried lines: $($row[0])" $okRow ($got -join ' | ')
+}
+$realTesting = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'docs/TESTING.md'))
+$realBlock = Get-P20PasteBlock -Text $realTesting
+Assert-True 'the real docs/TESTING.md''s paste block gives every half its lines: two for the CLI, one each for the agent and the web' `
+    (($null -ne $realBlock) -and (@($realBlock.cli).Count -eq 2) -and (@($realBlock.agent).Count -eq 1) -and (@($realBlock.web).Count -eq 1))
+Assert-True 'the real docs/TESTING.md carries its own lines: no finding against itself' (@(Get-P20CarriedCountFindings -BaseText $realTesting -HeadText $realTesting -Ran @('web')).Count -eq 0)
+
+$carriedScript = Join-Path $pkgRoot 'Scripts/Test-CarriedCounts.ps1'
+$carriedScratch = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-ci-carried-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+try {
+    New-Item -ItemType Directory -Path $carriedScratch -Force | Out-Null
+    $baseFile = Join-Path $carriedScratch 'base.md'
+    $sameFile = Join-Path $carriedScratch 'same.md'
+    $typedFile = Join-Path $carriedScratch 'typed.md'
+    [System.IO.File]::WriteAllText($baseFile, $carriedBase)
+    [System.IO.File]::WriteAllText($sameFile, (New-PasteDoc))
+    [System.IO.File]::WriteAllText($typedFile, (New-PasteDoc -Pytest 'pytest: 13 passed, 1 skipped'))
+    $null = Invoke-P20TestHost -File $carriedScript -Arguments @('-BasePath', $baseFile, '-HeadPath', $sameFile, '-Ran', 'web')
+    Assert-True 'Test-CarriedCounts.ps1, run as the contract job runs it: carried lines that are main''s exit 0' ($LASTEXITCODE -eq 0) "exit $LASTEXITCODE"
+    $said = (Invoke-P20TestHost -File $carriedScript -Arguments @('-BasePath', $baseFile, '-HeadPath', $typedFile, '-Ran', 'cli,web') | ForEach-Object { [string]$_ }) -join "`n"
+    Assert-True 'a typed pytest line exits 2 and names the line' (($LASTEXITCODE -eq 2) -and ($said -match [regex]::Escape("'pytest: 13 passed, 1 skipped'")) -and ($said -match '(?m)^Error: ')) "exit $LASTEXITCODE -- $said"
+    $null = Invoke-P20TestHost -File $carriedScript -Arguments @('-BasePath', $baseFile, '-HeadPath', $sameFile, '-Ran', 'docs')
+    Assert-True 'a -Ran that names no half exits 2' ($LASTEXITCODE -eq 2) "exit $LASTEXITCODE"
+}
+catch {
+    Assert-True 'the carried-lines script cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally {
+    Remove-Item -LiteralPath $carriedScratch -Recurse -Force -ErrorAction SilentlyContinue
+}
 
 # The landing page's workflow: every push to main and the button, no secret, the
 # deploy's two Pages permissions and a read, nothing more.

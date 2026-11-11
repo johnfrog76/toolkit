@@ -142,10 +142,13 @@ if ($combinedRow.Count -eq 1) {
 # back against the registry: the same suite count, the same names in the same
 # order, and a total that is the sum of its own lines. Deliberately not against a
 # live run: assertion counts move with a machine's config.local.json (see above).
-$pasteHead = [regex]::Match($testingText, '(?s)\*\*The counts, after a merge\.\*\*.*?```text\r?\n(.*?)\r?\n```')
-Assert-True 'docs/TESTING.md has the paste block under "The counts, after a merge"' $pasteHead.Success 'fenced block not found -- has the heading been reworded?'
-if ($pasteHead.Success) {
-    $pasteLines = @($pasteHead.Groups[1].Value -split "\r?\n" | Where-Object { $_.Trim() })
+# The block is read by Get-P20PasteBlock (Scripts/TestAll-Rules.ps1), the one rule
+# the drift check below and CI's carried-lines check read it with.
+. (Join-Path $pkgRoot 'Scripts/TestAll-Rules.ps1')
+$pasteBlock = Get-P20PasteBlock -Text $testingText
+Assert-True 'docs/TESTING.md has the paste block under "The counts, after a merge"' ($null -ne $pasteBlock) 'fenced block not found -- has the heading been reworded?'
+if ($null -ne $pasteBlock) {
+    $pasteLines = @($pasteBlock.cli)
     $pasteNames = @()
     $pasteSum = 0
     $pasteTotal = $null
