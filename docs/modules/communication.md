@@ -47,6 +47,8 @@ failing.
 `TEAMS_WEBHOOK_MANAGER`; a recipient that names no variable falls back to the convention
 `TEAMS_WEBHOOK_<KEY>`, and `TEAMS_WEBHOOK_URL` is a catch-all the engine accepts for any recipient.
 
+Known gap: [A webhook set after the agent started is not seen](../KNOWN-GAPS.md#a-webhook-set-after-the-agent-started-is-not-seen).
+
 ## Getting a webhook URL
 
 Nothing in Teams says where this lives, so the path, once:
@@ -67,19 +69,20 @@ Nothing in Teams says where this lives, so the path, once:
 
 **A second recipient is declared by hand.** `TEAMS_WEBHOOK_<KEY>` only supplies the variable name for a
 recipient that is already declared under `managerWorkflow.communication.recipients`; an undeclared
-one is refused (`unknown recipient key 'mom'`). `Config -Set` cannot declare one -- the schema is built
-from the shipped keys, where `manager` is the only recipient -- so edit `config.local.json`
-(top-level, gitignored) yourself:
+one is refused (`unknown recipient key 'mom'`). `Config -Set` cannot declare one -- `managerWorkflow` is the
+team's block in `config.default.json`, and `Config` never writes it, so any key under it answers
+`Unknown setting` -- so edit `config.local.json` (top-level, gitignored) yourself:
 
 ```json
 { "managerWorkflow": { "communication": { "recipients": {
     "demo_channel": { "type": "channel", "display": "Demo channel" } } } } }
 ```
 
-`"type"` is `"channel"` **even for a person**: `"chat"` is refused as `unsupported type`, and the shipped
-`manager` entry is itself a `"channel"` whose display says "DM via Workflow". Then
-`TEAMS_WEBHOOK_DEMO_CHANNEL` is the variable. Both limits are in
-[Known gaps](../KNOWN-GAPS.md) until Teams becomes a connection.
+`"type"` is `"channel"` **even for a person**: `"chat"` is refused as `unsupported type`, `"person"` as
+`DM deferred`, and the shipped `manager` entry is itself a `"channel"` whose display says "DM via
+Workflow". Then `TEAMS_WEBHOOK_DEMO_CHANNEL` is the variable.
+
+Known gap: [`Config -Set` cannot declare a Teams recipient](../KNOWN-GAPS.md#config--set-cannot-declare-a-teams-recipient).
 
 ## The verbs
 
@@ -198,7 +201,7 @@ dynamic expressions"*), and the loader reads with nothing else on purpose. The w
 | `GET /manager` | `manager/{current,archive}/` | Every session, newest first |
 | `GET /manager/{f}` | one session | Split into the sections the form owns, plus the raw content, and the `## Carried from` check: `carried_from`, `carried_from_expected`, `carried_from_verdict`, and `carried_from_note` -- the sentence to show, `""` when the heading is right. `PUT` answers with the same four. Read, never rewritten |
 | `POST /manager` | runs `NewMeeting` through the bridge, then reads the file it wrote | `{date, series}` only -- notes are an edit, through `PUT`, and a body with more is 422. 409 rather than overwrite, for a session in `current/` **or** already closed into `archive/`; 400 on a date that is not one; 503 naming the verb when the module is not in the CLI's table. The verb is the one writer of a new session |
-| `PUT /manager/{f}` | rewrites one session | **The only PUT in the API** |
+| `PUT /manager/{f}` | rewrites one session | **The only write in the API that does not go through the CLI** |
 | `POST /comms/send` | outbound webhook | A thin wrapper over the engine |
 | `POST /rewrite` | a model | Tidies a raw notes textarea. Declines with a reason when there is no key |
 | `POST /cmd/MeetingAgenda` | the bridge | Not this module's route -- the CLI bridge, with this module's verb in the argv. The web's **Close** and its stage buttons are `-Date <d> [-Type <series>] -<Plan\|Prep\|Retro\|Close>`, built by `buildMeetingAgendaParams` in `web/src/modules/ado/cliBridge.ts` and pinned by `cliBridge.test.ts`; a stated refusal (exit 2) comes back as `status: error` and is the page's message |
@@ -207,11 +210,12 @@ The whole router carries a dependency that raises 404 when the flag is off — a
 than a conditional mount, so the answer is re-read per request and a flag flipped in another
 terminal does not need a restart of the agent or the web UI (an open shell is another matter: [Configuration](../CONFIGURATION.md), "A module flag and an open shell"). `/env` gains a `communication` block, and only when the flag is on.
 
-**Why `POST`/`PUT` here rather than through the CLI bridge.** The rest of the app has one write
-path, and it is the CLI. These two bend it, for a stated reason: they save a form someone is typing
-into, and round-tripping keystrokes through a PowerShell process start would make the editor
-unusable. There is no second implementation to drift from — `_build_session_file` is the only thing
-on either side that writes a session. Closing a session does **not** bend it: the file move and the
+**Why `PUT` here rather than through the CLI bridge.** The rest of the app has one write
+path, and it is the CLI -- `POST /manager` included, which runs `NewMeeting`. `PUT` bends it, for a
+stated reason: it saves a form someone is typing into, and round-tripping keystrokes through a
+PowerShell process start would make the editor unusable. There is no second implementation to drift
+from — `_build_session_file` is the one thing in Python that writes a session, and it never creates
+one: a new session is the verb's. Closing a session does **not** bend it: the file move and the
 `**Closed:**` stamp are `MeetingAgenda -Close`, and the web's Close button runs that verb through
 the bridge rather than reimplementing either half.
 
@@ -242,9 +246,11 @@ appended server-side so the caller never has to read the file back in order to a
 ```
 
 `configured` is gate 2, answered before the click. `scope` says which config block the entry came
-from, which is gap C7 answered by rendering rather than by moving: the `manager` recipient is
-top-level and every other recipient is the active Space's, and that difference is *why* switching org
-changes one list and not the other. A UI that flattened the two could not explain it.
+from: `managerWorkflow` for a recipient declared under `managerWorkflow.communication.recipients`,
+the same in every Space, or `org` for one declared on the active Space's `communication.recipients`.
+Switching Space changes only the second, and `scope` is what can explain that. No page draws it.
+
+Known gap: [No page shows where a Teams recipient came from](../KNOWN-GAPS.md#no-page-shows-where-a-teams-recipient-came-from).
 
 `core/env.py` does not import this module. It asks a module that is **switched on** to describe
 itself, lazily and inside the flag check, so a checkout without the module still serves `/env`.
@@ -309,6 +315,8 @@ the three keys and labels both pages read.
 
 The `--modules=on` smoke asserts the button's **presence** on exactly one of the three fixture
 sessions and never presses it: a press moves a file in the committed fixture hub.
+
+Known gap: [A meeting row draws its actions side by side](../KNOWN-GAPS.md#a-meeting-row-draws-its-actions-side-by-side).
 
 ### Advancing a stage, from the browser
 
@@ -423,7 +431,7 @@ The three PowerShell suites are registered in `Tests/Test-Toolkit.ps1` (`-SendTe
 
 | # | Gap |
 | --- | --- |
-| — | C7: `managerWorkflow` is top-level while every other recipient lives on an org. Answered by rendering both honestly (`scope` in `/env`) rather than by moving one. A config wizard has to show both |
+| — | Recipients are read from two blocks, `managerWorkflow` and the active Space's, and `/env` says which (`scope`); no page draws it ([No page shows where a Teams recipient came from](../KNOWN-GAPS.md#no-page-shows-where-a-teams-recipient-came-from)). A config wizard has to show both |
 | — | Prep has no agent pass: the shipped prompt has two passes (Plan and Retro), not three |
 | — | An agenda line becomes a card from the terminal only (`NewPrompt -From`): the Meetings page has no "make a card" action on an agenda line, which belongs to the record's reading room, not yet built |
 | — | A card made from an agenda line names its record; the record does not name the card. Whether the agenda gets a line back (`-> card K7M2`) is undecided |

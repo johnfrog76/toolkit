@@ -44,6 +44,7 @@ if ($Help) {
   Clause 15 No gh, az or git call with a redirected stderr outside Invoke-TrackerRead.ps1
   Clause 22 Every suite starts its children through Invoke-P20TestHost (ratchet: the
             allow-list only shrinks)
+  Clause 23 No file under Tests/ calls git with a redirected stderr outside Invoke-P20TestGit
   Clause 16 No script in Scripts/ carries its own Get-CliPrefix or Write-CliError fallback;
             Scripts/Initialize-CliFallbacks.ps1 is the one copy
   Clause 18 Every Azure DevOps request takes its headers from Get-P20AdoHeaders -OrgUrl `$org
@@ -115,6 +116,7 @@ function Assert-True {
 # Test-PS51Compat, which had the same omission from the other direction --
 # see Tests/ScanExclusions.ps1.
 . (Join-Path $scriptDir 'ScanExclusions.ps1')
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 
 # Runtime source only. Tests may legitimately name things that shipped code may not.
 #
@@ -450,7 +452,7 @@ $vendorPaths = @('.claude', '.cursor', '.cursorrules', '.windsurfrules', '.githu
 $trackedVendor = @()
 Push-Location $pkgRoot
 try {
-    $tracked = @(git ls-files 2>$null)
+    $tracked = @((Invoke-P20TestGit ls-files).Out)
     foreach ($v in $vendorPaths) {
         $needle = $v
         foreach ($t in $tracked) {
@@ -1382,6 +1384,52 @@ $childPwshCases = @(
 foreach ($case in $childPwshCases) {
     $caseHits = @(Get-RawTrackerCalls $case.Body $childPwshPattern).Count
     Assert-True "Clause 22: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
+}
+
+# -- Clause 23: a suite calls git through Invoke-P20TestGit --------------------
+# A suite builds its fixture repositories with git, and on Windows git warns on
+# stderr about line endings. Under Windows PowerShell 5.1, a native command
+# whose stderr is redirected (2>&1, 2>$null, *>) while 'Stop' is in force
+# throws on that first line, so a suite that wrote `git add -A 2>&1 | Out-Null`
+# stopped part-way on 5.1 and passed on 7. Invoke-P20TestGit
+# (Tests/Get-TestHost.ps1) runs git with 'Continue' for the one call and returns
+# what it said as text. Every PowerShell file under Tests/ is read, the runner
+# included, with Clause 15's reader and its pattern for git, which matches a
+# call written with the call operator or without it. A comment or a string
+# naming such a call is not one. Nothing is allowed but the helper's own call.
+$suiteGitPattern = '(?<![\w$-])git\s(?:[^|\r\n`]|`[^\r\n]|`\r?\n)*(2>|\*>)'
+$suiteGitHelper = 'Tests/Get-TestHost.ps1'
+$suiteGitFiles = @(Get-ChildItem (Join-Path $pkgRoot 'Tests') -Filter '*.ps1' -File -Recurse | Where-Object {
+        -not (Test-ScanExcluded -Path $_.DirectoryName -Root $pkgRoot)
+    })
+$suiteGitHits = @()
+foreach ($f in $suiteGitFiles) {
+    $rel = Get-RelPath $f
+    if ($rel -eq $suiteGitHelper) { continue }
+    foreach ($hit in @(Get-RawTrackerCalls ([System.IO.File]::ReadAllText($f.FullName)) $suiteGitPattern)) { $suiteGitHits += "${rel}:$hit" }
+}
+$suiteGitDetail = "read $($suiteGitFiles.Count) files under Tests/"
+if ($suiteGitHits.Count -gt 0) {
+    $suiteGitDetail = "call git through Invoke-P20TestGit (Tests/Get-TestHost.ps1): " + ($suiteGitHits -join '; ')
+}
+$suiteGitRunner = @($suiteGitFiles | Where-Object { (Get-RelPath $_) -eq 'Tests/Test-Toolkit.ps1' }).Count
+Assert-True "Clause 23: no file under Tests/ calls git with its stderr redirected outside Invoke-P20TestGit" (($suiteGitHits.Count -eq 0) -and ($suiteGitFiles.Count -ge 50) -and ($suiteGitRunner -eq 1)) $suiteGitDetail
+$suiteGitHelperText = [System.IO.File]::ReadAllText((Join-Path $pkgRoot $suiteGitHelper))
+Assert-True "Clause 23: the helper sets Continue around its one git call" (($suiteGitHelperText -match 'function Invoke-P20TestGit') -and ($suiteGitHelperText -match "(?s)function Invoke-P20TestGit\s*\{.*?\`$ErrorActionPreference = 'Continue'.*?& git @gitArgs 2>&1")) 'Invoke-P20TestGit no longer sets Continue before its git call'
+
+# The sweep's own cases.
+$suiteGitCases = @(
+    @{ Hit = $true;  Why = 'git with the call operator, stderr kept';   Body = '$null = & git -C $repo add -A 2>&1' }
+    @{ Hit = $true;  Why = 'git with no call operator, piped away';     Body = 'git commit -q -m seed 2>&1 | Out-Null' }
+    @{ Hit = $true;  Why = 'git with stderr dropped, stdout kept';      Body = '$files = @(git -C $root ls-files 2>$null)' }
+    @{ Hit = $false; Why = 'git through the helper';                    Body = '$null = Invoke-P20TestGit -C $repo add -A' }
+    @{ Hit = $false; Why = 'git with no redirect';                      Body = 'git -C $repo init -q' }
+    @{ Hit = $false; Why = 'a comment that names the trap';             Body = '# git add -A 2>&1 throws under Stop on 5.1' }
+    @{ Hit = $false; Why = 'a string that names a call';                Body = '$cmd = "git status 2>&1"' }
+)
+foreach ($case in $suiteGitCases) {
+    $caseHits = @(Get-RawTrackerCalls $case.Body $suiteGitPattern).Count
+    Assert-True "Clause 23: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
 }
 
 # -- Clause 9: the documented config shape is the implemented one --------------

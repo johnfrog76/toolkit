@@ -291,7 +291,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **52 suites, 9714 assertions** with a `config.local.json`, every one
+findings. On this commit that is **52 suites, 9887 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -315,12 +315,14 @@ cd web && npm test           # the shell; the current counts are in docs/TESTING
 
 A skip is not a pass. Read the summary line, not just the total.
 
-**What CI covers of this gate.** A pull request's check (`.github/workflows/verify.yml`, the Ubuntu job) runs these three
+**What CI covers of this gate.** A pull request's check (`.github/workflows/verify.yml`, the Ubuntu jobs, one per half,
+summed up by one check, `Verify`) runs these three
 runners on Ubuntu, reads each one's summary line and fails a step on a failure, a skipped half or a run
-that counted nothing ([docs/TESTING.md](docs/TESTING.md), "In CI"). That is this gate on Linux under
+that counted nothing ([docs/TESTING.md](docs/TESTING.md), "In CI"). A pull request runs only the halves
+its files can reach, and the cross-half contract suites for the rest; a push to `main` runs all three. That is this gate on Linux under
 `pwsh` 7. Its Windows job, which runs on a weekday-evening schedule against `main`, from the Actions tab's button and on a pull request labelled `ci` (the label takes effect on the next push or reopen, and a label alone starts nothing, so it never cancels running checks; for a branch right away, `gh workflow run verify.yml --ref <branch>`), not on an ordinary pull request or a push to `main`, adds the CLI half on Windows twice, in two jobs side by side: `tkTest -Half cli` typed in Windows PowerShell 5.1
 after the one-manifest import, with the runner starting each suite in `pwsh` 7; and `Tests/Test-Toolkit.ps1`
-started by `powershell.exe`, so every suite and every verb a suite types runs in 5.1. Both are read the same way.
+with no suite switch started by `powershell.exe` (the `ps51` job), so every suite runs in 5.1. Both are read the same way.
 The agent's and the web UI's runners on Windows are still walked here and in Gate 12.
 
 ---
@@ -1226,7 +1228,7 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `powershell` (5.1) and in `pwsh`: `tkStartWork <id> -Launch` for a card sized `sonnet`. `git status
   --untracked-files=all` shows nothing new, and `dir .git\startwork` holds the `.log` and `.err.log`. Note
   whether the `.block.log` is already gone, or whether the launch printed `block: the session holds it open`.
-  Once the session has ended, a second launch removes it. The StartWork suite runs the launch on the Windows job
+  Once the session has ended, a second launch removes it. The StartWork suite runs the launch on both Windows jobs
   with a stub that exits at once; this row is a session that lives on.
 - [ ] **A hub under a folder whose name holds brackets works from Windows PowerShell 5.1 (review findings G1 f6,
   G2 f10 and G3 f12).** Copy a hub to `C:\Work [old]\hub` and, in `powershell` (5.1), set `PROMPTS_ROOT` to it in
@@ -1234,7 +1236,7 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   <id>` for a card in `current/` returns it unchanged; `tkArchive <id>` moves it. Then with `promptsRoot` set to
   `~/...` in `config.local.json` and no `PROMPTS_ROOT`, `tkStatus` still finds the hub: `-LiteralPath` expands a
   leading `~` on pwsh 7, and this row is the check on 5.1. The NewPrompt suite types the same verbs against a
-  scratch hub in such a folder on the Windows job, under both hosts; this row is a real hub and the `~` path.
+  scratch hub in such a folder on the two Windows jobs, one per host; this row is a real hub and the `~` path.
 - [ ] **Backlog reads every heading on a Western code page, from Windows PowerShell 5.1 (#260).** On the Windows
   PC, in `powershell` (5.1), check `[System.Text.Encoding]::Default.CodePage` first and note it: the row means most on
   1252. On a local Space, put four cards in `backlog/` whose headings are plain (`# Task K7M2: Plain`), start with an

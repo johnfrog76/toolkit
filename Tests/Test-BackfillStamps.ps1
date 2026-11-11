@@ -72,6 +72,7 @@ foreach ($fn in @('Get-P20CardStem', 'Test-P20ArchivePath', 'Get-P20CardHistoryD
 
 $T = "`t"
 . (Join-Path (Join-Path $pkgRoot 'Scripts') 'ConvertTo-LocalDay.ps1')
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 
 # -- The rules, on the log shapes they were learned from -------------------------
 
@@ -170,7 +171,7 @@ else {
         param([string]$Date, [string[]]$GitArgs)
         $env:GIT_AUTHOR_DATE = "${Date}T12:00:00"
         $env:GIT_COMMITTER_DATE = "${Date}T12:00:00"
-        & git -C $hub -c user.name=Test -c user.email=test@example.com -c commit.gpgsign=false -c core.autocrlf=false @GitArgs 2>&1 | Out-Null
+        $null = Invoke-P20TestGit -C $hub -c user.name=Test -c user.email=test@example.com -c commit.gpgsign=false -c core.autocrlf=false @GitArgs
         Remove-Item Env:GIT_AUTHOR_DATE, Env:GIT_COMMITTER_DATE -ErrorAction SilentlyContinue
     }
     function Write-HubFile {

@@ -121,10 +121,11 @@ if (-not (Test-Path $testDir)) {
 # suite that means to test an override sets it itself.
 . (Join-Path $PSScriptRoot '../Scripts/Get-Consts.ps1')
 . (Join-Path $PSScriptRoot '../Scripts/Hide-RunOverrides.ps1')
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 $savedOverrides = Hide-P20RunOverrides
 
 # Ensure PROMPTS_ROOT is set for child suites (standalone / -NoProfile runs)
-$repoRoot = (git -C $testDir rev-parse --show-toplevel 2>$null)
+$repoRoot = ((Invoke-P20TestGit -C $testDir rev-parse --show-toplevel).Out | Select-Object -First 1)
 if ($repoRoot) { $env:PROMPTS_ROOT = $repoRoot }
 
 # ── The usage log this run writes to ─────────────────────────────────────────
@@ -203,7 +204,6 @@ if (Test-Path $utilitiesPath) {
 # Test-DocCounts.ps1 reads the SAME list this runner does, rather than a count
 # retyped a second place.
 . (Join-Path $testDir 'Get-ToolkitSuiteRegistry.ps1')
-. (Join-Path $testDir 'Get-TestHost.ps1')
 $suites = Get-P20ToolkitSuiteRegistry
 # The summary file's name and its merge rule are {cliPrefix}Test's too:
 # one file holds both, so this runner and the verb that runs all three halves

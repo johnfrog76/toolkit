@@ -518,7 +518,7 @@ try {
     # The repo: one design of its own, and the board-ideas id promoted into it.
     Write-Doc (Join-Path $dRepo 'design/repo-note.md') $repoOnly 'Repo note'
     Write-Doc (Join-Path $dRepo 'design/board-ideas.md') $boardId 'Board ideas, in the product'
-    $gitQuiet = { param([string[]]$GitArgs) & git @GitArgs 2>&1 | Out-Null }
+    $gitQuiet = { param([string[]]$GitArgs) $null = Invoke-P20TestGit @GitArgs }
     & $gitQuiet @('-C', $dRepo, 'init', '-q')
     & $gitQuiet @('-C', $dRepo, 'remote', 'add', 'origin', 'https://github.com/acme/widgets.git')
     & $gitQuiet @('-C', $elsewhere, 'init', '-q')

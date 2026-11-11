@@ -55,6 +55,8 @@ if ($Help) {
 
 $ErrorActionPreference = 'Stop'
 
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
+
 $testDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pkgRoot = Split-Path $testDir -Parent
 
@@ -520,10 +522,10 @@ $utf8 = New-Object System.Text.UTF8Encoding($false)
 [System.IO.File]::WriteAllText((Join-Path $hookHub 'reviews/x/review.md'), "# Review`n", $utf8)
 Push-Location $hookHub
 try {
-    git init --quiet 2>&1 | Out-Null
-    git config user.email 'test@example.invalid' 2>&1 | Out-Null
-    git config user.name 'Hook test' 2>&1 | Out-Null
-    git config core.autocrlf false 2>&1 | Out-Null
+    $null = Invoke-P20TestGit init --quiet
+    $null = Invoke-P20TestGit config user.email 'test@example.invalid'
+    $null = Invoke-P20TestGit config user.name 'Hook test'
+    $null = Invoke-P20TestGit config core.autocrlf false
     $hook = Join-Path $hookHub '.git/hooks/pre-commit'
     [System.IO.File]::WriteAllText($hook, "#!/bin/sh`necho 'hook says no'`nexit 1`n")
     # git runs a hook only when the file is executable; Windows has no execute bit, Unix does.

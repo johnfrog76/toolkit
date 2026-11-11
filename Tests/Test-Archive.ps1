@@ -14,6 +14,7 @@
 param()
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 # Package root is the parent of Tests/, from this file's own location:
@@ -104,15 +105,15 @@ function New-ArchiveSandbox {
 
     Push-Location $base
     try {
-        git init --quiet 2>&1 | Out-Null
-        git checkout -B main --quiet 2>&1 | Out-Null
-        git config user.email 'test@example.com' 2>&1 | Out-Null
-        git config user.name 'Archive Test' 2>&1 | Out-Null
-        git config commit.gpgsign false 2>&1 | Out-Null
-        git config core.autocrlf false 2>&1 | Out-Null
+        $null = Invoke-P20TestGit init --quiet
+        $null = Invoke-P20TestGit checkout -B main --quiet
+        $null = Invoke-P20TestGit config user.email 'test@example.com'
+        $null = Invoke-P20TestGit config user.name 'Archive Test'
+        $null = Invoke-P20TestGit config commit.gpgsign false
+        $null = Invoke-P20TestGit config core.autocrlf false
         Set-Content -Path (Join-Path $base '.gitkeep') -Value '' -Encoding UTF8
-        git add .gitkeep 2>&1 | Out-Null
-        git commit -m 'init' --quiet 2>&1 | Out-Null
+        $null = Invoke-P20TestGit add .gitkeep
+        $null = Invoke-P20TestGit commit -m 'init' --quiet
     }
     finally {
         Pop-Location
@@ -147,8 +148,8 @@ function Save-SandboxState {
     param([string]$Sandbox, [string]$Message = 'seed')
     Push-Location $Sandbox
     try {
-        git add . 2>&1 | Out-Null
-        git commit -m $Message --quiet 2>&1 | Out-Null
+        $null = Invoke-P20TestGit add .
+        $null = Invoke-P20TestGit commit -m $Message --quiet
     }
     finally { Pop-Location }
 }

@@ -24,7 +24,7 @@ verb, the reader's fixtures and this file change in the same sitting.
 ```
 
 **The hub-root names are defaults, not constants.** `growth`, `reviews`, `resume`,
-`manager`, `reminders`, `design` and `agentic` are declared by the hub, in `<promptsRoot>/hub.json`'s `folders` block;
+`manager`, `reminders`, `design`, `spec`, `usage` and `agentic` are declared by the hub, in `<promptsRoot>/hub.json`'s `folders` block;
 omit a key and it keeps the name above. Both consumers resolve them through one accessor --
 `hub_folder()` in the agent, `Get-P20HubFolder` in the CLI -- so this document's shape is the same
 whatever they are called. [Configuration](../CONFIGURATION.md#the-hub-declares-its-orgs) has the manifest.
@@ -100,7 +100,8 @@ this table is pinned, case by case, in `Tests/test_growth_status.py` -- change o
 
 The deadline is read from the item's date field. A range is written
 `2026-03-02 to 2026-04-30` and the deadline is the end of it; a single date is
-its own deadline; `TBA` is not a date. **ASCII `to`, never a dash** -- these
+its own deadline; `TBA` is not a date. A training may also carry a `## Due Date`
+heading, and when it does that date is the deadline, ahead of the end of the range. **ASCII `to`, never a dash** -- these
 files are written by a PowerShell script that has to parse on PowerShell 5.1,
 where an en dash inside a double-quoted string is misread on a Windows-1252
 code page.

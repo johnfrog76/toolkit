@@ -61,6 +61,7 @@ param([switch]$Help)
 if ($Help) { Get-Help $MyInvocation.MyCommand.Path -Detailed; return }
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pkgRoot = Split-Path -Parent $scriptDir
 
@@ -337,8 +338,7 @@ try {
         # A scratch repository's git, its stderr swallowed whatever the host
         # (5.1 under Stop turns a redirected native stderr into a throw).
         param([string[]]$GitArgs)
-        $ErrorActionPreference = 'Continue'
-        $null = (& git @GitArgs 2>&1)
+        $null = Invoke-P20TestGit @GitArgs
         return $LASTEXITCODE
     }
     $esc = { param($s) $s -replace "'", "''" }
@@ -423,7 +423,7 @@ exec sleep 30
     function Get-GitStatus {
         # Every path git would show, untracked files one by one.
         param([string]$Dir)
-        $o = & git -C $Dir status --porcelain --untracked-files=all 2>&1
+        $o = (Invoke-P20TestGit -C $Dir status --porcelain --untracked-files=all).Lines
         return ((@($o) | ForEach-Object { [string]$_ }) -join ' | ')
     }
     function Wait-Gone {

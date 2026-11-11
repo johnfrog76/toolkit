@@ -341,7 +341,7 @@ reports -- leaves the editor open, the draft intact, and shows the refusal's own
 silently reverting to the old name.
 
 The rule
-exists once per half on purpose -- `Scripts/Get-PromptStatus.ps1` and `agent/core/parsers.py` -- and
+exists once per half on purpose -- `Scripts/Get-PromptFileStatus.ps1` (which `Get-PromptStatus.ps1` dot-sources) and `agent/core/parsers.py` -- and
 both run against the same fixture files in `Tests/fixtures/parsers/`, so a rule that drifts on one side
 fails on that side. It only holds for shapes a fixture HAS: `review-heading-no-url.md` holds that a
 `## PR Review Comments` heading with no `PR URL:` line is not Code Review, on either side.
@@ -408,7 +408,7 @@ The standup's suggestion -- one derived next move ([Team Agile](../modules/solit
 
 | What | Read from | Rule |
 | --- | --- | --- |
-| its milestone | the first `**Milestone:**` line, else -- a card with none that is not an Azure DevOps card -- the first `**Sprint:**` line ([the rule](#milestone-and-sprint-two-lines)) | the value WHOLE and trimmed -- `M2 -- 1.2.0, the standup sees the work`, `RecipesApp\Sprint 2` -- never the model's `sprint`, which keeps the last segment and cuts it at eighteen characters for the board; a parenthesised placeholder (`(not linked)`, `(none)`) is none |
+| its milestone | the first `**Milestone:**` line, else -- a card with none that is not an Azure DevOps card -- the first `**Sprint:**` line ([the rule](#milestone-and-sprint-two-lines)) | the value WHOLE and trimmed -- `M2 -- 1.2.0, the standup sees the work`, `RecipesApp\Sprint 2` -- never the model's `sprint`, which keeps the last segment and cuts it to 20 characters for the board; a parenthesised placeholder (`(not linked)`, `(none)`) is none |
 | its severity and size | the `Tags:` line | split on commas or semicolons and trimmed; the first tag that is one of the triage ceremony's severities, and the first that is one of the repo's worker labels |
 | who takes it | the `**Assigned:**` line | `me`, or a size; with none, its size |
 | its age | the `**Created:**` day | the oldest first; a card with none after every one with one |
@@ -440,7 +440,7 @@ fields, so nothing downstream parses a heading or a filename (`PromptInfo`, `age
 
 | Field | From | Notes |
 | --- | --- | --- |
-| `file` | the filename | the card's identity in every route and every bridge call |
+| `file` | the filename | the card's identity in the list and in every bridge call; the detail route, `GET /api/status/{filename}`, carries the same name as `filename` |
 | `id` | the filename, by the one id rule | a **string**; `null` for a file that is not a card |
 | `type`, `name` | the heading | `null` / `""` when the heading does not fit |
 | `title` | the heading, whole, cut to 60 characters | predates the model; kept for display |
@@ -468,10 +468,10 @@ fields, so nothing downstream parses a heading or a filename (`PromptInfo`, `age
 **The CLI, and nothing else.** The web changes a card only through `POST /api/cmd/{name}`, which runs the
 verb; there is no native route that CREATES a card in `current/`. Every write goes through `Write-CardText`:
 UTF-8, no BOM; a file the tool CREATES is LF (`-New`), a file it EDITS keeps the line endings it has
-([CLI](../CLI.md#the-bytes-a-card-is-written-with)). Every reader tolerates both endings. The one
-exception is an edit, not a create: the agent's `POST /api/pr-comments/{filename}/save` writes a decision
-and a reply into a card's review section, through the agent's own writer, `agent/core/cards.py`, which
-keeps the same edit rule -- the card's own line ending, no BOM.
+([CLI](../CLI.md#the-bytes-a-card-is-written-with)). Every reader tolerates both endings. No agent
+route edits a card natively either. The agent's own writer, `agent/core/cards.py`, keeps the same edit
+rule -- the file's own line ending, no BOM -- for the one hub file it does edit, a meeting session
+(`PUT /api/manager/{filename}`), which is not a card.
 
 | Verb | Does to the file |
 | --- | --- |
@@ -497,6 +497,6 @@ no work item, and `demo/archive/` holds two that are Done. The parser fixtures
 
 ## What is NOT in the model
 
-Hours. An assignee. A priority. An order within the backlog. A parent or a child. A due date. A status
+Hours. A priority. An order within the backlog. A parent or a child. A due date. A status
 field -- Backlog is a folder, not a field. Any of them may come (a priority and an order, by design,
 will not); none is here, and a reader should not look for one.

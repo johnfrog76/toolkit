@@ -63,7 +63,7 @@ this machine, the **Claude Code usage** inventory row's rule) --, `tracker`
 (which tracker the active board's address names -- `"ado"`, `"github"` or `"none"`), `howIWork` (the
 active Space's answer to "How do you want to work here?", `answer`, `source`, `tracker`, `locked` and
 Team Agile's `switch` as set -- `features` already carries the gate), `identity`
-(`{email, source}`, who the ADO routes filter by), nine named checks, and the active Space's config
+(`{email, source}`, who the ADO routes filter by), the named checks the Environment card lists, and the active Space's config
 including the full `spaces` list -- each Space with its `tracker` and its own `laneNames`. `agent/README.md`'s Tier and identity sections have each field's
 fallback chain and why the tier probe runs off the event loop, cached 45 seconds, keyed by the owner for a GitHub address, with concurrent misses merged into one probe.
 
@@ -177,8 +177,8 @@ $ curl -s -X POST localhost:4100/api/cmd/Archive \
 That request moved the file and stamped `**Closed:** <today>` into it -- it *is* `tkArchive`: the
 agent forks this repo's own PowerShell and calls the function. **The allowlist is the CLI's command
 table, not a list `agent/ado/bridge.py` keeps of its own** -- it reads `Get-P20CommandMap`, cached
-against the modification times of `utilities.psm1`, the two config files and
-`Config/*.commands.psd1`, so a verb added the usual way (see [Contributing](CONTRIBUTING.md)) is
+against a stamp of each file it depends on (modification time, size and a digest of the bytes) --
+`utilities.psm1`, the two config files, the hub's `hub.json` and `Config/*.commands.psd1` -- so a verb added the usual way (see [Contributing](CONTRIBUTING.md)) is
 bridgeable on the next request with no backend edit, and switching a module on makes its verbs
 callable on the next request too. Parameters travel as process argv -- no command string is built
 or parsed on either side -- and a reply is always a `CommandResponse` with one of four statuses
@@ -325,9 +325,10 @@ on a real Linux host -- nobody has run this combination on one, but the reason i
 already known. **The Docker path in this repository is for Docker Desktop.** On native Linux, skip
 Docker and run the agent and the web UI directly on the host instead -- `tkWeb -Dev`, which already
 works there ([Quickstart](QUICKSTART.md), "Supported platforms"). An opt-in, non-default bind
-address that would let the Docker path work on native Linux too is a known gap, not built
-([Known gaps](KNOWN-GAPS.md)). Do not rebind the agent to a wider address to make the container reach
-it.
+address that would let the Docker path work on native Linux too is not built. Do not rebind the
+agent to a wider address to make the container reach it.
+
+Known gap: [Docker does not reach the agent on native Linux](KNOWN-GAPS.md#docker-does-not-reach-the-agent-on-native-linux).
 
 ### CORS
 
@@ -368,6 +369,7 @@ natively in these places, and no others:
 | `PUT /api/manager/{filename}` | an existing 1:1 session (opt-in module) | Edits a file that exists; creating one (`POST /api/manager`) runs the `NewMeeting` verb, which refuses an existing session |
 | `POST /api/assets/upload` | one image, into a fresh folder under the system temp directory | Never the hub; the `Cover` verb copies it in, through the bridge |
 | `POST /api/comms/send` | nothing on disk; posts to a Teams webhook | Needs the webhook variable set; `dryRun` runs every gate and sends nothing |
+| `POST /api/log` | one line (`CMD`, `ERR`, `WARN` or `INFO`) appended to this machine's `usage.<machine>.log` | Always mounted; the one writer the agent logs through, `core/log_writer` |
 
 Anything else the browser can make happen -- archiving a card, opening a pull request, closing a work
 item -- is a verb run through the bridge, with the same checks the terminal applies.
@@ -398,10 +400,10 @@ consts.json             The contract file: the literals all three halves parse (
 ruff.toml               The Python linter's settings, for agent/ and Tests/*.py (docs/CONTRIBUTING.md, "Lint")
 Config/                 One opt-in module's CLI contribution per pair (D-CM, docs/modules/README.md)
   growth.commands.psd1    Feature, Commands, Order, Help -- a DATA file, it cannot run code
-  growth.commands.ps1     The five wrapper functions
-  communication.commands.psd1 / .ps1   The same, for the three communication verbs
-  organize.commands.psd1 / .ps1        The same, for the two organize verbs
-  solitaireAgile.commands.psd1 / .ps1  The same, for the three Team Agile verbs
+  growth.commands.ps1     One wrapper function per growth verb
+  communication.commands.psd1 / .ps1   The same, for the communication verbs
+  organize.commands.psd1 / .ps1        The same, for the organize verbs
+  solitaireAgile.commands.psd1 / .ps1  The same, for the Team Agile verbs
   settings-workflows.json The question each optional surface answers
   ceremonies.json         Team Agile's ceremony slots
   standup-vocabulary.json Team Agile's standup vocabulary
@@ -414,15 +416,20 @@ Prompt20Toolkit/        Autoload shim installed into the module path
 templates/              Prompt file templates by work item type, plus the module ones:
                         Training, Presentation, Goal (growth), ManagerSession (communication),
                         DesignNote (the Studio, core)
-agentic/                Six card-workflow prompts, pr-suggest, new-issue, four module
-                        prompts, and prompts.json -- which way of working each belongs to,
-                        who sends it and its category (the Studio's Prompts card reads it)
+agentic/                The card workflow's prompts (ado-comments, build, new-bug, new-user-story,
+                        pr-publish, pr-ship); the two the tools send (pr-review, pr-suggest);
+                        new-issue; the module prompts (generate-review, growth-create-training,
+                        growth-create-presentation, manager1on1); how-we-work.template.md, the
+                        template HowWeWork fills; and prompts.json -- which way of working each
+                        belongs to, who sends it and its category (the Studio's Prompts card reads it)
 spec/                   Where a product may keep its specs; this tree keeps only the README ([spec/README.md](../spec/README.md))
-samples/hub/            The sample hub `tkStart` copies out on a first run: one `local` org, Demo, with five
-                        tutorial cards, sample cards, meetings, a goal and a review. Read-only here -- it is
-                        never used in place
+samples/hub/            The sample hub `tkStart` copies out on a first run: two `local` Spaces, Demo and the
+                        GitHub demo (an address, until you connect it), and the folder for the shipped
+                        config's Azure demo, with tutorial cards, sample cards, meetings, a goal, a review,
+                        reminders and design/, spec/ and docs/ files. Read-only here -- it is never used in place
 design/                 Where a product may keep its design notes; this tree keeps only the README ([design/README.md](../design/README.md))
-.github/workflows/      verify.yml, the suites in CI; pages.yml, the landing page's deploy (docs/TESTING.md, "In CI")
+.github/workflows/      verify.yml, the suites in CI; release.yml, the GitHub Release from a tag; codeql.yml,
+                        code scanning; pages.yml, the landing page's deploy (docs/TESTING.md, "In CI")
 AGENTS.md  CHANGELOG.md  VERIFY.md  the agent guide, the change log, the verification gates
 changelog.d/            The next release's changelog entries, one file each, until the release folds them in
 docs/                   The documentation. The root README is the map; each subject has one owner
@@ -452,15 +459,20 @@ docs/                   The documentation. The root README is the map; each subj
   hub/design.md           The file contract for design/, the Studio's seed drawer
 agent/                  The FastAPI agent -- see agent/README.md
   app.py                  The app: the request gate, CORS, the /api router, module mounting, static serving
-  core/                   config, config_routes, consts, env, identity, tier, parsers, cards, clock, hosts,
-                          model, surfaces, assets, child, log, log_writer, usage -- always on
-  ado/                    status, pr_comments, accounting, reporting, sprint, design, docs, bridge
+  core/                   assets, cards, checkout, child, clock, config, config_routes, consts, disk_cache,
+                          env, git_history, hosts, hub_sync, identity, log, log_writer, model, parsers,
+                          request_gate, surfaces, tier, usage -- always on
+  ado/                    accounting, backlog, bridge (and bridge.ps1, the child it runs), design, docs,
+                          pr_comments, repo_read, reporting, sprint, status
   ado/Get-WeeklyBilling.ps1   Module-private: /billing shells out to it. Not a CLI command
   growth/                 growth, reviews, resume -- one router, gated on features.growth
   communication/          manager (the routes) + comms (the engine, carried whole)
   organize/               reminders -- gated on features.organize
-  studio/                 the hub's design/ notes, and the + dialog's repositories (NewSpace -Discover) -- core, mounted with no gate (D-S13)
-  solitaire/              the standup and triage, from a GitHub Space's tracker -- gated on features.solitaireAgile
+  studio/                 notes (the hub's design/ notes), spaces (the + dialog's repositories, NewSpace -Discover),
+                          ledger (the Spaces card's read) and prompts (the Prompts card) -- core, mounted with no gate (D-S13)
+  solitaire/              standup, triage, agenda, milestones, remind (the standup's attend and remind),
+                          corner (the PM Corner), suggest (the suggestion) and tracker (the read they share),
+                          from a GitHub Space's tracker -- gated on features.solitaireAgile
 web/                    The React shell + modules -- see web/README.md
   landing.html            The landing page's entry, the second one; built by `npm run build:landing`
   src/landing/            The landing page: its own copy (copy.ts), the banner, the three ways, the commercial
@@ -477,7 +489,8 @@ web/                    The React shell + modules -- see web/README.md
   tests/smokeMatrix.mjs   --matrix: each module flag alone, the flip, fresh and hostile storage
   tests/smokeFirstRun.mjs --first-run: the first tutorial card dragged to To do, on a copy of samples/hub
 Tests/                  Suites -- Test-*.ps1 (PowerShell) and test_*.py (the agent)
-  fixtures/parsers/       Four prompt files both parsers are pinned against
+  fixtures/parsers/       The prompt files both parsers are pinned against, and the shared tables,
+                          card-ids.json among them
   fixtures/hub/           A prompt store with no toolkit in it and no .git: two cards under
                           test/current/, plus growth/current/ (one artifact per type),
                           reviews/test/2026/..., resume/resume.md and manager/current/

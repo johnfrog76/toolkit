@@ -38,6 +38,8 @@ if ($Help) {
 
 $ErrorActionPreference = 'Stop'
 
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
+
 $testDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pkgRoot = Split-Path $testDir -Parent
 $reviewScript = Join-Path $pkgRoot 'Scripts/Generate-Review.ps1'
@@ -88,8 +90,8 @@ function Invoke-DatedCommit {
     param([string]$Message, [string]$Stamp)
     $env:GIT_AUTHOR_DATE = $Stamp
     $env:GIT_COMMITTER_DATE = $Stamp
-    git add -A 2>&1 | Out-Null
-    git -c user.name='Fixture' -c user.email='fixture@example.com' commit -m $Message 2>&1 | Out-Null
+    $null = Invoke-P20TestGit add -A
+    $null = Invoke-P20TestGit -c user.name='Fixture' -c user.email='fixture@example.com' commit -m $Message
     $env:GIT_AUTHOR_DATE = $null
     $env:GIT_COMMITTER_DATE = $null
 }
@@ -101,8 +103,8 @@ $savedReviewsDir = $env:PROMPTS_REVIEWS_DIR
 
 Push-Location $hub
 try {
-    git init -q -b main 2>&1 | Out-Null
-    git config core.autocrlf false 2>&1 | Out-Null
+    $null = Invoke-P20TestGit init -q -b main
+    $null = Invoke-P20TestGit config core.autocrlf false
 
     # Well outside the window under test.
     New-Card 'first/archive/101-old-thing.prompt.md' 'An older closed card' 'Sprint 1' '- [x] done'
@@ -314,8 +316,8 @@ try {
     New-Item -ItemType Directory -Path $renamedHub -Force | Out-Null
     Push-Location $renamedHub
     try {
-        git init -q -b main 2>&1 | Out-Null
-        git config core.autocrlf false 2>&1 | Out-Null
+        $null = Invoke-P20TestGit init -q -b main
+        $null = Invoke-P20TestGit config core.autocrlf false
         # Everything the default-named hub has, under a different name.
         [System.IO.File]::WriteAllText((Join-Path $renamedHub 'hub.json'),
             '{ "folders": { "growth": "development" } }', [System.Text.UTF8Encoding]::new($false))
@@ -420,8 +422,8 @@ try {
     # time inside the window -- the shape a reorganisation or a backfill leaves.
     New-StampedHub $gitHub9
     Push-Location $gitHub9
-    git init -q -b main 2>&1 | Out-Null
-    git config core.autocrlf false 2>&1 | Out-Null
+    $null = Invoke-P20TestGit init -q -b main
+    $null = Invoke-P20TestGit config core.autocrlf false
     Invoke-DatedCommit 'reorganise: every card touched in one commit' '2026-05-25T09:00:00'
     Pop-Location
 

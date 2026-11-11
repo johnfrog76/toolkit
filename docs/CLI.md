@@ -135,6 +135,16 @@ triage item of its own, with its own `Decision:` and `Reply:` slot, marked
 fills the thread's `Reply:` slot the moment it posts, so the card is the record before the next fetch
 as well as after it.
 
+**The side record.** Besides the card, a run writes one small file per PR, repository and day,
+`<promptsRoot>/<promptsFolder>/pr-comments/<date>-<repository>-PR<id>.md` (the PR title, its URL, the fetch
+time, the repository and the count of new comments; the repository is made safe for a file name, so
+`acme/widgets` is `acme-widgets`). The repository is in the name because a PR number is per repository.
+**Nothing overwrites one:** a second fetch the same day adds its own `Fetched:` and `Comments:` lines to
+the record already there. Nothing reads it today: the review count, `prsReviewed`, counts `LogPeerReview`'s
+`reviewed-` records. **With `-OutputFile <path>` it is not written at all** -- the named file is the only file
+that run writes, and the verb prints one line saying the side record was skipped -- so a run aimed at a
+scratch file leaves nothing behind in the hub.
+
 **On a GitHub board** `GetPRComments` reads through `gh api`, and reads all three places GitHub keeps a
 review: the inline review comments (a reply joins the thread of the comment it answers), the
 conversation tab, and each review's own summary text. Each becomes a thread in the same block shape,
@@ -154,13 +164,15 @@ naming them -- a read, but it writes a card, and the same number on the wrong re
 else's review. **The card** is the one whose `PR URL:` names it, else the head branch's, else the issue
 the pull request's body names (`NewPR`'s `Issue: #n` line, or a closing keyword such as `Fixes #n`).
 
-**Answering on a GitHub board.** `ReplyPR <pr> <thread>` takes the `(Thread N)` the card shows and finds
+### Answering on a GitHub board
+
+`ReplyPR <pr> <thread>` takes the `(Thread N)` the card shows and finds
 the repository the same way, in the same order. The id is one of the three kinds above, and each is
 answered the way GitHub allows. An **inline thread** gets a real reply, through REST
 (`pulls/<n>/comments/<root>/replies`, to the thread's first comment -- GitHub replies to a top-level
 comment only, so a follow-up's id answers through its root). A **conversation comment** or a **review's
 summary** has no thread on GitHub, so the reply is a new comment on the pull request that opens with a
-link to the one it answers -- and the next `GetPRComments` reads that comment back as a thread of its own ([Known gaps](KNOWN-GAPS.md)). Bodies travel as a JSON file (`gh api --input`), never in an argument --
+link to the one it answers -- and the next `GetPRComments` reads that comment back as a thread of its own. Bodies travel as a JSON file (`gh api --input`), never in an argument --
 Windows PowerShell 5.1 drops a bare `"` from a native command's argv. **`-Status`** keeps Azure DevOps'
 words and maps the ones GitHub has: a review thread is only resolved or unresolved, and REST cannot set
 either, so the status goes through GraphQL. `fixed` and `closed` run `resolveReviewThread`; `active`, the
@@ -172,17 +184,11 @@ name, before anything is asked or posted**, exit 2 -- say it in the reply instea
 comment or a review summary there is no thread to resolve: the reply is posted and the line says
 `-Status` was not applied. The card's `Status:` line reads `resolved` or `unresolved` afterwards.
 
-**The side record.** Besides the card, a run writes one small file per PR, repository and day,
-`<promptsRoot>/<promptsFolder>/pr-comments/<date>-<repository>-PR<id>.md` (the PR title, its URL, the fetch
-time, the repository and the count of new comments; the repository is made safe for a file name, so
-`acme/widgets` is `acme-widgets`). The repository is in the name because a PR number is per repository.
-**Nothing overwrites one:** a second fetch the same day adds its own `Fetched:` and `Comments:` lines to
-the record already there. Nothing reads it today: the review count, `prsReviewed`, counts `LogPeerReview`'s
-`reviewed-` records. **With `-OutputFile <path>` it is not written at all** -- the named file is the only file
-that run writes, and the verb prints one line saying the side record was skipped -- so a run aimed at a
-scratch file leaves nothing behind in the hub.
+Known gap: [A reply to a conversation comment reads back as its own thread](KNOWN-GAPS.md#a-reply-to-a-conversation-comment-reads-back-as-its-own-thread).
 
-And when it ships:
+### When it ships
+
+Archive the card:
 
 ```powershell
 tkArchive <ID>         # move current/ (or backlog/) -> archive/, and commit if storeSync is 'git'
@@ -320,6 +326,7 @@ own interval, so reorganising the hub never brings an archived card back onto th
 **A weekend belongs to the week after.** Only weekdays render, and time is in by Friday, so anything
 dated Saturday or Sunday -- a `**Closed:**`, a commit, a `**Review:**` -- is billed on the Monday
 after: a card closed on Saturday reads active through Friday and `resolved` on Monday.
+Daily is in the browser only, for this week and last.
 
 One line takes a card off it:
 
@@ -365,6 +372,8 @@ reader of a date from git uses that one helper (the agent's twin is `agent/core/
 **Commit it with a subject that starts `backfill:`.** Billing skips the commits the toolkit itself
 makes for mechanical reasons -- that one, and `sync: refresh package links` -- because they touch
 cards nobody worked on.
+
+Known gap: [Daily reads two weeks, in the browser only](KNOWN-GAPS.md#daily-reads-two-weeks-in-the-browser-only).
 
 #### A card's picture: Cover
 
@@ -443,7 +452,8 @@ writes, to a card or to the board.
 
 #### Every tracker verb names the space it acts in
 
-`NewPrompt`, `CloseItem`, `NewPR`, `MyWork`, `MyPRs` and `Dashboard` each print one header line
+`NewPrompt`, `CloseItem`, `NewPR`, `GetPRComments`, `ReplyPR`, `AddPRReview`, `Land`, `MyWork`, `MyPRs` and
+`Dashboard` each print one header line
 before they contact a tracker -- `[*] In <Space> (<tracker>)`, the active space's display name and
 `ado`, `gh` or `local`. An id is unambiguous **within** a space; across two configured tenants the
 same number names two different cards, and the active space decides which one silently. A guard
@@ -503,7 +513,7 @@ As `{prefix}Command`. `tkMenu` lists them live; `tkMenu -All` shows everything;
 | `Move <id\|file> -To Backlog\|Active\|InProgress\|CodeReview\|Done` | Move a card to a lane **by hand**, for a card with nothing checked in or no pull request: In Progress writes `**Started:**`, Code Review writes `**Review:**`, Done is `Archive` exactly. Active and Backlog move the FILE: `-To Active` pulls a planned card from `backlog/` into `current/`, `-To Backlog` parks an Active card -- refused, exit 2, when anything is threaded. A planned card moved to In Progress or Code Review is pulled into `current/` first. Found in `current/` or `backlog/`. A card travels one way; moving back is refused ([State](#state-three-machines-not-one)) |
 | `Billable <id\|file> [-No]` | `-No` keeps a card **off Daily** and off Team Agile's standup; without it the card is billable again. A card is billable unless it says otherwise ([below](#the-third-line-billable)) |
 | `Plan <id\|file> [-Milestone <title>] [-Sprint <title>] [-Rank top\|up\|down\|<n>]` / `Plan <id\|file> -Remove [-Only Milestone\|Sprint]` | Plan a card into a milestone, a sprint, or both -- the write side of the card's two planning lines, `**Milestone:**` and `**Sprint:**`, each its own line ([the card](hub/cards.md#milestone-and-sprint-two-lines)). `-Milestone` and `-Sprint` write the title **whole, never truncated**, through `Set-P20CardLine`, and each leaves the other line reading as it was. A card with no `**Milestone:**` line -- every card written before the two were separate -- reads its milestone from its `**Sprint:**` line, as it always did (an Azure DevOps card excepted: there that line is the iteration path), so `-Sprint` on such a card first writes a `**Milestone:**` line carrying that milestone (or `(none)`). `-Remove` deletes both lines, as it always deleted the one; `-Remove -Only Milestone` or `-Only Sprint` takes the card out of one and keeps the other. A call that changes neither reading writes nothing. Never touches the tracker: the different, tracker-bound `-Sprint` on `NewItem`/`EditItem` sets a milestone on the work item itself, through `gh`/`az`. Found in `current/` or `backlog/`, and **never** pulls a planned card into play first -- being planned before being pulled into play is the point. Sprints and milestones stay opt-in at every grain: no verb here ever requires one. **A milestone is also an order**, one file per milestone, `<Space>/milestones/<slug>.md` ([milestones](hub/milestones.md)), and `Plan` is its one writer: `-Milestone` appends the card's id at the bottom of that milestone's order (creating the file, UTF-8 with no BOM and LF, if there is none) and takes it out of the order of the milestone it left; `-Remove` and `-Remove -Only Milestone` take it out; `-Rank top`, `up`, `down` or a position from 1 moves it within its milestone's order -- one line removed and one inserted, no card touched -- counting only the cards the order ranks, and a card the order does not list yet joins it at the bottom first. `-Rank` refuses (exit 2) on a card with no milestone, naming `Plan <id> -Milestone`, and on an Azure DevOps Space, naming `MyWork`: there the board keeps the order and no order file is written by any switch |
-| `Tag <id\|file> <tag>[,<tag>] [-Remove]` | Write the card's `Tags:` line, under `## Work Item Info`, through `Set-P20CardLine` ([the card](hub/cards.md#2-the-parsed-tokens----what-the-machine-reads)): tags added after the ones already there, joined by a comma and a space, one it already carries (in any case) not added twice; `-Remove` takes them off, the last one leaving the template's `Tags: (None)`. A card with no line gets one under `Priority:`. A call that changes no tag writes nothing and says so. Several arguments or one with commas. Never touches the tracker. Found in `current/` or `backlog/` |
+| `Tag <id\|file> <tag>[,<tag>] [-Remove]` | Write the card's `Tags:` line, under `## Work Item Info`, through `Set-P20CardLine` ([the card](hub/cards.md#the-tags-line)): tags added after the ones already there, joined by a comma and a space, one it already carries (in any case) not added twice; `-Remove` takes them off, the last one leaving the template's `Tags: (None)`. A card with no line gets one under `Priority:`. A call that changes no tag writes nothing and says so. Several arguments or one with commas. Never touches the tracker. Found in `current/` or `backlog/` |
 | `Backlog [-Milestone <title>] [-Tag <tag>] [-Type <type>]` | The Space's waiting cards as one ranked table ([milestones](hub/milestones.md#the-backlog-the-order-as-a-table)): every card in `backlog/` -- rank, id, type, milestone, tags, age and title -- milestone by milestone, milestones with an order file first by the day the file was made, then the rest by title; inside each, its order; then the cards with no milestone, oldest first. A milestone's cards in play sit in their place, marked `in play` in the State column, so the ranks read 1, 2, 3 -- the place in the milestone's order, the count `Plan <id> -Rank` uses. The count line says the waiting and the in-play cards apart. `-Milestone`, `-Tag` and `-Type` go together and match ignoring case (`-Type` ignoring spaces, so `UserStory` is `User Story`); a filtered row keeps its rank. An empty `backlog/`, or a filter nothing matches, says so in words. Read-only, a folder read: it works offline and with no tracker. On an Azure DevOps Space it refuses (exit 2), naming `MyWork` |
 | `Cover <id\|file> <image> [-Before] [-Remove] [-WhatIf]` / `Cover -Samples [-WhatIf]` | Give a card a picture: copied into the Space's `assets/<card key>/`, named by a `**Cover:**` line (or `**Before:**`). Found in `current/` or `archive/`; attaching again replaces the card's own picture; a card that came back takes `cover-r2`; `-Remove` deletes the picture and the line; with `storeSync: git` the two are one commit, and a commit git refuses is a stated refusal (exit 2) that says the picture and the line are already written; `-Samples` dresses the sample cards of an older Demo that have no cover ([below](#a-cards-picture-cover)) |
 | `CloseItem <id> -Comment "..."` (formerly `CloseWorkItem`; `NewItem` was `NewAdoItem`, `EditItem` was `EditWorkItem` -- the old names still answer, with a one-time hint) | Close or resolve the tracker's card (`-Reason`, `-WhatIf`). On a GitHub board: `gh issue close`, where GitHub knows exactly two reasons -- the default and `Completed`/`Fixed` close as **completed**, the not-doing-it shorthands (`WontFix`, `Obsolete`, `Duplicate`, ...) close as **not planned**, and a word mapping to neither is refused with both named. The comment stays markdown there; GitHub renders it |
@@ -648,7 +658,7 @@ of the hub's files.
 | `InstallAutoload` | Install the module shim so commands autoload everywhere. `-Remove` takes it back out of every Modules folder it is in (link or copy; never the checkout), prints each path, says `nothing to remove` when there is none, and checks in a cold `-NoProfile` shell that the commands no longer resolve; `-WhatIf` prints and removes nothing; `-Remove -Force` is refused (exit 2). [Quick start](QUICKSTART.md), "Removing ToolKit" |
 | `Start` | The first run. Copies the sample hub (`samples/hub`) to a folder you own -- `-Path`, default `~/toolkit-hub` -- points this machine at it (`promptsRoot`, `activeSpace=demo`, the four opt-in modules on -- growth, communication, deck and organize --, all through `Config`), re-imports, and opens the web UI (`-NoWeb` to skip). The sample org is `local`: no ADO, no login. **Never overwrites**: a machine that already has a hub keeps it; a folder with anything in it, a folder inside the Toolkit, and a configured hub that has gone missing are refusals (exit 2) that change nothing. `-WhatIf` says what it would do |
 | `Update` | Bring this machine's Toolkit up to date: pull it, **fast-forward only**, re-import it into this shell, and say what else moved -- the autoload shim, the web UI's lockfile, the agent's requirements. `-Sync` then syncs the prompt store: software first, then data. `-WhatIf` fetches and reports. Never commits, rebases or pushes the Toolkit. The package must be the **root** of its own checkout; a copy inside another repository is refused rather than fast-forwarding that one |
-| `Log` | Diagnostic log (`-Errors`, `-Today`, `-Days <n>`, `-Count <n>`, `-Command`, `-Type`, `-Clear`; `-Tail` follows live) |
+| `Log` | Diagnostic log (`-Errors`, `-Today`, `-Days <n>`, `-Count <n>`, `-Command`, `-Type`, `-Clear`; `-Tail` follows live; `-Ack` dismisses `Menu`'s error indicator) |
 | `Burn [-AsJson] [-At <yyyy-mm-dd HH:mm>]` | **The current Claude Code burn**: today (from local midnight) and this week (from `burn.weekStarts`, Friday 05:00 local by default), this machine's session files read live plus the day records the other machines logged into the hub's `usage/` -- tokens by model, a cost marked derived, never a plan percentage. `-AsJson` prints the same as one JSON object, what the System page's tile reads through the agent; `-At` reads it as it stood at a past local time. [The current burn](#the-current-burn-burn) below |
 | `Burn -Log [-Date <yyyy-mm-dd>]` | Write **the day's Claude Code usage** on this machine into the hub: `usage/<yyyy-mm-dd>-<machine>.json`, read from Claude Code's own session files (read-only), with tokens by model and by session and a cost derived from `Config/claude-prices.json`. Today by default; `-Date` logs a past day. A second run that day replaces the record. `-Date` without `-Log`, and `-Log` with `-AsJson`, refuse, exit 2; a machine with no session files writes nothing and says so. [The day's Claude Code usage](#the-days-claude-code-usage-burn--log) below, and the record's shape in [`hub/usage.md`](hub/usage.md) |
 
@@ -994,7 +1004,7 @@ is off, and `SwitchSpace` brings them back in one that works with agents.
 | `UpdateResume [-NoPush] [-Preview]` | `features.growth` | The same three for `resume/` |
 | `LogPeerReview <id> [-Title <t>] [-Notes <n>]` | `features.growth` | Log a completed review of someone else's PR. The one thing growth writes that is **org**-scoped: it lands in the active Space's `pr-comments/` |
 | `SendTeams <recipient> <message> [-Session <file>] [-WhatIf] [-AsJson]` | `features.communication` | Post one line to a Teams recipient through the communication engine. `-Session` names the meeting record in `manager/current/` the send is for, and a sent message is noted under its `## Sent` |
-| `NewMeeting [-Date <YYYY-MM-DD>]` | `features.communication` | Scaffold a 1:1 session from `templates/ManagerSession.template.md`. Never overwrites, and refuses a date already closed into `manager/archive/`. Created out of order, it prints a `Check:` line naming the later session whose `## Carried from` heading is now stale ([Which session a record carries from](hub/manager.md#which-session-a-record-carries-from)) |
+| `NewMeeting [-Date <YYYY-MM-DD>] [-Type <series>]` | `features.communication` | Scaffold a 1:1 session from `templates/ManagerSession.template.md`. `-Type <series>` makes the record for another meeting series instead -- a lower-case, dashed name (`client-weekly`) that goes in front of the date in the filename ([Where it lives](hub/manager.md#where-it-lives)); any other name is refused, exit 2. Never overwrites, and refuses a date already closed into `manager/archive/`. Created out of order, it prints a `Check:` line naming the later session whose `## Carried from` heading is now stale ([Which session a record carries from](hub/manager.md#which-session-a-record-carries-from)) |
 | `MeetingAgenda [-Plan] [-Prep] [-Retro] [-Close] [-Date <d>] [-Type <t>] [-DryRun]` | `features.communication` | Drive a session through its stages -- plan, prep, retro -- and `-Close` it: the file moves to `manager/archive/` and is stamped `**Closed:**`. A `Check:` line says when a session's `## Carried from` heading no longer names the latest earlier session; nothing rewrites it |
 | `NewReminder -Title <t> [-Due <when>] [-Source <tag>] [-Ref <ref>]` | `features.organize` | Create a reminder in `reminders/current/` with a fresh short id. `-Due` takes a date, a date and time, or `1h` / `tomorrow` / `nextweek`. Never overwrites |
 | `Reminders [<id>] [-Snooze 1h\|tomorrow\|nextweek] [-Archive] [-Due <when>] [-NoDue] [-Title <text>] [-Source <tag>] [-Ref <ref>] [-All]` | `features.organize` | No id: the open reminders grouped overdue / today / upcoming. `-Snooze` rewrites the due time and nothing else; `-Due`, `-NoDue`, `-Title`, `-Source` and `-Ref` correct the entry, each rewriting its own line; `-Archive` moves it to `reminders/archive/` and stamps `**Closed:**` ([Organize](modules/organize.md)) |
@@ -1225,12 +1235,12 @@ switch to a script and its help, and that suite tells you the wrapper is missing
 | Tier too low | `<command> needs ADO (Tier 1); currently Tier <n>.` -- on a GitHub board the sentence says `needs GitHub` and the hint names `gh` (`gh auth login`); either way the hint says why (the org is `local`, the tool is not signed in, the tracker did not answer); exit 2, so the bridge reports it as an error. `-Help` answers on any tier |
 | Branch matches no prompt file | `No prompt file matches branch '<branch>'.` -- the hint names the folder it looked in; `-File` names the card |
 | Branch matches several | `Branch '<branch>' matches <n> prompt files.` -- the candidates are listed; `-File` picks one. Never the first of them |
-| Prompt file already exists | Not an error. `Card <id> is already in current/ -- nothing was written, and ADO was not contacted.`, the card's path, exit 0. There is no switch that overwrites: move or delete the file to start it over |
+| Prompt file already exists | Not an error. `[=] Card <id> is already in <folder>/ -- nothing was written, and ADO was not contacted.`, naming `current/` or `backlog/`, whichever holds the card, then the card's path, exit 0. There is no switch that overwrites: move or delete the file to start it over |
 | Archiving with no argument | `no card given.` -- pass the card's ID, or `tkArchive -List` |
-| Archiving an ID no card carries | `No card with id '<id>' in current/.` -- an argument with the shape of an ID (`141`, `k7m2`) is an ID, not a partial name. Only when it is in neither `current/` nor `archive/`: an archived one is success |
-| Archiving a name that matches nothing | `No file matching '<name>' found in current/.` -- `tkArchive -List` shows the candidates |
-| Archiving a name that matches several | `'<name>' matches <n> files in current/.` -- be more specific |
-| Archiving a partial name through the bridge | `'<name>' is not a card in current/; it matches '<file>' only by partial name.` -- pass the ID or the full filename |
+| Archiving an ID no card carries | `No card with id '<id>' in current/ or backlog/.` -- an argument with the shape of an ID (`141`, `k7m2`) is an ID, not a partial name. Only when it is in none of `current/`, `backlog/` and `archive/`: an archived one is success |
+| Archiving a name that matches nothing | `No file matching '<name>' found in current/ or backlog/.` -- `tkArchive -List` shows the candidates |
+| Archiving a name that matches several | `'<name>' matches <n> files in current/ and backlog/.` -- be more specific |
+| Archiving a partial name through the bridge | `'<name>' is not a card in current/ or backlog/; it matches '<file>' only by partial name.` -- pass the ID or the full filename |
 | Hub not found | `Hub not found: '<root>' -- is the drive connected? promptsRoot in config.local.json` -- said once at import, and by every verb that reads the hub |
 | A tracker tool is missing, or will not start | `<tool> is not installed, or not on the PATH, so it was not run.` (code `127`), or `<tool> could not be started: <reason>` (code `126`; a command line longer than the host will start is the usual reason) -- `Invoke-P20TrackerRead`'s answer, and nothing runs. Each verb then says it in its own words instead of reporting a write: `EditItem` and `CloseItem` refuse, exit 2 (`EditItem`'s hint carries the sentence); `NewPR` warns that the issue comment failed and goes on, the pull request made; `MyPRs` names the project that did not answer, with the sentence (Azure DevOps), or refuses, exit 2 (GitHub); `MyWork` and `Dashboard` warn for the read that failed |
 | `MyWork`'s query fails on Azure DevOps | `Azure DevOps did not answer the work item query in <org>: <what az said> <prefix>Env shows the tier.` -- a warning, exit 0, as the GitHub path says its own; never read as `No assigned work items found.` |
@@ -1350,22 +1360,30 @@ multi-thread reviews on demand. `-DryRun` costs an API call and posts nothing.
 The commands move a card between states. [`agentic/`](../agentic/) holds the part that decides *what
 to do* at each one -- prose, run by an assistant, no runtime of its own.
 
-Six ship as the **card-workflow** set, and the bar for that set is deliberately high:
+These ship as the **card-workflow** set, and the bar for that set is deliberately high:
 
 | Prompt | What it drives |
 | --- | --- |
+| `build` | Build a card that already exists: its branch, the work, each commit threaded in, its sections written as you go, then `pr-ship`. It is the prompt `tkStartWork`'s hand-off block carries |
 | `new-bug` | Draft a Bug, create it with `tkNewItem`, create its card with `tkNewPrompt`, fill in the repro |
 | `new-user-story` | The same for a User Story: scope, implementation details, described changes, acceptance criteria |
 | `ado-comments` | Two-pass PR comment triage -- the agent prepares every comment, then you decide one at a time |
 | `pr-ship` | Stage 1: verify the card's context is real, commit, open a **draft** PR |
 | `pr-publish` | Stage 2: draft → ready, plus comms. Deliberately separate from stage 1 |
-| `pr-review` | The prompt behind `tkAddPRReview` |
 
-A fifth, `new-issue`, ships beside them for a different reason: it is the front end of
+`pr-review` and `pr-suggest` ship beside them, and are not run by hand: they are the instructions the
+tools send to a model.
+
+| Prompt | What it drives |
+| --- | --- |
+| `pr-review` | The prompt behind `tkAddPRReview` |
+| `pr-suggest` | The prompt behind the agent's `POST /api/pr-comments/{filename}/suggest`, which the PR Comments page's **Suggest a reply** calls |
+
+`new-issue` ships beside them too, for a different reason: it is the front end of
 the GitHub issue list ([Contributing, "Start with an issue"](CONTRIBUTING.md#start-with-an-issue)), and a triage rule that says "an
 issue before a fix" is only real if filing one is a single command.
 
-Four more ship here as **module content** -- they are part of growth and communication the way a
+The rest ship here as **module content** -- they are part of growth and communication the way a
 script in `Scripts/` or a template in `templates/` is, and they come with their module rather than
 through the bar above:
 

@@ -1,14 +1,32 @@
-# The three halves' suites on Ubuntu, and what only Windows proves -- the CLI on
-# Windows, in PowerShell 7 and in Windows PowerShell 5.1, and the browser smoke --
-# on Windows. They run on different triggers, because Windows is slow and the
-# Ubuntu job is the merge gate:
+# The three halves' suites on Ubuntu, each in a job of its own, and what only
+# Windows proves -- the CLI on Windows, in PowerShell 7 and in Windows PowerShell
+# 5.1, and the browser smoke -- on Windows. They run on different triggers,
+# because Windows is slow and the Ubuntu jobs are the merge gate:
 #
-#   ubuntu   every pull request, every push to main, and the Actions tab's button.
-#   windows  the browser smoke and the CLI in PowerShell 7 on Windows.
-#   ps51     every CLI suite in Windows PowerShell 5.1, the floor.
-#            The two Windows jobs run side by side, on a schedule, the button, and
-#            a pull request that carries the `ci` label. A push to main does not
-#            run them, nor does an ordinary pull request.
+#   changes   every pull request, every push to main, and the Actions tab's button:
+#             which of the jobs below this run needs (Scripts/Get-CiScope.ps1).
+#   cli       the CLI half,      )
+#   agent     the agent half,    ) side by side, each with its own installs and lints,
+#   web       the web UI half,   ) each when `changes` says the change can reach it.
+#   contract  a pull request that leaves a half out: the cross-half suites of the
+#             halves that did not run, and the check that their paste lines in
+#             docs/TESTING.md are main's (Scripts/Test-CarriedCounts.ps1).
+#   verify    the one check that sums the run up: green when every job the
+#             change needed passed, whatever the filter skipped.
+#   windows   the browser smoke and the CLI in PowerShell 7 on Windows.
+#   ps51      every CLI suite in Windows PowerShell 5.1, the floor.
+#             The two Windows jobs run side by side, on a schedule, the button, and
+#             a pull request that carries the `ci` label -- ps51 on such a pull
+#             request only when `changes` says the CLI half is in scope. A push to
+#             main does not run them, nor does an ordinary pull request. Verify
+#             waits for ps51 on the runs that start it; the windows job is not
+#             behind Verify.
+#
+# A push to main and the button run every Ubuntu half. A pull request runs the
+# half each changed path can reach: web/ the web job, changelog.d/ and CHANGELOG.md
+# the CLI job, and a shared path -- or one the rule does not know -- all three. A
+# change to the count lines of docs/TESTING.md, AGENTS.md or VERIFY.md and nothing
+# else in them reaches no half by itself.
 #
 # Windows runs against main once each weekday evening, so a change that only 5.1 or
 # the browser would show is caught the same day. A pull request that is heavy on
@@ -33,6 +51,8 @@
 #
 # No secret and no personal token: each job reads the repository with the default
 # GITHUB_TOKEN and nothing else, and no TEAMS_WEBHOOK_* or model key exists here.
+# No action beyond actions/checkout, actions/setup-node and actions/setup-python:
+# the filter is one git diff and a script in this tree.
 # What the jobs run, and what stays a walk, is docs/TESTING.md, "In CI".
 name: verify
 
@@ -60,10 +80,56 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  ubuntu:
-    name: Three halves on Ubuntu
-    # Not the schedule: that is Windows's.
+  changes:
+    name: Which halves the change can reach
+    # Not the schedule: that is Windows's, and every Ubuntu job below waits on this one.
     if: ${{ github.event_name != 'schedule' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    outputs:
+      cli: ${{ steps.scope.outputs.cli }}
+      agent: ${{ steps.scope.outputs.agent }}
+      web: ${{ steps.scope.outputs.web }}
+      contract: ${{ steps.scope.outputs.contract }}
+    steps:
+      # The whole history, so the pull request's base is here to diff against.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # One step: the changed files, then the rule over them (Get-P20CiScope in
+      # Scripts/TestAll-Rules.ps1). --no-renames lists a moved file at both ends, so
+      # a file moved out of a shared folder still counts as a change there. The
+      # three documents that carry counts also go in as their changed lines and
+      # their text at the base, so a change to their count lines alone reaches no
+      # half (Get-P20CountOnlyPaths). Any other event lists nothing, and the script
+      # answers every half.
+      - name: The files changed, and the jobs they need
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          : > "$RUNNER_TEMP/changed.txt"
+          : > "$RUNNER_TEMP/counts.diff"
+          mkdir -p "$RUNNER_TEMP/base/docs"
+          if [ "$EVENT" = "pull_request" ]; then
+            git diff --name-only --no-renames "$BASE...HEAD" > "$RUNNER_TEMP/changed.txt"
+            git diff -U0 --no-renames "$BASE...HEAD" -- docs/TESTING.md AGENTS.md VERIFY.md > "$RUNNER_TEMP/counts.diff"
+            from=$(git merge-base "$BASE" HEAD)
+            for f in docs/TESTING.md AGENTS.md VERIFY.md; do
+              git show "$from:$f" > "$RUNNER_TEMP/base/$f" 2>/dev/null || : > "$RUNNER_TEMP/base/$f"
+            done
+          fi
+          pwsh -NoProfile -File Scripts/Get-CiScope.ps1 -Event "$EVENT" -PathsFile "$RUNNER_TEMP/changed.txt" -CountDiffFile "$RUNNER_TEMP/counts.diff" -BaseRoot "$RUNNER_TEMP/base"
+
+  cli:
+    name: The CLI on Ubuntu
+    needs: changes
+    if: ${{ needs.changes.outputs.cli == 'true' }}
     runs-on: ubuntu-latest
     # The CLI half spawns a child pwsh per case and a slow two-core runner has taken
     # four times what a quick one does for the same tree (33 minutes against a
@@ -75,21 +141,34 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-          cache-dependency-path: web/package-lock.json
+      - name: Versions
+        run: |
+          pwsh -NoProfile -Command '"pwsh " + $PSVersionTable.PSVersion.ToString()'
+          git --version
 
-      - name: npm ci (web)
-        id: npm
-        working-directory: web
-        run: npm ci
+      # The CLI: tkTest's CLI half in a shell with exactly one toolkit in it
+      # (AGENTS.md, "One toolkit per shell"); the runner's Total line. It runs
+      # every CLI suite, the cross-half ones the contract job runs included.
+      - name: The CLI -- tkTest -Half cli
+        run: |
+          set +e
+          pwsh -NoProfile -Command '$env:PSModulePath = (Resolve-Path .); Import-Module ./Prompt20Toolkit/Prompt20Toolkit.psd1 -Force; tkTest -Half cli; exit $LASTEXITCODE' 2>&1 | tee "$RUNNER_TEMP/cli.log"
+          code=${PIPESTATUS[0]}
+          pwsh -NoProfile -File Scripts/Test-CiHalf.ps1 -Half cli -Path "$RUNNER_TEMP/cli.log" -ExitCode "$code"
 
-      # Each install runs whatever the one before it did, so a failed npm ci cannot
-      # take the agent's answer with it; each runner below waits on its own install.
+  agent:
+    name: The agent on Ubuntu
+    needs: changes
+    if: ${{ needs.changes.outputs.agent == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
       - uses: actions/setup-python@v7
-        if: ${{ !cancelled() }}
         with:
           python-version: "3.12"
           cache: pip
@@ -99,15 +178,15 @@ jobs:
 
       - name: pip install (agent)
         id: pip
-        if: ${{ !cancelled() }}
         run: python -m pip install -r agent/requirements-dev.txt
 
+      # Each step below runs whatever the one before it did, so one red step cannot
+      # hide the others' answers; the runner and the lint wait on the install.
       - name: Versions
         if: ${{ !cancelled() }}
         run: |
           pwsh -NoProfile -Command '"pwsh " + $PSVersionTable.PSVersion.ToString()'
           python --version
-          node --version
           git --version
 
       # The agent: pytest's closing line.
@@ -127,17 +206,52 @@ jobs:
           ruff check
           ruff format --check
 
-      # The CLI: tkTest's CLI half in a shell with exactly one toolkit in it
-      # (AGENTS.md, "One toolkit per shell"); the runner's Total line.
-      - name: The CLI -- tkTest -Half cli
+      # The agent's dependency audit, so an advisory fails a run the day it lands
+      # rather than waiting on Dependabot's weekly pull request: pip-audit reads the
+      # agent's requirements in a throwaway environment of its own, as
+      # docs/CONTRIBUTING.md describes.
+      - name: The dependencies -- pip-audit
         if: ${{ !cancelled() }}
         run: |
-          set +e
-          pwsh -NoProfile -Command '$env:PSModulePath = (Resolve-Path .); Import-Module ./Prompt20Toolkit/Prompt20Toolkit.psd1 -Force; tkTest -Half cli; exit $LASTEXITCODE' 2>&1 | tee "$RUNNER_TEMP/cli.log"
-          code=${PIPESTATUS[0]}
-          pwsh -NoProfile -File Scripts/Test-CiHalf.ps1 -Half cli -Path "$RUNNER_TEMP/cli.log" -ExitCode "$code"
+          python -m venv "$RUNNER_TEMP/audit"
+          "$RUNNER_TEMP/audit/bin/python" -m pip install --quiet pip-audit
+          "$RUNNER_TEMP/audit/bin/python" -m pip_audit -r agent/requirements-dev.txt
 
-      # The web UI: jest's Tests: line.
+  web:
+    name: The web UI on Ubuntu
+    needs: changes
+    if: ${{ needs.changes.outputs.web == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: npm ci (web)
+        id: npm
+        working-directory: web
+        run: npm ci
+
+      # Each step below runs whatever the one before it did, so one red step cannot
+      # hide the others' answers; each waits on the install.
+      - name: Versions
+        if: ${{ !cancelled() }}
+        run: |
+          pwsh -NoProfile -Command '"pwsh " + $PSVersionTable.PSVersion.ToString()'
+          node --version
+          git --version
+
+      # The web UI: jest's Tests: line. It holds both web-side contracts too, the
+      # constants (src/shell/consts.test.ts) and the scenario grid
+      # (src/shell/scenarios.test.tsx).
       - name: The web UI -- npm test
         if: ${{ !cancelled() && steps.npm.outcome == 'success' }}
         working-directory: web
@@ -156,27 +270,143 @@ jobs:
 
       # The documentation lints: markdownlint over the root README.md and the other
       # root documents, docs/, web/README.md and agent/README.md, with the tree's
-      # own settings (.markdownlint-cli2.jsonc).
+      # own settings (.markdownlint-cli2.jsonc). Every documentation path is shared
+      # or under web/, so a change to any of them runs this job.
       - name: The documentation -- npm run lint:md
         if: ${{ !cancelled() && steps.npm.outcome == 'success' }}
         working-directory: web
         run: npm run lint:md
 
-      # The dependency audits, so an advisory fails a run the day it lands rather
-      # than waiting on Dependabot's weekly pull request. npm audits what ships
-      # (--omit=dev) at high or above; pip-audit reads the agent's requirements in
-      # a throwaway environment of its own, as docs/CONTRIBUTING.md describes.
+      # The web UI's dependency audit: what ships (--omit=dev), at high or above.
       - name: The dependencies -- npm audit
         if: ${{ !cancelled() && steps.npm.outcome == 'success' }}
         working-directory: web
         run: npm audit --omit=dev --audit-level=high
 
-      - name: The dependencies -- pip-audit
-        if: ${{ !cancelled() }}
+  contract:
+    name: The contracts between the halves
+    # A pull request that leaves a half out. The suites in the other halves that
+    # read what this change touched, for each half whose job did not run, and the
+    # carried paste lines. The CLI's set runs Portability's sweeps over web/,
+    # Menu's parity over every document, the constants and DocCounts; the agent's
+    # reads the web UI's agreed string, the artwork notices and the constants.
+    needs: changes
+    if: ${{ needs.changes.outputs.contract == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      RAN_CLI: ${{ needs.changes.outputs.cli }}
+      RAN_AGENT: ${{ needs.changes.outputs.agent }}
+      RAN_WEB: ${{ needs.changes.outputs.web }}
+    steps:
+      # The whole history, so main's docs/TESTING.md is here to compare with.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        if: ${{ needs.changes.outputs.agent != 'true' }}
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            agent/requirements.txt
+            agent/requirements-dev.txt
+
+      - name: pip install (agent)
+        id: pip
+        if: ${{ needs.changes.outputs.agent != 'true' }}
+        run: python -m pip install -r agent/requirements-dev.txt
+
+      # The CLI's contract suites, in a shell with exactly one toolkit in it, read
+      # through the same gate as the CLI half; the runner's Total line.
+      - name: The CLI's contract suites -- Consts, Portability, Menu, DocCounts
+        if: ${{ !cancelled() && needs.changes.outputs.cli != 'true' }}
         run: |
-          python -m venv "$RUNNER_TEMP/audit"
-          "$RUNNER_TEMP/audit/bin/python" -m pip install --quiet pip-audit
-          "$RUNNER_TEMP/audit/bin/python" -m pip_audit -r agent/requirements-dev.txt
+          set +e
+          pwsh -NoProfile -Command '$env:PSModulePath = (Resolve-Path .); & ./Tests/Test-Toolkit.ps1 -Consts -Portability -Menu -DocCounts; exit $LASTEXITCODE' 2>&1 | tee "$RUNNER_TEMP/cli-contract.log"
+          code=${PIPESTATUS[0]}
+          pwsh -NoProfile -File Scripts/Test-CiHalf.ps1 -Half cli -Path "$RUNNER_TEMP/cli-contract.log" -ExitCode "$code"
+
+      # The agent's contract tests; pytest's closing line.
+      - name: The agent's contract tests -- consts, pr_comments, third_party_notices
+        if: ${{ !cancelled() && needs.changes.outputs.agent != 'true' && steps.pip.outcome == 'success' }}
+        run: |
+          set +e
+          python -m pytest Tests/test_consts.py Tests/test_pr_comments.py Tests/test_third_party_notices.py 2>&1 | tee "$RUNNER_TEMP/agent-contract.log"
+          code=${PIPESTATUS[0]}
+          pwsh -NoProfile -File Scripts/Test-CiHalf.ps1 -Half agent -Path "$RUNNER_TEMP/agent-contract.log" -ExitCode "$code"
+
+      # A half that did not run here cannot have a new count: its paste lines in
+      # docs/TESTING.md must be main's, as they stand. One that differs was typed.
+      - name: The carried paste lines are main's
+        if: ${{ !cancelled() }}
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git show "$BASE:docs/TESTING.md" > "$RUNNER_TEMP/base-TESTING.md"
+          ran=""
+          if [ "$RAN_CLI" = "true" ]; then ran="$ran,cli"; fi
+          if [ "$RAN_AGENT" = "true" ]; then ran="$ran,agent"; fi
+          if [ "$RAN_WEB" = "true" ]; then ran="$ran,web"; fi
+          pwsh -NoProfile -File Scripts/Test-CarriedCounts.ps1 -BasePath "$RUNNER_TEMP/base-TESTING.md" -HeadPath docs/TESTING.md -Ran "${ran#,}"
+
+  verify:
+    # The one check that sums the run up. A job the filter skipped is fine; a job the change
+    # needed that failed, was cancelled or never started fails this one, and so
+    # does a filter that did not answer. ps51 is needed on exactly the runs its own
+    # `if` starts it on -- the same expression, in WANT_PS51 -- so the button and a
+    # `ci`-labelled pull request that reaches the CLI wait for it, and any other
+    # run reads it as not needed. The windows job is not behind this check.
+    name: Verify
+    needs: [changes, cli, agent, web, contract, ps51]
+    if: ${{ always() && github.event_name != 'schedule' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Every job the change needed passed
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          WANT_CLI: ${{ needs.changes.outputs.cli }}
+          WANT_AGENT: ${{ needs.changes.outputs.agent }}
+          WANT_WEB: ${{ needs.changes.outputs.web }}
+          WANT_CONTRACT: ${{ needs.changes.outputs.contract }}
+          WANT_PS51: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci') && needs.changes.outputs.cli == 'true') }}
+          GOT_CLI: ${{ needs.cli.result }}
+          GOT_AGENT: ${{ needs.agent.result }}
+          GOT_WEB: ${{ needs.web.result }}
+          GOT_CONTRACT: ${{ needs.contract.result }}
+          GOT_PS51: ${{ needs.ps51.result }}
+        run: |
+          fail=0
+          if [ "$CHANGES" != "success" ]; then
+            echo "::error title=The filter did not answer::changes is $CHANGES"
+            fail=1
+          fi
+          for job in cli agent web contract ps51; do
+            up=$(echo "$job" | tr '[:lower:]' '[:upper:]')
+            want_var="WANT_$up"
+            got_var="GOT_$up"
+            want="${!want_var}"
+            got="${!got_var}"
+            if [ "$want" = "true" ]; then
+              if [ "$got" = "success" ]; then
+                echo "$job: needed, passed"
+              else
+                echo "::error title=The $job job did not pass::needed by this change, and it is $got"
+                fail=1
+              fi
+            else
+              echo "$job: not needed ($got)"
+            fi
+          done
+          exit $fail
 
   windows:
     name: The browser smoke and the CLI in PowerShell 7 on Windows
@@ -279,8 +509,13 @@ jobs:
 
   ps51:
     name: Every CLI suite in Windows PowerShell 5.1
-    # The same triggers as the job above, beside it.
-    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci')) }}
+    # The Windows triggers -- the schedule, the button, or a pull request that
+    # carries the `ci` label -- and on that pull request only when the filter says
+    # the CLI half is in scope. The filter does not run on the schedule, so the
+    # job asks !cancelled() rather than its success: a skipped filter does not
+    # skip the scheduled run.
+    needs: changes
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci') && needs.changes.outputs.cli == 'true')) }}
     runs-on: windows-latest
     # Every suite, and every verb a suite types, in 5.1, which starts a process
     # more slowly than 7 does.
