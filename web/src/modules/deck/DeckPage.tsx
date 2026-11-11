@@ -104,7 +104,7 @@ export function DeckPage() {
                     {STATE_LABEL[deckState(deck)]}
                   </Badge>
                   {away ? (
-                    <Badge appearance="outline" color="subtle" size="small">
+                    <Badge appearance="tint" color="subtle" size="small">
                       archived on this machine
                     </Badge>
                   ) : null}

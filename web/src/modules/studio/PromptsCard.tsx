@@ -1,15 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import {
-  Badge,
-  Body1,
-  Caption1,
-  Card,
-  Link,
-  Subtitle2,
-  makeStyles,
-  tokens,
-} from "@fluentui/react-components";
+import { Badge, Caption1, Subtitle2, makeStyles, tokens } from "@fluentui/react-components";
 import { SparkleRegular } from "@fluentui/react-icons";
 import { CardActions, ROW } from "../../shared/CardActions";
 import type { CardAction } from "../../shared/CardActions";
@@ -28,6 +19,7 @@ import { Pagination } from "../../shared/Pagination";
 import { useGetPromptsQuery, useLazyGetPromptQuery } from "./api.studio";
 import type { PromptListRow, PromptSpace } from "./api.studio";
 import { STUDIO_PAGE_SIZE, promptPath } from "./paths";
+import { RowMetaText, StudioRow, useStudioCardClass } from "./StudioRow";
 import {
   categoryTabs,
   othersLine,
@@ -66,25 +58,6 @@ import type { PromptSets } from "./prompts";
 // disk), the menu holds Copy prompt (the body, for a chat that cannot), the
 // reading room and the prompt's history on GitHub, the external link last.
 const useStyles = makeStyles({
-  row: {
-    marginTop: tokens.spacingVerticalS,
-    padding: tokens.spacingVerticalS,
-    backgroundColor: tokens.colorNeutralBackgroundAlpha,
-  },
-  rowHeader: {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: tokens.spacingHorizontalS,
-  },
-  name: { flex: 1, minWidth: 0, textAlign: "start" },
-  metaRow: {
-    display: "flex",
-    gap: tokens.spacingHorizontalM,
-    flexWrap: "wrap" as const,
-    marginTop: tokens.spacingVerticalXS,
-    alignItems: "center",
-  },
   tip: { display: "flex", flexDirection: "column", gap: tokens.spacingVerticalXS },
 });
 
@@ -118,7 +91,6 @@ function PromptCardRow({
   onCopied: (c: Copied) => void;
   onReading: (name: string | null) => void;
 }) {
-  const styles = useStyles();
   const navigate = useNavigate();
   const [readPrompt] = useLazyGetPromptQuery();
   const open = () => navigate(promptPath(row.ref));
@@ -144,13 +116,11 @@ function PromptCardRow({
     secondary.push(ROW.external.action({ detail: "GitHub", href: row.history }));
   }
   return (
-    <Card className={styles.row} size="small" appearance="outline">
-      <div className={styles.rowHeader}>
-        <Link as="button" appearance="subtle" className={styles.name} onClick={open}>
-          <Body1>
-            <strong>{row.title || row.name}</strong>
-          </Body1>
-        </Link>
+    <StudioRow
+      kind="prompt"
+      title={row.title || row.name}
+      onOpen={open}
+      controls={
         <CardActions
           primaryAction={ROW.copy.action({
             detail: "reference",
@@ -163,21 +133,24 @@ function PromptCardRow({
           menuLabel={`Actions for ${row.name}`}
           secondaryActions={secondary}
         />
-      </div>
-      {row.purpose ? <Caption1>{row.purpose}</Caption1> : null}
-      <div className={styles.metaRow}>
-        <Badge
-          appearance="tint"
-          size="small"
-          color={row.group === "toolkit" ? "brand" : "informative"}
-        >
-          {ownerLabel(row, space)}
-        </Badge>
-        <Badge appearance="outline" size="small" color="subtle">
-          {row.category}
-        </Badge>
-      </div>
-    </Card>
+      }
+      description={row.purpose || undefined}
+      meta={
+        <>
+          <Badge
+            appearance="tint"
+            size="small"
+            color={row.group === "toolkit" ? "brand" : "informative"}
+          >
+            {ownerLabel(row, space)}
+          </Badge>
+          <Badge appearance="tint" size="small" color="subtle">
+            {row.category}
+          </Badge>
+          <RowMetaText>{row.path.split("/").pop()}</RowMetaText>
+        </>
+      }
+    />
   );
 }
 
@@ -212,6 +185,7 @@ function CardTip({
 }
 
 export function PromptsCard() {
+  const cardClass = useStudioCardClass();
   const filterStyles = useFilterRowStyles();
   const { data, isLoading, isFetching, error, refetch } = useGetPromptsQuery();
   const { data: env } = useGetEnvQuery();
@@ -286,6 +260,7 @@ export function PromptsCard() {
 
   return (
     <PageCard
+      className={cardClass}
       scrollable
       empty={empty}
       headerLeft={

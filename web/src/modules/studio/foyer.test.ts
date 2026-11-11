@@ -311,7 +311,7 @@ describe("which rows ask their visibility", () => {
   });
 
   it("the three Studio cards page five at a time", () => {
-    expect(STUDIO_PAGE_SIZE).toBe(5);
+    expect(STUDIO_PAGE_SIZE).toBe(3);
   });
 });
 

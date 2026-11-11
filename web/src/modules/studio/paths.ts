@@ -3,7 +3,7 @@ export const STUDIO_HOME = "/studio";
 
 /** How many rows each Studio card shows a page: the Foyer, Hub Designs and
  *  Prompts page alike, the shared pager in the foot's centre. */
-export const STUDIO_PAGE_SIZE = 5;
+export const STUDIO_PAGE_SIZE = 3;
 
 export const ROUTES = {
   home: STUDIO_HOME,

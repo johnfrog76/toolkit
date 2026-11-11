@@ -240,7 +240,7 @@ function ReviewCard({ item, orgs }: { item: EngagementReviewItem; orgs: SpaceInf
               Review
             </Badge>
             {item.archived && (
-              <Badge color="subtle" appearance="outline" size="small">
+              <Badge color="subtle" appearance="tint" size="small">
                 Archived
               </Badge>
             )}

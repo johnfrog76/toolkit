@@ -119,7 +119,7 @@ export function DesignDocPage({ archive = false }: { archive?: boolean }) {
                   </Badge>
                   {data.closed ? (
                     <Badge
-                      appearance="outline"
+                      appearance="tint"
                       size="small"
                       color="subtle"
                       title="The day it entered the archive"

@@ -3,10 +3,8 @@ import { usePagination } from "../../hooks/usePagination";
 import { useNavigate } from "react-router";
 import {
   Badge,
-  Body1,
   Button,
   Caption1,
-  Card,
   Dialog,
   DialogActions,
   DialogBody,
@@ -52,6 +50,7 @@ import { MoveDesignDialog } from "./MoveDesignDialog";
 import { ROADS, roadsFor } from "../ado/designRoads";
 import type { MoveRoad } from "../ado/designRoads";
 import { STUDIO_PAGE_SIZE, notePath } from "./paths";
+import { RowMetaText, StudioRow, useStudioCardClass } from "./StudioRow";
 import { useEnterSpace } from "./useEnterSpace";
 
 // The seed drawer (Studio S2b, D-S3): the hub's designs -- the ones that belong
@@ -63,34 +62,7 @@ import { useEnterSpace } from "./useEnterSpace";
 // writes a note through NewDesign (the bridge), so the file is the record from
 // its first minute.
 const useStyles = makeStyles({
-  row: {
-    marginTop: tokens.spacingVerticalS,
-    padding: tokens.spacingVerticalS,
-    backgroundColor: tokens.colorNeutralBackgroundAlpha,
-  },
-  rowHeader: {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: tokens.spacingHorizontalS,
-  },
-  // The title and, after it, the Space chip, on one line that wraps.
-  title: {
-    flex: 1,
-    minWidth: 0,
-    display: "flex",
-    alignItems: "center",
-    flexWrap: "wrap" as const,
-    columnGap: tokens.spacingHorizontalS,
-  },
   chip: { minWidth: "auto" },
-  metaRow: {
-    display: "flex",
-    gap: tokens.spacingHorizontalM,
-    flexWrap: "wrap" as const,
-    marginTop: tokens.spacingVerticalXS,
-    alignItems: "center",
-  },
   mismatch: { color: tokens.colorPaletteDarkOrangeForeground1 },
   fields: { display: "flex", flexDirection: "column", rowGap: tokens.spacingVerticalM },
 });
@@ -146,29 +118,28 @@ function DesignRow({
     secondary.push(ROW.external.action({ detail: "GitHub", href: design.thread }));
   }
   return (
-    <Card className={styles.row} size="small" appearance="outline">
-      <div className={styles.rowHeader}>
-        <div className={styles.title}>
-          <Body1>
-            <strong>{design.title}</strong>
-          </Body1>
-          {design.space ? (
-            <Tooltip content={design.space} relationship="description">
-              <Button
-                className={styles.chip}
-                size="small"
-                shape="circular"
-                appearance="outline"
-                aria-label={`Switch to ${space}`}
-                onClick={enter}
-                disabled={switching}
-              >
-                {space}
-              </Button>
-            </Tooltip>
-          ) : null}
-        </div>
-        {main ? (
+    <StudioRow
+      kind="design"
+      title={design.title}
+      badges={
+        design.space ? (
+          <Tooltip content={design.space} relationship="description">
+            <Button
+              className={styles.chip}
+              size="small"
+              shape="circular"
+              appearance="outline"
+              aria-label={`Switch to ${space}`}
+              onClick={enter}
+              disabled={switching}
+            >
+              {space}
+            </Button>
+          </Tooltip>
+        ) : null
+      }
+      controls={
+        main ? (
           <CardActions
             primaryAction={ROW.open.action({
               detail: design.note ? "the note" : "the spec",
@@ -177,56 +148,58 @@ function DesignRow({
             menuLabel={`Actions for ${design.title}`}
             secondaryActions={secondary}
           />
-        ) : null}
-      </div>
-      {failed ? (
-        <Caption1 role="alert">Could not switch to {space}. Nothing changed.</Caption1>
-      ) : null}
-      {design.description ? <Caption1>{design.description}</Caption1> : null}
-      <div className={styles.metaRow}>
-        <Badge appearance="tint" size="small" color={stateColor(design.state)}>
-          {design.state}
-        </Badge>
-        <Caption1 title={design.id}>{design.short}</Caption1>
-        {main ? <Caption1>{main.split("/").pop()}</Caption1> : null}
-        {design.thread_number ? (
-          <Badge appearance="outline" size="small" color="informative" icon={<CommentRegular />}>
-            #{design.thread_number}
+        ) : null
+      }
+      description={design.description || undefined}
+      meta={
+        <>
+          <Badge appearance="tint" size="small" color={stateColor(design.state)}>
+            {design.state}
           </Badge>
-        ) : design.note && !design.note.archived ? (
-          <Caption1>no thread yet</Caption1>
-        ) : null}
-        {design.closed ? (
-          <Caption1 title="The day it entered the archive">Closed {design.closed}</Caption1>
-        ) : null}
-        {design.outcome ? (
-          <Badge
-            appearance="outline"
-            size="small"
-            color={design.outcome === "dropped" ? "warning" : "success"}
-          >
-            {design.outcome}
-          </Badge>
-        ) : null}
-        {design.docs ? (
-          <DesignDocsLine
-            docs={design.docs}
-            linked={!!design.space && design.space === activeSpace}
-          />
-        ) : null}
-      </div>
-      {design.mismatch ? (
-        <Caption1 role="note" className={styles.mismatch}>
-          {design.mismatch}
-        </Caption1>
-      ) : null}
-      {/* The cards worked against it, from every Space: another Space's is named, not opened. */}
-      <BoundCards cards={design.cards} activeSpace={activeSpace} />
-    </Card>
+          <Caption1 title={design.id}>{design.short}</Caption1>
+          {main ? <RowMetaText>{main.split("/").pop()}</RowMetaText> : null}
+          {design.thread_number ? (
+            <Badge appearance="outline" size="small" color="informative" icon={<CommentRegular />}>
+              #{design.thread_number}
+            </Badge>
+          ) : design.note && !design.note.archived ? (
+            <Caption1>no thread yet</Caption1>
+          ) : null}
+          {design.closed ? (
+            <Caption1 title="The day it entered the archive">Closed {design.closed}</Caption1>
+          ) : null}
+          {design.outcome ? (
+            <Badge
+              appearance="outline"
+              size="small"
+              color={design.outcome === "dropped" ? "warning" : "success"}
+            >
+              {design.outcome}
+            </Badge>
+          ) : null}
+          {design.docs ? (
+            <DesignDocsLine
+              docs={design.docs}
+              linked={!!design.space && design.space === activeSpace}
+            />
+          ) : null}
+          {design.mismatch ? (
+            <Caption1 role="note" className={styles.mismatch}>
+              {design.mismatch}
+            </Caption1>
+          ) : null}
+          {failed ? (
+            <Caption1 role="alert">Could not switch to {space}. Nothing changed.</Caption1>
+          ) : null}
+          <BoundCards cards={design.cards} activeSpace={activeSpace} />
+        </>
+      }
+    />
   );
 }
 
 export function DesignsCard() {
+  const cardClass = useStudioCardClass();
   const styles = useStyles();
   const navigate = useNavigate();
   const { data, isLoading, isFetching, error, refetch } = useGetDesignNotesQuery();
@@ -354,6 +327,7 @@ export function DesignsCard() {
   return (
     <>
       <PageCard
+        className={cardClass}
         scrollable
         empty={empty}
         headerLeft={

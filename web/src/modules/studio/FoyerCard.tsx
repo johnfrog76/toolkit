@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import {
-  Badge,
-  Body1,
-  Caption1,
-  Card,
-  Subtitle2,
-  makeStyles,
-  tokens,
-} from "@fluentui/react-components";
+import { Badge, Caption1, Subtitle2 } from "@fluentui/react-components";
 import {
   ArrowEnterRegular,
   BuildingFactoryRegular,
@@ -22,7 +14,7 @@ import { trackerName } from "../ado/TrackerBadge";
 import { CreateButton } from "../../shared/CreateButton";
 import type { CardAction } from "../../shared/CardActions";
 import { FilterBadge } from "../../shared/FilterBadge";
-import { useFilterRowStyles, useListRowStyles } from "../../shared/listRowStyles";
+import { useFilterRowStyles } from "../../shared/listRowStyles";
 import { EmptyState } from "../../shared/EmptyState";
 import { PageCard } from "../../shared/PageCard";
 import { HubSyncLine } from "../ado/HubSyncLine";
@@ -62,6 +54,7 @@ import type { SpaceLifecycleVerb } from "./api.studio";
 import { NewSpaceDialog } from "./NewSpaceDialog";
 import { SpaceLifecycleDialog } from "./SpaceLifecycleDialog";
 import { STUDIO_PAGE_SIZE } from "./paths";
+import { RowMetaText, StudioRow, useStudioCardClass } from "./StudioRow";
 import { useEnterSpace } from "./useEnterSpace";
 
 // The one sentence that says what a Space is. Written here and in docs/modules/studio.md.
@@ -81,23 +74,6 @@ const SPACE_DEFINITION =
 // ten at a time. A row's `...` holds the end of a Space's life:
 // Retire and Remove, each RetireSpace / RemoveSpace through the bridge behind
 // the house confirm, which shows the verb's own -WhatIf first.
-const useStyles = makeStyles({
-  title: {
-    flex: 1,
-    minWidth: 0,
-    display: "flex",
-    flexDirection: "column",
-    rowGap: tokens.spacingVerticalXXS,
-  },
-  name: {
-    display: "flex",
-    alignItems: "center",
-    columnGap: tokens.spacingHorizontalS,
-    flexWrap: "wrap",
-  },
-  line: { color: tokens.colorNeutralForeground2 },
-});
-
 /** A Space's own moves, on no other record. Retire and Remove read like the
  *  vocabulary's Archive and Delete and are neither: Retire writes the Space's
  *  `status: archive` through Config and moves no file; Remove un-declares the
@@ -131,9 +107,6 @@ function FoyerRow({
   line: ReactNode;
   onLifecycle: (space: SpaceInfo, verb: SpaceLifecycleVerb) => void;
 }) {
-  const own = useStyles();
-  const rows = useListRowStyles();
-  const styles = { ...own, ...rows };
   const navigate = useNavigate();
   // The row is the switch the avatar menu makes (D-S2): the one switch, which
   // a design note's Space chip takes too.
@@ -172,32 +145,27 @@ function FoyerRow({
     secondary.push(ROW.external.action({ detail: tracker, href: space.org }));
   }
   return (
-    <Card className={styles.row} size="small" appearance="outline">
-      <div className={styles.rowHeader}>
-        <div className={styles.title}>
-          <div className={styles.name}>
-            <Body1>
-              <strong>{name}</strong>
-            </Body1>
-            <Badge appearance="outline" size="small" color="informative">
-              {spaceKind(space)}
+    <StudioRow
+      kind="space"
+      title={name}
+      badges={
+        <>
+          <Badge appearance="tint" size="small" color="informative">
+            {spaceKind(space)}
+          </Badge>
+          {space.status === "archive" ? (
+            <Badge appearance="tint" size="small" color="subtle">
+              archived
             </Badge>
-            {space.status === "archive" ? (
-              <Badge appearance="tint" size="small" color="subtle">
-                archived
-              </Badge>
-            ) : null}
-            {here ? (
-              <Badge appearance="tint" size="small" color="brand">
-                you are here
-              </Badge>
-            ) : null}
-          </div>
-          <Caption1 className={styles.line}>{line}</Caption1>
-          {failed ? (
-            <Caption1 role="alert">Could not switch to {name}. Nothing changed.</Caption1>
           ) : null}
-        </div>
+          {here ? (
+            <Badge appearance="tint" size="small" color="brand">
+              you are here
+            </Badge>
+          ) : null}
+        </>
+      }
+      controls={
         <CardActions
           primaryAction={(here ? ROW.open : SPACE_MOVES.enter).action({
             detail: name,
@@ -207,8 +175,22 @@ function FoyerRow({
           menuLabel={`Actions for ${name}`}
           secondaryActions={secondary}
         />
-      </div>
-    </Card>
+      }
+      description={typeof line === "string" ? line : undefined}
+      meta={
+        <>
+          <Badge appearance="tint" size="small" color="subtle">
+            Space
+          </Badge>
+          <RowMetaText>{space.slug}</RowMetaText>
+          {failed ? (
+            <Caption1 role="alert" data-row-meta-text>
+              Could not switch to {name}. Nothing changed.
+            </Caption1>
+          ) : null}
+        </>
+      }
+    />
   );
 }
 
@@ -305,6 +287,7 @@ function CardsReads({
 export const SPACES_FILTER_KEY = "studio.spaces.filter";
 
 export function FoyerCard() {
+  const cardClass = useStudioCardClass();
   const styles = useFilterRowStyles();
   const { data: env, isLoading } = useGetEnvQuery();
   const spaces = foyerSpaces(env);
@@ -382,6 +365,7 @@ export function FoyerCard() {
   return (
     <>
       <PageCard
+        className={cardClass}
         // scrollable, like the Reminders and Hub Designs cards: the rows then sit
         // in the card's scroll area, whose only spacing is the row's own margin.
         // Without it they were direct children of the card and took its 12px
