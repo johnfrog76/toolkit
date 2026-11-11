@@ -1161,6 +1161,75 @@ Assert-True 'the linked issues are NewPR''s Issue: line and closing keywords, no
     (((Get-P20GitHubLinkedIssues "Adds export.`n`nIssue: #41`nFixes #8, and see #99 for context") -join ',') -eq '41,8')
 
 Write-Host ""
+Write-Host "-- GitHub: ReplyPR's answer is read back into the thread it answers (pure) --" -ForegroundColor Cyan
+# The conversation tab has no "reply to", so ReplyPR posts a new comment that
+# opens with the reply lead. One row per case the fold tells apart.
+
+$ghUrl = 'https://github.com/acme/widgets/pull/12'
+$leadConv = New-P20GitHubReplyLead -Url "$ghUrl#issuecomment-3300000001" -Id 3300000001
+$leadSum = New-P20GitHubReplyLead -Url "$ghUrl#pullrequestreview-2900000001" -Id 2900000001
+$leadBare = New-P20GitHubReplyLead -Url '' -Id 3300000005
+Assert-True 'the lead names the URL, or the bare id when there is none' `
+    ($leadConv -eq "In reply to $ghUrl#issuecomment-3300000001:" -and $leadBare -eq 'In reply to comment 3300000005:') "$leadConv | $leadBare"
+$rtConv = ConvertFrom-P20GitHubReplyLead -Body "$leadConv`n`nThanks."
+$rtSum = ConvertFrom-P20GitHubReplyLead -Body "$leadSum`n`nLoop fixed."
+$rtBare = ConvertFrom-P20GitHubReplyLead -Body "$leadBare`n`nOk."
+Assert-True 'round trip: the reader gives back what the writer named, kind and id' `
+    ($rtConv.Kind -eq 'conversation' -and $rtConv.Id -eq 3300000001 -and $rtConv.Rest -eq 'Thanks.' -and
+     $rtSum.Kind -eq 'summary' -and $rtSum.Id -eq 2900000001 -and
+     $rtBare.Kind -eq '' -and $rtBare.Id -eq 3300000005) (($rtConv, $rtSum, $rtBare) | ConvertTo-Json -Compress)
+$rtCrlf = ConvertFrom-P20GitHubReplyLead -Body "$leadConv`r`n`r`nThanks."
+Assert-True 'a CRLF body reads the same' ($rtCrlf.Id -eq 3300000001 -and $rtCrlf.Rest -eq 'Thanks.') ($rtCrlf | ConvertTo-Json -Compress)
+Assert-True 'prose that merely starts "In reply to" is not a lead' `
+    ($null -eq (ConvertFrom-P20GitHubReplyLead -Body 'In reply to your question, yes.') -and
+     $null -eq (ConvertFrom-P20GitHubReplyLead -Body "Thanks.`n$leadConv") -and
+     $null -eq (ConvertFrom-P20GitHubReplyLead -Body "In reply to $ghUrl#discussion_r2412345678:`n`nx"))
+
+$fIssue = @(
+    [PSCustomObject]@{ id = 3300000001; user = (New-GhUser 'reviewer-a'); body = 'Overall: close, see inline.'; created_at = '2026-10-01T09:00:00Z' },
+    [PSCustomObject]@{ id = 3300000002; user = (New-GhUser 'ci-bot[bot]' 'Bot'); body = 'Coverage 81%'; created_at = '2026-10-01T09:05:00Z' },
+    [PSCustomObject]@{ id = 3300000010; user = (New-GhUser 'author-b'); body = "$leadConv`n`nThanks -- inline answers below."; created_at = '2026-10-02T09:00:00Z' },
+    [PSCustomObject]@{ id = 3300000011; user = (New-GhUser 'author-b'); body = "$leadSum`n`nLoop fixed."; created_at = '2026-10-02T09:01:00Z' },
+    [PSCustomObject]@{ id = 3300000012; user = (New-GhUser 'author-b'); body = "In reply to comment 3300000001:`r`n`r`nAnd one more."; created_at = '2026-10-02T09:02:00Z' },
+    [PSCustomObject]@{ id = 3300000013; user = (New-GhUser 'author-b'); body = "In reply to $ghUrl#issuecomment-3300009999:`n`nIts comment was deleted."; created_at = '2026-10-02T09:03:00Z' },
+    [PSCustomObject]@{ id = 3300000014; user = (New-GhUser 'author-b'); body = "In reply to $ghUrl#issuecomment-3300000002:`n`nAbout the coverage."; created_at = '2026-10-02T09:04:00Z' },
+    [PSCustomObject]@{ id = 3300000015; user = (New-GhUser 'reviewer-a'); body = "In reply to $ghUrl#issuecomment-3300000010:`n`nThanks for the answers."; created_at = '2026-10-02T09:05:00Z' },
+    [PSCustomObject]@{ id = 3300000016; user = (New-GhUser 'reviewer-a'); body = 'In reply to your question: yes, ship it.'; created_at = '2026-10-02T09:06:00Z' }
+)
+# Served out of date order, as a paginated read may: the fold reads them in date order.
+$fIssue = @($fIssue[8], $fIssue[7], $fIssue[0], $fIssue[2], $fIssue[1], $fIssue[3], $fIssue[4], $fIssue[5], $fIssue[6])
+$fReviews = @([PSCustomObject]@{ id = 2900000001; state = 'CHANGES_REQUESTED'; user = (New-GhUser 'reviewer-a'); body = 'Please fix the loop before merge.'; submitted_at = '2026-10-01T10:01:00Z' })
+$ft = ConvertTo-P20GitHubThreads -IssueComments $fIssue -Reviews $fReviews
+$ftIds = @($ft.Threads | ForEach-Object { [long]$_.id })
+$ftBy = @{}; foreach ($t in $ft.Threads) { $ftBy[[string]$t.id] = $t }
+$convIds = @($ftBy['3300000001'].comments | ForEach-Object { [long]$_.id })
+Assert-True 'a reply to a conversation comment is a follow-up in its thread, not a thread of its own' `
+    (-not ($ftIds -contains 3300000010) -and $convIds -contains 3300000010) ($ftIds -join ',')
+Assert-True 'a reply by the bare "comment <id>" lead folds the same way' (-not ($ftIds -contains 3300000012) -and $convIds -contains 3300000012) ($convIds -join ',')
+Assert-True 'a reply to a folded reply lands in the same root thread' (-not ($ftIds -contains 3300000015) -and $convIds -contains 3300000015) ($convIds -join ',')
+Assert-True 'the thread reads in date order: the opener, then each reply' (($convIds -join ',') -eq '3300000001,3300000010,3300000012,3300000015') ($convIds -join ',')
+Assert-True 'a folded reply keeps its whole body, lead included, and is marked' `
+    ($ftBy['3300000001'].comments[1].content -match '^In reply to https://github\.com/acme/widgets/pull/12#issuecomment-3300000001:' -and $ftBy['3300000001'].comments[1].foldedReply -eq $true -and -not $ftBy['3300000001'].comments[0].PSObject.Properties['foldedReply'])
+Assert-True 'a reply to a review summary is a follow-up in the summary''s thread' `
+    (-not ($ftIds -contains 3300000011) -and (($ftBy['2900000001'].comments | ForEach-Object { [long]$_.id }) -join ',') -eq '2900000001,3300000011') ($ftIds -join ',')
+Assert-True 'a reply whose comment is gone stays a thread of its own, as before' ($ftIds -contains 3300000013 -and $ftBy['3300000013'].status -eq 'conversation')
+Assert-True 'a reply to a Bot comment (not a thread here) stays a thread of its own' ($ftIds -contains 3300000014)
+Assert-True 'prose that starts "In reply to" stays a thread of its own' ($ftIds -contains 3300000016)
+Assert-True 'Total counts threads, not the replies folded into them' ($ft.Total -eq 6 -and ($ftIds -join ',') -eq '3300000001,2900000001,3300000013,3300000014,3300000016') "total $($ft.Total); $($ftIds -join ',')"
+
+# The delta: a folded reply is a follow-up a card does not have yet -- unless the
+# card already holds it as a thread of its own, which every run before the fold wrote.
+$d = Get-P20ThreadDelta -Thread $ftBy['3300000001'] -Recorded (Get-P20RecordedComments -FileContent "### Comment 1 (Thread 3300000001)`n")
+Assert-True 'a card with the conversation thread gets each folded reply as a follow-up' `
+    ($d.Kind -eq 'follow-up' -and ((@($d.FollowUps) | ForEach-Object { $_.Id }) -join ',') -eq '3300000010,3300000012,3300000015') ((@($d.FollowUps) | ForEach-Object { $_.Id }) -join ',')
+$legacy = "### Comment 1 (Thread 3300000001)`n### Comment 2 (Thread 3300000010)`n### Comment 3 (Thread 3300000012)`n### Comment 4 (Thread 3300000015)`n"
+$d = Get-P20ThreadDelta -Thread $ftBy['3300000001'] -Recorded (Get-P20RecordedComments -FileContent $legacy)
+Assert-True 'a card that already holds each reply as its own thread gets nothing: no reply twice' ($d.Kind -eq 'known') $d.Kind
+$d = Get-P20ThreadDelta -Thread $ftBy['3300000001'] -Recorded (Get-P20RecordedComments -FileContent "### Comment 1 (Thread 3300000001)`n### Comment 2 (Thread 3300000010)`n")
+Assert-True '...and one that holds some of them gets only the others' `
+    ($d.Kind -eq 'follow-up' -and ((@($d.FollowUps) | ForEach-Object { $_.Id }) -join ',') -eq '3300000012,3300000015') ((@($d.FollowUps) | ForEach-Object { $_.Id }) -join ',')
+
+Write-Host ""
 Write-Host "-- GitHub: the write side's rules (pure) --" -ForegroundColor Cyan
 # ReplyPR's -Status on GitHub, what a -ThreadId is, the GraphQL node lookup,
 # and AddPRReview's line positioning -- one row per case each rule tells apart.
@@ -1600,6 +1669,7 @@ try {
     Assert-True 'a conversation id: the review-comment lookup misses, the conversation one answers, a new comment is posted' `
         (($paths -join ',') -eq 'repos/acme/widgets/pulls/comments/3300000001,repos/acme/widgets/issues/comments/3300000001,repos/acme/widgets,repos/acme/widgets/issues/12/comments' -and $r.Text -match 'EXIT=0') (Format-Calls $r)
     Assert-True 'opening with a link to the comment it answers' (@($r.Inputs).Count -eq 1 -and $r.Inputs[0].body -eq "In reply to https://github.com/acme/widgets/pull/12#issuecomment-3300000001:`n`nThanks -- inline answers below.") ((@($r.Inputs) | ConvertTo-Json -Compress))
+    $r4Body = [string]@($r.Inputs)[0].body
     Assert-True 'no GraphQL at all, and -Status is said not to apply' ((Get-GqlCalls $r).Count -eq 0 -and $r.Text -match '-Status fixed not applied: on GitHub a conversation comment has no thread to resolve') $r.Text
     $after = [System.IO.File]::ReadAllText($wCard)
     Assert-True 'the card''s slot for that comment is filled, its Status left as it was' ($after -match "\(Thread 3300000001\)[\s\S]*?Status: conversation\r\nComment: [^\r]*\r\nCode suggestion: \(none\)\r\nDecision: [^\r]*\r\nReply: Thanks -- inline answers below\.") $after
@@ -1609,6 +1679,38 @@ try {
     $paths = @(Get-GhCalls $r | ForEach-Object { @($_ | Where-Object { $_ -like 'repos/*' })[0] } | Where-Object { $_ })
     Assert-True 'a review summary id: found third, answered on the conversation tab' `
         ($paths[-1] -eq 'repos/acme/widgets/issues/12/comments' -and $paths -contains 'repos/acme/widgets/pulls/12/reviews/2900000001' -and $r.Inputs[0].body -match '^In reply to https://github\.com/acme/widgets/pull/12#pullrequestreview-2900000001:' -and $r.Text -match 'EXIT=0') (Format-Calls $r)
+
+    $r5Body = [string]@($r.Inputs)[0].body
+
+    # -- R4/R5 read back: GetPRComments folds each answer into the thread it answers --
+    $replyLines = @(
+        (@{ id = 3300000099; user = @{ login = 'you'; type = 'User' }; body = $r4Body; created_at = '2026-10-03T10:00:00Z' } | ConvertTo-Json -Compress),
+        (@{ id = 3300000100; user = @{ login = 'you'; type = 'User' }; body = $r5Body; created_at = '2026-10-03T10:01:00Z' } | ConvertTo-Json -Compress)
+    )
+    Set-GhFixture 'repos/acme/widgets/issues/12/comments' ($issueLines + $replyLines)
+    $r = Invoke-GhVerb "${cfgPrefix}GetPRComments 12"
+    $after = [System.IO.File]::ReadAllText($wCard)
+    Assert-True 'GetPRComments reads ReplyPR''s answer to a conversation comment back as a follow-up of that thread' `
+        ($r.Text -match 'EXIT=0' -and $after -match '### Comment \d+ \(Thread 3300000001\)\r\nFollow-up: \(Thread 3300000001 / Comment 3300000099\)') $after
+    Assert-True '...and its answer to a review summary as a follow-up of the summary''s thread' ($after -match '### Comment \d+ \(Thread 2900000001\)\r\nFollow-up: \(Thread 2900000001 / Comment 3300000100\)') $after
+    Assert-True 'neither answer is a thread of its own' (-not ($after -match '\(Thread 3300000099\)') -and -not ($after -match '\(Thread 3300000100\)')) $after
+    Assert-True 'the answer reads as GitHub has it, lead and all' ($after -match 'Comment: In reply to https://github\.com/acme/widgets/pull/12#issuecomment-3300000001:\s+Thanks -- inline answers below\.') $after
+    $once = [System.IO.File]::ReadAllText($wCard)
+    $r = Invoke-GhVerb "${cfgPrefix}GetPRComments 12"
+    Assert-True 're-run after the fold: no new comments, and the card is byte-for-byte as it was' ($r.Text -match 'No new comments' -and $r.Text -match 'EXIT=0' -and [System.IO.File]::ReadAllText($wCard) -eq $once) $r.Text
+
+    # A card written before the fold holds each answer as a thread of its own: it keeps them, once.
+    $legacyCard = Join-Path $ghRoot 'legacy-fold.md'
+    $legacyText = (@('## PR Review Comments (PR 12)', 'PR URL: https://github.com/acme/widgets/pull/12', 'Round: 1',
+            'Non-actionable threads (bot comments on the conversation tab -- recorded for dedup, not for triage): (Thread 3300000002)', '',
+            '### Comment 1 (Thread 2412345678)', '### Comment 2 (Thread 2412345678)', 'Follow-up: (Thread 2412345678 / Comment 2412345690) -- a later comment in this thread',
+            '### Comment 3 (Thread 2412345700)', '### Comment 4 (Thread 2900000001)', '### Comment 5 (Thread 3300000001)',
+            '### Comment 6 (Thread 3300000099)', '### Comment 7 (Thread 3300000100)', '') -join "`n")
+    [System.IO.File]::WriteAllText($legacyCard, $legacyText, $utf8NoBom)
+    $r = Invoke-GhVerb "${cfgPrefix}GetPRComments 12 -OutputFile '$($legacyCard -replace "'", "''")'"
+    Assert-True 'a card that already holds the answers as threads of their own: nothing new, nothing shown twice' `
+        ($r.Text -match 'No new comments' -and $r.Text -match 'EXIT=0' -and [System.IO.File]::ReadAllText($legacyCard) -eq $legacyText) $r.Text
+    Set-GhFixture 'repos/acme/widgets/issues/12/comments' $issueLines
 
     # -- R6. An id the pull request does not have ------------------------------------
     $r = Invoke-GhVerb "${cfgPrefix}ReplyPR 12 4444444444 -Reply 'Hello?'"

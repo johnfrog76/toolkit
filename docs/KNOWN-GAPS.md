@@ -214,18 +214,6 @@ back instead.
 
 **Issue:** [#302](https://github.com/johnfrog76/toolkit/issues/302)
 
-### A reply to a conversation comment reads back as its own thread
-
-**What you see:** GitHub has no reply to a conversation-tab comment or a review's summary, so `ReplyPR`
-posts a new comment on the pull request that opens with a link to the one it answers. The card's `Reply:`
-slot is filled under the original thread, but the next `GetPRComments` reads that new comment as one more
-top-level conversation thread, not as a follow-up in the thread it answered. An inline review thread is
-not affected: its reply is a real reply and comes back inside it.
-
-**Where you meet it:** [CLI](CLI.md#answering-on-a-github-board), "Answering on a GitHub board"
-
-**Issue:** [#304](https://github.com/johnfrog76/toolkit/issues/304)
-
 ### Most CLI suites run their verbs on PowerShell 7 under 5.1
 
 **What you see:** 16 of 52 CLI suites start every child in the host they run in. The rest start `pwsh`

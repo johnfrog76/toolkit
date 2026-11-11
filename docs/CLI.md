@@ -172,7 +172,11 @@ answered the way GitHub allows. An **inline thread** gets a real reply, through 
 (`pulls/<n>/comments/<root>/replies`, to the thread's first comment -- GitHub replies to a top-level
 comment only, so a follow-up's id answers through its root). A **conversation comment** or a **review's
 summary** has no thread on GitHub, so the reply is a new comment on the pull request that opens with a
-link to the one it answers -- and the next `GetPRComments` reads that comment back as a thread of its own. Bodies travel as a JSON file (`gh api --input`), never in an argument --
+link to the one it answers (`In reply to <url>:`, or `In reply to comment <id>:` when GitHub gives no
+URL). The next `GetPRComments` reads that comment back into the thread it answers, as a follow-up -- a
+reply to that reply lands there too -- and a reply whose comment is gone, or is a bot's, stays a thread
+of its own. A card that already holds such a reply as a thread of its own keeps it, and does not get it
+twice. Bodies travel as a JSON file (`gh api --input`), never in an argument --
 Windows PowerShell 5.1 drops a bare `"` from a native command's argv. **`-Status`** keeps Azure DevOps'
 words and maps the ones GitHub has: a review thread is only resolved or unresolved, and REST cannot set
 either, so the status goes through GraphQL. `fixed` and `closed` run `resolveReviewThread`; `active`, the
@@ -186,8 +190,6 @@ the PR Comments page offers only those on a GitHub Space (`fixed`, `closed`, `ac
 suggested reject or modify to `active` and saying in the draft that the thread is left open. On a conversation
 comment or a review summary there is no thread to resolve: the reply is posted and the line says
 `-Status` was not applied. The card's `Status:` line reads `resolved` or `unresolved` afterwards.
-
-Known gap: [A reply to a conversation comment reads back as its own thread](KNOWN-GAPS.md#a-reply-to-a-conversation-comment-reads-back-as-its-own-thread).
 
 ### When it ships
 
