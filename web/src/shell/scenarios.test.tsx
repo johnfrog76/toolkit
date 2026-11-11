@@ -598,10 +598,10 @@ describe("the scenario grid: what each configuration shows", () => {
 
   // The PM Corner (docs/SCENARIOS.md, "Team Agile's standup"): the agent attaches it
   // where the suggestion is on, as the brief's LAST line; the page draws it at the
-  // head instead. Reached is the line and a link to the Milestones tab -- the Corner
+  // head instead. Reached is the line and a link to the Releases tab -- the Corner
   // throws no confetti (PmCorner.test.tsx holds that); the award dialog does.
   // Over corner.json's generated goldens.
-  it("the PM Corner: reached is the line and a way to Milestones; several left the chevron; no Corner off GitHub", () => {
+  it("the PM Corner: reached is the line and a way to Releases; several left the chevron; no Corner off GitHub", () => {
     const dir = path.resolve(__dirname, "../../../Tests/fixtures/rituals");
     const brief = (name: string) =>
       fs.readFileSync(path.join(dir, `corner-${name}.brief.txt`), "utf8");
@@ -685,21 +685,21 @@ describe("the scenario grid: what each configuration shows", () => {
     ]);
   });
 
-  // Team Agile's Milestones (docs/SCENARIOS.md, "Team Agile's milestones"): a third
+  // Team Agile's Releases (docs/SCENARIOS.md, "Team Agile's releases"): a third
   // page under the ONE Team Agile entry, absent with the flag off; over the shared
   // table (Tests/fixtures/rituals/milestones.json) a reached milestone first seen in
   // this browser is the award -- once -- and then reads awarded; an empty one is
   // never awarded.
-  it("Milestones: a page under Team Agile's one entry; reached is the award once, then awarded; empty never", () => {
+  it("Releases: a page under Team Agile's one entry; reached is the award once, then awarded; empty never", () => {
     const at = (features: Record<string, boolean>) => {
       const e = env({ status: "active", tier: 1, tracker: "github", features });
       const active = activeModules(modules, e);
       const ctx = { env: e } as CardContext;
       return {
-        route: moduleRoutes(active).some((r) => r.path === "/solitaire-agile/milestones"),
-        chromeless: isChromeless(active, "/solitaire-agile/milestones"),
+        route: moduleRoutes(active).some((r) => r.path === "/solitaire-agile/releases"),
+        chromeless: isChromeless(active, "/solitaire-agile/releases"),
         nav: moduleNavSplit(active, ctx)
-          .tabs.filter((n) => n.match("/solitaire-agile/milestones"))
+          .tabs.filter((n) => n.match("/solitaire-agile/releases"))
           .map((n) => n.label),
       };
     };

@@ -516,21 +516,30 @@ function Get-P20CiPathClass {
     <#
       What one changed path can affect, for CI's filter (Get-P20CiScope). The
       path is git's: relative to the root, forward slashes, case as committed.
-        changelog   changelog.d/ and CHANGELOG.md: the CLI's Changelog suite
-                    alone reads them.
+        changelog   changelog.d/ and CHANGELOG.md: no half. The contract job's
+                    CLI set (Changelog, DocCounts, Portability) and its markdown
+                    lint read them.
+        prose       docs/modules/*.md, docs/SCENARIOS.md and docs/KNOWN-GAPS.md:
+                    no half. Documents no full suite asserts beyond what the
+                    contract job runs: Menu's parity and Python spelling,
+                    DocCounts' gap links, Portability's links and sweeps, and the
+                    markdown lint.
         web         anything under web/, its README included: the web job, and
                     the contract set beside it.
         shared      a path more than one half reads: consts.json,
                     config.default.json, agent/, Scripts/, Prompt20Toolkit/,
                     Config/, Tests/, .github/, samples/hub/, agentic/,
-                    templates/, docs/ and every root document.
+                    templates/, every other document under docs/ and every
+                    other root document.
         unclassified anything else, read as shared: a path the rule has never
                     heard of runs every job rather than none.
-      Returns @{ Class; Halves }.
+      Returns @{ Class; Halves }. Halves is empty for a path that reaches the
+      contract job alone.
     #>
     param([string]$Path)
     $all = @(Get-P20TestHalves)
-    if ($Path -cmatch '^changelog\.d/' -or $Path -ceq 'CHANGELOG.md') { return @{ Class = 'changelog'; Halves = @('cli') } }
+    if ($Path -cmatch '^changelog\.d/' -or $Path -ceq 'CHANGELOG.md') { return @{ Class = 'changelog'; Halves = @() } }
+    if ($Path -cmatch '^docs/modules/[^/]+\.md$' -or @('docs/SCENARIOS.md', 'docs/KNOWN-GAPS.md') -ccontains $Path) { return @{ Class = 'prose'; Halves = @() } }
     if ($Path -cmatch '^web/') { return @{ Class = 'web'; Halves = @('web') } }
     $sharedFiles = @('consts.json', 'config.default.json')
     $sharedDirs = @('agent/', 'Scripts/', 'Prompt20Toolkit/', 'Config/', 'Tests/', '.github/', 'samples/hub/', 'agentic/', 'templates/', 'docs/')
@@ -547,12 +556,14 @@ function Get-P20CiScope {
       Which of verify.yml's Ubuntu jobs a run needs. Every event but a pull
       request runs the three halves. A pull request runs the half each changed
       path can affect (Get-P20CiPathClass), the union over its paths; a pull
-      request that lists no path runs everything. A path in -CountOnly
+      request that lists no path runs everything. A changelog or prose path
+      reaches the contract job alone. A path in -CountOnly
       (Get-P20CountOnlyPaths: docs/TESTING.md, AGENTS.md or VERIFY.md changed
-      in its count lines alone) reaches no half by itself; a pull request whose
+      in its count lines alone) reaches nothing by itself; a pull request whose
       every path is one runs everything. The contract job runs on a
       pull request where a half is left out: the cross-half suites of the halves
-      that did not run, and the carried-lines check.
+      that did not run, the markdown lint when the web job did not, and the
+      carried-lines check.
       Returns cli, agent, web and contract as booleans, and Paths: each path
       with its class, in the order given.
     #>
@@ -565,16 +576,19 @@ function Get-P20CiScope {
         return $out
     }
     $rows = @()
+    $contractOnly = $false
     foreach ($p in $clean) {
         if (@($CountOnly) -ccontains $p) { $rows += , @($p, 'count lines'); continue }
         $c = Get-P20CiPathClass -Path $p
         foreach ($h in $c.Halves) { $out[$h] = $true }
+        if (@($c.Halves).Count -eq 0) { $contractOnly = $true }
         $rows += , @($p, $c.Class)
     }
     $out.Paths = $rows
     # Count lines alone reach no half; a change of nothing else runs every half,
-    # so a paste of all three lines is held by the runs it pastes from.
-    if (@($all | Where-Object { $out[$_] }).Count -eq 0) {
+    # so a paste of all three lines is held by the runs it pastes from. A
+    # changelog or prose path beside them is the contract job's alone.
+    if (@($all | Where-Object { $out[$_] }).Count -eq 0 -and -not $contractOnly) {
         foreach ($h in $all) { $out[$h] = $true }
         return $out
     }

@@ -14,9 +14,10 @@
 
     The rule is Get-P20CiScope (Scripts/TestAll-Rules.ps1): every event but a
     pull request runs the three halves; a pull request runs the half each path
-    can affect -- web/ the web job, changelog.d/ and CHANGELOG.md the CLI job,
-    a shared path or one the rule does not know all three -- and the contract
-    job wherever a half is left out.
+    can affect -- web/ the web job; changelog.d/, CHANGELOG.md,
+    docs/modules/*.md, docs/SCENARIOS.md and docs/KNOWN-GAPS.md no half, only
+    the contract job; a shared path or one the rule does not know all three --
+    and the contract job wherever a half is left out.
 
     -CountDiffFile is the -U0 diff of docs/TESTING.md, AGENTS.md and VERIFY.md,
     -BaseRoot a folder holding those files as they stood at the base, and

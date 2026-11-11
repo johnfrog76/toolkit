@@ -419,7 +419,7 @@ Team Agile section (the reminder: a time and the days), saved through `POST /api
 | a suggestion, the Space's switch on (unset or true), and nothing waiting on you | the chair's reading's last line is the suggestion, drawn as its own row -- under the brief on Detail and Work, under the body on Brief, and on the Agenda as its first line above the lanes: the line verbatim (`Next: #141 is opus-sized and well defined -- send it to the crew? (tkStartWork 141)`), its action -- **Work it now** (the hand-off box, the Agenda tiles' words) for a start or a delegation, **Open Triage** for a route -- and a dismiss. A dismiss shows the next candidate's line, and with none left today's `Next: nothing is waiting on you.`; it holds for the session, per item, in this browser only (`scenarios.test.tsx`, "the chair's suggestion") |
 | something waiting on you, or `spaces.<slug>.features.suggestions=false` | no suggestion row: the brief as it came, its Next line the queue's (`Next: the walk -- 1 on the PC.`) or today's |
 | the suggestion on (the PM Corner) | at the head of the page, above the card, the Corner's line verbatim (`3 more issues to get milestone B - start #5 now`) and its chevron, which opens the same hand-off box as **Work it now**; the brief below stops above the Corner's line; with the switch off, on an Azure DevOps Space or with the tracker down, no Corner (`scenarios.test.tsx`, "the PM Corner") |
-| a milestone reached in the window | the Corner reads `milestone B reached: see Milestones`, no chevron; the link opens the Milestones tab. The standup never throws confetti |
+| a milestone reached in the window | the Corner reads `milestone B reached: see Releases`, no chevron; the link opens the Releases tab. The standup never throws confetti |
 | no tracker (`tracker.ok` false) | the same page: the chair's two lines and the `Tracker` line with the reason -- the ritual happens anyway; no links; Play |
 | nothing (the agent is away) | `Could not read today's standup` -- an error, never an empty standup; no Play |
 
@@ -453,20 +453,21 @@ is a page under Team Agile's one nav entry"; `RitualPage.test.tsx`).
 Nothing moves between issues: the title is one line, the deep-water row is always laid out, and the
 status line is a fixed three lines.
 
-### Team Agile's milestones (on; `web/src/modules/solitaireAgile/MilestonesPage.test.tsx`)
+### Team Agile's releases (on; `web/src/modules/solitaireAgile/MilestonesPage.test.tsx`)
 
-The strip reads **Standup | Triage | Milestones**; Milestones is `/solitaire-agile/milestones`, under the ONE
-Team Agile entry, with the chrome, and absent with the flag off (`scenarios.test.tsx`, "Milestones: a page
-under Team Agile's one entry").
+The strip reads **Standup | Triage | Releases**; Releases is `/solitaire-agile/releases`, under the ONE
+Team Agile entry, with the chrome, and absent with the flag off (`scenarios.test.tsx`, "Releases: a page
+under Team Agile's one entry"). The old `/solitaire-agile/milestones` address redirects to it. Until
+tag-based releases are built the rows are GitHub milestones, and the panel says so.
 
 | `GET /api/ritual/milestones` answers | The page shows |
 | --- | --- |
-| milestones, none reached and not yet awarded | one row each, in flight first: the title, its state (`open`, `awarded`, `no issues yet`), a bar of closed over total with `5 of 8 closed` under it, `due <day>` where there is one, `closed on the tracker` where GitHub closed it, and its GitHub link; no dialog, no confetti |
+| milestones, none reached and not yet awarded | the heading `Releases` and a subtitle naming GitHub milestones; one row each, in flight first: the title, `GitHub milestone`, its state (`open`, `awarded`, `no issues yet`), a bar of closed over total with `5 of 8 closed` under it, `due <day>` where there is one, `closed on the tracker` where GitHub closed it, and its GitHub link; no dialog, no confetti |
 | a reached milestone this browser has not awarded | the award dialog over the tab: `Congratulations: <title> reached!`, `12 issues closed, 1 October 2026 to 24 October 2026.`, a gold trophy, and confetti once over the whole app -- nothing rains under reduced motion. Close: the next one waiting, else the tab with it `awarded` |
 | the same, a later visit (the browser's mark set) | the tab, the milestone `awarded`, no dialog, no confetti |
 | a milestone with no issues | `no issues yet`, open or closed on GitHub; never reached, never awarded |
 | no tracker (`tracker.ok` false) | `Could not read the milestones`, with the reason |
-| no milestones | `No milestones yet` |
+| no milestones | `No GitHub milestones yet`, with `GitHub milestones are made on the tracker; each one shows here with its progress.` |
 | nothing (the agent is away) | `Could not read the milestones` -- an error |
 
 ### The Lounge (on)
