@@ -266,7 +266,7 @@ export function DesignsCard() {
   const shown = designs.filter((d) => designMatches(d, search.value, ALL));
   const folder = data?.folder || "design";
   // One pager over the list as the card draws it: the search applies first,
-  // then the groups' order (state, in road order), then five a page.
+  // then the groups' order (state, in road order), then three a page.
   const ordered = groupByState(shown).flatMap((g) => g.designs);
   const { page, totalPages, pageItems, setPage } = usePagination(ordered, STUDIO_PAGE_SIZE);
 

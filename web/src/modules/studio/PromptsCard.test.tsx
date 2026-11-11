@@ -619,7 +619,7 @@ describe("the Prompts card's rows", () => {
     envAnswer = how("team");
   });
 
-  // The row is ONE record: title, purpose, owner, category, and the one action.
+  // The row is ONE record: title, purpose, owner, category, file name, and the one action.
   // Its text, every piece of it, is those four; the index's fields are the reading room's.
   const rowText = (card: HTMLElement) =>
     // An empty description keeps its two lines but has no text to list.
@@ -627,7 +627,7 @@ describe("the Prompts card's rows", () => {
       .map((e) => e.textContent)
       .filter(Boolean);
 
-  it("each row shows title, purpose, owner and category, and nothing else", () => {
+  it("each row shows title, purpose, owner, category and file name, and nothing else", () => {
     listAnswer = {
       data: {
         count: 4,
