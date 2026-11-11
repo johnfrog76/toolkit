@@ -37,6 +37,7 @@ $pkgRoot = Split-Path $scriptDir -Parent
 . (Join-Path $pkgRoot 'Scripts/Get-Consts.ps1')
 . (Join-Path $pkgRoot 'Scripts/Resolve-HubConfig.ps1')
 . (Join-Path $pkgRoot 'Scripts/Read-DesignTree.ps1')
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 
 # -- Test harness --------------------------------------------------------------
 
@@ -260,7 +261,7 @@ try {
         $stamped = Join-Path $base 'stamped'
         New-Item -ItemType Directory -Path $stamped -Force | Out-Null
         Push-Location $stamped
-        try { git init -q . 2>$null | Out-Null } finally { Pop-Location }
+        try { $null = Invoke-P20TestGit init -q . } finally { Pop-Location }
         Write-Lf (Join-Path $stamped 'design/one.md') "---`n${idKey}: $idAlone`n---`n`n# One`n"
         $row = Get-DesignRow -In $stamped
         Assert-Equal 'a repository whose files are all stamped is on' $states.On $row.state
@@ -277,7 +278,7 @@ try {
         $readmeOnly = Join-Path $base 'readme-only'
         New-Item -ItemType Directory -Path $readmeOnly -Force | Out-Null
         Push-Location $readmeOnly
-        try { git init -q . 2>$null | Out-Null } finally { Pop-Location }
+        try { $null = Invoke-P20TestGit init -q . } finally { Pop-Location }
         Write-Lf (Join-Path $readmeOnly 'design/README.md') "# Design notes`n"
         Write-Lf (Join-Path $readmeOnly 'spec/README.md') "# Specs`n"
         $row = Get-DesignRow -In $readmeOnly
@@ -288,7 +289,7 @@ try {
         $nodesign = Join-Path $base 'nodesign'
         New-Item -ItemType Directory -Path $nodesign -Force | Out-Null
         Push-Location $nodesign
-        try { git init -q . 2>$null | Out-Null } finally { Pop-Location }
+        try { $null = Invoke-P20TestGit init -q . } finally { Pop-Location }
         $row = Get-DesignRow -In $nodesign
         Assert-Equal 'a repository with no design/ is not configured' $states.Unset $row.state
     }

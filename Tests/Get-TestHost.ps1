@@ -22,6 +22,24 @@
     so a non-ASCII test value arrives as itself. Output is stdout and stderr
     together, as `2>&1` gave it, and $LASTEXITCODE is the child's.
 
+    Invoke-P20TestGit is the one way a suite calls git, to build a fixture
+    repository or read one back. Under Windows PowerShell 5.1 a native
+    command's redirected stderr, with 'Stop' in force, throws on its first
+    line, and on Windows git warns on stderr about line endings. So a suite
+    that wrote `git add -A 2>&1 | Out-Null` stopped there on 5.1 and passed
+    on 7. The helper runs git with 'Continue' for the one call and returns
+    what it said as text:
+
+        $r = Invoke-P20TestGit -C $repo status --porcelain
+        if ($r.Code -ne 0) { ... $r.Lines ... }
+        $null = Invoke-P20TestGit -C $repo add -A
+
+    It returns @{ Code; Lines; Out; Err }, the shape Invoke-P20TrackerRead
+    gives a script: Lines is stdout and stderr in the order they came, Out
+    stdout alone (what `2>$null` kept), Err stderr alone. $LASTEXITCODE is
+    left at Code. The arguments go to git as written, with no gate on them:
+    a fixture is not a user's input.
+
 .NOTES
     PowerShell 5.1 compatible (ASCII only).
 #>
@@ -61,4 +79,24 @@ function Invoke-P20TestHost {
         $hostArgs += @('-EncodedCommand', $encoded)
     }
     & $exe @hostArgs 2>&1
+}
+
+function Invoke-P20TestGit {
+    # No param block: every argument, a dash-led one included (-C, -c, --quiet),
+    # reaches git as written.
+    $ErrorActionPreference = 'Continue'
+    $gitArgs = @($args | ForEach-Object { $_ })
+    $global:LASTEXITCODE = 0
+    $raw = @(& git @gitArgs 2>&1)
+    $code = $LASTEXITCODE
+    $out = @()
+    $err = @()
+    $lines = @()
+    foreach ($item in $raw) {
+        $text = [string]$item
+        $lines += $text
+        if ($item -is [System.Management.Automation.ErrorRecord]) { $err += $text } else { $out += $text }
+    }
+    $global:LASTEXITCODE = $code
+    return [PSCustomObject]@{ Code = $code; Lines = $lines; Out = $out; Err = $err }
 }

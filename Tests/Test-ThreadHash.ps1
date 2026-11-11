@@ -16,6 +16,7 @@
 param()
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pkgRoot = Split-Path $scriptDir -Parent
@@ -67,12 +68,12 @@ function Initialize-Repo {
     New-Item -ItemType Directory -Path $Path -Force | Out-Null
     Push-Location $Path
     try {
-        git init --quiet 2>&1 | Out-Null
-        git checkout -B main --quiet 2>&1 | Out-Null
-        git config user.email 'test@example.com' 2>&1 | Out-Null
-        git config user.name $UserName 2>&1 | Out-Null
-        git config commit.gpgsign false 2>&1 | Out-Null
-        git config core.autocrlf false 2>&1 | Out-Null
+        $null = Invoke-P20TestGit init --quiet
+        $null = Invoke-P20TestGit checkout -B main --quiet
+        $null = Invoke-P20TestGit config user.email 'test@example.com'
+        $null = Invoke-P20TestGit config user.name $UserName
+        $null = Invoke-P20TestGit config commit.gpgsign false
+        $null = Invoke-P20TestGit config core.autocrlf false
     }
     finally { Pop-Location }
 }
@@ -82,8 +83,8 @@ function Add-Commit {
     Set-Content -Path (Join-Path $Repo $FileName) -Value "$Message`n" -Encoding UTF8
     Push-Location $Repo
     try {
-        git add . 2>&1 | Out-Null
-        git commit -m $Message --quiet 2>&1 | Out-Null
+        $null = Invoke-P20TestGit add .
+        $null = Invoke-P20TestGit commit -m $Message --quiet
         return "$(git rev-parse --short=7 HEAD)".Trim()
     }
     finally { Pop-Location }
@@ -130,7 +131,7 @@ function New-ThreadSandbox {
     Initialize-Repo -Path $code -UserName 'Code Test'
     Add-Commit -Repo $code -FileName 'README.md' -Message 'initial' | Out-Null
     Push-Location $code
-    try { git checkout -b $Branch --quiet 2>&1 | Out-Null } finally { Pop-Location }
+    try { $null = Invoke-P20TestGit checkout -b $Branch --quiet } finally { Pop-Location }
     $h1 = Add-Commit -Repo $code -FileName 'one.txt' -Message 'first real change'
     $h2 = Add-Commit -Repo $code -FileName 'two.txt' -Message 'second real change'
     $h3 = Add-Commit -Repo $code -FileName 'three.txt' -Message 'third real change'
@@ -350,7 +351,7 @@ try {
 
     # A branch that matches no card is a stated refusal, not a guess.
     Push-Location $sb.Code
-    try { git checkout -b user/555-no-such-card --quiet 2>&1 | Out-Null } finally { Pop-Location }
+    try { $null = Invoke-P20TestGit checkout -b user/555-no-such-card --quiet } finally { Pop-Location }
     $r2 = Invoke-ThreadHash -From $sb.Code
     Assert-Equal "a branch with no card refuses (exit 2)" 2 $r2.Exit
     Assert-True "the refusal names the branch" ($r2.Text -match 'user/555-no-such-card') $r2.Text

@@ -38,6 +38,7 @@ $modPath = Join-Path ($pkgRoot) 'utilities.psm1'
 # failure case passed vacuously, because command-not-found also exits non-zero.
 #
 . (Join-Path (Join-Path $pkgRoot 'Scripts') 'Resolve-CliPrefix.ps1')
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 $cfgPrefix = Resolve-P20ConfigPrefix -PackageRoot $pkgRoot
 
 # ── Test harness ──────────────────────────────────────────────────────────────
@@ -578,8 +579,8 @@ else {
     [System.IO.File]::WriteAllText($coGh, "#!/bin/sh`necho 'gh: Not Found (HTTP 404)' >&2`nexit 1`n")
     & chmod +x $coGh
 }
-$coGit = { param([string[]]$GitArgs) $null = & git -C $coClone -c user.name=t -c user.email=t@t @GitArgs 2>&1 }
-& git init -q -b main $coClone 2>&1 | Out-Null
+$coGit = { param([string[]]$GitArgs) $null = Invoke-P20TestGit -C $coClone -c user.name=t -c user.email=t@t @GitArgs }
+$null = Invoke-P20TestGit init -q -b main $coClone
 & $coGit @('remote', 'add', 'origin', 'https://github.com/acme/widgets.git')
 [System.IO.File]::WriteAllText((Join-Path $coClone 'README.md'), "widgets`n")
 & $coGit @('add', '-A')

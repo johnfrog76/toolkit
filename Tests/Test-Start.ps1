@@ -21,6 +21,7 @@
 #>
 
 $pkgRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 
 $script:passed = 0
 $script:failed = 0
@@ -146,7 +147,7 @@ $base = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-start-" + [System.Guid
 $pkg = Join-Path $base 'pkg'
 New-Item -ItemType Directory -Path $pkg -Force | Out-Null
 $files = @()
-if (Get-Command git -ErrorAction SilentlyContinue) { $files = @(& git -C $pkgRoot ls-files --cached --others --exclude-standard 2>$null) }
+if (Get-Command git -ErrorAction SilentlyContinue) { $files = @((Invoke-P20TestGit -C $pkgRoot ls-files --cached --others --exclude-standard).Out) }
 if ($files.Count -eq 0) {
     $files = @(Get-ChildItem $pkgRoot -Recurse -File | Where-Object { $_.FullName -notmatch '[\\/](node_modules|\.git|dist|__pycache__)[\\/]' } |
         ForEach-Object { $_.FullName.Substring($pkgRoot.Length + 1) })
