@@ -40,10 +40,11 @@ the key and it stays `manager/`. [Configuration](../CONFIGURATION.md#the-hub-dec
 engagements the way a career record does — it must not reset when the active Space does. This is also
 why the `manager` recipient lives in a top-level `managerWorkflow` block rather than on an org.
 
-Filenames are date-first so the folder sorts chronologically and a session's identity is its date.
-That identity spans both folders: one date is one session, whether it is open in `current/` or
-closed in `archive/`, and every writer on both sides checks the pair rather than one of them.
-A file in `current/` whose name is not a date is not a session, and nothing reads it.
+Filenames end in the date so a series' records sort chronologically, and a session's identity is its
+name -- the series, if any, and the date. That identity spans both folders: one name is one session,
+whether it is open in `current/` or closed in `archive/`, and every writer on both sides checks the pair
+rather than one of them. A file in `current/` whose name does not fit the rule above is not a session,
+and nothing reads it.
 
 ## The stages
 

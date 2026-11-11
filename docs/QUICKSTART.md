@@ -9,13 +9,14 @@ the same install gate by gate, with what you should see at each one.
 | | |
 | --- | --- |
 | **PowerShell** | 5.1 (Windows built-in) or 7+. Both supported; the installer sets up both. On 5.1 the module turns TLS 1.2 on at import, so a locked-down machine that still leads with TLS 1.0 can reach Azure DevOps, the Anthropic API and Teams. |
-| **git** | Required by `Sync` and `ThreadHash`. Everything else degrades gracefully. |
+| **git** | Required by `Sync`, `ThreadHash` and `Update`, and `Setup` reports it missing as a failure. The card workflow itself degrades gracefully without it. |
 | **Azure CLI** (`az`) | Only for ADO commands. Sign in with `az login`. |
+| **GitHub CLI** (`gh`) | Only for a Space tracked on GitHub: `Connect` lists your repositories with it, and every read and write of a GitHub tracker goes through it. Sign in with `gh auth login`. |
 | **Python** 3.12+ | Only for the agent (`agent/`). The CLI never calls it. Runtime deps: `agent/requirements.txt`. |
 | **Python test deps** | Only for `python3 -m pytest Tests/` (Windows: `python` or `py -3`): `pytest` and `httpx` (`fastapi.testclient` imports httpx), and `ruff`, the Python half's linter. All three live in `agent/requirements-dev.txt`, which pulls the runtime file in. |
 | **Node** 24.22.0+ | Only for the web UI (`web/`). Node 24 is the active LTS; `.nvmrc` at the repository root and `web/package.json` `engines` both say so, and `engines` sets the floor at 24.22.0, because on 24.21 `npm test` is sometimes broken by a crash in Node itself ([Contributing](CONTRIBUTING.md)). `nvm install 24 && nvm alias default 24` moves an older 24 up. |
 | **Playwright browsers** | Only for `npm run smoke`. `npm ci` installs the library; the chromium binary lives in a machine-level cache and needs `npx playwright install chromium` once. |
-| `ANTHROPIC_API_KEY` | **Optional.** Only for `AddPRReview` and the agent's `suggest` route. Everything else works without it. |
+| `ANTHROPIC_API_KEY` | **Optional.** Only for `AddPRReview`, the agent's `suggest` route, its notes tidy-up (`POST /api/rewrite`) and Team Agile's dressed standup. Everything else works without it. |
 
 Without `az` you still get the full local workflow -- see [Tiers](CLI.md#tiers-what-works-without-ado).
 
@@ -26,13 +27,13 @@ What has been run, and where. A row says "verified" only where someone ran it an
 | Platform | Status | Where it is verified |
 | --- | --- | --- |
 | **macOS** | Supported, verified | The maintainer's Mac: the CLI, agent and web suites on every change ([Testing](TESTING.md)) |
-| **Windows**, with PowerShell 7 and with Windows PowerShell 5.1 | Supported, verified | A Windows PC, walked by hand: [`VERIFY.md`](../VERIFY.md), Gate 12, "Windows install and test", and its "Rows added by a fix" |
+| **Windows**, with PowerShell 7 and with Windows PowerShell 5.1 | Supported, verified | A Windows PC, walked by hand: [`VERIFY.md`](../VERIFY.md), Gate 12, "Windows install and test", and its "Rows added by a fix". And GitHub Actions, on `windows-latest`: the CLI suites in PowerShell 7, the browser smoke, and a set of the card and config suites run in Windows PowerShell 5.1 itself -- on a schedule, from the button, and on a pull request labelled `ci` (`.github/workflows/verify.yml`, [Testing](TESTING.md), "In CI") |
 | **Linux** | **The suites, in GitHub Actions** | `ubuntu-latest`: the CLI's suites, the agent's and the web UI's have run green there (`.github/workflows/verify.yml`, [Testing](TESTING.md), "In CI"). The first-run path (`Start`, the web UI in a browser) has not been walked on a Linux machine |
 
 | Runtime | Version | Where it is verified |
 | --- | --- | --- |
 | **PowerShell 7** | 7.6 | Both hosts: 7.6 on the Mac and on the Windows PC |
-| **Windows PowerShell** | 5.1, the floor: every script must parse and run on it | The Windows PC only (5.1.26100), under `powershell.exe`: `Test-PS51Compat`, `Test-Portability` and the Gate 12 rows. Nothing on a Mac can run it |
+| **Windows PowerShell** | 5.1, the floor: every script must parse and run on it | The Windows PC (5.1.26100), under `powershell.exe`: `Test-PS51Compat`, `Test-Portability` and the Gate 12 rows. The Windows job in GitHub Actions, which loads the module and runs a set of the card and config suites in `powershell.exe`. Nothing on a Mac can run it |
 | **Python** | 3.12 | Both hosts: 3.12.4 on the Mac and 3.12.10 on the Windows PC. 3.10 and 3.11 are not run by anything, so they are not claimed; the floor rises or falls with what runs |
 | **Node** | 24, the active LTS, from 24.22.0 (`.nvmrc`, `web/package.json` `engines`) | The Mac: `npm ci` and `npm test` on Node 24.22.0, the recorded web counts. The Windows PC: `npm test` on Node 24.22.0, with no crash in Node (the row under [`VERIFY.md`](../VERIFY.md)'s "Rows added by a fix") |
 | **Docker image** (`web/Dockerfile`, `web/docker-compose.yml`) | Builds on `node:24-alpine`, serves from `nginx:alpine` | The Windows PC: `docker compose build` and the smoke against the running container, published on `127.0.0.1:5174`. Linux hosts: see the trust model's note on `host.docker.internal` |
@@ -108,7 +109,7 @@ has run, or points it at a repo of your own. The **Azure demo** is ready for YOU
 organisation: give it the address (its tip, or `tkConnect azure-demo -Address https://dev.azure.com/<org>`)
 and sign in with `az login` ([the demo Spaces](modules/ado.md#the-demo-spaces-one-per-grain)).
 
-Above the tabs, a banner offers **Introducing ToolKit**, a nine-slide narrated deck: that is the
+Above the tabs, a banner offers **Introducing ToolKit**, the Toolkit deck, narrated: that is the
 *watch*. Watch it or dismiss it, and the banner does not come back (`firstRun.welcome`, in
 `docs/CONFIGURATION.md`).
 
@@ -169,10 +170,13 @@ other key are in [Configuration](CONFIGURATION.md).
 Nothing so far needs `az`, a board or a network:
 
 ```powershell
-tkNewPrompt -Title "Timeout on large files" -Type Bug   # scaffolds a card into {promptsRoot}/azure-demo/current/
-tkStatus                                                # every open card and its derived state: Active
-tkMenu                                                  # every command, most-used first
+tkNewPrompt -Title "Timeout on large files" -Type Bug -Now   # scaffolds a card into {promptsRoot}/azure-demo/current/
+tkStatus                                                     # every open card and its derived state: Active
+tkMenu                                                       # every command, most-used first
 ```
+
+Without `-Now` the card is planned rather than in play: it waits in `azure-demo/backlog/` until
+`tkMove <id> -To Active` pulls it into `current/`.
 
 With `az login` and a real org configured, `tkNewPrompt <id>` builds the same file from the ADO
 work item instead, and the rest of the loop -- `tkThreadHash`, `tkNewPR`, `tkGetPRComments`,
