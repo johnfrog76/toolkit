@@ -1239,12 +1239,12 @@ describe("the PM Corner", () => {
     expect(copyMock).toHaveBeenCalledWith(data.brief);
   });
 
-  it("reached: the line and 'see Milestones', and the standup never throws confetti", async () => {
+  it("reached: the line and 'see Releases', and the standup never throws confetti", async () => {
     answer = { data: withCorner("reached", reached) };
     const { unmount } = render(<StandupPage />);
     const corner = await screen.findByTestId("pm-corner");
-    expect(corner.textContent).toBe("milestone B reached: see Milestones");
-    expect(within(corner).getByRole("link", { name: "see Milestones" })).toBeTruthy();
+    expect(corner.textContent).toBe("milestone B reached: see Releases");
+    expect(within(corner).getByRole("link", { name: "see Releases" })).toBeTruthy();
     expect(screen.queryByTestId("confetti")).toBeNull();
     // Reached has no chevron: nothing left to start in B.
     expect(within(corner).queryByRole("button")).toBeNull();

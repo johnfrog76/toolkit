@@ -7,9 +7,12 @@ export const ROUTES = {
   /** Triage (V1): the open issues one at a time, unplaced first. Under
    *  the tab root, so the one Team Agile nav entry stays lit. */
   triage: `${SOLITAIRE_AGILE_HOME}/triage`,
-  /** Milestones: one row per tracker milestone with its bar, and the award
+  /** Releases: one row per GitHub milestone with its bar, and the award
    *  dialog -- the module's one celebration. Under the tab root, like Triage. */
-  milestones: `${SOLITAIRE_AGILE_HOME}/milestones`,
+  releases: `${SOLITAIRE_AGILE_HOME}/releases`,
+  /** The tab's earlier address, when it was named Milestones: it redirects to
+   *  `releases`, so a bookmark still lands on the tab. */
+  legacyMilestones: `${SOLITAIRE_AGILE_HOME}/milestones`,
   /**
    * Today's standup, PLAYED: the Remote Standup's stage as an audiobook deck
    * (V1). Under the deck module's `/deck/` prefix so it reads as a deck, but
