@@ -325,6 +325,9 @@ EXPECTED = {
     # Claude Code usage: /env's flag (the inventory row's key) and the burn route.
     ("usage", "envFlag"): "claudeUsage",
     ("usage", "burnRoute"): "/api/usage/burn",
+    # The statuses a reply may set, per tracker.
+    ("replyStatuses", "ado"): ["fixed", "active", "pending", "byDesign", "wontFix", "closed"],
+    ("replyStatuses", "github"): ["fixed", "closed", "active"],
     ("startWork", "text"): {
         "head": "# Start work: {kind} {id} -- {title}",
         "howWeWork": "## How we work in {space} ({source})",
@@ -506,6 +509,8 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.startwork_how_we_work_note(), EXPECTED[("startWork", "howWeWorkNote")])
         self.assertEqual(C.usage_env_flag(), EXPECTED[("usage", "envFlag")])
         self.assertEqual(C.usage_burn_route(), EXPECTED[("usage", "burnRoute")])
+        self.assertEqual(C.reply_statuses("ado"), tuple(EXPECTED[("replyStatuses", "ado")]))
+        self.assertEqual(C.reply_statuses("github"), tuple(EXPECTED[("replyStatuses", "github")]))
 
     def test_the_worker_rule_reads_the_contract(self):
         """The pane's worker chips and the standup read one prefix, not two."""

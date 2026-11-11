@@ -324,10 +324,12 @@ function Get-P20GitHubReplyStatus {
         reads afterwards.
     #>
     param([AllowEmptyString()][AllowNull()][string]$Status)
-    switch ("$Status") {
-        '' { return @{ Action = ''; Word = ''; Error = ''; Hint = '' } }
-        { $_ -in @('fixed', 'closed') } { return @{ Action = 'resolveReviewThread'; Word = 'resolved'; Error = ''; Hint = '' } }
-        'active' { return @{ Action = 'unresolveReviewThread'; Word = 'unresolved'; Error = ''; Hint = '' } }
+    . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
+    $accepted = @((Get-P20Consts).replyStatuses.github)
+    if (-not "$Status") { return @{ Action = ''; Word = ''; Error = ''; Hint = '' } }
+    if ("$Status" -in $accepted) {
+        if ("$Status" -eq 'active') { return @{ Action = 'unresolveReviewThread'; Word = 'unresolved'; Error = ''; Hint = '' } }
+        return @{ Action = 'resolveReviewThread'; Word = 'resolved'; Error = ''; Hint = '' }
     }
     return @{
         Action = ''; Word = ''

@@ -214,19 +214,6 @@ back instead.
 
 **Issue:** [#302](https://github.com/johnfrog76/toolkit/issues/302)
 
-### PR Comments offers statuses GitHub refuses
-
-**What you see:** On a GitHub Space, the PR Comments page offers every Azure DevOps status. **Post
-reply** sends the status the box holds, and **Suggest a reply** maps a recommendation to reject as
-`wontFix` and to modify as `pending`. GitHub keeps only resolved and unresolved, so `ReplyPR` refuses
-those two (and `byDesign`) before anything is posted, and the page shows the refusal under the thread.
-Pick `fixed`, `closed` or `active` and post again
-([CLI](CLI.md#answering-on-a-github-board), "Answering on a GitHub board").
-
-**Where you meet it:** [web README](../web/README.md#the-modules-surface), "The module's surface"
-
-**Issue:** [#303](https://github.com/johnfrog76/toolkit/issues/303)
-
 ### A reply to a conversation comment reads back as its own thread
 
 **What you see:** GitHub has no reply to a conversation-tab comment or a review's summary, so `ReplyPR`
