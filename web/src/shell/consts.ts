@@ -295,6 +295,7 @@ export const RITUALS = consts.rituals as {
     suggestNounCard: string;
     suggestNounIssue: string;
     suggestCommandStart: string;
+    suggestCommandLaunch: string;
     suggestCommandRoute: string;
     /** The PM Corner's lines; the page shows the served `line` verbatim, and the
      *  chevron is cornerChevron. cornerBrief / cornerBriefCommand are the brief's

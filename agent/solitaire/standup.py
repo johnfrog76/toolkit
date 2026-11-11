@@ -1865,7 +1865,7 @@ def standup_for(space: str = "", as_of: datetime | None = None, since: str = "",
             labels, issues, state = read_tracker(org, status, projects, state="all", body=True, refresh=refresh)
         filled = fill_standup(now, labels, issues, state, space=slug, window=since)
     # The suggestion (suggest.py): over the same read, before the brief renders it.
-    from ..core.config import how_i_work
+    from ..core.config import how_i_work, start_work_launch
     from .suggest import attach_suggestions, suggestions_on
 
     entry = _space_entry(cfg, space)
@@ -1886,6 +1886,7 @@ def standup_for(space: str = "", as_of: datetime | None = None, since: str = "",
             True,
             str(cfg.get("commandPrefix") or ""),
             viewer,
+            start_work_launch(),
         )
         # The PM Corner (corner.py): the suggestion's second surface, the same
         # switch, the same read and the same pick.

@@ -330,8 +330,9 @@ if ($choice.source -eq 'cards' -or $choice.source -eq 'both') {
     # where an issue read happened -- a cards Space has no assignee to compare.
     $viewer = ''
     if ($suggestOn -and $choice.source -eq 'both' -and $tracker.ok) { $viewer = Get-P20RitualViewer }
+    if (-not (Get-Command Test-P20StartWorkLaunch -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Test-StartWorkLaunch.ps1') }
     $null = Add-P20StandupSuggestion -Standup $standup -Labels $labels -Issues $issues -Cards $cards -HowIWork ([string]$how.answer) `
-        -On $suggestOn -Prefix (Get-CliPrefix) -Viewer $viewer -PackageRoot $repoRoot
+        -On $suggestOn -Prefix (Get-CliPrefix) -Viewer $viewer -PackageRoot $repoRoot -Launch (Test-P20StartWorkLaunch)
     # The PM Corner (Scripts/Corner-Rules.ps1): the suggestion's second surface --
     # the same switch, the same read, the same pick -- and the brief's last line.
     . (Join-Path $PSScriptRoot 'Corner-Rules.ps1')

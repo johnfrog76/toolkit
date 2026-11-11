@@ -736,7 +736,9 @@ call returns as soon as the session has started -- on every host.
 `claude` is on the PATH, `not configured` otherwise, named by `tkEnv` and `tkMenu -All` as **StartWork
 launch** with its question, "Can it start the work in a session for me?". `GET /api/env` carries the
 same answer as a top-level boolean, `startWorkLaunch`, so the page offers a launch only where it would
-work; the copy box works either way.
+work; the copy box works either way. The standup's delegate suggestion reads the same answer
+([the suggestion](#the-suggestion-one-next-move-derived)): where the launch is on, its Next line ends in
+`StartWork <n> -Launch`.
 
 **Proving it.** `tkTestToolkit -StartWork` builds scratch clones (the Space's, with a commit; another
 repository's; the Space's with no commit) and puts a stub `claude` first on the PATH: `-WhatIf` and its
@@ -789,10 +791,17 @@ that row together.
 | How you work | Who | Shape | Sentence | Command |
 | --- | --- | --- | --- | --- |
 | `alone`, or `agents` with it yours: `me`, or sized `fable` -- the owner's own seat, never the crew (D-AR10; `rituals.suggestOwnerSeat`) | -- | start | `23A3 is the last open card in milestone B -- start it?` | `StartWork 23A3` |
-| `agents` | a crew size, and the item has a milestone | delegate | `#4 is sonnet-sized and well defined -- send it to the crew?` | `StartWork 4` |
+| `agents` | a crew size, and the item has a milestone | delegate | `#4 is sonnet-sized and well defined -- send it to the crew?` | `StartWork 4`; `StartWork 4 -Launch` where [the launch](#the-launch-the-block-handed-to-a-session) is on (`rituals.text.suggestCommandLaunch`) |
 | `agents` | a crew size, and no milestone | place | `#5 is sonnet-sized but has no milestone -- place it?` | `Route 5 -Milestone <title>` on an issue; `Plan K7M2 -Milestone <title>` on a card, which writes its `**Milestone:**` line |
 | `agents` | nobody | route | `#4 is the oldest open sev2 in milestone B and nobody has it -- route it?` | `Route 4 -Assign <me\|size>` |
 | any | nothing left after the exclusions | -- | `Next: nothing is waiting on you.` (today's line) | -- |
+
+The launch is an input of the rule, not something it looks up: `suggest(items, how, dismissed, launch)` in the
+agent and `Select-P20Suggestion -Launch` in the CLI take it, so the rule stays pure and the table's rows carry
+a `launch` field. The caller asks the one question `/env` and the inventory ask -- `start_work_launch()`
+(`agent/core/config.py`) and `Test-P20StartWorkLaunch` (`Scripts/Test-StartWorkLaunch.ps1`, which the
+inventory's row reads too): `claude` on the PATH. Only the delegate shape changes; the start, place and
+route commands are the same with it on.
 
 "Well defined" is not a judgement: a size label and a milestone. The reason clause is one of three
 shapes: `the last open <card|issue> in milestone <m>` when the item's milestone has one open item (it),
@@ -819,13 +828,11 @@ chair's line is today's.
 
 `Tests/fixtures/suggestion/table.json` is the one table, asserted from `tkTestToolkit -Rituals` against
 `Scripts/Suggest-Rules.ps1` and from `Tests/test_rituals.py` against `agent/solitaire/suggest.py`: the
-nearest milestone, every shape the rule distinguishes (a `sev1` beats a nearer milestone; two in one
+nearest milestone, every shape the rule distinguishes, the delegation with the launch off and on (a `sev1` beats a nearer milestone; two in one
 milestone pick the older; one left beats three left; no milestone sorts last; a crew-sized item on an
 `agents` Space is a delegation and a `fable`-sized one a start; a sized item with no milestone is placed in
 one; an unrouted item is a route; in flight, not billable, waiting-on-you and someone else's excluded; the empty Space; a dismissed item yields the next), the switch, and three chair's readings
 end to end whose goldens (`suggestion-<case>.brief.txt`) `Tests/regenerate_joined_goldens.py` writes.
-
-Known gap: [The suggestion hands off, it does not launch](../KNOWN-GAPS.md#the-suggestion-hands-off-it-does-not-launch).
 
 ## The PM Corner: the line, the chevron, the confetti
 
@@ -1485,10 +1492,6 @@ repository", is the real write).
 - **Nobody calls your number.** A launched session is detached: its result is its log and, when it gets
   there, a pull request on the tracker. The page has no window screen, one line per order saying cooking
   or ready ([the drive-through](#the-loop-as-a-drive-through)); you look at the tracker or the log.
-- **The suggestion's delegation does not launch.** The launch exists (`StartWork <n> -Launch`, [a
-  session in a worktree](#the-launch-the-block-handed-to-a-session)), and the copy box offers it where `/env`
-  says so, but the chair's Next line still names `StartWork <n>`, the block carried by hand; the command
-  gaining `-Launch` where the launch is on is not built ([The suggestion hands off, it does not launch](../KNOWN-GAPS.md#the-suggestion-hands-off-it-does-not-launch)).
 - **A launch is proved on macOS here, and walked on Windows.** The pipe returning on Windows PowerShell
   5.1, the model a real `claude` runs, and a real session's first message being the block are `VERIFY.md`
   rows (Gate 12, "StartWork -Launch"); the suite's launch half runs off Windows only.

@@ -342,6 +342,7 @@ describe("consts.json", () => {
         suggestNounCard: "card",
         suggestNounIssue: "issue",
         suggestCommandStart: "StartWork {arg}",
+        suggestCommandLaunch: "StartWork {arg} -Launch",
         suggestCommandRoute: "Route {arg} -Assign <me|size>",
         suggestCommandPlace: "Route {arg} -Milestone <title>",
         suggestCommandPlaceCard: "Plan {arg} -Milestone <title>",
