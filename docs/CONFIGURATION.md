@@ -634,6 +634,11 @@ and **the halves a test run
 covers** (`tests.halves`, `agent`, `cli`, `web` in the order `tkTest` runs them, and `tests.legacyHalf`,
 what a `test-summary.<machine>.json` entry with no `half` is read as: the CLI runner and `tkTest` write
 the tag, `agent/core/log.py` serves it and the Health card draws it -- [Testing](TESTING.md)),
+and **where a machine keeps its test history** (`tests.summaryFile` and `tests.resultsFile`, the two files'
+names; `tests.historyBase`, `historyFallback` and `historyPath`, the per-platform folder outside every
+checkout; `env.testHistoryDir`, `P20_TEST_HISTORY_DIR`, the override the test runners set: `Scripts/Get-TestHistoryDir.ps1`
+and `agent/core/log.py` compute it by one rule, held to `Tests/fixtures/test-history/paths.json` --
+[Testing, "Where the record lives"](TESTING.md#where-the-record-lives)),
 and **the package's own repository** (`repository.url`: what the agent compares a Space's repository with when the package has no git origin to read, so ToolKit connected to itself still reads as itself on the Prompts card -- a checkout's origin wins when it is there),
 and **the product's version** (`version`, the one top-level value that is not a group: `Env` prints it
 in its first block, `GET /api/env` serves it and the System page's Environment card shows it).

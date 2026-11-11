@@ -95,6 +95,9 @@ describe("consts.json", () => {
     // Where the agent's on-disk cache goes instead of the user cache folder: the
     // test runners set it, the agent reads it. Stated here for the same reason.
     expect(consts.env.agentCacheDir).toBe("P20_AGENT_CACHE_DIR");
+    // Where the machine's test history goes instead of its per-machine folder:
+    // the test runners set it, the CLI and the agent read it.
+    expect(consts.env.testHistoryDir).toBe("P20_TEST_HISTORY_DIR");
     // The line a send writes under ## Sent, from the web button and from SendTeams -Session.
     expect(STAMPS.sent).toBe("Sent to");
     // Organize's reminders: the footer lines, the due pattern, and the two word lists.
@@ -119,6 +122,21 @@ describe("consts.json", () => {
     // The three halves a test run covers, in run order.
     expect(TESTS.halves).toEqual(["agent", "cli", "web"]);
     expect(TESTS.legacyHalf).toBe("cli");
+    // Where a machine keeps its test history: the CLI writes it, the agent reads
+    // it, the web only states it (it reads /api/test-history).
+    expect(consts.tests.summaryFile).toBe("test-summary.{machine}.json");
+    expect(consts.tests.resultsFile).toBe("test-results.{machine}.log");
+    expect(consts.tests.historyBase).toEqual({ windows: "LOCALAPPDATA", linux: "XDG_STATE_HOME" });
+    expect(consts.tests.historyFallback).toEqual({
+      windows: "AppData/Local",
+      macos: "Library/Application Support",
+      linux: ".local/state",
+    });
+    expect(consts.tests.historyPath).toEqual({
+      windows: "ToolKit/TestHistory",
+      macos: "ToolKit/TestHistory",
+      linux: "toolkit/test-history",
+    });
     // The Docs tab's roots: the agent's path rule and this half's link
     // resolver must agree on what is a doc.
     expect(DOCS.readme).toBe("README.md");

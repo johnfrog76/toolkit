@@ -486,7 +486,7 @@
         "A half that cannot run is skipped and says why -- no Python, no pytest or httpx, no pwsh, no npm, no web/node_modules -- and the verdict names it SKIPPED, not passed.",
         "Exit 0 when every half that ran passed; exit 2, after the summary, when a half failed or none ran.",
         "Expected vs actual, per half, from docs/TESTING.md's own lines: information, not a failure -- the merger pastes those counts from the Mac's run.",
-        "test-summary.<machine>.json gains a half field per suite and a halves block; the System page's Health card and {cliPrefix}Setup read the whole machine from it."
+        "test-summary.<machine>.json gains a half field per suite and a halves block, each record with the checkout and commit it ran from; the System page's Health card and {cliPrefix}Setup read the whole machine from it. It lives in the machine's test-history folder, one for every checkout and git worktree ({cliPrefix}TestToolkit's notes say where)."
       ],
       "switches": {
         "-Half": "One half: cli, agent or web",
@@ -510,7 +510,7 @@
       "notes": [
         "A suite switch is its name in the list below -- name several and they all run.",
         "A skip is not a pass: read the per-suite summary line, not the total.",
-        "test-summary.<machine>.json carries each suite's seconds; the Health card reads it, and -Failed reads its results."
+        "test-summary.<machine>.json carries each suite's seconds; the Health card reads it, and -Failed reads its results. It and test-results.<machine>.log live in one folder per machine, whichever checkout or git worktree ran: ~/Library/Application Support/ToolKit/TestHistory on macOS, %LOCALAPPDATA%\\ToolKit\\TestHistory on Windows, $XDG_STATE_HOME/toolkit/test-history (~/.local/state/toolkit/test-history) elsewhere; P20_TEST_HISTORY_DIR moves it."
       ],
       "switches": {
         "-<Suite>": "One suite by name; name several and they all run",

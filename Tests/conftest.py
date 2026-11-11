@@ -1,4 +1,4 @@
-"""Session setup for the agent's tests. Two jobs, both about not touching the
+"""Session setup for the agent's tests. Several jobs, all about not touching the
 engineer's own machine state.
 
 1. **The usage log.** Every write through ``agent/core/log_writer.py`` -- the
@@ -19,6 +19,12 @@ engineer's own machine state.
    says it is -- two tests may give different text one sha, and a row one test
    parsed must never answer for another. The rituals' in-memory reads (the
    tracker's 60-second answers, the dressed replies) are forgotten per test too.
+
+2b. **The test history.** ``agent/core/log.py`` reads the machine's test history
+   from one folder per machine, outside every checkout; ``P20_TEST_HISTORY_DIR``
+   (``consts.json`` ``env.testHistoryDir``) moves it, here to a temp directory at
+   import, so no test reads the engineer's record or writes into it, and no
+   child PowerShell a test starts appends to it.
 
 3. **The webhook variables.** ``SendTeams`` and ``POST /api/comms/send`` take
    whatever is in the environment at face value, and a machine that has ever
@@ -75,6 +81,7 @@ if request_gate is not None:
 _CONSTS = json.loads((Path(__file__).resolve().parent.parent / "consts.json").read_text(encoding="utf-8-sig"))
 WEBHOOK_PREFIX = _CONSTS["env"]["teamsWebhookPrefix"]
 AGENT_CACHE_ENV = _CONSTS["env"]["agentCacheDir"]
+TEST_HISTORY_ENV = _CONSTS["env"]["testHistoryDir"]
 TEST_RUN_MARKER = _CONSTS["env"]["testRunMarker"]
 RUN_OVERRIDES = (_CONSTS["env"]["activeSpace"], _CONSTS["env"]["promptsRoot"])
 
@@ -85,6 +92,9 @@ atexit.register(remove_tree, USAGE_LOG_DIR)
 AGENT_CACHE_DIR = tempfile.mkdtemp(prefix="p20-test-cache-")
 os.environ[AGENT_CACHE_ENV] = AGENT_CACHE_DIR
 atexit.register(remove_tree, AGENT_CACHE_DIR)
+TEST_HISTORY_DIR = tempfile.mkdtemp(prefix="p20-test-history-")
+os.environ[TEST_HISTORY_ENV] = TEST_HISTORY_DIR
+atexit.register(remove_tree, TEST_HISTORY_DIR)
 
 
 def scrub_webhooks(environ) -> dict:

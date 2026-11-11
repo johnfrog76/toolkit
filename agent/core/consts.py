@@ -275,6 +275,11 @@ def env_agent_cache_dir() -> str:
     return consts()["env"]["agentCacheDir"]
 
 
+def env_test_history_dir() -> str:
+    """Moves the machine's test history off its per-machine folder (the test runners' scratch)."""
+    return consts()["env"]["testHistoryDir"]
+
+
 def stamp_sent() -> str:
     """The line a send writes under ``## Sent``: "Sent to <recipient>: <date>"."""
     return consts()["stamps"]["sent"]
@@ -320,6 +325,24 @@ def test_halves() -> tuple[str, ...]:
 def test_legacy_half() -> str:
     """What a ``test-summary`` suite entry with no ``half`` is read as."""
     return consts()["tests"]["legacyHalf"]
+
+
+def test_history_file(kind: str, machine: str) -> str:
+    """``test-summary.<machine>.json`` (kind ``summary``) or ``test-results.<machine>.log``
+    (kind ``results``), from ``tests.summaryFile`` / ``tests.resultsFile``."""
+    key = "summaryFile" if kind == "summary" else "resultsFile"
+    return consts()["tests"][key].replace("{machine}", machine)
+
+
+def test_history_pieces(platform_name: str) -> tuple[str, list[str], list[str]]:
+    """One platform's (base variable, fallback segments, path segments) -- the
+    pieces of where a machine keeps its test history. An empty base variable means
+    the platform reads none."""
+    t = consts()["tests"]
+    base = t["historyBase"].get(platform_name, "")
+    fallback = [p for p in t["historyFallback"][platform_name].split("/") if p]
+    path = [p for p in t["historyPath"][platform_name].split("/") if p]
+    return base, fallback, path
 
 
 def docs_readme() -> str:

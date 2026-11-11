@@ -23,8 +23,9 @@ function script:Get-MachineName {
 # to merge machines, so redirecting the writer alone would leave the readers
 # pointed at the real log. Unset means the repo root, exactly as before.
 #
-# test-results.{machine}.log deliberately does NOT follow it. The Health card
-# reading real test results is the point of that file.
+# test-results.{machine}.log deliberately does NOT follow it: it lives in the
+# machine's test-history folder (Scripts/Get-TestHistoryDir.ps1), which has an
+# override of its own that the test runners set.
 # Global, so Setup (a script the module launches) can ask where the log goes
 # and prove it writable (Setup's C8) instead of retyping the rule.
 function global:Get-P20ToolkitLogDir {
@@ -64,21 +65,29 @@ function global:Write-P20TestResult {
         [Parameter(Mandatory)][int]$Passed,
         [Parameter(Mandatory)][int]$Total,
         [string]$Detail = 'ok',
-        [string]$Org = ''
+        [string]$Org = '',
+        # The test-history folder to append to. Unset, this process's own
+        # (Get-P20TestHistoryDir); a runner passes the one it resolved before it
+        # pointed its children at a scratch folder. None at all -- a marked run
+        # with no override -- writes nothing.
+        [string]$Dir
     )
+    if (-not $PSBoundParameters.ContainsKey('Dir')) { $Dir = Get-P20TestHistoryDir }
+    if (-not $Dir) { return }
     $timestamp = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss')
     $machine = Get-MachineName
     # Detail is a non-terminal tab-delimited column (org follows it); a tab or a
     # line break would bleed into the org field or forge a second result line.
     $safeDetail = ($Detail -replace '[\t\r\n\x0b\x0c\x1c-\x1e\x85\u2028\u2029]', ' ')
     $entry = "$timestamp`t$Suite`t$Result`t$Passed`t$Total`t$safeDetail`t$Org"
-    $logPath = Join-Path $PSScriptRoot "test-results.$machine.log"
+    $logPath = Join-Path $Dir (Get-P20TestHistoryFileName -Kind results -Machine $machine)
     # A byte-level append, as Write-ToolkitLog's: under Windows PowerShell 5.1,
     # Add-Content -Encoding UTF8 on a file something still holds for a moment (a
     # scanner, the write just before this one) throws "Stream was not readable",
     # and the line was lost behind the warning below. UTF-8 with no BOM, and the
     # host's line ending, as Add-Content wrote it; every reader takes either.
     try {
+        if (-not (Test-Path -LiteralPath $Dir)) { New-Item -ItemType Directory -Path $Dir -Force | Out-Null }
         [System.IO.File]::AppendAllText($logPath, $entry + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding $false))
     }
     catch {
@@ -115,6 +124,7 @@ if ($PSVersionTable.PSEdition -eq 'Desktop') {
 # While the marker is set, .env is not read at all: no
 # suite reads a value from it, and none should see a key it holds.
 . (Join-Path $toolkitRoot 'Scripts/Get-Consts.ps1')
+. (Join-Path $toolkitRoot 'Scripts/Get-TestHistoryDir.ps1')
 $dotEnvSkip = [bool][System.Environment]::GetEnvironmentVariable((Get-P20Consts).env.testRunMarker)
 foreach ($dotEnvPath in @(
     (Join-Path $toolkitRoot '.env')
