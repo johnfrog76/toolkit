@@ -366,6 +366,8 @@ modes, which run against servers someone started (Gate 8 and 9b), and its `--stu
 a live tracker (Gates 6 and 8c). Nor does it compare counts: the counts at the top of this page are those of the host that
 built the change, pasted after a merge, and a Linux or Windows run reads differently on purpose.
 
+Known gap: [Most CLI suites run their verbs on PowerShell 7 under 5.1](KNOWN-GAPS.md#most-cli-suites-run-their-verbs-on-powershell-7-under-51).
+
 ## The scenario grid
 
 What each configuration shows -- Space status, tier, tracker, every module on or off -- is written

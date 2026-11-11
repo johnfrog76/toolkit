@@ -822,6 +822,8 @@ milestone pick the older; one left beats three left; no milestone sorts last; a 
 one; an unrouted item is a route; in flight, not billable, waiting-on-you and someone else's excluded; the empty Space; a dismissed item yields the next), the switch, and three chair's readings
 end to end whose goldens (`suggestion-<case>.brief.txt`) `Tests/regenerate_joined_goldens.py` writes.
 
+Known gap: [The suggestion hands off, it does not launch](../KNOWN-GAPS.md#the-suggestion-hands-off-it-does-not-launch).
+
 ## The PM Corner: the line, the chevron, the confetti
 
 One derived line at the head of the Team Agile page, and the last line of `Standup -Brief`: where the
@@ -1095,6 +1097,8 @@ a hash two cards thread counted once), `not-billable-counts` (a not-billable car
 counts) and `window-three-days` (a three-day window with a close on each day, listed and counted once, and a
 close the day before the window not), with `expected.motions` and `expected.counts`; card rows carry
 `begun` and `commits`, as `read_cards` / `Get-P20StandupCards` read them.
+
+Known gap: [What moved is counted from the cards](../KNOWN-GAPS.md#what-moved-is-counted-from-the-cards).
 
 ### The two sources, joined
 
@@ -1475,7 +1479,7 @@ repository", is the real write).
 - **The suggestion's delegation does not launch.** The launch exists (`StartWork <n> -Launch`, [a
   session in a worktree](#the-launch-the-block-handed-to-a-session)), and the copy box offers it where `/env`
   says so, but the chair's Next line still names `StartWork <n>`, the block carried by hand; the command
-  gaining `-Launch` where the launch is on is not built.
+  gaining `-Launch` where the launch is on is not built ([The suggestion hands off, it does not launch](../KNOWN-GAPS.md#the-suggestion-hands-off-it-does-not-launch)).
 - **A launch is proved on macOS here, and walked on Windows.** The pipe returning on Windows PowerShell
   5.1, the model a real `claude` runs, and a real session's first message being the block are `VERIFY.md`
   rows (Gate 12, "StartWork -Launch"); the suite's launch half runs off Windows only.
@@ -1552,13 +1556,13 @@ repository", is the real write).
 - **The card read is every file in `archive/`.** Each archived card is read for its `**Closed:**` day on
   every standup; a hub with thousands of archived cards pays for it.
 - **`decide` and `look` are always empty.** Their labels are an open item of the spec; only `walk` is
-  filled.
+  filled ([The standup's decide and look queues are empty](../KNOWN-GAPS.md#the-standups-decide-and-look-queues-are-empty)).
 - **One repo per Space.** A Space spanning several repos says so on its `Tracker` line rather than
   merging them.
 - **The reads are capped, and not alike.** The CLI reads up to 500 issues for each read and 500
   labels; the agent reads up to 300 issues in every state, 100 open, and 200 labels. A repo past a
   cap loses its oldest issues from that read, and above the agent's caps the terminal and the page can
-  give different standups and triage lists ([issue #276](https://github.com/johnfrog76/toolkit/issues/276)).
+  give different standups and triage lists ([The terminal and the page can read different issues](../KNOWN-GAPS.md#the-terminal-and-the-page-can-read-different-issues)).
 - **A live refusal reads differently in the two halves.** The fixture pins the `Tracker` line only for
   the reason it is GIVEN; the sentence each half writes for a live failure -- a Space that is not GitHub,
   a tier below 1, `gh` not answering -- is its own. The Azure DevOps sentence is now the contract's
@@ -1567,3 +1571,6 @@ repository", is the real write).
 - **Several repos in one Space.** The verb says so on its `Tracker` line; the route merges labels by name
   and concatenates issues, and fails the whole read if any repo's read fails. Issue numbers from two
   repos could collide. Both are M0 choices; one rule belongs in the contract.
+
+Known gaps: [The standup's decide and look queues are empty](../KNOWN-GAPS.md#the-standups-decide-and-look-queues-are-empty) and
+[The terminal and the page can read different issues](../KNOWN-GAPS.md#the-terminal-and-the-page-can-read-different-issues).

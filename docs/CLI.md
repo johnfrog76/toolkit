@@ -135,6 +135,16 @@ triage item of its own, with its own `Decision:` and `Reply:` slot, marked
 fills the thread's `Reply:` slot the moment it posts, so the card is the record before the next fetch
 as well as after it.
 
+**The side record.** Besides the card, a run writes one small file per PR, repository and day,
+`<promptsRoot>/<promptsFolder>/pr-comments/<date>-<repository>-PR<id>.md` (the PR title, its URL, the fetch
+time, the repository and the count of new comments; the repository is made safe for a file name, so
+`acme/widgets` is `acme-widgets`). The repository is in the name because a PR number is per repository.
+**Nothing overwrites one:** a second fetch the same day adds its own `Fetched:` and `Comments:` lines to
+the record already there. Nothing reads it today: the review count, `prsReviewed`, counts `LogPeerReview`'s
+`reviewed-` records. **With `-OutputFile <path>` it is not written at all** -- the named file is the only file
+that run writes, and the verb prints one line saying the side record was skipped -- so a run aimed at a
+scratch file leaves nothing behind in the hub.
+
 **On a GitHub board** `GetPRComments` reads through `gh api`, and reads all three places GitHub keeps a
 review: the inline review comments (a reply joins the thread of the comment it answers), the
 conversation tab, and each review's own summary text. Each becomes a thread in the same block shape,
@@ -154,13 +164,15 @@ naming them -- a read, but it writes a card, and the same number on the wrong re
 else's review. **The card** is the one whose `PR URL:` names it, else the head branch's, else the issue
 the pull request's body names (`NewPR`'s `Issue: #n` line, or a closing keyword such as `Fixes #n`).
 
-**Answering on a GitHub board.** `ReplyPR <pr> <thread>` takes the `(Thread N)` the card shows and finds
+### Answering on a GitHub board
+
+`ReplyPR <pr> <thread>` takes the `(Thread N)` the card shows and finds
 the repository the same way, in the same order. The id is one of the three kinds above, and each is
 answered the way GitHub allows. An **inline thread** gets a real reply, through REST
 (`pulls/<n>/comments/<root>/replies`, to the thread's first comment -- GitHub replies to a top-level
 comment only, so a follow-up's id answers through its root). A **conversation comment** or a **review's
 summary** has no thread on GitHub, so the reply is a new comment on the pull request that opens with a
-link to the one it answers -- and the next `GetPRComments` reads that comment back as a thread of its own ([Known gaps](KNOWN-GAPS.md)). Bodies travel as a JSON file (`gh api --input`), never in an argument --
+link to the one it answers -- and the next `GetPRComments` reads that comment back as a thread of its own. Bodies travel as a JSON file (`gh api --input`), never in an argument --
 Windows PowerShell 5.1 drops a bare `"` from a native command's argv. **`-Status`** keeps Azure DevOps'
 words and maps the ones GitHub has: a review thread is only resolved or unresolved, and REST cannot set
 either, so the status goes through GraphQL. `fixed` and `closed` run `resolveReviewThread`; `active`, the
@@ -172,17 +184,11 @@ name, before anything is asked or posted**, exit 2 -- say it in the reply instea
 comment or a review summary there is no thread to resolve: the reply is posted and the line says
 `-Status` was not applied. The card's `Status:` line reads `resolved` or `unresolved` afterwards.
 
-**The side record.** Besides the card, a run writes one small file per PR, repository and day,
-`<promptsRoot>/<promptsFolder>/pr-comments/<date>-<repository>-PR<id>.md` (the PR title, its URL, the fetch
-time, the repository and the count of new comments; the repository is made safe for a file name, so
-`acme/widgets` is `acme-widgets`). The repository is in the name because a PR number is per repository.
-**Nothing overwrites one:** a second fetch the same day adds its own `Fetched:` and `Comments:` lines to
-the record already there. Nothing reads it today: the review count, `prsReviewed`, counts `LogPeerReview`'s
-`reviewed-` records. **With `-OutputFile <path>` it is not written at all** -- the named file is the only file
-that run writes, and the verb prints one line saying the side record was skipped -- so a run aimed at a
-scratch file leaves nothing behind in the hub.
+Known gap: [A reply to a conversation comment reads back as its own thread](KNOWN-GAPS.md#a-reply-to-a-conversation-comment-reads-back-as-its-own-thread).
 
-And when it ships:
+### When it ships
+
+Archive the card:
 
 ```powershell
 tkArchive <ID>         # move current/ (or backlog/) -> archive/, and commit if storeSync is 'git'
@@ -320,6 +326,7 @@ own interval, so reorganising the hub never brings an archived card back onto th
 **A weekend belongs to the week after.** Only weekdays render, and time is in by Friday, so anything
 dated Saturday or Sunday -- a `**Closed:**`, a commit, a `**Review:**` -- is billed on the Monday
 after: a card closed on Saturday reads active through Friday and `resolved` on Monday.
+Daily is in the browser only, for this week and last.
 
 One line takes a card off it:
 
@@ -365,6 +372,8 @@ reader of a date from git uses that one helper (the agent's twin is `agent/core/
 **Commit it with a subject that starts `backfill:`.** Billing skips the commits the toolkit itself
 makes for mechanical reasons -- that one, and `sync: refresh package links` -- because they touch
 cards nobody worked on.
+
+Known gap: [Daily reads two weeks, in the browser only](KNOWN-GAPS.md#daily-reads-two-weeks-in-the-browser-only).
 
 #### A card's picture: Cover
 

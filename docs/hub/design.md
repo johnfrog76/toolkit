@@ -177,7 +177,7 @@ folders would give and links here (**Learn more**). Files with no id: one line u
 naming `StampDesign` (or `StampDesign -Hub`) and linking here. Never inference, never a blank (D-DL11).
 
 **The library**, the design lifecycle's search across designs. One box over the Design tab (the filter drawer's) and one over Hub Designs:
-it filters on title, description and id at once, across every state, and opens the collapsed groups that
+it filters on the title, the description, the id and the file names of the design's note and spec at once, every word in any order, across every state -- so a design can be found by the file name its row prints -- and opens the collapsed groups that
 have a match. **Search inside** runs the same words over the documents' text, on the button only, after
 the groups are drawn: on disk for the hub's folders (`GET /api/studio/design/search?q=`), and for a repo
 through the tracker's code search scoped to the four folders (`GET /api/design/search?q=`), which reads the
