@@ -117,14 +117,25 @@ function Test-P20TestLegacyNativeArguments {
 function ConvertTo-P20TestGitArgument {
     <# One argument, as a legacy host has to be handed it for git to read the
        value back. The host wraps an argument holding whitespace in double
-       quotes and doubles its trailing backslashes; it does nothing for an
-       empty argument or for a double quote inside one. So an empty one goes
-       as "" and each double quote as \", with the backslashes before it
-       doubled, which is how the C runtime reads a command line. #>
+       quotes; it does nothing for an empty argument or for a double quote
+       inside one. So an empty one goes as "" and each double quote as \",
+       with the backslashes before it doubled, which is how the C runtime
+       reads a command line.
+
+       The trailing backslashes of a value it wraps are where the hosts part.
+       PowerShell 7's Legacy mode doubles them itself; Windows PowerShell 5.1
+       does not, so `my dir\` goes out as "my dir\" and the C runtime reads
+       \" as a quote, swallowing the next argument. On 5.1 the helper doubles
+       them; on 7 it leaves them, or they would be doubled twice. #>
     param([AllowEmptyString()][string]$Value)
     if ($Value.Length -eq 0) { return '""' }
-    if ($Value.IndexOf('"') -lt 0) { return $Value }
-    return [regex]::Replace($Value, '(\\*)"', '$1$1\"')
+    if ($Value.IndexOf('"') -ge 0) {
+        $Value = [regex]::Replace($Value, '(\\*)"', '$1$1\"')
+    }
+    if ($PSVersionTable.PSEdition -eq 'Desktop' -and $Value -match '\s') {
+        $Value = [regex]::Replace($Value, '(\\+)$', '$1$1')
+    }
+    return $Value
 }
 
 function Invoke-P20TestGit {
