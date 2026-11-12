@@ -626,12 +626,13 @@ is still Active Cards.
 - **A panel has no way to set a height, a class or an item style.** A kind's props are an exact
   interface, so filling a slot the kind does not have -- `height`, `className`, `pageSize`, a body --
   is a compile error (`ListPanel.test.tsx` holds nine of them with `@ts-expect-error`).
-- **A list panel is 592 px: its minimum and its maximum.** `PANEL_MIN_HEIGHT_PX` in `panelHeight.ts`
-  names a floor per kind and `PANEL_MAX_HEIGHT_PX` a cap for the list kind, the same figure, both
+- **A list panel is 600 px (`PANEL_HEIGHT_PX`): its minimum and its maximum.** `PANEL_MIN_HEIGHT_PX` in `panelHeight.ts`
+  names a floor per kind and `PANEL_MAX_HEIGHT_PX` a cap for the list kind, the same figure -- on the
+  4 px grid, holding four full card items under one row of filter chips with a few px to spare -- both
   applied above the two-column breakpoint (`PANEL_GRID_MIN_WIDTH_PX`, which a page's rows read
   too). The bounds are on the panel, and its row still stretches its neighbour. The
   other kinds (status, stat, chart, scene) have the floor only. The reference is the Azure DevOps
-  dual-entry row -- Active Cards beside My Work: two 592 px columns 16 px apart, a 24 px header, a
+  dual-entry row -- Active Cards beside My Work: two 600 px columns 16 px apart, a 24 px header, a
   32 px foot with the pager centred in it, 12 px of padding and 12 px between the parts.
 - **The foot holds the bottom.** `PanelFrame` is a column whose body grows, so a panel's foot sits at
   its bottom edge however short its content is, and the empty room is between the body and the foot.
@@ -685,7 +686,7 @@ is still Active Cards.
   Issues -- is `compact`, so no item keeps an empty two-line band; its `item` returns
   `CompactItemData`, which has no `description` field, and no item data has a `density` field. Within
   a panel every item is the same height. **The item size never moves the panel's floor**: a compact
-  panel has its kind's minimum height like any other, 592 px for a list, so one with two items still
+  panel has its kind's minimum height like any other, 600 px for a list, so one with two items still
   lines up with its neighbours. The item size changes how many fit on a page, nothing else.
 - **Every spacing value is a Fluent token on the 4 px grid.** In the panel layer -- the card item,
   the kinds, `PanelFrame` and `layoutTokens.ts` -- every gap, padding and margin is one of Fluent's
@@ -711,9 +712,9 @@ is still Active Cards.
   `filterRowGap` between two, a lead chart 153, a foot note 32, a status line 48) is the first
   paint's page, so nothing jumps, and the page wherever there is no layout to measure -- a narrow
   page, where a panel grows with its items, and the tests. Under a chip row the list drops its own top
-  padding, so the sum takes it off the chrome there. From `listPageSize`, and as measured at 1280
-  wide: four full items with no chip row, three under a chip row or a status line; five compact;
-  eleven log lines under the chart. The pager is in
+  padding, so the sum takes it off the chrome there. From `listPageSize`: four full items with no chip
+  row or under one, three under two chip rows or where a foot note or a status line takes room as
+  well; five compact; seventeen log lines, eleven under the chart. The pager is in
   the foot's centre, drawn only when there is a second page: Previous and Next, `Page 2 of 5`, and
   the arrow keys while it has focus. The kind sends the page back to the first when a filter chip, a
   picker or the search changes, and clamps it when the list shrinks.
@@ -1861,7 +1862,7 @@ paragraph:
 | `src/shared/TabRows.test.tsx` | A page's tab rows: `TabRows` one marked wrapper (`[data-tab-rows]`) with its rows directly inside, its padding the control rows' one space (`controlRowsSpace`, the same as under a list panel's chips) and its gap a Fluent token that is a multiple of 4 px, and every `TabList` under `src/` inside a `TabRows` with no className or style of its own |
 | `src/modules/ado/systemPanels.test.ts` | The System page's panels, read from `systemCards`: each that draws a list is a `ListPanel` (Test Health and the Log, so a row's two panels are one height), and a panel that is not one and draws rows is named with its reason (Environment, Modules, Burn) |
 | `src/shell/kinds/listRoom.test.ts` | The room a list has, from boxes handed in: from the list's top under its padding down to the foot, what sits above it and a line under the foot each taking its height, the foot row's room kept free while none is drawn, and nothing where the panel has no fixed height or there is no layout |
-| `src/shell/kinds/ListPanel.test.tsx` | The measured page size -- the formula at several rooms down to one item, the component following a handed-in room, watching the panel and what sits above the list, and keeping the page's first item in view when a resize changes the page; the page size as a sum over the panel's chrome, a full page always fitting and one more item never; the pager at five and not at four, its `Page 2 of 5` and arrow keys; a chip, the search and a picker each returning to page 1, the page clamped when the list shrinks; `empty` against `filteredEmpty`; the header, foot, status and lead slots; the compact density (five a page, no description band), a smaller page under more chrome, and the panel's height the same at every density; and nine things a panel cannot say, as compile errors |
+| `src/shell/kinds/ListPanel.test.tsx` | The measured page size -- the formula at several rooms down to one item, the component following a handed-in room, watching the panel and what sits above the list, and keeping the page's first item in view when a resize changes the page; the page size as a sum over the panel's chrome, a full page always fitting and one more item never, four full items under one chip row at the one panel height, and more chrome never a bigger page; the pager at five and not at four, its `Page 2 of 5` and arrow keys; a chip, the search and a picker each returning to page 1, the page clamped when the list shrinks; `empty` against `filteredEmpty`; the header, foot, status and lead slots; the compact density (five a page, no description band), a smaller page under more chrome, and the panel's height the same at every density; and nine things a panel cannot say, as compile errors |
 | `src/shell/CardItem.test.tsx` | One item shape whatever the text: the same classes with a long title, a long description and none; the clamp in CSS and the text whole in the DOM; a plain element, not a Fluent `Card`; a plain-text title with no tooltip; one exposed action and the menu; the meta band's thumb, progress, badges and text; the meta band one gap under the description -- a track of the item's grid, the band on the row after it, no margin on a band, the same under one line, two or none; the compact item, the title line and the meta band at one shorter height; the one-band line item |
 | `src/modules/ado/PromptStatus.test.tsx` | Active Cards as a list panel: four card items a page, the checklist's progress and the facts in the meta band, Open the way in, the state picker, and the two empty sentences |
 | `src/hooks/usePagination.test.ts` | Clamping a page that is out of range, paging independently of the filtered set's size, and controlled mode where the caller's `onPageChange` is the only writer |

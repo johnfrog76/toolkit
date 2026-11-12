@@ -1,6 +1,10 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { expectListPanelShape, expectSentenceInInfoTip } from "../../shell/kinds/panelShapeAssert";
-import { LIST_PAGE_SIZE } from "../../shell/pageSize";
+import {
+  expectListPanelShape,
+  expectSentenceInInfoTip,
+  pageSizeOf,
+} from "../../shell/kinds/panelShapeAssert";
+import { listPageSize } from "../../shell/pageSize";
 import { filterRowGap } from "../../shell/layoutTokens";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { DesignsCard } from "./DesignsCard";
@@ -15,9 +19,15 @@ import type { DesignNote } from "./api.studio";
 // writes one through NewDesign (the bridge -- never a native write), and one
 // note's reading room. The agent's reads are pinned in Tests/test_studio.py,
 // the verb's bytes there too. The viewer is mocked (react-markdown is ESM).
-// The pager's rules do not depend on how many rows a page holds: these suites
-// build their lists around LIST_PAGE_SIZE, the page under one chip row (three),
-// which is pinned in foyer.test.ts.
+// The pager's rules do not depend on how many rows a page holds: this suite
+// builds its lists around PAGE, the page under the chrome this card draws
+// (one chip row over a foot note), worked out by listPageSize and held to the
+// panel as drawn (pageSizeOf), so a change to the panel's height moves it.
+const PAGE = listPageSize({ density: "full", filterRows: 1, footNote: true });
+const pages = (count: number) => Math.ceil(count / PAGE);
+/** The panel as drawn pages at PAGE: the fixture's chrome is the chrome PAGE was worked out for. */
+const expectPage = () =>
+  expect(pageSizeOf(document.querySelector<HTMLElement>("[data-panel-kind]")!)).toBe(PAGE);
 
 jest.mock("../../shared/MarkdownViewer", () => ({
   MarkdownViewer: ({ content }: { content: string }) => <pre data-testid="viewer">{content}</pre>,
@@ -439,27 +449,25 @@ describe("the Designs card's pager", () => {
     window.localStorage.clear();
   });
 
-  it("four designs draw a pager, page 2 shows the fourth, and the chip stays the total", () => {
-    // One more than a page holds.
-    expect(LIST_PAGE_SIZE + 1).toBe(4);
-    listAnswer = { data: { folder: "design", count: 4, items: notes(LIST_PAGE_SIZE + 1) } };
+  it("one design more than a page draws a pager, page 2 shows the last, and the chip stays the total", () => {
+    listAnswer = { data: { folder: "design", count: PAGE + 1, items: notes(PAGE + 1) } };
     mount();
-    expect(screen.getByText("Note 3")).toBeTruthy();
-    expect(screen.queryByText("Note 4")).toBeNull();
+    expectPage();
+    expect(screen.getByText(`Note ${PAGE}`)).toBeTruthy();
+    expect(screen.queryByText(`Note ${PAGE + 1}`)).toBeNull();
     expect(screen.getByText("Page 1 of 2")).toBeTruthy();
-    expect(chip("Design").textContent).toContain("4");
+    expect(chip("Design").textContent).toContain(String(PAGE + 1));
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
-    expect(screen.getByText("Note 4")).toBeTruthy();
+    expect(screen.getByText(`Note ${PAGE + 1}`)).toBeTruthy();
     expect(screen.queryByText("Note 1")).toBeNull();
     expect(screen.getByRole("button", { name: /New Design Note/ })).toBeTruthy();
   });
 
-  it("three designs draw no pager", () => {
-    // Exactly one page's worth.
-    expect(LIST_PAGE_SIZE).toBe(3);
-    listAnswer = { data: { folder: "design", count: 3, items: notes(LIST_PAGE_SIZE) } };
+  it("exactly a page of designs draws no pager", () => {
+    listAnswer = { data: { folder: "design", count: PAGE, items: notes(PAGE) } };
     mount();
-    expect(screen.getByText("Note 3")).toBeTruthy();
+    expectPage();
+    expect(screen.getByText(`Note ${PAGE}`)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Next page" })).toBeNull();
   });
 
@@ -467,18 +475,18 @@ describe("the Designs card's pager", () => {
     listAnswer = { data: { folder: "design", count: 12, items: notes(12) } };
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
-    expect(screen.getByText("Page 2 of 4")).toBeTruthy();
+    expect(screen.getByText(`Page 2 of ${pages(12)}`)).toBeTruthy();
     fireEvent.change(screen.getByRole("searchbox", { name: "Search the hub's designs" }), {
       target: { value: "note 1" },
     });
-    // Note 1, 10, 11, 12: two pages of their own, and the first is shown.
-    expect(screen.getByText("Page 1 of 2")).toBeTruthy();
+    // Note 1, 10, 11, 12 are what the search leaves: their first page is shown.
     expect(screen.getByText("Note 1")).toBeTruthy();
-    expect(screen.queryByText("Note 12")).toBeNull();
+    expect(screen.queryByText(/^Page [2-9]/)).toBeNull();
+    expect(document.querySelectorAll("[data-card-item]")).toHaveLength(Math.min(4, PAGE));
     fireEvent.change(screen.getByRole("searchbox", { name: "Search the hub's designs" }), {
       target: { value: "" },
     });
-    expect(screen.getByText("Page 1 of 4")).toBeTruthy();
+    expect(screen.getByText(`Page 1 of ${pages(12)}`)).toBeTruthy();
   });
 });
 
@@ -662,8 +670,8 @@ describe("the Designs card's groups (L2)", () => {
     mount();
     pick("Spec");
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
-    // The Spec chip's rows run to three pages of three.
-    expect(screen.getByText("Page 2 of 3")).toBeTruthy();
+    // The Spec chip's rows run past one page.
+    expect(screen.getByText(/^Page 2 of \d+$/)).toBeTruthy();
     pick("Design");
     expect(screen.queryByText(/^Page 2 of/)).toBeNull();
     expect(screen.getByText("Offline specs")).toBeTruthy();

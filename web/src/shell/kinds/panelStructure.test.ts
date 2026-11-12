@@ -54,7 +54,13 @@ import {
   filterRowGap,
   filterRowGapPx,
 } from "../layoutTokens";
-import { PANEL_BODY, PANEL_MAX_HEIGHT_PX, PANEL_MIN_HEIGHT_PX, PANEL_SLOTS } from "../panelHeight";
+import {
+  PANEL_BODY,
+  PANEL_HEIGHT_PX,
+  PANEL_MAX_HEIGHT_PX,
+  PANEL_MIN_HEIGHT_PX,
+  PANEL_SLOTS,
+} from "../panelHeight";
 
 const SRC = path.join(__dirname, "..", "..");
 
@@ -544,8 +550,16 @@ describe("the panel rules, over every source file", () => {
       'usePanelMinHeightClass("list")',
     ]);
     expect(text).not.toMatch(/(minHeight|maxHeight|\bheight|min-height|max-height)"?\s*:\s*[`"']/);
-    expect(PANEL_MIN_HEIGHT_PX.list).toBe(592);
-    expect(PANEL_MAX_HEIGHT_PX).toEqual({ list: 592 });
+    // One height: a list's floor and its cap, and the floor of every kind but
+    // stat, two of which stack in one slot across the grid's gap.
+    expect(PANEL_MIN_HEIGHT_PX.list).toBe(PANEL_HEIGHT_PX);
+    expect(PANEL_MAX_HEIGHT_PX).toEqual({ list: PANEL_HEIGHT_PX });
+    for (const kind of ["status", "chart", "scene"] as const) {
+      expect(PANEL_MIN_HEIGHT_PX[kind]).toBe(PANEL_HEIGHT_PX);
+    }
+    const stackGap = parseInt(webLightTheme.spacingHorizontalL, 10);
+    expect(2 * PANEL_MIN_HEIGHT_PX.stat + stackGap).toBe(PANEL_HEIGHT_PX);
+    expect(PANEL_HEIGHT_PX % 4).toBe(0);
     const bounds = fs.readFileSync(path.join(SRC, "shell/kinds/panelMinHeight.ts"), "utf8");
     expect(bounds).not.toMatch(/density|compact|cardItem/i);
     // The rule for each kind: list has a max-height, no other kind does.

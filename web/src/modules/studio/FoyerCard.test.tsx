@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { expectListPanelShape } from "../../shell/kinds/panelShapeAssert";
-import { LIST_PAGE_SIZE } from "../../shell/pageSize";
+import { expectListPanelShape, pageSizeOf } from "../../shell/kinds/panelShapeAssert";
+import { listPageSize } from "../../shell/pageSize";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { FoyerCard, SPACES_FILTER_KEY } from "./FoyerCard";
 
@@ -32,9 +32,15 @@ let refreshedLedger = 0;
 let unsupportedReport: string[] = [];
 
 let envAnswer: unknown;
-// The pager's rules do not depend on how many rows a page holds: these suites
-// build their lists around LIST_PAGE_SIZE, the page under one chip row (three),
-// which is pinned in foyer.test.ts.
+// The pager's rules do not depend on how many rows a page holds: this suite
+// builds its lists around PAGE, the page under the chrome this card draws
+// (one chip row over a foot note), worked out by listPageSize and held to the
+// panel as drawn (pageSizeOf), so a change to the panel's height moves it.
+const PAGE = listPageSize({ density: "full", filterRows: 1, footNote: true });
+const pages = (count: number) => Math.ceil(count / PAGE);
+/** The panel as drawn pages at PAGE: the fixture's chrome is the chrome PAGE was worked out for. */
+const expectPage = () =>
+  expect(pageSizeOf(document.querySelector<HTMLElement>("[data-panel-kind]")!)).toBe(PAGE);
 
 jest.mock("../../shell/api", () => ({
   useGetEnvQuery: () => ({ data: envAnswer, isLoading: false }),
@@ -387,8 +393,9 @@ describe("the foyer", () => {
     await act(async () => {
       fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
     });
-    // Four Spaces are two pages of three: the archived one is on the second.
-    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    // The archived Space is last of four: on the second page where a page holds fewer.
+    const next = screen.queryByRole("button", { name: "Next page" });
+    if (next) fireEvent.click(next);
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Actions for Old" }));
     });
@@ -511,11 +518,13 @@ describe("the Spaces card's filter", () => {
       "Archive1",
     ]);
     expect(chip().textContent).toBe("5");
-    // Five Spaces are two pages of three.
+    // Five Spaces are two pages.
+    expectPage();
+    expect(pages(5)).toBe(2);
     const drawn = () =>
       Array.from(document.querySelectorAll("[data-card-item] strong")).map((e) => e.textContent);
     const first = drawn();
-    expect(first).toHaveLength(LIST_PAGE_SIZE);
+    expect(first).toHaveLength(PAGE);
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
     expect([...first, ...drawn()].sort()).toEqual(
       ["Toolkit", "Acme", "Wasteland", "Globex", "Demo"].sort(),
@@ -703,18 +712,19 @@ describe("the Spaces card's load, Refresh and pager", () => {
     expect((screen.getByTitle("Refresh") as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("pages at three: the pager is at the foot, the chip is the total, the + stays", () => {
-    expect(LIST_PAGE_SIZE).toBe(3);
+  it("pages at what fits: the pager is at the foot, the chip is the total, the + stays", () => {
+    const nth = (n: number) => `Space ${String(n).padStart(2, "0")}`;
     envAnswer = { config: { activeSpace: "s01", spaces: many(12) } };
     mount();
-    expect(screen.getByText("Space 03")).toBeTruthy();
-    expect(screen.queryByText("Space 04")).toBeNull();
-    expect(screen.getByText("Page 1 of 4")).toBeTruthy();
+    expectPage();
+    expect(screen.getByText(nth(PAGE))).toBeTruthy();
+    expect(screen.queryByText(nth(PAGE + 1))).toBeNull();
+    expect(screen.getByText(`Page 1 of ${pages(12)}`)).toBeTruthy();
     expect(screen.getByLabelText("12 Spaces").textContent).toBe("12");
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
-    expect(screen.getByText("Space 04")).toBeTruthy();
-    expect(screen.getByText("Space 06")).toBeTruthy();
-    expect(screen.queryByText("Space 07")).toBeNull();
+    expect(screen.getByText(nth(PAGE + 1))).toBeTruthy();
+    expect(screen.getByText(nth(Math.min(2 * PAGE, 12)))).toBeTruthy();
+    expect(screen.queryByText(nth(2 * PAGE + 1))).toBeNull();
     expect(screen.queryByText("Space 01")).toBeNull();
     expect(screen.getByLabelText("12 Spaces").textContent).toBe("12");
     expect(screen.getByRole("button", { name: /New Space/ })).toBeTruthy();
@@ -730,12 +740,12 @@ describe("the Spaces card's load, Refresh and pager", () => {
     }));
     envAnswer = { config: { activeSpace: "s01", spaces: [...many(12), ...products] } };
     mount();
-    // Twenty-three Spaces are eight pages of three; the eleven products, four.
-    expect(screen.getByText("Page 1 of 8")).toBeTruthy();
+    // Twenty-three Spaces, then the eleven products: each its own run of pages.
+    expect(screen.getByText(`Page 1 of ${pages(23)}`)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
-    expect(screen.getByText("Page 2 of 8")).toBeTruthy();
+    expect(screen.getByText(`Page 2 of ${pages(23)}`)).toBeTruthy();
     fireEvent.click(screen.getByRole("radio", { name: /^Products/ }));
-    expect(screen.getByText("Page 1 of 4")).toBeTruthy();
+    expect(screen.getByText(`Page 1 of ${pages(11)}`)).toBeTruthy();
     expect(screen.getByText("Product 1")).toBeTruthy();
     expect(screen.queryByText("Space 01")).toBeNull();
     expect(screen.getByLabelText("23 Spaces").textContent).toBe("23");
@@ -743,9 +753,10 @@ describe("the Spaces card's load, Refresh and pager", () => {
 
   it("one page: no pager, as the Reminders card", () => {
     // Exactly a page's worth.
-    envAnswer = { config: { activeSpace: "s01", spaces: many(LIST_PAGE_SIZE) } };
+    envAnswer = { config: { activeSpace: "s01", spaces: many(PAGE) } };
     mount();
-    expect(screen.getByText("Space 03")).toBeTruthy();
+    expectPage();
+    expect(screen.getByText(`Space ${String(PAGE).padStart(2, "0")}`)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Next page" })).toBeNull();
     expect(screen.queryByText("Page 1 of 1")).toBeNull();
   });

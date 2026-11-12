@@ -156,9 +156,11 @@ The same answer from the tokens, `listPageSize(chrome)` (`LIST_CHROME_PX`: frame
 with `filterRowGap` between two, a lead 153, a foot note 32, a status line 48), is the first paint's
 page and the page where there is no layout to measure (a narrow page, the tests). Under a chip row
 the list drops its own top padding, so the sum takes that padding off the chrome there. From
-`listPageSize`, and as measured at 1280 wide: four full items with no chip row, three under one or
-two chip rows (with a foot note or a status line as well) or under a status line alone; five compact;
-sixteen lines, eleven under a lead.
+`listPageSize`, at the one panel height (`PANEL_HEIGHT_PX`, 600 px, chosen to hold four full items
+under one chip row): four full items with no chip row or under one; three under two chip rows, or
+where a foot note or a status line takes room as well; five compact; seventeen lines, eleven under a
+lead. The sum counts a foot note whenever the panel passes one; the measured page follows the room
+the note really takes.
 
 The page is held as the index of its first item, so a resize that changes the page size keeps that
 item in view. The pager (`ListPager`, private to the kind) is in the foot's centre, drawn only past one
@@ -174,7 +176,7 @@ first, `cardListGap` (Fluent's S 8 px for full and compact, one value for every 
 margin. The list is handed to `PanelFrame` through its `body` slot.
 
 **Height.** The root wears `data-panel-kind="list"` and both bounds, `PANEL_MIN_HEIGHT_PX.list` and
-`PANEL_MAX_HEIGHT_PX.list` (592 px), above `PANEL_GRID_MIN_WIDTH_PX` (900 px), whatever the item size,
+`PANEL_MAX_HEIGHT_PX.list` (`PANEL_HEIGHT_PX`, 600 px), above `PANEL_GRID_MIN_WIDTH_PX` (900 px), whatever the item size,
 through `usePanelMinHeightClass(kind)` (`src/shell/kinds/panelMinHeight.ts`): a minimum for every kind,
 and for `list` the same figure as its maximum. A panel not yet on its kind may wear that class
 meanwhile, as the Environment panel does for `status`. The body is the paged form

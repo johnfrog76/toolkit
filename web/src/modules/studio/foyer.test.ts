@@ -310,9 +310,12 @@ describe("which rows ask their visibility", () => {
     expect(githubRowLine("", CONNECT_GITHUB)).toBe(CONNECT_GITHUB);
   });
 
-  it("the Studio cards page three at a time, what fits a list panel under one chip row", () => {
+  it("the list panel's one page size is what fits under one chip row, and a Studio card's is the same sum over its own chrome", () => {
     expect(LIST_PAGE_SIZE).toBe(listPageSize({ density: "full", filterRows: 1 }));
-    expect(LIST_PAGE_SIZE).toBe(3);
+    // The Spaces card has a foot note under its one chip row; more chrome is never a bigger page.
+    const spaces = listPageSize({ density: "full", filterRows: 1, footNote: true });
+    expect(spaces).toBeGreaterThanOrEqual(1);
+    expect(spaces).toBeLessThanOrEqual(LIST_PAGE_SIZE);
   });
 });
 

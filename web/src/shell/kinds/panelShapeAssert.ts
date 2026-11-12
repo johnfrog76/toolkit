@@ -52,6 +52,27 @@ export function cardItemsOf(panel: Element): HTMLElement[] {
   return Array.from(panel.querySelectorAll<HTMLElement>("[data-card-item]"));
 }
 
+/** The chrome a list panel has drawn, as the page-size sum counts it: its item
+ *  size, its chip rows, a lead, a foot note and a status line. */
+export function listChromeOf(panel: Element): ListChrome {
+  const body = panel.querySelector<HTMLElement>("[data-panel-body]")!;
+  return {
+    density: panel.getAttribute("data-panel-density") as ListDensity,
+    filterRows: body.querySelectorAll(
+      ":scope > [data-panel-filters] > [role='group'][aria-label^='Filter']",
+    ).length,
+    lead: body.querySelector(":scope > [data-panel-lead]") !== null,
+    footNote: panel.hasAttribute("data-panel-foot-note"),
+    status: body.querySelector(":scope > [data-panel-status]") !== null,
+  };
+}
+
+/** The page a list panel has at first paint, worked out from the chrome it has
+ *  drawn: what a panel's own test builds its lists around, so no test types it. */
+export function pageSizeOf(panel: Element): number {
+  return listPageSize(listChromeOf(panel));
+}
+
 export interface ListPanelShape {
   /** The titles of the items on the page, in order. */
   titles: string[];
@@ -101,15 +122,7 @@ export function expectListPanelShape(panel: HTMLElement, shape: ListPanelShape):
 
   // One page of items: as many as fit under the chrome this panel has drawn.
   const density = panel.getAttribute("data-panel-density") as ListDensity;
-  const chrome: ListChrome = {
-    density,
-    filterRows: body.querySelectorAll(
-      ":scope > [data-panel-filters] > [role='group'][aria-label^='Filter']",
-    ).length,
-    lead: body.querySelector(":scope > [data-panel-lead]") !== null,
-    footNote: panel.hasAttribute("data-panel-foot-note"),
-    status: body.querySelector(":scope > [data-panel-status]") !== null,
-  };
+  const chrome = listChromeOf(panel);
   const pageSize = listPageSize(chrome);
   const items = cardItemsOf(panel);
   expect(items.map((i) => i.querySelector("strong")?.textContent)).toEqual(shape.titles);
