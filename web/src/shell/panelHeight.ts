@@ -2,13 +2,24 @@
  *  fixed height: it is as tall as what it holds and never less than this, so
  *  short panels line up and an empty one does not collapse. This file is about
  *  panels only -- a card item's height is in cardItemTokens.ts. */
+/** The one panel height, in px: a list panel's on a wide page, and every other
+ *  kind's floor, so the panels in a row line up. It holds four full card items
+ *  under one row of filter chips with a few px to spare, on the 4 px grid
+ *  (measured at 1280 wide: four items need 440 px of list, and 600 gives 445:
+ *  room enough that a font metric, a zoom step or another browser keeps the fourth). */
+export const PANEL_HEIGHT_PX = 600;
+
+/** The grid's gap between two stat panels stacked in one slot, in px: the
+ *  page's panelGap (layoutTokens.ts, Fluent's L). */
+const STAT_STACK_GAP_PX = 16;
+
 export const PANEL_MIN_HEIGHT_PX = {
-  list: 592,
-  status: 592,
-  /** Two stat panels stack beside one list panel, across the 16 px grid gap. */
-  stat: 288,
-  chart: 592,
-  scene: 592,
+  list: PANEL_HEIGHT_PX,
+  status: PANEL_HEIGHT_PX,
+  /** Two stat panels stack beside one list panel, across the grid gap. */
+  stat: (PANEL_HEIGHT_PX - STAT_STACK_GAP_PX) / 2,
+  chart: PANEL_HEIGHT_PX,
+  scene: PANEL_HEIGHT_PX,
 } as const;
 
 /** The kinds a panel can be. */

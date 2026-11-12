@@ -362,7 +362,7 @@ kind -- `GitHub`, `Azure DevOps`, `Your own cards`.
 | ...and its tracker cannot answer | `; not connected yet -- connect it, and its board's work items come in beside its cards` (ADO, not `active`), or `; no tracker -- connect it to a GitHub repo and this row shows its open issues and last deploy` (no address) |
 | an archived Space | its row, marked `archived`, with no connect teaching |
 | any of these, while the reads are out | the card's own `Reading the Spaces...`, then the whole list at once -- never a row with a placeholder line |
-| more than four after the filter | four a page, the pager at the foot's centre; the chip still the total |
+| more than three after the filter | three a page, the pager at the foot's centre; the chip still the total |
 
 **The card's filter**: one exposed row of tags above the list, the Reminders card's -- **All | Products | Work | Out of box | Archive**
 -- each with its count (none for an empty bucket), opening on **All**, remembered per browser. One Space is in exactly one entry besides All, by the first

@@ -20,12 +20,13 @@ import { HairlineDivider } from "../../shared/HairlineDivider";
 import { InfoTip } from "../../shared/InfoTip";
 import { PanelFrame } from "../../shared/PanelFrame";
 import { RefreshButton } from "../../shared/RefreshButton";
+import { StatTile, StatTiles } from "../../shared/StatTile";
 import { StatusMessage } from "../../shared/StatusMessage";
 import { CardItem, CompactItem, LineItem } from "../CardItem";
 import type { CardItemData, CompactItemData, LineItemData } from "../CardItem";
 import { listPageSize, pageSizeForRoom } from "../pageSize";
 import { measureListRoom } from "./listRoom";
-import { cardListGap, cardListPaddingTop, filterRowGap } from "../layoutTokens";
+import { cardListGap, cardListPaddingTop, filterRowGap, filtersSpaceBelow } from "../layoutTokens";
 import { PANEL_BODY } from "../panelHeight";
 import type { ListChrome, ListDensity } from "../pageSize";
 import { ListPager } from "./ListPager";
@@ -52,10 +53,13 @@ const useStyles = makeStyles({
   body: { display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: 0, minWidth: 0 },
   // The filters: the chip rows in one column, spaced by its gap. A row has no
   // margin, so the space between two rows is there only while both are.
+  // The wrapper owns the space under the rows (filtersSpaceBelow); the space
+  // above is the frame's gap under the header rule, the same 12 px.
   filters: {
     display: "flex",
     flexDirection: "column",
     rowGap: filterRowGap,
+    paddingBottom: filtersSpaceBelow,
     minWidth: 0,
     flexShrink: 0,
   },
@@ -100,6 +104,9 @@ const useStyles = makeStyles({
     paddingTop: cardListPaddingTop.compact,
   },
   listLine: { rowGap: cardListGap.line, paddingTop: cardListPaddingTop.line },
+  // Directly under the filters, the list adds no space of its own over its
+  // first item: the filters' wrapper has given it.
+  listUnderFilters: { paddingTop: 0 },
   search: { minWidth: 0 },
   picker: { minWidth: 0 },
   foot: { color: tokens.colorNeutralForeground3 },
@@ -177,9 +184,47 @@ export interface ChartSpec {
   chart: ReactElement;
 }
 
-/** What sits above the items. */
+/** One summary figure above the items, as data: the kind draws it as a stat tile. */
+export interface StatSpec {
+  /** Stable among its row: a data-stat attribute, for a test. */
+  id: string;
+  count: string | number;
+  label: string;
+  /** Green, red or orange; left out, the theme's text colour. */
+  tone?: "pass" | "fail" | "warn";
+  /** A sentence about the figure, as its native title (the kinds carry no tooltip). */
+  detail?: string;
+}
+
+/** One row of summary figures. */
+export interface StatRow {
+  /** The row's accessible name: "Last run". */
+  label: string;
+  stats: StatSpec[];
+}
+
+/** What sits above the items: rows of summary figures, then a chart, either or both. */
 export interface ListLead {
-  chart: ChartSpec;
+  stats?: StatRow[];
+  chart?: ChartSpec;
+}
+
+const TONE_COLOR: Record<NonNullable<StatSpec["tone"]>, string> = {
+  pass: tokens.colorPaletteGreenForeground1,
+  fail: tokens.colorPaletteRedForeground1,
+  warn: tokens.colorPaletteDarkOrangeForeground1,
+};
+
+function LeadStat({ spec }: { spec: StatSpec }) {
+  return (
+    <StatTile
+      count={spec.count}
+      label={spec.label}
+      data-stat={spec.id}
+      title={spec.detail}
+      color={spec.tone ? TONE_COLOR[spec.tone] : undefined}
+    />
+  );
 }
 
 /** What a write on the panel came to, or what it is doing now. */
@@ -342,6 +387,8 @@ export function ListPanel<T>(props: ListPanelProps<T>) {
     return { id: data.id, element: <CardItem data={data} /> };
   };
 
+  // The list sits right under the chips: the chips' wrapper owns that space.
+  const underFilters = !loading && (filters?.length ?? 0) > 0 && !lead;
   const none = items.length === 0 ? (props.filteredEmpty ?? props.empty) : null;
 
   return (
@@ -480,8 +527,21 @@ export function ListPanel<T>(props: ListPanelProps<T>) {
                 ) : null}
                 {lead ? (
                   <>
-                    <div role="group" aria-label={lead.chart.label} data-panel-lead>
-                      {lead.chart.chart}
+                    <div data-panel-lead>
+                      {lead.stats?.map((row) => (
+                        <div key={row.label} role="group" aria-label={row.label}>
+                          <StatTiles>
+                            {row.stats.map((spec) => (
+                              <LeadStat key={spec.id} spec={spec} />
+                            ))}
+                          </StatTiles>
+                        </div>
+                      ))}
+                      {lead.chart ? (
+                        <div role="group" aria-label={lead.chart.label}>
+                          {lead.chart.chart}
+                        </div>
+                      ) : null}
                     </div>
                     <HairlineDivider />
                   </>
@@ -499,6 +559,7 @@ export function ListPanel<T>(props: ListPanelProps<T>) {
                         : density === "compact"
                           ? styles.listCompact
                           : styles.listFull,
+                      underFilters && styles.listUnderFilters,
                     )}
                     data-card-list=""
                   >
