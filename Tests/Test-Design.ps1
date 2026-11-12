@@ -375,6 +375,19 @@ try {
     foreach ($row in @($table.origins)) {
         Assert-Equal "the remote '$($row.url)' names '$($row.repo)'" $row.repo (Get-P20GitHubOriginRepo -Url $row.url)
     }
+    foreach ($row in @($table.adoOrigins)) {
+        Assert-Equal "the Azure DevOps remote '$($row.url)' names '$($row.repo)'" $row.repo (Get-P20AdoOriginRepo -Url $row.url)
+    }
+    foreach ($row in @($table.targets)) {
+        $got = Get-P20CheckoutTarget -OrgUrl $row.org -Projects @($row.projects)
+        Assert-Equal "the Space at '$($row.org)' with $(@($row.projects).Count) project(s) is a clone of '$($row.repo)'" $row.repo ([string]$got.Repo)
+    }
+    foreach ($row in @($table.clones)) {
+        $target = [string](Get-P20CheckoutTarget -OrgUrl $row.org -Projects @($row.projects)).Repo
+        $origin = Get-P20OriginRepo -Url $row.origin -Tracker (Resolve-P20Tracker -OrgUrl $row.org)
+        $hit = [bool]$target -and ($origin -ieq $target)
+        Assert-Equal "a clone with origin '$($row.origin)' answers for '$($row.org)': $($row.match)" $row.match $hit
+    }
     foreach ($row in @($table.matches)) {
         $same = [bool]$row.origin -and ($row.origin -ieq $row.space)
         Assert-Equal "origin '$($row.origin)' against '$($row.space)'" $row.match $same

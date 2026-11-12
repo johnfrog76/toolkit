@@ -447,6 +447,18 @@ function Get-P20GapLinkFindings {
         }
     }
 
+    # Every other document's relative links: a link to a heading must land on one.
+    foreach ($p in @($Docs.Keys)) {
+        if ($p -eq $GapsPath) { continue }
+        foreach ($link in @(Get-P20DocLinks -Text $Docs[$p])) {
+            $r = Resolve-P20DocLink -From $p -Link $link
+            if (-not $r -or -not $r.Anchor -or $r.Path -eq $GapsPath -or $r.Path -notlike '*.md' -or -not $Docs.ContainsKey($r.Path)) { continue }
+            if (-not (@(& $getSections $r.Path | Where-Object { $_.Slug -eq $r.Anchor }).Count)) {
+                $found += [pscustomobject]@{ Kind = 'link'; Text = "$p links $link, which does not resolve to a heading" }
+            }
+        }
+    }
+
     # The page's other links -- a Where line's is the 'where' check's, above.
     $rest = [regex]::Replace([string]$Docs[$GapsPath], '(?m)^\*\*Where you meet it:\*\*.*$', '')
     foreach ($link in @(Get-P20DocLinks -Text $rest)) {
@@ -491,6 +503,7 @@ $gapCases = @(
     @{ Why = 'a heading inside a code fence'; Kind = 'where'; Gaps = $caseGap.Replace('**ISSUE**', $caseIssue); A = $caseA.Replace('## The place', "``````text`n## The place`n``````"); Web = $caseWeb }
     @{ Why = 'a section that does not link back'; Kind = 'backlink'; Gaps = $caseGap.Replace('**ISSUE**', $caseIssue); A = "# A`n`n## The place`n`nText.`n`n## Elsewhere`n`n[x](KNOWN-GAPS.md#a-thing-is-missing)`n"; Web = $caseWeb }
     @{ Why = 'a link on the page to a heading that is not there'; Kind = 'outbound'; Gaps = $caseGap.Replace('**ISSUE**', $caseIssue).Replace('it is.', 'it is ([A](a.md#nowhere)).'); A = $caseA; Web = $caseWeb }
+    @{ Why = 'a link from another document to a heading that is not there'; Kind = 'link'; Gaps = $caseGap.Replace('**ISSUE**', $caseIssue); A = $caseA; Web = $caseWeb + "`n[x](../docs/a.md#nope)`n" }
     @{ Why = 'a document linking an anchor that is no gap'; Kind = 'inbound'; Gaps = $caseGap.Replace('**ISSUE**', $caseIssue); A = $caseA; Web = $caseWeb.Replace('#a-thing-is-missing', '#a-thing-was-missing') }
 )
 try {
@@ -530,7 +543,8 @@ $gapChecks = @(
     @('issue', 'every gap has an **Issue:** line with an issue link'),
     @('backlink', "the heading each gap's Where names links back to that gap"),
     @('inbound', 'every link into docs/KNOWN-GAPS.md#... from a document lands on a gap heading'),
-    @('outbound', 'every relative link in docs/KNOWN-GAPS.md resolves, file and heading')
+    @('outbound', 'every relative link in docs/KNOWN-GAPS.md resolves, file and heading'),
+    @('link', 'every relative link from any other document to a heading in a document lands on one')
 )
 foreach ($gc in $gapChecks) {
     $hits = @($gapFindings | Where-Object { $_.Kind -eq $gc[0] } | ForEach-Object { $_.Text })

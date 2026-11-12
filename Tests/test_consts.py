@@ -79,6 +79,7 @@ EXPECTED = {
     ("env", "activeSpace"): "P20_ACTIVE_SPACE",
     ("env", "promptsRoot"): "PROMPTS_ROOT",
     ("env", "agentCacheDir"): "P20_AGENT_CACHE_DIR",
+    ("env", "testHistoryDir"): "P20_TEST_HISTORY_DIR",
     ("env", "features"): "P20_FEATURES",
     ("env", "agentPort"): "P20_AGENT_PORT",
     ("env", "teamsWebhookPrefix"): "TEAMS_WEBHOOK_",
@@ -110,11 +111,40 @@ EXPECTED = {
     ("regex", "dueLine"): r"(?m)^\*\*Due:\*\*[ \t]*(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?",
     # A card's Tags: line splits on a comma or an Azure DevOps semicolon.
     ("regex", "tagSeparator"): "[,;]",
+    # The shapes of an Azure DevOps git remote and of its address (the checkout resolver, both halves).
+    (
+        "regex",
+        "adoOriginHttps",
+    ): r"^https://(?:[^/@\s]+@)?dev\.azure\.com/([^/\s]+)/([^/\s]+)/_git/([^/\s?#]+?)(?:\.git)?/?$",
+    (
+        "regex",
+        "adoOriginVisualStudio",
+    ): r"^https://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com/(?:DefaultCollection/)?([^/\s]+)/_git/([^/\s?#]+?)(?:\.git)?/?$",
+    (
+        "regex",
+        "adoOriginSsh",
+    ): r"^(?:ssh://)?[^/@\s]+@(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com):v3/([^/\s]+)/([^/\s]+)/([^/\s]+?)(?:\.git)?/?$",
+    ("regex", "adoOrgDev"): r"^https?://(?:[^/@\s]+@)?dev\.azure\.com/([^/\s]+)",
+    ("regex", "adoOrgVisualStudio"): r"^https?://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com(?:[/:]|$)",
     ("reminders", "buckets"): ["overdue", "today", "upcoming"],
     ("reminders", "snooze"): ["1h", "tomorrow", "nextweek"],
     # The three halves a test run covers: Test writes them, log.py serves them.
     ("tests", "halves"): ["agent", "cli", "web"],
     ("tests", "legacyHalf"): "cli",
+    # Where a machine keeps its test history (Tests/fixtures/test-history/paths.json).
+    ("tests", "summaryFile"): "test-summary.{machine}.json",
+    ("tests", "resultsFile"): "test-results.{machine}.log",
+    ("tests", "historyBase"): {"windows": "LOCALAPPDATA", "linux": "XDG_STATE_HOME"},
+    ("tests", "historyFallback"): {
+        "windows": "AppData/Local",
+        "macos": "Library/Application Support",
+        "linux": ".local/state",
+    },
+    ("tests", "historyPath"): {
+        "windows": "ToolKit/TestHistory",
+        "macos": "ToolKit/TestHistory",
+        "linux": "toolkit/test-history",
+    },
     ("visibility", "public"): "public",
     ("visibility", "private"): "private",
     ("visibility", "unknown"): "unknown",
@@ -325,6 +355,11 @@ EXPECTED = {
     # Claude Code usage: /env's flag (the inventory row's key) and the burn route.
     ("usage", "envFlag"): "claudeUsage",
     ("usage", "burnRoute"): "/api/usage/burn",
+    # The statuses a reply may set, per tracker.
+    ("replyStatuses", "ado"): ["fixed", "active", "pending", "byDesign", "wontFix", "closed"],
+    ("replyStatuses", "github"): ["fixed", "closed", "active"],
+    # The typed plan readings' subfolder of usage/: the CLI writes it, the agent fingerprints it.
+    ("usage", "readingsFolder"): "readings",
     ("startWork", "text"): {
         "head": "# Start work: {kind} {id} -- {title}",
         "howWeWork": "## How we work in {space} ({source})",
@@ -506,6 +541,9 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.startwork_how_we_work_note(), EXPECTED[("startWork", "howWeWorkNote")])
         self.assertEqual(C.usage_env_flag(), EXPECTED[("usage", "envFlag")])
         self.assertEqual(C.usage_burn_route(), EXPECTED[("usage", "burnRoute")])
+        self.assertEqual(C.reply_statuses("ado"), tuple(EXPECTED[("replyStatuses", "ado")]))
+        self.assertEqual(C.reply_statuses("github"), tuple(EXPECTED[("replyStatuses", "github")]))
+        self.assertEqual(C.usage_readings_folder(), EXPECTED[("usage", "readingsFolder")])
 
     def test_the_worker_rule_reads_the_contract(self):
         """The pane's worker chips and the standup read one prefix, not two."""

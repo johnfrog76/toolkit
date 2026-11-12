@@ -25,7 +25,10 @@
     half failed or nothing ran at all.
 
     test-summary.<machine>.json gains each half this run touched (Merge-P20TestSummary
-    in TestAll-Rules.ps1); the halves it did not run keep what they had.
+    in TestAll-Rules.ps1); the halves it did not run keep what they had. It and
+    test-results.<machine>.log live in the machine's test-history folder
+    (Get-TestHistoryDir.ps1), the same for every checkout, and each half's record
+    says which checkout and commit it ran from.
 
 .NOTES
     PowerShell 5.1 compatible: ASCII only, no ternary, no null-coalescing.
@@ -64,6 +67,11 @@ if ($Half) { $halves = @($Half) }
 $consts = Get-P20Consts
 $webhookPrefix = $consts.env.teamsWebhookPrefix
 $runMarker = $consts.env.testRunMarker
+# The machine's test-history folder, resolved once, before the web half sets the
+# run marker for its child: the CLI runner this starts resolves the same folder
+# the same way, and under a suite both inherit the suite's scratch override.
+$historyDir = Get-P20TestHistoryDir -PackageRoot $packageRoot
+$runSource = Get-P20TestCheckout -PackageRoot $packageRoot
 
 # -- Running one child ---------------------------------------------------------
 # Every line is shown as it arrives and kept for the parse. stderr is merged
@@ -190,7 +198,7 @@ $runCli = {
     $rec.passed = $c.Passed; $rec.failed = $c.Failed; $rec.total = $c.Total
     # A suite that skipped itself is a WARN in the runner's own summary file;
     # it is the CLI half's skip count.
-    $written = Read-P20TestSummary -Path (Get-P20TestSummaryPath -PackageRoot $packageRoot)
+    $written = Read-P20TestSummary -Path (Get-P20TestHistoryFile -Kind summary -Dir $historyDir)
     if ($null -ne $written -and $written.Contains('suites')) {
         $warns = 0
         foreach ($name in $written['suites'].Keys) {
@@ -267,6 +275,8 @@ foreach ($h in $halves) {
     Write-Host "  == ${prefix}Test: the $h half ==" -ForegroundColor Cyan
     $rec = & $runners[$h]
     $rec.timestamp = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss')
+    $rec.checkout = $runSource.checkout
+    $rec.commit = $runSource.commit
     if ($rec.result -eq 'skip') {
         Write-Host "  SKIP  $h -- $($rec.reason)" -ForegroundColor DarkYellow
     }
@@ -298,17 +308,17 @@ foreach ($h in @($records.Keys)) {
         org         = ''
     }
 }
-$summaryPath = Get-P20TestSummaryPath -PackageRoot $packageRoot
+$summaryPath = Get-P20TestHistoryFile -Kind summary -Dir $historyDir
 try {
     # Every half this run touched goes in the halves block, a skip with its
     # reason; the agent's and web's suite entries are replaced, and the CLI's
     # are left as the runner wrote them -- or, when the CLI half was skipped,
     # as the last run did.
     $replace = @($records.Keys | Where-Object { $suiteKeys.ContainsKey($_) })
-    Merge-P20TestSummary -Path $summaryPath -Halves $records -Suites $suiteEntries -ReplaceSuitesOf $replace
+    Merge-P20TestSummary -Path $summaryPath -Halves $records -Suites $suiteEntries -ReplaceSuitesOf $replace -Top $runSource
 }
 catch {
-    Write-Warning "Could not write $([System.IO.Path]::GetFileName($summaryPath)): $_"
+    Write-Warning "Could not write $(Get-P20TestHistoryFileName -Kind summary): $_"
 }
 
 # The daily history the Health card charts (test-results.<machine>.log): one
@@ -320,7 +330,7 @@ if (Get-Command Write-P20TestResult -ErrorAction SilentlyContinue) {
         $r = $records[$h]
         if ($r.result -eq 'skip') { continue }
         try {
-            Write-P20TestResult -Suite $suiteKeys[$h] -Result $r.result -Passed $r.passed -Total ($r.passed + $r.failed) -Detail $r.detail
+            Write-P20TestResult -Suite $suiteKeys[$h] -Result $r.result -Passed $r.passed -Total ($r.passed + $r.failed) -Detail $r.detail -Dir $historyDir
         }
         catch { Write-Warning "Could not log the $h half: $_" }
     }

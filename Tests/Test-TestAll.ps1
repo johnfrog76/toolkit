@@ -716,7 +716,12 @@ exit 0
     $fakeHome = Join-Path $base 'home'
     New-Item -ItemType Directory -Path $fakeHome -Force | Out-Null
     $verb =Join-Path $pkg 'Scripts/Invoke-TestAll.ps1'
-    $summaryFile = Get-P20TestSummaryPath -PackageRoot $pkg
+    # The verb and its fake runner write the machine's test history; here it is
+    # this case's own folder, named by the override both read.
+    $stubHistory = Join-Path $base 'history'
+    $savedHistoryDir = [System.Environment]::GetEnvironmentVariable($consts.env.testHistoryDir)
+    [System.Environment]::SetEnvironmentVariable($consts.env.testHistoryDir, $stubHistory)
+    $summaryFile = Join-Path $stubHistory (Get-P20TestHistoryFileName -Kind summary)
     [System.Environment]::SetEnvironmentVariable('TEAMS_WEBHOOK_TESTALL43', 'not-a-url')
 
     function Invoke-TestVerb {
@@ -779,6 +784,10 @@ exit 0
     $alpha = $s['suites']['Alpha']
     Assert-True 'the CLI entries are exactly as the runner wrote them' ((@($alpha.Keys) -join ',') -eq 'half,result,passed,total,seconds,description,org' -and $alpha['seconds'] -eq 1.5 -and $alpha['description'] -eq 'alpha suite') "$(@($alpha.Keys) -join ',')"
     Assert-True 'and the runner''s top-level totals stay' ($s['grandTotal'] -eq 10)
+    # Where each record came from: the scratch package is in no git repository,
+    # so both fields are there and empty.
+    Assert-True 'every half the verb wrote carries its checkout and commit' ($s['halves']['agent'].Contains('checkout') -and $s['halves']['agent'].Contains('commit') -and $s['halves']['web'].Contains('checkout')) "$(@($s['halves']['agent'].Keys) -join ',')"
+    Assert-True 'and so does the file' ($s.Contains('checkout') -and $s.Contains('commit') -and $s['checkout'] -eq '' -and $s['commit'] -eq '')
 
     # Expected vs actual that differ: information, not the verdict.
     [System.IO.File]::WriteAllText($docsPath, $docsSame.Replace('12 passed, 2 skipped', '13 passed, 2 skipped'))
@@ -900,6 +909,9 @@ catch {
 finally {
     $env:PATH = $savedPath
     [System.Environment]::SetEnvironmentVariable('TEAMS_WEBHOOK_TESTALL43', $savedHook)
+    if ($null -ne (Get-Variable savedHistoryDir -ErrorAction SilentlyContinue)) {
+        [System.Environment]::SetEnvironmentVariable($consts.env.testHistoryDir, $savedHistoryDir)
+    }
     Remove-Item $base -Recurse -Force -ErrorAction SilentlyContinue
 }
 
@@ -916,7 +928,9 @@ try {
     if (Test-Path (Join-Path $pkgRoot 'Config')) { Copy-Item (Join-Path $pkgRoot 'Config') (Join-Path $warnBase 'Config') -Recurse }
     $warnHost = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     $warnModule = $warnBase -replace '\\', '/'
+    $warnHistory = Join-Path $warnBase 'history'
     $warnCmd = "`$ErrorActionPreference = 'Continue'; " +
+        "`$env:$($consts.env.testHistoryDir) = '$($warnHistory -replace '\\', '/')'; " +
         "Import-Module '$warnModule/utilities.psm1' -Force 3>`$null 6>`$null; " +
         "Write-P20TestResult -Suite 'Zero' -Result 'warn' -Passed 0 -Total 0 -Detail 'ok'; " +
         "Write-P20TestResult -Suite 'Green' -Result 'pass' -Passed 3 -Total 3; " +
@@ -925,8 +939,9 @@ try {
     $env:TOOLKIT_QUIET_STARTUP = '1'
     try { $warnOut = (& $warnHost -NoProfile -ExecutionPolicy Bypass -Command $warnCmd 2>&1 | ForEach-Object { [string]$_ }) -join "`n" }
     finally { $env:TOOLKIT_QUIET_STARTUP = $savedQuiet }
-    $warnLogs = @(Get-ChildItem -Path $warnBase -Filter 'test-results.*.log')
-    Assert-True 'the writer wrote a log beside the scratch module' ($warnLogs.Count -eq 1) $warnOut
+    $warnLogs = @(Get-ChildItem -LiteralPath $warnHistory -Filter 'test-results.*.log' -ErrorAction SilentlyContinue)
+    Assert-True 'the writer wrote a log in the history folder it was given' ($warnLogs.Count -eq 1) $warnOut
+    Assert-True 'and none beside the module' (@(Get-ChildItem -LiteralPath $warnBase -Filter 'test-results.*.log').Count -eq 0)
     $warnLines = @()
     if ($warnLogs.Count -eq 1) { $warnLines = @([System.IO.File]::ReadAllLines($warnLogs[0].FullName)) }
     $zeroLine = @($warnLines | Where-Object { $_ -match "`tZero`t" }) | Select-Object -First 1
@@ -987,10 +1002,13 @@ try {
     $savedLogDir = $env:P20_USAGE_LOG_DIR
     $env:TOOLKIT_QUIET_STARTUP = '1'
     $env:P20_USAGE_LOG_DIR = $lineBase
+    $savedLineHistory = [System.Environment]::GetEnvironmentVariable($consts.env.testHistoryDir)
+    [System.Environment]::SetEnvironmentVariable($consts.env.testHistoryDir, $lineBase)
     try { $lineOut = (& $lineHost -NoProfile -ExecutionPolicy Bypass -File $probe 2>&1 | ForEach-Object { [string]$_ }) -join "`n" }
     finally {
         $env:TOOLKIT_QUIET_STARTUP = $savedQuiet
         $env:P20_USAGE_LOG_DIR = $savedLogDir
+        [System.Environment]::SetEnvironmentVariable($consts.env.testHistoryDir, $savedLineHistory)
     }
     $usageLogs = @(Get-ChildItem -Path $lineBase -Filter 'usage.*.log')
     $usageLines = @()
@@ -1047,18 +1065,22 @@ try {
     if (Test-Path (Join-Path $pkgRoot 'Config')) { Copy-Item (Join-Path $pkgRoot 'Config') (Join-Path $missBase 'Config') -Recurse }
     Copy-Item (Join-Path $scriptDir 'Test-Toolkit.ps1'), (Join-Path $scriptDir 'Get-ToolkitSuiteRegistry.ps1'), (Join-Path $scriptDir 'Get-TestHost.ps1') (Join-Path $missBase 'Tests')
     $missHost = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
-    $missOut = (& $missHost -NoProfile -ExecutionPolicy Bypass -File (Join-Path $missBase 'Tests/Test-Toolkit.ps1') -Consts 2>&1 | ForEach-Object { [string]$_ }) -join "`n"
+    $missHistory = Join-Path $missBase 'history'
+    $savedMissHistory = [System.Environment]::GetEnvironmentVariable($consts.env.testHistoryDir)
+    [System.Environment]::SetEnvironmentVariable($consts.env.testHistoryDir, $missHistory)
+    try { $missOut = (& $missHost -NoProfile -ExecutionPolicy Bypass -File (Join-Path $missBase 'Tests/Test-Toolkit.ps1') -Consts 2>&1 | ForEach-Object { [string]$_ }) -join "`n" }
+    finally { [System.Environment]::SetEnvironmentVariable($consts.env.testHistoryDir, $savedMissHistory) }
     $missExit = $LASTEXITCODE
     Assert-True 'the console says the file was not found' ($missOut -match 'file not found: Test-Consts\.ps1') $missOut
     Assert-True 'the runner exits non-zero: a missing suite fails the run' ($missExit -ne 0) "exit $missExit"
-    $missLogs = @(Get-ChildItem -Path $missBase -Filter 'test-results.*.log')
+    $missLogs = @(Get-ChildItem -LiteralPath $missHistory -Filter 'test-results.*.log' -ErrorAction SilentlyContinue)
     $missLines = @()
     if ($missLogs.Count -eq 1) { $missLines = @([System.IO.File]::ReadAllLines($missLogs[0].FullName)) }
     $missLine = @($missLines | Where-Object { $_ -match "`tConsts`t" }) | Select-Object -First 1
     $missCols = @()
     if ($missLine) { $missCols = @($missLine -split "`t") }
     Assert-True 'the missing suite is a line in the log: fail, 0 of 1, the same seven columns, with why' ($missCols.Count -eq 7 -and $missCols[2] -eq 'fail' -and $missCols[3] -eq '0' -and $missCols[4] -eq '1' -and $missCols[5] -match 'file not found') "$missLine"
-    $missSummaries = @(Get-ChildItem -Path $missBase -Filter 'test-summary.*.json')
+    $missSummaries = @(Get-ChildItem -LiteralPath $missHistory -Filter 'test-summary.*.json' -ErrorAction SilentlyContinue)
     $ms = $null
     if ($missSummaries.Count -eq 1) { $ms = Read-P20TestSummary -Path $missSummaries[0].FullName }
     Assert-True 'the summary entry says fail, with a real seconds value and the suite counted' ($null -ne $ms -and $ms['suites']['Consts']['result'] -eq 'fail' -and $null -ne $ms['suites']['Consts']['seconds'] -and $ms['suites']['Consts']['total'] -eq 1)
@@ -1069,6 +1091,113 @@ catch {
 }
 finally {
     Remove-Item $missBase -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# -- 3c2. Where the machine's test history lives ----------------------------
+Write-Host ""
+Write-Host "-- One folder per machine: the rule, a marked run, the old record, the checkout --" -ForegroundColor Cyan
+. (Join-Path $pkgRoot 'Scripts/Get-TestHistoryDir.ps1')
+$historyTable = [System.IO.File]::ReadAllText((Join-Path $scriptDir 'fixtures/test-history/paths.json')) | ConvertFrom-Json
+Assert-True 'the shared table has its rows' (@($historyTable.rows).Count -ge 10)
+foreach ($row in @($historyTable.rows)) {
+    $vars = @{}
+    foreach ($p in $row.env.PSObject.Properties) { $vars[$p.Name] = [string]$p.Value }
+    $got = Resolve-P20TestHistorySegments -Platform $row.platform -HomeDir $row.home -Variables $vars
+    if ($null -eq $row.expected) {
+        Assert-True "history: $($row.name)" ($null -eq $got) "got $(@($got) -join ' | ')"
+    }
+    else {
+        Assert-True "history: $($row.name)" ($null -ne $got -and ((@($got) -join '|') -eq (@($row.expected) -join '|'))) "got $(@($got) -join ' | ')"
+    }
+}
+
+$histBase = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-testall-history-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+New-Item -ItemType Directory -Path $histBase -Force | Out-Null
+$histNames = @($consts.env.testHistoryDir, $consts.env.testRunMarker, 'HOME', 'USERPROFILE', 'LOCALAPPDATA', 'XDG_STATE_HOME')
+$histSaved = @{}
+foreach ($n in $histNames) { $histSaved[$n] = [System.Environment]::GetEnvironmentVariable($n) }
+try {
+    # Every place the rule could reach is under one scratch home, so a mistake
+    # lands there and the assertion below sees it.
+    $fakeHistHome = Join-Path $histBase 'home'
+    New-Item -ItemType Directory -Path $fakeHistHome -Force | Out-Null
+    $homeVars = @{ HOME = $fakeHistHome; USERPROFILE = $fakeHistHome; LOCALAPPDATA = (Join-Path $fakeHistHome 'local'); XDG_STATE_HOME = (Join-Path $fakeHistHome 'state') }
+
+    # A marked run with no override: the real CLI runner in a scratch package,
+    # as a suite that drives it would start it -- marker set, no override.
+    $markPkg = Join-Path $histBase 'pkg'
+    New-Item -ItemType Directory -Path (Join-Path $markPkg 'Tests') -Force | Out-Null
+    Copy-Item (Join-Path $pkgRoot 'utilities.psm1'), (Join-Path $pkgRoot 'consts.json'), (Join-Path $pkgRoot 'config.default.json') $markPkg
+    Copy-Item (Join-Path $pkgRoot 'Scripts') (Join-Path $markPkg 'Scripts') -Recurse
+    if (Test-Path (Join-Path $pkgRoot 'Config')) { Copy-Item (Join-Path $pkgRoot 'Config') (Join-Path $markPkg 'Config') -Recurse }
+    Copy-Item (Join-Path $scriptDir 'Test-Toolkit.ps1'), (Join-Path $scriptDir 'Get-ToolkitSuiteRegistry.ps1'), (Join-Path $scriptDir 'Get-TestHost.ps1') (Join-Path $markPkg 'Tests')
+    # An old record at the scratch package's root: a marked run must not copy it anywhere either.
+    [System.IO.File]::WriteAllText((Join-Path $markPkg (Get-P20TestHistoryFileName -Kind summary)), '{ "machine": "OLD", "suites": {} }')
+    foreach ($k in $homeVars.Keys) { [System.Environment]::SetEnvironmentVariable($k, $homeVars[$k]) }
+    [System.Environment]::SetEnvironmentVariable($consts.env.testHistoryDir, $null)
+    [System.Environment]::SetEnvironmentVariable($consts.env.testRunMarker, '1')
+    $markDir = Get-P20TestHistoryDir -PackageRoot $markPkg
+    Assert-True 'under the marker with no override, the folder is none' ($markDir -eq '') "got '$markDir'"
+    $markSummary = Get-P20TestSummaryPath -PackageRoot $markPkg
+    Assert-True 'and so is the summary path' ($markSummary -eq '') "got '$markSummary'"
+    Merge-P20TestSummary -Path (Get-P20TestSummaryPath -PackageRoot $markPkg) -Halves @{ cli = [ordered]@{ half = 'cli'; result = 'pass' } }
+    $markHost = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+    $markOut = (& $markHost -NoProfile -ExecutionPolicy Bypass -File (Join-Path $markPkg 'Tests/Test-Toolkit.ps1') -Consts 2>&1 | ForEach-Object { [string]$_ }) -join "`n"
+    $markWrite = "`$ErrorActionPreference = 'Continue'; Import-Module '$(($markPkg -replace '\\', '/'))/utilities.psm1' -Force 3>`$null 6>`$null; Write-P20TestResult -Suite 'Marked' -Result 'pass' -Passed 1 -Total 1"
+    $markOut += (& $markHost -NoProfile -ExecutionPolicy Bypass -Command $markWrite 2>&1 | ForEach-Object { [string]$_ }) -join "`n"
+    Assert-True 'the runner ran (its missing suite is named)' ($markOut -match 'file not found: Test-Consts\.ps1') $markOut
+    # The host itself may keep its own caches under a home folder; what must not
+    # be there is a test record, or the folder the rule would have used.
+    $leaked = @(Get-ChildItem -LiteralPath $fakeHistHome -Recurse -Force | Where-Object { $_.Name -match '^test-(summary|results)\.' -or $_.Name -eq 'TestHistory' -or $_.Name -eq 'test-history' } | ForEach-Object { $_.FullName })
+    Assert-True 'a marked run with no override writes no record under the home folder' ($leaked.Count -eq 0) ($leaked -join ', ')
+    $atRoot = @(Get-ChildItem -LiteralPath $markPkg -Filter 'test-results.*' | ForEach-Object { $_.Name })
+    Assert-True 'and nothing beside the package either' ($atRoot.Count -eq 0) ($atRoot -join ', ')
+
+    # The old record, copied in once: no marker, no override, the scratch home.
+    [System.Environment]::SetEnvironmentVariable($consts.env.testRunMarker, $null)
+    $realDir = Get-P20TestHistoryDir -PackageRoot $markPkg
+    Assert-True 'with neither, the folder is under the home folder' ($realDir -and $realDir.StartsWith($fakeHistHome)) $realDir
+    $migrated = Join-Path $realDir (Get-P20TestHistoryFileName -Kind summary)
+    Assert-True 'and the checkout''s old record was copied in, so the first read is not "not run"' ((Test-Path -LiteralPath $migrated) -and (Read-P20TestSummary -Path $migrated)['machine'] -eq 'OLD')
+    Merge-P20TestSummary -Path $migrated -Halves @{ cli = [ordered]@{ half = 'cli'; result = 'pass'; passed = 1; failed = 0; total = 1 } }
+    $null = Get-P20TestHistoryDir -PackageRoot $markPkg
+    Assert-True 'a second read copies nothing over the newer record' ((Read-P20TestSummary -Path $migrated)['machine'] -eq [System.Environment]::MachineName)
+    Assert-True 'the old file is left where it was' (Test-Path -LiteralPath (Join-Path $markPkg (Get-P20TestHistoryFileName -Kind summary)))
+    [System.Environment]::SetEnvironmentVariable($consts.env.testHistoryDir, (Join-Path $histBase 'over'))
+    $overDir = Get-P20TestHistoryDir -PackageRoot $markPkg
+    Assert-True 'an override is the folder, and copies nothing in' ($overDir -eq (Join-Path $histBase 'over') -and -not (Test-Path -LiteralPath $overDir)) $overDir
+}
+catch {
+    Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally {
+    foreach ($n in $histNames) { [System.Environment]::SetEnvironmentVariable($n, $histSaved[$n]) }
+}
+
+# Where a run came from: main for a repository's own tree, the folder name of
+# a linked worktree, '' outside git.
+try {
+    $repo = Join-Path $histBase 'repo'
+    New-Item -ItemType Directory -Path $repo -Force | Out-Null
+    $null = Invoke-P20TestGit -C $repo init --quiet
+    [System.IO.File]::WriteAllText((Join-Path $repo 'a.txt'), 'a')
+    $null = Invoke-P20TestGit -C $repo add a.txt
+    $null = Invoke-P20TestGit -C $repo -c user.email=t@example.invalid -c user.name=t -c commit.gpgsign=false commit --quiet -m one
+    $head = ((Invoke-P20TestGit -C $repo rev-parse --short HEAD).Out | Select-Object -First 1)
+    $wt = Join-Path $histBase 'wt-311'
+    $null = Invoke-P20TestGit -C $repo worktree add --quiet --detach $wt
+    $mainSource = Get-P20TestCheckout -PackageRoot $repo
+    $wtSource = Get-P20TestCheckout -PackageRoot $wt
+    $noSource = Get-P20TestCheckout -PackageRoot (Join-Path $histBase 'home')
+    Assert-True 'a repository''s own tree is main, at its commit' ($mainSource.checkout -eq 'main' -and $mainSource.commit -eq $head -and $head) "$($mainSource.checkout) $($mainSource.commit) $head"
+    Assert-True 'a linked worktree is its folder name, at its commit' ($wtSource.checkout -eq 'wt-311' -and $wtSource.commit -eq $head) "$($wtSource.checkout) $($wtSource.commit)"
+    Assert-True 'outside git, both are empty' ($noSource.checkout -eq '' -and $noSource.commit -eq '') "$($noSource.checkout) $($noSource.commit)"
+}
+catch {
+    Assert-True 'the checkout cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally {
+    Remove-Item $histBase -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # -- 3d. The bridge's quiet marker does not reach the suites ----------------
@@ -1180,7 +1309,12 @@ Write-Host "-- The wiring --" -ForegroundColor Cyan
 $runnerSource = [System.IO.File]::ReadAllText((Join-Path $scriptDir 'Test-Toolkit.ps1'))
 Assert-True 'the CLI runner writes through the shared merge' ($runnerSource -match 'Merge-P20TestSummary\s+-Path\s+\$summaryFile')
 Assert-True 'its suite entries carry half = cli' ($runnerSource -match "half\s+=\s+'cli'")
-Assert-True 'and the summary path comes from the one rule' ($runnerSource -match 'Get-P20TestSummaryPath' -and $runnerSource -notmatch '"test-summary\.\$')
+Assert-True 'and the summary path comes from the one rule' ($runnerSource -match 'Get-P20TestHistoryFile -Kind summary -Dir \$historyDir' -and $runnerSource -notmatch '"test-summary\.\$')
+Assert-True 'the runner resolves the real folder before it sets the run marker' ($runnerSource -match '(?s)\$historyDir = Get-P20TestHistoryDir.*SetEnvironmentVariable\(\$runMarker, ''1''\)')
+Assert-True 'and hands its children a scratch one, put back in the finally' ($runnerSource -match 'SetEnvironmentVariable\(\$historyEnv, \$scratchHistoryDir\)' -and $runnerSource -match 'SetEnvironmentVariable\(\$historyEnv, \$previousHistoryDir\)')
+Assert-True 'its own records go to the folder it resolved, by name' (([regex]::Matches($runnerSource, 'Write-P20TestResult [^\r\n]*-Dir \$historyDir')).Count -eq 2)
+$verbSource = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'Scripts/Invoke-TestAll.ps1'))
+Assert-True 'Test resolves the folder once, before the web half sets the marker' ($verbSource -match '(?s)\$historyDir = Get-P20TestHistoryDir.*\$runWeb = ')
 $cfg = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'config.default.json')) | ConvertFrom-Json
 Assert-True 'config: Test outlasts the bridge''s default timeout' ([int]$cfg.commands.Test.bridgeTimeoutSeconds -ge 1800)
 

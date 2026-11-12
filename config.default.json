@@ -33,9 +33,15 @@
   },
   "_limits": "Limits the product SAYS, never enforces. inPlay is how many cards in play (current/, every lane) before Status and the board's Active column warn; unset means no line at all. Set per machine: tkConfig -Set limits.inPlay=5.",
   "limits": {},
-  "_burn": "Claude Code usage (Burn; docs/hub/usage.md, \"Today and this week\"). weekStarts is when the burn's week starts, local time -- a day and a 24-hour time, when the plan's allocation resets. Override it per machine: Config -Set burn.weekStarts=\"Monday 09:00\".",
+  "_burn": "Claude Code usage (Burn; docs/hub/usage.md, \"Today and this week\" and \"The weekly burndown\"). weekStarts is when the burn's week starts, local time -- a day and a 24-hour time, when the plan's allocation resets. Override it per machine: Config -Set burn.weekStarts=\"Monday 09:00\". cacheHours is how long a typed plan reading (Burn -Reading) is taken as current before it renews, whole hours, 1 to 168: Config -Set burn.cacheHours=<n>. product and buckets are the plan a reading is of -- each bucket's key is what -Reading types, its label what Burn and the System page print -- the team's to change, as workItemTypes is.",
   "burn": {
-    "weekStarts": "Friday 05:00"
+    "weekStarts": "Friday 05:00",
+    "cacheHours": 4,
+    "product": "claude",
+    "buckets": [
+      { "key": "general", "label": "General" },
+      { "key": "premium", "label": "Premium (Fable)" }
+    ]
   },
   "_ai": "The provider profile for everything that calls a model: AddPRReview in the CLI, and the agent's suggest (a draft reply to a review thread) and rewrite (tidy a notes box) routes. model is the model id all three send; override it per machine in config.local.json. The KEY is never here -- ANTHROPIC_API_KEY in the environment, or CLAUDE_API_KEY as the fallback name .env.example documents.",
   "ai": {
@@ -365,18 +371,21 @@
     "Burn": {
       "category": "info",
       "description": "Claude Code usage: today, this week, the day's log",
-      "usage": "{cliPrefix}Burn [-AsJson] [-At <yyyy-mm-dd HH:mm>] [-Log] [-Date <yyyy-mm-dd>] [-Help]",
+      "usage": "{cliPrefix}Burn [-AsJson] [-At <yyyy-mm-dd HH:mm>] [-Reading <bucket=percent,...>] [-Log] [-Date <yyyy-mm-dd>] [-Help]",
       "bridgeTimeoutSeconds": 180,
       "examples": [
         "{cliPrefix}Burn",
         "{cliPrefix}Burn -AsJson",
         "{cliPrefix}Burn -At '2026-11-06 04:59'",
+        "{cliPrefix}Burn -Reading general=43,premium=54",
+        "{cliPrefix}Burn -Reading premium=54 -At '2026-11-10 09:10'",
         "{cliPrefix}Burn -Log",
         "{cliPrefix}Burn -Log -Date 2026-11-02"
       ],
       "switches": {
         "-AsJson": "The current burn as one JSON object -- what the agent's GET /api/usage/burn reads. Not with -Log",
-        "-At <yyyy-mm-dd HH:mm>": "Read the burn as it stood at a past local time: that moment's today and week, nothing after it counted. Not with -Log",
+        "-At <yyyy-mm-dd HH:mm>": "Read the burn as it stood at a past local time: that moment's today and week, nothing after it counted. With -Reading, when the reading was taken. Not with -Log",
+        "-Reading <bucket=percent,...>": "Record the plan's weekly usage as Claude's usage page shows it, whole percents by bucket (burn.buckets: general, premium) -- one bucket or several. Appended to usage/readings/ in the hub. Not with -Log, -Date or -AsJson",
         "-Log": "Write the day's record: usage/<date>-<machine>.json in the hub",
         "-Date <yyyy-mm-dd>": "The local day -Log writes. Default: today. Only with -Log",
         "-Help": "This"
@@ -387,7 +396,8 @@
         "Reads Claude Code's own session files on this machine -- the projects folder under CLAUDE_CONFIG_DIR, else ~/.claude/projects -- and never writes there. A machine without them writes nothing and says so.",
         "One record per local day per machine. Run it again the same day and it replaces the record; over the same session files it writes the same bytes.",
         "Tokens by model and by session, each message counted once. The cost is derived from Config/claude-prices.json (list prices) and labelled so -- never the plan's allocation. A model with no price is counted and named as unpriced; Haiku is priced at its lower rate card, and says so.",
-        "No path and no user name in the record: a project is its last folder name, a session its id, the machine its short host name."
+        "No path and no user name in the record: a project is its last folder name, a session its id, the machine its short host name.",
+        "Alone it opens with the weekly burndown: each bucket's latest reading this week, and how far it is ahead of or behind an even pace -- a straight line from 0% at the week's start to 100% at the reset -- measured at the reading's own time. Readings are typed, never estimated: nothing on this machine holds the plan's percentages. A reading is current for burn.cacheHours (4 by default) and then due to be renewed; a new week starts empty."
       ]
     },
     "Setup": {
@@ -486,7 +496,7 @@
         "A half that cannot run is skipped and says why -- no Python, no pytest or httpx, no pwsh, no npm, no web/node_modules -- and the verdict names it SKIPPED, not passed.",
         "Exit 0 when every half that ran passed; exit 2, after the summary, when a half failed or none ran.",
         "Expected vs actual, per half, from docs/TESTING.md's own lines: information, not a failure -- the merger pastes those counts from the Mac's run.",
-        "test-summary.<machine>.json gains a half field per suite and a halves block; the System page's Health card and {cliPrefix}Setup read the whole machine from it."
+        "test-summary.<machine>.json gains a half field per suite and a halves block, each record with the checkout and commit it ran from; the System page's Health card and {cliPrefix}Setup read the whole machine from it. It lives in the machine's test-history folder, one for every checkout and git worktree ({cliPrefix}TestToolkit's notes say where)."
       ],
       "switches": {
         "-Half": "One half: cli, agent or web",
@@ -510,7 +520,7 @@
       "notes": [
         "A suite switch is its name in the list below -- name several and they all run.",
         "A skip is not a pass: read the per-suite summary line, not the total.",
-        "test-summary.<machine>.json carries each suite's seconds; the Health card reads it, and -Failed reads its results."
+        "test-summary.<machine>.json carries each suite's seconds; the Health card reads it, and -Failed reads its results. It and test-results.<machine>.log live in one folder per machine, whichever checkout or git worktree ran: ~/Library/Application Support/ToolKit/TestHistory on macOS, %LOCALAPPDATA%\\ToolKit\\TestHistory on Windows, $XDG_STATE_HOME/toolkit/test-history (~/.local/state/toolkit/test-history) elsewhere; P20_TEST_HISTORY_DIR moves it."
       ],
       "switches": {
         "-<Suite>": "One suite by name; name several and they all run",

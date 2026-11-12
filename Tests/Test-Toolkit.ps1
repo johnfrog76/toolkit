@@ -102,7 +102,8 @@ param(
     # Windows:
     #   -Fast    the suites that spawn no shell -- a few minutes; run after a pull
     #   -Slow    the rest, one host process per case
-    #   -Failed  whatever failed in the last run on this machine (test-summary.<machine>.json)
+    #   -Failed  whatever failed in the last run on this machine (test-summary.<machine>.json,
+    #            in the machine's test-history folder)
     [switch]$Fast,
     [switch]$Slow,
     [switch]$Failed,
@@ -142,8 +143,8 @@ if ($repoRoot) { $env:PROMPTS_ROOT = $repoRoot }
 # `{prefix}TestToolkit` is often run in the shell the engineer keeps using --
 # leaving it set would redirect their real log for the rest of the session.
 #
-# test-results.{machine}.log and test-summary.{machine}.json are NOT redirected:
-# the Health card reading real test results is the point of those two.
+# test-results.{machine}.log and test-summary.{machine}.json are not in it:
+# they live in the machine's test-history folder, below.
 $previousLogDir = $env:P20_USAGE_LOG_DIR
 $scratchLogDir = Join-Path ([System.IO.Path]::GetTempPath()) "p20-test-logs-$([guid]::NewGuid())"
 New-Item -ItemType Directory -Path $scratchLogDir -Force | Out-Null
@@ -163,6 +164,21 @@ foreach ($v in @(Get-ChildItem Env: | Where-Object { $_.Name.StartsWith($webhook
     $savedWebhooks[$v.Name] = $v.Value
     Remove-Item "Env:\$($v.Name)" -ErrorAction SilentlyContinue
 }
+# The machine's test history (Scripts/Get-TestHistoryDir.ps1): one folder for
+# every checkout, so a run in a git worktree reaches the Health card. Resolved
+# HERE, before the marker is set, because under the marker the rule gives no
+# folder -- this runner's own records go to the folder it resolved now, passed
+# by name, and every child (each suite, and any runner a suite starts in a
+# scratch package) is pointed at a scratch folder, so a suite's scratch run
+# never writes the machine's real record. A runner that is itself a suite's
+# child inherits that scratch folder as its own. Restored in the finally.
+. (Join-Path $PSScriptRoot '../Scripts/Get-TestHistoryDir.ps1')
+$historyDir = Get-P20TestHistoryDir -PackageRoot (Split-Path $testDir -Parent)
+$historyEnv = $runnerConsts.env.testHistoryDir
+$previousHistoryDir = [System.Environment]::GetEnvironmentVariable($historyEnv)
+$scratchHistoryDir = Join-Path ([System.IO.Path]::GetTempPath()) "p20-test-history-$([guid]::NewGuid())"
+[System.Environment]::SetEnvironmentVariable($historyEnv, $scratchHistoryDir)
+
 $previousMarker = [System.Environment]::GetEnvironmentVariable($runMarker)
 [System.Environment]::SetEnvironmentVariable($runMarker, '1')
 
@@ -207,9 +223,11 @@ if (Test-Path $utilitiesPath) {
 $suites = Get-P20ToolkitSuiteRegistry
 # The summary file's name and its merge rule are {cliPrefix}Test's too:
 # one file holds both, so this runner and the verb that runs all three halves
-# write the same file the same way.
+# write the same file the same way -- in the folder resolved above, not the
+# scratch one the children see. '' when there is none.
 . (Join-Path (Join-Path (Split-Path $testDir -Parent) 'Scripts') 'TestAll-Rules.ps1')
-$summaryFile = Get-P20TestSummaryPath -PackageRoot (Split-Path $testDir -Parent)
+$summaryFile = Get-P20TestHistoryFile -Kind summary -Dir $historyDir
+$runSource = Get-P20TestCheckout -PackageRoot (Split-Path $testDir -Parent)
 
 # ── Help ─────────────────────────────────────────────────────────────────────
 
@@ -280,8 +298,8 @@ $fastSuites = @('Consts', 'Compat', 'Menu', 'Environment', 'PRComments', 'PullRe
 if ($Fast) { $selectedSuites += @($suites.Keys | Where-Object { $fastSuites -contains $_ }) }
 if ($Slow) { $selectedSuites += @($suites.Keys | Where-Object { $fastSuites -notcontains $_ }) }
 if ($Failed) {
-    if (-not (Test-Path $summaryFile)) {
-        Write-Host "  -Failed: no $(Split-Path $summaryFile -Leaf) yet -- nothing has run on this machine." -ForegroundColor Yellow
+    if (-not $summaryFile -or -not (Test-Path -LiteralPath $summaryFile)) {
+        Write-Host "  -Failed: no $(Get-P20TestHistoryFileName -Kind summary) yet -- nothing has run on this machine." -ForegroundColor Yellow
         return
     }
     $last = Get-Content $summaryFile -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -336,7 +354,7 @@ foreach ($suiteName in $selectedSuites) {
         # streak breaks and the readers need no fourth word. Its detail says why.
         $missingOrg = if ($suite.Scope -eq 'org') { $activeSpace } else { '' }
         try {
-            Write-P20TestResult -Suite $suiteName -Result 'fail' -Passed 0 -Total 1 -Detail "file not found: $($suite.File)" -Org $missingOrg
+            Write-P20TestResult -Suite $suiteName -Result 'fail' -Passed 0 -Total 1 -Detail "file not found: $($suite.File)" -Org $missingOrg -Dir $historyDir
         }
         catch {
             Write-Warning "Failed to log test result for $suiteName`: $_"
@@ -390,7 +408,7 @@ foreach ($suiteName in $selectedSuites) {
     }
     $suiteOrg = if ($suite.Scope -eq 'org') { $activeSpace } else { '' }
     try {
-        Write-P20TestResult -Suite $suiteName -Result $logResult -Passed $suitePassed -Total ($suitePassed + $suiteFailed) -Detail $logDetail -Org $suiteOrg
+        Write-P20TestResult -Suite $suiteName -Result $logResult -Passed $suitePassed -Total ($suitePassed + $suiteFailed) -Detail $logDetail -Org $suiteOrg -Dir $historyDir
     }
     catch {
         Write-Warning "Failed to log test result for $suiteName`: $_"
@@ -496,6 +514,9 @@ $cliHalf = [ordered]@{
     reason    = ''
     detail    = if ($anyFail) { "$totalFailed failed" } else { 'ok' }
     timestamp = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss')
+    # Which tree the run was about: main, or a worktree's folder name, and HEAD.
+    checkout  = $runSource.checkout
+    commit    = $runSource.commit
 }
 if ($selectedSuites.Count -lt $suites.Count) { $cliHalf['partial'] = $true }
 $top = [ordered]@{
@@ -510,12 +531,14 @@ $top = [ordered]@{
     totalPassed = $totalPassed
     totalFailed = $totalFailed
     grandTotal  = $grandTotal
+    checkout    = $runSource.checkout
+    commit      = $runSource.commit
 }
 try {
     Merge-P20TestSummary -Path $summaryFile -Halves @{ cli = $cliHalf } -Suites $suitesHash -Top $top
 }
 catch {
-    Write-Warning "Failed to write $(Split-Path $summaryFile -Leaf): $_"
+    Write-Warning "Failed to write $(Get-P20TestHistoryFileName -Kind summary): $_"
 }
 
 if (-not $allGreen) { exit 1 }
@@ -534,6 +557,8 @@ finally {
     if ($null -eq $previousMarker) { [System.Environment]::SetEnvironmentVariable($runMarker, $null) }
     else { [System.Environment]::SetEnvironmentVariable($runMarker, $previousMarker) }
     [System.Environment]::SetEnvironmentVariable($agentCacheEnv, $previousAgentCache)
+    [System.Environment]::SetEnvironmentVariable($historyEnv, $previousHistoryDir)
+    Remove-Item -LiteralPath $scratchHistoryDir -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item -Path $scratchAgentCache -Recurse -Force -ErrorAction SilentlyContinue
     [System.Environment]::SetEnvironmentVariable('TOOLKIT_QUIET_STARTUP', $previousQuiet)
     Restore-P20RunOverrides $savedOverrides

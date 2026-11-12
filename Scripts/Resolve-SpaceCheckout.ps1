@@ -22,22 +22,28 @@
     shortcuts half of 2; the caller passes the configured path as -Configured
     and its own candidates as -Candidates. A candidate counts only when it is
     inside a git repository whose origin IS the Space's repository
-    (Get-P20GitHubOriginRepo, the rule StartWork -Launch holds a clone to), so
+    (Get-P20OriginRepo: GitHub's owner/name, or Azure DevOps's
+    org/project/repo, each from the Space's own address), so
     a folder that merely shares a name never answers -- the configured path
     included: a setting that points at the wrong clone is named in the
     result's ConfiguredReason and passed over.
 
     Returns a hashtable:
         Root              the clone's top level, or '' when none was found
-        Repo              'owner/name' when the address names one, else ''
+        Repo              'owner/name' (GitHub) or 'org/project/repo' (Azure DevOps)
+                          when the address names one, else ''
         Source            'configured' when Root came from the setting, 'found'
                           when from a candidate or wsRoot, '' when none was found
         Reason            why there is no Root, in words a refusal or a note can print
         ConfiguredReason  why the configured path was passed over ('' when it
                           was not set, or was used)
 
-    A Space whose tracker is not GitHub, or whose address names no single
-    repository, has no Root and says so; the caller decides what that means.
+    A Space with no tracker, or whose address names no single repository, has
+    no Root and says so; the caller decides what that means. An Azure DevOps
+    Space's address names its organisation and its projects[] entry the project
+    and repository (the repository is the project's own when the entry names
+    none); a clone is its when the origin, in any of the https or ssh forms
+    Azure DevOps gives, names the same three, ignoring case.
     Every git call goes through Invoke-P20TrackerRead (AGENTS.md, "Traps worth
     knowing"), which the caller dot-sources, with Resolve-Tracker.ps1.
 
@@ -49,6 +55,70 @@
     PowerShell 5.1 compatible (ASCII only). Resolve-P20SpaceCheckout reads no
     module state; the helpers read $global:P20Config and the nav table.
 #>
+
+if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
+}
+
+function Get-P20AdoOriginRepo {
+    <#
+      A git remote URL's Azure DevOps repository, 'org/project/repo' as the
+      URL spells it (percent-escapes read), or '' for anything else. The shapes
+      are consts.json regex.adoOrigin*; the host is matched ignoring case.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Url)
+    $text = "$Url".Trim()
+    if (-not $text) { return '' }
+    $rx = (Get-P20Consts).regex
+    foreach ($pattern in @($rx.adoOriginHttps, $rx.adoOriginVisualStudio, $rx.adoOriginSsh)) {
+        $m = [regex]::Match($text, [string]$pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        if ($m.Success) {
+            $parts = @(1, 2, 3 | ForEach-Object { [System.Uri]::UnescapeDataString($m.Groups[$_].Value) })
+            return ($parts -join '/')
+        }
+    }
+    return ''
+}
+
+function Get-P20OriginRepo {
+    # The repository a remote names on the given tracker ('github' or 'ado').
+    param([AllowEmptyString()][AllowNull()][string]$Url, [string]$Tracker = 'github')
+    if ($Tracker -eq 'ado') { return (Get-P20AdoOriginRepo -Url $Url) }
+    return (Get-P20GitHubOriginRepo -Url $Url)
+}
+
+function Get-P20AdoOrgName {
+    # The organisation an Azure DevOps address names: dev.azure.com/<org>, or
+    # <org>.visualstudio.com. '' when it names neither.
+    param([AllowEmptyString()][AllowNull()][string]$OrgUrl)
+    $rx = (Get-P20Consts).regex
+    foreach ($pattern in @($rx.adoOrgDev, $rx.adoOrgVisualStudio)) {
+        $m = [regex]::Match("$OrgUrl".Trim(), [string]$pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        if ($m.Success) { return [System.Uri]::UnescapeDataString($m.Groups[1].Value) }
+    }
+    return ''
+}
+
+function Get-P20CheckoutTarget {
+    <#
+      The one repository a Space's checkout is a clone of: @{ Repo = ... } or
+      @{ Reason = ... }. GitHub: Resolve-P20TrackerRepo's 'owner/name'. Azure
+      DevOps: 'org/project/repo' from the address's organisation and the one
+      projects[] entry (its repo, else the project's own name).
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$OrgUrl, $Projects)
+    $tracker = Resolve-P20Tracker -OrgUrl $OrgUrl
+    if ($tracker -eq 'github') { return (Resolve-P20TrackerRepo -OrgUrl $OrgUrl -Projects $Projects) }
+    if ($tracker -ne 'ado') { return @{ Reason = 'it has no tracker address' } }
+    $org = Get-P20AdoOrgName -OrgUrl $OrgUrl
+    if (-not $org) { return @{ Reason = 'the address names no Azure DevOps organisation' } }
+    $named = @($Projects | Where-Object { $_ -and $_.name })
+    if ($named.Count -eq 0) { return @{ Reason = 'the Space names no project' } }
+    if ($named.Count -gt 1) { return @{ Reason = "the Space names $($named.Count) projects, not one" } }
+    $repo = [string]$named[0].repo
+    if (-not $repo) { $repo = [string]$named[0].name }
+    return @{ Repo = "$org/$($named[0].name)/$repo" }
+}
 
 function Get-P20SpaceCheckoutKey {
     # The one spelling of the setting, for a refusal, a note or Config -Set.
@@ -138,7 +208,7 @@ function Get-P20NavAliasPaths {
 function Test-P20CheckoutCandidate {
     # The top level of the clone $Path is in when its origin is $Repo; else
     # Top is '' and Why says why, in words a note can print.
-    param([string]$Path, [string]$Repo)
+    param([string]$Path, [string]$Repo, [string]$Tracker = 'github')
     $out = @{ Top = ''; Why = '' }
     if (-not (Test-Path -LiteralPath $Path -PathType Container)) { $out.Why = 'that is not a folder on this machine'; return $out }
     $topRead = Invoke-P20TrackerRead 'git' @('-C', $Path, 'rev-parse', '--show-toplevel')
@@ -149,10 +219,12 @@ function Test-P20CheckoutCandidate {
     $originRead = Invoke-P20TrackerRead 'git' @('-C', $top, 'remote', 'get-url', 'origin')
     $originUrl = ''
     if ($originRead.Code -eq 0) { $originUrl = ([string](@($originRead.Out) | Select-Object -First 1)).Trim() }
-    $originRepo = Get-P20GitHubOriginRepo -Url $originUrl
+    $originRepo = Get-P20OriginRepo -Url $originUrl -Tracker $Tracker
     if ($originRepo -ine $Repo) {
+        $where = 'GitHub'
+        if ($Tracker -eq 'ado') { $where = 'Azure DevOps' }
         if ($originRepo) { $out.Why = "it is a clone of $originRepo, not $Repo" }
-        else { $out.Why = "its origin is not on GitHub, so it is not a clone of $Repo" }
+        else { $out.Why = "its origin is not on $where, so it is not a clone of $Repo" }
         return $out
     }
     $out.Top = $top
@@ -171,11 +243,12 @@ function Resolve-P20SpaceCheckout {
         [AllowEmptyString()][AllowNull()][string]$WsRoot = $env:WS_ROOT
     )
     $result = @{ Root = ''; Repo = ''; Source = ''; Reason = ''; ConfiguredReason = '' }
-    if ((Resolve-P20Tracker -OrgUrl $OrgUrl) -ne 'github') {
-        $result.Reason = 'its address is not a GitHub repository, so there is no clone to look for'
+    $tracker = Resolve-P20Tracker -OrgUrl $OrgUrl
+    if ($tracker -ne 'github' -and $tracker -ne 'ado') {
+        $result.Reason = 'its address is not a repository on GitHub or Azure DevOps, so there is no clone to look for'
         return $result
     }
-    $target = Resolve-P20TrackerRepo -OrgUrl $OrgUrl -Projects $Projects
+    $target = Get-P20CheckoutTarget -OrgUrl $OrgUrl -Projects $Projects
     if (-not $target.Repo) {
         $result.Reason = "its address names no single repository ($($target.Reason))"
         return $result
@@ -190,7 +263,7 @@ function Resolve-P20SpaceCheckout {
             $result.ConfiguredReason = "$keyWords is '$Configured', which is neither an absolute path nor under ~"
         }
         else {
-            $hit = Test-P20CheckoutCandidate -Path $path -Repo $result.Repo
+            $hit = Test-P20CheckoutCandidate -Path $path -Repo $result.Repo -Tracker $tracker
             if ($hit.Top) {
                 $result.Root = $hit.Top
                 $result.Source = 'configured'
@@ -204,13 +277,13 @@ function Resolve-P20SpaceCheckout {
     $all = @($Candidates)
     $wsCandidate = ''
     if ("$WsRoot".Trim()) {
-        $wsCandidate = Join-Path "$WsRoot".Trim() ($result.Repo.Split('/')[1])
+        $wsCandidate = Join-Path "$WsRoot".Trim() ($result.Repo.Split('/')[-1])
         $all += $wsCandidate
     }
     foreach ($candidate in $all) {
         $c = "$candidate".Trim()
         if (-not $c) { continue }
-        $hit = Test-P20CheckoutCandidate -Path $c -Repo $result.Repo
+        $hit = Test-P20CheckoutCandidate -Path $c -Repo $result.Repo -Tracker $tracker
         if (-not $hit.Top) { continue }
         $result.Root = $hit.Top
         $result.Source = 'found'

@@ -1334,8 +1334,10 @@ gets a reply box; **Suggest a reply** calls the agent's `suggest` route (offered
 says `anthropicConfigured`; otherwise the box names the variable) and fills the draft and the status
 from the recommendation; **Post reply** is `ReplyPR` through `runCommand`, the one writer of the
 card's `Reply:` slot, and the page re-reads the card. The page calls no native save route -- there is
-none -- and `PRCommentsDetail.reply.test.tsx` holds all of it. On a GitHub Space the status box still
-offers every Azure DevOps status. Known gap: [PR Comments offers statuses GitHub refuses](../docs/KNOWN-GAPS.md#pr-comments-offers-statuses-github-refuses).
+none -- and `PRCommentsDetail.reply.test.tsx` holds all of it. The status box offers the statuses the
+Space's tracker keeps (`consts.json` `replyStatuses`, by `/env`'s `tracker`): all six on Azure DevOps,
+`fixed`, `closed` and `active` on GitHub, where a suggested reject or modify maps to `active` and the
+draft says the thread is left open.
 
 The home cards have three branches, one per org status (`homeTabPlan` in `modules/ado/homeTabs.ts`
 also places each on a Home tab, and plans a GitHub Space's cards -- see "The shell's frame"). Which

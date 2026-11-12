@@ -92,7 +92,7 @@ table; this is the shape of it:
 
 | Scope | Keys | Goes to |
 | --- | --- | --- |
-| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `web.agentPort`, `web.corsOrigins`, `limits.inPlay`, `burn.weekStarts`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display`, `spaceCheckouts.<slug>.path` | `config.local.json`, created as a sparse patch if it is not there |
+| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `web.agentPort`, `web.corsOrigins`, `limits.inPlay`, `burn.weekStarts`, `burn.cacheHours`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display`, `spaceCheckouts.<slug>.path` | `config.local.json`, created as a sparse patch if it is not there |
 | **org** | `spaces.<slug>.name` / `.status` / `.orgType` / `.org` / `.tenant` / `.promptsFolder` / `.projects` / `.howIWork` / `.features.sprintAwareness` / `.features.suggestions` / `.features.trainingHoursPerQuarter` | the hub's `hub.json` -- or `config.local.json`'s `spaces.<slug>` patch with **`-Local`** |
 | **hub** | `storeSync`, `folders.<name>` | the hub's `hub.json`, and only with **`-Hub`** |
 | **default** | `commands`, `workItemTypes`, `cliVersion`, `managerWorkflow` | nowhere. These are the team's, and a `-Set` on one is refused by name |
@@ -362,6 +362,26 @@ agent never reads the key -- its hour-long cache is keyed by the config files, s
 It is not an optional surface and has no inventory row: it ships with a value and turns nothing on, like
 `ai.model`.
 
+## `burn.cacheHours` -- how long a reading is current
+
+A whole number of hours from 1 to 168: **4 by default** (`config.default.json`'s `burn` block). Per machine
+(`config.local.json`); `tkConfig -Set burn.cacheHours=6`. A plan reading typed with `Burn -Reading` is taken
+as current for this long: the burndown's last line says `*cached as of <the reading's time>` and
+`renews <that time plus burn.cacheHours>`, and past it `renewal due since`. Nothing is hidden, refused or
+coloured when a reading is due -- an old reading is not an error. Anything that is not a whole number from 1
+to 168 is refused by `Config -Set` naming the key, and a value written by hand that `Burn` cannot read makes
+`Burn` refuse, exit 2, naming the key and the file. One reader, `Get-P20BurnCacheHours`
+(`Scripts/Read-BurnReadings.ps1`), serves both.
+
+The CLI and the agent read it the same way by construction: the agent never reads the key, it serves
+`Burn -AsJson`'s `burndown` ([usage](hub/usage.md#the-weekly-burndown)), whose `cacheHours` and `renewsAt` are
+the verb's. Its cache is keyed by the config files, so a change is read at once. No inventory row, like
+`burn.weekStarts`.
+
+The plan itself -- `burn.product` (`claude`) and `burn.buckets` (`general`, General; `premium`, Premium
+(Fable)) -- is the team's configuration beside it, like `workItemTypes`: a plan's buckets are the plan's, so
+they are edited in the file rather than through `Config -Set`.
+
 ## `limits.inPlay` -- the WIP line
 
 One whole number of 1 or more, per machine (`config.local.json`; `tkConfig -Set limits.inPlay=5`). **Unset
@@ -400,9 +420,16 @@ moves only once the commit is pushed, because the tab reads GitHub ([A repositor
 Space's clone, and this setting is its first candidate, before the folder you stand in and the nav shortcuts'
 paths -- so `MoveDesign -Hub -Space <slug> -To Complete` checks `-Doc` in the configured checkout too. A
 candidate counts only when its `origin` names the Space's repository; a setting that points at another clone is
-passed over and said. The agent asks the same question of the configured path alone for the Design tab
+passed over and said. On a GitHub Space that repository is `owner/name`, from the address or its one `projects[]`
+repo. On an **Azure DevOps** Space it is the organisation the address names (`https://dev.azure.com/<org>` or
+`https://<org>.visualstudio.com`), the one `projects[]` entry's name, and that entry's `repo` (the project's own
+name where it has none) -- and a clone's `origin` is that repository in any form Azure DevOps gives it:
+`https://dev.azure.com/<org>/<project>/_git/<repo>`, `https://<org>.visualstudio.com/[DefaultCollection/]<project>/_git/<repo>`,
+or `git@ssh.dev.azure.com:v3/<org>/<project>/<repo>` and `<org>@vs-ssh.visualstudio.com:v3/<org>/<project>/<repo>`,
+the host in any case and a trailing `.git` optional. A Space with several projects names no single repository, so
+it has no clone to find. The patterns are `consts.json` `regex.adoOrigin*` and `regex.adoOrg*`. The agent asks the same question of the configured path alone for the Design tab
 (`agent/core/checkout.py`, on every `GET /api/design`, as `checkout`), and never searches; the path and
-origin rules are one table both halves assert, `Tests/fixtures/space-checkout/table.json`.
+origin rules (GitHub's and Azure DevOps's) are one table both halves assert, `Tests/fixtures/space-checkout/table.json`.
 
 Unset, a product row keeps its one link out, **Open on GitHub**, and the Design tab's foot names this setting;
 set to a folder that is not a clone of the Space's repository, the foot says why. `tkEnv` lists it under
@@ -634,6 +661,11 @@ and **the halves a test run
 covers** (`tests.halves`, `agent`, `cli`, `web` in the order `tkTest` runs them, and `tests.legacyHalf`,
 what a `test-summary.<machine>.json` entry with no `half` is read as: the CLI runner and `tkTest` write
 the tag, `agent/core/log.py` serves it and the Health card draws it -- [Testing](TESTING.md)),
+and **where a machine keeps its test history** (`tests.summaryFile` and `tests.resultsFile`, the two files'
+names; `tests.historyBase`, `historyFallback` and `historyPath`, the per-platform folder outside every
+checkout; `env.testHistoryDir`, `P20_TEST_HISTORY_DIR`, the override the test runners set: `Scripts/Get-TestHistoryDir.ps1`
+and `agent/core/log.py` compute it by one rule, held to `Tests/fixtures/test-history/paths.json` --
+[Testing, "Where the record lives"](TESTING.md#where-the-record-lives)),
 and **the package's own repository** (`repository.url`: what the agent compares a Space's repository with when the package has no git origin to read, so ToolKit connected to itself still reads as itself on the Prompts card -- a checkout's origin wins when it is there),
 and **the product's version** (`version`, the one top-level value that is not a group: `Env` prints it
 in its first block, `GET /api/env` serves it and the System page's Environment card shows it).
@@ -891,8 +923,9 @@ GitHub once ([the Studio](modules/studio.md#the-routes)). And the standup's dres
 of the model, the register and the facts the model was given, so a sentence is re-dressed only when its facts
 change ([Team Agile](modules/solitaire-agile.md), "The agentic layer"). And the current Claude Code burn,
 `burn-1/current.json`: one file, `Burn -AsJson`'s last answer with the hub it was read against and when, served
-for an hour, keyed by the hub and the config files (so `Config -Set burn.weekStarts` is a miss at once), and never
-past the answer's own next midnight or week start ([usage](hub/usage.md#today-and-this-week)).
+for an hour, keyed by the hub, the config files (so `Config -Set burn.weekStarts` is a miss at once) and the typed
+plan readings' files (so `Burn -Reading` is too), and never past the answer's own next midnight or week start, nor
+past its burndown's `renewsAt` ([usage](hub/usage.md#today-and-this-week)).
 `agent/core/disk_cache.py` owns the place:
 
 | Where | When |
