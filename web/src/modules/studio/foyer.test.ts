@@ -23,7 +23,7 @@ import {
   spacesFilterEmpty,
 } from "./foyer";
 import type { SpaceBucket, SpaceLifecycleAction, SpacesFilter } from "./foyer";
-import { LIST_PAGE_SIZE } from "../../shell/pageSize";
+import { LIST_PAGE_SIZE, listPageSize } from "../../shell/pageSize";
 import { visibilityLabel } from "../../shared/visibility";
 import type { EnvStatus, SpaceInfo } from "../../shell/api";
 import type { DeploysResponse, IssueReport, StatusResponse } from "../ado/api.ado";
@@ -310,8 +310,9 @@ describe("which rows ask their visibility", () => {
     expect(githubRowLine("", CONNECT_GITHUB)).toBe(CONNECT_GITHUB);
   });
 
-  it("the Studio cards page four at a time, what fits a list panel under one chip row", () => {
-    expect(LIST_PAGE_SIZE).toBe(4);
+  it("the Studio cards page three at a time, what fits a list panel under one chip row", () => {
+    expect(LIST_PAGE_SIZE).toBe(listPageSize({ density: "full", filterRows: 1 }));
+    expect(LIST_PAGE_SIZE).toBe(3);
   });
 });
 

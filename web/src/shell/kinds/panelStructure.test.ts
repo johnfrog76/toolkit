@@ -42,6 +42,7 @@ import {
   CARD_ITEM_HEIGHTS_PX,
   CARD_ITEM_LINE_BAND_PX,
   CARD_ITEM_META_BAND_PX,
+  CARD_ITEM_META_GAP_PX,
   CARD_ITEM_PADDING_Y_PX,
   CARD_ITEM_TITLE_BAND_PX,
 } from "../cardItemTokens";
@@ -334,12 +335,17 @@ describe("the panel rules, over every source file", () => {
   });
 
   it("an item's lengths are tokens, and its height is worked out from them", () => {
-    expect(CARD_ITEM_HEIGHTS_PX).toEqual({ full: 96, compact: 74, line: 28 });
-    // Each height is the outline, the one padding twice, and the bands: no
-    // fixed height can cancel a change to a padding or a band.
+    expect(CARD_ITEM_HEIGHTS_PX).toEqual({ full: 104, compact: 74, line: 28 });
+    // Each height is the outline, the one padding twice, and the bands -- with,
+    // in a full item, the gap over the meta band: no fixed height can cancel a
+    // change to a padding, a band or that gap.
     const frame = 2 * CARD_ITEM_BORDER_PX + 2 * CARD_ITEM_PADDING_Y_PX;
     expect(CARD_ITEM_HEIGHTS_PX.full).toBe(
-      frame + CARD_ITEM_TITLE_BAND_PX + CARD_ITEM_DESCRIPTION_BAND_PX + CARD_ITEM_META_BAND_PX,
+      frame +
+        CARD_ITEM_TITLE_BAND_PX +
+        CARD_ITEM_DESCRIPTION_BAND_PX +
+        CARD_ITEM_META_GAP_PX +
+        CARD_ITEM_META_BAND_PX,
     );
     expect(CARD_ITEM_HEIGHTS_PX.compact).toBe(
       frame + CARD_ITEM_TITLE_BAND_PX + CARD_ITEM_COMPACT_BAND_GAP_PX + CARD_ITEM_META_BAND_PX,
@@ -358,6 +364,12 @@ describe("the panel rules, over every source file", () => {
     }
     // Nothing is typed in the item: no length of its own.
     expect(item).not.toMatch(/\d+(\.\d+)?(px|rem|em)\b/);
+    // A full item's rows are its three bands and, over the meta band, the gap:
+    // a grid track that is Fluent's token, with the meta band on the row after it.
+    expect(item).toContain(
+      "gridTemplateRows: `${CARD_ITEM_TITLE_BAND_PX}px ${CARD_ITEM_DESCRIPTION_BAND_PX}px ${tokens.spacingVerticalS} ${CARD_ITEM_META_BAND_PX}px`,",
+    );
+    expect(item).toContain('"& > [data-row-meta]": { gridRow: "4" },');
     const tokensFile = fs.readFileSync(path.join(SRC, "shell/cardItemTokens.ts"), "utf8");
     expect(tokensFile).not.toMatch(/CARD_ITEM(_COMPACT|_LINE)?_HEIGHT_PX = \d/);
   });
@@ -393,7 +405,9 @@ describe("the panel rules, over every source file", () => {
     expect(frameText).not.toMatch(/margin\w*["']?\s*:/i);
     const itemTokens = fs.readFileSync(path.join(SRC, "shell/cardItemTokens.ts"), "utf8");
     expect(itemTokens).not.toMatch(/export const \w*(GAPS|MARGIN)\w*/);
-    expect(cardListGapPx).toEqual({ full: 4, compact: 8, line: 0 });
+    // One gap for every item that is a card, full or compact; a line item is a log row.
+    expect(cardListGapPx).toEqual({ full: 8, compact: 8, line: 0 });
+    expect(cardListGap.full).toBe(cardListGap.compact);
     expect(cardListPaddingTopPx).toEqual(cardListGapPx);
     expect(cardListPaddingTop).toEqual(cardListGap);
     const panel = fs.readFileSync(path.join(SRC, "shell/kinds/ListPanel.tsx"), "utf8");
@@ -491,12 +505,14 @@ describe("the panel rules, over every source file", () => {
     expect(tokenPx(filterRowGap)).toBe(filterRowGapPx);
     expect(theme.spacingVerticalM).toBe(`${CARD_ITEM_PADDING_Y_PX}px`);
     expect(theme.spacingVerticalS).toBe(`${CARD_ITEM_COMPACT_BAND_GAP_PX}px`);
+    expect(theme.spacingVerticalS).toBe(`${CARD_ITEM_META_GAP_PX}px`);
     for (const px of [
       ...Object.values(cardListGapPx),
       ...Object.values(cardListPaddingTopPx),
       filterRowGapPx,
       CARD_ITEM_PADDING_Y_PX,
       CARD_ITEM_COMPACT_BAND_GAP_PX,
+      CARD_ITEM_META_GAP_PX,
     ]) {
       expect(px % 4).toBe(0);
     }

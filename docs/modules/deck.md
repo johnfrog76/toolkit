@@ -171,7 +171,8 @@ page says so. A deck whose own `state` is `archive` is a different thing -- the 
 
 **The Decks panel's card item** keeps its title, its slide count, its running time and its state chip.
 Its title is plain text, as on every card item; its exposed action is **Open the deck**, which opens the
-page, and its `...` holds **Play**. The panel is a list panel: four decks a page, the pager in the foot.
+page, and its `...` holds **Play**. The panel is a list panel: three decks a page under its filter
+chips (four where it draws none), the pager in the foot.
 The vocabulary puts a row's link out last (`web/README.md`, "One vocabulary for row actions"), and a
 deck has none: the `Deck` type carries no address of its own (`project` picks the player's giveaway
 repository, which is the engine's and not the deck's), so neither shipped deck has an **Open on**

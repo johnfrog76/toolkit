@@ -66,9 +66,11 @@ export function listChromePx(chrome: ListChrome): number {
     LIST_CHROME_PX.frame +
     rows * LIST_CHROME_PX.filterRow +
     Math.max(0, rows - 1) * filterRowGapPx +
-    // The space under the chips. The list then drops its own top padding,
-    // which listHeightPx still counts: the sum errs a few px towards fewer.
-    (rows > 0 ? filtersSpaceBelowPx : 0) +
+    // The space under the chips. Right under them (no lead between) the list
+    // drops its own top padding, which listHeightPx counts, so it comes off here.
+    (rows > 0
+      ? filtersSpaceBelowPx - (chrome.lead ? 0 : cardListPaddingTopPx[chrome.density])
+      : 0) +
     (chrome.lead ? LIST_CHROME_PX.lead : 0) +
     (chrome.footNote ? LIST_CHROME_PX.footNote : 0) +
     (chrome.status ? LIST_CHROME_PX.status : 0)

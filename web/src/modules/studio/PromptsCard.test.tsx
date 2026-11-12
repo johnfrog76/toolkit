@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { expectListPanelShape } from "../../shell/kinds/panelShapeAssert";
+import { LIST_PAGE_SIZE } from "../../shell/pageSize";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -28,8 +29,9 @@ import type { PromptRow, PromptSpace } from "./api.studio";
 // row's one action Open (Copy reference and Copy prompt in its menu), the name plain
 // text. The agent's reads are pinned in Tests/test_studio_prompts.py.
 // The viewer is mocked (react-markdown is ESM).
-// The pager's rules do not depend on how many rows a page holds, and these
-// suites build their lists for five; the shipped size is pinned in foyer.test.ts.
+// The pager's rules do not depend on how many rows a page holds: these suites
+// build their lists around LIST_PAGE_SIZE, the page under one chip row (three),
+// which is pinned in foyer.test.ts.
 
 jest.mock("../../shared/MarkdownViewer", () => ({
   MarkdownViewer: ({ content }: { content: string }) => <pre data-testid="viewer">{content}</pre>,
@@ -543,7 +545,7 @@ describe("the Prompts card's category row", () => {
     expect(chip()).toBe("1");
     fireEvent.click(category("All"));
     expect(chip()).toBe("5");
-    // Five rows are two pages of four: the last is on the second.
+    // Five rows are two pages of three: the last is on the second.
     expect(screen.getByText("Page 1 of 2")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
     expect(screen.getByText("tk-loose")).toBeTruthy();
@@ -559,11 +561,13 @@ describe("the Prompts card's category row", () => {
     expect(screen.getByText("Page 1 of 3")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
     expect(screen.getByText("Page 2 of 3")).toBeTruthy();
-    // Seven ships: two pages of their own, from the first.
+    // Seven ships: three pages of their own, from the first.
     fireEvent.click(category("ship"));
-    expect(screen.getByText("Page 1 of 2")).toBeTruthy();
+    expect(screen.getByText("Page 1 of 3")).toBeTruthy();
     expect(screen.getByText("ship-1")).toBeTruthy();
     expect(screen.queryByText("ship-6")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(screen.getByText("ship-6")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
     expect(screen.getByText("ship-7")).toBeTruthy();
     expect(screen.queryByText("review-1")).toBeNull();
@@ -866,16 +870,18 @@ describe("the Prompts card's pager", () => {
     envAnswer = how("team");
   });
 
-  it("five rows draw a pager and page 2 shows the fifth; four draw none", () => {
-    prompts(5, 0);
+  it("four rows draw a pager and page 2 shows the fourth; three draw none", () => {
+    // One more than a page holds, then exactly a page.
+    expect(LIST_PAGE_SIZE).toBe(3);
+    prompts(LIST_PAGE_SIZE + 1, 0);
     const view = mount();
-    expect(screen.getByText("tk-4")).toBeTruthy();
-    expect(screen.queryByText("tk-5")).toBeNull();
+    expect(screen.getByText("tk-3")).toBeTruthy();
+    expect(screen.queryByText("tk-4")).toBeNull();
     expect(screen.getByText("Page 1 of 2")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
-    expect(screen.getByText("tk-5")).toBeTruthy();
+    expect(screen.getByText("tk-4")).toBeTruthy();
     view.unmount();
-    prompts(4, 0);
+    prompts(LIST_PAGE_SIZE, 0);
     mount();
     expect(screen.queryByRole("button", { name: "Next page" })).toBeNull();
   });
@@ -883,10 +889,11 @@ describe("the Prompts card's pager", () => {
   it("the pager runs over the active filter's rows, and a filter change starts at its first page", () => {
     prompts(7, 3);
     mount();
-    expect(screen.getByText("Page 1 of 2")).toBeTruthy();
+    expect(screen.getByText("Page 1 of 3")).toBeTruthy();
     expect(chip()).toBe("7");
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
-    expect(screen.getByText("tk-7")).toBeTruthy();
+    expect(screen.getByText("Page 2 of 3")).toBeTruthy();
+    expect(screen.getByText("tk-6")).toBeTruthy();
     // Your hub's three fit one page: no pager, page 1, the chip its count.
     fireEvent.click(radio("Your hub"));
     expect(screen.queryByRole("button", { name: "Next page" })).toBeNull();

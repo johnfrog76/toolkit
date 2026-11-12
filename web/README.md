@@ -665,16 +665,18 @@ is still Active Cards.
 - **Every length in an item is a token, and its height is their sum.** `src/shell/cardItemTokens.ts`
   names the outline (1), the one vertical padding (`CARD_ITEM_PADDING_Y_PX`, 12 -- Fluent's
   `tokens.spacingVerticalM`, which the styles use; a test holds the number to it), the title band
-  (24), a description line (15, two of them), the meta band (16) and the 8 between a compact item's
-  two bands. Each size's height is worked out from those -- 96 full, 74 compact, 28 line -- so no
-  fixed height can cancel a change to a padding or a band. **The space under the last band is the
+  (24), a description line (15, two of them), the meta band (16), the 8 between a full item's
+  description and its meta band (`CARD_ITEM_META_GAP_PX`, a track of the item's grid, so the meta
+  band has the same room under a one-line description as under two) and the 8 between a compact
+  item's two bands. Each size's height is worked out from those -- 104 full, 74 compact, 28 line --
+  so no fixed height can cancel a change to a padding, a band or that gap. **The space under the last band is the
   space over the first**: one padding serves both, the title's line is its band and the meta band is
   a badge's height, so there is 13 px over the title and 13 px under the badges. `CardItem.tsx`
   types no length of its own.
 - **The space between items is the collection's.** A card item has no margin. A list panel draws its
   items in one `<ul role="list" class="cardList" data-card-list>`, each alone in an `<li>`, and that
-  list owns the gap between them and the space over the first: `cardListGap` (4 full, 8 compact, 0
-  line) and `cardListPaddingTop` in `src/shell/layoutTokens.ts`. The rule holds at every level:
+  list owns the gap between them and the space over the first: `cardListGap` (8 for a full or a compact
+  item, 0 for a line) and `cardListPaddingTop` in `src/shell/layoutTokens.ts`. The rule holds at every level:
   spacing comes from the wrapper's gap, never from a margin on a card item, a `PanelFrame`, a row
   or a list ([A page is rows of panels](#a-page-is-rows-of-panels)).
 - **The item size is the panel's, never an item's.** `density: "full" | "compact" | "line"` is a
@@ -708,8 +710,10 @@ is still Active Cards.
   The same answer worked out from the tokens (`listPageSize`: the frame 117, a row of chips 26 with
   `filterRowGap` between two, a lead chart 153, a foot note 32, a status line 48) is the first
   paint's page, so nothing jumps, and the page wherever there is no layout to measure -- a narrow
-  page, where a panel grows with its items, and the tests. Measured, at 1280 wide: four full items
-  (three while a status line shows), five compact, eleven log lines under the chart. The pager is in
+  page, where a panel grows with its items, and the tests. Under a chip row the list drops its own top
+  padding, so the sum takes it off the chrome there. From `listPageSize`, and as measured at 1280
+  wide: four full items with no chip row, three under a chip row or a status line; five compact;
+  eleven log lines under the chart. The pager is in
   the foot's centre, drawn only when there is a second page: Previous and Next, `Page 2 of 5`, and
   the arrow keys while it has focus. The kind sends the page back to the first when a filter chip, a
   picker or the search changes, and clamps it when the list shrinks.
@@ -1858,7 +1862,7 @@ paragraph:
 | `src/modules/ado/systemPanels.test.ts` | The System page's panels, read from `systemCards`: each that draws a list is a `ListPanel` (Test Health and the Log, so a row's two panels are one height), and a panel that is not one and draws rows is named with its reason (Environment, Modules, Burn) |
 | `src/shell/kinds/listRoom.test.ts` | The room a list has, from boxes handed in: from the list's top under its padding down to the foot, what sits above it and a line under the foot each taking its height, the foot row's room kept free while none is drawn, and nothing where the panel has no fixed height or there is no layout |
 | `src/shell/kinds/ListPanel.test.tsx` | The measured page size -- the formula at several rooms down to one item, the component following a handed-in room, watching the panel and what sits above the list, and keeping the page's first item in view when a resize changes the page; the page size as a sum over the panel's chrome, a full page always fitting and one more item never; the pager at five and not at four, its `Page 2 of 5` and arrow keys; a chip, the search and a picker each returning to page 1, the page clamped when the list shrinks; `empty` against `filteredEmpty`; the header, foot, status and lead slots; the compact density (five a page, no description band), a smaller page under more chrome, and the panel's height the same at every density; and nine things a panel cannot say, as compile errors |
-| `src/shell/CardItem.test.tsx` | One item shape whatever the text: the same classes with a long title, a long description and none; the clamp in CSS and the text whole in the DOM; a plain element, not a Fluent `Card`; a plain-text title with no tooltip; one exposed action and the menu; the meta band's thumb, progress, badges and text; the compact item, the title line and the meta band at one shorter height; the one-band line item |
+| `src/shell/CardItem.test.tsx` | One item shape whatever the text: the same classes with a long title, a long description and none; the clamp in CSS and the text whole in the DOM; a plain element, not a Fluent `Card`; a plain-text title with no tooltip; one exposed action and the menu; the meta band's thumb, progress, badges and text; the meta band one gap under the description -- a track of the item's grid, the band on the row after it, no margin on a band, the same under one line, two or none; the compact item, the title line and the meta band at one shorter height; the one-band line item |
 | `src/modules/ado/PromptStatus.test.tsx` | Active Cards as a list panel: four card items a page, the checklist's progress and the facts in the meta band, Open the way in, the state picker, and the two empty sentences |
 | `src/hooks/usePagination.test.ts` | Clamping a page that is out of range, paging independently of the filtered set's size, and controlled mode where the caller's `onPageChange` is the only writer |
 

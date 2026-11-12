@@ -154,8 +154,11 @@ room is kept free while no foot is drawn, so a pager appearing never changes the
 
 The same answer from the tokens, `listPageSize(chrome)` (`LIST_CHROME_PX`: frame 117, a chip row 26
 with `filterRowGap` between two, a lead 153, a foot note 32, a status line 48), is the first paint's
-page and the page where there is no layout to measure (a narrow page, the tests). Measured at 1280
-wide: four full items (three while a status line shows), five compact, eleven lines under a lead.
+page and the page where there is no layout to measure (a narrow page, the tests). Under a chip row
+the list drops its own top padding, so the sum takes that padding off the chrome there. From
+`listPageSize`, and as measured at 1280 wide: four full items with no chip row, three under one or
+two chip rows (with a foot note or a status line as well) or under a status line alone; five compact;
+sixteen lines, eleven under a lead.
 
 The page is held as the index of its first item, so a resize that changes the page size keeps that
 item in view. The pager (`ListPager`, private to the kind) is in the foot's centre, drawn only past one
@@ -165,7 +168,8 @@ shrinks.
 
 **The list.** The items are drawn in one wrapper, `<ul role="list" class="cardList" data-card-list>`
 (`CARD_LIST_CLASS`), each alone in an `<li>`. The list owns the space between its items and over the
-first, `cardListGap` (Fluent's XS 4 px for full, S 8 px for compact, 0 for line) and
+first, `cardListGap` (Fluent's S 8 px for full and compact, one value for every item that is a card;
+0 for line, a log's rows) and
 `cardListPaddingTop` in `src/shell/layoutTokens.ts`, each with a px twin for the sums; an item has no
 margin. The list is handed to `PanelFrame` through its `body` slot.
 
@@ -211,9 +215,10 @@ their sum, so a change to a padding or a band changes the height with it:
 | `CARD_ITEM_TITLE_BAND_PX` | 24 | The title band: the title's line height and the controls' height. |
 | `CARD_ITEM_DESCRIPTION_LINE_PX` | 15 | One description line; `CARD_ITEM_DESCRIPTION_LINES` (2) of them make the band. |
 | `CARD_ITEM_META_BAND_PX` | 16 | The meta band: a small badge's height. |
+| `CARD_ITEM_META_GAP_PX` | 8 | Between a full item's description band and its meta band, a track of the item's grid; `tokens.spacingVerticalS`. |
 | `CARD_ITEM_COMPACT_BAND_GAP_PX` | 8 | Between a compact item's two bands; `tokens.spacingVerticalS`. |
 | `CARD_ITEM_LINE_BAND_PX` | 28 | A line item's one band. |
-| `CARD_ITEM_HEIGHT_PX` | 96 | Full, derived: 1 + 12 + 24 + 30 + 16 + 12 + 1. |
+| `CARD_ITEM_HEIGHT_PX` | 104 | Full, derived: 1 + 12 + 24 + 30 + 8 + 16 + 12 + 1. |
 | `CARD_ITEM_COMPACT_HEIGHT_PX` | 74 | Compact, derived: 1 + 12 + 24 + 8 + 16 + 12 + 1. |
 | `CARD_ITEM_LINE_HEIGHT_PX` | 28 | Line: its band. |
 

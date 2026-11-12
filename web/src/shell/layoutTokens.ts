@@ -21,15 +21,17 @@ export const pageRowGap = tokens.spacingVerticalL;
  *  A Fluent spacing token, and a multiple of 4 px. */
 export const panelGap = tokens.spacingHorizontalL;
 
-/** The gap between two card items in a list panel's list, by item size. */
+/** The gap between two card items in a list panel's list: one value for every
+ *  item that is a card, full or compact (Fluent's S, 8 px). A line item is a
+ *  row of a log, not a card, and sits flush against the next. */
 export const cardListGap: Record<CardItemSize, string> = {
-  full: tokens.spacingVerticalXS,
+  full: tokens.spacingVerticalS,
   compact: tokens.spacingVerticalS,
   line: "0",
 };
 
 /** `cardListGap`, in px, for the sums. */
-export const cardListGapPx: Record<CardItemSize, number> = { full: 4, compact: 8, line: 0 };
+export const cardListGapPx: Record<CardItemSize, number> = { full: 8, compact: 8, line: 0 };
 
 /** The space over the first item, by item size: one gap, so the list sits off
  *  the filter chips or the header as its items sit off each other. */

@@ -13,7 +13,8 @@ import {
   listPageSize,
   pageSizeForRoom,
 } from "../pageSize";
-import { cardListPaddingTopPx } from "../layoutTokens";
+import { cardListGapPx, cardListPaddingTopPx } from "../layoutTokens";
+import { CARD_ITEM_HEIGHTS_PX } from "../cardItemTokens";
 import * as listRoom from "./listRoom";
 import { PANEL_MAX_HEIGHT_PX, PANEL_MIN_HEIGHT_PX } from "../panelHeight";
 import { expectListPanelShape, expectSentenceInInfoTip, panelOf } from "./panelShapeAssert";
@@ -38,21 +39,30 @@ const none = { icon, title: "No notes yet" };
 const panel = () => panelOf(screen.getByText("Notes"));
 const titles = () =>
   Array.from(panel().querySelectorAll("[data-card-item] strong")).map((s) => s.textContent);
+/** The room, in px, that exactly `n` full items take: the items and the gaps between them. */
+const fullRoom = (n: number) => n * CARD_ITEM_HEIGHTS_PX.full + (n - 1) * cardListGapPx.full;
 
 describe("the page size", () => {
   it("is worked out from the panel's fixed height and its own chrome, never typed", () => {
     expect(PANEL_MIN_HEIGHT_PX.list).toBe(592);
     expect(PANEL_MAX_HEIGHT_PX.list).toBe(592);
-    expect(LIST_ITEM_PITCH_PX).toEqual({ full: 100, compact: 82, line: 28 });
-    // Full items: four, with no chip row, with one, with two, and over a foot note.
-    expect(LIST_PAGE_SIZE).toBe(4);
+    expect(LIST_ITEM_PITCH_PX).toEqual({
+      full: CARD_ITEM_HEIGHTS_PX.full + cardListGapPx.full,
+      compact: CARD_ITEM_HEIGHTS_PX.compact + cardListGapPx.compact,
+      line: CARD_ITEM_HEIGHTS_PX.line + cardListGapPx.line,
+    });
+    expect(LIST_ITEM_PITCH_PX).toEqual({ full: 112, compact: 82, line: 28 });
+    // Full items: four with no chip row; three under one chip row, under two,
+    // and over a foot note or under a status line as well.
     expect(listPageSize({ density: "full" })).toBe(4);
-    expect(listPageSize({ density: "full", filterRows: 1 })).toBe(4);
-    expect(listPageSize({ density: "full", filterRows: 2 })).toBe(4);
-    expect(listPageSize({ density: "full", filterRows: 1, footNote: true })).toBe(4);
-    // More chrome is a smaller page, by the same sum.
+    expect(LIST_PAGE_SIZE).toBe(listPageSize({ density: "full", filterRows: 1 }));
+    expect(LIST_PAGE_SIZE).toBe(3);
+    expect(listPageSize({ density: "full", filterRows: 2 })).toBe(3);
+    expect(listPageSize({ density: "full", filterRows: 1, footNote: true })).toBe(3);
     expect(listPageSize({ density: "full", filterRows: 2, footNote: true })).toBe(3);
     expect(listPageSize({ density: "full", filterRows: 1, footNote: true, status: true })).toBe(3);
+    // More chrome is a smaller page, by the same sum: a lead chart leaves two.
+    expect(listPageSize({ density: "full", filterRows: 1, lead: true })).toBe(2);
     // Compact items: five fit.
     expect(listPageSize({ density: "compact" })).toBe(5);
     // Line items: sixteen, or eleven under a lead chart.
@@ -84,13 +94,14 @@ describe("the page size", () => {
 
 describe("the page size, measured", () => {
   it("is the room divided by an item and the list's gap: n items and the n - 1 gaps between them", () => {
-    // Full: 96 px items, 4 px apart.
-    expect(pageSizeForRoom("full", 96)).toBe(1);
-    expect(pageSizeForRoom("full", 195)).toBe(1);
-    expect(pageSizeForRoom("full", 196)).toBe(2);
-    expect(pageSizeForRoom("full", 396)).toBe(4);
-    expect(pageSizeForRoom("full", 495)).toBe(4);
-    expect(pageSizeForRoom("full", 496)).toBe(5);
+    // Full: 104 px items, 8 px apart. One more item fits at exactly its room, and not a px sooner.
+    expect([fullRoom(1), fullRoom(2), fullRoom(4), fullRoom(5)]).toEqual([104, 216, 440, 552]);
+    expect(pageSizeForRoom("full", fullRoom(1))).toBe(1);
+    expect(pageSizeForRoom("full", fullRoom(2) - 1)).toBe(1);
+    expect(pageSizeForRoom("full", fullRoom(2))).toBe(2);
+    expect(pageSizeForRoom("full", fullRoom(4))).toBe(4);
+    expect(pageSizeForRoom("full", fullRoom(5) - 1)).toBe(4);
+    expect(pageSizeForRoom("full", fullRoom(5))).toBe(5);
     // Compact: 74 px items, 8 px apart.
     expect(pageSizeForRoom("compact", 402)).toBe(5);
     expect(pageSizeForRoom("compact", 401)).toBe(4);
@@ -152,7 +163,7 @@ describe("ListPanel, measuring its list", () => {
   });
 
   it("the measured room decides the page, down to one item", () => {
-    room = 496;
+    room = fullRoom(5);
     const { rerender } = render(
       <ListPanel title="Notes" items={notes(9)} item={toItem} empty={none} />,
     );
@@ -165,7 +176,7 @@ describe("ListPanel, measuring its list", () => {
   });
 
   it("watches the panel and what sits above the list, and a resize that changes the page keeps its first item in view", () => {
-    room = 396;
+    room = fullRoom(4);
     render(
       <ListPanel
         title="Notes"
@@ -181,12 +192,12 @@ describe("ListPanel, measuring its list", () => {
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
     expect(titles()).toEqual(["a-5", "a-6", "a-7", "a-8"]);
     // The panel loses room: three fit. The page that holds a-5 is shown.
-    room = 300;
+    room = fullRoom(3);
     act(() => notify());
     expect(titles()).toEqual(["a-4", "a-5", "a-6"]);
     expect(screen.getByText("Page 2 of 4")).toBeTruthy();
     // It gains room again: five fit, and a-5 is still on the page shown.
-    room = 496;
+    room = fullRoom(5);
     act(() => notify());
     expect(titles()).toEqual(["a-1", "a-2", "a-3", "a-4", "a-5"]);
   });
@@ -224,7 +235,7 @@ describe("ListPanel's paging", () => {
     expect(panel().querySelector("[data-row-description]")).toBeNull();
   });
 
-  it("more chrome is a smaller page: two chip rows over a foot note hold three full items, and so does one row under a status", () => {
+  it("more chrome is a smaller page: two chip rows over a foot note hold three full items, and so does one row over a foot note and under a status", () => {
     const rows: FilterRow[] = ["Filter notes", "Filter by kind"].map((label) => ({
       label,
       chips: [{ id: "all", label: "All", count: 9, active: true, onSelect: () => undefined }],
@@ -240,7 +251,8 @@ describe("ListPanel's paging", () => {
       />,
     );
     expectListPanelShape(panel(), { titles: ["a-1", "a-2", "a-3"], total: 9, chips: true });
-    // One chip row over a foot note holds four; a status shown above them takes one.
+    // A chip row takes the fourth item; one row with a foot note and a status
+    // line shown above the items still holds three.
     rerender(
       <ListPanel
         title="Notes"
@@ -372,30 +384,33 @@ describe("ListPanel's paging", () => {
   it("a chip, the search and a picker each send the list back to its first page", () => {
     render(<Filtered />);
     const next = () => fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    // Under the chip row a page is three: seven A notes are three pages, twelve B notes four.
+    expect(LIST_PAGE_SIZE).toBe(3);
     next();
-    expect(titles()).toEqual(["a-5", "a-6", "a-7"]);
+    expect(titles()).toEqual(["a-4", "a-5", "a-6"]);
     fireEvent.click(screen.getByRole("radio", { name: /^B/ }));
-    expect(screen.getByText("Page 1 of 3")).toBeTruthy();
+    expect(screen.getByText("Page 1 of 4")).toBeTruthy();
     next();
     // Back on the first chip: its first page, not the page it was left on.
     fireEvent.click(screen.getByRole("radio", { name: /^A/ }));
-    expect(screen.getByText("Page 1 of 2")).toBeTruthy();
+    expect(screen.getByText("Page 1 of 3")).toBeTruthy();
     fireEvent.click(screen.getByRole("radio", { name: /^B/ }));
     next();
     fireEvent.change(screen.getByRole("searchbox", { name: "Search notes" }), {
       target: { value: "b-1" },
     });
-    // b-1, b-10, b-11, b-12: one page.
-    expect(titles()).toEqual(["b-1", "b-10", "b-11", "b-12"]);
+    // b-1, b-10, b-11, b-12: two pages, and the first is shown.
+    expect(titles()).toEqual(["b-1", "b-10", "b-11"]);
+    expect(screen.getByText("Page 1 of 2")).toBeTruthy();
     fireEvent.change(screen.getByRole("searchbox", { name: "Search notes" }), {
       target: { value: "" },
     });
-    expect(screen.getByText("Page 1 of 3")).toBeTruthy();
+    expect(screen.getByText("Page 1 of 4")).toBeTruthy();
     next();
     fireEvent.change(screen.getByRole("combobox", { name: "Order" }), { target: { value: "old" } });
-    expect(screen.getByText("Page 1 of 3")).toBeTruthy();
+    expect(screen.getByText("Page 1 of 4")).toBeTruthy();
     expectListPanelShape(panel(), {
-      titles: ["b-1", "b-2", "b-3", "b-4"],
+      titles: ["b-1", "b-2", "b-3"],
       total: 12,
       chips: true,
     });
