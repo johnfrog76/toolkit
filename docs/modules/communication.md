@@ -78,7 +78,8 @@ tkConfig -Set managerWorkflow.communication.recipients.mom.webhookEnv=TEAMS_WEBH
 ```
 
 That writes `config.local.json` (top-level, this machine's), and `tkEnv`'s Teams delivery row then
-names `mom` among the recipients. The rest of `managerWorkflow` -- `retroChannel`, `postRetroSummary` --
+names `mom` among the recipients. The System page's Environment card lists it too, as *Every Space*,
+with whether its variable is set ([`/env`'s `communication` block](#envs-communication-block)). The rest of `managerWorkflow` -- `retroChannel`, `postRetroSummary` --
 is still the team's block in `config.default.json`, and `tkConfig` refuses it by name.
 
 - **`type`** is `chat` for a **Send webhook alerts to a chat** workflow and `channel` for **Send webhook
@@ -94,7 +95,8 @@ is still the team's block in `config.default.json`, and `tkConfig` refuses it by
 
 A recipient for one Space only -- a team channel -- is the same three fields under the Space:
 `tkConfig -Set spaces.<slug>.communication.recipients.<key>.type=channel` writes `hub.json`, and `-Local`
-this machine's patch instead. A Space's recipient wins over a `managerWorkflow` one with the same key.
+this machine's patch instead. A Space's recipient wins over a `managerWorkflow` one with the same key,
+and the Environment card lists it as *This Space*, while that Space is the active one.
 `tkConfig -Unset` takes one field at a time, and the recipient goes with its last.
 
 ## The verbs
