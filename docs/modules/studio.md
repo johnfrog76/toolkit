@@ -479,17 +479,23 @@ back: the room then shows the note and its thread, and the list shows `#<n>`.
 
 ## Known gaps
 
-- **Using a prompt from the tab** (Start work) is after the flip; today the card's actions are Open, with Copy reference and Copy prompt in its menu.
-- **The agent resolves `agenticExtensionPath` itself** (`agentic_extension_path()` in `agent/core/config.py`),
-  mirroring `Get-P20AgenticExtensionPath`; no shared fixture holds the two together yet.
+Each of these is a block on [Known gaps](../KNOWN-GAPS.md), with its issue:
 
+- **Using a prompt from the tab** (Start work) is after the flip; today the card's actions are Open, with Copy reference and Copy prompt in its menu
+  ([A prompt is not started from the Prompts card](../KNOWN-GAPS.md#a-prompt-is-not-started-from-the-prompts-card)).
+- **The agent resolves `agenticExtensionPath` itself** (`agentic_extension_path()` in `agent/core/config.py`),
+  mirroring `Get-P20AgenticExtensionPath`; no shared fixture holds the two together yet
+  ([The agent and the CLI each resolve the agentic extension path](../KNOWN-GAPS.md#the-agent-and-the-cli-each-resolve-the-agentic-extension-path)).
 - **No designs-in-flight count and no specs on a row yet.** Those are the foyer's S3 numbers (the spec's
-  "S3 -- the foyer"); a row carries the pane's counts today.
+  "S3 -- the foyer"); a row carries the pane's counts today
+  ([The foyer counts no designs or specs](../KNOWN-GAPS.md#the-foyer-counts-no-designs-or-specs)).
 - **Promote files into the Space you are in.** A note for another Space says so and asks you to switch;
-  the verb does not reach into a Space you are not in, the way every `NewItem` acts on the active Space.
+  the verb does not reach into a Space you are not in, the way every `NewItem` acts on the active Space
+  ([Promote files only into the Space you are in](../KNOWN-GAPS.md#promote-files-only-into-the-space-you-are-in)).
 - **Promotion is not the move.** The thread is opened; moving the note into its product's repo
   (`design/` beside `spec/`, D-S10) is a commit, the engineer's or the agent's, and nothing here offers it
-  (the spec's open item, "Promotion mechanics").
+  (the spec's open item, "Promotion mechanics")
+  ([Promote files only into the Space you are in](../KNOWN-GAPS.md#promote-files-only-into-the-space-you-are-in)).
 - **A repo's rows move only where this machine names its checkout, and show the move once it is pushed; its
   search inside sees the default branch only.** The hub's rows move through `MoveDesign -Hub` (L3); a repo's
   move through `MoveDesign -Space <slug>` in the clone `spaceCheckouts.<slug>.path` names, staged and never
@@ -498,9 +504,29 @@ back: the room then shows the note and its thread, and the list shows `#<n>`.
   meanwhile is refused by the verb, which reads the clone. A repo's
   Search inside (L2b) is GitHub's code search: it reads the default branch and lags a push by minutes,
   so a design on a branch, or pushed just now, is not found, and the note under the results says so; the hub
-  is searched on disk as it is. Until a product is stamped, its tab is a count and the fix named.
+  is searched on disk as it is. Until a product is stamped, its tab is a count and the fix named
+  ([A repository's designs move only through a named checkout](../KNOWN-GAPS.md#a-repositorys-designs-move-only-through-a-named-checkout)).
 - **No comment from the reading room.** The thread is read, not answered: commenting stays on github.com
-  until a reply route exists (the S2 bullet left open).
+  until a reply route exists (the S2 bullet left open)
+  ([Promote files only into the Space you are in](../KNOWN-GAPS.md#promote-files-only-into-the-space-you-are-in)).
+- **A retired Space is still on the avatar menu's Space list** -- the switcher's offered rule was not
+  changed when retiring was built ([A retired Space stays on the Space list](../KNOWN-GAPS.md#a-retired-space-stays-on-the-space-list)).
+- **Every Space is read by the one `gh` login.** A second GitHub login (a work account beside a
+  personal one) is not built: a repository only the other login can see reads `Visibility unknown` and
+  `not visible to this login` in the **Add owner/name** row, and can still be added
+  ([Every Space is read by one gh login](../KNOWN-GAPS.md#every-space-is-read-by-one-gh-login)).
+- **A list stops at 1000.** An owner with more repositories than that, or more shared with you, lists
+  the first 1000 and says so; one past them is typed as `owner/name`, which reads it the same way
+  ([New Space lists the first 1000 repositories](../KNOWN-GAPS.md#new-space-lists-the-first-1000-repositories)).
+- **One Space per +.** Several at once, discovering an Azure DevOps organisation's projects from
+  the dialog, and creating a GitHub repository are not built; an Azure DevOps Space is added from the
+  terminal (`NewSpace <slug> -Address <url>`, then `Connect <slug> -Discover`)
+  ([New Space adds one existing GitHub repository at a time](../KNOWN-GAPS.md#new-space-adds-one-existing-github-repository-at-a-time)).
+
+### True by design
+
+These are choices, not omissions, and are not on that list:
+
 - **One ledger read past the cache.** A cold foyer is one `gh api graphql` call per twenty repositories
   plus one `gh run list` per repository, then kept on disk ([The routes](#the-routes)). Fine for a
   studio; the run listing grows with every repository. A non-GitHub row is one folder read of its own,
@@ -509,22 +535,5 @@ back: the room then shows the note and its thread, and the list shows `#<n>`.
   on purpose -- a read per visit for work that is done is not worth it.
 - **An archived Space still has a row**, marked `archived`, under All and Archive -- that is what
   retiring it means; removing it is what takes the row away.
-- **A retired Space is still on the avatar menu's Space list** -- the switcher's offered rule was not
-  changed when retiring was built ([A retired Space stays on the Space list](../KNOWN-GAPS.md#a-retired-space-stays-on-the-space-list)).
-- **Every Space is read by the one `gh` login.** A second GitHub login (a work account beside a
-  personal one) is not built: a repository only the other login can see reads `Visibility unknown` and
-  `not visible to this login` in the **Add owner/name** row, and can still be added
-  ([Every Space is read by one gh login](../KNOWN-GAPS.md#every-space-is-read-by-one-gh-login)).
-- **A list stops at 1000.** An owner with more repositories than that, or more shared with you, lists
-  the first 1000 and says so; one past them is typed as `owner/name`, which reads it the same way.
-- **One Space per +.** Several at once, discovering an Azure DevOps organisation's projects from
-  the dialog, and creating a GitHub repository are not built; an Azure DevOps Space is added from the
-  terminal (`NewSpace <slug> -Address <url>`, then `Connect <slug> -Discover`).
 - **The filter is the one arrangement.** No tabs, no order of your own, no drag, no group you make, and no
   Hidden entry until hiding a Space is built -- the filter issue's body, still design.
-
-Known gaps: [The foyer counts no designs or specs](../KNOWN-GAPS.md#the-foyer-counts-no-designs-or-specs),
-[Promote files only into the Space you are in](../KNOWN-GAPS.md#promote-files-only-into-the-space-you-are-in),
-[A repository's designs move only through a named checkout](../KNOWN-GAPS.md#a-repositorys-designs-move-only-through-a-named-checkout),
-[A retired Space stays on the Space list](../KNOWN-GAPS.md#a-retired-space-stays-on-the-space-list) and
-[Every Space is read by one gh login](../KNOWN-GAPS.md#every-space-is-read-by-one-gh-login).

@@ -420,6 +420,7 @@ the engine takes whatever is in that variable at face value. Use `-WhatIf` from 
 | `web/.../ManagerDetailPage.test.tsx` | The read view's Carried-from line: the agent's sentence drawn for `stale`, `missing` and `absent`, and nothing for `ok` or when the fields are absent |
 | `web/.../cliBridge.test.ts` (three of its cases) | `MeetingAgenda`'s argv: `-Date`, `-Type` only for a series that is not the 1:1, then the one switch spelt the script's way |
 | `web/.../sendButton.test.ts` | The send button's three states, including that it is absent rather than disabled when the workflow has no send, and that what goes out is the Agenda and never the self-assessment |
+| `web/.../EnvCard.recipients.test.tsx` | The Environment card's Teams recipients: a `managerWorkflow` recipient labelled Every Space and an org one This Space, each with its variable set or named unset; and with `features.communication` off, no row drawn and the rows' chunk never fetched even when `/env` carries the block |
 | `web/.../registry.communication.test.tsx` | The registry contract from this module's side: off contributes no route, nav or card; on contributes exactly these seven routes |
 | `npm run smoke -- --modules=on` | In a browser: lists the three fixture sessions, reads their stages, finds the retro session's send button disabled and naming its variable, reaches the session page through `Edit / send`, and finds Close on exactly one session without pressing it |
 
@@ -427,11 +428,23 @@ The three PowerShell suites are registered in `Tests/Test-Toolkit.ps1` (`-SendTe
 
 ## Known gaps
 
-| # | Gap |
+| # | Gap | Known gap |
+| --- | --- | --- |
+| — | An agenda line becomes a card from the terminal only (`NewPrompt -From`): the Meetings page has no "make a card" action on an agenda line, which belongs to the record's reading room, not yet built | [An agenda line becomes a card from the terminal only](../KNOWN-GAPS.md#an-agenda-line-becomes-a-card-from-the-terminal-only) |
+| — | A card made from an agenda line names its record; the record does not name the card. Whether the agenda gets a line back (`-> card K7M2`) is undecided | [An agenda line becomes a card from the terminal only](../KNOWN-GAPS.md#an-agenda-line-becomes-a-card-from-the-terminal-only) |
+
+Three more are described where you meet them, earlier in this document:
+[A meeting row draws its actions side by side](../KNOWN-GAPS.md#a-meeting-row-draws-its-actions-side-by-side),
+[`Config -Set` cannot declare a Teams recipient](../KNOWN-GAPS.md#config--set-cannot-declare-a-teams-recipient) and
+[A webhook set after the agent started is not seen](../KNOWN-GAPS.md#a-webhook-set-after-the-agent-started-is-not-seen).
+
+### True by design
+
+These are choices, not omissions, and are not on [Known gaps](../KNOWN-GAPS.md):
+
+| # | Choice |
 | --- | --- |
 | — | Recipients are read from two blocks, `managerWorkflow` and the active Space's, and `/env` says which (`scope`); the Environment card draws it. A config wizard has to show both |
 | — | Prep has no agent pass: the shipped prompt has two passes (Plan and Retro), not three |
-| — | An agenda line becomes a card from the terminal only (`NewPrompt -From`): the Meetings page has no "make a card" action on an agenda line, which belongs to the record's reading room, not yet built |
-| — | A card made from an agenda line names its record; the record does not name the card. Whether the agenda gets a line back (`-> card K7M2`) is undecided |
 | — | `Timer` is module-local. If a second module ever wants one, that is the moment to promote it to `shared/` |
 | — | `/rewrite` keeps its own copy of the Messages API call rather than sharing the ADO module's. Deliberate — a module reaching into a sibling for a helper is how two modules stop being separable — but it is thirty duplicated lines |
