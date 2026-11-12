@@ -87,8 +87,6 @@ const FRAME_NOT_YET_MOVED: Record<string, string> = {
   "modules/ado/SprintVelocity.tsx": "ChartPanel",
   "modules/ado/WorkBreakdown.tsx": "ChartPanel",
   "modules/communication/OneOnOne.tsx": "ListPanel: Meetings",
-  "modules/growth/Goals.tsx": "ListPanel",
-  "modules/growth/ReviewArchive.tsx": "ListPanel: Reviews",
   "modules/growth/SkillsSnapshot.tsx": "merged into Work breakdown, as its legend",
   "modules/lounge/GoBoard.tsx": "ScenePanel",
   "modules/lounge/TicTacToe.tsx": "ScenePanel",
@@ -127,16 +125,12 @@ const CARD_NOT_YET_MOVED: string[] = [
   "modules/ado/PRCommentsDetail.tsx",
   "modules/ado/PRCommentsList.tsx",
   "modules/communication/OneOnOne.tsx",
-  "modules/growth/Goals.tsx",
-  "modules/growth/ReviewArchive.tsx",
   "modules/organize/RemindersCard.tsx",
 ];
 
 /** Panels still drawing their own pager. */
 const PAGER_NOT_YET_MOVED: string[] = [
   "modules/communication/OneOnOne.tsx",
-  "modules/growth/Goals.tsx",
-  "modules/growth/ReviewArchive.tsx",
   "modules/organize/RemindersCard.tsx",
 ];
 
@@ -324,6 +318,8 @@ describe("the panel rules, over every source file", () => {
       "modules/ado/TestHealth.tsx",
       "modules/ado/ToolkitLog.tsx",
       "modules/deck/DeckPickerCard.tsx",
+      "modules/growth/Goals.tsx",
+      "modules/growth/ReviewArchive.tsx",
       "modules/studio/DesignsCard.tsx",
       "modules/studio/FoyerCard.tsx",
       "modules/studio/PromptsCard.tsx",
