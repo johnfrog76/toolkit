@@ -773,9 +773,12 @@ foreach ($row in $offeredTable) {
     Assert-True $row.why ((@($got).Count -eq 1) -eq [bool]$row.offered) "got $(@($got).Count) org(s)"
 }
 $retiredOrg = [pscustomobject]@{ slug = 'gone'; status = 'archive' }
+# Assigned first, as the loop above does: both return `, $list`, so @(<call>) would
+# count the empty list itself as one item.
+$keptRetired = Select-P20OfferedSpaces -Spaces @($retiredOrg) -ActiveSpace 'other' -Dismissed $false
+$droppedRetired = Select-P20SwitcherSpaces -Spaces @($retiredOrg) -ActiveSpace 'other' -Dismissed $false
 Assert-True 'the offered list keeps a retired Space; only the switcher drops it' (
-    @(Select-P20OfferedSpaces -Spaces @($retiredOrg) -ActiveSpace 'other' -Dismissed $false).Count -eq 1 -and
-    @(Select-P20SwitcherSpaces -Spaces @($retiredOrg) -ActiveSpace 'other' -Dismissed $false).Count -eq 0)
+    @($keptRetired).Count -eq 1 -and @($droppedRetired).Count -eq 0) "offered $(@($keptRetired).Count), switcher $(@($droppedRetired).Count)"
 
 # -- spaces.<slug>.projects: the field discovery writes (settings by workflow W2) --
 Write-Host ''
@@ -913,6 +916,8 @@ try {
     $retiredIn = & pwsh -NoProfile -Command (& $switchTo 'retired-one') 2>&1 | Out-String
     $written4 = (Invoke-LockRetry 'read of a scratch file' { Get-Content $localPath -Raw }) | ConvertFrom-Json
     Assert-True 'SwitchSpace <slug> to a retired Space still switches' ($retiredIn -match 'SWITCH-CODE=0' -and $written4.activeSpace -eq 'retired-one') "$retiredIn $($written4.activeSpace)"
+    $listedIn = & pwsh -NoProfile -File $switchScript 'Status' 2>&1 | Out-String
+    Assert-True 'and the Space list names it only once you are in it' ($listed -notmatch 'retired-one' -and $listedIn -match '->\s*retired-one') "$listed $listedIn"
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
