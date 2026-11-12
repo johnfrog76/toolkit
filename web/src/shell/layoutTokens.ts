@@ -4,12 +4,22 @@ import type { CardItemSize } from "./cardItemTokens";
 /** The space between things: one rule at every level -- spacing comes only
  *  from the wrapper's gap, never from a margin on the thing wrapped. A card
  *  item has no margin, and neither does a panel; the list that holds the items
- *  sets the gap between them. This file is where each wrapper's gap is named.
+ *  sets the gap between them. This file is where each wrapper's gap is named,
+ *  from the page down: the page's rows, a row's panels, a list's items, a
+ *  panel's filter rows.
  *
  *  Every spacing value in the panel layer is one of Fluent's spacing tokens,
  *  on the 4 px grid (XS 4, S 8, M 12, L 16...). The styles use the token; the
  *  number beside it is the same length for the height sums, and a test holds
  *  each pair equal. */
+
+/** The gap between two rows of panels on a page: the page wrapper's. A Fluent
+ *  spacing token, and a multiple of 4 px. */
+export const pageRowGap = tokens.spacingVerticalL;
+
+/** The gap between the panels in one row, side by side or stacked: the row's.
+ *  A Fluent spacing token, and a multiple of 4 px. */
+export const panelGap = tokens.spacingHorizontalL;
 
 /** The gap between two card items in a list panel's list, by item size. */
 export const cardListGap: Record<CardItemSize, string> = {

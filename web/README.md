@@ -113,7 +113,8 @@ web/
     │   ├── api.ts          createApi, and exactly two endpoints: /env and /switch-mode
     │   ├── registry.ts     ToolkitModule, CardContext, and the four functions that read them
     │   ├── registry.test.tsx
-    │   └── cards.tsx       ShellContext: the card pages and the filter tuple, passed down
+    │   └── cards.tsx       ShellContext: the card pages and the filter tuple, passed down;
+    │                       PageGrid and PanelRow, a page's rows of panels
     ├── modules/ado/      the ADO prompt-engineering module -- always on, no flag
     │   ├── index.tsx       the ToolkitModule export: routes, nav, homeCards, systemCards
     │   ├── routes.tsx      AdoHome and AdoSystem -- what sits around the shell's card grid
@@ -627,8 +628,8 @@ is still Active Cards.
   is a compile error (`ListPanel.test.tsx` holds nine of them with `@ts-expect-error`).
 - **A list panel is 592 px: its minimum and its maximum.** `PANEL_MIN_HEIGHT_PX` in `panelHeight.ts`
   names a floor per kind and `PANEL_MAX_HEIGHT_PX` a cap for the list kind, the same figure, both
-  applied above the grid's two-column breakpoint (`PANEL_GRID_MIN_WIDTH_PX`, which the page grid
-  reads too). The bounds are on the panel, and the grid's rows still stretch its neighbours. The
+  applied above the two-column breakpoint (`PANEL_GRID_MIN_WIDTH_PX`, which a page's rows read
+  too). The bounds are on the panel, and its row still stretches its neighbour. The
   other kinds (status, stat, chart, scene) have the floor only. The reference is the Azure DevOps
   dual-entry row -- Active Cards beside My Work: two 592 px columns 16 px apart, a 24 px header, a
   32 px foot with the pager centred in it, 12 px of padding and 12 px between the parts.
@@ -674,7 +675,8 @@ is still Active Cards.
   items in one `<ul role="list" class="cardList" data-card-list>`, each alone in an `<li>`, and that
   list owns the gap between them and the space over the first: `cardListGap` (4 full, 8 compact, 0
   line) and `cardListPaddingTop` in `src/shell/layoutTokens.ts`. The rule holds at every level:
-  spacing comes from the wrapper's gap, never from a margin on a card item or a `PanelFrame`.
+  spacing comes from the wrapper's gap, never from a margin on a card item, a `PanelFrame`, a row
+  or a list ([A page is rows of panels](#a-page-is-rows-of-panels)).
 - **The item size is the panel's, never an item's.** `density: "full" | "compact" | "line"` is a
   prop on `ListPanel`, and the three sizes are named in `src/shell/cardItemTokens.ts`
   (`CARD_ITEM_HEIGHTS_PX`). A panel whose items never have a description -- My Work and GitHub
@@ -726,7 +728,52 @@ is still Active Cards.
   `loading` and the required `empty` (with `filteredEmpty` for a filter that hid everything) are the
   only other things a body can be.
 
-**The structural test holds it**, in two halves:
+### A page is rows of panels
+
+A page's panels sit in real row elements, so a row can be selected in the browser's developer tools
+with the gap that belongs to it and the panels it stretches together:
+
+```html
+<div data-page-rows>                       <!-- the page: a flex column, gap pageRowGap -->
+  <div class="panelRow" data-panel-row>    <!-- a row: a grid, gap panelGap, stretch -->
+    <!-- panel -->
+    <!-- panel -->
+  </div>
+  <div class="panelRow" data-panel-row>
+    <!-- panel -->
+  </div>
+</div>
+```
+
+- **`PageGrid` (`src/shell/cards.tsx`) is the page.** A page wraps its panels in it and declares no
+  columns of its own. The panels pair two to a row, in the order given. `ModuleCardGrid`, the System
+  page's cards, is a `PageGrid` with the cards' pager under it.
+- **A row holds at most two panels**: side by side above 900 px (`PANEL_GRID_MIN_WIDTH_PX`), stacked
+  below it, and stretched to the taller. The row element is there at every width.
+- **A lone panel keeps half the width**, like every other panel. `PageGrid full` is the list
+  exception -- the Backlog, Design and Docs tabs -- with one panel to a row, across the window.
+- **A page that groups its panels itself passes `PanelRow`.** The Studio tab is
+  `<PanelRow>` Spaces, Hub Designs `</PanelRow>` then `<PanelRow>` Prompts `</PanelRow>`. Panels beside
+  a `PanelRow` pair up on either side of it. A `PanelRow` handed more than two draws further rows,
+  two at a time, and one with nothing in it draws no row.
+- **A card the page leaves out leaves no slot.** `null`, `false`, `undefined` and an empty list are
+  dropped before pairing, and a list or a fragment of panels is laid flat, so a slot's cards pair with
+  the page's own. A panel that is mounted and then draws nothing keeps its place: its neighbour stays
+  where it was, at half width, and a row whose panels all drew nothing takes no room.
+- **Every space is a wrapper's gap, and each is a Fluent spacing token that is a multiple of 4 px.**
+  `src/shell/layoutTokens.ts` names them side by side: `pageRowGap` (the page, between rows;
+  `spacingVerticalL`, 16 px), `panelGap` (a row, between its panels; `spacingHorizontalL`, 16 px),
+  `cardListGap` (a list, between its items) and `filterRowGap` (a panel's filters, between chip
+  rows). Nothing has a margin: not a panel, a card item, a row or a list. The cards' pager is spaced
+  from the rows by a gap too.
+
+`src/shell/pageRows.test.tsx` holds it with `expectPageRowsShape` (`src/shell/pageRowsAssert.ts`):
+every panel is directly inside exactly one `[data-panel-row]`, the page holds rows and nothing else,
+a row holds at most two, the page and each row wear their gap token, and no page, row, panel, list or
+item has a margin. It draws the Studio page, the System page's grid and the Growth page with its
+slot, and real list panels for the margins inside.
+
+**The structural test holds the panel's rules**, in two halves:
 
 - `src/shell/kinds/panelStructure.test.ts` reads every source file and refuses: Fluent `Card`
   imported anywhere but `PanelFrame`; `PanelFrame` imported by a feature module; `ScenePanel` outside
@@ -1798,6 +1845,7 @@ paragraph:
 | `src/hooks/useCurrentTheme.test.ts` | A theme choice in a browser that refuses storage: with every storage call throwing, a chosen theme holds for the session, and a fresh load of the store answers the default again; where storage keeps, a fresh load answers the choice |
 | `src/landing/landing.test.tsx` | The landing page's words are the README's: each piece read out of `README.md` and `THIRD-PARTY-NOTICES.md` is found there as written, a README missing a piece is refused by name, and the page draws exactly those words, band by band, with band 3 absent while it is held ([The landing page](#the-landing-page)) |
 | `src/shell/kinds/panelStructure.test.ts` | The panel rules over every source file: Fluent `Card` only in `PanelFrame`, `PanelFrame` only in the kinds, the pager only in `ListPanel`, `ScenePanel` only in the Lounge, and no height, page size, tooltip, link, subhead, item or body of its own in a file that fills a kind -- with the panels not yet moved on named lists held exact, and the checker run over sources written wrong on purpose |
+| `src/shell/pageRows.test.tsx` | A page's rows of panels: every panel directly inside exactly one `[data-panel-row]`, the page holding rows only, a row of at most two, the gaps as Fluent tokens that are multiples of 4 px, and no margin on a page, a row, a panel, a list or an item -- for the Studio page, the System page's grid and the Growth page |
 | `src/shell/kinds/listRoom.test.ts` | The room a list has, from boxes handed in: from the list's top under its padding down to the foot, what sits above it and a line under the foot each taking its height, the foot row's room kept free while none is drawn, and nothing where the panel has no fixed height or there is no layout |
 | `src/shell/kinds/ListPanel.test.tsx` | The measured page size -- the formula at several rooms down to one item, the component following a handed-in room, watching the panel and what sits above the list, and keeping the page's first item in view when a resize changes the page; the page size as a sum over the panel's chrome, a full page always fitting and one more item never; the pager at five and not at four, its `Page 2 of 5` and arrow keys; a chip, the search and a picker each returning to page 1, the page clamped when the list shrinks; `empty` against `filteredEmpty`; the header, foot, status and lead slots; the compact density (five a page, no description band), a smaller page under more chrome, and the panel's height the same at every density; and nine things a panel cannot say, as compile errors |
 | `src/shell/CardItem.test.tsx` | One item shape whatever the text: the same classes with a long title, a long description and none; the clamp in CSS and the text whole in the DOM; a plain element, not a Fluent `Card`; a plain-text title with no tooltip; one exposed action and the menu; the meta band's thumb, progress, badges and text; the compact item, the title line and the meta band at one shorter height; the one-band line item |

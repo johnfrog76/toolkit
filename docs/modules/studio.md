@@ -231,8 +231,9 @@ is. The foyer draws a row for every Space it offers, chooses a GitHub row's read
 ## The web UI
 
 **Its own tab, `Studio`, at `/studio`**, always there: the nav entry after Growth's and Organize's
-places and before Team Agile's and the Lounge's, laid out like any other tab: cards in the shell's grid
-at half width.
+places and before Team Agile's and the Lounge's, laid out like any other tab, in rows of panels the
+page groups itself: Spaces beside Hub Designs, then Prompts alone at half width (`web/README.md`,
+"A page is rows of panels").
 
 **One card item, and one minimum height.** The three panels -- Spaces, Hub Designs and Prompts -- are
 list panels (`web/src/shell/kinds/ListPanel.tsx`), and a list panel draws every entry as a card item

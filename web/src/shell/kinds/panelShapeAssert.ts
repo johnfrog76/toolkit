@@ -12,7 +12,7 @@ import type { ListChrome, ListDensity } from "../pageSize";
  *  structure and the CSS rules its classes carry. */
 
 /** The CSS rules whose class the element wears: what the browser applies to it. */
-function rulesOf(el: Element): string {
+export function rulesOf(el: Element): string {
   const classes = new Set((el.getAttribute("class") ?? "").split(/\s+/).filter(Boolean));
   return Array.from(document.styleSheets)
     .flatMap((sheet) => Array.from(sheet.cssRules))
