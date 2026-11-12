@@ -123,13 +123,13 @@ web/
     ├── modules/growth/    opt-in, features.growth
     │   ├── index.tsx       export growthModule, plus ReviewArchive and SkillsSnapshot by name
     │   ├── api.growth.ts   tag types Growth, Resume, Reviews
-    │   └── GrowthPage, Goals, GoalDetailPage, SkillsPage, ReviewArchive, SkillsSnapshot
+    │   └── GrowthPage, Goals, GoalDetailPage, SkillsPage, ReviewArchive, SkillsSnapshot (Goals and ReviewArchive are list panels; their dialogs are files beside them)
     ├── modules/communication/   opt-in, features.communication
     │   ├── index.tsx       export communicationModule, the four routes and three redirects
     │   ├── paths.ts        every route path of this module, in one place
     │   ├── api.communication.ts   tag type Manager, and /env's communication block typed here
     │   ├── sendButton.ts   the send button's rule, as a pure function
-    │   └── OneOnOne, ManagerDetailPage, ManagerSessionPage, Timer
+    │   └── OneOnOne, NewMeetingDialog, ManagerDetailPage, ManagerSessionPage, Timer
     ├── modules/organize/   opt-in, features.organize -- the Organize tab
     │   ├── index.tsx       export organizeModule: one route, one nav entry, the header bell, no cards elsewhere
     │   ├── paths.ts        the module's route path, and the router state that opens a bucket
@@ -137,7 +137,7 @@ web/
     │   ├── useOverdueReminders  the past-due slice of the reminders read, polled each minute
     │   ├── api.organize.ts tag type Reminders; GET /api/reminders and the two verbs via the bridge
     │   ├── reminderEntry   a stored due split into the Edit dialog's date and time, and joined back
-    │   └── RemindersCard   bucket chips, snooze menu, edit, done, the quick add
+    │   └── RemindersCard   a list panel: bucket chips, archive, the snooze menu, edit, the quick add
     ├── modules/solitaireAgile/   opt-in, features.solitaireAgile -- today's standup, read and played, and triage
     │   ├── index.tsx       export solitaireAgileModule: four routes (the standup, triage, milestones, the played view, chromeless), one nav entry, no cards elsewhere
     │   ├── paths.ts        the module's route paths and the played deck's id
@@ -547,6 +547,7 @@ row that draws them, and listed here. Two kinds, both named:
 | `issue.unpin` | Unpin | `PinOffRegular` | one record | the Issues tab |
 | `reminder.snooze` | Snooze: *when* | `SnoozeRegular` | one record | Reminders |
 | `reminder.edit` | Edit | `EditRegular` | one record | Reminders |
+| `meeting.edit` | Edit or send | `EditRegular` | one record | Meetings: the session page, where the notes are edited and the retro is sent |
 | `deck.play` | Play | `PlayRegular` | one record | a deck, its row's menu and its page's exposed action |
 | `deck.unarchive` | Unarchive | `ArchiveArrowBackRegular` | one record | a deck's page, once it is archived on this machine |
 | `resume.generate` | Generate resume scaffold | `AddRegular` | one record | the resume |
@@ -1743,10 +1744,10 @@ Routes and nav, all of them spelled once in `paths.ts`:
 
 | Path | Renders |
 | --- | --- |
-| `/communication` | `OneOnOne` -- the one-card landing page the `Meetings` nav points at. A complete session's row offers **Close**, behind a confirm, through `POST /cmd/MeetingAgenda` |
+| `/communication` | `OneOnOne` -- the one-panel landing page the `Meetings` nav points at, a `ListPanel`: chips for All, Current, Past and Archive; each entry opens the read view, and its menu holds **Edit or send** and, on a complete session, **Archive**, behind a confirm, through `POST /cmd/MeetingAgenda` |
 | `/communication/1on1/:filename` | `ManagerDetailPage` -- read view, with an `Edit / send` button to the session page and **Close** on a complete session |
 | `/communication/sessions/new` | `ManagerSessionPage` -- scaffold and edit |
-| `/communication/sessions/:filename` | `ManagerSessionPage` -- edit, the stage ahead (`Prep` / `Retro` / `Plan` through `POST /cmd/MeetingAgenda`, saving the notes first), Close on a complete session, and the send. Reached from `Edit / send` on a meeting row and on the read view |
+| `/communication/sessions/:filename` | `ManagerSessionPage` -- edit, the stage ahead (`Prep` / `Retro` / `Plan` through `POST /cmd/MeetingAgenda`, saving the notes first), Close on a complete session, and the send. Reached from **Edit or send** in a meeting entry's menu and from `Edit / send` on the read view |
 | `/growth/1on1/:filename` | **redirect**, filename forwarded |
 | `/growth/sessions/new` | **redirect** |
 | `/growth/sessions/:filename` | **redirect**, filename forwarded |
@@ -2014,10 +2015,10 @@ come on top of these; the totals are in [`docs/TESTING.md`](../docs/TESTING.md))
 | The retro session has a send button | The third state of `sendButtonState`: shown, because `postRetroSummary` is on |
 | The send button is disabled | And an **enabled** one here is a reason to stop: it means a live webhook is configured in the agent's environment |
 | The send button names `TEAMS_WEBHOOK_MANAGER` | The disabled reason sends a reader to a shell rather than to source. This is the check the whole "read-only" rule exists to make possible -- the button is never pressed |
-| Each meeting row offers `Edit / send` | The page the send button is on can be reached from the list |
+| Each meeting entry's menu offers Edit or send | The page the send button is on can be reached from the list: every entry of the Meetings panel has a `...` menu, and each menu holds **Edit or send** |
 | The read view offers `Edit / send` | And from the page a row lands on |
 | `Edit / send` lands on the session page | The button is pressed -- it navigates, it does not send -- and the URL is `/communication/sessions/2026-02-05.md` |
-| Exactly the complete session offers Close | Presence on one of three rows, never pressed: a press runs `MeetingAgenda -Close` and moves a file in the committed fixture hub |
+| Exactly the complete session offers Archive | Presence in one of three entries' menus, never chosen: choosing it and confirming runs `MeetingAgenda -Close` and moves a file in the committed fixture hub |
 | No page errors across every route visited | Nothing threw while proving the others |
 
 It uses raw `playwright`, not `@playwright/test` -- chromium, `domcontentloaded`, then wait for the

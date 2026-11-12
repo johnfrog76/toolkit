@@ -660,9 +660,9 @@ is a pass. The checks: a Growth nav entry and
 `Organize`) nav entry and the three fixture sessions listed with their stage labels, both modules'
 data actually requested, the retro session's send button **present, disabled, and naming
 `TEAMS_WEBHOOK_MANAGER`**, and the page that button is on being **reachable**: an
-`Edit / send` on each meeting row and on the read view, and the read view's landing on
-`/communication/sessions/2026-02-05.md` when pressed, and exactly one of the three rows -- the
-complete one -- offering **Close**, which is never pressed because it would move a file in the
+**Edit or send** in each meeting entry's `...` menu and `Edit / send` on the read view, and the read view's landing on
+`/communication/sessions/2026-02-05.md` when pressed, and exactly one of the three entries -- the
+complete one -- offering **Archive** in its menu, which is never chosen because it would move a file in the
 committed fixture hub. The send button itself is read-only by design:
 it is never pressed, because a press posts to a real webhook. The runner deletes both
 `TEAMS_WEBHOOK_*` variables from its own environment -- which covers the runner and the browser it
