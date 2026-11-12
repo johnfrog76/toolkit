@@ -180,7 +180,10 @@ state a reopened thread returns to on Azure DevOps, runs `unresolveReviewThread`
 by a node id REST never shows, so the thread is first found by its first comment's REST id
 (`reviewThreads`, a hundred at a time, paged). A thread already in that state is said and left alone.
 `byDesign`, `pending` and `wontFix` carry a reason GitHub has nowhere to keep, so each is **refused by
-name, before anything is asked or posted**, exit 2 -- say it in the reply instead. On a conversation
+name, before anything is asked or posted**, exit 2 -- say it in the reply instead. The statuses each
+tracker accepts are one list in `consts.json` (`replyStatuses`): `ReplyPR`'s refusal reads GitHub's, and
+the PR Comments page offers only those on a GitHub Space (`fixed`, `closed`, `active`), mapping a
+suggested reject or modify to `active` and saying in the draft that the thread is left open. On a conversation
 comment or a review summary there is no thread to resolve: the reply is posted and the line says
 `-Status` was not applied. The card's `Status:` line reads `resolved` or `unresolved` afterwards.
 
@@ -659,7 +662,8 @@ of the hub's files.
 | `Start` | The first run. Copies the sample hub (`samples/hub`) to a folder you own -- `-Path`, default `~/toolkit-hub` -- points this machine at it (`promptsRoot`, `activeSpace=demo`, the four opt-in modules on -- growth, communication, deck and organize --, all through `Config`), re-imports, and opens the web UI (`-NoWeb` to skip). The sample org is `local`: no ADO, no login. **Never overwrites**: a machine that already has a hub keeps it; a folder with anything in it, a folder inside the Toolkit, and a configured hub that has gone missing are refusals (exit 2) that change nothing. `-WhatIf` says what it would do |
 | `Update` | Bring this machine's Toolkit up to date: pull it, **fast-forward only**, re-import it into this shell, and say what else moved -- the autoload shim, the web UI's lockfile, the agent's requirements. `-Sync` then syncs the prompt store: software first, then data. `-WhatIf` fetches and reports. Never commits, rebases or pushes the Toolkit. The package must be the **root** of its own checkout; a copy inside another repository is refused rather than fast-forwarding that one |
 | `Log` | Diagnostic log (`-Errors`, `-Today`, `-Days <n>`, `-Count <n>`, `-Command`, `-Type`, `-Clear`; `-Tail` follows live; `-Ack` dismisses `Menu`'s error indicator) |
-| `Burn [-AsJson] [-At <yyyy-mm-dd HH:mm>]` | **The current Claude Code burn**: today (from local midnight) and this week (from `burn.weekStarts`, Friday 05:00 local by default), this machine's session files read live plus the day records the other machines logged into the hub's `usage/` -- tokens by model, a cost marked derived, never a plan percentage. `-AsJson` prints the same as one JSON object, what the System page's tile reads through the agent; `-At` reads it as it stood at a past local time. [The current burn](#the-current-burn-burn) below |
+| `Burn [-AsJson] [-At <yyyy-mm-dd HH:mm>]` | **The current Claude Code burn**: today (from local midnight) and this week (from `burn.weekStarts`, Friday 05:00 local by default), this machine's session files read live plus the day records the other machines logged into the hub's `usage/` -- tokens by model, a cost marked derived, never a plan percentage -- opened by **the weekly burndown**, the plan readings typed with `-Reading`. `-AsJson` prints the same as one JSON object, what the System page's tile reads through the agent; `-At` reads it as it stood at a past local time. [The current burn](#the-current-burn-burn) below |
+| `Burn -Reading <bucket=percent,...> [-At <yyyy-mm-dd HH:mm>]` | Record **the plan's weekly usage** as Claude's usage page shows it -- whole percents by bucket, `general=43,premium=54`, one bucket or several (`burn.buckets`) -- appended to this machine's record for the week, `usage/readings/<week start>-<machine>.json` in the hub, then print the burndown. Typed, never estimated. `-At` says when it was read. A bucket the plan does not have, a percent that is not a whole number from 0 to 100, and `-Reading` with `-Log`, `-Date` or `-AsJson` refuse, exit 2, writing nothing. [The weekly burndown](#the-weekly-burndown-burn--reading) below |
 | `Burn -Log [-Date <yyyy-mm-dd>]` | Write **the day's Claude Code usage** on this machine into the hub: `usage/<yyyy-mm-dd>-<machine>.json`, read from Claude Code's own session files (read-only), with tokens by model and by session and a cost derived from `Config/claude-prices.json`. Today by default; `-Date` logs a past day. A second run that day replaces the record. `-Date` without `-Log`, and `-Log` with `-AsJson`, refuse, exit 2; a machine with no session files writes nothing and says so. [The day's Claude Code usage](#the-days-claude-code-usage-burn--log) below, and the record's shape in [`hub/usage.md`](hub/usage.md) |
 
 #### The day's Claude Code usage: `Burn -Log`
@@ -715,6 +719,32 @@ then. `-At <yyyy-mm-dd HH:mm>` reads the burn as it stood at a past local time; 
 and for a time to come. The long version, and the JSON's fields, are in [`hub/usage.md`](hub/usage.md), "Today
 and this week". The System page's **Claude Code burn** tile shows the same answer -- the agent runs
 `Burn -AsJson` and keeps it for an hour -- and is there only where this machine has Claude Code session files.
+
+#### The weekly burndown: `Burn -Reading`
+
+```powershell
+tkBurn -Reading general=43,premium=54                 # as the usage page shows it now
+tkBurn -Reading premium=54 -At '2026-11-10 09:10'     # one bucket, read earlier
+```
+
+```text
+  Weekly burndown, claude plan -- resets Fri 13 Nov 05:00 (2d 16h left)
+      General           #########...........   43%   behind pace by 17 (pace 60% at Tue 09:10)
+      Premium (Fable)   ############........   58%   behind pace by 4 (pace 62% at Tue 12:30)
+      *cached as of Tue 10 Nov 12:30 - renews Tue 10 Nov 16:30 (burn.cacheHours 4)
+```
+
+The plan's percentages are on Claude's usage page and on no file on this machine, so they are **typed**:
+nothing estimates one from tokens or cost. A reading is whole percents by bucket -- `general` and `premium`
+by default (`burn.buckets`, the team's config) -- and one bucket alone is a reading. Each is appended, with
+its time, to this machine's record for the week in the hub; the week's readings are every machine's.
+`Burn` opens with the burndown: per bucket the latest reading this week, its bar, and how far it is
+**ahead of** or **behind pace** -- an even line from 0% at the week's start (`burn.weekStarts`) to 100% at the
+reset, read at the reading's own time. The last line says when the latest reading was taken and when it
+**renews**, `burn.cacheHours` later (4 by default,
+[Configuration](CONFIGURATION.md#burncachehours----how-long-a-reading-is-current)); past that it says
+`renewal due since`, with no colour. A new week starts empty. `-AsJson` carries it as `burndown`. The rule,
+the record and the fields are in [`hub/usage.md`](hub/usage.md), "The weekly burndown".
 
 #### Navigation shortcuts
 
@@ -1021,7 +1051,7 @@ is off, and `SwitchSpace` brings them back in one that works with agents.
 
 | Command | Does |
 | --- | --- |
-| `Test [-Half cli\|agent\|web] [-Fast]` | Run the three halves -- the agent's `pytest`, the CLI runner, the web UI's `npm test` -- in that order, then one summary (per half its counts and time) and one verdict. A half that cannot run is skipped with its reason and the verdict names it SKIPPED, not passed. `-Half` runs one; `-Fast` is the CLI runner's `-Fast`. Exit 0 when every half that ran passed, exit 2 when one failed or none ran. Prints expected (`docs/TESTING.md`) vs actual per half as information, and writes all three halves into `test-summary.<machine>.json` ([Testing](TESTING.md)) |
+| `Test [-Half cli\|agent\|web] [-Fast]` | Run the three halves -- the agent's `pytest`, the CLI runner, the web UI's `npm test` -- in that order, then one summary (per half its counts and time) and one verdict. A half that cannot run is skipped with its reason and the verdict names it SKIPPED, not passed. `-Half` runs one; `-Fast` is the CLI runner's `-Fast`. Exit 0 when every half that ran passed, exit 2 when one failed or none ran. Prints expected (`docs/TESTING.md`) vs actual per half as information, and writes all three halves into `test-summary.<machine>.json`, in the machine's test-history folder whichever checkout ran ([Testing, "Where the record lives"](TESTING.md#where-the-record-lives)) |
 | `TestToolkit` | Run every suite (`-List` to enumerate, `-<Suite>` to run one, including `-Portability`) |
 | `TestCompat` | PowerShell 5.1 compatibility suite only |
 | `TestMenu` | Menu system suite only |
@@ -1284,8 +1314,9 @@ module in the shell you run it from still logs one `INFO tkEnv` row, as any shel
 toolkit does. That is the import, not the run.) So a suite's failing assertions never show up as
 the engineer's own errors on the Log card.
 
-`test-results.<MACHINE>.log` and `test-summary.<MACHINE>.json` deliberately do **not** follow it:
-the Health card reading real test results is the point of those two.
+`test-results.<MACHINE>.log` and `test-summary.<MACHINE>.json` do **not** follow it: they live in the
+machine's test-history folder, one for every checkout and git worktree, which `P20_TEST_HISTORY_DIR` moves
+and the test runners point at a scratch folder of their own ([Testing, "Where the record lives"](TESTING.md#where-the-record-lives)).
 
 ---
 

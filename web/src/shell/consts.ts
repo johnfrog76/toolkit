@@ -430,6 +430,17 @@ export function toRegExp(pattern: string, extraFlags = ""): RegExp {
 export const USAGE = consts.usage as {
   envFlag: string;
   burnRoute: string;
+  readingsFolder: string;
+};
+
+/**
+ * The thread statuses a reply may set, per tracker. Azure DevOps keeps all six;
+ * GitHub keeps what a review thread can be (resolved or unresolved), so the PR
+ * Comments status box offers only these there, and ReplyPR refuses the rest.
+ */
+export const REPLY_STATUSES_BY_TRACKER = consts.replyStatuses as {
+  ado: string[];
+  github: string[];
 };
 
 /** The contract's patterns, compiled once for this bundle. */

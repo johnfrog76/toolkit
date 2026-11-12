@@ -1,21 +1,30 @@
 """Log routes: /log, /log-entries, /test-history.
 
-All three read or write files that live beside this package at the repository
-root -- ``usage.{machine}.log``, ``test-results.{machine}.log`` and
-``test-summary.{machine}.json`` -- the same files the PowerShell CLI writes.
-The summary covers the machine's three halves: each suite entry carries a
-``half`` (``cli``, ``agent``, ``web``; an entry written before halves existed is
-the CLI's), and a ``halves`` block holds one record per half -- its counts, its
-seconds, and for a half ``{cliPrefix}Test`` could not run, the reason.
-They are a property of the tool, not of the prompt store, so none of them is
-resolved through the hub. ``usage.*.log`` alone can be moved, by
-``P20_USAGE_LOG_DIR`` -- the override a test run sets so it does not write into
-the engineer's own history.
+``usage.{machine}.log`` lives beside this package at the repository root, the
+same file the PowerShell CLI writes, and ``P20_USAGE_LOG_DIR`` moves it -- the
+override a test run sets so it does not write into the engineer's own history.
+
+The machine's test history -- ``test-results.{machine}.log`` and
+``test-summary.{machine}.json`` -- lives in ONE folder per machine, outside every
+checkout (``history_dir``), so a run made in any git worktree reaches the Health
+card whichever checkout this agent runs from. The rule is consts.json's
+(``tests.historyBase``, ``historyFallback``, ``historyPath``, ``env.testHistoryDir``)
+and Scripts/Get-TestHistoryDir.ps1 is held to the same table,
+Tests/fixtures/test-history/paths.json. The summary covers the machine's three
+halves: each suite entry carries a ``half`` (``cli``, ``agent``, ``web``; an entry
+written before halves existed is the CLI's), and a ``halves`` block holds one
+record per half -- its counts, its seconds, the checkout and commit it ran from,
+and for a half ``{cliPrefix}Test`` could not run, the reason. None of it is
+resolved through the hub.
 """
 
 import json
 import os
+import platform
+import shutil
 import socket
+from collections.abc import Mapping
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -24,6 +33,76 @@ from . import consts, log_writer
 from .config import REPO_ROOT, load_config
 
 api = APIRouter()
+
+
+# ---------------------------------------------------------------------------
+# Where the machine's test history lives
+# ---------------------------------------------------------------------------
+def _platform_name() -> str:
+    """windows, macos or linux -- anything that is neither of the first two."""
+    system = platform.system()
+    if system == "Windows":
+        return "windows"
+    if system == "Darwin":
+        return "macos"
+    return "linux"
+
+
+def history_segments(platform_name: str, home: str, env: Mapping[str, str]) -> list[str] | None:
+    """The rule, pure: the test-history folder as segments, the first a root (the
+    override, the platform's base variable or the home folder), or None for no
+    folder -- the run marker is set and no override names one, so a suite's
+    scratch run never writes the machine's real record. A blank value is unset."""
+
+    def read(name: str) -> str:
+        return (env.get(name) or "").strip() if name else ""
+
+    override = read(consts.env_test_history_dir())
+    if override:
+        return [override]
+    if read(consts.env_test_run_marker()):
+        return None
+    base_name, fallback, path = consts.test_history_pieces(platform_name)
+    base = read(base_name)
+    root = [base] if base else [home, *fallback]
+    return root + path
+
+
+def copy_legacy_history(legacy_root: Path, folder: Path, machine: str) -> list[str]:
+    """A checkout kept this machine's two files at its own root before the
+    history had a folder of its own. Each one ``folder`` lacks is copied in, so
+    the first read after the move is not "not run"; once the folder has it, the
+    old file is never read again, and it is left where it was."""
+    copied = []
+    for kind in ("summary", "results"):
+        name = consts.test_history_file(kind, machine)
+        src, dst = legacy_root / name, folder / name
+        if dst.exists() or not src.is_file():
+            continue
+        folder.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dst)
+        copied.append(name)
+    return copied
+
+
+def history_dir() -> Path | None:
+    """This process's test-history folder, or None when there is none. Re-read per
+    call, so a test that sets the override after import still takes effect. With
+    no override, this checkout's old record is copied in first (once)."""
+    segments = history_segments(_platform_name(), str(Path.home()), os.environ)
+    if not segments:
+        return None
+    folder = Path(segments[0]).joinpath(*segments[1:])
+    if not (os.environ.get(consts.env_test_history_dir()) or "").strip():
+        try:
+            copy_legacy_history(REPO_ROOT, folder, _machine())
+        except OSError:  # a copy that fails leaves the folder as it was; the read goes on
+            pass
+    return folder
+
+
+def _machine() -> str:
+    return os.environ.get("COMPUTERNAME") or socket.gethostname().split(".")[0]
 
 
 class LogRequest(BaseModel):
@@ -139,6 +218,8 @@ class HalfResult(BaseModel):
     seconds: float = 0
     reason: str = ""
     timestamp: str = ""
+    checkout: str = ""  # main, or the git worktree's folder name; "" outside git or before it was recorded
+    commit: str = ""  # HEAD's short hash when the half ran
 
 
 class TestDay(BaseModel):
@@ -151,6 +232,8 @@ class TestDay(BaseModel):
 class TestSummaryMachine(BaseModel):
     machine: str
     timestamp: str
+    checkout: str = ""
+    commit: str = ""
     suites: dict[str, SuiteResult]
     halves: dict[str, HalfResult] = {}
 
@@ -164,10 +247,12 @@ class TestHistoryResponse(BaseModel):
     machines: list[TestSummaryMachine]
 
 
-def _parse_test_log() -> list[dict]:
-    """Parse the local test-results.{machine}.log into a list of dicts."""
-    machine = os.environ.get("COMPUTERNAME") or socket.gethostname().split(".")[0]
-    log_path = REPO_ROOT / f"test-results.{machine}.log"
+def _parse_test_log(folder: Path | None = None) -> list[dict]:
+    """Parse this machine's test-results.{machine}.log into a list of dicts."""
+    folder = folder or history_dir()
+    if folder is None:
+        return []
+    log_path = folder / consts.test_history_file("results", _machine())
     if not log_path.exists():
         return []
 
@@ -226,6 +311,8 @@ def _half_records(data: dict, suites: dict[str, SuiteResult]) -> dict[str, HalfR
             seconds=float(rec.get("seconds") or 0),
             reason=str(rec.get("reason") or ""),
             timestamp=str(rec.get("timestamp") or ""),
+            checkout=str(rec.get("checkout") or ""),
+            commit=str(rec.get("commit") or ""),
         )
     if DEFAULT_HALF not in out:
         cli = [s for s in suites.values() if s.half == DEFAULT_HALF]
@@ -245,9 +332,15 @@ def _half_records(data: dict, suites: dict[str, SuiteResult]) -> dict[str, HalfR
 
 
 def _load_machine_summaries(root=None) -> list[TestSummaryMachine]:
-    """Load all test-summary.*.json files for cross-machine status."""
+    """Load every machine's test-summary.*.json in the history folder: this
+    machine's, and any another machine's that was copied in beside it."""
     machines = []
-    for p in (root or REPO_ROOT).glob("test-summary.*.json"):
+    folder = root or history_dir()
+    if folder is None:
+        return machines
+    pattern = consts.test_history_file("summary", "*")
+    prefix = pattern.split("*", 1)[0]
+    for p in sorted(folder.glob(pattern)):
         try:
             data = json.loads(p.read_text(encoding="utf-8-sig"))
             suites = {}
@@ -263,8 +356,10 @@ def _load_machine_summaries(root=None) -> list[TestSummaryMachine]:
                 )
             machines.append(
                 TestSummaryMachine(
-                    machine=data.get("machine", p.stem.replace("test-summary.", "")),
+                    machine=data.get("machine", p.stem.replace(prefix, "")),
                     timestamp=data.get("timestamp", ""),
+                    checkout=str(data.get("checkout") or ""),
+                    commit=str(data.get("commit") or ""),
                     suites=suites,
                     halves=_half_records(data, suites),
                 )
@@ -284,7 +379,8 @@ async def get_test_history():
     # Scope to the active Space: system suites (no org tag) always show; org-scoped
     # suites only when they ran under the active Space. So two Spaces coexist in
     # the log without one overwriting the other's card.
-    entries = _scope_entries_to_org(_parse_test_log(), active_space)
+    folder = history_dir()
+    entries = _scope_entries_to_org(_parse_test_log(folder), active_space)
 
     cutoff = (datetime.now() - timedelta(days=HISTORY_DAYS)).strftime("%Y-%m-%d")
 
@@ -338,7 +434,7 @@ async def get_test_history():
             else:
                 break  # gap in data = streak broken
 
-    machines = _load_machine_summaries()
+    machines = _load_machine_summaries(folder) if folder is not None else []
 
     # Build description and half lookups from machine summaries
     desc_map: dict[str, str] = {}
@@ -358,7 +454,7 @@ async def get_test_history():
             sr.half = half_map.get(sr.suite, DEFAULT_HALF)
 
     return TestHistoryResponse(
-        machine=os.environ.get("COMPUTERNAME") or socket.gethostname().split(".")[0],
+        machine=_machine(),
         active_space=active_space,
         days=days,
         last_run=last_run,

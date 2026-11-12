@@ -11,7 +11,11 @@ block with one record per half; ``agent/core/log.py`` serves both on
   ``Get-P20TestHalfRecords`` in Scripts/TestAll-Rules.ps1;
 - a three-half file serves each half's record in run order, a skipped half
   with its reason;
-- a file that does not parse is left out, not an error.
+- a file that does not parse is left out, not an error;
+- WHERE the two files live: one folder per machine, outside every checkout, by
+  the rule Tests/fixtures/test-history/paths.json holds both halves to; no
+  folder at all under the run marker with no override; and a checkout's old
+  record copied in once, so the first read after the move is not "not run".
 
 Run directly:  python Tests/test_test_summary.py
 Under pytest:  python -m pytest Tests/test_test_summary.py
@@ -25,6 +29,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 PKG_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PKG_ROOT))
@@ -171,14 +176,12 @@ class WarnInTheHistory(unittest.TestCase):
                 f"{today}T09:00:01\tZero\twarn\t0\t0\tok\t",
             ]
             (root / f"test-results.{machine}.log").write_text("\n".join(rows) + "\n", encoding="utf-8")
-            saved_root = log_mod.REPO_ROOT
             saved_cfg = log_mod.load_config
-            log_mod.REPO_ROOT = root
             log_mod.load_config = dict
             try:
-                resp = asyncio.run(log_mod.get_test_history())
+                with mock.patch.dict(os.environ, {C.env_test_history_dir(): str(root)}):
+                    resp = asyncio.run(log_mod.get_test_history())
             finally:
-                log_mod.REPO_ROOT = saved_root
                 log_mod.load_config = saved_cfg
         day = resp.days[-1]
         by_name = {sr.suite: sr for sr in day.suites}
@@ -187,6 +190,136 @@ class WarnInTheHistory(unittest.TestCase):
         self.assertEqual(by_name["Alpha"].result, "pass")
         self.assertEqual((day.passed, day.total), (6, 6))
         self.assertEqual(resp.streak, 1)
+
+
+FIXTURE = PKG_ROOT / "Tests" / "fixtures" / "test-history" / "paths.json"
+
+
+class WhereTheHistoryLives(unittest.TestCase):
+    """One folder per machine, outside every checkout. The rule is held to the
+    table Scripts/Get-TestHistoryDir.ps1 is held to."""
+
+    def test_every_row_of_the_shared_table(self):
+        rows = json.loads(FIXTURE.read_text(encoding="utf-8"))["rows"]
+        self.assertGreaterEqual(len(rows), 10)
+        for row in rows:
+            with self.subTest(row=row["name"]):
+                got = log_mod.history_segments(row["platform"], row["home"], row["env"])
+                self.assertEqual(got, row["expected"])
+
+    def test_the_file_names_are_the_contracts(self):
+        self.assertEqual(C.test_history_file("summary", "BOX"), "test-summary.BOX.json")
+        self.assertEqual(C.test_history_file("results", "BOX"), "test-results.BOX.log")
+
+
+class AMarkedRunHasNoRecord(unittest.TestCase):
+    """Under the run marker with no override there is no folder: the reader reads
+    nothing and nothing is written, wherever the home folder is."""
+
+    def test_no_folder_no_rows_no_write(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            env = {
+                C.env_test_run_marker(): "1",
+                "HOME": str(home),
+                "USERPROFILE": str(home),
+                "LOCALAPPDATA": str(home / "local"),
+                "XDG_STATE_HOME": str(home / "state"),
+            }
+            with mock.patch.dict(os.environ, env):
+                os.environ.pop(C.env_test_history_dir(), None)
+                self.assertIsNone(log_mod.history_dir())
+                self.assertEqual(log_mod._parse_test_log(), [])
+                self.assertEqual(log_mod._load_machine_summaries(), [])
+            self.assertEqual(list(home.rglob("*")), [])
+
+
+class TheOldRecordIsCopiedInOnce(unittest.TestCase):
+    """A checkout's record at its own root, from before the folder existed, is
+    copied into the folder the first time it is read, and never again."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        base = Path(self._tmp.name)
+        self.legacy = base / "checkout"
+        self.home = base / "home"
+        self.legacy.mkdir()
+        self.home.mkdir()
+        self.machine = log_mod._machine()
+        data = dict(THREE, machine=self.machine)
+        (self.legacy / f"test-summary.{self.machine}.json").write_text(json.dumps(data), encoding="utf-8")
+        (self.legacy / f"test-results.{self.machine}.log").write_text(
+            "2026-10-06T12:00:00\tAlpha\tpass\t6\t6\tok\t\n", encoding="utf-8"
+        )
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _env(self):
+        return {
+            "HOME": str(self.home),
+            "USERPROFILE": str(self.home),
+            "LOCALAPPDATA": str(self.home / "local"),
+            "XDG_STATE_HOME": str(self.home / "state"),
+        }
+
+    def test_copy_once_and_never_over_a_newer_record(self):
+        folder = self.home / "history"
+        copied = log_mod.copy_legacy_history(self.legacy, folder, self.machine)
+        self.assertEqual(
+            sorted(copied), sorted([f"test-summary.{self.machine}.json", f"test-results.{self.machine}.log"])
+        )
+        newer = folder / f"test-summary.{self.machine}.json"
+        newer.write_text('{"machine": "NEWER"}', encoding="utf-8")
+        self.assertEqual(log_mod.copy_legacy_history(self.legacy, folder, self.machine), [])
+        self.assertEqual(json.loads(newer.read_text(encoding="utf-8"))["machine"], "NEWER")
+        self.assertTrue(
+            (self.legacy / f"test-summary.{self.machine}.json").exists(), "the old file is left where it was"
+        )
+
+    def test_the_first_read_after_the_move_is_not_not_run(self):
+        saved_root = log_mod.REPO_ROOT
+        log_mod.REPO_ROOT = self.legacy
+        try:
+            with mock.patch.dict(os.environ, self._env()):
+                os.environ.pop(C.env_test_history_dir(), None)
+                os.environ.pop(C.env_test_run_marker(), None)
+                folder = log_mod.history_dir()
+                machines = log_mod._load_machine_summaries()
+                rows = log_mod._parse_test_log()
+        finally:
+            log_mod.REPO_ROOT = saved_root
+        self.assertTrue(str(folder).startswith(str(self.home)), folder)
+        self.assertEqual([m.machine for m in machines], [self.machine])
+        self.assertEqual([r["suite"] for r in rows], ["Alpha"])
+        self.assertTrue((folder / f"test-summary.{self.machine}.json").exists())
+
+    def test_an_override_copies_nothing(self):
+        saved_root = log_mod.REPO_ROOT
+        log_mod.REPO_ROOT = self.legacy
+        scratch = self.home / "scratch"
+        try:
+            with mock.patch.dict(os.environ, {**self._env(), C.env_test_history_dir(): str(scratch)}):
+                self.assertEqual(log_mod.history_dir(), scratch)
+        finally:
+            log_mod.REPO_ROOT = saved_root
+        self.assertFalse(scratch.exists())
+
+
+class WhereARunCameFrom(unittest.TestCase):
+    """Each record carries the checkout and the commit it ran on; the reader serves both."""
+
+    def test_checkout_and_commit_are_served(self):
+        data = json.loads(json.dumps(THREE))
+        data["checkout"], data["commit"] = "311", "c009bd1"
+        data["halves"]["cli"].update(checkout="311", commit="c009bd1")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "test-summary.NEWBOX.json").write_text(json.dumps(data), encoding="utf-8")
+            m = next(x for x in _load_machine_summaries(root) if x.machine == "NEWBOX")
+        self.assertEqual((m.checkout, m.commit), ("311", "c009bd1"))
+        self.assertEqual((m.halves["cli"].checkout, m.halves["cli"].commit), ("311", "c009bd1"))
+        self.assertEqual((m.halves["agent"].checkout, m.halves["agent"].commit), ("", ""))
 
 
 if __name__ == "__main__":

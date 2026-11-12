@@ -9,6 +9,16 @@ import { PlugDisconnectedRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
 import { checkLabel, envBadge } from "./envBadge";
 import { HubSyncRow } from "./HubSyncRow";
+import { lazyPart } from "../../shell/lazy";
+import type { EnvWithCommunication } from "../communication/api.communication";
+
+// The communication module's rows are a chunk fetched when first drawn, and only
+// drawn where /env carries the module's block (the agent adds it only with the
+// flag on), so a flag-off install ships and fetches nothing of it.
+const EnvRecipients = lazyPart(
+  () => import("../communication/EnvRecipients"),
+  (m) => m.EnvRecipients,
+);
 
 // A row that REPORTS a setting sends you to the place that changes it (the
 // Change link, settingRows.tsx). The key is a config key.
@@ -56,6 +66,7 @@ export function EnvCard({ className }: { className?: string }) {
   // Not refetch(): the agent holds the ADO reachability answer for 45s, and the
   // point of this button is to ask again rather than to re-read the same reply.
   const [refreshEnv, { isLoading: isRefreshing }] = useRefreshEnvMutation();
+  const communication = (env as EnvWithCommunication | undefined)?.communication;
   // No Space switcher here: the avatar menu is the one place a
   // Space is switched, and the tip at the foot of Home says so.
 
@@ -124,6 +135,9 @@ export function EnvCard({ className }: { className?: string }) {
                 Sync the hub. Absent from an older agent. */}
             {env.hubSync ? <HubSyncRow sync={env.hubSync} /> : null}
           </div>
+          {env.features?.communication === true && communication ? (
+            <EnvRecipients recipients={communication.recipients} />
+          ) : null}
         </>
       ) : null}
     </PageCard>

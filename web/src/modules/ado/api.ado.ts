@@ -738,6 +738,10 @@ export interface HalfResult {
   seconds: number;
   reason: string;
   timestamp: string;
+  /** The checkout it ran from: `main`, or the git worktree's folder name; "" when not recorded. */
+  checkout?: string;
+  /** HEAD's short hash when it ran; "" when not recorded. */
+  commit?: string;
 }
 
 export interface TestDay {
@@ -750,6 +754,9 @@ export interface TestDay {
 export interface TestSummaryMachine {
   machine: string;
   timestamp: string;
+  /** The checkout and commit of the run that last wrote the file. */
+  checkout?: string;
+  commit?: string;
   suites: Record<string, SuiteResult>;
   /** The machine's three halves, in run order; a file from before them has the CLI's alone. */
   halves?: Partial<Record<"agent" | "cli" | "web", HalfResult>>;

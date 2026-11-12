@@ -4,7 +4,9 @@
 used: one record per local day per machine, in the hub. It is a ledger of tokens, kept beside the work
 those tokens bought, so a later reader can set the two side by side. `Burn` alone reads them back, with
 this machine's session files, as **today and this week** -- in the terminal, and on the System page's
-**Claude Code burn** tile ([Today and this week](#today-and-this-week)).
+**Claude Code burn** tile ([Today and this week](#today-and-this-week)). And `Burn -Reading` records the
+plan's own weekly percentages, typed from Claude's usage page, which `Burn` opens with as **the weekly
+burndown** ([The weekly burndown](#the-weekly-burndown)).
 
 ## Where
 
@@ -150,7 +152,11 @@ grows through the day. It is written through `Write-CardText -New`: UTF-8, no BO
 [`Tests/fixtures/usage/week.json`](../../Tests/fixtures/usage/week.json) -- under Friday 05:00, Monday 09:00
 and Sunday 00:00: a record dated the week's first day the week before's, this machine's lines split at the
 week's start, this machine's own record never read, and the values `burn.weekStarts` takes and refuses -- and
-`Burn` and `Burn -AsJson` typed at a fixed `-At`, with `burn.weekStarts` set through `Config`; whether there are session files over
+`Burn` and `Burn -AsJson` typed at a fixed `-At`, with `burn.weekStarts` set through `Config`; the
+burndown's rule over [`Tests/fixtures/usage/burndown.json`](../../Tests/fixtures/usage/burndown.json), what
+`-Reading` accepts and `burn.cacheHours`' range, and `Burn -Reading` typed -- the week's record started and
+appended, another machine's readings merged, last week's not counted, the refusals writing nothing,
+`burn.cacheHours` set through `Config`; whether there are session files over
 [`Tests/fixtures/usage/projects-root.json`](../../Tests/fixtures/usage/projects-root.json), the table
 `Tests/test_usage_burn.py` holds the agent's `claudeUsage` to as well, with the route's hour-long cache. And
 the rule over the table [`Tests/fixtures/usage/cases.json`](../../Tests/fixtures/usage/cases.json)
@@ -191,7 +197,9 @@ tkBurn -At '2026-11-06 04:59'   # as it stood then: that moment's today and week
   `unpriced` in the record's own field shapes, and `machines`: one row per machine counted, its `source`
   (`session-files` for this one, `usage-records` for another, with the `days` it logged), its messages and
   its derived cost. Every model is priced from the table as it is now, so one answer is one table's
-  arithmetic; `cost` is the record's block, `priceNotes` included. No plan percentage, anywhere.
+  arithmetic; `cost` is the record's block, `priceNotes` included. No plan percentage in either window:
+  the only percentages in the answer are the burndown's, and those are typed
+  ([The weekly burndown](#the-weekly-burndown)).
 - **When it stops being right.** `nextBoundaryAt` is the sooner of the next local midnight and the next week
   start -- after it, the windows themselves are different. `weekStarts` names the setting it was read under
   (`Friday 05:00 local`), `asOf` when it was read; `sessionFiles` and `hub` say whether there were session
@@ -212,8 +220,128 @@ bad. The figures are the CLI's by construction: `GET /api/usage/burn` runs `Burn
 `nextBoundaryAt`; the browser keeps it for the session and never polls. **Refresh** asks again with
 `refresh=1`, past the agent's hour.
 
+## The weekly burndown
+
+How much of this week's plan is used, in each of the plan's buckets, and whether the week is ahead of or
+behind an even pace. **Every number in it is a reading someone typed.** Claude Code's session files hold
+tokens, not the plan's allowance, and the percentages Claude's usage page shows are on no file on this
+machine; a percentage worked out from tokens or from the derived cost would be a made-up number, so
+nothing here estimates one.
+
+```powershell
+tkBurn -Reading general=43,premium=54                 # now, as the usage page shows it
+tkBurn -Reading premium=54 -At '2026-11-10 09:10'     # one bucket, read earlier
+tkBurn                                                # opens with the burndown
+```
+
+```text
+  Weekly burndown, claude plan -- resets Fri 13 Nov 05:00 (2d 16h left)
+      General           #########...........   43%   behind pace by 17 (pace 60% at Tue 09:10)
+      Premium (Fable)   ############........   58%   behind pace by 4 (pace 62% at Tue 12:30)
+      *cached as of Tue 10 Nov 12:30 - renews Tue 10 Nov 16:30 (burn.cacheHours 4)
+      Typed readings, never estimated; pace is an even line from 0% at the week's start to 100% at the reset.
+```
+
+### A reading
+
+`-Reading` takes `bucket=percent`, one bucket or several, comma-separated (`general=43,premium=54`, quoted
+or not). **A bucket** is a key of `burn.buckets` in `config.default.json` -- `general` (General) and
+`premium` (Premium (Fable)) by default, matched ignoring case -- because a plan's buckets are the plan's:
+a second plan is new configuration, not new code. `burn.buckets` and `burn.product` (`claude`) are the
+team's configuration, like `workItemTypes`, and not a `Config -Set` row. **A percent** is a whole number
+from 0 to 100, as the usage page shows it; a trailing `%` is allowed. **One bucket alone is a reading**:
+typing `premium=54` leaves General's latest reading as it was. `-At <yyyy-mm-dd HH:mm>` says when it was
+read, a past local time; without it, now. Refused, exit 2, with nothing written: a bucket the plan does not
+have, one typed twice, a percent that is not a whole number from 0 to 100, no hub, and `-Reading` with
+`-Log`, `-Date` or `-AsJson`.
+
+### Where it is kept
+
+`<promptsRoot>/usage/readings/<yyyy-mm-dd>-<machine>.json` -- beside the day records, in a subfolder
+(`readings`, `consts.json` `usage.readingsFolder`) so the day-record reader, which reads `usage/*.json`
+and nothing below, never meets one. **One file per week per machine**: `<yyyy-mm-dd>` is the local date the
+week starts on (`burn.weekStarts`), `<machine>` the short host name as above. Per machine, so two machines
+never write one synced file; the week's readings are every machine's files for that week, merged by time.
+
+```json
+{
+  "readings": 1,
+  "product": "claude",
+  "source": "typed",
+  "machine": "build-box",
+  "weekStart": "2026-11-06T13:00:00.000Z",
+  "weekStarts": "Friday 05:00 local",
+  "entries": [
+    { "at": "2026-11-10T17:10:00.000Z", "buckets": { "general": 43, "premium": 54 } },
+    { "at": "2026-11-11T16:00:00.000Z", "buckets": { "premium": 60 } }
+  ]
+}
+```
+
+| Field | What it is |
+| --- | --- |
+| `readings` | the shape's version, `1` |
+| `product` | whose plan: `burn.product`, `claude` |
+| `source` | `typed`: a person read it off the usage page. A supported reader, if Claude Code ever offers one, would be a second writer of the same record with its own `source` |
+| `machine` | where it was typed |
+| `weekStart`, `weekStarts` | the week's first instant, in UTC, and the setting it was worked out under |
+| `entries` | one per reading, in time order: `at`, when it was read (UTC), and `buckets`, only the buckets typed |
+
+A reading is **appended**: the file is read, the entry added, the entries sorted by time and the whole
+written through `Write-CardText` -- `-New` when the week's first reading creates it (UTF-8, no BOM, LF), as
+an edit after. Unlike a day record it is a record of events, so a reading is never replaced; to take one
+back, edit the file. A file there that is not a readings record is refused rather than overwritten.
+
+### The rule
+
+[`Tests/fixtures/usage/burndown.json`](../../Tests/fixtures/usage/burndown.json) is the table, one row per
+case: no reading, one bucket typed, behind, ahead, on pace, the rounding, two readings across machines,
+stale, the renewal's exact moment, a reading from before the reset, one after now, one at the week's first
+instant. `Get-P20Burndown` (`Scripts/Read-BurnReadings.ps1`) is the CLI's, and the web asserts the same
+table where it draws the burndown.
+
+- **The week** is `burn.weekStarts`'s -- Friday 05:00 local by default, the reset -- to the next week start.
+  A reading counts toward the week holding its time: at or after the week's start, before the reset, and
+  not after now (with `-At`, not after then). **A new week starts empty** at the reset.
+- **Per bucket, the latest reading that names it** counts, from any machine. Two at the same instant go to
+  the machine whose name sorts last.
+- **Pace** is a straight line from 0% at the week's start to 100% at the reset, in real time (UTC
+  instants, so a week across a clock change is 167 or 169 hours). It is read **at the reading's own time**,
+  not at now: the gap is a fact about the reading, and an old reading is not counted against a clock that
+  has moved on since. `pace = floor(elapsed / week length x 100 + 0.5)`, a whole percent rounded half up.
+- **The gap** is `percent - pace`, whole points: more than zero is **ahead of pace by** it, less is **behind
+  pace by** it, zero is **on pace**. Behind is capacity that resets unused if nothing changes. It is a gap,
+  not a judgement: no colour and no word says good or bad.
+- **The cache line.** `cachedAt` is the latest reading the burndown uses; `renewsAt` is `cachedAt` plus
+  `burn.cacheHours` (4 by default; [Configuration](../CONFIGURATION.md#burncachehours----how-long-a-reading-is-current));
+  `due` is whether now is at or past `renewsAt`. Due is a fact, not an error: the reading is still shown,
+  and the line says `renewal due since` instead of `renews`.
+- **No reading this week**: every bucket's percent, pace and gap are `null`, `cachedAt` and `renewsAt` are
+  `null`, and `Burn` says how to record one.
+
+### In the answer
+
+`Burn -AsJson` carries it as `burndown`, and so does `GET /api/usage/burn`:
+
+| Field | What it is |
+| --- | --- |
+| `product`, `source` | `burn.product`, and `typed` |
+| `weekFrom`, `resetsAt` | the week's start and its reset, UTC |
+| `cacheHours`, `cachedAt`, `renewsAt`, `due` | the cache line, as above |
+| `buckets` | one row per `burn.buckets` entry, in config order: `key`, `label`, `percent`, `readingAt`, `machine`, `pace`, `gap` -- the last five `null` with no reading |
+| `readings` | every reading this week up to now, in time order -- `at`, `machine`, `buckets` -- for a line through the week |
+
+`skipped.readings` counts a readings file or entry that could not be read. The agent keeps the answer as it
+keeps the burn's, and a new reading is a miss at once: it fingerprints the readings folder, and never serves
+a kept answer past its `renewsAt` ([Today and this week](#today-and-this-week)).
+
 ## Not yet
 
 No record is written unless someone runs `Burn -Log`: nothing schedules it, so another machine's share of
 today is as old as its last log. The ratio of the burn to the work it bought, and a weekly chart, are later
 work on the records this logs.
+
+The weekly burndown is in the terminal and in `GET /api/usage/burn`'s answer; the System page does not
+draw it yet.
+
+Known gap: [The plan's weekly usage is typed, not read](../KNOWN-GAPS.md#the-plans-weekly-usage-is-typed-not-read).

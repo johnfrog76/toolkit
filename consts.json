@@ -121,10 +121,11 @@
   },
 
   "env": {
-    "_": "Environment variables one half SETS and another READS. teamsWebhookPrefix is the front of every TEAMS_WEBHOOK_<RECIPIENT> variable (gate 2 of a send) -- the engine, the CLI script and the three test runners agree on it, so a runner can clear every webhook by pattern. testRunMarker is set by every test runner and read by the two things that can post to a real webhook: while it is set, nothing posts. agentPort carries web.agentPort (the config key, resolved by Scripts/Get-AgentPort.ps1) from the launcher to the two proxies that cannot read config: Start-Web.ps1 sets it, web/vite.config.ts reads it for the dev proxy, and docker-compose.yml passes it to nginx's envsubst template. The name itself is what has to agree; the value is configuration. activeSpace and features are the two per-PROCESS stand-ins for config.local.json that `Web -Dev -Fixture` sets for the servers it starts, so a smoke run never rewrites the machine's config: activeSpace is a Space slug and replaces config.local.json's activeSpace; features is a JSON object and replaces config.local.json's top-level features block ({} = no flag set). Read by utilities.psm1 through Scripts/Resolve-HubConfig.ps1 and by agent/core/config.py's load_config. agentCacheDir moves the agent's on-disk cache (agent/core/disk_cache.py: the Design tab's parsed rows and note bodies, by blob sha) off the platform's user cache folder: the two test runners point it at a scratch folder so no suite writes the real one. promptsRoot is the per-shell override of the hub folder (it beats promptsRoot in the config files); with activeSpace it is one of the two overrides every test runner removes for the run and puts back after, so a shell's choice of Space or hub cannot steer a suite that copies samples/hub.",
+    "_": "Environment variables one half SETS and another READS. teamsWebhookPrefix is the front of every TEAMS_WEBHOOK_<RECIPIENT> variable (gate 2 of a send) -- the engine, the CLI script and the three test runners agree on it, so a runner can clear every webhook by pattern. testRunMarker is set by every test runner and read by the two things that can post to a real webhook: while it is set, nothing posts. agentPort carries web.agentPort (the config key, resolved by Scripts/Get-AgentPort.ps1) from the launcher to the two proxies that cannot read config: Start-Web.ps1 sets it, web/vite.config.ts reads it for the dev proxy, and docker-compose.yml passes it to nginx's envsubst template. The name itself is what has to agree; the value is configuration. activeSpace and features are the two per-PROCESS stand-ins for config.local.json that `Web -Dev -Fixture` sets for the servers it starts, so a smoke run never rewrites the machine's config: activeSpace is a Space slug and replaces config.local.json's activeSpace; features is a JSON object and replaces config.local.json's top-level features block ({} = no flag set). Read by utilities.psm1 through Scripts/Resolve-HubConfig.ps1 and by agent/core/config.py's load_config. agentCacheDir moves the agent's on-disk cache (agent/core/disk_cache.py: the Design tab's parsed rows and note bodies, by blob sha) off the platform's user cache folder: the two test runners point it at a scratch folder so no suite writes the real one. testHistoryDir moves the machine's test history (tests.summaryFile and tests.resultsFile) off its per-machine folder (tests.historyBase, historyFallback, historyPath): every test runner points its children at a scratch folder, and while testRunMarker is set and testHistoryDir is not, the history has no folder at all, so a suite's scratch run never writes the machine's real record. promptsRoot is the per-shell override of the hub folder (it beats promptsRoot in the config files); with activeSpace it is one of the two overrides every test runner removes for the run and puts back after, so a shell's choice of Space or hub cannot steer a suite that copies samples/hub.",
     "activeSpace": "P20_ACTIVE_SPACE",
     "promptsRoot": "PROMPTS_ROOT",
     "agentCacheDir": "P20_AGENT_CACHE_DIR",
+    "testHistoryDir": "P20_TEST_HISTORY_DIR",
     "features": "P20_FEATURES",
     "agentPort": "P20_AGENT_PORT",
     "teamsWebhookPrefix": "TEAMS_WEBHOOK_",
@@ -149,9 +150,14 @@
   },
 
   "tests": {
-    "_": "The three halves a test run covers, in the order {cliPrefix}Test runs them. test-summary.<machine>.json tags every suite entry with one of them (`half`) and holds one record per half under `halves`; the CLI runner and Test write it (Scripts/TestAll-Rules.ps1), agent/core/log.py serves it on GET /api/test-history, and the System page's Health card and Setup draw it in this order. legacyHalf is what an entry with no `half` is read as: the file was the CLI runner's alone before the halves existed.",
+    "_": "The three halves a test run covers, in the order {cliPrefix}Test runs them. test-summary.<machine>.json tags every suite entry with one of them (`half`) and holds one record per half under `halves`; the CLI runner and Test write it (Scripts/TestAll-Rules.ps1), agent/core/log.py serves it on GET /api/test-history, and the System page's Health card and Setup draw it in this order. legacyHalf is what an entry with no `half` is read as: the file was the CLI runner's alone before the halves existed. WHERE a machine keeps its test history -- summaryFile and resultsFile, {machine} the machine's name -- is one folder per machine, outside every checkout, so a run in any git worktree reaches the Health card: env.testHistoryDir when it is set; else, while env.testRunMarker is set, no folder (nothing is written); else the platform's (windows, macos, linux -- anything that is neither of the first two) historyBase variable when it is set and not blank, or the home folder joined with historyFallback, then historyPath. Fallback and path are /-separated segments. Scripts/Get-TestHistoryDir.ps1 (Resolve-P20TestHistorySegments) and agent/core/log.py (history_segments) are held to one table, Tests/fixtures/test-history/paths.json. A reader that finds no record for its machine there copies the one its own checkout kept at its root, once.",
     "halves": ["agent", "cli", "web"],
-    "legacyHalf": "cli"
+    "legacyHalf": "cli",
+    "summaryFile": "test-summary.{machine}.json",
+    "resultsFile": "test-results.{machine}.log",
+    "historyBase": { "windows": "LOCALAPPDATA", "linux": "XDG_STATE_HOME" },
+    "historyFallback": { "windows": "AppData/Local", "macos": "Library/Application Support", "linux": ".local/state" },
+    "historyPath": { "windows": "ToolKit/TestHistory", "macos": "ToolKit/TestHistory", "linux": "toolkit/test-history" }
   },
 
   "spaces": {
@@ -351,8 +357,15 @@
   },
 
   "usage": {
-    "_": "Claude Code usage (docs/hub/usage.md). envFlag is the literal name of the top-level boolean GET /api/env carries for it, and the key of the Claude Code usage row in the CLI's inventory (Scripts/Get-OptionalSurfaces.ps1): true where Claude Code's projects folder is on this machine (CLAUDE_CONFIG_DIR's, else ~/.claude/projects; agent/core/config.py claude_usage, the same rule as the row, held to one table by Tests/fixtures/usage/projects-root.json). The agent serves it and the web reads it by this name: the System page's Claude Code burn tile is drawn, and burnRoute fetched, only when it is true; an agent that serves no such field reads as off. burnRoute is the current burn -- today and this week, Burn -AsJson run through the bridge and kept on the agent's disk for an hour -- the agent mounts it (404 where envFlag is false), the web asks it.",
+    "_": "Claude Code usage (docs/hub/usage.md). envFlag is the literal name of the top-level boolean GET /api/env carries for it, and the key of the Claude Code usage row in the CLI's inventory (Scripts/Get-OptionalSurfaces.ps1): true where Claude Code's projects folder is on this machine (CLAUDE_CONFIG_DIR's, else ~/.claude/projects; agent/core/config.py claude_usage, the same rule as the row, held to one table by Tests/fixtures/usage/projects-root.json). The agent serves it and the web reads it by this name: the System page's Claude Code burn tile is drawn, and burnRoute fetched, only when it is true; an agent that serves no such field reads as off. burnRoute is the current burn -- today and this week, Burn -AsJson run through the bridge and kept on the agent's disk for an hour -- the agent mounts it (404 where envFlag is false), the web asks it. readingsFolder is the subfolder of the hub's usage/ that holds the typed plan readings (Burn -Reading; docs/hub/usage.md, \"The weekly burndown\"): <usage>/<readingsFolder>/<yyyy-mm-dd>-<machine>.json, one per week per machine -- the CLI writes and reads it, and the agent fingerprints it so a new reading is a miss in the burn route's cache.",
     "envFlag": "claudeUsage",
-    "burnRoute": "/api/usage/burn"
+    "burnRoute": "/api/usage/burn",
+    "readingsFolder": "readings"
+  },
+
+  "replyStatuses": {
+    "_": "The thread statuses a reply may set, per tracker (ReplyPR -Status; the PR Comments page's status box). ado is every status Azure DevOps keeps, in the order the box lists them. github is the three GitHub keeps -- a review thread is only resolved or unresolved: fixed and closed resolve it, active reopens it. byDesign, pending and wontFix carry a reason GitHub has nowhere to keep, so ReplyPR refuses them there, nothing posted, and the page does not offer them.",
+    "ado": ["fixed", "active", "pending", "byDesign", "wontFix", "closed"],
+    "github": ["fixed", "closed", "active"]
   }
 }

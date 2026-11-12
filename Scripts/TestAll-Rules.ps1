@@ -9,8 +9,12 @@
     and the suite (Tests/Test-TestAll.ps1) read one answer:
 
       Get-P20TestHalves            the three halves, in the order Test runs them.
-      Get-P20TestSummaryPath       test-summary.<machine>.json -- the one place
-                                   the file's name and the machine rule live.
+      Get-P20TestSummaryPath       test-summary.<machine>.json in the machine's
+                                   test-history folder (Get-TestHistoryDir.ps1),
+                                   '' when a marked run has none.
+      Get-P20TestResultsPath       test-results.<machine>.log, the same way.
+      Get-P20TestCheckout          the checkout a run came from (main, or the
+                                   worktree's folder name) and its commit.
       ConvertFrom-P20PytestOutput  pytest's closing summary line -> counts.
       ConvertFrom-P20JestOutput    jest's `Tests:` and `Test Suites:` lines -> counts,
                                    and whether jest force-exited a worker (Leaked).
@@ -53,6 +57,12 @@
 if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
 }
+if (-not (Get-Command Get-P20TestHistoryDir -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Get-TestHistoryDir.ps1')
+}
+if (-not (Get-Command Invoke-P20TrackerRead -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
+}
 
 function Get-P20TestHalves {
     <# The order Test runs them in -- consts.json tests.halves: the agent, the CLI, the web UI. #>
@@ -66,13 +76,49 @@ function Get-P20LegacyTestHalf {
 
 function Get-P20TestSummaryPath {
     <#
-      test-summary.<machine>.json at the package root. The CLI runner, Test and
-      Setup all ask here; agent/core/log.py globs test-summary.*.json from the
-      same root. The machine is [System.Environment]::MachineName -- the rule
-      Write-P20TestResult and the usage log use.
+      test-summary.<machine>.json in this machine's test-history folder, one for
+      every checkout (Scripts/Get-TestHistoryDir.ps1). The CLI runner, Test and
+      Setup all ask here; agent/core/log.py reads the same folder by the same
+      rule. -PackageRoot is the checkout asking: a record it kept at its own root
+      before the folder existed is copied in, once. '' under the run marker with
+      no override -- nothing is written and nothing is read.
+    #>
+    param([string]$PackageRoot)
+    return (Get-P20TestHistoryFile -Kind summary -PackageRoot $PackageRoot)
+}
+
+function Get-P20TestResultsPath {
+    <# test-results.<machine>.log beside the summary, by the same rule. #>
+    param([string]$PackageRoot)
+    return (Get-P20TestHistoryFile -Kind results -PackageRoot $PackageRoot)
+}
+
+function Get-P20TestCheckout {
+    <#
+      Where a run came from: `checkout` is `main` for a repository's own working
+      tree, the folder name of a linked git worktree, '' outside git; `commit`
+      is HEAD's short hash, '' when git cannot say. Both go on every record a run
+      writes, so a reader can say which tree a result is about.
     #>
     param([Parameter(Mandatory)][string]$PackageRoot)
-    return (Join-Path $PackageRoot ("test-summary.{0}.json" -f [System.Environment]::MachineName))
+    $out = [ordered]@{ checkout = ''; commit = '' }
+    try {
+        $r = Invoke-P20TrackerRead 'git' @('-C', $PackageRoot, 'rev-parse', '--show-toplevel', '--git-dir', '--git-common-dir', '--short', 'HEAD')
+    }
+    catch { return $out }
+    $lines = @($r.Out | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
+    if ($r.Code -ne 0 -or $lines.Count -lt 4) { return $out }
+    $full = {
+        param([string]$P)
+        if (-not [System.IO.Path]::IsPathRooted($P)) { $P = Join-Path $PackageRoot $P }
+        return ([System.IO.Path]::GetFullPath($P)).TrimEnd('\', '/')
+    }
+    $gitDir = & $full $lines[1]
+    $commonDir = & $full $lines[2]
+    if ($gitDir -eq $commonDir) { $out.checkout = 'main' }
+    else { $out.checkout = Split-Path -Leaf (& $full $lines[0]) }
+    $out.commit = $lines[3]
+    return $out
 }
 
 function New-P20Counts {
@@ -699,8 +745,8 @@ function ConvertTo-P20PlainTable {
 
 function Read-P20TestSummary {
     <# The summary file as ordered hashtables, or $null when there is none or it does not parse. #>
-    param([Parameter(Mandatory)][string]$Path)
-    if (-not (Test-Path -LiteralPath $Path)) { return $null }
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Path)
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { return $null }
     try {
         $raw = [System.IO.File]::ReadAllText($Path)
         if (-not $raw.Trim()) { return $null }
@@ -727,15 +773,17 @@ function Merge-P20TestSummary {
       passes the agent and web only, because the CLI's suites are the
       runner's own and it has just written them. -Top sets top-level keys
       (the CLI runner's totals). Written UTF-8 without a BOM; every reader
-      takes either.
+      takes either. An empty -Path -- a marked run with no history folder --
+      writes nothing.
     #>
     param(
-        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Path,
         [System.Collections.IDictionary]$Halves = @{},
         [System.Collections.IDictionary]$Suites = @{},
         [System.Collections.IDictionary]$Top = @{},
         [string[]]$ReplaceSuitesOf
     )
+    if (-not $Path) { return }
     $existing = Read-P20TestSummary -Path $Path
     if ($null -eq $existing) { $existing = [ordered]@{} }
 
@@ -771,6 +819,8 @@ function Merge-P20TestSummary {
     $out['halves'] = $halvesOut
 
     $json = $out | ConvertTo-Json -Depth 6
+    $folder = Split-Path -Parent $Path
+    if ($folder -and -not (Test-Path -LiteralPath $folder)) { New-Item -ItemType Directory -Path $folder -Force | Out-Null }
     [System.IO.File]::WriteAllText($Path, $json + "`n", (New-Object System.Text.UTF8Encoding($false)))
 }
 
