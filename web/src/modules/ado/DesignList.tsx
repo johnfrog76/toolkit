@@ -16,7 +16,7 @@ import type { CardAction } from "../../shared/CardActions";
 import { CardSpinner } from "../../shared/CardSpinner";
 import { EmptyState } from "../../shared/EmptyState";
 import type { EmptyMessage } from "../../shared/EmptyState";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { useGetDesignQuery, useLazySearchDesignQuery } from "./api.ado";
 import { designRoomPath } from "./docRooms";
@@ -286,7 +286,7 @@ export function DesignList() {
   const footLine = data?.supported && designs.length > 0 ? checkoutLine(checkout, data.repo) : "";
   return (
     <>
-      <PageCard
+      <PanelFrame
         scrollable
         empty={empty ? <EmptyState {...empty} /> : undefined}
         footerLeft={footLine ? <Caption1 role="note">{footLine}</Caption1> : undefined}
@@ -347,7 +347,7 @@ export function DesignList() {
             ) : null}
           </>
         )}
-      </PageCard>
+      </PanelFrame>
       {move && product ? (
         <MoveDesignDialog
           design={move.design}

@@ -1,6 +1,7 @@
 import { Caption1, makeStyles, tokens } from "@fluentui/react-components";
 import { ImageOffRegular } from "@fluentui/react-icons";
 import { STAMPS } from "../../shell/consts";
+import { escapeRegExp } from "../../shared/escapeRegExp";
 
 // A card's pictures (docs/hub/cards.md, "A card's pictures"): the cover on
 // the board's card face, a thumbnail in the Home list's meta line, and the cover
@@ -119,7 +120,7 @@ export function CoverThumb({ cover, label }: { cover?: string | null; label: str
  * whose file is missing": the model serves null for both.
  */
 export function imageLine(content: string, stamp: string): string | null {
-  const escaped = stamp.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escaped = escapeRegExp(stamp);
   const m = new RegExp(`^${escaped}[ \\t]*(\\S[^\\r\\n]*?)[ \\t]*\\r?$`, "m").exec(content ?? "");
   return m ? m[1] : null;
 }

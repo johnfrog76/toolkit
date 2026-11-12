@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { expectOneRowShape } from "./rowShapeAssert";
+import { expectListPanelShape } from "../../shell/kinds/panelShapeAssert";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { FoyerCard, SPACES_FILTER_KEY } from "./FoyerCard";
 
@@ -507,8 +507,15 @@ describe("the Spaces card's filter", () => {
       "Archive1",
     ]);
     expect(chip().textContent).toBe("5");
-    for (const name of ["Toolkit", "Acme", "Wasteland", "Globex", "Demo"])
-      expect(screen.getByText(name)).toBeTruthy();
+    // Five Spaces are two pages of four.
+    const drawn = () =>
+      Array.from(document.querySelectorAll("[data-card-item] strong")).map((e) => e.textContent);
+    const first = drawn();
+    expect(first).toHaveLength(4);
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect([...first, ...drawn()].sort()).toEqual(
+      ["Toolkit", "Acme", "Wasteland", "Globex", "Demo"].sort(),
+    );
   });
 
   it("a populated card carries no helper sentence: the title, the tags and the rows say it", () => {
@@ -692,16 +699,16 @@ describe("the Spaces card's load, Refresh and pager", () => {
     expect((screen.getByTitle("Refresh") as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("pages at five: the pager is at the foot, the chip is the total, the + stays", () => {
+  it("pages at four: the pager is at the foot, the chip is the total, the + stays", () => {
     envAnswer = { config: { activeSpace: "s01", spaces: many(12) } };
     mount();
-    expect(screen.getByText("Space 05")).toBeTruthy();
-    expect(screen.queryByText("Space 06")).toBeNull();
-    expect(screen.getByText("1 / 3")).toBeTruthy();
+    expect(screen.getByText("Space 04")).toBeTruthy();
+    expect(screen.queryByText("Space 05")).toBeNull();
+    expect(screen.getByText("Page 1 of 3")).toBeTruthy();
     expect(screen.getByLabelText("12 Spaces").textContent).toBe("12");
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
-    expect(screen.getByText("Space 06")).toBeTruthy();
-    expect(screen.getByText("Space 10")).toBeTruthy();
+    expect(screen.getByText("Space 05")).toBeTruthy();
+    expect(screen.getByText("Space 08")).toBeTruthy();
     expect(screen.queryByText("Space 01")).toBeNull();
     expect(screen.getByLabelText("12 Spaces").textContent).toBe("12");
     expect(screen.getByRole("button", { name: /New Space/ })).toBeTruthy();
@@ -717,22 +724,22 @@ describe("the Spaces card's load, Refresh and pager", () => {
     }));
     envAnswer = { config: { activeSpace: "s01", spaces: [...many(12), ...products] } };
     mount();
-    expect(screen.getByText("1 / 5")).toBeTruthy();
+    expect(screen.getByText("Page 1 of 6")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
-    expect(screen.getByText("2 / 5")).toBeTruthy();
+    expect(screen.getByText("Page 2 of 6")).toBeTruthy();
     fireEvent.click(screen.getByRole("radio", { name: /^Products/ }));
-    expect(screen.getByText("1 / 3")).toBeTruthy();
+    expect(screen.getByText("Page 1 of 3")).toBeTruthy();
     expect(screen.getByText("Product 1")).toBeTruthy();
     expect(screen.queryByText("Space 01")).toBeNull();
     expect(screen.getByLabelText("23 Spaces").textContent).toBe("23");
   });
 
   it("one page: no pager, as the Reminders card", () => {
-    envAnswer = { config: { activeSpace: "s01", spaces: many(5) } };
+    envAnswer = { config: { activeSpace: "s01", spaces: many(4) } };
     mount();
-    expect(screen.getByText("Space 05")).toBeTruthy();
+    expect(screen.getByText("Space 04")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Next page" })).toBeNull();
-    expect(screen.queryByText("1 / 1")).toBeNull();
+    expect(screen.queryByText("Page 1 of 1")).toBeNull();
   });
 
   it("a GitHub Space not connected says nothing about visibility", () => {
@@ -787,7 +794,10 @@ describe("the Spaces card's row shape", () => {
       },
     };
     const { container } = mount();
-    const rows = expectOneRowShape(container, "space", [long, "Two", "Acme"]);
+    const rows = expectListPanelShape(container.querySelector<HTMLElement>("[data-panel-kind]")!, {
+      titles: [long, "Two", "Acme"],
+      chips: true,
+    });
     // Status badges beside the name, the kind and slug on the bottom line.
     expect(rows[1].querySelector("[data-row-text]")!.textContent).toContain("archived");
     expect(rows[2].querySelector("[data-row-text]")!.textContent).toContain("you are here");

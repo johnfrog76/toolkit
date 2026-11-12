@@ -10,7 +10,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { RefreshButton } from "../../shared/RefreshButton";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { CommentRegular, ArrowRightRegular, FolderRegular } from "@fluentui/react-icons";
 import { useGetEnvQuery } from "../../shell/api";
 import { useGetPrCommentsQuery, useGetPrsQuery } from "./api.ado";
@@ -120,7 +120,7 @@ export function PRCommentsList({
           };
 
   return (
-    <PageCard
+    <PanelFrame
       scrollable
       empty={emptyMessage ? <EmptyState {...emptyMessage} /> : undefined}
       loading={loading || userRefetching}
@@ -181,6 +181,6 @@ export function PRCommentsList({
           ))}
         </div>
       )}
-    </PageCard>
+    </PanelFrame>
   );
 }

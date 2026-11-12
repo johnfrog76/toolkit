@@ -33,7 +33,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { BackButton } from "../../shared/BackButton";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { PageGrid } from "../../shell/cards";
 import { useConnectStepMutation, useGetConnectStateQuery } from "./api.ado";
 import type { CommandResponse } from "./api.ado";
@@ -176,7 +176,7 @@ export function ConnectPage() {
 
   return (
     <PageGrid>
-      <PageCard
+      <PanelFrame
         loading={isFetching && !report}
         loadingLabel="Asking the toolkit where this Space stands…"
         headerLeft={
@@ -428,7 +428,7 @@ export function ConnectPage() {
           <Body1Strong>In a terminal:</Body1Strong>{" "}
           <span className={styles.code}>tkConnect {slug}</span> walks the same steps.
         </Caption1>
-      </PageCard>
+      </PanelFrame>
     </PageGrid>
   );
 }
