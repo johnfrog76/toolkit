@@ -420,6 +420,7 @@ the engine takes whatever is in that variable at face value. Use `-WhatIf` from 
 | `web/.../ManagerDetailPage.test.tsx` | The read view's Carried-from line: the agent's sentence drawn for `stale`, `missing` and `absent`, and nothing for `ok` or when the fields are absent |
 | `web/.../cliBridge.test.ts` (three of its cases) | `MeetingAgenda`'s argv: `-Date`, `-Type` only for a series that is not the 1:1, then the one switch spelt the script's way |
 | `web/.../sendButton.test.ts` | The send button's three states, including that it is absent rather than disabled when the workflow has no send, and that what goes out is the Agenda and never the self-assessment |
+| `web/.../EnvCard.recipients.test.tsx` | The Environment card's Teams recipients: a `managerWorkflow` recipient labelled Every Space and an org one This Space, each with its variable set or named unset; and with `features.communication` off, no row drawn and the rows' chunk never fetched even when `/env` carries the block |
 | `web/.../registry.communication.test.tsx` | The registry contract from this module's side: off contributes no route, nav or card; on contributes exactly these seven routes |
 | `npm run smoke -- --modules=on` | In a browser: lists the three fixture sessions, reads their stages, finds the retro session's send button disabled and naming its variable, reaches the session page through `Edit / send`, and finds Close on exactly one session without pressing it |
 
