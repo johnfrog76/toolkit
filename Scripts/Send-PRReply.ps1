@@ -181,7 +181,7 @@ if (-not $Reply) {
 # ValidateSet this replaces did), on either tracker, before anything is asked
 # or posted.
 if ("$Status" -and "$Status" -notin $replyStatuses) {
-    Write-CliError -Message "-Status $Status is not a thread status." -Hint "Nothing was posted. Use one of $($replyStatuses -join ', '), or leave -Status off."
+    Write-CliError -Message "-Status $Status is not a thread status." -Hint "Nothing was posted. Use one of $($replyStatuses -join ', ') (consts.json replyStatuses.ado), or leave -Status off."
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
 

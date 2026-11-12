@@ -1583,7 +1583,7 @@ try {
     $before = [System.IO.File]::ReadAllText($wCard)
     $r = Invoke-GhVerb "${cfgPrefix}ReplyPR 12 2412345690 -Reply 'Not this time.' -Status resolved"
     Assert-True 'ReplyPR -Status <not a status>: refused, exit 2, one block naming the word and the contract''s six' `
-        ($r.Text -match 'Error: -Status resolved is not a thread status' -and $r.Text -match [regex]::Escape("Use one of $($contractStatuses -join ', ')") -and $r.Text -match 'EXIT=2' -and ([regex]::Matches($r.Text, '(?m)^Error: ')).Count -eq 1) $r.Text
+        ($r.Text -match 'Error: -Status resolved is not a thread status' -and $r.Text -match [regex]::Escape("Use one of $($contractStatuses -join ', ')") -and $r.Text -match 'consts\.json replyStatuses\.ado' -and $r.Text -match 'EXIT=2' -and ([regex]::Matches($r.Text, '(?m)^Error: ')).Count -eq 1) $r.Text
     Assert-True '...and nothing was asked or posted: no gh call, the card untouched' `
         ((Get-GhCalls $r).Count -eq 0 -and [System.IO.File]::ReadAllText($wCard) -eq $before) (Format-Calls $r)
 
