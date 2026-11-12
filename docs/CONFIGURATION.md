@@ -420,9 +420,16 @@ moves only once the commit is pushed, because the tab reads GitHub ([A repositor
 Space's clone, and this setting is its first candidate, before the folder you stand in and the nav shortcuts'
 paths -- so `MoveDesign -Hub -Space <slug> -To Complete` checks `-Doc` in the configured checkout too. A
 candidate counts only when its `origin` names the Space's repository; a setting that points at another clone is
-passed over and said. The agent asks the same question of the configured path alone for the Design tab
+passed over and said. On a GitHub Space that repository is `owner/name`, from the address or its one `projects[]`
+repo. On an **Azure DevOps** Space it is the organisation the address names (`https://dev.azure.com/<org>` or
+`https://<org>.visualstudio.com`), the one `projects[]` entry's name, and that entry's `repo` (the project's own
+name where it has none) -- and a clone's `origin` is that repository in any form Azure DevOps gives it:
+`https://dev.azure.com/<org>/<project>/_git/<repo>`, `https://<org>.visualstudio.com/[DefaultCollection/]<project>/_git/<repo>`,
+or `git@ssh.dev.azure.com:v3/<org>/<project>/<repo>` and `<org>@vs-ssh.visualstudio.com:v3/<org>/<project>/<repo>`,
+the host in any case and a trailing `.git` optional. A Space with several projects names no single repository, so
+it has no clone to find. The patterns are `consts.json` `regex.adoOrigin*` and `regex.adoOrg*`. The agent asks the same question of the configured path alone for the Design tab
 (`agent/core/checkout.py`, on every `GET /api/design`, as `checkout`), and never searches; the path and
-origin rules are one table both halves assert, `Tests/fixtures/space-checkout/table.json`.
+origin rules (GitHub's and Azure DevOps's) are one table both halves assert, `Tests/fixtures/space-checkout/table.json`.
 
 Unset, a product row keeps its one link out, **Open on GitHub**, and the Design tab's foot names this setting;
 set to a folder that is not a clone of the Space's repository, the foot says why. `tkEnv` lists it under
