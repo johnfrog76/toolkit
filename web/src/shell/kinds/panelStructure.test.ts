@@ -45,7 +45,14 @@ import {
   CARD_ITEM_PADDING_Y_PX,
   CARD_ITEM_TITLE_BAND_PX,
 } from "../cardItemTokens";
-import { cardListGap, cardListPaddingTop, filterRowGap } from "../layoutTokens";
+import {
+  cardListGap,
+  cardListGapPx,
+  cardListPaddingTop,
+  cardListPaddingTopPx,
+  filterRowGap,
+  filterRowGapPx,
+} from "../layoutTokens";
 import { PANEL_BODY, PANEL_MAX_HEIGHT_PX, PANEL_MIN_HEIGHT_PX, PANEL_SLOTS } from "../panelHeight";
 
 const SRC = path.join(__dirname, "..", "..");
@@ -387,28 +394,29 @@ describe("the panel rules, over every source file", () => {
     expect(frameText).not.toMatch(/margin\w*["']?\s*:/i);
     const itemTokens = fs.readFileSync(path.join(SRC, "shell/cardItemTokens.ts"), "utf8");
     expect(itemTokens).not.toMatch(/export const \w*(GAPS|MARGIN)\w*/);
-    expect(cardListGap).toEqual({ full: 3, compact: 8, line: 0 });
+    expect(cardListGapPx).toEqual({ full: 4, compact: 8, line: 0 });
+    expect(cardListPaddingTopPx).toEqual(cardListGapPx);
     expect(cardListPaddingTop).toEqual(cardListGap);
     const panel = fs.readFileSync(path.join(SRC, "shell/kinds/ListPanel.tsx"), "utf8");
     // One wrapper, a real list, findable by class and attribute, wearing the tokens.
     expect(panel.match(/<ul\s/g)).toHaveLength(1);
     expect(panel.match(/<li\s/g)).toHaveLength(1);
-    expect(panel).toMatch(/<ul\s+role="list"/);
+    expect(panel).toMatch(/<ul\s[^>]*role="list"/);
     expect(panel).toContain('export const CARD_LIST_CLASS = "cardList";');
     expect(panel).toContain('data-card-list=""');
     for (const size of ["full", "compact", "line"]) {
-      expect(panel).toContain(`rowGap: \`\${cardListGap.${size}}px\``);
-      expect(panel).toContain(`paddingTop: \`\${cardListPaddingTop.${size}}px\``);
+      expect(panel).toContain(`rowGap: cardListGap.${size}`);
+      expect(panel).toContain(`paddingTop: cardListPaddingTop.${size}`);
     }
     // The items are drawn inside it and nowhere else.
     expect(panel.match(/<(CardItem|CompactItem|LineItem)\b/g)).toHaveLength(3);
   });
 
   it("the filter rows sit in one wrapper whose gap spaces them: a row has no margin, and no tint of its own", () => {
-    expect(filterRowGap).toBe(4);
+    expect(filterRowGapPx).toBe(4);
     const panel = fs.readFileSync(path.join(SRC, "shell/kinds/ListPanel.tsx"), "utf8");
     expect(panel.match(/data-panel-filters/g)).toHaveLength(1);
-    expect(panel).toContain("rowGap: `${filterRowGap}px`");
+    expect(panel).toContain("rowGap: filterRowGap,");
     // The only margins in the kind are the list's reset to none.
     expect(panel.match(/margin\w*:\s*[^0\s]/g)).toBeNull();
     // A row of chips is its label and its chips: every row looks alike.
@@ -421,6 +429,82 @@ describe("the panel rules, over every source file", () => {
     expect(fields("FilterRow")).toEqual(["label", "chips"]);
     expect(fields("FilterChip")).toEqual(["id", "label", "count", "active", "onSelect"]);
     expect(panel).not.toMatch(/appearance=\{row/);
+  });
+
+  it("every spacing value in the panel layer is a Fluent spacing token on the 4 px grid, and no length is typed", () => {
+    // The panel layer: the item, the kinds, the frame and the layout tokens.
+    const layer = Array.from(facts.keys()).filter(
+      (file) =>
+        file === "shell/CardItem.tsx" ||
+        file === FRAME ||
+        file === "shell/layoutTokens.ts" ||
+        file.startsWith(KINDS_DIR),
+    );
+    expect(layer).toEqual(expect.arrayContaining(["shell/kinds/ListPanel.tsx", FRAME]));
+    const theme = webLightTheme as unknown as Record<string, string>;
+    const SPACING = /^(margin|padding|gap|rowGap|columnGap)/;
+    const offGrid: string[] = [];
+    const typed: string[] = [];
+    for (const file of layer) {
+      const text = fs.readFileSync(path.join(SRC, file), "utf8");
+      const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+      const at = (n: ts.Node) =>
+        `${file}:${sf.getLineAndCharacterOfPosition(n.getStart()).line + 1}`;
+      const visit = (node: ts.Node) => {
+        // A spacing property takes a token (or a name that holds one), or 0: never a typed length.
+        if (
+          ts.isPropertyAssignment(node) &&
+          (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name)) &&
+          SPACING.test(node.name.text)
+        ) {
+          const value = node.initializer;
+          const zero = ts.isNumericLiteral(value) && value.text === "0";
+          const name =
+            ts.isPropertyAccessExpression(value) ||
+            ts.isIdentifier(value) ||
+            ts.isElementAccessExpression(value);
+          if (!zero && !name) typed.push(`${at(node)}: ${node.getText(sf).slice(0, 60)}`);
+        }
+        // Every Fluent spacing token named in the layer is a multiple of 4 px.
+        if (
+          ts.isPropertyAccessExpression(node) &&
+          ts.isIdentifier(node.expression) &&
+          node.expression.text === "tokens" &&
+          /^spacing/.test(node.name.text)
+        ) {
+          const px = parseInt(theme[node.name.text], 10);
+          if (!(px > 0 && px % 4 === 0)) offGrid.push(`${at(node)}: ${node.name.text} is ${px}px`);
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(sf);
+    }
+    expect(typed).toEqual([]);
+    expect(offGrid).toEqual([]);
+
+    // Each number kept for the sums is its token's length, and on the grid.
+    const tokenPx = (value: string) =>
+      value === "0" ? 0 : parseInt(theme[/^var\(--(\w+)\)$/.exec(value)![1]], 10);
+    for (const size of ["full", "compact", "line"] as const) {
+      expect(tokenPx(cardListGap[size])).toBe(cardListGapPx[size]);
+      expect(tokenPx(cardListPaddingTop[size])).toBe(cardListPaddingTopPx[size]);
+    }
+    expect(tokenPx(filterRowGap)).toBe(filterRowGapPx);
+    expect(theme.spacingVerticalM).toBe(`${CARD_ITEM_PADDING_Y_PX}px`);
+    expect(theme.spacingVerticalS).toBe(`${CARD_ITEM_COMPACT_BAND_GAP_PX}px`);
+    for (const px of [
+      ...Object.values(cardListGapPx),
+      ...Object.values(cardListPaddingTopPx),
+      filterRowGapPx,
+      CARD_ITEM_PADDING_Y_PX,
+      CARD_ITEM_COMPACT_BAND_GAP_PX,
+    ]) {
+      expect(px % 4).toBe(0);
+    }
+    // Not spacing, so not held to the grid: the bands are content sizes -- the
+    // title's line (24), a description line (15) and a badge's height (16).
+    const item = fs.readFileSync(path.join(SRC, "shell/CardItem.tsx"), "utf8");
+    expect(item).toContain("rowGap: tokens.spacingVerticalS,");
   });
 
   it("an item's data has no density of its own, and a compact item no description", () => {

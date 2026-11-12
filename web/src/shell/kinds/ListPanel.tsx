@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 import {
   Badge,
@@ -23,7 +23,8 @@ import { RefreshButton } from "../../shared/RefreshButton";
 import { StatusMessage } from "../../shared/StatusMessage";
 import { CardItem, CompactItem, LineItem } from "../CardItem";
 import type { CardItemData, CompactItemData, LineItemData } from "../CardItem";
-import { listPageSize } from "../pageSize";
+import { listPageSize, pageSizeForRoom } from "../pageSize";
+import { measureListRoom } from "./listRoom";
 import { cardListGap, cardListPaddingTop, filterRowGap } from "../layoutTokens";
 import { PANEL_BODY } from "../panelHeight";
 import type { ListChrome, ListDensity } from "../pageSize";
@@ -54,7 +55,7 @@ const useStyles = makeStyles({
   filters: {
     display: "flex",
     flexDirection: "column",
-    rowGap: `${filterRowGap}px`,
+    rowGap: filterRowGap,
     minWidth: 0,
     flexShrink: 0,
   },
@@ -62,7 +63,7 @@ const useStyles = makeStyles({
     display: "flex",
     flexWrap: "nowrap",
     overflowX: "auto",
-    gap: tokens.spacingHorizontalXXS,
+    gap: tokens.spacingHorizontalXS,
     flexShrink: 0,
     // The chips are tight and never wrap: at the narrowest width the row
     // scrolls sideways inside the panel instead.
@@ -93,12 +94,12 @@ const useStyles = makeStyles({
     paddingLeft: 0,
   },
   listItem: { display: "block", minWidth: 0 },
-  listFull: { rowGap: `${cardListGap.full}px`, paddingTop: `${cardListPaddingTop.full}px` },
+  listFull: { rowGap: cardListGap.full, paddingTop: cardListPaddingTop.full },
   listCompact: {
-    rowGap: `${cardListGap.compact}px`,
-    paddingTop: `${cardListPaddingTop.compact}px`,
+    rowGap: cardListGap.compact,
+    paddingTop: cardListPaddingTop.compact,
   },
-  listLine: { rowGap: `${cardListGap.line}px`, paddingTop: `${cardListPaddingTop.line}px` },
+  listLine: { rowGap: cardListGap.line, paddingTop: cardListPaddingTop.line },
   search: { minWidth: 0 },
   picker: { minWidth: 0 },
   foot: { color: tokens.colorNeutralForeground3 },
@@ -142,8 +143,6 @@ export interface SearchSlot {
   placeholder?: string;
   value: string;
   onChange: (value: string) => void;
-  /** What a deeper search found, drawn above the items. */
-  results?: ReactElement;
 }
 
 export interface RefreshSlot {
@@ -280,20 +279,54 @@ export function ListPanel<T>(props: ListPanelProps<T>) {
     footNote: footNote != null,
     status: status != null,
   };
-  const pageSize = listPageSize(chrome);
+  // The static sum is the first paint's answer and the answer where nothing
+  // can be measured; once the list is laid out, the room it really has decides.
+  const [room, setRoom] = useState<number | null>(null);
+  const pageSize = room === null ? listPageSize(chrome) : pageSizeForRoom(density, room);
 
-  // The page: back to the first when a filter, a picker or the search changes,
+  // The page is held as the index of its first item, so when a resize changes
+  // the page size the item at the top of the page stays in view. It goes back
+  // to the first item when a filter, a picker or the search changes, and is
   // clamped when the list shrinks.
   const signature = filterSignature(props);
-  const [chosenPage, setChosenPage] = useState(0);
+  const [chosenFirst, setChosenFirst] = useState(0);
   const [seen, setSeen] = useState(signature);
   if (seen !== signature) {
     setSeen(signature);
-    setChosenPage(0);
+    setChosenFirst(0);
   }
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
-  const page = Math.min(seen === signature ? chosenPage : 0, totalPages - 1);
+  const page = Math.min(
+    seen === signature ? Math.floor(chosenFirst / pageSize) : 0,
+    totalPages - 1,
+  );
   const pageItems = items.slice(page * pageSize, (page + 1) * pageSize);
+  const hasFoot = Boolean(footLeft) || create != null || (totalPages > 1 && !loading);
+
+  // Measure after every draw, and again whenever the panel or anything above
+  // the list changes size by itself (a result block that loads, a window that
+  // narrows the header into two lines).
+  const rootRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    const list = listRef.current;
+    const frame = root?.firstElementChild as HTMLElement | null;
+    const frameBody = frame?.querySelector<HTMLElement>(":scope > [data-panel-frame-body]");
+    if (!root || !list || !frame || !frameBody) return;
+    const measure = () => {
+      const next = measureListRoom(root, frame, frameBody, list, hasFoot);
+      setRoom((was) => (was === next ? was : next));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(root);
+    for (const el of Array.from(frame.children)) if (el !== frameBody) observer.observe(el);
+    const body = list.parentElement;
+    for (const el of Array.from(body?.children ?? [])) if (el !== list) observer.observe(el);
+    return () => observer.disconnect();
+  });
 
   // One entry, drawn at the panel's density from the data its `item` returns.
   const drawItem = (entry: T): { id?: string; element: ReactElement } => {
@@ -313,6 +346,7 @@ export function ListPanel<T>(props: ListPanelProps<T>) {
 
   return (
     <div
+      ref={rootRef}
       className={mergeClasses(styles.root, minHeight)}
       data-panel-kind="list"
       data-panel-density={density}
@@ -394,7 +428,11 @@ export function ListPanel<T>(props: ListPanelProps<T>) {
         footerLeft={footLeft ? <Caption1 className={styles.foot}>{footLeft}</Caption1> : undefined}
         footerCenter={
           totalPages > 1 && !loading ? (
-            <ListPager page={page} totalPages={totalPages} onPageChange={setChosenPage} />
+            <ListPager
+              page={page}
+              totalPages={totalPages}
+              onPageChange={(to) => setChosenFirst(to * pageSize)}
+            />
           ) : undefined
         }
         footerRight={
@@ -418,7 +456,6 @@ export function ListPanel<T>(props: ListPanelProps<T>) {
               <CardSpinner label={loading.label} />
             ) : (
               <>
-                {search?.results}
                 {filters?.length ? (
                   <div className={styles.filters} data-panel-filters>
                     {filters.map((row) => (
@@ -452,6 +489,7 @@ export function ListPanel<T>(props: ListPanelProps<T>) {
                 {none ? <EmptyState {...none} /> : null}
                 {pageItems.length > 0 ? (
                   <ul
+                    ref={listRef}
                     role="list"
                     className={mergeClasses(
                       CARD_LIST_CLASS,

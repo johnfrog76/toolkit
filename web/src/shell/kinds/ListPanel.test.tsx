@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { DocumentRegular } from "@fluentui/react-icons";
 import { ListPanel } from "./ListPanel";
 import type { FilterRow } from "./ListPanel";
@@ -11,7 +11,10 @@ import {
   listChromePx,
   listHeightPx,
   listPageSize,
+  pageSizeForRoom,
 } from "../pageSize";
+import { cardListPaddingTopPx } from "../layoutTokens";
+import * as listRoom from "./listRoom";
 import { PANEL_MAX_HEIGHT_PX, PANEL_MIN_HEIGHT_PX } from "../panelHeight";
 import { expectListPanelShape, expectSentenceInInfoTip, panelOf } from "./panelShapeAssert";
 
@@ -40,7 +43,7 @@ describe("the page size", () => {
   it("is worked out from the panel's fixed height and its own chrome, never typed", () => {
     expect(PANEL_MIN_HEIGHT_PX.list).toBe(592);
     expect(PANEL_MAX_HEIGHT_PX.list).toBe(592);
-    expect(LIST_ITEM_PITCH_PX).toEqual({ full: 99, compact: 82, line: 28 });
+    expect(LIST_ITEM_PITCH_PX).toEqual({ full: 100, compact: 82, line: 28 });
     // Full items: four, with no chip row, with one, with two, and over a foot note.
     expect(LIST_PAGE_SIZE).toBe(4);
     expect(listPageSize({ density: "full" })).toBe(4);
@@ -76,6 +79,116 @@ describe("the page size", () => {
         }
       }
     }
+  });
+});
+
+describe("the page size, measured", () => {
+  it("is the room divided by an item and the list's gap: n items and the n - 1 gaps between them", () => {
+    // Full: 96 px items, 4 px apart.
+    expect(pageSizeForRoom("full", 96)).toBe(1);
+    expect(pageSizeForRoom("full", 195)).toBe(1);
+    expect(pageSizeForRoom("full", 196)).toBe(2);
+    expect(pageSizeForRoom("full", 396)).toBe(4);
+    expect(pageSizeForRoom("full", 495)).toBe(4);
+    expect(pageSizeForRoom("full", 496)).toBe(5);
+    // Compact: 74 px items, 8 px apart.
+    expect(pageSizeForRoom("compact", 402)).toBe(5);
+    expect(pageSizeForRoom("compact", 401)).toBe(4);
+    // Line: 28 px, touching.
+    expect(pageSizeForRoom("line", 308)).toBe(11);
+    expect(pageSizeForRoom("line", 307)).toBe(10);
+  });
+
+  it("is never less than one item, however little room there is", () => {
+    for (const room of [0, 10, -400]) {
+      expect(pageSizeForRoom("full", room)).toBe(1);
+      expect(pageSizeForRoom("compact", room)).toBe(1);
+      expect(pageSizeForRoom("line", room)).toBe(1);
+    }
+  });
+
+  it("agrees with the static sum where the chrome is what the sum expects", () => {
+    for (const density of ["full", "compact", "line"] as const) {
+      for (const filterRows of [0, 1, 2]) {
+        const chrome = { density, filterRows };
+        const room =
+          PANEL_MAX_HEIGHT_PX.list - listChromePx(chrome) - cardListPaddingTopPx[density];
+        expect(pageSizeForRoom(density, room)).toBe(listPageSize(chrome));
+      }
+    }
+  });
+});
+
+describe("ListPanel, measuring its list", () => {
+  // jsdom lays nothing out, so the room is handed in: the measurement itself is
+  // listRoom's own test, and the browser check's.
+  let room: number | null = null;
+  const observed: Element[] = [];
+  let notify: () => void = () => undefined;
+  const RealObserver = globalThis.ResizeObserver;
+  beforeEach(() => {
+    room = null;
+    observed.length = 0;
+    jest.spyOn(listRoom, "measureListRoom").mockImplementation(() => room);
+    globalThis.ResizeObserver = class {
+      constructor(callback: ResizeObserverCallback) {
+        notify = () => callback([], this as unknown as ResizeObserver);
+      }
+      observe(el: Element) {
+        observed.push(el);
+      }
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+    globalThis.ResizeObserver = RealObserver;
+  });
+
+  it("with nothing to measure, the static sum stands", () => {
+    render(<ListPanel title="Notes" items={notes(9)} item={toItem} empty={none} />);
+    expect(titles()).toHaveLength(4);
+  });
+
+  it("the measured room decides the page, down to one item", () => {
+    room = 496;
+    const { rerender } = render(
+      <ListPanel title="Notes" items={notes(9)} item={toItem} empty={none} />,
+    );
+    expect(titles()).toEqual(["a-1", "a-2", "a-3", "a-4", "a-5"]);
+    expect(screen.getByText("Page 1 of 2")).toBeTruthy();
+    room = 120;
+    rerender(<ListPanel title="Notes" items={notes(9)} item={toItem} empty={none} />);
+    expect(titles()).toEqual(["a-1"]);
+    expect(screen.getByText("Page 1 of 9")).toBeTruthy();
+  });
+
+  it("watches the panel and what sits above the list, and a resize that changes the page keeps its first item in view", () => {
+    room = 396;
+    render(
+      <ListPanel
+        title="Notes"
+        items={notes(12)}
+        item={toItem}
+        empty={none}
+        status={{ tone: "busy", text: "Reading..." }}
+      />,
+    );
+    expect(observed).toContain(panel());
+    expect(observed.some((el) => el.hasAttribute("data-panel-status"))).toBe(true);
+    expect(observed.some((el) => el.hasAttribute("data-card-list"))).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(titles()).toEqual(["a-5", "a-6", "a-7", "a-8"]);
+    // The panel loses room: three fit. The page that holds a-5 is shown.
+    room = 300;
+    act(() => notify());
+    expect(titles()).toEqual(["a-4", "a-5", "a-6"]);
+    expect(screen.getByText("Page 2 of 4")).toBeTruthy();
+    // It gains room again: five fit, and a-5 is still on the page shown.
+    room = 496;
+    act(() => notify());
+    expect(titles()).toEqual(["a-1", "a-2", "a-3", "a-4", "a-5"]);
   });
 });
 

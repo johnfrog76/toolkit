@@ -39,11 +39,10 @@ import {
 } from "../ado/DesignGroups";
 import { DESIGN } from "../../shell/consts";
 import { boundCardPath } from "../ado/DesignBindings";
-import { DesignSearchInside } from "../ado/DesignSearchInside";
 import { ALL, designMatches } from "../ado/docFilters";
 import { roomFor } from "../ado/docRooms";
 import { useSharedPersistedValue } from "../../shared/usePersistedState";
-import type { Design } from "../ado/api.ado";
+import type { Design, DesignSearchHit } from "../ado/api.ado";
 import {
   useGetDesignNotesQuery,
   useLazySearchHubDesignsQuery,
@@ -75,6 +74,10 @@ const useStyles = makeStyles({
 const NO_SPACE = "";
 /** The drawer's search, remembered per browser (not a Space's: a switch keeps it). */
 export const HUB_DESIGN_TEXT_KEY = "studio.design.text";
+
+/** What the panel lists: the hub's designs, or -- while a search inside is
+ *  showing -- the documents it found. Both are card items, paged alike. */
+type Row = { design: Design } | { hit: DesignSearchHit };
 
 export function DesignsCard() {
   const styles = useStyles();
@@ -211,8 +214,55 @@ export function DesignsCard() {
         ? { icon, tone: "filtered", title: "No design matches the search" }
         : { icon, tone: "filtered", title: "No archived design with that outcome" };
 
+  // Search inside: the words run over the files on disk, and what they find
+  // takes the list's place -- each hit a card item, paged like the designs --
+  // until the Designs chip brings the designs back.
+  const matching = asked !== null;
+  const hits = inside.data?.hits ?? [];
+  const matchesEmpty: EmptyMessage = inside.error
+    ? {
+        icon,
+        tone: "error",
+        title: "Could not search inside",
+        detail: "The agent did not answer. Nothing was read.",
+      }
+    : inside.data && !inside.data.supported
+      ? {
+          icon,
+          title: "Nothing to search inside",
+          detail:
+            "Search inside reads a GitHub repo's design/ and spec/; this Space has none to read.",
+        }
+      : inside.data && !inside.data.available
+        ? { icon, tone: "error", title: "Could not search inside", detail: inside.data.reason }
+        : {
+            icon,
+            tone: "filtered",
+            title: "Nothing inside the documents carries every word",
+          };
+
   const filters: FilterRow[] = [];
-  if (groups.length > 0) {
+  if (matching) {
+    filters.push({
+      label: "Filter designs",
+      chips: [
+        {
+          id: "designs",
+          label: "Designs",
+          count: shown.length > 0 ? shown.length : undefined,
+          active: false,
+          onSelect: () => setAsked(null),
+        },
+        {
+          id: "inside",
+          label: "Matches inside",
+          count: hits.length > 0 ? hits.length : undefined,
+          active: true,
+          onSelect: () => undefined,
+        },
+      ],
+    });
+  } else if (groups.length > 0) {
     filters.push({
       label: "Filter designs",
       chips: groups.map((g) => ({
@@ -224,7 +274,7 @@ export function DesignsCard() {
       })),
     });
   }
-  if (archived) {
+  if (archived && !matching) {
     // A second press on an outcome goes back to any. Each chip counts the
     // archived designs in view that it would show.
     const toggle = (o: string) => setOutcomeFilter(outcomeFilter === o ? ALL_OUTCOMES : o);
@@ -257,7 +307,22 @@ export function DesignsCard() {
     });
   }
 
-  const toItem = (design: Design): CardItemData => {
+  const hitItem = (h: DesignSearchHit): CardItemData => ({
+    id: `inside:${h.path}`,
+    title: h.title,
+    name: h.path,
+    description: h.line || undefined,
+    meta: [
+      h.state ? { badge: { label: h.state, color: stateColor(h.state) } } : { text: "no id" },
+      { text: h.path, shrink: true },
+    ],
+    primary: ROW.open.action({
+      detail: h.kind === "spec" ? "the spec" : "the note",
+      onClick: () => navigate(notePath(h.path)),
+    }),
+  });
+
+  const designItem = (design: Design): CardItemData => {
     // The document the item opens: the note (the design IS the note), else the spec.
     const main = (design.note ?? design.spec)?.path ?? null;
     const space = design.space ? spaceName(design.space) : "";
@@ -370,6 +435,12 @@ export function DesignsCard() {
     };
   };
 
+  const rows: Row[] = error
+    ? []
+    : matching
+      ? hits.map((hit) => ({ hit }))
+      : ordered.map((design) => ({ design }));
+
   return (
     <>
       <ListPanel
@@ -377,29 +448,25 @@ export function DesignsCard() {
         icon={icon}
         info="Your private files. Notes that belong to no product yet."
         infoLabel="About Hub Designs"
-        items={error ? [] : ordered}
-        item={toItem}
-        empty={empty}
-        filteredEmpty={filteredEmpty}
+        items={rows}
+        item={(row) => ("hit" in row ? hitItem(row.hit) : designItem(row.design))}
+        empty={matching ? matchesEmpty : empty}
+        filteredEmpty={matching ? undefined : filteredEmpty}
         loading={
-          isLoading || isFetching ? { label: "Reading the hub's design notes..." } : undefined
+          isLoading || isFetching
+            ? { label: "Reading the hub's design notes..." }
+            : matching && inside.isFetching
+              ? { label: "Searching inside the documents…" }
+              : undefined
         }
+        // What was searched, said at the foot while the matches are showing.
+        footLeft={matching ? inside.data?.note || undefined : undefined}
         filters={filters.length > 0 ? filters : undefined}
         search={{
           label: "Search the hub's designs",
           placeholder: "Search designs",
           value: search.value,
           onChange: search.setValue,
-          results:
-            asked !== null ? (
-              <DesignSearchInside
-                result={inside.data}
-                loading={inside.isFetching}
-                failed={!!inside.error}
-                onOpen={(h) => navigate(notePath(h.path))}
-                onClear={() => setAsked(null)}
-              />
-            ) : undefined,
         }}
         // Search inside runs the words over the files on disk: offered once
         // the box has words.

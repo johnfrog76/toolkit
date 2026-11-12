@@ -628,7 +628,7 @@ describe("the Designs card's groups (L2)", () => {
     ]);
     // The wrapper's gap is the token; neither row has a margin or a spacer between.
     expect(rules(wrapper()[0])).toMatch(/flex-direction:\s*column/);
-    expect(rules(wrapper()[0])).toMatch(new RegExp(`row-gap:\\s*${filterRowGap}px`));
+    expect(rules(wrapper()[0])).toContain(`row-gap: ${filterRowGap}`);
     for (const r of rows) expect(rules(r)).not.toMatch(/margin/);
     expect(rows[0].getAttribute("class")).toBe(rows[1].getAttribute("class"));
     pick("Design");
@@ -879,13 +879,83 @@ describe("the Designs card's search (L2b)", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Search inside" }));
     expect(hubSearchedFor).toEqual(["nobody"]);
-    const section = within(screen.getByRole("region", { name: "Matches inside" }));
-    expect(section.getByText("Waiting for nobody.")).toBeTruthy();
-    expect(section.getByText("Searched on disk.")).toBeTruthy();
-    fireEvent.click(section.getByRole("button", { name: "Open design/archive/a-second-room.md" }));
+    // What it found takes the list's place: each hit a card item, paged like
+    // the designs, under a chip row that names the two lists.
+    const chips = Array.from(
+      screen.getByRole("group", { name: "Filter designs" }).querySelectorAll("[role='radio']"),
+    );
+    expect(chips.map((c) => [c.textContent, c.getAttribute("aria-checked")])).toEqual([
+      // The box narrows the designs too, and no title carries the word.
+      ["Designs", "false"],
+      ["Matches inside1", "true"],
+    ]);
+    expect(screen.queryByRole("region", { name: "Matches inside" })).toBeNull();
+    const [hit] = expectListPanelShape(
+      screen.getByText("Hub Designs").closest<HTMLElement>("[data-panel-kind]")!,
+      { titles: ["A second room"], total: 1, chips: true },
+    );
+    expect(hit.querySelector("[data-row-description]")!.textContent).toBe("Waiting for nobody.");
+    expect(hit.querySelector("[data-row-meta]")!.textContent).toBe(
+      "Archiveddesign/archive/a-second-room.md",
+    );
+    // What was searched is said at the foot.
+    expect(screen.getByText("Searched on disk.")).toBeTruthy();
+    fireEvent.click(within(hit).getByRole("button", { name: "Open the note" }));
     expect(screen.getByTestId("where").textContent).toBe(
       "/studio/design/design/archive/a-second-room.md",
     );
+  });
+});
+
+describe("the Designs card's search inside, when it finds nothing or cannot look", () => {
+  const ask = () => {
+    mount();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search the hub's designs" }), {
+      target: { value: "nobody" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Search inside" }));
+  };
+  const answer = (over: Record<string, unknown>) => ({
+    data: {
+      supported: true,
+      repo: "the hub",
+      query: "nobody",
+      available: true,
+      reason: "",
+      note: "",
+      hits: [],
+      ...over,
+    },
+  });
+  beforeEach(() => {
+    window.localStorage.clear();
+    listAnswer = { data: GROUPED };
+  });
+  afterEach(() => {
+    hubSearchAnswer = {};
+  });
+
+  it("no hit says so, and the Designs chip brings the designs back", () => {
+    hubSearchAnswer = answer({});
+    ask();
+    expect(screen.getByText("Nothing inside the documents carries every word")).toBeTruthy();
+    fireEvent.click(screen.getByRole("radio", { name: /^Designs/ }));
+    expect(screen.queryByRole("radio", { name: /^Matches inside/ })).toBeNull();
+    // The box still holds the word, and no design's title carries it.
+    expect(screen.getByText("No design matches the search")).toBeTruthy();
+  });
+
+  it("a search that could not run says why", () => {
+    hubSearchAnswer = answer({ available: false, reason: "The hub has no design/ folder." });
+    ask();
+    expect(screen.getByRole("alert").textContent).toContain("Could not search inside");
+    expect(screen.getByText("The hub has no design/ folder.")).toBeTruthy();
+  });
+
+  it("an agent that did not answer is an error, not an empty result", () => {
+    hubSearchAnswer = { error: { status: 500 } };
+    ask();
+    expect(screen.getByRole("alert").textContent).toContain("The agent did not answer");
   });
 });
 

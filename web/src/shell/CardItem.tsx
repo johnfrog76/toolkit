@@ -12,7 +12,6 @@ import { CardActions } from "../shared/CardActions";
 import type { CardAction } from "../shared/CardActions";
 import {
   CARD_ITEM_BORDER_PX,
-  CARD_ITEM_COMPACT_BAND_GAP_PX,
   CARD_ITEM_COMPACT_HEIGHT_PX,
   CARD_ITEM_DESCRIPTION_BAND_PX,
   CARD_ITEM_DESCRIPTION_LINES,
@@ -67,7 +66,8 @@ const useStyles = makeStyles({
   compact: {
     display: "grid",
     gridTemplateRows: `${CARD_ITEM_TITLE_BAND_PX}px ${CARD_ITEM_META_BAND_PX}px`,
-    rowGap: `${CARD_ITEM_COMPACT_BAND_GAP_PX}px`,
+    // CARD_ITEM_COMPACT_BAND_GAP_PX is this token's number.
+    rowGap: tokens.spacingVerticalS,
     height: `${CARD_ITEM_COMPACT_HEIGHT_PX}px`,
     // One padding, top and bottom: CARD_ITEM_PADDING_Y_PX is this token's number.
     paddingTop: tokens.spacingVerticalM,

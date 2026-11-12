@@ -47,7 +47,9 @@ export const CARD_ITEM_THUMB_WIDTH_PX = 24;
 /** The width, in px, of the progress bar in the meta band. */
 export const CARD_ITEM_PROGRESS_WIDTH_PX = 64;
 
-/** The space between a compact item's two bands, in px. A full item's bands touch. */
+/** The space between a compact item's two bands, in px: Fluent's
+ *  `tokens.spacingVerticalS`, which the item's styles use; this is its number,
+ *  for the height sums. A full item's bands touch. */
 export const CARD_ITEM_COMPACT_BAND_GAP_PX = 8;
 
 /** A line item's one band, in px, the rule under it included. A line item has

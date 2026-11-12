@@ -1,20 +1,21 @@
 import type { CardItemSize } from "./cardItemTokens";
 import { CARD_ITEM_HEIGHTS_PX } from "./cardItemTokens";
-import { cardListGap, cardListPaddingTop, filterRowGap } from "./layoutTokens";
+import { cardListGapPx, cardListPaddingTopPx, filterRowGapPx } from "./layoutTokens";
 import { PANEL_MAX_HEIGHT_PX } from "./panelHeight";
 
 /** How many card items a list panel shows on a page. It is never typed in a
- *  panel: it is worked out here, from the panel's fixed height and what the
- *  panel's own chrome takes of it, so a full page always fits and nothing
- *  scrolls or is cut off. A panel with a second filter row, a lead or a foot
- *  note gets a smaller page, by the same sum. */
+ *  panel. At runtime it is measured: the room the list really has, divided by
+ *  an item and the list's gap (`pageSizeForRoom`), so a full page always fits
+ *  and nothing scrolls or is cut off, whatever sits above the list. The sum
+ *  below (`listPageSize`) is the same answer worked out from the tokens, for
+ *  the first paint and wherever there is no layout to measure. */
 export type ListDensity = CardItemSize;
 
 /** One item's share of the body, in px: its height and the list's gap. */
 export const LIST_ITEM_PITCH_PX: Record<ListDensity, number> = {
-  full: CARD_ITEM_HEIGHTS_PX.full + cardListGap.full,
-  compact: CARD_ITEM_HEIGHTS_PX.compact + cardListGap.compact,
-  line: CARD_ITEM_HEIGHTS_PX.line + cardListGap.line,
+  full: CARD_ITEM_HEIGHTS_PX.full + cardListGapPx.full,
+  compact: CARD_ITEM_HEIGHTS_PX.compact + cardListGapPx.compact,
+  line: CARD_ITEM_HEIGHTS_PX.line + cardListGapPx.line,
 };
 
 /** What a list of `count` items takes, in px: the space over the first, the
@@ -22,9 +23,9 @@ export const LIST_ITEM_PITCH_PX: Record<ListDensity, number> = {
 export function listHeightPx(density: ListDensity, count: number): number {
   if (count === 0) return 0;
   return (
-    cardListPaddingTop[density] +
+    cardListPaddingTopPx[density] +
     count * CARD_ITEM_HEIGHTS_PX[density] +
-    (count - 1) * cardListGap[density]
+    (count - 1) * cardListGapPx[density]
   );
 }
 
@@ -59,7 +60,7 @@ export function listChromePx(chrome: ListChrome): number {
   return (
     LIST_CHROME_PX.frame +
     rows * LIST_CHROME_PX.filterRow +
-    Math.max(0, rows - 1) * filterRowGap +
+    Math.max(0, rows - 1) * filterRowGapPx +
     (chrome.lead ? LIST_CHROME_PX.lead : 0) +
     (chrome.footNote ? LIST_CHROME_PX.footNote : 0) +
     (chrome.status ? LIST_CHROME_PX.status : 0)
@@ -72,6 +73,14 @@ export function listPageSize(chrome: ListChrome): number {
   let count = 1;
   while (listHeightPx(chrome.density, count + 1) <= room) count += 1;
   return count;
+}
+
+/** How many items fit in `room` px of list, measured: at least one. The room
+ *  holds n items and the n - 1 gaps between them. */
+export function pageSizeForRoom(density: ListDensity, room: number): number {
+  const item = CARD_ITEM_HEIGHTS_PX[density];
+  const gap = cardListGapPx[density];
+  return Math.max(1, Math.floor((room + gap) / (item + gap)));
 }
 
 /** The page of full items most list panels have: under one filter row. */

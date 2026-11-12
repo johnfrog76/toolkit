@@ -1,6 +1,9 @@
 import { CARD_ITEM_DESCRIPTION_LINES, CARD_ITEM_HEIGHTS_PX } from "../cardItemTokens";
 import { PANEL_BODY, PANEL_MAX_HEIGHT_PX, PANEL_MIN_HEIGHT_PX } from "../panelHeight";
 import { cardListGap, cardListPaddingTop, filterRowGap } from "../layoutTokens";
+
+/** A token as a rule spells it: `var(--spacingVerticalXS)`, or 0 with or without a unit. */
+const cssValue = (value: string) => (value === "0" ? "0(px)?" : value.replace(/[()]/g, "\\$&"));
 import { listChromePx, listHeightPx, listPageSize } from "../pageSize";
 import type { ListChrome, ListDensity } from "../pageSize";
 
@@ -124,8 +127,10 @@ export function expectListPanelShape(panel: HTMLElement, shape: ListPanelShape):
     for (const li of Array.from(list.children)) expect(rulesOf(li)).not.toMatch(/margin|padding/);
     const listRules = rulesOf(list);
     expect(listRules).toMatch(/flex-direction:\s*column/);
-    expect(listRules).toMatch(new RegExp(`row-gap:\\s*${cardListGap[density]}px`));
-    expect(listRules).toMatch(new RegExp(`padding-top:\\s*${cardListPaddingTop[density]}px`));
+    expect(listRules).toMatch(new RegExp(`row-gap:\\s*${cssValue(cardListGap[density])}`));
+    expect(listRules).toMatch(
+      new RegExp(`padding-top:\\s*${cssValue(cardListPaddingTop[density])}`),
+    );
   }
   for (const item of items) {
     expect(rulesOf(item)).not.toMatch(/margin/);
@@ -165,7 +170,7 @@ export function expectListPanelShape(panel: HTMLElement, shape: ListPanelShape):
     expect(groups.every((g) => g.parentElement === wrappers[0])).toBe(true);
     expect(wrappers[0].children.length).toBe(groups.length);
     expect(rulesOf(wrappers[0])).toMatch(/flex-direction:\s*column/);
-    expect(rulesOf(wrappers[0])).toMatch(new RegExp(`row-gap:\\s*${filterRowGap}px`));
+    expect(rulesOf(wrappers[0])).toMatch(new RegExp(`row-gap:\\s*${cssValue(filterRowGap)}`));
     expect(rulesOf(wrappers[0])).not.toMatch(/margin/);
   }
   for (const group of groups) {
