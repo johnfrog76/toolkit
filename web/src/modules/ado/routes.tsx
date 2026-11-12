@@ -8,6 +8,7 @@ import {
   Tab,
   TabList,
   makeStyles,
+  mergeClasses,
   tokens,
 } from "@fluentui/react-components";
 import { AddRegular } from "@fluentui/react-icons";
@@ -43,6 +44,7 @@ import { drawerSections } from "./homeTabs";
 import { trackerName } from "./TrackerBadge";
 import { GH_EXPLAIN } from "./ghExplain";
 import { TabRows } from "../../shared/TabRows";
+import { controlRowsSpace } from "../../shell/layoutTokens";
 
 const useStyles = makeStyles({
   // The row above Home's cards spans the whole centre block: the tabs at its
@@ -53,6 +55,12 @@ const useStyles = makeStyles({
   // is absent.
   // The explain line, then the button that belongs to it -- "New card button
   // always follows the explain text".
+  // Home's head: the filter drawer and the first-run banner, in one column
+  // whose gap spaces them. It owns the space under them only when no tab strip
+  // follows -- the strip's wrapper (TabRows) owns that space when it is there --
+  // so nothing above or below carries a margin for it.
+  head: { display: "flex", flexDirection: "column", rowGap: controlRowsSpace },
+  headAlone: { paddingBottom: controlRowsSpace },
   explainRow: {
     display: "flex",
     alignItems: "center",
@@ -246,22 +254,30 @@ export function AdoHome() {
 
   return (
     <>
-      {showDrawer ? (
-        <FilterDrawer
-          value={filters.filterValue}
-          onChange={filters.setFilterValue}
-          activeRepo={filters.activeRepo}
-          onRepoChange={filters.setActiveRepo}
-          stateFilter={filters.stateFilter}
-          onStateChange={filters.setStateFilter}
-          stateOptions={filters.stateOptions}
-          stateLabel={laneLabel}
-          typeFilter={filters.typeFilter}
-          onTypeChange={filters.setTypeFilter}
-          linkFilter={filters.linkFilter}
-          onLinkChange={filters.setLinkFilter}
-          sections={sections}
-        />
+      {showDrawer || (banner.length > 0 && !archiveLoading) ? (
+        <div
+          className={mergeClasses(styles.head, !(showStrip && !archiveLoading) && styles.headAlone)}
+          data-home-head=""
+        >
+          {showDrawer ? (
+            <FilterDrawer
+              value={filters.filterValue}
+              onChange={filters.setFilterValue}
+              activeRepo={filters.activeRepo}
+              onRepoChange={filters.setActiveRepo}
+              stateFilter={filters.stateFilter}
+              onStateChange={filters.setStateFilter}
+              stateOptions={filters.stateOptions}
+              stateLabel={laneLabel}
+              typeFilter={filters.typeFilter}
+              onTypeChange={filters.setTypeFilter}
+              linkFilter={filters.linkFilter}
+              onLinkChange={filters.setLinkFilter}
+              sections={sections}
+            />
+          ) : null}
+          {archiveLoading ? null : banner}
+        </div>
       ) : null}
       {archiveLoading ? (
         <div className={styles.pageSpinner}>
@@ -270,7 +286,6 @@ export function AdoHome() {
         </div>
       ) : (
         <>
-          {banner}
           {showStrip ? (
             <TabRows>
               <TabList
