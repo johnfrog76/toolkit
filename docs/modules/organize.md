@@ -246,15 +246,23 @@ belongs to a module that is off.
 
 ## Known gaps
 
+Each of these is a block on [Known gaps](../KNOWN-GAPS.md), with its issue:
+
 - **A hub synced across two time zones** puts a reminder in different buckets on each machine, because
-  times are stored local with no offset. Named on purpose, not fixed.
-- **No recurrence.** Out of scope.
-- **No delivery.** It reminds you, on screen. Reminding someone else is a later issue with its own gate.
+  times are stored local with no offset ([A reminder's bucket depends on the machine's time zone](../KNOWN-GAPS.md#a-reminders-bucket-depends-on-the-machines-time-zone)).
 - **A meeting's follow-up does not become a reminder yet.** Team Agile's `Standup -Remind` writes one
-  (above), but `MeetingAgenda` calling `NewReminder` (a no-op when organize is off) waits for its own
-  small issue.
+  (above), but `MeetingAgenda` does not call `NewReminder` ([A meeting's follow-up does not become a reminder](../KNOWN-GAPS.md#a-meetings-follow-up-does-not-become-a-reminder)).
 - **A ref to an archived card is named, not linked.** The card page reads the active Space's `current/`
-  only, so there is nowhere in the web UI to open an archived card; the row says `(done)` instead.
+  only, so there is nowhere in the web UI to open an archived card; the row says `(done)` instead
+  ([A reminder that names an archived card does not link to it](../KNOWN-GAPS.md#a-reminder-that-names-an-archived-card-does-not-link-to-it)).
+
+### True by design
+
+These are choices, not omissions, and are not on that list:
+
+- **No recurrence.** Out of scope.
+- **No delivery.** It reminds you, on screen. Reminding someone else would be a feature of its own, with
+  its own gate.
 - **A card does not say it has a reminder.** Decided against for now -- see
   [Remind me about this](#remind-me-about-this).
 - **No reminder detail page.** A reminder is one line; its file is in the hub.
