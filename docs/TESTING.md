@@ -42,7 +42,10 @@ UI are one entry each (`pytest`, `jest`), and a `halves` block holds one record 
 reason. The CLI runner writes its own entries the way it always has; a half `tkTest` did not run keeps
 what it had. The System page's Health card draws the machine's halves from it, and `tkSetup` prints one
 line of it. `tkTestToolkit -TestAll` (the halves stubbed), `Tests/test_test_summary.py` and
-`web/src/modules/ado/testHalves.test.ts` hold it.
+`web/src/modules/ado/testHalves.test.ts` hold it. Each half's record, and the file itself, also says where the
+run came from: `checkout` is `main` for a repository's own working tree or the folder name of a git worktree
+(empty outside git), and `commit` is HEAD's short hash. The file is the machine's, not the checkout's:
+[Where the record lives](#where-the-record-lives).
 
 A suite that exits 0 and prints no tests (`Results: 0/0 passed`) ends **WARN**: neither a pass nor a
 failure, and it does not fail the run. It is recorded under its own word -- `warn` in the
@@ -160,7 +163,8 @@ suite once in the runner's order, and no single suite's row carrying a count of 
 puts it back afterwards, does the same for the two per-shell overrides, `P20_ACTIVE_SPACE` and `PROMPTS_ROOT` (`consts.json` `env.activeSpace` and `env.promptsRoot`) -- they beat the config files, so a shell that holds them would point every suite that copies `samples/hub` at a Space or folder that hub does not have (`Tests/Test-Toolkit.ps1` and `tkTest` through `Scripts/Hide-RunOverrides.ps1`, `Tests/conftest.py` itself; the browser smoke pins both for every server it starts); a suite that means to test an override sets it itself -- points `P20_USAGE_LOG_DIR` at a scratch folder so the run never writes into
 your real usage log, points `P20_AGENT_CACHE_DIR` (`consts.json` `env.agentCacheDir`) at another so it never
 fills the agent's real cache (`conftest.py` gives every test a fresh one, because a fixture's blob sha is
-whatever the test says it is), and sets the run marker (`consts.json` `env.testRunMarker`, `P20_TEST_RUN`) that the
+whatever the test says it is), points `P20_TEST_HISTORY_DIR` (`consts.json` `env.testHistoryDir`) at a third for
+its children so no suite's scratch run writes the machine's test record ([Where the record lives](#where-the-record-lives)), and sets the run marker (`consts.json` `env.testRunMarker`, `P20_TEST_RUN`) that the
 engine's one POST and `SendTeams` refuse on while it is set. `Tests/Test-Toolkit.ps1` also removes `TOOLKIT_QUIET_STARTUP` for the run (and `Test` removes it around the CLI half): the web UI's Test Health card runs `Test` through the bridge, which marks its child non-interactive with that variable, and every suite's shell would inherit it, where a stated refusal throws instead of exiting 2. Nothing to unset by hand, and a send from
 another shell still works while a suite runs: the marker is an environment variable and lives only
 in the runner's children. `Tests/test_runner_environment.py` and `tkTestToolkit -SendTeams` prove it; `Tests/test_run_overrides.py` and `tkTestToolkit -TestAll` prove the overrides the same way, each starting a run from a shell that holds both and asserting the suite saw neither and the shell has them back after.
@@ -243,7 +247,7 @@ stated skip prints `Results: 0/0 passed` and exits 0, and reads as a warning.
 Environment, PRComments, PullRequest, CloseWorkItem, PromptStatus, HubJson, Portability, Review,
 BackfillStamps, Changelog, Sync, DocCounts) -- a few minutes, the set to run after a pull; some of them still start a host process for a case or two, but none starts one per case. `-Slow` is the rest, one host
 process per case, which is where the time goes on Windows; `-Failed` reruns whatever failed in the last
-run on this machine, read from `test-summary.<machine>.json`, which also carries each suite's seconds.
+run on this machine, from any checkout, read from `test-summary.<machine>.json` ([Where the record lives](#where-the-record-lives)), which also carries each suite's seconds.
 The runner prints each suite's time as it finishes. On Windows, real-time scanning of `%TEMP%` and
 the package folder is a large part of the cost of the slow set; excluding them is your call to make
 knowingly.
@@ -272,6 +276,33 @@ with it, the full run. **That is an acceptable run,
 not a broken one**: a machine that only wants the CLI does not need the Python test dependencies,
 and the skips are named in the summary so nobody mistakes the short run for the full one. `tkTestToolkit -Agent` asserts the shape statically, so it holds on a machine
 with no Python at all.
+
+## Where the record lives
+
+`test-summary.<machine>.json` and `test-results.<machine>.log` are kept in **one folder per machine**, outside
+every checkout, so a run made in any git worktree reaches the Health card whichever checkout the agent runs
+from:
+
+| Platform | Folder |
+| --- | --- |
+| macOS | `~/Library/Application Support/ToolKit/TestHistory` |
+| Windows | `%LOCALAPPDATA%\ToolKit\TestHistory` |
+| elsewhere | `$XDG_STATE_HOME/toolkit/test-history`, else `~/.local/state/toolkit/test-history` |
+
+`P20_TEST_HISTORY_DIR` (`consts.json` `env.testHistoryDir`) moves it. While the run marker is set and that
+variable is not, there is **no folder at all**: nothing is written and nothing is read. Each runner resolves the
+real folder before it sets the marker, writes its own records there by name, and points its children at a
+scratch folder, so a suite that starts a runner in a scratch package never writes this machine's record. The
+pieces are in `consts.json` `tests`, and `Scripts/Get-TestHistoryDir.ps1` and `agent/core/log.py` are held to
+one table, `Tests/fixtures/test-history/paths.json`, from `tkTestToolkit -TestAll` and
+`Tests/test_test_summary.py`.
+
+Before this folder, each checkout kept the two files at its own root. A reader or writer that finds no file for
+its machine in the folder **copies the one its own checkout kept, once** (each file on its own), so the first
+read after upgrading is the last record, not "not run"; the old file is left where it is and is not read again.
+It is copied, not merged: of a main checkout and its worktrees, whichever reads first brings its record, and later
+runs write over it. Another machine's `test-summary.<machine>.json` still shows on the card the way it always
+has: copy it into this folder beside yours. Nothing syncs it.
 
 ## In CI
 
