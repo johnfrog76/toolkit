@@ -76,7 +76,7 @@ python3 -m pip install -r agent/requirements-dev.txt   # once -- runtime deps pl
 python3 -m pytest Tests/     # 1440 passed, 6 skipped -- the agent
 cd web && npm ci             # once
 cd web && npx playwright install chromium   # once -- for `npm run smoke` only
-cd web && npm test           # 5 build-contract checks, then 166 suites, 1965 tests -- the shell
+cd web && npm test           # 5 build-contract checks, then 171 suites, 2067 tests -- the shell
 cd web && npm run smoke              # 23 checks, flags off -- the browser; needs two servers up
 cd web && npm run smoke -- --modules=on  # 30 checks, both module flags on
 cd web && npm run smoke -- --studio      # the Studio's contract -- starts and stops its own servers
@@ -141,7 +141,7 @@ a passing `pytest:` line may end `(via <python>)`, which is information and not 
   Consts 222, Compat 1808, Menu 2122, Environment 78, Archive 217, PRComments 249, BackfillStamps 50, Changelog 88, Update 68, Start 87, PullRequest 10, CloseWorkItem 51, PromptStatus 125, ThreadHash 86, Setup 82, Move 51, Billable 36, Plan 114, Tag 34, Backlog 56, Cover 106, Design 225, NewPrompt 159, ExitCodes 133, Autoload 86, GitRoot 17, Sync 86, Connect 62, NewSpace 149, HowWeWork 42, EditItem 69, Land 139, Burn 193, PublishPR 39, Config 322, HubJson 186, Portability 220, Web 165, Agent 129, TestAll 332, ModuleCommands 88, Reminders 71, Rituals 658, StandupRemind 85, Triage 121, StartWork 85, Review 82, WorkReview 36, SendTeams 43, NewMeeting 63, MeetingAgenda 178, DocCounts 179
   52 suites, 10182 assertions
   pytest: 1440 passed, 6 skipped
-  web: 166 suites, 1965 tests
+  web: 171 suites, 2067 tests
 ```
 
 **Which lines the paste owns.** The per-suite line is the `tkTestToolkit` row's list in the table below; the
@@ -506,6 +506,7 @@ pytest rows carry the count of the file they name, and a jest row names its file
 | `pytest Tests/test_comms_format.py` | 21 | The engine, carried with **every assertion unchanged**: tone formatting, the Adaptive Card envelope, recipient resolution, the master switch, validation, dry run and fail-soft failure. This file is the evidence the engine did not change behaviour while it moved packages |
 | `npm test -- settingsWorkflows` | -- | Settings by workflow: the one list's shape and rules; every module the registry declares has a question and no entry names a module the web does not know; an entry's state from its surfaces' (`on` if any, `not configured` if all, else `off`); the anchor with the active Space filled in; tips only from `not configured` and only entries that carry one (D-W3) |
 | `npm test -- PRCommentsDetail.reply` | -- | The page's h1 is the card's title; the reply box: an open thread with no reply gets it and a triaged one keeps Resolve; Suggest a reply fills the draft from the model's answer and maps the recommendation to ReplyPR's status; Post reply runs `ReplyPR` through the bridge with the draft and the status and re-reads the card; the agent's 412 is shown as its own sentence; with no key the button is absent and the box names the variable |
+| `npm test -- kinds` | -- | The panel kinds: `panelStructure.test.ts` reads every source file and refuses Fluent `Card` outside `PanelFrame`, `PanelFrame` in a feature module, the pager outside `ListPanel`, and a height, a page size, a tooltip, a link, a subhead, an item or a body of its own in a file that fills a kind, with the panels not yet moved on named lists held exact; `ListPanel.test.tsx` holds the page-size table, the pager, the page's reset and clamp, the slots, and the slots a panel cannot fill as compile errors. `CardItem.test.tsx`, beside them in `src/shell/`, holds the one item shape. Each moved panel's own test calls `expectListPanelShape` on what it draws (`web/README.md`, "Panels and card items") |
 | `npm test -- ConnectPage` | -- | The wizard page: a Space with no address is a whole shape and steps 2-3 wait; Save address is the verb's step; an Azure DevOps Space says it is an organisation, names `az login` and never runs it; a GitHub Space is one repo with no sprint step; the sprint switch is the last step; the Example offers to become yours (D-W15) |
 | `npm test -- HowDoI` | -- | The drawer's "How do I…" section: every question with the CLI's state word; Change opens the drawer at `spaces.<active>.org`; a sentence and a keyless journey have no door; folded on arrival at an anchor and unfolded by a click (D-W11) |
 | `npm test -- useFacePref` | -- | The Face store where browser storage throws: `localStorage.getItem` made to throw before the module loads, the hook answering the default face and `ToolKitLogo` rendering; `setItem` throwing, a chosen face holding for the session with nothing stored |

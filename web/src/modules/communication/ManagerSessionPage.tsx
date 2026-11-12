@@ -27,7 +27,7 @@ import { ArrowRightRegular, SendRegular } from "@fluentui/react-icons";
 import { BackButton } from "../../shared/BackButton";
 import { HairlineDivider } from "../../shared/HairlineDivider";
 import { MarkdownBlock } from "../../shared/MarkdownBlock";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { useGetEnvQuery } from "../../shell/api";
 import { STAMPS } from "../../shell/consts";
 import { extractSection, hasContent, sendButtonState } from "./sendButton";
@@ -288,7 +288,7 @@ export function ManagerSessionPage() {
 
   return (
     <div className={styles.page}>
-      <PageCard
+      <PanelFrame
         loading={isLoading}
         loadingLabel="Loading session..."
         empty={
@@ -511,7 +511,7 @@ export function ManagerSessionPage() {
             </div>
           </div>
         )}
-      </PageCard>
+      </PanelFrame>
     </div>
   );
 }

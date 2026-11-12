@@ -101,6 +101,7 @@ describe("the cards that write into the hub", () => {
   ])("%s draws the one shared foot line", (file) => {
     const src = fs.readFileSync(path.join(root, file), "utf8");
     expect(src).toContain('from "../ado/HubSyncLine"');
-    expect(src).toContain("footNote={<HubSyncLine />}");
+    // In the foot-note slot: alone, or last under another line of the panel's.
+    expect(src).toMatch(/footNote=\{\s*(<>[\s\S]{0,200}?)?<HubSyncLine \/>/);
   });
 });

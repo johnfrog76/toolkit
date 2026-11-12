@@ -6,7 +6,7 @@ import { BackButton } from "../../shared/BackButton";
 import { CardActions, ROW } from "../../shared/CardActions";
 import { EmptyState } from "../../shared/EmptyState";
 import { FilePath } from "../../shared/FilePath";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { StatusMessage } from "../../shared/StatusMessage";
 import { DECKS } from "./decks/index";
 import { estimateDeckDuration } from "./engine/deckDuration";
@@ -15,7 +15,7 @@ import { DECK_MOVES } from "./deckMoves";
 import { deckPlayPath } from "./paths";
 import { useDeckArchive } from "./useDeckArchive";
 
-// A deck's page: the house's detail page -- PageCard, the back arrow and
+// A deck's page: the house's detail page -- PanelFrame, the back arrow and
 // the title on the left, the controls on the right, the body below -- between
 // the Decks card and the player. Everything on it is READ from the deck file;
 // nothing here edits one. Play is the one exposed action and opens the player
@@ -88,7 +88,7 @@ export function DeckPage() {
 
   return (
     <div className={styles.page}>
-      <PageCard
+      <PanelFrame
         empty={empty}
         headerLeft={
           <>
@@ -186,7 +186,7 @@ export function DeckPage() {
             </dl>
           </div>
         )}
-      </PageCard>
+      </PanelFrame>
     </div>
   );
 }

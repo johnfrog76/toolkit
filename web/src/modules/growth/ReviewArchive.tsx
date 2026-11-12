@@ -33,7 +33,7 @@ import type { CardAction } from "../../shared/CardActions";
 import { ConfirmDialog } from "../../shared/ConfirmDialog";
 import { buildWorkReviewParams, commandResultMessage } from "../ado/cliBridge";
 import { RefreshButton } from "../../shared/RefreshButton";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { HubSyncLine } from "../ado/HubSyncLine";
 import { CreateButton } from "../../shared/CreateButton";
 import { Pagination } from "../../shared/Pagination";
@@ -638,7 +638,7 @@ export function ReviewArchive({ activeTag }: { activeTag?: string | null }) {
 
   return (
     <>
-      <PageCard
+      <PanelFrame
         scrollable
         loading={isLoading}
         loadingLabel="Loading reviews..."
@@ -758,7 +758,7 @@ export function ReviewArchive({ activeTag }: { activeTag?: string | null }) {
             ),
           )
         )}
-      </PageCard>
+      </PanelFrame>
 
       <Dialog open={infoOpen} onOpenChange={(_e, d) => setInfoOpen(d.open)}>
         <DialogSurface>

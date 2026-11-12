@@ -12,7 +12,7 @@ Adding an export or a prop means adding its section or its row in the same commi
 
 ## Three words
 
-- **Panel** -- one framed box on a page, drawn by `PageCard`: a header, a body, a footer. What a person
+- **Panel** -- one framed box on a page, drawn by a kind such as `ListPanel` on `PanelFrame`: a header, a body, a foot. What a person
   sees on Home or on a module's page as "the Prompts card" or "the Reminders card" is a panel.
 - **Card item** -- one entry inside a panel's list: a row with a title, a line or two, and its actions.
   The "Active Cards" panel shows each prompt file as a card item.
@@ -27,44 +27,212 @@ Adding an export or a prop means adding its section or its row in the same commi
 
 ## Where a shared piece lives
 
-Shared pieces are in `src/shared/`, with `lazyPart` in `src/shell/`. A module imports from them; they
+Shared pieces are in `src/shared/`, with `lazyPart` in `src/shell/` and the panel kinds in `src/shell/kinds/`. A module imports from them; they
 import from no module. Props are always an exported, named type, never an inline literal, never `any`,
 never an index signature, and never `ComponentProps<typeof X>` standing in for a real type. A lint
 rule (`@typescript-eslint/no-explicit-any` as an error under `src/shell/` and `src/shared/`) holds
 the first of those.
 
-## `PageCard`
+## `PanelFrame`
 
-**What it is for:** the one frame a panel is drawn in.
+**What it is for:** the frame every panel is drawn in, and the private base of the panel kinds. It is
+the outline box (Fluent's `Card`, imported here and nowhere else), the header with its rule, the body,
+the toast and the foot.
 
-**Use it** for every panel: it gives the header with its rule, the body (a spinner, an empty message,
-or the children), the toast, and the footer with its three slots. **Do not use it** for a list entry
-inside a panel (that is a card item), and do not set a height on it from outside.
+**Use it** only from a kind in `src/shell/kinds/`: a feature module fills a kind (`ListPanel`), never
+the frame. A page that is not a panel (a detail or document page, the Docs reader, the Actions forms,
+the Connect, Standup and Triage pages) keeps the frame and is exempt by name, with its reason, in
+`src/shell/kinds/panelStructure.test.ts`. A panel that has not moved onto its kind yet is on a named
+list in the same test, which is held exact: a file that moves comes off it, and a new file cannot join
+it quietly. **Do not use it** for a list entry inside a panel (that is a card item), and do not set a
+height or a margin on it from outside.
 
 Props:
 
 | Prop | Type | Notes |
 | --- | --- | --- |
-| `headerLeft` | `ReactNode` | Title side of the header. |
-| `headerRight` | `ReactNode` | Actions side: search, refresh, count. |
-| `children` | `ReactNode` | The body. |
+| `headerLeft` | `ReactNode` | Title side of the header; a rule follows when either side is set. |
+| `headerRight` | `ReactNode` | Actions side: pickers, search, refresh, the count chip. |
+| `body` | `ReactNode` | The body slot: what the panel holds, named like every other slot. |
+| `children` | `ReactNode` | The default slot: it fills `body`. Pass `body` or children, never both: the types refuse both, and the frame throws when drawn with both. |
 | `toast` | `ReactNode` | A `StatusMessage` under the body; hidden while loading. |
-| `footer` | `ReactNode` | A single footer cell, used only when no footer slot is set. |
-| `footerLeft` | `ReactNode` | Footer, left: usually a sentence. |
-| `footerCenter` | `ReactNode` | Footer, middle: the pager. Keeps its width on one line. |
-| `footerRight` | `ReactNode` | Footer, right: usually a `CreateButton`. |
-| `footNote` | `ReactNode` | One line under the footer, the width of the card. |
-| `scrollable` | `boolean` | Body scrolls inside the panel. |
-| `loading` | `boolean` | Draws the spinner instead of the body, toast and footer. |
+| `footer` | `ReactNode` | A single foot cell, used only when no foot slot is set. |
+| `footerLeft` | `ReactNode` | Foot, left: usually a sentence. |
+| `footerCenter` | `ReactNode` | Foot, middle: the pager. Keeps its width on one line; the two sides share what is left. |
+| `footerRight` | `ReactNode` | Foot, right: usually a `CreateButton`. |
+| `footNote` | `ReactNode` | One line under the foot row, the width of the panel. |
+| `scrollable` | `boolean` | The body in the frame's thin-scrollbar scroll area, the header and foot fixed. The one sanctioned scroll form, for a panel whose body is a single block; a list panel never uses it, because it pages. |
+| `loading` | `boolean` | Draws the spinner instead of the body, toast and foot. |
 | `loadingLabel` | `string` | The spinner's label; default `Loading...`. |
-| `empty` | `ReactNode` | Replaces the body; hand it an `EmptyState`. |
-| `className` | `string` | Merged onto the card. |
+| `empty` | `ReactNode` | Replaces the body; hand it an `EmptyState`. The header and foot stay, so a filter that hid everything stays reachable. |
+| `className` | `string` | Merged onto the box. |
 
-**Used by:** nearly every panel: Active Cards, My Work, Prompts and the Studio panels.
+**The foot holds the bottom.** The frame is a column and its body grows (`flex-grow: 1`, one rule in
+the frame's styles), so the foot sits at the frame's bottom edge however short the content is, with the
+empty room between the body and the foot. No divider is drawn above the foot. The body's children are
+wrapped in one element (`data-panel-frame-body`) that keeps the frame's 12 px gap between them.
 
-**Pattern:** a slot-based frame (header, body, footer) that sets no height; each panel's height is its
-own. **Test:** [`PageCard.footer.test.tsx`](src/shared/PageCard.footer.test.tsx) (the footer's centre
-slot only).
+### Slots
+
+A panel reads as named slots. `PANEL_SLOTS` (`src/shell/panelHeight.ts`) names them once, in this
+order; the last column is the `PanelFrame` prop that fills each today.
+
+| Slot | What fills it | Optional | `PanelFrame` prop today |
+| --- | --- | --- | --- |
+| `header` | the panel's icon and title | no for a kind (`title` is required); optional on the frame | `headerLeft` |
+| `info` | one sentence about what the panel holds, behind the info icon after the title | yes | `headerLeft` (an `InfoTip` after the title) |
+| `actions` | the header's controls: pickers, search, the panel's one action, refresh, the count chip | yes | `headerRight` |
+| `filters` | rows of filter chips, each chip with its count | yes | the top of `body` (a list panel draws them over its list) |
+| `body` | what the panel holds: a list panel's card list, paged; a block kind's content, scrolled when it overflows | no (a kind always has one; `empty` or `loading` stand in for it) | `body`, or children as the default slot |
+| `foot` | the foot row (words at the left, the pager in the centre, the **+** at the right) and one line under it | yes | `footerLeft`, `footerCenter`, `footerRight`, `footNote` |
+
+A panel with a maximum height holds what does not fit in one of two forms, chosen by its kind and named
+in `PANEL_BODY` (`src/shell/panelHeight.ts`): `paged` (card items, the pager at the foot) or `scroll`
+(the `scrollable` prop). No panel sets an overflow of its own.
+
+**Used by:** the kinds, the exempt pages and the panels on the migration's list. **Pattern:** a
+slot-based frame that sets no height and has no margin; a panel is spaced by the wrapper that holds it.
+**Test:** [`PanelFrame.footer.test.tsx`](src/shared/PanelFrame.footer.test.tsx) (the foot's slots and
+that the foot holds the bottom), and `panelStructure.test.ts` for who may import it.
+
+## `ListPanel`
+
+**What it is for:** the kind for records you act on. A panel fills its slots and nothing else; a slot
+the kind does not have is a compile error.
+
+**Use it** for any panel whose body is a list of card items: Active Cards, My Work, the Log, Decks, the
+Studio's lists. Hand it data, not JSX: `item` turns one entry into the card item's data, and the kind
+draws it. **Do not use it** for a body that is one block (a set of checks, a chart alone).
+
+```tsx
+<ListPanel
+  title="Reminders"
+  items={reminders}
+  item={toItem}                      // (entry) => CardItemData: data, not JSX
+  empty={{ icon, title: "No reminders yet" }}
+  create={{ label: "New Reminder", onClick: add }}
+/>
+```
+
+Props:
+
+| Prop | Type | Notes |
+| --- | --- | --- |
+| `title` | `string` | Required. The header's title. |
+| `icon` | `ReactElement` | Before the title. |
+| `info` | `ReactNode` | What the panel holds, behind the info icon after the title. |
+| `infoLabel` | `string` | The info icon's accessible name; default `About <title>`. |
+| `items` | `T[]` | Required. Every item, after the panel's own filtering; the kind pages them. |
+| `item` | `(entry: T) => CardItemData` | Required. One entry as data. With `density="compact"` it returns `CompactItemData` (no `description`); with `density="line"`, `LineItemData`. |
+| `density` | `"full" \| "compact" \| "line"` | The item size for every item of the panel: three bands (default), the title and meta bands, or one band. An item never chooses it, and it never changes the panel's height. |
+| `empty` | `EmptyMessage` | Required. Shown when there are no items: nothing yet, or nothing could be read (`tone: "error"`). |
+| `filteredEmpty` | `EmptyMessage` | Shown instead when a filter or a search hid every item. |
+| `filters` | `FilterRow[]` | Rows of chips: `{ label, chips: [{ id, label, count?, active, onSelect }] }`. The rows sit in one wrapper (`data-panel-filters`), a column spaced by `filterRowGap` (Fluent's XS, 4 px, `src/shell/layoutTokens.ts`); a row has no margin and no tint of its own. |
+| `pickers` | `SelectSlot[]` | Small header selects: `{ label, value, options, onChange, disabled? }`. |
+| `search` | `SearchSlot` | The header's search box: `{ label, placeholder?, value, onChange }`. What a deeper search finds is handed to the kind as `items`, never drawn as a block over the list. |
+| `action` | `ActionSlot` | One header button for a thing the whole panel does: `{ label, glyph, onClick, disabled?, title? }`. |
+| `refresh` | `RefreshSlot` | `{ onClick, isFetching?, disabled? }`. |
+| `count` | `number \| string` | The count chip. A string is a count that needs a word: `latest 500`. |
+| `countLabel` | `string` | The count chip's accessible name: `12 prompts`. |
+| `lead` | `ListLead` | A chart above the items: `{ chart: { label, chart } }`. |
+| `status` | `PanelStatus` | What a write came to (`success` or `error`, dismissable) or what the panel is doing (`busy`). |
+| `create` | `CreateSlot` | The foot's **+**: `{ label, onClick }`; the label is the title of the dialog it opens. |
+| `footLeft` | `string` | Words at the foot's left. |
+| `footNote` | `ReactElement` | One line under the foot. |
+| `loading` | `LoadingSlot` | `{ label }`, present while the panel is reading. |
+
+There is no `className`, `style`, `height`, `children`, `pageSize` or pager slot.
+
+**Paging is the kind's, and the page size is measured.** Once the list is laid out the kind reads the
+room it really has, from the list's top under its padding down to where the foot begins
+(`measureListRoom`, `src/shell/kinds/listRoom.ts`), and the page is
+`max(1, floor((room + gap) / (item + gap)))` (`pageSizeForRoom`, `src/shell/pageSize.ts`), with the
+density's item height and `cardListGap`. Whatever sits above the list takes its real height, so the
+last item always ends above the foot: nothing scrolls and nothing is cut off. A `ResizeObserver` on the
+panel and on what sits above the list measures again when any of them changes size; the foot row's
+room is kept free while no foot is drawn, so a pager appearing never changes the page.
+
+The same answer from the tokens, `listPageSize(chrome)` (`LIST_CHROME_PX`: frame 117, a chip row 26
+with `filterRowGap` between two, a lead 153, a foot note 32, a status line 48), is the first paint's
+page and the page where there is no layout to measure (a narrow page, the tests). Measured at 1280
+wide: four full items (three while a status line shows), five compact, eleven lines under a lead.
+
+The page is held as the index of its first item, so a resize that changes the page size keeps that
+item in view. The pager (`ListPager`, private to the kind) is in the foot's centre, drawn only past one
+page: Previous, `Page 2 of 5`, Next, and the arrow keys while it has focus. The page returns to the
+first when an active chip, a picker's value or the search changes, and is clamped when the list
+shrinks.
+
+**The list.** The items are drawn in one wrapper, `<ul role="list" class="cardList" data-card-list>`
+(`CARD_LIST_CLASS`), each alone in an `<li>`. The list owns the space between its items and over the
+first, `cardListGap` (Fluent's XS 4 px for full, S 8 px for compact, 0 for line) and
+`cardListPaddingTop` in `src/shell/layoutTokens.ts`, each with a px twin for the sums; an item has no
+margin. The list is handed to `PanelFrame` through its `body` slot.
+
+**Height.** The root wears `data-panel-kind="list"` and both bounds, `PANEL_MIN_HEIGHT_PX.list` and
+`PANEL_MAX_HEIGHT_PX.list` (592 px), above `PANEL_GRID_MIN_WIDTH_PX` (900 px), whatever the item size,
+through `usePanelMinHeightClass(kind)` (`src/shell/kinds/panelMinHeight.ts`): a minimum for every kind,
+and for `list` the same figure as its maximum. A panel not yet on its kind may wear that class
+meanwhile, as the Environment panel does for `status`. The body is the paged form
+(`data-panel-body="paged"`). Below 900 px the panel stacks and is as tall as its items.
+
+### Card items
+
+A card item is one entry inside a list panel, drawn by `ListPanel` from `CardItemData`
+(`src/shell/CardItem.tsx`). A panel never renders one itself. It is a plain element styled with Fluent
+tokens, not a Fluent `Card`.
+
+| Field of `CardItemData` | Type | Notes |
+| --- | --- | --- |
+| `id` | `string` | Stable among the panel's items; the position on the page when left out. |
+| `title` | `string` | Required. One line, clamped, plain text: never a link. |
+| `description` | `string` | Two lines, clamped; the band stays, empty, when there is none. |
+| `badges` | `BadgeSpec[]` | Status badges beside the title: `{ label, color?, appearance?, shape?, glyph?, title? }`. |
+| `meta` | `MetaItem[]` | The meta band: `{ badge: BadgeSpec }` or `{ text, title?, shrink?, tone?, mono? }`. |
+| `thumb` | `ThumbSpec` | A small picture at the start of the meta band: `{ url, label }`. |
+| `progress` | `{ done: number; total: number }` | A bar and `done/total` in the meta band; nothing when `total` is 0. |
+| `primary` | `PrimaryAction` | Required. The one exposed action, Open, built from `ROW.open.action()`. |
+| `menu` | `MenuAction[]` | Every other action, in the `...` menu; an external link is drawn last. |
+| `name` | `string` | The menu's accessible name is `Actions for <name>`; the title when left out. |
+| `busy` | `boolean` | A write on this item is running: the menu trigger spins. |
+
+`CompactItemData` (`density="compact"`) is `CardItemData` without `description`: the title band and the
+meta band. My Work and GitHub Issues use it. `LineItemData` (`density="line"`) is one band (`meta`
+texts, `badges`, then the title in bold and the description on one clamped line), and its `primary` is
+optional: a line that opens nothing, such as a log entry, has no action.
+
+Every length inside an item is a token in `src/shell/cardItemTokens.ts`, and each size's height is
+their sum, so a change to a padding or a band changes the height with it:
+
+| Token | Value | What it is |
+| --- | --- | --- |
+| `CARD_ITEM_BORDER_PX` | 1 | The outline, each edge. |
+| `CARD_ITEM_PADDING_Y_PX` | 12 | The one vertical padding, top and bottom; Fluent's `tokens.spacingVerticalM`. |
+| `CARD_ITEM_TITLE_BAND_PX` | 24 | The title band: the title's line height and the controls' height. |
+| `CARD_ITEM_DESCRIPTION_LINE_PX` | 15 | One description line; `CARD_ITEM_DESCRIPTION_LINES` (2) of them make the band. |
+| `CARD_ITEM_META_BAND_PX` | 16 | The meta band: a small badge's height. |
+| `CARD_ITEM_COMPACT_BAND_GAP_PX` | 8 | Between a compact item's two bands; `tokens.spacingVerticalS`. |
+| `CARD_ITEM_LINE_BAND_PX` | 28 | A line item's one band. |
+| `CARD_ITEM_HEIGHT_PX` | 96 | Full, derived: 1 + 12 + 24 + 30 + 16 + 12 + 1. |
+| `CARD_ITEM_COMPACT_HEIGHT_PX` | 74 | Compact, derived: 1 + 12 + 24 + 8 + 16 + 12 + 1. |
+| `CARD_ITEM_LINE_HEIGHT_PX` | 28 | Line: its band. |
+
+Every spacing value in the panel layer is a Fluent spacing token on the 4 px grid; the bands (24, 15,
+16) are content sizes and are not held to it. Text is clamped with an ellipsis and stays whole in the
+DOM, with no tooltip on it; a badge or a short word in the meta band may carry a native `title`.
+
+**Used by:** Active Cards, My Work, GitHub Issues, the Log, Decks and the Studio's lists. **Pattern:** a
+template over data: the panel says what it holds and the kind decides how it is drawn, paged and
+measured. **Test:** [`ListPanel.test.tsx`](src/shell/kinds/ListPanel.test.tsx) and
+[`listRoom.test.ts`](src/shell/kinds/listRoom.test.ts); in a panel's own test, call
+`expectListPanelShape(panel, { titles, total?, chips? })` from `src/shell/kinds/panelShapeAssert.ts`
+on the drawn panel.
+
+## `CARD_LIST_CLASS`
+
+**What it is for:** the class name of a list panel's one `<ul>`, `cardList`, so a test or a style can
+find the list without retyping it. Exported by `src/shell/kinds/ListPanel.tsx`. **Used by:** the kind
+and its shape assertions. **Test:** `panelStructure.test.ts`.
 
 ## `CardActions`
 
@@ -230,7 +398,7 @@ that reads `Loading...`, the word the smoke test waits to clear.
 **What it is for:** how a panel says it has nothing to show. Its props are the exported
 `EmptyMessage` type.
 
-**Use it** as `PageCard`'s `empty` slot, or on its own where there is no `PageCard`. Three tones that
+**Use it** as `PanelFrame`'s `empty` slot or `ListPanel`'s `empty` and `filteredEmpty`, or on its own where there is no panel. Three tones that
 must not look alike: `empty` (nothing, and that is fine), `filtered` (something is hidden by a
 filter), `error` (nothing was read -- never dressed as empty). **Do not use it** for plain text.
 
@@ -342,7 +510,7 @@ Props:
 
 **What it is for:** the result of an act: a success or a stated refusal, in the verb's own words.
 
-**Use it** as a `PageCard` `toast`, or under a form. Success hides itself after 30 seconds; an error
+**Use it** as a `PanelFrame` `toast`, or under a form. Success hides itself after 30 seconds; an error
 stays until dismissed. **Do not use it** for a state of the page (use `EmptyState`).
 
 Props:
@@ -378,7 +546,7 @@ yet.
 
 **What it is for:** the one-pixel rule between a panel's header and its body.
 
-**Use it** where `PageCard` does not already draw one. **Do not use it** as spacing.
+**Use it** where `PanelFrame` does not already draw one. **Do not use it** as spacing.
 
 Props:
 
@@ -386,4 +554,4 @@ Props:
 | --- | --- | --- |
 | `style` | `CSSProperties` | Merged over the rule's own style. |
 
-**Used by:** the Dashboard, Test Health, Configuration and `PageCard`. **Pattern:** a styled `hr`. **Test:** none of its own yet.
+**Used by:** the Dashboard, Test Health, Configuration and `PanelFrame`. **Pattern:** a styled `hr`. **Test:** none of its own yet.
