@@ -414,7 +414,8 @@ describe("consts.json", () => {
     });
     // The gh read limits the CLI and the agent share; the web reads none, so the
     // contract's values are held here as the third half's statement of them.
-    const { _: ghDoc, ...ghKeys } = (consts as unknown as { ghReads: Record<string, unknown> }).ghReads;
+    const { _: ghDoc, ...ghKeys } = (consts as unknown as { ghReads: Record<string, unknown> })
+      .ghReads;
     expect(ghDoc).toMatch(/Standup and Triage/);
     expect(ghKeys).toEqual({ openIssues: 500, allIssues: 500, labels: 500 });
     // Claude Code usage: /env's flag (the CLI inventory row's key) and the burn route.

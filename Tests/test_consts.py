@@ -352,11 +352,11 @@ EXPECTED = {
     ("startWork", "howWeWorkNote"): "agentic/how-we-work.md",
     # The line HowWeWork prints for a repository's AGENTS.md; the web finds it by this shape.
     ("startWork", "howWeWorkLine"): "How we work here: {path}",
-    # Claude Code usage: /env's flag (the inventory row's key) and the burn route.
     # The gh read limits both halves share (Standup/Triage and their routes).
     ("ghReads", "openIssues"): 500,
     ("ghReads", "allIssues"): 500,
     ("ghReads", "labels"): 500,
+    # Claude Code usage: /env's flag (the inventory row's key) and the burn route.
     ("usage", "envFlag"): "claudeUsage",
     ("usage", "burnRoute"): "/api/usage/burn",
     # The statuses a reply may set, per tracker.
