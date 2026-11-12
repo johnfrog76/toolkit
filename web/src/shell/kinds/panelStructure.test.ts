@@ -86,14 +86,10 @@ const FRAME_NOT_YET_MOVED: Record<string, string> = {
   "modules/ado/PRCommentsList.tsx": "ListPanel",
   "modules/ado/SprintVelocity.tsx": "ChartPanel",
   "modules/ado/WorkBreakdown.tsx": "ChartPanel",
-  "modules/communication/OneOnOne.tsx": "ListPanel: Meetings",
-  "modules/growth/Goals.tsx": "ListPanel",
-  "modules/growth/ReviewArchive.tsx": "ListPanel: Reviews",
   "modules/growth/SkillsSnapshot.tsx": "merged into Work breakdown, as its legend",
   "modules/lounge/GoBoard.tsx": "ScenePanel",
   "modules/lounge/TicTacToe.tsx": "ScenePanel",
   "modules/lounge/WordRing.tsx": "ScenePanel",
-  "modules/organize/RemindersCard.tsx": "ListPanel",
   "modules/solitaireAgile/MilestonesPage.tsx": "ListPanel",
 };
 
@@ -126,19 +122,10 @@ const CARD_NOT_YET_MOVED: string[] = [
   "modules/ado/MyPRs.tsx",
   "modules/ado/PRCommentsDetail.tsx",
   "modules/ado/PRCommentsList.tsx",
-  "modules/communication/OneOnOne.tsx",
-  "modules/growth/Goals.tsx",
-  "modules/growth/ReviewArchive.tsx",
-  "modules/organize/RemindersCard.tsx",
 ];
 
 /** Panels still drawing their own pager. */
-const PAGER_NOT_YET_MOVED: string[] = [
-  "modules/communication/OneOnOne.tsx",
-  "modules/growth/Goals.tsx",
-  "modules/growth/ReviewArchive.tsx",
-  "modules/organize/RemindersCard.tsx",
-];
+const PAGER_NOT_YET_MOVED: string[] = [];
 
 /** Files exempt from the pager rule, each with its reason. None: the shell's
  *  pager over a page of panels draws the kinds' own ListPager. */
@@ -323,7 +310,11 @@ describe("the panel rules, over every source file", () => {
       "modules/ado/PromptStatus.tsx",
       "modules/ado/TestHealth.tsx",
       "modules/ado/ToolkitLog.tsx",
+      "modules/communication/OneOnOne.tsx",
       "modules/deck/DeckPickerCard.tsx",
+      "modules/growth/Goals.tsx",
+      "modules/growth/ReviewArchive.tsx",
+      "modules/organize/RemindersCard.tsx",
       "modules/studio/DesignsCard.tsx",
       "modules/studio/FoyerCard.tsx",
       "modules/studio/PromptsCard.tsx",

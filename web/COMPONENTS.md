@@ -101,7 +101,8 @@ that the foot holds the bottom), and `panelStructure.test.ts` for who may import
 the kind does not have is a compile error.
 
 **Use it** for any panel whose body is a list of card items: Active Cards, My Work, the Log, Decks, the
-Studio's lists. Hand it data, not JSX: `item` turns one entry into the card item's data, and the kind
+Studio's lists, Growth's Reviews and Goals, Reminders, Meetings. A file under `src/modules/` that draws
+rows without it fails `src/shell/kinds/modulePanels.test.ts`, unless it is named there with its reason. Hand it data, not JSX: `item` turns one entry into the card item's data, and the kind
 draws it. **Do not use it** for a body that is one block (a set of checks, a chart alone).
 
 ```tsx
