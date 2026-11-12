@@ -125,6 +125,10 @@ own slow clocks and never asks you for anything."
 
 ## Known gaps
 
-Everything beyond the room -- the hand-tuning pass (wood-panel grain, the element-by-element zen), the
-study, the company (Solitaire Agile), the story -- lives on the living design card and the spec's
-open items, done with the owner's eye, never speculatively.
+None of its own on [Known gaps](../KNOWN-GAPS.md).
+
+### True by design
+
+The room is the whole module. Everything beyond it -- the hand-tuning pass (wood-panel grain, the
+element-by-element zen), the study, the company (Solitaire Agile), the story -- lives on the living design
+card and the spec's open items, done with the owner's eye, never speculatively.

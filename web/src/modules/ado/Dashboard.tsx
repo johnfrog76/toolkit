@@ -2,7 +2,7 @@ import { useEffect, useState, useId } from "react";
 import { Badge, Button, Caption1, Subtitle2, makeStyles, tokens } from "@fluentui/react-components";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { FilterBadge } from "../../shared/FilterBadge";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import {
   OpenRegular,
   CheckmarkCircleRegular,
@@ -328,7 +328,7 @@ export function Dashboard() {
       : null;
 
   return (
-    <PageCard
+    <PanelFrame
       headerLeft={
         <>
           <Subtitle2>Build</Subtitle2>
@@ -472,6 +472,6 @@ export function Dashboard() {
           </div>
         </>
       )}
-    </PageCard>
+    </PanelFrame>
   );
 }

@@ -514,9 +514,16 @@ be invisible until it mattered:
 
 ## Known gaps
 
-| # | Gap | What you see |
+| # | Gap | What you see | Known gap |
+| --- | --- | --- | --- |
+| GR4 | The quarter line reads `growth/current/` only, shows the current quarter only, and has no history of the last four quarters | A training moved to `growth/archive/` stops counting toward the quarter it was dated in, and *Archive* in the UI (`NewGrowth -Close`) moves it there | [An archived training leaves its quarter's count](../KNOWN-GAPS.md#an-archived-training-leaves-its-quarters-count) |
+
+### True by design
+
+This one is a choice, not an omission, and is not on [Known gaps](../KNOWN-GAPS.md):
+
+| # | Choice | What you see |
 | --- | --- | --- |
-| GR4 | The quarter line reads `growth/current/` only, shows the current quarter only, and has no history of the last four quarters | A training moved to `growth/archive/` stops counting toward the quarter it was dated in, and *Archive* in the UI (`NewGrowth -Close`) moves it there |
 | GR3 | `ReviewPage` ownership settled as (a): it stays an ADO card and this module serves its routes | `/review` says "No reviews yet" when growth is off. Not an error, and not a bug |
 
 ---
