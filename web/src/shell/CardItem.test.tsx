@@ -2,9 +2,11 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { CardItem, CompactItem, LineItem } from "./CardItem";
 import type { CardItemData } from "./CardItem";
 import { ROW } from "../shared/CardActions";
+import { escapeRegExp } from "../shared/escapeRegExp";
 import { CARD_ITEM_COMPACT_HEIGHT_PX, CARD_ITEM_HEIGHT_PX } from "./cardItemTokens";
 import {
   expectDescriptionClamp,
+  expectMetaGap,
   expectOneLineClamp,
   rulesOf,
   titleOf,
@@ -60,7 +62,9 @@ describe("CardItem", () => {
     expect(description.textContent).toBe(LONG_TEXT);
     expectOneLineClamp(titleOf(item));
     expectDescriptionClamp(description);
-    expect(rulesOf(item)).toMatch(new RegExp(`(^|[^-])height:\\s*${CARD_ITEM_HEIGHT_PX}px`));
+    expect(rulesOf(item)).toMatch(
+      new RegExp(`(^|[^-])height:\\s*${escapeRegExp(String(CARD_ITEM_HEIGHT_PX))}px`),
+    );
   });
 
   it("an element with no clamp of its own has none read for it", () => {
@@ -75,6 +79,23 @@ describe("CardItem", () => {
     const description = rulesOf(container.querySelector("[data-row-description]")!);
     expect(description).not.toMatch(/white-space:\s*nowrap/);
     expect(rulesOf(titleOf(container))).not.toMatch(/-webkit-line-clamp/);
+  });
+
+  it("the meta band sits one gap under the description, the same under one line, two lines or none: a grid track, never a margin", () => {
+    const { container } = render(
+      <>
+        <CardItem data={data({ description: "short" })} />
+        <CardItem data={data({ description: LONG_TEXT })} />
+        <CardItem data={data({ description: undefined })} />
+      </>,
+    );
+    const items = Array.from(container.querySelectorAll<HTMLElement>("[data-card-item]"));
+    expect(items).toHaveLength(3);
+    // The track, the meta band's row, no margin on a band, and the height sum.
+    for (const item of items) expectMetaGap(item);
+    // One rule places all three: the description's length changes nothing.
+    expect(rulesOf(items[1])).toBe(rulesOf(items[0]));
+    expect(rulesOf(items[2])).toBe(rulesOf(items[0]));
   });
 
   it("is a plain element, not a Fluent Card", () => {
@@ -161,7 +182,7 @@ describe("CompactItem", () => {
     expect(items[0].querySelector("strong")!.textContent).toBe(LONG_TITLE);
     expect(items[0].querySelector("[data-row-meta]")!.textContent).toBe("file.md");
     expect(rulesOf(items[0])).toMatch(
-      new RegExp(`(^|[^-])height:\\s*${CARD_ITEM_COMPACT_HEIGHT_PX}px`),
+      new RegExp(`(^|[^-])height:\\s*${escapeRegExp(String(CARD_ITEM_COMPACT_HEIGHT_PX))}px`),
     );
     expectOneLineClamp(titleOf(items[0]));
     expect(CARD_ITEM_COMPACT_HEIGHT_PX).toBeLessThan(CARD_ITEM_HEIGHT_PX);

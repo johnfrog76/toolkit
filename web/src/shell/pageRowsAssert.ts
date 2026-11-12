@@ -1,4 +1,5 @@
 import { webLightTheme } from "@fluentui/react-components";
+import { escapeRegExp } from "../shared/escapeRegExp";
 import { pageRowGap, panelGap } from "./layoutTokens";
 import { rulesOf } from "./kinds/panelShapeAssert";
 
@@ -14,8 +15,6 @@ export function tokenPx(token: string): number {
   if (!/^\d+px$/.test(value ?? "")) throw new Error(`no px length for ${name}`);
   return parseInt(value, 10);
 }
-
-const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** The rows of a page, in order. */
 export function panelRowsOf(root: ParentNode): HTMLElement[] {
@@ -34,7 +33,7 @@ export function expectPageRowsShape(root: ParentNode, panels: HTMLElement[]): HT
   const pageRules = rulesOf(page);
   expect(pageRules).toMatch(/display:\s*flex/);
   expect(pageRules).toMatch(/flex-direction:\s*column/);
-  expect(pageRules).toMatch(new RegExp(`row-gap:\\s*${escaped(pageRowGap)}`));
+  expect(pageRules).toMatch(new RegExp(`row-gap:\\s*${escapeRegExp(pageRowGap)}`));
   expect(pageRules).not.toMatch(/margin/);
   expect(page.style.margin).toBe("");
   const rows = panelRowsOf(root);
@@ -47,8 +46,8 @@ export function expectPageRowsShape(root: ParentNode, panels: HTMLElement[]): HT
     const rowRules = rulesOf(row);
     expect(rowRules).toMatch(/display:\s*grid/);
     expect(rowRules).toMatch(/align-items:\s*stretch/);
-    expect(rowRules).toMatch(new RegExp(`row-gap:\\s*${escaped(panelGap)}`));
-    expect(rowRules).toMatch(new RegExp(`column-gap:\\s*${escaped(panelGap)}`));
+    expect(rowRules).toMatch(new RegExp(`row-gap:\\s*${escapeRegExp(panelGap)}`));
+    expect(rowRules).toMatch(new RegExp(`column-gap:\\s*${escapeRegExp(panelGap)}`));
     expect(rowRules).not.toMatch(/margin/);
     expect(row.style.margin).toBe("");
     expect(row.children.length).toBeGreaterThanOrEqual(1);

@@ -276,6 +276,11 @@ describe("the pages", () => {
     expect(rulesOf(stack)).toMatch(/flex-direction:\s*column/);
     expect(rulesOf(stack)).toContain(`row-gap: ${pageRowGap}`);
     expect(rulesOf(stack)).not.toMatch(/margin/);
+    // One visible label, the panels' "Page n of m", centred; the nav's name is
+    // for a screen reader and is not drawn a second time.
+    expect(pager.textContent).toBe("Page 1 of 2");
+    expect(rulesOf(pager)).toMatch(/justify-content:\s*center/);
+    expect(pager.querySelector("[data-list-pager]")).not.toBeNull();
   });
 
   it("System with one page of cards draws no pager", () => {
