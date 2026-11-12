@@ -56,8 +56,12 @@ const useStyles = makeStyles({
   },
   full: {
     display: "grid",
-    gridTemplateRows: `${CARD_ITEM_TITLE_BAND_PX}px ${CARD_ITEM_DESCRIPTION_BAND_PX}px ${CARD_ITEM_META_BAND_PX}px`,
+    // Title, description, then the meta band one track lower: the third track
+    // is the gap over the meta band (CARD_ITEM_META_GAP_PX is this token's
+    // number), the item's own layout and never a margin on a band.
+    gridTemplateRows: `${CARD_ITEM_TITLE_BAND_PX}px ${CARD_ITEM_DESCRIPTION_BAND_PX}px ${tokens.spacingVerticalS} ${CARD_ITEM_META_BAND_PX}px`,
     rowGap: 0,
+    "& > [data-row-meta]": { gridRow: "4" },
     height: `${CARD_ITEM_HEIGHT_PX}px`,
     // One padding, top and bottom: CARD_ITEM_PADDING_Y_PX is this token's number.
     paddingTop: tokens.spacingVerticalM,
