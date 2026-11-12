@@ -44,8 +44,13 @@ const useStyles = makeStyles({
   },
 });
 
+export interface StatTilesProps {
+  children: ReactNode;
+  className?: string;
+}
+
 /** The row a card's tiles sit in: wraps, centred, the summary's spacing. */
-export function StatTiles({ children, className }: { children: ReactNode; className?: string }) {
+export function StatTiles({ children, className }: StatTilesProps) {
   const styles = useStyles();
   return (
     <div className={mergeClasses(styles.tiles, className)} data-stat-tiles="">

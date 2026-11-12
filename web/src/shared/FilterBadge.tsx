@@ -45,7 +45,7 @@ const useStyles = makeStyles({
 
 export type FilterBadgeAppearance = "pink" | "purple" | "orange";
 
-interface FilterBadgeProps {
+export interface FilterBadgeProps {
   label: string;
   count?: number;
   active: boolean;

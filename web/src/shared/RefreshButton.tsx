@@ -1,7 +1,7 @@
 import { Button, Spinner } from "@fluentui/react-components";
 import { ArrowSyncRegular } from "@fluentui/react-icons";
 
-interface RefreshButtonProps {
+export interface RefreshButtonProps {
   onClick: () => void;
   isFetching?: boolean;
   disabled?: boolean;

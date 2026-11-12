@@ -3,12 +3,12 @@ import { makeStyles, tokens } from "@fluentui/react-components";
 import { DismissRegular } from "@fluentui/react-icons";
 import { thinScrollbar } from "./thinScrollbar";
 
-type StatusMessageProps = {
+export interface StatusMessageProps {
   status: "success" | "error";
   children: React.ReactNode;
   onDismiss?: () => void;
   autoHideMs?: number;
-};
+}
 
 const DEFAULT_AUTO_HIDE_MS = 30000;
 
