@@ -554,13 +554,32 @@ async function runViewport(viewportName) {
     // 6. The page the send button is on can be REACHED. Once nothing
     // in the UI led to /communication/sessions/<file>: the card's rows and the
     // read view both went elsewhere, and a built, tested feature was findable
-    // only by typing its URL. The row carries an "Edit / send" control, and the
-    // read view's own "Edit / send" lands on the session page.
+    // only by typing its URL. Each entry's `...` menu carries "Edit or send", and
+    // the read view's own "Edit / send" lands on the session page.
+    // 7 is read in the same pass. A complete session offers Archive, the move
+    // that closes it -- READ-ONLY. Presence only: choosing it and confirming
+    // runs MeetingAgenda -Close through the bridge, which MOVES the fixture file
+    // into manager/archive/, and the fixture hub is the committed one. The retro
+    // session is the only complete one of the three.
     await open("/communication");
-    const rowEditSend = await page.evaluate(
-      () => document.querySelectorAll('button[aria-label="Edit / send"]').length,
-    );
-    check("each meeting row offers Edit / send", rowEditSend >= 3, `found ${rowEditSend}`);
+    const meetingMenus = page
+      .locator('[data-panel-kind="list"]')
+      .filter({ has: page.locator('[role="group"][aria-label="Filter meetings"]') })
+      .locator('button[aria-label^="Actions for "]');
+    const meetingRows = await meetingMenus.count();
+    let rowEditSend = 0;
+    let closeOffers = 0;
+    for (let i = 0; i < meetingRows; i += 1) {
+      await meetingMenus.nth(i).click();
+      const menu = page.getByRole("menu");
+      await menu.waitFor({ timeout: 5000 }).catch(() => {});
+      if ((await menu.getByRole("menuitem", { name: /^Edit or send/ }).count()) > 0) rowEditSend += 1;
+      if ((await menu.getByRole("menuitem", { name: /^Archive/ }).count()) > 0) closeOffers += 1;
+      await page.keyboard.press("Escape");
+      await menu.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    }
+    check("each meeting entry's menu offers Edit or send", rowEditSend >= 3, `found ${rowEditSend} of ${meetingRows}`);
+    check("exactly the complete session offers Archive", closeOffers === 1, `found ${closeOffers}`);
     await open("/communication/1on1/2026-02-05.md");
     const clicked = await page.evaluate(() => {
       const el = Array.from(document.querySelectorAll("button")).find((b) => /Edit \/ send/.test(b.textContent ?? ""));
@@ -575,16 +594,6 @@ async function runViewport(viewportName) {
       page.url().includes("/communication/sessions/2026-02-05.md"),
       page.url(),
     );
-
-    // 7. A complete session offers Close -- READ-ONLY. Presence only: pressing
-    // it runs MeetingAgenda -Close through the bridge, which MOVES the fixture
-    // file into manager/archive/, and the fixture hub is the committed one.
-    // The retro session is the only complete one of the three.
-    await open("/communication");
-    const closeButtons = await page.evaluate(
-      () => document.querySelectorAll('button[aria-label="Close this meeting"]').length,
-    );
-    check("exactly the complete session offers Close", closeButtons === 1, `found ${closeButtons}`);
   }
 
   check(`no page errors across the ${routesVisited.length} routes`, pageErrors.length === 0, pageErrors.join(" | "));

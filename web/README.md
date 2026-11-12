@@ -123,13 +123,13 @@ web/
     ├── modules/growth/    opt-in, features.growth
     │   ├── index.tsx       export growthModule, plus ReviewArchive and SkillsSnapshot by name
     │   ├── api.growth.ts   tag types Growth, Resume, Reviews
-    │   └── GrowthPage, Goals, GoalDetailPage, SkillsPage, ReviewArchive, SkillsSnapshot
+    │   └── GrowthPage, Goals, GoalDetailPage, SkillsPage, ReviewArchive, SkillsSnapshot (Goals and ReviewArchive are list panels; their dialogs are files beside them)
     ├── modules/communication/   opt-in, features.communication
     │   ├── index.tsx       export communicationModule, the four routes and three redirects
     │   ├── paths.ts        every route path of this module, in one place
     │   ├── api.communication.ts   tag type Manager, and /env's communication block typed here
     │   ├── sendButton.ts   the send button's rule, as a pure function
-    │   └── OneOnOne, ManagerDetailPage, ManagerSessionPage, Timer
+    │   └── OneOnOne, NewMeetingDialog, ManagerDetailPage, ManagerSessionPage, Timer
     ├── modules/organize/   opt-in, features.organize -- the Organize tab
     │   ├── index.tsx       export organizeModule: one route, one nav entry, the header bell, no cards elsewhere
     │   ├── paths.ts        the module's route path, and the router state that opens a bucket
@@ -137,7 +137,7 @@ web/
     │   ├── useOverdueReminders  the past-due slice of the reminders read, polled each minute
     │   ├── api.organize.ts tag type Reminders; GET /api/reminders and the two verbs via the bridge
     │   ├── reminderEntry   a stored due split into the Edit dialog's date and time, and joined back
-    │   └── RemindersCard   bucket chips, snooze menu, edit, done, the quick add
+    │   └── RemindersCard   a list panel: bucket chips, archive, the snooze menu, edit, the quick add
     ├── modules/solitaireAgile/   opt-in, features.solitaireAgile -- today's standup, read and played, and triage
     │   ├── index.tsx       export solitaireAgileModule: four routes (the standup, triage, milestones, the played view, chromeless), one nav entry, no cards elsewhere
     │   ├── paths.ts        the module's route paths and the played deck's id
@@ -547,6 +547,7 @@ row that draws them, and listed here. Two kinds, both named:
 | `issue.unpin` | Unpin | `PinOffRegular` | one record | the Issues tab |
 | `reminder.snooze` | Snooze: *when* | `SnoozeRegular` | one record | Reminders |
 | `reminder.edit` | Edit | `EditRegular` | one record | Reminders |
+| `meeting.edit` | Edit or send | `EditRegular` | one record | Meetings: the session page, where the notes are edited and the retro is sent |
 | `deck.play` | Play | `PlayRegular` | one record | a deck, its row's menu and its page's exposed action |
 | `deck.unarchive` | Unarchive | `ArchiveArrowBackRegular` | one record | a deck's page, once it is archived on this machine |
 | `resume.generate` | Generate resume scaffold | `AddRegular` | one record | the resume |
@@ -1743,10 +1744,10 @@ Routes and nav, all of them spelled once in `paths.ts`:
 
 | Path | Renders |
 | --- | --- |
-| `/communication` | `OneOnOne` -- the one-card landing page the `Meetings` nav points at. A complete session's row offers **Close**, behind a confirm, through `POST /cmd/MeetingAgenda` |
+| `/communication` | `OneOnOne` -- the one-panel landing page the `Meetings` nav points at, a `ListPanel`: chips for All, Current, Past and Archive; each entry opens the read view, and its menu holds **Edit or send** and, on a complete session, **Archive**, behind a confirm, through `POST /cmd/MeetingAgenda` |
 | `/communication/1on1/:filename` | `ManagerDetailPage` -- read view, with an `Edit / send` button to the session page and **Close** on a complete session |
 | `/communication/sessions/new` | `ManagerSessionPage` -- scaffold and edit |
-| `/communication/sessions/:filename` | `ManagerSessionPage` -- edit, the stage ahead (`Prep` / `Retro` / `Plan` through `POST /cmd/MeetingAgenda`, saving the notes first), Close on a complete session, and the send. Reached from `Edit / send` on a meeting row and on the read view |
+| `/communication/sessions/:filename` | `ManagerSessionPage` -- edit, the stage ahead (`Prep` / `Retro` / `Plan` through `POST /cmd/MeetingAgenda`, saving the notes first), Close on a complete session, and the send. Reached from **Edit or send** in a meeting entry's menu and from `Edit / send` on the read view |
 | `/growth/1on1/:filename` | **redirect**, filename forwarded |
 | `/growth/sessions/new` | **redirect** |
 | `/growth/sessions/:filename` | **redirect**, filename forwarded |
@@ -1862,6 +1863,7 @@ paragraph:
 | `src/shell/pageRows.test.tsx` | A page's rows of panels: every panel directly inside exactly one `[data-panel-row]`, the page holding rows only, a row of at most two, the gaps as Fluent tokens that are multiples of 4 px, and no margin on a page, a row, a panel, a list or an item -- for the Studio page, the System page's grid and the Growth page |
 | `src/shared/TabRows.test.tsx` | A page's tab rows: `TabRows` one marked wrapper (`[data-tab-rows]`) with its rows directly inside, its padding the control rows' one space (`controlRowsSpace`, the same as under a list panel's chips) and its gap a Fluent token that is a multiple of 4 px, and every `TabList` under `src/` inside a `TabRows` with no className or style of its own |
 | `src/modules/ado/systemPanels.test.ts` | The System page's panels, read from `systemCards`: each that draws a list is a `ListPanel` (Test Health and the Log, so a row's two panels are one height), and a panel that is not one and draws rows is named with its reason (Environment, Modules, Burn) |
+| `src/shell/kinds/modulePanels.test.ts` | Every module's panels and pages, read for their kind with the reader `systemPanels.test.ts` uses (`panelKindFacts.ts`): a file under `src/modules/` that draws a panel or a page and maps entries to elements is a `ListPanel`, unless it is named with its reason on one of three lists held exact -- a fixed set of status, stat or chart rows; a page, a form or a scene whose rows are not records; a list of records not yet moved (Home's pull requests, review comments, milestones, deploys, builds and the matches inside a design search, and Team Agile's Releases). The twelve list panels are named, and the reader is tried on three shapes It cannot see a list split across files (the frame in one, the `.map()` in the other), so each such file is named on a fourth list, `ROWS_THROUGH_CHILDREN` (the Design tab's list and the Standup's agenda lanes), held exact. |
 | `src/shell/kinds/listRoom.test.ts` | The room a list has, from boxes handed in: from the list's top under its padding down to the foot, what sits above it and a line under the foot each taking its height, the foot row's room kept free while none is drawn, and nothing where the panel has no fixed height or there is no layout |
 | `src/shell/kinds/ListPanel.test.tsx` | The measured page size -- the formula at several rooms down to one item, the component following a handed-in room, watching the panel and what sits above the list, and keeping the page's first item in view when a resize changes the page; the page size as a sum over the panel's chrome, a full page always fitting and one more item never, four full items under one chip row at the one panel height, and more chrome never a bigger page; the pager at five and not at four, its `Page 2 of 5` and arrow keys; a chip, the search and a picker each returning to page 1, the page clamped when the list shrinks; `empty` against `filteredEmpty`; the header, foot, status and lead slots; the compact density (five a page, no description band), a smaller page under more chrome, and the panel's height the same at every density; and nine things a panel cannot say, as compile errors |
 | `src/shell/CardItem.test.tsx` | One item shape whatever the text: the same classes with a long title, a long description and none; the clamp in CSS and the text whole in the DOM; a plain element, not a Fluent `Card`; a plain-text title with no tooltip; one exposed action and the menu; the meta band's thumb, progress, badges and text; the meta band one gap under the description -- a track of the item's grid, the band on the row after it, no margin on a band, the same under one line, two or none; the compact item, the title line and the meta band at one shorter height; the one-band line item |
@@ -2014,10 +2016,10 @@ come on top of these; the totals are in [`docs/TESTING.md`](../docs/TESTING.md))
 | The retro session has a send button | The third state of `sendButtonState`: shown, because `postRetroSummary` is on |
 | The send button is disabled | And an **enabled** one here is a reason to stop: it means a live webhook is configured in the agent's environment |
 | The send button names `TEAMS_WEBHOOK_MANAGER` | The disabled reason sends a reader to a shell rather than to source. This is the check the whole "read-only" rule exists to make possible -- the button is never pressed |
-| Each meeting row offers `Edit / send` | The page the send button is on can be reached from the list |
+| Each meeting entry's menu offers Edit or send | The page the send button is on can be reached from the list: every entry of the Meetings panel has a `...` menu, and each menu holds **Edit or send** |
 | The read view offers `Edit / send` | And from the page a row lands on |
 | `Edit / send` lands on the session page | The button is pressed -- it navigates, it does not send -- and the URL is `/communication/sessions/2026-02-05.md` |
-| Exactly the complete session offers Close | Presence on one of three rows, never pressed: a press runs `MeetingAgenda -Close` and moves a file in the committed fixture hub |
+| Exactly the complete session offers Archive | Presence in one of three entries' menus, never chosen: choosing it and confirming runs `MeetingAgenda -Close` and moves a file in the committed fixture hub |
 | No page errors across every route visited | Nothing threw while proving the others |
 
 It uses raw `playwright`, not `@playwright/test` -- chromium, `domcontentloaded`, then wait for the
