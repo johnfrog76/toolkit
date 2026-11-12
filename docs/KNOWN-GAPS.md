@@ -21,16 +21,6 @@ finds the repository's clone on this machine and works from it, an unpushed bran
 
 **Issue:** [#285](https://github.com/johnfrog76/toolkit/issues/285)
 
-### No page shows where a Teams recipient came from
-
-**What you see:** `GET /api/env` carries each Teams recipient's `scope` -- `managerWorkflow` or `org`,
-the config block it was declared in -- but no page draws it, so nothing in the browser explains why
-switching Space changes some recipients and not others.
-
-**Where you meet it:** [Communication](modules/communication.md#envs-communication-block), "`/env`'s `communication` block"
-
-**Issue:** [#286](https://github.com/johnfrog76/toolkit/issues/286)
-
 ### A meeting row draws its actions side by side
 
 **What you see:** A complete meeting's row on the Meetings card shows Close, Edit / send and View details
@@ -271,6 +261,29 @@ leave ts-jest, which is a decision of its own.
 **Where you meet it:** [web README](../web/README.md#stack), "Stack"
 
 **Issue:** [#305](https://github.com/johnfrog76/toolkit/issues/305)
+
+### Milestones appear on two pages
+
+**What you see:** a GitHub Space's milestones appear on the Stats tab's Milestones card and on Team Agile's
+Milestones tab. Both build their rows from the same reader and order and word them by the same rules, so they
+agree. But each page has its own route and cache and draws its own row, so for a moment the two can show a
+different read, and a milestone can look different in each place.
+
+**Where you meet it:** [Scenarios](SCENARIOS.md#stats-on-a-github-space), "Stats, on a GitHub Space", and
+[Team Agile](modules/solitaire-agile.md#milestones-the-tab-and-the-award), "Milestones: the tab and the award"
+
+**Issue:** [#321](https://github.com/johnfrog76/toolkit/issues/321)
+
+### The plan's weekly usage is typed, not read
+
+**What you see:** `Burn`'s weekly burndown shows only the readings someone typed with
+`Burn -Reading general=<n>,premium=<n>`, copied from Claude's usage page. Nothing reads the plan's
+percentages automatically, because nothing documented carries them per bucket. With no reading this week,
+`Burn` says how to record one, and a reading older than `burn.cacheHours` says its renewal is due.
+
+**Where you meet it:** [Usage](hub/usage.md#not-yet), "Not yet"
+
+**Issue:** [#320](https://github.com/johnfrog76/toolkit/issues/320)
 
 ## True by design
 

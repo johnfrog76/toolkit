@@ -975,6 +975,8 @@ date, every issue closed while GitHub shows it open, every issue closed and clos
 GitHub with an issue still open, empty open and empty closed) and the route's rows out, asserted from
 `Tests/test_ritual_milestones.py` and drawn by `MilestonesPage.test.tsx`.
 
+Known gap: [Milestones appear on two pages](../KNOWN-GAPS.md#milestones-appear-on-two-pages).
+
 ## The reminder to attend
 
 D-TA15: the one ask-shaped thing the feature has is Organize's bell, and it is opt-in twice -- Organize's

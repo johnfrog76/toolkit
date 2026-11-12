@@ -61,6 +61,8 @@ tab); the strip's order and addresses are `web/src/shell/registry.test.tsx`.
 `scenarios.test.tsx`, "Stats on a GitHub Space"; the ordering and the sentence are
 `web/src/modules/ado/MilestonesCard.test.tsx`, the rule `Tests/test_milestones.py`.
 
+Known gap: [Milestones appear on two pages](KNOWN-GAPS.md#milestones-appear-on-two-pages).
+
 ### The filter drawer, by tab
 
 | Space | Tab | The drawer holds | Why |

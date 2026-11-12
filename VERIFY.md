@@ -291,7 +291,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **52 suites, 9961 assertions** with a `config.local.json`, every one
+findings. On this commit that is **52 suites, 9988 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -903,8 +903,8 @@ real one.
 
 **The three runs are one line:** `tkTest` runs the agent's `pytest`, the CLI runner and the web UI's
 `npm test` in order, each with its own environment, and prints one summary and one verdict -- a half
-that cannot run is named SKIPPED, not passed -- and writes all three into `test-summary.<machine>.json`,
-in the machine's test-history folder (`docs/TESTING.md`, at its head). The rows below that name `tkTestToolkit`,
+that cannot run is named SKIPPED, not passed -- and writes all three into `test-summary.<machine>.json`
+(`docs/TESTING.md`, at its head). The rows below that name `tkTestToolkit`,
 `python -m pytest Tests/` or `npm test` are the one-half form of the same runs.
 
 - [ ] **Clone from nothing.** A fresh clone, then `README.md` and the Quick start it links
@@ -914,7 +914,7 @@ in the machine's test-history folder (`docs/TESTING.md`, at its head). The rows 
       verbs exist), then open a fresh `powershell.exe -NoProfile` **and** a fresh `pwsh -NoProfile`:
       `tkMenu` answers in both. Gate 1's note about the two module directories is the usual failure
 - [ ] **The suite on 5.1.** `tkTestToolkit` in `powershell.exe`, full pass, count read from
-      `test-results.<machine>.log` in the machine's test-history folder (latest row per suite). Then again in `pwsh`. Both totals go in
+      `test-results.<machine>.log` (latest row per suite). Then again in `pwsh`. Both totals go in
       the ledger next to the other host's; a suite that passes only on 7 is a 5.1 defect, filed
 - [ ] **Configure against the real hub.** `config.local.json` with `promptsRoot` at
       your real hub and your real `activeOrg`; `tkSetup` green; `tkStatus` lists the
@@ -1248,15 +1248,6 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   head, `tkWeb -Restart`, then open the Lounge and refresh the page: the room draws again, and the address bar still
   says `localhost:5174`, not `5173` (a browser that met the old redirect keeps it: refresh with Cmd+Shift+R). Then
   the four `curl` lines of Gate 12b for `/system`, `/lounge`, `/lounge/` and `/lounge/temple.html` each print `200`. `Tests/test_consts.py` holds the template to it; this row is the image.
-- [ ] **A worktree's test run reaches the Health card on Windows, under Windows PowerShell 5.1 too (#317).** On the
-  Windows PC, in `powershell` (5.1), from a git worktree of the package (`git worktree add ..\toolkit-wt-317`), run
-  `tkTestToolkit -Consts` there. `%LOCALAPPDATA%\ToolKit\TestHistory` now holds `test-summary.<MACHINE>.json` and
-  `test-results.<MACHINE>.log`, the summary's `checkout` reads `toolkit-wt-317` and its `commit` is the worktree's
-  `git rev-parse --short HEAD`, and neither file is in the worktree. Then, with the agent started from the main
-  checkout, the System page's Test Health card shows that run. On a machine that had a `test-summary.<MACHINE>.json`
-  in the main checkout before the upgrade and no folder yet, the card's first read shows that old record, not "not
-  run". `tkTestToolkit -TestAll` holds the rule over `Tests/fixtures/test-history/paths.json`, whose Windows rows
-  only a Windows host reads live.
 
 ## Recording a run
 
