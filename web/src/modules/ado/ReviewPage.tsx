@@ -14,7 +14,7 @@ import { CloudArrowUpRegular, SaveRegular } from "@fluentui/react-icons";
 import { BackButton } from "../../shared/BackButton";
 import { MarkdownBlock } from "../../shared/MarkdownBlock";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import {
   useGetReviewPreviewQuery,
   useGetReviewDetailQuery,
@@ -96,7 +96,7 @@ export function ReviewPage() {
 
   return (
     <div className={styles.page}>
-      <PageCard
+      <PanelFrame
         loading={isLoading || detailLoading}
         loadingLabel="Loading reviews..."
         empty={
@@ -208,7 +208,7 @@ export function ReviewPage() {
             />
           </>
         ) : null}
-      </PageCard>
+      </PanelFrame>
     </div>
   );
 }

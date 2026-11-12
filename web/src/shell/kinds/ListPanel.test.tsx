@@ -1,0 +1,456 @@
+import { useState } from "react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { DocumentRegular } from "@fluentui/react-icons";
+import { ListPanel } from "./ListPanel";
+import type { FilterRow } from "./ListPanel";
+import type { CardItemData, CompactItemData } from "../CardItem";
+import { ROW } from "../../shared/CardActions";
+import {
+  LIST_ITEM_PITCH_PX,
+  LIST_PAGE_SIZE,
+  listChromePx,
+  listHeightPx,
+  listPageSize,
+} from "../pageSize";
+import { PANEL_MAX_HEIGHT_PX, PANEL_MIN_HEIGHT_PX } from "../panelHeight";
+import { expectListPanelShape, expectSentenceInInfoTip, panelOf } from "./panelShapeAssert";
+
+interface Note {
+  name: string;
+  group: "a" | "b";
+}
+
+const notes = (n: number, group: Note["group"] = "a"): Note[] =>
+  Array.from({ length: n }, (_, i) => ({ name: `${group}-${i + 1}`, group }));
+
+const toItem = (note: Note): CardItemData => ({
+  id: note.name,
+  title: note.name,
+  description: `About ${note.name}`,
+  primary: ROW.open.action({ detail: "the note", onClick: () => undefined }),
+});
+
+const icon = <DocumentRegular />;
+const none = { icon, title: "No notes yet" };
+const panel = () => panelOf(screen.getByText("Notes"));
+const titles = () =>
+  Array.from(panel().querySelectorAll("[data-card-item] strong")).map((s) => s.textContent);
+
+describe("the page size", () => {
+  it("is worked out from the panel's fixed height and its own chrome, never typed", () => {
+    expect(PANEL_MIN_HEIGHT_PX.list).toBe(592);
+    expect(PANEL_MAX_HEIGHT_PX.list).toBe(592);
+    expect(LIST_ITEM_PITCH_PX).toEqual({ full: 99, compact: 82, line: 28 });
+    // Full items: four, with no chip row, with one, with two, and over a foot note.
+    expect(LIST_PAGE_SIZE).toBe(4);
+    expect(listPageSize({ density: "full" })).toBe(4);
+    expect(listPageSize({ density: "full", filterRows: 1 })).toBe(4);
+    expect(listPageSize({ density: "full", filterRows: 2 })).toBe(4);
+    expect(listPageSize({ density: "full", filterRows: 1, footNote: true })).toBe(4);
+    // More chrome is a smaller page, by the same sum.
+    expect(listPageSize({ density: "full", filterRows: 2, footNote: true })).toBe(3);
+    expect(listPageSize({ density: "full", filterRows: 1, footNote: true, status: true })).toBe(3);
+    // Compact items: five fit.
+    expect(listPageSize({ density: "compact" })).toBe(5);
+    // Line items: sixteen, or eleven under a lead chart.
+    expect(listPageSize({ density: "line" })).toBe(16);
+    expect(listPageSize({ density: "line", lead: true })).toBe(11);
+  });
+
+  it("a full page always fits, and one more item never would", () => {
+    for (const density of ["full", "compact", "line"] as const) {
+      for (const filterRows of [0, 1, 2, 3]) {
+        for (const lead of [false, true]) {
+          for (const footNote of [false, true]) {
+            for (const status of [false, true]) {
+              const chrome = { density, filterRows, lead, footNote, status };
+              const n = listPageSize(chrome);
+              const used = (count: number) => listChromePx(chrome) + listHeightPx(density, count);
+              expect(n).toBeGreaterThanOrEqual(1);
+              if (n > 1) expect(used(n)).toBeLessThanOrEqual(PANEL_MAX_HEIGHT_PX.list);
+              expect(used(n + 1)).toBeGreaterThan(PANEL_MAX_HEIGHT_PX.list);
+              // A list's height is its items, the gaps between them and the space over the first.
+              expect(listHeightPx(density, n)).toBe(n * LIST_ITEM_PITCH_PX[density]);
+            }
+          }
+        }
+      }
+    }
+  });
+});
+
+describe("ListPanel's paging", () => {
+  it("full items: one page of four, no pager at four, a pager at five", () => {
+    const { rerender } = render(
+      <ListPanel title="Notes" items={notes(4)} item={toItem} empty={none} />,
+    );
+    expectListPanelShape(panel(), { titles: ["a-1", "a-2", "a-3", "a-4"], total: 4 });
+    rerender(<ListPanel title="Notes" items={notes(5)} item={toItem} empty={none} />);
+    expectListPanelShape(panel(), { titles: ["a-1", "a-2", "a-3", "a-4"], total: 5 });
+    expect(screen.getByText("Page 1 of 2")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(titles()).toEqual(["a-5"]);
+    expect(screen.getByText("Page 2 of 2")).toBeTruthy();
+  });
+
+  it("compact density: every item the shorter one, no description band, five a page", () => {
+    const compact = (n: Note) => ({
+      id: n.name,
+      title: n.name,
+      meta: [{ text: `#${n.name}` }],
+      primary: ROW.open.action({ detail: "the note", onClick: () => undefined }),
+    });
+    render(
+      <ListPanel title="Notes" density="compact" items={notes(11)} item={compact} empty={none} />,
+    );
+    const items = expectListPanelShape(panel(), {
+      titles: notes(5).map((n) => n.name),
+      total: 11,
+    });
+    expect(items.every((i) => i.getAttribute("data-density") === "compact")).toBe(true);
+    expect(panel().querySelector("[data-row-description]")).toBeNull();
+  });
+
+  it("more chrome is a smaller page: two chip rows over a foot note hold three full items, and so does one row under a status", () => {
+    const rows: FilterRow[] = ["Filter notes", "Filter by kind"].map((label) => ({
+      label,
+      chips: [{ id: "all", label: "All", count: 9, active: true, onSelect: () => undefined }],
+    }));
+    const { rerender } = render(
+      <ListPanel
+        title="Notes"
+        items={notes(9)}
+        item={toItem}
+        empty={none}
+        filters={rows}
+        footNote={<span>synced</span>}
+      />,
+    );
+    expectListPanelShape(panel(), { titles: ["a-1", "a-2", "a-3"], total: 9, chips: true });
+    // One chip row over a foot note holds four; a status shown above them takes one.
+    rerender(
+      <ListPanel
+        title="Notes"
+        items={notes(9)}
+        item={toItem}
+        empty={none}
+        filters={rows.slice(0, 1)}
+        footNote={<span>synced</span>}
+        status={{ tone: "busy", text: "Reading..." }}
+      />,
+    );
+    expectListPanelShape(panel(), { titles: ["a-1", "a-2", "a-3"], total: 9, chips: true });
+  });
+
+  it("the panel's height is its kind's whatever the item size: a compact panel with two items is still a 592 px list panel", () => {
+    const floor = (density: "full" | "compact" | "line") => {
+      const view = render(
+        density === "full" ? (
+          <ListPanel title="Notes" items={notes(2)} item={toItem} empty={none} />
+        ) : density === "compact" ? (
+          <ListPanel
+            title="Notes"
+            density="compact"
+            items={notes(2)}
+            item={(n) => ({ title: n.name, primary: toItem(n).primary })}
+            empty={none}
+          />
+        ) : (
+          <ListPanel
+            title="Notes"
+            density="line"
+            items={notes(2)}
+            item={(n) => ({ title: n.name })}
+            empty={none}
+          />
+        ),
+      );
+      // The helper asserts the kind's minimum and maximum height on the root.
+      expectListPanelShape(panel(), { titles: ["a-1", "a-2"], total: 2 });
+      const classes = panel().getAttribute("class");
+      view.unmount();
+      return classes;
+    };
+    // The same root classes at every density: nothing about the item reaches the floor.
+    expect(floor("compact")).toBe(floor("full"));
+    expect(floor("line")).toBe(floor("full"));
+  });
+
+  it("line density: sixteen one-band items a page", () => {
+    render(
+      <ListPanel
+        title="Notes"
+        density="line"
+        items={notes(17)}
+        item={(n) => ({ title: n.name })}
+        empty={none}
+      />,
+    );
+    expectListPanelShape(panel(), { titles: notes(16).map((n) => n.name), total: 17 });
+  });
+
+  it("the arrow keys page while the pager has focus", () => {
+    render(<ListPanel title="Notes" items={notes(11)} item={toItem} empty={none} />);
+    const pager = screen.getByRole("group", { name: "Pages" });
+    fireEvent.keyDown(pager, { key: "ArrowRight" });
+    expect(screen.getByText("Page 2 of 3")).toBeTruthy();
+    fireEvent.keyDown(pager, { key: "ArrowRight" });
+    fireEvent.keyDown(pager, { key: "ArrowRight" });
+    expect(screen.getByText("Page 3 of 3")).toBeTruthy();
+    fireEvent.keyDown(pager, { key: "ArrowLeft" });
+    expect(screen.getByText("Page 2 of 3")).toBeTruthy();
+  });
+
+  it("the page is clamped when the list shrinks", () => {
+    const { rerender } = render(
+      <ListPanel title="Notes" items={notes(11)} item={toItem} empty={none} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(titles()).toEqual(["a-9", "a-10", "a-11"]);
+    rerender(<ListPanel title="Notes" items={notes(7)} item={toItem} empty={none} />);
+    expect(titles()).toEqual(["a-5", "a-6", "a-7"]);
+  });
+
+  function Filtered() {
+    const [group, setGroup] = useState<Note["group"]>("a");
+    const [text, setText] = useState("");
+    const [sort, setSort] = useState("new");
+    const all = [...notes(7, "a"), ...notes(12, "b")];
+    const items = all.filter((n) => n.group === group && n.name.includes(text));
+    const filters: FilterRow[] = [
+      {
+        label: "Filter notes",
+        chips: (["a", "b"] as const).map((g) => ({
+          id: g,
+          label: g.toUpperCase(),
+          count: all.filter((n) => n.group === g).length,
+          active: group === g,
+          onSelect: () => setGroup(g),
+        })),
+      },
+    ];
+    return (
+      <ListPanel
+        title="Notes"
+        items={items}
+        item={toItem}
+        empty={none}
+        filteredEmpty={{ icon, tone: "filtered", title: "No note matches" }}
+        filters={filters}
+        search={{ label: "Search notes", value: text, onChange: setText }}
+        pickers={[
+          {
+            label: "Order",
+            value: sort,
+            options: [
+              { value: "new", label: "Newest" },
+              { value: "old", label: "Oldest" },
+            ],
+            onChange: setSort,
+          },
+        ]}
+        count={items.length}
+        countLabel={`${items.length} notes`}
+      />
+    );
+  }
+
+  it("a chip, the search and a picker each send the list back to its first page", () => {
+    render(<Filtered />);
+    const next = () => fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    next();
+    expect(titles()).toEqual(["a-5", "a-6", "a-7"]);
+    fireEvent.click(screen.getByRole("radio", { name: /^B/ }));
+    expect(screen.getByText("Page 1 of 3")).toBeTruthy();
+    next();
+    // Back on the first chip: its first page, not the page it was left on.
+    fireEvent.click(screen.getByRole("radio", { name: /^A/ }));
+    expect(screen.getByText("Page 1 of 2")).toBeTruthy();
+    fireEvent.click(screen.getByRole("radio", { name: /^B/ }));
+    next();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search notes" }), {
+      target: { value: "b-1" },
+    });
+    // b-1, b-10, b-11, b-12: one page.
+    expect(titles()).toEqual(["b-1", "b-10", "b-11", "b-12"]);
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search notes" }), {
+      target: { value: "" },
+    });
+    expect(screen.getByText("Page 1 of 3")).toBeTruthy();
+    next();
+    fireEvent.change(screen.getByRole("combobox", { name: "Order" }), { target: { value: "old" } });
+    expect(screen.getByText("Page 1 of 3")).toBeTruthy();
+    expectListPanelShape(panel(), {
+      titles: ["b-1", "b-2", "b-3", "b-4"],
+      total: 12,
+      chips: true,
+    });
+  });
+
+  it("a filter that hides everything says so under the chips, which stay", () => {
+    render(<Filtered />);
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search notes" }), {
+      target: { value: "zzz" },
+    });
+    expect(screen.getByText("No note matches")).toBeTruthy();
+    expect(screen.queryByText("No notes yet")).toBeNull();
+    expect(screen.getByRole("group", { name: "Filter notes" })).toBeTruthy();
+    expect(screen.getByLabelText("0 notes").textContent).toBe("0");
+  });
+});
+
+describe("ListPanel's slots", () => {
+  it("no items: the empty message, and no pager", () => {
+    render(<ListPanel title="Notes" items={[]} item={toItem} empty={none} />);
+    expect(screen.getByText("No notes yet")).toBeTruthy();
+    expectListPanelShape(panel(), { titles: [], total: 0 });
+  });
+
+  it("loading: the label, no items, no pager", () => {
+    render(
+      <ListPanel
+        title="Notes"
+        items={notes(9)}
+        item={toItem}
+        empty={none}
+        loading={{ label: "Reading the notes..." }}
+      />,
+    );
+    expect(screen.getByText("Reading the notes...")).toBeTruthy();
+    expect(titles()).toEqual([]);
+    expect(screen.queryByRole("group", { name: "Pages" })).toBeNull();
+  });
+
+  it("the header: icon, title and info at the left; action, refresh and count at the right", () => {
+    const run = jest.fn();
+    const refresh = jest.fn();
+    render(
+      <ListPanel
+        title="Notes"
+        icon={icon}
+        info="Notes that belong to no product yet."
+        items={notes(1)}
+        item={toItem}
+        empty={none}
+        action={{ label: "Tidy", glyph: icon, onClick: run }}
+        refresh={{ onClick: refresh }}
+        count="latest 500"
+      />,
+    );
+    expectSentenceInInfoTip(panel(), "About Notes", "Notes that belong to no product yet.");
+    fireEvent.click(screen.getByRole("button", { name: "Tidy" }));
+    fireEvent.click(screen.getByTitle("Refresh"));
+    expect(run).toHaveBeenCalled();
+    expect(refresh).toHaveBeenCalled();
+    expect(panel().querySelector("[data-panel-count]")!.textContent).toBe("latest 500");
+  });
+
+  it("the foot: the left words, the + named for its dialog, and the foot note", () => {
+    const add = jest.fn();
+    render(
+      <ListPanel
+        title="Notes"
+        items={notes(1)}
+        item={toItem}
+        empty={none}
+        footLeft="open, assigned to all"
+        create={{ label: "New Note", onClick: add }}
+        footNote={<span>synced a minute ago</span>}
+      />,
+    );
+    expect(screen.getByText("open, assigned to all")).toBeTruthy();
+    expect(screen.getByText("synced a minute ago")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "New Note" }));
+    expect(add).toHaveBeenCalled();
+  });
+
+  it("a status: what a write came to, dismissable; or what the panel is doing", async () => {
+    const gone = jest.fn();
+    const { rerender } = render(
+      <ListPanel
+        title="Notes"
+        items={notes(1)}
+        item={toItem}
+        empty={none}
+        status={{ tone: "error", text: "Nothing was written.", onDismiss: gone }}
+      />,
+    );
+    expect((await screen.findByRole("alert")).textContent).toContain("Nothing was written.");
+    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Dismiss" }));
+    expect(gone).toHaveBeenCalled();
+    rerender(
+      <ListPanel
+        title="Notes"
+        items={notes(1)}
+        item={toItem}
+        empty={none}
+        status={{ tone: "busy", text: "Reading a-1..." }}
+      />,
+    );
+    expect(screen.getByRole("status").textContent).toBe("Reading a-1...");
+  });
+
+  it("a lead chart sits above the items, named", () => {
+    render(
+      <ListPanel
+        title="Notes"
+        density="line"
+        items={notes(1)}
+        item={(n) => ({ title: n.name })}
+        empty={none}
+        lead={{ chart: { label: "Notes by day", chart: <svg data-testid="chart" /> } }}
+      />,
+    );
+    expect(
+      within(screen.getByRole("group", { name: "Notes by day" })).getByTestId("chart"),
+    ).toBeTruthy();
+  });
+});
+
+// What a panel cannot say. Each line below is a compile error, held by tsc:
+// were the slot to exist, the directive itself would fail the type check.
+export function NotAllowed() {
+  return (
+    <>
+      {/* @ts-expect-error -- a panel sets no height */}
+      <ListPanel title="Log" items={notes(1)} item={toItem} empty={none} height={600} />
+      {/* @ts-expect-error -- a panel names no page size */}
+      <ListPanel title="Log" items={notes(1)} item={toItem} empty={none} pageSize={3} />
+      {/* @ts-expect-error -- a panel wears no class */}
+      <ListPanel title="Log" items={notes(1)} item={toItem} empty={none} className="mine" />
+      {/* @ts-expect-error -- a panel draws no pager */}
+      <ListPanel title="Log" items={notes(1)} item={toItem} empty={none} pager={<div />} />
+      {/* @ts-expect-error -- `item` returns data, not JSX */}
+      <ListPanel title="Log" items={notes(1)} item={(n: Note) => <b>{n.name}</b>} empty={none} />
+      {/* @ts-expect-error -- a panel has no body of its own */}
+      <ListPanel title="Log" items={notes(1)} item={toItem} empty={none}>
+        <p>These are the notes.</p>
+      </ListPanel>
+      <ListPanel
+        title="Log"
+        density="compact"
+        items={notes(1)}
+        item={(n: Note): CompactItemData => ({
+          title: n.name,
+          primary: toItem(n).primary,
+          // @ts-expect-error -- a compact item carries no description
+          description: "more",
+        })}
+        empty={none}
+      />
+      <ListPanel
+        title="Log"
+        items={notes(1)}
+        item={(n: Note): CardItemData => ({
+          ...toItem(n),
+          // @ts-expect-error -- an item does not choose its density
+          density: "compact",
+        })}
+        empty={none}
+      />
+      {/* @ts-expect-error -- the empty message is required */}
+      <ListPanel title="Log" items={notes(1)} item={toItem} />
+    </>
+  );
+}

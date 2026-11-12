@@ -21,7 +21,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { FlagRegular, OpenRegular } from "@fluentui/react-icons";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { EmptyState } from "../../shared/EmptyState";
 import { StatTile, StatTiles } from "../../shared/StatTile";
@@ -130,7 +130,7 @@ export function MilestonesCard() {
     />
   ) : undefined;
   return (
-    <PageCard
+    <PanelFrame
       loading={isLoading}
       loadingLabel="Reading the GitHub milestones..."
       empty={empty}
@@ -150,6 +150,6 @@ export function MilestonesCard() {
       {list.map((m) => (
         <MilestoneRow key={`${m.repo}-${m.number}`} m={m} />
       ))}
-    </PageCard>
+    </PanelFrame>
   );
 }

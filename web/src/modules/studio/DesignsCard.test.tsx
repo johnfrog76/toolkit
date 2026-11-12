@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { expectOneRowShape, expectSentenceInInfoTip } from "./rowShapeAssert";
+import { expectListPanelShape, expectSentenceInInfoTip } from "../../shell/kinds/panelShapeAssert";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { DesignsCard } from "./DesignsCard";
 import { DesignNotePage, promoteBlocked } from "./DesignNotePage";
@@ -436,23 +436,23 @@ describe("the Designs card's pager", () => {
     window.localStorage.clear();
   });
 
-  it("six designs draw a pager, page 2 shows the sixth, and the chip stays the total", () => {
-    listAnswer = { data: { folder: "design", count: 6, items: notes(6) } };
+  it("five designs draw a pager, page 2 shows the fifth, and the chip stays the total", () => {
+    listAnswer = { data: { folder: "design", count: 5, items: notes(5) } };
     mount();
-    expect(screen.getByText("Note 5")).toBeTruthy();
-    expect(screen.queryByText("Note 6")).toBeNull();
-    expect(screen.getByText("1 / 2")).toBeTruthy();
-    expect(chip("Design").textContent).toContain("6");
+    expect(screen.getByText("Note 4")).toBeTruthy();
+    expect(screen.queryByText("Note 5")).toBeNull();
+    expect(screen.getByText("Page 1 of 2")).toBeTruthy();
+    expect(chip("Design").textContent).toContain("5");
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
-    expect(screen.getByText("Note 6")).toBeTruthy();
+    expect(screen.getByText("Note 5")).toBeTruthy();
     expect(screen.queryByText("Note 1")).toBeNull();
     expect(screen.getByRole("button", { name: /New Design Note/ })).toBeTruthy();
   });
 
-  it("five designs draw no pager", () => {
-    listAnswer = { data: { folder: "design", count: 5, items: notes(5) } };
+  it("four designs draw no pager", () => {
+    listAnswer = { data: { folder: "design", count: 4, items: notes(4) } };
     mount();
-    expect(screen.getByText("Note 5")).toBeTruthy();
+    expect(screen.getByText("Note 4")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Next page" })).toBeNull();
   });
 
@@ -460,7 +460,7 @@ describe("the Designs card's pager", () => {
     listAnswer = { data: { folder: "design", count: 12, items: notes(12) } };
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
-    expect(screen.getByText("2 / 3")).toBeTruthy();
+    expect(screen.getByText("Page 2 of 3")).toBeTruthy();
     fireEvent.change(screen.getByRole("searchbox", { name: "Search the hub's designs" }), {
       target: { value: "note 1" },
     });
@@ -470,7 +470,7 @@ describe("the Designs card's pager", () => {
     fireEvent.change(screen.getByRole("searchbox", { name: "Search the hub's designs" }), {
       target: { value: "" },
     });
-    expect(screen.getByText("1 / 3")).toBeTruthy();
+    expect(screen.getByText("Page 1 of 3")).toBeTruthy();
   });
 });
 
@@ -491,11 +491,14 @@ describe("the Designs card's Docs line", () => {
     ],
   });
 
-  it("opens the document in the Docs tab when the design names the Space you are in", () => {
+  it("opens the document in the Docs tab when the design names the Space you are in", async () => {
     listAnswer = { data: complete("toolkit") };
     mount();
     pick("Complete");
-    fireEvent.click(screen.getByText("docs/x.md"));
+    // The docs line is text; the way in is the menu, with every other action.
+    expect(screen.getByText("Docs: docs/x.md")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /^Actions for / }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Open its docs" }));
     expect(screen.getByTestId("where").textContent).toBe("/docs/docs/x.md");
   });
 
@@ -542,7 +545,7 @@ describe("the Designs card's groups (L2)", () => {
     const outcomes = within(screen.getByRole("group", { name: "Filter archived by outcome" }));
     fireEvent.click(outcomes.getByRole("radio", { name: "shipped" }));
     expect(screen.queryByText("A second room")).toBeNull();
-    expect(screen.getByText("No archived design with that outcome.")).toBeTruthy();
+    expect(screen.getByText("No archived design with that outcome")).toBeTruthy();
     fireEvent.click(outcomes.getByRole("radio", { name: "dropped" }));
     expect(screen.getByText("A second room")).toBeTruthy();
   });
@@ -567,9 +570,9 @@ describe("the Designs card's groups (L2)", () => {
     mount();
     pick("Spec");
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
-    expect(screen.getByText("2 / 2")).toBeTruthy();
+    expect(screen.getByText("Page 2 of 2")).toBeTruthy();
     pick("Design");
-    expect(screen.queryByText("2 / 2")).toBeNull();
+    expect(screen.queryByText("Page 2 of 2")).toBeNull();
     expect(screen.getByText("Offline specs")).toBeTruthy();
   });
 
@@ -746,9 +749,8 @@ describe("the Designs card's search (L2b)", () => {
       target: { value: "nothing here" },
     });
     // Beside the not-shown line, which stays: a search hides rows, never the count of what is not a design.
-    expect(screen.getAllByRole("status").map((s) => s.textContent)).toContain(
-      "No design matches the search.",
-    );
+    expect(screen.getByText("No design matches the search")).toBeTruthy();
+    expect(screen.getAllByRole("status").length).toBeGreaterThan(0);
   });
 
   it("a search by file name finds the design, by the Design tab's one rule", () => {
@@ -1054,7 +1056,10 @@ describe("the Designs card's row shape", () => {
       },
     };
     const { container } = mount();
-    const rows = expectOneRowShape(container, "design", [long, "Long text", "Bare"]);
+    const rows = expectListPanelShape(container.querySelector<HTMLElement>("[data-panel-kind]")!, {
+      titles: [long, "Long text", "Bare"],
+      chips: true,
+    });
     expectSentenceInInfoTip(
       container,
       "About Hub Designs",
