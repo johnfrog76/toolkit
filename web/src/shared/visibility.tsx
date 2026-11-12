@@ -55,16 +55,18 @@ export function PublicLine({ show }: { show: boolean }) {
   );
 }
 
-/** The pill: an outline Badge, `informative` for public and `subtle` otherwise.
+/** The pill: an outline `informative` Badge for public, a `tint` `subtle` one
+ *  otherwise (`outline` with `subtle` is white on white in the light theme).
  *  Draws nothing when there is no visibility to state. */
 export function VisibilityBadge({ visibility }: { visibility: string | undefined }) {
   const label = visibilityLabel(visibility);
   if (!label) return null;
+  const pub = isPublicVisibility(visibility);
   return (
     <Badge
-      appearance="outline"
+      appearance={pub ? "outline" : "tint"}
       size="small"
-      color={isPublicVisibility(visibility) ? "informative" : "subtle"}
+      color={pub ? "informative" : "subtle"}
     >
       {label}
     </Badge>

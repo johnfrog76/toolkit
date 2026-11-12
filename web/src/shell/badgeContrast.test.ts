@@ -47,6 +47,26 @@ export function isOutlineSubtle(tag: string): boolean {
   return /\bappearance="outline"/.test(tag) && /\bcolor="subtle"/.test(tag);
 }
 
+/** A Badge that can be outline and whose colour is a variable or an
+ *  expression, so the literal rule cannot read it. */
+export function isOutlineWithComputedColor(tag: string): boolean {
+  const outline = /\bappearance="outline"/.test(tag) || /\bappearance=\{[^]*?"outline"/.test(tag);
+  return outline && /\bcolor=\{/.test(tag);
+}
+
+/** Files whose outline Badge has a computed colour AND the string "subtle",
+ *  each with why it is safe. `badgeContrastRender.test.tsx` mounts them. */
+const COMPUTED_ALLOW: Record<string, string> = {
+  "shared/visibility.tsx": "outline only when the colour is informative; tint with subtle",
+  "modules/ado/ConfigSettings.tsx": "sourceColor's subtle gets tint",
+  "modules/ado/DesignDocPage.tsx":
+    "its subtle colour is on a tint Badge; the outline one is warning or success",
+  "modules/growth/GoalDetailPage.tsx":
+    "its subtle colour is on a tint Badge; the outline one is not computed to subtle",
+  "modules/growth/Goals.tsx":
+    "its subtle colour is on a tint Badge; the outline one reads TYPE_COLOUR, which has none",
+};
+
 describe("no Badge is outline with the subtle colour", () => {
   it("in any source file under web/src", () => {
     const offenders: string[] = [];
@@ -60,6 +80,34 @@ describe("no Badge is outline with the subtle colour", () => {
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  it("no file pairs a computed-colour outline Badge with the word subtle, unlisted", () => {
+    const offenders: string[] = [];
+    for (const file of sourceFiles(SRC)) {
+      const rel = path.relative(SRC, file).split(path.sep).join("/");
+      const source = fs.readFileSync(file, "utf8");
+      // A Button's appearance="subtle" is not a Badge colour.
+      const mentionsSubtle = source.replace(/appearance="subtle"/g, "").includes('"subtle"');
+      if (!mentionsSubtle || rel in COMPUTED_ALLOW) continue;
+      if (badgeTags(source).some(isOutlineWithComputedColor)) offenders.push(rel);
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("the computed rule flags the two shapes that slipped through", () => {
+    const flagged = [
+      '<Badge appearance="outline" size="small" color={isPublic(v) ? "informative" : "subtle"}>x</Badge>',
+      '<Badge appearance="outline" color={sourceColor(setting.source)} size="small">x</Badge>',
+      '<Badge appearance={p ? "outline" : "tint"} color={c}>x</Badge>',
+    ];
+    for (const src of flagged) {
+      expect(isOutlineWithComputedColor(badgeTags(src)[0])).toBe(true);
+    }
+    expect(isOutlineWithComputedColor('<Badge appearance="tint" color={c}>x</Badge>')).toBe(false);
+    expect(isOutlineWithComputedColor('<Badge appearance="outline" color="brand">x</Badge>')).toBe(
+      false,
+    );
   });
 
   it("the rule reads what it thinks it reads: any order, across lines", () => {
