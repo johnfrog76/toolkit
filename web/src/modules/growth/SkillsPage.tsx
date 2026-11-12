@@ -1,7 +1,7 @@
 import { Subtitle2, Caption1, Badge, makeStyles, tokens } from "@fluentui/react-components";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { BackButton } from "../../shared/BackButton";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
 // growthApi, not the shell's api: "Resume" is this module's tag and only
 // the enhanced slice knows it exists.
@@ -39,7 +39,7 @@ export function SkillsPage() {
 
   return (
     <div className={styles.page}>
-      <PageCard
+      <PanelFrame
         loading={isLoading}
         loadingLabel="Loading resume..."
         empty={
@@ -96,7 +96,7 @@ export function SkillsPage() {
             style={{ marginTop: tokens.spacingVerticalS }}
           />
         )}
-      </PageCard>
+      </PanelFrame>
     </div>
   );
 }

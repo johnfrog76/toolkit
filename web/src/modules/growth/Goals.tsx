@@ -26,7 +26,7 @@ import { GoalActions } from "./GoalActions";
 import { DialogDismiss } from "../../shared/DialogDismiss";
 import { ROW } from "../../shared/CardActions";
 import { RefreshButton } from "../../shared/RefreshButton";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { CreateButton } from "../../shared/CreateButton";
 import { Pagination } from "../../shared/Pagination";
 import { usePagination } from "../../hooks/usePagination";
@@ -254,7 +254,7 @@ export function Goals() {
 
   return (
     <>
-      <PageCard
+      <PanelFrame
         scrollable
         loading={isLoading}
         loadingLabel="Loading goals..."
@@ -312,7 +312,7 @@ export function Goals() {
         ) : (
           pageItems.map((item) => <GoalCard key={item.filename} item={item} />)
         )}
-      </PageCard>
+      </PanelFrame>
 
       <Dialog
         open={dialogOpen}

@@ -1,5 +1,14 @@
-import { Subtitle2, Body1, Caption1, Badge, Tooltip, tokens } from "@fluentui/react-components";
-import { PageCard } from "../../shared/PageCard";
+import {
+  Subtitle2,
+  Body1,
+  Caption1,
+  Badge,
+  Tooltip,
+  mergeClasses,
+  tokens,
+} from "@fluentui/react-components";
+import { usePanelMinHeightClass } from "../../shell/kinds/panelMinHeight";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { useGetEnvQuery, useRefreshEnvMutation } from "../../shell/api";
 import type { EnvCheck } from "../../shell/api";
@@ -67,12 +76,16 @@ export function EnvCard({ className }: { className?: string }) {
   // point of this button is to ask again rather than to re-read the same reply.
   const [refreshEnv, { isLoading: isRefreshing }] = useRefreshEnvMutation();
   const communication = (env as EnvWithCommunication | undefined)?.communication;
+  // A status panel in waiting: it wears that kind's minimum height so it lines
+  // up beside the Log, and keeps its own rows until its checks, the hub-sync
+  // row and the verdict are drawn by the kind.
+  const minHeight = usePanelMinHeightClass("status");
   // No Space switcher here: the avatar menu is the one place a
   // Space is switched, and the tip at the foot of Home says so.
 
   return (
-    <PageCard
-      className={className}
+    <PanelFrame
+      className={mergeClasses(className, minHeight)}
       loading={loading}
       loadingLabel="Checking environment..."
       headerLeft={<Subtitle2>Environment</Subtitle2>}
@@ -112,34 +125,37 @@ export function EnvCard({ className }: { className?: string }) {
           </div>
         ) : undefined
       }
-    >
-      {error ? (
-        <EmptyState
-          icon={<PlugDisconnectedRegular />}
-          tone="error"
-          title="Could not read this machine's environment"
-          detail="The agent did not answer. Nothing was read."
-        />
-      ) : env ? (
+      body={
         <>
-          <div style={{ marginTop: tokens.spacingVerticalS }}>
-            {Object.entries(env.checks).map(([key, check]) => (
-              <CheckRow
-                key={key}
-                label={checkLabel(key, env.tracker)}
-                check={check}
-                setting={settingFor(key, env.config?.activeSpace ?? "")}
-              />
-            ))}
-            {/* storeSync, and under git the hub's distance from its remote and
+          {error ? (
+            <EmptyState
+              icon={<PlugDisconnectedRegular />}
+              tone="error"
+              title="Could not read this machine's environment"
+              detail="The agent did not answer. Nothing was read."
+            />
+          ) : env ? (
+            <>
+              <div style={{ marginTop: tokens.spacingVerticalS }}>
+                {Object.entries(env.checks).map(([key, check]) => (
+                  <CheckRow
+                    key={key}
+                    label={checkLabel(key, env.tracker)}
+                    check={check}
+                    setting={settingFor(key, env.config?.activeSpace ?? "")}
+                  />
+                ))}
+                {/* storeSync, and under git the hub's distance from its remote and
                 Sync the hub. Absent from an older agent. */}
-            {env.hubSync ? <HubSyncRow sync={env.hubSync} /> : null}
-          </div>
-          {env.features?.communication === true && communication ? (
-            <EnvRecipients recipients={communication.recipients} />
+                {env.hubSync ? <HubSyncRow sync={env.hubSync} /> : null}
+              </div>
+              {env.features?.communication === true && communication ? (
+                <EnvRecipients recipients={communication.recipients} />
+              ) : null}
+            </>
           ) : null}
         </>
-      ) : null}
-    </PageCard>
+      }
+    />
   );
 }

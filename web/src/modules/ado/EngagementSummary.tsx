@@ -1,5 +1,5 @@
 import { Subtitle2, Body1, Caption1, Badge, makeStyles, tokens } from "@fluentui/react-components";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { useGetEngagementSummaryQuery } from "./api.ado";
 import { BuildingRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
@@ -23,7 +23,7 @@ export function EngagementSummary({ slug, isArchived }: { slug: string; isArchiv
   const growth = Boolean(env?.features?.growth);
 
   return (
-    <PageCard
+    <PanelFrame
       loading={isLoading}
       loadingLabel="Loading engagement summary..."
       headerLeft={<Subtitle2>Space</Subtitle2>}
@@ -65,6 +65,6 @@ export function EngagementSummary({ slug, isArchived }: { slug: string; isArchiv
           </StatTiles>
         </>
       )}
-    </PageCard>
+    </PanelFrame>
   );
 }

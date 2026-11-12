@@ -1,25 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
-import type { ReactNode } from "react";
-import { Badge, Caption1, Subtitle2 } from "@fluentui/react-components";
 import { BuildingFactoryRegular } from "@fluentui/react-icons";
 import { useNavigate } from "react-router";
-import { CardActions, ROW } from "../../shared/CardActions";
+import { ROW } from "../../shared/CardActions";
 import { trackerName } from "../ado/TrackerBadge";
-import { CreateButton } from "../../shared/CreateButton";
 import type { CardAction } from "../../shared/CardActions";
-import { FilterBadge } from "../../shared/FilterBadge";
-import { EmptyState } from "../../shared/EmptyState";
-import { PageCard } from "../../shared/PageCard";
+import type { EmptyMessage } from "../../shared/EmptyState";
 import { HubSyncLine } from "../ado/HubSyncLine";
-import { Pagination } from "../../shared/Pagination";
-import { RefreshButton } from "../../shared/RefreshButton";
-import { usePagination } from "../../hooks/usePagination";
-import { StatusMessage } from "../../shared/StatusMessage";
 import { usePersistedValue } from "../../shared/usePersistedState";
 import { visibilityLabel } from "../../shared/visibility";
 import { useGetEnvQuery } from "../../shell/api";
 import type { SpaceInfo } from "../../shell/api";
 import { VISIBILITY } from "../../shell/consts";
+import { ListPanel } from "../../shell/kinds/ListPanel";
+import type { BadgeSpec, CardItemData, MetaItem } from "../../shell/CardItem";
 import { useGetStatusQuery } from "../ado/api.ado";
 import {
   useGetSpaceStatusQuery,
@@ -47,8 +40,6 @@ import type { SpaceLifecycleVerb } from "./api.studio";
 import { NewSpaceDialog } from "./NewSpaceDialog";
 import { SpaceLifecycleDialog } from "./SpaceLifecycleDialog";
 import { SPACE_MOVES } from "./spaceMoves";
-import { RowMetaText, StudioRow, useStudioCardClass, useStudioChipRowClass } from "./StudioRow";
-import { LIST_PAGE_SIZE } from "../../shell/cardHeight";
 import { useEnterSpace } from "./useEnterSpace";
 
 // The one sentence that says what a Space is. Written here and in docs/modules/studio.md.
@@ -65,108 +56,9 @@ const SPACE_DEFINITION =
 // choice, in this browser -- a convenience, never a setting. Its + adds
 // a Space: the New Space dialog, which runs NewSpace through the bridge.
 // It loads once and whole, reads again only on its Refresh, and pages its rows
-// ten at a time. A row's `...` holds the end of a Space's life:
+// as every list panel does. A row's `...` holds the end of a Space's life:
 // Retire and Remove, each RetireSpace / RemoveSpace through the bridge behind
 // the house confirm, which shows the verb's own -WhatIf first.
-
-/** The row's frame: name, kind, where you are, the line, and the door. */
-function FoyerRow({
-  space,
-  here,
-  line,
-  onLifecycle,
-}: {
-  space: SpaceInfo;
-  here: boolean;
-  line: ReactNode;
-  onLifecycle: (space: SpaceInfo, verb: SpaceLifecycleVerb) => void;
-}) {
-  const navigate = useNavigate();
-  // The row is the switch the avatar menu makes (D-S2): the one switch, which
-  // a design note's Space chip takes too.
-  const { enter: enterSpace, switching, failed } = useEnterSpace(space.slug, here);
-  const name = space.name || space.slug;
-  const secondary: CardAction[] = [];
-  // A Space that is not yet connected is one step from what connecting shows:
-  // the connect wizard (/connect/<slug>) is the core's, and the same door the
-  // How-do-I list opens.
-  if (space.status !== "active" && space.status !== "archive") {
-    secondary.push(
-      SPACE_MOVES.connect.action({
-        detail: name,
-        onClick: () => navigate(`/connect/${space.slug}`),
-      }),
-    );
-  }
-  // The end of its life: Retire keeps it declared and archived, Remove
-  // un-declares it -- its folder and cards stay either way.
-  for (const action of spaceLifecycleActions(space, here)) {
-    secondary.push(
-      action === "retire"
-        ? SPACE_MOVES.retire.action({
-            detail: name,
-            onClick: () => onLifecycle(space, "RetireSpace"),
-          })
-        : SPACE_MOVES.remove.action({
-            detail: name,
-            onClick: () => onLifecycle(space, "RemoveSpace"),
-          }),
-    );
-  }
-  // The Space's address on its tracker: the external link, last.
-  const tracker = trackerName(space.tracker);
-  if (space.org && tracker) {
-    secondary.push(ROW.external.action({ detail: tracker, href: space.org }));
-  }
-  return (
-    <StudioRow
-      kind="space"
-      title={name}
-      badges={
-        <>
-          <Badge appearance="tint" size="small" color="informative">
-            {spaceKind(space)}
-          </Badge>
-          {space.status === "archive" ? (
-            <Badge appearance="tint" size="small" color="subtle">
-              archived
-            </Badge>
-          ) : null}
-          {here ? (
-            <Badge appearance="tint" size="small" color="brand">
-              you are here
-            </Badge>
-          ) : null}
-        </>
-      }
-      controls={
-        <CardActions
-          primaryAction={ROW.open.action({
-            detail: name,
-            onClick: enterSpace,
-            disabled: switching,
-          })}
-          menuLabel={`Actions for ${name}`}
-          secondaryActions={secondary}
-        />
-      }
-      description={typeof line === "string" ? line : undefined}
-      meta={
-        <>
-          <Badge appearance="tint" size="small" color="subtle">
-            Space
-          </Badge>
-          <RowMetaText>{space.slug}</RowMetaText>
-          {failed ? (
-            <Caption1 role="alert" data-row-meta-text>
-              Could not switch to {name}. Nothing changed.
-            </Caption1>
-          ) : null}
-        </>
-      }
-    />
-  );
-}
 
 /** What one Space's reads came to: its line once every read has settled --
  *  answered or failed -- null before; and whether any of them is fetching. */
@@ -261,8 +153,7 @@ function CardsReads({
 export const SPACES_FILTER_KEY = "studio.spaces.filter";
 
 export function FoyerCard() {
-  const cardClass = useStudioCardClass();
-  const chipRow = useStudioChipRowClass();
+  const navigate = useNavigate();
   const { data: env, isLoading } = useGetEnvQuery();
   const spaces = foyerSpaces(env);
   const active = env?.config?.activeSpace ?? "";
@@ -316,103 +207,128 @@ export function FoyerCard() {
     fetching: Boolean(ledgerQuery.isFetching || refreshingLedger.isLoading),
   };
   const listed = shown.filter((s) => reads[s.slug]?.line != null);
-  const { page, totalPages, pageItems, setPage } = usePagination(listed, LIST_PAGE_SIZE);
-  const choose = (next: SpacesFilter) => {
-    setFilter(next);
-    setPage(0);
+  // The item is the switch the avatar menu makes (D-S2): the one switch, which
+  // a design note's Space takes too.
+  const { enter, switching, failed } = useEnterSpace(active);
+  const icon = <BuildingFactoryRegular />;
+  // Two empties, and they are different facts: no Space at all, and a filter
+  // that matches none -- that one sits under the chips, which stay reachable.
+  const empty: EmptyMessage = { icon, title: "No Spaces yet", detail: SPACE_DEFINITION };
+  const filteredEmpty: EmptyMessage | undefined =
+    spaces.length > 0
+      ? {
+          icon,
+          tone: "filtered",
+          title: spacesFilterEmpty(filter),
+          detail: `${spaces.length} ${spaces.length === 1 ? "Space is" : "Spaces are"} under All.`,
+        }
+      : undefined;
+
+  /** A Space, as a card item: name, kind, where you are, the line, and the door. */
+  const toItem = (space: SpaceInfo): CardItemData => {
+    const here = space.slug === active;
+    const name = space.name || space.slug;
+    const menu: CardAction[] = [];
+    // A Space that is not yet connected is one step from what connecting
+    // shows: the connect wizard is the core's, and the same door the How-do-I
+    // list opens.
+    if (space.status !== "active" && space.status !== "archive") {
+      menu.push(
+        SPACE_MOVES.connect.action({
+          detail: name,
+          onClick: () => navigate(`/connect/${space.slug}`),
+        }),
+      );
+    }
+    // The end of its life: Retire keeps it declared and archived, Remove
+    // un-declares it -- its folder and cards stay either way.
+    for (const action of spaceLifecycleActions(space, here)) {
+      menu.push(
+        action === "retire"
+          ? SPACE_MOVES.retire.action({
+              detail: name,
+              onClick: () => setEnding({ space, verb: "RetireSpace" }),
+            })
+          : SPACE_MOVES.remove.action({
+              detail: name,
+              onClick: () => setEnding({ space, verb: "RemoveSpace" }),
+            }),
+      );
+    }
+    // The Space's address on its tracker: the external link, last.
+    const tracker = trackerName(space.tracker);
+    if (space.org && tracker) menu.push(ROW.external.action({ detail: tracker, href: space.org }));
+    const badges: BadgeSpec[] = [{ label: spaceKind(space), color: "informative" }];
+    if (space.status === "archive") badges.push({ label: "archived", color: "subtle" });
+    if (here) badges.push({ label: "you are here", color: "brand" });
+    const meta: MetaItem[] = [
+      { badge: { label: "Space", color: "subtle" } },
+      { text: space.slug, shrink: true },
+    ];
+    if (failed === space.slug) {
+      meta.push({ text: `Could not switch to ${name}. Nothing changed.`, tone: "alert" });
+    }
+    return {
+      id: space.slug,
+      title: name,
+      badges,
+      description: reads[space.slug]?.line ?? undefined,
+      meta,
+      primary: ROW.open.action({
+        detail: name,
+        onClick: () => enter(space.slug),
+        disabled: switching,
+      }),
+      menu,
+    };
   };
-  // Two empties, and they are different facts: no Space at all (nothing to
-  // filter, so it takes the body's place), and a filter that matches none --
-  // that one sits UNDER the tag row, which has to stay reachable.
-  const empty = !drawn ? undefined : spaces.length === 0 ? (
-    <EmptyState icon={<BuildingFactoryRegular />} title="No Spaces yet" detail={SPACE_DEFINITION} />
-  ) : undefined;
-  const filteredEmpty =
-    spaces.length > 0 && shown.length === 0 ? (
-      <EmptyState
-        icon={<BuildingFactoryRegular />}
-        tone="filtered"
-        title={spacesFilterEmpty(filter)}
-        detail={`${spaces.length} ${spaces.length === 1 ? "Space is" : "Spaces are"} under All.`}
-      />
-    ) : null;
+
   return (
     <>
-      <PageCard
-        className={cardClass}
-        // scrollable, like the Reminders and Hub Designs cards: the rows then sit
-        // in the card's scroll area, whose only spacing is the row's own margin.
-        // Without it they were direct children of the card and took its 12px
-        // gap ON TOP of that margin -- the looser list the owner marked.
-        scrollable
-        loading={!drawn}
-        loadingLabel="Reading the Spaces..."
+      <ListPanel
+        title="Spaces"
+        icon={icon}
+        items={listed}
+        item={toItem}
         empty={empty}
-        headerLeft={
-          <>
-            <BuildingFactoryRegular />
-            <Subtitle2>Spaces</Subtitle2>
-          </>
+        filteredEmpty={filteredEmpty}
+        loading={drawn ? undefined : { label: "Reading the Spaces..." }}
+        // No helper sentence on this panel, populated or empty: the title, the
+        // chips (All and its count say "these are all your Spaces") and the
+        // items carry it, and the empty panel is its title and the +.
+        filters={
+          spaces.length > 0
+            ? [
+                {
+                  label: "Filter Spaces",
+                  chips: SPACES_FILTERS.map((f) => {
+                    const n = filterSpaces(spaces, f.value).length;
+                    return {
+                      id: f.value,
+                      label: f.label,
+                      count: n > 0 ? n : undefined,
+                      active: filter === f.value,
+                      onSelect: () => setFilter(f.value),
+                    };
+                  }),
+                },
+              ]
+            : undefined
         }
-        headerRight={
-          <>
-            {/* The house position, as the Environment card has it: Refresh
-                left of the count chip. */}
-            <RefreshButton
-              onClick={() => setGeneration((g) => g + 1)}
-              isFetching={!drawn || refreshing}
-            />
-            <Badge
-              color="informative"
-              appearance="filled"
-              size="large"
-              aria-label={`${spaces.length} Spaces`}
-            >
-              {spaces.length}
-            </Badge>
-          </>
+        refresh={{
+          onClick: () => setGeneration((g) => g + 1),
+          isFetching: !drawn || refreshing,
+        }}
+        count={spaces.length}
+        countLabel={`${spaces.length} Spaces`}
+        status={
+          outcome
+            ? { tone: "success", text: outcome, onDismiss: () => setOutcome(null) }
+            : undefined
         }
-        footerCenter={
-          totalPages > 1 ? (
-            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-          ) : undefined
-        }
-        footerRight={<CreateButton label="New Space" onClick={() => setAdding(true)} />}
+        create={{ label: "New Space", onClick: () => setAdding(true) }}
         footNote={<HubSyncLine />}
-      >
-        {outcome ? (
-          <StatusMessage status="success" onDismiss={() => setOutcome(null)}>
-            {outcome}
-          </StatusMessage>
-        ) : null}
-        {/* No helper sentence on this card, populated or empty: the
-            title, the tags (All and its count say "these are all your Spaces")
-            and the rows carry it, and the empty card is its title and the +. */}
-        <div className={chipRow} role="group" aria-label="Filter Spaces">
-          {SPACES_FILTERS.map((f) => {
-            const n = filterSpaces(spaces, f.value).length;
-            return (
-              <FilterBadge
-                key={f.value}
-                label={f.label}
-                count={n > 0 ? n : undefined}
-                active={filter === f.value}
-                onClick={() => choose(f.value)}
-              />
-            );
-          })}
-        </div>
-        {filteredEmpty}
-        {pageItems.map((s) => (
-          <FoyerRow
-            key={s.slug}
-            space={s}
-            here={s.slug === active}
-            line={reads[s.slug]?.line}
-            onLifecycle={(space, verb) => setEnding({ space, verb })}
-          />
-        ))}
-      </PageCard>
+      />
       {/* The readers: one per Space, every Space, outside the card -- the card
           draws no children while it loads, and these are what it waits on. */}
       {spaces.map((s) =>

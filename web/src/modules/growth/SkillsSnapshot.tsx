@@ -1,6 +1,6 @@
 import { Subtitle2, Caption1, Badge, Button, makeStyles, tokens } from "@fluentui/react-components";
 import { DismissRegular } from "@fluentui/react-icons";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { useGetEngagementSkillsQuery } from "./api.growth";
 import type { SkillGroups } from "./api.growth";
 
@@ -56,7 +56,7 @@ export function SkillsSnapshot({ slug, activeTag, onTagClick }: SkillsSnapshotPr
 
   if (isLoading)
     return (
-      <PageCard
+      <PanelFrame
         loading
         loadingLabel="Loading skills…"
         headerLeft={<Subtitle2>Skills Snapshot</Subtitle2>}
@@ -68,7 +68,7 @@ export function SkillsSnapshot({ slug, activeTag, onTagClick }: SkillsSnapshotPr
   if (nonEmpty.length === 0) return null;
 
   return (
-    <PageCard
+    <PanelFrame
       headerLeft={<Subtitle2>Skills Snapshot</Subtitle2>}
       headerRight={
         activeTag ? (
@@ -110,6 +110,6 @@ export function SkillsSnapshot({ slug, activeTag, onTagClick }: SkillsSnapshotPr
           </div>
         ))}
       </div>
-    </PageCard>
+    </PanelFrame>
   );
 }
