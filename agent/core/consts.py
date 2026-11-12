@@ -487,7 +487,7 @@ def rituals_triage_route() -> str:
 
 
 def rituals_milestones_route() -> str:
-    """The Milestones tab's route, with the /api prefix: ``/api/ritual/milestones``."""
+    """The Releases tab's route, with the /api prefix: ``/api/ritual/milestones``."""
     return consts()["rituals"]["milestonesRoute"]
 
 

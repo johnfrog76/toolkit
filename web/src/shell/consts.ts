@@ -192,7 +192,7 @@ export const RITUALS = consts.rituals as {
   route: string;
   /** Triage's read: the open issues by milestone. */
   triageRoute: string;
-  /** The Milestones tab's read: the tracker's milestones with its own counts. */
+  /** The Releases tab's read: the tracker's milestones with its own counts. */
   milestonesRoute: string;
   /** "me": the one answer to who takes an item that is not a size (D-AR10) --
    *  what the Triage page sends as `Route -Assign`, and an item's `who` when it is yours. */

@@ -436,7 +436,7 @@ export const startWorkEndpoints = api.injectEndpoints({
 
 export const { useRunStartWorkMutation } = startWorkEndpoints;
 
-// -- Milestones (the Milestones tab) ----------------------------------------
+// -- Milestones (the Releases tab) ----------------------------------------
 //
 // The Space's tracker milestones with the tracker's own counts. Each row is the
 // ado core's own Milestone -- the shape GET /api/milestones serves the Stats
