@@ -16,6 +16,14 @@ import { panelKindFacts, panelKindFactsOf } from "./panelKindFacts";
  *   NOT_A_LIST      a page, a form or a scene whose rows are not records;
  *   NOT_YET_MOVED   a list of records that has not moved onto ListPanel yet.
  *
+ * What it cannot see: the check needs the frame and the `.map()` in the same
+ * file. A list whose rows a child component draws (the file frames, the child
+ * maps), or whose rows sit inside a frame another file owns (the file maps,
+ * its parent frames), is not seen by it. Each such file is named below on a
+ * fourth list, ROWS_THROUGH_CHILDREN, with its reason, and held exact: a file
+ * on it must exist, must not be a ListPanel, and must be one the main check
+ * cannot see (else it belongs on one of the three lists above).
+ *
  * systemPanels.test.ts holds the same rule over the System page by the panels
  * its registration returns; this holds it over every module by file, so a new
  * list cannot stay outside ListPanel quietly, on any page.
@@ -61,8 +69,15 @@ const NOT_YET_MOVED: Record<string, string> = {
   "ado/MilestonesCard.tsx": "Home's Milestones: waits on one shape for milestones",
   "ado/MyPRs.tsx": "Home's My PRs",
   "ado/PRCommentsList.tsx": "Home's PR Comments",
-  "solitaireAgile/MilestonesPage.tsx":
-    "Team Agile's Releases: waits on the tab's timeline and a named progress bar in the card item",
+  "solitaireAgile/MilestonesPage.tsx": "Team Agile's Releases: moves with the tab's timeline, #326",
+};
+
+/** Lists of records split across files, which the main check cannot see:
+ *  tracked here by name until each moves onto ListPanel. */
+const ROWS_THROUGH_CHILDREN: Record<string, string> = {
+  "ado/DesignList.tsx": "the Design tab's designs and specs, each row a child DesignRow card",
+  "solitaireAgile/AgendaLanes.tsx":
+    "the Standup's agenda lanes, mapped here inside the Standup page's frame",
 };
 
 function panelFiles(dir: string, out: string[] = []): string[] {
@@ -134,6 +149,25 @@ describe("every module's panels and pages", () => {
       /^(growth|organize|communication|deck|studio)\//.test(file),
     );
     expect(left).toEqual([]);
+  });
+});
+
+describe("the lists drawn through children", () => {
+  it("names files that exist, are not ListPanels, and that the main check cannot see", () => {
+    for (const [file, reason] of Object.entries(ROWS_THROUGH_CHILDREN)) {
+      const f = facts.get(file) ?? panelKindFacts(path.join(MODULES, file));
+      expect({ file, exists: fs.existsSync(path.join(MODULES, file)) }).toEqual({
+        file,
+        exists: true,
+      });
+      expect({ file, listPanel: f.listPanel, seenByTheCheck: f.framed && f.mapsToJsx }).toEqual({
+        file,
+        listPanel: false,
+        seenByTheCheck: false,
+      });
+      expect(file in named).toBe(false);
+      expect(reason.length).toBeGreaterThan(10);
+    }
   });
 });
 
