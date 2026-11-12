@@ -2,6 +2,13 @@ import type { ReactNode } from "react";
 import { Tooltip } from "@fluentui/react-components";
 import { InfoRegular } from "@fluentui/react-icons";
 
+export interface InfoTipProps {
+  /** What the tooltip says about the thing beside the icon. */
+  content: ReactNode;
+  /** The icon's accessible name. */
+  label?: string;
+}
+
 /**
  * The house's info tip: a small info icon whose tooltip DESCRIBES the thing
  * beside it -- a card's header, a form section's title. One component, so a
@@ -12,7 +19,7 @@ import { InfoRegular } from "@fluentui/react-icons";
  * times so `aria-describedby` on the icon resolves, and shows it on hover or
  * focus. The icon takes focus so a keyboard reaches it.
  */
-export function InfoTip({ content, label = "About this" }: { content: ReactNode; label?: string }) {
+export function InfoTip({ content, label = "About this" }: InfoTipProps) {
   return (
     <Tooltip content={{ children: content }} relationship="description">
       <InfoRegular

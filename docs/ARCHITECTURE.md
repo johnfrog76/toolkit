@@ -191,6 +191,9 @@ verb that catches its own failure still honours.
 `web/` is a React + Fluent UI app in two parts: a **shell** that owns the chrome, and **modules**
 that own everything else. `web/README.md` has the layout, the `ToolkitModule` interface field by
 field, every module's own surface, and the production path in full.
+The shared components every panel is built from -- the frame, the row menu, the dialog parts, the
+empty state -- are documented in one place, [`web/COMPONENTS.md`](../web/COMPONENTS.md), which a test
+holds to the code.
 
 ```bash
 cd web && npm ci && npm run dev        # http://localhost:5174 -- or the next free port, which it prints

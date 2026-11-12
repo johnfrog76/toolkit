@@ -78,7 +78,7 @@ const useStyles = makeStyles({
   },
 });
 
-interface PageCardProps {
+export interface PageCardProps {
   headerLeft?: ReactNode;
   headerRight?: ReactNode;
   children?: ReactNode;

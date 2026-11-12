@@ -1,7 +1,12 @@
 import { tokens } from "@fluentui/react-components";
 import type { CSSProperties } from "react";
 
-export function HairlineDivider({ style }: { style?: CSSProperties } = {}) {
+export interface HairlineDividerProps {
+  /** Merged over the rule's own style. */
+  style?: CSSProperties;
+}
+
+export function HairlineDivider({ style }: HairlineDividerProps = {}) {
   return (
     <hr
       style={{
