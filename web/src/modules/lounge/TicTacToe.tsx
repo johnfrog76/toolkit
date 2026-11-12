@@ -17,7 +17,7 @@ import {
   shorthands,
   tokens,
 } from "@fluentui/react-components";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { useLocalPersistedState } from "../../shared/usePersistedState";
 
 export const TTT_KEY = "toolkit-lounge-tictactoe";
@@ -172,7 +172,7 @@ export function TicTacToe() {
     won === "x" ? "✕ wins" : won === "o" ? "○ wins" : full ? "a draw" : "your move · ✕";
 
   return (
-    <PageCard
+    <PanelFrame
       scrollable
       headerLeft={<Subtitle2>Tic-tac-toe</Subtitle2>}
       headerRight={
@@ -212,6 +212,6 @@ export function TicTacToe() {
           </div>
         ))}
       </div>
-    </PageCard>
+    </PanelFrame>
   );
 }

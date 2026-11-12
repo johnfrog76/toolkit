@@ -6,7 +6,7 @@ import type { ToolkitTheme } from "./themeList";
 // A named theme (themeList.ts, plain data) made into a Fluent theme. Fluent's
 // own web themes carry everything; a Toolkit theme changes the accent and, for
 // a FLAT theme, what a card is made of. Every card in the app is
-// `colorNeutralBackgroundAlpha` (shared/PageCard.tsx), so one token is the
+// `colorNeutralBackgroundAlpha` (shared/PanelFrame.tsx), so one token is the
 // whole difference between glass and flat -- no component knows which it is.
 
 // Fluent derives some forty tokens from a sixteen-step brand ramp -- tinted

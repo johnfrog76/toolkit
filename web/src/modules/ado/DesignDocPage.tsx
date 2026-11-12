@@ -11,11 +11,11 @@ import { BackButton } from "../../shared/BackButton";
 import { EmptyState } from "../../shared/EmptyState";
 import { FilePath } from "../../shared/FilePath";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { RefreshButton } from "../../shared/RefreshButton";
 
 // The reading room for ONE design or spec (Studio S2, D-S11) -- the house's
-// reading page, the same frame an issue or a card is read in: PageCard, the
+// reading page, the same frame an issue or a card is read in: PanelFrame, the
 // back arrow and the title on the left, compact controls on the right, and ONE
 // MarkdownViewer. When the document names a thread (a `> GitHub:` line), the
 // thread is part of that one document, after the file -- read from the same
@@ -99,7 +99,7 @@ export function DesignDocPage({ archive = false }: { archive?: boolean }) {
 
   return (
     <div className={styles.page}>
-      <PageCard
+      <PanelFrame
         loading={isLoading}
         loadingLabel="Reading the document..."
         empty={empty}
@@ -183,7 +183,7 @@ export function DesignDocPage({ archive = false }: { archive?: boolean }) {
             style={{ marginTop: tokens.spacingVerticalS }}
           />
         )}
-      </PageCard>
+      </PanelFrame>
     </div>
   );
 }
