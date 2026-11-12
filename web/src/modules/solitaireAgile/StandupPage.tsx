@@ -25,6 +25,7 @@ import {
 import { EmptyState } from "../../shared/EmptyState";
 import { copyText } from "../../shared/copyText";
 import { PanelFrame } from "../../shared/PanelFrame";
+import { TabRows } from "../../shared/TabRows";
 import { usePersistedValue } from "../../shared/usePersistedState";
 import { useGetEnvQuery } from "../../shell/api";
 import { RITUALS } from "../../shell/consts";
@@ -477,23 +478,25 @@ export function StandupPage() {
       >
         {readable && (
           <>
-            <TabList
-              size="small"
-              aria-label="Standup"
-              selectedValue={onAgenda ? AGENDA : grain}
-              onTabSelect={(_e, d) => {
-                const v = String(d.value);
-                setTab(v);
-                if (isGrain(v)) setGrain(v);
-              }}
-            >
-              <Tab value={AGENDA}>Agenda</Tab>
-              {GRAINS.map((g) => (
-                <Tab key={g} value={g}>
-                  {grainLabel(g)}
-                </Tab>
-              ))}
-            </TabList>
+            <TabRows>
+              <TabList
+                size="small"
+                aria-label="Standup"
+                selectedValue={onAgenda ? AGENDA : grain}
+                onTabSelect={(_e, d) => {
+                  const v = String(d.value);
+                  setTab(v);
+                  if (isGrain(v)) setGrain(v);
+                }}
+              >
+                <Tab value={AGENDA}>Agenda</Tab>
+                {GRAINS.map((g) => (
+                  <Tab key={g} value={g}>
+                    {grainLabel(g)}
+                  </Tab>
+                ))}
+              </TabList>
+            </TabRows>
             {onAgenda && (
               <>
                 <div className={styles.agendaHead}>

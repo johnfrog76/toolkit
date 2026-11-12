@@ -1,6 +1,17 @@
-import { CARD_ITEM_DESCRIPTION_LINES, CARD_ITEM_HEIGHTS_PX } from "../cardItemTokens";
+import {
+  CARD_ITEM_BORDER_PX,
+  CARD_ITEM_DESCRIPTION_BAND_PX,
+  CARD_ITEM_DESCRIPTION_LINES,
+  CARD_ITEM_HEIGHT_PX,
+  CARD_ITEM_HEIGHTS_PX,
+  CARD_ITEM_META_BAND_PX,
+  CARD_ITEM_META_GAP_PX,
+  CARD_ITEM_PADDING_Y_PX,
+  CARD_ITEM_TITLE_BAND_PX,
+} from "../cardItemTokens";
+import { tokens } from "@fluentui/react-components";
 import { PANEL_BODY, PANEL_MAX_HEIGHT_PX, PANEL_MIN_HEIGHT_PX } from "../panelHeight";
-import { cardListGap, cardListPaddingTop, filterRowGap } from "../layoutTokens";
+import { cardListGap, cardListPaddingTop, filterRowGap, filtersSpaceBelow } from "../layoutTokens";
 import { escapeRegExp } from "../../shared/escapeRegExp";
 
 /** A token as a rule spells it: `var(--spacingVerticalXS)`, or 0 with or without a unit. */
@@ -13,7 +24,7 @@ import type { ListChrome, ListDensity } from "../pageSize";
  *  structure and the CSS rules its classes carry. */
 
 /** The CSS rules whose class the element wears: what the browser applies to it. */
-function rulesOf(el: Element): string {
+export function rulesOf(el: Element): string {
   const classes = new Set((el.getAttribute("class") ?? "").split(/\s+/).filter(Boolean));
   return Array.from(document.styleSheets)
     .flatMap((sheet) => Array.from(sheet.cssRules))
@@ -40,6 +51,27 @@ export function panelOf(el: Element): HTMLElement {
 /** The card items a panel has drawn, in order. */
 export function cardItemsOf(panel: Element): HTMLElement[] {
   return Array.from(panel.querySelectorAll<HTMLElement>("[data-card-item]"));
+}
+
+/** The chrome a list panel has drawn, as the page-size sum counts it: its item
+ *  size, its chip rows, a lead, a foot note and a status line. */
+export function listChromeOf(panel: Element): ListChrome {
+  const body = panel.querySelector<HTMLElement>("[data-panel-body]")!;
+  return {
+    density: panel.getAttribute("data-panel-density") as ListDensity,
+    filterRows: body.querySelectorAll(
+      ":scope > [data-panel-filters] > [role='group'][aria-label^='Filter']",
+    ).length,
+    lead: body.querySelector(":scope > [data-panel-lead]") !== null,
+    footNote: panel.hasAttribute("data-panel-foot-note"),
+    status: body.querySelector(":scope > [data-panel-status]") !== null,
+  };
+}
+
+/** The page a list panel has at first paint, worked out from the chrome it has
+ *  drawn: what a panel's own test builds its lists around, so no test types it. */
+export function pageSizeOf(panel: Element): number {
+  return listPageSize(listChromeOf(panel));
 }
 
 export interface ListPanelShape {
@@ -91,15 +123,7 @@ export function expectListPanelShape(panel: HTMLElement, shape: ListPanelShape):
 
   // One page of items: as many as fit under the chrome this panel has drawn.
   const density = panel.getAttribute("data-panel-density") as ListDensity;
-  const chrome: ListChrome = {
-    density,
-    filterRows: body.querySelectorAll(
-      ":scope > [data-panel-filters] > [role='group'][aria-label^='Filter']",
-    ).length,
-    lead: body.querySelector(":scope > [data-panel-lead]") !== null,
-    footNote: panel.hasAttribute("data-panel-foot-note"),
-    status: body.querySelector(":scope > [data-panel-status]") !== null,
-  };
+  const chrome = listChromeOf(panel);
   const pageSize = listPageSize(chrome);
   const items = cardItemsOf(panel);
   expect(items.map((i) => i.querySelector("strong")?.textContent)).toEqual(shape.titles);
@@ -129,9 +153,20 @@ export function expectListPanelShape(panel: HTMLElement, shape: ListPanelShape):
     const listRules = rulesOf(list);
     expect(listRules).toMatch(/flex-direction:\s*column/);
     expect(listRules).toMatch(new RegExp(`row-gap:\\s*${cssValue(cardListGap[density])}`));
-    expect(listRules).toMatch(
-      new RegExp(`padding-top:\\s*${cssValue(cardListPaddingTop[density])}`),
-    );
+    // Right under the filter chips the list adds no space over its first item:
+    // the chips' wrapper owns the space below them (filtersSpaceBelow), the
+    // frame's gap the space above. Anywhere else the list's own padding does.
+    const prev = list.previousElementSibling;
+    if (prev?.hasAttribute("data-panel-filters")) {
+      expect(listRules).toMatch(/padding-top:\s*0(px)?;/);
+      expect(rulesOf(prev as HTMLElement)).toMatch(
+        new RegExp(`padding-bottom:\\s*${cssValue(filtersSpaceBelow)}`),
+      );
+    } else {
+      expect(listRules).toMatch(
+        new RegExp(`padding-top:\\s*${cssValue(cardListPaddingTop[density])}`),
+      );
+    }
   }
   for (const item of items) {
     expect(rulesOf(item)).not.toMatch(/margin/);
@@ -246,8 +281,57 @@ export function expectListPanelShape(panel: HTMLElement, shape: ListPanelShape):
     expect(rulesOf(titleBand.querySelector("strong")!.parentElement!)).toMatch(
       /text-overflow:\s*ellipsis/,
     );
+    expectMetaGap(item);
   }
   return items;
+}
+
+/** A full item's meta band sits one gap under its description, whether the
+ *  description runs to one line or two: the gap is a track of the item's own
+ *  grid (Fluent's `spacingVerticalS`), the meta band is on the row after it,
+ *  no band has a margin, and the tracks, the padding and the outline come to
+ *  the item's height. */
+export function expectMetaGap(item: HTMLElement) {
+  const rules = rulesOf(item);
+  // Title, description, the gap, meta: four tracks, in that order.
+  expect(rules).toMatch(
+    new RegExp(
+      "grid-template-rows:\\s*" +
+        [
+          `${CARD_ITEM_TITLE_BAND_PX}px`,
+          `${CARD_ITEM_DESCRIPTION_BAND_PX}px`,
+          cssValue(tokens.spacingVerticalS),
+          `${CARD_ITEM_META_BAND_PX}px`,
+        ].join("\\s+") +
+        "\\s*;",
+    ),
+  );
+  expect(tokens.spacingVerticalS).toBe("var(--spacingVerticalS)");
+  expect(rules).toMatch(/row-gap:\s*0(px)?;/);
+  // The meta band is on the fourth row, under the gap's track.
+  expect(rules).toMatch(/>\s*\[data-row-meta\]\s*\{[^}]*grid-row(-start)?:\s*4\b/);
+  const bands = [
+    item.querySelector<HTMLElement>("[data-row-text]")!.parentElement!,
+    item.querySelector<HTMLElement>("[data-row-description]")!,
+    item.querySelector<HTMLElement>("[data-row-meta]")!,
+  ];
+  // The three bands -- the title line, the description, the meta -- are the
+  // item's only children, in that order: the gap is a track, not an element.
+  expect(Array.from(item.children)).toEqual(bands);
+  // The gap is the grid's: no band has a margin.
+  for (const band of bands) {
+    expect(rulesOf(band)).not.toMatch(/margin/);
+    expect(band.style.margin).toBe("");
+  }
+  // The outline, the padding, the bands and the gap are the whole height.
+  expect(
+    2 * CARD_ITEM_BORDER_PX +
+      2 * CARD_ITEM_PADDING_Y_PX +
+      CARD_ITEM_TITLE_BAND_PX +
+      CARD_ITEM_DESCRIPTION_BAND_PX +
+      CARD_ITEM_META_GAP_PX +
+      CARD_ITEM_META_BAND_PX,
+  ).toBe(CARD_ITEM_HEIGHT_PX);
 }
 
 /** A helper sentence lives in the header's info tip, never in the body: the

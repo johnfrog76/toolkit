@@ -113,7 +113,8 @@ web/
     │   ├── api.ts          createApi, and exactly two endpoints: /env and /switch-mode
     │   ├── registry.ts     ToolkitModule, CardContext, and the four functions that read them
     │   ├── registry.test.tsx
-    │   └── cards.tsx       ShellContext: the card pages and the filter tuple, passed down
+    │   └── cards.tsx       ShellContext: the card pages and the filter tuple, passed down;
+    │                       PageGrid and PanelRow, a page's rows of panels
     ├── modules/ado/      the ADO prompt-engineering module -- always on, no flag
     │   ├── index.tsx       the ToolkitModule export: routes, nav, homeCards, systemCards
     │   ├── routes.tsx      AdoHome and AdoSystem -- what sits around the shell's card grid
@@ -122,13 +123,13 @@ web/
     ├── modules/growth/    opt-in, features.growth
     │   ├── index.tsx       export growthModule, plus ReviewArchive and SkillsSnapshot by name
     │   ├── api.growth.ts   tag types Growth, Resume, Reviews
-    │   └── GrowthPage, Goals, GoalDetailPage, SkillsPage, ReviewArchive, SkillsSnapshot
+    │   └── GrowthPage, Goals, GoalDetailPage, SkillsPage, ReviewArchive, SkillsSnapshot (Goals and ReviewArchive are list panels; their dialogs are files beside them)
     ├── modules/communication/   opt-in, features.communication
     │   ├── index.tsx       export communicationModule, the four routes and three redirects
     │   ├── paths.ts        every route path of this module, in one place
     │   ├── api.communication.ts   tag type Manager, and /env's communication block typed here
     │   ├── sendButton.ts   the send button's rule, as a pure function
-    │   └── OneOnOne, ManagerDetailPage, ManagerSessionPage, Timer
+    │   └── OneOnOne, NewMeetingDialog, ManagerDetailPage, ManagerSessionPage, Timer
     ├── modules/organize/   opt-in, features.organize -- the Organize tab
     │   ├── index.tsx       export organizeModule: one route, one nav entry, the header bell, no cards elsewhere
     │   ├── paths.ts        the module's route path, and the router state that opens a bucket
@@ -136,7 +137,7 @@ web/
     │   ├── useOverdueReminders  the past-due slice of the reminders read, polled each minute
     │   ├── api.organize.ts tag type Reminders; GET /api/reminders and the two verbs via the bridge
     │   ├── reminderEntry   a stored due split into the Edit dialog's date and time, and joined back
-    │   └── RemindersCard   bucket chips, snooze menu, edit, done, the quick add
+    │   └── RemindersCard   a list panel: bucket chips, archive, the snooze menu, edit, the quick add
     ├── modules/solitaireAgile/   opt-in, features.solitaireAgile -- today's standup, read and played, and triage
     │   ├── index.tsx       export solitaireAgileModule: four routes (the standup, triage, milestones, the played view, chromeless), one nav entry, no cards elsewhere
     │   ├── paths.ts        the module's route paths and the played deck's id
@@ -546,6 +547,7 @@ row that draws them, and listed here. Two kinds, both named:
 | `issue.unpin` | Unpin | `PinOffRegular` | one record | the Issues tab |
 | `reminder.snooze` | Snooze: *when* | `SnoozeRegular` | one record | Reminders |
 | `reminder.edit` | Edit | `EditRegular` | one record | Reminders |
+| `meeting.edit` | Edit or send | `EditRegular` | one record | Meetings: the session page, where the notes are edited and the retro is sent |
 | `deck.play` | Play | `PlayRegular` | one record | a deck, its row's menu and its page's exposed action |
 | `deck.unarchive` | Unarchive | `ArchiveArrowBackRegular` | one record | a deck's page, once it is archived on this machine |
 | `resume.generate` | Generate resume scaffold | `AddRegular` | one record | the resume |
@@ -625,12 +627,13 @@ is still Active Cards.
 - **A panel has no way to set a height, a class or an item style.** A kind's props are an exact
   interface, so filling a slot the kind does not have -- `height`, `className`, `pageSize`, a body --
   is a compile error (`ListPanel.test.tsx` holds nine of them with `@ts-expect-error`).
-- **A list panel is 592 px: its minimum and its maximum.** `PANEL_MIN_HEIGHT_PX` in `panelHeight.ts`
-  names a floor per kind and `PANEL_MAX_HEIGHT_PX` a cap for the list kind, the same figure, both
-  applied above the grid's two-column breakpoint (`PANEL_GRID_MIN_WIDTH_PX`, which the page grid
-  reads too). The bounds are on the panel, and the grid's rows still stretch its neighbours. The
+- **A list panel is 600 px (`PANEL_HEIGHT_PX`): its minimum and its maximum.** `PANEL_MIN_HEIGHT_PX` in `panelHeight.ts`
+  names a floor per kind and `PANEL_MAX_HEIGHT_PX` a cap for the list kind, the same figure -- on the
+  4 px grid, holding four full card items under one row of filter chips with a few px to spare -- both
+  applied above the two-column breakpoint (`PANEL_GRID_MIN_WIDTH_PX`, which a page's rows read
+  too). The bounds are on the panel, and its row still stretches its neighbour. The
   other kinds (status, stat, chart, scene) have the floor only. The reference is the Azure DevOps
-  dual-entry row -- Active Cards beside My Work: two 592 px columns 16 px apart, a 24 px header, a
+  dual-entry row -- Active Cards beside My Work: two 600 px columns 16 px apart, a 24 px header, a
   32 px foot with the pager centred in it, 12 px of padding and 12 px between the parts.
 - **The foot holds the bottom.** `PanelFrame` is a column whose body grows, so a panel's foot sits at
   its bottom edge however short its content is, and the empty room is between the body and the foot.
@@ -664,24 +667,27 @@ is still Active Cards.
 - **Every length in an item is a token, and its height is their sum.** `src/shell/cardItemTokens.ts`
   names the outline (1), the one vertical padding (`CARD_ITEM_PADDING_Y_PX`, 12 -- Fluent's
   `tokens.spacingVerticalM`, which the styles use; a test holds the number to it), the title band
-  (24), a description line (15, two of them), the meta band (16) and the 8 between a compact item's
-  two bands. Each size's height is worked out from those -- 96 full, 74 compact, 28 line -- so no
-  fixed height can cancel a change to a padding or a band. **The space under the last band is the
+  (24), a description line (15, two of them), the meta band (16), the 8 between a full item's
+  description and its meta band (`CARD_ITEM_META_GAP_PX`, a track of the item's grid, so the meta
+  band has the same room under a one-line description as under two) and the 8 between a compact
+  item's two bands. Each size's height is worked out from those -- 104 full, 74 compact, 28 line --
+  so no fixed height can cancel a change to a padding, a band or that gap. **The space under the last band is the
   space over the first**: one padding serves both, the title's line is its band and the meta band is
   a badge's height, so there is 13 px over the title and 13 px under the badges. `CardItem.tsx`
   types no length of its own.
 - **The space between items is the collection's.** A card item has no margin. A list panel draws its
   items in one `<ul role="list" class="cardList" data-card-list>`, each alone in an `<li>`, and that
-  list owns the gap between them and the space over the first: `cardListGap` (4 full, 8 compact, 0
-  line) and `cardListPaddingTop` in `src/shell/layoutTokens.ts`. The rule holds at every level:
-  spacing comes from the wrapper's gap, never from a margin on a card item or a `PanelFrame`.
+  list owns the gap between them and the space over the first: `cardListGap` (8 for a full or a compact
+  item, 0 for a line) and `cardListPaddingTop` in `src/shell/layoutTokens.ts`. The rule holds at every level:
+  spacing comes from the wrapper's gap, never from a margin on a card item, a `PanelFrame`, a row
+  or a list ([A page is rows of panels](#a-page-is-rows-of-panels)).
 - **The item size is the panel's, never an item's.** `density: "full" | "compact" | "line"` is a
   prop on `ListPanel`, and the three sizes are named in `src/shell/cardItemTokens.ts`
   (`CARD_ITEM_HEIGHTS_PX`). A panel whose items never have a description -- My Work and GitHub
   Issues -- is `compact`, so no item keeps an empty two-line band; its `item` returns
   `CompactItemData`, which has no `description` field, and no item data has a `density` field. Within
   a panel every item is the same height. **The item size never moves the panel's floor**: a compact
-  panel has its kind's minimum height like any other, 592 px for a list, so one with two items still
+  panel has its kind's minimum height like any other, 600 px for a list, so one with two items still
   lines up with its neighbours. The item size changes how many fit on a page, nothing else.
 - **Every spacing value is a Fluent token on the 4 px grid.** In the panel layer -- the card item,
   the kinds, `PanelFrame` and `layoutTokens.ts` -- every gap, padding and margin is one of Fluent's
@@ -706,14 +712,17 @@ is still Active Cards.
   The same answer worked out from the tokens (`listPageSize`: the frame 117, a row of chips 26 with
   `filterRowGap` between two, a lead chart 153, a foot note 32, a status line 48) is the first
   paint's page, so nothing jumps, and the page wherever there is no layout to measure -- a narrow
-  page, where a panel grows with its items, and the tests. Measured, at 1280 wide: four full items
-  (three while a status line shows), five compact, eleven log lines under the chart. The pager is in
+  page, where a panel grows with its items, and the tests. Under a chip row the list drops its own top
+  padding, so the sum takes it off the chrome there. From `listPageSize`: four full items with no chip
+  row or under one, three under two chip rows or where a foot note or a status line takes room as
+  well; five compact; seventeen log lines, eleven under the chart. The pager is in
   the foot's centre, drawn only when there is a second page: Previous and Next, `Page 2 of 5`, and
   the arrow keys while it has focus. The kind sends the page back to the first when a filter chip, a
   picker or the search changes, and clamps it when the list shrinks.
 - **One way to filter: `filters`.** A panel that splits its items hands the kind rows of chips, each
   chip with its count; a row is one line and scrolls sideways where it cannot fit. The rows sit in
-  one wrapper, a column whose gap (`filterRowGap` in `layoutTokens.ts`, Fluent's XS, 4 px) spaces them: a row has
+  one wrapper, a column whose gap (`filterRowGap` in `layoutTokens.ts`, Fluent's XS, 4 px) spaces them, and which owns
+  the space under them (`filtersSpaceBelow`, 12 px, matching the frame's 12 px over them): a row has
   no margin, so the space between two rows is there only while both are drawn, and every row looks
   alike -- a chosen chip in a second row is drawn as one in the first. An inline subhead
   used as a split ("Design (5)") is not allowed. A choice from a longer list (a period, a tag, a
@@ -726,7 +735,59 @@ is still Active Cards.
   `loading` and the required `empty` (with `filteredEmpty` for a filter that hid everything) are the
   only other things a body can be.
 
-**The structural test holds it**, in two halves:
+### A page is rows of panels
+
+A page's panels sit in real row elements, so a row can be selected in the browser's developer tools
+with the gap that belongs to it and the panels it stretches together:
+
+```html
+<div data-page-rows>                       <!-- the page: a flex column, gap pageRowGap -->
+  <div class="panelRow" data-panel-row>    <!-- a row: a grid, gap panelGap, stretch -->
+    <!-- panel -->
+    <!-- panel -->
+  </div>
+  <div class="panelRow" data-panel-row>
+    <!-- panel -->
+  </div>
+</div>
+```
+
+- **`PageGrid` (`src/shell/cards.tsx`) is the page.** A page wraps its panels in it and declares no
+  columns of its own. The panels pair two to a row, in the order given. `ModuleCardGrid`, the System
+  page's cards, is a `PageGrid` with the cards' pager under it.
+- **A row holds at most two panels**: side by side above 900 px (`PANEL_GRID_MIN_WIDTH_PX`), stacked
+  below it, and stretched to the taller. The row element is there at every width.
+- **A lone panel keeps half the width**, like every other panel. `PageGrid full` is the list
+  exception -- the Backlog, Design and Docs tabs -- with one panel to a row, across the window.
+- **A page that groups its panels itself passes `PanelRow`.** The Studio tab is
+  `<PanelRow>` Spaces, Hub Designs `</PanelRow>` then `<PanelRow>` Prompts `</PanelRow>`. Panels beside
+  a `PanelRow` pair up on either side of it. A `PanelRow` handed more than two draws further rows,
+  two at a time, and one with nothing in it draws no row.
+- **A card the page leaves out leaves no slot.** `null`, `false`, `undefined` and an empty list are
+  dropped before pairing, and a list or a fragment of panels is laid flat, so a slot's cards pair with
+  the page's own. A panel that is mounted and then draws nothing keeps its place: its neighbour stays
+  where it was, at half width, and a row whose panels all drew nothing takes no room.
+- **Every space is a wrapper's gap, and each is a Fluent spacing token that is a multiple of 4 px.**
+  `src/shell/layoutTokens.ts` names them side by side: `pageRowGap` (the page, between rows;
+  `spacingVerticalL`, 16 px), `panelGap` (a row, between its panels; `spacingHorizontalL`, 16 px),
+  `cardListGap` (a list, between its items) and `filterRowGap` (a panel's filters, between chip
+  rows). Nothing has a margin: not a panel, a card item, a row or a list. The cards' pager is spaced
+  from the rows by a gap too.
+
+`src/shell/pageRows.test.tsx` holds it with `expectPageRowsShape` (`src/shell/pageRowsAssert.ts`):
+every panel is directly inside exactly one `[data-panel-row]`, the page holds rows and nothing else,
+a row holds at most two, the page and each row wear their gap token, and no page, row, panel, list or
+item has a margin. It draws the Studio page, the System page's grid and the Growth page with its
+slot, and real list panels for the margins inside.
+
+**A page's tab rows sit in one wrapper too.** `TabRows` (`src/shared/TabRows.tsx`,
+`data-tab-rows`) holds Home's view strip, Team Agile's ceremony strip and the Standup panel's
+Agenda and grain tabs. It owns the space: `tabRowsPadding` above and below (`controlRowsSpace`, `spacingVerticalM`, 12 px,
+the same as the space under a list panel's chips) and `tabRowGap` between two rows stacked in it
+(`spacingVerticalS`, 8 px), all in `src/shell/layoutTokens.ts`. A `TabList` takes no className and no style, so a tab row has no margin
+of its own. `src/shared/TabRows.test.tsx` holds every `TabList` in the app to that.
+
+**The structural test holds the panel's rules**, in two halves:
 
 - `src/shell/kinds/panelStructure.test.ts` reads every source file and refuses: Fluent `Card`
   imported anywhere but `PanelFrame`; `PanelFrame` imported by a feature module; `ScenePanel` outside
@@ -903,8 +964,8 @@ wordmark's default blob, and by no theme.
   1px rule in the theme's stroke follows it, then the engineer's tabs; the data model still lists Home.
 - **A title per page**, from the nav entry that owns the path: `Daily · ToolKit`. A path with no
   entry is just `ToolKit`.
-- **The header holds what is true on every page** -- brand, org, nav, you; no pager. System's pager is under its cards, with words ("Cards, page
-  1 of 3"), from `pager` on the shell context. Home has no pager: it has named tabs (below).
+- **The header holds what is true on every page** -- brand, org, nav, you; no pager. System's pager is under its cards, centred: the panels' own `ListPager`, `Page 1 of 3`, in a nav named
+  "More cards", from `pager` on the shell context. Home has no pager: it has named tabs (below).
 - **Home is named tabs -- Focus | Board | Sprint | Actions** on an Azure DevOps Space, and on a
   GitHub space the strip wears that tracker's words and its own order: **Issues | Board | Stats |
   Design | Docs** (Sprint is an ADO word; the issues come first because the board ceremony is optional on a
@@ -1689,10 +1750,10 @@ Routes and nav, all of them spelled once in `paths.ts`:
 
 | Path | Renders |
 | --- | --- |
-| `/communication` | `OneOnOne` -- the one-card landing page the `Meetings` nav points at. A complete session's row offers **Close**, behind a confirm, through `POST /cmd/MeetingAgenda` |
+| `/communication` | `OneOnOne` -- the one-panel landing page the `Meetings` nav points at, a `ListPanel`: chips for All, Current, Past and Archive; each entry opens the read view, and its menu holds **Edit or send** and, on a complete session, **Archive**, behind a confirm, through `POST /cmd/MeetingAgenda` |
 | `/communication/1on1/:filename` | `ManagerDetailPage` -- read view, with an `Edit / send` button to the session page and **Close** on a complete session |
 | `/communication/sessions/new` | `ManagerSessionPage` -- scaffold and edit |
-| `/communication/sessions/:filename` | `ManagerSessionPage` -- edit, the stage ahead (`Prep` / `Retro` / `Plan` through `POST /cmd/MeetingAgenda`, saving the notes first), Close on a complete session, and the send. Reached from `Edit / send` on a meeting row and on the read view |
+| `/communication/sessions/:filename` | `ManagerSessionPage` -- edit, the stage ahead (`Prep` / `Retro` / `Plan` through `POST /cmd/MeetingAgenda`, saving the notes first), Close on a complete session, and the send. Reached from **Edit or send** in a meeting entry's menu and from `Edit / send` on the read view |
 | `/growth/1on1/:filename` | **redirect**, filename forwarded |
 | `/growth/sessions/new` | **redirect** |
 | `/growth/sessions/:filename` | **redirect**, filename forwarded |
@@ -1806,9 +1867,13 @@ paragraph:
 | `src/hooks/useCurrentTheme.test.ts` | A theme choice in a browser that refuses storage: with every storage call throwing, a chosen theme holds for the session, and a fresh load of the store answers the default again; where storage keeps, a fresh load answers the choice |
 | `src/landing/landing.test.tsx` | The landing page's words are the README's: each piece read out of `README.md` and `THIRD-PARTY-NOTICES.md` is found there as written, a README missing a piece is refused by name, and the page draws exactly those words, band by band, with band 3 absent while it is held ([The landing page](#the-landing-page)) |
 | `src/shell/kinds/panelStructure.test.ts` | The panel rules over every source file: Fluent `Card` only in `PanelFrame`, `PanelFrame` only in the kinds, the pager only in `ListPanel`, `ScenePanel` only in the Lounge, and no height, page size, tooltip, link, subhead, item or body of its own in a file that fills a kind -- with the panels not yet moved on named lists held exact, and the checker run over sources written wrong on purpose |
+| `src/shell/pageRows.test.tsx` | A page's rows of panels: every panel directly inside exactly one `[data-panel-row]`, the page holding rows only, a row of at most two, the gaps as Fluent tokens that are multiples of 4 px, and no margin on a page, a row, a panel, a list or an item -- for the Studio page, the System page's grid and the Growth page |
+| `src/shared/TabRows.test.tsx` | A page's tab rows: `TabRows` one marked wrapper (`[data-tab-rows]`) with its rows directly inside, its padding the control rows' one space (`controlRowsSpace`, the same as under a list panel's chips) and its gap a Fluent token that is a multiple of 4 px, and every `TabList` under `src/` inside a `TabRows` with no className or style of its own |
+| `src/modules/ado/systemPanels.test.ts` | The System page's panels, read from `systemCards`: each that draws a list is a `ListPanel` (Test Health and the Log, so a row's two panels are one height), and a panel that is not one and draws rows is named with its reason (Environment, Modules, Burn) |
+| `src/shell/kinds/modulePanels.test.ts` | Every module's panels and pages, read for their kind with the reader `systemPanels.test.ts` uses (`panelKindFacts.ts`): a file under `src/modules/` that draws a panel or a page and maps entries to elements is a `ListPanel`, unless it is named with its reason on one of three lists held exact -- a fixed set of status, stat or chart rows; a page, a form or a scene whose rows are not records; a list of records not yet moved (Home's pull requests, review comments, milestones, deploys, builds and the matches inside a design search, and Team Agile's Releases). The twelve list panels are named, and the reader is tried on three shapes It cannot see a list split across files (the frame in one, the `.map()` in the other), so each such file is named on a fourth list, `ROWS_THROUGH_CHILDREN` (the Design tab's list and the Standup's agenda lanes), held exact. |
 | `src/shell/kinds/listRoom.test.ts` | The room a list has, from boxes handed in: from the list's top under its padding down to the foot, what sits above it and a line under the foot each taking its height, the foot row's room kept free while none is drawn, and nothing where the panel has no fixed height or there is no layout |
-| `src/shell/kinds/ListPanel.test.tsx` | The measured page size -- the formula at several rooms down to one item, the component following a handed-in room, watching the panel and what sits above the list, and keeping the page's first item in view when a resize changes the page; the page size as a sum over the panel's chrome, a full page always fitting and one more item never; the pager at five and not at four, its `Page 2 of 5` and arrow keys; a chip, the search and a picker each returning to page 1, the page clamped when the list shrinks; `empty` against `filteredEmpty`; the header, foot, status and lead slots; the compact density (five a page, no description band), a smaller page under more chrome, and the panel's height the same at every density; and nine things a panel cannot say, as compile errors |
-| `src/shell/CardItem.test.tsx` | One item shape whatever the text: the same classes with a long title, a long description and none; the clamp in CSS and the text whole in the DOM; a plain element, not a Fluent `Card`; a plain-text title with no tooltip; one exposed action and the menu; the meta band's thumb, progress, badges and text; the compact item, the title line and the meta band at one shorter height; the one-band line item |
+| `src/shell/kinds/ListPanel.test.tsx` | The measured page size -- the formula at several rooms down to one item, the component following a handed-in room, watching the panel and what sits above the list, and keeping the page's first item in view when a resize changes the page; the page size as a sum over the panel's chrome, a full page always fitting and one more item never, four full items under one chip row at the one panel height, and more chrome never a bigger page; the pager at five and not at four, its `Page 2 of 5` and arrow keys; a chip, the search and a picker each returning to page 1, the page clamped when the list shrinks; `empty` against `filteredEmpty`; the header, foot, status and lead slots; the compact density (five a page, no description band), a smaller page under more chrome, and the panel's height the same at every density; and nine things a panel cannot say, as compile errors |
+| `src/shell/CardItem.test.tsx` | One item shape whatever the text: the same classes with a long title, a long description and none; the clamp in CSS and the text whole in the DOM; a plain element, not a Fluent `Card`; a plain-text title with no tooltip; one exposed action and the menu; the meta band's thumb, progress, badges and text; the meta band one gap under the description -- a track of the item's grid, the band on the row after it, no margin on a band, the same under one line, two or none; the compact item, the title line and the meta band at one shorter height; the one-band line item |
 | `src/modules/ado/PromptStatus.test.tsx` | Active Cards as a list panel: four card items a page, the checklist's progress and the facts in the meta band, Open the way in, the state picker, and the two empty sentences |
 | `src/hooks/usePagination.test.ts` | Clamping a page that is out of range, paging independently of the filtered set's size, and controlled mode where the caller's `onPageChange` is the only writer |
 
@@ -1958,10 +2023,10 @@ come on top of these; the totals are in [`docs/TESTING.md`](../docs/TESTING.md))
 | The retro session has a send button | The third state of `sendButtonState`: shown, because `postRetroSummary` is on |
 | The send button is disabled | And an **enabled** one here is a reason to stop: it means a live webhook is configured in the agent's environment |
 | The send button names `TEAMS_WEBHOOK_MANAGER` | The disabled reason sends a reader to a shell rather than to source. This is the check the whole "read-only" rule exists to make possible -- the button is never pressed |
-| Each meeting row offers `Edit / send` | The page the send button is on can be reached from the list |
+| Each meeting entry's menu offers Edit or send | The page the send button is on can be reached from the list: every entry of the Meetings panel has a `...` menu, and each menu holds **Edit or send** |
 | The read view offers `Edit / send` | And from the page a row lands on |
 | `Edit / send` lands on the session page | The button is pressed -- it navigates, it does not send -- and the URL is `/communication/sessions/2026-02-05.md` |
-| Exactly the complete session offers Close | Presence on one of three rows, never pressed: a press runs `MeetingAgenda -Close` and moves a file in the committed fixture hub |
+| Exactly the complete session offers Archive | Presence in one of three entries' menus, never chosen: choosing it and confirming runs `MeetingAgenda -Close` and moves a file in the committed fixture hub |
 | No page errors across every route visited | Nothing threw while proving the others |
 
 It uses raw `playwright`, not `@playwright/test` -- chromium, `domcontentloaded`, then wait for the

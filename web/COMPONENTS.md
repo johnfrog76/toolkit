@@ -101,7 +101,8 @@ that the foot holds the bottom), and `panelStructure.test.ts` for who may import
 the kind does not have is a compile error.
 
 **Use it** for any panel whose body is a list of card items: Active Cards, My Work, the Log, Decks, the
-Studio's lists. Hand it data, not JSX: `item` turns one entry into the card item's data, and the kind
+Studio's lists, Growth's Reviews and Goals, Reminders, Meetings. A file under `src/modules/` that draws
+rows without it fails `src/shell/kinds/modulePanels.test.ts`, unless it is named there with its reason. Hand it data, not JSX: `item` turns one entry into the card item's data, and the kind
 draws it. **Do not use it** for a body that is one block (a set of checks, a chart alone).
 
 ```tsx
@@ -127,14 +128,14 @@ Props:
 | `density` | `"full" \| "compact" \| "line"` | The item size for every item of the panel: three bands (default), the title and meta bands, or one band. An item never chooses it, and it never changes the panel's height. |
 | `empty` | `EmptyMessage` | Required. Shown when there are no items: nothing yet, or nothing could be read (`tone: "error"`). |
 | `filteredEmpty` | `EmptyMessage` | Shown instead when a filter or a search hid every item. |
-| `filters` | `FilterRow[]` | Rows of chips: `{ label, chips: [{ id, label, count?, active, onSelect }] }`. The rows sit in one wrapper (`data-panel-filters`), a column spaced by `filterRowGap` (Fluent's XS, 4 px, `src/shell/layoutTokens.ts`); a row has no margin and no tint of its own. |
+| `filters` | `FilterRow[]` | Rows of chips: `{ label, chips: [{ id, label, count?, active, onSelect }] }`. The rows sit in one wrapper (`data-panel-filters`), a column spaced by `filterRowGap` (Fluent's XS, 4 px, `src/shell/layoutTokens.ts`); a row has no margin and no tint of its own. The wrapper owns the space below the rows, `filtersSpaceBelow` (`controlRowsSpace`, Fluent's M, 12 px), and the list under it drops its own top padding, so the chips sit 12 px under the header rule and 12 px over the first item. |
 | `pickers` | `SelectSlot[]` | Small header selects: `{ label, value, options, onChange, disabled? }`. |
 | `search` | `SearchSlot` | The header's search box: `{ label, placeholder?, value, onChange }`. What a deeper search finds is handed to the kind as `items`, never drawn as a block over the list. |
 | `action` | `ActionSlot` | One header button for a thing the whole panel does: `{ label, glyph, onClick, disabled?, title? }`. |
 | `refresh` | `RefreshSlot` | `{ onClick, isFetching?, disabled? }`. |
 | `count` | `number \| string` | The count chip. A string is a count that needs a word: `latest 500`. |
 | `countLabel` | `string` | The count chip's accessible name: `12 prompts`. |
-| `lead` | `ListLead` | A chart above the items: `{ chart: { label, chart } }`. |
+| `lead` | `ListLead` | What sits above the items, either or both: rows of figures, `stats: [{ label, stats: [{ id, count, label, tone?, detail? }] }]`, drawn as `StatTile`s with `detail` as the native title, then a chart, `chart: { label, chart }`. |
 | `status` | `PanelStatus` | What a write came to (`success` or `error`, dismissable) or what the panel is doing (`busy`). |
 | `create` | `CreateSlot` | The foot's **+**: `{ label, onClick }`; the label is the title of the dialog it opens. |
 | `footLeft` | `string` | Words at the foot's left. |
@@ -154,8 +155,13 @@ room is kept free while no foot is drawn, so a pager appearing never changes the
 
 The same answer from the tokens, `listPageSize(chrome)` (`LIST_CHROME_PX`: frame 117, a chip row 26
 with `filterRowGap` between two, a lead 153, a foot note 32, a status line 48), is the first paint's
-page and the page where there is no layout to measure (a narrow page, the tests). Measured at 1280
-wide: four full items (three while a status line shows), five compact, eleven lines under a lead.
+page and the page where there is no layout to measure (a narrow page, the tests). Under a chip row
+the list drops its own top padding, so the sum takes that padding off the chrome there. From
+`listPageSize`, at the one panel height (`PANEL_HEIGHT_PX`, 600 px, chosen to hold four full items
+under one chip row): four full items with no chip row or under one; three under two chip rows, or
+where a foot note or a status line takes room as well; five compact; seventeen lines, eleven under a
+lead. The sum counts a foot note whenever the panel passes one; the measured page follows the room
+the note really takes.
 
 The page is held as the index of its first item, so a resize that changes the page size keeps that
 item in view. The pager (`ListPager`, private to the kind) is in the foot's centre, drawn only past one
@@ -165,12 +171,13 @@ shrinks.
 
 **The list.** The items are drawn in one wrapper, `<ul role="list" class="cardList" data-card-list>`
 (`CARD_LIST_CLASS`), each alone in an `<li>`. The list owns the space between its items and over the
-first, `cardListGap` (Fluent's XS 4 px for full, S 8 px for compact, 0 for line) and
+first, `cardListGap` (Fluent's S 8 px for full and compact, one value for every item that is a card;
+0 for line, a log's rows) and
 `cardListPaddingTop` in `src/shell/layoutTokens.ts`, each with a px twin for the sums; an item has no
 margin. The list is handed to `PanelFrame` through its `body` slot.
 
 **Height.** The root wears `data-panel-kind="list"` and both bounds, `PANEL_MIN_HEIGHT_PX.list` and
-`PANEL_MAX_HEIGHT_PX.list` (592 px), above `PANEL_GRID_MIN_WIDTH_PX` (900 px), whatever the item size,
+`PANEL_MAX_HEIGHT_PX.list` (`PANEL_HEIGHT_PX`, 600 px), above `PANEL_GRID_MIN_WIDTH_PX` (900 px), whatever the item size,
 through `usePanelMinHeightClass(kind)` (`src/shell/kinds/panelMinHeight.ts`): a minimum for every kind,
 and for `list` the same figure as its maximum. A panel not yet on its kind may wear that class
 meanwhile, as the Environment panel does for `status`. The body is the paged form
@@ -211,9 +218,10 @@ their sum, so a change to a padding or a band changes the height with it:
 | `CARD_ITEM_TITLE_BAND_PX` | 24 | The title band: the title's line height and the controls' height. |
 | `CARD_ITEM_DESCRIPTION_LINE_PX` | 15 | One description line; `CARD_ITEM_DESCRIPTION_LINES` (2) of them make the band. |
 | `CARD_ITEM_META_BAND_PX` | 16 | The meta band: a small badge's height. |
+| `CARD_ITEM_META_GAP_PX` | 8 | Between a full item's description band and its meta band, a track of the item's grid; `tokens.spacingVerticalS`. |
 | `CARD_ITEM_COMPACT_BAND_GAP_PX` | 8 | Between a compact item's two bands; `tokens.spacingVerticalS`. |
 | `CARD_ITEM_LINE_BAND_PX` | 28 | A line item's one band. |
-| `CARD_ITEM_HEIGHT_PX` | 96 | Full, derived: 1 + 12 + 24 + 30 + 16 + 12 + 1. |
+| `CARD_ITEM_HEIGHT_PX` | 104 | Full, derived: 1 + 12 + 24 + 30 + 8 + 16 + 12 + 1. |
 | `CARD_ITEM_COMPACT_HEIGHT_PX` | 74 | Compact, derived: 1 + 12 + 24 + 8 + 16 + 12 + 1. |
 | `CARD_ITEM_LINE_HEIGHT_PX` | 28 | Line: its band. |
 
@@ -503,7 +511,7 @@ Props:
 | `label` | `ReactNode` | What it counts. |
 | `color` | `string` | A health colour for the number, when the count is a verdict. |
 
-**Used by:** Milestones, Burn, the issue report and Test Health. **Pattern:** a ref-forwarding presentational box. **Test:**
+**Used by:** Milestones, Burn, the issue report, and `ListPanel`'s lead (Test Health's figures). **Pattern:** a ref-forwarding presentational box. **Test:**
 [`StatTile.test.tsx`](src/shared/StatTile.test.tsx).
 
 ## `StatusMessage`
@@ -541,6 +549,47 @@ Props:
 
 **Used by:** Create Prompt and the Prompts panel. **Pattern:** a keyboard-reachable description tooltip. **Test:** none of its own
 yet.
+
+## `TabRows`
+
+**What it is for:** the one wrapper a page's in-page tab rows sit in. It owns their space, the way a
+panel row owns the space around its panels.
+
+**Use it** around every Fluent `TabList` that switches a page's views or a panel's sub-views: Home's
+Focus, Board, Sprint and Actions strip, Team Agile's Standup, Triage and Releases strip, and the
+Standup panel's Agenda and grain tabs. Two rows that stack go in one `TabRows`. **Do not** give the
+`TabList` a className, a style or a margin: the wrapper's padding and gap are the only space.
+
+Props:
+
+| Prop | Type | Notes |
+| --- | --- | --- |
+| `children` | `ReactNode` | One tab row, or two stacked. |
+
+What is drawn:
+
+```html
+<div class="tabRows" data-tab-rows>   <!-- column; padding-block: tabRowsPadding; row-gap: tabRowGap -->
+  <!-- TabList --> <!-- TabList -->
+</div>
+```
+
+| Token (`src/shell/layoutTokens.ts`) | Value | What it is |
+| --- | --- | --- |
+| `tabRowsPadding` | `controlRowsSpace`: `tokens.spacingVerticalM`, 12 px | Above and below the rows. The same value as the space under a list panel's filter chips, so tab rows and chip rows read as one family. |
+| `tabRowGap` | `tokens.spacingVerticalS`, 8 px | Between two rows stacked in one wrapper. |
+
+**Used by:** Home's strip (`src/modules/ado/routes.tsx`), `RitualTabs`
+(`src/modules/solitaireAgile/RitualPage.tsx`) and the Standup panel. **Pattern:** a wrapper that owns
+its children's spacing, so nothing inside has a margin. **Test:**
+[`TabRows.test.tsx`](src/shared/TabRows.test.tsx), which also reads every source file and fails on a
+`TabList` outside a `TabRows`, or one with a className or a style.
+
+## `TAB_ROWS_CLASS`
+
+**What it is for:** the wrapper's class name, `tabRows`, so a test or a style can find it without
+retyping it. `data-tab-rows` marks the same element. **Used by:** `TabRows` and its test. **Test:**
+`TabRows.test.tsx`.
 
 ## `HairlineDivider`
 
