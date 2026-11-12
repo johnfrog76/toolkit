@@ -44,3 +44,18 @@ export const filterRowGap = tokens.spacingVerticalXS;
 
 /** `filterRowGap`, in px, for the sums. */
 export const filterRowGapPx = 4;
+
+/** The space above and below a page's tab rows: the tab-row wrapper's
+ *  (`TabRows`, shared/TabRows.tsx), top and bottom. A Fluent spacing token, and
+ *  a multiple of 4 px. */
+export const tabRowsPadding = tokens.spacingVerticalS;
+
+/** `tabRowsPadding`, in px. */
+export const tabRowsPaddingPx = 8;
+
+/** The gap between two tab rows stacked in one wrapper. A Fluent spacing token,
+ *  and a multiple of 4 px. */
+export const tabRowGap = tokens.spacingVerticalS;
+
+/** `tabRowGap`, in px. */
+export const tabRowGapPx = 8;

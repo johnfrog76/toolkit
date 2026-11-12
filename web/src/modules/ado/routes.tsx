@@ -42,6 +42,7 @@ import { FilterDrawer } from "./FilterDrawer";
 import { drawerSections } from "./homeTabs";
 import { trackerName } from "./TrackerBadge";
 import { GH_EXPLAIN } from "./ghExplain";
+import { TabRows } from "../../shared/TabRows";
 
 const useStyles = makeStyles({
   // The row above Home's cards spans the whole centre block: the tabs at its
@@ -50,29 +51,6 @@ const useStyles = makeStyles({
   // is the earlier row's; the pager that sat at the right is gone -- a tab
   // has all its cards. The tabs never move, so nothing reflows when the toggle
   // is absent.
-  // The row the tab strip sits in, and where its 0.5rem of inset lives -- on the
-  // WRAPPER, not on the TabList (the owner: "probably put that on wrapper
-  // obviously"). Everything on the row moves together, and the strip keeps the
-  // one adjustment that is about Fluent rather than about layout.
-  viewBar: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: tokens.spacingHorizontalM,
-    marginBottom: tokens.spacingVerticalS,
-    paddingLeft: tokens.spacingHorizontalS,
-  },
-  // The tab strip's TEXT starts flush with the cards and the explain line: a
-  // small Fluent tab insets its label by the tab's inline padding (SNudge) plus
-  // the content's (XXS), so the list is pulled back by exactly that. It was
-  // spacingHorizontalM, a medium tab's figure, and overshot by 4px.
-  // With the wrapper's inset, the label then lands level with the intro line
-  // underneath. The strip is not a shared component -- it is
-  // Home's -- but it lines up with one.
-  tabs: {
-    marginLeft: `calc(-1 * (${tokens.spacingHorizontalSNudge} + ${tokens.spacingHorizontalXXS}))`,
-  },
   // The explain line, then the button that belongs to it -- "New card button
   // always follows the explain text".
   explainRow: {
@@ -294,9 +272,8 @@ export function AdoHome() {
         <>
           {banner}
           {showStrip ? (
-            <div className={styles.viewBar}>
+            <TabRows>
               <TabList
-                className={styles.tabs}
                 size="small"
                 aria-label="Home"
                 selectedValue={tabId}
@@ -311,7 +288,7 @@ export function AdoHome() {
                   </Tab>
                 ))}
               </TabList>
-            </div>
+            </TabRows>
           ) : null}
           {/* ONE view at a time. The owner's rule: "you toggle views, ADO or sprint
               lanes -- seeing both [is] too much ... users have limited ability to

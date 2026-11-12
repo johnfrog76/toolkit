@@ -542,6 +542,47 @@ Props:
 **Used by:** Create Prompt and the Prompts panel. **Pattern:** a keyboard-reachable description tooltip. **Test:** none of its own
 yet.
 
+## `TabRows`
+
+**What it is for:** the one wrapper a page's in-page tab rows sit in. It owns their space, the way a
+panel row owns the space around its panels.
+
+**Use it** around every Fluent `TabList` that switches a page's views or a panel's sub-views: Home's
+Focus, Board, Sprint and Actions strip, Team Agile's Standup, Triage and Releases strip, and the
+Standup panel's Agenda and grain tabs. Two rows that stack go in one `TabRows`. **Do not** give the
+`TabList` a className, a style or a margin: the wrapper's padding and gap are the only space.
+
+Props:
+
+| Prop | Type | Notes |
+| --- | --- | --- |
+| `children` | `ReactNode` | One tab row, or two stacked. |
+
+What is drawn:
+
+```html
+<div class="tabRows" data-tab-rows>   <!-- column; padding-block: tabRowsPadding; row-gap: tabRowGap -->
+  <!-- TabList --> <!-- TabList -->
+</div>
+```
+
+| Token (`src/shell/layoutTokens.ts`) | Value | What it is |
+| --- | --- | --- |
+| `tabRowsPadding` | `tokens.spacingVerticalS`, 8 px | Above and below the rows. |
+| `tabRowGap` | `tokens.spacingVerticalS`, 8 px | Between two rows stacked in one wrapper. |
+
+**Used by:** Home's strip (`src/modules/ado/routes.tsx`), `RitualTabs`
+(`src/modules/solitaireAgile/RitualPage.tsx`) and the Standup panel. **Pattern:** a wrapper that owns
+its children's spacing, so nothing inside has a margin. **Test:**
+[`TabRows.test.tsx`](src/shared/TabRows.test.tsx), which also reads every source file and fails on a
+`TabList` outside a `TabRows`, or one with a className or a style.
+
+## `TAB_ROWS_CLASS`
+
+**What it is for:** the wrapper's class name, `tabRows`, so a test or a style can find it without
+retyping it. `data-tab-rows` marks the same element. **Used by:** `TabRows` and its test. **Test:**
+`TabRows.test.tsx`.
+
 ## `HairlineDivider`
 
 **What it is for:** the one-pixel rule between a panel's header and its body.

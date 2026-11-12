@@ -773,6 +773,13 @@ a row holds at most two, the page and each row wear their gap token, and no page
 item has a margin. It draws the Studio page, the System page's grid and the Growth page with its
 slot, and real list panels for the margins inside.
 
+**A page's tab rows sit in one wrapper too.** `TabRows` (`src/shared/TabRows.tsx`,
+`data-tab-rows`) holds Home's view strip, Team Agile's ceremony strip and the Standup panel's
+Agenda and grain tabs. It owns the space: `tabRowsPadding` above and below (`spacingVerticalS`, 8 px)
+and `tabRowGap` between two rows stacked in it (`spacingVerticalS`, 8 px), both in
+`src/shell/layoutTokens.ts`. A `TabList` takes no className and no style, so a tab row has no margin
+of its own. `src/shared/TabRows.test.tsx` holds every `TabList` in the app to that.
+
 **The structural test holds the panel's rules**, in two halves:
 
 - `src/shell/kinds/panelStructure.test.ts` reads every source file and refuses: Fluent `Card`
@@ -1846,6 +1853,7 @@ paragraph:
 | `src/landing/landing.test.tsx` | The landing page's words are the README's: each piece read out of `README.md` and `THIRD-PARTY-NOTICES.md` is found there as written, a README missing a piece is refused by name, and the page draws exactly those words, band by band, with band 3 absent while it is held ([The landing page](#the-landing-page)) |
 | `src/shell/kinds/panelStructure.test.ts` | The panel rules over every source file: Fluent `Card` only in `PanelFrame`, `PanelFrame` only in the kinds, the pager only in `ListPanel`, `ScenePanel` only in the Lounge, and no height, page size, tooltip, link, subhead, item or body of its own in a file that fills a kind -- with the panels not yet moved on named lists held exact, and the checker run over sources written wrong on purpose |
 | `src/shell/pageRows.test.tsx` | A page's rows of panels: every panel directly inside exactly one `[data-panel-row]`, the page holding rows only, a row of at most two, the gaps as Fluent tokens that are multiples of 4 px, and no margin on a page, a row, a panel, a list or an item -- for the Studio page, the System page's grid and the Growth page |
+| `src/shared/TabRows.test.tsx` | A page's tab rows: `TabRows` one marked wrapper (`[data-tab-rows]`) with its rows directly inside, its padding `spacingVerticalS` and its gap a Fluent token that is a multiple of 4 px, and every `TabList` under `src/` inside a `TabRows` with no className or style of its own |
 | `src/shell/kinds/listRoom.test.ts` | The room a list has, from boxes handed in: from the list's top under its padding down to the foot, what sits above it and a line under the foot each taking its height, the foot row's room kept free while none is drawn, and nothing where the panel has no fixed height or there is no layout |
 | `src/shell/kinds/ListPanel.test.tsx` | The measured page size -- the formula at several rooms down to one item, the component following a handed-in room, watching the panel and what sits above the list, and keeping the page's first item in view when a resize changes the page; the page size as a sum over the panel's chrome, a full page always fitting and one more item never; the pager at five and not at four, its `Page 2 of 5` and arrow keys; a chip, the search and a picker each returning to page 1, the page clamped when the list shrinks; `empty` against `filteredEmpty`; the header, foot, status and lead slots; the compact density (five a page, no description band), a smaller page under more chrome, and the panel's height the same at every density; and nine things a panel cannot say, as compile errors |
 | `src/shell/CardItem.test.tsx` | One item shape whatever the text: the same classes with a long title, a long description and none; the clamp in CSS and the text whole in the DOM; a plain element, not a Fluent `Card`; a plain-text title with no tooltip; one exposed action and the menu; the meta band's thumb, progress, badges and text; the compact item, the title line and the meta band at one shorter height; the one-band line item |

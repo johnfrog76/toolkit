@@ -33,6 +33,7 @@ const SHARED_FILES = [
   "src/shared/StatusMessage.tsx",
   "src/shared/InfoTip.tsx",
   "src/shared/HairlineDivider.tsx",
+  "src/shared/TabRows.tsx",
   "src/shell/lazy.tsx",
 ];
 
@@ -60,6 +61,8 @@ const SOURCES: Record<string, { type: string } | "none"> = {
   StatusMessage: { type: "StatusMessageProps" },
   InfoTip: { type: "InfoTipProps" },
   HairlineDivider: { type: "HairlineDividerProps" },
+  TabRows: { type: "TabRowsProps" },
+  TAB_ROWS_CLASS: "none",
 };
 
 const doc = fs.readFileSync(DOC, "utf8");
