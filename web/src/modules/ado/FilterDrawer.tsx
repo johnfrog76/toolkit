@@ -12,9 +12,9 @@ import { DesignKindRow, DocsFolderRow } from "./DocFilterRows";
 import { useDesignFilters, useDocsFilters } from "./docFilters";
 
 const useStyles = makeStyles({
-  root: {
-    marginBottom: tokens.spacingVerticalL,
-  },
+  // No margin: the space under the drawer is the tab strip's wrapper
+  // (TabRows), which owns the space around Home's tabs.
+  root: {},
   toggle: {
     display: "flex",
     justifyContent: "flex-end",

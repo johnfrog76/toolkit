@@ -49,8 +49,16 @@ export const CARD_ITEM_PROGRESS_WIDTH_PX = 64;
 
 /** The space between a compact item's two bands, in px: Fluent's
  *  `tokens.spacingVerticalS`, which the item's styles use; this is its number,
- *  for the height sums. A full item's bands touch. */
+ *  for the height sums. A full item's title and description touch; its meta band
+ *  sits CARD_ITEM_META_GAP_PX under the description. */
 export const CARD_ITEM_COMPACT_BAND_GAP_PX = 8;
+
+/** The space between a full item's description band and its meta band, in px:
+ *  Fluent's `tokens.spacingVerticalS`, which the item's grid uses for that
+ *  track; this is its number, for the height sums. It is the same 8 px as the
+ *  gap between two card items, so the meta row has the same room under a
+ *  two-line description as under a one-line one. */
+export const CARD_ITEM_META_GAP_PX = 8;
 
 /** A line item's one band, in px, the rule under it included. A line item has
  *  no padding over or under it: the band is the item. */
@@ -58,10 +66,14 @@ export const CARD_ITEM_LINE_BAND_PX = 28;
 
 const FRAME_PX = 2 * CARD_ITEM_BORDER_PX + 2 * CARD_ITEM_PADDING_Y_PX;
 
-/** The height, in px, of a full card item: its outline, its padding and its
- *  three bands. */
+/** The height, in px, of a full card item: its outline, its padding, its three
+ *  bands and the gap over the meta band. */
 export const CARD_ITEM_HEIGHT_PX =
-  FRAME_PX + CARD_ITEM_TITLE_BAND_PX + CARD_ITEM_DESCRIPTION_BAND_PX + CARD_ITEM_META_BAND_PX;
+  FRAME_PX +
+  CARD_ITEM_TITLE_BAND_PX +
+  CARD_ITEM_DESCRIPTION_BAND_PX +
+  CARD_ITEM_META_GAP_PX +
+  CARD_ITEM_META_BAND_PX;
 
 /** The height, in px, of a compact card item: the title band and the meta
  *  band, for a panel whose items never have a description. */
