@@ -275,4 +275,4 @@ do not move when the worn theme does.
 ## Known gaps
 
 Not built yet: baking voices from the Toolkit, a way to keep your own decks outside this repo, and
-`ShellEmbed`.
+`ShellEmbed` ([Deck voices and your own decks are not made in the Toolkit](../KNOWN-GAPS.md#deck-voices-and-your-own-decks-are-not-made-in-the-toolkit)).

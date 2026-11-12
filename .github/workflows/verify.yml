@@ -542,8 +542,9 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci') && needs.changes.outputs.cli == 'true')) }}
     runs-on: windows-latest
-    # Every suite, and every verb a suite types, in 5.1, which starts a process
-    # more slowly than 7 does.
+    # Every suite's own code in 5.1, which starts a process more slowly than 7
+    # does. A suite that starts its children through Invoke-P20TestHost runs
+    # the verbs it types in 5.1 too; the rest still start pwsh for them.
     timeout-minutes: 150
     defaults:
       run:
@@ -580,9 +581,13 @@ jobs:
           powershell.exe -NoProfile -Command '"Windows PowerShell 5.1 reads a script without a BOM in code page " + [System.Text.Encoding]::Default.CodePage'
 
       # The runner itself in powershell.exe, with no suite switch: it starts every
-      # suite in the host it is running in, and each suite starts the verbs it
-      # types the same way (Tests/Get-TestHost.ps1), so nothing is handed to pwsh.
-      # PSModulePath is set inside that shell. The runner's Total line.
+      # suite in the host it is running in, so every suite's own code runs in 5.1.
+      # A suite that starts its children through Invoke-P20TestHost
+      # (Tests/Get-TestHost.ps1) runs the verbs it types in 5.1 too. The rest
+      # still start pwsh by name, so their verbs run in PowerShell 7 here as
+      # well: Clause 22 of Tests/Test-Portability.ps1 lists them, and the list
+      # only shrinks. PSModulePath is set inside that shell. The runner's Total
+      # line.
       - name: The CLI in Windows PowerShell 5.1 -- Tests/Test-Toolkit.ps1
         run: |
           $log = Join-Path $env:RUNNER_TEMP 'cli-51.log'
