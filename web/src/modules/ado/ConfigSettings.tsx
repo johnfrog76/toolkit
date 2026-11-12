@@ -223,7 +223,7 @@ interface FieldRowProps {
   effective?: boolean;
 }
 
-function FieldRow({ setting, row, draft, onChange, anchor, effective }: FieldRowProps) {
+export function FieldRow({ setting, row, draft, onChange, anchor, effective }: FieldRowProps) {
   const styles = useStyles();
   const value = draft ?? setting.value;
   const type = row?.type ?? "string";
@@ -286,7 +286,11 @@ function FieldRow({ setting, row, draft, onChange, anchor, effective }: FieldRow
       <Body1 id={`${id}-label`} className={styles.labelText}>
         {words.label}
       </Body1>
-      <Badge appearance="outline" color={sourceColor(setting.source)} size="small">
+      <Badge
+        appearance={sourceColor(setting.source) === "subtle" ? "tint" : "outline"}
+        color={sourceColor(setting.source)}
+        size="small"
+      >
         {setting.source}
       </Badge>
       {/* What it does for you, in sight -- it used to be behind an (i) per row. */}
