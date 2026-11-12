@@ -11,7 +11,7 @@ import {
 } from "@fluentui/react-components";
 import { HairlineDivider } from "../../shared/HairlineDivider";
 import { RefreshButton } from "../../shared/RefreshButton";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { thinScrollbar } from "../../shared/thinScrollbar";
 import {
   CheckmarkCircleRegular,
@@ -262,7 +262,7 @@ export function TestHealth() {
       : undefined;
 
   return (
-    <PageCard
+    <PanelFrame
       className={styles.card}
       loading={isLoading}
       loadingLabel="Loading test history..."
@@ -410,6 +410,6 @@ export function TestHealth() {
           </Caption1>
         </>
       )}
-    </PageCard>
+    </PanelFrame>
   );
 }

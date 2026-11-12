@@ -8,14 +8,14 @@ import { copyText } from "../../shared/copyText";
 import { EmptyState } from "../../shared/EmptyState";
 import { FilePath } from "../../shared/FilePath";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { useGetPromptQuery } from "./api.studio";
 import { promptReference } from "./PromptsCard";
 import { groupLabel, senderLabel, workflowLabel } from "./prompts";
 
 // The reading room for ONE agentic prompt -- the house's reading page,
-// the frame a hub design is read in (DesignNotePage): PageCard, the back arrow
+// the frame a hub design is read in (DesignNotePage): PanelFrame, the back arrow
 // and the name on the left, compact controls on the right, the file's address,
 // and ONE MarkdownViewer. Read-only: a prompt is changed in its file.
 //
@@ -76,7 +76,7 @@ export function PromptPage() {
 
   return (
     <div className={styles.page}>
-      <PageCard
+      <PanelFrame
         loading={isLoading}
         loadingLabel="Reading the prompt..."
         empty={empty}
@@ -163,7 +163,7 @@ export function PromptPage() {
             />
           </>
         )}
-      </PageCard>
+      </PanelFrame>
     </div>
   );
 }

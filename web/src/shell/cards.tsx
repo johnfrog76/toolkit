@@ -3,6 +3,7 @@ import type { ReactElement, ReactNode } from "react";
 import type { HomeTab } from "./registry";
 import { Caption1, makeStyles, tokens } from "@fluentui/react-components";
 import { Pagination } from "../shared/Pagination";
+import { PANEL_GRID_MIN_WIDTH_PX } from "./panelHeight";
 
 /**
  * What the shell hands down to a module's `/` and `/system` route elements.
@@ -121,7 +122,7 @@ const useStyles = makeStyles({
     display: "grid",
     gridTemplateColumns: "1fr",
     gap: tokens.spacingVerticalL,
-    "@media (min-width: 900px)": {
+    [`@media (min-width: ${PANEL_GRID_MIN_WIDTH_PX}px)`]: {
       gridTemplateColumns: "1fr 1fr",
     },
   },
@@ -138,7 +139,7 @@ const useStyles = makeStyles({
  *  again. The rule it keeps is the visible one: a page with a single card shows
  *  that card at HALF width, like every other card in the product, instead of
  *  stretching it across the window because it happens to be alone. Meetings did
- *  stretch, because its page rendered `PageCard` straight into the route.
+ *  stretch, because its page rendered `PanelFrame` straight into the route.
  *
  *  It is a component rather than an exported class name so there is one grid in
  *  the product and not a third copy of `gridTemplateColumns` to drift. */

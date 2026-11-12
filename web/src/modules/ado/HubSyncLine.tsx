@@ -6,7 +6,7 @@ import { hubSyncWords } from "./hubSync";
 import { SYSTEM_PATH } from "./paths";
 
 // The one foot line every card that writes into the hub draws -- the Spaces,
-// Hub Designs, Reminders and the Reviews -- through PageCard's `footNote`
+// Hub Designs, Reminders and the Reviews -- through PanelFrame's `footNote`
 // (docs/CONFIGURATION.md, "Syncing the hub from the web app").
 //
 // It READS. The state is /env's `hubSync`, already in the cache every page

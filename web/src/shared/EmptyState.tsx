@@ -30,8 +30,8 @@ const useStyles = makeStyles({
   action: { marginTop: tokens.spacingVerticalXS },
 });
 
-/** What a card has to say when it has no body. `PageCard` takes one as its
- *  `empty` slot; anything that is not a PageCard renders <EmptyState> with it. */
+/** What a card has to say when it has no body. `PanelFrame` takes one as its
+ *  `empty` slot; anything that is not a PanelFrame renders <EmptyState> with it. */
 export interface EmptyMessage {
   /** The card's own icon, for the plain empty case. */
   icon: ReactElement;

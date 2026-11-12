@@ -12,7 +12,7 @@ This is one of the Toolkit's three halves. It reads through the agent (`../agent
 [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md#the-web-ui) is the short version of this file; this
 one is the detail. The root [`README.md`](../README.md) is the map of every document.
 
-The shared components -- `PageCard`, `CardActions`, the dialog parts, `EmptyState` and the rest -- have
+The shared components -- `PanelFrame` and the panel kinds, `CardActions`, the dialog parts, `EmptyState` and the rest -- have
 one document, [`COMPONENTS.md`](COMPONENTS.md): what each is for, when to use it, its props and its
 test.
 
@@ -160,7 +160,7 @@ web/
     │   ├── Landing.tsx     the five bands, drawn from the words
     │   ├── Commercial.tsx  the deck's poster and player, the app's own engine and clips
     │   └── people.ts       band 3's three lines -- empty, and the band held, until they are written
-    ├── shared/           reusable UI: PageCard, Pagination, FilterBadge, listRowStyles (the house list row), MarkdownViewer, ImageDropZone (one picture in: drop, paste, or a file; C2),
+    ├── shared/           reusable UI: PanelFrame (the private base of the panel kinds -- "Panels and card items"), Pagination, FilterBadge, listRowStyles (the house list row), MarkdownViewer, ImageDropZone (one picture in: drop, paste, or a file; C2),
     │                     StatusMessage (a live region: role=status, role=alert for an error), StatTile (the one way a card counts), CardActions,
     │                     ConfirmDialog and CreateButton (one grammar for acting), ToolKitLogo over Wordmark (the SVG mark, its outlines in wordmarkPaths.ts),
     │                     usePersistedState, faces, health, Confetti (the one wrapper over react-confetti; the root mounts it),
@@ -455,7 +455,7 @@ flow card actions etc"), converged on this:
   the goal, Open the review, Open the resume); where the tracker has no page of ours for the thing -- an
   ADO work item or PR -- it is the tracker's page; a reminder has no page, so it is the act it exists
   for, **Archive**. The external link is LAST in the menu, behind a divider. A row's title is plain text, never a link
-  or a button: opening goes through Open, and the Studio's three cards hold it (`rowShapeAssert.ts`). The trigger's name is
+  or a button: opening goes through Open, and every list panel holds it (`expectListPanelShape`, [Panels and card items](#panels-and-card-items)). The trigger's name is
   `Actions for <the row's title>`. Every word, icon and tooltip comes from one vocabulary --
   [One vocabulary for row actions](#one-vocabulary-for-row-actions).
 - **A card that makes something has one +.** `shared/CreateButton`: the footer's subtle **+**, its
@@ -591,7 +591,7 @@ defect, not a style question. What the pass settled, beside the intro lines and 
   (**GitHub**, **Azure DevOps**, or **Tracker** on a Space with none);
   its **Store sync** row is `HubSyncRow.tsx` -- under `git`, ahead and behind and **Sync the hub**, one
   fetch when the page opens; under `none`, what carries the folder -- and the cards that write into the
-  hub share one foot line, `HubSyncLine.tsx`, through `PageCard`'s `footNote`, both worded by `hubSync.ts`
+  hub share one foot line, `HubSyncLine.tsx`, through `PanelFrame`'s `footNote`, both worded by `hubSync.ts`
   (`docs/CONFIGURATION.md`, "Syncing the hub from the web app");
   its badge's sentence names the tracker too ("this Space's GitHub answered", never "az CLI, and ADO" on gh;
   `envBadge.ts`, shared with the Build card). The drawer's Configuration says "the Space you are working
@@ -606,6 +606,160 @@ defect, not a style question. What the pass settled, beside the intro lines and 
 `MyWork.test.tsx` holds the Issues tab's states as a table, tracker by state, and asserts no ADO word on
 gh soil; `ActionDialog.titles.test.tsx` holds the dialog's titles door by door; `envBadge.test.ts` holds the
 Environment card's words by tracker, and `configLabels.test.ts` the Space's address and status.
+
+## Panels and card items
+
+Three words, and the code, the docs and the tests use these and no others:
+
+| Word | Means | Lives in |
+| --- | --- | --- |
+| **panel** | The container on a page. A panel is one of the **kinds** -- `ListPanel` today; `StatusPanel`, `StatPanel`, `ChartPanel` and `ScenePanel` as their panels move -- each built on `PanelFrame`, the private base only the kinds wrap. Every kind has a minimum height; a list panel is exactly that height. | `src/shell/kinds/`, with the minimum heights in `src/shell/panelHeight.ts`; `src/shared/PanelFrame.tsx` |
+| **card item** | One entry inside a list panel: the clamped, uniform entry `CardItem` draws from data, with no tooltip. | `src/shell/CardItem.tsx`, with its tokens (the item height, the clamp lines) in `src/shell/cardItemTokens.ts` |
+| **prompt file** | The Markdown file a work item keeps in the hub, which the CLI also calls a card ([`docs/hub/cards.md`](../docs/hub/cards.md)). Active Cards shows each one **as a card item**. Where the two meet, say "prompt file" for the file and "card item" for its entry on screen. | the hub |
+
+"Module" is neither: it already means a feature module. Titles on screen do not change -- Active Cards
+is still Active Cards.
+
+**A panel picks a kind and fills its slots.** It does not configure a general-purpose frame:
+
+- **A panel has no way to set a height, a class or an item style.** A kind's props are an exact
+  interface, so filling a slot the kind does not have -- `height`, `className`, `pageSize`, a body --
+  is a compile error (`ListPanel.test.tsx` holds nine of them with `@ts-expect-error`).
+- **A list panel is 592 px: its minimum and its maximum.** `PANEL_MIN_HEIGHT_PX` in `panelHeight.ts`
+  names a floor per kind and `PANEL_MAX_HEIGHT_PX` a cap for the list kind, the same figure, both
+  applied above the grid's two-column breakpoint (`PANEL_GRID_MIN_WIDTH_PX`, which the page grid
+  reads too). The bounds are on the panel, and the grid's rows still stretch its neighbours. The
+  other kinds (status, stat, chart, scene) have the floor only. The reference is the Azure DevOps
+  dual-entry row -- Active Cards beside My Work: two 592 px columns 16 px apart, a 24 px header, a
+  32 px foot with the pager centred in it, 12 px of padding and 12 px between the parts.
+- **The foot holds the bottom.** `PanelFrame` is a column whose body grows, so a panel's foot sits at
+  its bottom edge however short its content is, and the empty room is between the body and the foot.
+  It is one rule in the frame that every kind inherits; no divider is drawn above the foot, and no
+  panel pins one of its own. Environment's version line is its foot.
+- **A panel reads as named slots.** `PANEL_SLOTS` in `panelHeight.ts` names them once, in order:
+  `header`, `info`, `actions`, `filters`, `body`, `foot`. On `PanelFrame` they are filled today by
+  `headerLeft` (the header and its info icon), `headerRight` (the actions), `body`, and `footerLeft`,
+  `footerCenter`, `footerRight` and `footNote` (the foot); a list panel's filters are the top of its
+  body. `body` is a named slot like the others, and `children` is the default slot that fills it:
+  pass one or the other, never both -- the types refuse both, and so does the frame when drawn. A
+  kind fills the body by name: `ListPanel` hands the frame its card list.
+- **What does not fit has two forms, chosen by the kind and never ad hoc.** A list panel **pages**:
+  its page is sized to fit, so nothing scrolls inside it and nothing is cut off. A panel whose body
+  is one block rather than items -- a set of checks, a long status body -- **scrolls** it in
+  `PanelFrame`'s own `scrollable` area, the header and foot fixed. `PANEL_BODY` names each capped
+  kind's form (`list: "paged"`); a kind that gains a cap gains an entry, and a typed `body` prop if
+  its panels differ. No panel sets an overflow of its own.
+- **`item` returns data.** `ListPanel`'s `item: (entry) => CardItemData` hands the kind an object --
+  `title`, `description`, `badges`, `meta`, `thumb`, `progress`, `primary`, `menu` -- and the kind
+  draws the card item. A panel cannot draw its own, so one item shape and one clamp hold by
+  construction.
+- **A card item: a plain title, one exposed action, the rest in the menu.** In `full` density, three
+  bands: the title on one line with its status badges and the controls at the right, the description
+  on two lines, and a meta band. In `compact` density, the title line and the meta band, with no
+  description band. In `line` density, one band. The title is plain text, never a link; `primary` is
+  the one exposed action, Open from the [row vocabulary](#one-vocabulary-for-row-actions), and every
+  other action is in `menu`. Text is clamped and stays whole in the DOM; **clamped text has no
+  tooltip** -- Open is how a person sees more. A badge or a short word in the meta band may carry a
+  native `title` for what it stands for. A `line` item that opens nothing (a log entry) has no action.
+- **Every length in an item is a token, and its height is their sum.** `src/shell/cardItemTokens.ts`
+  names the outline (1), the one vertical padding (`CARD_ITEM_PADDING_Y_PX`, 12 -- Fluent's
+  `tokens.spacingVerticalM`, which the styles use; a test holds the number to it), the title band
+  (24), a description line (15, two of them), the meta band (16) and the 8 between a compact item's
+  two bands. Each size's height is worked out from those -- 96 full, 74 compact, 28 line -- so no
+  fixed height can cancel a change to a padding or a band. **The space under the last band is the
+  space over the first**: one padding serves both, the title's line is its band and the meta band is
+  a badge's height, so there is 13 px over the title and 13 px under the badges. `CardItem.tsx`
+  types no length of its own.
+- **The space between items is the collection's.** A card item has no margin. A list panel draws its
+  items in one `<ul role="list" class="cardList" data-card-list>`, each alone in an `<li>`, and that
+  list owns the gap between them and the space over the first: `cardListGap` (4 full, 8 compact, 0
+  line) and `cardListPaddingTop` in `src/shell/layoutTokens.ts`. The rule holds at every level:
+  spacing comes from the wrapper's gap, never from a margin on a card item or a `PanelFrame`.
+- **The item size is the panel's, never an item's.** `density: "full" | "compact" | "line"` is a
+  prop on `ListPanel`, and the three sizes are named in `src/shell/cardItemTokens.ts`
+  (`CARD_ITEM_HEIGHTS_PX`). A panel whose items never have a description -- My Work and GitHub
+  Issues -- is `compact`, so no item keeps an empty two-line band; its `item` returns
+  `CompactItemData`, which has no `description` field, and no item data has a `density` field. Within
+  a panel every item is the same height. **The item size never moves the panel's floor**: a compact
+  panel has its kind's minimum height like any other, 592 px for a list, so one with two items still
+  lines up with its neighbours. The item size changes how many fit on a page, nothing else.
+- **Every spacing value is a Fluent token on the 4 px grid.** In the panel layer -- the card item,
+  the kinds, `PanelFrame` and `layoutTokens.ts` -- every gap, padding and margin is one of Fluent's
+  spacing tokens whose length is a multiple of 4 (XS 4, S 8, M 12, L 16...), never a typed length
+  and never an off-grid token (XXS 2, SNudge 6). Where a sum needs the number, it sits beside its
+  token (`cardListGapPx`, `filterRowGapPx`, `CARD_ITEM_PADDING_Y_PX`) and a test holds the pair
+  equal. The bands are not spacing but content sizes -- the title's line (24), a description line
+  (15), a badge's height (16) -- and are not held to the grid.
+- **`CardItem` is not a Fluent `Card`.** It is a plain element styled with Fluent tokens. Fluent's
+  `Card` is imported by `PanelFrame`, as its outline box, and by nothing else.
+- **`ListPanel` owns paging.** A panel passes `items` and nothing about pages: no page-size prop, no
+  pager slot, no page state. **The page size is measured.** Once the list is laid out, the kind reads
+  the room it really has -- from the list's top down to where the foot begins (`measureListRoom`,
+  `src/shell/kinds/listRoom.ts`) -- and the page is `max(1, floor((room + gap) / (item + gap)))`
+  (`pageSizeForRoom`, `src/shell/pageSize.ts`), with the density's derived item height and
+  `cardListGap`. So whatever sits above the list takes its real height -- a status line, a second row
+  of chips, a header that wrapped -- and the last item always ends above the foot: nothing scrolls
+  and nothing is cut off. A `ResizeObserver` on the panel and on what sits above the list measures
+  again when any of them changes size. The foot row's room is kept free while no foot is drawn, so a
+  pager appearing never changes the page. The page is held as the index of its first item: when a
+  resize changes the page size, the item at the top of the page stays in view.
+  The same answer worked out from the tokens (`listPageSize`: the frame 117, a row of chips 26 with
+  `filterRowGap` between two, a lead chart 153, a foot note 32, a status line 48) is the first
+  paint's page, so nothing jumps, and the page wherever there is no layout to measure -- a narrow
+  page, where a panel grows with its items, and the tests. Measured, at 1280 wide: four full items
+  (three while a status line shows), five compact, eleven log lines under the chart. The pager is in
+  the foot's centre, drawn only when there is a second page: Previous and Next, `Page 2 of 5`, and
+  the arrow keys while it has focus. The kind sends the page back to the first when a filter chip, a
+  picker or the search changes, and clamps it when the list shrinks.
+- **One way to filter: `filters`.** A panel that splits its items hands the kind rows of chips, each
+  chip with its count; a row is one line and scrolls sideways where it cannot fit. The rows sit in
+  one wrapper, a column whose gap (`filterRowGap` in `layoutTokens.ts`, Fluent's XS, 4 px) spaces them: a row has
+  no margin, so the space between two rows is there only while both are drawn, and every row looks
+  alike -- a chosen chip in a second row is drawn as one in the first. An inline subhead
+  used as a split ("Design (5)") is not allowed. A choice from a longer list (a period, a tag, a
+  state) is a `pickers` entry in the header.
+- **One way to explain: `info`.** A sentence about what a panel holds goes behind the info icon
+  beside its title. No helper sentence sits in the body.
+- **The header and the foot have one order.** Header: icon, title, info; then pickers, search, the
+  panel's one `action`, refresh, the count chip. Foot: `footLeft` words, the pager, the **+**
+  (`create`), and a `footNote` line under them. `status` says what the last write came to;
+  `loading` and the required `empty` (with `filteredEmpty` for a filter that hid everything) are the
+  only other things a body can be.
+
+**The structural test holds it**, in two halves:
+
+- `src/shell/kinds/panelStructure.test.ts` reads every source file and refuses: Fluent `Card`
+  imported anywhere but `PanelFrame`; `PanelFrame` imported by a feature module; `ScenePanel` outside
+  the Lounge; `Pagination` or `usePagination` outside `ListPanel`; and, in a file that fills a kind, a
+  `height`, `min-height` or `max-height`, a `density` on an item, a px or vh length, a page size, a `Tooltip`, a link, a
+  heading, a `<section>`, a `CardItem` or `CardActions` of its own, or a body handed to the kind.
+- `expectListPanelShape` (`src/shell/kinds/panelShapeAssert.ts`), called from each panel's own test,
+  asserts on the DOM: the root carries `data-panel-kind` and both of its kind's bounds;
+  every item is a card item with the same band classes, a plain-text title, exactly one exposed action
+  besides the `...` menu, and its text whole with no tooltip; no more than one page is drawn, with a
+  pager exactly when there is more. It asserts that the items sit alone in the `<li>`s of one
+  `ul.cardList` in the body, which wears the gap tokens, and that no item has a margin; that the
+  frame's body grows so the foot is the last thing in it; the kind's bounds whatever the item size, the
+  density's own height on every item, no description band on a compact item, that the body is the
+  paged form with no `overflow-y` scroll on the panel, its frame, its body or an item, and that the
+  chrome it drew plus its items come to no more than the panel's height.
+
+The static half also pins the item's tokens -- each height the sum of its outline, padding and bands,
+the padding equal to Fluent's token, no length typed in `CardItem.tsx`, no margin on an item or the
+frame, one `<ul>` owning the gap -- the slot names, and the item sizes: the three heights, that a `density` is never set in an
+item's data, that a file whose panel is `compact` gives no item a description, and that `ListPanel`
+asks for one height class, its kind's, with nothing about density in it; that the list kind has both
+bounds and every other kind a floor only; and that a capped kind names its form and `ListPanel`
+never asks for the frame's scroll area.
+
+**The migration's to-do is that test's named lists.** A panel not yet on its kind is on
+`FRAME_NOT_YET_MOVED` (with the kind it becomes), `CARD_NOT_YET_MOVED` or `PAGER_NOT_YET_MOVED`; a
+page that is not a panel -- a detail or document page, the Docs reader, the Actions forms, the
+Connect, Standup and Triage pages -- is on `FRAME_EXEMPT` with its reason. Each list is held exact: a
+file that moves comes off its list, and a new one cannot join quietly. On the kinds today: Active
+Cards, My Work / GitHub Issues, the Log, Decks, and the Studio's Spaces, Hub Designs and Prompts. The
+Environment panel wears the status kind's minimum height and is still on the frame; with no cap it has
+nothing to scroll, and takes the scroll form when the status kind is built.
 
 ## The settings drawer
 
@@ -688,7 +842,7 @@ what the operating system says. (A browser that has never chosen follows the sys
 
 Two **kinds**, because both are wanted. *Glass* is translucent cards over a gradient and paper grain.
 *Flat* is opaque cards on a plain page: functional, classic, right for a projector. Every card in the
-app is `colorNeutralBackgroundAlpha` (`shared/PageCard.tsx`), so that one token is the whole
+app is `colorNeutralBackgroundAlpha` (`shared/PanelFrame.tsx`), so that one token is the whole
 difference -- no component knows which kind it is in.
 
 **Every theme keeps its own accent.** Atlantis's cyan, Basement's amber lamp, Office's teal: the
@@ -840,7 +994,7 @@ wordmark's default blob, and by no theme.
   `design/` then `spec/`: each row the house row (title as text, **Open the document** exposed, the menu
   holding *Open the thread* when the file names one and then *Open on GitHub*), with the frontmatter
   description, the folder and the thread's `#n`. `/design/:folder/:name` is `DesignDocPage.tsx`, the
-  house reading page -- `PageCard`, `BackButton`, compact header controls and ONE `MarkdownViewer`
+  house reading page -- `PanelFrame`, `BackButton`, compact header controls and ONE `MarkdownViewer`
   holding the document and then its thread (`designDocument`, reusing the issue page's
   `issueDocument` over `GET /api/issue/{n}`). The thread is read only when it lives in the Space's own
   repo -- the issue route resolves its repo among the Space's, so another repo's would be the wrong
@@ -853,13 +1007,14 @@ wordmark's default blob, and by no theme.
   into the design's reading room (`/studio/design/<path>` for a hub design, `/design/<folder>/<name>` for a
   repo's). Unresolved, it is the line as last written: the short id and the title, a GitHub link opening
   github.com, the tooltip saying it was not read. A hand-written `> Spec:` line shows its title and its words,
-  with no id. Every design row -- the Design tab's and Hub Designs' -- ends with `BoundCards`: `N cards`, each
+  with no id. A design row on the Design tab ends with `BoundCards`: `N cards`, each
   card's id and state, a click opening the card when it is in the Space you are in and not archived,
-  another Space's named with its slug in brackets. Nothing reads the line here; the agent serves it parsed.
+  another Space's named with its slug in brackets. Hub Designs is a list panel, so its card item says
+  `N cards` in the meta band and opens each card that can be opened from its `...` menu, by the same rule. Nothing reads the line here; the agent serves it parsed.
   `DesignBindings.test.tsx` pins the rooms, the words, the chip and the cards.
 - **A GitHub Space has a Docs tab, last** (D-S12): `docs` in `HOME_TABS`, filled by
   `homeTabPlan`'s GitHub branch at Tier 1 beside Design -- the same gate, so Tier 2, an ADO and a
-  local Space never show it. `DocsLanding.tsx` is the tab: the house detail page -- `PageCard`, the
+  local Space never show it. `DocsLanding.tsx` is the tab: the house detail page -- `PanelFrame`, the
   README's title and the repo on the left, Refresh then **Open on GitHub** last on the right, ONE
   `MarkdownViewer` holding `README.md` -- with everything under `docs/` folded above the text
   (`DocsTree`, a `<details>`, closed, so nothing moves until it is asked for). `/docs/*` is
@@ -895,7 +1050,7 @@ wordmark's default blob, and by no theme.
   (Pin on GitHub / Unpin) and then Open on GitHub -- consistency over the shortcut a linked title would be. An ADO row, with no
   reading room, still exposes Open in ADO. The page shows the body, the thread under it, then
   the timeline's high signal (commits, the linked PR, cross-refs) from `GET /api/issue/{number}`. **It is the
-  house reading page, not a page of its own**: `PageCard`, `BackButton` and the title
+  house reading page, not a page of its own**: `PanelFrame`, `BackButton` and the title
   (badges and the issue's link under it, through `FilePath`, the line every detail page carries) on
   the left, every control on the right and compact as the 1:1 page's are -- severity, then Close
   issue, Pin / Unpin and Open on GitHub as icons with a title, Make a card the one with words, Refresh last -- and ONE `MarkdownViewer` holding body, thread and timeline as one document
@@ -1119,7 +1274,7 @@ are prompts, and agile lanes are a better view for how multiple items flow for h
 - Empty lanes use `EmptyState`; under ~1000px the lanes scroll sideways INSIDE the board and the page
   never overflows; tokens only, checked in Seaglass and Basement.
 - **A lane's scrollbar is the app's scrollbar.** Both scrolls -- a lane's cards and the lanes sideways --
-  spread `shared/thinScrollbar.ts`, the same fragment `PageCard`, `StatusMessage` and `TestHealth` use.
+  spread `shared/thinScrollbar.ts`, the same fragment `PanelFrame`, `StatusMessage` and `TestHealth` use.
   The lane keeps `paddingRight: 2px`: the styled bar is a classic one that takes its 6px
   beside the padding, so the gap between a card's edge and the bar is unchanged.
 
@@ -1196,7 +1351,7 @@ lets ts-jest compile exactly the markdown stack's ESM packages and React Router 
   an outline. `headingsOf()` (in `prepareMarkdown.ts`) gives each heading its `level`, its `line`
   and an id from its words, with `-2`, `-3` on a repeat (five review rounds each headed
   `### Response`); the h2 and h3 renderers take the id by the heading's line, so the list and the
-  element agree even when the words do not differ. Sticky works because `PageCard` is
+  element agree even when the words do not differ. Sticky works because `PanelFrame` is
   `overflow: clip`, not Fluent's `hidden` -- `hidden` makes the card a scroll container that never
   scrolls, and sticky never sticks inside one.
 - **100% is the comfortable size.** The scale is built in (`BASE_SCALE`), so the control means what
@@ -1360,7 +1515,7 @@ year of use behind it.
 | `local` | `PRCommentsList`, `PromptStatus`, and `SprintVelocity` if `features.sprintAwareness` |
 | active | Tier-gated: `PRCommentsList` (Tier ≤ 2), `MyPRs` (Tier 1), `PromptStatus` (always), `MyWork`, `EngagementSummary`, `WorkBreakdown`, `Dashboard`, `PromptActions` (all Tier 1), plus `SprintVelocity` on its flag |
 
-`systemCards`: `EnvCard`, `ModulesCard`, `ToolkitLog`, `TestHealth` (Tier ≤ 2) -- four (the owner: "system tab four and lounge tab four"). `EnvCard` is the machine's story, its checks and the footer's metadata; `ModulesCard` names every add-on, on, off or not configured, with a Change link to its flag -- the CLI's `Opt in by configuration` block in web form. There is no
+`systemCards`: `EnvCard`, `ModulesCard`, `ToolkitLog`, `TestHealth` (Tier ≤ 2) -- four (the owner: "system tab four and lounge tab four"). `EnvCard` is the machine's story, its checks and the footer's metadata; `ModulesCard` names every add-on, on, off or not configured, with a Change link to its flag -- the CLI's `Opt in by configuration` block in web form. What the panel holds is said behind the info icon beside its title, not in a sentence at its foot. There is no
 Space dropdown here: the avatar menu is the one place a Space is switched. `settingRows.tsx` is the
 row grammar both cards share. `FacePicker` is drawn by the Lounge (spec D-L24) and nowhere else.
 Configuration is a section of [the settings drawer](#the-settings-drawer), not a card.
@@ -1447,15 +1602,16 @@ cannot, so it is lifted into a real flag -- and an inline flag with no JS equiva
 build time rather than matching nothing. `src/shell/consts.test.ts` covers that and greps this
 half for a retyped literal; ["The contract file"](../docs/CONFIGURATION.md#the-contract-file) in `docs/CONFIGURATION.md` is the long version.
 
-**One way to say "nothing here": `shared/EmptyState.tsx`, in `PageCard`'s `empty` slot**, so an
+**One way to say "nothing here": `shared/EmptyState.tsx`, in `PanelFrame`'s `empty` slot**, so an
 empty page looks empty rather than half finished.
 
-- **`PageCard` has an `empty` slot**: a `ReactNode`, like `headerLeft`, optional. `null` or
+- **`PanelFrame` has an `empty` slot**: a `ReactNode`, like `headerLeft`, optional. `null` or
   `undefined` means the card has a body; anything else is shown INSTEAD of the body, with the header
   and footer kept -- a filter that hid everything has to stay reachable. Hand it an `<EmptyState>`.
 - **`<EmptyState icon title detail? tone? action? />`** is the one component: the card's own icon, a
-  title, and a second line that says why or what comes next. A card that is not a `PageCard` (Daily)
-  or whose message sits below other content (the Log's filters) renders it directly.
+  title, and a second line that says why or what comes next. A card that is not a `PanelFrame` (Daily)
+  renders it directly. A panel on a kind hands the kind an `EmptyMessage` -- the same fields, as
+  data -- in its required `empty` slot, and a `filteredEmpty` for a filter that hid everything.
 - **Three tones that must not look alike.** `empty` -- nothing, and that is fine. `filtered` -- there
   IS something and a filter is hiding it; it says how many. `error` -- nothing was READ: a red icon
   and `role="alert"`, never dressed as empty: a "No ... yet" for a request that FAILED is an
@@ -1628,6 +1784,7 @@ paragraph:
 | --- | --- |
 | `src/shell/registry.test.tsx` | The registry contract: a module whose flag is false is dropped and contributes no routes, nav or cards; a missing `features` map reads the same as false; a module with no `feature` is always on; module order is preserved across routes, nav and cards; a `hidden` nav predicate is honoured; a module that contributes nothing is not an error. And Home's tabs: cards grouped by the tab they declare, in strip order; an empty tab absent; the tab read from the address, `/board` as Cards |
 | `src/modules/ado/homeTabs.test.ts` | Which Home tab each ADO card is on, as a table: active at Tiers 1-3 with sprint awareness on and off, `local`, archived with growth on and off, and not loaded yet -- and no card on two tabs |
+| `src/shared/escapeRegExp.test.ts` | The one regex escape: text with every character a pattern reads as syntax, a stamp, a token and the empty string each match only themselves once escaped |
 | `src/shared/usePersistedState.test.ts` | Surviving a remount, falling back rather than throwing on corrupt stored values or a stale `isValid` shape, localStorage that throws, and the updater form composing two updates in one batch instead of clobbering |
 | `src/modules/ado/cliBridge.test.ts` | The CLI parameter contract: the exact argv each of the two dialogs produces, that a value with spaces stays one element, that a field left blank is omitted rather than sent as the script's own default, and that each of the four statuses renders as its own message |
 | `src/modules/communication/stages.test.ts` | The three stages in one place -- the file's word, the badge's label, what comes next, complete only at the last -- so no page keeps its own list; and the one switch the session page offers, the stage ahead |
@@ -1648,6 +1805,11 @@ paragraph:
 | `src/hooks/useFacePref.test.tsx` | A browser that refuses storage: with `localStorage.getItem` throwing BEFORE the Face store is imported -- its read runs at module scope, in the shell, through the logo -- the store answers the default face and the logo renders; with `setItem` throwing, a chosen face holds for the session and nothing is kept |
 | `src/hooks/useCurrentTheme.test.ts` | A theme choice in a browser that refuses storage: with every storage call throwing, a chosen theme holds for the session, and a fresh load of the store answers the default again; where storage keeps, a fresh load answers the choice |
 | `src/landing/landing.test.tsx` | The landing page's words are the README's: each piece read out of `README.md` and `THIRD-PARTY-NOTICES.md` is found there as written, a README missing a piece is refused by name, and the page draws exactly those words, band by band, with band 3 absent while it is held ([The landing page](#the-landing-page)) |
+| `src/shell/kinds/panelStructure.test.ts` | The panel rules over every source file: Fluent `Card` only in `PanelFrame`, `PanelFrame` only in the kinds, the pager only in `ListPanel`, `ScenePanel` only in the Lounge, and no height, page size, tooltip, link, subhead, item or body of its own in a file that fills a kind -- with the panels not yet moved on named lists held exact, and the checker run over sources written wrong on purpose |
+| `src/shell/kinds/listRoom.test.ts` | The room a list has, from boxes handed in: from the list's top under its padding down to the foot, what sits above it and a line under the foot each taking its height, the foot row's room kept free while none is drawn, and nothing where the panel has no fixed height or there is no layout |
+| `src/shell/kinds/ListPanel.test.tsx` | The measured page size -- the formula at several rooms down to one item, the component following a handed-in room, watching the panel and what sits above the list, and keeping the page's first item in view when a resize changes the page; the page size as a sum over the panel's chrome, a full page always fitting and one more item never; the pager at five and not at four, its `Page 2 of 5` and arrow keys; a chip, the search and a picker each returning to page 1, the page clamped when the list shrinks; `empty` against `filteredEmpty`; the header, foot, status and lead slots; the compact density (five a page, no description band), a smaller page under more chrome, and the panel's height the same at every density; and nine things a panel cannot say, as compile errors |
+| `src/shell/CardItem.test.tsx` | One item shape whatever the text: the same classes with a long title, a long description and none; the clamp in CSS and the text whole in the DOM; a plain element, not a Fluent `Card`; a plain-text title with no tooltip; one exposed action and the menu; the meta band's thumb, progress, badges and text; the compact item, the title line and the meta band at one shorter height; the one-band line item |
+| `src/modules/ado/PromptStatus.test.tsx` | Active Cards as a list panel: four card items a page, the checklist's progress and the facts in the meta band, Open the way in, the state picker, and the two empty sentences |
 | `src/hooks/usePagination.test.ts` | Clamping a page that is out of range, paging independently of the filtered set's size, and controlled mode where the caller's `onPageChange` is the only writer |
 
 The per-module registry tests mock **every** module, not only their own -- see

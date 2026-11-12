@@ -1,11 +1,12 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
 import { DeckPickerCard } from "./DeckPickerCard";
+import { expectListPanelShape } from "../../shell/kinds/panelShapeAssert";
 
-// The Decks card's row: a click opens the deck's page, the row's menu is
-// the vocabulary's (Open first, Play, and no link out -- no deck carries an
-// address of its own), and a deck put away on this machine leaves the default
-// list for the archived chip.
+// The Decks panel's card item: the title is plain text, Open is the deck's
+// page, the menu is the vocabulary's (Play, and no link out -- no deck carries
+// an address of its own), and a deck put away on this machine leaves the
+// default list for the archived chip.
 
 jest.mock("./decks/index", () => ({
   get DECKS() {
@@ -39,10 +40,14 @@ beforeEach(() => {
 });
 
 describe("the Decks card's row", () => {
-  it("a click on the row opens the deck's page, not the player", () => {
-    card();
+  it("the title is plain text: a click on it goes nowhere, and Open is the way in", () => {
+    const { container } = card();
     fireEvent.click(screen.getByText("Newer Deck"));
-    expect(screen.getByTestId("where").textContent).toBe("/decks/newer");
+    expect(screen.getByTestId("where").textContent).toBe("/growth");
+    expectListPanelShape(container.querySelector<HTMLElement>("[data-panel-kind]")!, {
+      titles: ["Newer Deck", "Older Deck"],
+      total: 2,
+    });
   });
 
   it("its exposed action is Open the deck; its menu plays it, with no link out", async () => {
