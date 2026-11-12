@@ -23,8 +23,8 @@ import { RefreshButton } from "../../shared/RefreshButton";
 import { StatusMessage } from "../../shared/StatusMessage";
 import { CardItem, CompactItem, LineItem } from "../CardItem";
 import type { CardItemData, CompactItemData, LineItemData } from "../CardItem";
-import { LIST_FILTER_ROW_GAP_PX, listPageSize } from "../pageSize";
-import { cardListGap, cardListPaddingTop } from "../layoutTokens";
+import { listPageSize } from "../pageSize";
+import { cardListGap, cardListPaddingTop, filterRowGap } from "../layoutTokens";
 import { PANEL_BODY } from "../panelHeight";
 import type { ListChrome, ListDensity } from "../pageSize";
 import { ListPager } from "./ListPager";
@@ -49,12 +49,20 @@ const useStyles = makeStyles({
   // The body: the items, a page at a time. It takes what the header and the
   // foot leave and never scrolls -- the page is sized to fit it.
   body: { display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: 0, minWidth: 0 },
+  // The filters: the chip rows in one column, spaced by its gap. A row has no
+  // margin, so the space between two rows is there only while both are.
+  filters: {
+    display: "flex",
+    flexDirection: "column",
+    rowGap: `${filterRowGap}px`,
+    minWidth: 0,
+    flexShrink: 0,
+  },
   chips: {
     display: "flex",
     flexWrap: "nowrap",
     overflowX: "auto",
     gap: tokens.spacingHorizontalXXS,
-    marginBottom: `${LIST_FILTER_ROW_GAP_PX}px`,
     flexShrink: 0,
     // The chips are tight and never wrap: at the narrowest width the row
     // scrolls sideways inside the panel instead.
@@ -111,7 +119,6 @@ export interface FilterRow {
   /** The row's accessible name: "Filter prompts". */
   label: string;
   chips: FilterChip[];
-  tone?: "pink" | "purple" | "orange";
 }
 
 export interface SelectOption {
@@ -412,20 +419,28 @@ export function ListPanel<T>(props: ListPanelProps<T>) {
             ) : (
               <>
                 {search?.results}
-                {filters?.map((row) => (
-                  <div key={row.label} className={styles.chips} role="group" aria-label={row.label}>
-                    {row.chips.map((chip) => (
-                      <FilterBadge
-                        key={chip.id}
-                        label={chip.label}
-                        count={chip.count}
-                        active={chip.active}
-                        appearance={row.tone}
-                        onClick={chip.onSelect}
-                      />
+                {filters?.length ? (
+                  <div className={styles.filters} data-panel-filters>
+                    {filters.map((row) => (
+                      <div
+                        key={row.label}
+                        className={styles.chips}
+                        role="group"
+                        aria-label={row.label}
+                      >
+                        {row.chips.map((chip) => (
+                          <FilterBadge
+                            key={chip.id}
+                            label={chip.label}
+                            count={chip.count}
+                            active={chip.active}
+                            onClick={chip.onSelect}
+                          />
+                        ))}
+                      </div>
                     ))}
                   </div>
-                ))}
+                ) : null}
                 {lead ? (
                   <>
                     <div role="group" aria-label={lead.chart.label} data-panel-lead>

@@ -11,3 +11,7 @@ export const cardListGap: Record<CardItemSize, number> = { full: 3, compact: 8, 
 /** The space over the first item, in px, by item size: one gap, so the list
  *  sits off the filter chips or the header as its items sit off each other. */
 export const cardListPaddingTop: Record<CardItemSize, number> = { ...cardListGap };
+
+/** The gap between two rows of filter chips in a panel's filters, in px. A gap
+ *  spaces a row only when it is drawn, so the space comes and goes with the row. */
+export const filterRowGap = 4;

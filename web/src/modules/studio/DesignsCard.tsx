@@ -225,27 +225,31 @@ export function DesignsCard() {
     });
   }
   if (archived) {
-    // A second press on an outcome goes back to any.
+    // A second press on an outcome goes back to any. Each chip counts the
+    // archived designs in view that it would show.
     const toggle = (o: string) => setOutcomeFilter(outcomeFilter === o ? ALL_OUTCOMES : o);
+    const counted = (o: string) => archivedByOutcome(inState, o).length;
     filters.push({
       label: "Filter archived by outcome",
-      tone: "pink",
       chips: [
         {
           id: "outcome:any",
           label: "any outcome",
+          count: counted(ALL_OUTCOMES),
           active: outcomeFilter === ALL_OUTCOMES,
           onSelect: () => setOutcomeFilter(ALL_OUTCOMES),
         },
         ...DESIGN.outcomes.map((o) => ({
           id: `outcome:${o}`,
           label: o,
+          count: counted(o),
           active: outcomeFilter === o,
           onSelect: () => toggle(o),
         })),
         {
           id: "outcome:none",
           label: "nothing said",
+          count: counted(NO_OUTCOME),
           active: outcomeFilter === NO_OUTCOME,
           onSelect: () => toggle(NO_OUTCOME),
         },

@@ -1,6 +1,6 @@
 import { CARD_ITEM_DESCRIPTION_LINES, CARD_ITEM_HEIGHTS_PX } from "../cardItemTokens";
 import { PANEL_BODY, PANEL_MAX_HEIGHT_PX, PANEL_MIN_HEIGHT_PX } from "../panelHeight";
-import { cardListGap, cardListPaddingTop } from "../layoutTokens";
+import { cardListGap, cardListPaddingTop, filterRowGap } from "../layoutTokens";
 import { listChromePx, listHeightPx, listPageSize } from "../pageSize";
 import type { ListChrome, ListDensity } from "../pageSize";
 
@@ -89,7 +89,9 @@ export function expectListPanelShape(panel: HTMLElement, shape: ListPanelShape):
   const density = panel.getAttribute("data-panel-density") as ListDensity;
   const chrome: ListChrome = {
     density,
-    filterRows: body.querySelectorAll(":scope > [role='group'][aria-label^='Filter']").length,
+    filterRows: body.querySelectorAll(
+      ":scope > [data-panel-filters] > [role='group'][aria-label^='Filter']",
+    ).length,
     lead: body.querySelector(":scope > [data-panel-lead]") !== null,
     footNote: panel.hasAttribute("data-panel-foot-note"),
     status: body.querySelector(":scope > [data-panel-status]") !== null,
@@ -155,7 +157,19 @@ export function expectListPanelShape(panel: HTMLElement, shape: ListPanelShape):
     const radios = Array.from(groups[0].querySelectorAll<HTMLElement>("[role='radio']"));
     expect(radios.some((r) => /\d/.test(r.textContent ?? ""))).toBe(true);
   }
+  // The chip rows sit in one filters wrapper, a column whose gap spaces them:
+  // a row has no margin, so the space is there only while two rows are.
+  const wrappers = panel.querySelectorAll<HTMLElement>("[data-panel-filters]");
+  expect(wrappers.length).toBe(groups.length > 0 ? 1 : 0);
+  if (wrappers.length === 1) {
+    expect(groups.every((g) => g.parentElement === wrappers[0])).toBe(true);
+    expect(wrappers[0].children.length).toBe(groups.length);
+    expect(rulesOf(wrappers[0])).toMatch(/flex-direction:\s*column/);
+    expect(rulesOf(wrappers[0])).toMatch(new RegExp(`row-gap:\\s*${filterRowGap}px`));
+    expect(rulesOf(wrappers[0])).not.toMatch(/margin/);
+  }
   for (const group of groups) {
+    expect(rulesOf(group)).not.toMatch(/margin/);
     const rules = rulesOf(group);
     expect(rules).toMatch(/flex-wrap:\s*nowrap/);
     expect(rules).toMatch(/overflow-x:\s*auto/);

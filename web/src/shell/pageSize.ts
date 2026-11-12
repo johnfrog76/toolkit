@@ -1,6 +1,6 @@
 import type { CardItemSize } from "./cardItemTokens";
 import { CARD_ITEM_HEIGHTS_PX } from "./cardItemTokens";
-import { cardListGap, cardListPaddingTop } from "./layoutTokens";
+import { cardListGap, cardListPaddingTop, filterRowGap } from "./layoutTokens";
 import { PANEL_MAX_HEIGHT_PX } from "./panelHeight";
 
 /** How many card items a list panel shows on a page. It is never typed in a
@@ -28,18 +28,14 @@ export function listHeightPx(density: ListDensity, count: number): number {
   );
 }
 
-/** The height of one row of filter chips and the space under it, in px. */
-export const LIST_FILTER_ROW_GAP_PX = 1;
-const FILTER_ROW_PX = 26 + LIST_FILTER_ROW_GAP_PX;
-
 /** What a list panel's chrome takes of its height, in px, measured in the
  *  browser. `frame` is what every list panel has: the frame's padding (12 top
  *  and bottom), the header (24), its hairline (1), the foot row with the pager
  *  (32), and the three 12 px gaps between those and the body. */
 export const LIST_CHROME_PX = {
   frame: 117,
-  /** One row of filter chips. */
-  filterRow: FILTER_ROW_PX,
+  /** One row of filter chips. Two rows have `filterRowGap` between them. */
+  filterRow: 26,
   /** A lead chart (152), with the hairline under it. */
   lead: 153,
   /** One line under the foot row (20), and the gap above it. */
@@ -59,9 +55,11 @@ export interface ListChrome {
 
 /** The height, in px, a panel's chrome takes. */
 export function listChromePx(chrome: ListChrome): number {
+  const rows = chrome.filterRows ?? 0;
   return (
     LIST_CHROME_PX.frame +
-    (chrome.filterRows ?? 0) * LIST_CHROME_PX.filterRow +
+    rows * LIST_CHROME_PX.filterRow +
+    Math.max(0, rows - 1) * filterRowGap +
     (chrome.lead ? LIST_CHROME_PX.lead : 0) +
     (chrome.footNote ? LIST_CHROME_PX.footNote : 0) +
     (chrome.status ? LIST_CHROME_PX.status : 0)

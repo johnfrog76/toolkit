@@ -688,7 +688,7 @@ is still Active Cards.
 - **`ListPanel` owns paging.** A panel passes `items` and nothing about pages: no page-size prop, no
   pager slot, no page state. The page size is worked out in `src/shell/pageSize.ts`, from the panel's
   592 px and what its own chrome takes of them: `LIST_CHROME_PX` is the table -- the frame (117), a
-  row of filter chips (27), a lead chart (153), a foot note (32), a status line (48) -- and
+  row of filter chips (26, with `filterRowGap` between two), a lead chart (153), a foot note (32), a status line (48) -- and
   `LIST_ITEM_PITCH_PX` an item's height and the list's gap (99 full, 82 compact, 28 line). So four
   full items fit, under no chip row, one or two, and under one chip row over a foot note; two chip
   rows over a foot note leave three; five compact items fit; and sixteen lines, or eleven under a
@@ -698,7 +698,10 @@ is still Active Cards.
   the arrow keys while it has focus. The kind holds the page, sends it back to the first when a
   filter chip, a picker or the search changes, and clamps it when the list shrinks.
 - **One way to filter: `filters`.** A panel that splits its items hands the kind rows of chips, each
-  chip with its count; a row is one line and scrolls sideways where it cannot fit. An inline subhead
+  chip with its count; a row is one line and scrolls sideways where it cannot fit. The rows sit in
+  one wrapper, a column whose gap (`filterRowGap` in `layoutTokens.ts`, 4 px) spaces them: a row has
+  no margin, so the space between two rows is there only while both are drawn, and every row looks
+  alike -- a chosen chip in a second row is drawn as one in the first. An inline subhead
   used as a split ("Design (5)") is not allowed. A choice from a longer list (a period, a tag, a
   state) is a `pickers` entry in the header.
 - **One way to explain: `info`.** A sentence about what a panel holds goes behind the info icon

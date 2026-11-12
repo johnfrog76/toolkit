@@ -45,7 +45,7 @@ import {
   CARD_ITEM_PADDING_Y_PX,
   CARD_ITEM_TITLE_BAND_PX,
 } from "../cardItemTokens";
-import { cardListGap, cardListPaddingTop } from "../layoutTokens";
+import { cardListGap, cardListPaddingTop, filterRowGap } from "../layoutTokens";
 import { PANEL_BODY, PANEL_MAX_HEIGHT_PX, PANEL_MIN_HEIGHT_PX, PANEL_SLOTS } from "../panelHeight";
 
 const SRC = path.join(__dirname, "..", "..");
@@ -402,6 +402,25 @@ describe("the panel rules, over every source file", () => {
     }
     // The items are drawn inside it and nowhere else.
     expect(panel.match(/<(CardItem|CompactItem|LineItem)\b/g)).toHaveLength(3);
+  });
+
+  it("the filter rows sit in one wrapper whose gap spaces them: a row has no margin, and no tint of its own", () => {
+    expect(filterRowGap).toBe(4);
+    const panel = fs.readFileSync(path.join(SRC, "shell/kinds/ListPanel.tsx"), "utf8");
+    expect(panel.match(/data-panel-filters/g)).toHaveLength(1);
+    expect(panel).toContain("rowGap: `${filterRowGap}px`");
+    // The only margins in the kind are the list's reset to none.
+    expect(panel.match(/margin\w*:\s*[^0\s]/g)).toBeNull();
+    // A row of chips is its label and its chips: every row looks alike.
+    const sf = ts.createSourceFile("ListPanel.tsx", panel, ts.ScriptTarget.Latest, true);
+    const fields = (name: string) =>
+      sf.statements
+        .filter(ts.isInterfaceDeclaration)
+        .find((d) => d.name.text === name)!
+        .members.map((m) => (m.name as ts.Identifier).text);
+    expect(fields("FilterRow")).toEqual(["label", "chips"]);
+    expect(fields("FilterChip")).toEqual(["id", "label", "count", "active", "onSelect"]);
+    expect(panel).not.toMatch(/appearance=\{row/);
   });
 
   it("an item's data has no density of its own, and a compact item no description", () => {

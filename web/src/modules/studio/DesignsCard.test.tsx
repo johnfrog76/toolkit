@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { expectListPanelShape, expectSentenceInInfoTip } from "../../shell/kinds/panelShapeAssert";
+import { filterRowGap } from "../../shell/layoutTokens";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { DesignsCard } from "./DesignsCard";
 import { DesignNotePage, promoteBlocked } from "./DesignNotePage";
@@ -543,11 +544,95 @@ describe("the Designs card's groups (L2)", () => {
     expect(screen.queryByRole("group", { name: "Filter archived by outcome" })).toBeNull();
     pick("Archived");
     const outcomes = within(screen.getByRole("group", { name: "Filter archived by outcome" }));
-    fireEvent.click(outcomes.getByRole("radio", { name: "shipped" }));
+    fireEvent.click(outcomes.getByRole("radio", { name: /^shipped/ }));
     expect(screen.queryByText("A second room")).toBeNull();
     expect(screen.getByText("No archived design with that outcome")).toBeTruthy();
-    fireEvent.click(outcomes.getByRole("radio", { name: "dropped" }));
+    fireEvent.click(outcomes.getByRole("radio", { name: /^dropped/ }));
     expect(screen.getByText("A second room")).toBeTruthy();
+  });
+
+  it("the outcome chips read like the state chips: each with its count over the archived designs, and no tint of their own", () => {
+    const archivedRow = (n: number, outcome: string) =>
+      row({
+        id: `bbbbbbbb-0000-4000-8000-00000000000${n}`,
+        state: "Archived",
+        title: `Archived ${n}`,
+        outcome,
+        note: doc("design/archive", `a${n}.md`, `Archived ${n}`, { archived: true, outcome }),
+      });
+    listAnswer = {
+      data: {
+        ...GROUPED,
+        designs: [
+          ...GROUPED.designs,
+          archivedRow(1, "shipped"),
+          archivedRow(2, "shipped"),
+          archivedRow(3, ""),
+        ],
+      },
+    };
+    mount();
+    pick("Archived");
+    const group = screen.getByRole("group", { name: "Filter archived by outcome" });
+    const chips = Array.from(group.querySelectorAll<HTMLElement>("[role='radio']"));
+    // any outcome is the archived total; every chip carries its count.
+    expect(chips.map((c) => c.textContent)).toEqual([
+      "any outcome4",
+      "shipped2",
+      "dropped1",
+      "nothing said1",
+    ]);
+    // A chosen outcome chip looks as a chosen state chip does: the same classes.
+    const chosenState = chip("Archived");
+    expect(chosenState.getAttribute("aria-checked")).toBe("true");
+    expect(chips[0].getAttribute("aria-checked")).toBe("true");
+    expect(chips[0].getAttribute("class")).toBe(chosenState.getAttribute("class"));
+    fireEvent.click(chips[1]);
+    expect(chips[1].getAttribute("class")).toBe(chosenState.getAttribute("class"));
+    expect(screen.getByText("Archived 1")).toBeTruthy();
+    expect(screen.queryByText("A second room")).toBeNull();
+    // The counts stay the archived designs', whatever outcome is chosen.
+    expect(chips.map((c) => c.textContent)).toEqual([
+      "any outcome4",
+      "shipped2",
+      "dropped1",
+      "nothing said1",
+    ]);
+  });
+
+  it("the chip rows sit in the filters wrapper, spaced by its gap: one row, then two under Archived, and no margin on either", () => {
+    const { container } = mount();
+    const rules = (el: Element) => {
+      const classes = (el.getAttribute("class") ?? "").split(/\s+/).filter(Boolean);
+      return Array.from(document.styleSheets)
+        .flatMap((sheet) => Array.from(sheet.cssRules))
+        .filter((r) =>
+          classes.some((c) => ((r as CSSStyleRule).selectorText ?? "").includes(`.${c}`)),
+        )
+        .map((r) => r.cssText)
+        .join("\n");
+    };
+    const wrapper = () => container.querySelectorAll<HTMLElement>("[data-panel-filters]");
+    // Archived off: one row in the one wrapper.
+    expect(wrapper()).toHaveLength(1);
+    expect(Array.from(wrapper()[0].children).map((r) => r.getAttribute("aria-label"))).toEqual([
+      "Filter designs",
+    ]);
+    pick("Archived");
+    // Archived on: the outcome row joins it, in the same wrapper.
+    expect(wrapper()).toHaveLength(1);
+    const rows = Array.from(wrapper()[0].children);
+    expect(rows.map((r) => r.getAttribute("aria-label"))).toEqual([
+      "Filter designs",
+      "Filter archived by outcome",
+    ]);
+    // The wrapper's gap is the token; neither row has a margin or a spacer between.
+    expect(rules(wrapper()[0])).toMatch(/flex-direction:\s*column/);
+    expect(rules(wrapper()[0])).toMatch(new RegExp(`row-gap:\\s*${filterRowGap}px`));
+    for (const r of rows) expect(rules(r)).not.toMatch(/margin/);
+    expect(rows[0].getAttribute("class")).toBe(rows[1].getAttribute("class"));
+    pick("Design");
+    expect(wrapper()[0].children).toHaveLength(1);
   });
 
   it("choosing a chip restarts the pager at page 1", () => {
