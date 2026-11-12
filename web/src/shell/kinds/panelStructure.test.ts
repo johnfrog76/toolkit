@@ -42,6 +42,7 @@ import {
   CARD_ITEM_HEIGHTS_PX,
   CARD_ITEM_LINE_BAND_PX,
   CARD_ITEM_META_BAND_PX,
+  CARD_ITEM_META_GAP_PX,
   CARD_ITEM_PADDING_Y_PX,
   CARD_ITEM_TITLE_BAND_PX,
 } from "../cardItemTokens";
@@ -53,7 +54,13 @@ import {
   filterRowGap,
   filterRowGapPx,
 } from "../layoutTokens";
-import { PANEL_BODY, PANEL_MAX_HEIGHT_PX, PANEL_MIN_HEIGHT_PX, PANEL_SLOTS } from "../panelHeight";
+import {
+  PANEL_BODY,
+  PANEL_HEIGHT_PX,
+  PANEL_MAX_HEIGHT_PX,
+  PANEL_MIN_HEIGHT_PX,
+  PANEL_SLOTS,
+} from "../panelHeight";
 
 const SRC = path.join(__dirname, "..", "..");
 
@@ -78,7 +85,6 @@ const FRAME_NOT_YET_MOVED: Record<string, string> = {
   "modules/ado/MyPRs.tsx": "ListPanel",
   "modules/ado/PRCommentsList.tsx": "ListPanel",
   "modules/ado/SprintVelocity.tsx": "ChartPanel",
-  "modules/ado/TestHealth.tsx": "StatusPanel",
   "modules/ado/WorkBreakdown.tsx": "ChartPanel",
   "modules/communication/OneOnOne.tsx": "ListPanel: Meetings",
   "modules/growth/Goals.tsx": "ListPanel",
@@ -134,10 +140,9 @@ const PAGER_NOT_YET_MOVED: string[] = [
   "modules/organize/RemindersCard.tsx",
 ];
 
-/** The shell's own pager over a page of panels is not a list's pager. */
-const PAGER_EXEMPT: Record<string, string> = {
-  "shell/cards.tsx": "the shell pages a module's panels, not a list's items",
-};
+/** Files exempt from the pager rule, each with its reason. None: the shell's
+ *  pager over a page of panels draws the kinds' own ListPager. */
+const PAGER_EXEMPT: Record<string, string> = {};
 
 interface Imported {
   from: string;
@@ -316,6 +321,7 @@ describe("the panel rules, over every source file", () => {
     expect(moved).toEqual([
       "modules/ado/MyWork.tsx",
       "modules/ado/PromptStatus.tsx",
+      "modules/ado/TestHealth.tsx",
       "modules/ado/ToolkitLog.tsx",
       "modules/deck/DeckPickerCard.tsx",
       "modules/studio/DesignsCard.tsx",
@@ -335,12 +341,17 @@ describe("the panel rules, over every source file", () => {
   });
 
   it("an item's lengths are tokens, and its height is worked out from them", () => {
-    expect(CARD_ITEM_HEIGHTS_PX).toEqual({ full: 96, compact: 74, line: 28 });
-    // Each height is the outline, the one padding twice, and the bands: no
-    // fixed height can cancel a change to a padding or a band.
+    expect(CARD_ITEM_HEIGHTS_PX).toEqual({ full: 104, compact: 74, line: 28 });
+    // Each height is the outline, the one padding twice, and the bands -- with,
+    // in a full item, the gap over the meta band: no fixed height can cancel a
+    // change to a padding, a band or that gap.
     const frame = 2 * CARD_ITEM_BORDER_PX + 2 * CARD_ITEM_PADDING_Y_PX;
     expect(CARD_ITEM_HEIGHTS_PX.full).toBe(
-      frame + CARD_ITEM_TITLE_BAND_PX + CARD_ITEM_DESCRIPTION_BAND_PX + CARD_ITEM_META_BAND_PX,
+      frame +
+        CARD_ITEM_TITLE_BAND_PX +
+        CARD_ITEM_DESCRIPTION_BAND_PX +
+        CARD_ITEM_META_GAP_PX +
+        CARD_ITEM_META_BAND_PX,
     );
     expect(CARD_ITEM_HEIGHTS_PX.compact).toBe(
       frame + CARD_ITEM_TITLE_BAND_PX + CARD_ITEM_COMPACT_BAND_GAP_PX + CARD_ITEM_META_BAND_PX,
@@ -359,6 +370,12 @@ describe("the panel rules, over every source file", () => {
     }
     // Nothing is typed in the item: no length of its own.
     expect(item).not.toMatch(/\d+(\.\d+)?(px|rem|em)\b/);
+    // A full item's rows are its three bands and, over the meta band, the gap:
+    // a grid track that is Fluent's token, with the meta band on the row after it.
+    expect(item).toContain(
+      "gridTemplateRows: `${CARD_ITEM_TITLE_BAND_PX}px ${CARD_ITEM_DESCRIPTION_BAND_PX}px ${tokens.spacingVerticalS} ${CARD_ITEM_META_BAND_PX}px`,",
+    );
+    expect(item).toContain('"& > [data-row-meta]": { gridRow: "4" },');
     const tokensFile = fs.readFileSync(path.join(SRC, "shell/cardItemTokens.ts"), "utf8");
     expect(tokensFile).not.toMatch(/CARD_ITEM(_COMPACT|_LINE)?_HEIGHT_PX = \d/);
   });
@@ -394,7 +411,9 @@ describe("the panel rules, over every source file", () => {
     expect(frameText).not.toMatch(/margin\w*["']?\s*:/i);
     const itemTokens = fs.readFileSync(path.join(SRC, "shell/cardItemTokens.ts"), "utf8");
     expect(itemTokens).not.toMatch(/export const \w*(GAPS|MARGIN)\w*/);
-    expect(cardListGapPx).toEqual({ full: 4, compact: 8, line: 0 });
+    // One gap for every item that is a card, full or compact; a line item is a log row.
+    expect(cardListGapPx).toEqual({ full: 8, compact: 8, line: 0 });
+    expect(cardListGap.full).toBe(cardListGap.compact);
     expect(cardListPaddingTopPx).toEqual(cardListGapPx);
     expect(cardListPaddingTop).toEqual(cardListGap);
     const panel = fs.readFileSync(path.join(SRC, "shell/kinds/ListPanel.tsx"), "utf8");
@@ -492,12 +511,14 @@ describe("the panel rules, over every source file", () => {
     expect(tokenPx(filterRowGap)).toBe(filterRowGapPx);
     expect(theme.spacingVerticalM).toBe(`${CARD_ITEM_PADDING_Y_PX}px`);
     expect(theme.spacingVerticalS).toBe(`${CARD_ITEM_COMPACT_BAND_GAP_PX}px`);
+    expect(theme.spacingVerticalS).toBe(`${CARD_ITEM_META_GAP_PX}px`);
     for (const px of [
       ...Object.values(cardListGapPx),
       ...Object.values(cardListPaddingTopPx),
       filterRowGapPx,
       CARD_ITEM_PADDING_Y_PX,
       CARD_ITEM_COMPACT_BAND_GAP_PX,
+      CARD_ITEM_META_GAP_PX,
     ]) {
       expect(px % 4).toBe(0);
     }
@@ -529,8 +550,16 @@ describe("the panel rules, over every source file", () => {
       'usePanelMinHeightClass("list")',
     ]);
     expect(text).not.toMatch(/(minHeight|maxHeight|\bheight|min-height|max-height)"?\s*:\s*[`"']/);
-    expect(PANEL_MIN_HEIGHT_PX.list).toBe(592);
-    expect(PANEL_MAX_HEIGHT_PX).toEqual({ list: 592 });
+    // One height: a list's floor and its cap, and the floor of every kind but
+    // stat, two of which stack in one slot across the grid's gap.
+    expect(PANEL_MIN_HEIGHT_PX.list).toBe(PANEL_HEIGHT_PX);
+    expect(PANEL_MAX_HEIGHT_PX).toEqual({ list: PANEL_HEIGHT_PX });
+    for (const kind of ["status", "chart", "scene"] as const) {
+      expect(PANEL_MIN_HEIGHT_PX[kind]).toBe(PANEL_HEIGHT_PX);
+    }
+    const stackGap = parseInt(webLightTheme.spacingHorizontalL, 10);
+    expect(2 * PANEL_MIN_HEIGHT_PX.stat + stackGap).toBe(PANEL_HEIGHT_PX);
+    expect(PANEL_HEIGHT_PX % 4).toBe(0);
     const bounds = fs.readFileSync(path.join(SRC, "shell/kinds/panelMinHeight.ts"), "utf8");
     expect(bounds).not.toMatch(/density|compact|cardItem/i);
     // The rule for each kind: list has a max-height, no other kind does.
