@@ -362,7 +362,7 @@ kind -- `GitHub`, `Azure DevOps`, `Your own cards`.
 | ...and its tracker cannot answer | `; not connected yet -- connect it, and its board's work items come in beside its cards` (ADO, not `active`), or `; no tracker -- connect it to a GitHub repo and this row shows its open issues and last deploy` (no address) |
 | an archived Space | its row, marked `archived`, with no connect teaching |
 | any of these, while the reads are out | the card's own `Reading the Spaces...`, then the whole list at once -- never a row with a placeholder line |
-| more than three after the filter | three a page, the pager at the foot's centre; the chip still the total |
+| more than five after the filter | five a page, the pager at the foot's centre; the chip still the total |
 
 **The card's filter**: one exposed row of tags above the list, the Reminders card's -- **All | Products | Work | Out of box | Archive**
 -- each with its count (none for an empty bucket), opening on **All**, remembered per browser. One Space is in exactly one entry besides All, by the first
@@ -385,8 +385,8 @@ The card's foot carries a **+** in every configuration -- with or without `gh`, 
 New Space dialog, your repositories when `gh` can list them and an `owner/name` field when it cannot,
 or your own cards (`NewSpaceDialog.test.tsx`).
 
-A row's one action is **Go into \<name>**: the avatar menu's switch, then that Space's Home (on GitHub, its
-Issues). A Space that is neither `active` nor `archive` has **Connect \<name>** in its `...`, the wizard at
+A row's one action is **Open \<name>**: the avatar menu's switch, then that Space's Home (on GitHub, its
+Issues). The title is plain text on every Studio row; the `...` holds the rest. A Space that is neither `active` nor `archive` has **Connect \<name>** in its `...`, the wizard at
 `/connect/<slug>`. The end of a Space's life is in the same `...` (`scenarios.test.tsx`, "Retire and
 Remove in a Space's row menu"; the confirm is `SpaceLifecycleDialog.test.tsx`), never on the avatar menu's
 Space list:
@@ -401,7 +401,7 @@ Space list:
 Each opens the house confirm with the verb's own `-WhatIf` under the question -- for a Remove, the folder
 that stays and its cards counted -- and the shipped Azure demo's Remove is refused there in the verb's
 words. Under the
-foyer, **Hub Designs**: the hub's `design/` notes, a note that names a Space carrying a chip that switches into it; a note with a thread that a declared GitHub Space can read
+foyer, **Hub Designs**: the hub's `design/` notes, a note that names a Space carrying a badge, with **Go into** in its `...` to switch; a note with a thread that a declared GitHub Space can read
 opens as the note and then its thread, in one viewer, whichever Space you are in
 (`DesignsCard.test.tsx`). A hub with no `design/` folder -- one an older `Start` copied out; the sample hub
 now carries the four folders -- says `No design/ folder yet`, not an error, and its + makes the folder.

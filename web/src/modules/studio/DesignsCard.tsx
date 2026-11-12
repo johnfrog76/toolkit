@@ -17,7 +17,6 @@ import {
   Input,
   Option,
   Subtitle2,
-  Tooltip,
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
@@ -49,8 +48,10 @@ import {
 import { MoveDesignDialog } from "./MoveDesignDialog";
 import { ROADS, roadsFor } from "../ado/designRoads";
 import type { MoveRoad } from "../ado/designRoads";
-import { STUDIO_PAGE_SIZE, notePath } from "./paths";
+import { notePath } from "./paths";
+import { SPACE_MOVES } from "./spaceMoves";
 import { RowMetaText, StudioRow, useStudioCardClass } from "./StudioRow";
+import { LIST_PAGE_SIZE } from "../../shell/cardHeight";
 import { useEnterSpace } from "./useEnterSpace";
 
 // The seed drawer (Studio S2b, D-S3): the hub's designs -- the ones that belong
@@ -62,7 +63,6 @@ import { useEnterSpace } from "./useEnterSpace";
 // writes a note through NewDesign (the bridge), so the file is the record from
 // its first minute.
 const useStyles = makeStyles({
-  chip: { minWidth: "auto" },
   mismatch: { color: tokens.colorPaletteDarkOrangeForeground1 },
   fields: { display: "flex", flexDirection: "column", rowGap: tokens.spacingVerticalM },
 });
@@ -92,7 +92,7 @@ function DesignRow({
   const styles = useStyles();
   const navigate = useNavigate();
   // The Space a note names is a switch into it: the foyer row's move,
-  // through the one hook. A note with no Space draws no chip.
+  // through the one hook. A note with no Space draws no badge.
   const space = design.space ? spaceName(design.space) : "";
   const { enter, switching, failed } = useEnterSpace(design.space, design.space === activeSpace);
   const main = primaryPath(design);
@@ -100,6 +100,13 @@ function DesignRow({
   if (design.note && design.spec) {
     secondary.push(
       ROW.open.action({ detail: "the spec", onClick: () => navigate(notePath(design.spec!.path)) }),
+    );
+  }
+  // The Space a note names is a switch into it: a move in the menu, not a
+  // button beside the title.
+  if (design.space) {
+    secondary.push(
+      SPACE_MOVES.enter.action({ detail: space, onClick: enter, disabled: switching }),
     );
   }
   // The moves a hub row offers (L3): by what the design has and where it is.
@@ -123,19 +130,9 @@ function DesignRow({
       title={design.title}
       badges={
         design.space ? (
-          <Tooltip content={design.space} relationship="description">
-            <Button
-              className={styles.chip}
-              size="small"
-              shape="circular"
-              appearance="outline"
-              aria-label={`Switch to ${space}`}
-              onClick={enter}
-              disabled={switching}
-            >
-              {space}
-            </Button>
-          </Tooltip>
+          <Badge appearance="outline" size="small" shape="circular" color="informative">
+            {space}
+          </Badge>
         ) : null
       }
       controls={
@@ -266,9 +263,9 @@ export function DesignsCard() {
   const shown = designs.filter((d) => designMatches(d, search.value, ALL));
   const folder = data?.folder || "design";
   // One pager over the list as the card draws it: the search applies first,
-  // then the groups' order (state, in road order), then three a page.
+  // then the groups' order (state, in road order), then five a page.
   const ordered = groupByState(shown).flatMap((g) => g.designs);
-  const { page, totalPages, pageItems, setPage } = usePagination(ordered, STUDIO_PAGE_SIZE);
+  const { page, totalPages, pageItems, setPage } = usePagination(ordered, LIST_PAGE_SIZE);
 
   const reset = () => {
     setTitle("");

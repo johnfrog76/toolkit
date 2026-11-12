@@ -1,20 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Badge, Caption1, Subtitle2 } from "@fluentui/react-components";
-import {
-  ArrowEnterRegular,
-  BuildingFactoryRegular,
-  HistoryRegular,
-  LinkRegular,
-  SubtractCircleRegular,
-} from "@fluentui/react-icons";
+import { BuildingFactoryRegular } from "@fluentui/react-icons";
 import { useNavigate } from "react-router";
-import { CardActions, ROW, defineRowMoves } from "../../shared/CardActions";
+import { CardActions, ROW } from "../../shared/CardActions";
 import { trackerName } from "../ado/TrackerBadge";
 import { CreateButton } from "../../shared/CreateButton";
 import type { CardAction } from "../../shared/CardActions";
 import { FilterBadge } from "../../shared/FilterBadge";
-import { useFilterRowStyles } from "../../shared/listRowStyles";
 import { EmptyState } from "../../shared/EmptyState";
 import { PageCard } from "../../shared/PageCard";
 import { HubSyncLine } from "../ado/HubSyncLine";
@@ -53,8 +46,9 @@ import type { SpacesFilter } from "./foyer";
 import type { SpaceLifecycleVerb } from "./api.studio";
 import { NewSpaceDialog } from "./NewSpaceDialog";
 import { SpaceLifecycleDialog } from "./SpaceLifecycleDialog";
-import { STUDIO_PAGE_SIZE } from "./paths";
-import { RowMetaText, StudioRow, useStudioCardClass } from "./StudioRow";
+import { SPACE_MOVES } from "./spaceMoves";
+import { RowMetaText, StudioRow, useStudioCardClass, useStudioChipRowClass } from "./StudioRow";
+import { LIST_PAGE_SIZE } from "../../shell/cardHeight";
 import { useEnterSpace } from "./useEnterSpace";
 
 // The one sentence that says what a Space is. Written here and in docs/modules/studio.md.
@@ -74,26 +68,6 @@ const SPACE_DEFINITION =
 // ten at a time. A row's `...` holds the end of a Space's life:
 // Retire and Remove, each RetireSpace / RemoveSpace through the bridge behind
 // the house confirm, which shows the verb's own -WhatIf first.
-/** A Space's own moves, on no other record. Retire and Remove read like the
- *  vocabulary's Archive and Delete and are neither: Retire writes the Space's
- *  `status: archive` through Config and moves no file; Remove un-declares the
- *  Space and deletes nothing -- its folder and cards stay in the hub. */
-const SPACE_MOVES = defineRowMoves("space", {
-  enter: { word: "Go into", icon: ArrowEnterRegular },
-  connect: { word: "Connect", icon: LinkRegular },
-  retire: {
-    word: "Retire",
-    icon: HistoryRegular,
-    differentMove:
-      "RetireSpace writes the Space's status through Config; no file moves and nothing is stamped closed.",
-  },
-  remove: {
-    word: "Remove",
-    icon: SubtractCircleRegular,
-    differentMove:
-      "RemoveSpace un-declares the Space; its folder and every card in it stay in the hub.",
-  },
-});
 
 /** The row's frame: name, kind, where you are, the line, and the door. */
 function FoyerRow({
@@ -167,7 +141,7 @@ function FoyerRow({
       }
       controls={
         <CardActions
-          primaryAction={(here ? ROW.open : SPACE_MOVES.enter).action({
+          primaryAction={ROW.open.action({
             detail: name,
             onClick: enterSpace,
             disabled: switching,
@@ -288,7 +262,7 @@ export const SPACES_FILTER_KEY = "studio.spaces.filter";
 
 export function FoyerCard() {
   const cardClass = useStudioCardClass();
-  const styles = useFilterRowStyles();
+  const chipRow = useStudioChipRowClass();
   const { data: env, isLoading } = useGetEnvQuery();
   const spaces = foyerSpaces(env);
   const active = env?.config?.activeSpace ?? "";
@@ -342,7 +316,7 @@ export function FoyerCard() {
     fetching: Boolean(ledgerQuery.isFetching || refreshingLedger.isLoading),
   };
   const listed = shown.filter((s) => reads[s.slug]?.line != null);
-  const { page, totalPages, pageItems, setPage } = usePagination(listed, STUDIO_PAGE_SIZE);
+  const { page, totalPages, pageItems, setPage } = usePagination(listed, LIST_PAGE_SIZE);
   const choose = (next: SpacesFilter) => {
     setFilter(next);
     setPage(0);
@@ -414,7 +388,7 @@ export function FoyerCard() {
         {/* No helper sentence on this card, populated or empty: the
             title, the tags (All and its count say "these are all your Spaces")
             and the rows carry it, and the empty card is its title and the +. */}
-        <div className={styles.chips} role="group" aria-label="Filter Spaces">
+        <div className={chipRow} role="group" aria-label="Filter Spaces">
           {SPACES_FILTERS.map((f) => {
             const n = filterSpaces(spaces, f.value).length;
             return (

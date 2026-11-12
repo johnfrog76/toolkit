@@ -25,12 +25,11 @@ import type { PromptRow, PromptSpace } from "./api.studio";
 // there), Your hub, and the active Space's own agentic/ (only when the Space is
 // not this package itself, which the agent says) -- each with its count, its
 // rows and its empty state; the card's info tip in place of a footer; each
-// row's one action Copy reference (Copy prompt in its menu), the name opening
-// the reading room. The agent's reads are pinned in Tests/test_studio_prompts.py.
+// row's one action Open (Copy reference and Copy prompt in its menu), the name plain
+// text. The agent's reads are pinned in Tests/test_studio_prompts.py.
 // The viewer is mocked (react-markdown is ESM).
 // The pager's rules do not depend on how many rows a page holds, and these
 // suites build their lists for five; the shipped size is pinned in foyer.test.ts.
-jest.mock("./paths", () => ({ ...jest.requireActual("./paths"), STUDIO_PAGE_SIZE: 5 }));
 
 jest.mock("../../shared/MarkdownViewer", () => ({
   MarkdownViewer: ({ content }: { content: string }) => <pre data-testid="viewer">{content}</pre>,
@@ -239,6 +238,12 @@ const tipFor = (label = "About the Prompts card") => {
   return document.getElementById(id)?.textContent ?? "";
 };
 
+/** An item of a row's `...` menu: the one place every action but Open lives. */
+async function menuItem(card: HTMLElement, name: string) {
+  fireEvent.click(within(card).getByRole("button", { name: /^Actions for / }));
+  return screen.findByRole("menuitem", { name });
+}
+
 describe("the Space's answer to How do you want to work?", () => {
   it.each([
     ["the agent says alone", how("alone"), "alone"],
@@ -360,12 +365,12 @@ describe("the Prompts card's filters", () => {
     expect(chip()).toBe("2");
     const deck = screen.getByText("deck-contract").closest(".fui-Card") as HTMLElement;
     await act(async () => {
-      fireEvent.click(within(deck).getByRole("button", { name: "Copy reference" }));
+      fireEvent.click(await menuItem(deck, "Copy reference"));
     });
     expect(copiedText).toEqual(["@agentic/deck-contract.prompt.md"]);
     // No day and no history: the contents read carries neither.
     expect(within(deck).queryByText(/^changed/)).toBeNull();
-    fireEvent.click(screen.getByText("deck-contract"));
+    fireEvent.click(within(deck).getByRole("button", { name: "Open the prompt" }));
     expect(screen.getByTestId("where").textContent).toBe("/studio/prompts/space/deck-contract");
   });
 
@@ -700,7 +705,7 @@ describe("the Prompts card's rows", () => {
       within(deck)
         .getAllByRole("button")
         .map((b) => b.getAttribute("aria-label") ?? b.textContent),
-    ).toEqual(["Deck contract", "Copy reference", "Actions for deck-contract"]);
+    ).toEqual(["Open the prompt", "Actions for deck-contract"]);
   });
 
   it("names the owner in the filter row's words", () => {
@@ -717,12 +722,12 @@ describe("the Prompts card's rows", () => {
     expect(screen.queryByText("pr-ship")).toBeNull();
   });
 
-  it("the one exposed action is Copy reference: the @ path, a ToolKit prompt's relative to the checkout", async () => {
+  it("Copy reference, in the menu: the @ path, a ToolKit prompt's relative to the checkout", async () => {
     mount();
     const ship = screen.getByText("pr-ship").closest(".fui-Card") as HTMLElement;
-    expect(within(ship).queryByRole("button", { name: "Copy prompt" })).toBeNull();
+    expect(within(ship).queryByRole("button", { name: "Copy reference" })).toBeNull();
     await act(async () => {
-      fireEvent.click(within(ship).getByRole("button", { name: "Copy reference" }));
+      fireEvent.click(await menuItem(ship, "Copy reference"));
     });
     expect(copiedText).toEqual(["@agentic/pr-ship.prompt.md"]);
     expect(screen.getByText(/Copied the reference to pr-ship/)).toBeTruthy();
@@ -733,7 +738,7 @@ describe("the Prompts card's rows", () => {
     fireEvent.click(radio("Your hub"));
     const mine = screen.getByText("bench-billing").closest(".fui-Card") as HTMLElement;
     await act(async () => {
-      fireEvent.click(within(mine).getByRole("button", { name: "Copy reference" }));
+      fireEvent.click(await menuItem(mine, "Copy reference"));
     });
     expect(copiedText).toEqual([`@${BENCH.file_path}`]);
     expect(BENCH.file_path.startsWith("/")).toBe(true);
@@ -773,10 +778,10 @@ describe("the Prompts card's rows", () => {
     expect(screen.queryByText(/Copied pr-ship/)).toBeNull();
   });
 
-  it("the name opens the reading room", () => {
+  it("Open opens the reading room; the name is plain text", () => {
     mount();
     fireEvent.click(radio("Your hub"));
-    fireEvent.click(screen.getByText("bench-billing"));
+    fireEvent.click(screen.getByRole("button", { name: "Open the prompt" }));
     expect(screen.getByTestId("where").textContent).toBe("/studio/prompts/yours/bench-billing");
   });
 
@@ -820,15 +825,15 @@ describe("the Space's how-we-work note", () => {
     expect(screen.getByText("bench-billing")).toBeTruthy();
   });
 
-  it("Copy reference copies its path in the hub, and its name opens the reading room", async () => {
+  it("Copy reference copies its path in the hub, and Open opens the reading room", async () => {
     mount();
     fireEvent.click(radio("Your hub"));
     const card = screen.getByText("How we work in GitHub demo").closest(".fui-Card") as HTMLElement;
     await act(async () => {
-      fireEvent.click(within(card).getByRole("button", { name: "Copy reference" }));
+      fireEvent.click(await menuItem(card, "Copy reference"));
     });
     expect(copiedText).toEqual([`@${NOTE.file_path}`]);
-    fireEvent.click(screen.getByText("How we work in GitHub demo"));
+    fireEvent.click(within(card).getByRole("button", { name: "Open the prompt" }));
     expect(screen.getByTestId("where").textContent).toBe("/studio/prompts/yours/how-we-work");
   });
 });
@@ -960,14 +965,25 @@ describe("a prompt's reading room", () => {
     expect(screen.getByTestId("viewer").textContent).toBe(DECK.body);
   });
 
-  it("Copy prompt copies the whole file", async () => {
+  it("the page's one exposed action is Copy prompt; Copy reference is in its menu", async () => {
     oneAnswer = { data: PR_SHIP };
     mount(promptPath("pr-ship"));
+    const exposed = screen
+      .getAllByRole("button")
+      .map((b) => b.getAttribute("aria-label") ?? b.textContent ?? "")
+      .filter((n) => /^Copy (prompt|reference)|^Actions for /.test(n));
+    expect(exposed).toEqual(["Copy prompt", "Actions for pr-ship"]);
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Copy prompt" }));
     });
     expect(copiedText).toEqual([PR_SHIP.body]);
-    expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy();
+    expect(screen.getByText("Copied the prompt")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Actions for pr-ship" }));
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("menuitem", { name: "Copy reference" }));
+    });
+    expect(copiedText).toEqual([PR_SHIP.body, "@agentic/pr-ship.prompt.md"]);
+    expect(screen.getByText("Copied the reference")).toBeTruthy();
   });
 
   it("a name the agent does not know is said in its words", () => {

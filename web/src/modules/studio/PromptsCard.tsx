@@ -9,7 +9,6 @@ import { copyText } from "../../shared/copyText";
 import { EmptyState } from "../../shared/EmptyState";
 import { FilterBadge } from "../../shared/FilterBadge";
 import { InfoTip } from "../../shared/InfoTip";
-import { useFilterRowStyles } from "../../shared/listRowStyles";
 import { PageCard } from "../../shared/PageCard";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { StatusMessage } from "../../shared/StatusMessage";
@@ -18,8 +17,9 @@ import { usePagination } from "../../hooks/usePagination";
 import { Pagination } from "../../shared/Pagination";
 import { useGetPromptsQuery, useLazyGetPromptQuery } from "./api.studio";
 import type { PromptListRow, PromptSpace } from "./api.studio";
-import { STUDIO_PAGE_SIZE, promptPath } from "./paths";
-import { RowMetaText, StudioRow, useStudioCardClass } from "./StudioRow";
+import { promptPath } from "./paths";
+import { RowMetaText, StudioRow, useStudioCardClass, useStudioChipRowClass } from "./StudioRow";
+import { LIST_PAGE_SIZE } from "../../shell/cardHeight";
 import {
   categoryTabs,
   othersLine,
@@ -96,6 +96,14 @@ function PromptCardRow({
   const open = () => navigate(promptPath(row.ref));
   const secondary: CardAction[] = [
     ROW.copy.action({
+      detail: "reference",
+      onClick: () => {
+        void copyText(promptReference(row)).then(() =>
+          onCopied({ name: row.name, what: "reference" }),
+        );
+      },
+    }),
+    ROW.copy.action({
       detail: "prompt",
       // The list carries no text: the body is read now, by the one-prompt
       // route, and copied when it arrives.
@@ -109,7 +117,6 @@ function PromptCardRow({
           .finally(() => onReading(null));
       },
     }),
-    ROW.open.action({ detail: "the prompt", onClick: open }),
   ];
   if (row.history) {
     // Its history: the folder's log on GitHub, the external link, last.
@@ -119,17 +126,9 @@ function PromptCardRow({
     <StudioRow
       kind="prompt"
       title={row.title || row.name}
-      onOpen={open}
       controls={
         <CardActions
-          primaryAction={ROW.copy.action({
-            detail: "reference",
-            onClick: () => {
-              void copyText(promptReference(row)).then(() =>
-                onCopied({ name: row.name, what: "reference" }),
-              );
-            },
-          })}
+          primaryAction={ROW.open.action({ detail: "the prompt", onClick: open })}
           menuLabel={`Actions for ${row.name}`}
           secondaryActions={secondary}
         />
@@ -186,7 +185,7 @@ function CardTip({
 
 export function PromptsCard() {
   const cardClass = useStudioCardClass();
-  const filterStyles = useFilterRowStyles();
+  const chipRow = useStudioChipRowClass();
   const { data, isLoading, isFetching, error, refetch } = useGetPromptsQuery();
   const { data: env } = useGetEnvQuery();
   const [copied, setCopied] = useState<Copied | null>(null);
@@ -209,7 +208,7 @@ export function PromptsCard() {
       ? chosenCategory
       : null;
   const listed = category === null ? inSource : inSource.filter((r) => r.category === category);
-  const { page, totalPages, pageItems, setPage } = usePagination(listed, STUDIO_PAGE_SIZE);
+  const { page, totalPages, pageItems, setPage } = usePagination(listed, LIST_PAGE_SIZE);
   const choose = (f: PromptFilter) => {
     setChosen(f);
     setPage(0);
@@ -313,7 +312,7 @@ export function PromptsCard() {
         <CardSpinner label="Reading the prompts..." />
       ) : (
         <>
-          <div className={filterStyles.chips} role="group" aria-label="Filter prompts">
+          <div className={chipRow} role="group" aria-label="Filter prompts">
             {filters.map((f) => (
               <FilterBadge
                 key={f.value}
@@ -326,7 +325,7 @@ export function PromptsCard() {
               />
             ))}
           </div>
-          <div className={filterStyles.chips} role="group" aria-label="Filter by category">
+          <div className={chipRow} role="group" aria-label="Filter by category">
             <FilterBadge
               label="All"
               count={inSource.length > 0 ? inSource.length : undefined}
