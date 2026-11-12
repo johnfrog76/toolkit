@@ -1,0 +1,7 @@
+{
+  // A fragment is the entry as it will read under its heading in CHANGELOG.md:
+  // it opens with a dash, never a heading. Every other rule is the root file's.
+  "config": {
+    "MD041": false
+  }
+}

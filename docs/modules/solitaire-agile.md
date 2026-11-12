@@ -1579,8 +1579,8 @@ These are how the rituals read, on purpose, and are not on that list:
   log, not into the response -- `spoken: null` says only that nothing was dressed, and `GET /api/env`'s
   `anthropicConfigured` says whether a key is there.
 - **Triage's milestones are the Space you are in.** The page's picker reads `GET /api/milestones`, which
-  is the active Space's; the page itself asks about the active Space too, so the two agree, but neither
-  takes another Space's slug yet.
+  is the active Space's; the page itself asks about the active Space too, so the two agree. Neither takes
+  another Space's slug, because a ritual reads the Space you are in, as every other page does.
 - **Not on Azure DevOps, by design.** An ADO Space answers `rituals.text.adoTracker` on its `Tracker`
   line (D-TA19: ADO is the human team's board, and its standup is the one the team holds). A local Space
   fills from its cards.
