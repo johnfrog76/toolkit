@@ -78,7 +78,6 @@ const FRAME_NOT_YET_MOVED: Record<string, string> = {
   "modules/ado/MyPRs.tsx": "ListPanel",
   "modules/ado/PRCommentsList.tsx": "ListPanel",
   "modules/ado/SprintVelocity.tsx": "ChartPanel",
-  "modules/ado/TestHealth.tsx": "StatusPanel",
   "modules/ado/WorkBreakdown.tsx": "ChartPanel",
   "modules/communication/OneOnOne.tsx": "ListPanel: Meetings",
   "modules/growth/Goals.tsx": "ListPanel",
@@ -134,10 +133,9 @@ const PAGER_NOT_YET_MOVED: string[] = [
   "modules/organize/RemindersCard.tsx",
 ];
 
-/** The shell's own pager over a page of panels is not a list's pager. */
-const PAGER_EXEMPT: Record<string, string> = {
-  "shell/cards.tsx": "the shell pages a module's panels, not a list's items",
-};
+/** Files exempt from the pager rule, each with its reason. None: the shell's
+ *  pager over a page of panels draws the kinds' own ListPager. */
+const PAGER_EXEMPT: Record<string, string> = {};
 
 interface Imported {
   from: string;
@@ -316,6 +314,7 @@ describe("the panel rules, over every source file", () => {
     expect(moved).toEqual([
       "modules/ado/MyWork.tsx",
       "modules/ado/PromptStatus.tsx",
+      "modules/ado/TestHealth.tsx",
       "modules/ado/ToolkitLog.tsx",
       "modules/deck/DeckPickerCard.tsx",
       "modules/studio/DesignsCard.tsx",

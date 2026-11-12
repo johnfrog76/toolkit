@@ -1,6 +1,11 @@
 import type { CardItemSize } from "./cardItemTokens";
 import { CARD_ITEM_HEIGHTS_PX } from "./cardItemTokens";
-import { cardListGapPx, cardListPaddingTopPx, filterRowGapPx } from "./layoutTokens";
+import {
+  cardListGapPx,
+  cardListPaddingTopPx,
+  filterRowGapPx,
+  filtersSpaceBelowPx,
+} from "./layoutTokens";
 import { PANEL_MAX_HEIGHT_PX } from "./panelHeight";
 
 /** How many card items a list panel shows on a page. It is never typed in a
@@ -61,6 +66,9 @@ export function listChromePx(chrome: ListChrome): number {
     LIST_CHROME_PX.frame +
     rows * LIST_CHROME_PX.filterRow +
     Math.max(0, rows - 1) * filterRowGapPx +
+    // The space under the chips. The list then drops its own top padding,
+    // which listHeightPx still counts: the sum errs a few px towards fewer.
+    (rows > 0 ? filtersSpaceBelowPx : 0) +
     (chrome.lead ? LIST_CHROME_PX.lead : 0) +
     (chrome.footNote ? LIST_CHROME_PX.footNote : 0) +
     (chrome.status ? LIST_CHROME_PX.status : 0)

@@ -1,6 +1,6 @@
 import { CARD_ITEM_DESCRIPTION_LINES, CARD_ITEM_HEIGHTS_PX } from "../cardItemTokens";
 import { PANEL_BODY, PANEL_MAX_HEIGHT_PX, PANEL_MIN_HEIGHT_PX } from "../panelHeight";
-import { cardListGap, cardListPaddingTop, filterRowGap } from "../layoutTokens";
+import { cardListGap, cardListPaddingTop, filterRowGap, filtersSpaceBelow } from "../layoutTokens";
 
 /** A token as a rule spells it: `var(--spacingVerticalXS)`, or 0 with or without a unit. */
 const cssValue = (value: string) => (value === "0" ? "0(px)?" : value.replace(/[()]/g, "\\$&"));
@@ -128,9 +128,20 @@ export function expectListPanelShape(panel: HTMLElement, shape: ListPanelShape):
     const listRules = rulesOf(list);
     expect(listRules).toMatch(/flex-direction:\s*column/);
     expect(listRules).toMatch(new RegExp(`row-gap:\\s*${cssValue(cardListGap[density])}`));
-    expect(listRules).toMatch(
-      new RegExp(`padding-top:\\s*${cssValue(cardListPaddingTop[density])}`),
-    );
+    // Right under the filter chips the list adds no space over its first item:
+    // the chips' wrapper owns the space below them (filtersSpaceBelow), the
+    // frame's gap the space above. Anywhere else the list's own padding does.
+    const prev = list.previousElementSibling;
+    if (prev?.hasAttribute("data-panel-filters")) {
+      expect(listRules).toMatch(/padding-top:\s*0(px)?;/);
+      expect(rulesOf(prev as HTMLElement)).toMatch(
+        new RegExp(`padding-bottom:\\s*${cssValue(filtersSpaceBelow)}`),
+      );
+    } else {
+      expect(listRules).toMatch(
+        new RegExp(`padding-top:\\s*${cssValue(cardListPaddingTop[density])}`),
+      );
+    }
   }
   for (const item of items) {
     expect(rulesOf(item)).not.toMatch(/margin/);

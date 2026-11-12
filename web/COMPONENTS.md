@@ -127,14 +127,14 @@ Props:
 | `density` | `"full" \| "compact" \| "line"` | The item size for every item of the panel: three bands (default), the title and meta bands, or one band. An item never chooses it, and it never changes the panel's height. |
 | `empty` | `EmptyMessage` | Required. Shown when there are no items: nothing yet, or nothing could be read (`tone: "error"`). |
 | `filteredEmpty` | `EmptyMessage` | Shown instead when a filter or a search hid every item. |
-| `filters` | `FilterRow[]` | Rows of chips: `{ label, chips: [{ id, label, count?, active, onSelect }] }`. The rows sit in one wrapper (`data-panel-filters`), a column spaced by `filterRowGap` (Fluent's XS, 4 px, `src/shell/layoutTokens.ts`); a row has no margin and no tint of its own. |
+| `filters` | `FilterRow[]` | Rows of chips: `{ label, chips: [{ id, label, count?, active, onSelect }] }`. The rows sit in one wrapper (`data-panel-filters`), a column spaced by `filterRowGap` (Fluent's XS, 4 px, `src/shell/layoutTokens.ts`); a row has no margin and no tint of its own. The wrapper owns the space below the rows, `filtersSpaceBelow` (`controlRowsSpace`, Fluent's M, 12 px), and the list under it drops its own top padding, so the chips sit 12 px under the header rule and 12 px over the first item. |
 | `pickers` | `SelectSlot[]` | Small header selects: `{ label, value, options, onChange, disabled? }`. |
 | `search` | `SearchSlot` | The header's search box: `{ label, placeholder?, value, onChange }`. What a deeper search finds is handed to the kind as `items`, never drawn as a block over the list. |
 | `action` | `ActionSlot` | One header button for a thing the whole panel does: `{ label, glyph, onClick, disabled?, title? }`. |
 | `refresh` | `RefreshSlot` | `{ onClick, isFetching?, disabled? }`. |
 | `count` | `number \| string` | The count chip. A string is a count that needs a word: `latest 500`. |
 | `countLabel` | `string` | The count chip's accessible name: `12 prompts`. |
-| `lead` | `ListLead` | A chart above the items: `{ chart: { label, chart } }`. |
+| `lead` | `ListLead` | What sits above the items, either or both: rows of figures, `stats: [{ label, stats: [{ id, count, label, tone?, detail? }] }]`, drawn as `StatTile`s with `detail` as the native title, then a chart, `chart: { label, chart }`. |
 | `status` | `PanelStatus` | What a write came to (`success` or `error`, dismissable) or what the panel is doing (`busy`). |
 | `create` | `CreateSlot` | The foot's **+**: `{ label, onClick }`; the label is the title of the dialog it opens. |
 | `footLeft` | `string` | Words at the foot's left. |
@@ -503,7 +503,7 @@ Props:
 | `label` | `ReactNode` | What it counts. |
 | `color` | `string` | A health colour for the number, when the count is a verdict. |
 
-**Used by:** Milestones, Burn, the issue report and Test Health. **Pattern:** a ref-forwarding presentational box. **Test:**
+**Used by:** Milestones, Burn, the issue report, and `ListPanel`'s lead (Test Health's figures). **Pattern:** a ref-forwarding presentational box. **Test:**
 [`StatTile.test.tsx`](src/shared/StatTile.test.tsx).
 
 ## `StatusMessage`
@@ -568,7 +568,7 @@ What is drawn:
 
 | Token (`src/shell/layoutTokens.ts`) | Value | What it is |
 | --- | --- | --- |
-| `tabRowsPadding` | `tokens.spacingVerticalS`, 8 px | Above and below the rows. |
+| `tabRowsPadding` | `controlRowsSpace`: `tokens.spacingVerticalM`, 12 px | Above and below the rows. The same value as the space under a list panel's filter chips, so tab rows and chip rows read as one family. |
 | `tabRowGap` | `tokens.spacingVerticalS`, 8 px | Between two rows stacked in one wrapper. |
 
 **Used by:** Home's strip (`src/modules/ado/routes.tsx`), `RitualTabs`

@@ -1,8 +1,8 @@
 import { Children, Fragment, cloneElement, createContext, isValidElement, useContext } from "react";
 import type { ReactElement, ReactNode } from "react";
 import type { HomeTab } from "./registry";
-import { Caption1, makeStyles, mergeClasses, tokens } from "@fluentui/react-components";
-import { Pagination } from "../shared/Pagination";
+import { makeStyles, mergeClasses } from "@fluentui/react-components";
+import { ListPager } from "./kinds/ListPager";
 import { pageRowGap, panelGap } from "./layoutTokens";
 import { PANEL_GRID_MIN_WIDTH_PX } from "./panelHeight";
 
@@ -120,13 +120,9 @@ const PANELS_PER_ROW = 2;
 const useStyles = makeStyles({
   // The cards and the pager under them: a column whose gap is the page's.
   pagerStack: { display: "flex", flexDirection: "column", rowGap: pageRowGap },
-  pager: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: tokens.spacingHorizontalM,
-  },
-  pagerWords: { color: tokens.colorNeutralForeground3 },
+  // One pager, centred under the rows: the panels' own, "Page n of m", with
+  // the nav's name for a screen reader and no second label beside it.
+  pager: { display: "flex", justifyContent: "center" },
   // The page: a column of rows. It owns the gap between two rows.
   page: { display: "flex", flexDirection: "column", rowGap: pageRowGap },
   // A row: a grid of its panels, stretched to the tallest. It owns the gap
@@ -269,10 +265,7 @@ export function ModuleCardGrid({
       <PageGrid>{shown}</PageGrid>
       {pagerPlacement === "below" && pager.totalPages > 1 ? (
         <nav className={styles.pager} aria-label="More cards">
-          <Caption1 className={styles.pagerWords}>
-            Cards, page {pager.page + 1} of {pager.totalPages}
-          </Caption1>
-          <Pagination
+          <ListPager
             page={pager.page}
             totalPages={pager.totalPages}
             onPageChange={pager.onPageChange}

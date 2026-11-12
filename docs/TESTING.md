@@ -76,7 +76,7 @@ python3 -m pip install -r agent/requirements-dev.txt   # once -- runtime deps pl
 python3 -m pytest Tests/     # 1440 passed, 6 skipped -- the agent
 cd web && npm ci             # once
 cd web && npx playwright install chromium   # once -- for `npm run smoke` only
-cd web && npm test           # 5 build-contract checks, then 172 suites, 2084 tests -- the shell
+cd web && npm test           # 5 build-contract checks, then 173 suites, 2088 tests -- the shell
 cd web && npm run smoke              # 23 checks, flags off -- the browser; needs two servers up
 cd web && npm run smoke -- --modules=on  # 30 checks, both module flags on
 cd web && npm run smoke -- --studio      # the Studio's contract -- starts and stops its own servers
@@ -141,7 +141,7 @@ a passing `pytest:` line may end `(via <python>)`, which is information and not 
   Consts 222, Compat 1808, Menu 2122, Environment 78, Archive 217, PRComments 249, BackfillStamps 50, Changelog 88, Update 68, Start 87, PullRequest 10, CloseWorkItem 51, PromptStatus 125, ThreadHash 86, Setup 82, Move 51, Billable 36, Plan 114, Tag 34, Backlog 56, Cover 106, Design 225, NewPrompt 159, ExitCodes 133, Autoload 86, GitRoot 17, Sync 86, Connect 62, NewSpace 149, HowWeWork 42, EditItem 69, Land 139, Burn 193, PublishPR 39, Config 322, HubJson 186, Portability 164, Web 165, Agent 129, TestAll 332, ModuleCommands 88, Reminders 71, Rituals 658, StandupRemind 85, Triage 121, StartWork 85, Review 82, WorkReview 36, SendTeams 43, NewMeeting 63, MeetingAgenda 178, DocCounts 179
   52 suites, 10126 assertions
   pytest: 1440 passed, 6 skipped
-  web: 172 suites, 2084 tests
+  web: 173 suites, 2088 tests
 ```
 
 **Which lines the paste owns.** The per-suite line is the `tkTestToolkit` row's list in the table below; the
@@ -502,7 +502,8 @@ pytest rows carry the count of the file they name, and a jest row names its file
 | `npm test -- HowDoI` | -- | The drawer's "How do I…" section: every question with the CLI's state word; Change opens the drawer at `spaces.<active>.org`; a sentence and a keyless journey have no door; folded on arrival at an anchor and unfolded by a click (D-W11) |
 | `npm test -- useFacePref` | -- | The Face store where browser storage throws: `localStorage.getItem` made to throw before the module loads, the hook answering the default face and `ToolKitLogo` rendering; `setItem` throwing, a chosen face holding for the session with nothing stored |
 | `npm test -- useCurrentTheme` | -- | A theme choice where browser storage is refused: every storage call throwing, a choice reading back for the session; a fresh load (a reload) giving the default; storage that keeps, a fresh load giving the choice |
-| `npm test -- TestHealth.badge` | -- | The Test Health card's Space badge: rendered from a `/api/test-history` answer carrying `active_space` and the three-half `halves` block, the badge and the foot name the Space |
+| `npm test -- TestHealth.badge` | -- | The Test Health panel's Space: rendered from a `/api/test-history` answer carrying `active_space` and the three-half `halves` block, the foot names the Space |
+| `npm test -- systemPanels` | -- | The System page's panels, read from `systemCards`: each that draws a list is a `ListPanel` (Test Health and the Log), and a panel that is not one and draws rows is named with its reason (Environment, Modules, Burn) |
 | `npm test -- TestHealth.digits` | -- | The Test Health card with five-digit totals: the tiles, the three halves and the suite rows read grouped by the reader's locale (`12,661/12,661`; under 1,000 unchanged); the y-axis is given its ticks (`0` to `14,000` in steps of `3,500`), each drawn grouped, and is as wide as `countAxisWidth` says its widest label needs, wider than the 30px that cut `14000` to `4000` |
 | `npm test -- formatCount` | -- | `shared/formatCount.ts`, the one way a card writes a count: exact and grouped by locale (`12661` reads `12,661` in en-US and `12.661` in de-DE, a total under 1,000 unchanged, one failure in `12,660/12,661` still visible); a count axis's round ticks from 0 that hold the max; and an axis width that grows with its widest label |
 | `pytest Tests/test_studio.py` | 56 (+ subtests) | The Studio (S2b): the `space` argument on `/issue-report`, `/deploys`, `/issue/{n}` and `/status` (another Space's cards from its own folder, no tracker asked) (the named Space's repos and tier; an ADO Space unsupported with `gh` never asked; an undeclared slug 404; no argument the active Space's as before); `/env`'s per-Space `tracker` and lane names; the seed drawer's two routes over a scratch fixture hub (every field, non-notes skipped, no folder empty with `exists: false`, the name rule, the folder renamed through `hub.json`, the thread-Space rule, a leftover `features.studio` true or false changing nothing -- the Studio is core); and, where `pwsh` is on the machine, **`NewDesign` and Promote typed as verbs** in a fresh shell -- both Studio verbs resolving, in `Menu -All`, `-Help` and the bridge whatever a leftover flag says, the autoload manifest naming them, `Config -Set features.studio=` refused with exit 2 and nothing written; the file from the template with its bytes and an `id:` of the contract's shape (`design.idRegex`) that the agent's reader still parses past, never overwriting, `-Space`, the stated refusals; `NewItem -FromDesign` with `gh` stubbed: the issue from the note labelled `design`, the thread line written back in the note's own endings, `-ReadOnly`, six refusals |

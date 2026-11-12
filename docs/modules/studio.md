@@ -332,7 +332,7 @@ Spaces and Prompts cards use (`ListPanel`'s `filters` slot): a chip per state in
 one chosen when the card opens, no inline subhead. Choosing a chip filters the list and the pager
 restarts at page 1; the Archived chip adds a second row of outcome chips (any outcome, shipped,
 dropped, nothing said), each with its count over the archived designs in view -- any outcome is their
-total -- drawn as the state chips are, the two rows a small gap apart (`filterRowGap`). Each row is
+total -- drawn as the state chips are, the two rows a small gap apart (`filterRowGap`), with 12 px under them before the first design, as over them. Each row is
 the design with its state badge and short id, an archived note under Archived with its Closed date and
 outcome, and one line under the list counting the files that carry no id, naming `StampDesign -Hub` and
 linking **Learn more** to the contract (`NotShownLine`, shared with the Design tab, whose grouped

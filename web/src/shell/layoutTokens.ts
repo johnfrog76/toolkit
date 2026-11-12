@@ -45,13 +45,30 @@ export const filterRowGap = tokens.spacingVerticalXS;
 /** `filterRowGap`, in px, for the sums. */
 export const filterRowGapPx = 4;
 
+/** The breathing room around a panel's or a page's rows of controls -- tab rows
+ *  and filter-chip rows alike, one value so they read as one family: the space
+ *  below the rows matches the space above them. A Fluent spacing token, and a
+ *  multiple of 4 px. */
+export const controlRowsSpace = tokens.spacingVerticalM;
+
+/** `controlRowsSpace`, in px. */
+export const controlRowsSpacePx = 12;
+
 /** The space above and below a page's tab rows: the tab-row wrapper's
- *  (`TabRows`, shared/TabRows.tsx), top and bottom. A Fluent spacing token, and
- *  a multiple of 4 px. */
-export const tabRowsPadding = tokens.spacingVerticalS;
+ *  (`TabRows`, shared/TabRows.tsx), top and bottom. */
+export const tabRowsPadding = controlRowsSpace;
 
 /** `tabRowsPadding`, in px. */
-export const tabRowsPaddingPx = 8;
+export const tabRowsPaddingPx = controlRowsSpacePx;
+
+/** The space under a list panel's filter chips, before what follows them. The
+ *  space above is the frame's own gap under the header rule, the same 12 px;
+ *  the list under the chips drops its own top padding, so the chips sit
+ *  centred between the rule and the first item. */
+export const filtersSpaceBelow = controlRowsSpace;
+
+/** `filtersSpaceBelow`, in px. */
+export const filtersSpaceBelowPx = controlRowsSpacePx;
 
 /** The gap between two tab rows stacked in one wrapper. A Fluent spacing token,
  *  and a multiple of 4 px. */

@@ -4,7 +4,14 @@ import ts from "typescript";
 import { render } from "@testing-library/react";
 import { Tab, TabList } from "@fluentui/react-components";
 import { TAB_ROWS_CLASS, TabRows } from "./TabRows";
-import { tabRowGap, tabRowGapPx, tabRowsPadding, tabRowsPaddingPx } from "../shell/layoutTokens";
+import {
+  controlRowsSpace,
+  filtersSpaceBelow,
+  tabRowGap,
+  tabRowGapPx,
+  tabRowsPadding,
+  tabRowsPaddingPx,
+} from "../shell/layoutTokens";
 import { tokenPx } from "../shell/pageRowsAssert";
 
 /**
@@ -83,10 +90,12 @@ describe("TabRows", () => {
     ]);
   });
 
-  it("pads top and bottom with S, and spaces two rows on the 4 px grid", () => {
-    expect(tabRowsPadding).toBe("var(--spacingVerticalS)");
+  it("pads top and bottom with the control rows' one space, and spaces two rows on the 4 px grid", () => {
+    // Tabs and filter chips read as one family: the same breathing room.
+    expect(tabRowsPadding).toBe(controlRowsSpace);
+    expect(filtersSpaceBelow).toBe(controlRowsSpace);
     expect(tokenPx(tabRowsPadding)).toBe(tabRowsPaddingPx);
-    expect(tabRowsPaddingPx).toBe(8);
+    expect(tabRowsPaddingPx % 4).toBe(0);
     expect(tokenPx(tabRowGap)).toBe(tabRowGapPx);
     expect(tabRowGapPx % 4).toBe(0);
   });
