@@ -79,6 +79,7 @@ EXPECTED = {
     ("env", "activeSpace"): "P20_ACTIVE_SPACE",
     ("env", "promptsRoot"): "PROMPTS_ROOT",
     ("env", "agentCacheDir"): "P20_AGENT_CACHE_DIR",
+    ("env", "testHistoryDir"): "P20_TEST_HISTORY_DIR",
     ("env", "features"): "P20_FEATURES",
     ("env", "agentPort"): "P20_AGENT_PORT",
     ("env", "teamsWebhookPrefix"): "TEAMS_WEBHOOK_",
@@ -115,6 +116,20 @@ EXPECTED = {
     # The three halves a test run covers: Test writes them, log.py serves them.
     ("tests", "halves"): ["agent", "cli", "web"],
     ("tests", "legacyHalf"): "cli",
+    # Where a machine keeps its test history (Tests/fixtures/test-history/paths.json).
+    ("tests", "summaryFile"): "test-summary.{machine}.json",
+    ("tests", "resultsFile"): "test-results.{machine}.log",
+    ("tests", "historyBase"): {"windows": "LOCALAPPDATA", "linux": "XDG_STATE_HOME"},
+    ("tests", "historyFallback"): {
+        "windows": "AppData/Local",
+        "macos": "Library/Application Support",
+        "linux": ".local/state",
+    },
+    ("tests", "historyPath"): {
+        "windows": "ToolKit/TestHistory",
+        "macos": "ToolKit/TestHistory",
+        "linux": "toolkit/test-history",
+    },
     ("visibility", "public"): "public",
     ("visibility", "private"): "private",
     ("visibility", "unknown"): "unknown",

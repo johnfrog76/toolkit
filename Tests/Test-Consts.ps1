@@ -134,6 +134,7 @@ $expected = [ordered]@{
     'env.activeSpace'         = 'P20_ACTIVE_SPACE'
     'env.promptsRoot'         = 'PROMPTS_ROOT'
     'env.agentCacheDir'       = 'P20_AGENT_CACHE_DIR'
+    'env.testHistoryDir'      = 'P20_TEST_HISTORY_DIR'
     'env.features'            = 'P20_FEATURES'
     'env.agentPort'           = 'P20_AGENT_PORT'
     'env.teamsWebhookPrefix'  = 'TEAMS_WEBHOOK_'
@@ -163,9 +164,16 @@ $expected = [ordered]@{
     'reminders.buckets'       = 'overdue,today,upcoming'
     'reminders.snooze'        = '1h,tomorrow,nextweek'
     # The three halves a test run covers: Test and the CLI runner write
-    # them into test-summary.<machine>.json; the agent serves them.
+    # them into the machine's test summary; the agent serves them.
     'tests.halves'            = 'agent,cli,web'
     'tests.legacyHalf'        = 'cli'
+    # Where a machine keeps its test history: one folder per machine, outside
+    # every checkout (Scripts/Get-TestHistoryDir.ps1; agent/core/log.py).
+    'tests.summaryFile'       = 'test-summary.{machine}.json'
+    'tests.resultsFile'       = 'test-results.{machine}.log'
+    'tests.historyBase'       = 'windows=LOCALAPPDATA,linux=XDG_STATE_HOME'
+    'tests.historyFallback'   = 'windows=AppData/Local,macos=Library/Application Support,linux=.local/state'
+    'tests.historyPath'       = 'windows=ToolKit/TestHistory,macos=ToolKit/TestHistory,linux=toolkit/test-history'
     # The Docs tab's two roots: the agent's path rule and the web's link
     # resolver read them; the CLI states them so the contract is three-sided.
     'docs.readme'             = 'README.md'

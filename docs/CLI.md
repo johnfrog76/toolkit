@@ -1051,7 +1051,7 @@ is off, and `SwitchSpace` brings them back in one that works with agents.
 
 | Command | Does |
 | --- | --- |
-| `Test [-Half cli\|agent\|web] [-Fast]` | Run the three halves -- the agent's `pytest`, the CLI runner, the web UI's `npm test` -- in that order, then one summary (per half its counts and time) and one verdict. A half that cannot run is skipped with its reason and the verdict names it SKIPPED, not passed. `-Half` runs one; `-Fast` is the CLI runner's `-Fast`. Exit 0 when every half that ran passed, exit 2 when one failed or none ran. Prints expected (`docs/TESTING.md`) vs actual per half as information, and writes all three halves into `test-summary.<machine>.json` ([Testing](TESTING.md)) |
+| `Test [-Half cli\|agent\|web] [-Fast]` | Run the three halves -- the agent's `pytest`, the CLI runner, the web UI's `npm test` -- in that order, then one summary (per half its counts and time) and one verdict. A half that cannot run is skipped with its reason and the verdict names it SKIPPED, not passed. `-Half` runs one; `-Fast` is the CLI runner's `-Fast`. Exit 0 when every half that ran passed, exit 2 when one failed or none ran. Prints expected (`docs/TESTING.md`) vs actual per half as information, and writes all three halves into `test-summary.<machine>.json`, in the machine's test-history folder whichever checkout ran ([Testing, "Where the record lives"](TESTING.md#where-the-record-lives)) |
 | `TestToolkit` | Run every suite (`-List` to enumerate, `-<Suite>` to run one, including `-Portability`) |
 | `TestCompat` | PowerShell 5.1 compatibility suite only |
 | `TestMenu` | Menu system suite only |
@@ -1314,8 +1314,9 @@ module in the shell you run it from still logs one `INFO tkEnv` row, as any shel
 toolkit does. That is the import, not the run.) So a suite's failing assertions never show up as
 the engineer's own errors on the Log card.
 
-`test-results.<MACHINE>.log` and `test-summary.<MACHINE>.json` deliberately do **not** follow it:
-the Health card reading real test results is the point of those two.
+`test-results.<MACHINE>.log` and `test-summary.<MACHINE>.json` do **not** follow it: they live in the
+machine's test-history folder, one for every checkout and git worktree, which `P20_TEST_HISTORY_DIR` moves
+and the test runners point at a scratch folder of their own ([Testing, "Where the record lives"](TESTING.md#where-the-record-lives)).
 
 ---
 

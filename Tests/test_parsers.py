@@ -12,6 +12,7 @@ Under pytest:  python3 -m pytest Tests/
 
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -24,7 +25,6 @@ from _skipguard import skip_module  # noqa: E402
 try:
     from agent.ado.pr_comments import _parse_pr_comments
     from agent.ado.reporting import _closed_dates
-    from agent.core import log as agent_log
     from agent.core.log import _parse_test_log, _scope_entries_to_org
     from agent.core.parsers import _parse_status_metadata, card_status, status_sort_key
 except Exception as e:
@@ -451,12 +451,14 @@ class TestLogOrgColumnTests(unittest.TestCase):
     6-column rows must still parse as system (empty org)."""
 
     def setUp(self):
-        # Drive _parse_test_log at a unique machine name so it reads our temp
-        # log and never collides with a real test-results.{machine}.log.
+        # Drive _parse_test_log at a unique machine name and a temp history
+        # folder, so it reads our log and never the machine's real record.
         self._machine = "PARSERTEST-ORGCOL"
         self._prev_computername = os.environ.get("COMPUTERNAME")
         os.environ["COMPUTERNAME"] = self._machine
-        self._log_path = agent_log.REPO_ROOT / f"test-results.{self._machine}.log"
+        self._tmp = tempfile.TemporaryDirectory()
+        self._folder = Path(self._tmp.name)
+        self._log_path = self._folder / f"test-results.{self._machine}.log"
         rows = [
             "# header comment is skipped",
             # org-scoped rows under two different orgs
@@ -470,23 +472,23 @@ class TestLogOrgColumnTests(unittest.TestCase):
         self._log_path.write_text("\n".join(rows) + "\n", encoding="utf-8")
 
     def tearDown(self):
-        self._log_path.unlink(missing_ok=True)
+        self._tmp.cleanup()
         if self._prev_computername is None:
             os.environ.pop("COMPUTERNAME", None)
         else:
             os.environ["COMPUTERNAME"] = self._prev_computername
 
     def test_org_column_parsed(self):
-        by_suite = {(e["suite"], e["org"]): e for e in _parse_test_log()}
+        by_suite = {(e["suite"], e["org"]): e for e in _parse_test_log(self._folder)}
         self.assertEqual(by_suite[("Billing", "demo")]["result"], "fail")
         self.assertEqual(by_suite[("Billing", "globex")]["result"], "pass")
 
     def test_system_row_has_empty_org(self):
-        compat = next(e for e in _parse_test_log() if e["suite"] == "Compat")
+        compat = next(e for e in _parse_test_log(self._folder) if e["suite"] == "Compat")
         self.assertEqual(compat["org"], "")
 
     def test_legacy_six_column_row_parses_as_system(self):
-        snap = next(e for e in _parse_test_log() if e["suite"] == "Snapshot")
+        snap = next(e for e in _parse_test_log(self._folder) if e["suite"] == "Snapshot")
         self.assertEqual(snap["org"], "")
         self.assertEqual(snap["passed"], 34)
 
