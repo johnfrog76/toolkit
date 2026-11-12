@@ -96,9 +96,9 @@ $verifyPath = Join-Path $pkgRoot 'VERIFY.md'
 # lines CI's count-line exemption reads, so the two cannot drift apart.
 . (Join-Path $pkgRoot 'Scripts/TestAll-Rules.ps1')
 $countPatterns = Get-P20CountLinePatterns
-$agentsCount = Get-DocSuiteCount -Path $agentsPath -Label 'AGENTS.md' -Pattern $countPatterns.AgentsCli
+$agentsCount = Get-DocSuiteCount -Path $agentsPath -Label 'AGENTS.md' -Pattern $countPatterns.AgentsCli -Group 2
 $testingCount = Get-DocSuiteCount -Path $testingPath -Label 'docs/TESTING.md' -Pattern $countPatterns.TestingCliTotal -Group 2
-$verifyCount = Get-DocSuiteCount -Path $verifyPath -Label 'VERIFY.md' -Pattern $countPatterns.VerifyCli
+$verifyCount = Get-DocSuiteCount -Path $verifyPath -Label 'VERIFY.md' -Pattern $countPatterns.VerifyCli -Group 2
 
 if ($null -ne $agentsCount) { Write-Host "  AGENTS.md:       $agentsCount suites" -ForegroundColor DarkGray }
 if ($null -ne $testingCount) { Write-Host "  docs/TESTING.md: $testingCount suites" -ForegroundColor DarkGray }
@@ -168,7 +168,35 @@ if ($null -ne $pasteBlock) {
     if ($null -ne $pasteTotal) {
         Assert-Equal 'the paste block''s suite count is the registry''s' $realCount $pasteTotal.Groups[1].Value
         Assert-Equal 'the paste block''s total is the sum of its own per-suite lines' $pasteSum $pasteTotal.Groups[2].Value
+
+        # AGENTS.md and VERIFY.md state the same total. The paste block is the one
+        # record, so each is held to its `N suites, M assertions` text.
+        $pasteTotalText = ($pasteTotal.Value).Trim()
+        $totalDocs = @(
+            @('AGENTS.md', $agentsPath, $countPatterns.AgentsCli),
+            @('VERIFY.md', $verifyPath, $countPatterns.VerifyCli)
+        )
+        foreach ($td in $totalDocs) {
+            if (-not (Test-Path -LiteralPath $td[1])) { continue }
+            $tm = [regex]::Match((Get-Content -LiteralPath $td[1] -Raw -Encoding UTF8), $td[2])
+            if ($tm.Success) { Assert-Equal "$($td[0])'s total is the paste block's" $pasteTotalText $tm.Groups[1].Value }
+        }
     }
+}
+
+# One row per stale total: the pattern must read the whole `N suites, M assertions`
+# text, so a total that differs from the paste block's is a difference to report.
+$totalTable = @(
+    # name, pattern, text, the total the paste block says, whether it agrees
+    @('AGENTS.md total agrees', $countPatterns.AgentsCli, 'tkTestToolkit                 # the CLI -- 3 suites, 60 assertions on this commit', '3 suites, 60 assertions', $true),
+    @('AGENTS.md stale total', $countPatterns.AgentsCli, 'tkTestToolkit                 # the CLI -- 3 suites, 59 assertions on this commit', '3 suites, 60 assertions', $false),
+    @('VERIFY.md total agrees', $countPatterns.VerifyCli, 'findings. On this commit that is **3 suites, 60 assertions** with a config', '3 suites, 60 assertions', $true),
+    @('VERIFY.md stale total', $countPatterns.VerifyCli, 'findings. On this commit that is **3 suites, 61 assertions** with a config', '3 suites, 60 assertions', $false)
+)
+foreach ($tc in $totalTable) {
+    $m = [regex]::Match($tc[2], $tc[1])
+    $agrees = $m.Success -and ($m.Groups[1].Value -eq $tc[3])
+    Assert-True "total fixture, $($tc[0])" ($m.Success -and ($agrees -eq $tc[4])) "read '$($m.Groups[1].Value)' against '$($tc[3])'"
 }
 
 $suiteRows = @($testingRows | Where-Object { $_ -match '^\|\s*`tkTestToolkit -[A-Za-z]+`\s*\|' })

@@ -388,8 +388,10 @@ function Get-P20CountLinePatterns {
                          (group 1 the figure, group 2 the suite count)
         TestingPytest    its command block's pytest totals (group 1)
         TestingWeb       its command block's npm test totals (group 1)
-        AgentsCli        AGENTS.md's `tkTestToolkit # the CLI -- N suites, ...`
-        VerifyCli        VERIFY.md's Gate 4 `On this commit that is **N suites, ...`
+        AgentsCli        AGENTS.md's `tkTestToolkit # the CLI -- N suites, M assertions`
+                         (group 1 the figure, group 2 the suite count)
+        VerifyCli        VERIFY.md's Gate 4 `On this commit that is **N suites, M assertions**`
+                         (the same two groups)
       docs/TESTING.md's paste block is the seventh, found by Get-P20PasteBlockMatch.
     #>
     return [ordered]@{
@@ -397,8 +399,8 @@ function Get-P20CountLinePatterns {
         TestingCliTotal = 'tkTestToolkit\s+#\s*((\d+) suites, \d+ assertions)'
         TestingPytest   = 'pytest Tests/\s+#\s*(.+?)\s+--'
         TestingWeb      = 'npm test\s+#\s*(?:.*?then\s+)?(\d+ suites, \d+ tests)'
-        AgentsCli       = 'tkTestToolkit\s+#\s*the CLI -- (\d+) suites,'
-        VerifyCli       = 'is \*\*(\d+) suites,'
+        AgentsCli       = 'tkTestToolkit\s+#\s*the CLI -- ((\d+) suites, \d+ assertions)'
+        VerifyCli       = 'is \*\*((\d+) suites, \d+ assertions)\*\*'
     }
 }
 
