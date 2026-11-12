@@ -427,11 +427,23 @@ The three PowerShell suites are registered in `Tests/Test-Toolkit.ps1` (`-SendTe
 
 ## Known gaps
 
-| # | Gap |
+| # | Gap | Known gap |
+| --- | --- | --- |
+| — | An agenda line becomes a card from the terminal only (`NewPrompt -From`): the Meetings page has no "make a card" action on an agenda line, which belongs to the record's reading room, not yet built | [An agenda line becomes a card from the terminal only](../KNOWN-GAPS.md#an-agenda-line-becomes-a-card-from-the-terminal-only) |
+| — | A card made from an agenda line names its record; the record does not name the card. Whether the agenda gets a line back (`-> card K7M2`) is undecided | [An agenda line becomes a card from the terminal only](../KNOWN-GAPS.md#an-agenda-line-becomes-a-card-from-the-terminal-only) |
+
+Three more are described where you meet them, earlier in this document:
+[A meeting row draws its actions side by side](../KNOWN-GAPS.md#a-meeting-row-draws-its-actions-side-by-side),
+[`Config -Set` cannot declare a Teams recipient](../KNOWN-GAPS.md#config--set-cannot-declare-a-teams-recipient) and
+[A webhook set after the agent started is not seen](../KNOWN-GAPS.md#a-webhook-set-after-the-agent-started-is-not-seen).
+
+### True by design
+
+These are choices, not omissions, and are not on [Known gaps](../KNOWN-GAPS.md):
+
+| # | Choice |
 | --- | --- |
 | — | Recipients are read from two blocks, `managerWorkflow` and the active Space's, and `/env` says which (`scope`); the Environment card draws it. A config wizard has to show both |
 | — | Prep has no agent pass: the shipped prompt has two passes (Plan and Retro), not three |
-| — | An agenda line becomes a card from the terminal only (`NewPrompt -From`): the Meetings page has no "make a card" action on an agenda line, which belongs to the record's reading room, not yet built |
-| — | A card made from an agenda line names its record; the record does not name the card. Whether the agenda gets a line back (`-> card K7M2`) is undecided |
 | — | `Timer` is module-local. If a second module ever wants one, that is the moment to promote it to `shared/` |
 | — | `/rewrite` keeps its own copy of the Messages API call rather than sharing the ADO module's. Deliberate — a module reaching into a sibling for a helper is how two modules stop being separable — but it is thirty duplicated lines |
