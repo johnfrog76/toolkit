@@ -13,6 +13,10 @@ jest.mock("./api.ado", () => ({
   useRunCommandMutation: () => [jest.fn(), { isLoading: false }],
 }));
 
+// Set by the stand-in the module-off test registers for the rows' chunk: its
+// factory runs only when that chunk is fetched.
+let rowsChunkLoaded = false;
+
 const base = {
   os: "Linux",
   uptime: 60,
@@ -66,10 +70,36 @@ describe("the Environment card's Teams recipients", () => {
     ).toBeTruthy();
   });
 
-  it("draws no recipient rows with the module off", () => {
-    env = { ...base, features: { communication: false } };
-    render(<EnvCard />);
-    expect(screen.queryByText("Every Space")).toBeNull();
-    expect(screen.queryByText("This Space")).toBeNull();
+  it("draws no recipient rows, and fetches none, with the module off", async () => {
+    // A fresh registry for the whole render, with a stand-in for the rows'
+    // chunk whose factory runs only if this render fetches it. Testing Library
+    // registers hooks when it loads, so this test mounts the card itself.
+    rowsChunkLoaded = false;
+    env = { ...base, features: { communication: false }, communication };
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    jest.doMock("../communication/EnvRecipients", () => {
+      rowsChunkLoaded = true;
+      return { EnvRecipients: () => null };
+    });
+    await jest.isolateModulesAsync(async () => {
+      const React = await import("react");
+      const { createRoot } = await import("react-dom/client");
+      const { EnvCard: FreshCard } = await import("./EnvCard");
+      const root = createRoot(host);
+      await React.act(async () => {
+        root.render(React.createElement(FreshCard));
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+      expect(host.textContent).toContain("Linux");
+      for (const text of ["My Manager", "Team Channel", "Every Space", "This Space"]) {
+        expect(host.textContent).not.toContain(text);
+      }
+      await React.act(async () => root.unmount());
+    });
+    jest.dontMock("../communication/EnvRecipients");
+    host.remove();
+    expect(rowsChunkLoaded).toBe(false);
   });
 });
