@@ -126,7 +126,7 @@ describe("consts.json", () => {
       String.raw`^https://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com/(?:DefaultCollection/)?([^/\s]+)/_git/([^/\s?#]+?)(?:\.git)?/?$`,
     );
     expect(consts.regex.adoOriginSsh).toBe(
-      String.raw`^(?:ssh://)?[^/@\s]+@(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com):v3/([^/\s]+)/([^/\s]+)/([^/\s]+?)(?:\.git)?/?$`,
+      String.raw`^(?:ssh://(?:[^/@\s]+@)?(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com)(?::\d+)?/|(?:ssh://)?[^/@\s]+@(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com):)v3/([^/\s]+)/([^/\s]+)/([^/\s]+?)(?:\.git)?/?$`,
     );
     expect(consts.regex.adoOrgDev).toBe(
       String.raw`^https?://(?:[^/@\s]+@)?dev\.azure\.com/([^/\s]+)`,
