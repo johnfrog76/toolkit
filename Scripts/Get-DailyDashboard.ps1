@@ -18,7 +18,7 @@ $cfg = $global:P20Config
 # filled it yet, ask it the way the module's own tier check does, so a machine
 # below Tier 1 gets the local view and not a full view of answers that look true.
 if (-not ($global:P20Env -and $global:P20Env.Tier)) {
-    try { & (Join-Path $PSScriptRoot 'Get-Environment.ps1') -Startup -Quiet | Out-Null } catch { $null = $_ }
+    try { & (Join-Path $PSScriptRoot 'Get-Environment.ps1') -Quiet | Out-Null } catch { $null = $_ }
 }
 $tier = if ($global:P20Env -and $global:P20Env.Tier) { [int]$global:P20Env.Tier } else { 1 }
 

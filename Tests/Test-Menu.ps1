@@ -1563,7 +1563,7 @@ foreach ($cmdName in $parityNames) {
     # it; `switches`, where a verb has one, describes the same set (below).
     # Composition, not switches anyone types, and so not in any usage line:
     # Web's and Agent's -Reuse (Start-Web.ps1 reusing a running agent), Env's -Quiet (the
-    # module's startup probe), InstallAutoload's -ModuleRoot and -CopyOnly
+    # module's tier probe, on first need), InstallAutoload's -ModuleRoot and -CopyOnly
     # (Test-Autoload's scratch installs).
     $compositionByVerb = @{ Web = @('Reuse'); Agent = @('Reuse'); Env = @('Quiet'); InstallAutoload = @('ModuleRoot', 'CopyOnly') }
     $composition = @($compositionByVerb[$cmdName])

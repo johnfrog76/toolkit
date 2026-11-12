@@ -55,6 +55,7 @@ if ($Help) {
     Write-Host "  Wrapper      {prefix}Env reports configured surfaces as on"
     Write-Host "  Agreement    the in-module and direct call shapes print one identical block"
     Write-Host "  Accessors    the shadow case: a script's own variables cannot change the answer"
+    Write-Host "  Import       no gh or az call on import; the tier probed once, on first need"
     Write-Host ""
     return
 }
@@ -578,6 +579,166 @@ tkEnv | Out-Null
 "@
 Assert-True 'importing the module outside a git repository (Env -Startup) leaves $LASTEXITCODE at 0' ($exitOut -match '(?m)^IMPORT-EXIT=0\s*$') (($exitOut -split "`r?`n" | Select-String 'IMPORT-EXIT') -join ' ')
 Assert-True 'Env typed outside a git repository leaves $LASTEXITCODE at 0' ($exitOut -match '(?m)^ENV-EXIT=0\s*$') (($exitOut -split "`r?`n" | Select-String 'ENV-EXIT') -join ' ')
+
+# -- 7. No network on import; the tier on first need ---------------------------
+# Importing the module asks no tracker anything: a tool that loads it for one
+# function must open no connection. The tracker's tools here are REAL commands
+# on the PATH -- stand-ins that append their arguments to a log -- not the
+# function the other sections define, because the claim is about what a child
+# shell would actually run. The stand-in gh is signed in and knows its user but
+# cannot see the owner, so the probe makes all three of its reads and lands on
+# Tier 2: a verb that needs the tracker then refuses without a fourth call.
+Write-Host ""
+Write-Host "  No network on import; the tier on first need" -ForegroundColor Magenta
+
+. (Join-Path $testDir 'Get-TestHost.ps1')
+$liveHub = Join-Path $sandboxRoot 'live-hub'
+$standIns = Join-Path $sandboxRoot 'stand-ins'
+$noGhDir = Join-Path $sandboxRoot 'no-gh'
+$callLog = Join-Path $sandboxRoot 'tracker-calls.log'
+foreach ($dir in @($liveHub, $standIns, $noGhDir, (Join-Path $liveHub 'livegh'), (Join-Path $liveHub 'liveado'))) {
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+}
+$liveJson = @'
+{
+  "hub": 1,
+  "orgs": [
+    { "slug": "livegh", "name": "Live GitHub", "status": "active", "promptsFolder": "livegh", "org": "https://github.com/acme/widgets" },
+    { "slug": "liveado", "name": "Live Azure", "status": "active", "promptsFolder": "liveado", "org": "https://dev.azure.com/acme" }
+  ]
+}
+'@
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText((Join-Path $liveHub 'hub.json'), $liveJson, $utf8)
+
+$onWindows = ($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop')
+function New-StandIn {
+    <# A gh or az that logs `<tool> <args>`; gh answers as signed in, knowing its user and not the owner. #>
+    param([string]$Dir, [string]$Tool)
+    if ($onWindows) {
+        $body = "@echo off`r`necho $Tool %*>>`"$callLog`"`r`n"
+        if ($Tool -eq 'gh') {
+            $body += "if `"%1 %2`"==`"auth status`" exit /b 0`r`nif `"%1 %2`"==`"api user`" (echo octo& exit /b 0)`r`n"
+        }
+        $body += "exit /b 1`r`n"
+        [System.IO.File]::WriteAllText((Join-Path $Dir "$Tool.cmd"), $body, $utf8)
+        return
+    }
+    $body = "#!/bin/sh`nprintf '%s\n' `"$Tool `$*`" >> '$callLog'`n"
+    if ($Tool -eq 'gh') {
+        $body += "case `"`$1 `$2`" in`n  'auth status') exit 0 ;;`n  'api user') echo octo; exit 0 ;;`nesac`n"
+    }
+    $body += "exit 1`n"
+    $path = Join-Path $Dir $Tool
+    [System.IO.File]::WriteAllText($path, $body, $utf8)
+    & chmod +x $path
+}
+New-StandIn -Dir $standIns -Tool 'gh'
+New-StandIn -Dir $standIns -Tool 'az'
+New-StandIn -Dir $noGhDir -Tool 'az'
+# The no-gh PATH still needs git, or the import reads Tier 3 for another reason.
+$realGit = [string](Get-Command git -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+if ($onWindows) {
+    [System.IO.File]::WriteAllText((Join-Path $noGhDir 'git.cmd'), "@`"$realGit`" %*`r`n", $utf8)
+}
+elseif ($realGit) {
+    New-Item -ItemType SymbolicLink -Path (Join-Path $noGhDir 'git') -Target $realGit | Out-Null
+}
+
+function Invoke-LiveChild {
+    <# A fresh child, in this host, with the stand-ins first on the PATH and one Space active. #>
+    param([string]$Space, [string]$Snippet, [switch]$Quiet, [switch]$NoGh)
+    $pathSep = [System.IO.Path]::PathSeparator
+    $path = if ($NoGh) { $noGhDir } else { "$standIns$pathSep$env:PATH" }
+    $quietLine = if ($Quiet) { "`$env:TOOLKIT_QUIET_STARTUP = '1'" } else { 'Remove-Item Env:\TOOLKIT_QUIET_STARTUP -ErrorAction SilentlyContinue' }
+    $pkgQ = $pkgDir -replace "'", "''"
+    $hubQ = $liveHub -replace "'", "''"
+    $logQ = $logDir -replace "'", "''"
+    $pathQ = $path -replace "'", "''"
+    $callQ = $callLog -replace "'", "''"
+    $body = @"
+`$env:PSModulePath = '$pkgQ'
+`$env:PROMPTS_ROOT = '$hubQ'
+`$env:P20_ACTIVE_SPACE = '$Space'
+`$env:P20_USAGE_LOG_DIR = '$logQ'
+`$env:PATH = '$pathQ'
+$quietLine
+Get-ChildItem Env: | Where-Object { `$_.Name -like 'TEAMS_WEBHOOK_*' } |
+    ForEach-Object { Remove-Item "Env:\`$(`$_.Name)" -ErrorAction SilentlyContinue }
+`$callLog = '$callQ'
+function Get-CallCount { if (Test-Path -LiteralPath `$callLog) { @(Get-Content -LiteralPath `$callLog -Encoding UTF8 | Where-Object { `$_ }).Count } else { 0 } }
+Import-Module '$pkgQ/utilities.psm1' -Force -DisableNameChecking
+"AFTER-IMPORT=`$(Get-CallCount)"
+$Snippet
+"@
+    $runner = Join-Path $sandboxRoot ("live-" + [guid]::NewGuid().ToString('N').Substring(0, 8) + ".ps1")
+    [System.IO.File]::WriteAllText($runner, $body, $utf8)
+    if (Test-Path -LiteralPath $callLog) { Remove-Item -LiteralPath $callLog -Force }
+    $out = Invoke-P20TestHost -File $runner -NonInteractive
+    $calls = @()
+    if (Test-Path -LiteralPath $callLog) {
+        $calls = @([System.IO.File]::ReadAllText($callLog) -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    }
+    return [pscustomobject]@{ Out = (($out | ForEach-Object { $_.ToString() }) -join "`n"); Calls = $calls }
+}
+
+# The banner is under test, so this section shows it: quietStart off for the run.
+$liveLocalKept = [System.IO.File]::ReadAllText($localFile)
+$liveLocal = $liveLocalKept | ConvertFrom-Json
+$liveLocal.quietStart = $false
+[System.IO.File]::WriteAllText($localFile, ($liveLocal | ConvertTo-Json -Depth 6), $utf8)
+try {
+    $ghImport = Invoke-LiveChild -Space 'livegh' -Snippet '"IMPORTED"'
+    Assert-True 'importing on an active GitHub Space calls neither gh nor az' `
+        ($ghImport.Out -match 'IMPORTED' -and $ghImport.Calls.Count -eq 0) "calls: $($ghImport.Calls -join ' | ')`n$($ghImport.Out)"
+    Assert-True 'and with gh installed, the import line says nothing' `
+        ($ghImport.Out -notmatch '\[\*\]|\[!\]') $ghImport.Out
+
+    $adoImport = Invoke-LiveChild -Space 'liveado' -Snippet '"IMPORTED"'
+    Assert-True 'importing on an active Azure DevOps Space calls neither az nor gh' `
+        ($adoImport.Out -match 'IMPORTED' -and $adoImport.Calls.Count -eq 0) "calls: $($adoImport.Calls -join ' | ')`n$($adoImport.Out)"
+
+    $noGh = Invoke-LiveChild -Space 'livegh' -NoGh -Snippet '"IMPORTED"'
+    Assert-True 'with no gh on the PATH, the import line says so, from the PATH alone' `
+        ($noGh.Out -match "\[\*\] 'livegh' is active but gh is not installed -- GitHub commands unavailable") $noGh.Out
+    Assert-True 'and it still calls nothing' ($noGh.Calls.Count -eq 0) "calls: $($noGh.Calls -join ' | ')"
+
+    $firstNeed = Invoke-LiveChild -Space 'livegh' -Snippet @'
+tkMyWork *>&1 | Out-String
+"AFTER-FIRST=$(Get-CallCount) TIER=$($global:P20Env.Tier)"
+tkMyWork *>&1 | Out-String
+"AFTER-SECOND=$(Get-CallCount)"
+'@
+    Assert-True 'nothing is probed until a verb needs the tier' ($firstNeed.Out -match '(?m)^AFTER-IMPORT=0\s*$') $firstNeed.Out
+    Assert-True 'the first verb that needs it probes gh -- three calls -- and finds Tier 2' `
+        ($firstNeed.Out -match '(?m)^AFTER-FIRST=3 TIER=2\s*$') $firstNeed.Out
+    Assert-True 'those three are auth status, the user and the owner, in order' `
+        (($firstNeed.Calls -join ' | ') -eq 'gh auth status | gh api user -q .login | gh api users/acme -q .login') ($firstNeed.Calls -join ' | ')
+    Assert-True 'the second verb reads the cached tier and calls nothing' ($firstNeed.Out -match '(?m)^AFTER-SECOND=3\s*$') $firstNeed.Out
+    Assert-True 'the verb refuses with the tier it found, and the cause' `
+        ($firstNeed.Out -match 'tkMyWork needs GitHub \(Tier 1\); currently Tier 2' -and $firstNeed.Out -match 'GitHub did not answer') $firstNeed.Out
+    Assert-True 'the probe on first need prints no banner of its own: the refusal says why, once' `
+        ($firstNeed.Out -notmatch '\[\*\]') $firstNeed.Out
+
+    $bridge = Invoke-LiveChild -Space 'livegh' -Quiet -Snippet @'
+try { tkMyWork | Out-Null; "THREW=no" } catch { "THREW=$($_.Exception.Message)" }
+"AFTER-FIRST=$(Get-CallCount)"
+'@
+    Assert-True 'a bridge child (TOOLKIT_QUIET_STARTUP) imports with no call either' ($bridge.Out -match '(?m)^AFTER-IMPORT=0\s*$') $bridge.Out
+    Assert-True 'and its first verb gets the right tier: the stated refusal, re-raised, after the same three calls' `
+        ($bridge.Out -match 'THREW=tkMyWork needs GitHub \(Tier 1\); currently Tier 2' -and $bridge.Out -match '(?m)^AFTER-FIRST=3\s*$') $bridge.Out
+
+    $adoNeed = Invoke-LiveChild -Space 'liveado' -Snippet @'
+tkMyWork *>&1 | Out-String
+"AFTER-FIRST=$(Get-CallCount) TIER=$($global:P20Env.Tier)"
+'@
+    Assert-True 'on Azure DevOps the first verb asks az once, and nothing of gh' `
+        ($adoNeed.Out -match '(?m)^AFTER-IMPORT=0\s*$' -and $adoNeed.Out -match '(?m)^AFTER-FIRST=1 TIER=2\s*$' -and ($adoNeed.Calls -join ' | ') -eq 'az account show --output json') `
+        "calls: $($adoNeed.Calls -join ' | ')`n$($adoNeed.Out)"
+}
+finally {
+    [System.IO.File]::WriteAllText($localFile, $liveLocalKept, $utf8)
+}
 
 $total = $script:passed + $script:failed
 

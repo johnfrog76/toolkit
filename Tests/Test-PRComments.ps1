@@ -1353,7 +1353,7 @@ Import-Module '$p/utilities.psm1' -Force -DisableNameChecking *>`$null
     if (Test-Path $ghInputs) { $sentBodies = @(Get-Content $ghInputs | Where-Object { $_ } | ForEach-Object { $_ | ConvertFrom-Json }) }
     return [pscustomobject]@{ Text = $text; Calls = $argv; Inputs = $sentBodies }
 }
-# The tracker calls the verb made. The module's own probe at import (`gh auth
+# The tracker calls the verb made. The module's own tier probe (`gh auth
 # status`, a read of the sign-in) is not the verb's and is left out.
 function Get-GhCalls($r) { return @($r.Calls | Where-Object { $_[0] -eq 'gh' -and -not ($_[1] -eq 'auth' -and $_[2] -eq 'status') }) }
 function Format-Calls($r) { return (@($r.Calls | ForEach-Object { $_ -join ' ' }) -join ' | ') }
