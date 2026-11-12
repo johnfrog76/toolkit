@@ -421,6 +421,9 @@ Each step already done is skipped, so it is safe to re-run.
   `core.autocrlf false` stays, because it decides the bytes a card gets on Windows, but it is not what
   keeps stderr quiet. `Test-Portability`'s Clause 23 fails on a raw redirected git call anywhere under
   `Tests/`, the runner included, and allows nothing but the helper's own.
+  **An argument PowerShell would split is quoted.** The helper has no `param` block, so a bare `--` is dropped
+  before it runs, and `-c:x`, `-a.b`, a comma and `stash@{0}` each arrive as two arguments: write `'--'`, `'-c:x'`.
+  Clause 23 fails on one written bare, and holds a table of what git is handed, on 5.1's argument passing as well.
 - **A suite that runs a script directly does not test the verb.** A suite that drives
   `Move-PromptToArchive.ps1` with a stubbed `Get-PromptFolders` stays green while `Archive` typed as a
   verb can look in `<hub>/<org>/` and see no cards at all -- as it does when the module's own

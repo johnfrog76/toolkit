@@ -402,6 +402,16 @@ repositories with git, and on Windows git warns on stderr about line endings; un
 PowerShell file under `Tests/`, the runner included, and fails on a raw git call with its stderr redirected, with or
 without the call operator. Its allow-list is empty.
 
+**Each argument reaches git as one value, and five bare shapes are quoted.** The helper has no `param` block, so
+PowerShell reads its arguments as a function's before it runs: the first bare `--` ends the parameters and is
+dropped, `-c:x` arrives as `-c:` and `x`, `-a.b` as `-a` and `.b`, a comma makes two arguments, and `stash@{0}`
+arrives as `stash@` and `0`. Written in quotes, each arrives as written: `Invoke-P20TestGit -C $repo checkout -q '--'
+$path`. Clause 23 reads every call of the helper under `Tests/` as syntax and fails on one of these written bare,
+naming the line. It also holds a table of what git is handed, one row per shape, read back with `git rev-parse
+--sq-quote`. Windows PowerShell 5.1 joins a native command's arguments into one line itself, which loses an empty
+argument and a double quote, so the helper escapes for that host; the table runs as the host passes arguments, and on
+PowerShell 7.3 and later a second time with `$PSNativeCommandArgumentPassing = 'Legacy'`, which is 5.1's rule.
+
 Each step tees its runner's output to a transcript and hands it, with the runner's exit code, to
 `Scripts/Test-CiHalf.ps1`. That reads the half with the parser and the verdict `tkTest` uses
 (`Get-P20CiHalfVerdict` in `Scripts/TestAll-Rules.ps1`) and one rule tighter, because a check nobody

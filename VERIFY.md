@@ -1257,6 +1257,14 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   in the main checkout before the upgrade and no folder yet, the card's first read shows that old record, not "not
   run". `tkTestToolkit -TestAll` holds the rule over `Tests/fixtures/test-history/paths.json`, whose Windows rows
   only a Windows host reads live.
+- [ ] **`Invoke-P20TestGit` hands git an empty argument, a double quote and a trailing backslash under Windows
+  PowerShell 5.1 (#356).** On the Windows PC, in `powershell` (5.1), run `tkTestToolkit -Portability`. Every
+  `Clause 23: git is handed ...` line passes, and there are 18 of them, each ending `as the host passes arguments`:
+  5.1 has no `$PSNativeCommandArgumentPassing`, so its own passing is the only one run. The rows that only 5.1 on
+  Windows reads live are `an empty value, and the one after it`, the four with a double quote, and `a trailing
+  backslash after a space`. On macOS and Linux the same rows run a second time with `Legacy` passing, which is
+  5.1's rule in PowerShell 7; this row is 5.1's own command line and git for Windows reading it. The `ps51` job
+  runs the suite on 5.1 too.
 
 ## Recording a run
 
