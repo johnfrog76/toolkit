@@ -272,8 +272,9 @@ jobs:
         run: npm run lint
 
       # The documentation lints: markdownlint over the root README.md and the other
-      # root documents, docs/, web/README.md and agent/README.md, with the tree's
-      # own settings (.markdownlint-cli2.jsonc). A documentation path that reaches
+      # root documents, docs/, changelog.d/ (each waiting entry and its README),
+      # web/README.md and agent/README.md, with the tree's own settings
+      # (.markdownlint-cli2.jsonc). A documentation path that reaches
       # no half is linted by the contract job's copy of this step instead.
       - name: The documentation -- npm run lint:md
         if: ${{ !cancelled() && steps.npm.outcome == 'success' }}
