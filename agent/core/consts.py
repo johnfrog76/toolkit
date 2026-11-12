@@ -673,6 +673,12 @@ def usage_env_flag() -> str:
     return consts()["usage"]["envFlag"]
 
 
+def reply_statuses(tracker: str) -> tuple:
+    """The thread statuses a reply may set on ``tracker`` (``ado`` or ``github``): what
+    ReplyPR accepts there and the PR Comments page's status box offers."""
+    return tuple(consts()["replyStatuses"][tracker])
+
+
 def usage_burn_route() -> str:
     """The current Claude Code burn, today and this week: ``/api/usage/burn``."""
     return consts()["usage"]["burnRoute"]

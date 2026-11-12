@@ -28,6 +28,7 @@ import {
   STUDIO,
   TESTS,
   TOKENS,
+  REPLY_STATUSES_BY_TRACKER,
   USAGE,
   VISIBILITY,
   toRegExp,
@@ -403,6 +404,17 @@ describe("consts.json", () => {
       burnRoute: "/api/usage/burn",
       readingsFolder: "readings",
     });
+
+    // The statuses a reply may set, per tracker.
+    expect(REPLY_STATUSES_BY_TRACKER.ado).toEqual([
+      "fixed",
+      "active",
+      "pending",
+      "byDesign",
+      "wontFix",
+      "closed",
+    ]);
+    expect(REPLY_STATUSES_BY_TRACKER.github).toEqual(["fixed", "closed", "active"]);
   });
 
   // Every key of the contract is stated by this half, so a key added to
@@ -421,6 +433,7 @@ describe("consts.json", () => {
         "folders",
         "regex",
         "reminders",
+        "replyStatuses",
         "repository",
         "reviews",
         "rituals",

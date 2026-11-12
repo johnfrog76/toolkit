@@ -42,7 +42,7 @@ import {
 import type { PRCommentItem } from "./api.ado";
 import { useGetEnvQuery } from "../../shell/api";
 import { logWebError } from "./logError";
-import { TOKENS } from "../../shell/consts";
+import { REPLY_STATUSES_BY_TRACKER, TOKENS } from "../../shell/consts";
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -197,25 +197,34 @@ function decisionColor(d: string): "success" | "danger" | "warning" | "informati
   return "informative";
 }
 
-// ReplyPR's -Status values, in the verb's own spelling (Scripts/Send-PRReply.ps1).
-export const REPLY_STATUSES = [
-  "fixed",
-  "active",
-  "pending",
-  "byDesign",
-  "wontFix",
-  "closed",
-] as const;
-export type ReplyStatus = (typeof REPLY_STATUSES)[number];
+export type ReplyStatus = "fixed" | "active" | "pending" | "byDesign" | "wontFix" | "closed";
+
+// ReplyPR's -Status values, in the verb's own spelling, per tracker: the lists
+// are the contract's (consts.json replyStatuses), Azure DevOps keeping all six
+// and GitHub the three a review thread can be.
+export const REPLY_STATUSES = REPLY_STATUSES_BY_TRACKER.ado as ReplyStatus[];
+
+export function replyStatusesFor(tracker?: string): ReplyStatus[] {
+  return (
+    tracker === "github" ? REPLY_STATUSES_BY_TRACKER.github : REPLY_STATUSES_BY_TRACKER.ado
+  ) as ReplyStatus[];
+}
 
 // What a model's recommendation means for the thread's status: taking the
-// comment fixes it, rejecting it is "won't fix", modifying it is still pending.
-export function statusFor(recommendation: string): ReplyStatus {
+// comment fixes it. On Azure DevOps rejecting it is "won't fix" and modifying
+// it is still pending; GitHub keeps neither, so both leave the thread open.
+export function statusFor(recommendation: string, tracker?: string): ReplyStatus {
   if (recommendation === "take") return "fixed";
+  if (tracker === "github") {
+    return recommendation === "reject" || recommendation === "modify" ? "active" : "fixed";
+  }
   if (recommendation === "reject") return "wontFix";
   if (recommendation === "modify") return "pending";
   return "fixed";
 }
+
+// Said in a draft whose status leaves the thread open on GitHub.
+const LEFT_OPEN_NOTE = "Leaving this thread open.";
 
 interface ReplyDraft {
   reply: string;
@@ -323,9 +332,12 @@ export function PRCommentsDetail({
           code_suggestion: comment.code_suggestion,
         },
       }).unwrap();
+      const leftOpen =
+        env?.tracker === "github" &&
+        (answer.recommendation === "reject" || answer.recommendation === "modify");
       setDraft(threadId, {
-        reply: answer.draft_reply,
-        status: statusFor(answer.recommendation),
+        reply: leftOpen ? `${answer.draft_reply}\n\n${LEFT_OPEN_NOTE}` : answer.draft_reply,
+        status: statusFor(answer.recommendation, env?.tracker),
         hint: `Suggested: ${answer.recommendation} (${answer.confidence} confidence). Edit it before you post.`,
       });
     } catch (e: unknown) {
@@ -643,7 +655,7 @@ export function PRCommentsDetail({
                         })
                       }
                     >
-                      {REPLY_STATUSES.map((value) => (
+                      {replyStatusesFor(env?.tracker).map((value) => (
                         <Option key={value} value={value}>
                           {value}
                         </Option>

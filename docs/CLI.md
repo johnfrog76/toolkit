@@ -180,7 +180,10 @@ state a reopened thread returns to on Azure DevOps, runs `unresolveReviewThread`
 by a node id REST never shows, so the thread is first found by its first comment's REST id
 (`reviewThreads`, a hundred at a time, paged). A thread already in that state is said and left alone.
 `byDesign`, `pending` and `wontFix` carry a reason GitHub has nowhere to keep, so each is **refused by
-name, before anything is asked or posted**, exit 2 -- say it in the reply instead. On a conversation
+name, before anything is asked or posted**, exit 2 -- say it in the reply instead. The statuses each
+tracker accepts are one list in `consts.json` (`replyStatuses`): `ReplyPR`'s refusal reads GitHub's, and
+the PR Comments page offers only those on a GitHub Space (`fixed`, `closed`, `active`), mapping a
+suggested reject or modify to `active` and saying in the draft that the thread is left open. On a conversation
 comment or a review summary there is no thread to resolve: the reply is posted and the line says
 `-Status` was not applied. The card's `Status:` line reads `resolved` or `unresolved` afterwards.
 
