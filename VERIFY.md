@@ -1265,6 +1265,17 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   backslash after a space`. On macOS and Linux the same rows run a second time with `Legacy` passing, which is
   5.1's rule in PowerShell 7; this row is 5.1's own command line and git for Windows reading it. The `ps51` job
   runs the suite on 5.1 too.
+- [ ] **A Space's checkout whose path has a space and ends in a backslash is found under Windows PowerShell 5.1
+  (#407).** On the Windows PC, clone a repository a Space names into a folder with a space in its path, say
+  `C:\My Repos\product`. In `powershell` (5.1), in that Space, run
+  `tkConfig -Set "spaceCheckouts.<slug>.path=C:\My Repos\product\"` (the trailing backslash is the point), then
+  `tkMoveDesign <id> -To Spec -Space <slug> -WhatIf` for a note in that product. It names the clone at
+  `C:\My Repos\product` and the move it would make; it does not say `it is not inside a git repository`. Then run
+  `tkTestToolkit -Design -Portability`: the line `a clone in a folder with a space, asked for with a trailing
+  separator, is found (Desktop 5.1...)` passes, the one after it too, and so does every `Clause 23: the shipped
+  reader hands git ...` line, `a checkout path with a space and a trailing backslash, and the arguments after it`
+  among them. Those rows are `Invoke-P20TrackerRead` escaping for 5.1's own command line, which no other host
+  builds; the `ps51` job runs both suites on 5.1 too.
 
 ## Recording a run
 

@@ -322,7 +322,8 @@ is no "not configured": the shipped config answers `none`.
   count that was true a minute ago.
 
 Every git call this makes is the CLI half's -- `Scripts/Get-HubSyncState.ps1`, through
-`Invoke-P20TrackerRead` -- so it reads the same on Windows PowerShell 5.1 as on 7. The hub must be the
+`Invoke-P20TrackerRead` -- so it reads the same on Windows PowerShell 5.1 as on 7, a hub whose path holds a
+space and ends in a separator included. The hub must be the
 root of its repository, the same question `Sync` asks before it writes; a hub with no upstream branch
 says so in git's words.
 
@@ -400,8 +401,9 @@ shipped file carries an empty `limits` block and nothing in it.
 
 Where a Space's own repository is cloned **on this machine**: `tkConfig -Set spaceCheckouts.toolkit.path=~/Repos/toolkit`,
 or the **This Space's checkout** row in Settings (the drawer lists the Space you are in; another Space's is set by
-its key). A folder anywhere inside the clone will do; the path is absolute or starts with `~`. Keyed by the
-Space's slug, and the slug must be a declared Space.
+its key). A folder anywhere inside the clone will do; the path is absolute or starts with `~`, and a separator
+at its end is ignored (`C:\My Repos\product\` reads as `C:\My Repos\product`; a drive root stays as written).
+Keyed by the Space's slug, and the slug must be a declared Space.
 
 **It is this machine's, and only ever this machine's.** It is written to `config.local.json` and nowhere else:
 `-Hub` with it is refused, and a `spaceCheckouts` block in `config.default.json` or `hub.json` is read by

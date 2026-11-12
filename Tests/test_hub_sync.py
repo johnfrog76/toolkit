@@ -270,6 +270,18 @@ class TheScriptAgainstARealRemote(unittest.TestCase):
         self.assertTrue(out["fetchError"])
         self.assertEqual(out["ahead"], 0)
 
+    def test_a_hub_with_a_space_in_its_path_and_a_separator_at_its_end_reads(self):
+        # Under Windows PowerShell 5.1, `...\\my hub\\` reached git with its
+        # closing quote read into the path. The script takes the separator off
+        # and the reader escapes for that host; elsewhere this passes either way.
+        spaced = self.tmp / "my hub"
+        subprocess.run(["git", "clone", "-q", "-b", "main", str(self.remote), str(spaced)], check=True)
+        self.git(spaced, "commit", "-q", "--allow-empty", "-m", "mine")
+        out = hub_sync._run(str(spaced) + os.sep, fetch=True)
+        self.assertIsNone(out["error"])
+        self.assertTrue(out["fetched"])
+        self.assertEqual((out["ahead"], out["behind"]), (1, 0))
+
     def test_a_folder_that_is_not_the_root_says_so(self):
         sub = self.hub / "sub"
         sub.mkdir()

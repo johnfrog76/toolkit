@@ -30,6 +30,23 @@
 # percent-encoded byte (%2F) passes, because a URL path carries them: gh's branch
 # path does, and gh can be a .cmd shim. Two such bytes with a letter first (%C3%A9) have a variable's shape and are refused, on a rare path.
 #
+# A host that joins a native command's arguments into one line itself (Windows
+# PowerShell 5.1, PowerShell 7.0 to 7.2, a later one set to Legacy) loses an
+# empty argument and a double quote, and 5.1 wraps `C:\My Repos\r\` in quotes
+# without doubling its last backslash, so the tool reads the closing quote as
+# part of the value and the arguments after it are swallowed. On such a host
+# every argument goes through ConvertTo-P20NativeArgument
+# (ConvertTo-NativeArgument.ps1, dot-sourced here), the one rule the test helper
+# Invoke-P20TestGit calls too. The order is: the .cmd rule reads each argument AS
+# WRITTEN, so it refuses exactly what it refused before, and only then is what
+# passed converted. The conversion adds nothing cmd.exe reads: an argument with
+# a double quote never gets this far for a .cmd, an empty one becomes "", and a
+# doubled backslash is not syntax there.
+#
+if (-not (Get-Command ConvertTo-P20NativeArgument -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'ConvertTo-NativeArgument.ps1')
+}
+
 function Test-P20CmdArgument {
     param([AllowEmptyString()][string]$Argument)
     if ($Argument -match '["\r\n]') { return $false }
@@ -75,9 +92,15 @@ function Invoke-P20TrackerRead {
     $isAz = ([System.IO.Path]::GetFileNameWithoutExtension($Tool) -eq 'az')
     $savedPython = [System.Environment]::GetEnvironmentVariable('PYTHONIOENCODING')
     if ($isAz) { [System.Environment]::SetEnvironmentVariable('PYTHONIOENCODING', 'utf-8') }
+    # What the host is handed: each argument as written, or on a host that
+    # builds the command line itself, as that host has to be given it.
+    $passed = @($Arguments)
+    if (Test-P20LegacyNativeArguments) {
+        $passed = @($Arguments | ForEach-Object { ConvertTo-P20NativeArgument $_ })
+    }
     $global:LASTEXITCODE = 0
     try {
-        $raw = @(& $Tool @Arguments 2>&1)
+        $raw = @(& $Tool @passed 2>&1)
     }
     catch {
         $said = "$Tool could not be started: $($_.Exception.Message)"

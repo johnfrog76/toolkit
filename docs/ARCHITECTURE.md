@@ -413,6 +413,7 @@ Config/                 One opt-in module's CLI contribution per pair (D-CM, doc
 Scripts/                One script per command, core and module alike
   Get-Consts.ps1          The CLI's reader for consts.json -- dot-sourced, not a verb
   Invoke-TrackerRead.ps1  Invoke-P20TrackerRead, the one gh/az call (stderr as text on 5.1 too) -- dot-sourced
+  ConvertTo-NativeArgument.ps1  How an argument is handed to a host that builds the command line itself (5.1), and a folder path without its trailing separator -- dot-sourced
   Get-AdoToken.ps1        The Azure DevOps token, its headers and the 401/403 advice, for every ADO script -- dot-sourced
   Initialize-CliFallbacks.ps1  Get-CliPrefix and Write-CliError for a script run with no module -- dot-sourced
 Prompt20Toolkit/        Autoload shim installed into the module path
