@@ -13,7 +13,7 @@ import { FlagRegular, OpenRegular, TrophyRegular } from "@fluentui/react-icons";
 import { useGetEnvQuery } from "../../shell/api";
 import { lazyPart } from "../../shell/lazy";
 import { EmptyState } from "../../shared/EmptyState";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import type { Milestone } from "../ado/api.ado";
 import { milestoneProgress, milestoneStage, orderMilestones } from "../ado/milestones";
 import { useGetRitualMilestonesQuery } from "./api.solitaireAgile";
@@ -201,7 +201,7 @@ export function MilestonesPage() {
 
   return (
     <div className={styles.body}>
-      <PageCard
+      <PanelFrame
         loading={envLoading || isLoading}
         loadingLabel="Reading the milestones..."
         empty={empty}
@@ -218,7 +218,7 @@ export function MilestonesPage() {
         {list.map((m) => (
           <MilestoneRow key={`${m.repo}-${m.number}`} m={m} stage={stageOf(m)} />
         ))}
-      </PageCard>
+      </PanelFrame>
       {awarding.length > 0 && (
         <AwardDialog
           milestones={awarding}

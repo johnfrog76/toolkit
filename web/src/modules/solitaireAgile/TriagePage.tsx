@@ -13,7 +13,7 @@ import {
 } from "@fluentui/react-components";
 import { ArrowNextRegular, TaskListLtrRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { useGetEnvQuery } from "../../shell/api";
 import { RITUALS } from "../../shell/consts";
@@ -254,7 +254,7 @@ export function TriagePage() {
 
   return (
     <div className={styles.page}>
-      <PageCard
+      <PanelFrame
         loading={envLoading || isLoading}
         loadingLabel="Reading the open issues..."
         empty={empty}
@@ -425,7 +425,7 @@ export function TriagePage() {
             </div>
           </div>
         )}
-      </PageCard>
+      </PanelFrame>
       {splitting !== null && (
         <ActionDialog
           open

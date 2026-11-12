@@ -41,7 +41,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { AlertRegular, EditRegular, SnoozeRegular } from "@fluentui/react-icons";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { HubSyncLine } from "../ado/HubSyncLine";
 import { CreateButton } from "../../shared/CreateButton";
 import { FilterBadge } from "../../shared/FilterBadge";
@@ -308,7 +308,7 @@ export function RemindersCard() {
 
   return (
     <>
-      <PageCard
+      <PanelFrame
         scrollable
         loading={isLoading}
         loadingLabel="Loading reminders..."
@@ -395,7 +395,7 @@ export function RemindersCard() {
             />
           ))
         )}
-      </PageCard>
+      </PanelFrame>
 
       {/* Mounted only while open, so each opening starts from empty fields. */}
       {addOpen && (
