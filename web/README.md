@@ -12,7 +12,7 @@ This is one of the Toolkit's three halves. It reads through the agent (`../agent
 [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md#the-web-ui) is the short version of this file; this
 one is the detail. The root [`README.md`](../README.md) is the map of every document.
 
-The shared components -- `PageCard`, `CardActions`, the dialog parts, `EmptyState` and the rest -- have
+The shared components -- `PanelFrame` and the panel kinds, `CardActions`, the dialog parts, `EmptyState` and the rest -- have
 one document, [`COMPONENTS.md`](COMPONENTS.md): what each is for, when to use it, its props and its
 test.
 
