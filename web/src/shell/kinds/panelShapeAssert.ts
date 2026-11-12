@@ -3,7 +3,8 @@ import { PANEL_BODY, PANEL_MAX_HEIGHT_PX, PANEL_MIN_HEIGHT_PX } from "../panelHe
 import { cardListGap, cardListPaddingTop, filterRowGap } from "../layoutTokens";
 
 /** A token as a rule spells it: `var(--spacingVerticalXS)`, or 0 with or without a unit. */
-const cssValue = (value: string) => (value === "0" ? "0(px)?" : value.replace(/[()]/g, "\\$&"));
+const cssValue = (value: string) =>
+  value === "0" ? "0(px)?" : value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 import { listChromePx, listHeightPx, listPageSize } from "../pageSize";
 import type { ListChrome, ListDensity } from "../pageSize";
 
