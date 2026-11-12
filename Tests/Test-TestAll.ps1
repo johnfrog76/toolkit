@@ -300,8 +300,11 @@ Assert-True 'the Windows job runs the CLI from Windows PowerShell 5.1, the modul
     ($workflow -match "powershell\.exe -NoProfile -Command '\`$env:PSModulePath = \(Resolve-Path \.\); Import-Module \./Prompt20Toolkit/Prompt20Toolkit\.psd1 -Force; tkTest -Half cli; exit \`$LASTEXITCODE'")
 # tkTest starts the runner in pwsh, so the step above runs every suite on 7, and
 # its name says so. The ps51 job starts the runner in powershell.exe with no suite
-# switch, which starts every suite, and they their verbs, in 5.1
-# (Tests/Get-TestHost.ps1), read through the same gate.
+# switch, which starts every suite in 5.1, so every suite's own code runs there.
+# A suite that starts its children through Invoke-P20TestHost
+# (Tests/Get-TestHost.ps1) runs its verbs in 5.1 too; the rest still start pwsh
+# by name, and Test-Portability's Clause 22 lists them. The job is read through
+# the same gate.
 Assert-True 'the smoke job''s CLI step says it runs the suites in PowerShell 7' `
     ($workflow -match "(?m)^\s+- name: The CLI in PowerShell 7 on Windows -- tkTest -Half cli\s*$")
 $ps51Job = Get-WfJob 'ps51'
