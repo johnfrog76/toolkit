@@ -282,7 +282,7 @@ time zones can show the same reminder as due on one and as upcoming on the other
 
 **Where you meet it:** [Organize](modules/organize.md#known-gaps), "Known gaps"
 
-**Issue:** [#359](https://github.com/johnfrog76/toolkit/issues/359)
+**Issue:** [#374](https://github.com/johnfrog76/toolkit/issues/374)
 
 ### A meeting's follow-up does not become a reminder
 
@@ -291,7 +291,7 @@ meeting stays a line in the meeting's record until someone types `NewReminder` f
 
 **Where you meet it:** [Organize](modules/organize.md#known-gaps), "Known gaps"
 
-**Issue:** [#359](https://github.com/johnfrog76/toolkit/issues/359)
+**Issue:** [#375](https://github.com/johnfrog76/toolkit/issues/375)
 
 ### A reminder that names an archived card does not link to it
 
@@ -301,7 +301,7 @@ archived, the row names the card and says `(done)`, with no link: the card page 
 
 **Where you meet it:** [Organize](modules/organize.md#known-gaps), "Known gaps"
 
-**Issue:** [#359](https://github.com/johnfrog76/toolkit/issues/359)
+**Issue:** [#376](https://github.com/johnfrog76/toolkit/issues/376)
 
 ### An archived training leaves its quarter's count
 
@@ -311,7 +311,7 @@ dated in. The line shows the current quarter only, with no history of earlier on
 
 **Where you meet it:** [Growth](modules/growth.md#known-gaps), "Known gaps"
 
-**Issue:** [#359](https://github.com/johnfrog76/toolkit/issues/359)
+**Issue:** [#377](https://github.com/johnfrog76/toolkit/issues/377)
 
 ### An agenda line becomes a card from the terminal only
 
@@ -321,7 +321,7 @@ line back naming the card.
 
 **Where you meet it:** [Communication](modules/communication.md#known-gaps), "Known gaps"
 
-**Issue:** [#359](https://github.com/johnfrog76/toolkit/issues/359)
+**Issue:** [#378](https://github.com/johnfrog76/toolkit/issues/378)
 
 ### Deck voices and your own decks are not made in the Toolkit
 
@@ -332,7 +332,7 @@ The engine's `ShellEmbed` piece is not carried, so a deck cannot embed a shell's
 
 **Where you meet it:** [the deck module](modules/deck.md#known-gaps), "Known gaps"
 
-**Issue:** [#359](https://github.com/johnfrog76/toolkit/issues/359)
+**Issue:** [#379](https://github.com/johnfrog76/toolkit/issues/379)
 
 ### A prompt is not started from the Prompts card
 
@@ -341,7 +341,7 @@ is no action that starts work from a prompt: the text is copied and carried to a
 
 **Where you meet it:** [the Studio](modules/studio.md#known-gaps), "Known gaps"
 
-**Issue:** [#359](https://github.com/johnfrog76/toolkit/issues/359)
+**Issue:** [#380](https://github.com/johnfrog76/toolkit/issues/380)
 
 ### New Space lists the first 1000 repositories
 
@@ -351,7 +351,7 @@ reads it the same way.
 
 **Where you meet it:** [the Studio](modules/studio.md#known-gaps), "Known gaps"
 
-**Issue:** [#359](https://github.com/johnfrog76/toolkit/issues/359)
+**Issue:** [#381](https://github.com/johnfrog76/toolkit/issues/381)
 
 ### New Space adds one existing GitHub repository at a time
 
@@ -361,7 +361,7 @@ terminal with `NewSpace <slug> -Address <url>`, then `Connect <slug> -Discover`.
 
 **Where you meet it:** [the Studio](modules/studio.md#known-gaps), "Known gaps"
 
-**Issue:** [#359](https://github.com/johnfrog76/toolkit/issues/359)
+**Issue:** [#382](https://github.com/johnfrog76/toolkit/issues/382)
 
 ### The agent and the CLI each resolve the agentic extension path
 
@@ -372,7 +372,7 @@ terminal read different folders.
 
 **Where you meet it:** [the Studio](modules/studio.md#known-gaps), "Known gaps"
 
-**Issue:** [#359](https://github.com/johnfrog76/toolkit/issues/359)
+**Issue:** [#383](https://github.com/johnfrog76/toolkit/issues/383)
 
 ### A launched session does not report back to the page
 
@@ -382,7 +382,7 @@ and which are done: you look at the tracker or the log.
 
 **Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
 
-**Issue:** [#359](https://github.com/johnfrog76/toolkit/issues/359)
+**Issue:** [#384](https://github.com/johnfrog76/toolkit/issues/384)
 
 ### The bell and Home's tips carry no suggestion
 
@@ -391,7 +391,7 @@ notification bell and the tips on Home do not show it.
 
 **Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
 
-**Issue:** [#359](https://github.com/johnfrog76/toolkit/issues/359)
+**Issue:** [#385](https://github.com/johnfrog76/toolkit/issues/385)
 
 ### A reached milestone celebrates once per browser
 
@@ -400,7 +400,7 @@ one whose site data was cleared, celebrates the same milestone once more the fir
 
 **Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
 
-**Issue:** [#359](https://github.com/johnfrog76/toolkit/issues/359)
+**Issue:** [#386](https://github.com/johnfrog76/toolkit/issues/386)
 
 ### The dress guard reads names by their capital
 
@@ -412,7 +412,7 @@ other, so the same facts are not asked again until they change.
 
 **Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
 
-**Issue:** [#359](https://github.com/johnfrog76/toolkit/issues/359)
+**Issue:** [#387](https://github.com/johnfrog76/toolkit/issues/387)
 
 ### A Route typed in a terminal reaches the page a minute later
 
@@ -422,7 +422,7 @@ out, or at once on the Triage page's Refresh.
 
 **Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
 
-**Issue:** [#359](https://github.com/johnfrog76/toolkit/issues/359)
+**Issue:** [#388](https://github.com/johnfrog76/toolkit/issues/388)
 
 ### The played standup is a first cut
 
@@ -433,7 +433,7 @@ and the nonsense register's door is not drawn on the stage.
 
 **Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
 
-**Issue:** [#359](https://github.com/johnfrog76/toolkit/issues/359)
+**Issue:** [#389](https://github.com/johnfrog76/toolkit/issues/389)
 
 ### A card linked to an unrouted issue is in no slot
 
@@ -444,7 +444,7 @@ shows.
 
 **Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
 
-**Issue:** [#359](https://github.com/johnfrog76/toolkit/issues/359)
+**Issue:** [#390](https://github.com/johnfrog76/toolkit/issues/390)
 
 ### The standup's prose reads no age, pull request or assignee
 
@@ -454,7 +454,7 @@ closed in the window: an issue that moved to review since the last standup is no
 
 **Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
 
-**Issue:** [#359](https://github.com/johnfrog76/toolkit/issues/359)
+**Issue:** [#391](https://github.com/johnfrog76/toolkit/issues/391)
 
 ### The terminal's standup refuses a Space with several repositories
 
@@ -475,7 +475,7 @@ DevOps sentence is shared by both.
 
 **Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
 
-**Issue:** [#359](https://github.com/johnfrog76/toolkit/issues/359)
+**Issue:** [#392](https://github.com/johnfrog76/toolkit/issues/392)
 
 ## True by design
 
