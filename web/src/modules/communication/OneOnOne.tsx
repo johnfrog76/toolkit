@@ -35,7 +35,7 @@ import { DialogDismiss } from "../../shared/DialogDismiss";
 import { Pagination } from "../../shared/Pagination";
 import { usePagination } from "../../hooks/usePagination";
 import { RefreshButton } from "../../shared/RefreshButton";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { CreateButton } from "../../shared/CreateButton";
 import { useGetManagerQuery, useCreateManagerSessionMutation } from "./api.communication";
 import { oneOnOnePath, sessionPath } from "./paths";
@@ -236,7 +236,7 @@ export function OneOnOne() {
 
   return (
     <>
-      <PageCard
+      <PanelFrame
         scrollable
         loading={isLoading}
         loadingLabel="Loading meetings..."
@@ -292,7 +292,7 @@ export function OneOnOne() {
         ) : (
           pagedItems.map((item) => <SessionRow key={item.filename} item={item} />)
         )}
-      </PageCard>
+      </PanelFrame>
 
       <Dialog open={dialogOpen} onOpenChange={(_e, d) => setDialogOpen(d.open)}>
         <DialogSurface>

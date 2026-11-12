@@ -20,7 +20,8 @@ const DOC = path.join(WEB, "COMPONENTS.md");
 
 /** The files whose exports are the shared layer this document covers. */
 const SHARED_FILES = [
-  "src/shared/PageCard.tsx",
+  "src/shared/PanelFrame.tsx",
+  "src/shell/kinds/ListPanel.tsx",
   "src/shared/CardActions.tsx",
   "src/shared/DialogDismiss.tsx",
   "src/shared/ConfirmDialog.tsx",
@@ -41,7 +42,9 @@ const SHARED_FILES = [
  * has no table.
  */
 const SOURCES: Record<string, { type: string } | "none"> = {
-  PageCard: { type: "PageCardProps" },
+  PanelFrame: { type: "PanelFrameProps" },
+  ListPanel: { type: "ListPanelProps" },
+  CARD_LIST_CLASS: "none",
   CardActions: { type: "CardActionsProps" },
   CardAction: { type: "CardAction" },
   ROW: "none",
