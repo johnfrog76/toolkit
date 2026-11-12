@@ -26,6 +26,7 @@ own checkout -- and it need not be a git repository (`storeSync`, [Configuration
     archive/
   agentic/                  the hub's own agentic workflow prompts, if it keeps any
   usage/                    the day's Claude Code usage, one record per day per machine (Burn -Log)
+    readings/               the plan's typed weekly readings, one file per week per machine (Burn -Reading)
 ```
 
 | Folder | What one file is | Scope | The shape's owner | Example |
@@ -41,7 +42,7 @@ own checkout -- and it need not be a git repository (`storeSync`, [Configuration
 | `reminders/` | one reminder -- a note to yourself with a due date -- `current/` then `archive/` | the engineer | [`reminders.md`](reminders.md) | `samples/hub/reminders/`, `Tests/fixtures/hub/reminders/` |
 | `design/`, `design/archive/`, `spec/`, `spec/archive/` | one design note, or the spec it graduated to -- the same four folders a product's repo keeps, and the same state read from where the files are (Design, Spec, Complete, Archived) | the engineer | [`design.md`](design.md) | `Tests/fixtures/hub/design/`, `Tests/fixtures/design/states.json` |
 | `agentic/` | one prompt of yours, `<name>.prompt.md` -- listed on the Studio's Prompts card under **Your hub**, on every machine | the engineer | [A prompt of yours](#a-prompt-of-yours----agentic) below; [`agentic/README.md`](../../agentic/README.md) | `agentic/` in the package -- the shipped ones are the same shape |
-| `usage/` | `<yyyy-mm-dd>-<machine>.json` -- **the day's Claude Code usage** on one machine, read from Claude Code's own session files: tokens by model and by session, a cost derived from list prices. Written by `Burn -Log`, replaced whole on a re-run | the engineer, per machine | [`usage.md`](usage.md) | `Tests/fixtures/usage/record.json` |
+| `usage/` | `<yyyy-mm-dd>-<machine>.json` -- **the day's Claude Code usage** on one machine, read from Claude Code's own session files: tokens by model and by session, a cost derived from list prices. Written by `Burn -Log`, replaced whole on a re-run. And `readings/<week start>-<machine>.json` -- **the plan's weekly readings**, typed with `Burn -Reading`, appended | the engineer, per machine | [`usage.md`](usage.md) | `Tests/fixtures/usage/record.json` |
 | `hub.json` | the hub's manifest: its orgs, the nine folder names above, `storeSync`, and nothing else | the hub | [Configuration](../CONFIGURATION.md#the-hub-declares-its-orgs) | `samples/hub/hub.json` |
 
 **Two scopes, and the difference is real.** A card belongs to an ORG: switch org and you see a different

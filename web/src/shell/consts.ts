@@ -430,6 +430,7 @@ export function toRegExp(pattern: string, extraFlags = ""): RegExp {
 export const USAGE = consts.usage as {
   envFlag: string;
   burnRoute: string;
+  readingsFolder: string;
 };
 
 /**

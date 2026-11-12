@@ -661,6 +661,13 @@ def usage_burn_route() -> str:
     return consts()["usage"]["burnRoute"]
 
 
+def usage_readings_folder() -> str:
+    """``readings`` -- the subfolder of the hub's ``usage/`` that holds the typed plan
+    readings ``Burn -Reading`` appends to, one file per week per machine. The burn
+    route fingerprints it, so a new reading is a miss in its cache."""
+    return consts()["usage"]["readingsFolder"]
+
+
 def startwork_how_we_work_note() -> str:
     """``agentic/how-we-work.md`` -- the Space's own note, relative to its folder in the
     hub: HowWeWork writes it, StartWork quotes it, the Studio's Prompts card lists it."""

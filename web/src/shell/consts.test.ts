@@ -381,7 +381,11 @@ describe("consts.json", () => {
     // Claude Code usage: /env's flag (the CLI inventory row's key) and the burn route.
     const { _: usageDoc, ...usageKeys } = USAGE as typeof USAGE & { _: string };
     expect(usageDoc).toMatch(/Burn -AsJson/);
-    expect(usageKeys).toEqual({ envFlag: "claudeUsage", burnRoute: "/api/usage/burn" });
+    expect(usageKeys).toEqual({
+      envFlag: "claudeUsage",
+      burnRoute: "/api/usage/burn",
+      readingsFolder: "readings",
+    });
 
     // The statuses a reply may set, per tracker.
     expect(REPLY_STATUSES_BY_TRACKER.ado).toEqual([

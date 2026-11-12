@@ -44,6 +44,16 @@
                      a record skipped; -At's refusals; burn.weekStarts set
                      through Config (a bad value refused) and read by Burn,
                      and one Burn cannot read refused naming the key.
+   12. The burndown  Tests/fixtures/usage/burndown.json, the rule from typed
+                     readings to each bucket's percent, pace and gap and the
+                     cache line (no reading, one bucket, ahead, behind, on pace,
+                     rounding, latest wins, stale, past reset, after now);
+                     burn.cacheHours' range; what -Reading accepts.
+   13. -Reading      Burn -Reading typed: the week's record started and
+                     appended (UTF-8, no BOM, LF), another machine's readings
+                     merged, last week's not counted, the refusals writing
+                     nothing, Burn and -AsJson carrying the burndown, a new week
+                     empty, burn.cacheHours set through Config and read by Burn.
 
     Run:  pwsh -File Tests/Test-Burn.ps1
 #>
@@ -216,7 +226,7 @@ try {
     Write-Host "-- Registration ----------------------------------------" -ForegroundColor Cyan
     $reg = Invoke-Burn "'MAP=' + (Get-P20CommandMap); tkBurn -Help"
     Assert-True 'Burn is in the command table the bridge reads' ($reg.All -match '"Burn":\s*"Invoke-P20Burn"') $reg.All
-    Assert-True '-Help prints the usage from config' ($reg.All.Contains('tkBurn [-AsJson] [-At <yyyy-mm-dd HH:mm>] [-Log] [-Date <yyyy-mm-dd>]')) $reg.All
+    Assert-True '-Help prints the usage from config' ($reg.All.Contains('tkBurn [-AsJson] [-At <yyyy-mm-dd HH:mm>] [-Reading <bucket=percent,...>] [-Log] [-Date <yyyy-mm-dd>]')) $reg.All
     $manifest = Get-Content (Join-Path $pkgRoot 'Prompt20Toolkit/Prompt20Toolkit.psd1') -Raw
     Assert-True 'the autoload manifest names tkBurn (core, no flag)' ($manifest -match "'tkBurn',")
 
@@ -490,7 +500,12 @@ try {
         Test-NoPrivateText 'the -AsJson answer' $s.Text
     }
     $s = Get-Section $r.All 'console'
-    Assert-True 'Burn -At: exit 0, today and this week, the cost derived, never a share of the plan' ($s.Exit -eq '0' -and $s.Text.Contains("as of $at") -and $s.Text.Contains('Today, ') -and $s.Text.Contains('This week, from ') -and $s.Text.Contains('the week starts Friday 05:00, burn.weekStarts') -and $s.Text.Contains("not the plan's allocation") -and $s.Text -notmatch '\d%') $s.Text
+    # The burn's own blocks carry no percentage: the plan's share is the burndown's, and typed.
+    $burnPart = $s.Text
+    $burnAt = $burnPart.IndexOf('Claude Code burn on')
+    if ($burnAt -ge 0) { $burnPart = $burnPart.Substring($burnAt) }
+    Assert-True 'Burn -At: exit 0, today and this week, the cost derived, never a share of the plan' ($s.Exit -eq '0' -and $burnAt -ge 0 -and $s.Text.Contains("as of $at") -and $s.Text.Contains('Today, ') -and $s.Text.Contains('This week, from ') -and $s.Text.Contains('the week starts Friday 05:00, burn.weekStarts') -and $s.Text.Contains("not the plan's allocation") -and $burnPart -notmatch '\d%') $s.Text
+    Assert-True '  and opens with the burndown, no reading yet, saying how to record one' ($burnAt -gt $s.Text.IndexOf('Weekly burndown') -and $s.Text.IndexOf('Weekly burndown') -ge 0 -and $s.Text.Contains('no reading this week') -and $s.Text.Contains('tkBurn -Reading general=<n>,premium=<n>')) $s.Text
     Assert-True '  and says Haiku is priced at its lower rate card' ($s.Text.Contains('claude-haiku-5-5 is priced at its lower rate card')) $s.Text
     $s = Get-Section $r.All 'atbad'
     Assert-True '-At that is not a time: exit 2, one Error block' ($s.Exit -eq '2' -and $s.Text.Contains('is not a time') -and (@([regex]::Matches($s.Text, '(?m)^Error: ')).Count -eq 1)) $s.Text
@@ -514,6 +529,135 @@ try {
     $s = Get-Section $r.All 'handbad'
     Assert-True 'a burn.weekStarts Burn cannot read: exit 2, naming the key and the file' ($s.Exit -eq '2' -and $s.Text.Contains("burn.weekStarts is a day and a 24-hour time") -and $s.Text.Contains('config.local.json') -and (@([regex]::Matches($s.Text, '(?m)^Error: ')).Count -eq 1)) $s.Text
     Assert-True 'Burn reads the projects folder and changes nothing in it' ($before -eq $after)
+
+    # -- 12. The burndown's rule: Tests/fixtures/usage/burndown.json ------------------------------
+    Write-Host ""
+    Write-Host "-- The burndown's rule: Tests/fixtures/usage/burndown.json --" -ForegroundColor Cyan
+    . (Join-Path $pkgRoot 'Scripts/Read-BurnReadings.ps1')
+    $bd = [System.IO.File]::ReadAllText((Join-Path $fixtures 'burndown.json')) | ConvertFrom-Json @jsonArgs
+    $bdBuckets = @(Get-P20BurnBuckets -Value @($bd.buckets))
+    $nullText = { param($v) if ($null -eq $v) { 'null' } else { [string]$v } }
+    foreach ($case in @($bd.cases)) {
+        $entries = @()
+        foreach ($e in @($case.entries)) {
+            $b = [ordered]@{}
+            foreach ($p in $e.buckets.PSObject.Properties) { $b[$p.Name] = [int]$p.Value }
+            $entries += @{ At = (ConvertTo-P20UtcInstant $e.at); Machine = [string]$e.machine; Buckets = $b }
+        }
+        $got = Get-P20Burndown -WeekStart (ConvertTo-P20UtcInstant $bd.weekStart) -WeekEnd (ConvertTo-P20UtcInstant $bd.weekEnd) `
+            -Now (ConvertTo-P20UtcInstant $case.now) -CacheHours ([int]$case.cacheHours) -Buckets $bdBuckets -Entries $entries -Product 'claude'
+        $wantText = @(); $gotText = @()
+        foreach ($b in $bdBuckets) {
+            $w = $case.expect.buckets.($b.key)
+            if ($null -eq $w) { $wantText += "$($b.key)=none" } else { $wantText += "$($b.key)=$($w.percent)/$($w.pace)/$($w.gap)@$($w.readingAt) by $($w.machine)" }
+            $g = @($got.buckets | Where-Object { $_.key -eq $b.key })[0]
+            if ($null -eq $g.percent) { $gotText += "$($b.key)=none" } else { $gotText += "$($b.key)=$($g.percent)/$($g.pace)/$($g.gap)@$($g.readingAt) by $($g.machine)" }
+        }
+        Assert-Equal "burndown: $($case.name)" ($wantText -join '; ') ($gotText -join '; ')
+        Assert-Equal "  cached, renews, due" "$(& $nullText $case.expect.cachedAt) / $(& $nullText $case.expect.renewsAt) / $($case.expect.due)" "$(& $nullText $got.cachedAt) / $(& $nullText $got.renewsAt) / $($got.due)"
+    }
+    foreach ($v in @(@{ t = ''; ok = '4' }, @{ t = '1'; ok = '1' }, @{ t = '168'; ok = '168' }, @{ t = ' 6 '; ok = '6' }, @{ t = '0'; ok = '' }, @{ t = '169'; ok = '' }, @{ t = '2.5'; ok = '' }, @{ t = '-3'; ok = '' }, @{ t = 'four'; ok = '' })) {
+        $h = Get-P20BurnCacheHours -Value $v.t
+        $read = ''
+        if ($h.Ok) { $read = [string]$h.Hours }
+        Assert-Equal "burn.cacheHours '$($v.t)' reads as '$(if ($v.ok) { $v.ok } else { 'refused' })'" $v.ok $read
+    }
+    foreach ($v in @(
+            @{ t = @('general=43', 'premium=54'); want = 'general=43,premium=54' },
+            @{ t = @('General = 7'); want = 'general=7' },
+            @{ t = @('premium=54%'); want = 'premium=54' },
+            @{ t = @('premium=0,general=100'); want = 'premium=0,general=100' },
+            @{ t = @('general=101'); want = 'refused' },
+            @{ t = @('general=4.5'); want = 'refused' },
+            @{ t = @('gold=5'); want = 'refused' },
+            @{ t = @('general=4,general=5'); want = 'refused' },
+            @{ t = @('general'); want = 'refused' },
+            @{ t = @(''); want = 'refused' })) {
+        $r2 = ConvertFrom-P20BurnReading -Text $v.t -Buckets $bdBuckets
+        $read = 'refused'
+        if ($r2.Ok) { $read = (@($r2.Values.Keys | ForEach-Object { "$_=$($r2.Values[$_])" }) -join ',') }
+        Assert-Equal "-Reading '$($v.t -join ',')' reads as $($v.want)" $v.want $read
+    }
+
+    # -- 13. Burn -Reading, typed -----------------------------------------------------------------
+    # The week of cases.json's day (a Wednesday) starts Friday 05:00 the 10th
+    # under the default. Two readings from this machine, one from laptop's file,
+    # last week's file not counted, a refusal writing nothing.
+    Write-Host ""
+    Write-Host "-- Burn -Reading, typed ------------------------------" -ForegroundColor Cyan
+    $readingsDir = Join-Path $usageDir 'readings'
+    $weekKey = '2026-07-10'
+    $mine = Join-Path $readingsDir "$weekKey-$machine.json"
+    New-Item -ItemType Directory -Path $readingsDir -Force | Out-Null
+    $stampOf = { param([string]$Text) (& $local $Text).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ', $inv) }
+    $laptopBody = [ordered]@{ readings = 1; product = 'claude'; source = 'typed'; machine = 'laptop'; weekStart = (& $stampOf '2026-07-10 05:00'); weekStarts = 'Friday 05:00 local'
+        entries = @([ordered]@{ at = (& $stampOf '2026-07-15 10:00'); buckets = [ordered]@{ general = 50 } }) }
+    [System.IO.File]::WriteAllText((Join-Path $readingsDir "$weekKey-laptop.json"), ($laptopBody | ConvertTo-Json -Depth 6), $utf8)
+    $lastBody = [ordered]@{ readings = 1; machine = $machine; entries = @([ordered]@{ at = (& $stampOf '2026-07-08 12:00'); buckets = [ordered]@{ general = 99; premium = 99 } }) }
+    [System.IO.File]::WriteAllText((Join-Path $readingsDir "2026-07-03-$machine.json"), ($lastBody | ConvertTo-Json -Depth 6), $utf8)
+    $snippet = "'BEGIN:first'`ntkBurn -Reading general=43,premium=54 -At '2026-07-14 09:10'`n'END:first=' + `$LASTEXITCODE`n"
+    $snippet += "'BEGIN:second'`ntkBurn -Reading premium=60 -At '2026-07-15 08:00'`n'END:second=' + `$LASTEXITCODE`n"
+    foreach ($bad in @(@('big', 'general=101'), @('gold', 'gold=5'), @('twice', "'general=4,general=5'"))) {
+        $snippet += "'BEGIN:$($bad[0])'`ntkBurn -Reading $($bad[1]) -At '2026-07-15 09:00'`n'END:$($bad[0])=' + `$LASTEXITCODE`n"
+    }
+    $snippet += "'BEGIN:withlog'`ntkBurn -Reading general=40 -Log`n'END:withlog=' + `$LASTEXITCODE`n"
+    $snippet += "'BEGIN:withjson'`ntkBurn -Reading general=40 -AsJson`n'END:withjson=' + `$LASTEXITCODE`n"
+    $snippet += "'BEGIN:rjson'`ntkBurn -AsJson -At '2026-07-15 14:00'`n'END:rjson=' + `$LASTEXITCODE`n"
+    $snippet += "'BEGIN:rconsole'`ntkBurn -At '2026-07-15 14:00'`n'END:rconsole=' + `$LASTEXITCODE`n"
+    $snippet += "'BEGIN:empty'`ntkBurn -AsJson -At '2026-07-10 06:00'`n'END:empty=' + `$LASTEXITCODE`n"
+    $snippet += "'BEGIN:cachebad'`ntkConfig -Set burn.cacheHours=0`n'END:cachebad=' + `$LASTEXITCODE`n"
+    $snippet += "'BEGIN:cacheset'`ntkConfig -Set burn.cacheHours=6`n'END:cacheset=' + `$LASTEXITCODE`n"
+    $snippet += "'BEGIN:rjson6'`ntkBurn -AsJson -At '2026-07-15 14:00'`n'END:rjson6=' + `$LASTEXITCODE`n"
+    $snippet += "`$c = Get-Content -Raw '$localCfg' | ConvertFrom-Json; `$c.burn.cacheHours = 'lots'; [System.IO.File]::WriteAllText('$localCfg', (`$c | ConvertTo-Json -Depth 8))`n"
+    $snippet += "Import-Module '$($pkgDir -replace "'", "''")/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null`n"
+    $snippet += "'BEGIN:cachehand'`ntkBurn -At '2026-07-15 14:00'`n'END:cachehand=' + `$LASTEXITCODE`n"
+    $snippet += "`$c.PSObject.Properties.Remove('burn'); [System.IO.File]::WriteAllText('$localCfg', (`$c | ConvertTo-Json -Depth 8))`n"
+    $r = Invoke-Burn $snippet
+
+    $s = Get-Section $r.All 'first'
+    Assert-True 'Burn -Reading general=43,premium=54 (the unquoted comma form): exit 0, recorded, the week''s record started' ($s.Exit -eq '0' -and $s.Text.Contains('Recorded general=43,premium=54') -and $s.Text.Contains('Started the week') -and (Test-Path -LiteralPath $mine)) $s.Text
+    Assert-True '  and prints the burndown' ($s.Text.Contains('Weekly burndown') -and $s.Text.Contains('*cached as of')) $s.Text
+    $s = Get-Section $r.All 'second'
+    Assert-True 'a second reading the same week is appended to the same file' ($s.Exit -eq '0' -and $s.Text.Contains('Added a reading to the week') -and $s.Text.Contains('2 reading(s)')) $s.Text
+    $bytes = [System.IO.File]::ReadAllBytes($mine)
+    $text = $utf8.GetString($bytes)
+    Assert-True 'the record is UTF-8 with no BOM and LF only' (-not ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB) -and -not $text.Contains("`r") -and $text.EndsWith("`n")) $text
+    $rec = $text | ConvertFrom-Json @jsonArgs
+    Assert-Equal '  its shape: version, product, source, machine, week, two entries in time order' "1 / claude / typed / $machine / $(& $stampOf '2026-07-10 05:00') / Friday 05:00 local / $(& $stampOf '2026-07-14 09:10'),$(& $stampOf '2026-07-15 08:00')" `
+        "$($rec.readings) / $($rec.product) / $($rec.source) / $($rec.machine) / $($rec.weekStart) / $($rec.weekStarts) / $(@($rec.entries | ForEach-Object { $_.at }) -join ',')"
+    Assert-Equal '  and each entry names only the buckets typed' 'general=43,premium=54 | premium=60' ((@($rec.entries | ForEach-Object { @($_.buckets.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ',' })) -join ' | ')
+    Test-NoPrivateText 'the readings record' $text
+    foreach ($bad in @(@('big', 'not a reading'), @('gold', "not one of the plan's buckets"), @('twice', 'typed twice'), @('withlog', 'One at a time'), @('withjson', "not -Reading's"))) {
+        $s = Get-Section $r.All $bad[0]
+        Assert-True "-Reading refused ($($bad[0])): exit 2, one Error block" ($s.Exit -eq '2' -and $s.Text.Contains($bad[1]) -and (@([regex]::Matches($s.Text, '(?m)^Error: ')).Count -eq 1)) $s.Text
+    }
+    Assert-Equal '  and a refusal writes nothing' '2' ([string]@(($utf8.GetString([System.IO.File]::ReadAllBytes($mine)) | ConvertFrom-Json @jsonArgs).entries).Count)
+    $s = Get-Section $r.All 'rjson'
+    $j = & $parseJson $s.Text
+    Assert-True 'Burn -AsJson carries the burndown' ($s.Exit -eq '0' -and $null -ne $j -and $null -ne $j.burndown) $s.Text
+    if ($null -ne $j -and $null -ne $j.burndown) {
+        $bdj = $j.burndown
+        $row = { param($k) $x = @($bdj.buckets | Where-Object { $_.key -eq $k })[0]; "$($x.label): $($x.percent)/$($x.pace)/$($x.gap) by $($x.machine)" }
+        Assert-Equal "  General is laptop's later reading (Wed 10:00, 125 of 168 hours: pace 74)" 'General: 50/74/-24 by laptop' (& $row 'general')
+        Assert-Equal "  Premium is this machine's latest (Wed 08:00, 123 hours: pace 73); last week's 99 not counted" ("Premium (Fable): 60/73/-13 by $machine") (& $row 'premium')
+        Assert-Equal '  the week, the reset, the cache line: due at 14:00, four hours after 10:00' "$(& $stampOf '2026-07-10 05:00') / $(& $stampOf '2026-07-17 05:00') / 4 / $(& $stampOf '2026-07-15 10:00') / $(& $stampOf '2026-07-15 14:00') / True / claude" `
+            "$($bdj.weekFrom) / $($bdj.resetsAt) / $($bdj.cacheHours) / $($bdj.cachedAt) / $($bdj.renewsAt) / $($bdj.due) / $($bdj.product)"
+        Assert-Equal '  and the week''s readings, in time order, for the line' '3' ([string]@($bdj.readings).Count)
+    }
+    $s = Get-Section $r.All 'rconsole'
+    Assert-True 'Burn opens with the burndown: bars, the gap, the reset, the cache line, no colour word' ($s.Exit -eq '0' -and $s.Text.IndexOf('Weekly burndown') -ge 0 -and $s.Text.IndexOf('Weekly burndown') -lt $s.Text.IndexOf('Claude Code burn on') -and $s.Text.Contains('behind pace by 24') -and $s.Text.Contains('behind pace by 13') -and $s.Text.Contains('resets Fri 17 Jul 05:00 (1d 15h left)') -and $s.Text.Contains('*cached as of Wed 15 Jul 10:00 - renewal due since Wed 15 Jul 14:00')) $s.Text
+    $s = Get-Section $r.All 'empty'
+    $j = & $parseJson $s.Text
+    Assert-True 'a new week starts empty: last week''s readings are not this week''s, and none is yet' ($s.Exit -eq '0' -and $null -ne $j -and @($j.burndown.buckets | Where-Object { $null -ne $_.percent }).Count -eq 0 -and $null -eq $j.burndown.cachedAt -and $j.burndown.due -eq $false) $s.Text
+    $s = Get-Section $r.All 'cachebad'
+    Assert-True 'Config -Set burn.cacheHours=0: refused, exit 2, naming the key' ($s.Exit -eq '2' -and $s.Text.Contains('burn.cacheHours is a whole number of hours from 1 to 168')) $s.Text
+    $s = Get-Section $r.All 'cacheset'
+    Assert-True 'Config -Set burn.cacheHours=6: written, exit 0' ($s.Exit -eq '0') $s.Text
+    $s = Get-Section $r.All 'rjson6'
+    $j = & $parseJson $s.Text
+    Assert-True '  and Burn reads it: renews six hours after the reading, not yet due' ($s.Exit -eq '0' -and $null -ne $j -and $j.burndown.cacheHours -eq 6 -and $j.burndown.renewsAt -eq (& $stampOf '2026-07-15 16:00') -and $j.burndown.due -eq $false) $s.Text
+    $s = Get-Section $r.All 'cachehand'
+    Assert-True 'a burn.cacheHours Burn cannot read: exit 2, naming the key and the file' ($s.Exit -eq '2' -and $s.Text.Contains('burn.cacheHours is a whole number') -and $s.Text.Contains('config.local.json') -and (@([regex]::Matches($s.Text, '(?m)^Error: ')).Count -eq 1)) $s.Text
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message

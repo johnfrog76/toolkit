@@ -483,6 +483,20 @@ $script:ModuleState.Config = @{
     BurnWeekStarts = if ($localConfig.burn -and $localConfig.burn.weekStarts) { [string]$localConfig.burn.weekStarts }
     elseif ($defaultConfig.burn -and $defaultConfig.burn.weekStarts) { [string]$defaultConfig.burn.weekStarts }
     else { '' }
+    # How long a typed plan reading is taken as current (burn.cacheHours), as
+    # written: Burn reads it through Get-P20BurnCacheHours
+    # (Scripts/Read-BurnReadings.ps1) and refuses one it cannot read.
+    BurnCacheHours = if ($localConfig.burn -and $null -ne $localConfig.burn.cacheHours) { [string]$localConfig.burn.cacheHours }
+    elseif ($defaultConfig.burn -and $null -ne $defaultConfig.burn.cacheHours) { [string]$defaultConfig.burn.cacheHours }
+    else { '' }
+    # The plan's buckets and product (burn.buckets, burn.product): a plan's
+    # buckets are the plan's, so they are configuration.
+    BurnBuckets = if ($localConfig.burn -and $localConfig.burn.buckets) { @($localConfig.burn.buckets) }
+    elseif ($defaultConfig.burn -and $defaultConfig.burn.buckets) { @($defaultConfig.burn.buckets) }
+    else { @() }
+    BurnProduct = if ($localConfig.burn -and $localConfig.burn.product) { [string]$localConfig.burn.product }
+    elseif ($defaultConfig.burn -and $defaultConfig.burn.product) { [string]$defaultConfig.burn.product }
+    else { '' }
     AiModel = if ($localConfig.ai -and $localConfig.ai.model) { [string]$localConfig.ai.model }
     elseif ($defaultConfig.ai -and $defaultConfig.ai.model) { [string]$defaultConfig.ai.model }
     else { '' }
@@ -2031,7 +2045,8 @@ function global:Get-P20ToolkitLog {
 # Burn: Claude Code usage. Alone (or -AsJson, which the agent's
 # GET /api/usage/burn reads), the current burn -- today and this week, this
 # machine's session files plus the other machines' records in the hub; with
-# -Log, the day's record written into the hub (usage/). Core, no flag: the
+# -Log, the day's record written into the hub (usage/); with -Reading, a typed
+# plan reading appended to the week's record (usage/readings/). Core, no flag: the
 # inventory names whether this machine has session files to read.
 function global:Invoke-P20Burn {
     [CmdletBinding()]
@@ -2040,6 +2055,7 @@ function global:Invoke-P20Burn {
         [string]$Date,
         [switch]$AsJson,
         [string]$At,
+        [string[]]$Reading,
         [switch]$Help
     )
     if ($Help) { Show-CommandHelp 'Burn'; return }
