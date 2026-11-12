@@ -941,12 +941,18 @@ function global:Get-P20CommandScores {
 }
 
 # -- Tier detection (calls {cliPrefix}Env inline, caches in $global:P20Env) ---------
+# The import works out no tier: probing the tracker is a network call, and
+# loading a module must not make one. The first verb that needs the tier asks
+# here, the probe runs once, and $global:P20Env holds the answer for the
+# session -- until a Space switch or a config re-read empties it again.
 function script:Get-CurrentTier {
     if ($global:P20Env -and $global:P20Env.Tier) {
         return $global:P20Env.Tier
     }
-    # Not yet populated -- run detection silently
-    & "$toolkitRoot\Scripts\Get-Environment.ps1" -Startup
+    # Not yet populated -- run detection silently. -Quiet alone probes and fills
+    # $global:P20Env with no output: the verb that asked states any refusal
+    # itself, once, and a bridge child's stdout stays clean.
+    & "$toolkitRoot\Scripts\Get-Environment.ps1" -Quiet
     if ($global:P20Env -and $global:P20Env.Tier) {
         return $global:P20Env.Tier
     }
@@ -2508,7 +2514,10 @@ $global:P20Config = $script:ModuleState.Config
 $script:ModuleState.ConfigWatch = @($localConfigPath, $(if ($script:HubRoot) { Join-Path $script:HubRoot 'hub.json' } else { '' }))
 $script:ModuleState.ConfigStamp = Get-P20ConfigStamp -Paths $script:ModuleState.ConfigWatch
 
-# -- Startup: detect environment tier (silent on Tier 1) ----------------------
+# -- Startup: what is known without the network ------------------------------
+# The import asks no tracker anything (no gh, no az): Env -Startup says only
+# what the config and the PATH can tell, and the tier waits for the first verb
+# that needs it (Get-CurrentTier).
 # TOOLKIT_QUIET_STARTUP is set by non-interactive callers (e.g. the agent) that
 # parse a command's stdout as JSON; the startup banner would otherwise corrupt it.
 # Startup banner is opt-out: config quietStart, or TOOLKIT_QUIET_STARTUP for a
@@ -2518,11 +2527,9 @@ if ($defaultConfig -and $null -ne $defaultConfig.quietStart) { $script:QuietStar
 if ($localConfig   -and $null -ne $localConfig.quietStart)   { $script:QuietStart = [bool]$localConfig.quietStart }
 if ($env:TOOLKIT_QUIET_STARTUP) { $script:QuietStart = $true }
 & "$toolkitRoot\Scripts\Get-Environment.ps1" -Startup -Quiet:$script:QuietStart
-# The startup probe runs native commands (az) that may fail against the committed
-# template org, leaving $LASTEXITCODE non-zero in the importing session. Every
-# wrapper guard reads that variable after its script returns; without this
-# reset the first verb after Import-Module reports "exit code 1" for a failure
-# that was never its own.
+# Every wrapper guard reads $LASTEXITCODE after its script returns, so the
+# import leaves it at 0: whatever the importing session held before, the first
+# verb after Import-Module must not report an "exit code 1" that was never its own.
 $global:LASTEXITCODE = 0
 
 # -- Command registration (prefix-driven) --------------------------------------

@@ -4,10 +4,14 @@
 .DESCRIPTION
     Runs detection checks (git, az CLI, ADO reachability, repo presence),
     resolves a capability tier, and populates $global:P20Env.
-    With -Startup, prints a one-liner on Tier 2/3 and stays silent on Tier 1.
+    With -Startup -- the line an import prints -- it asks no tracker anything:
+    it says only what the config and the PATH can tell, and leaves the tier to
+    be worked out by the first verb that needs it.
+    With -Quiet alone, it works the tier out, fills $global:P20Env and prints
+    nothing: the module's own tier check, on first need.
 .EXAMPLE
     {cliPrefix}Env             # Full environment report
-    {cliPrefix}Env -Startup    # Silent on Tier 1, one-liner on Tier 2/3
+    {cliPrefix}Env -Startup    # The import's line: no network, silent unless something is missing
 #>
 [CmdletBinding()]
 param(
@@ -22,7 +26,7 @@ param(
 if ($Help) {
     Write-Host ""
     Write-Host "  $(Get-CliPrefix)Env            Full environment report with tier detection" -ForegroundColor Cyan
-    Write-Host "  $(Get-CliPrefix)Env -Startup   Silent on Tier 1, one-liner on Tier 2/3" -ForegroundColor Cyan
+    Write-Host "  $(Get-CliPrefix)Env -Startup   The import's line: asks no tracker, silent unless something is missing" -ForegroundColor Cyan
     Write-Host "  $(Get-CliPrefix)Env -Help      Show this help" -ForegroundColor Cyan
     Write-Host ""
     exit 0
@@ -46,6 +50,36 @@ $repoFound = [bool]($cfg.PromptsRoot -and (Test-Path -LiteralPath $cfg.PromptsRo
 . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 $trackerKind = Resolve-P20Tracker -OrgUrl $cfg.Org
 $trackerName = if ($trackerKind -eq 'github') { 'GitHub' } else { 'Azure DevOps' }
+
+# -- Startup mode: what is known without the network --------------------------
+# Importing the module must not reach a tracker: a tool that loads it for one
+# function opens no connection, an offline machine does not wait, and a bridge
+# child starts at once. So the import's line says only what the config and the
+# PATH can tell -- git and the hub (Tier 3), and the tracker's tool missing from
+# an active Space -- and leaves $global:P20Env empty. The tier itself is worked
+# out by the first verb that needs it (the module's Get-CurrentTier, which runs
+# this script with -Quiet), and cached there.
+if ($Startup) {
+    $startupOrgWord = if ($cfg.ActiveSpace) { "'$($cfg.ActiveSpace)'" } else { 'the active Space' }
+    $startupTool = if ($trackerKind -eq 'github') { 'gh' } else { 'az' }
+    $startupQuietOrg = ($cfg.OrgStatus -eq 'local' -or $cfg.OrgStatus -eq 'archive')
+    if (-not $repoFound -or -not $gitInstalled) {
+        if (-not $Quiet) { Write-Host "  [!] Minimal mode -- repo not found or git missing  ($(Get-CliPrefix)Env for details)" -ForegroundColor Red }
+        Write-ToolkitLog -Type INFO -Source "$(Get-CliPrefix)Env" -Detail "$machine -- Tier 3 (minimal mode)"
+    }
+    elseif (-not $startupQuietOrg -and -not (Get-Command $startupTool -ErrorAction SilentlyContinue)) {
+        # Yellow only when something WANTED is missing: an active Space whose
+        # tracker's tool is not on this machine. A local or archived Space
+        # opens every shell with nothing missing, so nothing is said.
+        $startupWhy = "$startupOrgWord is active but $startupTool is not installed"
+        if (-not $Quiet) {
+            $bannerWord = if ($trackerKind -eq 'github') { 'GitHub' } else { 'ADO' }
+            Write-Host "  [*] $startupWhy -- $bannerWord commands unavailable  ($(Get-CliPrefix)Env for details)" -ForegroundColor Yellow
+        }
+        Write-ToolkitLog -Type INFO -Source "$(Get-CliPrefix)Env" -Detail "$machine -- Tier 2 ($startupWhy)"
+    }
+    exit 0
+}
 
 $azCliInstalled = $false
 $azAuthenticated = $false
@@ -162,23 +196,16 @@ $global:P20Env = @{
     ActiveSpace        = $cfg.ActiveSpace
 }
 
-# -- Startup mode: one-liner on Tier 2/3, silent on Tier 1 --------------------
-if ($Startup) {
-    # -Quiet: populate $global:P20Env and log, but emit no banner. Used when the
-    # module is imported by a non-interactive caller (e.g. the agent) that parses
-    # stdout as JSON -- a Write-Host banner here would corrupt that output.
+# -- Quiet mode: the tier, worked out on first need -------------------------
+# -Quiet without -Startup is the module's tier check (Get-CurrentTier): the
+# probes above have run and $global:P20Env is filled; it logs the tier the way
+# the import used to and prints nothing, because the verb that asked will say
+# what it needs -- once -- and a bridge child parses stdout as JSON.
+if ($Quiet) {
     if ($tier -eq 2) {
-        # Yellow only when something WANTED did not happen: an active org that
-        # could not be reached. A local or archived org opens every shell with
-        # nothing missing, so nothing is said.
-        if (-not $Quiet -and $cfg.OrgStatus -ne 'local' -and $cfg.OrgStatus -ne 'archive') {
-            $bannerWord = if ($trackerKind -eq 'github') { 'GitHub' } else { 'ADO' }
-            Write-Host "  [*] $tierWhy -- $bannerWord commands unavailable  ($(Get-CliPrefix)Env for details)" -ForegroundColor Yellow
-        }
         Write-ToolkitLog -Type INFO -Source "$(Get-CliPrefix)Env" -Detail "$machine -- Tier 2 ($tierWhy)"
     }
     elseif ($tier -eq 3) {
-        if (-not $Quiet) { Write-Host "  [!] Minimal mode -- repo not found or git missing  ($(Get-CliPrefix)Env for details)" -ForegroundColor Red }
         Write-ToolkitLog -Type INFO -Source "$(Get-CliPrefix)Env" -Detail "$machine -- Tier 3 (minimal mode)"
     }
     exit 0

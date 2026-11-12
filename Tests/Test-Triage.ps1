@@ -199,8 +199,9 @@ $Snippet
     if (Test-Path -LiteralPath $ghLog) {
         $calls = @([System.IO.File]::ReadAllText($ghLog) -split "`n" | Where-Object { $_ })
     }
-    # The module's own startup probe (Get-Environment.ps1: gh auth status, gh api user,
-    # gh api users/<owner>) is not the verb's: the log holds the VERB's reads and writes.
+    # The module's own tier probe, run on the verb's first need (Get-Environment.ps1: gh
+    # auth status, gh api user, gh api users/<owner>), is not the verb's: the log holds
+    # the VERB's reads and writes.
     $sep = [string][char]0x1F
     $calls = @($calls | Where-Object { -not ($_.StartsWith('auth') -or $_.StartsWith("api${sep}user")) })
     return [pscustomobject]@{ All = $out; Inner = $inner; Exit = $code; Calls = $calls }

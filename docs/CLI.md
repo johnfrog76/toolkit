@@ -1090,6 +1090,16 @@ miss.
 Tracker commands check tier **once**, before running, and say what is unavailable and why -- never a
 silent empty result, never a raw API error.
 
+**The tier is worked out on first need, never at import.** Importing the module calls neither `gh`
+nor `az`, so a program that loads it for one function opens no connection, and an offline machine
+does not wait. The first verb that needs the tier -- a tracker verb, `Dashboard`, or `Menu`, which
+marks what the tier rules out -- runs the probe once, quietly, and the session keeps the answer
+until a Space switch or a re-read config clears it; `Env` makes the live check every time it runs.
+A bridge child (`TOOLKIT_QUIET_STARTUP`) works the same way, so its first verb gets the same answer
+a terminal would. The line an import prints says only what is known without the network: `[!]
+Minimal mode` when the hub or git is missing, and `[*] '<space>' is active but gh is not installed`
+(or `az`) when an active Space's tool is not on the PATH. Otherwise it says nothing.
+
 **The invariant:** a Tier-2 machine still produces and maintains prompt files. Losing the tracker
 degrades the workflow; it must not break the discipline.
 
@@ -1310,8 +1320,9 @@ the web UI's Log card all glob `usage.*.log`. Unset, the log is beside the modul
 `tkTestToolkit` points it at a temp directory for the length of the run and restores it afterwards,
 and `Tests/conftest.py` does the same for pytest -- at **import** time, because pytest runs
 module-level code during collection and one file starts a child PowerShell there. (Importing the
-module in the shell you run it from still logs one `INFO tkEnv` row, as any shell that imports the
-toolkit does. That is the import, not the run.) So a suite's failing assertions never show up as
+module in the shell you run it from can still log one `INFO tkEnv` row -- where the hub or git is
+missing, or the tracker's tool is not installed -- as any shell that imports the toolkit does, and the
+first tier check logs one where the tier is below 1. That is the shell, not the run.) So a suite's failing assertions never show up as
 the engineer's own errors on the Log card.
 
 `test-results.<MACHINE>.log` and `test-summary.<MACHINE>.json` do **not** follow it: they live in the
