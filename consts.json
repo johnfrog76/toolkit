@@ -350,5 +350,11 @@
     "envFlag": "claudeUsage",
     "burnRoute": "/api/usage/burn",
     "readingsFolder": "readings"
+  },
+
+  "replyStatuses": {
+    "_": "The thread statuses a reply may set, per tracker (ReplyPR -Status; the PR Comments page's status box). ado is every status Azure DevOps keeps, in the order the box lists them. github is the three GitHub keeps -- a review thread is only resolved or unresolved: fixed and closed resolve it, active reopens it. byDesign, pending and wontFix carry a reason GitHub has nowhere to keep, so ReplyPR refuses them there, nothing posted, and the page does not offer them.",
+    "ado": ["fixed", "active", "pending", "byDesign", "wontFix", "closed"],
+    "github": ["fixed", "closed", "active"]
   }
 }
