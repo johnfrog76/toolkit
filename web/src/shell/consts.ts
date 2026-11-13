@@ -355,6 +355,8 @@ export const RITUALS = consts.rituals as {
     countsClosed: string;
     countsStarted: string;
     countsInProgress: string;
+    /** Commits the dates read could not date, said after the commits. */
+    countsUndated: string;
   };
 };
 

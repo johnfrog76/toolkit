@@ -272,7 +272,8 @@ bridge is how the page asks for it.
 
 ### One tracker read, kept a minute
 
-Each `gh` answer the two routes read -- a repo's labels, its issues in a state, the signed-in login -- is
+Each `gh` answer the two routes read -- a repo's labels, its issues in a state, the signed-in login, the
+standup's dates read ([What moved, and the window](#what-moved-and-the-window)) -- is
 kept in the agent's memory for 60 seconds (`READ_TTL_SECONDS` in `agent/solitaire/tracker.py`, the design
 list's `LIST_TTL_SECONDS`), and the standup and triage share them. A second GET inside the minute -- the
 standup re-mounted after attending, the Triage page opened after the standup -- starts no subprocess.
@@ -1061,21 +1062,44 @@ already says, so a line does not repeat them:
 | in yesterday (an issue closed, a card archived, in the window) | `closed` | `#153 Close the books`, or with commits `#153 (2 commits) Close the books` |
 | in today or the blockers, its card -- its own, or the card an issue's number names -- began in the window | `started` | `#151 (started) Count the commits`, or `#151 (started, 2 commits) ...` |
 | in today or the blockers, otherwise | `inProgress` | `#154 Read the label`, or `#152 (1 commit) Fold the window` |
-| an issue with no card | `closed` or `inProgress`, never `started` | no parenthesis: an issue alone has no commits |
+| an open issue with no card, given its worker label or assigned in the window | `started` | `#171 (started) Read the timeline` -- an issue alone has no commits |
+| an issue with no card, otherwise | `closed` or `inProgress` | no parenthesis |
 
 **Began** is the card's `**Started:**` day (`Move -To InProgress` writes it), else its `**Created:**` day
--- the card's own footer, read with its lane. An issue alone cannot say `started`: the read
-(`number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees`) carries no time its work began -- not when a
-worker label was added, not whether a branch exists -- and finding out is a timeline read per issue that
-the standup does not make. So an issue with no card is closed or in progress, said plainly; a team whose
-work runs on cards gets the three words from the cards.
+-- the card's own footer, read with its lane. A card decides its issue's start: its footer is the job
+record, so an issue whose card began before the window stays in progress whatever its timeline says.
+**An issue with no card began** when its timeline first says so: the earliest of a worker label being
+added and the issue being assigned (a label that routes to no worker does not count), read in the dates
+read below. It is `started` when that falls in the window, else in progress. Where the dates read was
+not made or did not answer, an issue alone is closed or in progress, as it was before the read existed.
+
+**The dates read.** On a GitHub Space the standup makes one more read after the issues: one `gh api
+graphql` call per repo, with the query in a file and the owner and name as fields. It asks two things at
+once, as aliased fields: for each hash the standup counts, the commit it names
+(`object(expression: "<hash>")` -- an abbreviated hash resolves, and its `authoredDate` is read), and for
+each open issue with no card that reads in progress, its labelled and assigned events
+(`timelineItems(itemTypes: [LABELED_EVENT, ASSIGNED_EVENT], first: 50)`). It is asked for what the fill
+counted and nothing else, so a Space with no card and no lone routed issue makes no call. One call holds
+at most 50 aliases; a standup that needs more makes one call per 50. The agent asks every repo of the
+Space for every hash (a card does not say which repo it was committed to) and each issue of its own repo;
+the CLI reads its one repo. The answer is kept for the minute like every other read
+([One tracker read, kept a minute](#one-tracker-read-kept-a-minute)). An Azure DevOps Space and a cards
+Space make no dates read, and their counts are what they were.
 
 **Commits** are the card's `- <hash>` bullets -- the same lines that put it In Progress
 (`regex.commitBullet`, the lane rule's own pattern, which captures the hash), so counting them is no
 new read and no second pattern. A hash is compared by its first seven characters, lowercase: a short and a full hash of one commit
 are one. A card with no bullets counts none; an issue with no card counts none; a not-billable card is
-not a row and adds nothing to one, its commits included. A card's commits are all it threads, not only
-the window's: a bullet has no date.
+not a row and adds nothing to one, its commits included.
+
+**Only commits authored in the window count.** A bullet has no date, so the date is the repository's:
+the dates read gives each hash its `authoredDate`, and a hash counts when that falls in `[since, asOf]`.
+Authored, not committed: a rebase resets the committer date and leaves the authored one, the clock Daily
+already bills by. A card worked over three weeks counts only the commits of the window on the day it
+closes. A hash the read cannot date -- not in the repository, ambiguous, or naming something that is not
+that commit -- is **undated**: not counted, and never guessed, but said after the commits on the counts
+line, `5 commits (2 undated)` (`rituals.text.countsUndated`; `undated` in each count). Where no dates read
+was made -- a cards Space, or a dates read that failed -- every bullet counts, as it did before the read.
 
 ```text
 Fable
@@ -1089,7 +1113,8 @@ Opus
 **The counts** (`counts` in the response) sum the slots per worker and in total -- closed, started, in
 progress and commits -- and **a hash is counted once however many cards thread it**, per worker and in
 the total. The brief opens on the total ([the chair's reading](#the-chairs-reading)):
-`Since Thursday 1 October 2026: 2 closed, 2 started, 2 in progress, 5 commits.` The counts are the
+`Since Thursday 1 October 2026: 2 closed, 2 started, 2 in progress, 5 commits.`, or with hashes the
+dates read could not date, `... 3 commits (2 undated).` The counts are the
 page's, at the top -- the brief sits above every grain -- and not the stage's: the played view speaks
 the work grain, one sentence a group, and the dress guard holds every number a sentence says to the
 group's own; a velocity line there would be a number the group does not carry.
@@ -1105,9 +1130,16 @@ The default stays the previous working day (D-SA3). `-Days` is not this: it is t
 a hash two cards thread counted once), `not-billable-counts` (a not-billable card absent from the
 counts) and `window-three-days` (a three-day window with a close on each day, listed and counted once, and a
 close the day before the window not), with `expected.motions` and `expected.counts`; card rows carry
-`begun` and `commits`, as `read_cards` / `Get-P20StandupCards` read them.
+`begun` and `commits`, as `read_cards` / `Get-P20StandupCards` read them. The dates read's cases carry
+`commitDates` and `issueStarts`: `commits-window` (commits before the window and after `asOf` dropped,
+undated ones said), `issue-labelled-in-window` (an issue alone reads `started`),
+`issue-assigned-before-window` (in progress, and a card's own start winning over its issue's timeline)
+and `dates-not-read` (the same cards with no dates read: every bullet counts).
+`Tests/fixtures/rituals/standup-dates.json` holds the query, line for line, and the parse of an answer
+into the two maps: an abbreviated hash, a missing object, an oid that is not the hash, a label that routes
+to no worker, the earliest of a label and an assignment, and a timeline with neither.
 
-Known gap: [What moved is counted from the cards](../KNOWN-GAPS.md#what-moved-is-counted-from-the-cards).
+Known gap: [The terminal's standup dates a commit from one repository, the page from every repository of the Space](../KNOWN-GAPS.md#the-terminals-standup-dates-a-commit-from-one-repository-the-page-from-every-repository-of-the-space).
 
 ### The two sources, joined
 
@@ -1535,11 +1567,11 @@ Each of these is a block on [Known gaps](../KNOWN-GAPS.md), with its issue:
   `blocked` label is not read. A clause is the title's head as written -- not lower-cased, so a title
   that starts with a capital keeps it (`#<n>, Rename the slug`)
   ([The standup's prose reads no age, pull request or assignee](../KNOWN-GAPS.md#the-standups-prose-reads-no-age-pull-request-or-assignee)).
-- **An issue alone never says `started`.** The issue read carries no time its work began, so an issue
-  with no card is `closed` or `in progress` ([what moved](#what-moved-and-the-window)); `started` needs a
-  card. A card's commits are every bullet it carries, not only the window's -- a bullet has no date -- so
-  a card worked over weeks counts all of them the day it closes
-  ([What moved is counted from the cards](../KNOWN-GAPS.md#what-moved-is-counted-from-the-cards)).
+- **The dates read is GitHub's, and the CLI's covers one repo.** Commit dates and issue timelines come
+  from a GitHub repository ([what moved](#what-moved-and-the-window)); a cards Space, an Azure DevOps
+  Space, or a dates read that failed counts every bullet and reads an issue alone as `in progress`. A
+  timeline is read to its first 50 labelled and assigned events. On a Space of several repos the terminal
+  and the page can date different commits ([The terminal's standup dates a commit from one repository, the page from every repository of the Space](../KNOWN-GAPS.md#the-terminals-standup-dates-a-commit-from-one-repository-the-page-from-every-repository-of-the-space)).
 - **`decide` and `look` are always empty.** Their labels are an open item of the spec; only `walk` is
   filled ([The standup's decide and look queues are empty](../KNOWN-GAPS.md#the-standups-decide-and-look-queues-are-empty)).
 - **One repo per Space.** A Space spanning several repos says so on its `Tracker` line rather than

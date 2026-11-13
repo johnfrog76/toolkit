@@ -94,17 +94,6 @@ are always empty, because no label is named for them.
 
 **Issue:** [#293](https://github.com/johnfrog76/toolkit/issues/293)
 
-### What moved is counted from the cards
-
-**What you see:** An issue with no card never reads `started`: the issue read carries no time its work
-began, so it is closed or in progress, and only a card's `**Started:**` (else `**Created:**`) day can say
-`started`. A card's commit count is every hash it threads, not only the ones inside the `-Since` window --
-a bullet has no date -- so a card worked over weeks counts all of them the day it closes.
-
-**Where you meet it:** [Team Agile](modules/solitaire-agile.md#what-moved-and-the-window), "What moved, and the window"
-
-**Issue:** [#294](https://github.com/johnfrog76/toolkit/issues/294)
-
 ### The suggestion hands off, it does not launch
 
 **What you see:** The chair's Next line suggests one next move, and for a crew-sized item its command is
@@ -127,6 +116,17 @@ neither says its read was cut short.
 **Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
 
 **Issue:** [#276](https://github.com/johnfrog76/toolkit/issues/276)
+
+### The terminal's standup dates a commit from one repository, the page from every repository of the Space
+
+**What you see:** On a Space that spans several GitHub repositories, the CLI's `Standup` asks only the
+Space's one repository for its commit dates, and the Team Agile page asks every repository. A commit
+made to another repository of the Space reads undated in the terminal, and is dated and counted on the
+page, so the two counts lines can differ.
+
+**Where you meet it:** [Team Agile](modules/solitaire-agile.md#what-moved-and-the-window), "What moved, and the window"
+
+**Issue:** [#316](https://github.com/johnfrog76/toolkit/issues/316)
 
 ### The foyer counts no designs or specs
 

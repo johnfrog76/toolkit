@@ -396,6 +396,7 @@ describe("consts.json", () => {
         countsClosed: "{n} closed",
         countsStarted: "{n} started",
         countsInProgress: "{n} in progress",
+        countsUndated: "({n} undated)",
       },
     });
     // StartWork's hand-off block (D-AR5): the CLI types the four headings and the
