@@ -72,7 +72,8 @@ tkTestToolkit -GitRoot   # a folder inside someone else's repository is not a ch
 ```
 
 `tkTestToolkit` runs the suites in the host it is typed in: PowerShell 7 from `pwsh`, Windows PowerShell 5.1
-from `powershell`. `tkTest` starts the CLI runner in `pwsh` on every host ("In CI", below).
+from `powershell`. `tkTest` starts the CLI runner in `pwsh` on every host ("In CI", below), so typed in 5.1 it
+still proves PowerShell 7 ([#436](https://github.com/johnfrog76/toolkit/issues/436)).
 
 ```bash
 python3 -m pip install -r agent/requirements-dev.txt   # once -- runtime deps plus pytest, httpx and ruff

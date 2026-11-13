@@ -1246,12 +1246,16 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   letter (`# écrire le guide`). `tkBacklog` lists all four with their titles intact: the emoji and the symbol
   dropped, the accented letter kept, and no `is not valid` error. The `ps51` job runs the Backlog suite on 5.1 and
   prints the code page it ran on; this row is a real console and a real hub.
-  CONFIRMED on Windows: walked in Windows PowerShell 5.1.26100 at 663ce6a, on 2026-11-13.
+  CONFIRMED on Windows: walked in Windows PowerShell 5.1.26100 at 663ce6a, on 2026-11-13, on code page 1252, with
+  four cards: plain, an emoji (U+1F52C), a symbol (U+2705) and an accented letter. Exit 0 and no `is not valid`;
+  the emoji and the symbol were dropped from the titles and the `é` kept.
 - [x] **A refresh of the Lounge in the Docker image draws the app (#226).** With Docker Desktop running, on the merged
   head, `tkWeb -Restart`, then open the Lounge and refresh the page: the room draws again, and the address bar still
   says `localhost:5174`, not `5173` (a browser that met the old redirect keeps it: refresh with Cmd+Shift+R). Then
   the four `curl` lines of Gate 12b for `/system`, `/lounge`, `/lounge/` and `/lounge/temple.html` each print `200`. `Tests/test_consts.py` holds the template to it; this row is the image.
-  CONFIRMED on Windows: walked at 663ce6a, on 2026-11-13.
+  CONFIRMED on Windows: walked at 663ce6a, on 2026-11-13, with Docker 29.6.1. The Lounge drew on load and on two
+  reloads, and the address stayed `:5174/lounge`. `/`, `/system`, `/lounge` and `/lounge/temple.html` each
+  answered 200.
 - [x] **A worktree's test run reaches the Health card on Windows, under Windows PowerShell 5.1 too (#317).** On the
   Windows PC, in `powershell` (5.1), from a git worktree of the package whose branch is not named after its folder
   (`git worktree add -b verify-317 ..\toolkit-wt-317`), run
@@ -1269,6 +1273,7 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   in `powershell.exe`. For the last clause, with a scratch `LOCALAPPDATA` and a copy of the sample hub, the first
   read of the System page showed the old root record, not "not run"; that read created the `TestHistory` folder
   and copied both files byte for byte, leaving the root files in place, and the next run wrote into the folder.
+  The summary carried the worktree's folder name and its HEAD, and the Health card showed it.
 - [ ] **`Invoke-P20TestGit` hands git an empty argument, a double quote and a trailing backslash under Windows
   PowerShell 5.1 (#356).** On the Windows PC, in `powershell` (5.1), run `tkTestToolkit -Portability`. Every
   `Clause 23: git is handed ...` line passes, and there are 18 of them, each ending `as the host passes arguments`:
@@ -1283,7 +1288,9 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `tkDaily -Since <that Monday> -Until <that Friday>`: the same text. `tkDaily -Since 2026-01-05` prints one
   `Error:` naming `-Since and -Until go together`, and `$LASTEXITCODE` is 2. The `ps51` job runs the Billable
   suite on 5.1; this row is a real console, a real hub and the page.
-  CONFIRMED on Windows: walked in Windows PowerShell 5.1.26100 at 663ce6a, on 2026-11-13.
+  CONFIRMED on Windows: walked in Windows PowerShell 5.1.26100 at 663ce6a, on 2026-11-13. `-LastWeek` printed,
+  exit 0, the clipboard unchanged. `-Since` alone gave one `Error:` and its `Hint:`, exit 2. The page three weeks
+  back, with Copy All, matched `-Since`/`-Until` line for line, 160 lines.
 - [ ] **`tkTestToolkit` typed in Windows PowerShell 5.1 runs the suites in 5.1 (#435).** On the Windows PC, in
   `powershell` (5.1), run `tkTestToolkit -Portability`. It prints 18 `Clause 23: git is handed ...` lines, each
   ending `as the host passes arguments`, and none ending `with Legacy passing`: the second pass exists only where
