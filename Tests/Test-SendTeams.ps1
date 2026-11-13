@@ -453,8 +453,14 @@ $body = $reader.ReadToEnd()
 $answer = '{"status":"dry-run","detail":"would post (not sent)","target":{"recipient":"mom","display":"Mom"},"payload":"**a line**"}'
 $bytes = [System.Text.Encoding]::UTF8.GetBytes($answer)
 $ctx.Response.ContentType = 'application/json'
+# The length is stated and the listener outlives the answer: on Windows a
+# listener stopped the moment the response closes can drop the answer before
+# the caller has read it.
+$ctx.Response.ContentLength64 = $bytes.Length
 $ctx.Response.OutputStream.Write($bytes, 0, $bytes.Length)
+$ctx.Response.OutputStream.Close()
 $ctx.Response.Close()
+Start-Sleep -Seconds 2
 $listener.Stop()
 '@
 [System.IO.File]::WriteAllText($stubScript, $stubText, (New-Object System.Text.UTF8Encoding($false)))
@@ -470,8 +476,9 @@ try {
     }
     Assert-True "the stand-in agent is listening" $up "port $stubPort"
     $result = Invoke-Send -Root $sandbox -Arguments @('mom', 'a line', '-WhatIf') -Environment @{ TEAMS_WEBHOOK_MOM = 'set-for-this-test' }
-    Assert-Contains "-WhatIf to a chat returns the payload unsent" $result.Output "Dry run -- would post to 'mom'"
-    Assert-Contains "formatted" $result.Output '**a line**'
+    # Assert-True, so a failure prints what the verb did say.
+    Assert-True "-WhatIf to a chat returns the payload unsent" ($result.Output.Contains("Dry run -- would post to 'mom'")) $result.Output
+    Assert-True "formatted" ($result.Output.Contains('**a line**')) $result.Output
     Assert-NotContains "with no unsupported type" $result.Output 'unsupported type'
     $sent = ''
     for ($i = 0; $i -lt 30 -and -not (Test-Path $bodyFile); $i++) { Start-Sleep -Milliseconds 100 }
