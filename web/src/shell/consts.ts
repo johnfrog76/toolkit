@@ -74,6 +74,17 @@ export const REMINDERS = consts.reminders as {
 };
 
 /**
+ * The words a Teams recipient's type may be: channel and chat post through
+ * their webhook alike; person is accepted and never posts. The web shows the
+ * type /env carries and branches on none of them, so this is the contract
+ * stated, not a rule this half applies.
+ */
+export const COMMUNICATION = consts.communication as {
+  webhookRecipientTypes: string[];
+  deferredRecipientTypes: string[];
+};
+
+/**
  * The three halves a test run covers, in the order `{cliPrefix}Test` runs
  * them, and what a summary entry with no `half` is read as. The Health card
  * draws a machine's halves in this order.
@@ -192,7 +203,7 @@ export const RITUALS = consts.rituals as {
   route: string;
   /** Triage's read: the open issues by milestone. */
   triageRoute: string;
-  /** The Milestones tab's read: the tracker's milestones with its own counts. */
+  /** The Releases tab's read: the tracker's milestones with its own counts. */
   milestonesRoute: string;
   /** "me": the one answer to who takes an item that is not a size (D-AR10) --
    *  what the Triage page sends as `Route -Assign`, and an item's `who` when it is yours. */
@@ -356,6 +367,8 @@ export const RITUALS = consts.rituals as {
     countsClosed: string;
     countsStarted: string;
     countsInProgress: string;
+    /** Commits the dates read could not date, said after the commits. */
+    countsUndated: string;
   };
 };
 
@@ -442,6 +455,20 @@ export const USAGE = consts.usage as {
 export const REPLY_STATUSES_BY_TRACKER = consts.replyStatuses as {
   ado: string[];
   github: string[];
+};
+
+/**
+ * Daily's window (docs/CLI.md, "The third line: Billable"): the sentences the
+ * billing script, the CLI's Daily and GET /api/billing refuse a window with. The
+ * page sends only whole windows it built itself and shows the agent's `error`
+ * verbatim, so it types none of them.
+ */
+export const BILLING = consts.billing as {
+  text: {
+    halfWindow: string;
+    notADay: string;
+    backwards: string;
+  };
 };
 
 /** The contract's patterns, compiled once for this bundle. */

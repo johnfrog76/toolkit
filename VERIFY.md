@@ -39,8 +39,8 @@ halves talking to each other, and the flag that makes a whole module appear and 
 three halves at once. A check that can be automated belongs in a suite; one that cannot is a gate here,
 or it is not verified.
 
-Every verb `config.default.json` defines is in the table below -- 48 always-on, and the 15 the modules
-contribute through `Config/*.commands.psd1` (63 in all; `docs/CLI.md` prints both counts) -- with the
+Every verb `config.default.json` defines is in the table below -- 49 always-on, and the 15 the modules
+contribute through `Config/*.commands.psd1` (64 in all; `docs/CLI.md` prints both counts) -- with the
 suite that types it and the gate that walks it. `Tests/Test-DocCounts.ps1` reads the table back, so a
 verb added without a row fails a suite. **A row that says "neither" is a verb nothing verifies**; it is
 left in the table rather than dropped, because a verb the reader cannot see in it is indistinguishable
@@ -61,6 +61,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `Sync` | `Sync` (typed, against a bare repo; hook cases skip where there is no `hooks/pre-commit`, and a skip is not a pass) | 6, 12 |
 | `Move` | `Move` (typed) | neither |
 | `Billable` | `Billable` (typed) | neither |
+| `Daily` | `Billable` (typed: a past window byte for byte against the billing script's `raw`, `-Compact`, and the three refusals) | 12 (Windows PowerShell 5.1 and a real hub: the row under "Rows added by a fix") |
 | `Plan` | `Plan` (typed) | neither |
 | `Tag` | `Tag` (typed) | neither |
 | `Backlog` | `Backlog` (typed) | 12 (a Western code page: the row under "Rows added by a fix") |
@@ -291,7 +292,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **52 suites, 10126 assertions** with a `config.local.json`, every one
+findings. On this commit that is **52 suites, 10609 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -759,7 +760,8 @@ opens a browser and names it.
 - [ ] `/skills` renders
 - [ ] A **Meetings** nav entry, and `/communication` lists the three fixture sessions with their
       stages -- Plan, Prep, Retro
-- [ ] The retro session's send button is **present, disabled, and names `TEAMS_WEBHOOK_MANAGER`**
+- [ ] The retro session's send button is **present, disabled, and says `Sending off on this server`**
+      (`Webhook not set` on a server not started as a test run)
 - [ ] No page errors across the six routes
 
 > The send button is never pressed, by the runner or by you. A press posts to a real webhook, and
@@ -799,7 +801,9 @@ curl -s localhost:4100/api/env | python -c "import json,sys; print(json.load(sys
 - [ ] The block **names the variable** (`"webhookEnv": "TEAMS_WEBHOOK_MANAGER"`) and does not
       contain a URL anywhere
 - [ ] On a Retro-stage session, the send button is **visible and disabled**, with the reason on the
-      line below it naming `TEAMS_WEBHOOK_MANAGER` -- not hidden, and not an error
+      line below it reading `Webhook not set` and `TEAMS_WEBHOOK_MANAGER` named only in the info
+      icon beside it -- not hidden, and not an error. The System page's Environment card reads the
+      same phrase on that recipient's row, under *Teams messages*
 - [ ] `tkSendTeams manager 'test' -WhatIf` prints the same refusal, names the variable, and
       **exits 0** -- an unset variable is a configuration fact, not a failure
 
@@ -1257,6 +1261,38 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   in the main checkout before the upgrade and no folder yet, the card's first read shows that old record, not "not
   run". `tkTestToolkit -TestAll` holds the rule over `Tests/fixtures/test-history/paths.json`, whose Windows rows
   only a Windows host reads live.
+- [ ] **`Invoke-P20TestGit` hands git an empty argument, a double quote and a trailing backslash under Windows
+  PowerShell 5.1 (#356).** On the Windows PC, in `powershell` (5.1), run `tkTestToolkit -Portability`. Every
+  `Clause 23: git is handed ...` line passes, and there are 18 of them, each ending `as the host passes arguments`:
+  5.1 has no `$PSNativeCommandArgumentPassing`, so its own passing is the only one run. The rows that only 5.1 on
+  Windows reads live are `an empty value, and the one after it`, the four with a double quote, and `a trailing
+  backslash after a space`. On macOS and Linux the same rows run a second time with `Legacy` passing, which is
+  5.1's rule in PowerShell 7; this row is 5.1's own command line and git for Windows reading it. The `ps51` job
+  runs the suite on 5.1 too.
+- [ ] **Daily prints any week from Windows PowerShell 5.1 (#291).** On the Windows PC, in `powershell` (5.1), on a
+  Space with cards, run `tkDaily -LastWeek`: the days print, with no `Error:` and nothing copied to the clipboard.
+  Open the web UI's Daily page, step back three weeks with *Earlier week*, press Copy All, and compare it with
+  `tkDaily -Since <that Monday> -Until <that Friday>`: the same text. `tkDaily -Since 2026-01-05` prints one
+  `Error:` naming `-Since and -Until go together`, and `$LASTEXITCODE` is 2. The `ps51` job runs the Billable
+  suite on 5.1; this row is a real console, a real hub and the page.
+- [ ] **A Space's checkout whose path has a space and ends in a backslash is found under Windows PowerShell 5.1
+  (#407).** On the Windows PC, clone a repository a Space names into a folder with a space in its path, say
+  `C:\My Repos\product`. In `powershell` (5.1), in that Space, run
+  `tkConfig -Set "spaceCheckouts.<slug>.path=C:\My Repos\product\"` (the trailing backslash is the point), then
+  `tkMoveDesign <id> -To Spec -Space <slug> -WhatIf` for a note in that product. It names the clone at
+  `C:\My Repos\product` and the move it would make; it does not say `it is not inside a git repository`. Then run
+  `tkTestToolkit -Design -Portability`: the line `a clone in a folder with a space, asked for with a trailing
+  separator, is found (Desktop 5.1...)` passes, the one after it too, and so does every `Clause 23: the shipped
+  reader hands git ...` line, `a checkout path with a space and a trailing backslash, and the arguments after it`
+  among them. Those rows are `Invoke-P20TrackerRead` escaping for 5.1's own command line, which no other host
+  builds; the `ps51` job runs both suites on 5.1 too.
+- [ ] **The agent's checkout tests pass under Python on Windows (#410).** On the Windows PC, from the package root,
+  run `py -3 -m pytest Tests/test_space_checkout.py`. It reads `13 passed`, with no failure naming `/srv/clones/r`:
+  the shared table's absolute-path rows carry `os`, and on Windows the `posix` rows are not run and the two
+  `windows` rows (`C:\clones\r`, and the same with spaces around it) are. Then `tkTestToolkit -Design` in `pwsh` and
+  in `powershell` (5.1): its lines `a path written 'C:\clones\r' reads as 'C:\clones\r'` pass and none names
+  `/srv/clones/r`. The two Windows CI jobs run the Design suite; no CI job runs this pytest file on Windows, so this
+  row is the only place the agent's half reads the `windows` rows live.
 
 ## Recording a run
 

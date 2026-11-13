@@ -67,22 +67,37 @@ Nothing in Teams says where this lives, so the path, once:
 5. Prove it unsent: `tkSendTeams manager 'Hello from the Toolkit' -WhatIf`. The URL is a secret; never
    send from a session to find out.
 
-**A second recipient is declared by hand.** `TEAMS_WEBHOOK_<KEY>` only supplies the variable name for a
-recipient that is already declared under `managerWorkflow.communication.recipients`; an undeclared
-one is refused (`unknown recipient key 'mom'`). `Config -Set` cannot declare one -- `managerWorkflow` is the
-team's block in `config.default.json`, and `Config` never writes it, so any key under it answers
-`Unknown setting` -- so edit `config.local.json` (top-level, gitignored) yourself:
+**A second recipient is declared with `tkConfig`.** `TEAMS_WEBHOOK_<KEY>` only supplies the variable
+name for a recipient that is already declared; an undeclared one is refused (`unknown recipient key
+'mom'`). A recipient is three fields under a key of your choosing -- the key is what `SendTeams` takes:
 
-```json
-{ "managerWorkflow": { "communication": { "recipients": {
-    "demo_channel": { "type": "channel", "display": "Demo channel" } } } } }
+```powershell
+tkConfig -Set managerWorkflow.communication.recipients.mom.type=chat
+tkConfig -Set managerWorkflow.communication.recipients.mom.display=Mom
+tkConfig -Set managerWorkflow.communication.recipients.mom.webhookEnv=TEAMS_WEBHOOK_MOM
 ```
 
-`"type"` is `"channel"` **even for a person**: `"chat"` is refused as `unsupported type`, `"person"` as
-`DM deferred`, and the shipped `manager` entry is itself a `"channel"` whose display says "DM via
-Workflow". Then `TEAMS_WEBHOOK_DEMO_CHANNEL` is the variable.
+That writes `config.local.json` (top-level, this machine's), and `tkEnv`'s Teams delivery row then
+names `mom` among the recipients. The System page's Environment card lists it too, as *Every Space*,
+with whether its variable is set ([`/env`'s `communication` block](#envs-communication-block)). The rest of `managerWorkflow` -- `retroChannel`, `postRetroSummary` --
+is still the team's block in `config.default.json`, and `tkConfig` refuses it by name.
 
-Known gap: [`Config -Set` cannot declare a Teams recipient](../KNOWN-GAPS.md#config--set-cannot-declare-a-teams-recipient).
+- **`type`** is `chat` for a **Send webhook alerts to a chat** workflow and `channel` for **Send webhook
+  alerts to a channel**. The two post the same way, through the webhook, and gate 2 checks the variable
+  for both. `person` is accepted and never posts: a direct message is not built, and the engine answers
+  `skipped`, a DM deferred. Any other word is refused with the three allowed values named. The shipped
+  `manager` entry is a `channel` whose display says "DM via Workflow"; it works as it is, and
+  `tkConfig -Set managerWorkflow.communication.recipients.manager.type=chat` says what it is.
+- **`display`** is the name the Meetings page and a dry run show.
+- **`webhookEnv`** is the NAME of the variable, never the URL: `TEAMS_WEBHOOK_` and then capitals,
+  digits and `_`. Anything else is refused -- a URL in particular, which is not repeated back. Left
+  unset, the name is `TEAMS_WEBHOOK_<KEY>`, the key in capitals. The URL goes in `.env` under that name.
+
+A recipient for one Space only -- a team channel -- is the same three fields under the Space:
+`tkConfig -Set spaces.<slug>.communication.recipients.<key>.type=channel` writes `hub.json`, and `-Local`
+this machine's patch instead. A Space's recipient wins over a `managerWorkflow` one with the same key,
+and the Environment card lists it as *This Space*, while that Space is the active one.
+`tkConfig -Unset` takes one field at a time, and the recipient goes with its last.
 
 ## The verbs
 
@@ -241,14 +256,33 @@ appended server-side so the caller never has to read the file back in order to a
       "webhookEnv": "TEAMS_WEBHOOK_MANAGER",
       "configured": false
     }
-  ]
+  ],
+  "sendingOff": false
 }
 ```
 
-`configured` is gate 2, answered before the click. `scope` says which config block the entry came
+`configured` is gate 2, answered before the click. `type` is the entry's own word -- `channel`,
+`chat` or `person` -- passed through as written; the page branches on none of them. `sendingOff` is whether this server was started
+with sending turned off: the run marker (`consts.json` `env.testRunMarker`) is set, which is what
+makes the engine refuse to post. A server started for review or testing (`Web -Dev -Fixture`, or a
+test runner) removes every `TEAMS_WEBHOOK_*` variable and sets the marker, so the two travel
+together, and a page reads `sendingOff` rather than the variable's absence alone. `scope` says which config block the entry came
 from: `managerWorkflow` for a recipient declared under `managerWorkflow.communication.recipients`,
 the same in every Space, or `org` for one declared on the active Space's `communication.recipients`.
-Switching Space changes only the second, and `scope` is what explains that. The System page's Environment card draws one row per recipient from this block (`EnvRecipients`, a lazy part of this module): the display name, *Every Space* for `managerWorkflow` or *This Space* for `org`, and whether the webhook variable is set. An unset variable is named, in the send button's words. The rows come from the `/env` the card already reads, so they cost no request, and with the flag off the block is absent and nothing is drawn or fetched. The URL is never shown.
+Switching Space changes only the second, and `scope` is what explains that. The System page's Environment card draws one row per recipient from this block (`EnvRecipients`, a lazy part of this module), under the title *Teams messages*. A row says what the recipient does in plain words -- *Your manager: Teams direct message* for the recipient the retro goes to (`retroChannel`), *`<name>`: Teams post* for any other webhook -- then *Every Space* for `managerWorkflow` or *This Space* for `org`, then its state. The rows come from the `/env` the card already reads, so they cost no request, and with the flag off the block is absent and nothing is drawn or fetched. The URL is never shown.
+
+A recipient's state is a few neutral words, never red and never an instruction:
+
+| State | When | The row and the send button read |
+| --- | --- | --- |
+| ready | The webhook is set and this server can send | `Ready` on the row; the button is not held back |
+| not set | No webhook is set. It is an optional setting nobody has set up yet, not an error | `Webhook not set` |
+| off | `sendingOff` is true. Every recipient reads this, whatever is set, and there is nothing to fix | `Sending off on this server` |
+| person | The recipient's `type` is `person`, which is never posted to | `No webhook needed` |
+
+How to set a webhook up, and the environment variable's name, are behind the row's info icon and
+nowhere in the row's text. The words and the how-to live in one file, `recipientState.ts`, read by
+both the card's rows and the send button, and `EnvCard.recipients.test.tsx` holds the two equal.
 
 `core/env.py` does not import this module. It asks a module that is **switched on** to describe
 itself, lazily and inside the flag check, so a checkout without the module still serves `/env`.
@@ -259,10 +293,10 @@ Export: **`communicationModule`** from `web/src/modules/communication/index.tsx`
 
 | Route | Renders |
 | --- | --- |
-| `/communication` | `OneOnOne` — the one-card landing page the `Meetings` nav points at. A complete session's row offers **Close**. **With `features.organize` on it redirects to `/organize`**, where the same card sits beside Reminders |
+| `/communication` | `OneOnOne` — the one-panel landing page the `Meetings` nav points at: a list panel (`ListPanel`, [`web/COMPONENTS.md`](../../web/COMPONENTS.md)) whose chips split the sessions into All, Current, Past and Archive. Each entry's one exposed action is **Open the meeting** (the read view); its `...` menu holds **Edit or send** (the session page) and, on a complete session, **Archive**, which closes it behind the confirm. **With `features.organize` on it redirects to `/organize`**, where the same card sits beside Reminders |
 | `/communication/1on1/:filename` | `ManagerDetailPage` — read view, with an `Edit / send` button to the session page, and **Close** on a complete session; under the title, the agent's `carried_from_note` as a quiet line when `carried_from_verdict` is `stale`, `missing` or `absent`, and nothing when it is `ok` or an older agent sends none |
 | `/communication/sessions/new` | `ManagerSessionPage` — scaffold and edit |
-| `/communication/sessions/:filename` | `ManagerSessionPage` — edit, the stage ahead (Plan / Prep / Retro through the bridge), Close on a complete session, and the send. Reached from `Edit / send` on a meeting row and on the read view |
+| `/communication/sessions/:filename` | `ManagerSessionPage` — edit, the stage ahead (Plan / Prep / Retro through the bridge), Close on a complete session, and the send. Reached from **Edit or send** in a meeting entry's menu and from `Edit / send` on the read view |
 | `/growth/1on1/:filename` | redirect, filename forwarded |
 | `/growth/sessions/new` | redirect |
 | `/growth/sessions/:filename` | redirect, filename forwarded |
@@ -293,9 +327,11 @@ tag type with `enhanceEndpoints`. `/env`'s communication block is typed here, no
 
 ### Close, from the browser
 
-A session at Retro reads "Complete — close it to move it to the archive", and beside it, on the
-Meetings card's row and in the read view's header, a **Close** button, so the last step of the flow
-needs no terminal either. It is `CloseMeetingButton` in `CloseMeeting.tsx`, and it is the one action on
+A session at Retro reads "Complete. Archive it to close it and move it to the archive." on its entry
+in the Meetings panel, whose `...` menu then holds **Archive**, the row vocabulary's word for this move;
+the read view's header has a **Close** button. So the last step of the flow
+needs no terminal either. Both open `CloseMeetingDialog` in `CloseMeeting.tsx` (the button is
+`CloseMeetingButton`, beside it), and it is the one action on
 these pages behind a confirm, because it moves a file -- the house's one confirm, `shared/ConfirmDialog`
 ("Are you sure?", the act named, Cancel and Submit; a refusal stays in it). The confirm runs `POST /api/cmd/MeetingAgenda`
 with `-Date <date> [-Type <series>] -Close` — the argv is `buildMeetingAgendaParams` in
@@ -313,8 +349,6 @@ the three keys and labels both pages read.
 
 The `--modules=on` smoke asserts the button's **presence** on exactly one of the three fixture
 sessions and never presses it: a press moves a file in the committed fixture hub.
-
-Known gap: [A meeting row draws its actions side by side](../KNOWN-GAPS.md#a-meeting-row-draws-its-actions-side-by-side).
 
 ### Advancing a stage, from the browser
 
@@ -340,7 +374,7 @@ posts to a real webhook.
 | State | When |
 | --- | --- |
 | **absent** | `postRetroSummary` is false -- the workflow does not include a send, so there is nothing to explain -- or the session is closed (`folder: "archive"` on the detail): `PUT` writes only `current/`, so a send from there is one the file could never record |
-| **disabled** | The stage is not Retro, the recipient has no webhook, `## Sent` already records a send (the line names the date), or the Agenda holds only its placeholder. Every reason that holds is on the line below it, the recipient's first -- so the variable is named from the moment the page opens, not revealed at Retro when it is needed |
+| **disabled** | The stage is not Retro, the recipient has no webhook, sending is off on this server, `## Sent` already records a send (the line names the date), or the Agenda holds only its placeholder. Every reason that holds is on the line below it, the recipient's first -- so it is said from the moment the page opens, not revealed at Retro when it is needed. The recipient's reason is its state in the Environment card's words, `Webhook not set` or `Sending off on this server`; the variable's name and the how-to are in the info icon beside the line |
 | **enabled** | Retro stage, recipient configured, an Agenda with content, nothing under `## Sent` |
 
 A click posts `{caller: "ManagerSessionPage", recipient: <retroChannel>, subject: <session title>,
@@ -403,7 +437,8 @@ curl -s localhost:4100/api/env | python3 -c "import json,sys; print(json.load(sy
 ```
 
 With `TEAMS_WEBHOOK_MANAGER` unset, `/env` reports the recipient unconfigured and names the
-variable; set it to anything and `configured` flips to true. **`/api/comms/send` posts for real** —
+variable; set it to anything and `configured` flips to true. `sendingOff` is true only on a server
+started with the run marker. **`/api/comms/send` posts for real** —
 the engine takes whatever is in that variable at face value. Use `-WhatIf` from the CLI, or
 `"dryRun": true` on the body, to exercise the path without sending.
 
@@ -412,26 +447,38 @@ the engine takes whatever is in that variable at face value. Use `-WhatIf` from 
 | Suite | What it guards |
 | --- | --- |
 | `Tests/test_comms_format.py` | The engine, carried with every assertion unchanged: tone formatting, the Adaptive Card envelope, recipient resolution, the master switch, validation, dry run and fail-soft failure. This file is the evidence the engine did not change behaviour while it moved packages |
-| `Tests/test_manager.py` | The routes against a copy of the fixture hub — list, read, create, save — plus the module gate and the two overwrite gates (a session in `current/`, and one already closed into `archive/`): off is a 404 that writes nothing, and `/env` reports the recipient unconfigured with its variable's name, then configured once it is set. Also that a save never deletes an agenda, never moves the stage, and never loses a Sent line; and every row of the shared `Tests/fixtures/carried-from/table.json` read through `carried_from_check`, with the detail reporting a session added out of order and leaving its file as it was |
+| `Tests/test_manager.py` | The routes against a copy of the fixture hub — list, read, create, save — plus the module gate and the two overwrite gates (a session in `current/`, and one already closed into `archive/`): off is a 404 that writes nothing, and `/env` reports the recipient unconfigured with its variable's name, then configured once it is set, and `sendingOff` following the run marker, the engine's own answer. Also that a save never deletes an agenda, never moves the stage, and never loses a Sent line; and every row of the shared `Tests/fixtures/carried-from/table.json` read through `carried_from_check`, with the detail reporting a session added out of order and leaving its file as it was |
 | `Tests/Test-SendTeams.ps1` | Gate 2 reported rather than raised, the `TEAMS_WEBHOOK_<KEY>` fallback, the catch-all variable, and the wrapper. Every case runs in a sandbox with its own config and an agent port nothing listens on |
 | `Tests/Test-NewMeeting.ps1` | The eight headings by name, the prior session found across folders and out of order, an existing session reported rather than overwritten — with its hand-written content asserted still there — and a date already closed into `archive/` refused, with nothing scaffolded beside the record. A session created out of order names the later record whose heading it made stale, and leaves that record alone |
 | `Tests/Test-MeetingAgenda.ps1` | The stage lifecycle, read back out of the file rather than out of the command's output, and `-Close` end to end: the move, the `**Closed:**` stamp, `archive/` created when absent, a second run idempotent, and `-DryRun` writing nothing — plus the duplicate case, where a session sits in `current/` and a closed one in `archive/` for the same date and `-Close` refuses rather than reporting success. Plus two absence tests: the help names none of the three retired hub prompts, and the retro does not suggest the org-scoped `Archive` verb — it names `-Close` instead. And every row of the shared `Tests/fixtures/carried-from/table.json` read through `Resolve-P20CarriedFrom`, then the `Check:` line end to end -- status, quick menu, `-Plan` -- with the session's bytes unchanged |
 | `web/.../stages.test.ts` | The three stages in one place: the file's word, the badge's label, what comes next, complete only at the last -- and the one switch the session page offers: the stage ahead, `Plan` for a blank stage, nothing for a closed session |
+| `web/.../OneOnOne.test.tsx` | A meeting's row: one exposed button and a `...` menu named for the row; **Archive** offered only on a complete, unclosed session; and Archive asking first, then calling `MeetingAgenda -Close` through the bridge |
 | `web/.../ManagerDetailPage.test.tsx` | The read view's Carried-from line: the agent's sentence drawn for `stale`, `missing` and `absent`, and nothing for `ok` or when the fields are absent |
 | `web/.../cliBridge.test.ts` (three of its cases) | `MeetingAgenda`'s argv: `-Date`, `-Type` only for a series that is not the 1:1, then the one switch spelt the script's way |
 | `web/.../sendButton.test.ts` | The send button's three states, including that it is absent rather than disabled when the workflow has no send, and that what goes out is the Agenda and never the self-assessment |
+| `web/.../EnvCard.recipients.test.tsx` | The Environment card's Teams recipients: a `managerWorkflow` recipient labelled Every Space and an org one This Space, each saying what it does under the title Teams messages; the states -- Ready, Webhook not set with the variable only in the info icon, Sending off on this server for every recipient where `/env` says so, and a person asked for no webhook; the row and the send button holding the same phrase and the same how-to; and with `features.communication` off, no row drawn and the rows' chunk never fetched even when `/env` carries the block |
 | `web/.../registry.communication.test.tsx` | The registry contract from this module's side: off contributes no route, nav or card; on contributes exactly these seven routes |
-| `npm run smoke -- --modules=on` | In a browser: lists the three fixture sessions, reads their stages, finds the retro session's send button disabled and naming its variable, reaches the session page through `Edit / send`, and finds Close on exactly one session without pressing it |
+| `npm run smoke -- --modules=on` | In a browser: lists the three fixture sessions, reads their stages, finds the retro session's send button disabled and naming its variable, finds **Edit or send** in each meeting entry's menu, reaches the session page through the read view's `Edit / send`, and finds Archive in exactly one entry's menu without choosing it |
 
 The three PowerShell suites are registered in `Tests/Test-Toolkit.ps1` (`-SendTeams`, `-NewMeeting`, `-MeetingAgenda`) and run in the full `tkTestToolkit` pass; they can also be run directly. Each suite's count is in [Testing](../TESTING.md).
 
 ## Known gaps
 
-| # | Gap |
+| # | Gap | Known gap |
+| --- | --- | --- |
+| — | An agenda line becomes a card from the terminal only (`NewPrompt -From`): the Meetings page has no "make a card" action on an agenda line, which belongs to the record's reading room, not yet built | [An agenda line becomes a card from the terminal only](../KNOWN-GAPS.md#an-agenda-line-becomes-a-card-from-the-terminal-only) |
+| — | A card made from an agenda line names its record; the record does not name the card. Whether the agenda gets a line back (`-> card K7M2`) is undecided | [An agenda line becomes a card from the terminal only](../KNOWN-GAPS.md#an-agenda-line-becomes-a-card-from-the-terminal-only) |
+
+One more is described where you meet it, earlier in this document:
+[A webhook set after the agent started is not seen](../KNOWN-GAPS.md#a-webhook-set-after-the-agent-started-is-not-seen).
+
+### True by design
+
+These are choices, not omissions, and are not on [Known gaps](../KNOWN-GAPS.md):
+
+| # | Choice |
 | --- | --- |
 | — | Recipients are read from two blocks, `managerWorkflow` and the active Space's, and `/env` says which (`scope`); the Environment card draws it. A config wizard has to show both |
 | — | Prep has no agent pass: the shipped prompt has two passes (Plan and Retro), not three |
-| — | An agenda line becomes a card from the terminal only (`NewPrompt -From`): the Meetings page has no "make a card" action on an agenda line, which belongs to the record's reading room, not yet built |
-| — | A card made from an agenda line names its record; the record does not name the card. Whether the agenda gets a line back (`-> card K7M2`) is undecided |
 | — | `Timer` is module-local. If a second module ever wants one, that is the moment to promote it to `shared/` |
 | — | `/rewrite` keeps its own copy of the Messages API call rather than sharing the ADO module's. Deliberate — a module reaching into a sibling for a helper is how two modules stop being separable — but it is thirty duplicated lines |

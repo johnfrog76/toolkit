@@ -337,8 +337,9 @@ def attach_suggestions(
     answering (a ritual with no read has no list to choose from). ``prefix`` is the
     CLI's, for the command the chair's line names; ``viewer`` the signed-in gh user's
     login (triage's one read), "" when gh cannot say -- then every assignee is
-    someone else's, and a suggestion is never someone else's work. ``launch`` is ``start_work_launch()``'s answer: a delegation's
-    command ends in ``-Launch`` where it is true."""
+    someone else's, and a suggestion is never someone else's work. ``launch`` is
+    ``start_work_launch()``'s answer: a delegation's command ends in ``-Launch``
+    where it is true."""
     filled.suggestions = []
     filled.suggestion = None
     if not on or not filled.tracker.ok:

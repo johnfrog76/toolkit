@@ -37,12 +37,42 @@
     It returns @{ Code; Lines; Out; Err }, the shape Invoke-P20TrackerRead
     gives a script: Lines is stdout and stderr in the order they came, Out
     stdout alone (what `2>$null` kept), Err stderr alone. $LASTEXITCODE is
-    left at Code. The arguments go to git as written, with no gate on them:
-    a fixture is not a user's input.
+    left at Code. There is no gate on the arguments: a fixture is not a
+    user's input.
+
+    Each argument reaches git as one value, with two things to know.
+
+    PowerShell reads a function's arguments before the function sees them,
+    so a bare word is not always one argument. Quote these, and each arrives
+    as written:
+
+        '--'            bare, the first one ends the parameters and is dropped
+        '-c:x'          bare, it arrives as  -c:  and  x
+        '-a.b'          bare, it arrives as  -a   and  .b
+        '--format=%h,%s'  bare, the comma splits it in two
+        'stash@{0}'     bare, it arrives as  stash@  and  0
+
+        $null = Invoke-P20TestGit -C $repo checkout -q '--' $path
+
+    Clause 23 of Test-Portability.ps1 reads every call under Tests/ and
+    fails on one of these written bare.
+
+    Windows PowerShell 5.1, and PowerShell 7 with
+    $PSNativeCommandArgumentPassing set to Legacy, build a native command
+    line by joining the arguments: an empty one vanishes and a double quote
+    inside one is not escaped, and 5.1 wraps 'my dir\' in quotes without
+    doubling the backslash at its end. The helper escapes for that host with
+    the shipped rule, ConvertTo-P20NativeArgument
+    (Scripts/ConvertTo-NativeArgument.ps1, dot-sourced below), which
+    Invoke-P20TrackerRead applies too: there is one rule and no copy of it
+    here. So '', 'say "hi"' and 'my dir\' arrive as themselves there too.
 
 .NOTES
     PowerShell 5.1 compatible (ASCII only).
 #>
+
+# The one rule for a legacy host's arguments, shared with Invoke-P20TrackerRead.
+. (Join-Path (Join-Path (Split-Path -Parent $PSScriptRoot) 'Scripts') 'ConvertTo-NativeArgument.ps1')
 
 function Get-P20TestHost {
     <# The running host's own executable: pwsh, or powershell.exe on 5.1. #>
@@ -82,10 +112,14 @@ function Invoke-P20TestHost {
 }
 
 function Invoke-P20TestGit {
-    # No param block: every argument, a dash-led one included (-C, -c, --quiet),
-    # reaches git as written.
+    # No param block: a dash-led argument (-C, -c, --quiet) reaches git rather
+    # than binding here. The header says which bare words PowerShell splits
+    # before this function sees them.
     $ErrorActionPreference = 'Continue'
-    $gitArgs = @($args | ForEach-Object { $_ })
+    $gitArgs = @($args | ForEach-Object { $_ } | ForEach-Object { [string]$_ })
+    if (Test-P20LegacyNativeArguments) {
+        $gitArgs = @($gitArgs | ForEach-Object { ConvertTo-P20NativeArgument $_ })
+    }
     $global:LASTEXITCODE = 0
     $raw = @(& git @gitArgs 2>&1)
     $code = $LASTEXITCODE

@@ -92,12 +92,21 @@ table; this is the shape of it:
 
 | Scope | Keys | Goes to |
 | --- | --- | --- |
-| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `web.agentPort`, `web.corsOrigins`, `limits.inPlay`, `burn.weekStarts`, `burn.cacheHours`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display`, `spaceCheckouts.<slug>.path` | `config.local.json`, created as a sparse patch if it is not there |
-| **org** | `spaces.<slug>.name` / `.status` / `.orgType` / `.org` / `.tenant` / `.promptsFolder` / `.projects` / `.howIWork` / `.features.sprintAwareness` / `.features.suggestions` / `.features.trainingHoursPerQuarter` | the hub's `hub.json` -- or `config.local.json`'s `spaces.<slug>` patch with **`-Local`** |
+| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `web.agentPort`, `web.corsOrigins`, `limits.inPlay`, `burn.weekStarts`, `burn.cacheHours`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display`, `spaceCheckouts.<slug>.path`, `managerWorkflow.communication.recipients.<key>.type` / `.display` / `.webhookEnv` | `config.local.json`, created as a sparse patch if it is not there |
+| **org** | `spaces.<slug>.name` / `.status` / `.orgType` / `.org` / `.tenant` / `.promptsFolder` / `.projects` / `.howIWork` / `.features.sprintAwareness` / `.features.suggestions` / `.features.trainingHoursPerQuarter` / `.communication.recipients.<key>.type` / `.display` / `.webhookEnv` | the hub's `hub.json` -- or `config.local.json`'s `spaces.<slug>` patch with **`-Local`** |
 | **hub** | `storeSync`, `folders.<name>` | the hub's `hub.json`, and only with **`-Hub`** |
-| **default** | `commands`, `workItemTypes`, `cliVersion`, `managerWorkflow` | nowhere. These are the team's, and a `-Set` on one is refused by name |
+| **default** | `commands`, `workItemTypes`, `cliVersion`, `managerWorkflow` (all of it but its recipients) | nowhere. These are the team's, and a `-Set` on one is refused by name |
 
 Things worth knowing before you use it:
+
+- **A Teams recipient is declared here, a field at a time** -- `type` (`channel`, `chat` or `person`,
+  from `consts.json`'s `communication` block; any other word is refused naming the three), `display`, and
+  `webhookEnv`, the NAME of the variable that holds the webhook (`TEAMS_WEBHOOK_<NAME>`, never a URL,
+  which is refused and not echoed). `managerWorkflow.communication.recipients.<key>.*` is the engineer's,
+  the same in every Space; `spaces.<slug>.communication.recipients.<key>.*` is one Space's. Every other
+  `managerWorkflow` key stays the team's and is refused as such, not as unknown. `-Unset` of a
+  recipient's last field removes the recipient. [Communication](modules/communication.md#getting-a-webhook-url)
+  has the walk.
 
 - **A slug nobody has declared is how you add an org** -- and `tkNewSpace` is the easy way to do it
   ([Adding a Space](#adding-a-space), below), writing these same keys. `tkConfig -Set spaces.acme.name=Acme` appends
@@ -245,9 +254,13 @@ config file, and a build that asked for the port would refuse.
   "whatever ships ... follow the same pattern"; the demo Spaces are
   [the add-on's](modules/ado.md#the-demo-spaces-one-per-grain)). Set this `true` (Settings: **Hide Demo**) and those orgs are left out of every list a
   person picks an org from: the web's switcher, Settings, the Reviews page's org chips (all read `/env`'s
-  `config.spaces`, which the agent filters), and `tkSwitchSpace Status`. It is **never removed from
-  config**, `tkSwitchSpace azure-demo` still works, and the org you are IN is always shown. One rule in each
-  half -- `Scripts/Select-OfferedSpaces.ps1` and `offered_spaces` in `agent/core/config.py` -- held to one
+  `config.spaces`, which the agent filters). The switcher leaves off one more: a **retired** Space (`status: archive`,
+  `tkRetireSpace`), whatever this is set to. That list is `/env`'s `config.switcherSpaces` (slugs) and
+  `tkSwitchSpace Status`; `config.spaces` keeps the retired Space, so its cards, reviews and row under
+  Archive stay. Nothing is **removed from config**, `tkSwitchSpace azure-demo` (or a retired Space) still
+  works, and the org you are IN is always shown. The switcher rule is `Select-P20SwitcherSpaces`
+  (`Scripts/Select-OfferedSpaces.ps1`) and `switcher_spaces` in `agent/core/config.py`, on top of the offered
+  rule (`Select-P20OfferedSpaces`, `offered_spaces`); the switcher rule is held to one
   table, `Tests/fixtures/offered-orgs/table.json`. `tkStart` does not set it. Not an opt-in surface, so
   it has no row in the inventory.
 - **`commandPrefix`, and the name in `aliases.<name>`** -- become part of a command. A prefix is a
@@ -322,7 +335,8 @@ is no "not configured": the shipped config answers `none`.
   count that was true a minute ago.
 
 Every git call this makes is the CLI half's -- `Scripts/Get-HubSyncState.ps1`, through
-`Invoke-P20TrackerRead` -- so it reads the same on Windows PowerShell 5.1 as on 7. The hub must be the
+`Invoke-P20TrackerRead` -- so it reads the same on Windows PowerShell 5.1 as on 7, a hub whose path holds a
+space and ends in a separator included. The hub must be the
 root of its repository, the same question `Sync` asks before it writes; a hub with no upstream branch
 says so in git's words.
 
@@ -400,21 +414,28 @@ shipped file carries an empty `limits` block and nothing in it.
 
 Where a Space's own repository is cloned **on this machine**: `tkConfig -Set spaceCheckouts.toolkit.path=~/Repos/toolkit`,
 or the **This Space's checkout** row in Settings (the drawer lists the Space you are in; another Space's is set by
-its key). A folder anywhere inside the clone will do; the path is absolute or starts with `~`. Keyed by the
-Space's slug, and the slug must be a declared Space.
+its key). A folder anywhere inside the clone will do; the path is absolute or starts with `~`, and a separator
+at its end is ignored (`C:\My Repos\product\` reads as `C:\My Repos\product`; a drive root stays as written).
+Keyed by the Space's slug, and the slug must be a declared Space.
 
 **It is this machine's, and only ever this machine's.** It is written to `config.local.json` and nowhere else:
 `-Hub` with it is refused, and a `spaceCheckouts` block in `config.default.json` or `hub.json` is read by
 nobody. The hub syncs between machines whose clones of the same repository sit in different folders, so a path
 in `hub.json` would be wrong everywhere but where it was typed.
 
-**What it turns on.** The Design tab reads a product's `design/` and `spec/` from GitHub, so its rows could only
-open a design, never move one -- a move is a `git mv` in a clone. With a checkout named, and its `origin` the
-Space's repository, a product design's menu offers the same moves a hub design's does (**Graduate to a spec**,
+**What it turns on.** A move is a `git mv` in a clone, so without one the Design tab's rows only open a design,
+read from GitHub. With a checkout named, and its `origin` the Space's repository, the tab reads that clone
+instead, and a product design's menu offers the same moves a hub design's does (**Graduate to a spec**,
 **Archive as shipped**, **Archive as dropped**, **Complete**), each running `MoveDesign -Space <slug>` through
 the bridge. The verb **stages the move in that clone and never commits**: a product's history is the engineer's.
-The dialog shows what was staged and the commit line the verb suggests, and the tab re-reads -- though a row
-moves only once the commit is pushed, because the tab reads GitHub ([A repository's designs move only through a named checkout](KNOWN-GAPS.md#a-repositorys-designs-move-only-through-a-named-checkout)).
+The dialog shows what was staged and the commit line the verb suggests, and the tab re-reads.
+
+**What the tab reads, with it.** The listing, **Search inside** and the reading room read the clone's
+**working tree** -- the four folders on disk, on whatever branch it has checked out -- so a staged move shows
+on the re-read, before anything is committed, and a design only that branch carries is listed and found. The
+card's foot says which source was read: the clone and its branch, or the repository on GitHub. Without the
+setting, or with one that is not a clone of the Space's repository, the tab reads GitHub's default branch as it
+always has, and its search is GitHub's code search.
 
 **One resolver.** `Resolve-P20SpaceCheckout` (`Scripts/Resolve-SpaceCheckout.ps1`) is the one thing that finds a
 Space's clone, and this setting is its first candidate, before the folder you stand in and the nav shortcuts'
@@ -425,11 +446,14 @@ repo. On an **Azure DevOps** Space it is the organisation the address names (`ht
 `https://<org>.visualstudio.com`), the one `projects[]` entry's name, and that entry's `repo` (the project's own
 name where it has none) -- and a clone's `origin` is that repository in any form Azure DevOps gives it:
 `https://dev.azure.com/<org>/<project>/_git/<repo>`, `https://<org>.visualstudio.com/[DefaultCollection/]<project>/_git/<repo>`,
-or `git@ssh.dev.azure.com:v3/<org>/<project>/<repo>` and `<org>@vs-ssh.visualstudio.com:v3/<org>/<project>/<repo>`,
+or `git@ssh.dev.azure.com:v3/<org>/<project>/<repo>` and `<org>@vs-ssh.visualstudio.com:v3/<org>/<project>/<repo>`
+(either ssh remote also as a URL, `ssh://git@ssh.dev.azure.com/v3/<org>/<project>/<repo>`, with or without the user and a port),
 the host in any case and a trailing `.git` optional. A Space with several projects names no single repository, so
 it has no clone to find. The patterns are `consts.json` `regex.adoOrigin*` and `regex.adoOrg*`. The agent asks the same question of the configured path alone for the Design tab
 (`agent/core/checkout.py`, on every `GET /api/design`, as `checkout`), and never searches; the path and
 origin rules (GitHub's and Azure DevOps's) are one table both halves assert, `Tests/fixtures/space-checkout/table.json`.
+What counts as absolute is the platform's, so the table's absolute-path rows carry `os` (`posix` for `/srv/clones/r`,
+`windows` for `C:\clones\r`) and each suite runs the rows for the platform it is on; the `~` and relative rows run everywhere.
 
 Unset, a product row keeps its one link out, **Open on GitHub**, and the Design tab's foot names this setting;
 set to a folder that is not a clone of the Space's repository, the foot says why. `tkEnv` lists it under
@@ -657,6 +681,9 @@ which `NewPrompt -Design` writes, and the corpus's hand-written `> Spec:` form, 
 and **the Studio's Prompts card's read** (`studio.promptsRoute`, which the agent mounts and the web asks,
 see [the Studio](modules/studio.md#the-web-ui)), and **the Spaces card's one read of every GitHub Space's
 ledger** (`studio.ledgerRoute`, the same, see [the Studio](modules/studio.md#the-routes)),
+and **the sentences Daily refuses a window with** (`billing.text`: `halfWindow`, `notADay` and
+`backwards` -- the billing script, the CLI's `Daily` and `GET /api/billing` say the same one, see
+[the CLI](CLI.md#the-third-line-billable)),
 and **the halves a test run
 covers** (`tests.halves`, `agent`, `cli`, `web` in the order `tkTest` runs them, and `tests.legacyHalf`,
 what a `test-summary.<machine>.json` entry with no `half` is read as: the CLI runner and `tkTest` write
@@ -938,14 +965,14 @@ past its burndown's `renewsAt` ([usage](hub/usage.md#today-and-this-week)).
 Never the hub -- it is your record, and it may be synced between machines -- and never the package, whose
 tree `Update` refuses to move while it is dirty. Under it, `rows/<reader>.json` holds the parsed rows (the
 reader's name carries a version, bumped when what it parses changes), `bodies/<sha>` the opened bodies, and
-`ledger-1/<slug>.json` each GitHub Space's ledger with the time it was read (the folder's version is bumped
+`ledger-2/<slug>.json` each GitHub Space's ledger with the time it was read (the folder's version is bumped
 when the ledger's shape changes), and `standup-dress-1/<hash>.json` the dressed replies.
 `rows/`, `bodies/` and `standup-dress-1/` are **capped by one rule**, applied when something is written: a record or file unseen for
 30 days goes, and past 3000 records the oldest-unseen go first (`AGENT_CACHE_MAX_AGE_DAYS` and
 `AGENT_CACHE_MAX_RECORDS` in `agent/core/config.py`; not settings -- nothing to configure). "Seen" is when it
 was last written or served. In `rows/` a row carries a stamp in its file's `seen` map, refreshed by a warm
 read at most once a day; in `bodies/` and `standup-dress-1/` it is the file's modification time, set by the
-write and touched on a disk hit. `ledger-1/` is held to the Spaces instead: on a write, the file of any
+write and touched on a disk hit. `ledger-2/` is held to the Spaces instead: on a write, the file of any
 Space no longer in the config is dropped. `burn-1/` is one file, replaced on every read, so it needs no cap.
 A prune that cannot run leaves the cache as it was.
 Delete the folder whenever you like: the next read fetches what it needs again. `Config` does not know the

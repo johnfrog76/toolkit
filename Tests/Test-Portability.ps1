@@ -45,6 +45,8 @@ if ($Help) {
   Clause 22 Every suite starts its children through Invoke-P20TestHost (ratchet: the
             allow-list only shrinks)
   Clause 23 No file under Tests/ calls git with a redirected stderr outside Invoke-P20TestGit
+            and no call of the helper writes an argument PowerShell splits or drops
+            before the helper sees it; each argument reaches git as one value
   Clause 16 No script in Scripts/ carries its own Get-CliPrefix or Write-CliError fallback;
             Scripts/Initialize-CliFallbacks.ps1 is the one copy
   Clause 18 Every Azure DevOps request takes its headers from Get-P20AdoHeaders -OrgUrl `$org
@@ -1431,6 +1433,192 @@ foreach ($case in $suiteGitCases) {
     $caseHits = @(Get-RawTrackerCalls $case.Body $suiteGitPattern).Count
     Assert-True "Clause 23: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
 }
+
+# The arguments. The helper has no param block, so PowerShell reads its
+# arguments as a function's before it runs, and a bare word is not always one
+# argument: the first bare -- ends the parameters and is dropped, -c:x arrives
+# as -c: and x, -a.b as -a and .b, a comma makes two, and stash@{0} arrives as
+# stash@ and 0. Quoted, each arrives as written. So every call of the helper
+# under Tests/ is read as syntax, and one that writes such a word bare is a
+# hit: the call would run a different git command.
+function Get-TestGitSplitArguments {
+    param([string]$Text)
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$null, [ref]$null)
+    $calls = @($ast.FindAll({ param($n) ($n -is [System.Management.Automation.Language.CommandAst]) -and ($n.GetCommandName() -eq 'Invoke-P20TestGit') }, $true))
+    $found = @()
+    foreach ($call in $calls) {
+        $els = @($call.CommandElements)
+        for ($i = 1; $i -lt $els.Count; $i++) {
+            $el = $els[$i]
+            $why = ''
+            if ($el -is [System.Management.Automation.Language.CommandParameterAst]) {
+                if ($el.Extent.Text -eq '--') { $why = "a bare -- is dropped; write '--'" }
+                elseif ($null -ne $el.Argument) { $why = "$($el.Extent.Text) is split at the colon; quote it" }
+            }
+            elseif ($el -is [System.Management.Automation.Language.ArrayLiteralAst]) { $why = "$($el.Extent.Text) is split at the comma; quote it" }
+            elseif ($el.Extent.StartOffset -eq $els[$i - 1].Extent.EndOffset) { $why = "$($els[$i - 1].Extent.Text)$($el.Extent.Text) is split in two; quote it" }
+            if ($why) { $found += "$($el.Extent.StartLineNumber): $why" }
+        }
+    }
+    return $found
+}
+$suiteGitArgHits = @()
+$suiteGitArgCalls = 0
+foreach ($f in $suiteGitFiles) {
+    $text = [System.IO.File]::ReadAllText($f.FullName)
+    $suiteGitArgCalls += ([regex]::Matches($text, 'Invoke-P20TestGit\s')).Count
+    foreach ($hit in @(Get-TestGitSplitArguments $text)) { $suiteGitArgHits += "$(Get-RelPath $f):$hit" }
+}
+$suiteGitArgDetail = "read $($suiteGitFiles.Count) files under Tests/"
+if ($suiteGitArgHits.Count -gt 0) { $suiteGitArgDetail = $suiteGitArgHits -join '; ' }
+Assert-True "Clause 23: no call of Invoke-P20TestGit writes an argument PowerShell splits or drops" (($suiteGitArgHits.Count -eq 0) -and ($suiteGitArgCalls -ge 100)) $suiteGitArgDetail
+
+$suiteGitArgCases = @(
+    @{ Hit = $true;  Why = 'a bare --';                              Body = '$null = Invoke-P20TestGit -C $repo checkout -q -- $path' }
+    @{ Hit = $true;  Why = 'a bare -name:value';                     Body = '$r = Invoke-P20TestGit log -c:x' }
+    @{ Hit = $true;  Why = 'a bare -name: with its value after';     Body = '$r = Invoke-P20TestGit log -c: x' }
+    @{ Hit = $true;  Why = 'a bare dash-led word holding a dot';     Body = '$r = Invoke-P20TestGit log -a.b' }
+    @{ Hit = $true;  Why = 'a bare word holding a comma';            Body = '$r = Invoke-P20TestGit log --format=%h,%s' }
+    @{ Hit = $true;  Why = 'a bare list';                            Body = '$r = Invoke-P20TestGit add a.txt,b.txt' }
+    @{ Hit = $true;  Why = 'a bare stash@{0}';                       Body = '$r = Invoke-P20TestGit stash show stash@{0}' }
+    @{ Hit = $true;  Why = 'a bare -- inside a pipeline';            Body = '$n = @((Invoke-P20TestGit -C $repo log --oneline -- $path).Out | Where-Object { $_ }).Count' }
+    @{ Hit = $false; Why = 'a quoted --';                            Body = "`$null = Invoke-P20TestGit -C `$repo checkout -q '--' `$path" }
+    @{ Hit = $false; Why = 'a quoted -name:value';                   Body = "`$r = Invoke-P20TestGit log '-c:x'" }
+    @{ Hit = $false; Why = 'a quoted word holding a comma';          Body = "`$r = Invoke-P20TestGit log '--format=%h,%s'" }
+    @{ Hit = $false; Why = 'a double-dash option holding a colon';   Body = '$r = Invoke-P20TestGit log --pretty=format:%s' }
+    @{ Hit = $false; Why = 'the options a fixture is built with';    Body = '$null = Invoke-P20TestGit -C $repo -c user.email=t@example.invalid -c commit.gpgsign=false commit --quiet -m "one two"' }
+    @{ Hit = $false; Why = 'a revision and a variable';              Body = '$r = Invoke-P20TestGit -C $repo diff --stat HEAD~1 $head' }
+    @{ Hit = $false; Why = 'a member read as an argument';           Body = '$r = Invoke-P20TestGit -C $box.Repo show $card.Hash' }
+    @{ Hit = $false; Why = 'another command with a bare --';         Body = 'Set-Thing -Name a -- b' }
+    @{ Hit = $false; Why = 'a comment that names the trap';          Body = '# Invoke-P20TestGit checkout -- file.txt drops the --' }
+    @{ Hit = $false; Why = 'a string that names a call';             Body = '$cmd = "Invoke-P20TestGit checkout -- file.txt"' }
+)
+foreach ($case in $suiteGitArgCases) {
+    $caseHits = @(Get-TestGitSplitArguments $case.Body).Count
+    Assert-True "Clause 23: the argument sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
+}
+
+# What git is handed, one row per shape. `git rev-parse --sq-quote` prints each
+# argument it received in single quotes, so a row states exactly what arrived.
+# Every row runs as the host passes arguments by default; where the host has
+# $PSNativeCommandArgumentPassing (PowerShell 7.3 and later) it runs again with
+# Legacy, the passing Windows PowerShell 5.1 has, which loses an empty argument
+# and a double quote unless the helper escapes them.
+$suiteGitShapes = @(
+    @{ Why = 'plain words';                               Want = " 'log' '-q' '--oneline'";      Call = { Invoke-P20TestGit rev-parse --sq-quote log -q --oneline } }
+    @{ Why = 'a quoted -- and the path after it';         Want = " 'checkout' '--' 'file.txt'";  Call = { Invoke-P20TestGit rev-parse --sq-quote checkout '--' file.txt } }
+    @{ Why = 'a quoted -name:value';                      Want = " '-c:x'";                      Call = { Invoke-P20TestGit rev-parse --sq-quote '-c:x' } }
+    @{ Why = 'a quoted dash-led word holding a dot';      Want = " '-a.b'";                      Call = { Invoke-P20TestGit rev-parse --sq-quote '-a.b' } }
+    @{ Why = 'a quoted word holding a comma';             Want = " '--format=%h,%s'";            Call = { Invoke-P20TestGit rev-parse --sq-quote '--format=%h,%s' } }
+    @{ Why = 'a quoted stash@{0}';                        Want = " 'stash@{0}'";                 Call = { Invoke-P20TestGit rev-parse --sq-quote 'stash@{0}' } }
+    @{ Why = 'a double-dash option holding a colon';      Want = " '--pretty=format:%s'";        Call = { Invoke-P20TestGit rev-parse --sq-quote --pretty=format:%s } }
+    @{ Why = 'an option and its value, a = between';      Want = " '-c' 'user.name=t'";          Call = { Invoke-P20TestGit rev-parse --sq-quote -c user.name=t } }
+    @{ Why = 'a value holding spaces';                    Want = " '-m' 'one two  three'";       Call = { Invoke-P20TestGit rev-parse --sq-quote -m 'one two  three' } }
+    @{ Why = 'an empty value, and the one after it';      Want = " '-m' '' 'after'";             Call = { Invoke-P20TestGit rev-parse --sq-quote -m '' after } }
+    @{ Why = 'a double quote inside a word';              Want = " 'x`"y'";                      Call = { Invoke-P20TestGit rev-parse --sq-quote 'x"y' } }
+    @{ Why = 'double quotes inside a value with spaces';  Want = " 'say `"hi there`" twice'";    Call = { Invoke-P20TestGit rev-parse --sq-quote 'say "hi there" twice' } }
+    @{ Why = 'a lone double quote';                       Want = " '`"' 'after'";                Call = { Invoke-P20TestGit rev-parse --sq-quote '"' after } }
+    @{ Why = 'a backslash before a double quote';         Want = " 'a\`"b'";                     Call = { Invoke-P20TestGit rev-parse --sq-quote 'a\"b' } }
+    @{ Why = 'a trailing backslash';                      Want = " 'dir\' 'after'";              Call = { Invoke-P20TestGit rev-parse --sq-quote 'dir\' after } }
+    @{ Why = 'a trailing backslash after a space';        Want = " 'my dir\' 'after'";           Call = { Invoke-P20TestGit rev-parse --sq-quote 'my dir\' after } }
+    @{ Why = 'a checkout path with a space and a trailing backslash, and the arguments after it'; Want = " '-C' 'C:\My Repos\product\' 'rev-parse' '--show-toplevel'"; Call = { Invoke-P20TestGit rev-parse --sq-quote -C 'C:\My Repos\product\' rev-parse --show-toplevel } }
+    @{ Why = 'a wildcard';                                Want = " '*.txt'";                     Call = { Invoke-P20TestGit rev-parse --sq-quote *.txt } }
+    @{ Why = 'a variable holding spaces and a quote';     Want = " 'a `"b`" c' 'after'";         Call = { $v = 'a "b" c'; Invoke-P20TestGit rev-parse --sq-quote $v after } }
+)
+$suiteGitModes = @('')
+if (Get-Variable -Name PSNativeCommandArgumentPassing -ErrorAction SilentlyContinue) { $suiteGitModes += 'Legacy' }
+foreach ($mode in $suiteGitModes) {
+    $label = if ($mode) { "with $mode passing" } else { 'as the host passes arguments' }
+    foreach ($shape in $suiteGitShapes) {
+        $got = & {
+            if ($mode) { $PSNativeCommandArgumentPassing = $mode }
+            (& $shape.Call).Out -join "`n"
+        }
+        Assert-True "Clause 23: git is handed $($shape.Why), $label" ($got -ceq $shape.Want) "wanted [$($shape.Want)], git got [$got]"
+    }
+}
+
+# The same table, through the shipped reader. Invoke-P20TrackerRead takes
+# its arguments as an array, so nothing is parsed on the way in: each row hands
+# it the values the row says git should print, read out of Want, and git has to
+# print them back. Both helpers call one rule, ConvertTo-P20NativeArgument
+# (Scripts/ConvertTo-NativeArgument.ps1), behind one test of the host; a row that
+# passed for one and failed for the other would be a second rule.
+. (Join-Path $pkgRoot 'Scripts/Invoke-TrackerRead.ps1')
+foreach ($mode in $suiteGitModes) {
+    $label = if ($mode) { "with $mode passing" } else { 'as the host passes arguments' }
+    foreach ($shape in $suiteGitShapes) {
+        $values = @([regex]::Matches($shape.Want, "'([^']*)'") | ForEach-Object { $_.Groups[1].Value })
+        $got = & {
+            if ($mode) { $PSNativeCommandArgumentPassing = $mode }
+            (Invoke-P20TrackerRead 'git' (@('rev-parse', '--sq-quote') + $values)).Out -join "`n"
+        }
+        Assert-True "Clause 23: the shipped reader hands git $($shape.Why), $label" ($got -ceq $shape.Want) "wanted [$($shape.Want)], git got [$got]"
+    }
+}
+
+# The rule itself, one row per value it distinguishes, for each edition. This is
+# how Windows PowerShell 5.1's half is read on a host that is not 5.1: only the
+# Desktop edition doubles the backslashes at the end of a value it will wrap.
+$nativeArgumentRows = @(
+    @{ Why = 'an empty value';                              In = '';                        Desktop = '""';                      Core = '""' }
+    @{ Why = 'a plain word';                                In = 'plain';                   Desktop = 'plain';                   Core = 'plain' }
+    @{ Why = 'a value holding a space';                     In = 'my dir';                  Desktop = 'my dir';                  Core = 'my dir' }
+    @{ Why = 'a double quote';                              In = 'x"y';                     Desktop = 'x\"y';                    Core = 'x\"y' }
+    @{ Why = 'a backslash before a double quote';           In = 'a\"b';                    Desktop = 'a\\\"b';                  Core = 'a\\\"b' }
+    @{ Why = 'a trailing backslash and no space';           In = 'dir\';                    Desktop = 'dir\';                    Core = 'dir\' }
+    @{ Why = 'a trailing backslash after a space';          In = 'my dir\';                 Desktop = 'my dir\\';                Core = 'my dir\' }
+    @{ Why = 'two trailing backslashes after a space';      In = 'my dir\\';                Desktop = 'my dir\\\\';              Core = 'my dir\\' }
+    @{ Why = 'a checkout path with a space, ending in one'; In = 'C:\My Repos\product\';   Desktop = 'C:\My Repos\product\\';  Core = 'C:\My Repos\product\' }
+    @{ Why = 'a checkout path with a space, ending in none'; In = 'C:\My Repos\product';   Desktop = 'C:\My Repos\product';    Core = 'C:\My Repos\product' }
+    @{ Why = 'a drive root';                                In = 'C:\';                     Desktop = 'C:\';                     Core = 'C:\' }
+)
+foreach ($row in $nativeArgumentRows) {
+    $asDesktop = ConvertTo-P20NativeArgument $row.In -Desktop $true
+    $asCore = ConvertTo-P20NativeArgument $row.In -Desktop $false
+    Assert-True "Clause 23: the rule gives Windows PowerShell 5.1 $($row.Why) as [$($row.Desktop)]" ($asDesktop -ceq $row.Desktop) "got [$asDesktop]"
+    Assert-True "Clause 23: the rule gives PowerShell 7's Legacy passing $($row.Why) as [$($row.Core)]" ($asCore -ceq $row.Core) "got [$asCore]"
+}
+
+# One rule, in one file. The test helper and the shipped reader each call it
+# behind the same test of the host, and neither defines an escape of its own.
+$nativeRuleFile = 'Scripts/ConvertTo-NativeArgument.ps1'
+$nativeRuleDefiners = @()
+$nativeRuleRead = @(Get-ChildItem (Join-Path $pkgRoot 'Scripts'), (Join-Path $pkgRoot 'Tests'), (Join-Path $pkgRoot 'Config') -Include '*.ps1', '*.psm1' -File -Recurse) + @(Get-ChildItem $pkgRoot -Filter '*.psm1' -File)
+foreach ($f in $nativeRuleRead) {
+    $body = [System.IO.File]::ReadAllText($f.FullName)
+    if ($body -match '(?m)^\s*function\s+(global:)?(ConvertTo-P20NativeArgument|Test-P20LegacyNativeArguments|ConvertTo-P20TestGitArgument|Test-P20TestLegacyNativeArguments)\b') { $nativeRuleDefiners += (Get-RelPath $f) }
+}
+Assert-True "Clause 23: the argument rule is defined in $nativeRuleFile and nowhere else" ((@($nativeRuleDefiners) -join ',') -eq $nativeRuleFile) "read $($nativeRuleRead.Count) files; defined in: $($nativeRuleDefiners -join ', ')"
+$readerText = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'Scripts/Invoke-TrackerRead.ps1'))
+$ruleCall = '(?s)if \(Test-P20LegacyNativeArguments\)\s*\{[^}]*ConvertTo-P20NativeArgument \$_'
+Assert-True 'Clause 23: the test helper and the shipped reader both call the rule, behind the same test of the host' (($suiteGitHelperText -match $ruleCall) -and ($readerText -match $ruleCall)) 'one of them no longer calls ConvertTo-P20NativeArgument behind Test-P20LegacyNativeArguments'
+# The .cmd rule reads an argument as written, before the conversion: converted
+# first, an empty argument would arrive as "" and be refused for its quotes.
+$cmdCheckAt = $readerText.IndexOf('if (Test-P20CmdArgument $argument)')
+$convertAt = $readerText.IndexOf('ConvertTo-P20NativeArgument $_')
+Assert-True 'Clause 23: the shipped reader checks an argument for cmd.exe as written, then converts it' (($cmdCheckAt -gt 0) -and ($convertAt -gt $cmdCheckAt) -and (Test-P20CmdArgument '') -and (-not (Test-P20CmdArgument (ConvertTo-P20NativeArgument '')))) "check at $cmdCheckAt, convert at $convertAt"
+
+# And one that runs a different command without it: the file is named as the
+# branch is, so `git checkout trunk` is a switch that restores nothing and
+# `git checkout -- trunk` puts the file back.
+$dashScratch = Join-Path ([System.IO.Path]::GetTempPath()) "p20-portability-dash-$([guid]::NewGuid().ToString('N'))"
+try {
+    $null = New-Item -ItemType Directory -Path $dashScratch -Force
+    $null = Invoke-P20TestGit -C $dashScratch init --quiet
+    $null = Invoke-P20TestGit -C $dashScratch symbolic-ref HEAD refs/heads/trunk
+    $null = Invoke-P20TestGit -C $dashScratch config core.autocrlf false
+    $dashFile = Join-Path $dashScratch 'trunk'
+    [System.IO.File]::WriteAllText($dashFile, "committed`n")
+    $null = Invoke-P20TestGit -C $dashScratch add trunk
+    $dashCommit = Invoke-P20TestGit -C $dashScratch -c user.email=t@example.invalid -c user.name=t -c commit.gpgsign=false commit --quiet -m one
+    [System.IO.File]::WriteAllText($dashFile, "edited`n")
+    $dashBack = Invoke-P20TestGit -C $dashScratch checkout --quiet '--' trunk
+    $dashNow = [System.IO.File]::ReadAllText($dashFile)
+    Assert-True "Clause 23: a quoted -- and the path after it reach git (checkout -- <path> restores a file named as the branch is)" (($dashCommit.Code -eq 0) -and ($dashBack.Code -eq 0) -and ($dashNow -ceq "committed`n")) "commit $($dashCommit.Code), checkout $($dashBack.Code): $($dashBack.Lines -join ' ') -- the file reads [$($dashNow.Trim())]"
+}
+catch { Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message }
+finally { Remove-Item -LiteralPath $dashScratch -Recurse -Force -ErrorAction SilentlyContinue }
 
 # -- Clause 9: the documented config shape is the implemented one --------------
 Write-ClauseProgress 'Clause 9'

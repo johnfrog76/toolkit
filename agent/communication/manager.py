@@ -755,4 +755,9 @@ def communication_env() -> dict:
         "postRetroSummary": bool(workflow.get("postRetroSummary", False)),
         "retroChannel": workflow.get("retroChannel", "manager"),
         "recipients": entries,
+        # Whether this server was started with sending turned off: the run
+        # marker, which is what stops the engine's POST. A page reads this
+        # rather than a missing variable alone, because a server started for
+        # review or testing removes the webhooks AND sets the marker.
+        "sendingOff": comms.sending_off(),
     }

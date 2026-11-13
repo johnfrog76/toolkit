@@ -8,6 +8,7 @@ import {
   cardsPhrase,
   dayAge,
   deployPhrase,
+  designPhrase,
   filterSpaces,
   foyerLine,
   foyerSpaces,
@@ -23,7 +24,7 @@ import {
   spacesFilterEmpty,
 } from "./foyer";
 import type { SpaceBucket, SpaceLifecycleAction, SpacesFilter } from "./foyer";
-import { LIST_PAGE_SIZE } from "../../shell/cardHeight";
+import { LIST_PAGE_SIZE, listPageSize } from "../../shell/pageSize";
 import { visibilityLabel } from "../../shared/visibility";
 import type { EnvStatus, SpaceInfo } from "../../shell/api";
 import type { DeploysResponse, IssueReport, StatusResponse } from "../ado/api.ado";
@@ -272,6 +273,51 @@ describe("the whole line", () => {
   it("null while the issues are still being read", () => {
     expect(foyerLine(undefined, deploys([]), NOW)).toBeNull();
   });
+
+  it("a product with designs ends the line with them", () => {
+    expect(
+      foyerLine(report(), deploys([{ when: "2026-09-28" }]), NOW, {
+        in_flight: 3,
+        specs: 1,
+        not_stamped: 0,
+      }),
+    ).toBe("no open issues; last deploy 3 days ago, green; 3 designs in flight, 1 spec");
+  });
+
+  it("no designs half when the issues were not read", () => {
+    expect(
+      foyerLine(report({ supported: false }), deploys([]), NOW, {
+        in_flight: 1,
+        specs: 0,
+        not_stamped: 0,
+      }),
+    ).toBe(CONNECT_GITHUB);
+  });
+});
+
+// The designs half: the ledger's counts of the live design/ and spec/, grouped
+// as the Design tab groups them. No design/ is nothing, never zero.
+describe("the designs half", () => {
+  it.each<[string, Parameters<typeof designPhrase>[0], string | null]>([
+    ["no design/ folder", null, null],
+    ["an older agent", undefined, null],
+    ["an empty design/", { in_flight: 0, specs: 0, not_stamped: 0 }, "no designs in flight"],
+    ["one of each", { in_flight: 1, specs: 1, not_stamped: 0 }, "1 design in flight, 1 spec"],
+    ["no spec yet", { in_flight: 3, specs: 0, not_stamped: 0 }, "3 designs in flight"],
+    ["two specs", { in_flight: 3, specs: 2, not_stamped: 0 }, "3 designs in flight, 2 specs"],
+    [
+      "files with no id",
+      { in_flight: 3, specs: 1, not_stamped: 2 },
+      "3 designs in flight, 1 spec; 2 files not stamped with an id",
+    ],
+    [
+      "only unstamped files",
+      { in_flight: 0, specs: 0, not_stamped: 1 },
+      "no designs in flight; 1 file not stamped with an id",
+    ],
+  ])("%s", (_name, counts, want) => {
+    expect(designPhrase(counts)).toBe(want);
+  });
 });
 
 // A GitHub row's line leads with its repository's visibility, as the
@@ -310,8 +356,12 @@ describe("which rows ask their visibility", () => {
     expect(githubRowLine("", CONNECT_GITHUB)).toBe(CONNECT_GITHUB);
   });
 
-  it("the Studio cards page five at a time, the shared list setting", () => {
-    expect(LIST_PAGE_SIZE).toBe(5);
+  it("the list panel's one page size is what fits under one chip row, and a Studio card's is the same sum over its own chrome", () => {
+    expect(LIST_PAGE_SIZE).toBe(listPageSize({ density: "full", filterRows: 1 }));
+    // The Spaces card has a foot note under its one chip row; more chrome is never a bigger page.
+    const spaces = listPageSize({ density: "full", filterRows: 1, footNote: true });
+    expect(spaces).toBeGreaterThanOrEqual(1);
+    expect(spaces).toBeLessThanOrEqual(LIST_PAGE_SIZE);
   });
 });
 

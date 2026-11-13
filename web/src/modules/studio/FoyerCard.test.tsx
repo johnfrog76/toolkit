@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { expectOneRowShape } from "./rowShapeAssert";
+import { expectListPanelShape, pageSizeOf } from "../../shell/kinds/panelShapeAssert";
+import { listPageSize } from "../../shell/pageSize";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { FoyerCard, SPACES_FILTER_KEY } from "./FoyerCard";
 
@@ -29,10 +30,19 @@ const refetched: string[] = [];
 let refreshedLedger = 0;
 // A GitHub Space whose tracker has nothing to say (not connected yet).
 let unsupportedReport: string[] = [];
+// A GitHub Space's design counts, as the ledger says them; absent is null (no design/).
+let designOf: Record<string, { in_flight: number; specs: number; not_stamped: number }> = {};
 
 let envAnswer: unknown;
-// The pager's rules do not depend on how many rows a page holds, and these
-// suites build their lists for five; the shipped size is pinned in foyer.test.ts.
+// The pager's rules do not depend on how many rows a page holds: this suite
+// builds its lists around PAGE, the page under the chrome this card draws
+// (one chip row over a foot note), worked out by listPageSize and held to the
+// panel as drawn (pageSizeOf), so a change to the panel's height moves it.
+const PAGE = listPageSize({ density: "full", filterRows: 1, footNote: true });
+const pages = (count: number) => Math.ceil(count / PAGE);
+/** The panel as drawn pages at PAGE: the fixture's chrome is the chrome PAGE was worked out for. */
+const expectPage = () =>
+  expect(pageSizeOf(document.querySelector<HTMLElement>("[data-panel-kind]")!)).toBe(PAGE);
 
 jest.mock("../../shell/api", () => ({
   useGetEnvQuery: () => ({ data: envAnswer, isLoading: false }),
@@ -74,6 +84,7 @@ function mockLedgerEntry(slug: string) {
       visibility: failingVisibility.includes(slug) ? "unknown" : (visibilityOf[slug] ?? "unknown"),
       repos: [],
     },
+    design: designOf[slug] ?? null,
   };
 }
 jest.mock("./api.studio", () => ({
@@ -225,6 +236,7 @@ describe("the foyer", () => {
     refetched.length = 0;
     refreshedLedger = 0;
     unsupportedReport = [];
+    designOf = {};
     window.localStorage.clear();
     envAnswer = { config: { activeSpace: "acme", spaces: SPACES } };
   });
@@ -260,6 +272,18 @@ describe("the foyer", () => {
     mount();
     expect(screen.getByText("Visibility unknown; 4 open; no deploys yet")).toBeTruthy();
     expect(screen.getByText("Visibility unknown; no open issues; no deploys yet")).toBeTruthy();
+  });
+
+  it("a GitHub row whose repository keeps designs counts them; one with no design/ says nothing of them", () => {
+    designOf = { toolkit: { in_flight: 3, specs: 1, not_stamped: 2 } };
+    mount();
+    expect(
+      screen.getByText(
+        "Public; 4 open; no deploys yet; 3 designs in flight, 1 spec; 2 files not stamped with an id",
+      ),
+    ).toBeTruthy();
+    // Wasteland's ledger has design: null -- no design words, not a zero.
+    expect(screen.getByText("Private; no open issues; no deploys yet")).toBeTruthy();
   });
 
   it("a ledger read the agent did not answer settles every GitHub row, saying so", () => {
@@ -385,6 +409,9 @@ describe("the foyer", () => {
     await act(async () => {
       fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
     });
+    // The archived Space is last of four: on the second page where a page holds fewer.
+    const next = screen.queryByRole("button", { name: "Next page" });
+    if (next) fireEvent.click(next);
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Actions for Old" }));
     });
@@ -490,6 +517,7 @@ describe("the Spaces card's filter", () => {
 
   beforeEach(() => {
     window.localStorage.clear();
+    designOf = {};
     envAnswer = { config: { activeSpace: "acme", spaces: MIXED } };
   });
 
@@ -507,8 +535,17 @@ describe("the Spaces card's filter", () => {
       "Archive1",
     ]);
     expect(chip().textContent).toBe("5");
-    for (const name of ["Toolkit", "Acme", "Wasteland", "Globex", "Demo"])
-      expect(screen.getByText(name)).toBeTruthy();
+    // Five Spaces are two pages.
+    expectPage();
+    expect(pages(5)).toBe(2);
+    const drawn = () =>
+      Array.from(document.querySelectorAll("[data-card-item] strong")).map((e) => e.textContent);
+    const first = drawn();
+    expect(first).toHaveLength(PAGE);
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect([...first, ...drawn()].sort()).toEqual(
+      ["Toolkit", "Acme", "Wasteland", "Globex", "Demo"].sort(),
+    );
   });
 
   it("a populated card carries no helper sentence: the title, the tags and the rows say it", () => {
@@ -610,6 +647,7 @@ describe("the Spaces card's load, Refresh and pager", () => {
     askedLedger.length = 0;
     ledgerFails = false;
     unsupportedReport = [];
+    designOf = {};
     failingSpaceStatus = [];
     failingVisibility = [];
     visibilityOf = { toolkit: "public", wasteland: "private" };
@@ -692,16 +730,19 @@ describe("the Spaces card's load, Refresh and pager", () => {
     expect((screen.getByTitle("Refresh") as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("pages at five: the pager is at the foot, the chip is the total, the + stays", () => {
+  it("pages at what fits: the pager is at the foot, the chip is the total, the + stays", () => {
+    const nth = (n: number) => `Space ${String(n).padStart(2, "0")}`;
     envAnswer = { config: { activeSpace: "s01", spaces: many(12) } };
     mount();
-    expect(screen.getByText("Space 05")).toBeTruthy();
-    expect(screen.queryByText("Space 06")).toBeNull();
-    expect(screen.getByText("1 / 3")).toBeTruthy();
+    expectPage();
+    expect(screen.getByText(nth(PAGE))).toBeTruthy();
+    expect(screen.queryByText(nth(PAGE + 1))).toBeNull();
+    expect(screen.getByText(`Page 1 of ${pages(12)}`)).toBeTruthy();
     expect(screen.getByLabelText("12 Spaces").textContent).toBe("12");
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
-    expect(screen.getByText("Space 06")).toBeTruthy();
-    expect(screen.getByText("Space 10")).toBeTruthy();
+    expect(screen.getByText(nth(PAGE + 1))).toBeTruthy();
+    expect(screen.getByText(nth(Math.min(2 * PAGE, 12)))).toBeTruthy();
+    expect(screen.queryByText(nth(2 * PAGE + 1))).toBeNull();
     expect(screen.queryByText("Space 01")).toBeNull();
     expect(screen.getByLabelText("12 Spaces").textContent).toBe("12");
     expect(screen.getByRole("button", { name: /New Space/ })).toBeTruthy();
@@ -717,22 +758,25 @@ describe("the Spaces card's load, Refresh and pager", () => {
     }));
     envAnswer = { config: { activeSpace: "s01", spaces: [...many(12), ...products] } };
     mount();
-    expect(screen.getByText("1 / 5")).toBeTruthy();
+    // Twenty-three Spaces, then the eleven products: each its own run of pages.
+    expect(screen.getByText(`Page 1 of ${pages(23)}`)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
-    expect(screen.getByText("2 / 5")).toBeTruthy();
+    expect(screen.getByText(`Page 2 of ${pages(23)}`)).toBeTruthy();
     fireEvent.click(screen.getByRole("radio", { name: /^Products/ }));
-    expect(screen.getByText("1 / 3")).toBeTruthy();
+    expect(screen.getByText(`Page 1 of ${pages(11)}`)).toBeTruthy();
     expect(screen.getByText("Product 1")).toBeTruthy();
     expect(screen.queryByText("Space 01")).toBeNull();
     expect(screen.getByLabelText("23 Spaces").textContent).toBe("23");
   });
 
   it("one page: no pager, as the Reminders card", () => {
-    envAnswer = { config: { activeSpace: "s01", spaces: many(5) } };
+    // Exactly a page's worth.
+    envAnswer = { config: { activeSpace: "s01", spaces: many(PAGE) } };
     mount();
-    expect(screen.getByText("Space 05")).toBeTruthy();
+    expectPage();
+    expect(screen.getByText(`Space ${String(PAGE).padStart(2, "0")}`)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Next page" })).toBeNull();
-    expect(screen.queryByText("1 / 1")).toBeNull();
+    expect(screen.queryByText("Page 1 of 1")).toBeNull();
   });
 
   it("a GitHub Space not connected says nothing about visibility", () => {
@@ -787,7 +831,10 @@ describe("the Spaces card's row shape", () => {
       },
     };
     const { container } = mount();
-    const rows = expectOneRowShape(container, "space", [long, "Two", "Acme"]);
+    const rows = expectListPanelShape(container.querySelector<HTMLElement>("[data-panel-kind]")!, {
+      titles: [long, "Two", "Acme"],
+      chips: true,
+    });
     // Status badges beside the name, the kind and slug on the bottom line.
     expect(rows[1].querySelector("[data-row-text]")!.textContent).toContain("archived");
     expect(rows[2].querySelector("[data-row-text]")!.textContent).toContain("you are here");

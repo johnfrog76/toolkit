@@ -40,7 +40,11 @@ What moved: every slot item carries its ``motion`` (closed,
 started or inProgress) and its card's ``commits`` -- a detail line says only what
 adds to its slot, ``started`` and the commits; ``standup_counts`` sums them
 per worker and in total -- a hash once however many cards thread it -- and the
-brief opens on that counts line. ``window_start`` widens yesterday's lower bound
+brief opens on that counts line. On a GitHub Space one batched dates read
+(``tracker.dates``, ``date_asks``) keeps a card's commits to those authored in
+the window -- a hash it cannot date is counted ``undated`` and said, not
+counted -- and lets an open issue with no card say ``started`` from its
+timeline. ``window_start`` widens yesterday's lower bound
 (``?since=<yyyy-MM-dd>``); today and the blockers are what is open now.
 
 The ritual happens anyway (principle 3): an Azure DevOps Space, a tier below 1,
@@ -173,10 +177,12 @@ class SlotItem(BaseModel):
     url: str = ""
     path: str = ""
     # What moved: ``rituals.motions`` -- closed (yesterday's), started or
-    # inProgress (open). An issue with no card is closed or inProgress; a card,
-    # or the card an issue's number names, is started when its **Started:** day,
-    # else its **Created:** day, falls in the window. ``commits`` is the distinct
-    # hashes of that card's ``- <hash>`` bullets; 0 with no card.
+    # inProgress (open). A card, or the card an issue's number names, is started
+    # when its **Started:** day, else its **Created:** day, falls in the window;
+    # an open issue with no card is started when its timeline's first worker
+    # label or assignment does (``issue_starts``). ``commits`` is the distinct
+    # hashes of that card's ``- <hash>`` bullets -- only those authored inside
+    # the window when the commit dates were read; 0 with no card.
     motion: str = ""
     commits: int = 0
 
@@ -262,12 +268,16 @@ class CardLink(BaseModel):
 class MotionCount(BaseModel):
     # One worker's motion in the window (``label`` and ``name`` "" for the
     # total): its items by motion, and the distinct commits their cards thread.
+    # ``undated`` is the distinct hashes whose commit date the read could not
+    # give: not counted in ``commits``, and said beside them. 0 when no dates
+    # were read.
     label: str = ""
     name: str = ""
     closed: int = 0
     started: int = 0
     inProgress: int = 0
     commits: int = 0
+    undated: int = 0
 
 
 class Counts(BaseModel):
@@ -477,6 +487,136 @@ def card_begun_in(card: dict, first: str, last: str) -> bool:
     return bool(day) and first <= day <= last
 
 
+# A hash as a dates read asks for it: what ``card_hashes`` keeps, and nothing
+# else is written into a query.
+_HASH = re.compile(r"^[0-9a-f]{7,40}$")
+# Aliased lookups per dates call; a timeline is at most this many events.
+DATES_CHUNK = 50
+TIMELINE_FIRST = 50
+
+
+def commit_in_window(when, since: datetime, as_of: datetime) -> bool:
+    """Whether a commit's authored instant falls in [since, as_of]. A date
+    that does not read is not in it."""
+    at = _when(when)
+    return at is not None and since <= at <= as_of
+
+
+def window_hashes(
+    hashes: list[str], commit_dates: dict | None, since: datetime, as_of: datetime
+) -> tuple[list[str], list[str]]:
+    """(the hashes to count, the hashes with no date) for one card. With
+    ``commit_dates`` None -- the dates were not read: a cards Space, or a read
+    that failed -- every hash counts, as it always has. Otherwise a hash counts
+    when its authored date is in the window, is dropped when it is outside it,
+    and is undated when the read gave it no date. The mirror of
+    ``Select-P20StandupWindowHashes``."""
+    if commit_dates is None:
+        return list(hashes), []
+    dates = {str(k).strip().lower()[:7]: v for k, v in commit_dates.items()}
+    inside: list[str] = []
+    undated: list[str] = []
+    for h in hashes:
+        when = dates.get(h)
+        if _when(when) is None:
+            undated.append(h)
+        elif commit_in_window(when, since, as_of):
+            inside.append(h)
+    return inside, undated
+
+
+def issue_started(nodes: list, worker_labels: list[str]) -> str | None:
+    """An issue's start from its timeline: the earliest of a worker label
+    being added and the issue being assigned, as the timeline states it; None
+    when neither happened. A label that routes to no worker is not a start. The
+    mirror of ``Get-P20StandupIssueStart``."""
+    best: tuple[datetime, str] | None = None
+    names = set(worker_labels or [])
+    for node in nodes or []:
+        if not isinstance(node, dict):
+            continue
+        kind = node.get("__typename")
+        if kind == "LabeledEvent":
+            if str((node.get("label") or {}).get("name") or "") not in names:
+                continue
+        elif kind != "AssignedEvent":
+            continue
+        at = _when(node.get("createdAt"))
+        if at is not None and (best is None or at < best[0]):
+            best = (at, str(node.get("createdAt")))
+    return best[1] if best else None
+
+
+def dates_query(hashes: list[str], numbers: list[int]) -> str:
+    """The one GraphQL query a dates read sends for a repo: ``c<i>`` the
+    i-th hash's commit, ``i<n>`` issue n's labelled and assigned events. The
+    owner and name travel as variables. The mirror of ``Get-P20StandupDatesQuery``;
+    standup-dates.json holds the text."""
+    lines = ["query($owner: String!, $name: String!) {", "  repository(owner: $owner, name: $name) {"]
+    for i, h in enumerate(hashes):
+        if _HASH.match(h):
+            lines.append(f'    c{i}: object(expression: "{h}") {{ ... on Commit {{ oid authoredDate }} }}')
+    for n in numbers:
+        lines.append(
+            f"    i{int(n)}: issue(number: {int(n)}) {{ timelineItems(itemTypes: [LABELED_EVENT, ASSIGNED_EVENT], "
+            f"first: {TIMELINE_FIRST}) {{ nodes {{ __typename ... on LabeledEvent {{ createdAt label {{ name }} }} "
+            "... on AssignedEvent { createdAt } } } }"
+        )
+    lines += ["  }", "}"]
+    return "\n".join(lines) + "\n"
+
+
+def dates_from_answer(
+    repository: dict | None, hashes: list[str], numbers: list[int], worker_labels: list[str]
+) -> tuple[dict[str, str | None], dict[int, str]]:
+    """A dates answer's ``repository`` object -> (hash -> its authored instant,
+    or None; issue number -> its start). A commit is dated only when the object
+    GitHub resolved is a commit whose oid begins with the hash asked -- a
+    missing or ambiguous hash is None, never a guess. An issue with no start is
+    not a key. The mirror of ``ConvertFrom-P20StandupDates``."""
+    repo = repository if isinstance(repository, dict) else {}
+    commits: dict[str, str | None] = {}
+    for i, h in enumerate(hashes):
+        node = repo.get(f"c{i}")
+        node = node if isinstance(node, dict) else {}
+        oid = str(node.get("oid") or "").lower()
+        when = node.get("authoredDate")
+        commits[h] = str(when) if oid and oid.startswith(h) and _when(when) is not None else None
+    starts: dict[int, str] = {}
+    for n in numbers:
+        node = repo.get(f"i{int(n)}")
+        timeline = (node or {}).get("timelineItems") if isinstance(node, dict) else None
+        start = issue_started((timeline or {}).get("nodes") or [], worker_labels)
+        if start:
+            starts[int(n)] = start
+    return commits, starts
+
+
+def date_asks(filled: Standup, cards: list[dict]) -> tuple[list[str], list[int]]:
+    """What a standup asks the dates read for, from its own fill: the hashes
+    of every card a slot item counts (an issue's joined card, by its link's
+    path; a card item, by its own), and the numbers of the open issues with no
+    card that read in progress -- the only ones a timeline can make started.
+    Distinct, in first-seen order; the numbers ascending. The mirror of
+    ``Get-P20StandupDateAsks``."""
+    by_path = {str(c.get("path") or f"{c.get('folder', '')}/{c.get('file', '')}"): c for c in cards or []}
+    linked = {lk.number: lk.path for lk in filled.links}
+    _closed, _started, in_progress = rituals_motions()
+    hashes: list[str] = []
+    numbers: set[int] = set()
+    for w in filled.workers:
+        for slot in ceremonies()[CEREMONY]["slots"]:
+            for it in getattr(w, slot):
+                path = linked.get(it.number) if it.number is not None else it.path
+                if it.number is not None and it.number not in linked and it.motion == in_progress:
+                    numbers.add(it.number)
+                card = by_path.get(path or "")
+                for h in card_hashes(card) if card else []:
+                    if h not in hashes:
+                        hashes.append(h)
+    return hashes, sorted(numbers)
+
+
 def worker_name(description: str) -> str:
     """The text after the prefix, up to the separator, trimmed."""
     rest = (description or "")[len(rituals_worker_label_prefix()) :]
@@ -498,8 +638,9 @@ def _when(stamp) -> datetime | None:
 
 
 def _item(issue: dict) -> SlotItem:
-    # An issue alone says closed or in progress: the read has no fact that
-    # marks when its work began. A card joined to it may say started.
+    # An issue alone says closed or in progress here: the issue read has no
+    # fact that marks when its work began. The joined fill may say started --
+    # from a card joined to it, else from its timeline (``issue_starts``).
     closed, _started, in_progress = rituals_motions()
     is_open = str(issue.get("state", "")).upper() == "OPEN"
     return SlotItem(
@@ -713,10 +854,17 @@ def cards_in_play(cards: list[dict]) -> list[dict]:
 
 
 def _cards_tile(
-    as_of: datetime, cards: list[dict], label: str, name: str, marks: dict, since: datetime | None = None
-) -> tuple[Worker, list[WalkItem], dict[str, tuple[str, str]], dict[str, list[str]]]:
+    as_of: datetime,
+    cards: list[dict],
+    label: str,
+    name: str,
+    marks: dict,
+    since: datetime | None = None,
+    commit_dates: dict | None = None,
+) -> tuple[Worker, list[WalkItem], dict[str, tuple[str, str]], dict[str, list[str]], dict[str, list[str]]]:
     """Cards (already in play) -> one worker's slots, its walk items, the
-    work keys and each item's hashes. yesterday: in ``archive/``, ``closed`` (a
+    work keys, each item's hashes to count and each item's undated hashes
+    (``window_hashes`` over ``commit_dates``). yesterday: in ``archive/``, ``closed`` (a
     day) in [since's day, asOf's day]. today: in ``current/``, In Progress or
     Code Review. walk: in ``current/``, Code Review. An Active card is nowhere;
     so is an archived card with no Closed day. A yesterday item is closed; a
@@ -729,6 +877,7 @@ def _cards_tile(
     walk: list[WalkItem] = []
     key_of: dict[str, tuple[str, str]] = {}
     hashes: dict[str, list[str]] = {}
+    undated: dict[str, list[str]] = {}
     for card in cards:
         file = str(card.get("file", ""))
         folder = str(card.get("folder", ""))
@@ -742,8 +891,9 @@ def _cards_tile(
         # A card groups by the design card it names, else its type.
         key_of[f"{item.id}|{item.path}"] = work_key(None, card.get("body"), card.get("type"), {})
         marks[item.id or ""] = [str(card.get("type") or "")]
-        hashes[f"{item.id}|{item.path}"] = card_hashes(card)
-        item.commits = len(hashes[f"{item.id}|{item.path}"])
+        ref = f"{item.id}|{item.path}"
+        hashes[ref], undated[ref] = window_hashes(card_hashes(card), commit_dates, since, as_of)
+        item.commits = len(hashes[ref])
         if folder == folder_archive():
             item.motion = closed
             day = str(card.get("closed") or "")[:10]
@@ -756,7 +906,7 @@ def _cards_tile(
             worker.today.append(item)
         if state == status_code_review():
             walk.append(WalkItem(**item.model_dump(), worker=name))
-    return worker, walk, key_of, hashes
+    return worker, walk, key_of, hashes, undated
 
 
 def fill_cards_standup(
@@ -782,7 +932,7 @@ def fill_cards_standup(
         tracker=TrackerState(ok=True, reason=""),
         chair=Chair(open=phrasebook[d % len(phrasebook)], close=phrasebook[(d + 1) % len(phrasebook)]),
     )
-    worker, walk, key_of, hashes = _cards_tile(as_of, cards_in_play(cards), space, name, out._marks, since)
+    worker, walk, key_of, hashes, _undated = _cards_tile(as_of, cards_in_play(cards), space, name, out._marks, since)
     if not (worker.yesterday or worker.today or worker.blockers):
         worker.empty = True
         worker.excuse = nothing[d % len(nothing)]
@@ -826,12 +976,21 @@ def fill_joined_standup(
     space: str = "",
     space_name: str = "",
     window: str = "",
+    commit_dates: dict | None = None,
+    issue_starts: dict | None = None,
 ) -> Standup:
     """The issues fill, joined with the cards on the id. Pure; the mirror of
     ``Invoke-P20StandupJoinedFill``. With the tracker not answering it is the
     issues fill as it stands: the chair's lines and the reason. A joined card
     gives its issue's row its commits, and says started for an open one whose
-    card began in the window."""
+    card began in the window.
+
+    The dates read (``tracker.dates``), when there was one: ``commit_dates``
+    (hash -> its authored instant, or None) keeps a card's commits to those
+    inside the window and counts the rest undated; ``issue_starts`` (issue
+    number -> its timeline's start) says started for an open issue with no card
+    whose work began in the window. None for either is not read, and today's
+    rule stands: every bullet counts, and an issue alone is in progress."""
     out = fill_standup(as_of, labels, issues, tracker_state, space=space, window=window)
     if not out.tracker.ok:
         return out
@@ -841,6 +1000,7 @@ def fill_joined_standup(
     first, last = since.date().isoformat(), as_of.date().isoformat()
     _closed, started, in_progress = rituals_motions()
     hashes: dict[str, list[str]] = {}
+    undated: dict[str, list[str]] = {}
     issue_items = [i for w in out.workers for slot in ceremonies()[CEREMONY]["slots"] for i in getattr(w, slot)]
     issue_items += list(out.queue.walk)
     by_number = {int(i.get("number", 0)): i for i in issues or []}
@@ -865,7 +1025,7 @@ def fill_joined_standup(
         out.links.append(
             CardLink(number=number, id=str(card.get("id") or ""), lane=str(card.get("status") or ""), path=path)
         )
-        hashes[f"#{number}|"] = card_hashes(card)
+        hashes[f"#{number}|"], undated[f"#{number}|"] = window_hashes(card_hashes(card), commit_dates, since, as_of)
         begun = card_begun_in(card, first, last)
         placed = False
         for it in issue_items:
@@ -886,29 +1046,44 @@ def fill_joined_standup(
         if not placed and current:
             unrouted.append(card)
 
+    # An open issue with no card: its timeline says when its work began.
+    starts = {int(k): v for k, v in (issue_starts or {}).items()}
+    for it in issue_items:
+        if it.number is None or it.number in joined or it.motion != in_progress:
+            continue
+        if commit_in_window(starts.get(it.number), since, as_of):
+            it.motion = started
+
     tile_cards = sorted(alone + unrouted, key=lambda c: str(c.get("file", "")))
-    tile, walk, card_keys, tile_hashes = _cards_tile(as_of, tile_cards, space, space_name or space, out._marks, since)
+    tile, walk, card_keys, tile_hashes, tile_undated = _cards_tile(
+        as_of, tile_cards, space, space_name or space, out._marks, since, commit_dates
+    )
     if tile.yesterday or tile.today or tile.blockers:
         out.workers.append(tile)
     out.queue.walk.extend(walk)
     out.work = build_work(out, {**issue_keys(issues), **card_keys})
-    out.counts = standup_counts(out, {**hashes, **tile_hashes})
+    out.counts = standup_counts(out, {**hashes, **tile_hashes}, {**undated, **tile_undated})
     return out
 
 
-def standup_counts(filled: Standup, hashes: dict[str, list[str]]) -> Counts:
+def standup_counts(
+    filled: Standup, hashes: dict[str, list[str]], undated: dict[str, list[str]] | None = None
+) -> Counts:
     """What moved in the window, per worker (in the workers' order) and in total:
     each slot item by its motion, and the distinct hashes its card threads --
-    ``hashes`` maps an item's ``<ref>|<path>`` to them. A hash is counted once
+    ``hashes`` maps an item's ``<ref>|<path>`` to them, and ``undated`` to the
+    ones the dates read gave no date. A hash is counted once
     per worker and once in the total, however many cards thread it; an issue
     with no card, and a card with no bullets, count none. Pure; the mirror of
     ``Get-P20StandupCounts``."""
     closed, started, in_progress = rituals_motions()
     out = Counts()
     every: list[str] = []
+    every_undated: list[str] = []
     for w in filled.workers:
         c = MotionCount(label=w.label, name=w.name)
         mine: list[str] = []
+        mine_undated: list[str] = []
         for slot in ceremonies()[CEREMONY]["slots"]:
             for it in getattr(w, slot):
                 if it.motion == closed:
@@ -921,13 +1096,19 @@ def standup_counts(filled: Standup, hashes: dict[str, list[str]]) -> Counts:
                 for h in hashes.get(f"{ref}|{it.path}", []):
                     if h not in mine:
                         mine.append(h)
+                for h in (undated or {}).get(f"{ref}|{it.path}", []):
+                    if h not in mine_undated:
+                        mine_undated.append(h)
         c.commits = len(mine)
+        c.undated = len(mine_undated)
         every += [h for h in mine if h not in every]
+        every_undated += [h for h in mine_undated if h not in every_undated]
         out.workers.append(c)
         out.total.closed += c.closed
         out.total.started += c.started
         out.total.inProgress += c.inProgress
     out.total.commits = len(every)
+    out.total.undated = len(every_undated)
     return out
 
 
@@ -1609,7 +1790,8 @@ def motion_said(item: SlotItem) -> str:
 
 def counts_said(c: MotionCount) -> str:
     """One count as its non-zero parts -- closed, started, in progress, commits --
-    joined, or ``text.countsNone`` when nothing moved."""
+    joined, or ``text.countsNone`` when nothing moved. Commits the dates read
+    could not date follow the commits as ``text.countsUndated``."""
     t = rituals_text()
     bits = [
         _fill(t[key], {"n": str(n)})
@@ -1620,8 +1802,11 @@ def counts_said(c: MotionCount) -> str:
         )
         if n
     ]
-    if c.commits:
-        bits.append(commits_said(c.commits))
+    if c.commits or c.undated:
+        said = commits_said(c.commits)
+        if c.undated:
+            said += " " + _fill(t["countsUndated"], {"n": str(c.undated)})
+        bits.append(said)
     return t["countsSeparator"].join(bits) if bits else t["countsNone"]
 
 
@@ -1830,6 +2015,60 @@ def _space_entry(cfg: dict, space: str) -> dict:
     return next((s for s in cfg.get("spaces", []) or [] if s.get("slug") == slug), {}) or {}
 
 
+def _issue_repo(issue: dict, repos: list[str]) -> str:
+    """The repo an issue row came from, by its url; the first repo when the url does not say."""
+    m = re.match(r"^https://github\.com/([^/]+/[^/]+)/issues/\d+", str(issue.get("url") or ""))
+    found = m.group(1) if m else ""
+    return next((r for r in repos if r.lower() == found.lower()), repos[0] if repos else "")
+
+
+def _dated(
+    filled: Standup,
+    org: str,
+    projects: list[dict],
+    labels: list[dict],
+    issues: list[dict],
+    cards: list[dict],
+    now: datetime,
+    slug: str,
+    name: str,
+    since: str,
+    refresh: bool,
+) -> Standup:
+    """The joined fill again, with the dates read: the commit dates of the
+    hashes the fill counts and the timelines of the open issues with no card
+    (``date_asks``). Nothing to ask, or a read that failed, keeps the fill as it
+    is -- today's rule."""
+    from ..core.config import tracker_repos
+    from . import tracker as tracker_read
+
+    hashes, numbers = date_asks(filled, cards)
+    if not hashes and not numbers:
+        return filled
+    repos = tracker_repos(org, projects)
+    by_number = {int(i.get("number", 0)): i for i in issues or []}
+    numbers_by_repo: dict[str, list[int]] = {}
+    for n in numbers:
+        numbers_by_repo.setdefault(_issue_repo(by_number.get(n, {}), repos), []).append(n)
+    prefix = rituals_worker_label_prefix()
+    workers = [str(lab.get("name", "")) for lab in labels or [] if str(lab.get("description") or "").startswith(prefix)]
+    commit_dates, issue_starts, why = tracker_read.dates(repos, hashes, numbers_by_repo, workers, refresh)
+    if why:
+        return filled
+    return fill_joined_standup(
+        now,
+        labels,
+        issues,
+        filled.tracker.model_dump(),
+        cards,
+        space=slug,
+        space_name=name,
+        window=since,
+        commit_dates=commit_dates,
+        issue_starts=issue_starts,
+    )
+
+
 def standup_for(space: str = "", as_of: datetime | None = None, since: str = "", refresh: bool = False) -> Standup:
     """The whole standup for a Space -- the active one when ``space`` is "".
     ``since`` (yyyy-MM-dd) widens yesterday's window back to that day; a day that
@@ -1858,6 +2097,8 @@ def standup_for(space: str = "", as_of: datetime | None = None, since: str = "",
     elif source == "both":
         labels, issues, state = read_tracker(org, status, projects, state="all", body=True, refresh=refresh)
         filled = fill_joined_standup(now, labels, issues, state, cards, space=slug, space_name=name, window=since)
+        if filled.tracker.ok:
+            filled = _dated(filled, org, projects, labels, issues, cards, now, slug, name, since, refresh)
     else:
         if source == "none":
             labels, issues, state = [], [], {"ok": False, "reason": reason}
