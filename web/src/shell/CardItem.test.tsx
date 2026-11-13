@@ -2,12 +2,15 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { CardItem, CompactItem, LineItem } from "./CardItem";
 import type { CardItemData } from "./CardItem";
 import { ROW } from "../shared/CardActions";
+import { escapeRegExp } from "../shared/escapeRegExp";
+import { CARD_ITEM_COMPACT_HEIGHT_PX, CARD_ITEM_HEIGHT_PX } from "./cardItemTokens";
 import {
-  CARD_ITEM_COMPACT_HEIGHT_PX,
-  CARD_ITEM_DESCRIPTION_LINES,
-  CARD_ITEM_HEIGHT_PX,
-} from "./cardItemTokens";
-import { expectMetaGap, rulesOf } from "./kinds/panelShapeAssert";
+  expectDescriptionClamp,
+  expectMetaGap,
+  expectOneLineClamp,
+  rulesOf,
+  titleOf,
+} from "./kinds/panelShapeAssert";
 
 const LONG_TITLE = "A title that is far too long to fit on one line ".repeat(6).trim();
 const LONG_TEXT = "A description that runs on and on past two lines. ".repeat(20).trim();
@@ -20,12 +23,6 @@ function data(over: Partial<CardItemData> = {}): CardItemData {
     ...over,
   };
 }
-
-const rules = () =>
-  Array.from(document.styleSheets)
-    .flatMap((sheet) => Array.from(sheet.cssRules))
-    .map((r) => r.cssText)
-    .join("\n");
 
 describe("CardItem", () => {
   it("a long title, a long description and no description have the same structure and classes", () => {
@@ -50,17 +47,38 @@ describe("CardItem", () => {
     expect(none?.textContent).toBe("");
   });
 
-  it("the title is one line and the description two, each clamped, the text whole in the DOM", () => {
+  it("the title is one line and the description two, each clamped by its own element's rules, the text whole in the DOM", () => {
+    // A line item in the same document clamps its own text: its rules are not
+    // the card item's, and are not what the assertions read.
+    const { container } = render(
+      <>
+        <CardItem data={data({ title: LONG_TITLE, description: LONG_TEXT })} />
+        <LineItem data={{ title: "Status", description: LONG_TEXT }} />
+      </>,
+    );
+    const item = container.querySelector("[data-card-item][data-density='full']")!;
+    const description = item.querySelector("[data-row-description]")!;
+    expect(titleOf(item).textContent).toBe(LONG_TITLE);
+    expect(description.textContent).toBe(LONG_TEXT);
+    expectOneLineClamp(titleOf(item));
+    expectDescriptionClamp(description);
+    expect(rulesOf(item)).toMatch(
+      new RegExp(`(^|[^-])height:\\s*${escapeRegExp(String(CARD_ITEM_HEIGHT_PX))}px`),
+    );
+  });
+
+  it("an element with no clamp of its own has none read for it", () => {
     const { container } = render(
       <CardItem data={data({ title: LONG_TITLE, description: LONG_TEXT })} />,
     );
-    expect(container.querySelector("strong")!.textContent).toBe(LONG_TITLE);
-    expect(container.querySelector("[data-row-description]")!.textContent).toBe(LONG_TEXT);
-    const css = rules();
-    expect(css).toMatch(/text-overflow:\s*ellipsis/);
-    expect(css).toMatch(/white-space:\s*nowrap/);
-    expect(css).toMatch(new RegExp(`-webkit-line-clamp:\\s*${CARD_ITEM_DESCRIPTION_LINES}`));
-    expect(css).toMatch(new RegExp(`height:\\s*${CARD_ITEM_HEIGHT_PX}px`));
+    // The title band holds the clamped title, and is not itself clamped; the
+    // description has two lines, and no one-line ellipsis.
+    const band = rulesOf(container.querySelector("[data-row-text]")!);
+    expect(band).not.toMatch(/text-overflow/);
+    expect(band).not.toMatch(/-webkit-line-clamp/);
+    const description = rulesOf(container.querySelector("[data-row-description]")!);
+    expect(description).not.toMatch(/white-space:\s*nowrap/);
+    expect(rulesOf(titleOf(container))).not.toMatch(/-webkit-line-clamp/);
   });
 
   it("the meta band sits one gap under the description, the same under one line, two lines or none: a grid track, never a margin", () => {
@@ -163,7 +181,10 @@ describe("CompactItem", () => {
     expect(container.querySelector("[data-row-description]")).toBeNull();
     expect(items[0].querySelector("strong")!.textContent).toBe(LONG_TITLE);
     expect(items[0].querySelector("[data-row-meta]")!.textContent).toBe("file.md");
-    expect(rules()).toMatch(new RegExp(`height:\\s*${CARD_ITEM_COMPACT_HEIGHT_PX}px`));
+    expect(rulesOf(items[0])).toMatch(
+      new RegExp(`(^|[^-])height:\\s*${escapeRegExp(String(CARD_ITEM_COMPACT_HEIGHT_PX))}px`),
+    );
+    expectOneLineClamp(titleOf(items[0]));
     expect(CARD_ITEM_COMPACT_HEIGHT_PX).toBeLessThan(CARD_ITEM_HEIGHT_PX);
     expect(screen.getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual([
       "Open the note",
@@ -187,6 +208,7 @@ describe("LineItem", () => {
     const item = container.querySelector("[data-card-item]")!;
     expect(item.getAttribute("data-density")).toBe("line");
     expect(item.textContent).toBe(`09:00:00CMDStatus ${LONG_TEXT}`);
+    expectOneLineClamp(item.querySelector("[data-row-text]")!);
     expect(item.querySelector("[data-row-description]")).toBeNull();
     // A line that opens nothing has no action.
     expect(screen.queryByRole("button")).toBeNull();

@@ -181,7 +181,9 @@ by a node id REST never shows, so the thread is first found by its first comment
 (`reviewThreads`, a hundred at a time, paged). A thread already in that state is said and left alone.
 `byDesign`, `pending` and `wontFix` carry a reason GitHub has nowhere to keep, so each is **refused by
 name, before anything is asked or posted**, exit 2 -- say it in the reply instead. The statuses each
-tracker accepts are one list in `consts.json` (`replyStatuses`): `ReplyPR`'s refusal reads GitHub's, and
+tracker accepts are one list in `consts.json` (`replyStatuses`): `ReplyPR` checks `-Status` against Azure
+DevOps' six on either tracker (a word that is not one of them is refused, exit 2, its hint naming the six and the key,
+`consts.json` `replyStatuses.ado`, before anything is asked or posted), its GitHub refusal reads GitHub's three, and
 the PR Comments page offers only those on a GitHub Space (`fixed`, `closed`, `active`), mapping a
 suggested reject or modify to `active` and saying in the draft that the thread is left open. On a conversation
 comment or a review summary there is no thread to resolve: the reply is posted and the line says
@@ -329,7 +331,13 @@ own interval, so reorganising the hub never brings an archived card back onto th
 **A weekend belongs to the week after.** Only weekdays render, and time is in by Friday, so anything
 dated Saturday or Sunday -- a `**Closed:**`, a commit, a `**Review:**` -- is billed on the Monday
 after: a card closed on Saturday reads active through Friday and `resolved` on Monday.
-Daily is in the browser only, for this week and last.
+Daily is in the browser and in the terminal, for any week. The page opens on this week and steps back
+a week at a time; `Daily` prints this week, `Daily -LastWeek` the week before, and
+`Daily -Since <yyyy-MM-dd> -Until <yyyy-MM-dd>` any window -- the same text the page's Copy All copies,
+built by the same script (`agent/ado/Get-WeeklyBilling.ps1`) from the same Space folder, on the output
+stream so it pipes. A window is both ends or neither, each a `yyyy-MM-dd` day, the first not after the
+last; anything else is refused, exit 2, in the sentence the page shows for it (`consts.json`
+`billing.text`, one rule in `Scripts/Resolve-BillingWindow.ps1`).
 
 One line takes a card off it:
 
@@ -375,8 +383,6 @@ reader of a date from git uses that one helper (the agent's twin is `agent/core/
 **Commit it with a subject that starts `backfill:`.** Billing skips the commits the toolkit itself
 makes for mechanical reasons -- that one, and `sync: refresh package links` -- because they touch
 cards nobody worked on.
-
-Known gap: [Daily reads two weeks, in the browser only](KNOWN-GAPS.md#daily-reads-two-weeks-in-the-browser-only).
 
 #### A card's picture: Cover
 
@@ -487,7 +493,7 @@ three the agent's `GET /api/visibility` serves: `public`, `private`, `unknown`.
 
 ## Command reference
 
-**48 always on, 63 with every opt-in module switched on.** The 48 are `config.default.json`'s
+**49 always on, 64 with every opt-in module switched on.** The 49 are `config.default.json`'s
 `commands`, and are below -- the Studio's `NewDesign`, `StampDesign`, `MoveDesign`, `NewSpace`, `RetireSpace`, `RemoveSpace` and `HowWeWork` among them, because the Studio is
 core ([Studio](modules/studio.md); D-S13); the fifteen the growth,
 communication, organize and Team Agile modules contribute have their own table further down, each marked
@@ -514,6 +520,7 @@ As `{prefix}Command`. `tkMenu` lists them live; `tkMenu -All` shows everything;
 | `Status [-Board]` | With `limits.inPlay` set, opens on `in play: 4` (`in play: 7 of 5` past the number); then the active prompts with progress and last-modified (the day of the newest commit naming the card, from one `git log` for `current/`; the file's time for a card never committed or a hub that is not a repository), then the backlog folded to a count and its names (`Backlog (N), planned -- not in play:`). `-Board` is an opt-in, read-only join against the board: each linked card's work item state, `(differs)` on a `current/` card whose item is closed ([the two can disagree](#3-the-two-can-disagree-and-nothing-notices)); refused with ADO off, no `az` or no sign-in |
 | `Archive <name>` | Move a prompt to `archive/` -- from `current/`, or from `backlog/` for a planned card retired without being in play -- and commit if the store is a git repo (`storeSync`). The commit stages the two folders the move touched (the one it left and `archive/`), plus the card's own old path in the other lane when git still tracks it there and the file is gone (a backlog card `Land` put in play just before), and nothing else in the hub, so a card created and archived before it was ever committed commits cleanly, and a tracked one is a rename. If git refuses the commit (a hook, say), the file has still moved: `Archive` states git's own sentence, exits 2 and says to commit it yourself or run `Sync`. A card that comes back for a second round first commits a rename of the earlier archived copy to `-r1`; if git refuses that commit, `Archive` stops before moving the card, names the rename, states git's own sentence and exits 2. A card that is already there answers `[=] Already archived: <path>` and exit 0: Archive touches no tracker, so twice is harmless. `CloseItem` and `NewPR` act on Azure DevOps and are not idempotent in this way |
 | `Move <id\|file> -To Backlog\|Active\|InProgress\|CodeReview\|Done` | Move a card to a lane **by hand**, for a card with nothing checked in or no pull request: In Progress writes `**Started:**`, Code Review writes `**Review:**`, Done is `Archive` exactly. Active and Backlog move the FILE: `-To Active` pulls a planned card from `backlog/` into `current/`, `-To Backlog` parks an Active card -- refused, exit 2, when anything is threaded. A planned card moved to In Progress or Code Review is pulled into `current/` first. Found in `current/` or `backlog/`. A card travels one way; moving back is refused ([State](#state-three-machines-not-one)) |
+| `Daily [-LastWeek] [-Since <yyyy-MM-dd> -Until <yyyy-MM-dd>] [-Compact]` | Print a week's timesheet from the active Space's cards -- the text the web UI's Daily page copies, built by the same script, on the output stream (`Daily \| Set-Clipboard`). This week by default; `-LastWeek` the week before; `-Since`/`-Until` any window, which wins over `-LastWeek`; `-Compact` the page's Short lines. Cards left off -- marked not billable, or with no date -- are counted after it, on the host. Half a window, a value that is not a `yyyy-MM-dd` day, or a window that ends before it starts is a stated refusal (exit 2). Read-only: nothing is written and the clipboard is not touched ([below](#the-third-line-billable)) |
 | `Billable <id\|file> [-No]` | `-No` keeps a card **off Daily** and off Team Agile's standup; without it the card is billable again. A card is billable unless it says otherwise ([below](#the-third-line-billable)) |
 | `Plan <id\|file> [-Milestone <title>] [-Sprint <title>] [-Rank top\|up\|down\|<n>]` / `Plan <id\|file> -Remove [-Only Milestone\|Sprint]` | Plan a card into a milestone, a sprint, or both -- the write side of the card's two planning lines, `**Milestone:**` and `**Sprint:**`, each its own line ([the card](hub/cards.md#milestone-and-sprint-two-lines)). `-Milestone` and `-Sprint` write the title **whole, never truncated**, through `Set-P20CardLine`, and each leaves the other line reading as it was. A card with no `**Milestone:**` line -- every card written before the two were separate -- reads its milestone from its `**Sprint:**` line, as it always did (an Azure DevOps card excepted: there that line is the iteration path), so `-Sprint` on such a card first writes a `**Milestone:**` line carrying that milestone (or `(none)`). `-Remove` deletes both lines, as it always deleted the one; `-Remove -Only Milestone` or `-Only Sprint` takes the card out of one and keeps the other. A call that changes neither reading writes nothing. Never touches the tracker: the different, tracker-bound `-Sprint` on `NewItem`/`EditItem` sets a milestone on the work item itself, through `gh`/`az`. Found in `current/` or `backlog/`, and **never** pulls a planned card into play first -- being planned before being pulled into play is the point. Sprints and milestones stay opt-in at every grain: no verb here ever requires one. **A milestone is also an order**, one file per milestone, `<Space>/milestones/<slug>.md` ([milestones](hub/milestones.md)), and `Plan` is its one writer: `-Milestone` appends the card's id at the bottom of that milestone's order (creating the file, UTF-8 with no BOM and LF, if there is none) and takes it out of the order of the milestone it left; `-Remove` and `-Remove -Only Milestone` take it out; `-Rank top`, `up`, `down` or a position from 1 moves it within its milestone's order -- one line removed and one inserted, no card touched -- counting only the cards the order ranks, and a card the order does not list yet joins it at the bottom first. `-Rank` refuses (exit 2) on a card with no milestone, naming `Plan <id> -Milestone`, and on an Azure DevOps Space, naming `MyWork`: there the board keeps the order and no order file is written by any switch |
 | `Tag <id\|file> <tag>[,<tag>] [-Remove]` | Write the card's `Tags:` line, under `## Work Item Info`, through `Set-P20CardLine` ([the card](hub/cards.md#the-tags-line)): tags added after the ones already there, joined by a comma and a space, one it already carries (in any case) not added twice; `-Remove` takes them off, the last one leaving the template's `Tags: (None)`. A card with no line gets one under `Priority:`. A call that changes no tag writes nothing and says so. Several arguments or one with commas. Never touches the tracker. Found in `current/` or `backlog/` |
@@ -1077,7 +1084,7 @@ The toolkit degrades by capability rather than failing:
 | Tier | Means | Available |
 | --- | --- | --- |
 | 1 | the board's tracker tool present, authenticated, the tracker reachable | Everything |
-| 2 | Repo + git, no tracker | `NewPrompt -Title`, `Archive`, `Billable`, `Cover`, `Status`, `Sync`, `Menu`, `Log`, `Env`, tests |
+| 2 | Repo + git, no tracker | `NewPrompt -Title`, `Archive`, `Billable`, `Daily`, `Cover`, `Status`, `Sync`, `Menu`, `Log`, `Env`, tests |
 | 3 | Repo or git missing | `Menu`, tests |
 
 **Which tool tier 1 means follows the board's address**

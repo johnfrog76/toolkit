@@ -123,7 +123,7 @@ EXPECTED = {
     (
         "regex",
         "adoOriginSsh",
-    ): r"^(?:ssh://)?[^/@\s]+@(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com):v3/([^/\s]+)/([^/\s]+)/([^/\s]+?)(?:\.git)?/?$",
+    ): r"^(?:ssh://(?:[^/@\s]+@)?(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com)(?::\d+)?/|(?:ssh://)?[^/@\s]+@(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com):)v3/([^/\s]+)/([^/\s]+)/([^/\s]+?)(?:\.git)?/?$",
     ("regex", "adoOrgDev"): r"^https?://(?:[^/@\s]+@)?dev\.azure\.com/([^/\s]+)",
     ("regex", "adoOrgVisualStudio"): r"^https?://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com(?:[/:]|$)",
     ("reminders", "buckets"): ["overdue", "today", "upcoming"],
@@ -361,6 +361,13 @@ EXPECTED = {
     ("replyStatuses", "github"): ["fixed", "closed", "active"],
     # The typed plan readings' subfolder of usage/: the CLI writes it, the agent fingerprints it.
     ("usage", "readingsFolder"): "readings",
+    # Daily's window: the billing script, the CLI's Daily and GET /api/billing refuse
+    # a window in these words (Scripts/Resolve-BillingWindow.ps1 is the rule).
+    ("billing", "text"): {
+        "halfWindow": "-Since and -Until go together: pass both (YYYY-MM-DD), or neither for this week.",
+        "notADay": "{name} '{value}' is not a day: yyyy-MM-dd.",
+        "backwards": "-Since {since} is after -Until {until}.",
+    },
     ("startWork", "text"): {
         "head": "# Start work: {kind} {id} -- {title}",
         "howWeWork": "## How we work in {space} ({source})",
@@ -391,6 +398,7 @@ class TheFileParses(unittest.TestCase):
             "design",
             "rituals",
             "startWork",
+            "billing",
             "assets",
             "tests",
             "agent",
@@ -542,9 +550,8 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.startwork_how_we_work_note(), EXPECTED[("startWork", "howWeWorkNote")])
         self.assertEqual(C.usage_env_flag(), EXPECTED[("usage", "envFlag")])
         self.assertEqual(C.usage_burn_route(), EXPECTED[("usage", "burnRoute")])
-        self.assertEqual(C.reply_statuses("ado"), tuple(EXPECTED[("replyStatuses", "ado")]))
-        self.assertEqual(C.reply_statuses("github"), tuple(EXPECTED[("replyStatuses", "github")]))
         self.assertEqual(C.usage_readings_folder(), EXPECTED[("usage", "readingsFolder")])
+        self.assertEqual(C.billing_text(), EXPECTED[("billing", "text")])
 
     def test_the_worker_rule_reads_the_contract(self):
         """The pane's worker chips and the standup read one prefix, not two."""
@@ -633,6 +640,9 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         # Claude Code usage: served through usage_env_flag() and usage_burn_route().
         ("usage.envFlag", "claudeUsage"),
         ("usage.burnRoute", "/api/usage/burn"),
+        # Daily's window sentences: the route reads them through billing_text().
+        ("billing.text.halfWindow", "-Since and -Until go together"),
+        ("billing.text.notADay", "is not a day: yyyy-MM-dd"),
     ]
 
     # The allowlist, and why each entry is on it:

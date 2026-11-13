@@ -467,7 +467,7 @@ agent/                  The FastAPI agent -- see agent/README.md
                           request_gate, surfaces, tier, usage -- always on
   ado/                    accounting, backlog, bridge (and bridge.ps1, the child it runs), design, docs,
                           pr_comments, repo_read, reporting, sprint, status
-  ado/Get-WeeklyBilling.ps1   Module-private: /billing shells out to it. Not a CLI command
+  ado/Get-WeeklyBilling.ps1   Run by path: /billing shells out to it, and the CLI's Daily runs it
   growth/                 growth, reviews, resume -- one router, gated on features.growth
   communication/          manager (the routes) + comms (the engine, carried whole)
   organize/               reminders -- gated on features.organize
