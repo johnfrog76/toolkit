@@ -113,6 +113,7 @@ describe("every module's panels and pages", () => {
       "deck/DeckPickerCard.tsx",
       "growth/Goals.tsx",
       "growth/ReviewArchive.tsx",
+      "organize/ReferenceCard.tsx",
       "organize/RemindersCard.tsx",
       "studio/DesignsCard.tsx",
       "studio/FoyerCard.tsx",
