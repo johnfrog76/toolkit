@@ -58,6 +58,7 @@ function shell(over: Partial<ShellValue>): ShellValue {
   return {
     cards: { home: [], system: [] },
     homeTabs: [],
+    systemTabs: [],
     slot: () => [],
     openSettings: () => undefined,
     pager: { page: 0, totalPages: 1, onPageChange: () => undefined },

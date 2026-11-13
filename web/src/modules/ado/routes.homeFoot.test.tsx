@@ -42,6 +42,7 @@ jest.mock("./api.ado", () => ({
 const tabsValue = (): ShellValue => ({
   cards: { home: [], system: [] },
   homeTabs: [{ id: "cards", label: "Cards", path: "/", cards: [] }],
+  systemTabs: [],
   slot: () => [],
   openSettings: () => {},
   pager: { page: 0, totalPages: 1, onPageChange: () => {} },
