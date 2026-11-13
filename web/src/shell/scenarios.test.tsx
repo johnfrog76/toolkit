@@ -30,6 +30,7 @@ import {
   activeModules,
   isChromeless,
   moduleCards,
+  moduleSystemTabs,
   moduleHomeTabs,
   moduleNavSplit,
   moduleRoutes,
@@ -113,8 +114,8 @@ function env(o: {
   };
 }
 
-function see(e: EnvStatus | undefined) {
-  const ctx: CardContext = {
+function ctxFor(e: EnvStatus | undefined): CardContext {
+  return {
     env: e,
     filterValue: "",
     stateFilter: "All",
@@ -125,6 +126,17 @@ function see(e: EnvStatus | undefined) {
     activeSkillTag: null,
     setActiveSkillTag: () => {},
   };
+}
+
+/** System's tab strip as `Label:card+card`, one string per tab. */
+function seeSystemTabs(e: EnvStatus | undefined) {
+  return moduleSystemTabs(activeModules(modules, e), ctxFor(e)).map(
+    (t) => `${t.label}:${t.cards.map((c) => String(c.key)).join("+")}`,
+  );
+}
+
+function see(e: EnvStatus | undefined) {
+  const ctx = ctxFor(e);
   const active = activeModules(modules, e);
   const { anchor, tabs } = moduleNavSplit(active, ctx);
   return {
@@ -461,6 +473,16 @@ describe("the scenario grid: what each configuration shows", () => {
       "/organize/reference/:name",
     ]);
     expect(routes({ organize: false })).toEqual([]);
+  });
+
+  it("System's tabs: Overview holds the at-a-glance cards, Agents the burn, and an empty tab is absent", () => {
+    const withUsage = (e: EnvStatus, on: boolean) => ({ ...e, [USAGE.envFlag]: on }) as EnvStatus;
+    const ado1 = env({ status: "active", tier: 1, tracker: "ado" });
+    expect(seeSystemTabs(withUsage(ado1, true))).toEqual([
+      "Overview:env+modules+log+test-health",
+      "Agents:burn",
+    ]);
+    expect(seeSystemTabs(withUsage(ado1, false))).toEqual(["Overview:env+modules+log+test-health"]);
   });
 
   it("System's Claude Code burn tile is there where the usage flag is on, and absent where not", () => {

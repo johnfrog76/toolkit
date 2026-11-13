@@ -58,6 +58,8 @@ export const adoModule: ToolkitModule = {
   routes: [
     { path: "/", element: <AdoHome /> },
     { path: SYSTEM_PATH, element: <AdoSystem /> },
+    // The System page's other tab, an address (SYSTEM_TABS).
+    { path: `${SYSTEM_PATH}/agents`, element: <AdoSystem /> },
     { path: "/pr-comments/:filename", element: <PRCommentsDetail /> },
     { path: CARD_ROUTE, element: <PromptDetailPage /> },
     { path: "/review", element: <ReviewPage /> },
@@ -98,7 +100,11 @@ export const adoModule: ToolkitModule = {
         p.startsWith("/design/") ||
         p.startsWith("/docs/"),
     },
-    { label: "System", to: SYSTEM_PATH, match: (p) => p === SYSTEM_PATH },
+    {
+      label: "System",
+      to: SYSTEM_PATH,
+      match: (p) => p === SYSTEM_PATH || p.startsWith(`${SYSTEM_PATH}/`),
+    },
     {
       label: "Daily",
       to: "/daily",

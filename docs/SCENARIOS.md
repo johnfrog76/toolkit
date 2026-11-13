@@ -100,8 +100,14 @@ lives in the Lounge (spec D-L24). Never a Space switcher: the avatar menu is the
 **The Claude Code burn** comes last, on any Space and tier, **only where `/env`'s `claudeUsage` is true** --
 the **Claude Code usage** inventory row's rule, Claude Code's projects folder on the agent's machine. Off or
 absent, there is no tile and nothing asks `GET /api/usage/burn` (which is 404 there). So a connected machine
-with Claude Code shows five cards, a second page of System's pager, and a Tier 3 one four
+with Claude Code shows five cards and a Tier 3 one four
 (`web/src/shell/scenarios.test.tsx`, "System's Claude Code burn tile").
+
+**System's cards sit under in-page tabs**, the same tab row Home and Team Agile use, each tab an address:
+**Overview** (`/system`) holds Environment, Modules, Log and Test Health, and **Agents** (`/system/agents`)
+holds the Claude Code burn. A tab with no cards is absent, and with fewer than two tabs there is no strip,
+so a machine without Claude Code sees System exactly as before, with no pager (`web/src/shell/scenarios.test.tsx`,
+"System's tabs").
 
 | `claudeUsage` | Tier 1-2 | Tier 3 |
 | --- | --- | --- |
