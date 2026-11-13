@@ -1,6 +1,6 @@
 import { Children, Fragment, cloneElement, createContext, isValidElement, useContext } from "react";
 import type { ReactElement, ReactNode } from "react";
-import type { HomeTab } from "./registry";
+import type { HomeTab, SystemTab } from "./registry";
 import { makeStyles, mergeClasses } from "@fluentui/react-components";
 import { ListPager } from "./kinds/ListPager";
 import { pageRowGap, panelGap } from "./layoutTokens";
@@ -42,6 +42,8 @@ export interface ShellValue {
   /** Home's named tabs that have cards (registry `moduleHomeTabs`). The page
    *  that draws Home picks the one its address names. */
   homeTabs: HomeTab[];
+  /** The System page's named tabs that have cards (registry `moduleSystemTabs`). */
+  systemTabs: SystemTab[];
   filters: FilterControls;
   /** The cards other modules contributed to a named slot on a page (the
    *  registry's `slotCards`). A page renders its own slot; it never imports the
@@ -60,6 +62,7 @@ export interface ShellValue {
 const EMPTY: ShellValue = {
   cards: { home: [], system: [] },
   homeTabs: [],
+  systemTabs: [],
   slot: () => [],
   openSettings: () => {},
   pager: { page: 0, totalPages: 1, onPageChange: () => {} },
@@ -103,6 +106,11 @@ export function useShellFilters(): FilterControls {
 /** Home's tabs that have cards, in strip order. */
 export function useHomeTabs(): HomeTab[] {
   return useContext(ShellContext).homeTabs;
+}
+
+/** The System page's tabs that have cards, in strip order. */
+export function useSystemTabs(): SystemTab[] {
+  return useContext(ShellContext).systemTabs;
 }
 
 /** The shell's card pager, for a page that draws it somewhere other than under the grid. */
