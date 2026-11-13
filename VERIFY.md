@@ -292,7 +292,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **52 suites, 10496 assertions** with a `config.local.json`, every one
+findings. On this commit that is **52 suites, 10600 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -1272,6 +1272,17 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `tkDaily -Since <that Monday> -Until <that Friday>`: the same text. `tkDaily -Since 2026-01-05` prints one
   `Error:` naming `-Since and -Until go together`, and `$LASTEXITCODE` is 2. The `ps51` job runs the Billable
   suite on 5.1; this row is a real console, a real hub and the page.
+- [ ] **A Space's checkout whose path has a space and ends in a backslash is found under Windows PowerShell 5.1
+  (#407).** On the Windows PC, clone a repository a Space names into a folder with a space in its path, say
+  `C:\My Repos\product`. In `powershell` (5.1), in that Space, run
+  `tkConfig -Set "spaceCheckouts.<slug>.path=C:\My Repos\product\"` (the trailing backslash is the point), then
+  `tkMoveDesign <id> -To Spec -Space <slug> -WhatIf` for a note in that product. It names the clone at
+  `C:\My Repos\product` and the move it would make; it does not say `it is not inside a git repository`. Then run
+  `tkTestToolkit -Design -Portability`: the line `a clone in a folder with a space, asked for with a trailing
+  separator, is found (Desktop 5.1...)` passes, the one after it too, and so does every `Clause 23: the shipped
+  reader hands git ...` line, `a checkout path with a space and a trailing backslash, and the arguments after it`
+  among them. Those rows are `Invoke-P20TrackerRead` escaping for 5.1's own command line, which no other host
+  builds; the `ps51` job runs both suites on 5.1 too.
 
 ## Recording a run
 
