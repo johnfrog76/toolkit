@@ -31,7 +31,8 @@ export interface RitualItem {
   /** What moved (RITUALS.motions): closed, started or inProgress -- already said
    *  in `text` after the ref. Absent from an agent that predates it. */
   motion?: string;
-  /** The distinct commits its card threads; 0 with no card. */
+  /** The distinct commits its card threads -- on a GitHub Space, only those
+   *  authored inside the window; 0 with no card. */
   commits?: number;
 }
 
@@ -43,6 +44,9 @@ export interface MotionCount {
   started: number;
   inProgress: number;
   commits: number;
+  /** Commits the dates read could not date: not in `commits`, said beside them.
+   *  Absent from an agent that predates it. */
+  undated?: number;
 }
 
 /** A walk item also names the worker it is routed to. */

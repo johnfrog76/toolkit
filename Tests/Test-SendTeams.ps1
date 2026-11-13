@@ -68,7 +68,7 @@ function Assert-NotContains {
 $DeadPort = 49781
 
 function New-SendSandbox {
-    param([hashtable]$Recipients, [string]$HubJson, [hashtable]$LocalConfig)
+    param([hashtable]$Recipients, [string]$HubJson, [hashtable]$LocalConfig, [int]$AgentPort = $DeadPort)
 
     $root = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-send-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
     New-Item -Path (Join-Path $root 'Scripts') -ItemType Directory -Force | Out-Null
@@ -77,7 +77,7 @@ function New-SendSandbox {
     Copy-Item (Join-Path (Split-Path $sendScript -Parent) 'Resolve-HubConfig.ps1') (Join-Path $root 'Scripts/Resolve-HubConfig.ps1')
     # The contract file and its reader: the webhook prefix, the run marker, the Sent line.
     # ...and Get-CliPrefix and Write-CliError for a run with no module.
-    foreach ($helper in @('Get-Consts.ps1', 'ConvertTo-Utf8Body.ps1', 'Add-SentLine.ps1', 'Write-CardText.ps1', 'Write-ConfigParseWarning.ps1', 'Initialize-CliFallbacks.ps1')) {
+    foreach ($helper in @('Get-Consts.ps1', 'Read-CommunicationConfig.ps1', 'ConvertTo-Utf8Body.ps1', 'Add-SentLine.ps1', 'Write-CardText.ps1', 'Write-ConfigParseWarning.ps1', 'Initialize-CliFallbacks.ps1')) {
         Copy-Item (Join-Path (Split-Path $sendScript -Parent) $helper) (Join-Path $root "Scripts/$helper")
     }
     Copy-Item (Join-Path (Split-Path (Split-Path $sendScript -Parent) -Parent) 'consts.json') (Join-Path $root 'consts.json')
@@ -98,7 +98,7 @@ function New-SendSandbox {
     }
     $cfg = @{
         activeOrg       = 'test'
-        web             = @{ agentPort = $DeadPort }
+        web             = @{ agentPort = $AgentPort }
         managerWorkflow = @{
             retroChannel = 'manager'
             communication = @{ recipients = $Recipients }
@@ -143,7 +143,7 @@ function Invoke-Send {
     $envPrefix += "Get-ChildItem Env: | Where-Object { `$_.Name.StartsWith('$($consts.env.teamsWebhookPrefix)') } | ForEach-Object { Remove-Item (""Env:\"" + `$_.Name) }; "
     # PROMPTS_ROOT: the runner points every suite at a scratch hub; a sandbox
     # here names its own hub in config.local.json, and the override would win.
-    foreach ($key in @('TEAMS_WEBHOOK_MANAGER', 'TEAMS_WEBHOOK_URL', 'TEAMS_WEBHOOK_TEAM_CHANNEL', 'P20_TEST_RUN', 'PROMPTS_ROOT')) {
+    foreach ($key in @('TEAMS_WEBHOOK_MANAGER', 'TEAMS_WEBHOOK_URL', 'TEAMS_WEBHOOK_TEAM_CHANNEL', 'TEAMS_WEBHOOK_MOM', 'P20_TEST_RUN', 'PROMPTS_ROOT')) {
         # P20_TEST_RUN: the runner sets it for this process; the child must not
         # inherit it unless a case asks, or every gate-2 case would stop at the
         # marker instead of reaching the (dead) agent it asserts on.
@@ -389,6 +389,113 @@ catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
 }
 finally { Remove-SendSandbox $sandbox }
+
+# -- A Teams chat: a recipient type of its own ------------------------------------
+# A chat posts through its webhook exactly as a channel does, so gate 2 runs for
+# it -- before this, a chat skipped the gate and the engine refused it.
+
+Write-Host ""
+Write-Host "-- A chat recipient --------------------------------------" -ForegroundColor Cyan
+
+$chatRecipients = @{
+    manager = @{ type = 'channel'; display = 'My Manager'; webhookEnv = 'TEAMS_WEBHOOK_MANAGER' }
+    mom     = @{ type = 'chat'; display = 'Mom'; webhookEnv = 'TEAMS_WEBHOOK_MOM' }
+}
+$sandbox = New-SendSandbox -Recipients $chatRecipients
+try {
+    $result = Invoke-Send -Root $sandbox -Arguments @('mom', 'a line') -Environment @{}
+    Assert-Contains "a chat with no webhook meets gate 2" $result.Output 'Not sent -- no webhook configured'
+    Assert-Contains "and the gate names the chat's variable" $result.Output 'TEAMS_WEBHOOK_MOM'
+    Assert-NotContains "and never reaches the agent" $result.Output 'Could not reach the agent'
+    $result = Invoke-Send -Root $sandbox -Arguments @('mom', 'a line', '-WhatIf') -Environment @{}
+    Assert-Contains "-WhatIf meets the same gate" $result.Output 'Not sent -- no webhook configured'
+
+    # A person is accepted and never posts: the gate is not its, the engine's skip is.
+    $sandbox2 = New-SendSandbox -Recipients @{ boss = @{ type = 'person'; display = 'Boss' } }
+    try {
+        $result = Invoke-Send -Root $sandbox2 -Arguments @('boss', 'a line') -Environment @{}
+        Assert-NotContains "a person recipient is not answered by gate 2" $result.Output 'Not sent -- no webhook configured'
+    }
+    finally { Remove-SendSandbox $sandbox2 }
+
+    # A machine that sets one field of the shipped recipient keeps the rest:
+    # Config -Set writes a field at a time, and the reader merges field by field.
+    $sandbox3 = New-SendSandbox -LocalConfig @{ managerWorkflow = @{ communication = @{ recipients = @{ manager = @{ display = 'Boss' } } } } }
+    try {
+        $result = Invoke-Send -Root $sandbox3 -Arguments @('manager', 'a line') -Environment @{}
+        Assert-Contains "a local display over the shipped recipient keeps its type and variable" $result.Output 'TEAMS_WEBHOOK_MANAGER'
+    }
+    finally { Remove-SendSandbox $sandbox3 }
+}
+catch {
+    Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally { Remove-SendSandbox $sandbox }
+
+# -WhatIf to a chat, against a stand-in agent on the loopback: the request the
+# script makes is a dry run, and the stand-in answers the way the engine does.
+# Nothing here can post -- the stand-in is the only thing listening, and the
+# webhook variable holds a plain string.
+$probe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+$probe.Start(); $stubPort = $probe.LocalEndpoint.Port; $probe.Stop()
+$sandbox = New-SendSandbox -Recipients $chatRecipients -AgentPort $stubPort
+$bodyFile = Join-Path $sandbox 'request.json'
+$stubScript = Join-Path $sandbox 'stub-agent.ps1'
+$stubText = @'
+param([int]$Port, [string]$BodyFile)
+$listener = [System.Net.HttpListener]::new()
+$listener.Prefixes.Add("http://localhost:$Port/")
+$listener.Start()
+$ctx = $listener.GetContext()
+$reader = [System.IO.StreamReader]::new($ctx.Request.InputStream, [System.Text.Encoding]::UTF8)
+$body = $reader.ReadToEnd()
+[System.IO.File]::WriteAllText($BodyFile, $ctx.Request.Url.AbsolutePath + "`n" + $body)
+$answer = '{"status":"dry-run","detail":"would post (not sent)","target":{"recipient":"mom","display":"Mom"},"payload":"**a line**"}'
+$bytes = [System.Text.Encoding]::UTF8.GetBytes($answer)
+$ctx.Response.ContentType = 'application/json'
+# The length is stated and the listener outlives the answer: on Windows a
+# listener stopped the moment the response closes can drop the answer before
+# the caller has read it.
+$ctx.Response.ContentLength64 = $bytes.Length
+$ctx.Response.OutputStream.Write($bytes, 0, $bytes.Length)
+$ctx.Response.OutputStream.Close()
+$ctx.Response.Close()
+Start-Sleep -Seconds 2
+$listener.Stop()
+'@
+[System.IO.File]::WriteAllText($stubScript, $stubText, (New-Object System.Text.UTF8Encoding($false)))
+$stub = $null
+try {
+    $stub = Start-Process -FilePath (Get-Process -Id $PID).Path -PassThru `
+        -ArgumentList @('-NoProfile', '-NonInteractive', '-File', $stubScript, '-Port', $stubPort, '-BodyFile', $bodyFile)
+    # Wait for the stand-in to listen before the send is made.
+    $up = $false
+    for ($i = 0; $i -lt 100 -and -not $up; $i++) {
+        try { $c = [System.Net.Sockets.TcpClient]::new('localhost', $stubPort); $c.Close(); $up = $true }
+        catch { Start-Sleep -Milliseconds 100 }
+    }
+    Assert-True "the stand-in agent is listening" $up "port $stubPort"
+    $result = Invoke-Send -Root $sandbox -Arguments @('mom', 'a line', '-WhatIf') -Environment @{ TEAMS_WEBHOOK_MOM = 'set-for-this-test' }
+    # Assert-True, so a failure prints what the verb did say.
+    Assert-True "-WhatIf to a chat returns the payload unsent" ($result.Output.Contains("Dry run -- would post to 'mom'")) $result.Output
+    Assert-True "formatted" ($result.Output.Contains('**a line**')) $result.Output
+    Assert-NotContains "with no unsupported type" $result.Output 'unsupported type'
+    $sent = ''
+    for ($i = 0; $i -lt 30 -and -not (Test-Path $bodyFile); $i++) { Start-Sleep -Milliseconds 100 }
+    if (Test-Path $bodyFile) { $sent = [System.IO.File]::ReadAllText($bodyFile) }
+    Assert-True "the request went to the engine's send route" $sent.StartsWith('/api/comms/send') $sent
+    $sentBody = $null
+    try { $sentBody = ($sent.Substring($sent.IndexOf("`n") + 1)) | ConvertFrom-Json } catch { $sentBody = $null }
+    Assert-True "and asked for a dry run, so nothing is sent" ($null -ne $sentBody -and $sentBody.dryRun -eq $true) $sent
+    Assert-True "to the chat" ($null -ne $sentBody -and $sentBody.recipient -eq 'mom') $sent
+}
+catch {
+    Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally {
+    if ($stub -and -not $stub.HasExited) { Stop-Process -Id $stub.Id -Force -ErrorAction SilentlyContinue }
+    Remove-SendSandbox $sandbox
+}
 
 # -- The wrapper ------------------------------------------------------------------
 # The loader is not on this branch yet, so the command file is dot-sourced by

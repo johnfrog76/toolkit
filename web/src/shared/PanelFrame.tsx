@@ -29,6 +29,19 @@ const useStyles = makeStyles({
     //   maxHeight: "600px",
     // },
   },
+  // The frame is a column (Fluent's Card is one) and the body takes what the
+  // header and the foot leave, so the foot sits at the frame's bottom edge
+  // however short the content is. The gap between the body's own children is
+  // the frame's, as it was when they were the frame's children.
+  body: {
+    display: "flex",
+    flexDirection: "column",
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: "auto",
+    minWidth: 0,
+    rowGap: tokens.spacingVerticalM,
+  },
   header: {
     display: "flex",
     alignItems: "center",
@@ -78,10 +91,9 @@ const useStyles = makeStyles({
   },
 });
 
-export interface PageCardProps {
+interface PanelFrameSlots {
   headerLeft?: ReactNode;
   headerRight?: ReactNode;
-  children?: ReactNode;
   toast?: ReactNode;
   footer?: ReactNode;
   footerLeft?: ReactNode;
@@ -103,10 +115,27 @@ export interface PageCardProps {
   className?: string;
 }
 
-export function PageCard({
+/** The body, as the named slot or as the default slot (children), which fills
+ *  it: one or the other, never both. */
+type PanelFrameBody =
+  | {
+      /** The body slot: what the panel holds. Named like every other slot. */
+      body?: ReactNode;
+      children?: never;
+    }
+  | {
+      body?: never;
+      /** The default slot: it fills `body`. */
+      children?: ReactNode;
+    };
+
+export type PanelFrameProps = PanelFrameSlots & PanelFrameBody;
+
+export function PanelFrame({
   headerLeft,
   headerRight,
-  children,
+  body: bodySlot,
+  children: defaultSlot,
   toast,
   footer,
   footerLeft,
@@ -118,8 +147,14 @@ export function PageCard({
   loadingLabel = "Loading...",
   empty,
   className,
-}: PageCardProps) {
+}: PanelFrameProps) {
   const styles = useStyles();
+  // One body: the named slot, or the default slot standing in for it.
+  // The types refuse both at compile time; this refuses a caller that got past them.
+  if (bodySlot != null && defaultSlot != null) {
+    throw new Error("PanelFrame: pass `body` or children, never both -- children fill the body.");
+  }
+  const children = bodySlot ?? defaultSlot;
   const hasHeader = headerLeft != null || headerRight != null;
   const mid = footerCenter != null;
   const hasFooterSlots = footerLeft != null || footerCenter != null || footerRight != null;
@@ -138,6 +173,14 @@ export function PageCard({
   } else {
     body = children;
   }
+  // A scrollable frame is a grid whose body row already takes the room.
+  const framed = scrollable ? (
+    body
+  ) : (
+    <div className={styles.body} data-panel-frame-body>
+      {body}
+    </div>
+  );
 
   return (
     <Card
@@ -151,7 +194,7 @@ export function PageCard({
         </div>
       )}
       {hasHeader && <HairlineDivider />}
-      {body}
+      {framed}
       {toast != null && !loading && toast}
       {hasFooterSlots && !loading && (
         <div className={styles.footer}>
