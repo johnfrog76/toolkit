@@ -142,7 +142,7 @@ web/
     │   ├── index.tsx       export solitaireAgileModule: four routes (the standup, triage, milestones, the played view, chromeless), one nav entry, no cards elsewhere
     │   ├── paths.ts        the module's route paths and the played deck's id
     │   ├── api.solitaireAgile.ts   GET /api/ritual/standup, /triage and /milestones ?space=<slug>, read through @consts; POST /api/cmd/Route
-    │   ├── RitualPage      the Standup | Triage | Milestones strip, each tab an address, and the page under it
+    │   ├── RitualPage      the Standup | Triage | Releases strip, each tab an address, and the page under it
     │   ├── StandupPage     Agenda first, then the agent's text verbatim on Detail | Work | Brief: line one the header, the rest monospace, #<n> linked; Copy and Play in the header
     │   ├── AgendaLanes     the Agenda: Since <day> and Waiting on you, tiles from the board's face pieces (or rows), one button a waiting tile
     │   ├── agenda.ts       the Agenda's words: the long day, the lane heading, each tile's one fact

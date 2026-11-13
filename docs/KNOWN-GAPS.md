@@ -126,7 +126,7 @@ so the container cannot reach the agent -- by Docker's own networking model. On 
 
 **What you see:** `Plan <id> -Rank` keeps the order in `milestones/<slug>.md`, the CLI and the agent read
 it the same way, and `Backlog` and `GET /api/backlog` serve it as a table, but no page shows it: Team
-Agile's Milestones tab lists a milestone's issues without the order, and the order is not mirrored into a
+Agile's Releases tab lists a milestone's issues without the order, and the order is not mirrored into a
 GitHub milestone's description. A card that is archived leaves a stale line in the file until a person
 deletes it.
 
@@ -175,7 +175,7 @@ leave ts-jest, which is a decision of its own.
 ### Milestones appear on two pages
 
 **What you see:** a GitHub Space's milestones appear on the Stats tab's Milestones card and on Team Agile's
-Milestones tab. Both build their rows from the same reader and order and word them by the same rules, so they
+Releases tab. Both build their rows from the same reader and order and word them by the same rules, so they
 agree. But each page has its own route and cache and draws its own row, so for a moment the two can show a
 different read, and a milestone can look different in each place.
 

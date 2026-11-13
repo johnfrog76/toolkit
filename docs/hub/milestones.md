@@ -141,7 +141,7 @@ Azure DevOps; `MyWork` lists what is assigned to you") and `GET /api/backlog` is
 ## Not yet
 
 The order is read by the CLI and the agent, and `Backlog` prints it, but no page draws it yet: Team
-Agile's Milestones tab shows no order, and the Backlog page on Home is a later piece of work. `Plan` never writes the tracker -- a
+Agile's Releases tab shows no order, and the Backlog page on Home is a later piece of work. `Plan` never writes the tracker -- a
 GitHub milestone's description is not the order, and mirroring the file into it is not built.
 
 Known gap: [A milestone's order is not drawn](../KNOWN-GAPS.md#a-milestones-order-is-not-drawn).
