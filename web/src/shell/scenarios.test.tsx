@@ -458,6 +458,23 @@ describe("the scenario grid: what each configuration shows", () => {
   // The Claude Code burn tile follows /env's claudeUsage (consts.json usage.envFlag,
   // the CLI's Claude Code usage inventory row): on, it is System's last card on any
   // Space and tier; off or absent, there is no tile and nothing asks /usage/burn.
+  // The Organize tab's second page, Reference (#441): one flag gives the page and
+  // the document's reading room as routes; off, neither exists.
+  it("Organize's Reference page and reading room are routes only where organize is on", () => {
+    const routes = (features: Record<string, boolean>) =>
+      moduleRoutes(
+        activeModules(modules, env({ status: "active", tier: 1, tracker: "ado", features })),
+      )
+        .map((r) => r.path)
+        .filter((p) => (p ?? "").startsWith("/organize"));
+    expect(routes({ organize: true })).toEqual([
+      "/organize",
+      "/organize/reference",
+      "/organize/reference/:name",
+    ]);
+    expect(routes({ organize: false })).toEqual([]);
+  });
+
   it("System's tabs: Overview holds the at-a-glance cards, Agents the burn, and an empty tab is absent", () => {
     const withUsage = (e: EnvStatus, on: boolean) => ({ ...e, [USAGE.envFlag]: on }) as EnvStatus;
     const ado1 = env({ status: "active", tier: 1, tracker: "ado" });
