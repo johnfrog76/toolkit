@@ -1,5 +1,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { SpaceChoice } from "./AvatarMenu";
+import { foyerSpaces, spaceBucket } from "../modules/studio/foyer";
+import type { EnvStatus } from "./api";
 import type * as AvatarMenuModule from "./AvatarMenu";
 import type * as QuickMenuModule from "./SpaceQuickMenu";
 
@@ -14,7 +16,7 @@ import type * as QuickMenuModule from "./SpaceQuickMenu";
   removeListener: () => {},
 });
 /* eslint-disable @typescript-eslint/no-require-imports */
-const { AvatarMenu } = require("./AvatarMenu") as typeof AvatarMenuModule;
+const { AvatarMenu, switcherChoices } = require("./AvatarMenu") as typeof AvatarMenuModule;
 const { SPACE_QUICK_MENU_THRESHOLD } = require("./SpaceQuickMenu") as typeof QuickMenuModule;
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -169,5 +171,32 @@ describe("the avatar menu's Space entry", () => {
     });
     expect(screen.queryByRole("combobox")).toBeNull();
     expect(document.activeElement).toBe(entry);
+  });
+});
+
+describe("a retired Space", () => {
+  const env = {
+    config: {
+      activeSpace: "a",
+      spaces: [
+        { slug: "a", name: "A", status: "active" },
+        { slug: "gone", name: "Gone", status: "archive" },
+      ],
+      switcherSpaces: ["a"],
+    },
+  } as unknown as EnvStatus;
+
+  it("is absent from the switcher but still in config.spaces, where the Spaces card files it under Archive", () => {
+    expect(switcherChoices(env.config).map((s) => s.slug)).toEqual(["a"]);
+    const rows = foyerSpaces(env);
+    expect(rows.map((s) => s.slug)).toEqual(["a", "gone"]);
+    expect(spaceBucket(rows[1])).toBe("archive");
+  });
+
+  it("reads as every Space when an older agent sends no switcher list", () => {
+    expect(switcherChoices({ spaces: env.config.spaces }).map((s) => s.slug)).toEqual([
+      "a",
+      "gone",
+    ]);
   });
 });

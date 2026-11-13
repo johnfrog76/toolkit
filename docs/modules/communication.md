@@ -67,22 +67,37 @@ Nothing in Teams says where this lives, so the path, once:
 5. Prove it unsent: `tkSendTeams manager 'Hello from the Toolkit' -WhatIf`. The URL is a secret; never
    send from a session to find out.
 
-**A second recipient is declared by hand.** `TEAMS_WEBHOOK_<KEY>` only supplies the variable name for a
-recipient that is already declared under `managerWorkflow.communication.recipients`; an undeclared
-one is refused (`unknown recipient key 'mom'`). `Config -Set` cannot declare one -- `managerWorkflow` is the
-team's block in `config.default.json`, and `Config` never writes it, so any key under it answers
-`Unknown setting` -- so edit `config.local.json` (top-level, gitignored) yourself:
+**A second recipient is declared with `tkConfig`.** `TEAMS_WEBHOOK_<KEY>` only supplies the variable
+name for a recipient that is already declared; an undeclared one is refused (`unknown recipient key
+'mom'`). A recipient is three fields under a key of your choosing -- the key is what `SendTeams` takes:
 
-```json
-{ "managerWorkflow": { "communication": { "recipients": {
-    "demo_channel": { "type": "channel", "display": "Demo channel" } } } } }
+```powershell
+tkConfig -Set managerWorkflow.communication.recipients.mom.type=chat
+tkConfig -Set managerWorkflow.communication.recipients.mom.display=Mom
+tkConfig -Set managerWorkflow.communication.recipients.mom.webhookEnv=TEAMS_WEBHOOK_MOM
 ```
 
-`"type"` is `"channel"` **even for a person**: `"chat"` is refused as `unsupported type`, `"person"` as
-`DM deferred`, and the shipped `manager` entry is itself a `"channel"` whose display says "DM via
-Workflow". Then `TEAMS_WEBHOOK_DEMO_CHANNEL` is the variable.
+That writes `config.local.json` (top-level, this machine's), and `tkEnv`'s Teams delivery row then
+names `mom` among the recipients. The System page's Environment card lists it too, as *Every Space*,
+with whether its variable is set ([`/env`'s `communication` block](#envs-communication-block)). The rest of `managerWorkflow` -- `retroChannel`, `postRetroSummary` --
+is still the team's block in `config.default.json`, and `tkConfig` refuses it by name.
 
-Known gap: [`Config -Set` cannot declare a Teams recipient](../KNOWN-GAPS.md#config--set-cannot-declare-a-teams-recipient).
+- **`type`** is `chat` for a **Send webhook alerts to a chat** workflow and `channel` for **Send webhook
+  alerts to a channel**. The two post the same way, through the webhook, and gate 2 checks the variable
+  for both. `person` is accepted and never posts: a direct message is not built, and the engine answers
+  `skipped`, a DM deferred. Any other word is refused with the three allowed values named. The shipped
+  `manager` entry is a `channel` whose display says "DM via Workflow"; it works as it is, and
+  `tkConfig -Set managerWorkflow.communication.recipients.manager.type=chat` says what it is.
+- **`display`** is the name the Meetings page and a dry run show.
+- **`webhookEnv`** is the NAME of the variable, never the URL: `TEAMS_WEBHOOK_` and then capitals,
+  digits and `_`. Anything else is refused -- a URL in particular, which is not repeated back. Left
+  unset, the name is `TEAMS_WEBHOOK_<KEY>`, the key in capitals. The URL goes in `.env` under that name.
+
+A recipient for one Space only -- a team channel -- is the same three fields under the Space:
+`tkConfig -Set spaces.<slug>.communication.recipients.<key>.type=channel` writes `hub.json`, and `-Local`
+this machine's patch instead. A Space's recipient wins over a `managerWorkflow` one with the same key,
+and the Environment card lists it as *This Space*, while that Space is the active one.
+`tkConfig -Unset` takes one field at a time, and the recipient goes with its last.
 
 ## The verbs
 
@@ -245,7 +260,8 @@ appended server-side so the caller never has to read the file back in order to a
 }
 ```
 
-`configured` is gate 2, answered before the click. `scope` says which config block the entry came
+`configured` is gate 2, answered before the click. `type` is the entry's own word -- `channel`,
+`chat` or `person` -- passed through as written; the page branches on none of them. `scope` says which config block the entry came
 from: `managerWorkflow` for a recipient declared under `managerWorkflow.communication.recipients`,
 the same in every Space, or `org` for one declared on the active Space's `communication.recipients`.
 Switching Space changes only the second, and `scope` is what explains that. The System page's Environment card draws one row per recipient from this block (`EnvRecipients`, a lazy part of this module): the display name, *Every Space* for `managerWorkflow` or *This Space* for `org`, and whether the webhook variable is set. An unset variable is named, in the send button's words. The rows come from the `/env` the card already reads, so they cost no request, and with the flag off the block is absent and nothing is drawn or fetched. The URL is never shown.
@@ -315,8 +331,6 @@ the three keys and labels both pages read.
 
 The `--modules=on` smoke asserts the button's **presence** on exactly one of the three fixture
 sessions and never presses it: a press moves a file in the committed fixture hub.
-
-Known gap: [A meeting row draws its actions side by side](../KNOWN-GAPS.md#a-meeting-row-draws-its-actions-side-by-side).
 
 ### Advancing a stage, from the browser
 
@@ -419,6 +433,7 @@ the engine takes whatever is in that variable at face value. Use `-WhatIf` from 
 | `Tests/Test-NewMeeting.ps1` | The eight headings by name, the prior session found across folders and out of order, an existing session reported rather than overwritten — with its hand-written content asserted still there — and a date already closed into `archive/` refused, with nothing scaffolded beside the record. A session created out of order names the later record whose heading it made stale, and leaves that record alone |
 | `Tests/Test-MeetingAgenda.ps1` | The stage lifecycle, read back out of the file rather than out of the command's output, and `-Close` end to end: the move, the `**Closed:**` stamp, `archive/` created when absent, a second run idempotent, and `-DryRun` writing nothing — plus the duplicate case, where a session sits in `current/` and a closed one in `archive/` for the same date and `-Close` refuses rather than reporting success. Plus two absence tests: the help names none of the three retired hub prompts, and the retro does not suggest the org-scoped `Archive` verb — it names `-Close` instead. And every row of the shared `Tests/fixtures/carried-from/table.json` read through `Resolve-P20CarriedFrom`, then the `Check:` line end to end -- status, quick menu, `-Plan` -- with the session's bytes unchanged |
 | `web/.../stages.test.ts` | The three stages in one place: the file's word, the badge's label, what comes next, complete only at the last -- and the one switch the session page offers: the stage ahead, `Plan` for a blank stage, nothing for a closed session |
+| `web/.../OneOnOne.test.tsx` | A meeting's row: one exposed button and a `...` menu named for the row; **Archive** offered only on a complete, unclosed session; and Archive asking first, then calling `MeetingAgenda -Close` through the bridge |
 | `web/.../ManagerDetailPage.test.tsx` | The read view's Carried-from line: the agent's sentence drawn for `stale`, `missing` and `absent`, and nothing for `ok` or when the fields are absent |
 | `web/.../cliBridge.test.ts` (three of its cases) | `MeetingAgenda`'s argv: `-Date`, `-Type` only for a series that is not the 1:1, then the one switch spelt the script's way |
 | `web/.../sendButton.test.ts` | The send button's three states, including that it is absent rather than disabled when the workflow has no send, and that what goes out is the Agenda and never the self-assessment |
@@ -435,9 +450,7 @@ The three PowerShell suites are registered in `Tests/Test-Toolkit.ps1` (`-SendTe
 | — | An agenda line becomes a card from the terminal only (`NewPrompt -From`): the Meetings page has no "make a card" action on an agenda line, which belongs to the record's reading room, not yet built | [An agenda line becomes a card from the terminal only](../KNOWN-GAPS.md#an-agenda-line-becomes-a-card-from-the-terminal-only) |
 | — | A card made from an agenda line names its record; the record does not name the card. Whether the agenda gets a line back (`-> card K7M2`) is undecided | [An agenda line becomes a card from the terminal only](../KNOWN-GAPS.md#an-agenda-line-becomes-a-card-from-the-terminal-only) |
 
-Three more are described where you meet them, earlier in this document:
-[A meeting row draws its actions side by side](../KNOWN-GAPS.md#a-meeting-row-draws-its-actions-side-by-side),
-[`Config -Set` cannot declare a Teams recipient](../KNOWN-GAPS.md#config--set-cannot-declare-a-teams-recipient) and
+One more is described where you meet it, earlier in this document:
 [A webhook set after the agent started is not seen](../KNOWN-GAPS.md#a-webhook-set-after-the-agent-started-is-not-seen).
 
 ### True by design
