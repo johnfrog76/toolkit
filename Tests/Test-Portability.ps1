@@ -1521,6 +1521,7 @@ $suiteGitShapes = @(
     @{ Why = 'a backslash before a double quote';         Want = " 'a\`"b'";                     Call = { Invoke-P20TestGit rev-parse --sq-quote 'a\"b' } }
     @{ Why = 'a trailing backslash';                      Want = " 'dir\' 'after'";              Call = { Invoke-P20TestGit rev-parse --sq-quote 'dir\' after } }
     @{ Why = 'a trailing backslash after a space';        Want = " 'my dir\' 'after'";           Call = { Invoke-P20TestGit rev-parse --sq-quote 'my dir\' after } }
+    @{ Why = 'a checkout path with a space and a trailing backslash, and the arguments after it'; Want = " '-C' 'C:\My Repos\product\' 'rev-parse' '--show-toplevel'"; Call = { Invoke-P20TestGit rev-parse --sq-quote -C 'C:\My Repos\product\' rev-parse --show-toplevel } }
     @{ Why = 'a wildcard';                                Want = " '*.txt'";                     Call = { Invoke-P20TestGit rev-parse --sq-quote *.txt } }
     @{ Why = 'a variable holding spaces and a quote';     Want = " 'a `"b`" c' 'after'";         Call = { $v = 'a "b" c'; Invoke-P20TestGit rev-parse --sq-quote $v after } }
 )
@@ -1536,6 +1537,67 @@ foreach ($mode in $suiteGitModes) {
         Assert-True "Clause 23: git is handed $($shape.Why), $label" ($got -ceq $shape.Want) "wanted [$($shape.Want)], git got [$got]"
     }
 }
+
+# The same table, through the shipped reader. Invoke-P20TrackerRead takes
+# its arguments as an array, so nothing is parsed on the way in: each row hands
+# it the values the row says git should print, read out of Want, and git has to
+# print them back. Both helpers call one rule, ConvertTo-P20NativeArgument
+# (Scripts/ConvertTo-NativeArgument.ps1), behind one test of the host; a row that
+# passed for one and failed for the other would be a second rule.
+. (Join-Path $pkgRoot 'Scripts/Invoke-TrackerRead.ps1')
+foreach ($mode in $suiteGitModes) {
+    $label = if ($mode) { "with $mode passing" } else { 'as the host passes arguments' }
+    foreach ($shape in $suiteGitShapes) {
+        $values = @([regex]::Matches($shape.Want, "'([^']*)'") | ForEach-Object { $_.Groups[1].Value })
+        $got = & {
+            if ($mode) { $PSNativeCommandArgumentPassing = $mode }
+            (Invoke-P20TrackerRead 'git' (@('rev-parse', '--sq-quote') + $values)).Out -join "`n"
+        }
+        Assert-True "Clause 23: the shipped reader hands git $($shape.Why), $label" ($got -ceq $shape.Want) "wanted [$($shape.Want)], git got [$got]"
+    }
+}
+
+# The rule itself, one row per value it distinguishes, for each edition. This is
+# how Windows PowerShell 5.1's half is read on a host that is not 5.1: only the
+# Desktop edition doubles the backslashes at the end of a value it will wrap.
+$nativeArgumentRows = @(
+    @{ Why = 'an empty value';                              In = '';                        Desktop = '""';                      Core = '""' }
+    @{ Why = 'a plain word';                                In = 'plain';                   Desktop = 'plain';                   Core = 'plain' }
+    @{ Why = 'a value holding a space';                     In = 'my dir';                  Desktop = 'my dir';                  Core = 'my dir' }
+    @{ Why = 'a double quote';                              In = 'x"y';                     Desktop = 'x\"y';                    Core = 'x\"y' }
+    @{ Why = 'a backslash before a double quote';           In = 'a\"b';                    Desktop = 'a\\\"b';                  Core = 'a\\\"b' }
+    @{ Why = 'a trailing backslash and no space';           In = 'dir\';                    Desktop = 'dir\';                    Core = 'dir\' }
+    @{ Why = 'a trailing backslash after a space';          In = 'my dir\';                 Desktop = 'my dir\\';                Core = 'my dir\' }
+    @{ Why = 'two trailing backslashes after a space';      In = 'my dir\\';                Desktop = 'my dir\\\\';              Core = 'my dir\\' }
+    @{ Why = 'a checkout path with a space, ending in one'; In = 'C:\My Repos\product\';   Desktop = 'C:\My Repos\product\\';  Core = 'C:\My Repos\product\' }
+    @{ Why = 'a checkout path with a space, ending in none'; In = 'C:\My Repos\product';   Desktop = 'C:\My Repos\product';    Core = 'C:\My Repos\product' }
+    @{ Why = 'a drive root';                                In = 'C:\';                     Desktop = 'C:\';                     Core = 'C:\' }
+)
+foreach ($row in $nativeArgumentRows) {
+    $asDesktop = ConvertTo-P20NativeArgument $row.In -Desktop $true
+    $asCore = ConvertTo-P20NativeArgument $row.In -Desktop $false
+    Assert-True "Clause 23: the rule gives Windows PowerShell 5.1 $($row.Why) as [$($row.Desktop)]" ($asDesktop -ceq $row.Desktop) "got [$asDesktop]"
+    Assert-True "Clause 23: the rule gives PowerShell 7's Legacy passing $($row.Why) as [$($row.Core)]" ($asCore -ceq $row.Core) "got [$asCore]"
+}
+
+# One rule, in one file. The test helper and the shipped reader each call it
+# behind the same test of the host, and neither defines an escape of its own.
+$nativeRuleFile = 'Scripts/ConvertTo-NativeArgument.ps1'
+$nativeRuleDefiners = @()
+$nativeRuleRead = @(Get-ChildItem (Join-Path $pkgRoot 'Scripts'), (Join-Path $pkgRoot 'Tests'), (Join-Path $pkgRoot 'Config') -Include '*.ps1', '*.psm1' -File -Recurse) + @(Get-ChildItem $pkgRoot -Filter '*.psm1' -File)
+foreach ($f in $nativeRuleRead) {
+    $body = [System.IO.File]::ReadAllText($f.FullName)
+    if ($body -match '(?m)^\s*function\s+(global:)?(ConvertTo-P20NativeArgument|Test-P20LegacyNativeArguments|ConvertTo-P20TestGitArgument|Test-P20TestLegacyNativeArguments)\b') { $nativeRuleDefiners += (Get-RelPath $f) }
+}
+Assert-True "Clause 23: the argument rule is defined in $nativeRuleFile and nowhere else" ((@($nativeRuleDefiners) -join ',') -eq $nativeRuleFile) "read $($nativeRuleRead.Count) files; defined in: $($nativeRuleDefiners -join ', ')"
+$readerText = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'Scripts/Invoke-TrackerRead.ps1'))
+$ruleCall = '(?s)if \(Test-P20LegacyNativeArguments\)\s*\{[^}]*ConvertTo-P20NativeArgument \$_'
+Assert-True 'Clause 23: the test helper and the shipped reader both call the rule, behind the same test of the host' (($suiteGitHelperText -match $ruleCall) -and ($readerText -match $ruleCall)) 'one of them no longer calls ConvertTo-P20NativeArgument behind Test-P20LegacyNativeArguments'
+# The .cmd rule reads an argument as written, before the conversion: converted
+# first, an empty argument would arrive as "" and be refused for its quotes.
+$cmdCheckAt = $readerText.IndexOf('if (Test-P20CmdArgument $argument)')
+$convertAt = $readerText.IndexOf('ConvertTo-P20NativeArgument $_')
+Assert-True 'Clause 23: the shipped reader checks an argument for cmd.exe as written, then converts it' (($cmdCheckAt -gt 0) -and ($convertAt -gt $cmdCheckAt) -and (Test-P20CmdArgument '') -and (-not (Test-P20CmdArgument (ConvertTo-P20NativeArgument '')))) "check at $cmdCheckAt, convert at $convertAt"
 
 # And one that runs a different command without it: the file is named as the
 # branch is, so `git checkout trunk` is a switch that restores nothing and

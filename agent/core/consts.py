@@ -250,6 +250,18 @@ def env_teams_webhook_prefix() -> str:
     return consts()["env"]["teamsWebhookPrefix"]
 
 
+def webhook_recipient_types() -> tuple[str, ...]:
+    """The recipient types that post through their webhook: a Teams channel and a
+    Teams chat, sent the same way. The CLI's gate 2 checks the same list."""
+    return tuple(consts()["communication"]["webhookRecipientTypes"])
+
+
+def deferred_recipient_types() -> tuple[str, ...]:
+    """The recipient types config may name that never post (``person``: a direct
+    message, not built)."""
+    return tuple(consts()["communication"]["deferredRecipientTypes"])
+
+
 def env_test_run_marker() -> str:
     """Set by every test runner; while it is set, nothing posts to a real webhook."""
     return consts()["env"]["testRunMarker"]
@@ -487,7 +499,7 @@ def rituals_triage_route() -> str:
 
 
 def rituals_milestones_route() -> str:
-    """The Milestones tab's route, with the /api prefix: ``/api/ritual/milestones``."""
+    """The Releases tab's route, with the /api prefix: ``/api/ritual/milestones``."""
     return consts()["rituals"]["milestonesRoute"]
 
 
@@ -666,6 +678,21 @@ def startwork_launch_env_flag() -> str:
     return consts()["startWork"]["launchEnvFlag"]
 
 
+def gh_read_limit_open_issues() -> int:
+    """How many open issues one ``gh issue list --state open`` reads."""
+    return int(consts()["ghReads"]["openIssues"])
+
+
+def gh_read_limit_all_issues() -> int:
+    """How many issues, in every state, one ``gh issue list --state all`` reads."""
+    return int(consts()["ghReads"]["allIssues"])
+
+
+def gh_read_limit_labels() -> int:
+    """How many labels one ``gh label list`` reads."""
+    return int(consts()["ghReads"]["labels"])
+
+
 def usage_env_flag() -> str:
     """``claudeUsage`` -- the name of the top-level boolean ``GET /api/env`` carries for
     Claude Code usage on this machine, and the inventory row's key; the System page's
@@ -683,6 +710,13 @@ def usage_readings_folder() -> str:
     readings ``Burn -Reading`` appends to, one file per week per machine. The burn
     route fingerprints it, so a new reading is a miss in its cache."""
     return consts()["usage"]["readingsFolder"]
+
+
+def billing_text() -> dict[str, str]:
+    """Daily's window sentences -- ``halfWindow``, ``notADay`` ({name}, {value}) and
+    ``backwards`` ({since}, {until}): the billing script, the CLI's Daily and
+    ``GET /api/billing`` refuse a window in the same words."""
+    return dict(consts()["billing"]["text"])
 
 
 def startwork_how_we_work_note() -> str:

@@ -88,7 +88,7 @@ web/
 ├── nginx.conf.template   static + /api -> host.docker.internal:${P20_AGENT_PORT}, substituted
 │                        by the nginx image's entrypoint at container start
 ├── docker-compose.yml    127.0.0.1:5174 -> container 5173; passes P20_AGENT_PORT in
-├── tests/smoke.mjs       Playwright, two modes (23 checks off / 30 on), raw `playwright` not @playwright/test
+├── tests/smoke.mjs       Playwright, two modes (28 checks off / 31 on), raw `playwright` not @playwright/test
 ├── tests/smokeStudio.mjs   its --studio cases; smokeStack.mjs starts the servers that mode owns
 ├── tests/smokeMatrix.mjs   its --matrix cases, on the same kind of servers
 ├── tests/smokeA11y.mjs     its --a11y audit, on the same kind of servers
@@ -142,7 +142,7 @@ web/
     │   ├── index.tsx       export solitaireAgileModule: four routes (the standup, triage, milestones, the played view, chromeless), one nav entry, no cards elsewhere
     │   ├── paths.ts        the module's route paths and the played deck's id
     │   ├── api.solitaireAgile.ts   GET /api/ritual/standup, /triage and /milestones ?space=<slug>, read through @consts; POST /api/cmd/Route
-    │   ├── RitualPage      the Standup | Triage | Milestones strip, each tab an address, and the page under it
+    │   ├── RitualPage      the Standup | Triage | Releases strip, each tab an address, and the page under it
     │   ├── StandupPage     Agenda first, then the agent's text verbatim on Detail | Work | Brief: line one the header, the rest monospace, #<n> linked; Copy and Play in the header
     │   ├── AgendaLanes     the Agenda: Since <day> and Waiting on you, tiles from the board's face pieces (or rows), one button a waiting tile
     │   ├── agenda.ts       the Agenda's words: the long day, the lane heading, each tile's one fact
@@ -1132,7 +1132,13 @@ wordmark's default blob, and by no theme.
   it. The subtitle carries the one rule true of every hub -- the cards'
   dates decide -- and the sentence under the week (`billingNote`) carries what is conditional on the
   week that was built: whether git enriched it, and which cards were left off. A CLI instruction in
-  the GUI uses the machine's prefix (`env.cliPrefix`).
+  the GUI uses the machine's prefix (`env.cliPrefix`). The week is a stepper -- *Earlier week*, a
+  label, *Later week* -- that opens on "This week" and steps back a week at a time ("Last week",
+  then "Week of 19 Oct"); *Later week* is disabled on this week. This week and last week ask the
+  route `week=current|last`, so the script works them out; two or more back, the page sends that
+  week's Monday to Friday as `since`/`until`, worked out in local time (`billingWeek.ts`, with a
+  Sunday belonging to the week before, as the script has it). The CLI's `Daily -Since -Until` prints
+  the same week's copy text.
 
 ## The avatar menu, and arriving at a setting
 
@@ -1856,6 +1862,7 @@ paragraph:
 | `src/modules/ado/TrackerBadge.test.tsx` | The card's tracker chip as a table: `github` wears **gh**, `ado` wears **ado**, and `none`, an absent field (an older agent) or an unknown word wear nothing |
 | `src/modules/ado/Board.badge.test.tsx` | The board's card face in a mixed Space: a GitHub-born, an ADO-born and a custom card each wear their own chip, the custom one none |
 | `src/modules/ado/FilterDrawer.test.tsx` | The drawer's linkedness row: drawn in a mixed Space with counts from the cards, a badge sets its filter and the active one sets All back, absent where every card is custom, kept while a filter is active |
+| `src/modules/ado/Billing.test.tsx` | Daily Activity's week stepper: it opens on this week with *Later week* disabled, one step back asks `week=last`, three back ask that week's Monday to Friday as `since`/`until`; Monday found as the script finds it (a Sunday ends the week before) and a week in another year named with its year; the agent's `error` shown as the week that could not be built |
 | `src/modules/ado/billingNote.test.ts` | The sentence under the week on Daily Activity: what it was built from, and the cards that are NOT on it and why -- singular and plural, silence for a count of zero, and the git clause only for a hub that has git |
 | `src/modules/ado/useLandCard.test.tsx` | Land asks first, naming the card; Land runs `POST /api/cmd/Land` with the card's file and says once that it landed; a refusal keeps the confirm open with the verb's own sentence; Cancel runs nothing |
 | `src/modules/ado/useBillableToggle.test.ts` | The toggle offers the opposite of what the card says now, and says what the change means for Daily |
@@ -1929,7 +1936,8 @@ the filter changes, the choice kept after a reload, a fresh browser context open
 **`--matrix`** (`npm run smoke:matrix`) runs on the same kind of servers, over `Tests/fixtures/hub`:
 each module flag alone on -- its nav entry, page, data and source there, every other module's absent and
 never requested, one new browser context per pass, the cases being `docs/SCENARIOS.md`'s "The nav, by
-module" rows; `flipCase` on the Lounge; and each choice kept in browser storage (the Spaces filter, the
+module" rows; the board's lanes by tracker, four on the fixture's Azure DevOps address before the passes and
+five, Backlog first, on the GitHub one after them; `flipCase` on the Lounge; and each choice kept in browser storage (the Spaces filter, the
 Reminders filter, the theme, the Lounge's tic-tac-toe) in a fresh context and in one whose
 `localStorage` and `sessionStorage` throw on access. Chromium only, and opt-in because every flag write
 is a `Config` run through the bridge.

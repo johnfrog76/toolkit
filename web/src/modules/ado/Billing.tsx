@@ -14,7 +14,12 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { RefreshButton } from "../../shared/RefreshButton";
-import { CopyRegular, CheckmarkRegular } from "@fluentui/react-icons";
+import {
+  CopyRegular,
+  CheckmarkRegular,
+  ChevronLeftRegular,
+  ChevronRightRegular,
+} from "@fluentui/react-icons";
 import { CardSpinner } from "../../shared/CardSpinner";
 import { HairlineDivider } from "../../shared/HairlineDivider";
 import { useGetBillingQuery } from "./api.ado";
@@ -23,6 +28,7 @@ import { markdownPlugins } from "../../shared/markdownPlugins";
 import { CalendarLtrRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
 import { billingNote } from "./billingNote";
+import { dailyWeek } from "./billingWeek";
 import { copyText as copyToClipboard } from "../../shared/copyText";
 
 const useStyles = makeStyles({
@@ -96,6 +102,7 @@ const useStyles = makeStyles({
     borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
   },
   headerHint: { color: tokens.colorNeutralForeground3 },
+  weekLabel: { minWidth: "7.5rem", textAlign: "center" as const, whiteSpace: "nowrap" as const },
   note: { color: tokens.colorNeutralForeground3, flex: "1 1 auto", minWidth: 0 },
   // Visually hidden, still in the accessibility tree: the live region.
   srOnly: {
@@ -130,9 +137,11 @@ function dayToMarkdown(raw: string): string {
 
 export function Billing() {
   const styles = useStyles();
-  const [week, setWeek] = useState("current");
+  // Weeks back from this one: 0 is this week, 1 last week, and so on.
+  const [back, setBack] = useState(0);
+  const week = dailyWeek(back);
   const [format, setFormat] = useState<"normal" | "compact">("normal");
-  const { data, isLoading, isFetching, isError, refetch } = useGetBillingQuery(week);
+  const { data, isLoading, isFetching, isError, refetch } = useGetBillingQuery(week.arg);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   // What a screen reader is told a copy did. The button's own label flips to
   // "Copied!" for two seconds, but a label change on the control you just
@@ -169,15 +178,26 @@ export function Billing() {
             <option value="normal">Full lines</option>
             <option value="compact">Short lines</option>
           </Select>
-          <Select
+          <Button
             size="small"
-            value={week}
-            aria-label="Which week"
-            onChange={(_, d) => setWeek(d.value)}
-          >
-            <option value="current">This Week</option>
-            <option value="last">Last Week</option>
-          </Select>
+            appearance="subtle"
+            icon={<ChevronLeftRegular />}
+            aria-label="Earlier week"
+            title="Earlier week"
+            onClick={() => setBack((b) => b + 1)}
+          />
+          <Caption1 className={styles.weekLabel} aria-live="polite">
+            {week.label}
+          </Caption1>
+          <Button
+            size="small"
+            appearance="subtle"
+            icon={<ChevronRightRegular />}
+            aria-label="Later week"
+            title="Later week"
+            disabled={back === 0}
+            onClick={() => setBack((b) => Math.max(0, b - 1))}
+          />
           <RefreshButton
             onClick={refetch}
             isFetching={isFetching && !isLoading}
@@ -222,7 +242,10 @@ export function Billing() {
         <EmptyState
           icon={<CalendarLtrRegular />}
           title="Nothing recorded for this week"
-          detail={["A day fills in as you work on cards. Try last week, above.", billingNote(data)]
+          detail={[
+            "A day fills in as you work on cards. Try an earlier week, above.",
+            billingNote(data),
+          ]
             .filter(Boolean)
             .join(" ")}
         />

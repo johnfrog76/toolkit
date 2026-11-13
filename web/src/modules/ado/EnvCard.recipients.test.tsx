@@ -170,38 +170,51 @@ describe("the Environment card's Teams recipients", () => {
     // A fresh registry for the whole render, with a stand-in for the rows'
     // chunk whose factory runs only if this render fetches it. Testing Library
     // registers hooks when it loads, so this test mounts the card itself.
+    // Everything this case sets up is undone in the finally blocks, so a
+    // failing assertion leaves no mock, element or flag for the cases after it.
     rowsChunkLoaded = false;
     env = { ...base, features: { communication: false }, communication };
-    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const actHost = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
+    const hadActFlag = "IS_REACT_ACT_ENVIRONMENT" in actHost;
+    const actFlagBefore = actHost.IS_REACT_ACT_ENVIRONMENT;
     const host = document.createElement("div");
-    document.body.appendChild(host);
-    jest.doMock("../communication/EnvRecipients", () => {
-      rowsChunkLoaded = true;
-      return { EnvRecipients: () => null };
-    });
-    await jest.isolateModulesAsync(async () => {
-      const React = await import("react");
-      const { createRoot } = await import("react-dom/client");
-      const { EnvCard: FreshCard } = await import("./EnvCard");
-      const root = createRoot(host);
-      await React.act(async () => {
-        root.render(React.createElement(FreshCard));
-        await new Promise((resolve) => setTimeout(resolve, 50));
+    try {
+      actHost.IS_REACT_ACT_ENVIRONMENT = true;
+      document.body.appendChild(host);
+      jest.doMock("../communication/EnvRecipients", () => {
+        rowsChunkLoaded = true;
+        return { EnvRecipients: () => null };
       });
-      expect(host.textContent).toContain("Linux");
-      for (const text of [
-        "Teams messages",
-        "Your manager",
-        "Team Channel",
-        "Every Space",
-        "This Space",
-      ]) {
-        expect(host.textContent).not.toContain(text);
-      }
-      await React.act(async () => root.unmount());
-    });
-    jest.dontMock("../communication/EnvRecipients");
-    host.remove();
+      await jest.isolateModulesAsync(async () => {
+        const React = await import("react");
+        const { createRoot } = await import("react-dom/client");
+        const { EnvCard: FreshCard } = await import("./EnvCard");
+        const root = createRoot(host);
+        try {
+          await React.act(async () => {
+            root.render(React.createElement(FreshCard));
+            await new Promise((resolve) => setTimeout(resolve, 50));
+          });
+          expect(host.textContent).toContain("Linux");
+          for (const text of [
+            "Teams messages",
+            "Your manager",
+            "Team Channel",
+            "Every Space",
+            "This Space",
+          ]) {
+            expect(host.textContent).not.toContain(text);
+          }
+        } finally {
+          await React.act(async () => root.unmount());
+        }
+      });
+    } finally {
+      jest.dontMock("../communication/EnvRecipients");
+      host.remove();
+      if (hadActFlag) actHost.IS_REACT_ACT_ENVIRONMENT = actFlagBefore;
+      else delete actHost.IS_REACT_ACT_ENVIRONMENT;
+    }
     expect(rowsChunkLoaded).toBe(false);
   });
 });

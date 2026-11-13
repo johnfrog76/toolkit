@@ -4,7 +4,7 @@ import type { MilestoneStage } from "../ado/milestones";
 import { hasSeen, markSeen } from "./celebrate";
 
 // The award (docs/modules/solitaire-agile.md, "Milestones: the tab and the award"):
-// which reached milestone the Milestones tab congratulates next, what its one line
+// which reached milestone the Releases tab congratulates next, what its one line
 // says, and the browser's mark that it has been. Pure but for the mark, and kept
 // out of the dialog so a test can read the rule without drawing a canvas.
 //
