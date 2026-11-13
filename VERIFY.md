@@ -1283,6 +1283,13 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   reader hands git ...` line, `a checkout path with a space and a trailing backslash, and the arguments after it`
   among them. Those rows are `Invoke-P20TrackerRead` escaping for 5.1's own command line, which no other host
   builds; the `ps51` job runs both suites on 5.1 too.
+- [ ] **The agent's checkout tests pass under Python on Windows (#410).** On the Windows PC, from the package root,
+  run `py -3 -m pytest Tests/test_space_checkout.py`. It reads `13 passed`, with no failure naming `/srv/clones/r`:
+  the shared table's absolute-path rows carry `os`, and on Windows the `posix` rows are not run and the two
+  `windows` rows (`C:\clones\r`, and the same with spaces around it) are. Then `tkTestToolkit -Design` in `pwsh` and
+  in `powershell` (5.1): its lines `a path written 'C:\clones\r' reads as 'C:\clones\r'` pass and none names
+  `/srv/clones/r`. The two Windows CI jobs run the Design suite; no CI job runs this pytest file on Windows, so this
+  row is the only place the agent's half reads the `windows` rows live.
 
 ## Recording a run
 

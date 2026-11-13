@@ -452,6 +452,8 @@ the host in any case and a trailing `.git` optional. A Space with several projec
 it has no clone to find. The patterns are `consts.json` `regex.adoOrigin*` and `regex.adoOrg*`. The agent asks the same question of the configured path alone for the Design tab
 (`agent/core/checkout.py`, on every `GET /api/design`, as `checkout`), and never searches; the path and
 origin rules (GitHub's and Azure DevOps's) are one table both halves assert, `Tests/fixtures/space-checkout/table.json`.
+What counts as absolute is the platform's, so the table's absolute-path rows carry `os` (`posix` for `/srv/clones/r`,
+`windows` for `C:\clones\r`) and each suite runs the rows for the platform it is on; the `~` and relative rows run everywhere.
 
 Unset, a product row keeps its one link out, **Open on GitHub**, and the Design tab's foot names this setting;
 set to a folder that is not a clone of the Space's repository, the foot says why. `tkEnv` lists it under
