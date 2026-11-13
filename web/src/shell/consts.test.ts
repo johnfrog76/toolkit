@@ -99,6 +99,9 @@ describe("consts.json", () => {
     // Where the machine's test history goes instead of its per-machine folder:
     // the test runners set it, the CLI and the agent read it.
     expect(consts.env.testHistoryDir).toBe("P20_TEST_HISTORY_DIR");
+    // The instant the CLI's Standup reads the clock as, in a test run only. The
+    // web never reads it; the name is stated on all three sides.
+    expect(consts.env.standupAsOf).toBe("P20_STANDUP_AS_OF");
     // The line a send writes under ## Sent, from the web button and from SendTeams -Session.
     expect(STAMPS.sent).toBe("Sent to");
     // Organize's reminders: the footer lines, the due pattern, and the two word lists.
@@ -580,6 +583,7 @@ describe("no half retypes a contract literal", () => {
     ["regex.commitBullet", consts.regex.commitBullet],
     ["env.agentPort", consts.env.agentPort],
     ["env.testRunMarker", consts.env.testRunMarker],
+    ["env.standupAsOf", consts.env.standupAsOf],
     ["env.activeSpace", consts.env.activeSpace],
     ["env.features", consts.env.features],
     // Solitaire Agile: the route, and the distinctive words of the rendering --

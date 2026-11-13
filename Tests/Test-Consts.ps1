@@ -139,6 +139,7 @@ $expected = [ordered]@{
     'env.agentPort'           = 'P20_AGENT_PORT'
     'env.teamsWebhookPrefix'  = 'TEAMS_WEBHOOK_'
     'env.testRunMarker'       = 'P20_TEST_RUN'
+    'env.standupAsOf'         = 'P20_STANDUP_AS_OF'
     'agent.bindHost'          = '127.0.0.1'
     'agent.apiPrefix'         = '/api'
     'agent.responseHeaders'   = 'Content-Security-Policy=default-src ''self''; script-src ''self''; style-src ''self'' ''unsafe-inline''; img-src ''self'' data: blob: https:; media-src ''self'' blob:; frame-src ''self''; frame-ancestors ''none''; object-src ''none''; base-uri ''none'',X-Frame-Options=DENY,X-Content-Type-Options=nosniff,Referrer-Policy=no-referrer'
@@ -481,6 +482,8 @@ $guarded = [ordered]@{
     'env.agentPort'          = 'P20_AGENT_PORT'
     'env.activeSpace'        = 'P20_ACTIVE_SPACE'
     'env.features'           = 'P20_FEATURES'
+    # Get-Standup.ps1 and Hide-RunOverrides.ps1 read the name from (Get-P20Consts).env.standupAsOf.
+    'env.standupAsOf'        = 'P20_STANDUP_AS_OF'
     'stamps.due'             = '**Due:**'
     'stamps.cover'           = '**Cover:**'
     'stamps.before'          = '**Before:**'

@@ -165,6 +165,7 @@ module and you add a mock line to every one of these files.
 > The same goes for the per-shell overrides `P20_ACTIVE_SPACE` and `PROMPTS_ROOT` (`consts.json`
 > `env.activeSpace`, `env.promptsRoot`): the runners remove them for the run and put them back, so a
 > shell that holds them reads the same as one that does not; a suite that tests an override sets it itself.
+> `P20_STANDUP_AS_OF` (`env.standupAsOf`), the clock `Standup` reads under the run marker, goes with them.
 
 **Four test runners**, one per half plus one for the two together. Run the ones your change touches:
 

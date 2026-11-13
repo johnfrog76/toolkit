@@ -838,9 +838,11 @@ $utf8 = New-Object System.Text.UTF8Encoding($false)
 # an expectation built from this process's clock is a second reading of now, and
 # the two disagree when a run crosses midnight. The suite reads the clock once,
 # to the second, hands that text to every child (Invoke-Standup) and builds every
-# expectation from it. P20_STANDUP_AS_OF in the suite's own environment names the
-# instant instead, which is how the run is put a second before midnight.
-$pin = ConvertTo-P20RitualTime ([string]$env:P20_STANDUP_AS_OF)
+# expectation from it. The name is the contract's (consts.json env.standupAsOf).
+# Set in the environment of a suite run on its own, it names the instant instead,
+# which is how a run is put a second before midnight; a runner removes it first.
+$pinName = [string]$consts.env.standupAsOf
+$pin = ConvertTo-P20RitualTime ([string][System.Environment]::GetEnvironmentVariable($pinName))
 if ($null -eq $pin) { $pin = [DateTimeOffset]::Now }
 $pinText = Format-P20RitualTime $pin
 $pin = ConvertTo-P20RitualTime $pinText
@@ -858,8 +860,8 @@ function Invoke-Standup {
     $q = { param($p) $p -replace "'", "''" }
     # One instant for the verb and the expectation: the child reads the suite's
     # pin and not its own clock, which the verb honours only in a test run.
-    $clock = "`$env:$([string]$consts.env.testRunMarker) = '1'`n`$env:P20_STANDUP_AS_OF = '$AsOf'`n"
-    if (-not $Marker) { $clock = "Remove-Item Env:\$([string]$consts.env.testRunMarker) -ErrorAction SilentlyContinue`n`$env:P20_STANDUP_AS_OF = '$AsOf'`n" }
+    $clock = "`$env:$([string]$consts.env.testRunMarker) = '1'`n`$env:$pinName = '$AsOf'`n"
+    if (-not $Marker) { $clock = "Remove-Item Env:\$([string]$consts.env.testRunMarker) -ErrorAction SilentlyContinue`n`$env:$pinName = '$AsOf'`n" }
     $down = ''
     if ($GhDown) { $down = "`$env:P20_TEST_GH_DOWN = '1'`n" }
     $body = $down + $clock + @"
