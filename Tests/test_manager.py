@@ -606,6 +606,30 @@ class EnvReportsGateTwo(ManagerRouteTestCase):
         entry = next(r for r in self._block()["recipients"] if r["key"] == "manager")
         self.assertEqual(entry["scope"], "managerWorkflow")
 
+    def test_a_chat_recipient_is_reported_with_its_type_and_gate(self):
+        # A Teams chat (type chat) is a recipient like a channel: /env carries
+        # its own type word, the variable it reads, and whether that is set.
+        from agent.communication import comms
+
+        block = {
+            "postRetroSummary": True,
+            "communication": {
+                "recipients": {
+                    "manager": {"type": "channel", "webhookEnv": "TEAMS_WEBHOOK_MANAGER"},
+                    "mom": {"type": "chat", "display": "Mom", "webhookEnv": "TEAMS_WEBHOOK_MOM"},
+                }
+            },
+        }
+        with mock.patch.object(comms, "manager_workflow", return_value=block):
+            entry = next(r for r in self._block()["recipients"] if r["key"] == "mom")
+            self.assertEqual(entry["type"], "chat")
+            self.assertEqual(entry["display"], "Mom")
+            self.assertEqual(entry["webhookEnv"], "TEAMS_WEBHOOK_MOM")
+            self.assertFalse(entry["configured"])
+            with mock.patch.dict(os.environ, {"TEAMS_WEBHOOK_MOM": DUMMY_WEBHOOK}):
+                entry = next(r for r in self._block()["recipients"] if r["key"] == "mom")
+            self.assertTrue(entry["configured"])
+
     def test_post_retro_summary_is_reported(self):
         self.assertTrue(self._block()["postRetroSummary"])
 

@@ -809,6 +809,114 @@ catch {
 }
 finally { Remove-Item $box.Root -Recurse -Force -ErrorAction SilentlyContinue }
 
+# -- A Teams recipient: declared through Config, never by hand ------------------
+# Two patterns: managerWorkflow.communication.recipients.<key>.<field> is this
+# machine's, and spaces.<slug>.communication.recipients.<key>.<field> is the
+# Space's. The rest of managerWorkflow stays the team's -- the trap is that the
+# machine pattern row would hide the team's managerWorkflow row.
+Write-Host ''
+Write-Host '-- A Teams recipient: two patterns, one writer ----------' -ForegroundColor Cyan
+$recipientRows = @($schemaRows | Where-Object { $_.key -like 'managerWorkflow.communication.recipients.<key>.*' })
+Assert-Equal 'the schema has a machine row per recipient field' 'type,display,webhookEnv' (@($recipientRows | ForEach-Object { ($_.key -split '\.')[-1] }) -join ',')
+Assert-True 'and every one is the machine''s' (@($recipientRows | Where-Object { $_.scope -ne 'machine' }).Count -eq 0)
+$typeRow = @($recipientRows | Where-Object { $_.key -like '*.type' })[0]
+$recipientConsts = (Get-Content (Join-Path $pkgRoot 'consts.json') -Raw | ConvertFrom-Json).communication
+Assert-Equal 'a type takes the contract''s words, webhook types then deferred' `
+    ((@($recipientConsts.webhookRecipientTypes) + @($recipientConsts.deferredRecipientTypes)) -join ', ') (@($typeRow.allowed) -join ', ')
+Assert-Equal 'which are channel, chat and person' 'channel, chat, person' (@($typeRow.allowed) -join ', ')
+Assert-True 'managerWorkflow itself is still the team''s row' `
+    (@($schemaRows | Where-Object { $_.key -eq 'managerWorkflow' -and $_.scope -eq 'default' }).Count -eq 1)
+Assert-True 'and aliases is still not a team row' (@($schemaRows | Where-Object { $_.key -eq 'aliases' }).Count -eq 0)
+Assert-True 'the Space''s recipient rows are hub.json''s' `
+    (@($schemaRows | Where-Object { $_.key -like 'spaces.<slug>.communication.recipients.<key>.*' -and $_.scope -eq 'org' }).Count -eq 3)
+$box = New-ConfigSandbox
+try {
+    Set-HubRoot $box
+    foreach ($pair in @('managerWorkflow.communication.recipients.mom.type=chat',
+            'managerWorkflow.communication.recipients.mom.display=Mom',
+            'managerWorkflow.communication.recipients.mom.webhookEnv=TEAMS_WEBHOOK_MOM')) {
+        $r = Invoke-Config $box @('-Set', $pair)
+        Assert-Equal "-Set $($pair.Split('=')[0].Split('.')[-1]) of a recipient exits 0" 0 $r.ExitCode $r.Output
+    }
+    $local = Get-LocalConfigText $box | ConvertFrom-Json
+    $mom = $local.managerWorkflow.communication.recipients.mom
+    Assert-Equal 'the type lands in config.local.json' 'chat' $mom.type
+    Assert-Equal 'and the display' 'Mom' $mom.display
+    Assert-Equal 'and the variable''s NAME' 'TEAMS_WEBHOOK_MOM' $mom.webhookEnv
+    Assert-True 'and nothing of it reaches hub.json' ((Get-HubText $box) -notlike '*TEAMS_WEBHOOK_MOM*') (Get-HubText $box)
+    Assert-True 'and the shipped recipient is not copied in beside it' ($null -eq $local.managerWorkflow.communication.recipients.PSObject.Properties['manager'])
+    $upper = Invoke-Config $box @('-Set', 'managerWorkflow.communication.recipients.mom.type=CHAT')
+    Assert-Equal 'a type in other capitals is accepted' 0 $upper.ExitCode $upper.Output
+    Assert-Equal 'and written as the contract spells it' 'chat' (Get-LocalConfigText $box | ConvertFrom-Json).managerWorkflow.communication.recipients.mom.type
+
+    $pager = Invoke-Config $box @('-Set', 'managerWorkflow.communication.recipients.mom.type=pager')
+    Assert-Equal 'an unknown type is refused' 2 $pager.ExitCode
+    Assert-Contains 'naming the allowed values' $pager.Output 'channel, chat, person'
+    $url = Invoke-Config $box @('-Set', 'managerWorkflow.communication.recipients.mom.webhookEnv=https://example.invalid/hook')
+    Assert-Equal 'a URL where the variable''s name goes is refused' 2 $url.ExitCode
+    Assert-True 'and the refusal does not echo the URL' ($url.Output -notlike '*example.invalid*') $url.Output
+    Assert-True 'and no file carries it' ((Get-LocalConfigText $box) -notlike '*example.invalid*')
+    $plain = Invoke-Config $box @('-Set', 'managerWorkflow.communication.recipients.mom.webhookEnv=MOM_HOOK')
+    Assert-Equal 'a variable without the webhook prefix is refused' 2 $plain.ExitCode
+    Assert-Contains 'naming the prefix' $plain.Output 'TEAMS_WEBHOOK_<NAME>'
+    $field = Invoke-Config $box @('-Set', 'managerWorkflow.communication.recipients.mom.colour=blue')
+    Assert-Equal 'a field a recipient does not have is refused' 2 $field.ExitCode
+    Assert-Contains 'naming the fields' $field.Output 'type, display, webhookEnv'
+    foreach ($bad in @('managerWorkflow.communication.recipients.a.b.type', 'managerWorkflow.communication.recipients.mom', 'managerWorkflow.communication.recipients')) {
+        $r = Invoke-Config $box @('-Set', "$bad=x")
+        Assert-Equal "'$bad' is refused for its shape" 2 $r.ExitCode
+        Assert-Contains 'naming the shape' $r.Output 'recipients.<key>.<field>'
+    }
+    $digit = Invoke-Config $box @('-Set', 'managerWorkflow.communication.recipients.9x.type=chat')
+    Assert-Equal 'a key that starts with a digit is refused' 2 $digit.ExitCode
+    Assert-Contains 'saying what a key is' $digit.Output 'cannot be a recipient''s key'
+
+    # The other side of the trap: the rest of managerWorkflow is the team's.
+    foreach ($teamKey in @('managerWorkflow.retroChannel', 'managerWorkflow', 'managerWorkflow.communication.other')) {
+        $r = Invoke-Config $box @('-Set', "$teamKey=x")
+        Assert-Equal "'$teamKey' is refused" 2 $r.ExitCode
+        Assert-Contains 'as the team''s, not as unknown' $r.Output 'config.default.json, which this command never writes'
+    }
+
+    # The Space's own: hub.json, or -Local for this machine's patch.
+    $team = Invoke-Config $box @('-Set', 'spaces.azure-demo.communication.recipients.team.type=channel')
+    Assert-Equal 'a Space''s recipient is accepted' 0 $team.ExitCode $team.Output
+    $demo = Get-HubSpace $box 'azure-demo'
+    Assert-Equal 'and nests under the Space''s entry in hub.json' 'channel' $demo.communication.recipients.team.type
+    $teamLocal = Invoke-Config $box @('-Set', 'spaces.azure-demo.communication.recipients.team.display=Team', '-Local')
+    Assert-Equal 'with -Local it is accepted' 0 $teamLocal.ExitCode $teamLocal.Output
+    Assert-Equal 'and lands in this machine''s patch' 'Team' (Get-LocalConfigText $box | ConvertFrom-Json).spaces.'azure-demo'.communication.recipients.team.display
+    $spaceBad = Invoke-Config $box @('-Set', 'spaces.azure-demo.communication.recipients.team.type=pager')
+    Assert-Equal 'a Space''s recipient takes the same types' 2 $spaceBad.ExitCode
+    Assert-Contains 'and names them' $spaceBad.Output 'channel, chat, person'
+    $spaceShape = Invoke-Config $box @('-Set', 'spaces.azure-demo.communication.recipients.team=x')
+    Assert-Equal 'a Space''s recipient with no field is refused' 2 $spaceShape.ExitCode
+    Assert-Contains 'naming the shape' $spaceShape.Output 'spaces.<slug>.communication.recipients.<key>.<field>'
+
+    # -Unset one field, then the last: the recipient goes with its last field.
+    $un = Invoke-Config $box @('-Unset', 'managerWorkflow.communication.recipients.mom.display')
+    Assert-Equal '-Unset of one field exits 0' 0 $un.ExitCode $un.Output
+    $mom = (Get-LocalConfigText $box | ConvertFrom-Json).managerWorkflow.communication.recipients.mom
+    Assert-True 'and takes only that field' ($null -eq $mom.PSObject.Properties['display'] -and $mom.type -eq 'chat') (Get-LocalConfigText $box)
+    [void](Invoke-Config $box @('-Unset', 'managerWorkflow.communication.recipients.mom.type'))
+    [void](Invoke-Config $box @('-Unset', 'managerWorkflow.communication.recipients.mom.webhookEnv'))
+    $recips = (Get-LocalConfigText $box | ConvertFrom-Json).managerWorkflow.communication.recipients
+    Assert-True 'the recipient goes with its last field' ($null -eq $recips.PSObject.Properties['mom']) (Get-LocalConfigText $box)
+    [void](Invoke-Config $box @('-Unset', 'spaces.azure-demo.communication.recipients.team.type', '-Hub'))
+    $demo = Get-HubSpace $box 'azure-demo'
+    Assert-True 'and a Space''s, from hub.json' ($null -eq $demo.communication.recipients.PSObject.Properties['team']) (Get-HubText $box)
+
+    $schema = Invoke-Config $box @('-Schema')
+    Assert-Contains '-Schema prints the machine pattern' $schema.Output 'managerWorkflow.communication.recipients.<key>.type'
+    Assert-Contains 'and the Space''s' $schema.Output 'spaces.<slug>.communication.recipients.<key>.type'
+    $list = Invoke-Config $box @('-List', '-AsJson')
+    Assert-True '-List (the web''s form) lists no pattern row' ($list.Output -notlike '*<key>*') $list.Output
+}
+catch {
+    Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally { Remove-Item $box.Root -Recurse -Force -ErrorAction SilentlyContinue }
+
 # SwitchSpace Status offers what the rule says, and the switch is the Config verb's.
 $box = New-ConfigSandbox
 try {

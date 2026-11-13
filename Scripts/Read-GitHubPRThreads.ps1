@@ -19,7 +19,10 @@
 #                        comment, so a thread is "the root and every comment
 #                        that names it".
 #   issues/<n>/comments  the conversation tab. A pull request is also an issue;
-#                        these comments have no threads, so each is its own.
+#                        these comments have no threads, so each is its own --
+#                        except ReplyPR's answer to one, which opens with the
+#                        reply lead (New-P20GitHubReplyLead) and is read back
+#                        into the thread it names, as a follow-up.
 #   pulls/<n>/reviews    a review's own summary text ("Request changes: ...").
 #                        Each submitted review with text is its own thread.
 #
@@ -76,6 +79,52 @@ function New-P20GitHubComment {
     }
 }
 
+# -- The reply lead: the one shape ReplyPR writes and GetPRComments reads -----------
+#
+# The conversation tab has no "reply to", so ReplyPR answers a conversation
+# comment or a review summary with a new comment whose FIRST line names what it
+# answers: "In reply to <html_url>:", or "In reply to comment <id>:" when GitHub
+# gave no URL. The writer and the reader are the two functions below and nothing
+# else, so the shape cannot drift between them.
+
+function New-P20GitHubReplyLead {
+    # The lead line, without the blank line and the reply that follow it.
+    param([AllowEmptyString()][AllowNull()][string]$Url, [long]$Id)
+    if ($Url) { return "In reply to $($Url):" }
+    return "In reply to comment $($Id):"
+}
+
+function ConvertFrom-P20GitHubReplyLead {
+    <#
+        What a conversation comment's lead names, read from its FIRST line only:
+        @{ Kind = 'conversation' | 'summary' | '' (the bare "comment <id>" form,
+        either); Id = [long]; Rest = the body after the lead and its blank line },
+        or $null when the first line is not a lead. The trailing colon is part of
+        the shape, so prose that merely starts "In reply to" is not read as one.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Body)
+    $text = "$Body"
+    $first = $text
+    $rest = ''
+    $nl = $text.IndexOf("`n")
+    if ($nl -ge 0) { $first = $text.Substring(0, $nl); $rest = $text.Substring($nl + 1) }
+    $first = $first.TrimEnd("`r")
+    # The two forms New-P20GitHubReplyLead writes; a URL to anything but a
+    # conversation comment or a review is not a lead.
+    $m = [regex]::Match($first, '^In reply to (?:https://(?:www\.)?github\.com/\S+?#(issuecomment|pullrequestreview)-(\d+)|comment (\d+)):[ \t]*$')
+    if (-not $m.Success) { return $null }
+    $kind = ''
+    $id = 0
+    if ($m.Groups[1].Success) {
+        $kind = 'conversation'
+        if ($m.Groups[1].Value -eq 'pullrequestreview') { $kind = 'summary' }
+        $id = [long]$m.Groups[2].Value
+    }
+    else { $id = [long]$m.Groups[3].Value }
+    $rest = $rest -replace '^\r?\n', ''
+    return [PSCustomObject]@{ Kind = $kind; Id = $id; Rest = $rest }
+}
+
 function ConvertTo-P20GitHubThreads {
     <#
         The three payloads (arrays of the REST objects, any of them empty) as
@@ -87,6 +136,13 @@ function ConvertTo-P20GitHubThreads {
         shape Get-P20ThreadDelta and the card writer already read. `status`
         says WHAT the thread is: GitHub's REST API does not carry whether an
         inline thread is resolved, so no active/fixed word is invented for it.
+
+        A conversation comment that opens with the reply lead and names a
+        conversation comment or review summary that IS a thread here is not a
+        thread of its own: it is appended to that thread's comments, marked
+        foldedReply, and Total does not count it. A reply to such a reply lands
+        in the same thread. A lead whose target is absent -- deleted, a Bot
+        comment, a review with no text -- leaves the reply its own thread.
     #>
     param(
         [AllowNull()][AllowEmptyCollection()][object[]]$ReviewComments = @(),
@@ -96,6 +152,8 @@ function ConvertTo-P20GitHubThreads {
     $threads = @()
     $nonActionable = @()
     $total = 0
+    # 'conversation:<id>' / 'summary:<id>' -> the thread a reply naming that id joins.
+    $replyTarget = @{}
 
     # -- Inline review comments, grouped into their threads ----------------------
     $byRoot = [ordered]@{}
@@ -129,27 +187,50 @@ function ConvertTo-P20GitHubThreads {
         if ($state -eq 'PENDING') { continue }   # an unsent draft, visible to its author only
         if ([string]::IsNullOrWhiteSpace([string]$r.body)) { continue }   # a vote, not a remark
         $total++
-        $threads += [PSCustomObject]@{
+        $summary = [PSCustomObject]@{
             id            = [long]$r.id
             status        = ('review, ' + ($state.ToLowerInvariant() -replace '_', ' '))
             threadContext = $null
             properties    = $null
             comments      = @(New-P20GitHubComment $r.id $r.user $r.body $r.submitted_at)
         }
+        $threads += $summary
+        $replyTarget['summary:' + [string]$summary.id] = $summary
     }
 
-    # -- The conversation tab: each comment its own thread ------------------------
-    foreach ($c in @($IssueComments | Where-Object { $_ })) {
+    # -- The conversation tab: each comment its own thread, but a reply -----------
+    # In the order they were written, so a reply's target is always seen first.
+    $conversation = @($IssueComments | Where-Object { $_ } | Sort-Object -Property @{ Expression = { ConvertTo-P20GitHubDate $_.created_at } }, @{ Expression = { [long]$_.id } })
+    foreach ($c in $conversation) {
         if ([string]::IsNullOrWhiteSpace([string]$c.body)) { continue }
+        if (Test-P20GitHubBot $c.user) { $total++; $nonActionable += [long]$c.id; continue }
+        $comment = New-P20GitHubComment $c.id $c.user $c.body $c.created_at
+        $lead = ConvertFrom-P20GitHubReplyLead -Body ([string]$c.body)
+        $target = $null
+        if ($lead) {
+            $kinds = @('conversation', 'summary')
+            if ($lead.Kind) { $kinds = @($lead.Kind) }
+            foreach ($k in $kinds) {
+                $key = $k + ':' + [string]$lead.Id
+                if ($replyTarget.ContainsKey($key)) { $target = $replyTarget[$key]; break }
+            }
+        }
+        if ($target) {
+            $comment | Add-Member -NotePropertyName foldedReply -NotePropertyValue $true
+            $target.comments = @($target.comments) + $comment
+            $replyTarget['conversation:' + [string]$comment.id] = $target
+            continue
+        }
         $total++
-        if (Test-P20GitHubBot $c.user) { $nonActionable += [long]$c.id; continue }
-        $threads += [PSCustomObject]@{
+        $own = [PSCustomObject]@{
             id            = [long]$c.id
             status        = 'conversation'
             threadContext = $null
             properties    = $null
-            comments      = @(New-P20GitHubComment $c.id $c.user $c.body $c.created_at)
+            comments      = @($comment)
         }
+        $threads += $own
+        $replyTarget['conversation:' + [string]$own.id] = $own
     }
 
     # In the order they were written, whichever channel they came through.

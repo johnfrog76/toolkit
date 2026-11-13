@@ -40,6 +40,9 @@ from .consts import (
     folder_archive,
     folder_backlog,
     folder_current,
+    gh_read_limit_all_issues,
+    gh_read_limit_labels,
+    gh_read_limit_open_issues,
     renamed_spaces,
     space_scoped_features,
 )
@@ -163,13 +166,14 @@ DEFAULT_CORS_ORIGINS = [
 # for a route that does not exist answers 404 rather than 200 HTML.
 API_PREFIX = consts()["agent"]["apiPrefix"]
 
-# How far one ``gh issue list`` reads, per state: an open backlog is short, a
-# closed history longer, so the ``all`` read goes further. ``accounting._gh_issues``
+# How far one ``gh`` list read goes, from the contract (``consts.json`` ``ghReads``),
+# the same numbers the CLI's Standup and Triage read. ``accounting._gh_issues``
 # builds its ``--limit`` from these, and ``solitaire/tracker.py`` reads the same
 # two to tell whether a kept all-states read is complete (fewer rows than the
 # limit means every issue is in it).
-ISSUE_LIMIT_OPEN = 100
-ISSUE_LIMIT_ALL = 300
+ISSUE_LIMIT_OPEN = gh_read_limit_open_issues()
+ISSUE_LIMIT_ALL = gh_read_limit_all_issues()
+ISSUE_LIMIT_LABELS = gh_read_limit_labels()
 
 # The verbs that write an issue on the tracker. A kept read of the active Space's
 # issues (the Studio ledger's entry, which ``/issue-report`` serves) is dropped

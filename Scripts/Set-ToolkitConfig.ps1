@@ -30,7 +30,11 @@
                           only, in config.local.json's spaces.<slug> patch.
       config.default.json the TEAM's -- commands, workItemTypes, aliases,
                           cliVersion, managerWorkflow. NEVER written here. A
-                          key that lives only there is refused by name.
+                          key that lives only there is refused by name. The
+                          one exception is managerWorkflow's Teams recipients:
+                          managerWorkflow.communication.recipients.<key>.<field>
+                          is this machine's and goes to config.local.json;
+                          the rest of the block stays the team's.
 
     Retiring a Space is `-Set spaces.<slug>.status=archive`, which is the value
     the web shell already renders as the retrospective view (RetireSpace runs it).
@@ -217,6 +221,22 @@ function Remove-PathValue {
     if (-not $node.PSObject.Properties[$segments[-1]]) { return $false }
     $node.PSObject.Properties.Remove($segments[-1])
     return $true
+}
+
+function Remove-EmptyRecipient {
+    <#
+      After a Teams recipient's field is unset, the recipient itself goes once
+      it has no field left: an empty `recipients.<key>` would still be a key
+      SendTeams and the engine find, with no type to send by.
+    #>
+    param($Object, [string]$Path)
+    if ($Path -notmatch '(^|\.)communication\.recipients\.[^.]+\.[^.]+$') { return }
+    $segments = @($Path.Split('.'))
+    $parentPath = ($segments[0..($segments.Count - 2)] -join '.')
+    $parent = Get-PathValue $Object $parentPath
+    if ($parent.Found -and ($parent.Value -is [System.Management.Automation.PSCustomObject]) -and @($parent.Value.PSObject.Properties).Count -eq 0) {
+        [void](Remove-PathValue $Object $parentPath)
+    }
 }
 
 function Format-Value {
@@ -935,6 +955,7 @@ foreach ($rawKey in (ConvertTo-UnsetKeys $Unset)) {
         }
         $old = (Get-PathValue $entry $field)
         if (Remove-PathValue $entry $field) {
+            Remove-EmptyRecipient $entry $field
             $touchHub = $true
             $changes += [PSCustomObject]@{ Key = "spaces.$slug.$field"; File = 'hub.json'; Old = (Format-Value $old.Value); New = ''; Action = 'unset' }
         }
@@ -967,6 +988,7 @@ foreach ($rawKey in (ConvertTo-UnsetKeys $Unset)) {
     if ($resolvedKey.Slug) { $path = "spaces.$($resolvedKey.Slug).$($resolvedKey.Field)" }
     $old = (Get-PathValue $pendingLocal $path)
     if (Remove-PathValue $pendingLocal $path) {
+        Remove-EmptyRecipient $pendingLocal $path
         $touchLocal = $true
         $changes += [PSCustomObject]@{ Key = $path; File = 'config.local.json'; Old = (Format-Value $old.Value); New = ''; Action = 'unset' }
     }

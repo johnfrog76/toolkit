@@ -20,7 +20,8 @@ const DOC = path.join(WEB, "COMPONENTS.md");
 
 /** The files whose exports are the shared layer this document covers. */
 const SHARED_FILES = [
-  "src/shared/PageCard.tsx",
+  "src/shared/PanelFrame.tsx",
+  "src/shell/kinds/ListPanel.tsx",
   "src/shared/CardActions.tsx",
   "src/shared/DialogDismiss.tsx",
   "src/shared/ConfirmDialog.tsx",
@@ -32,6 +33,7 @@ const SHARED_FILES = [
   "src/shared/StatusMessage.tsx",
   "src/shared/InfoTip.tsx",
   "src/shared/HairlineDivider.tsx",
+  "src/shared/TabRows.tsx",
   "src/shell/lazy.tsx",
 ];
 
@@ -41,7 +43,9 @@ const SHARED_FILES = [
  * has no table.
  */
 const SOURCES: Record<string, { type: string } | "none"> = {
-  PageCard: { type: "PageCardProps" },
+  PanelFrame: { type: "PanelFrameProps" },
+  ListPanel: { type: "ListPanelProps" },
+  CARD_LIST_CLASS: "none",
   CardActions: { type: "CardActionsProps" },
   CardAction: { type: "CardAction" },
   ROW: "none",
@@ -57,6 +61,8 @@ const SOURCES: Record<string, { type: string } | "none"> = {
   StatusMessage: { type: "StatusMessageProps" },
   InfoTip: { type: "InfoTipProps" },
   HairlineDivider: { type: "HairlineDividerProps" },
+  TabRows: { type: "TabRowsProps" },
+  TAB_ROWS_CLASS: "none",
 };
 
 const doc = fs.readFileSync(DOC, "utf8");

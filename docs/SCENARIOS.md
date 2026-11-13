@@ -71,7 +71,7 @@ Known gap: [Milestones appear on two pages](KNOWN-GAPS.md#milestones-appear-on-t
 | github | **Issues** | search ("Issue number, title or label"); **the issue filters** -- state, assignee, worked by, kind, severity, milestone | the chips live in ONE place; the list says what they are set to in one line under its header |
 | github | Board | search; ToolKit's card rows -- **no repo row** | the repo row matches a card's ADO link, so it is ADO furniture on gh soil |
 | local | Board | search; ToolKit's card rows | the files, and the board of them |
-| github | **Design** | search over the title, description, id and the note's and spec's file names; **kind** (design note, spec) (L2); with words in the box, **Search inside** on the tab's header runs them over the documents' text through the tracker's code search, on the button only (L2b) -- and the Archived group's **outcome** chips, shipped / dropped / nothing said | the list grows with every design; the kind is what a design HAS -- a spec, or a note alone -- and a search opens the collapsed Complete and Archived groups that have a match; search inside says its reason in a row when it cannot run, and that it reads the default branch only |
+| github | **Design** | search over the title, description, id and the note's and spec's file names; **kind** (design note, spec) (L2); with words in the box, **Search inside** on the tab's header runs them over the documents' text -- on disk in the Space's checkout where this machine names one, else through the tracker's code search -- on the button only (L2b) -- and the Archived group's **outcome** chips, shipped / dropped / nothing said | the list grows with every design; the kind is what a design HAS -- a spec, or a note alone -- and a search opens the collapsed Complete and Archived groups that have a match; search inside says its reason in a row when it cannot run, and which source it searched: the clone and its branch, or GitHub's default branch only |
 | github | **Docs** | search over titles and paths; **folder** -- the folders the tree actually has (`docs/`, `docs/hub/`, ...) | narrows the FOLDED `docs/` tree only; the README and its Documentation table are untouched, so the landing page's index is unchanged |
 | github | Stats | **the slot, disabled** -- tooltip `No filters on this tab` | filters nothing, by design: a reader of Stats wants the whole picture |
 | ado | Sprint, Actions | **the slot, disabled** -- the same tooltip | no section reaches a card there -- yet: a section is one name in `drawerSections` |
@@ -351,6 +351,7 @@ kind -- `GitHub`, `Azure DevOps`, `Your own cards`.
 | none at all | `No Spaces yet`, "A Space is where you work on one piece of software: your cards on a board, and the tracker's issues, designs and stats beside them once it is connected." under it, and the **+** at the foot |
 | a cold `Start` (the three demo Spaces, no `gh`, no `az`) | Azure demo, Demo and GitHub demo, each with a line that teaches; nothing reads as an error |
 | GitHub Spaces, connected, `gh` signed in | one row each: `Public; 4 open, 2 closed this week, 1 sev1 open; last deploy 3 days ago, green`; the Space you are in marked `you are here` |
+| ...its repository keeps designs (`design/`) | the line ends `; 3 designs in flight, 1 spec`, and `; 2 files not stamped with an id` when any have no `id:`; no `design/`, nothing about designs |
 | ...its repository public | the line leads `Public;` |
 | ...its repository private, or `INTERNAL` | the line leads `Private;` |
 | ...the tracker did not answer its visibility (below Tier 1, `gh` signed out, a failed read) | the line leads `Visibility unknown;` -- said, never guessed or left out |
@@ -362,7 +363,7 @@ kind -- `GitHub`, `Azure DevOps`, `Your own cards`.
 | ...and its tracker cannot answer | `; not connected yet -- connect it, and its board's work items come in beside its cards` (ADO, not `active`), or `; no tracker -- connect it to a GitHub repo and this row shows its open issues and last deploy` (no address) |
 | an archived Space | its row, marked `archived`, with no connect teaching |
 | any of these, while the reads are out | the card's own `Reading the Spaces...`, then the whole list at once -- never a row with a placeholder line |
-| more than five after the filter | five a page, the pager at the foot's centre; the chip still the total |
+| more than three after the filter | three a page, the pager at the foot's centre; the chip still the total |
 
 **The card's filter**: one exposed row of tags above the list, the Reminders card's -- **All | Products | Work | Out of box | Archive**
 -- each with its count (none for an empty bucket), opening on **All**, remembered per browser. One Space is in exactly one entry besides All, by the first
