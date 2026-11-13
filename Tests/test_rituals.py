@@ -355,6 +355,31 @@ class TheCardsTable(unittest.TestCase):
                 self.assertEqual(standup.card_title(row["content"], row["file"], row["id"]), row["title"])
 
 
+# -- The dates read: its query and its parse ---------------------------------
+DATES_TABLE = json.loads((FIXTURES / "standup-dates.json").read_text(encoding="utf-8"))
+
+
+class TheDatesTable(unittest.TestCase):
+    """standup-dates.json -- the same rows tkTestToolkit -Rituals asserts
+    against Get-P20StandupDatesQuery and ConvertFrom-P20StandupDates."""
+
+    def test_the_query_line_for_line(self):
+        q = DATES_TABLE["query"]
+        self.assertEqual(standup.dates_query(q["hashes"], q["numbers"]), "\n".join(q["lines"]) + "\n")
+
+    def test_each_answer_parses_to_its_two_maps(self):
+        for case in DATES_TABLE["cases"]:
+            with self.subTest(case=case["name"]):
+                commits, starts = standup.dates_from_answer(
+                    case["answer"], case["hashes"], case["numbers"], DATES_TABLE["workerLabels"]
+                )
+                self.assertEqual(commits, case["expected"]["commitDates"])
+                self.assertEqual({str(k): v for k, v in starts.items()}, case["expected"]["issueStarts"])
+
+    def test_a_hash_that_is_not_hex_is_never_written_into_the_query(self):
+        self.assertNotIn("evil", standup.dates_query(['a0a1111") { x } evil: object(expression: "'], []))
+
+
 # -- Both: issues and cards, joined on the id -------------------------------
 JOINED_TABLE = json.loads((FIXTURES / "standup-joined.json").read_text(encoding="utf-8"))
 JOINED_CASES = {c["name"]: c for c in JOINED_TABLE["cases"]}
@@ -370,6 +395,8 @@ def _fill_joined(case: dict, tracker_state: dict | None = None) -> "standup.Stan
         space=JOINED_TABLE["space"],
         space_name=JOINED_TABLE["spaceName"],
         window=case.get("window", ""),
+        commit_dates=case.get("commitDates"),
+        issue_starts=case.get("issueStarts"),
     )
     filled.text = standup.render_standup(filled)
     filled.work.text = standup.render_work(filled)
@@ -400,6 +427,10 @@ class TheJoinedTable(unittest.TestCase):
                 "counts",
                 "not-billable-counts",
                 "window-three-days",
+                "commits-window",
+                "issue-labelled-in-window",
+                "issue-assigned-before-window",
+                "dates-not-read",
             ],
         )
 
@@ -433,12 +464,17 @@ class TheJoinedTable(unittest.TestCase):
             if want is None:
                 continue
             counts = _fill_joined(case).counts
-            fields = ("closed", "started", "inProgress", "commits")
+            fields = ("closed", "started", "inProgress", "commits", "undated")
+
+            def wanted(row: dict) -> dict:
+                return {**row, "undated": row.get("undated", 0)}  # absent is none undated
+
             with self.subTest(case=name):
                 self.assertEqual(
-                    [{"label": c.label, **{f: getattr(c, f) for f in fields}} for c in counts.workers], want["workers"]
+                    [{"label": c.label, **{f: getattr(c, f) for f in fields}} for c in counts.workers],
+                    [wanted(r) for r in want["workers"]],
                 )
-                self.assertEqual({f: getattr(counts.total, f) for f in fields}, want["total"])
+                self.assertEqual({f: getattr(counts.total, f) for f in fields}, wanted(want["total"]))
 
     def test_the_counts_line_opens_the_brief(self):
         t = C.rituals_text()
@@ -449,6 +485,88 @@ class TheJoinedTable(unittest.TestCase):
         self.assertTrue(filled.brief.startswith(t["countsTotal"].split("{date}")[0]))
         quiet = _fill_joined(JOINED_CASES["not-billable-counts"])
         self.assertEqual(quiet.brief.split("\n")[0], "Since Thursday 1 October 2026: 1 in progress.")
+
+    def test_commits_outside_the_window_are_not_counted(self):
+        """One before the window and one after asOf are dropped; with no dates read every bullet counts."""
+        dated = _fill_joined(JOINED_CASES["commits-window"])
+        plain = _fill_joined(JOINED_CASES["dates-not-read"])
+        self.assertEqual((dated.counts.total.commits, plain.counts.total.commits), (3, 7))
+        self.assertEqual(plain.counts.total.undated, 0)
+
+    def test_an_undated_commit_is_said_not_counted(self):
+        filled = _fill_joined(JOINED_CASES["commits-window"])
+        self.assertEqual(filled.counts.total.undated, 2)
+        first = filled.brief.split("\n")[0]
+        self.assertEqual(first, "Since Thursday 1 October 2026: 1 started, 1 in progress, 3 commits (2 undated).")
+        none_dated = standup.MotionCount(undated=2)
+        self.assertEqual(standup.counts_said(none_dated), "0 commits (2 undated)")
+
+    def test_an_issue_labelled_in_the_window_is_started(self):
+        filled = _fill_joined(JOINED_CASES["issue-labelled-in-window"])
+        self.assertEqual([(i.number, i.motion) for i in filled.workers[1].today], [(171, "started")])
+        before = _fill_joined(JOINED_CASES["issue-assigned-before-window"])
+        self.assertEqual(
+            [(i.number, i.motion) for i in before.workers[0].today], [(172, "inProgress"), (173, "inProgress")]
+        )
+
+    def test_the_window_hashes_rule(self):
+        at = datetime.fromisoformat(JOINED_TABLE["asOf"])
+        since = datetime.fromisoformat(JOINED_TABLE["since"])
+        self.assertEqual(standup.window_hashes(["a0a1111"], None, since, at), (["a0a1111"], []))
+        self.assertEqual(
+            standup.window_hashes(
+                ["a0a1111", "b0b2222", "c0c3333", "d0d4444"],
+                {"A0A1111FFFF": "2026-10-01T04:00:00Z", "b0b2222": "2026-09-30T23:59:59-04:00", "c0c3333": None},
+                since,
+                at,
+            ),
+            (["a0a1111"], ["c0c3333", "d0d4444"]),
+        )
+
+    def test_the_asks_are_the_counted_cards_and_the_open_issues_alone(self):
+        case = JOINED_CASES["dates-not-read"]
+        hashes, numbers = standup.date_asks(_fill_joined(case), case["cards"])
+        self.assertEqual(hashes, ["a0a1111", "b0b2222", "c0c3333", "d0d4444", "a0a9999", "e0e5555", "f0f6666"])
+        self.assertEqual(numbers, [])
+        lone = JOINED_CASES["issue-assigned-before-window"]
+        self.assertEqual(standup.date_asks(_fill_joined(lone), lone["cards"]), ([], [172]))
+
+    def test_one_dates_read_per_repo_per_standup(self):
+        """The dates read is one gh api graphql per repo, kept for the TTL; a failed read keeps today's rule."""
+        from agent.solitaire import tracker
+
+        calls: list[list[str]] = []
+
+        def fake_run(cmd, timeout, **_kw):
+            calls.append(cmd)
+            query = Path(cmd[cmd.index("-F") + 1].split("@", 1)[1]).read_text(encoding="utf-8")
+            repo = {}
+            for i, h in enumerate(re.findall(r'object\(expression: "([0-9a-f]+)"\)', query)):
+                repo[f"c{i}"] = {"oid": h + "0" * (40 - len(h)), "authoredDate": "2026-10-01T10:00:00Z"}
+            return subprocess.CompletedProcess(cmd, 0, json.dumps({"data": {"repository": repo}}), "")
+
+        tracker.forget()
+        try:
+            with mock.patch("agent.ado.repo_read.run_read", side_effect=fake_run):
+                hashes = ["a0a1111", "b0b2222"]
+                got = tracker.dates(["acme/widgets", "acme/gears"], hashes, {"acme/widgets": [171]}, ["opus"])
+                self.assertEqual(len(calls), 2)
+                self.assertTrue(all(c[:3] == ["gh", "api", "graphql"] for c in calls))
+                self.assertEqual(got[0], {h: "2026-10-01T10:00:00Z" for h in hashes})
+                self.assertIsNone(got[2])
+                tracker.dates(["acme/widgets", "acme/gears"], hashes, {"acme/widgets": [171]}, ["opus"])
+                self.assertEqual(len(calls), 2, "the second standup is served from the kept read")
+                many = [f"{i:07x}" for i in range(standup.DATES_CHUNK + 1)]
+                tracker.dates(["acme/widgets"], many, {}, ["opus"])
+                self.assertEqual(len(calls), 4, "past one chunk's aliases, one call more")
+            with mock.patch(
+                "agent.ado.repo_read.run_read",
+                return_value=subprocess.CompletedProcess([], 1, "", "HTTP 502: down"),
+            ):
+                tracker.forget()
+                self.assertEqual(tracker.dates(["acme/widgets"], ["a0a1111"], {}, []), (None, None, "HTTP 502: down"))
+        finally:
+            tracker.forget()
 
     def test_a_window_is_a_day_on_or_before_today(self):
         at = datetime.fromisoformat(JOINED_TABLE["asOf"])
@@ -1401,7 +1519,20 @@ GROUP_FIELDS = {"name", "by", "count", "refs", "phrase"}
 WORKER_FIELDS = {"label", "name", "yesterday", "today", "blockers", "empty", "excuse"}
 WALK_FIELDS = {"number", "id", "title", "url", "path", "motion", "commits", "worker"}
 ITEM_FIELDS = {"number", "id", "title", "url", "path", "motion", "commits"}
-COUNT_FIELDS = {"label", "name", "closed", "started", "inProgress", "commits"}
+COUNT_FIELDS = {"label", "name", "closed", "started", "inProgress", "commits", "undated"}
+
+
+def _graphql_answer(argv: list[str], when: str) -> "subprocess.CompletedProcess":
+    """A stub's answer to the standup's dates read: every hash the query asks
+    for a commit authored at ``when``, every issue a timeline with no event."""
+    query = Path(argv[argv.index("-F") + 1].split("@", 1)[1]).read_text(encoding="utf-8")
+    repo: dict = {}
+    for i, h in enumerate(re.findall(r'object\(expression: "([0-9a-f]+)"\)', query)):
+        repo[f"c{i}"] = {"oid": h + "0" * (40 - len(h)), "authoredDate": when}
+    for n in re.findall(r"\bi(\d+): issue\(", query):
+        repo[f"i{n}"] = {"timelineItems": {"nodes": []}}
+    return subprocess.CompletedProcess(argv, 0, stdout=json.dumps({"data": {"repository": repo}}), stderr="")
+
 
 TOOLKIT = "https://github.com/johnfrog76/toolkit"
 ACME = "https://dev.azure.com/acme"
@@ -1506,6 +1637,8 @@ class TheRoute(unittest.TestCase):
                 raise subprocess.TimeoutExpired(argv, 30)
             if argv[:3] == ["gh", "label", "list"]:
                 return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(_labels(fx)), stderr="")
+            if argv[:3] == ["gh", "api", "graphql"]:
+                return _graphql_answer(argv, fx["asOf"])
             issues = [dict(i, labels=[{"name": n} for n in i["labels"]]) for i in fx["issues"]]
             return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(issues), stderr="")
 
@@ -1561,7 +1694,11 @@ class TheRoute(unittest.TestCase):
         self.assertEqual(body["source"], "both")
         self.assertEqual((body["checks"], body["links"]), ([], []))
         # The two reads, then who "me" is -- once, for the suggestion (triage's gh api user).
-        self.assertEqual([c[:3] for c in calls], [["gh", "label", "list"], ["gh", "issue", "list"], *self.viewer_reads])
+        # The two reads, the dates read for what they counted, then who "me" is.
+        self.assertEqual(
+            [c[:3] for c in calls],
+            [["gh", "label", "list"], ["gh", "issue", "list"], ["gh", "api", "graphql"], *self.viewer_reads],
+        )
         self.assertIn("johnfrog76/toolkit", calls[0])
         self.assertIn("all", calls[1])
         # The work grain reads the milestone and the body.
@@ -1712,7 +1849,11 @@ class TheRoute(unittest.TestCase):
         body = res.json()
         self.assertEqual(body["source"], "both")
         # The two reads, then who "me" is -- once, for the suggestion (triage's gh api user).
-        self.assertEqual([c[:3] for c in calls], [["gh", "label", "list"], ["gh", "issue", "list"], *self.viewer_reads])
+        # The two reads, the dates read for what they counted, then who "me" is.
+        self.assertEqual(
+            [c[:3] for c in calls],
+            [["gh", "label", "list"], ["gh", "issue", "list"], ["gh", "api", "graphql"], *self.viewer_reads],
+        )
         self.assertEqual(body["workers"][-1]["label"], "toolkit")
         self.assertEqual([i["id"] for i in body["workers"][-1]["today"]], ["K7M2"])
         self.assertNotIn("C4D7", body["text"])
@@ -1923,6 +2064,8 @@ class TheOneTrackerRead(unittest.TestCase):
                 return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(_labels(fx)), stderr="")
             if argv[:3] == ["gh", "api", "user"]:
                 return subprocess.CompletedProcess(argv, 0, stdout="johnfrog76\n", stderr="")
+            if argv[:3] == ["gh", "api", "graphql"]:
+                return _graphql_answer(argv, fx["asOf"])
             state = argv[argv.index("--state") + 1]
             rows = [i for i in self.issues if state == "all" or i["state"].lower() == state]
             return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(rows), stderr="")
@@ -1952,6 +2095,7 @@ class TheOneTrackerRead(unittest.TestCase):
         first = self.client.get("/api/ritual/standup?space=toolkit").json()
         second = self.client.get("/api/ritual/standup?space=toolkit").json()
         self.assertEqual(self._reads(), (1, 1, 1))
+        self.assertEqual(self._gh("api", "graphql"), 1, "the dates read is kept like the others")
         self.assertEqual(first, second, "the same facts, the same words")
         self.assertEqual(first["text"], _golden("standup-friday.txt"))
 

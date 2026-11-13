@@ -123,7 +123,7 @@ EXPECTED = {
     (
         "regex",
         "adoOriginSsh",
-    ): r"^(?:ssh://)?[^/@\s]+@(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com):v3/([^/\s]+)/([^/\s]+)/([^/\s]+?)(?:\.git)?/?$",
+    ): r"^(?:ssh://(?:[^/@\s]+@)?(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com)(?::\d+)?/|(?:ssh://)?[^/@\s]+@(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com):)v3/([^/\s]+)/([^/\s]+)/([^/\s]+?)(?:\.git)?/?$",
     ("regex", "adoOrgDev"): r"^https?://(?:[^/@\s]+@)?dev\.azure\.com/([^/\s]+)",
     ("regex", "adoOrgVisualStudio"): r"^https?://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com(?:[/:]|$)",
     ("reminders", "buckets"): ["overdue", "today", "upcoming"],
@@ -342,6 +342,7 @@ EXPECTED = {
         "countsClosed": "{n} closed",
         "countsStarted": "{n} started",
         "countsInProgress": "{n} in progress",
+        "countsUndated": "({n} undated)",
     },
     # StartWork's hand-off block (D-AR5): the CLI types these four, the web's copy
     # box finds the block's title by the first; Tests/fixtures/start-work/ holds
@@ -353,6 +354,10 @@ EXPECTED = {
     ("startWork", "howWeWorkNote"): "agentic/how-we-work.md",
     # The line HowWeWork prints for a repository's AGENTS.md; the web finds it by this shape.
     ("startWork", "howWeWorkLine"): "How we work here: {path}",
+    # The gh read limits both halves share (Standup/Triage and their routes).
+    ("ghReads", "openIssues"): 500,
+    ("ghReads", "allIssues"): 500,
+    ("ghReads", "labels"): 500,
     # Claude Code usage: /env's flag (the inventory row's key) and the burn route.
     ("usage", "envFlag"): "claudeUsage",
     ("usage", "burnRoute"): "/api/usage/burn",
@@ -361,6 +366,13 @@ EXPECTED = {
     ("replyStatuses", "github"): ["fixed", "closed", "active"],
     # The typed plan readings' subfolder of usage/: the CLI writes it, the agent fingerprints it.
     ("usage", "readingsFolder"): "readings",
+    # Daily's window: the billing script, the CLI's Daily and GET /api/billing refuse
+    # a window in these words (Scripts/Resolve-BillingWindow.ps1 is the rule).
+    ("billing", "text"): {
+        "halfWindow": "-Since and -Until go together: pass both (YYYY-MM-DD), or neither for this week.",
+        "notADay": "{name} '{value}' is not a day: yyyy-MM-dd.",
+        "backwards": "-Since {since} is after -Until {until}.",
+    },
     ("startWork", "text"): {
         "head": "# Start work: {kind} {id} -- {title}",
         "howWeWork": "## How we work in {space} ({source})",
@@ -380,6 +392,7 @@ class TheFileParses(unittest.TestCase):
             "regex",
             "status",
             "folders",
+            "ghReads",
             "reviews",
             "features",
             "reminders",
@@ -391,6 +404,7 @@ class TheFileParses(unittest.TestCase):
             "design",
             "rituals",
             "startWork",
+            "billing",
             "assets",
             "tests",
             "agent",
@@ -540,11 +554,13 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.rituals_corner_shapes(), tuple(EXPECTED[("rituals", "cornerShapes")]))
         self.assertEqual(C.startwork_launch_env_flag(), EXPECTED[("startWork", "launchEnvFlag")])
         self.assertEqual(C.startwork_how_we_work_note(), EXPECTED[("startWork", "howWeWorkNote")])
+        self.assertEqual(C.gh_read_limit_open_issues(), EXPECTED[("ghReads", "openIssues")])
+        self.assertEqual(C.gh_read_limit_all_issues(), EXPECTED[("ghReads", "allIssues")])
+        self.assertEqual(C.gh_read_limit_labels(), EXPECTED[("ghReads", "labels")])
         self.assertEqual(C.usage_env_flag(), EXPECTED[("usage", "envFlag")])
         self.assertEqual(C.usage_burn_route(), EXPECTED[("usage", "burnRoute")])
-        self.assertEqual(C.reply_statuses("ado"), tuple(EXPECTED[("replyStatuses", "ado")]))
-        self.assertEqual(C.reply_statuses("github"), tuple(EXPECTED[("replyStatuses", "github")]))
         self.assertEqual(C.usage_readings_folder(), EXPECTED[("usage", "readingsFolder")])
+        self.assertEqual(C.billing_text(), EXPECTED[("billing", "text")])
 
     def test_the_worker_rule_reads_the_contract(self):
         """The pane's worker chips and the standup read one prefix, not two."""
@@ -632,7 +648,14 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("startWork.howWeWorkNote", "agentic/how-we-work.md"),
         # Claude Code usage: served through usage_env_flag() and usage_burn_route().
         ("usage.envFlag", "claudeUsage"),
+        # The gh read limits: served through gh_read_limit_*(), never typed as a --limit.
+        ("ghReads.labels", '"--limit", "200"'),
+        ("ghReads.openIssues", '"--limit", "100"'),
+        ("ghReads.allIssues", '"--limit", "300"'),
         ("usage.burnRoute", "/api/usage/burn"),
+        # Daily's window sentences: the route reads them through billing_text().
+        ("billing.text.halfWindow", "-Since and -Until go together"),
+        ("billing.text.notADay", "is not a day: yyyy-MM-dd"),
     ]
 
     # The allowlist, and why each entry is on it:

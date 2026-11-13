@@ -54,7 +54,10 @@ The core -- cards, the board, Daily and the Studio -- is not an add-on and has n
 7. **The file shape** -- what it writes into the hub, or a link to the `docs/hub/` document that owns it;
    and **how status is read from the file**, rule by rule, because that is what regresses.
 8. **The tests** -- which suite holds which promise, and what no suite can (the manual runbook).
-9. **Known gaps** -- this add-on's, each with its issue.
+9. **Known gaps** -- this add-on's. Each one links its block in [Known gaps](../KNOWN-GAPS.md), which
+   carries what you see and the issue; a block's "Where you meet it" names this section or the one that
+   describes the behaviour. What the add-on does on purpose goes under a `### True by design` heading
+   inside the section, and is on no list.
 
 A document may end with an optional **History** section after the nine: a few dated bullets for the
 changes a maintainer needs to know about (a rename, a rule people's files were written against). The

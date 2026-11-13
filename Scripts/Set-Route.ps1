@@ -260,7 +260,7 @@ if ($cardMode) {
             Write-CliError -Message 'gh is not installed, so the sizes could not be read and nothing was written.' -Hint 'Install the GitHub CLI and run gh auth login.'
             exit 2
         }
-        $got = Invoke-P20TrackerRead 'gh' @('label', 'list', '--repo', $target.Repo, '--limit', '500', '--json', 'name,description')
+        $got = Invoke-P20TrackerRead 'gh' @('label', 'list', '--repo', $target.Repo, '--limit', ([string](Get-P20Consts).ghReads.labels), '--json', 'name,description')
         $labels = @()
         # Enumerated, as Read-P20RouteJson does below: 5.1's ConvertFrom-Json hands
         # a JSON array on as ONE object, so @(... | ConvertFrom-Json) was an array
@@ -367,7 +367,7 @@ if ($Assign -and -not $assignMe) {
 $sizeLabel = ''
 $otherSizes = @()
 if ($Size) {
-    $labels = Read-P20RouteJson -What 'its labels' -Arguments @('label', 'list', '--repo', $repo, '--limit', '500', '--json', 'name,description')
+    $labels = Read-P20RouteJson -What 'its labels' -Arguments @('label', 'list', '--repo', $repo, '--limit', ([string](Get-P20Consts).ghReads.labels), '--json', 'name,description')
     $workers = @(Get-P20StandupWorkers -Labels $labels -Prefix ([string](Get-P20Consts).rituals.workerLabelPrefix))
     $match = @($workers | Where-Object { [string]$_.label -ieq $Size.Trim() }) | Select-Object -First 1
     if (-not $match) {

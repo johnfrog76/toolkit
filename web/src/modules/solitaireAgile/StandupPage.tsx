@@ -24,7 +24,8 @@ import {
 } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
 import { copyText } from "../../shared/copyText";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
+import { TabRows } from "../../shared/TabRows";
 import { usePersistedValue } from "../../shared/usePersistedState";
 import { useGetEnvQuery } from "../../shell/api";
 import { RITUALS } from "../../shell/consts";
@@ -449,7 +450,7 @@ export function StandupPage() {
   return (
     <div className={styles.page}>
       {corner && <PmCorner corner={corner} onStart={(arg) => setStartFor(arg)} />}
-      <PageCard
+      <PanelFrame
         loading={envLoading || isLoading}
         loadingLabel="Checking the tracker..."
         empty={empty}
@@ -477,23 +478,25 @@ export function StandupPage() {
       >
         {readable && (
           <>
-            <TabList
-              size="small"
-              aria-label="Standup"
-              selectedValue={onAgenda ? AGENDA : grain}
-              onTabSelect={(_e, d) => {
-                const v = String(d.value);
-                setTab(v);
-                if (isGrain(v)) setGrain(v);
-              }}
-            >
-              <Tab value={AGENDA}>Agenda</Tab>
-              {GRAINS.map((g) => (
-                <Tab key={g} value={g}>
-                  {grainLabel(g)}
-                </Tab>
-              ))}
-            </TabList>
+            <TabRows>
+              <TabList
+                size="small"
+                aria-label="Standup"
+                selectedValue={onAgenda ? AGENDA : grain}
+                onTabSelect={(_e, d) => {
+                  const v = String(d.value);
+                  setTab(v);
+                  if (isGrain(v)) setGrain(v);
+                }}
+              >
+                <Tab value={AGENDA}>Agenda</Tab>
+                {GRAINS.map((g) => (
+                  <Tab key={g} value={g}>
+                    {grainLabel(g)}
+                  </Tab>
+                ))}
+              </TabList>
+            </TabRows>
             {onAgenda && (
               <>
                 <div className={styles.agendaHead}>
@@ -561,7 +564,7 @@ export function StandupPage() {
             {!onAgenda && grain === BRIEF && suggestionRow}
           </>
         )}
-      </PageCard>
+      </PanelFrame>
       {startFor !== null && <StartWorkBox id={startFor} onClose={() => setStartFor(null)} />}
     </div>
   );

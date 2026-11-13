@@ -90,8 +90,9 @@ describe("a review's row", () => {
 
   it("shows its Spaces as chips by name, and no raw orgs line", () => {
     mount();
-    expect(screen.getByText("First Space")).toBeTruthy();
-    expect(screen.getByText("Second Space")).toBeTruthy();
+    const meta = document.querySelector<HTMLElement>("[data-row-meta]")!;
+    expect(within(meta).getByText("First Space")).toBeTruthy();
+    expect(within(meta).getByText("Second Space")).toBeTruthy();
     expect(screen.queryByText(/orgs:/)).toBeNull();
   });
 
@@ -107,14 +108,16 @@ describe("a review's row", () => {
     expect(screen.queryByText("Are you sure?")).toBeNull();
   });
 
-  it("a refused Archive says so on the row, in the verb's words", async () => {
+  it("a refused Archive says so on the panel, in the verb's words", async () => {
     answer = { status: "error", error: "an archived review is already there", output: null };
     mount();
     openMenu(active.period);
     await act(async () => {
       fireEvent.click(screen.getByRole("menuitem", { name: /^Archive/ }));
     });
-    expect(screen.getByRole("alert").textContent).toContain("an archived review is already there");
+    expect(document.querySelector("[data-panel-status]")?.textContent).toContain(
+      "an archived review is already there",
+    );
   });
 
   it("Delete asks first, naming the range and the Spaces; Cancel runs nothing", () => {
@@ -172,9 +175,8 @@ describe("the Archived filter", () => {
 
   it("Archived reads them, and an archived row offers Delete but not Archive", async () => {
     mount();
-    fireEvent.click(screen.getByRole("combobox", { name: "Space or type" }));
     await act(async () => {
-      fireEvent.click(screen.getByRole("option", { name: "Archived" }));
+      fireEvent.click(screen.getByRole("radio", { name: /^Archived/ }));
     });
     expect(reviewsQuery).toHaveBeenLastCalledWith({ slug: "all", archived: true });
     expect(screen.getByText(archived.period)).toBeTruthy();
