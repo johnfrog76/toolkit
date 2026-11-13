@@ -123,7 +123,7 @@ EXPECTED = {
     (
         "regex",
         "adoOriginSsh",
-    ): r"^(?:ssh://)?[^/@\s]+@(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com):v3/([^/\s]+)/([^/\s]+)/([^/\s]+?)(?:\.git)?/?$",
+    ): r"^(?:ssh://(?:[^/@\s]+@)?(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com)(?::\d+)?/|(?:ssh://)?[^/@\s]+@(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com):)v3/([^/\s]+)/([^/\s]+)/([^/\s]+?)(?:\.git)?/?$",
     ("regex", "adoOrgDev"): r"^https?://(?:[^/@\s]+@)?dev\.azure\.com/([^/\s]+)",
     ("regex", "adoOrgVisualStudio"): r"^https?://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com(?:[/:]|$)",
     ("reminders", "buckets"): ["overdue", "today", "upcoming"],
