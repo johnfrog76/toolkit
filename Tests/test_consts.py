@@ -128,6 +128,9 @@ EXPECTED = {
     ("regex", "adoOrgVisualStudio"): r"^https?://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com(?:[/:]|$)",
     ("reminders", "buckets"): ["overdue", "today", "upcoming"],
     ("reminders", "snooze"): ["1h", "tomorrow", "nextweek"],
+    # A Teams recipient's type: the engine posts the first list and skips the second.
+    ("communication", "webhookRecipientTypes"): ["channel", "chat"],
+    ("communication", "deferredRecipientTypes"): ["person"],
     # The three halves a test run covers: Test writes them, log.py serves them.
     ("tests", "halves"): ["agent", "cli", "web"],
     ("tests", "legacyHalf"): "cli",
@@ -396,6 +399,7 @@ class TheFileParses(unittest.TestCase):
             "reviews",
             "features",
             "reminders",
+            "communication",
             "env",
             "docs",
             "visibility",
@@ -561,6 +565,8 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.usage_burn_route(), EXPECTED[("usage", "burnRoute")])
         self.assertEqual(C.usage_readings_folder(), EXPECTED[("usage", "readingsFolder")])
         self.assertEqual(C.billing_text(), EXPECTED[("billing", "text")])
+        self.assertEqual(C.webhook_recipient_types(), tuple(EXPECTED[("communication", "webhookRecipientTypes")]))
+        self.assertEqual(C.deferred_recipient_types(), tuple(EXPECTED[("communication", "deferredRecipientTypes")]))
 
     def test_the_worker_rule_reads_the_contract(self):
         """The pane's worker chips and the standup read one prefix, not two."""

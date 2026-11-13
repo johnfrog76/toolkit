@@ -169,6 +169,9 @@ $expected = [ordered]@{
     'regex.adoOrgVisualStudio'     = '^https?://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com(?:[/:]|$)'
     'reminders.buckets'       = 'overdue,today,upcoming'
     'reminders.snooze'        = '1h,tomorrow,nextweek'
+    # A Teams recipient's type: gate 2 checks the first list; the schema offers both.
+    'communication.webhookRecipientTypes'  = 'channel,chat'
+    'communication.deferredRecipientTypes' = 'person'
     # The three halves a test run covers: Test and the CLI runner write
     # them into the machine's test summary; the agent serves them.
     'tests.halves'            = 'agent,cli,web'

@@ -250,6 +250,18 @@ def env_teams_webhook_prefix() -> str:
     return consts()["env"]["teamsWebhookPrefix"]
 
 
+def webhook_recipient_types() -> tuple[str, ...]:
+    """The recipient types that post through their webhook: a Teams channel and a
+    Teams chat, sent the same way. The CLI's gate 2 checks the same list."""
+    return tuple(consts()["communication"]["webhookRecipientTypes"])
+
+
+def deferred_recipient_types() -> tuple[str, ...]:
+    """The recipient types config may name that never post (``person``: a direct
+    message, not built)."""
+    return tuple(consts()["communication"]["deferredRecipientTypes"])
+
+
 def env_test_run_marker() -> str:
     """Set by every test runner; while it is set, nothing posts to a real webhook."""
     return consts()["env"]["testRunMarker"]
