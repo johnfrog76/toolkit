@@ -366,6 +366,13 @@
     }
   },
 
+  "ghReads": {
+    "_": "How far one gh list read goes, shared by Standup and Triage in the CLI and GET /api/ritual/standup and /triage in the agent, so the terminal and the page read the same issues of a large repository. openIssues is the open-state issue read (the triage list), allIssues the every-state read (the standup), labels the repository's labels (both). A read that returns this many rows may have been cut short.",
+    "openIssues": 500,
+    "allIssues": 500,
+    "labels": 500
+  },
+
   "usage": {
     "_": "Claude Code usage (docs/hub/usage.md). envFlag is the literal name of the top-level boolean GET /api/env carries for it, and the key of the Claude Code usage row in the CLI's inventory (Scripts/Get-OptionalSurfaces.ps1): true where Claude Code's projects folder is on this machine (CLAUDE_CONFIG_DIR's, else ~/.claude/projects; agent/core/config.py claude_usage, the same rule as the row, held to one table by Tests/fixtures/usage/projects-root.json). The agent serves it and the web reads it by this name: the System page's Claude Code burn tile is drawn, and burnRoute fetched, only when it is true; an agent that serves no such field reads as off. burnRoute is the current burn -- today and this week, Burn -AsJson run through the bridge and kept on the agent's disk for an hour -- the agent mounts it (404 where envFlag is false), the web asks it. readingsFolder is the subfolder of the hub's usage/ that holds the typed plan readings (Burn -Reading; docs/hub/usage.md, \"The weekly burndown\"): <usage>/<readingsFolder>/<yyyy-mm-dd>-<machine>.json, one per week per machine -- the CLI writes and reads it, and the agent fingerprints it so a new reading is a miss in the burn route's cache.",
     "envFlag": "claudeUsage",

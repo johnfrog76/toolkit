@@ -172,14 +172,17 @@ or exactly one repo in the Space's projects), and, while [the suggestion](#the-s
 is on, a third, `gh api user -q .login` -- who "me" is, best effort, the read Triage makes:
 
 ```text
-gh label list --repo <repo> --limit 500 --json name,description
-gh issue list --repo <repo> --state all --limit 500 --json number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees
+gh label list --repo <repo> --limit <n> --json name,description
+gh issue list --repo <repo> --state all --limit <n> --json number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees
 ```
+
+`<n>` is `consts.json` `ghReads` (`labels`, `allIssues` for the standup, `openIssues` for Triage), read by
+the CLI and the agent alike.
 
 `milestone` and `body` are the work grain's: an item groups by its milestone, else by the design card
 its body names. `createdAt` and `assignees` are the suggestion's: an item's age, and who has it.
 
-**Triage's reads**: `gh label list` as above, then `gh issue list --repo <repo> --state open --limit 500
+**Triage's reads**: `gh label list` as above, then `gh issue list --repo <repo> --state open --limit <n>
 --json number,title,state,labels,assignees,milestone,url`, then `gh api user -q .login` -- who "me" is,
 best effort: when `gh` cannot say, an issue assigned to you reads `@<login>` and the triage still answers.
 **Route's writes**, each its own call, nothing else:
@@ -260,7 +263,7 @@ The one stated refusal (`Error:`, `Hint:`, exit 2) is a `-Space` nobody declared
 
 | Route | Gate | Reads | Writes |
 | --- | --- | --- | --- |
-| `GET /api/ritual/standup?space=<slug>&since=<yyyy-MM-dd>&refresh=1` | `features.solitaireAgile` per request, with the active Space's answer applied (**404** unless the switch is on and the Space you are in works with agents; the detail names which is off); `space` scoped like `/api/issue-report` (an undeclared slug 404); `since` widens yesterday's window as `Standup -Since` does, and a `since` that is not a day, or is after today, is a **422** naming it; `refresh=1` reads the tracker again past the kept read ([below](#one-tracker-read-kept-a-minute)) | the same two `gh` reads as `Standup` (the issues with `milestone`, `body` and `createdAt`), and `gh api user` while the suggestion is on, through the same data files, kept a minute -- or, for a local Space, its cards. The limits are not yet the CLI's: the agent reads up to 300 issues in every state, 100 open, and 200 labels, where the CLI reads up to 500 issues for each read and 500 labels, so above those the terminal and the page can differ ([issue #276](https://github.com/johnfrog76/toolkit/issues/276)) | nothing |
+| `GET /api/ritual/standup?space=<slug>&since=<yyyy-MM-dd>&refresh=1` | `features.solitaireAgile` per request, with the active Space's answer applied (**404** unless the switch is on and the Space you are in works with agents; the detail names which is off); `space` scoped like `/api/issue-report` (an undeclared slug 404); `since` widens yesterday's window as `Standup -Since` does, and a `since` that is not a day, or is after today, is a **422** naming it; `refresh=1` reads the tracker again past the kept read ([below](#one-tracker-read-kept-a-minute)) | the same two `gh` reads as `Standup` (the issues with `milestone`, `body` and `createdAt`), and `gh api user` while the suggestion is on, through the same data files, kept a minute -- or, for a local Space, its cards. | nothing |
 | `GET /api/ritual/triage?space=<slug>&refresh=1` | the same | `gh label list`, `gh issue list --state open` with `milestone` and `assignees`, and `gh api user` (who "me" is, best effort), kept a minute and shared with the standup | nothing |
 | `GET /api/ritual/milestones?space=<slug>&refresh=1` | the same | one `gh api --method GET repos/{owner}/{repo}/milestones -f state=all -F per_page=100` per repo -- the ado core's own reader -- kept a minute ([Milestones](#milestones-the-tab-and-the-award)) | nothing |
 | `POST /api/cmd/Route` | the bridge: `Route` is in the CLI's command table only while the flag resolves on -- the switch on and the Space answered `agents` | -- | what `Route` writes, and nothing else |
@@ -1530,10 +1533,6 @@ Each of these is a block on [Known gaps](../KNOWN-GAPS.md), with its issue:
 - **The celebration's mark is per browser.** Another browser, or one whose site data was cleared, celebrates a
   reached milestone once more on first sight
   ([A reached milestone celebrates once per browser](../KNOWN-GAPS.md#a-reached-milestone-celebrates-once-per-browser)).
-- **Only the issue read's rows are candidates.** The suggestion reads the standup's read, capped like it:
-  up to 500 issues in the CLI, up to 300 in every state and 100 open in the agent, so above those the
-  terminal and the page can suggest differently
-  ([The terminal and the page can read different issues](../KNOWN-GAPS.md#the-terminal-and-the-page-can-read-different-issues)).
 - **The guard reads names by their capital**. A capitalised word that is not in the facts is
   refused, so a persona's proper noun ("Dev-Hero") sends the prose instead, and an invented name written
   in lower case is not caught; numbers, refs and kind counts are checked exactly. A group whose own name is
@@ -1577,10 +1576,6 @@ Each of these is a block on [Known gaps](../KNOWN-GAPS.md), with its issue:
 - **One repo per Space.** A Space spanning several repos says so on its `Tracker` line rather than
   merging them
   ([The terminal's standup refuses a Space with several repositories](../KNOWN-GAPS.md#the-terminals-standup-refuses-a-space-with-several-repositories)).
-- **The reads are capped, and not alike.** The CLI reads up to 500 issues for each read and 500
-  labels; the agent reads up to 300 issues in every state, 100 open, and 200 labels. A repo past a
-  cap loses its oldest issues from that read, and above the agent's caps the terminal and the page can
-  give different standups and triage lists ([The terminal and the page can read different issues](../KNOWN-GAPS.md#the-terminal-and-the-page-can-read-different-issues)).
 - **A live refusal reads differently in the two halves.** The fixture pins the `Tracker` line only for
   the reason it is GIVEN; the sentence each half writes for a live failure -- a Space that is not GitHub,
   a tier below 1, `gh` not answering -- is its own. The Azure DevOps sentence is now the contract's
@@ -1633,3 +1628,8 @@ These are how the rituals read, on purpose, and are not on that list:
   worker, and a card cannot be a blocker (there is no walk label on a card).
 - **The card read is every file in `archive/`.** Each archived card is read for its `**Closed:**` day on
   every standup; a hub with thousands of archived cards pays for it.
+- **Only the issue read's rows are candidates.** The suggestion reads the standup's read, capped like it:
+  the same `consts.json` `ghReads` numbers in the CLI and the agent, so the terminal and the page suggest from the same issues.
+- **The reads are capped, and alike.** Both halves read up to `consts.json` `ghReads` -- 500 open
+  issues, 500 issues in every state and 500 labels, one number per read, read by the CLI's scripts and the
+  agent. A repo past a cap loses its oldest issues from that read in both halves, and neither says so.

@@ -268,6 +268,10 @@ $expected = [ordered]@{
     'startWork.launchEnvFlag'   = 'startWorkLaunch'
     'startWork.howWeWorkNote'   = 'agentic/how-we-work.md'
     'startWork.howWeWorkLine'   = 'How we work here: {path}'
+    # The gh read limits both halves share: Standup, Triage and Route, and the agent's two ritual routes.
+    'ghReads.openIssues'        = '500'
+    'ghReads.allIssues'         = '500'
+    'ghReads.labels'            = '500'
     # Claude Code usage: /env's flag (and the inventory row's key), and the burn route.
     'usage.envFlag'             = 'claudeUsage'
     'usage.burnRoute'           = '/api/usage/burn'
@@ -518,6 +522,8 @@ $guarded = [ordered]@{
     # (Get-P20Consts).billing.text, and nothing types it. notADay is not guarded:
     # the standup's own -Since refusal says a sentence of the same shape.
     'billing.text.halfWindow'    = '-Since and -Until go together'
+    # The gh read limits: Get-Standup.ps1 and Get-Triage.ps1 read (Get-P20Consts).ghReads.
+    'ghReads.limitArgument'      = "'--limit', '500'"
 }
 $allowed = @('Scripts/Get-Consts.ps1')
 

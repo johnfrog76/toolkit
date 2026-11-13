@@ -12,8 +12,8 @@
     printing. Three reads, all on the Space's ONE repo (Resolve-P20TrackerRepo, the
     rule every GitHub verb uses):
 
-        gh label list --repo <repo> --limit 500 --json name,description
-        gh issue list --repo <repo> --state all --limit 500 --json number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees
+        gh label list --repo <repo> --limit <n> --json name,description
+        gh issue list --repo <repo> --state all --limit <n> --json number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees
         gh api graphql -F query=@<file> -f owner=<owner> -f name=<name>
 
     The third is the dates read (Get-P20StandupDates): when each commit the
@@ -272,10 +272,10 @@ elseif ($choice.source -eq 'both') {
     else {
         # -- The thin layer: two gh reads (Scripts/Ritual-Common.ps1) --------
         $repo = $target.Repo
-        $got = Invoke-P20RitualGh -Repo $repo -Arguments @('label', 'list', '--repo', $repo, '--limit', '500', '--json', 'name,description')
+        $got = Invoke-P20RitualGh -Repo $repo -Arguments @('label', 'list', '--repo', $repo, '--limit', [string](Get-P20Consts).ghReads.labels, '--json', 'name,description')
         if ($got.ok) {
             $labels = $got.value
-            $got = Invoke-P20RitualGh -Repo $repo -Arguments @('issue', 'list', '--repo', $repo, '--state', 'all', '--limit', '500',
+            $got = Invoke-P20RitualGh -Repo $repo -Arguments @('issue', 'list', '--repo', $repo, '--state', 'all', '--limit', [string](Get-P20Consts).ghReads.allIssues,
                 '--json', 'number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees')
         }
         if ($got.ok) {

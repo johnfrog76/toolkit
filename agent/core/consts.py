@@ -666,6 +666,21 @@ def startwork_launch_env_flag() -> str:
     return consts()["startWork"]["launchEnvFlag"]
 
 
+def gh_read_limit_open_issues() -> int:
+    """How many open issues one ``gh issue list --state open`` reads."""
+    return int(consts()["ghReads"]["openIssues"])
+
+
+def gh_read_limit_all_issues() -> int:
+    """How many issues, in every state, one ``gh issue list --state all`` reads."""
+    return int(consts()["ghReads"]["allIssues"])
+
+
+def gh_read_limit_labels() -> int:
+    """How many labels one ``gh label list`` reads."""
+    return int(consts()["ghReads"]["labels"])
+
+
 def usage_env_flag() -> str:
     """``claudeUsage`` -- the name of the top-level boolean ``GET /api/env`` carries for
     Claude Code usage on this machine, and the inventory row's key; the System page's

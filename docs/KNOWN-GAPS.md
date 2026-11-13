@@ -106,17 +106,6 @@ command does not carry `-Launch`.
 
 **Issue:** [#295](https://github.com/johnfrog76/toolkit/issues/295)
 
-### The terminal and the page can read different issues
-
-**What you see:** The CLI's `Standup`, `Triage` and suggestion read up to 500 issues and 500 labels. The
-Team Agile page reads up to 300 issues in every state, 100 open issues and 200 labels. On a repository
-past those numbers, the page's standup, triage list and suggestion can differ from the terminal's, and
-neither says its read was cut short.
-
-**Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
-
-**Issue:** [#276](https://github.com/johnfrog76/toolkit/issues/276)
-
 ### The terminal's standup dates a commit from one repository, the page from every repository of the Space
 
 **What you see:** On a Space that spans several GitHub repositories, the CLI's `Standup` asks only the
