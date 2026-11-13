@@ -37,8 +37,32 @@
     It returns @{ Code; Lines; Out; Err }, the shape Invoke-P20TrackerRead
     gives a script: Lines is stdout and stderr in the order they came, Out
     stdout alone (what `2>$null` kept), Err stderr alone. $LASTEXITCODE is
-    left at Code. The arguments go to git as written, with no gate on them:
-    a fixture is not a user's input.
+    left at Code. There is no gate on the arguments: a fixture is not a
+    user's input.
+
+    Each argument reaches git as one value, with two things to know.
+
+    PowerShell reads a function's arguments before the function sees them,
+    so a bare word is not always one argument. Quote these, and each arrives
+    as written:
+
+        '--'            bare, the first one ends the parameters and is dropped
+        '-c:x'          bare, it arrives as  -c:  and  x
+        '-a.b'          bare, it arrives as  -a   and  .b
+        '--format=%h,%s'  bare, the comma splits it in two
+        'stash@{0}'     bare, it arrives as  stash@  and  0
+
+        $null = Invoke-P20TestGit -C $repo checkout -q '--' $path
+
+    Clause 23 of Test-Portability.ps1 reads every call under Tests/ and
+    fails on one of these written bare.
+
+    Windows PowerShell 5.1, and PowerShell 7 with
+    $PSNativeCommandArgumentPassing set to Legacy, build a native command
+    line by joining the arguments: an empty one vanishes and a double quote
+    inside one is not escaped. The helper escapes for that host
+    (ConvertTo-P20TestGitArgument), so '' and 'say "hi"' arrive as
+    themselves there too.
 
 .NOTES
     PowerShell 5.1 compatible (ASCII only).
@@ -81,11 +105,48 @@ function Invoke-P20TestHost {
     & $exe @hostArgs 2>&1
 }
 
+function Test-P20TestLegacyNativeArguments {
+    <# True where the host joins a native command's arguments into one line
+       itself: Windows PowerShell 5.1, PowerShell 7.0 to 7.2, and a later one
+       whose $PSNativeCommandArgumentPassing is Legacy. #>
+    if ($PSVersionTable.PSVersion.Major -lt 6) { return $true }
+    $mode = Get-Variable -Name PSNativeCommandArgumentPassing -ValueOnly -ErrorAction SilentlyContinue
+    return ((-not $mode) -or ([string]$mode -eq 'Legacy'))
+}
+
+function ConvertTo-P20TestGitArgument {
+    <# One argument, as a legacy host has to be handed it for git to read the
+       value back. The host wraps an argument holding whitespace in double
+       quotes; it does nothing for an empty argument or for a double quote
+       inside one. So an empty one goes as "" and each double quote as \",
+       with the backslashes before it doubled, which is how the C runtime
+       reads a command line.
+
+       The trailing backslashes of a value it wraps are where the hosts part.
+       PowerShell 7's Legacy mode doubles them itself; Windows PowerShell 5.1
+       does not, so `my dir\` goes out as "my dir\" and the C runtime reads
+       \" as a quote, swallowing the next argument. On 5.1 the helper doubles
+       them; on 7 it leaves them, or they would be doubled twice. #>
+    param([AllowEmptyString()][string]$Value)
+    if ($Value.Length -eq 0) { return '""' }
+    if ($Value.IndexOf('"') -ge 0) {
+        $Value = [regex]::Replace($Value, '(\\*)"', '$1$1\"')
+    }
+    if ($PSVersionTable.PSEdition -eq 'Desktop' -and $Value -match '\s') {
+        $Value = [regex]::Replace($Value, '(\\+)$', '$1$1')
+    }
+    return $Value
+}
+
 function Invoke-P20TestGit {
-    # No param block: every argument, a dash-led one included (-C, -c, --quiet),
-    # reaches git as written.
+    # No param block: a dash-led argument (-C, -c, --quiet) reaches git rather
+    # than binding here. The header says which bare words PowerShell splits
+    # before this function sees them.
     $ErrorActionPreference = 'Continue'
-    $gitArgs = @($args | ForEach-Object { $_ })
+    $gitArgs = @($args | ForEach-Object { $_ } | ForEach-Object { [string]$_ })
+    if (Test-P20TestLegacyNativeArguments) {
+        $gitArgs = @($gitArgs | ForEach-Object { ConvertTo-P20TestGitArgument $_ })
+    }
     $global:LASTEXITCODE = 0
     $raw = @(& git @gitArgs 2>&1)
     $code = $LASTEXITCODE
