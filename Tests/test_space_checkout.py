@@ -51,6 +51,12 @@ class TheSharedTable(unittest.TestCase):
                     want = row["expect"]
                 self.assertEqual(checkout.checkout_path(row["written"]), want)
 
+    def test_a_trailing_separator_is_taken_off_and_a_root_keeps_its_own(self):
+        # Both separators named, as Windows reads a path, so its rows run here.
+        for row in TABLE["trailing"]:
+            with self.subTest(path=row["path"]):
+                self.assertEqual(checkout.trim_trailing_separator(row["path"], "\\/"), row["expect"])
+
     def test_the_repository_a_remote_names(self):
         for row in TABLE["origins"]:
             with self.subTest(url=row["url"]):

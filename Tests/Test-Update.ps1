@@ -31,7 +31,7 @@ $targetScript = Join-Path (Join-Path $pkgRoot 'Scripts') 'Update-Toolkit.ps1'
 # Every script Update-Toolkit.ps1 dot-sources. Resolve-Python.ps1 was missing
 # from this list, so the sandbox's Update fell back to `python3` -- wrong on the
 # Windows, right by coincidence on macOS.
-$helperScripts = @('Test-GitRoot.ps1', 'Resolve-Python.ps1', 'Initialize-CliFallbacks.ps1', 'Invoke-TrackerRead.ps1')
+$helperScripts = @('Test-GitRoot.ps1', 'Resolve-Python.ps1', 'Initialize-CliFallbacks.ps1', 'Invoke-TrackerRead.ps1', 'ConvertTo-NativeArgument.ps1')
 
 $script:passed = 0
 $script:failed = 0
@@ -242,7 +242,7 @@ try {
     # Update SAYS, once, and writes nothing: the verb that dresses them is Cover -Samples.
     Write-Host ""
     Write-Host "-- An older Demo: Update says, and writes nothing -----" -ForegroundColor Cyan
-    $coverHelpers = @('Get-SampleCoverGaps.ps1', 'Add-CardImage.ps1', 'Invoke-TrackerRead.ps1', 'Get-Consts.ps1', 'Resolve-CardName.ps1', 'Set-CardLine.ps1', 'Write-CardText.ps1')
+    $coverHelpers = @('Get-SampleCoverGaps.ps1', 'Add-CardImage.ps1', 'Invoke-TrackerRead.ps1', 'ConvertTo-NativeArgument.ps1', 'Get-Consts.ps1', 'Resolve-CardName.ps1', 'Set-CardLine.ps1', 'Write-CardText.ps1')
     function New-CoverConsumer {
         param([string]$Name)
         $path = New-Consumer $Name

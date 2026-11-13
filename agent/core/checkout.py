@@ -20,6 +20,7 @@ Read only; nothing raises.
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from urllib.parse import unquote
@@ -30,6 +31,8 @@ from .config import load_config, tracker, tracker_repos
 from .consts import consts
 from .git_history import git_read
 
+# A drive with nothing after it, which a trimmed drive root must not become.
+_DRIVE = re.compile(r"^[A-Za-z]:$")
 # The same pattern as Get-P20GitHubOriginRepo (Scripts/Resolve-Tracker.ps1),
 # ignoring case as that one does.
 _ORIGIN = re.compile(r"github\.com[:/]+([^/\s]+)/([^/\s]+?)(?:\.git)?/?$", re.IGNORECASE)
@@ -61,16 +64,36 @@ def checkout_key(slug: str) -> str:
     return f"spaceCheckouts.{slug}.path"
 
 
+def trim_trailing_separator(path: str, seps: str | None = None) -> str:
+    """A folder path without the directory separators at its end. A root is
+    left as it is: a path that is nothing but separators, and a drive root,
+    which keeps one (``C:\\`` stays ``C:\\``; ``C:`` alone is the drive's
+    current folder). The same rule as Remove-P20TrailingSeparator
+    (Scripts/ConvertTo-NativeArgument.ps1), held to it by the fixture's
+    ``trailing`` rows. ``seps`` is the running platform's unless a test names
+    them."""
+    if seps is None:
+        seps = os.sep + (os.altsep or "")
+    p = path or ""
+    trimmed = p.rstrip(seps)
+    if len(trimmed) == len(p) or not trimmed:
+        return p
+    if _DRIVE.match(trimmed):
+        return trimmed + p[2]
+    return trimmed
+
+
 def checkout_path(written: str) -> str:
     """A configured path as written: absolute, or under ``~``. A relative path
-    has nothing on this machine to be relative to, so it is ""."""
+    has nothing on this machine to be relative to, so it is "". A separator at
+    its end is taken off; a root keeps its own."""
     p = (written or "").strip()
     if not p:
         return ""
     if p == "~" or p.startswith(("~/", "~\\")):
         rest = p[1:].lstrip("/\\")
         return str(Path.home() / rest) if rest else str(Path.home())
-    return p if Path(p).is_absolute() else ""
+    return trim_trailing_separator(p) if Path(p).is_absolute() else ""
 
 
 def origin_repo(url: str) -> str:
