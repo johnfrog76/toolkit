@@ -415,7 +415,16 @@ export interface DesignListResponse {
   notShown?: DesignNotShown[];
   structure?: DesignStructure;
   reason?: string | null;
+  /** Which source was read: the Space's checkout on this machine (its working
+   *  tree) or GitHub. Absent from an older agent. */
+  source?: DesignSource;
+  /** The sentence that says which source, drawn at the list's foot. */
+  note?: string;
 }
+
+/** Where a product's designs were read from: the clone the checkout
+ *  names, on disk, or the repo on GitHub. */
+export type DesignSource = "checkout" | "github";
 
 export interface DesignDocDetail extends DesignDoc {
   supported: boolean;
@@ -450,6 +459,8 @@ export interface DesignSearchResponse {
   available: boolean;
   reason: string;
   note: string;
+  /** A repo's search: on disk in the checkout, or GitHub's code search. Absent in the hub. */
+  source?: DesignSource;
   hits: DesignSearchHit[];
 }
 

@@ -26,6 +26,14 @@ is the ADO core's tab on a GitHub Space, not a module -- no flag). The address
 must name ONE repository: an owner-grained address (``github.com/<owner>``)
 is refused with a stated 400, because a design folder is one repo's.
 
+Where this machine names the Space's checkout (``spaceCheckouts.<slug>.path``)
+and it is a clone of this repo (``agent/core/checkout.py``, ``ready``), all three
+routes read THAT CLONE'S WORKING TREE instead -- the four folders on disk, by the
+same field rule, never cached -- so a move MoveDesign has staged there shows on
+the next read, and search inside runs over the files on disk by the hub's word
+rule. Every listing and every search says which source it read in ``note``, and
+``source`` names it: ``checkout`` or ``github``.
+
 A folder that does not exist is an empty list, not an error -- most repos have
 no ``design/`` yet, and the tab then teaches the structure rather than going
 blank (D-DL11). The listing is cached per process for a short TTL. Under it,
@@ -61,6 +69,7 @@ from ..core.consts import (
     stamp_outcome,
     status_done,
 )
+from ..core.git_history import git_read
 from ..core.parsers import _parse_status_metadata, card_design, card_id
 from ..core.tier import _resolve_tier
 from .repo_read import GH_TIMEOUT_SECONDS, _gh, read_folder_rows
@@ -201,6 +210,10 @@ class DesignListResponse(BaseModel):
     notShown: list[NotShown] = []  # files in the four folders that are not designs
     structure: Structure = Structure()
     reason: str | None = None
+    # Which source was read: "checkout" (the clone's working tree) or "github";
+    # and the sentence that says so, drawn under the list.
+    source: str = ""
+    note: str = ""
     # The Space's checkout on this machine (spaceCheckouts.<slug>.path): ready,
     # and a product row offers MoveDesign's roads; not, and the tab names the
     # setting. Read fresh on every request -- never from the listing's cache.
@@ -239,6 +252,7 @@ class DesignSearchResponse(BaseModel):
     available: bool = True  # False when the search engine could not answer; reason says why
     reason: str = ""
     note: str = ""  # what this search cannot see, said every time
+    source: str = ""  # "checkout" (on disk, in the clone) or "github" (code search); "" in the hub
     hits: list[SearchHit] = []
 
 
@@ -246,6 +260,10 @@ CODE_SEARCH_NOTE = (
     "GitHub's code search reads the default branch only, and lags a push by minutes: "
     "a design on a branch, or pushed just now, is not found."
 )
+GITHUB_LIST_NOTE = "Read from {repo} on GitHub, its default branch: a move staged in a clone shows once it is pushed."
+CHECKOUT_LIST_NOTE = "Read on disk, in the clone at {root} on {branch}, as its working tree is right now."
+CHECKOUT_SEARCH_NOTE = "Searched on disk, in the clone at {root} on {branch}, as its working tree is right now."
+SOURCE_CHECKOUT, SOURCE_GITHUB = "checkout", "github"
 
 
 def search_words(q: str) -> list[str]:
@@ -316,10 +334,12 @@ def search_design(repo: str, q: str) -> DesignSearchResponse:
     two roots (each with its archive under it), asked for text matches."""
     words = search_words(q)
     if not words:
-        return DesignSearchResponse(repo=repo, query=q, note=CODE_SEARCH_NOTE)
+        return DesignSearchResponse(repo=repo, query=q, note=CODE_SEARCH_NOTE, source=SOURCE_GITHUB)
     listing = list_design(repo)
     if listing.reason:
-        return DesignSearchResponse(repo=repo, query=q, available=False, reason=listing.reason, note=CODE_SEARCH_NOTE)
+        return DesignSearchResponse(
+            repo=repo, query=q, available=False, reason=listing.reason, note=CODE_SEARCH_NOTE, source=SOURCE_GITHUB
+        )
     matches: list[tuple[str, str]] = []
     for root in DESIGN_FOLDERS:
         # The query goes as -f/-F fields, never in the URL: the agent runs gh
@@ -339,7 +359,12 @@ def search_design(repo: str, q: str) -> DesignSearchResponse:
         )
         if why:
             return DesignSearchResponse(
-                repo=repo, query=q, available=False, reason=f"{repo}: {why}", note=CODE_SEARCH_NOTE
+                repo=repo,
+                query=q,
+                available=False,
+                reason=f"{repo}: {why}",
+                note=CODE_SEARCH_NOTE,
+                source=SOURCE_GITHUB,
             )
         for item in (rows or {}).get("items", []) if isinstance(rows, dict) else []:
             path = item.get("path", "")
@@ -350,7 +375,7 @@ def search_design(repo: str, q: str) -> DesignSearchResponse:
             matches.append((path, line))
     hits = hits_from_matches(listing.items, listing.designs, matches)
     log_writer.write_log("CMD", "agent/design", f"search '{q}': {len(hits)} hits ({repo})")
-    return DesignSearchResponse(repo=repo, query=q, hits=hits, note=CODE_SEARCH_NOTE)
+    return DesignSearchResponse(repo=repo, query=q, hits=hits, note=CODE_SEARCH_NOTE, source=SOURCE_GITHUB)
 
 
 def space_repo(org_url: str) -> str | None:
@@ -630,7 +655,7 @@ def list_design(repo: str) -> DesignListResponse:
         repo, [f for f, _k, _w in folders], namespace=DESIGN_ROWS, parse=design_fields, keep=_is_design_file
     )
     if read.reason:
-        return DesignListResponse(repo=repo, reason=f"{repo}: {read.reason}")
+        return DesignListResponse(repo=repo, reason=f"{repo}: {read.reason}", source=SOURCE_GITHUB)
     items: list[DesignDoc] = []
     structure = Structure()
     for folder, _kind, where in folders:
@@ -641,7 +666,15 @@ def list_design(repo: str) -> DesignListResponse:
             setattr(structure, folder, True)
         items.extend(design_doc(read.rows[e.path], e.path, read.file_url(e.path)) for e in entries)
     designs, not_shown = group_designs(items)
-    resp = DesignListResponse(repo=repo, items=items, designs=designs, notShown=not_shown, structure=structure)
+    resp = DesignListResponse(
+        repo=repo,
+        items=items,
+        designs=designs,
+        notShown=not_shown,
+        structure=structure,
+        source=SOURCE_GITHUB,
+        note=GITHUB_LIST_NOTE.format(repo=repo),
+    )
     _list_cache[repo] = (time.monotonic(), resp, read.shas)
     log_writer.write_log(
         "CMD",
@@ -674,6 +707,131 @@ def read_design_doc(repo: str, path: str) -> DesignDocDetail:
     doc = parse_design_doc(text or "", path, url or (row or {}).get("html_url", ""))
     log_writer.write_log("CMD", "agent/design", f"{path} ({repo}{'' if row else '; from the cache'})")
     return DesignDocDetail(**doc.model_dump(), repo=repo, body=text or "")
+
+
+# -- The Space's checkout, read on disk (the clone's working tree) -----------------
+# Where the checkout is ready, the clone IS the truth this machine has: what
+# MoveDesign staged there, and what the clone's branch carries that GitHub's
+# default branch does not. Nothing here is cached -- a move must show on the
+# next read -- and nothing here touches _list_cache, which is GitHub's.
+
+
+def checkout_branch(root: Path) -> str:
+    """The branch the clone has checked out, "" when HEAD is detached or git cannot say."""
+    return (git_read(["branch", "--show-current"], root) or "").strip()
+
+
+def _inside(root: Path, path: Path) -> bool:
+    """``path``, links followed, is under ``root``: nothing outside the clone is read."""
+    try:
+        path.resolve().relative_to(root.resolve())
+    except (OSError, ValueError):
+        return False
+    return True
+
+
+def _blob_base(repo: str, branch: str) -> str:
+    return f"https://github.com/{repo}/blob/{branch or 'HEAD'}"
+
+
+def read_tree(repo: str, root: Path) -> tuple[list[DesignDoc], dict[str, str], Structure, str]:
+    """The four folders of the clone at ``root``, read from its working tree:
+    the docs (by the same ``parse_design_doc`` the GitHub read uses), each
+    file's text by its repo path (for search inside), which roots exist, and
+    the branch. A file's ``url`` is its page on github.com on that branch, so
+    the reading room's relative links resolve as they do on the GitHub read."""
+    branch = checkout_branch(root)
+    base = _blob_base(repo, branch)
+    docs: list[DesignDoc] = []
+    texts: dict[str, str] = {}
+    structure = Structure()
+    for folder, _kind, where in design_folders():
+        d = root / folder
+        if not d.is_dir() or not _inside(root, d):
+            continue  # no such folder: an empty list, not an error
+        if where == LIVE:
+            setattr(structure, folder, True)
+        for f in sorted(d.iterdir(), key=lambda p: p.name):
+            if not f.is_file() or not _is_design_file(f.name) or not _inside(root, f):
+                continue
+            try:
+                text = f.read_text(encoding="utf-8-sig", errors="replace")
+            except OSError:
+                continue
+            path = f"{folder}/{f.name}"
+            docs.append(parse_design_doc(text, path, f"{base}/{path}"))
+            texts[path] = text
+    return docs, texts, structure, branch
+
+
+def _branch_words(branch: str) -> str:
+    return branch or "a detached HEAD"
+
+
+def list_design_local(repo: str, root: Path) -> DesignListResponse:
+    """The listing, read from the clone's working tree -- never cached."""
+    items, _texts, structure, branch = read_tree(repo, root)
+    designs, not_shown = group_designs(items)
+    log_writer.write_log(
+        "CMD", "agent/design", f"{len(designs)} designs, {len(not_shown)} not shown ({repo}; the clone at {root})"
+    )
+    return DesignListResponse(
+        repo=repo,
+        items=items,
+        designs=designs,
+        notShown=not_shown,
+        structure=structure,
+        source=SOURCE_CHECKOUT,
+        note=CHECKOUT_LIST_NOTE.format(root=root, branch=_branch_words(branch)),
+    )
+
+
+def search_design_local(repo: str, root: Path, q: str) -> DesignSearchResponse:
+    """Search inside the clone's four folders: the hub's rule (``match_words``)
+    over each file's text on disk, so a design only the clone's branch carries
+    is found."""
+    words = search_words(q)
+    docs, texts, _structure, branch = read_tree(repo, root)
+    matches: list[tuple[str, str]] = []
+    for doc in docs if words else []:
+        line = match_words(texts.get(doc.path, ""), words)
+        if line is not None:
+            matches.append((doc.path, line))
+    designs, _not_shown = group_designs(docs)
+    hits = hits_from_matches(docs, designs, matches)
+    if words:
+        log_writer.write_log("CMD", "agent/design", f"search '{q}': {len(hits)} hits ({repo}; the clone at {root})")
+    note = CHECKOUT_SEARCH_NOTE.format(root=root, branch=_branch_words(branch))
+    return DesignSearchResponse(repo=repo, query=q, hits=hits, note=note, source=SOURCE_CHECKOUT)
+
+
+def read_design_doc_local(repo: str, root: Path, path: str) -> DesignDocDetail:
+    """One document, read from the clone's working tree. ``path`` has already
+    passed ``folder_of``; it is resolved under the clone, and a link that leads
+    out of it is not followed."""
+    f = root / path
+    if not _inside(root, f) or not f.is_file():
+        raise HTTPException(status_code=404, detail=f"No {path} in the clone at {root}.")
+    folder, _, name = path.rpartition("/")
+    try:
+        text = f.read_text(encoding="utf-8-sig", errors="replace")
+    except OSError as e:
+        return DesignDocDetail(repo=repo, folder=folder, name=name, path=path, reason=f"{root}: {e}")
+    doc = parse_design_doc(text, path, f"{_blob_base(repo, checkout_branch(root))}/{path}")
+    log_writer.write_log("CMD", "agent/design", f"{path} ({repo}; the clone at {root})")
+    return DesignDocDetail(**doc.model_dump(), repo=repo, body=text)
+
+
+def _checkout_for(cfg: dict, repo: str) -> SpaceCheckout | None:
+    """The active Space's checkout, checked against ``repo``; None when no Space
+    is active. Asked fresh on every request, so a Config -Set shows on a re-read."""
+    slug = str(cfg.get("activeSpace") or "")
+    return space_checkout(slug, repo, cfg) if slug else None
+
+
+def _ready_root(checkout: SpaceCheckout | None) -> Path | None:
+    """The clone's top level when the checkout is ready: the source to read."""
+    return Path(checkout.root) if checkout is not None and checkout.ready and checkout.root else None
 
 
 # -- The cards a design was worked against (toolkit card C3) ----------------------
@@ -758,31 +916,38 @@ async def get_design():
     repo = await repo_gate()
     if repo is None:
         return DesignListResponse(supported=False)
-    listed = await asyncio.to_thread(list_design, repo)
-    # The listing is cached; the cards are read fresh, onto a copy, so a card
-    # bound a second ago is on the next read (toolkit card C3).
-    resp = listed.model_copy(deep=True)
-    # The active Space's own cards: a repo's design is that product's.
     cfg = load_config()
     slug = str(cfg.get("activeSpace") or "")
+    # The configured checkout, checked against this repo: whether the moves can
+    # run here, and -- when they can -- the source the listing is read from.
+    checkout = await asyncio.to_thread(_checkout_for, cfg, repo)
+    root = _ready_root(checkout)
+    if root is not None:
+        resp = await asyncio.to_thread(list_design_local, repo, root)
+    else:
+        # The GitHub listing is cached; the cards are read fresh, onto a copy,
+        # so a card bound a second ago is on the next read (toolkit card C3).
+        resp = (await asyncio.to_thread(list_design, repo)).model_copy(deep=True)
+    # The active Space's own cards: a repo's design is that product's.
     folders = [(slug, resolve_dirs()[0].parent)]
     await asyncio.to_thread(attach_cards, resp.designs, folders)
-    # Whether the moves can run here: the configured checkout, checked against
-    # this repo (#146). Fresh per request, so a Config -Set shows on a re-read.
-    if slug:
-        resp.checkout = await asyncio.to_thread(space_checkout, slug, repo, cfg)
+    resp.checkout = checkout
     return resp
 
 
 @api.get("/design/search", response_model=DesignSearchResponse)
 async def get_design_search(q: str = ""):
     # Search inside a repo's four folders (L2b): asked on request, never on the
-    # tab's first draw -- GitHub's code search is Tier 1, rate-limited and slow
-    # on a cold agent, so the tab degrades the way its other reads do:
-    # the groups are already drawn, and a search that cannot run says why.
+    # tab's first draw. On disk in the clone where the checkout is ready; else
+    # GitHub's code search -- Tier 1, rate-limited and slow on a cold agent, so
+    # the tab degrades the way its other reads do: the groups are already
+    # drawn, and a search that cannot run says why.
     repo = await repo_gate()
     if repo is None:
         return DesignSearchResponse(supported=False, query=q, note=CODE_SEARCH_NOTE)
+    root = _ready_root(await asyncio.to_thread(_checkout_for, load_config(), repo))
+    if root is not None:
+        return await asyncio.to_thread(search_design_local, repo, root, q)
     return await asyncio.to_thread(search_design, repo, q)
 
 
@@ -798,4 +963,9 @@ async def get_design_doc(path: str):
     repo = await repo_gate()
     if repo is None:
         return DesignDocDetail(supported=False)
+    # The same source the listing read, so a path it handed out opens: a move
+    # staged in the clone has a path GitHub does not have yet.
+    root = _ready_root(await asyncio.to_thread(_checkout_for, load_config(), repo))
+    if root is not None:
+        return await asyncio.to_thread(read_design_doc_local, repo, root, path)
     return await asyncio.to_thread(read_design_doc, repo, path)

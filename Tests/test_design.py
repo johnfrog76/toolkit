@@ -942,5 +942,166 @@ class TheRoutes(unittest.TestCase):
         self.assertTrue(body.endswith("New.\n"))
 
 
+_REAL_RUN = subprocess.run
+
+
+def _git(cwd: Path, *args: str) -> None:
+    _REAL_RUN(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "-C", str(cwd), *args],
+        check=True,
+        capture_output=True,
+    )
+
+
+class TheCheckoutSource(unittest.TestCase):
+    """Where the active Space's checkout is configured and is a clone of the
+    Space's repo, the three routes read the clone's WORKING TREE: a staged move
+    shows on the next read, search runs on disk by the hub's word rule, and the
+    document read follows the listing's paths. Otherwise, GitHub, as before."""
+
+    NOTE_X = _front(ID_A) + "# The board\n\nA note about the board.\n"
+
+    def setUp(self):
+        design.clear_cache()
+        self.client = TestClient(app)
+        self._tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self._tmp.name).resolve()
+        self.clone = self.base / "clone"
+        self.clone.mkdir()
+        _git(self.clone, "init", "-q", "-b", "main")
+        _git(self.clone, "remote", "add", "origin", f"https://github.com/{REPO}.git")
+        (self.clone / "design").mkdir()
+        (self.clone / "spec").mkdir()
+        (self.clone / "design" / "x.md").write_text(self.NOTE_X, encoding="utf-8")
+        _git(self.clone, "add", "-A")
+        _git(self.clone, "commit", "-q", "-m", "seed")
+        self.space = self.base / "hub" / "prod"
+        (self.space / "current").mkdir(parents=True)
+        (self.space / "archive").mkdir()
+        self.gh_calls: list[list[str]] = []
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _get(self, url: str, checkout: str | None = None, active: bool = True, fake: FakeRepo | None = None):
+        cfg: dict = {"org": ORG, "status": "active"}
+        if active:
+            cfg["activeSpace"] = "prod"
+        cfg["spaceCheckouts"] = {"prod": {"path": str(self.clone if checkout is None else checkout)}}
+
+        def run(argv, **kw):
+            if argv[0] == "git":
+                return _REAL_RUN(argv, **kw)
+            self.gh_calls.append(list(argv))
+            if fake is None:
+                raise AssertionError(f"the checkout's read asked gh: {argv}")
+            return fake(argv, **kw)
+
+        with (
+            mock.patch.object(design, "load_config", return_value=cfg),
+            mock.patch.object(design, "_resolve_tier", return_value=(1, "")),
+            mock.patch.object(design, "resolve_dirs", return_value=(self.space / "current", self.space / "archive")),
+            mock.patch.object(design.subprocess, "run", side_effect=run),
+        ):
+            return self.client.get(url)
+
+    def test_the_listing_reads_the_working_tree_and_says_so(self):
+        body = self._get("/api/design").json()
+        self.assertEqual(body["source"], "checkout")
+        self.assertEqual(
+            body["note"], f"Read on disk, in the clone at {self.clone} on main, as its working tree is right now."
+        )
+        self.assertTrue(body["checkout"]["ready"])
+        self.assertEqual(body["structure"], {"design": True, "spec": True})
+        self.assertEqual([(d["id"], d["state"], d["title"]) for d in body["designs"]], [(ID_A, "Design", "The board")])
+        self.assertEqual(body["items"][0]["url"], f"https://github.com/{REPO}/blob/main/design/x.md")
+        self.assertEqual(self.gh_calls, [])
+
+    def test_a_staged_move_shows_on_the_next_read(self):
+        self.assertEqual(self._get("/api/design").json()["designs"][0]["state"], "Design")
+        (self.clone / "design" / "archive").mkdir()
+        _git(self.clone, "mv", "design/x.md", "design/archive/x.md")  # staged, never committed
+        body = self._get("/api/design").json()
+        self.assertEqual(
+            [(d["state"], d["note"]["path"]) for d in body["designs"]], [("Archived", "design/archive/x.md")]
+        )
+        # A file nobody has added yet is on the working tree too.
+        (self.clone / "spec" / "x.spec.md").write_text(_front(ID_A) + "# The board\n", encoding="utf-8")
+        self.assertEqual(self._get("/api/design").json()["designs"][0]["state"], "Spec")
+        self.assertEqual(self.gh_calls, [])
+
+    def test_search_finds_text_only_on_the_clones_branch(self):
+        _git(self.clone, "checkout", "-q", "-b", "lounge")
+        (self.clone / "design" / "lounge.md").write_text(
+            _front(ID_B) + "# The lounge\n\nAn AMBIENT room, nothing asked.\n", encoding="utf-8"
+        )
+        _git(self.clone, "add", "-A")
+        _git(self.clone, "commit", "-q", "-m", "branch only")
+        body = self._get("/api/design/search?q=room%20ambient").json()
+        self.assertEqual((body["supported"], body["available"], body["source"]), (True, True, "checkout"))
+        self.assertEqual(
+            [(h["path"], h["id"], h["state"], h["line"]) for h in body["hits"]],
+            [("design/lounge.md", ID_B, "Design", "An AMBIENT room, nothing asked.")],
+        )
+        self.assertEqual(
+            body["note"], f"Searched on disk, in the clone at {self.clone} on lounge, as its working tree is right now."
+        )
+        self.assertEqual(body["hits"][0]["url"], f"https://github.com/{REPO}/blob/lounge/design/lounge.md")
+        self.assertEqual(self._get("/api/design/search?q=").json()["hits"], [])
+        self.assertEqual(self.gh_calls, [])
+
+    def test_the_document_read_follows_the_listing(self):
+        (self.clone / "design" / "archive").mkdir()
+        _git(self.clone, "mv", "design/x.md", "design/archive/x.md")
+        moved = self._get("/api/design/design/archive/x.md")
+        self.assertEqual(moved.status_code, 200)
+        body = moved.json()
+        self.assertEqual((body["path"], body["archived"], body["id"]), ("design/archive/x.md", True, ID_A))
+        self.assertEqual(body["body"], self.NOTE_X)
+        self.assertEqual(self._get("/api/design/design/x.md").status_code, 404)
+        self.assertEqual(self.gh_calls, [])
+
+    def test_a_path_outside_the_four_folders_is_refused(self):
+        outside = self.base / "secret.md"
+        outside.write_text(_front(ID_C) + "# Not the clone's\n", encoding="utf-8")
+        (self.clone / "design" / "leak.md").symlink_to(outside)
+        (self.clone / "design" / "archive").symlink_to(self.base, target_is_directory=True)
+        for url in (
+            "/api/design/issues/x.md",
+            "/api/design/design/../../secret.md",
+            "/api/design/design/%2E%2E/x.md",
+            "/api/design/design/leak.md",
+            "/api/design/design/archive/secret.md",
+        ):
+            self.assertEqual(self._get(url).status_code, 404, url)
+        listed = self._get("/api/design").json()
+        self.assertEqual([i["path"] for i in listed["items"]], ["design/x.md"])
+        self.assertEqual(self.gh_calls, [])
+
+    def test_a_checkout_of_another_repo_falls_back_to_github(self):
+        _git(self.clone, "remote", "set-url", "origin", "https://github.com/o/other.git")
+        fake = FakeRepo({"design": {"x.md": _front(ID_A) + "# On GitHub\n\nThe default branch.\n"}})
+        body = self._get("/api/design", fake=fake).json()
+        self.assertFalse(body["checkout"]["ready"])
+        self.assertEqual(body["source"], "github")
+        self.assertEqual(body["note"], design.GITHUB_LIST_NOTE.format(repo=REPO))
+        self.assertEqual(body["designs"][0]["title"], "On GitHub")
+        found = self._get("/api/design/search?q=default%20branch", fake=fake).json()
+        self.assertEqual((found["source"], found["note"]), ("github", design.CODE_SEARCH_NOTE))
+        self.assertEqual([h["path"] for h in found["hits"]], ["design/x.md"])
+        self.assertEqual(self._get("/api/design/design/x.md", fake=fake).json()["title"], "On GitHub")
+        self.assertNotEqual(self.gh_calls, [])
+
+    def test_no_checkout_is_todays_read(self):
+        fake = FakeRepo({"design": {"x.md": _front(ID_A) + "# On GitHub\n"}})
+        for checkout, active in ((None, False), ("", True)):
+            design.clear_cache()
+            body = self._get("/api/design", checkout=checkout, active=active, fake=fake).json()
+            self.assertEqual((body["source"], body["designs"][0]["title"]), ("github", "On GitHub"))
+            self.assertEqual(body["note"], design.GITHUB_LIST_NOTE.format(repo=REPO))
+            found = self._get("/api/design/search?q=github", checkout=checkout, active=active, fake=fake).json()
+            self.assertEqual((found["source"], found["note"]), ("github", design.CODE_SEARCH_NOTE))
+
+
 if __name__ == "__main__":
     unittest.main()

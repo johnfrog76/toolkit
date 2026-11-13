@@ -35,21 +35,6 @@ one exposed action and the rest in its `...` menu
 
 **Issue:** [#287](https://github.com/johnfrog76/toolkit/issues/287)
 
-### A repository's designs move only through a named checkout
-
-**What you see:** The Design tab moves a product's design only where `spaceCheckouts.<slug>.path` names a
-clone of its repository
-([Configuration](CONFIGURATION.md#spacecheckoutsslugpath----a-spaces-checkout-on-this-machine)); without
-one, the tab's foot names the setting. The move is staged in the clone and never committed, and the tab
-reads GitHub, so the row keeps its old place until the engineer commits and pushes; choosing the road
-again meanwhile is refused by the verb, in its words. A repository's **Search inside** is GitHub's code
-search: the default branch only, minutes behind a push, and rate-limited. The note under the results says
-so, and a search that cannot run says why in its row.
-
-**Where you meet it:** [the Studio](modules/studio.md#known-gaps), "Known gaps"
-
-**Issue:** [#288](https://github.com/johnfrog76/toolkit/issues/288)
-
 ### `Config -Set` cannot declare a Teams recipient
 
 **What you see:** `tkConfig -Set managerWorkflow.communication.recipients.<key>.display=...` answers
