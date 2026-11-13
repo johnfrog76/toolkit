@@ -385,7 +385,7 @@ $joinedCases = @($joinedTable.cases)
 $joinedAsOf = ([regex]::Match($joinedRaw, '"asOf"\s*:\s*"([^"]+)"')).Groups[1].Value
 $joinedSince = ([regex]::Match($joinedRaw, '"since"\s*:\s*"([^"]+)"')).Groups[1].Value
 $joinedNames = (@($joinedCases | ForEach-Object { [string]$_.name })) -join ','
-Assert-True 'the joined table is read: the six shapes, all of them together, then what moved' ($joinedNames -ceq 'linked-card-open-issue,linked-card-archived-issue-open,issue-closed-card-current,linked-card-issue-unrouted,custom-card-alone,issue-alone,not-billable,together,counts,not-billable-counts,window-three-days') $joinedNames
+Assert-True 'the joined table is read: the six shapes, all of them together, then what moved' ($joinedNames -ceq 'linked-card-open-issue,linked-card-archived-issue-open,issue-closed-card-current,linked-card-issue-unrouted,custom-card-alone,issue-alone,not-billable,together,counts,not-billable-counts,window-three-days,commits-window,issue-labelled-in-window,issue-assigned-before-window,dates-not-read') $joinedNames
 
 foreach ($case in $joinedCases) {
     $name = 'joined-' + [string]$case.name
@@ -393,8 +393,10 @@ foreach ($case in $joinedCases) {
     Write-Host ""
     Write-Host "-- $name --" -ForegroundColor Cyan
     $window = ConvertTo-P20StandupDay $case.window
+    # The dates read, when the case has one: absent is not read, and today's rule stands.
     $s = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @($joinedTable.workerLabels) -Issues @($case.issues) -Tracker @{ ok = $true; reason = '' } `
-        -Cards @($case.cards) -Space ([string]$joinedTable.space) -SpaceName ([string]$joinedTable.spaceName) -Window $window -PackageRoot $pkgRoot
+        -Cards @($case.cards) -Space ([string]$joinedTable.space) -SpaceName ([string]$joinedTable.spaceName) -Window $window -PackageRoot $pkgRoot `
+        -CommitDates (ConvertTo-P20StandupMap $case.commitDates) -IssueStarts (ConvertTo-P20StandupMap $case.issueStarts)
     if ($window) {
         # A window's since is that day's midnight in asOf's own offset (7's ConvertFrom-Json may hand back a [datetime]: the instant is compared).
         $wantSince = ConvertTo-P20RitualTime $exp.since
@@ -421,10 +423,11 @@ foreach ($case in $joinedCases) {
         Assert-True "${name}: each item's motion and commits" ($gotMotions -ceq $wantMotions) ("`n got: $gotMotions`nwant: $wantMotions")
     }
     if ($null -ne $exp.counts) {
-        $countLine = { param($c) "$($c.closed)/$($c.started)/$($c.inProgress)/$($c.commits)" }
+        # Absent undated is none undated.
+        $countLine = { param($c) $u = 0; if ($null -ne $c.undated) { $u = [int]$c.undated }; "$($c.closed)/$($c.started)/$($c.inProgress)/$($c.commits)/$u" }
         $wantCounts = (@($exp.counts.workers | ForEach-Object { "$($_.label) " + (& $countLine $_) }) + @('total ' + (& $countLine $exp.counts.total))) -join ' | '
         $gotCounts = (@($s.counts.workers | ForEach-Object { "$($_.label) " + (& $countLine $_) }) + @('total ' + (& $countLine $s.counts.total))) -join ' | '
-        Assert-True "${name}: the counts per worker and in total (closed/started/in progress/commits)" ($gotCounts -ceq $wantCounts) ("`n got: $gotCounts`nwant: $wantCounts")
+        Assert-True "${name}: the counts per worker and in total (closed/started/in progress/commits/undated)" ($gotCounts -ceq $wantCounts) ("`n got: $gotCounts`nwant: $wantCounts")
     }
 
     $text = Format-P20StandupText -Standup $s -PackageRoot $pkgRoot
@@ -468,6 +471,47 @@ $countsCase = @($joinedCases | Where-Object { $_.name -eq 'counts' })[0]
 $countsFill = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @($joinedTable.workerLabels) -Issues @($countsCase.issues) -Tracker @{ ok = $true; reason = '' } -Cards @($countsCase.cards) -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
 $countsFirst = @((Format-P20StandupBrief -Standup $countsFill -PackageRoot $pkgRoot) -split "`n")[0]
 Assert-True 'the counts line opens the brief' ($countsFirst -ceq 'Since Thursday 1 October 2026: 2 closed, 2 started, 2 in progress, 5 commits.') $countsFirst
+$windowCase = @($joinedCases | Where-Object { $_.name -eq 'commits-window' })[0]
+$windowFill = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @($joinedTable.workerLabels) -Issues @($windowCase.issues) -Tracker @{ ok = $true; reason = '' } -Cards @($windowCase.cards) -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot `
+    -CommitDates (ConvertTo-P20StandupMap $windowCase.commitDates) -IssueStarts (ConvertTo-P20StandupMap $windowCase.issueStarts)
+$windowFirst = @((Format-P20StandupBrief -Standup $windowFill -PackageRoot $pkgRoot) -split "`n")[0]
+Assert-True 'an undated commit is said after the commits, not counted' ($windowFirst -ceq 'Since Thursday 1 October 2026: 1 started, 1 in progress, 3 commits (2 undated).') $windowFirst
+Assert-True 'with only undated commits the count says so: 0 commits (2 undated)' ((Get-P20StandupCountsText ([ordered]@{ closed = 0; started = 0; inProgress = 0; commits = 0; undated = 2 })) -ceq '0 commits (2 undated)')
+$readSince = Get-P20StandupSince -AsOf $readAsOf
+$wh = Select-P20StandupWindowHashes -Hashes @('a0a1111', 'b0b2222', 'c0c3333', 'd0d4444') -CommitDates @{ 'A0A1111FFFF' = '2026-10-01T04:00:00Z'; 'b0b2222' = '2026-09-30T23:59:59-04:00'; 'c0c3333' = $null } -Since $readSince -AsOf $readAsOf
+Assert-True 'the window hashes rule: in the window counts, before it drops, no date is undated (agent: the same)' ((($wh.inside) -join ',') -ceq 'a0a1111' -and (($wh.undated) -join ',') -ceq 'c0c3333,d0d4444') "$($wh.inside -join ',') | $($wh.undated -join ',')"
+$notRead = Select-P20StandupWindowHashes -Hashes @('a0a1111') -CommitDates $null -Since $readSince -AsOf $readAsOf
+Assert-True 'no dates read: every hash counts' ((($notRead.inside) -join ',') -ceq 'a0a1111' -and @($notRead.undated).Count -eq 0)
+$plainCase = @($joinedCases | Where-Object { $_.name -eq 'dates-not-read' })[0]
+$plainFill = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @($joinedTable.workerLabels) -Issues @($plainCase.issues) -Tracker @{ ok = $true; reason = '' } -Cards @($plainCase.cards) -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
+$plainAsks = Get-P20StandupDateAsks -Standup $plainFill -Cards @($plainCase.cards) -Slots @('yesterday', 'today', 'blockers')
+Assert-True 'the asks are the counted cards'' hashes (agent: the same)' ((($plainAsks.hashes) -join ',') -ceq 'a0a1111,b0b2222,c0c3333,d0d4444,a0a9999,e0e5555,f0f6666' -and @($plainAsks.numbers).Count -eq 0) "$($plainAsks.hashes -join ',') | $($plainAsks.numbers -join ',')"
+$loneCase = @($joinedCases | Where-Object { $_.name -eq 'issue-assigned-before-window' })[0]
+$loneFill = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @($joinedTable.workerLabels) -Issues @($loneCase.issues) -Tracker @{ ok = $true; reason = '' } -Cards @($loneCase.cards) -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
+$loneAsks = Get-P20StandupDateAsks -Standup $loneFill -Cards @($loneCase.cards) -Slots @('yesterday', 'today', 'blockers')
+Assert-True 'and the open issues with no card, by number (agent: the same)' (@($loneAsks.hashes).Count -eq 0 -and (($loneAsks.numbers) -join ',') -ceq '172') "$($loneAsks.numbers -join ',')"
+
+# -- The dates read: its query and its parse ----------------------------------
+# Tests/fixtures/rituals/standup-dates.json, the SAME rows Tests/test_rituals.py
+# asserts against dates_query and dates_from_answer.
+Write-Host ""
+Write-Host "-- The dates read --" -ForegroundColor Cyan
+$datesTable = [System.IO.File]::ReadAllText((Join-Path $fixtureDir 'standup-dates.json')) | ConvertFrom-Json
+$dq = $datesTable.query
+$wantQuery = ((@($dq.lines | ForEach-Object { [string]$_ })) -join "`n") + "`n"
+$gotQuery = Get-P20StandupDatesQuery -Hashes ([string[]]@($dq.hashes)) -Numbers ([int[]]@($dq.numbers))
+Assert-True 'dates: the query, line for line' ($gotQuery -ceq $wantQuery) ("`n--- got ---`n$gotQuery--- want ---`n$wantQuery")
+Assert-True 'dates: a hash that is not hex is never written into the query' (-not (Get-P20StandupDatesQuery -Hashes @('a0a1111") { x } evil: object(expression: "') -Numbers @()).Contains('evil'))
+foreach ($dc in @($datesTable.cases)) {
+    $got = ConvertFrom-P20StandupDates -Repository $dc.answer -Hashes ([string[]]@($dc.hashes)) -Numbers ([int[]]@($dc.numbers)) -WorkerLabels ([string[]]@($datesTable.workerLabels))
+    $instant = { param($v) $t = ConvertTo-P20RitualTime $v; if ($null -eq $t) { 'null' } else { $t.UtcTicks } }
+    $wantC = (@($dc.expected.commitDates.PSObject.Properties | ForEach-Object { "$($_.Name)=$(& $instant $_.Value)" }) | Sort-Object) -join ','
+    $gotC = (@($got.commitDates.Keys | ForEach-Object { "$_=$(& $instant $got.commitDates[$_])" }) | Sort-Object) -join ','
+    $wantS = (@($dc.expected.issueStarts.PSObject.Properties | ForEach-Object { "$($_.Name)=$(& $instant $_.Value)" }) | Sort-Object) -join ','
+    $gotS = (@($got.issueStarts.Keys | ForEach-Object { "$_=$(& $instant $got.issueStarts[$_])" }) | Sort-Object) -join ','
+    Assert-True "dates $($dc.name): the commit dates" ($gotC -ceq $wantC) "got [$gotC] want [$wantC]"
+    Assert-True "dates $($dc.name): the issue starts" ($gotS -ceq $wantS) "got [$gotS] want [$wantS]"
+}
 Assert-True 'rounds share an id: the one in current/ is the card, so an earlier archived round is no Check line' (@($rounds.checks).Count -eq 0 -and (@($rounds.links | ForEach-Object { "$($_.lane)|$($_.path)" }) -join ',') -ceq 'In Progress|current/141-build.prompt.md') ((@($rounds.links | ForEach-Object { "$($_.lane)|$($_.path)" })) -join ',')
 
 # -- 1c. The work grain (D-TA20) -------------------------------------------
@@ -689,7 +733,7 @@ foreach ($row in @($suggestTable.nearest)) {
 }
 foreach ($row in $suggestRows) {
     $dismissed = [string[]]@($row.dismissed | ForEach-Object { [string]$_ })
-    $chosen = Select-P20Suggestion -Items @($row.items) -HowIWork ([string]$row.howIWork) -Dismissed $dismissed -PackageRoot $pkgRoot
+    $chosen = Select-P20Suggestion -Items @($row.items) -HowIWork ([string]$row.howIWork) -Dismissed $dismissed -PackageRoot $pkgRoot -Launch ([bool]$row.launch)
     $exp = $row.expected
     $gotOrder = (@($chosen.picked | ForEach-Object { $_.ref })) -join ','
     $wantOrder = (@($exp.order | ForEach-Object { [string]$_ })) -join ','
@@ -858,6 +902,20 @@ function global:gh {
     `$global:LASTEXITCODE = 0
     if (`$args[0] -eq 'label' -and `$args[1] -eq 'list') { return (Get-Content -Raw -LiteralPath '$(& $q (Join-Path $scratch 'labels.json'))') }
     if (`$args[0] -eq 'issue' -and `$args[1] -eq 'list') { return (Get-Content -Raw -LiteralPath '$(& $q (Join-Path $scratch 'issues.json'))') }
+    if (`$args[0] -eq 'api' -and `$args[1] -eq 'graphql') {
+        # The dates read: every hash asked for authored a minute ago -- one starting d7, thirty days ago -- and every issue a timeline with no event.
+        `$query = Get-Content -Raw -Encoding UTF8 -LiteralPath ((@(`$args) | Where-Object { "`$_" -like 'query=@*' } | Select-Object -First 1).Substring(7))
+        `$when = [DateTimeOffset]::UtcNow.AddMinutes(-1).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", [System.Globalization.CultureInfo]::InvariantCulture)
+        `$old = [DateTimeOffset]::UtcNow.AddDays(-30).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", [System.Globalization.CultureInfo]::InvariantCulture)
+        `$repo = [ordered]@{}
+        foreach (`$m in [regex]::Matches(`$query, '(c\d+): object\(expression: "([0-9a-f]+)"\)')) {
+            `$at = `$when
+            if (`$m.Groups[2].Value.StartsWith('d7')) { `$at = `$old }
+            `$repo[`$m.Groups[1].Value] = [ordered]@{ oid = `$m.Groups[2].Value.PadRight(40, '0'); authoredDate = `$at }
+        }
+        foreach (`$m in [regex]::Matches(`$query, '\b(i\d+): issue\(')) { `$repo[`$m.Groups[1].Value] = [ordered]@{ timelineItems = [ordered]@{ nodes = @() } } }
+        return (ConvertTo-Json -InputObject ([ordered]@{ data = [ordered]@{ repository = `$repo } }) -Depth 6 -Compress)
+    }
     return ''
 }
 Import-Module '$(& $q $pkg)/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null
@@ -1056,7 +1114,7 @@ try {
     # not-billable card -- and they are taken away again after.
     $widgetsCurrent = Join-Path $hub 'widgets/current'
     $joinedFiles = [ordered]@{
-        'TaskK7M2-wire-the-board.prompt.md'  = "# Task K7M2: Wire the board`n`n- a41c2e9 first`n"
+        'TaskK7M2-wire-the-board.prompt.md'  = "# Task K7M2: Wire the board`n`n- d74f5b2 before the window`n- a41c2e9 first`n"
         'Task102-rename-the-slug.prompt.md'  = "# Task 102: Rename the slug`n`n- b52d3f0 first`n"
         'TaskC4D7-bench.prompt.md'           = "# Task C4D7: Bench`n`n- c63e4a1 first`n`n**Billable:** no`n"
     }
@@ -1066,11 +1124,13 @@ try {
     $afterJoined = Get-HubSnapshot
     $widgetCards = @(Get-P20StandupCards -CurrentDir $widgetsCurrent -ArchiveDir (Join-Path $hub 'widgets/archive') `
             -Pattern (Get-P20CardIdPattern -WorkItemTypes (Get-P20WorkItemTypes -Config $null)))
+    # The stub dates d74f5b2 thirty days ago and the others a minute ago: the verb's dates read drops the one before the window.
+    $stubDates = @{ 'd74f5b2' = [DateTimeOffset]::UtcNow.AddDays(-30); 'a41c2e9' = [DateTimeOffset]::UtcNow.AddMinutes(-1); 'b52d3f0' = [DateTimeOffset]::UtcNow.AddMinutes(-1) }
     $joinedNow = Invoke-P20StandupJoinedFill -AsOf ([DateTimeOffset]::Now) -Labels $ghLabels -Issues $ghIssues -Tracker @{ ok = $true; reason = '' } `
-        -Cards $widgetCards -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
+        -Cards $widgetCards -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot -CommitDates $stubDates -IssueStarts @{}
     $joinedText = (Format-P20StandupText -Standup $joinedNow -PackageRoot $pkgRoot).TrimEnd([char]10)
     Assert-True 'a GitHub Space with cards: the joined standup, exit 0, line for line' ($jv.Exit -eq '0' -and $jv.Inner -ceq $joinedText) ("`n--- got ---`n$($jv.Inner)`n--- want ---`n$joinedText")
-    Assert-True 'a card of its own is a row under you, on the Space''s tile, with its commit' ($jv.Inner -match '(?m)^Widgets$' -and $jv.Inner -match '(?m)^  Today {6}K7M2 \(1 commit\) Wire the board$') $jv.Inner
+    Assert-True 'a card of its own is a row under you, on the Space''s tile, with its commit -- the one authored before the window not counted, by the typed verb''s dates read' ($jv.Inner -match '(?m)^Widgets$' -and $jv.Inner -match '(?m)^  Today {6}K7M2 \(1 commit\) Wire the board$') $jv.Inner
     $check102 = ([string]$consts.rituals.text.checkIssueClosed).Replace('{item}', '#102 Rename the slug')
     Assert-True 'a card linked to a closed issue, still in current/: one Check line' ($jv.Inner -match ('(?m)^  Check {6}' + [regex]::Escape($check102) + '$')) $jv.Inner
     Assert-True 'a not-billable card is not a row' ($jv.Inner -notmatch 'C4D7') $jv.Inner

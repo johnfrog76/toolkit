@@ -1,25 +1,18 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Badge, Caption1, Subtitle2, makeStyles, tokens } from "@fluentui/react-components";
+import { makeStyles, tokens } from "@fluentui/react-components";
 import { SparkleRegular } from "@fluentui/react-icons";
-import { CardActions, ROW } from "../../shared/CardActions";
+import { ROW } from "../../shared/CardActions";
 import type { CardAction } from "../../shared/CardActions";
-import { CardSpinner } from "../../shared/CardSpinner";
 import { copyText } from "../../shared/copyText";
-import { EmptyState } from "../../shared/EmptyState";
-import { FilterBadge } from "../../shared/FilterBadge";
-import { InfoTip } from "../../shared/InfoTip";
-import { PageCard } from "../../shared/PageCard";
-import { RefreshButton } from "../../shared/RefreshButton";
-import { StatusMessage } from "../../shared/StatusMessage";
+import type { EmptyMessage } from "../../shared/EmptyState";
 import { useGetEnvQuery } from "../../shell/api";
-import { usePagination } from "../../hooks/usePagination";
-import { Pagination } from "../../shared/Pagination";
+import { ListPanel } from "../../shell/kinds/ListPanel";
+import type { FilterRow, PanelStatus } from "../../shell/kinds/ListPanel";
+import type { CardItemData } from "../../shell/CardItem";
 import { useGetPromptsQuery, useLazyGetPromptQuery } from "./api.studio";
 import type { PromptListRow, PromptSpace } from "./api.studio";
 import { promptPath } from "./paths";
-import { RowMetaText, StudioRow, useStudioCardClass, useStudioChipRowClass } from "./StudioRow";
-import { LIST_PAGE_SIZE } from "../../shell/cardHeight";
 import {
   categoryTabs,
   othersLine,
@@ -53,10 +46,10 @@ import type { PromptSets } from "./prompts";
 // The index's other fields (the ways of working, who sends it, the add-on, what
 // it drives) and where it lives and when it changed are the reading room's.
 //
-// The house row: the title opens the reading room, the ONE exposed action is
-// Copy reference (the @ form of the file's path, for a chat that can read the
-// disk), the menu holds Copy prompt (the body, for a chat that cannot), the
-// reading room and the prompt's history on GitHub, the external link last.
+// The card item: the title is text, the ONE exposed action opens the reading
+// room, the menu holds Copy reference (the @ form of the file's path, for a
+// chat that can read the disk), Copy prompt (the body, for a chat that cannot)
+// and the prompt's history on GitHub, the external link last.
 const useStyles = makeStyles({
   tip: { display: "flex", flexDirection: "column", gap: tokens.spacingVerticalXS },
 });
@@ -79,79 +72,6 @@ export function promptReference(row: PromptListRow): string {
 }
 
 type Copied = { name: string; what: "reference" | "prompt" | "failed" };
-
-function PromptCardRow({
-  row,
-  space,
-  onCopied,
-  onReading,
-}: {
-  row: PromptListRow;
-  space: PromptSpace | undefined;
-  onCopied: (c: Copied) => void;
-  onReading: (name: string | null) => void;
-}) {
-  const navigate = useNavigate();
-  const [readPrompt] = useLazyGetPromptQuery();
-  const open = () => navigate(promptPath(row.ref));
-  const secondary: CardAction[] = [
-    ROW.copy.action({
-      detail: "reference",
-      onClick: () => {
-        void copyText(promptReference(row)).then(() =>
-          onCopied({ name: row.name, what: "reference" }),
-        );
-      },
-    }),
-    ROW.copy.action({
-      detail: "prompt",
-      // The list carries no text: the body is read now, by the one-prompt
-      // route, and copied when it arrives.
-      onClick: () => {
-        onReading(row.name);
-        readPrompt(row.ref, true)
-          .unwrap()
-          .then((one) => copyText(one.body))
-          .then(() => onCopied({ name: row.name, what: "prompt" }))
-          .catch(() => onCopied({ name: row.name, what: "failed" }))
-          .finally(() => onReading(null));
-      },
-    }),
-  ];
-  if (row.history) {
-    // Its history: the folder's log on GitHub, the external link, last.
-    secondary.push(ROW.external.action({ detail: "GitHub", href: row.history }));
-  }
-  return (
-    <StudioRow
-      kind="prompt"
-      title={row.title || row.name}
-      controls={
-        <CardActions
-          primaryAction={ROW.open.action({ detail: "the prompt", onClick: open })}
-          menuLabel={`Actions for ${row.name}`}
-          secondaryActions={secondary}
-        />
-      }
-      description={row.purpose || undefined}
-      meta={
-        <>
-          <Badge
-            appearance="tint"
-            size="small"
-            color={row.group === "toolkit" ? "brand" : "informative"}
-          >
-            {ownerLabel(row, space)}
-          </Badge>
-          <Badge appearance="tint" size="small" color="subtle">
-            {row.category}
-          </Badge>
-          <RowMetaText>{row.path.split("/").pop()}</RowMetaText>
-        </>
-      }
-    />
-  );
-}
 
 /** What the card does, for its info tip: read from the same sets the list is. */
 function CardTip({
@@ -184,8 +104,8 @@ function CardTip({
 }
 
 export function PromptsCard() {
-  const cardClass = useStudioCardClass();
-  const chipRow = useStudioChipRowClass();
+  const navigate = useNavigate();
+  const [readPrompt] = useLazyGetPromptQuery();
   const { data, isLoading, isFetching, error, refetch } = useGetPromptsQuery();
   const { data: env } = useGetEnvQuery();
   const [copied, setCopied] = useState<Copied | null>(null);
@@ -208,152 +128,153 @@ export function PromptsCard() {
       ? chosenCategory
       : null;
   const listed = category === null ? inSource : inSource.filter((r) => r.category === category);
-  const { page, totalPages, pageItems, setPage } = usePagination(listed, LIST_PAGE_SIZE);
-  const choose = (f: PromptFilter) => {
-    setChosen(f);
-    setPage(0);
-  };
-  const chooseCategory = (c: string | null) => {
-    setChosenCategory(c);
-    setPage(0);
-  };
 
   const icon = <SparkleRegular />;
-  const empty =
-    isLoading || isFetching ? undefined : error ? (
-      <EmptyState
-        icon={icon}
-        tone="error"
-        title="Could not read the prompts"
-        detail="The agent did not answer. Nothing was read."
-      />
-    ) : undefined;
+  // Each filter's own empty state, under the chip rows.
+  const empty: EmptyMessage = error
+    ? {
+        icon,
+        tone: "error",
+        title: "Could not read the prompts",
+        detail: "The agent did not answer. Nothing was read.",
+      }
+    : filter === "toolkit"
+      ? {
+          icon,
+          title: `None for working ${workflowLabel(workflow)}`,
+          detail: othersLine(sets) ?? undefined,
+        }
+      : filter === "yours"
+        ? {
+            icon,
+            title: "None yet",
+            detail: "A <name>.prompt.md in your hub's agentic/ folder is listed here.",
+          }
+        : {
+            icon,
+            title: `None in ${withSpace ? space.repo : "this Space"}`,
+            detail: "A <name>.prompt.md in an agentic/ folder in that repository is listed here.",
+          };
 
-  const filters: { value: PromptFilter; label: string; count: number }[] = [
+  const sources: { value: PromptFilter; label: string; count: number }[] = [
     { value: "toolkit", label: "ToolKit", count: sets.toolkit.length },
     { value: "yours", label: "Your hub", count: sets.yours.length },
   ];
-  if (withSpace) filters.push({ value: "space", label: space.name, count: sets.space.length });
+  if (withSpace) sources.push({ value: "space", label: space.name, count: sets.space.length });
+  const filters: FilterRow[] = [
+    {
+      label: "Filter prompts",
+      // A zero draws no number, as the Spaces panel's chips do: the filter's
+      // empty state says it.
+      chips: sources.map((f) => ({
+        id: f.value,
+        label: f.label,
+        count: f.count > 0 ? f.count : undefined,
+        active: filter === f.value,
+        onSelect: () => setChosen(f.value),
+      })),
+    },
+    {
+      label: "Filter by category",
+      chips: [
+        {
+          id: "",
+          label: "All",
+          count: inSource.length > 0 ? inSource.length : undefined,
+          active: category === null,
+          onSelect: () => setChosenCategory(null),
+        },
+        ...tabs.map((t) => ({
+          id: `category:${t.category}`,
+          label: t.category,
+          count: t.count,
+          active: category === t.category,
+          onSelect: () => setChosenCategory(t.category),
+        })),
+      ],
+    },
+  ];
 
-  // Each filter's own empty state, in the body's place under the row.
-  const filteredEmpty =
-    inSource.length > 0 ? null : filter === "toolkit" ? (
-      <EmptyState
-        icon={icon}
-        title={`None for working ${workflowLabel(workflow)}`}
-        detail={othersLine(sets) ?? undefined}
-      />
-    ) : filter === "yours" ? (
-      <EmptyState
-        icon={icon}
-        title="None yet"
-        detail="A <name>.prompt.md in your hub's agentic/ folder is listed here."
-      />
-    ) : (
-      <EmptyState
-        icon={icon}
-        title={`None in ${withSpace ? space.repo : "this Space"}`}
-        detail="A <name>.prompt.md in an agentic/ folder in that repository is listed here."
-      />
-    );
+  const status: PanelStatus | undefined = reading
+    ? { tone: "busy", text: `Reading ${reading}...` }
+    : copied
+      ? {
+          tone: copied.what === "failed" ? "error" : "success",
+          text:
+            copied.what === "reference"
+              ? `Copied the reference to ${copied.name}. Paste it into your assistant's chat.`
+              : copied.what === "failed"
+                ? `Could not read ${copied.name}, so nothing was copied. Try again.`
+                : `Copied ${copied.name}. Paste it into a chat that cannot read your files.`,
+          onDismiss: () => setCopied(null),
+        }
+      : undefined;
+
+  const toItem = (row: PromptListRow): CardItemData => {
+    const menu: CardAction[] = [
+      ROW.copy.action({
+        detail: "reference",
+        onClick: () => {
+          void copyText(promptReference(row)).then(() =>
+            setCopied({ name: row.name, what: "reference" }),
+          );
+        },
+      }),
+      ROW.copy.action({
+        detail: "prompt",
+        // The list carries no text: the body is read now, by the one-prompt
+        // route, and copied when it arrives.
+        onClick: () => {
+          setReading(row.name);
+          readPrompt(row.ref, true)
+            .unwrap()
+            .then((one) => copyText(one.body))
+            .then(() => setCopied({ name: row.name, what: "prompt" }))
+            .catch(() => setCopied({ name: row.name, what: "failed" }))
+            .finally(() => setReading(null));
+        },
+      }),
+    ];
+    // Its history: the folder's log on GitHub, the external link, last.
+    if (row.history) menu.push(ROW.external.action({ detail: "GitHub", href: row.history }));
+    return {
+      id: row.ref,
+      title: row.title || row.name,
+      name: row.name,
+      description: row.purpose || undefined,
+      meta: [
+        {
+          badge: {
+            label: ownerLabel(row, space),
+            color: row.group === "toolkit" ? "brand" : "informative",
+          },
+        },
+        { badge: { label: row.category, color: "subtle" } },
+        { text: row.path.split("/").pop() ?? "", shrink: true },
+      ],
+      primary: ROW.open.action({
+        detail: "the prompt",
+        onClick: () => navigate(promptPath(row.ref)),
+      }),
+      menu,
+    };
+  };
 
   return (
-    <PageCard
-      className={cardClass}
-      scrollable
+    <ListPanel
+      title="Prompts"
+      icon={icon}
+      info={<CardTip sets={sets} workflow={workflow} space={space} />}
+      infoLabel="About the Prompts card"
+      items={error ? [] : listed}
+      item={toItem}
       empty={empty}
-      headerLeft={
-        <>
-          {icon}
-          <Subtitle2>Prompts</Subtitle2>
-          <InfoTip
-            label="About the Prompts card"
-            content={<CardTip sets={sets} workflow={workflow} space={space} />}
-          />
-        </>
-      }
-      headerRight={
-        <>
-          <RefreshButton
-            onClick={refetch}
-            isFetching={isFetching && !isLoading}
-            disabled={isLoading}
-          />
-          <Badge
-            color="informative"
-            appearance="filled"
-            size="large"
-            aria-label={`${listed.length} prompts`}
-          >
-            {listed.length}
-          </Badge>
-        </>
-      }
-      footerCenter={
-        totalPages > 1 ? (
-          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-        ) : undefined
-      }
-    >
-      {reading ? <Caption1>{`Reading ${reading}...`}</Caption1> : null}
-      {copied ? (
-        <StatusMessage
-          status={copied.what === "failed" ? "error" : "success"}
-          onDismiss={() => setCopied(null)}
-        >
-          {copied.what === "reference"
-            ? `Copied the reference to ${copied.name}. Paste it into your assistant's chat.`
-            : copied.what === "failed"
-              ? `Could not read ${copied.name}, so nothing was copied. Try again.`
-              : `Copied ${copied.name}. Paste it into a chat that cannot read your files.`}
-        </StatusMessage>
-      ) : null}
-      {isLoading || isFetching ? (
-        <CardSpinner label="Reading the prompts..." />
-      ) : (
-        <>
-          <div className={chipRow} role="group" aria-label="Filter prompts">
-            {filters.map((f) => (
-              <FilterBadge
-                key={f.value}
-                label={f.label}
-                // A zero draws no number, as the Spaces card's chips do: the
-                // filter's empty state says it.
-                count={f.count > 0 ? f.count : undefined}
-                active={filter === f.value}
-                onClick={() => choose(f.value)}
-              />
-            ))}
-          </div>
-          <div className={chipRow} role="group" aria-label="Filter by category">
-            <FilterBadge
-              label="All"
-              count={inSource.length > 0 ? inSource.length : undefined}
-              active={category === null}
-              onClick={() => chooseCategory(null)}
-            />
-            {tabs.map((t) => (
-              <FilterBadge
-                key={t.category}
-                label={t.category}
-                count={t.count}
-                active={category === t.category}
-                onClick={() => chooseCategory(t.category)}
-              />
-            ))}
-          </div>
-          {filteredEmpty}
-          {pageItems.map((row) => (
-            <PromptCardRow
-              key={row.ref}
-              row={row}
-              space={space}
-              onCopied={setCopied}
-              onReading={setReading}
-            />
-          ))}
-        </>
-      )}
-    </PageCard>
+      filters={error ? undefined : filters}
+      loading={isLoading || isFetching ? { label: "Reading the prompts..." } : undefined}
+      refresh={{ onClick: refetch, isFetching: isFetching && !isLoading, disabled: isLoading }}
+      count={listed.length}
+      countLabel={`${listed.length} prompts`}
+      status={status}
+    />
   );
 }

@@ -408,13 +408,19 @@ Space's slug, and the slug must be a declared Space.
 nobody. The hub syncs between machines whose clones of the same repository sit in different folders, so a path
 in `hub.json` would be wrong everywhere but where it was typed.
 
-**What it turns on.** The Design tab reads a product's `design/` and `spec/` from GitHub, so its rows could only
-open a design, never move one -- a move is a `git mv` in a clone. With a checkout named, and its `origin` the
-Space's repository, a product design's menu offers the same moves a hub design's does (**Graduate to a spec**,
+**What it turns on.** A move is a `git mv` in a clone, so without one the Design tab's rows only open a design,
+read from GitHub. With a checkout named, and its `origin` the Space's repository, the tab reads that clone
+instead, and a product design's menu offers the same moves a hub design's does (**Graduate to a spec**,
 **Archive as shipped**, **Archive as dropped**, **Complete**), each running `MoveDesign -Space <slug>` through
 the bridge. The verb **stages the move in that clone and never commits**: a product's history is the engineer's.
-The dialog shows what was staged and the commit line the verb suggests, and the tab re-reads -- though a row
-moves only once the commit is pushed, because the tab reads GitHub ([A repository's designs move only through a named checkout](KNOWN-GAPS.md#a-repositorys-designs-move-only-through-a-named-checkout)).
+The dialog shows what was staged and the commit line the verb suggests, and the tab re-reads.
+
+**What the tab reads, with it.** The listing, **Search inside** and the reading room read the clone's
+**working tree** -- the four folders on disk, on whatever branch it has checked out -- so a staged move shows
+on the re-read, before anything is committed, and a design only that branch carries is listed and found. The
+card's foot says which source was read: the clone and its branch, or the repository on GitHub. Without the
+setting, or with one that is not a clone of the Space's repository, the tab reads GitHub's default branch as it
+always has, and its search is GitHub's code search.
 
 **One resolver.** `Resolve-P20SpaceCheckout` (`Scripts/Resolve-SpaceCheckout.ps1`) is the one thing that finds a
 Space's clone, and this setting is its first candidate, before the folder you stand in and the nav shortcuts'
@@ -425,7 +431,8 @@ repo. On an **Azure DevOps** Space it is the organisation the address names (`ht
 `https://<org>.visualstudio.com`), the one `projects[]` entry's name, and that entry's `repo` (the project's own
 name where it has none) -- and a clone's `origin` is that repository in any form Azure DevOps gives it:
 `https://dev.azure.com/<org>/<project>/_git/<repo>`, `https://<org>.visualstudio.com/[DefaultCollection/]<project>/_git/<repo>`,
-or `git@ssh.dev.azure.com:v3/<org>/<project>/<repo>` and `<org>@vs-ssh.visualstudio.com:v3/<org>/<project>/<repo>`,
+or `git@ssh.dev.azure.com:v3/<org>/<project>/<repo>` and `<org>@vs-ssh.visualstudio.com:v3/<org>/<project>/<repo>`
+(either ssh remote also as a URL, `ssh://git@ssh.dev.azure.com/v3/<org>/<project>/<repo>`, with or without the user and a port),
 the host in any case and a trailing `.git` optional. A Space with several projects names no single repository, so
 it has no clone to find. The patterns are `consts.json` `regex.adoOrigin*` and `regex.adoOrg*`. The agent asks the same question of the configured path alone for the Design tab
 (`agent/core/checkout.py`, on every `GET /api/design`, as `checkout`), and never searches; the path and
@@ -657,6 +664,9 @@ which `NewPrompt -Design` writes, and the corpus's hand-written `> Spec:` form, 
 and **the Studio's Prompts card's read** (`studio.promptsRoute`, which the agent mounts and the web asks,
 see [the Studio](modules/studio.md#the-web-ui)), and **the Spaces card's one read of every GitHub Space's
 ledger** (`studio.ledgerRoute`, the same, see [the Studio](modules/studio.md#the-routes)),
+and **the sentences Daily refuses a window with** (`billing.text`: `halfWindow`, `notADay` and
+`backwards` -- the billing script, the CLI's `Daily` and `GET /api/billing` say the same one, see
+[the CLI](CLI.md#the-third-line-billable)),
 and **the halves a test run
 covers** (`tests.halves`, `agent`, `cli`, `web` in the order `tkTest` runs them, and `tests.legacyHalf`,
 what a `test-summary.<machine>.json` entry with no `half` is read as: the CLI runner and `tkTest` write

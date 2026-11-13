@@ -187,6 +187,192 @@ function Test-P20StandupCardBegun {
     return ([bool]$day -and [string]::CompareOrdinal($day, $From) -ge 0 -and [string]::CompareOrdinal($day, $To) -le 0)
 }
 
+# -- The dates read: commit dates and issue timelines ---------------------------
+# On a GitHub Space the standup asks the repository, in one batched GraphQL call
+# per repo, when each counted hash was authored and when each open issue with no
+# card was first given a worker label or assigned. Tests/fixtures/rituals/
+# standup-dates.json holds the query and the parse; standup-joined.json the fill.
+
+function Get-P20StandupDatesLimits {
+    <# The dates read's two sizes, held in a function rather than in variables: aliases per call, and events per timeline. DATES_CHUNK and TIMELINE_FIRST in the agent. #>
+    return @{ chunk = 50; timelineFirst = 50 }
+}
+
+function ConvertTo-P20StandupMap {
+    <# A dates map as a hashtable, whether it came as one or read back from JSON as an object; $null stays $null (not read). #>
+    param($Value)
+    if ($null -eq $Value) { return $null }
+    if ($Value -is [System.Collections.IDictionary]) { return $Value }
+    $map = @{}
+    foreach ($p in @($Value.PSObject.Properties)) { $map[[string]$p.Name] = $p.Value }
+    return $map
+}
+
+function Test-P20StandupCommitInWindow {
+    <# Whether an instant (a commit's authored date, an issue's start) falls in [Since, AsOf]. One that does not read is not in it. commit_in_window in the agent. #>
+    param($When, [DateTimeOffset]$Since, [DateTimeOffset]$AsOf)
+    $at = ConvertTo-P20RitualTime $When
+    return ($null -ne $at -and $at -ge $Since -and $at -le $AsOf)
+}
+
+function Select-P20StandupWindowHashes {
+    <#
+      One card's hashes -> @{ inside; undated }: the ones to count and the ones
+      the dates read gave no date. With CommitDates $null (not read: a cards
+      Space, or a read that failed) every hash counts, as it always has; else a
+      hash counts when its authored date is in the window, is dropped outside
+      it, and is undated with no date. window_hashes in the agent.
+    #>
+    param([string[]]$Hashes, $CommitDates, [DateTimeOffset]$Since, [DateTimeOffset]$AsOf)
+    $inside = New-Object 'System.Collections.Generic.List[string]'
+    $undated = New-Object 'System.Collections.Generic.List[string]'
+    if ($null -eq $CommitDates) {
+        foreach ($h in @($Hashes)) { if ($h) { $inside.Add([string]$h) } }
+        return @{ inside = [string[]]$inside.ToArray(); undated = [string[]]@() }
+    }
+    $given = ConvertTo-P20StandupMap $CommitDates
+    $dates = @{}
+    foreach ($k in @($given.Keys)) {
+        $key = ([string]$k).Trim().ToLowerInvariant()
+        if ($key.Length -gt 7) { $key = $key.Substring(0, 7) }
+        $dates[$key] = $given[$k]
+    }
+    foreach ($h in @($Hashes)) {
+        if (-not $h) { continue }
+        $when = $null
+        if ($dates.ContainsKey([string]$h)) { $when = $dates[[string]$h] }
+        if ($null -eq (ConvertTo-P20RitualTime $when)) { $undated.Add([string]$h) }
+        elseif (Test-P20StandupCommitInWindow -When $when -Since $Since -AsOf $AsOf) { $inside.Add([string]$h) }
+    }
+    return @{ inside = [string[]]$inside.ToArray(); undated = [string[]]$undated.ToArray() }
+}
+
+function Get-P20StandupIssueStart {
+    <#
+      An issue's start from its timeline nodes: the earliest of a worker label
+      being added and the issue being assigned, as the timeline states it; $null
+      when neither happened. A label that routes to no worker is not a start.
+      issue_started in the agent.
+    #>
+    param($Nodes, [string[]]$WorkerLabels)
+    $best = $null
+    $bestText = $null
+    foreach ($node in @($Nodes)) {
+        if ($null -eq $node) { continue }
+        $kind = [string]$node.__typename
+        if ($kind -ceq 'LabeledEvent') {
+            $labelName = ''
+            if ($null -ne $node.label) { $labelName = [string]$node.label.name }
+            if (@($WorkerLabels) -notcontains $labelName) { continue }
+        }
+        elseif ($kind -cne 'AssignedEvent') { continue }
+        $at = ConvertTo-P20RitualTime $node.createdAt
+        if ($null -ne $at -and ($null -eq $best -or $at -lt $best)) { $best = $at; $bestText = $node.createdAt }
+    }
+    return $bestText
+}
+
+function Get-P20StandupDatesQuery {
+    <#
+      The one GraphQL query a dates read sends for a repo: c<i> the i-th hash's
+      commit, i<n> issue n's labelled and assigned events; the owner and name
+      travel as variables. A hash that is not 7 to 40 hex characters is never
+      written into it. LF-joined, LF-terminated. dates_query in the agent.
+    #>
+    param([string[]]$Hashes, [int[]]$Numbers)
+    $lines = New-Object 'System.Collections.Generic.List[string]'
+    $lines.Add('query($owner: String!, $name: String!) {')
+    $lines.Add('  repository(owner: $owner, name: $name) {')
+    $first = (Get-P20StandupDatesLimits).timelineFirst
+    $i = 0
+    foreach ($h in @($Hashes | Where-Object { $_ })) {
+        if ([string]$h -cmatch '^[0-9a-f]{7,40}$') { $lines.Add("    c${i}: object(expression: `"$h`") { ... on Commit { oid authoredDate } }") }
+        $i++
+    }
+    foreach ($n in @($Numbers | Where-Object { $null -ne $_ })) {
+        $lines.Add("    i${n}: issue(number: $n) { timelineItems(itemTypes: [LABELED_EVENT, ASSIGNED_EVENT], first: $first) { nodes { __typename ... on LabeledEvent { createdAt label { name } } ... on AssignedEvent { createdAt } } } }")
+    }
+    $lines.Add('  }')
+    $lines.Add('}')
+    return (($lines.ToArray()) -join "`n") + "`n"
+}
+
+function ConvertFrom-P20StandupDates {
+    <#
+      A dates answer's repository object -> @{ commitDates; issueStarts }:
+      hash -> its authored instant, or $null; issue number (as a string) -> its
+      start. A commit is dated only when GitHub resolved the hash to a commit
+      whose oid begins with it -- a missing or ambiguous hash is $null, never a
+      guess. An issue with no start is not a key. dates_from_answer in the agent.
+    #>
+    param($Repository, [string[]]$Hashes, [int[]]$Numbers, [string[]]$WorkerLabels)
+    $commits = @{}
+    $starts = @{}
+    $i = 0
+    foreach ($h in @($Hashes | Where-Object { $_ })) {
+        $node = $null
+        if ($null -ne $Repository -and $Repository.PSObject.Properties["c$i"]) { $node = $Repository."c$i" }
+        $when = $null
+        if ($null -ne $node) {
+            $oid = ([string]$node.oid).ToLowerInvariant()
+            if ($oid -and $oid.StartsWith([string]$h, [System.StringComparison]::Ordinal) -and $null -ne (ConvertTo-P20RitualTime $node.authoredDate)) { $when = $node.authoredDate }
+        }
+        $commits[[string]$h] = $when
+        $i++
+    }
+    foreach ($n in @($Numbers | Where-Object { $null -ne $_ })) {
+        $node = $null
+        if ($null -ne $Repository -and $Repository.PSObject.Properties["i$n"]) { $node = $Repository."i$n" }
+        $nodes = @()
+        if ($null -ne $node -and $null -ne $node.timelineItems) { $nodes = @($node.timelineItems.nodes) }
+        $start = Get-P20StandupIssueStart -Nodes $nodes -WorkerLabels $WorkerLabels
+        if ($null -ne $start) { $starts[[string]$n] = $start }
+    }
+    return @{ commitDates = $commits; issueStarts = $starts }
+}
+
+function Get-P20StandupDateAsks {
+    <#
+      What a standup asks the dates read for, from its own fill: the hashes of
+      every card a slot item counts (an issue's joined card by its link's path,
+      a card item by its own), and the numbers of the open issues with no card
+      that read in progress. Distinct, first-seen order; the numbers ascending.
+      @{ hashes; numbers }. date_asks in the agent.
+    #>
+    param($Standup, $Cards, [string[]]$Slots)
+    $motions = @((Get-P20Consts).rituals.motions | ForEach-Object { [string]$_ })
+    $byPath = @{}
+    foreach ($card in @($Cards)) {
+        if ($null -eq $card) { continue }
+        $p = [string]$card.path
+        if (-not $p) { $p = ([string]$card.folder) + '/' + [string]$card.file }
+        $byPath[$p] = $card
+    }
+    $linked = @{}
+    foreach ($lk in @($Standup.links | Where-Object { $null -ne $_ })) { $linked[[string]$lk.number] = [string]$lk.path }
+    $hashes = New-Object 'System.Collections.Generic.List[string]'
+    $numbers = New-Object 'System.Collections.Generic.List[int]'
+    foreach ($w in @($Standup.workers | Where-Object { $null -ne $_ })) {
+        foreach ($slot in $Slots) {
+            foreach ($it in @($w.$slot | Where-Object { $null -ne $_ })) {
+                $isIssue = ($null -ne $it.number -and "$($it.number)" -ne '')
+                $path = [string]$it.path
+                if ($isIssue) {
+                    $path = ''
+                    if ($linked.ContainsKey([string]$it.number)) { $path = $linked[[string]$it.number] }
+                    elseif ([string]$it.motion -ceq $motions[2] -and -not $numbers.Contains([int]$it.number)) { $numbers.Add([int]$it.number) }
+                }
+                if ($path -and $byPath.ContainsKey($path)) {
+                    $cardHashes = Get-P20StandupCardHashes $byPath[$path]
+                    foreach ($h in $cardHashes) { if ($h -and -not $hashes.Contains($h)) { $hashes.Add($h) } }
+                }
+            }
+        }
+    }
+    $numbers.Sort()
+    return @{ hashes = [string[]]$hashes.ToArray(); numbers = [int[]]$numbers.ToArray() }
+}
+
 function Get-P20StandupWorkers {
     <#
       The worker labels, from `gh label list --json name,description`: each one
@@ -325,8 +511,9 @@ function Invoke-P20StandupFill {
             }
             # Every item has the same seven keys whichever source filled it: an
             # issue's id is null and its path ''; a card's number is null and
-            # its url ''. An issue alone says closed or in progress: the read
-            # has no fact that marks when its work began.
+            # its url ''. An issue alone says closed or in progress here: the
+            # issue read has no fact that marks when its work began. The joined
+            # fill may say started, from its card or its timeline (-IssueStarts).
             $motion = $motions[2]
             if (-not $isOpen) { $motion = $motions[0] }
             $item = [ordered]@{ number = [int]$issue.number; id = $null; title = [string]$issue.title; url = [string]$issue.url; path = ''; motion = $motion; commits = 0 }
@@ -400,20 +587,23 @@ function Get-P20StandupCounts {
     <#
       What moved in the window, per worker (in the workers' order) and in total,
       as [ordered]@{ workers; total }, each count [ordered]@{ label; name; closed;
-      started; inProgress; commits } (the total's label and name ''). Each slot
+      started; inProgress; commits; undated } (the total's label and name ''). Each slot
       item by its motion, and the distinct hashes its card threads -- Hashes
-      maps an item's '<ref>|<path>' to them. A hash is counted once per worker
+      maps an item's '<ref>|<path>' to them, and Undated to the ones the dates
+      read gave no date. A hash is counted once per worker
       and once in the total, however many cards thread it; an issue with no
       card, and a card with no bullets, count none. standup_counts in the agent.
     #>
-    param($Standup, [hashtable]$Hashes, [string[]]$Slots)
+    param($Standup, [hashtable]$Hashes, [string[]]$Slots, [hashtable]$Undated)
     $m = @((Get-P20Consts).rituals.motions | ForEach-Object { [string]$_ })
     $rows = New-Object System.Collections.ArrayList
     $every = New-Object 'System.Collections.Generic.List[string]'
-    $total = [ordered]@{ label = ''; name = ''; closed = 0; started = 0; inProgress = 0; commits = 0 }
+    $everyUndated = New-Object 'System.Collections.Generic.List[string]'
+    $total = [ordered]@{ label = ''; name = ''; closed = 0; started = 0; inProgress = 0; commits = 0; undated = 0 }
     foreach ($w in @($Standup.workers | Where-Object { $null -ne $_ })) {
-        $c = [ordered]@{ label = [string]$w.label; name = [string]$w.name; closed = 0; started = 0; inProgress = 0; commits = 0 }
+        $c = [ordered]@{ label = [string]$w.label; name = [string]$w.name; closed = 0; started = 0; inProgress = 0; commits = 0; undated = 0 }
         $mine = New-Object 'System.Collections.Generic.List[string]'
+        $mineUndated = New-Object 'System.Collections.Generic.List[string]'
         foreach ($slot in $Slots) {
             foreach ($it in @($w.$slot | Where-Object { $null -ne $_ })) {
                 $mo = [string]$it.motion
@@ -424,14 +614,20 @@ function Get-P20StandupCounts {
                 if ($Hashes -and $Hashes.ContainsKey($key)) {
                     foreach ($h in @($Hashes[$key])) { if ($h -and -not $mine.Contains([string]$h)) { $mine.Add([string]$h) } }
                 }
+                if ($Undated -and $Undated.ContainsKey($key)) {
+                    foreach ($h in @($Undated[$key])) { if ($h -and -not $mineUndated.Contains([string]$h)) { $mineUndated.Add([string]$h) } }
+                }
             }
         }
         $c['commits'] = $mine.Count
+        $c['undated'] = $mineUndated.Count
         foreach ($h in $mine) { if (-not $every.Contains($h)) { $every.Add($h) } }
+        foreach ($h in $mineUndated) { if (-not $everyUndated.Contains($h)) { $everyUndated.Add($h) } }
         foreach ($k in @('closed', 'started', 'inProgress')) { $total[$k] = $total[$k] + $c[$k] }
         [void]$rows.Add($c)
     }
     $total['commits'] = $every.Count
+    $total['undated'] = $everyUndated.Count
     return [ordered]@{ workers = [object[]]$rows.ToArray(); total = $total }
 }
 
@@ -615,9 +811,11 @@ function Get-P20StandupCardTile {
       card with no Closed day. A yesterday item is closed; a today item started
       when its begun day is in the window, else in progress. worker.empty is
       set; its status sentence is the caller's. Also returns hashes, each item's
-      '<ref>|<path>' -> its card's hashes. _cards_tile in the agent.
+      '<ref>|<path>' -> its card's hashes to count, and undated, the ones the
+      dates read gave no date (Select-P20StandupWindowHashes over CommitDates).
+      _cards_tile in the agent.
     #>
-    param([Parameter(Mandatory)][DateTimeOffset]$AsOf, $Cards, [string]$Label, [string]$Name, [string[]]$Slots, $From)
+    param([Parameter(Mandatory)][DateTimeOffset]$AsOf, $Cards, [string]$Label, [string]$Name, [string[]]$Slots, $From, $CommitDates)
     $c = Get-P20Consts
     $st = $c.status
     $motions = @($c.rituals.motions | ForEach-Object { [string]$_ })
@@ -628,6 +826,7 @@ function Get-P20StandupCardTile {
     $fromDay = ([DateTimeOffset]$start).ToString('yyyy-MM-dd', $inv)
     $toDay = $AsOf.ToString('yyyy-MM-dd', $inv)
     $hashesOf = @{}
+    $undatedOf = @{}
     $keyOf = @{}
     $lists = @{}
     foreach ($slot in $Slots) { $lists[$slot] = New-Object System.Collections.ArrayList }
@@ -637,12 +836,14 @@ function Get-P20StandupCardTile {
         $file = [string]$card.file
         $path = [string]$card.path
         if (-not $path) { $path = ([string]$card.folder) + '/' + $file }
-        $hashes = Get-P20StandupCardHashes $card
+        $windowed = Select-P20StandupWindowHashes -Hashes (Get-P20StandupCardHashes $card) -CommitDates $CommitDates -Since ([DateTimeOffset]$start) -AsOf $AsOf
+        $hashes = $windowed.inside
         $item = [ordered]@{ number = $null; id = [string]$card.id; title = [string]$card.title; url = ''; path = $path; motion = $motions[2]; commits = $hashes.Count }
         if (Test-P20StandupCardBegun -Card $card -From $fromDay -To $toDay) { $item['motion'] = $motions[1] }
         # A card groups by the design card it names, else its type.
         $keyOf[$item.id + '|' + $path] = Get-P20StandupWorkKey -Milestone $null -Body ([string]$card.body) -Type ([string]$card.type) -Threads @{}
         $hashesOf[$item.id + '|' + $path] = $hashes
+        $undatedOf[$item.id + '|' + $path] = $windowed.undated
         $status = [string]$card.status
         if ([string]$card.folder -eq $archiveName) {
             $item['motion'] = $motions[0]
@@ -666,7 +867,7 @@ function Get-P20StandupCardTile {
     }
     $w['empty'] = $empty
     $w['excuse'] = ''
-    return @{ worker = $w; walk = [object[]]$walk.ToArray(); keyOf = $keyOf; hashes = $hashesOf }
+    return @{ worker = $w; walk = [object[]]$walk.ToArray(); keyOf = $keyOf; hashes = $hashesOf; undated = $undatedOf }
 }
 
 function Invoke-P20StandupCardsFill {
@@ -762,6 +963,12 @@ function Invoke-P20StandupJoinedFill {
       The issues fill, joined with the cards on the id. Pure over its inputs.
       With the tracker not answering it is the issues fill as it stands: the
       chair's lines and the reason. fill_joined_standup in the agent.
+
+      The dates read, when there was one: CommitDates (hash -> its authored
+      instant, or $null) keeps a card's commits to those inside the window and
+      counts the rest undated; IssueStarts (issue number -> its timeline's
+      start) says started for an open issue with no card whose work began in
+      the window. $null for either is not read, and today's rule stands.
     #>
     param(
         [Parameter(Mandatory)]$AsOf,
@@ -772,7 +979,9 @@ function Invoke-P20StandupJoinedFill {
         [string]$Space = '',
         [string]$SpaceName = '',
         [string]$Window = '',
-        [string]$PackageRoot
+        [string]$PackageRoot,
+        $CommitDates,
+        $IssueStarts
     )
     $out = Invoke-P20StandupFill -AsOf $AsOf -Labels $Labels -Issues $Issues -Tracker $Tracker -Space $Space -Window $Window -PackageRoot $PackageRoot
     if (-not $out.tracker.ok) { return $out }
@@ -796,6 +1005,7 @@ function Invoke-P20StandupJoinedFill {
     }
     foreach ($it in @($out.queue.walk | Where-Object { $null -ne $_ })) { [void]$issueItems.Add($it) }
     $hashesOf = @{}
+    $undatedOf = @{}
 
     $byNumber = @{}
     foreach ($issue in @($Issues)) { if ($null -ne $issue) { $byNumber[[int]$issue.number] = $issue } }
@@ -830,8 +1040,10 @@ function Invoke-P20StandupJoinedFill {
         $path = [string]$card.path
         if (-not $path) { $path = ([string]$card.folder) + '/' + [string]$card.file }
         [void]$links.Add([ordered]@{ number = [int]$n; id = [string]$card.id; lane = [string]$card.status; path = $path })
-        $hashes = Get-P20StandupCardHashes $card
+        $windowed = Select-P20StandupWindowHashes -Hashes (Get-P20StandupCardHashes $card) -CommitDates $CommitDates -Since $since -AsOf $at
+        $hashes = $windowed.inside
         $hashesOf['#' + $n + '|'] = $hashes
+        $undatedOf['#' + $n + '|'] = $windowed.undated
         $begun = Test-P20StandupCardBegun -Card $card -From $fromDay -To $toDay
         $placed = $false
         foreach ($it in $issueItems) {
@@ -851,6 +1063,17 @@ function Invoke-P20StandupJoinedFill {
         if (-not $placed -and $current.Count -gt 0) { [void]$unrouted.Add($card) }
     }
 
+    # An open issue with no card: its timeline says when its work began.
+    $starts = ConvertTo-P20StandupMap $IssueStarts
+    if ($null -ne $starts) {
+        foreach ($it in $issueItems) {
+            if ($null -eq $it.number -or "$($it.number)" -eq '' -or $joined.ContainsKey([int]$it.number) -or [string]$it.motion -cne $motions[2]) { continue }
+            $start = $null
+            foreach ($k in @($starts.Keys)) { if ([string]$k -eq [string]$it.number) { $start = $starts[$k] } }
+            if (Test-P20StandupCommitInWindow -When $start -Since $since -AsOf $at) { $it['motion'] = $motions[1] }
+        }
+    }
+
     $name = $SpaceName
     if (-not $name) { $name = $Space }
     $tileByFile = @{}
@@ -862,8 +1085,9 @@ function Invoke-P20StandupJoinedFill {
     }
     $tileFileNames.Sort([System.StringComparer]::Ordinal)
     $tileCards = @($tileFileNames | ForEach-Object { $tileByFile[$_] })
-    $tile = Get-P20StandupCardTile -AsOf $at -Cards $tileCards -Label $Space -Name $name -Slots $slots -From $since
+    $tile = Get-P20StandupCardTile -AsOf $at -Cards $tileCards -Label $Space -Name $name -Slots $slots -From $since -CommitDates $CommitDates
     foreach ($k in @($tile.hashes.Keys)) { $hashesOf[$k] = $tile.hashes[$k] }
+    foreach ($k in @($tile.undated.Keys)) { $undatedOf[$k] = $tile.undated[$k] }
     $workers = New-Object System.Collections.ArrayList
     foreach ($w in @($out.workers | Where-Object { $null -ne $_ })) { [void]$workers.Add($w) }
     if (-not $tile.worker.empty) { [void]$workers.Add($tile.worker) }
@@ -879,7 +1103,7 @@ function Invoke-P20StandupJoinedFill {
     $out.work = New-P20StandupWork -Standup @{ queue = $out.queue; workers = $out.workers } -KeyOf $keyOf -QueueKinds $kinds -Slots $slots
     $out.checks = [object[]]$checks.ToArray()
     $out.links = [object[]]$links.ToArray()
-    $out.counts = Get-P20StandupCounts -Standup @{ workers = $out.workers } -Hashes $hashesOf -Slots $slots
+    $out.counts = Get-P20StandupCounts -Standup @{ workers = $out.workers } -Hashes $hashesOf -Slots $slots -Undated $undatedOf
     return $out
 }
 
@@ -1645,7 +1869,7 @@ function Get-P20StandupMotionText {
 }
 
 function Get-P20StandupCountsText {
-    <# One count as its non-zero parts -- closed, started, in progress, commits -- joined, or text.countsNone. counts_said in the agent. #>
+    <# One count as its non-zero parts -- closed, started, in progress, commits (then text.countsUndated for the ones the dates read could not date) -- joined, or text.countsNone. counts_said in the agent. #>
     param($Count)
     $t = (Get-P20Consts).rituals.text
     $bits = New-Object System.Collections.Generic.List[string]
@@ -1655,8 +1879,18 @@ function Get-P20StandupCountsText {
         if ($n -gt 0) { $bits.Add(([string]$t.($pair[0])).Replace('{n}', [string]$n)) }
     }
     $commits = 0
-    if ($null -ne $Count) { $commits = [int]$Count.commits }
-    if ($commits -gt 0) { $bits.Add((Get-P20StandupCommitsText $commits)) }
+    $undated = 0
+    if ($null -ne $Count) {
+        $commits = [int]$Count.commits
+        # An older answer read back from JSON may carry no undated.
+        if ($Count -is [System.Collections.IDictionary]) { if ($Count.Contains('undated')) { $undated = [int]$Count['undated'] } }
+        elseif ($Count.PSObject.Properties['undated']) { $undated = [int]$Count.undated }
+    }
+    if ($commits -gt 0 -or $undated -gt 0) {
+        $said = Get-P20StandupCommitsText $commits
+        if ($undated -gt 0) { $said += ' ' + ([string]$t.countsUndated).Replace('{n}', [string]$undated) }
+        $bits.Add($said)
+    }
     if ($bits.Count -eq 0) { return [string]$t.countsNone }
     return ($bits -join [string]$t.countsSeparator)
 }

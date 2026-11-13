@@ -8,6 +8,9 @@ meet it; **Where you meet it**, the document and heading that describe that part
 whose section links back here; and **Issue**, the GitHub issue that carries it. A gap goes when its issue
 closes and the fix is merged.
 
+Each add-on's own document ends with a "Known gaps" section. Every gap it lists is a block here, and
+links to it; what that add-on does on purpose sits under that section's "True by design" heading.
+
 ## Known gaps
 
 ### Create PR on Azure DevOps needs the branch pushed
@@ -31,21 +34,6 @@ one exposed action and the rest in its `...` menu
 **Where you meet it:** [Communication](modules/communication.md#close-from-the-browser), "Close, from the browser"
 
 **Issue:** [#287](https://github.com/johnfrog76/toolkit/issues/287)
-
-### A repository's designs move only through a named checkout
-
-**What you see:** The Design tab moves a product's design only where `spaceCheckouts.<slug>.path` names a
-clone of its repository
-([Configuration](CONFIGURATION.md#spacecheckoutsslugpath----a-spaces-checkout-on-this-machine)); without
-one, the tab's foot names the setting. The move is staged in the clone and never committed, and the tab
-reads GitHub, so the row keeps its old place until the engineer commits and pushes; choosing the road
-again meanwhile is refused by the verb, in its words. A repository's **Search inside** is GitHub's code
-search: the default branch only, minutes behind a push, and rate-limited. The note under the results says
-so, and a search that cannot run says why in its row.
-
-**Where you meet it:** [the Studio](modules/studio.md#known-gaps), "Known gaps"
-
-**Issue:** [#288](https://github.com/johnfrog76/toolkit/issues/288)
 
 ### `Config -Set` cannot declare a Teams recipient
 
@@ -71,15 +59,6 @@ Azure DevOps routes still exist.
 
 **Issue:** [#290](https://github.com/johnfrog76/toolkit/issues/290)
 
-### Daily reads two weeks, in the browser only
-
-**What you see:** Daily offers this week and last week, in the browser. A timesheet three weeks late has
-no page, and no CLI verb prints a week.
-
-**Where you meet it:** [CLI](CLI.md#the-third-line-billable), "The third line: Billable"
-
-**Issue:** [#291](https://github.com/johnfrog76/toolkit/issues/291)
-
 ### The Docs tab reads one repository, and only reads
 
 **What you see:** The filter drawer narrows the `docs/` tree by title and path; there is no search inside
@@ -100,39 +79,27 @@ are always empty, because no label is named for them.
 
 **Issue:** [#293](https://github.com/johnfrog76/toolkit/issues/293)
 
-### What moved is counted from the cards
+### The terminal's standup dates a commit from one repository, the page from every repository of the Space
 
-**What you see:** An issue with no card never reads `started`: the issue read carries no time its work
-began, so it is closed or in progress, and only a card's `**Started:**` (else `**Created:**`) day can say
-`started`. A card's commit count is every hash it threads, not only the ones inside the `-Since` window --
-a bullet has no date -- so a card worked over weeks counts all of them the day it closes.
+**What you see:** On a Space that spans several GitHub repositories, the CLI's `Standup` asks only the
+Space's one repository for its commit dates, and the Team Agile page asks every repository. A commit
+made to another repository of the Space reads undated in the terminal, and is dated and counted on the
+page, so the two counts lines can differ.
 
 **Where you meet it:** [Team Agile](modules/solitaire-agile.md#what-moved-and-the-window), "What moved, and the window"
 
-**Issue:** [#294](https://github.com/johnfrog76/toolkit/issues/294)
+**Issue:** [#316](https://github.com/johnfrog76/toolkit/issues/316)
 
-### The suggestion hands off, it does not launch
+### The foyer's design counts can differ from the Design tab's
 
-**What you see:** The chair's Next line suggests one next move, and for a crew-sized item its command is
-`StartWork <n>` -- the block, carried by hand. `StartWork <n> -Launch` starts a session from a terminal,
-and the hand-off box offers **Launch** where `/env` says the launch is on
-([the launch](modules/solitaire-agile.md#the-launch-the-block-handed-to-a-session)), but the Next line's
-command does not carry `-Launch`.
+**What you see:** A GitHub row in the Studio's foyer counts a product's designs and specs from GitHub's
+default branch. The Design tab, where this machine has a ready checkout of that repository, reads the
+clone's working tree instead. A design moved in the clone and not yet committed and pushed is in its new
+place on the tab and in its old one in the foyer's counts, so the two can differ by a staged move.
 
-**Where you meet it:** [Team Agile](modules/solitaire-agile.md#the-suggestion-one-next-move-derived), "The suggestion: one next move, derived"
+**Where you meet it:** [the Studio](modules/studio.md#the-routes), "The routes"
 
-**Issue:** [#295](https://github.com/johnfrog76/toolkit/issues/295)
-
-### The terminal and the page can read different issues
-
-**What you see:** The CLI's `Standup`, `Triage` and suggestion read up to 500 issues and 500 labels. The
-Team Agile page reads up to 300 issues in every state, 100 open issues and 200 labels. On a repository
-past those numbers, the page's standup, triage list and suggestion can differ from the terminal's, and
-neither says its read was cut short.
-
-**Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
-
-**Issue:** [#276](https://github.com/johnfrog76/toolkit/issues/276)
+**Issue:** [#296](https://github.com/johnfrog76/toolkit/issues/296)
 
 ### Promote files only into the Space you are in
 
@@ -263,6 +230,208 @@ percentages automatically, because nothing documented carries them per bucket. W
 
 **Issue:** [#320](https://github.com/johnfrog76/toolkit/issues/320)
 
+### A reminder's bucket depends on the machine's time zone
+
+**What you see:** A reminder's time is stored as local time with no offset. A hub synced between two machines in different
+time zones can show the same reminder as due on one and as upcoming on the other.
+
+**Where you meet it:** [Organize](modules/organize.md#known-gaps), "Known gaps"
+
+**Issue:** [#374](https://github.com/johnfrog76/toolkit/issues/374)
+
+### A meeting's follow-up does not become a reminder
+
+**What you see:** Team Agile's `Standup -Remind` writes a reminder, but `MeetingAgenda` does not: a follow-up agreed in a
+meeting stays a line in the meeting's record until someone types `NewReminder` for it.
+
+**Where you meet it:** [Organize](modules/organize.md#known-gaps), "Known gaps"
+
+**Issue:** [#375](https://github.com/johnfrog76/toolkit/issues/375)
+
+### A reminder that names an archived card does not link to it
+
+**What you see:** A reminder whose reference is the id of a card in `current/` is a link to that card. When the card is
+archived, the row names the card and says `(done)`, with no link: the card page reads the active Space's
+`current/` only, so the web UI has nowhere to open an archived card.
+
+**Where you meet it:** [Organize](modules/organize.md#known-gaps), "Known gaps"
+
+**Issue:** [#376](https://github.com/johnfrog76/toolkit/issues/376)
+
+### An archived training leaves its quarter's count
+
+**What you see:** The quarter line adds up the trainings in `growth/current/` only. A training moved to `growth/archive/`,
+which is what *Archive* in the web UI and `NewGrowth -Close` do, stops counting toward the quarter it was
+dated in. The line shows the current quarter only, with no history of earlier ones.
+
+**Where you meet it:** [Growth](modules/growth.md#known-gaps), "Known gaps"
+
+**Issue:** [#377](https://github.com/johnfrog76/toolkit/issues/377)
+
+### An agenda line becomes a card from the terminal only
+
+**What you see:** `NewPrompt -Title "<the line>" -From <record>` makes a card from a meeting's agenda line; the Meetings
+page has no action that does. The card names its record in a `**From:**` line, and the record gets no
+line back naming the card.
+
+**Where you meet it:** [Communication](modules/communication.md#known-gaps), "Known gaps"
+
+**Issue:** [#378](https://github.com/johnfrog76/toolkit/issues/378)
+
+### Deck voices and your own decks are not made in the Toolkit
+
+**What you see:** A deck is code compiled into the web build, so a deck of your own is a file added to this repository's
+tree and cannot be kept in your hub. Nothing in the Toolkit bakes a deck's voice files: they are made
+elsewhere and copied in beside the deck, and a slide with no file for a voice does not offer that voice.
+The engine's `ShellEmbed` piece is not carried, so a deck cannot embed a shell's output.
+
+**Where you meet it:** [the deck module](modules/deck.md#known-gaps), "Known gaps"
+
+**Issue:** [#379](https://github.com/johnfrog76/toolkit/issues/379)
+
+### A prompt is not started from the Prompts card
+
+**What you see:** A row on the Studio's Prompts card offers Open, with Copy reference and Copy prompt in its menu. There
+is no action that starts work from a prompt: the text is copied and carried to a session by hand.
+
+**Where you meet it:** [the Studio](modules/studio.md#known-gaps), "Known gaps"
+
+**Issue:** [#380](https://github.com/johnfrog76/toolkit/issues/380)
+
+### New Space lists the first 1000 repositories
+
+**What you see:** In the New Space dialog, an owner with more than 1000 repositories, or more than 1000 shared with you,
+lists the first 1000 and says so. A repository past them is added by typing it as `owner/name`, which
+reads it the same way.
+
+**Where you meet it:** [the Studio](modules/studio.md#known-gaps), "Known gaps"
+
+**Issue:** [#381](https://github.com/johnfrog76/toolkit/issues/381)
+
+### New Space adds one existing GitHub repository at a time
+
+**What you see:** The Spaces card's **+** adds one Space each time. It does not add several at once, create a GitHub
+repository, or list an Azure DevOps organisation's projects: an Azure DevOps Space is added from the
+terminal with `NewSpace <slug> -Address <url>`, then `Connect <slug> -Discover`.
+
+**Where you meet it:** [the Studio](modules/studio.md#known-gaps), "Known gaps"
+
+**Issue:** [#382](https://github.com/johnfrog76/toolkit/issues/382)
+
+### The agent and the CLI each resolve the agentic extension path
+
+**What you see:** Nothing you would see while the two agree. The CLI resolves `agenticExtensionPath` in
+`Get-P20AgenticExtensionPath` and the agent resolves it again in `agentic_extension_path()`, and no
+shared fixture holds the two to one answer, so a change to one could make the Prompts card and the
+terminal read different folders.
+
+**Where you meet it:** [the Studio](modules/studio.md#known-gaps), "Known gaps"
+
+**Issue:** [#383](https://github.com/johnfrog76/toolkit/issues/383)
+
+### A launched session does not report back to the page
+
+**What you see:** `StartWork <n> -Launch` starts a detached session. Its result is its log and, when it gets there, a pull
+request on the tracker. The Team Agile page has no list of launched sessions saying which are running
+and which are done: you look at the tracker or the log.
+
+**Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
+
+**Issue:** [#384](https://github.com/johnfrog76/toolkit/issues/384)
+
+### The bell and Home's tips carry no suggestion
+
+**What you see:** The suggestion, the one derived next move, is drawn on the chair's Next line and in the PM Corner. The
+notification bell and the tips on Home do not show it.
+
+**Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
+
+**Issue:** [#385](https://github.com/johnfrog76/toolkit/issues/385)
+
+### A reached milestone celebrates once per browser
+
+**What you see:** The mark that says a reached milestone has been celebrated is kept in the browser. Another browser, or
+one whose site data was cleared, celebrates the same milestone once more the first time it sees it.
+
+**Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
+
+**Issue:** [#386](https://github.com/johnfrog76/toolkit/issues/386)
+
+### The dress guard reads names by their capital
+
+**What you see:** When the model dresses the played standup, a capitalised word that is not in the facts is refused and
+the derived prose is shown instead, so a persona with a proper noun of its own ("Dev-Hero") is never
+dressed, and an invented name written in lower case is not caught. A group whose own name is a kind noun
+("Bugs") with no item of that kind is never dressed either. A refused reply is kept on disk like any
+other, so the same facts are not asked again until they change.
+
+**Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
+
+**Issue:** [#387](https://github.com/johnfrog76/toolkit/issues/387)
+
+### A Route typed in a terminal reaches the page a minute later
+
+**What you see:** The agent drops its kept tracker reads when a verb runs through the browser, but a `Route` typed in a
+terminal never reaches the agent. The Team Agile pages show the change when the kept read's minute runs
+out, or at once on the Triage page's Refresh.
+
+**Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
+
+**Issue:** [#388](https://github.com/johnfrog76/toolkit/issues/388)
+
+### The played standup is a first cut
+
+**What you see:** The played view draws one tile for each worker label, however many sessions that worker is running. The
+week's seat is always ghosted, and the tracker's seat lights only to say the tracker could not be read.
+The voice is the browser's own, whatever the machine has; there is no lock-screen play, pause or next;
+and the nonsense register's door is not drawn on the stage.
+
+**Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
+
+**Issue:** [#389](https://github.com/johnfrog76/toolkit/issues/389)
+
+### A card linked to an unrouted issue is in no slot
+
+**What you see:** A card whose id is an issue's number adds no row of its own to the standup. When that issue is open and
+carries no worker label, the issue is in no slot and neither is the card's work: the card's lane is in
+the response's `links[]`, and the text says nothing about it. Give the issue a worker label and it
+shows.
+
+**Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
+
+**Issue:** [#390](https://github.com/johnfrog76/toolkit/issues/390)
+
+### The standup's prose reads no age, pull request or assignee
+
+**What you see:** *Blocked* is only the blockers slot, an open, routed `verify-close` issue waiting on your walk: a
+review that has sat for days is not blocked, and a `blocked` label is not read. *Yesterday* is only what
+closed in the window: an issue that moved to review since the last standup is not in it.
+
+**Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
+
+**Issue:** [#391](https://github.com/johnfrog76/toolkit/issues/391)
+
+### The terminal's standup refuses a Space with several repositories
+
+**What you see:** On a Space with more than one repository, `Standup` in a terminal says so on its `Tracker` line and
+shows none of the tracker's items. The Team Agile page reads every repository, merging labels by name
+and listing the issues together; it fails the whole read if one repository's read fails, and issue
+numbers from two repositories can collide.
+
+**Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
+
+**Issue:** [#347](https://github.com/johnfrog76/toolkit/issues/347)
+
+### A failed tracker read is worded differently in the terminal and on the page
+
+**What you see:** When the standup cannot read the tracker (the Space is not on GitHub, the tier is too low, `gh` does not
+answer), the terminal and the page each write their own sentence on the `Tracker` line. Only the Azure
+DevOps sentence is shared by both.
+
+**Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
+
+**Issue:** [#392](https://github.com/johnfrog76/toolkit/issues/392)
+
 ## True by design
 
 Some things are true by design rather than by omission, and are not on that list. The deck narration
@@ -275,7 +444,7 @@ route ([the modules guide](modules/README.md)). Teams recipients are read from t
 ([Communication](modules/communication.md#envs-communication-block)). Team Agile's standup does not read
 an Azure DevOps board: on an Azure DevOps Space it prints the ritual with "Azure DevOps is the human team's board ..." on its
 Tracker line, because that board's standup is the one the team holds
-([Team Agile](modules/solitaire-agile.md#known-gaps)). Only Team Agile's played view is dressed by the
+([Team Agile](modules/solitaire-agile.md#true-by-design)). Only Team Agile's played view is dressed by the
 model; the Work grain, Copy and `Standup -Grain work` carry the derived prose, and the counts line is
 read on the page and in the brief, not spoken on the stage
 ([the agentic layer](modules/solitaire-agile.md#the-agentic-layer)).

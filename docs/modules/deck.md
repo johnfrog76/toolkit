@@ -60,7 +60,7 @@ are a chunk the browser fetches when a deck is shown, never part of the first lo
 | | |
 | --- | --- |
 | **The launcher** | a **Decks** card on the **Growth** page -- a presentation is a growth item, and a deck is what a presentation produces. With growth off, the module has a **Decks** tab of its own |
-| **A deck's page** | `/decks/<id>`, inside the shell: what the deck file says about it, **Play**, and this machine's **Archive** -- "A deck's page", below. A click on a row of the Decks card opens it |
+| **A deck's page** | `/decks/<id>`, inside the shell: what the deck file says about it, **Play**, and this machine's **Archive** -- "A deck's page", below. **Open the deck** on an item of the Decks panel opens it |
 | **A deck** | `/deck/<id>`, full screen: the Toolkit's nav bar is not drawn around it. **Exit** goes back where you came from |
 | **The podium** | `/deck/<id>?present=1` -- Podium: the presenter's bar and notes in a second window (`/deck/<id>/notes`); the deck window is silent -- "The player's two bars", below |
 | **The landing page** | Introducing ToolKit plays on the GitHub Pages landing page too, from the same engine and baked clips, whatever `features.deck` says: the page is not part of the app, so no flag applies to it ([`web/README.md`, "The landing page"](../../web/README.md#the-landing-page)) |
@@ -169,8 +169,9 @@ archived this way leaves the Decks card's default list and sits under its **arch
 page says so. A deck whose own `state` is `archive` is a different thing -- the studio's word for it
 -- and stays in the default list under that state's chip.
 
-**The Decks card's row** keeps its title, its slide count, its running time and its state chip. A click
-anywhere on it opens the page; its exposed action is **Open the deck**, and its `...` holds **Play**.
+**The Decks panel's card item** keeps its title, its slide count, its running time and its state chip.
+Its title is plain text, as on every card item; its exposed action is **Open the deck**, which opens the
+page, and its `...` holds **Play**. The panel is a list panel: four decks a page, the pager in the foot.
 The vocabulary puts a row's link out last (`web/README.md`, "One vocabulary for row actions"), and a
 deck has none: the `Deck` type carries no address of its own (`project` picks the player's giveaway
 repository, which is the engine's and not the deck's), so neither shipped deck has an **Open on**
@@ -194,7 +195,7 @@ The two copies are kept byte-identical; edit the studio's, then copy.
   so a deck file ports unchanged. `state` -- draft, in progress, complete, archive -- means what it
   always did, and the launcher filters on it -- **only once two decks in its list are in different
   states.** With every listed deck in the same state the row would offer four choices that all show
-  the same thing, so `DeckPicker` counts distinct states in play and hides them rather than showing
+  the same thing, so `DeckPickerCard` counts distinct states in play and hides them rather than showing
   a filter that filters nothing. The **archived** chip follows the same rule: it is drawn once a deck
   is archived on this machine (`deckList.ts` holds both, `deckList.test.ts` is the table).
 - **Audience is the default mode.** Presenter-as-default suits an engine with a live narration service,
@@ -275,4 +276,4 @@ do not move when the worn theme does.
 ## Known gaps
 
 Not built yet: baking voices from the Toolkit, a way to keep your own decks outside this repo, and
-`ShellEmbed`.
+`ShellEmbed` ([Deck voices and your own decks are not made in the Toolkit](../KNOWN-GAPS.md#deck-voices-and-your-own-decks-are-not-made-in-the-toolkit)).

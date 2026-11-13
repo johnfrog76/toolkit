@@ -4,6 +4,7 @@ import { StandupPage } from "./StandupPage";
 import { TriagePage } from "./TriagePage";
 import { MilestonesPage } from "./MilestonesPage";
 import { ROUTES } from "./paths";
+import { TabRows } from "../../shared/TabRows";
 
 // The Team Agile tab's pages, Standup | Triage | Releases: one nav entry,
 // and under it a strip of in-page tabs, each an ADDRESS -- the shape Home's
@@ -21,20 +22,13 @@ const CEREMONIES: { id: Ceremony; label: string; to: string }[] = [
 
 const useStyles = makeStyles({
   page: { display: "flex", flexDirection: "column", gap: tokens.spacingVerticalS, width: "100%" },
-  // The strip's text starts flush with the card under it -- Home's rule (routes.tsx).
-  bar: { paddingLeft: tokens.spacingHorizontalS },
-  tabs: {
-    marginLeft: `calc(-1 * (${tokens.spacingHorizontalSNudge} + ${tokens.spacingHorizontalXXS}))`,
-  },
 });
 
 export function RitualTabs({ current }: { current: Ceremony }) {
-  const styles = useStyles();
   const navigate = useNavigate();
   return (
-    <div className={styles.bar}>
+    <TabRows>
       <TabList
-        className={styles.tabs}
         size="small"
         selectedValue={current}
         onTabSelect={(_e, d) => {
@@ -49,7 +43,7 @@ export function RitualTabs({ current }: { current: Ceremony }) {
           </Tab>
         ))}
       </TabList>
-    </div>
+    </TabRows>
   );
 }
 

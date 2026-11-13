@@ -232,7 +232,7 @@ is a finding like an error: the bar is zero of either.
 | agent | the repository root | `ruff check` | `ruff.toml` |
 | agent | the repository root | `ruff format --check`; without `--check` to apply | `ruff.toml` |
 | CLI | the repository root, in `pwsh` | the PSScriptAnalyzer command below | `PSScriptAnalyzerSettings.psd1` |
-| documentation | `web/` | `npm run lint:md` (markdownlint-cli2 over every document in the repository: the root `README.md` and other root documents, `docs/`, the `design/` and `spec/` READMEs, `web/README.md`, `agent/README.md`) | `.markdownlint-cli2.jsonc` |
+| documentation | `web/` | `npm run lint:md` (markdownlint-cli2 over every document in the repository: the root `README.md` and other root documents, `docs/`, the `design/` and `spec/` READMEs, every entry waiting in `changelog.d/`, `web/README.md`, `agent/README.md`) | `.markdownlint-cli2.jsonc`, and `changelog.d/.markdownlint-cli2.jsonc`, which turns off the first-line-heading rule there because an entry opens with a dash |
 
 A Prettier failure names the files: fix them with `npx prettier --write <file>` (`npm run format` for all of `web/src`), then run `npm run lint` again.
 
