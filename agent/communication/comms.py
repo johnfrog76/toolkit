@@ -23,7 +23,12 @@ import urllib.request
 
 from ..core import log_writer
 from ..core.config import DEFAULT_CONFIG_PATH, LOCAL_CONFIG_PATH, _deep_merge, load_config
-from ..core.consts import env_teams_webhook_prefix, env_test_run_marker
+from ..core.consts import (
+    deferred_recipient_types,
+    env_teams_webhook_prefix,
+    env_test_run_marker,
+    webhook_recipient_types,
+)
 
 _VALID_TONES = ("broadcast", "alert", "personal")
 # sections is intentionally NOT required: a subject-only post -- the SendTeams
@@ -174,9 +179,13 @@ def _resolve_recipient(recipient_key: str, communication: dict) -> dict:
     """Resolve a logical recipient key to a transport target.
 
     Returns a dict:
-        {"ok": True,  "type": "channel", "url": <webhook>, "display": ...}
+        {"ok": True,  "type": <the entry's own type>, "url": <webhook>, "display": ...}
       or
         {"ok": False, "reason": <human detail for the skipped status>}
+
+    A channel and a chat post the same way -- both are a Workflows webhook --
+    so the type that comes back is the entry's own word, and nothing past this
+    point branches on it.
     """
     recipients = communication.get("recipients", {}) or {}
     entry = recipients.get(recipient_key)
@@ -186,11 +195,11 @@ def _resolve_recipient(recipient_key: str, communication: dict) -> dict:
     rtype = entry.get("type")
     display = entry.get("display", recipient_key)
 
-    if rtype == "person":
+    if rtype in deferred_recipient_types():
         # Graph DM path is deferred to v2 -> skipped, never posts.
-        return {"ok": False, "reason": f"person recipient '{recipient_key}' (DM deferred to v2)"}
+        return {"ok": False, "reason": f"{rtype} recipient '{recipient_key}' (DM deferred to v2)"}
 
-    if rtype != "channel":
+    if rtype not in webhook_recipient_types():
         return {"ok": False, "reason": f"recipient '{recipient_key}' has unsupported type '{rtype}'"}
 
     # The secret webhook URL lives only in env; config names the var, never the URL.
@@ -199,7 +208,7 @@ def _resolve_recipient(recipient_key: str, communication: dict) -> dict:
     if not url:
         return {"ok": False, "reason": f"webhook env var '{env_name}' (and {FALLBACK_WEBHOOK_ENV}) unset"}
 
-    return {"ok": True, "type": "channel", "url": url, "display": display, "envName": env_name}
+    return {"ok": True, "type": rtype, "url": url, "display": display, "envName": env_name}
 
 
 # ---------------------------------------------------------------------------

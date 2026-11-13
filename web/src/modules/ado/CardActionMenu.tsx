@@ -1,4 +1,4 @@
-import { CardActions } from "../../shared/CardActions";
+import { CardActions, ROW } from "../../shared/CardActions";
 import type { CardAction } from "../../shared/CardActions";
 import { useGetEnvQuery } from "../../shell/api";
 import type { PromptInfo } from "./api.ado";
@@ -69,6 +69,21 @@ function toCardAction(spec: CardActionSpec, h: CardActionHandlers): CardAction {
     dividerBefore: spec.dividerBefore,
     onClick: spec.disabled ? undefined : onClick,
   });
+}
+
+/** The same answers as data, for a card item: its one exposed action and its menu. */
+export function cardActionData(
+  card: PromptInfo,
+  context: CardActionContext,
+  handlers: CardActionHandlers,
+): { primary: CardAction; menu: CardAction[] } {
+  const plan = cardActions(card, context);
+  return {
+    primary: plan.primary
+      ? toCardAction(plan.primary, handlers)
+      : ROW.open.action({ detail: "the card", onClick: handlers.onOpenCard }),
+    menu: plan.secondary.map((s) => toCardAction(s, handlers)),
+  };
 }
 
 interface CardActionMenuProps extends CardActionHandlers {

@@ -12,7 +12,10 @@ kept on disk per Space for the visibility cache's 600 s. What is pinned here:
 - a Space whose read did not fully answer is not kept;
 - the report counts what ``accounting._github_issue_report`` counts, from the
   same issues;
-- no argv puts a query in a URL.
+- no argv puts a query in a URL;
+- a design repository's live ``design/`` and ``spec/`` ride the same alias, and
+  are counted by the Design tab's own grouping: designs in flight, specs, and
+  files with no ``id:`` -- no ``design/``, no counts.
 
 No network: ``subprocess.run`` is stubbed and answers like gh.
 
@@ -39,7 +42,7 @@ from _skipguard import skip_module  # noqa: E402
 try:
     from fastapi.testclient import TestClient
 
-    from agent.ado import accounting
+    from agent.ado import accounting, design
     from agent.app import app
     from agent.core import disk_cache
     from agent.core.consts import studio_ledger_route
@@ -463,6 +466,134 @@ class TheRepoRecord(LedgerCase):
             rec = accounting.gh_repo_record("o/none")
         self.assertEqual(rec, {"visibility": "unknown", "has_issues": None, "url": ""})
         self.assertIsNone(accounting.cached_repo_record("o/none"))
+
+
+# -- The designs -------------------------------------------------------------------
+
+ID_A = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+ID_B = "1b2c3d4e-5f6a-4b7c-9d8e-0f1a2b3c4d5e"
+ID_C = "2c3d4e5f-6a7b-4c8d-ae9f-1a2b3c4d5e6f"
+
+
+def design_text(doc_id, title):
+    head = f"---\nid: {doc_id}\n---\n\n" if doc_id else ""
+    return f"{head}# {title}\n\nBody.\n"
+
+
+# Three designs in flight: A with its spec (Spec), B and C notes alone (Design);
+# one note with no id; and the README, which is not a design.
+LIVE = {
+    "design": {
+        "a.md": design_text(ID_A, "A"),
+        "b.md": design_text(ID_B, "B"),
+        "c.md": design_text(ID_C, "C"),
+        "loose.md": design_text("", "Loose"),
+        "README.md": "# The folder\n",
+    },
+    "spec": {"a.spec.md": design_text(ID_A, "A spec")},
+}
+
+
+def tree(files, null_text=()):
+    return {
+        "entries": [
+            {"name": n, "type": "blob", "oid": f"{i:040x}", "object": {"text": None if n in null_text else t}}
+            for i, (n, t) in enumerate(files.items())
+        ]
+        + [{"name": "archive", "type": "tree", "oid": "f" * 40, "object": {}}]
+    }
+
+
+def design_node(folders, null_text=()):
+    """A repo alias's answer with its live design folders, ``lf0`` design/ and
+    ``lf1`` spec/ (a folder not in ``folders`` is null, as GitHub answers it)."""
+    node = repo_node(ISSUES)
+    for i, folder in enumerate(("design", "spec")):
+        node[f"lf{i}"] = tree(folders[folder], null_text) if folder in folders else None
+    return node
+
+
+class TheDesignCounts(LedgerCase):
+    def test_a_space_with_design_notes_and_specs_counts_both(self):
+        gh = FakeGh({"johnfrog76/toolkit": design_node(LIVE)})
+        out = self.read(self.cfg(space("toolkit")), gh)
+        got = out.spaces["toolkit"].design
+        self.assertEqual((got.in_flight, got.specs, got.not_stamped), (3, 1, 1))
+
+    def test_the_design_folders_ride_the_one_call(self):
+        gh = FakeGh({"johnfrog76/toolkit": design_node(LIVE), "johnfrog76/deck": design_node(LIVE)})
+        self.read(self.cfg(space("toolkit"), space("deck")), gh)
+        self.assertEqual(gh.kinds().count("api graphql"), 1)
+        self.assertEqual(len(gh.calls), 3)
+        query = gh.queries[0]
+        self.assertIn("fragment ledgerDesign on Repository", query)
+        self.assertEqual(query.count("...ledgerDesign"), 2)
+        self.assertIn("lf0=HEAD:design", gh.calls[0])
+        self.assertIn("lf1=HEAD:spec", gh.calls[0])
+        self.assertNotIn("archive", query)
+
+    def test_the_counts_match_the_design_tab_over_the_same_files(self):
+        from test_design import FakeRepo
+
+        design.clear_cache()
+        with mock.patch.object(design.subprocess, "run", side_effect=FakeRepo(LIVE)):
+            tab = design.list_design("johnfrog76/toolkit")
+        gh = FakeGh({"johnfrog76/toolkit": design_node(LIVE)})
+        got = self.read(self.cfg(space("toolkit")), gh).spaces["toolkit"].design
+        states = [d.state for d in tab.designs]
+        self.assertEqual(got.in_flight, len(states))
+        self.assertEqual(got.specs, states.count("Spec"))
+        self.assertEqual(got.not_stamped, sum(1 for n in tab.notShown if n.reason == design.NO_ID_REASON))
+
+    def test_no_design_folder_has_no_counts(self):
+        for folders in ({}, {"spec": LIVE["spec"]}):
+            with self.subTest(folders=sorted(folders)):
+                gh = FakeGh({"johnfrog76/toolkit": design_node(folders)})
+                out = self.read(self.cfg(space("toolkit")), gh, refresh=True)
+                self.assertIsNone(out.spaces["toolkit"].design)
+
+    def test_an_empty_design_folder_counts_zero(self):
+        gh = FakeGh({"johnfrog76/toolkit": design_node({"design": {}})})
+        got = self.read(self.cfg(space("toolkit")), gh).spaces["toolkit"].design
+        self.assertEqual((got.in_flight, got.specs, got.not_stamped), (0, 0, 0))
+
+    def test_an_unstamped_file_is_counted_as_not_stamped(self):
+        gh = FakeGh({"johnfrog76/toolkit": design_node({"design": {"x.md": "# X\n", "y.md": "# Y\n"}})})
+        got = self.read(self.cfg(space("toolkit")), gh).spaces["toolkit"].design
+        self.assertEqual((got.in_flight, got.specs, got.not_stamped), (0, 0, 2))
+
+    def test_a_blob_github_would_not_inline_is_left_out_never_called_unstamped(self):
+        gh = FakeGh({"johnfrog76/toolkit": design_node(LIVE, null_text=("b.md", "loose.md"))})
+        got = self.read(self.cfg(space("toolkit")), gh).spaces["toolkit"].design
+        self.assertEqual((got.in_flight, got.specs, got.not_stamped), (2, 1, 0))
+        self.assertEqual(gh.kinds().count("api graphql"), 1)
+
+    def test_an_owner_grained_address_has_no_counts(self):
+        owner = {
+            "slug": "fleet",
+            "org": "https://github.com/johnfrog76",
+            "status": "active",
+            "projects": [{"repo": "toolkit"}],
+        }
+        gh = FakeGh({"johnfrog76/toolkit": design_node(LIVE)})
+        out = self.read(self.cfg(owner), gh)
+        self.assertIsNone(out.spaces["fleet"].design)
+        self.assertNotIn("ledgerDesign", gh.queries[0])
+        self.assertNotIn("$lf0", gh.queries[0])
+
+    def test_the_counts_are_kept_with_the_row(self):
+        self.read(self.cfg(space("toolkit")), FakeGh({"johnfrog76/toolkit": design_node(LIVE)}))
+        gh = FakeGh()
+        got = self.read(self.cfg(space("toolkit")), gh).spaces["toolkit"].design
+        self.assertEqual(gh.calls, [])
+        self.assertEqual((got.in_flight, got.specs, got.not_stamped), (3, 1, 1))
+
+    def test_a_note_left_live_after_its_spec_was_archived_is_in_flight_here(self):
+        # The one difference from the Design tab (docs/modules/studio.md): the
+        # archive is not read, so the tab's Complete-with-a-mismatch is in flight.
+        gh = FakeGh({"johnfrog76/toolkit": design_node({"design": {"a.md": design_text(ID_A, "A")}, "spec": {}})})
+        got = self.read(self.cfg(space("toolkit")), gh).spaces["toolkit"].design
+        self.assertEqual((got.in_flight, got.specs), (1, 0))
 
 
 class TheArgv(LedgerCase):

@@ -814,6 +814,44 @@ describe("a product design's moves", () => {
     );
   });
 
+  it("read from the clone, the foot says so and a staged move has moved already", async () => {
+    const note =
+      "Read on disk, in the clone at /src/toolkit on main, as its working tree is right now.";
+    listAnswer = {
+      data: { ...FULL, checkout: READY, source: "checkout", note },
+      refetch,
+    } as typeof listAnswer;
+    mountList();
+    expect(screen.getByRole("note").textContent).toBe(note);
+    await menuOf("A note about the board");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Archive as shipped" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Archive as shipped" }));
+    const status = await within(dialog).findByRole("status");
+    expect(
+      within(status).getByText(/reads the clone's working tree, so the row has moved already/),
+    ).toBeTruthy();
+    expect(within(status).queryByText(/once the commit is pushed/)).toBeNull();
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("read from GitHub, the foot says so, then names the setting", async () => {
+    const note =
+      "Read from johnfrog76/toolkit on GitHub, its default branch: a move staged in a clone shows once it is pushed.";
+    listAnswer = {
+      data: {
+        ...FULL,
+        checkout: { ...READY, path: "", root: "", ready: false },
+        source: "github",
+        note,
+      },
+    };
+    mountList();
+    expect(screen.getByRole("note").textContent).toBe(
+      `${note} To move these designs from here, name this machine's clone of johnfrog76/toolkit: spaceCheckouts.toolkit.path in Settings.`,
+    );
+  });
+
   it("an older agent that says nothing about a checkout keeps today's menu and says nothing", async () => {
     listAnswer = { data: FULL };
     mountList();

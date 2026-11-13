@@ -52,6 +52,10 @@ if (-not (Get-Command Get-P20SettingsWorkflows -ErrorAction SilentlyContinue)) {
 if (-not (Get-Command Get-P20ClaudeProjectsRoot -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Read-ClaudeUsage.ps1')
 }
+# The Teams recipients registry -- the Teams delivery row names who is declared.
+if (-not (Get-Command Read-P20CommunicationConfig -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Read-CommunicationConfig.ps1')
+}
 # The one way this file calls git with stderr read as text (Invoke-TrackerRead.ps1).
 if (-not (Get-Command Invoke-P20TrackerRead -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
@@ -573,6 +577,13 @@ function Get-P20OptionalSurfaces {
         $hookState = $states.On
         $hookNote = "$($webhooks.Count) set -- gate 2 of a Teams send"
     }
+    # Who a send can go to: the recipients declared for the Space you are in,
+    # by key -- what SendTeams takes, and what Config -Set declares. A name, not
+    # a URL: the URL is only ever in the environment.
+    $recipientKeys = @()
+    try { $recipientKeys = @((Read-P20CommunicationConfig -Root $PackageRoot).Recipients.Keys | Sort-Object) }
+    catch { $recipientKeys = @() }
+    if ($recipientKeys.Count -gt 0) { $hookNote += "; recipients: $($recipientKeys -join ', ')" }
     $rows += New-P20SurfaceRow -Key 'TEAMS_WEBHOOK_*' -Title 'Teams delivery' -State $hookState `
         -Config 'TEAMS_WEBHOOK_<RECIPIENT> in .env in the package root (copy .env.example)' -Note $hookNote
 
@@ -585,7 +596,8 @@ function Get-P20OptionalSurfaces {
     # key IS that flag's name: consts.json startWork.launchEnvFlag.
     $launchState = $states.Unset
     $launchNote = $Prefix + 'StartWork <id> -Launch: a session in a worktree; the block works without it'
-    if (Get-Command claude -CommandType Application -ErrorAction SilentlyContinue) { $launchState = $states.On }
+    if (-not (Get-Command Test-P20StartWorkLaunch -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Test-StartWorkLaunch.ps1') }
+    if (Test-P20StartWorkLaunch) { $launchState = $states.On }
     $rows += New-P20SurfaceRow -Key (Get-P20Consts).startWork.launchEnvFlag -Title 'StartWork launch' -State $launchState `
         -Config 'claude on the PATH (install Claude Code)' -Note $launchNote
 

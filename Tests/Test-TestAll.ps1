@@ -300,8 +300,11 @@ Assert-True 'the Windows job runs the CLI from Windows PowerShell 5.1, the modul
     ($workflow -match "powershell\.exe -NoProfile -Command '\`$env:PSModulePath = \(Resolve-Path \.\); Import-Module \./Prompt20Toolkit/Prompt20Toolkit\.psd1 -Force; tkTest -Half cli; exit \`$LASTEXITCODE'")
 # tkTest starts the runner in pwsh, so the step above runs every suite on 7, and
 # its name says so. The ps51 job starts the runner in powershell.exe with no suite
-# switch, which starts every suite, and they their verbs, in 5.1
-# (Tests/Get-TestHost.ps1), read through the same gate.
+# switch, which starts every suite in 5.1, so every suite's own code runs there.
+# A suite that starts its children through Invoke-P20TestHost
+# (Tests/Get-TestHost.ps1) runs its verbs in 5.1 too; the rest still start pwsh
+# by name, and Test-Portability's Clause 22 lists them. The job is read through
+# the same gate.
 Assert-True 'the smoke job''s CLI step says it runs the suites in PowerShell 7' `
     ($workflow -match "(?m)^\s+- name: The CLI in PowerShell 7 on Windows -- tkTest -Half cli\s*$")
 $ps51Job = Get-WfJob 'ps51'
@@ -1315,6 +1318,7 @@ Assert-True 'and hands its children a scratch one, put back in the finally' ($ru
 Assert-True 'its own records go to the folder it resolved, by name' (([regex]::Matches($runnerSource, 'Write-P20TestResult [^\r\n]*-Dir \$historyDir')).Count -eq 2)
 $verbSource = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'Scripts/Invoke-TestAll.ps1'))
 Assert-True 'Test resolves the folder once, before the web half sets the marker' ($verbSource -match '(?s)\$historyDir = Get-P20TestHistoryDir.*\$runWeb = ')
+Assert-True 'the CLI runner names each suite before it starts it' ($runnerSource -match "(?s)--\s+started\s+\{1\}.{0,400}Invoke-P20TestHost\s+-File")
 $cfg = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'config.default.json')) | ConvertFrom-Json
 Assert-True 'config: Test outlasts the bridge''s default timeout' ([int]$cfg.commands.Test.bridgeTimeoutSeconds -ge 1800)
 

@@ -9,11 +9,11 @@ import { repoLinkBase } from "./docRooms";
 import { BackButton } from "../../shared/BackButton";
 import { EmptyState } from "../../shared/EmptyState";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { RefreshButton } from "../../shared/RefreshButton";
 
 // The Docs room (D-S12): ONE document from a GitHub Space's README.md or
-// docs/, read the house way -- PageCard, the back arrow and the title on the
+// docs/, read the house way -- PanelFrame, the back arrow and the title on the
 // left, compact controls on the right with github.com LAST, and one
 // MarkdownViewer given the document's place in the repo, so its relative links
 // open here (the anchor kept), its images come through /api/docs/asset, and
@@ -116,7 +116,7 @@ export function DocsDocPage() {
 
   return (
     <div className={styles.page} ref={topRef}>
-      <PageCard
+      <PanelFrame
         loading={isLoading}
         loadingLabel="Reading the document..."
         empty={readable ? undefined : docEmpty(path, data, error)}
@@ -149,7 +149,7 @@ export function DocsDocPage() {
             style={{ marginTop: tokens.spacingVerticalS }}
           />
         )}
-      </PageCard>
+      </PanelFrame>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 {
-  "_": "The standup's two sources JOINED on the id (docs/modules/solitaire-agile.md, \"The two sources, joined\"): an active GitHub Space reads its issues AND its cards. Both halves -- tkTestToolkit -Rituals and Tests/test_rituals.py -- feed each case's labels, issues and card rows to their joined fill (fill_joined_standup / Invoke-P20StandupJoinedFill) and assert the source, the walk queue and every worker's slots by ref (#<n> for an issue, the id for a card), the Check lines and the links; a case that names goldens is rendered and compared byte for byte (LF): standup-joined-<name>.txt (the detail), standup-joined-<name>.work.txt (the work grain) and standup-joined-<name>.brief.txt (the chair's reading). One case per shape, then all of them on one day. A card row is what the thin layer reads (read_cards / Get-P20StandupCards); `billable: false` is a card that says **Billable:** no, and a row without the key is billable. What moved: a card row's `begun` is the day its work began (its **Started:** day, else its **Created:** day) and `commits` the hashes of its `- <hash>` bullets; a row without them began outside any window and threads none. A case's `window` is Standup -Since's day (yesterday's lower bound moved back; `expected.since` then says where it landed). `expected.motions` is each item's motion and commit count by ref; `expected.counts` is the counts per worker and in total. The goldens are generated from this table -- and from standup.json and standup-cards.json -- by Tests/regenerate_joined_goldens.py, never typed.",
+  "_": "The standup's two sources JOINED on the id (docs/modules/solitaire-agile.md, \"The two sources, joined\"): an active GitHub Space reads its issues AND its cards. Both halves -- tkTestToolkit -Rituals and Tests/test_rituals.py -- feed each case's labels, issues and card rows to their joined fill (fill_joined_standup / Invoke-P20StandupJoinedFill) and assert the source, the walk queue and every worker's slots by ref (#<n> for an issue, the id for a card), the Check lines and the links; a case that names goldens is rendered and compared byte for byte (LF): standup-joined-<name>.txt (the detail), standup-joined-<name>.work.txt (the work grain) and standup-joined-<name>.brief.txt (the chair's reading). One case per shape, then all of them on one day. A card row is what the thin layer reads (read_cards / Get-P20StandupCards); `billable: false` is a card that says **Billable:** no, and a row without the key is billable. What moved: a card row's `begun` is the day its work began (its **Started:** day, else its **Created:** day) and `commits` the hashes of its `- <hash>` bullets; a row without them began outside any window and threads none. A case's `window` is Standup -Since's day (yesterday's lower bound moved back; `expected.since` then says where it landed). `expected.motions` is each item's motion and commit count by ref; `expected.counts` is the counts per worker and in total. The goldens are generated from this table -- and from standup.json and standup-cards.json -- by Tests/regenerate_joined_goldens.py, never typed. The dates read (a GitHub Space, docs/modules/solitaire-agile.md, \"What moved, and the window\"): a case's `commitDates` is hash -> its authored instant, or null where the read gave none, and `issueStarts` is issue number -> its timeline's start (the first worker label added, or the first assignment). With them, a card counts only the commits authored inside the window, a hash with no date is not counted but counted undated (`expected.counts.*.undated`, 0 when absent), and an open issue with no card is started when its start is in the window -- a joined card still decides its issue's start. A case with neither key is a Space whose dates were not read, and today's rule stands.",
   "asOf": "2026-10-02T09:00:00-04:00",
   "since": "2026-10-01T00:00:00-04:00",
   "space": "widgets",
@@ -309,6 +309,131 @@
         "text": "standup-joined-window-three-days.txt",
         "work": "standup-joined-window-three-days.work.txt",
         "brief": "standup-joined-window-three-days.brief.txt"
+      }
+    },
+    {
+      "name": "commits-window",
+      "shape": "the commit dates read: a card counts only the commits authored inside the window -- one before it and one after asOf are dropped, a hash the read gave no date (null, or not in the answer at all) is not counted but said undated; the counts line says the undated after the commits",
+      "issues": [
+        {"number": 170, "title": "Date the commits", "state": "OPEN", "labels": ["opus"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/170"}
+      ],
+      "cards": [
+        {"file": "Task170-date-the-commits.prompt.md", "folder": "current", "status": "In Progress", "closed": null, "title": "Date the commits", "id": "170", "begun": "2026-09-25", "commits": ["a0a1111", "b0b2222", "c0c3333", "d0d4444", "a0a9999"]},
+        {"file": "TaskP4Q8-say-the-undated.prompt.md", "folder": "current", "status": "In Progress", "closed": null, "title": "Say the undated", "id": "P4Q8", "begun": "2026-10-02", "commits": ["e0e5555", "f0f6666"]}
+      ],
+      "commitDates": {"a0a1111": "2026-09-28T15:00:00Z", "b0b2222": "2026-10-01T10:00:00Z", "c0c3333": "2026-10-02T12:00:00Z", "d0d4444": null, "a0a9999": "2026-10-02T14:00:00Z", "e0e5555": "2026-10-01T04:30:00Z"},
+      "issueStarts": {},
+      "expected": {
+        "walk": [],
+        "workers": [
+          {"label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true},
+          {"label": "opus", "name": "Opus", "yesterday": [], "today": ["#170"], "blockers": [], "empty": false},
+          {"label": "widgets", "name": "Widgets", "yesterday": [], "today": ["P4Q8"], "blockers": [], "empty": false}
+        ],
+        "checks": [],
+        "links": [{"number": 170, "id": "170", "lane": "In Progress"}],
+        "motions": {"#170": ["inProgress", 2], "P4Q8": ["started", 1]},
+        "counts": {
+          "workers": [
+            {"label": "fable", "closed": 0, "started": 0, "inProgress": 0, "commits": 0},
+            {"label": "opus", "closed": 0, "started": 0, "inProgress": 1, "commits": 2, "undated": 1},
+            {"label": "widgets", "closed": 0, "started": 1, "inProgress": 0, "commits": 1, "undated": 1}
+          ],
+          "total": {"closed": 0, "started": 1, "inProgress": 1, "commits": 3, "undated": 2}
+        },
+        "text": "standup-joined-commits-window.txt",
+        "work": "standup-joined-commits-window.work.txt",
+        "brief": "standup-joined-commits-window.brief.txt"
+      }
+    },
+    {
+      "name": "issue-labelled-in-window",
+      "shape": "an open issue with no card whose worker label was added inside the window reads started; its timeline is the only fact that can say so",
+      "issues": [
+        {"number": 171, "title": "Read the timeline", "state": "OPEN", "labels": ["opus"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/171"}
+      ],
+      "cards": [],
+      "commitDates": {},
+      "issueStarts": {"171": "2026-10-01T14:00:00Z"},
+      "expected": {
+        "walk": [],
+        "workers": [
+          {"label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true},
+          {"label": "opus", "name": "Opus", "yesterday": [], "today": ["#171"], "blockers": [], "empty": false}
+        ],
+        "checks": [],
+        "links": [],
+        "motions": {"#171": ["started", 0]},
+        "counts": {
+          "workers": [
+            {"label": "fable", "closed": 0, "started": 0, "inProgress": 0, "commits": 0},
+            {"label": "opus", "closed": 0, "started": 1, "inProgress": 0, "commits": 0}
+          ],
+          "total": {"closed": 0, "started": 1, "inProgress": 0, "commits": 0}
+        },
+        "text": null
+      }
+    },
+    {
+      "name": "issue-assigned-before-window",
+      "shape": "an open issue with no card assigned before the window is in progress; an issue whose card began before the window stays in progress whatever its timeline says -- the card decides",
+      "issues": [
+        {"number": 172, "title": "Hold the line", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/172"},
+        {"number": 173, "title": "Keep the card's word", "state": "OPEN", "labels": ["fable"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/173"}
+      ],
+      "cards": [
+        {"file": "Task173-keep-the-cards-word.prompt.md", "folder": "current", "status": "In Progress", "closed": null, "title": "Keep the card's word", "id": "173", "begun": "2026-09-15", "commits": []}
+      ],
+      "commitDates": {},
+      "issueStarts": {"172": "2026-09-20T15:00:00Z", "173": "2026-10-01T15:00:00Z"},
+      "expected": {
+        "walk": [],
+        "workers": [
+          {"label": "fable", "name": "Fable", "yesterday": [], "today": ["#172", "#173"], "blockers": [], "empty": false},
+          {"label": "opus", "name": "Opus", "yesterday": [], "today": [], "blockers": [], "empty": true}
+        ],
+        "checks": [],
+        "links": [{"number": 173, "id": "173", "lane": "In Progress"}],
+        "motions": {"#172": ["inProgress", 0], "#173": ["inProgress", 0]},
+        "counts": {
+          "workers": [
+            {"label": "fable", "closed": 0, "started": 0, "inProgress": 2, "commits": 0},
+            {"label": "opus", "closed": 0, "started": 0, "inProgress": 0, "commits": 0}
+          ],
+          "total": {"closed": 0, "started": 0, "inProgress": 2, "commits": 0}
+        },
+        "text": null
+      }
+    },
+    {
+      "name": "dates-not-read",
+      "shape": "commits-window's issues and cards with no dates read (a cards Space, or a read that failed): every bullet counts, as before the read, and nothing is undated",
+      "issues": [
+        {"number": 170, "title": "Date the commits", "state": "OPEN", "labels": ["opus"], "closedAt": null, "url": "https://github.com/acme/widgets/issues/170"}
+      ],
+      "cards": [
+        {"file": "Task170-date-the-commits.prompt.md", "folder": "current", "status": "In Progress", "closed": null, "title": "Date the commits", "id": "170", "begun": "2026-09-25", "commits": ["a0a1111", "b0b2222", "c0c3333", "d0d4444", "a0a9999"]},
+        {"file": "TaskP4Q8-say-the-undated.prompt.md", "folder": "current", "status": "In Progress", "closed": null, "title": "Say the undated", "id": "P4Q8", "begun": "2026-10-02", "commits": ["e0e5555", "f0f6666"]}
+      ],
+      "expected": {
+        "walk": [],
+        "workers": [
+          {"label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true},
+          {"label": "opus", "name": "Opus", "yesterday": [], "today": ["#170"], "blockers": [], "empty": false},
+          {"label": "widgets", "name": "Widgets", "yesterday": [], "today": ["P4Q8"], "blockers": [], "empty": false}
+        ],
+        "checks": [],
+        "links": [{"number": 170, "id": "170", "lane": "In Progress"}],
+        "motions": {"#170": ["inProgress", 5], "P4Q8": ["started", 2]},
+        "counts": {
+          "workers": [
+            {"label": "fable", "closed": 0, "started": 0, "inProgress": 0, "commits": 0},
+            {"label": "opus", "closed": 0, "started": 0, "inProgress": 1, "commits": 5},
+            {"label": "widgets", "closed": 0, "started": 1, "inProgress": 0, "commits": 2}
+          ],
+          "total": {"closed": 0, "started": 1, "inProgress": 1, "commits": 7}
+        },
+        "text": null
       }
     }
   ]
