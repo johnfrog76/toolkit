@@ -87,7 +87,7 @@ place on the tab and in its old one in the foyer's counts, so the two can differ
 
 **Where you meet it:** [the Studio](modules/studio.md#the-routes), "The routes"
 
-**Issue:** [#296](https://github.com/johnfrog76/toolkit/issues/296)
+**Issue:** [#431](https://github.com/johnfrog76/toolkit/issues/431)
 
 ### Promote files only into the Space you are in
 
