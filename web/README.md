@@ -88,7 +88,7 @@ web/
 ├── nginx.conf.template   static + /api -> host.docker.internal:${P20_AGENT_PORT}, substituted
 │                        by the nginx image's entrypoint at container start
 ├── docker-compose.yml    127.0.0.1:5174 -> container 5173; passes P20_AGENT_PORT in
-├── tests/smoke.mjs       Playwright, two modes (23 checks off / 30 on), raw `playwright` not @playwright/test
+├── tests/smoke.mjs       Playwright, two modes (28 checks off / 31 on), raw `playwright` not @playwright/test
 ├── tests/smokeStudio.mjs   its --studio cases; smokeStack.mjs starts the servers that mode owns
 ├── tests/smokeMatrix.mjs   its --matrix cases, on the same kind of servers
 ├── tests/smokeA11y.mjs     its --a11y audit, on the same kind of servers
@@ -1926,7 +1926,8 @@ the filter changes, the choice kept after a reload, a fresh browser context open
 **`--matrix`** (`npm run smoke:matrix`) runs on the same kind of servers, over `Tests/fixtures/hub`:
 each module flag alone on -- its nav entry, page, data and source there, every other module's absent and
 never requested, one new browser context per pass, the cases being `docs/SCENARIOS.md`'s "The nav, by
-module" rows; `flipCase` on the Lounge; and each choice kept in browser storage (the Spaces filter, the
+module" rows; the board's lanes by tracker, four on the fixture's Azure DevOps address before the passes and
+five, Backlog first, on the GitHub one after them; `flipCase` on the Lounge; and each choice kept in browser storage (the Spaces filter, the
 Reminders filter, the theme, the Lounge's tic-tac-toe) in a fresh context and in one whose
 `localStorage` and `sessionStorage` throw on access. Chromium only, and opt-in because every flag write
 is a `Config` run through the bridge.

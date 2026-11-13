@@ -49,7 +49,7 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defaultPython, launchChromium, moduleSourceUrl } from "./smokeStack.mjs";
+import { boardLanesCheck, defaultPython, launchChromium, moduleSourceUrl } from "./smokeStack.mjs";
 import { runA11y } from "./smokeA11y.mjs";
 import { runMatrix } from "./smokeMatrix.mjs";
 import { runStudio } from "./smokeStudio.mjs";
@@ -325,31 +325,12 @@ async function runViewport(viewportName) {
   await checkNoSidewaysScroll("/");
   await shoot("/");
 
-  // 1a. The board's FIRST lane is Backlog, and the fixture's planned card
-  // (test/backlog/Task403-...) is in it: /api/status reads backlog/ beside
-  // current/, and a card from there is Backlog whatever its text says. The
-  // board is /board beside Focus, or / when it is Home's only tab.
-  for (const route of ["/board", "/"]) {
-    await open(route);
-    const hasBoard = await page
-      .waitForSelector('section[aria-label="Board"] [role="group"]', { timeout: 5000 })
-      .then(() => true)
-      .catch(() => false);
-    if (!hasBoard) continue;
-    await page.waitForFunction(() => document.body.innerText.includes("Cache the thumbnails"), null, { timeout: 15000 }).catch(() => {});
-    const lanes = await page.evaluate(() =>
-      Array.from(document.querySelectorAll('section[aria-label="Board"] [role="group"]')).map((g) => ({
-        label: g.getAttribute("aria-label") ?? "",
-        text: g.textContent ?? "",
-      })),
-    );
-    check(
-      `${route} draws five lanes, Backlog first, holding the planned card`,
-      lanes.length === 5 && lanes[0].label.startsWith("Backlog") && lanes[0].text.includes("Cache the thumbnails"),
-      JSON.stringify(lanes.map((l) => l.label)),
-    );
-    break;
-  }
+  // 1a. The board's lanes, by the Space's tracker, and the fixture's planned
+  // card (test/backlog/Task403-...) in the first one: five lanes with Backlog
+  // first on a GitHub or local Space, four with Active first on an Azure
+  // DevOps one -- which the fixture's Space is. boardLanesCheck is shared
+  // with --matrix, the mode CI runs, which holds both shapes.
+  await boardLanesCheck({ page, base, open, check });
 
   // 1b. Home is named tabs, not pages. The
   // fixture's tier decides how many tabs there are, so the assertions hold for
