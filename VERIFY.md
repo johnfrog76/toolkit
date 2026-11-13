@@ -292,7 +292,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **52 suites, 10127 assertions** with a `config.local.json`, every one
+findings. On this commit that is **52 suites, 10292 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -1258,6 +1258,14 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   in the main checkout before the upgrade and no folder yet, the card's first read shows that old record, not "not
   run". `tkTestToolkit -TestAll` holds the rule over `Tests/fixtures/test-history/paths.json`, whose Windows rows
   only a Windows host reads live.
+- [ ] **`Invoke-P20TestGit` hands git an empty argument, a double quote and a trailing backslash under Windows
+  PowerShell 5.1 (#356).** On the Windows PC, in `powershell` (5.1), run `tkTestToolkit -Portability`. Every
+  `Clause 23: git is handed ...` line passes, and there are 18 of them, each ending `as the host passes arguments`:
+  5.1 has no `$PSNativeCommandArgumentPassing`, so its own passing is the only one run. The rows that only 5.1 on
+  Windows reads live are `an empty value, and the one after it`, the four with a double quote, and `a trailing
+  backslash after a space`. On macOS and Linux the same rows run a second time with `Legacy` passing, which is
+  5.1's rule in PowerShell 7; this row is 5.1's own command line and git for Windows reading it. The `ps51` job
+  runs the suite on 5.1 too.
 - [ ] **Daily prints any week from Windows PowerShell 5.1 (#291).** On the Windows PC, in `powershell` (5.1), on a
   Space with cards, run `tkDaily -LastWeek`: the days print, with no `Error:` and nothing copied to the clipboard.
   Open the web UI's Daily page, step back three weeks with *Earlier week*, press Copy All, and compare it with

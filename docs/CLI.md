@@ -181,7 +181,9 @@ by a node id REST never shows, so the thread is first found by its first comment
 (`reviewThreads`, a hundred at a time, paged). A thread already in that state is said and left alone.
 `byDesign`, `pending` and `wontFix` carry a reason GitHub has nowhere to keep, so each is **refused by
 name, before anything is asked or posted**, exit 2 -- say it in the reply instead. The statuses each
-tracker accepts are one list in `consts.json` (`replyStatuses`): `ReplyPR`'s refusal reads GitHub's, and
+tracker accepts are one list in `consts.json` (`replyStatuses`): `ReplyPR` checks `-Status` against Azure
+DevOps' six on either tracker (a word that is not one of them is refused, exit 2, its hint naming the six and the key,
+`consts.json` `replyStatuses.ado`, before anything is asked or posted), its GitHub refusal reads GitHub's three, and
 the PR Comments page offers only those on a GitHub Space (`fixed`, `closed`, `active`), mapping a
 suggested reject or modify to `active` and saying in the draft that the thread is left open. On a conversation
 comment or a review summary there is no thread to resolve: the reply is posted and the line says
