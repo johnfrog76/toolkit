@@ -165,11 +165,25 @@ export interface PromptsResponse {
   categories?: string[];
 }
 
+/** A product's design work, from its repository's live design/ and spec/,
+ *  grouped as the Design tab groups them. */
+export interface DesignCounts {
+  /** Designs whose state is Design or Spec. */
+  in_flight: number;
+  /** The designs among them at Spec. */
+  specs: number;
+  /** Files with no `id:`, which the Design tab does not show as designs. */
+  not_stamped: number;
+}
+
 /** One GitHub Space's row facts, in the shapes the three per-Space routes answer. */
 export interface SpaceLedger {
   report: IssueReport;
   deploys: DeploysResponse;
   visibility: SpaceVisibility;
+  /** Null (or absent, from an older agent) when the repository has no design/,
+   *  or the Space's address names an owner rather than one repository. */
+  design?: DesignCounts | null;
 }
 
 /** GET /api/studio/ledger -- every declared GitHub Space's facts, by slug. A

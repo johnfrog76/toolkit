@@ -104,6 +104,8 @@ _list_cache: dict[str, tuple[float, "DesignListResponse", dict[str, str]]] = {}
 
 NOTE, SPEC = "note", "spec"
 LIVE, ARCHIVE = "live", "archive"
+# The reason a file with no `id:` is not shown; the foyer counts files by it.
+NO_ID_REASON = "no id"
 
 
 def clear_cache() -> None:
@@ -578,7 +580,7 @@ def group_designs(docs: list[DesignDoc]) -> tuple[list[Design], list[NotShown]]:
     by_id: dict[str, list[DesignDoc]] = {}
     for d in docs:
         if not d.id:
-            not_shown.append(NotShown(path=d.path, reason="no id"))
+            not_shown.append(NotShown(path=d.path, reason=NO_ID_REASON))
             continue
         by_id.setdefault(d.id, []).append(d)
 

@@ -90,12 +90,14 @@ page, so the two counts lines can differ.
 
 **Issue:** [#316](https://github.com/johnfrog76/toolkit/issues/316)
 
-### The foyer counts no designs or specs
+### The foyer's design counts can differ from the Design tab's
 
-**What you see:** A GitHub row in the Studio's foyer says how a product's ledger stands and its last
-deploy, with no count of the designs in flight or of the specs.
+**What you see:** A GitHub row in the Studio's foyer counts a product's designs and specs from GitHub's
+default branch. The Design tab, where this machine has a ready checkout of that repository, reads the
+clone's working tree instead. A design moved in the clone and not yet committed and pushed is in its new
+place on the tab and in its old one in the foyer's counts, so the two can differ by a staged move.
 
-**Where you meet it:** [the Studio](modules/studio.md#known-gaps), "Known gaps"
+**Where you meet it:** [the Studio](modules/studio.md#the-routes), "The routes"
 
 **Issue:** [#296](https://github.com/johnfrog76/toolkit/issues/296)
 
