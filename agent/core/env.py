@@ -34,11 +34,11 @@ from .config import (
     lane_names,
     load_config,
     offered_spaces,
-    switcher_spaces,
     read_config_file,
     renamed_slug,
     resolve_dirs,
     start_work_launch,
+    switcher_spaces,
     tracker,
 )
 from .hosts import host_env_block
