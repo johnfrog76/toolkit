@@ -516,3 +516,82 @@ class TheAgentNamesTheBillingFolder(unittest.TestCase):
             {},
         )
         self.assertEqual((resolved, passed), ("", "."))
+
+
+class TheBillingRouteTakesAWindow(unittest.TestCase):
+    """``GET /billing`` takes ``since`` and ``until`` as well as ``week``, and passes
+    them to the script as ``-Since`` and ``-Until``. Half a window, or a value that
+    is not a yyyy-MM-dd day, is refused before any PowerShell starts, in the
+    script's own words (consts.json billing.text)."""
+
+    def _ask(self, **query) -> tuple[list[list[str]], object]:
+        from agent.ado import reporting
+
+        with tempfile.TemporaryDirectory() as cfg_dir, tempfile.TemporaryDirectory() as hub:
+            base = Path(cfg_dir)
+            (base / "config.default.json").write_text(
+                json.dumps({"activeSpace": "t", "spaces": [{"slug": "t", "status": "local", "promptsFolder": "t"}]}),
+                encoding="utf-8",
+            )
+            (base / "config.local.json").write_text("{}", encoding="utf-8")
+            seen: list[list[str]] = []
+
+            def fake_run(args, **_kwargs):
+                seen.append(list(args))
+                return subprocess.CompletedProcess(
+                    args, 0, stdout='{"days": [], "raw": "No activity found."}', stderr=""
+                )
+
+            with (
+                mock.patch.object(config, "DEFAULT_CONFIG_PATH", base / "config.default.json"),
+                mock.patch.object(config, "LOCAL_CONFIG_PATH", base / "config.local.json"),
+                mock.patch.dict(os.environ, {"PROMPTS_ROOT": hub}, clear=False),
+                mock.patch.object(reporting, "host_argv", lambda script, *a: ["pwsh", "-File", script, *a]),
+                mock.patch.object(reporting.subprocess, "run", fake_run),
+            ):
+                answer = asyncio.run(reporting.get_billing(**query))
+        return seen, answer
+
+    def test_a_window_reaches_the_argv_as_since_and_until(self):
+        seen, answer = self._ask(since="2026-01-05", until="2026-01-09")
+        self.assertEqual(answer.error, "")
+        argv = seen[0]
+        self.assertEqual(argv[argv.index("-Since") + 1], "2026-01-05")
+        self.assertEqual(argv[argv.index("-Until") + 1], "2026-01-09")
+        self.assertNotIn("-LastWeek", argv)
+
+    def test_a_window_wins_over_week(self):
+        seen, _ = self._ask(week="last", since="2026-01-05", until="2026-01-09")
+        self.assertIn("-Since", seen[0])
+        self.assertNotIn("-LastWeek", seen[0])
+
+    def test_week_last_is_unchanged(self):
+        seen, answer = self._ask(week="last")
+        self.assertEqual(answer.error, "")
+        self.assertIn("-LastWeek", seen[0])
+        self.assertNotIn("-Since", seen[0])
+        seen, _ = self._ask()
+        self.assertFalse({"-LastWeek", "-Since", "-Until"} & set(seen[0]))
+
+    def test_half_a_window_is_refused_in_the_scripts_words_and_starts_nothing(self):
+        from agent.core.consts import billing_text
+
+        for query in ({"since": "2026-01-05"}, {"until": "2026-01-09"}):
+            with self.subTest(query=query):
+                seen, answer = self._ask(**query)
+                self.assertEqual(seen, [], "no PowerShell is started for a window the script would refuse")
+                self.assertEqual(answer.error, billing_text()["halfWindow"])
+                self.assertEqual(answer.days, [])
+
+    def test_a_value_that_is_not_a_day_is_refused_and_starts_nothing(self):
+        from agent.core.consts import billing_text
+
+        for since in ("2026-13-01", "-LastWeek", "1/5/2026", "2026-1-5", "2026-02-30"):
+            with self.subTest(since=since):
+                seen, answer = self._ask(since=since, until="2026-01-09")
+                self.assertEqual(seen, [])
+                expected = billing_text()["notADay"].replace("{name}", "-Since").replace("{value}", since)
+                self.assertEqual(answer.error, expected)
+        seen, answer = self._ask(since="2026-01-05", until="soon")
+        self.assertEqual(seen, [])
+        self.assertIn("-Until 'soon'", answer.error)

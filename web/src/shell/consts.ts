@@ -443,6 +443,20 @@ export const REPLY_STATUSES_BY_TRACKER = consts.replyStatuses as {
   github: string[];
 };
 
+/**
+ * Daily's window (docs/CLI.md, "The third line: Billable"): the sentences the
+ * billing script, the CLI's Daily and GET /api/billing refuse a window with. The
+ * page sends only whole windows it built itself and shows the agent's `error`
+ * verbatim, so it types none of them.
+ */
+export const BILLING = consts.billing as {
+  text: {
+    halfWindow: string;
+    notADay: string;
+    backwards: string;
+  };
+};
+
 /** The contract's patterns, compiled once for this bundle. */
 export const RE = {
   prUrlLine: toRegExp(consts.regex.prUrlLine),

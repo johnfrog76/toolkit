@@ -2113,6 +2113,22 @@ function global:Set-P20CardBillable {
         -Name $inv.Name -Prefix $inv.Prefix
 }
 
+# Daily: the week's timesheet from the cards -- the web UI's Daily page, as the
+# text its Copy All copies. This week, -LastWeek, or -Since/-Until. Read-only.
+function global:Get-P20Daily {
+    [CmdletBinding()]
+    param(
+        [switch]$LastWeek,
+        [string]$Since,
+        [string]$Until,
+        [switch]$Compact,
+        [switch]$Help
+    )
+    $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'Daily'
+    Invoke-ToolkitScript -Path "$toolkitRoot\Scripts\Get-Daily.ps1" -Parameters $PSBoundParameters `
+        -Name $inv.Name -Prefix $inv.Prefix
+}
+
 function global:Set-P20CardCover {
     [CmdletBinding()]
     param(
@@ -2543,6 +2559,7 @@ $script:ModuleState.CommandMap = [ordered]@{
     'Archive'          = 'Move-P20PromptToArchive'
     'Status'           = 'Get-P20PromptStatus'
     'Billable'         = 'Set-P20CardBillable'
+    'Daily'            = 'Get-P20Daily'            # the week's timesheet, as the Daily page copies it
     'Cover'            = 'Set-P20CardCover'
     'Move'             = 'Move-P20CardLane'
     'Plan'             = 'Set-P20CardSprint'
