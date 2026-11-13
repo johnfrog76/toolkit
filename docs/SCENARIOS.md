@@ -146,6 +146,11 @@ when the Space's repository is -- said, never asked (`ActionDialog.titles.test.t
 | lounge | + Lounge, **last** | you look up from the work, so the room stands apart |
 | all six | [Space] \| System · Daily · Growth · Organize · Studio · Team Agile · Lounge | Meetings and Decks are carried, not lost |
 
+**Organize's tab has two pages under in-page tabs**, the same tab row Home and Team Agile use: **Reminders**
+(`/organize`) and **Reference** (`/organize/reference`, the hub's reference documents, listed and searched,
+and `/organize/reference/<file name>` to read one). With organize off, none of the three is a route and
+`GET /api/reference` is 404 (`web/src/shell/scenarios.test.tsx`, "Organize's Reference page").
+
 The add-ons are the ENGINEER's, so the same nav shows on Demo (local) and on a GitHub space; only
 Home's strip differs there -- and Team Agile, which the Space's answer gates: Demo has no tracker,
 so it is absent there. A flag answered `false` reads exactly as one never set.
