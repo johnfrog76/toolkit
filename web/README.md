@@ -99,7 +99,7 @@ web/
 ├── tests/routeModules.jest.cjs  jest only: a stub for react-router's one file that reads import.meta
 └── src/
     ├── shell/            the composition root -- owns chrome, owns no decisions
-    │   ├── App.tsx         theme, nav, the /env gate, Home's tabs, System's pager, the <Routes> table
+    │   ├── App.tsx         theme, nav, the /env gate, Home's tabs, System's tabs, the <Routes> table
     │   ├── SpaceAnchor.tsx the Space pill at the left of the nav, which IS the Home entry
     │   ├── SettingsDrawer.tsx  the one settings surface; the avatar in the nav bar opens it
     │   ├── main.tsx        Provider + BrowserRouter + ConfettiProvider + App
@@ -964,8 +964,11 @@ wordmark's default blob, and by no theme.
   1px rule in the theme's stroke follows it, then the engineer's tabs; the data model still lists Home.
 - **A title per page**, from the nav entry that owns the path: `Daily · ToolKit`. A path with no
   entry is just `ToolKit`.
-- **The header holds what is true on every page** -- brand, org, nav, you; no pager. System's pager is under its cards, centred: the panels' own `ListPager`, `Page 1 of 3`, in a nav named
-  "More cards", from `pager` on the shell context. Home has no pager: it has named tabs (below).
+- **The header holds what is true on every page** -- brand, org, nav, you; no pager. No page has one for its cards. System's cards sit under in-page tabs,
+  **Overview** (`/system`) and **Agents** (`/system/agents`): `SYSTEM_TABS` in the registry, grouped by
+  `moduleSystemTabs`, each tab an address and showing all of its cards. The strip is placed as Team
+  Agile's is, in a `TabRows` above the cards, and with fewer than two tabs there is no strip. Home has
+  named tabs too (below).
 - **Home is named tabs -- Focus | Board | Sprint | Actions** on an Azure DevOps Space, and on a
   GitHub space the strip wears that tracker's words and its own order: **Issues | Board | Stats |
   Design | Docs** (Sprint is an ADO word; the issues come first because the board ceremony is optional on a
@@ -1324,7 +1327,7 @@ are prompts, and agile lanes are a better view for how multiple items flow for h
 - **The tab row spans the centre block, flush both ends.** Home's row above the cards (`viewBar`: flex,
   space-between) has the tabs at its left edge, level with the cards below. **New card
   follows the explain text** on both rows: on the board, after the milestone, sprint and tag filters, at the row's end; the
-  text wraps inside itself so the buttons keep the row. The System page keeps its pager under the grid.
+  text wraps inside itself so the buttons keep the row. The System page has a tab strip of its own above its cards, and no pager.
 - **The board owns the height; a lane scrolls inside itself.** The owner: "they all expand to fill the
   space; if I have 20 cards in a single lane each lane has overflow-y." The lanes grid is
   `clamp(360px, 100vh - 290px, 1100px)` tall with `align-items: stretch`, so every lane is the same height
