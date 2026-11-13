@@ -292,7 +292,7 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **52 suites, 10496 assertions** with a `config.local.json`, every one
+findings. On this commit that is **52 suites, 10600 assertions** with a `config.local.json`, every one
 of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
 `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
 sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
@@ -760,7 +760,8 @@ opens a browser and names it.
 - [ ] `/skills` renders
 - [ ] A **Meetings** nav entry, and `/communication` lists the three fixture sessions with their
       stages -- Plan, Prep, Retro
-- [ ] The retro session's send button is **present, disabled, and names `TEAMS_WEBHOOK_MANAGER`**
+- [ ] The retro session's send button is **present, disabled, and says `Sending off on this server`**
+      (`Webhook not set` on a server not started as a test run)
 - [ ] No page errors across the six routes
 
 > The send button is never pressed, by the runner or by you. A press posts to a real webhook, and
@@ -800,7 +801,9 @@ curl -s localhost:4100/api/env | python -c "import json,sys; print(json.load(sys
 - [ ] The block **names the variable** (`"webhookEnv": "TEAMS_WEBHOOK_MANAGER"`) and does not
       contain a URL anywhere
 - [ ] On a Retro-stage session, the send button is **visible and disabled**, with the reason on the
-      line below it naming `TEAMS_WEBHOOK_MANAGER` -- not hidden, and not an error
+      line below it reading `Webhook not set` and `TEAMS_WEBHOOK_MANAGER` named only in the info
+      icon beside it -- not hidden, and not an error. The System page's Environment card reads the
+      same phrase on that recipient's row, under *Teams messages*
 - [ ] `tkSendTeams manager 'test' -WhatIf` prints the same refusal, names the variable, and
       **exits 0** -- an unset variable is a configuration fact, not a failure
 
@@ -1272,6 +1275,24 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `tkDaily -Since <that Monday> -Until <that Friday>`: the same text. `tkDaily -Since 2026-01-05` prints one
   `Error:` naming `-Since and -Until go together`, and `$LASTEXITCODE` is 2. The `ps51` job runs the Billable
   suite on 5.1; this row is a real console, a real hub and the page.
+- [ ] **A Space's checkout whose path has a space and ends in a backslash is found under Windows PowerShell 5.1
+  (#407).** On the Windows PC, clone a repository a Space names into a folder with a space in its path, say
+  `C:\My Repos\product`. In `powershell` (5.1), in that Space, run
+  `tkConfig -Set "spaceCheckouts.<slug>.path=C:\My Repos\product\"` (the trailing backslash is the point), then
+  `tkMoveDesign <id> -To Spec -Space <slug> -WhatIf` for a note in that product. It names the clone at
+  `C:\My Repos\product` and the move it would make; it does not say `it is not inside a git repository`. Then run
+  `tkTestToolkit -Design -Portability`: the line `a clone in a folder with a space, asked for with a trailing
+  separator, is found (Desktop 5.1...)` passes, the one after it too, and so does every `Clause 23: the shipped
+  reader hands git ...` line, `a checkout path with a space and a trailing backslash, and the arguments after it`
+  among them. Those rows are `Invoke-P20TrackerRead` escaping for 5.1's own command line, which no other host
+  builds; the `ps51` job runs both suites on 5.1 too.
+- [ ] **The agent's checkout tests pass under Python on Windows (#410).** On the Windows PC, from the package root,
+  run `py -3 -m pytest Tests/test_space_checkout.py`. It reads `13 passed`, with no failure naming `/srv/clones/r`:
+  the shared table's absolute-path rows carry `os`, and on Windows the `posix` rows are not run and the two
+  `windows` rows (`C:\clones\r`, and the same with spaces around it) are. Then `tkTestToolkit -Design` in `pwsh` and
+  in `powershell` (5.1): its lines `a path written 'C:\clones\r' reads as 'C:\clones\r'` pass and none names
+  `/srv/clones/r`. The two Windows CI jobs run the Design suite; no CI job runs this pytest file on Windows, so this
+  row is the only place the agent's half reads the `windows` rows live.
 
 ## Recording a run
 
