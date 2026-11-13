@@ -1,0 +1,7 @@
+Since Thursday 1 October 2026: 1 started, 1 in progress, 3 commits (2 undated).
+Nothing is waiting on you.
+Fable: nothing today.
+Opus: nothing yesterday, 1 open, 2 commits, none in flight, no blockers.
+Widgets: nothing yesterday, 1 open, 1 started, 1 commit, no blockers.
+In flight is not yet known: every routed issue reads as open.
+Next: nothing is waiting on you.

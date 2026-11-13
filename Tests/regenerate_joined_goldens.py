@@ -74,6 +74,8 @@ def filled_case(table: dict, case: dict) -> "standup.Standup":
             space=table["space"],
             space_name=table["spaceName"],
             window=case.get("window", ""),
+            commit_dates=case.get("commitDates"),
+            issue_starts=case.get("issueStarts"),
         )
     )
 

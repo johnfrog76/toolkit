@@ -49,6 +49,11 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 . (Join-Path $PSScriptRoot 'Test-GitRoot.ps1')
 
+# The hub root without a separator at its end (a drive root keeps its own). The
+# reader escapes `C:\My Hub\` for Windows PowerShell 5.1 either way; this keeps
+# the value clean for every call below, and for the sentence that names it.
+$HubRoot = Remove-P20TrailingSeparator $HubRoot
+
 $result = [ordered]@{
     ahead      = $null
     behind     = $null

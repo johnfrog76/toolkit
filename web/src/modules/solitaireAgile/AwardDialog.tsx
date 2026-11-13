@@ -19,7 +19,7 @@ import { useConfetti } from "../../hooks/useConfetti";
 
 // The award (docs/modules/solitaire-agile.md, "Milestones: the tab and the award"):
 // the ONE place Team Agile celebrates. When a milestone is reached and the person
-// next opens the Milestones tab, this dialog says so -- "Congratulations: <title>
+// next opens the Releases tab, this dialog says so -- "Congratulations: <title>
 // reached!", one line of what it took, the gold trophy -- and throws the confetti once,
 // when it opens. The burst is the app's, drawn at the shell's root over the whole
 // viewport (shell/ConfettiProvider.tsx); this dialog only says when, through
@@ -29,7 +29,7 @@ import { useConfetti } from "../../hooks/useConfetti";
 // Whether it opens is the page's business (award.ts: once per Space and milestone
 // per browser); this component draws one award and says when it is closed.
 //
-// A lazyPart of the Milestones page (shell/lazy.tsx); the confetti's own bytes are
+// A lazyPart of the Releases page (shell/lazy.tsx); the confetti's own bytes are
 // the root's lazyPart, fetched only when this dialog first throws.
 
 const useStyles = makeStyles({

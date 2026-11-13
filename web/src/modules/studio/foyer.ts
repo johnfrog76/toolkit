@@ -25,6 +25,7 @@ import type { DateTime } from "luxon";
 import type { EnvStatus, SpaceInfo } from "../../shell/api";
 import { STATUS } from "../../shell/consts";
 import type { DeploysResponse, IssueReport, StatusResponse } from "../ado/api.ado";
+import type { DesignCounts } from "./api.studio";
 import { localNow, parseLocal } from "../../utility/dates";
 
 /** The Spaces the foyer draws a row for: every one /env offers, in its order. */
@@ -168,16 +169,37 @@ export function deployPhrase(
   return `last deploy ${dayAge(last.when, now)}, ${state}`;
 }
 
+const counted = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** The designs half of a row's line, or null for a product with no design/
+ *  (nothing rather than zero): `3 designs in flight, 1 spec`, then the files
+ *  the Design tab does not show for want of an `id:`. */
+export function designPhrase(counts: DesignCounts | null | undefined): string | null {
+  if (!counts) return null;
+  const parts = [
+    counts.in_flight === 0
+      ? "no designs in flight"
+      : counted(counts.in_flight, "design in flight", "designs in flight"),
+  ];
+  if (counts.specs > 0) parts.push(counted(counts.specs, "spec", "specs"));
+  const phrase = parts.join(", ");
+  return counts.not_stamped > 0
+    ? `${phrase}; ${counted(counts.not_stamped, "file", "files")} not stamped with an id`
+    : phrase;
+}
+
 /** A GitHub row's whole line, or null while the issues are still being read. */
 export function foyerLine(
   report: IssueReport | undefined,
   deploys: DeploysResponse | undefined,
   now: DateTime = localNow(),
+  design?: DesignCounts | null,
 ): string | null {
   const issues = issuesPhrase(report);
   if (issues === null) return null;
   const deploy = report?.supported ? deployPhrase(deploys, now) : "";
-  return deploy ? `${issues}; ${deploy}` : issues;
+  const designs = report?.supported ? designPhrase(design) : null;
+  return [issues, deploy, designs].filter(Boolean).join("; ");
 }
 
 /**

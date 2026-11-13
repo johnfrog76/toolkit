@@ -14,8 +14,8 @@
     The rule is Scripts/Triage-Rules.ps1's, shared with the suite; this script
     is the thin layer: which Space, which repo, the gh reads, the printing.
 
-        gh label list --repo <repo> --limit 500 --json name,description
-        gh issue list --repo <repo> --state open --limit 500 --json number,title,state,labels,assignees,milestone,url
+        gh label list --repo <repo> --limit <n> --json name,description
+        gh issue list --repo <repo> --state open --limit <n> --json number,title,state,labels,assignees,milestone,url
         gh api user -q .login     (best effort: who "me" is)
 
     A GitHub Space only. An Azure DevOps or local Space, a Space whose repo is
@@ -69,6 +69,7 @@ if ($Help) {
 . (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
 . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 . (Join-Path $PSScriptRoot 'Ritual-Common.ps1')
+if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Get-Consts.ps1') }
 
 # -- Which Space ---------------------------------------------------------------
 # No -Space: the one you are in. A slug: that Space's own entry, read without
@@ -108,10 +109,10 @@ else {
     else {
         # -- The thin layer: two gh reads (Scripts/Ritual-Common.ps1) --------
         $repo = $target.Repo
-        $got = Invoke-P20RitualGh -Repo $repo -Arguments @('label', 'list', '--repo', $repo, '--limit', '500', '--json', 'name,description')
+        $got = Invoke-P20RitualGh -Repo $repo -Arguments @('label', 'list', '--repo', $repo, '--limit', [string](Get-P20Consts).ghReads.labels, '--json', 'name,description')
         if ($got.ok) {
             $labels = $got.value
-            $got = Invoke-P20RitualGh -Repo $repo -Arguments @('issue', 'list', '--repo', $repo, '--state', 'open', '--limit', '500',
+            $got = Invoke-P20RitualGh -Repo $repo -Arguments @('issue', 'list', '--repo', $repo, '--state', 'open', '--limit', [string](Get-P20Consts).ghReads.openIssues,
                 '--json', 'number,title,state,labels,assignees,milestone,url')
         }
         if ($got.ok) {
