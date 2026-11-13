@@ -538,7 +538,9 @@ class TheBillingRouteTakesAWindow(unittest.TestCase):
 
             def fake_run(args, **_kwargs):
                 seen.append(list(args))
-                return subprocess.CompletedProcess(args, 0, stdout='{"days": [], "raw": "No activity found."}', stderr="")
+                return subprocess.CompletedProcess(
+                    args, 0, stdout='{"days": [], "raw": "No activity found."}', stderr=""
+                )
 
             with (
                 mock.patch.object(config, "DEFAULT_CONFIG_PATH", base / "config.default.json"),
