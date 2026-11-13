@@ -337,7 +337,7 @@ if ($choice.source -eq 'cards' -or $choice.source -eq 'both') {
     # the same switch, the same read, the same pick -- and the brief's last line.
     . (Join-Path $PSScriptRoot 'Corner-Rules.ps1')
     $null = Add-P20StandupCorner -Standup $standup -Labels $labels -Issues $issues -Cards $cards `
-        -On $suggestOn -Prefix (Get-CliPrefix) -Viewer $viewer -PackageRoot $repoRoot
+        -On $suggestOn -Prefix (Get-CliPrefix) -Viewer $viewer -PackageRoot $repoRoot -HowIWork ([string]$how.answer) -Launch (Test-P20StartWorkLaunch)
 }
 $standup.text = Format-P20StandupText -Standup $standup -PackageRoot $repoRoot
 $standup.work.text = Format-P20StandupWork -Standup $standup -PackageRoot $repoRoot

@@ -157,8 +157,13 @@ def filled_corner_case(table: dict, case: dict) -> "standup.Standup":
         space_name=b["spaceName"],
     )
     on = suggest.suggestions_on(True, case["suggestions"])
-    suggest.attach_suggestions(filled, table["workerLabels"], case["issues"], cards, case["howIWork"], on, b["prefix"])
-    corner.attach_corner(filled, table["workerLabels"], case["issues"], cards, on, b["prefix"])
+    launch = bool(case.get("launch"))
+    suggest.attach_suggestions(
+        filled, table["workerLabels"], case["issues"], cards, case["howIWork"], on, b["prefix"], launch=launch
+    )
+    corner.attach_corner(
+        filled, table["workerLabels"], case["issues"], cards, on, b["prefix"], how=case["howIWork"], launch=launch
+    )
     return _rendered(filled)
 
 

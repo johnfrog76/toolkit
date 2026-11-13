@@ -1900,6 +1900,8 @@ def standup_for(space: str = "", as_of: datetime | None = None, since: str = "",
             True,
             str(cfg.get("commandPrefix") or ""),
             viewer,
+            how,
+            start_work_launch(),
         )
     # The Agenda (agenda.py): the page's tiles, over the same read. The viewer is
     # the suggestion's, asked only while it is on; "" leaves an assignee someone else's.

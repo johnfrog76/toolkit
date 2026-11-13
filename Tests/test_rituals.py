@@ -1275,7 +1275,13 @@ class TheCornerTable(unittest.TestCase):
         items = self.suggest.suggest_items(CORNER["workerLabels"], row["issues"], cards, set())
         since = datetime.fromisoformat(CORNER["since"])
         as_of = datetime.fromisoformat(CORNER["asOf"])
-        return self.corner.corner(items, self.corner.corner_closed(row["issues"], cards, since, as_of))
+        # howIWork and launch are the row's when it names them: alone and off otherwise.
+        return self.corner.corner(
+            items,
+            self.corner.corner_closed(row["issues"], cards, since, as_of),
+            row.get("howIWork", "alone"),
+            bool(row.get("launch")),
+        )
 
     def test_every_shape_has_a_row(self):
         names = {r["name"] for r in CORNER["rows"]}
@@ -1334,6 +1340,28 @@ class TheCornerTable(unittest.TestCase):
                 if filled.corner:
                     # The Corner is the brief's LAST line, after the Next line.
                     self.assertEqual(filled.brief.rstrip("\n").split("\n")[-1], filled.corner.brief)
+                sug = filled.suggestion
+                shared = bool(filled.corner and filled.corner.command and sug and sug.ref == filled.corner.ref)
+                if shared and sug.shape == C.rituals_suggest_shapes()[1]:
+                    # One pick, one command: a delegation's is the suggestion's, -Launch and all.
+                    self.assertEqual(filled.corner.command, sug.command)
+
+    def test_the_launch_rows_differ_only_in_the_command(self):
+        """Launch on and off over one read: the same line and pick, and only the
+        delegation's command gains -Launch."""
+        rows = {r["name"]: r for r in CORNER["rows"]}
+        off = rows["a-delegation-with-the-launch-off-is-a-plain-start"]
+        on = rows["a-delegation-with-the-launch-on-names-the-launch"]
+        self.assertEqual((off["issues"], off["cards"]), (on["issues"], on["cards"]))
+        self.assertEqual((bool(off.get("launch")), bool(on.get("launch"))), (False, True))
+        t = C.rituals_text()
+        arg = on["expected"]["ref"].lstrip("#")
+        self.assertEqual(off["expected"]["command"], t["suggestCommandStart"].replace("{arg}", arg))
+        self.assertEqual(on["expected"]["command"], t["suggestCommandLaunch"].replace("{arg}", arg))
+        self.assertEqual(
+            {k: v for k, v in off["expected"].items() if k != "command"},
+            {k: v for k, v in on["expected"].items() if k != "command"},
+        )
 
 
 # The response's field names, exactly as the contract's JSON spells them.
