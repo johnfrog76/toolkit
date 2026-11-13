@@ -1292,7 +1292,9 @@ class TheSuggestionTable(unittest.TestCase):
     def test_every_row(self):
         for row in SUGGEST["rows"]:
             with self.subTest(row=row["name"]):
-                picked, excluded = self.suggest.suggest(row["items"], row["howIWork"], row["dismissed"])
+                picked, excluded = self.suggest.suggest(
+                    row["items"], row["howIWork"], row["dismissed"], bool(row.get("launch"))
+                )
                 exp = row["expected"]
                 self.assertEqual([p["ref"] for p in picked], exp["order"])
                 self.assertEqual(excluded, exp["excluded"])

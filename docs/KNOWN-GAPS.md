@@ -94,18 +94,6 @@ are always empty, because no label is named for them.
 
 **Issue:** [#293](https://github.com/johnfrog76/toolkit/issues/293)
 
-### The suggestion hands off, it does not launch
-
-**What you see:** The chair's Next line suggests one next move, and for a crew-sized item its command is
-`StartWork <n>` -- the block, carried by hand. `StartWork <n> -Launch` starts a session from a terminal,
-and the hand-off box offers **Launch** where `/env` says the launch is on
-([the launch](modules/solitaire-agile.md#the-launch-the-block-handed-to-a-session)), but the Next line's
-command does not carry `-Launch`.
-
-**Where you meet it:** [Team Agile](modules/solitaire-agile.md#the-suggestion-one-next-move-derived), "The suggestion: one next move, derived"
-
-**Issue:** [#295](https://github.com/johnfrog76/toolkit/issues/295)
-
 ### The terminal's standup dates a commit from one repository, the page from every repository of the Space
 
 **What you see:** On a Space that spans several GitHub repositories, the CLI's `Standup` asks only the

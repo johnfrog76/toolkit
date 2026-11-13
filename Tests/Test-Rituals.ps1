@@ -733,7 +733,7 @@ foreach ($row in @($suggestTable.nearest)) {
 }
 foreach ($row in $suggestRows) {
     $dismissed = [string[]]@($row.dismissed | ForEach-Object { [string]$_ })
-    $chosen = Select-P20Suggestion -Items @($row.items) -HowIWork ([string]$row.howIWork) -Dismissed $dismissed -PackageRoot $pkgRoot
+    $chosen = Select-P20Suggestion -Items @($row.items) -HowIWork ([string]$row.howIWork) -Dismissed $dismissed -PackageRoot $pkgRoot -Launch ([bool]$row.launch)
     $exp = $row.expected
     $gotOrder = (@($chosen.picked | ForEach-Object { $_.ref })) -join ','
     $wantOrder = (@($exp.order | ForEach-Object { [string]$_ })) -join ','
