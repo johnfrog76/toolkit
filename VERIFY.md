@@ -1238,26 +1238,37 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `~/...` in `config.local.json` and no `PROMPTS_ROOT`, `tkStatus` still finds the hub: `-LiteralPath` expands a
   leading `~` on pwsh 7, and this row is the check on 5.1. The NewPrompt suite types the same verbs against a
   scratch hub in such a folder on the two Windows jobs, one per host; this row is a real hub and the `~` path.
-- [ ] **Backlog reads every heading on a Western code page, from Windows PowerShell 5.1 (#260).** On the Windows
+- [x] **Backlog reads every heading on a Western code page, from Windows PowerShell 5.1 (#260).** On the Windows
   PC, in `powershell` (5.1), check `[System.Text.Encoding]::Default.CodePage` first and note it: the row means most on
-  1252. On a local Space, put four cards in `backlog/` whose headings are plain (`# Task K7M2: Plain`), start with an
+  1252. On a local Space, put four cards in `backlog/` whose headings are plain (`# Task W3R7: Plain`; any id no
+  card in the hub has, and an id never holds 0, O, 1, I, L, B, 8, S, 5 or Z), start with an
   emoji outside the BMP (U+1F52C), start with a BMP symbol (U+2705 or U+26A0), and start with a lowercase accented
   letter (`# écrire le guide`). `tkBacklog` lists all four with their titles intact: the emoji and the symbol
   dropped, the accented letter kept, and no `is not valid` error. The `ps51` job runs the Backlog suite on 5.1 and
   prints the code page it ran on; this row is a real console and a real hub.
-- [ ] **A refresh of the Lounge in the Docker image draws the app (#226).** With Docker Desktop running, on the merged
+  CONFIRMED on Windows: walked in Windows PowerShell 5.1.26100 at 663ce6a, on 2026-11-13.
+- [x] **A refresh of the Lounge in the Docker image draws the app (#226).** With Docker Desktop running, on the merged
   head, `tkWeb -Restart`, then open the Lounge and refresh the page: the room draws again, and the address bar still
   says `localhost:5174`, not `5173` (a browser that met the old redirect keeps it: refresh with Cmd+Shift+R). Then
   the four `curl` lines of Gate 12b for `/system`, `/lounge`, `/lounge/` and `/lounge/temple.html` each print `200`. `Tests/test_consts.py` holds the template to it; this row is the image.
-- [ ] **A worktree's test run reaches the Health card on Windows, under Windows PowerShell 5.1 too (#317).** On the
-  Windows PC, in `powershell` (5.1), from a git worktree of the package (`git worktree add ..\toolkit-wt-317`), run
+  CONFIRMED on Windows: walked at 663ce6a, on 2026-11-13.
+- [x] **A worktree's test run reaches the Health card on Windows, under Windows PowerShell 5.1 too (#317).** On the
+  Windows PC, in `powershell` (5.1), from a git worktree of the package whose branch is not named after its folder
+  (`git worktree add -b verify-317 ..\toolkit-wt-317`), run
   `tkTestToolkit -Consts` there. `%LOCALAPPDATA%\ToolKit\TestHistory` now holds `test-summary.<MACHINE>.json` and
-  `test-results.<MACHINE>.log`, the summary's `checkout` reads `toolkit-wt-317` and its `commit` is the worktree's
+  `test-results.<MACHINE>.log`, the summary's `checkout` reads `toolkit-wt-317`, the worktree folder's name and not
+  the branch's, and its `commit` is the worktree's
   `git rev-parse --short HEAD`, and neither file is in the worktree. Then, with the agent started from the main
-  checkout, the System page's Test Health card shows that run. On a machine that had a `test-summary.<MACHINE>.json`
+  checkout, the System page's Test Health card shows that run. The card mounts only at tier 2 or below, so the
+  checkout needs a hub first, or the page shows no card at all: `tkStart`, or `PROMPTS_ROOT` pointing at a copy of
+  `samples/hub`. On a machine that had a `test-summary.<MACHINE>.json`
   in the main checkout before the upgrade and no folder yet, the card's first read shows that old record, not "not
   run". `tkTestToolkit -TestAll` holds the rule over `Tests/fixtures/test-history/paths.json`, whose Windows rows
   only a Windows host reads live.
+  CONFIRMED on Windows: walked in Windows PowerShell 5.1.26100 at 663ce6a, on 2026-11-13, with the runner started
+  in `powershell.exe`. For the last clause, with a scratch `LOCALAPPDATA` and a copy of the sample hub, the first
+  read of the System page showed the old root record, not "not run"; that read created the `TestHistory` folder
+  and copied both files byte for byte, leaving the root files in place, and the next run wrote into the folder.
 - [ ] **`Invoke-P20TestGit` hands git an empty argument, a double quote and a trailing backslash under Windows
   PowerShell 5.1 (#356).** On the Windows PC, in `powershell` (5.1), run `tkTestToolkit -Portability`. Every
   `Clause 23: git is handed ...` line passes, and there are 18 of them, each ending `as the host passes arguments`:
@@ -1266,12 +1277,19 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   backslash after a space`. On macOS and Linux the same rows run a second time with `Legacy` passing, which is
   5.1's rule in PowerShell 7; this row is 5.1's own command line and git for Windows reading it. The `ps51` job
   runs the suite on 5.1 too.
-- [ ] **Daily prints any week from Windows PowerShell 5.1 (#291).** On the Windows PC, in `powershell` (5.1), on a
+- [x] **Daily prints any week from Windows PowerShell 5.1 (#291).** On the Windows PC, in `powershell` (5.1), on a
   Space with cards, run `tkDaily -LastWeek`: the days print, with no `Error:` and nothing copied to the clipboard.
   Open the web UI's Daily page, step back three weeks with *Earlier week*, press Copy All, and compare it with
   `tkDaily -Since <that Monday> -Until <that Friday>`: the same text. `tkDaily -Since 2026-01-05` prints one
   `Error:` naming `-Since and -Until go together`, and `$LASTEXITCODE` is 2. The `ps51` job runs the Billable
   suite on 5.1; this row is a real console, a real hub and the page.
+  CONFIRMED on Windows: walked in Windows PowerShell 5.1.26100 at 663ce6a, on 2026-11-13.
+- [ ] **`tkTestToolkit` typed in Windows PowerShell 5.1 runs the suites in 5.1 (#435).** On the Windows PC, in
+  `powershell` (5.1), run `tkTestToolkit -Portability`. It prints 18 `Clause 23: git is handed ...` lines, each
+  ending `as the host passes arguments`, and none ending `with Legacy passing`: the second pass exists only where
+  `$PSNativeCommandArgumentPassing` does, which is PowerShell 7, so a line of it means the verb started the runner
+  in `pwsh`. The four `Clause 22` lines that name `TestToolkit` pass there too. In `pwsh`, the same command prints
+  36. The suite holds the wrapper on every host; this row is the verb typed in 5.1.
 
 ## Recording a run
 

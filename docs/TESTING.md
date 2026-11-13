@@ -71,6 +71,9 @@ tkTestToolkit -Autoload  # run one suite; any suite name from -List works this w
 tkTestToolkit -GitRoot   # a folder inside someone else's repository is not a checkout of its own
 ```
 
+`tkTestToolkit` runs the suites in the host it is typed in: PowerShell 7 from `pwsh`, Windows PowerShell 5.1
+from `powershell`. `tkTest` starts the CLI runner in `pwsh` on every host ("In CI", below).
+
 ```bash
 python3 -m pip install -r agent/requirements-dev.txt   # once -- runtime deps plus pytest, httpx and ruff
 python3 -m pytest Tests/     # 1480 passed, 6 skipped -- the agent
@@ -380,7 +383,9 @@ versions and the ANSI code page 5.1 reads a script without a BOM in, then one st
 Both smoke modes start and stop their own agent and Vite on a scratch copy of the package (`web/tests/smokeStack.mjs`),
 on free ports, so neither job brings up a long-lived server. In the first job, the import and the verb are 5.1's;
 `tkTest` then starts the runner in `pwsh`, as it does on every host, so the suites there run under PowerShell 7 on
-Windows: Windows paths, consoles and processes. The runner starts each suite in the host it is running in, and a
+Windows: Windows paths, consoles and processes. `tkTestToolkit` is the other way round: it starts the runner in
+the host it is typed in, so typed in `powershell` (5.1) it runs the runner and every suite in 5.1, which is the
+second job's shape, and typed in `pwsh` it runs them in PowerShell 7. The runner starts each suite in the host it is running in, and a
 suite that starts its children through `Invoke-P20TestHost` starts the verbs it types the same way
 (`Tests/Get-TestHost.ps1`, a `-Command` child as `-EncodedCommand`), so the second job, the runner started by
 `powershell.exe`, runs every suite's own code on 5.1, and those suites' verbs too, rather than on PowerShell 7 --
@@ -395,7 +400,9 @@ then loads PowerShell 7's copies of a module. The two jobs' times are on the run
 `Invoke-P20TestHost` (`Tests/Get-TestHost.ps1`), so under Windows PowerShell 5.1 the verbs they type run on 5.1
 too. The rest still type `& pwsh`, so under 5.1 their own code runs there but their verbs run on PowerShell 7,
 and a child's first stderr line can stop the suite under `Stop`. Clause 22 of `Tests/Test-Portability.ps1`
-lists them, the list only shrinks, and the count above is held to it. The move goes in batches (#271).
+lists them, the list only shrinks, and the count above is held to it. The move goes in batches (#271). The same
+clause holds the `tkTestToolkit` wrapper to the rule: it names no host for the runner and asks `Get-P20TestHost`
+which one it is in, and typed with a decoy `pwsh` first on the `PATH` it still reaches the real runner (#435).
 
 **Every suite calls git through `Invoke-P20TestGit`** (`Tests/Get-TestHost.ps1`). A suite builds its fixture
 repositories with git, and on Windows git warns on stderr about line endings; under Windows PowerShell 5.1 a raw
