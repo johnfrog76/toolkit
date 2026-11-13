@@ -7,6 +7,7 @@ import {
   CARD_ITEM_DESCRIPTION_LINES,
   CARD_ITEM_HEIGHT_PX,
 } from "./cardItemTokens";
+import { expectMetaGap, rulesOf } from "./kinds/panelShapeAssert";
 
 const LONG_TITLE = "A title that is far too long to fit on one line ".repeat(6).trim();
 const LONG_TEXT = "A description that runs on and on past two lines. ".repeat(20).trim();
@@ -60,6 +61,23 @@ describe("CardItem", () => {
     expect(css).toMatch(/white-space:\s*nowrap/);
     expect(css).toMatch(new RegExp(`-webkit-line-clamp:\\s*${CARD_ITEM_DESCRIPTION_LINES}`));
     expect(css).toMatch(new RegExp(`height:\\s*${CARD_ITEM_HEIGHT_PX}px`));
+  });
+
+  it("the meta band sits one gap under the description, the same under one line, two lines or none: a grid track, never a margin", () => {
+    const { container } = render(
+      <>
+        <CardItem data={data({ description: "short" })} />
+        <CardItem data={data({ description: LONG_TEXT })} />
+        <CardItem data={data({ description: undefined })} />
+      </>,
+    );
+    const items = Array.from(container.querySelectorAll<HTMLElement>("[data-card-item]"));
+    expect(items).toHaveLength(3);
+    // The track, the meta band's row, no margin on a band, and the height sum.
+    for (const item of items) expectMetaGap(item);
+    // One rule places all three: the description's length changes nothing.
+    expect(rulesOf(items[1])).toBe(rulesOf(items[0]));
+    expect(rulesOf(items[2])).toBe(rulesOf(items[0]));
   });
 
   it("is a plain element, not a Fluent Card", () => {

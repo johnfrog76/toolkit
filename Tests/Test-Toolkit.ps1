@@ -364,6 +364,9 @@ foreach ($suiteName in $selectedSuites) {
 
     $suiteStart = Get-Date
 
+    # Name the suite before it runs, so a cancelled run's log shows which one stalled.
+    Write-Host ("  {0} -- started {1}" -f $suiteName, $suiteStart.ToString('HH:mm:ss')) -ForegroundColor DarkGray
+
     # Run in a subprocess to get isolated exit code, in the host this runner is
     # running in (Tests/Get-TestHost.ps1): a runner started under 5.1 runs its suites on 5.1.
     $result = Invoke-P20TestHost -File $file

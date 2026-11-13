@@ -63,8 +63,6 @@ const COMPUTED_ALLOW: Record<string, string> = {
     "its subtle colour is on a tint Badge; the outline one is warning or success",
   "modules/growth/GoalDetailPage.tsx":
     "its subtle colour is on a tint Badge; the outline one is not computed to subtle",
-  "modules/growth/Goals.tsx":
-    "its subtle colour is on a tint Badge; the outline one reads TYPE_COLOUR, which has none",
 };
 
 describe("no Badge is outline with the subtle colour", () => {

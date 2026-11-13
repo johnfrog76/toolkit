@@ -1178,6 +1178,22 @@ foreach ($stName in @('byDesign', 'pending', 'wontFix')) {
     Assert-True "-Status $stName is refused by name: GitHub keeps no reason" (-not $plan.Action -and $plan.Error -match [regex]::Escape("-Status $stName has no equivalent on GitHub") -and $plan.Hint -match 'Nothing was posted') $plan.Error
 }
 
+# The words -Status takes are ONE list, the contract's (consts.json
+# replyStatuses.ado): the script checks against it, types no list of its own,
+# and has Azure DevOps' number for every word on it. GitHub's three are a
+# subset, so a word the page offers there is one the verb accepts.
+$replySrc = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'Scripts/Send-PRReply.ps1'))
+. (Join-Path $pkgRoot 'Scripts/Get-Consts.ps1')
+$contractStatuses = @((Get-P20Consts).replyStatuses.ado)
+Assert-True 'Send-PRReply.ps1 reads -Status'' words from consts.json replyStatuses.ado' ($replySrc -match '\(Get-P20Consts\)\.replyStatuses\.ado')
+Assert-True '...and declares no ValidateSet of its own' ($replySrc -notmatch '\[ValidateSet\(')
+foreach ($stName in $contractStatuses) {
+    Assert-True "the Azure DevOps status table has a number for the contract's '$stName'" ($replySrc -cmatch "(?m)^\s+$([regex]::Escape($stName))\s+=\s+\d+\s*$")
+}
+$mapWords = @([regex]::Matches(([regex]::Match($replySrc, '(?s)\$statusMap = @\{(.*?)\}').Groups[1].Value), '(?m)^\s+(\w+)\s+=') | ForEach-Object { $_.Groups[1].Value })
+Assert-True 'and no word the contract does not list' ($mapWords.Count -eq $contractStatuses.Count -and @($mapWords | Where-Object { $_ -cnotin $contractStatuses }).Count -eq 0) ($mapWords -join ',')
+Assert-True 'every status GitHub keeps is one the verb accepts' (@((Get-P20Consts).replyStatuses.github | Where-Object { $_ -cnotin $contractStatuses }).Count -eq 0)
+
 $rcRoot = [PSCustomObject]@{ id = 2412345678; pull_request_url = 'https://api.github.com/repos/acme/widgets/pulls/12'; html_url = 'https://github.com/acme/widgets/pull/12#discussion_r2412345678' }
 $rcReply = [PSCustomObject]@{ id = 2412345690; in_reply_to_id = 2412345678; pull_request_url = 'https://api.github.com/repos/acme/widgets/pulls/12' }
 $rcOther = [PSCustomObject]@{ id = 2412345678; pull_request_url = 'https://api.github.com/repos/acme/widgets/pulls/120' }
@@ -1561,6 +1577,15 @@ try {
         Assert-True "...and nothing was asked or posted: no gh call, no git call, the card untouched ($bad)" `
             ((Get-GhCalls $r).Count -eq 0 -and @($r.Calls | Where-Object { $_[0] -eq 'git' }).Count -eq 0 -and [System.IO.File]::ReadAllText($wCard) -eq $before) (Format-Calls $r)
     }
+
+    # -- R1b. A word that is no status at all: the verb's own list is the contract's
+    #    (consts.json replyStatuses.ado), stated once, before anything is asked.
+    $before = [System.IO.File]::ReadAllText($wCard)
+    $r = Invoke-GhVerb "${cfgPrefix}ReplyPR 12 2412345690 -Reply 'Not this time.' -Status resolved"
+    Assert-True 'ReplyPR -Status <not a status>: refused, exit 2, one block naming the word and the contract''s six' `
+        ($r.Text -match 'Error: -Status resolved is not a thread status' -and $r.Text -match [regex]::Escape("Use one of $($contractStatuses -join ', ')") -and $r.Text -match 'consts\.json replyStatuses\.ado' -and $r.Text -match 'EXIT=2' -and ([regex]::Matches($r.Text, '(?m)^Error: ')).Count -eq 1) $r.Text
+    Assert-True '...and nothing was asked or posted: no gh call, the card untouched' `
+        ((Get-GhCalls $r).Count -eq 0 -and [System.IO.File]::ReadAllText($wCard) -eq $before) (Format-Calls $r)
 
     # -- R2. A reply in an inline thread, -Status fixed: REST reply, GraphQL resolve --
     $replyText = 'Fixed in "abc1234" -- see a && b.'
