@@ -364,7 +364,15 @@ try {
     . (Join-Path $pkgRoot 'Scripts/Resolve-Tracker.ps1')
     . (Join-Path $pkgRoot 'Scripts/Resolve-SpaceCheckout.ps1')
     $table = Get-Content -LiteralPath (Join-Path $pkgRoot 'Tests/fixtures/space-checkout/table.json') -Raw | ConvertFrom-Json
+    # What counts as absolute is the platform's: a row that carries "os" runs only
+    # there, a row without one runs everywhere, and any other value stops the suite.
+    $here = 'posix'
+    if ($env:OS -eq 'Windows_NT') { $here = 'windows' }
     foreach ($row in @($table.paths)) {
+        if ($row.PSObject.Properties['os']) {
+            if (@('posix', 'windows') -notcontains [string]$row.os) { throw "the paths row '$($row.written)' has os '$($row.os)'; it is posix, windows or absent" }
+            if ([string]$row.os -ne $here) { continue }
+        }
         if ($row.PSObject.Properties['home']) {
             $want = $HOME
             if ($row.home) { $want = Join-Path $HOME $row.home }

@@ -43,8 +43,14 @@ def _git(path: Path, *args: str) -> None:
 
 class TheSharedTable(unittest.TestCase):
     def test_a_path_as_written(self):
+        # What counts as absolute is the platform's: a row that carries "os" runs
+        # only there, a row without one runs everywhere, and any other value fails.
+        here = "windows" if os.name == "nt" else "posix"
         for row in TABLE["paths"]:
             with self.subTest(written=row["written"]):
+                self.assertIn(row.get("os", here), ("posix", "windows"), "a row's os is posix, windows or absent")
+                if row.get("os", here) != here:
+                    continue
                 if "home" in row:
                     want = str(Path.home() / row["home"]) if row["home"] else str(Path.home())
                 else:
