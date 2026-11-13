@@ -24,17 +24,6 @@ finds the repository's clone on this machine and works from it, an unpushed bran
 
 **Issue:** [#285](https://github.com/johnfrog76/toolkit/issues/285)
 
-### A meeting row draws its actions side by side
-
-**What you see:** A complete meeting's row on the Meetings card shows Close, Edit / send and View details
-side by side, and every other meeting row shows Edit / send and View details. Everywhere else a row has
-one exposed action and the rest in its `...` menu
-([One grammar for dialogs and row actions](../web/README.md#one-grammar-for-dialogs-and-row-actions)).
-
-**Where you meet it:** [Communication](modules/communication.md#close-from-the-browser), "Close, from the browser"
-
-**Issue:** [#287](https://github.com/johnfrog76/toolkit/issues/287)
-
 ### Azure DevOps verbs are hidden, not gone
 
 **What you see:** On a machine with no Azure DevOps in use, `Menu`, `Setup`, the New card dialog and
