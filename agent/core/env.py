@@ -38,6 +38,7 @@ from .config import (
     renamed_slug,
     resolve_dirs,
     start_work_launch,
+    switcher_spaces,
     tracker,
 )
 from .hosts import host_env_block
@@ -343,6 +344,14 @@ def _config_block(cfg: dict) -> dict:
         "spaces": [
             {**o, "tracker": tracker(o.get("org", "")), "laneNames": lane_names(o)}
             for o in offered_spaces(
+                cfg.get("spaces", []), cfg.get("activeSpace", ""), cfg.get("isDemoDismissed", False)
+            )
+        ],
+        # The slugs the avatar menu's switcher lists: `spaces` above less a
+        # retired Space you are not in. Only the switcher reads it.
+        "switcherSpaces": [
+            o["slug"]
+            for o in switcher_spaces(
                 cfg.get("spaces", []), cfg.get("activeSpace", ""), cfg.get("isDemoDismissed", False)
             )
         ],
