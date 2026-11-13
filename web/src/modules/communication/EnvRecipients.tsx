@@ -1,6 +1,14 @@
 import { Body1, Caption1, tokens } from "@fluentui/react-components";
+import { InfoTip } from "../../shared/InfoTip";
 import { useRowStyles } from "../ado/settingRows";
-import type { CommunicationRecipient } from "./api.communication";
+import type { CommunicationEnv, CommunicationRecipient } from "./api.communication";
+import {
+  RECIPIENTS_TITLE,
+  RECIPIENT_STATE_LABEL,
+  recipientHowTo,
+  recipientLabel,
+  recipientState,
+} from "./recipientState";
 
 /** Where a recipient was declared, in the words a person uses. */
 export const SCOPE_LABEL: Record<CommunicationRecipient["scope"], string> = {
@@ -8,40 +16,50 @@ export const SCOPE_LABEL: Record<CommunicationRecipient["scope"], string> = {
   org: "This Space",
 };
 
-/** Gate 2 answered ahead of the click. Only the variable's NAME is ever shown,
- *  worded as the send button words it; the webhook URL never reaches the page. */
-function webhookState(r: CommunicationRecipient): string {
-  return r.configured
-    ? `${r.webhookEnv} is set`
-    : `Set ${r.webhookEnv} to this recipient's webhook URL.`;
-}
-
-/** One row per Teams recipient /env serves, drawn on the Environment card. */
-export function EnvRecipients({ recipients }: { recipients: CommunicationRecipient[] }) {
+/**
+ * One row per Teams recipient /env serves, drawn on the Environment card.
+ *
+ * A row says what the recipient does and which of its states it is in, in a
+ * few neutral words (recipientState.ts, shared with the send button). None is
+ * red and none is an instruction: how to set a webhook up, and the variable's
+ * name, are behind the row's info icon. The webhook URL never reaches the page.
+ */
+export function EnvRecipients({ communication }: { communication: CommunicationEnv }) {
   const styles = useRowStyles();
+  const { recipients, retroChannel, sendingOff } = communication;
   if (recipients.length === 0) return null;
   return (
     <div style={{ marginTop: tokens.spacingVerticalS }}>
-      {recipients.map((r) => (
-        <div key={`${r.scope}:${r.key}`} className={styles.checkRow}>
-          <span className={styles.checkIcon}>{r.configured ? "✓" : "✗"}</span>
-          <Body1 className={styles.checkLabel}>
-            <strong>{r.display}</strong>
-          </Body1>
-          <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
-            {SCOPE_LABEL[r.scope]}
-          </Caption1>
-          <Caption1
-            style={{
-              color: r.configured
-                ? tokens.colorNeutralForeground3
-                : tokens.colorPaletteRedForeground1,
-            }}
+      <Caption1 as="h3" block style={{ margin: 0, color: tokens.colorNeutralForeground3 }}>
+        {RECIPIENTS_TITLE}
+      </Caption1>
+      {recipients.map((r) => {
+        const state = recipientState(r, sendingOff);
+        const label = recipientLabel(r, retroChannel);
+        return (
+          <div
+            key={`${r.scope}:${r.key}`}
+            className={styles.checkRow}
+            style={{ flexWrap: "wrap" }}
+            data-recipient={r.key}
+            data-state={state}
           >
-            {webhookState(r)}
-          </Caption1>
-        </div>
-      ))}
+            <span className={styles.checkIcon} aria-hidden="true">
+              {state === "ready" ? "✓" : "–"}
+            </span>
+            <Body1>
+              <strong>{label}</strong>
+            </Body1>
+            <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+              {SCOPE_LABEL[r.scope]}
+            </Caption1>
+            <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+              {RECIPIENT_STATE_LABEL[state]}
+            </Caption1>
+            <InfoTip label={`About ${label}`} content={recipientHowTo(r, state)} />
+          </div>
+        );
+      })}
     </div>
   );
 }

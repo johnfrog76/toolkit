@@ -1774,12 +1774,15 @@ is pressing a button that posts to a real webhook.
 | State | When |
 | --- | --- |
 | **absent** | `postRetroSummary` is false. The workflow does not include a send, so there is nothing to explain |
-| **disabled** | The stage is not Retro, the recipient has no webhook, `## Sent` already records a send, or the Agenda holds only its placeholder -- and every reason that holds is rendered on the line below it, the recipient's first, **naming the environment variable** from the moment the page opens, before Retro as well as at it |
+| **disabled** | The stage is not Retro, the recipient has no webhook, sending is off on this server, `## Sent` already records a send, or the Agenda holds only its placeholder -- and every reason that holds is rendered on the line below it, the recipient's first, from the moment the page opens, before Retro as well as at it |
 | **enabled** | Retro stage, recipient configured, an Agenda with content, nothing under `## Sent` |
 
 Disabled-and-explained rather than hidden is the point: a button that vanishes teaches nobody what
-to set. The reason string is the whole fix -- `Set TEAMS_WEBHOOK_MANAGER to this recipient's webhook
-URL.`
+to set. The recipient's reason is its state in a few neutral words -- `Webhook not set`, or
+`Sending off on this server` where `/env` reports `sendingOff` -- and the fix, with the environment
+variable's name, is in the info icon beside it. Those words are the Environment card's too: both
+read `recipientState.ts` ([`docs/modules/communication.md`](../docs/modules/communication.md),
+"`/env`'s `communication` block").
 
 A click posts
 

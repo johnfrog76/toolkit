@@ -533,9 +533,11 @@ async function runViewport(viewportName) {
 
     // 5. The retro session's send button -- READ-ONLY. Its presence and its
     // disabled reason are the assertion; the button is never pressed, because a
-    // press posts to a real webhook. A disabled button that names the variable is
-    // the whole design: the alternative is a live button that fails on click and
-    // only then tells you something is unset.
+    // press posts to a real webhook. A disabled button that says why is the whole
+    // design: the alternative is a live button that fails on click and only then
+    // tells you something is unset. Its reason is the recipient's state in a few
+    // neutral words -- sending off on a server started as a test run, which is
+    // what this one is, or no webhook set on any other -- and never the variable.
     const session = await open("/communication/sessions/2026-02-05.md");
     const sendBtn = await page.evaluate(() => {
       const el = Array.from(document.querySelectorAll("button")).find((b) => /send/i.test(b.textContent ?? ""));
@@ -544,8 +546,13 @@ async function runViewport(viewportName) {
     check("the retro session has a send button", sendBtn.found, session.slice(0, 300));
     check("the send button is disabled", sendBtn.disabled, "an enabled send button means a configured live webhook -- stop");
     check(
-      "the send button names TEAMS_WEBHOOK_MANAGER",
-      session.includes("TEAMS_WEBHOOK_MANAGER"),
+      "the send button says why: sending is off on this server, or no webhook is set",
+      session.includes("Sending off on this server") || session.includes("Webhook not set"),
+      session.slice(0, 400),
+    );
+    check(
+      "the send button's reason is not an instruction to set a variable",
+      !/Set TEAMS_WEBHOOK_[A-Z_]+ to/.test(session),
       session.slice(0, 400),
     );
     await checkNoSidewaysScroll("/communication/sessions/2026-02-05.md");

@@ -544,7 +544,7 @@ pytest rows carry the count of the file they name, and a jest row names its file
 | `npm test -- registry.growth` | -- | Growth contributes routes and a nav entry only when the flag is true, and no home cards of its own |
 | `npm test -- registry.communication` | -- | The same from communication's side: off contributes nothing; on contributes exactly its seven routes |
 | `npm test -- stages` | -- | The three stages in one place: the file's word, the badge's label, what comes next, complete only at the last -- and the one switch the session page offers: the stage ahead, `Plan` for a blank stage, nothing for a closed session |
-| `npm test -- sendButton` | -- | The send button's three states, including that it is **absent** rather than disabled when the workflow has no send, that a disabled button names the webhook variable before the Retro stage rather than only at it, that a send recorded under `## Sent` or an Agenda holding only its placeholder disables it with the reason, and that what goes out is the Agenda and never the self-assessment |
+| `npm test -- sendButton` | -- | The send button's three states, including that it is **absent** rather than disabled when the workflow has no send, that a disabled button says the recipient's state before the Retro stage rather than only at it -- `Webhook not set`, or `Sending off on this server` where `/env` says so, with the variable's name only in the info text -- that a send recorded under `## Sent` or an Agenda holding only its placeholder disables it with the reason, and that what goes out is the Agenda and never the self-assessment |
 
 **Every module is mocked in every registry test**, including the ones the test is not about. A
 registry test is about the registry's filtering, so the other modules are stand-ins by design -- and a
@@ -671,8 +671,8 @@ it -- and asserts an `Organize` nav entry (not a `Meetings` one) and the fixture
 is a pass. The checks: a Growth nav entry and
 `/growth` listing the fixture hub's three artifacts by title, `/skills` rendering, a `Meetings` (or
 `Organize`) nav entry and the three fixture sessions listed with their stage labels, both modules'
-data actually requested, the retro session's send button **present, disabled, and naming
-`TEAMS_WEBHOOK_MANAGER`**, and the page that button is on being **reachable**: an
+data actually requested, the retro session's send button **present, disabled, and saying why**
+(`Sending off on this server` on a server started as a test run, `Webhook not set` on any other), and the page that button is on being **reachable**: an
 **Edit or send** in each meeting entry's `...` menu and `Edit / send` on the read view, and the read view's landing on
 `/communication/sessions/2026-02-05.md` when pressed, and exactly one of the three entries -- the
 complete one -- offering **Archive** in its menu, which is never chosen because it would move a file in the
