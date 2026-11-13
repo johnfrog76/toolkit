@@ -88,7 +88,7 @@ web/
 ├── nginx.conf.template   static + /api -> host.docker.internal:${P20_AGENT_PORT}, substituted
 │                        by the nginx image's entrypoint at container start
 ├── docker-compose.yml    127.0.0.1:5174 -> container 5173; passes P20_AGENT_PORT in
-├── tests/smoke.mjs       Playwright, two modes (28 checks off / 31 on), raw `playwright` not @playwright/test
+├── tests/smoke.mjs       Playwright, two modes (28 checks off / 32 on), raw `playwright` not @playwright/test
 ├── tests/smokeStudio.mjs   its --studio cases; smokeStack.mjs starts the servers that mode owns
 ├── tests/smokeMatrix.mjs   its --matrix cases, on the same kind of servers
 ├── tests/smokeA11y.mjs     its --a11y audit, on the same kind of servers
