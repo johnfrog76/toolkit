@@ -2026,7 +2026,8 @@ come on top of these; the totals are in [`docs/TESTING.md`](../docs/TESTING.md))
 | 1:1 data was requested | `/api/manager` was actually called |
 | The retro session has a send button | The third state of `sendButtonState`: shown, because `postRetroSummary` is on |
 | The send button is disabled | And an **enabled** one here is a reason to stop: it means a live webhook is configured in the agent's environment |
-| The send button names `TEAMS_WEBHOOK_MANAGER` | The disabled reason sends a reader to a shell rather than to source. This is the check the whole "read-only" rule exists to make possible -- the button is never pressed |
+| The send button says why | Its reason is the recipient's state in a few neutral words: `Sending off on this server` on a server started as a test run, which the fixture one is, or `Webhook not set` on any other. The button is never pressed |
+| The send button's reason is not an instruction to set a variable | The variable's name and the how-to are behind the info icon beside the reason, not in the reason itself |
 | Each meeting entry's menu offers Edit or send | The page the send button is on can be reached from the list: every entry of the Meetings panel has a `...` menu, and each menu holds **Edit or send** |
 | The read view offers `Edit / send` | And from the page a row lands on |
 | `Edit / send` lands on the session page | The button is pressed -- it navigates, it does not send -- and the URL is `/communication/sessions/2026-02-05.md` |
