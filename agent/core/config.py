@@ -33,9 +33,6 @@ from typing import Any
 from . import log_writer
 from .consts import (
     consts,
-    gh_read_limit_all_issues,
-    gh_read_limit_labels,
-    gh_read_limit_open_issues,
     docs_readme,
     docs_root,
     env_active_space,
@@ -43,6 +40,9 @@ from .consts import (
     folder_archive,
     folder_backlog,
     folder_current,
+    gh_read_limit_all_issues,
+    gh_read_limit_labels,
+    gh_read_limit_open_issues,
     renamed_spaces,
     space_scoped_features,
 )
