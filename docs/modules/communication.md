@@ -259,10 +259,10 @@ Export: **`communicationModule`** from `web/src/modules/communication/index.tsx`
 
 | Route | Renders |
 | --- | --- |
-| `/communication` | `OneOnOne` — the one-card landing page the `Meetings` nav points at. A complete session's row offers **Close**. **With `features.organize` on it redirects to `/organize`**, where the same card sits beside Reminders |
+| `/communication` | `OneOnOne` — the one-panel landing page the `Meetings` nav points at: a list panel (`ListPanel`, [`web/COMPONENTS.md`](../../web/COMPONENTS.md)) whose chips split the sessions into All, Current, Past and Archive. Each entry's one exposed action is **Open the meeting** (the read view); its `...` menu holds **Edit or send** (the session page) and, on a complete session, **Archive**, which closes it behind the confirm. **With `features.organize` on it redirects to `/organize`**, where the same card sits beside Reminders |
 | `/communication/1on1/:filename` | `ManagerDetailPage` — read view, with an `Edit / send` button to the session page, and **Close** on a complete session; under the title, the agent's `carried_from_note` as a quiet line when `carried_from_verdict` is `stale`, `missing` or `absent`, and nothing when it is `ok` or an older agent sends none |
 | `/communication/sessions/new` | `ManagerSessionPage` — scaffold and edit |
-| `/communication/sessions/:filename` | `ManagerSessionPage` — edit, the stage ahead (Plan / Prep / Retro through the bridge), Close on a complete session, and the send. Reached from `Edit / send` on a meeting row and on the read view |
+| `/communication/sessions/:filename` | `ManagerSessionPage` — edit, the stage ahead (Plan / Prep / Retro through the bridge), Close on a complete session, and the send. Reached from **Edit or send** in a meeting entry's menu and from `Edit / send` on the read view |
 | `/growth/1on1/:filename` | redirect, filename forwarded |
 | `/growth/sessions/new` | redirect |
 | `/growth/sessions/:filename` | redirect, filename forwarded |
@@ -293,9 +293,11 @@ tag type with `enhanceEndpoints`. `/env`'s communication block is typed here, no
 
 ### Close, from the browser
 
-A session at Retro reads "Complete — close it to move it to the archive", and beside it, on the
-Meetings card's row and in the read view's header, a **Close** button, so the last step of the flow
-needs no terminal either. It is `CloseMeetingButton` in `CloseMeeting.tsx`, and it is the one action on
+A session at Retro reads "Complete. Archive it to close it and move it to the archive." on its entry
+in the Meetings panel, whose `...` menu then holds **Archive**, the row vocabulary's word for this move;
+the read view's header has a **Close** button. So the last step of the flow
+needs no terminal either. Both open `CloseMeetingDialog` in `CloseMeeting.tsx` (the button is
+`CloseMeetingButton`, beside it), and it is the one action on
 these pages behind a confirm, because it moves a file -- the house's one confirm, `shared/ConfirmDialog`
 ("Are you sure?", the act named, Cancel and Submit; a refusal stays in it). The confirm runs `POST /api/cmd/MeetingAgenda`
 with `-Date <date> [-Type <series>] -Close` — the argv is `buildMeetingAgendaParams` in
@@ -420,18 +422,31 @@ the engine takes whatever is in that variable at face value. Use `-WhatIf` from 
 | `web/.../ManagerDetailPage.test.tsx` | The read view's Carried-from line: the agent's sentence drawn for `stale`, `missing` and `absent`, and nothing for `ok` or when the fields are absent |
 | `web/.../cliBridge.test.ts` (three of its cases) | `MeetingAgenda`'s argv: `-Date`, `-Type` only for a series that is not the 1:1, then the one switch spelt the script's way |
 | `web/.../sendButton.test.ts` | The send button's three states, including that it is absent rather than disabled when the workflow has no send, and that what goes out is the Agenda and never the self-assessment |
+| `web/.../EnvCard.recipients.test.tsx` | The Environment card's Teams recipients: a `managerWorkflow` recipient labelled Every Space and an org one This Space, each with its variable set or named unset; and with `features.communication` off, no row drawn and the rows' chunk never fetched even when `/env` carries the block |
 | `web/.../registry.communication.test.tsx` | The registry contract from this module's side: off contributes no route, nav or card; on contributes exactly these seven routes |
-| `npm run smoke -- --modules=on` | In a browser: lists the three fixture sessions, reads their stages, finds the retro session's send button disabled and naming its variable, reaches the session page through `Edit / send`, and finds Close on exactly one session without pressing it |
+| `npm run smoke -- --modules=on` | In a browser: lists the three fixture sessions, reads their stages, finds the retro session's send button disabled and naming its variable, finds **Edit or send** in each meeting entry's menu, reaches the session page through the read view's `Edit / send`, and finds Archive in exactly one entry's menu without choosing it |
 
 The three PowerShell suites are registered in `Tests/Test-Toolkit.ps1` (`-SendTeams`, `-NewMeeting`, `-MeetingAgenda`) and run in the full `tkTestToolkit` pass; they can also be run directly. Each suite's count is in [Testing](../TESTING.md).
 
 ## Known gaps
 
-| # | Gap |
+| # | Gap | Known gap |
+| --- | --- | --- |
+| — | An agenda line becomes a card from the terminal only (`NewPrompt -From`): the Meetings page has no "make a card" action on an agenda line, which belongs to the record's reading room, not yet built | [An agenda line becomes a card from the terminal only](../KNOWN-GAPS.md#an-agenda-line-becomes-a-card-from-the-terminal-only) |
+| — | A card made from an agenda line names its record; the record does not name the card. Whether the agenda gets a line back (`-> card K7M2`) is undecided | [An agenda line becomes a card from the terminal only](../KNOWN-GAPS.md#an-agenda-line-becomes-a-card-from-the-terminal-only) |
+
+Three more are described where you meet them, earlier in this document:
+[A meeting row draws its actions side by side](../KNOWN-GAPS.md#a-meeting-row-draws-its-actions-side-by-side),
+[`Config -Set` cannot declare a Teams recipient](../KNOWN-GAPS.md#config--set-cannot-declare-a-teams-recipient) and
+[A webhook set after the agent started is not seen](../KNOWN-GAPS.md#a-webhook-set-after-the-agent-started-is-not-seen).
+
+### True by design
+
+These are choices, not omissions, and are not on [Known gaps](../KNOWN-GAPS.md):
+
+| # | Choice |
 | --- | --- |
 | — | Recipients are read from two blocks, `managerWorkflow` and the active Space's, and `/env` says which (`scope`); the Environment card draws it. A config wizard has to show both |
 | — | Prep has no agent pass: the shipped prompt has two passes (Plan and Retro), not three |
-| — | An agenda line becomes a card from the terminal only (`NewPrompt -From`): the Meetings page has no "make a card" action on an agenda line, which belongs to the record's reading room, not yet built |
-| — | A card made from an agenda line names its record; the record does not name the card. Whether the agenda gets a line back (`-> card K7M2`) is undecided |
 | — | `Timer` is module-local. If a second module ever wants one, that is the moment to promote it to `shared/` |
 | — | `/rewrite` keeps its own copy of the Messages API call rather than sharing the ADO module's. Deliberate — a module reaching into a sibling for a helper is how two modules stop being separable — but it is thirty duplicated lines |

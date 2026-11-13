@@ -12,7 +12,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { RefreshButton } from "../../shared/RefreshButton";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { CardActions, ROW, defineRowMoves } from "../../shared/CardActions";
 import { trackerName } from "./TrackerBadge";
 import { CommentRegular, CloudRegular } from "@fluentui/react-icons";
@@ -150,7 +150,7 @@ export function MyPRs({
           };
 
   return (
-    <PageCard
+    <PanelFrame
       scrollable
       loading={isLoading || isFetching}
       loadingLabel="Fetching pull requests..."
@@ -227,6 +227,6 @@ export function MyPRs({
           </div>
         </Card>
       ))}
-    </PageCard>
+    </PanelFrame>
   );
 }

@@ -275,7 +275,8 @@ bridge is how the page asks for it.
 
 ### One tracker read, kept a minute
 
-Each `gh` answer the two routes read -- a repo's labels, its issues in a state, the signed-in login -- is
+Each `gh` answer the two routes read -- a repo's labels, its issues in a state, the signed-in login, the
+standup's dates read ([What moved, and the window](#what-moved-and-the-window)) -- is
 kept in the agent's memory for 60 seconds (`READ_TTL_SECONDS` in `agent/solitaire/tracker.py`, the design
 list's `LIST_TTL_SECONDS`), and the standup and triage share them. A second GET inside the minute -- the
 standup re-mounted after attending, the Triage page opened after the standup -- starts no subprocess.
@@ -1064,21 +1065,44 @@ already says, so a line does not repeat them:
 | in yesterday (an issue closed, a card archived, in the window) | `closed` | `#153 Close the books`, or with commits `#153 (2 commits) Close the books` |
 | in today or the blockers, its card -- its own, or the card an issue's number names -- began in the window | `started` | `#151 (started) Count the commits`, or `#151 (started, 2 commits) ...` |
 | in today or the blockers, otherwise | `inProgress` | `#154 Read the label`, or `#152 (1 commit) Fold the window` |
-| an issue with no card | `closed` or `inProgress`, never `started` | no parenthesis: an issue alone has no commits |
+| an open issue with no card, given its worker label or assigned in the window | `started` | `#171 (started) Read the timeline` -- an issue alone has no commits |
+| an issue with no card, otherwise | `closed` or `inProgress` | no parenthesis |
 
 **Began** is the card's `**Started:**` day (`Move -To InProgress` writes it), else its `**Created:**` day
--- the card's own footer, read with its lane. An issue alone cannot say `started`: the read
-(`number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees`) carries no time its work began -- not when a
-worker label was added, not whether a branch exists -- and finding out is a timeline read per issue that
-the standup does not make. So an issue with no card is closed or in progress, said plainly; a team whose
-work runs on cards gets the three words from the cards.
+-- the card's own footer, read with its lane. A card decides its issue's start: its footer is the job
+record, so an issue whose card began before the window stays in progress whatever its timeline says.
+**An issue with no card began** when its timeline first says so: the earliest of a worker label being
+added and the issue being assigned (a label that routes to no worker does not count), read in the dates
+read below. It is `started` when that falls in the window, else in progress. Where the dates read was
+not made or did not answer, an issue alone is closed or in progress, as it was before the read existed.
+
+**The dates read.** On a GitHub Space the standup makes one more read after the issues: one `gh api
+graphql` call per repo, with the query in a file and the owner and name as fields. It asks two things at
+once, as aliased fields: for each hash the standup counts, the commit it names
+(`object(expression: "<hash>")` -- an abbreviated hash resolves, and its `authoredDate` is read), and for
+each open issue with no card that reads in progress, its labelled and assigned events
+(`timelineItems(itemTypes: [LABELED_EVENT, ASSIGNED_EVENT], first: 50)`). It is asked for what the fill
+counted and nothing else, so a Space with no card and no lone routed issue makes no call. One call holds
+at most 50 aliases; a standup that needs more makes one call per 50. The agent asks every repo of the
+Space for every hash (a card does not say which repo it was committed to) and each issue of its own repo;
+the CLI reads its one repo. The answer is kept for the minute like every other read
+([One tracker read, kept a minute](#one-tracker-read-kept-a-minute)). An Azure DevOps Space and a cards
+Space make no dates read, and their counts are what they were.
 
 **Commits** are the card's `- <hash>` bullets -- the same lines that put it In Progress
 (`regex.commitBullet`, the lane rule's own pattern, which captures the hash), so counting them is no
 new read and no second pattern. A hash is compared by its first seven characters, lowercase: a short and a full hash of one commit
 are one. A card with no bullets counts none; an issue with no card counts none; a not-billable card is
-not a row and adds nothing to one, its commits included. A card's commits are all it threads, not only
-the window's: a bullet has no date.
+not a row and adds nothing to one, its commits included.
+
+**Only commits authored in the window count.** A bullet has no date, so the date is the repository's:
+the dates read gives each hash its `authoredDate`, and a hash counts when that falls in `[since, asOf]`.
+Authored, not committed: a rebase resets the committer date and leaves the authored one, the clock Daily
+already bills by. A card worked over three weeks counts only the commits of the window on the day it
+closes. A hash the read cannot date -- not in the repository, ambiguous, or naming something that is not
+that commit -- is **undated**: not counted, and never guessed, but said after the commits on the counts
+line, `5 commits (2 undated)` (`rituals.text.countsUndated`; `undated` in each count). Where no dates read
+was made -- a cards Space, or a dates read that failed -- every bullet counts, as it did before the read.
 
 ```text
 Fable
@@ -1092,7 +1116,8 @@ Opus
 **The counts** (`counts` in the response) sum the slots per worker and in total -- closed, started, in
 progress and commits -- and **a hash is counted once however many cards thread it**, per worker and in
 the total. The brief opens on the total ([the chair's reading](#the-chairs-reading)):
-`Since Thursday 1 October 2026: 2 closed, 2 started, 2 in progress, 5 commits.` The counts are the
+`Since Thursday 1 October 2026: 2 closed, 2 started, 2 in progress, 5 commits.`, or with hashes the
+dates read could not date, `... 3 commits (2 undated).` The counts are the
 page's, at the top -- the brief sits above every grain -- and not the stage's: the played view speaks
 the work grain, one sentence a group, and the dress guard holds every number a sentence says to the
 group's own; a velocity line there would be a number the group does not carry.
@@ -1108,9 +1133,16 @@ The default stays the previous working day (D-SA3). `-Days` is not this: it is t
 a hash two cards thread counted once), `not-billable-counts` (a not-billable card absent from the
 counts) and `window-three-days` (a three-day window with a close on each day, listed and counted once, and a
 close the day before the window not), with `expected.motions` and `expected.counts`; card rows carry
-`begun` and `commits`, as `read_cards` / `Get-P20StandupCards` read them.
+`begun` and `commits`, as `read_cards` / `Get-P20StandupCards` read them. The dates read's cases carry
+`commitDates` and `issueStarts`: `commits-window` (commits before the window and after `asOf` dropped,
+undated ones said), `issue-labelled-in-window` (an issue alone reads `started`),
+`issue-assigned-before-window` (in progress, and a card's own start winning over its issue's timeline)
+and `dates-not-read` (the same cards with no dates read: every bullet counts).
+`Tests/fixtures/rituals/standup-dates.json` holds the query, line for line, and the parse of an answer
+into the two maps: an abbreviated hash, a missing object, an oid that is not the hash, a label that routes
+to no worker, the earliest of a label and an assignment, and a timeline with neither.
 
-Known gap: [What moved is counted from the cards](../KNOWN-GAPS.md#what-moved-is-counted-from-the-cards).
+Known gap: [The terminal's standup dates a commit from one repository, the page from every repository of the Space](../KNOWN-GAPS.md#the-terminals-standup-dates-a-commit-from-one-repository-the-page-from-every-repository-of-the-space).
 
 ### The two sources, joined
 
@@ -1485,59 +1517,100 @@ repository", is the real write).
 
 ## Known gaps
 
+Each of these is a block on [Known gaps](../KNOWN-GAPS.md), with its issue:
+
 - **Nobody calls your number.** A launched session is detached: its result is its log and, when it gets
   there, a pull request on the tracker. The page has no window screen, one line per order saying cooking
-  or ready ([the drive-through](#the-loop-as-a-drive-through)); you look at the tracker or the log.
+  or ready ([the drive-through](#the-loop-as-a-drive-through)); you look at the tracker or the log
+  ([A launched session does not report back to the page](../KNOWN-GAPS.md#a-launched-session-does-not-report-back-to-the-page)).
 - **The suggestion's delegation does not launch.** The launch exists (`StartWork <n> -Launch`, [a
   session in a worktree](#the-launch-the-block-handed-to-a-session)), and the copy box offers it where `/env`
   says so, but the chair's Next line still names `StartWork <n>`, the block carried by hand; the command
   gaining `-Launch` where the launch is on is not built ([The suggestion hands off, it does not launch](../KNOWN-GAPS.md#the-suggestion-hands-off-it-does-not-launch)).
+- **The bell and Home's tips do not suggest yet.** They are the suggestion's later surfaces, behind the
+  same switch; the chair's line and [the PM Corner](#the-pm-corner-the-line-the-chevron-the-confetti) are the two built
+  ([The bell and Home's tips carry no suggestion](../KNOWN-GAPS.md#the-bell-and-homes-tips-carry-no-suggestion)).
+- **The celebration's mark is per browser.** Another browser, or one whose site data was cleared, celebrates a
+  reached milestone once more on first sight
+  ([A reached milestone celebrates once per browser](../KNOWN-GAPS.md#a-reached-milestone-celebrates-once-per-browser)).
+- **The guard reads names by their capital**. A capitalised word that is not in the facts is
+  refused, so a persona's proper noun ("Dev-Hero") sends the prose instead, and an invented name written
+  in lower case is not caught; numbers, refs and kind counts are checked exactly. A group whose own name is
+  a kind noun ("Bugs") with no item of that kind can never be dressed -- its prose fails the kind guard too
+  ([The dress guard reads names by their capital](../KNOWN-GAPS.md#the-dress-guard-reads-names-by-their-capital)).
+- **The dress is remembered by its facts, on disk**: a reply the guard refused is kept like any other,
+  so the same facts are not re-asked until they change. Nothing prunes the folder -- one small file per
+  set of facts the model was asked about, in the agent's cache, which may be deleted whenever you like
+  ([The dress guard reads names by their capital](../KNOWN-GAPS.md#the-dress-guard-reads-names-by-their-capital)).
+- **A `Route` typed in a terminal is not seen at once.** The agent forgets its kept tracker reads when a
+  verb runs through the bridge, but a verb typed in a terminal never reaches it: the pages show the change
+  when the minute runs out, or at once on the Triage page's Refresh
+  ([A Route typed in a terminal reaches the page a minute later](../KNOWN-GAPS.md#a-route-typed-in-a-terminal-reaches-the-page-a-minute-later)).
+- **The played view is a first cut.** One tile a worker label: "a worker is many" (`QA DEV (Opus 1)`)
+  waits on the agent half knowing its running instances. The week's seat is always ghosted, and the
+  tracker's lights only to say it could not be read. No neural voice (V2's `/narrate`); the browser's
+  voice is whatever the machine has, and an authored fifteen seconds a tile is not imposed -- a slide
+  lasts as long as its lines take to read, plus the engine's dwell. No Media Session (lock-screen play,
+  pause, next). The nonsense register's door is not drawn on the stage
+  ([The played standup is a first cut](../KNOWN-GAPS.md#the-played-standup-is-a-first-cut)).
+- **A linked card follows its issue, even to nowhere.** A card whose id is an issue's number adds no
+  row of its own ([the join](#the-join)), so when that issue is open and no worker label routes it, the
+  issue is in no slot and neither is the card's work: the card's lane is in `links[]`, but the text says
+  nothing. Give the issue a worker label and it shows
+  ([A card linked to an unrouted issue is in no slot](../KNOWN-GAPS.md#a-card-linked-to-an-unrouted-issue-is-in-no-slot)).
+- **The prose reads no age, no pull request and no assignee**. The issue's grammar names more
+  facts than the read carries: "blocked" also means a review older than N days, and "yesterday" also
+  items that moved to review since the last standup. Nothing new is read from the tracker, and the read
+  has no time an issue entered review and no age, so *blocked* is the blockers slot (an open, routed
+  `verify-close` issue -- waiting on your walk), *yesterday* is the closed-in-the-window slot, and a
+  `blocked` label is not read. A clause is the title's head as written -- not lower-cased, so a title
+  that starts with a capital keeps it (`#<n>, Rename the slug`)
+  ([The standup's prose reads no age, pull request or assignee](../KNOWN-GAPS.md#the-standups-prose-reads-no-age-pull-request-or-assignee)).
+- **The dates read is GitHub's, and the CLI's covers one repo.** Commit dates and issue timelines come
+  from a GitHub repository ([what moved](#what-moved-and-the-window)); a cards Space, an Azure DevOps
+  Space, or a dates read that failed counts every bullet and reads an issue alone as `in progress`. A
+  timeline is read to its first 50 labelled and assigned events. On a Space of several repos the terminal
+  and the page can date different commits ([The terminal's standup dates a commit from one repository, the page from every repository of the Space](../KNOWN-GAPS.md#the-terminals-standup-dates-a-commit-from-one-repository-the-page-from-every-repository-of-the-space)).
+- **`decide` and `look` are always empty.** Their labels are an open item of the spec; only `walk` is
+  filled ([The standup's decide and look queues are empty](../KNOWN-GAPS.md#the-standups-decide-and-look-queues-are-empty)).
+- **One repo per Space.** A Space spanning several repos says so on its `Tracker` line rather than
+  merging them
+  ([The terminal's standup refuses a Space with several repositories](../KNOWN-GAPS.md#the-terminals-standup-refuses-a-space-with-several-repositories)).
+- **A live refusal reads differently in the two halves.** The fixture pins the `Tracker` line only for
+  the reason it is GIVEN; the sentence each half writes for a live failure -- a Space that is not GitHub,
+  a tier below 1, `gh` not answering -- is its own. The Azure DevOps sentence is now the contract's
+  (`rituals.text.adoTracker`, both halves); the rest are not yet, and if they should match they get a key
+  in `consts.json` `rituals` the same way
+  ([A failed tracker read is worded differently in the terminal and on the page](../KNOWN-GAPS.md#a-failed-tracker-read-is-worded-differently-in-the-terminal-and-on-the-page)).
+- **Several repos in one Space.** The verb says so on its `Tracker` line; the route merges labels by name
+  and concatenates issues, and fails the whole read if any repo's read fails. Issue numbers from two
+  repos could collide. Both are M0 choices; one rule belongs in the contract
+  ([The terminal's standup refuses a Space with several repositories](../KNOWN-GAPS.md#the-terminals-standup-refuses-a-space-with-several-repositories)).
+
+### True by design
+
+These are how the rituals read, on purpose, and are not on that list:
+
 - **A launch is proved on macOS here, and walked on Windows.** The pipe returning on Windows PowerShell
   5.1, the model a real `claude` runs, and a real session's first message being the block are `VERIFY.md`
   rows (Gate 12, "StartWork -Launch"); the suite's launch half runs off Windows only.
-- **The bell and Home's tips do not suggest yet.** They are the suggestion's later surfaces, behind the
-  same switch; the chair's line and [the PM Corner](#the-pm-corner-the-line-the-chevron-the-confetti) are the two built.
 - **The Corner's milestones in reach are the suggestion's candidates.** A milestone whose every open item is
   in flight, waiting on you or someone else's has nothing to start, and the Corner moves on to the next
   milestone with something to start, or reads `no milestone in reach`.
 - **Reached lasts the standup's window.** `milestone B reached` reads while the last close is inside
   yesterday's window (or the one `-Since` widens); after it, the line moves on to the next milestone.
-- **The celebration's mark is per browser.** Another browser, or one whose site data was cleared, celebrates a
-  reached milestone once more on first sight.
-- **Only the issue read's rows are candidates.** The suggestion reads the standup's read, capped like it:
-  the same `consts.json` `ghReads` numbers in the CLI and the agent, so the terminal and the page suggest from the same issues.
 - **Only the played view is dressed** (why, and what the reader sees when it is off, under
   [the agentic layer](#the-agentic-layer), "Where the dressed text shows"). `spoken` is the agent's and the stage's: `Standup -Grain work`
   and the page's Work grain show the prose, Copy copies it, and the queue's sentences, "Nothing blocked."
   and a mug's status sentence are never sent to the model. The decline when no key is set is written to the usage
   log, not into the response -- `spoken: null` says only that nothing was dressed, and `GET /api/env`'s
   `anthropicConfigured` says whether a key is there.
-- **The guard reads names by their capital**. A capitalised word that is not in the facts is
-  refused, so a persona's proper noun ("Dev-Hero") sends the prose instead, and an invented name written
-  in lower case is not caught; numbers, refs and kind counts are checked exactly. A group whose own name is
-  a kind noun ("Bugs") with no item of that kind can never be dressed -- its prose fails the kind guard too.
-- **The dress is remembered by its facts, on disk**: a reply the guard refused is kept like any other,
-  so the same facts are not re-asked until they change. Nothing prunes the folder -- one small file per
-  set of facts the model was asked about, in the agent's cache, which may be deleted whenever you like.
-- **A `Route` typed in a terminal is not seen at once.** The agent forgets its kept tracker reads when a
-  verb runs through the bridge, but a verb typed in a terminal never reaches it: the pages show the change
-  when the minute runs out, or at once on the Triage page's Refresh.
 - **Triage's milestones are the Space you are in.** The page's picker reads `GET /api/milestones`, which
-  is the active Space's; the page itself asks about the active Space too, so the two agree, but neither
-  takes another Space's slug yet.
-- **The played view is a first cut.** One tile a worker label: "a worker is many" (`QA DEV (Opus 1)`)
-  waits on the agent half knowing its running instances. The week's seat is always ghosted, and the
-  tracker's lights only to say it could not be read. No neural voice (V2's `/narrate`); the browser's
-  voice is whatever the machine has, and an authored fifteen seconds a tile is not imposed -- a slide
-  lasts as long as its lines take to read, plus the engine's dwell. No Media Session (lock-screen play,
-  pause, next). The nonsense register's door is not drawn on the stage.
+  is the active Space's; the page itself asks about the active Space too, so the two agree. Neither takes
+  another Space's slug, because a ritual reads the Space you are in, as every other page does.
 - **Not on Azure DevOps, by design.** An ADO Space answers `rituals.text.adoTracker` on its `Tracker`
   line (D-TA19: ADO is the human team's board, and its standup is the one the team holds). A local Space
   fills from its cards.
-- **A linked card follows its issue, even to nowhere.** A card whose id is an issue's number adds no
-  row of its own ([the join](#the-join)), so when that issue is open and no worker label routes it, the
-  issue is in no slot and neither is the card's work: the card's lane is in `links[]`, but the text says
-  nothing. Give the issue a worker label and it shows.
 - **The work grain's nouns are the tracker's own words**. A design note is named from its file stem
   (`team-agile.md` is `Team Agile`), not from its heading, which the read does not fetch; a
   `> GitHub:` thread outside the read (closed long ago, another repo) is named `#<n>`; a card's type
@@ -1545,17 +1618,6 @@ repository", is the real write).
   two titles that mean the same work but start with different words are two groups. The prose
   says these nouns as they are: `#<n>` for a thread the read does not hold (`I'm also on two more:
   #<n> and Design lifecycle L3.`), `one in Bug` for a card's type.
-- **The prose reads no age, no pull request and no assignee**. The issue's grammar names more
-  facts than the read carries: "blocked" also means a review older than N days, and "yesterday" also
-  items that moved to review since the last standup. Nothing new is read from the tracker, and the read
-  has no time an issue entered review and no age, so *blocked* is the blockers slot (an open, routed
-  `verify-close` issue -- waiting on your walk), *yesterday* is the closed-in-the-window slot, and a
-  `blocked` label is not read. A clause is the title's head as written -- not lower-cased, so a title
-  that starts with a capital keeps it (`#<n>, Rename the slug`).
-- **An issue alone never says `started`.** The issue read carries no time its work began, so an issue
-  with no card is `closed` or `in progress` ([what moved](#what-moved-and-the-window)); `started` needs a
-  card. A card's commits are every bullet it carries, not only the window's -- a bullet has no date -- so
-  a card worked over weeks counts all of them the day it closes.
 - **The counts are not spoken on the stage.** The counts line is the page's and the brief's: the played
   view speaks the work grain, whose dress guard holds every number to its group's own, so velocity is
   read, not heard.
@@ -1566,20 +1628,8 @@ repository", is the real write).
   worker, and a card cannot be a blocker (there is no walk label on a card).
 - **The card read is every file in `archive/`.** Each archived card is read for its `**Closed:**` day on
   every standup; a hub with thousands of archived cards pays for it.
-- **`decide` and `look` are always empty.** Their labels are an open item of the spec; only `walk` is
-  filled ([The standup's decide and look queues are empty](../KNOWN-GAPS.md#the-standups-decide-and-look-queues-are-empty)).
-- **One repo per Space.** A Space spanning several repos says so on its `Tracker` line rather than
-  merging them.
+- **Only the issue read's rows are candidates.** The suggestion reads the standup's read, capped like it:
+  the same `consts.json` `ghReads` numbers in the CLI and the agent, so the terminal and the page suggest from the same issues.
 - **The reads are capped, and alike.** Both halves read up to `consts.json` `ghReads` -- 500 open
   issues, 500 issues in every state and 500 labels, one number per read, read by the CLI's scripts and the
   agent. A repo past a cap loses its oldest issues from that read in both halves, and neither says so.
-- **A live refusal reads differently in the two halves.** The fixture pins the `Tracker` line only for
-  the reason it is GIVEN; the sentence each half writes for a live failure -- a Space that is not GitHub,
-  a tier below 1, `gh` not answering -- is its own. The Azure DevOps sentence is now the contract's
-  (`rituals.text.adoTracker`, both halves); the rest are not yet, and if they should match they get a key
-  in `consts.json` `rituals` the same way.
-- **Several repos in one Space.** The verb says so on its `Tracker` line; the route merges labels by name
-  and concatenates issues, and fails the whole read if any repo's read fails. Issue numbers from two
-  repos could collide. Both are M0 choices; one rule belongs in the contract.
-
-Known gap: [The standup's decide and look queues are empty](../KNOWN-GAPS.md#the-standups-decide-and-look-queues-are-empty).

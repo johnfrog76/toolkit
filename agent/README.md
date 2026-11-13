@@ -82,7 +82,7 @@ agent/
 │   ├── sprint.py             sprint awareness, gated per org
 │   ├── bridge.py             POST /cmd/{name} -- the route, and the derived allowlist
 │   ├── bridge.ps1            module-private; the child PowerShell the bridge runs
-│   └── Get-WeeklyBilling.ps1 module-private; /billing shells out to it
+│   └── Get-WeeklyBilling.ps1 run by path: /billing shells out to it, and the CLI's Daily runs it
 ├── growth/                 opt-in, features.growth -- one router, one gate
 │   ├── __init__.py           growth_router(): the gate, declared once on the router
 │   ├── growth.py             GET /growth, GET /growth/{filename}
@@ -511,7 +511,7 @@ route list.
 | `GET /visibility` | `ado/accounting` | GitHub spaces only -- `supported: false` and `visibility: ""` elsewhere; below Tier 1 `unknown` with `gh` not asked. `?space=<slug>` as `/issue-report` | `gh api repos/{owner}/{repo}` -> `visibility`, once per repo, held 600 s as one record per repository -- `visibility`, `has_issues` and `url` (`html_url`), the one source the Spaces card and the Docs tab read (`gh_repo_record`, `cached_repo_record`); the Studio's ledger fills the same record from its GraphQL call (`hasIssuesEnabled`, `url`), so a repository it read is not asked again (an unanswered call is not held); `?refresh=1` drops that Space's repos' answers and goes past the tier probe's cache, then asks again -- the Spaces card's Refresh: `public`, `private` (gh's `INTERNAL` too) or `unknown`, never guessed (`consts.json` `visibility`). A Space of several repos is `public` when any is | — |
 | `GET /dashboard` | `ado/accounting` | Tier 1 | ADO via `az`, plus local repo health | — |
 | `GET /dashboard/pipelines/{project}` | `ado/accounting` | Tier 1 | ADO via `az` | — |
-| `GET /billing` | `ado/reporting` | Tier 2+ | `Get-WeeklyBilling.ps1` over the cards' own dates, enriched by `git log` where the hub has one | — |
+| `GET /billing` | `ado/reporting` | Tier 2+ | `Get-WeeklyBilling.ps1` over the cards' own dates, enriched by `git log` where the hub has one; `?week=current\|last`, or a window `?since=&until=` (both `yyyy-MM-dd`, which wins over `week`) | — |
 | `GET /engagement/{slug}/summary` | `ado/reporting` | Tier 2+ | `archive/`, config | — |
 | `GET /engagement/{slug}/work-breakdown` | `ado/reporting` | Tier 2+ | `archive/` | — |
 | `GET /engagement/{slug}/skills` | `ado/reporting` | Tier 2+ | `archive/`, reviews | — |
@@ -860,9 +860,10 @@ for the terminal, so the bridge and the CLI agree about what failed.
 
 `/billing` is the other route that shells out to PowerShell -- through the same `core/hosts.py`
 resolver the bridge uses -- and the script it calls lives here, in
-`ado/`, rather than in `Scripts/`. That is deliberate: it is **not a CLI command**, has no alias, no
-entry in the command map and no `{prefix}` form. It belongs to this module, is invoked by path, and
-takes `-PromptsRoot` and `-PromptsFolder` so the agent hands it the hub and the active Space's folder
+`ado/`, rather than in `Scripts/`. It is not a verb itself: it is invoked by path, by two callers --
+this route, in a child PowerShell, and the CLI's `Daily` (`Scripts/Get-Daily.ps1`), in its own
+session, which prints the `raw` it answers -- and it
+takes `-PromptsRoot` and `-PromptsFolder` so each caller hands it the hub and the active Space's folder
 instead of the script guessing at either. Both are required: the script resolves no Space of its own,
 so the folder Daily bills is the one `load_config` resolved, fallback included. A Space whose cards sit
 at the hub root is passed as `.` -- Windows PowerShell 5.1 drops an empty argument.
@@ -870,6 +871,15 @@ at the hub root is passed as `.` -- Windows PowerShell 5.1 drops an empty argume
 ```bash
 pwsh -NoProfile -File agent/ado/Get-WeeklyBilling.ps1 -PromptsRoot <hub> -PromptsFolder <folder> -AsJson
 ```
+
+**The week.** `?week=current` (the default) and `?week=last` pass nothing and `-LastWeek`; a window,
+`?since=<yyyy-MM-dd>&until=<yyyy-MM-dd>`, passes `-Since` and `-Until` and wins over `week`, as it does
+in the script. The route checks the window before it starts anything: half a window, or a value that is
+not a `yyyy-MM-dd` day, is a `BillingResponse` whose `error` is the script's own sentence
+(`consts.json` `billing.text`) -- no PowerShell is started, and a value starting with `-` can never reach
+the argv as a switch. A window that ends before it starts is refused by the script
+(`Scripts/Resolve-BillingWindow.ps1`, the rule's one writer), and its sentence comes back in `error`
+after `Billing script failed:`.
 
 **The cards decide; git enriches.** The script enumerates `current/` and
 `archive/`, keeps the files that carry a card id (`Scripts/Resolve-CardName.ps1` -- the one id rule, so
@@ -888,7 +898,7 @@ web:
 | `source` | `stamps` (no git, or none needed) or `stamps+git` |
 | `nonBillable` | cards inside the week left off because they say so |
 | `unstamped` | cards with no date and no git to lend one: counted, never guessed |
-| `error` | set **only** when the week could not be built (no script, no PowerShell host, a timeout, a script that failed, no hub -- the script exits 2 for that one). `days` is empty then too, which is also what a quiet week looks like, so Daily reads this field and not the emptiness |
+| `error` | set **only** when the week could not be built (a window the route refuses, no script, no PowerShell host, a timeout, a script that failed, no hub -- the script exits 2 for that one). `days` is empty then too, which is also what a quiet week looks like, so Daily reads this field and not the emptiness |
 
 **There is no server-side cache.** A finished week can still change -- the first time a card closed
 on Friday is marked not billable on Monday -- and a cache keyed by week would also ignore the org and
@@ -898,9 +908,10 @@ It dot-sources `Scripts/Get-Consts.ps1` and `Scripts/Resolve-CardName.ps1` from 
 **exits 1 loudly** if either is missing -- silently billing nothing is the one failure a timesheet
 cannot afford. `GET /status` serves the same fact per card, as `billable` (default `true`).
 
-The alternative -- putting it in `Scripts/` -- would have made it a command, and a command is a thing
-someone can run, needs help text for, and expects to be in `tkMenu`. It is a subroutine of one
-route.
+It stays here rather than in `Scripts/` because the route is what it was written for and what it
+answers in -- JSON, one object, on every exit path. The command is `Daily`, a thin verb in
+`Scripts/` that runs it with `-AsJson` and prints the text; the script itself has no alias, no
+command-map row and no `{prefix}` form.
 
 ## Tests
 

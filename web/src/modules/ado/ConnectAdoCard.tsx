@@ -1,6 +1,6 @@
 import { Body1, Button, Caption1, Subtitle2, makeStyles, tokens } from "@fluentui/react-components";
 import { PlugConnectedRegular } from "@fluentui/react-icons";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { useNavigate } from "react-router";
 
 // What a LOCAL org shows where My Work and My Pull Requests would be. Off means
@@ -25,7 +25,7 @@ export function ConnectAdoCard({ slug, orgName }: { slug: string; orgName: strin
   const styles = useStyles();
   const navigate = useNavigate();
   return (
-    <PageCard
+    <PanelFrame
       headerLeft={
         <span className={styles.header}>
           <PlugConnectedRegular aria-hidden />
@@ -47,6 +47,6 @@ export function ConnectAdoCard({ slug, orgName }: { slug: string; orgName: strin
           awareness. Everything else on this page works without it.
         </Caption1>
       </div>
-    </PageCard>
+    </PanelFrame>
   );
 }

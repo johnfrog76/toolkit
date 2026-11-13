@@ -688,12 +688,6 @@ def usage_env_flag() -> str:
     return consts()["usage"]["envFlag"]
 
 
-def reply_statuses(tracker: str) -> tuple:
-    """The thread statuses a reply may set on ``tracker`` (``ado`` or ``github``): what
-    ReplyPR accepts there and the PR Comments page's status box offers."""
-    return tuple(consts()["replyStatuses"][tracker])
-
-
 def usage_burn_route() -> str:
     """The current Claude Code burn, today and this week: ``/api/usage/burn``."""
     return consts()["usage"]["burnRoute"]
@@ -704,6 +698,13 @@ def usage_readings_folder() -> str:
     readings ``Burn -Reading`` appends to, one file per week per machine. The burn
     route fingerprints it, so a new reading is a miss in its cache."""
     return consts()["usage"]["readingsFolder"]
+
+
+def billing_text() -> dict[str, str]:
+    """Daily's window sentences -- ``halfWindow``, ``notADay`` ({name}, {value}) and
+    ``backwards`` ({since}, {until}): the billing script, the CLI's Daily and
+    ``GET /api/billing`` refuse a window in the same words."""
+    return dict(consts()["billing"]["text"])
 
 
 def startwork_how_we_work_note() -> str:

@@ -115,6 +115,27 @@ export function archivedByOutcome(rows: Design[], outcome: string): Design[] {
   return rows.filter((d) => d.outcome === outcome);
 }
 
+/** The line under a list about the files that are not designs, with Learn more. */
+export function NotShownLine({
+  notShown,
+  stampHint,
+}: {
+  notShown: DesignNotShown[];
+  stampHint: string;
+}) {
+  const styles = useStyles();
+  const line = notShownLine(notShown, stampHint);
+  if (!line) return null;
+  return (
+    <Caption1 role="status" className={styles.notShown}>
+      {line}{" "}
+      <Link href={DESIGN_LEARN_MORE} target="_blank" rel="noopener noreferrer">
+        Learn more
+      </Link>
+    </Caption1>
+  );
+}
+
 export function DesignGroups({
   designs,
   notShown,
@@ -128,7 +149,6 @@ export function DesignGroups({
   const [outcome, setOutcome] = useState<string>(ALL_OUTCOMES);
   const groups = groupByState(designs);
   const totals = counted ? groupByState(counted) : groups;
-  const line = notShownLine(notShown, stampHint);
   const archivedState = DESIGN.states[3];
   return (
     <>
@@ -190,14 +210,7 @@ export function DesignGroups({
           </section>
         );
       })}
-      {line ? (
-        <Caption1 role="status" className={styles.notShown}>
-          {line}{" "}
-          <Link href={DESIGN_LEARN_MORE} target="_blank" rel="noopener noreferrer">
-            Learn more
-          </Link>
-        </Caption1>
-      ) : null}
+      <NotShownLine notShown={notShown} stampHint={stampHint} />
     </>
   );
 }

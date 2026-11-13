@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { expectOneRowShape } from "./rowShapeAssert";
+import { expectListPanelShape, pageSizeOf } from "../../shell/kinds/panelShapeAssert";
+import { listPageSize } from "../../shell/pageSize";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -28,8 +29,15 @@ import type { PromptRow, PromptSpace } from "./api.studio";
 // row's one action Open (Copy reference and Copy prompt in its menu), the name plain
 // text. The agent's reads are pinned in Tests/test_studio_prompts.py.
 // The viewer is mocked (react-markdown is ESM).
-// The pager's rules do not depend on how many rows a page holds, and these
-// suites build their lists for five; the shipped size is pinned in foyer.test.ts.
+// The pager's rules do not depend on how many rows a page holds: this suite
+// builds its lists around PAGE, the page under the chrome this card draws
+// (its source row and its category row), worked out by listPageSize and held to the
+// panel as drawn (pageSizeOf), so a change to the panel's height moves it.
+const PAGE = listPageSize({ density: "full", filterRows: 2 });
+const pages = (count: number) => Math.ceil(count / PAGE);
+/** The panel as drawn pages at PAGE: the fixture's chrome is the chrome PAGE was worked out for. */
+const expectPage = () =>
+  expect(pageSizeOf(document.querySelector<HTMLElement>("[data-panel-kind]")!)).toBe(PAGE);
 
 jest.mock("../../shared/MarkdownViewer", () => ({
   MarkdownViewer: ({ content }: { content: string }) => <pre data-testid="viewer">{content}</pre>,
@@ -363,7 +371,7 @@ describe("the Prompts card's filters", () => {
     expect(screen.getByText("What a deck must carry")).toBeTruthy();
     expect(screen.queryByText("pr-ship")).toBeNull();
     expect(chip()).toBe("2");
-    const deck = screen.getByText("deck-contract").closest(".fui-Card") as HTMLElement;
+    const deck = screen.getByText("deck-contract").closest("[data-card-item]") as HTMLElement;
     await act(async () => {
       fireEvent.click(await menuItem(deck, "Copy reference"));
     });
@@ -543,6 +551,9 @@ describe("the Prompts card's category row", () => {
     expect(chip()).toBe("1");
     fireEvent.click(category("All"));
     expect(chip()).toBe("5");
+    // Five rows are more than a page: the last is on the last page.
+    expect(screen.getByText("Page 1 of 2")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
     expect(screen.getByText("tk-loose")).toBeTruthy();
   });
 
@@ -553,15 +564,20 @@ describe("the Prompts card's category row", () => {
       data: { count: 9, prompts: [...reviews, ...ships], space: LOCAL, categories: VOCABULARY },
     };
     mount();
-    expect(screen.getByText("1 / 2")).toBeTruthy();
+    expectPage();
+    expect(screen.getByText(`Page 1 of ${pages(9)}`)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
-    expect(screen.getByText("2 / 2")).toBeTruthy();
-    // Seven ships: two pages of their own, from the first.
+    expect(screen.getByText(`Page 2 of ${pages(9)}`)).toBeTruthy();
+    // Seven ships: pages of their own, from the first.
     fireEvent.click(category("ship"));
-    expect(screen.getByText("1 / 2")).toBeTruthy();
+    expect(screen.getByText(`Page 1 of ${pages(7)}`)).toBeTruthy();
     expect(screen.getByText("ship-1")).toBeTruthy();
-    expect(screen.queryByText("ship-6")).toBeNull();
+    expect(screen.queryByText(`ship-${PAGE + 1}`)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(screen.getByText(`ship-${PAGE + 1}`)).toBeTruthy();
+    for (let page = 2; page < pages(7); page += 1) {
+      fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    }
     expect(screen.getByText("ship-7")).toBeTruthy();
     expect(screen.queryByText("review-1")).toBeNull();
     // Two reviews fit one page: no pager.
@@ -652,7 +668,8 @@ describe("the Prompts card's rows", () => {
       },
     };
     mount();
-    const card = (title: string) => screen.getByText(title).closest(".fui-Card") as HTMLElement;
+    const card = (title: string) =>
+      screen.getByText(title).closest("[data-card-item]") as HTMLElement;
     expect(rowText(card("PR Ship"))).toEqual([
       "PR Ship",
       "Ship-it flow, stage 1",
@@ -724,7 +741,7 @@ describe("the Prompts card's rows", () => {
 
   it("Copy reference, in the menu: the @ path, a ToolKit prompt's relative to the checkout", async () => {
     mount();
-    const ship = screen.getByText("pr-ship").closest(".fui-Card") as HTMLElement;
+    const ship = screen.getByText("pr-ship").closest("[data-card-item]") as HTMLElement;
     expect(within(ship).queryByRole("button", { name: "Copy reference" })).toBeNull();
     await act(async () => {
       fireEvent.click(await menuItem(ship, "Copy reference"));
@@ -736,7 +753,7 @@ describe("the Prompts card's rows", () => {
   it("one of the hub's copies its absolute path, which the hub is never inside the tree", async () => {
     mount();
     fireEvent.click(radio("Your hub"));
-    const mine = screen.getByText("bench-billing").closest(".fui-Card") as HTMLElement;
+    const mine = screen.getByText("bench-billing").closest("[data-card-item]") as HTMLElement;
     await act(async () => {
       fireEvent.click(await menuItem(mine, "Copy reference"));
     });
@@ -748,7 +765,7 @@ describe("the Prompts card's rows", () => {
     lazyAsked.length = 0;
     lazyFails = false;
     mount();
-    const ship = screen.getByText("pr-ship").closest(".fui-Card") as HTMLElement;
+    const ship = screen.getByText("pr-ship").closest("[data-card-item]") as HTMLElement;
     await act(async () => {
       fireEvent.click(within(ship).getByRole("button", { name: "Actions for pr-ship" }));
     });
@@ -765,7 +782,7 @@ describe("the Prompts card's rows", () => {
     lazyAsked.length = 0;
     lazyFails = true;
     mount();
-    const ship = screen.getByText("pr-ship").closest(".fui-Card") as HTMLElement;
+    const ship = screen.getByText("pr-ship").closest("[data-card-item]") as HTMLElement;
     await act(async () => {
       fireEvent.click(within(ship).getByRole("button", { name: "Actions for pr-ship" }));
     });
@@ -828,7 +845,9 @@ describe("the Space's how-we-work note", () => {
   it("Copy reference copies its path in the hub, and Open opens the reading room", async () => {
     mount();
     fireEvent.click(radio("Your hub"));
-    const card = screen.getByText("How we work in GitHub demo").closest(".fui-Card") as HTMLElement;
+    const card = screen
+      .getByText("How we work in GitHub demo")
+      .closest("[data-card-item]") as HTMLElement;
     await act(async () => {
       fireEvent.click(await menuItem(card, "Copy reference"));
     });
@@ -860,28 +879,32 @@ describe("the Prompts card's pager", () => {
     envAnswer = how("team");
   });
 
-  it("six rows draw a pager and page 2 shows the sixth; five draw none", () => {
-    prompts(6, 0);
+  it("one row more than a page draws a pager and page 2 shows the last; exactly a page draws none", () => {
+    prompts(PAGE + 1, 0);
     const view = mount();
-    expect(screen.getByText("tk-5")).toBeTruthy();
-    expect(screen.queryByText("tk-6")).toBeNull();
-    expect(screen.getByText("1 / 2")).toBeTruthy();
+    expectPage();
+    expect(screen.getByText(`tk-${PAGE}`)).toBeTruthy();
+    expect(screen.queryByText(`tk-${PAGE + 1}`)).toBeNull();
+    expect(screen.getByText("Page 1 of 2")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
-    expect(screen.getByText("tk-6")).toBeTruthy();
+    expect(screen.getByText(`tk-${PAGE + 1}`)).toBeTruthy();
     view.unmount();
-    prompts(5, 0);
+    prompts(PAGE, 0);
     mount();
+    expectPage();
     expect(screen.queryByRole("button", { name: "Next page" })).toBeNull();
   });
 
   it("the pager runs over the active filter's rows, and a filter change starts at its first page", () => {
     prompts(7, 3);
     mount();
-    expect(screen.getByText("1 / 2")).toBeTruthy();
+    expect(screen.getByText(`Page 1 of ${pages(7)}`)).toBeTruthy();
     expect(chip()).toBe("7");
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
-    expect(screen.getByText("tk-7")).toBeTruthy();
+    expect(screen.getByText(`Page 2 of ${pages(7)}`)).toBeTruthy();
+    expect(screen.getByText(`tk-${PAGE + 1}`)).toBeTruthy();
     // Your hub's three fit one page: no pager, page 1, the chip its count.
+    expect(PAGE).toBeGreaterThanOrEqual(3);
     fireEvent.click(radio("Your hub"));
     expect(screen.queryByRole("button", { name: "Next page" })).toBeNull();
     expect(screen.getByText("mine-1")).toBeTruthy();
@@ -1016,9 +1039,12 @@ describe("the Prompts card's row shape", () => {
       },
     };
     const { container } = mount();
-    expectOneRowShape(container, "prompt", [long, "Long text", "Bare"]);
+    expectListPanelShape(container.querySelector<HTMLElement>("[data-panel-kind]")!, {
+      titles: [long, "Long text", "Bare"],
+      chips: true,
+    });
     // The badges and the file name are on the bottom line, the controls beside the title.
-    const bare = container.querySelectorAll("[data-studio-row]")[2];
+    const bare = container.querySelectorAll("[data-card-item]")[2];
     expect(bare.querySelector("[data-row-meta]")!.textContent).toContain("ToolKit");
     expect(bare.querySelector("[data-row-meta]")!.textContent).toContain("bare.prompt.md");
   });

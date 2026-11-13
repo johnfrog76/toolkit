@@ -4,6 +4,7 @@ import { MyWork } from "./MyWork";
 import { IssueFilterRows } from "./IssueFilterRows";
 import type { WorkItemInfo } from "./api.ado";
 import { workItemsPath } from "./issueAxes";
+import { expectListPanelShape } from "../../shell/kinds/panelShapeAssert";
 
 // The Issues row wears the house row: the title is text, the one exposed
 // action goes somewhere, the menu holds the rest. On a gh space the exposed
@@ -536,5 +537,43 @@ describe("the Issues filters, in the drawer", () => {
     workAnswer = { data: { count: rows.length, items: rows } };
     mount({ globalState: "Active", activeRepo: "somewhere-else" });
     expect(shown()).toHaveLength(3);
+  });
+});
+
+// The Issues list has no description to show, so the panel is compact: every
+// item is the title line and the meta band, with no empty band between. The
+// panel is one fixed height on both trackers, so a page is what fits: five.
+describe("the Issues list, as a compact list panel", () => {
+  const many: WorkItemInfo[] = Array.from({ length: 12 }, (_, i) => ({
+    ...ITEM,
+    id: i + 1,
+    title: `Issue ${i + 1}`,
+  }));
+  const panel = (container: HTMLElement) =>
+    container.querySelector<HTMLElement>("[data-panel-kind]")!;
+
+  it.each(["github", "ado"])("on %s: five compact items a page, the pager at the foot", (t) => {
+    tracker = t;
+    workAnswer = { data: { count: many.length, items: many } };
+    const { container } = mount();
+    expect(panel(container).getAttribute("data-panel-density")).toBe("compact");
+    expectListPanelShape(panel(container), {
+      titles: many.slice(0, 5).map((i) => i.title),
+      total: 12,
+    });
+    expect(panel(container).querySelector("[data-row-description]")).toBeNull();
+    expect(screen.getByText("Page 1 of 3")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expectListPanelShape(panel(container), {
+      titles: many.slice(5, 10).map((i) => i.title),
+      total: 12,
+    });
+  });
+
+  it("a short list is the same panel: two items, the same height bounds, no pager", () => {
+    tracker = "github";
+    workAnswer = { data: { count: 2, items: many.slice(0, 2) } };
+    const { container } = mount();
+    expectListPanelShape(panel(container), { titles: ["Issue 1", "Issue 2"], total: 2 });
   });
 });

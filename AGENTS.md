@@ -169,7 +169,7 @@ module and you add a mock line to every one of these files.
 **Four test runners**, one per half plus one for the two together. Run the ones your change touches:
 
 ```powershell
-tkTestToolkit                 # the CLI -- 52 suites, 10126 assertions on this commit
+tkTestToolkit                 # the CLI -- 52 suites, 10355 assertions on this commit
 ```
 
 ```bash
@@ -412,7 +412,9 @@ Each step already done is skipped, so it is safe to re-run.
   BOM-less UTF-8 file correctly whatever the verb asked for. A suite's children start through
   `Invoke-P20TestHost` (`Tests/Get-TestHost.ps1`), in the host it is running in, with a `-Command`
   passed as `-EncodedCommand` because 5.1 drops a bare `"` from a native argument; the runner starts each
-  suite the same way, and the Windows `ps51` job starts the runner in `powershell.exe`, so every suite runs on 5.1.
+  suite the same way, and the Windows `ps51` job starts the runner in `powershell.exe`, so every suite's own
+  code runs on 5.1. Its verbs run there only once the suite has made the move: `Test-Portability`'s Clause 22
+  lists the suites that still type `pwsh`, and the list only shrinks.
 - **A suite calls git through `Invoke-P20TestGit`, never raw.** A suite builds its fixture repositories
   with git, and on Windows git warns on stderr about line endings. Under 5.1, `git add -A 2>&1 | Out-Null`
   with `Stop` in force throws on that warning, so the suite stops part-way there and passes on 7.
@@ -421,6 +423,9 @@ Each step already done is skipped, so it is safe to re-run.
   `core.autocrlf false` stays, because it decides the bytes a card gets on Windows, but it is not what
   keeps stderr quiet. `Test-Portability`'s Clause 23 fails on a raw redirected git call anywhere under
   `Tests/`, the runner included, and allows nothing but the helper's own.
+  **An argument PowerShell would split is quoted.** The helper has no `param` block, so a bare `--` is dropped
+  before it runs, and `-c:x`, `-a.b`, a comma and `stash@{0}` each arrive as two arguments: write `'--'`, `'-c:x'`.
+  Clause 23 fails on one written bare, and holds a table of what git is handed, on 5.1's argument passing as well.
 - **A suite that runs a script directly does not test the verb.** A suite that drives
   `Move-PromptToArchive.ps1` with a stubbed `Get-PromptFolders` stays green while `Archive` typed as a
   verb can look in `<hub>/<org>/` and see no cards at all -- as it does when the module's own

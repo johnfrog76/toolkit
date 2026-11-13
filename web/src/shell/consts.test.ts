@@ -15,6 +15,7 @@ import consts from "@consts";
 
 import {
   ASSETS,
+  BILLING,
   DESIGN,
   DOCS,
   FEATURES,
@@ -126,7 +127,7 @@ describe("consts.json", () => {
       String.raw`^https://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com/(?:DefaultCollection/)?([^/\s]+)/_git/([^/\s?#]+?)(?:\.git)?/?$`,
     );
     expect(consts.regex.adoOriginSsh).toBe(
-      String.raw`^(?:ssh://)?[^/@\s]+@(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com):v3/([^/\s]+)/([^/\s]+)/([^/\s]+?)(?:\.git)?/?$`,
+      String.raw`^(?:ssh://(?:[^/@\s]+@)?(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com)(?::\d+)?/|(?:ssh://)?[^/@\s]+@(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com):)v3/([^/\s]+)/([^/\s]+)/([^/\s]+?)(?:\.git)?/?$`,
     );
     expect(consts.regex.adoOrgDev).toBe(
       String.raw`^https?://(?:[^/@\s]+@)?dev\.azure\.com/([^/\s]+)`,
@@ -395,6 +396,7 @@ describe("consts.json", () => {
         countsClosed: "{n} closed",
         countsStarted: "{n} started",
         countsInProgress: "{n} in progress",
+        countsUndated: "({n} undated)",
       },
     });
     // StartWork's hand-off block (D-AR5): the CLI types the four headings and the
@@ -437,6 +439,17 @@ describe("consts.json", () => {
       "closed",
     ]);
     expect(REPLY_STATUSES_BY_TRACKER.github).toEqual(["fixed", "closed", "active"]);
+    // Daily's window: the sentences a window is refused with, in all three halves.
+    const { _: billingDoc, ...billingKeys } = BILLING as typeof BILLING & { _: string };
+    expect(billingDoc).toMatch(/Resolve-BillingWindow/);
+    expect(billingKeys).toEqual({
+      text: {
+        halfWindow:
+          "-Since and -Until go together: pass both (YYYY-MM-DD), or neither for this week.",
+        notADay: "{name} '{value}' is not a day: yyyy-MM-dd.",
+        backwards: "-Since {since} is after -Until {until}.",
+      },
+    });
   });
 
   // Every key of the contract is stated by this half, so a key added to
@@ -448,6 +461,7 @@ describe("consts.json", () => {
         "_README",
         "agent",
         "assets",
+        "billing",
         "design",
         "docs",
         "env",
