@@ -240,6 +240,12 @@ def _build_payload(text: str) -> dict:
     }
 
 
+def sending_off() -> bool:
+    """Whether this server was started with sending turned off (the run marker).
+    The POST below and /env both ask here, so the page and the engine agree."""
+    return bool(os.environ.get(env_test_run_marker()))
+
+
 def _post_to_webhook(url: str, text: str) -> tuple[bool, str]:
     # The one place a message leaves the machine. While a test run is in
     # progress -- the runners set the marker for their own process tree and
@@ -247,7 +253,7 @@ def _post_to_webhook(url: str, text: str) -> tuple[bool, str]:
     # An
     # engineer's own shell has no marker, so a real send beside a running suite
     # still works: that is the normal state of a working day.
-    if os.environ.get(env_test_run_marker()):
+    if sending_off():
         return False, "refused: a test run does not post to a webhook"
     """POST the rendered markdown to a Teams webhook. Returns (ok, detail)."""
     payload = json.dumps(_build_payload(text)).encode("utf-8")

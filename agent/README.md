@@ -447,7 +447,8 @@ without the module still serves `/env`.
   "recipients": [
     { "key": "manager", "display": "My Manager (DM via Workflow)", "type": "channel",
       "scope": "managerWorkflow", "webhookEnv": "TEAMS_WEBHOOK_MANAGER", "configured": false }
-  ]
+  ],
+  "sendingOff": false
 }
 ```
 
@@ -456,6 +457,10 @@ named environment variable is set, and `webhookEnv` names it so the UI can tell 
 rather than merely refusing; with `TEAMS_WEBHOOK_MANAGER` unset it is `false`, as above. **The URL
 itself is never in config and never in this response** --
 config names the variable, the environment holds the value.
+
+`sendingOff` is whether this server was started with sending turned off -- the run marker
+(`consts.json` `env.testRunMarker`) is set, which is what makes the engine refuse to post. The UI
+reads it to tell "sending is off on this server" from "no webhook is set".
 
 `scope` says which config block each entry came from: `managerWorkflow` for a recipient declared
 under `managerWorkflow.communication.recipients`, the same in every Space, or `org` for one declared
