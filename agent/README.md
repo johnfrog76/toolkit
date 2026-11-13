@@ -555,7 +555,8 @@ And the modules', gated per request on their flag and 404 when it is off:
 | `PUT /manager/{filename}` | `communication/manager` | one session | **that session** |
 | `POST /comms/send` | `communication/manager` | `/env`'s recipient registry, the webhook variable | **an outbound webhook** |
 | `POST /rewrite` | `communication/manager` | a model | — |
-| `GET /reference?q=`, `GET /reference/{name}` | `organize/reference` | `{hub}/reference/current/` -- gated on `features.organize`, 404 when off; a search keeps the documents with every word, any order, case ignored | — (a person files these by hand) |
+| `GET /reference` | `organize/reference` | `{hub}/reference/current/` -- gated on `features.organize`, 404 when off; `?q=` keeps the documents with every word, any order, case ignored | — (a person files these by hand) |
+| `GET /reference/{name}` | `organize/reference` | one document in `{hub}/reference/current/` -- gated on `features.organize`, 404 when off | — |
 | `GET /reminders` | `organize/reminders` | `{hub}/reminders/current/` -- gated on `features.organize`, 404 when off; the bucket derived against the local clock | — (every reminder write is `NewReminder` / `Reminders` through the bridge) |
 
 | Route | Package | Gate | Reads | Writes |
