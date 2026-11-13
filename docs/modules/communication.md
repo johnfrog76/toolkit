@@ -332,8 +332,6 @@ the three keys and labels both pages read.
 The `--modules=on` smoke asserts the button's **presence** on exactly one of the three fixture
 sessions and never presses it: a press moves a file in the committed fixture hub.
 
-Known gap: [A meeting row draws its actions side by side](../KNOWN-GAPS.md#a-meeting-row-draws-its-actions-side-by-side).
-
 ### Advancing a stage, from the browser
 
 The session page offers **one** button for the stage ahead — `Prep` at draft, `Retro` at prep,
@@ -435,6 +433,7 @@ the engine takes whatever is in that variable at face value. Use `-WhatIf` from 
 | `Tests/Test-NewMeeting.ps1` | The eight headings by name, the prior session found across folders and out of order, an existing session reported rather than overwritten — with its hand-written content asserted still there — and a date already closed into `archive/` refused, with nothing scaffolded beside the record. A session created out of order names the later record whose heading it made stale, and leaves that record alone |
 | `Tests/Test-MeetingAgenda.ps1` | The stage lifecycle, read back out of the file rather than out of the command's output, and `-Close` end to end: the move, the `**Closed:**` stamp, `archive/` created when absent, a second run idempotent, and `-DryRun` writing nothing — plus the duplicate case, where a session sits in `current/` and a closed one in `archive/` for the same date and `-Close` refuses rather than reporting success. Plus two absence tests: the help names none of the three retired hub prompts, and the retro does not suggest the org-scoped `Archive` verb — it names `-Close` instead. And every row of the shared `Tests/fixtures/carried-from/table.json` read through `Resolve-P20CarriedFrom`, then the `Check:` line end to end -- status, quick menu, `-Plan` -- with the session's bytes unchanged |
 | `web/.../stages.test.ts` | The three stages in one place: the file's word, the badge's label, what comes next, complete only at the last -- and the one switch the session page offers: the stage ahead, `Plan` for a blank stage, nothing for a closed session |
+| `web/.../OneOnOne.test.tsx` | A meeting's row: one exposed button and a `...` menu named for the row; **Archive** offered only on a complete, unclosed session; and Archive asking first, then calling `MeetingAgenda -Close` through the bridge |
 | `web/.../ManagerDetailPage.test.tsx` | The read view's Carried-from line: the agent's sentence drawn for `stale`, `missing` and `absent`, and nothing for `ok` or when the fields are absent |
 | `web/.../cliBridge.test.ts` (three of its cases) | `MeetingAgenda`'s argv: `-Date`, `-Type` only for a series that is not the 1:1, then the one switch spelt the script's way |
 | `web/.../sendButton.test.ts` | The send button's three states, including that it is absent rather than disabled when the workflow has no send, and that what goes out is the Agenda and never the self-assessment |
@@ -451,8 +450,7 @@ The three PowerShell suites are registered in `Tests/Test-Toolkit.ps1` (`-SendTe
 | — | An agenda line becomes a card from the terminal only (`NewPrompt -From`): the Meetings page has no "make a card" action on an agenda line, which belongs to the record's reading room, not yet built | [An agenda line becomes a card from the terminal only](../KNOWN-GAPS.md#an-agenda-line-becomes-a-card-from-the-terminal-only) |
 | — | A card made from an agenda line names its record; the record does not name the card. Whether the agenda gets a line back (`-> card K7M2`) is undecided | [An agenda line becomes a card from the terminal only](../KNOWN-GAPS.md#an-agenda-line-becomes-a-card-from-the-terminal-only) |
 
-Two more are described where you meet them, earlier in this document:
-[A meeting row draws its actions side by side](../KNOWN-GAPS.md#a-meeting-row-draws-its-actions-side-by-side) and
+One more is described where you meet it, earlier in this document:
 [A webhook set after the agent started is not seen](../KNOWN-GAPS.md#a-webhook-set-after-the-agent-started-is-not-seen).
 
 ### True by design
