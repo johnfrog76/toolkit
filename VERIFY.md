@@ -760,7 +760,8 @@ opens a browser and names it.
 - [ ] `/skills` renders
 - [ ] A **Meetings** nav entry, and `/communication` lists the three fixture sessions with their
       stages -- Plan, Prep, Retro
-- [ ] The retro session's send button is **present, disabled, and names `TEAMS_WEBHOOK_MANAGER`**
+- [ ] The retro session's send button is **present, disabled, and says `Sending off on this server`**
+      (`Webhook not set` on a server not started as a test run)
 - [ ] No page errors across the six routes
 
 > The send button is never pressed, by the runner or by you. A press posts to a real webhook, and
@@ -800,7 +801,9 @@ curl -s localhost:4100/api/env | python -c "import json,sys; print(json.load(sys
 - [ ] The block **names the variable** (`"webhookEnv": "TEAMS_WEBHOOK_MANAGER"`) and does not
       contain a URL anywhere
 - [ ] On a Retro-stage session, the send button is **visible and disabled**, with the reason on the
-      line below it naming `TEAMS_WEBHOOK_MANAGER` -- not hidden, and not an error
+      line below it reading `Webhook not set` and `TEAMS_WEBHOOK_MANAGER` named only in the info
+      icon beside it -- not hidden, and not an error. The System page's Environment card reads the
+      same phrase on that recipient's row, under *Teams messages*
 - [ ] `tkSendTeams manager 'test' -WhatIf` prints the same refusal, names the variable, and
       **exits 0** -- an unset variable is a configuration fact, not a failure
 

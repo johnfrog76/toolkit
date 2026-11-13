@@ -88,7 +88,7 @@ web/
 ├── nginx.conf.template   static + /api -> host.docker.internal:${P20_AGENT_PORT}, substituted
 │                        by the nginx image's entrypoint at container start
 ├── docker-compose.yml    127.0.0.1:5174 -> container 5173; passes P20_AGENT_PORT in
-├── tests/smoke.mjs       Playwright, two modes (28 checks off / 31 on), raw `playwright` not @playwright/test
+├── tests/smoke.mjs       Playwright, two modes (28 checks off / 32 on), raw `playwright` not @playwright/test
 ├── tests/smokeStudio.mjs   its --studio cases; smokeStack.mjs starts the servers that mode owns
 ├── tests/smokeMatrix.mjs   its --matrix cases, on the same kind of servers
 ├── tests/smokeA11y.mjs     its --a11y audit, on the same kind of servers
@@ -1780,12 +1780,15 @@ is pressing a button that posts to a real webhook.
 | State | When |
 | --- | --- |
 | **absent** | `postRetroSummary` is false. The workflow does not include a send, so there is nothing to explain |
-| **disabled** | The stage is not Retro, the recipient has no webhook, `## Sent` already records a send, or the Agenda holds only its placeholder -- and every reason that holds is rendered on the line below it, the recipient's first, **naming the environment variable** from the moment the page opens, before Retro as well as at it |
+| **disabled** | The stage is not Retro, the recipient has no webhook, sending is off on this server, `## Sent` already records a send, or the Agenda holds only its placeholder -- and every reason that holds is rendered on the line below it, the recipient's first, from the moment the page opens, before Retro as well as at it |
 | **enabled** | Retro stage, recipient configured, an Agenda with content, nothing under `## Sent` |
 
 Disabled-and-explained rather than hidden is the point: a button that vanishes teaches nobody what
-to set. The reason string is the whole fix -- `Set TEAMS_WEBHOOK_MANAGER to this recipient's webhook
-URL.`
+to set. The recipient's reason is its state in a few neutral words -- `Webhook not set`, or
+`Sending off on this server` where `/env` reports `sendingOff` -- and the fix, with the environment
+variable's name, is in the info icon beside it. Those words are the Environment card's too: both
+read `recipientState.ts` ([`docs/modules/communication.md`](../docs/modules/communication.md),
+"`/env`'s `communication` block").
 
 A click posts
 
