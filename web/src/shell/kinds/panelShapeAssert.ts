@@ -23,7 +23,10 @@ import type { ListChrome, ListDensity } from "../pageSize";
  *  panel as it is drawn. jsdom cannot measure a height, so the shape is the
  *  structure and the CSS rules its classes carry. */
 
-/** The CSS rules whose class the element wears: what the browser applies to it. */
+/** The CSS rules that name a class this element wears: what the browser applies
+ *  to it, and to no other element. A selector counts only when one of its class
+ *  names is exactly one of the element's, so a clamp on anything else in the
+ *  document is not in the answer. */
 export function rulesOf(el: Element): string {
   const classes = new Set((el.getAttribute("class") ?? "").split(/\s+/).filter(Boolean));
   return Array.from(document.styleSheets)
@@ -35,10 +38,34 @@ export function rulesOf(el: Element): string {
     })
     .filter((r) => {
       const sel = (r as CSSStyleRule).selectorText ?? "";
-      return Array.from(classes).some((c) => sel.includes(`.${c}`));
+      return Array.from(sel.matchAll(/\.([\w-]+)/g)).some((m) => classes.has(m[1]));
     })
     .map((r) => r.cssText)
     .join("\n");
+}
+
+/** One line with an ellipsis, by the element's own rules: a card item's title,
+ *  or a line item's text. */
+export function expectOneLineClamp(el: Element) {
+  const rules = rulesOf(el);
+  expect(rules).toMatch(/white-space:\s*nowrap/);
+  expect(rules).toMatch(/text-overflow:\s*ellipsis/);
+  expect(rules).toMatch(/overflow:\s*hidden/);
+}
+
+/** The description's lines and no more, by the element's own rules. */
+export function expectDescriptionClamp(el: Element) {
+  const rules = rulesOf(el);
+  expect(rules).toMatch(
+    new RegExp(`-webkit-line-clamp:\\s*${escapeRegExp(String(CARD_ITEM_DESCRIPTION_LINES))}\\b`),
+  );
+  expect(rules).toMatch(/overflow:\s*hidden/);
+  expect(rules).toMatch(/display:\s*-webkit-box/);
+}
+
+/** The element that clamps a card item's title: the one that wraps its `<strong>`. */
+export function titleOf(item: Element): Element {
+  return item.querySelector("[data-row-text] strong")!.parentElement!;
 }
 
 /** The panel root an element sits in. */
@@ -247,7 +274,7 @@ export function expectListPanelShape(panel: HTMLElement, shape: ListPanelShape):
     if (density === "line") {
       // A line that opens nothing has no action; one that does has one.
       expect(exposed.length).toBeLessThanOrEqual(1);
-      expect(rulesOf(titleBand)).toMatch(/text-overflow:\s*ellipsis/);
+      expectOneLineClamp(titleBand);
       continue;
     }
     expect(exposed).toHaveLength(1);
@@ -258,6 +285,8 @@ export function expectListPanelShape(panel: HTMLElement, shape: ListPanelShape):
     expect(rulesOf(item)).toMatch(
       new RegExp(`(^|[^-])height:\\s*${CARD_ITEM_HEIGHTS_PX[density]}px`),
     );
+    // The title is one line, by its own element's rules.
+    expectOneLineClamp(titleOf(item));
     expect(item.querySelector("[data-row-meta]")).not.toBeNull();
     expect(classOf(item, "[data-row-meta]")).toBe(classOf(items[0], "[data-row-meta]"));
     if (density === "compact") {
@@ -271,16 +300,10 @@ export function expectListPanelShape(panel: HTMLElement, shape: ListPanelShape):
     expect(classOf(item, "[data-row-description]")).toBe(
       classOf(items[0], "[data-row-description]"),
     );
-    // The clamp is real CSS on the elements, not left to the text.
+    // The description is plain text, and its lines are its own element's rules.
     expect(description.hasAttribute("tabindex")).toBe(false);
     expect(description.hasAttribute("title")).toBe(false);
-    const clamp = rulesOf(description);
-    expect(clamp).toMatch(new RegExp(`-webkit-line-clamp:\\s*${CARD_ITEM_DESCRIPTION_LINES}\\b`));
-    expect(clamp).toMatch(/overflow:\s*hidden/);
-    expect(clamp).toMatch(/display:\s*-webkit-box/);
-    expect(rulesOf(titleBand.querySelector("strong")!.parentElement!)).toMatch(
-      /text-overflow:\s*ellipsis/,
-    );
+    expectDescriptionClamp(description);
     expectMetaGap(item);
   }
   return items;
