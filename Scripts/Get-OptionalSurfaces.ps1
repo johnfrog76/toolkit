@@ -596,7 +596,8 @@ function Get-P20OptionalSurfaces {
     # key IS that flag's name: consts.json startWork.launchEnvFlag.
     $launchState = $states.Unset
     $launchNote = $Prefix + 'StartWork <id> -Launch: a session in a worktree; the block works without it'
-    if (Get-Command claude -CommandType Application -ErrorAction SilentlyContinue) { $launchState = $states.On }
+    if (-not (Get-Command Test-P20StartWorkLaunch -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Test-StartWorkLaunch.ps1') }
+    if (Test-P20StartWorkLaunch) { $launchState = $states.On }
     $rows += New-P20SurfaceRow -Key (Get-P20Consts).startWork.launchEnvFlag -Title 'StartWork launch' -State $launchState `
         -Config 'claude on the PATH (install Claude Code)' -Note $launchNote
 

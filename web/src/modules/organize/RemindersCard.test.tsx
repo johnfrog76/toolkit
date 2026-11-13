@@ -4,10 +4,17 @@ import { MemoryRouter } from "react-router";
 import { RemindersCard } from "./RemindersCard";
 import type { Reminder } from "./api.organize";
 
-// A reminder's ref, as the card draws it: a ref the agent resolved to a card in
-// current/ is a link to that card's page; one resolved to an archived card is
-// named, not linked (the card page reads current/); any other ref stays in the
-// tag as written. And both dialogs carry a Ref field with Source.
+// A reminder's ref, as the panel draws it: a ref the agent resolved to a card in
+// current/ is named on the item and opens from its menu; one resolved to an
+// archived card is named and has nothing to open (the card page reads
+// current/); any other ref stays in the tag as written. And both dialogs carry
+// a Ref field with Source.
+
+const navigate = jest.fn();
+jest.mock("react-router", () => ({
+  ...jest.requireActual("react-router"),
+  useNavigate: () => navigate,
+}));
 
 const runReminders = jest.fn();
 const runNewReminder = jest.fn();
@@ -78,7 +85,7 @@ beforeEach(() => {
 });
 
 describe("a reminder's ref", () => {
-  it("is a link to the card when it names a card in current/", () => {
+  it("names the card and opens it from the menu when it names a card in current/", async () => {
     items = [
       reminder("T6RA", {
         ref: "401",
@@ -91,14 +98,18 @@ describe("a reminder's ref", () => {
       }),
     ];
     draw();
-    const link = screen.getByRole("link", { name: "401 Add retry" });
-    expect(link.getAttribute("href")).toBe("/prompts/Task401-add-retry.prompt.md");
-    // The tag keeps the source; the ref is the link, not repeated in the tag.
+    // An item's text is never a link: the card opens from the menu.
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.getByText("401 Add retry")).toBeTruthy();
+    // The tag keeps the source; the ref is the card, not repeated in the tag.
     expect(screen.getByText("ado")).toBeTruthy();
     expect(screen.queryByText("ado 401")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Actions for Reminder T6RA" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Open the card" }));
+    expect(navigate).toHaveBeenCalledWith("/prompts/Task401-add-retry.prompt.md");
   });
 
-  it("names an archived card without linking it", () => {
+  it("names an archived card and offers nothing to open", async () => {
     items = [
       reminder("T6RA", {
         ref: "388",
@@ -113,6 +124,9 @@ describe("a reminder's ref", () => {
     draw();
     expect(screen.queryByRole("link")).toBeNull();
     expect(screen.getByText("388 Old work (done)")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Actions for Reminder T6RA" }));
+    await screen.findByRole("menuitem", { name: "Edit" });
+    expect(screen.queryByRole("menuitem", { name: "Open the card" })).toBeNull();
   });
 
   it("stays the plain tag it always was when it names no card", () => {

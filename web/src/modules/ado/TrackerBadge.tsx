@@ -1,4 +1,5 @@
 import { Badge, Tooltip } from "@fluentui/react-components";
+import type { BadgeSpec } from "../../shell/CardItem";
 
 // WHERE, the first chip of the chip grammar: whose ledger stands behind
 // this card -- (gh), (ado), or nothing. The fact is the card model's `tracker`,
@@ -33,6 +34,14 @@ export function trackerName(tracker: string | undefined | null): string {
  *  agent that does not serve the field. */
 export function trackerChip(tracker: string | undefined | null): string | null {
   return (tracker && CHIP[tracker]?.label) || null;
+}
+
+/** The same chip as data, for a card item's meta band; null where the badge draws nothing. */
+export function trackerBadgeSpec(tracker: string | undefined | null): BadgeSpec | null {
+  const chip = tracker ? CHIP[tracker] : undefined;
+  return chip
+    ? { label: chip.label, appearance: "outline", color: "informative", title: chip.says }
+    : null;
 }
 
 export function TrackerBadge({ tracker }: { tracker: string | undefined | null }) {

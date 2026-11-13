@@ -170,7 +170,8 @@ cards worked against it -- each its id and state, opening the card when it is in
 named only when it is archived or another Space's; a Complete row's `Docs:` line opens the document it names in the Docs tab (on the Hub Designs card, when the design names the Space you are in, else it is a caption); in Spec and Complete the repo's row opens the spec with
 the note in its menu. A hub row's menu carries its road's moves (`MoveDesign -Hub`); a repo's row carries the same
 moves where this machine names the Space's checkout (`spaceCheckouts.<slug>.path`), staged in that clone by
-`MoveDesign -Space <slug>` and never committed -- and where it does not, the tab's foot names the setting
+`MoveDesign -Space <slug>` and never committed -- and there the tab reads that clone's working tree, so the
+moved row shows on the re-read; where it does not, the tab reads GitHub and its foot names the setting
 ([Studio](../modules/studio.md), "The web UI"). A card names its design with `{cliPrefix}NewPrompt -Design <name|id>`. The archive is read in the same room as
 a live note, with its Closed date and outcome. No `design/` at all: the empty state says what the four
 folders would give and links here (**Learn more**). Files with no id: one line under the list, counted,
@@ -179,10 +180,11 @@ naming `StampDesign` (or `StampDesign -Hub`) and linking here. Never inference, 
 **The library**, the design lifecycle's search across designs. One box over the Design tab (the filter drawer's) and one over Hub Designs:
 it filters on the title, the description, the id and the file names of the design's note and spec at once, every word in any order, across every state -- so a design can be found by the file name its row prints -- and opens the collapsed groups that
 have a match. **Search inside** runs the same words over the documents' text, on the button only, after
-the groups are drawn: on disk for the hub's folders (`GET /api/studio/design/search?q=`), and for a repo
-through the tracker's code search scoped to the four folders (`GET /api/design/search?q=`), which reads the
-default branch only and lags a push by minutes -- the note under the results says so, and a search that
-cannot run says why in a row rather than holding the tab. A hit names the design, its state and the
+the groups are drawn: on disk for the hub's folders (`GET /api/studio/design/search?q=`); for a repo
+(`GET /api/design/search?q=`), on disk in the Space's checkout where this machine names one -- its working
+tree, on the branch it has checked out -- and otherwise through the tracker's code search scoped to the four
+folders, which reads the default branch only and lags a push by minutes. The note under the results says
+which it searched, and a search that cannot run says why in a row rather than holding the tab. A hit names the design, its state and the
 matching line, and opens its room; a file with no id is still a hit, with no state. The **Archived** group
 filters by outcome: shipped, dropped, or nothing said.
 
