@@ -81,6 +81,35 @@ function Invoke-Git {
     return @((Invoke-P20TestGit -C $Repo -c user.name=Test -c user.email=test@example.com -c commit.gpgsign=false -c core.autocrlf=false @GitArgs).Lines)
 }
 
+# No fixture repository runs maintenance on its own, and no fixture clone
+# hardlinks its objects. A commit starts `git maintenance run --auto --detach`,
+# which can still be repacking when the next step clones the repository by
+# path; a local clone hardlinks what it finds in objects/pack, a half-written
+# tmp_pack_* included, and stops with "hardlink different from source". Either
+# half alone closes that; both are here so neither depends on the other.
+$noAutoMaintenance = @('gc.auto=0', 'maintenance.auto=false')
+
+function Set-NoAutoMaintenance {
+    # Straight after `git init`, before anything is added or committed.
+    param([string]$Repo)
+    $said = @()
+    foreach ($pair in $noAutoMaintenance) {
+        $key, $value = $pair -split '=', 2
+        $said += @((Invoke-P20TestGit -C $Repo config $key $value).Lines)
+    }
+    return $said
+}
+
+function Copy-Repo {
+    # The one way this suite clones: a full copy of the objects, and the new
+    # repository's own config carrying the same two settings.
+    param([string]$From, [string]$To, [switch]$Bare)
+    $cloneArgs = @('clone', '-q', '--no-hardlinks')
+    foreach ($pair in $noAutoMaintenance) { $cloneArgs += @('-c', $pair) }
+    if ($Bare) { $cloneArgs += '--bare' }
+    return @((Invoke-P20TestGit @cloneArgs $From $To).Lines)
+}
+
 function Write-RepoFile {
     param([string]$Repo, [string]$Rel, [string]$Text)
     $full = Join-Path $Repo $Rel
@@ -100,7 +129,7 @@ function New-Consumer {
     # A fresh clone with the REAL script dropped in, untracked.
     param([string]$Name)
     $path = Join-Path $base $Name
-    $null = Invoke-P20TestGit clone -q $origin $path
+    [void](Copy-Repo $origin $path)
     New-Item -ItemType Directory -Path (Join-Path $path 'Scripts') -Force | Out-Null
     Copy-Item $targetScript (Join-Path (Join-Path $path 'Scripts') 'Update-Toolkit.ps1')
     foreach ($h in $helperScripts) {
@@ -124,7 +153,8 @@ function Get-Head { param([string]$Repo) return (Invoke-Git $Repo @('rev-parse',
 
 try {
     $null = Invoke-P20TestGit init -q --bare -b main $origin
-    $null = Invoke-P20TestGit clone -q $origin $publisher
+    [void](Set-NoAutoMaintenance $origin)
+    [void](Copy-Repo $origin $publisher)
     [void](Invoke-Git $publisher @('checkout', '-q', '-b', 'main'))
     Publish-Commit 'utilities.psm1' "# v1`n" 'first'
 
@@ -362,12 +392,14 @@ try {
     }
     Assert-True 'the clone is built: every listed file is copied' ($copyErrors.Count -eq 0) (@($copyErrors | ForEach-Object { "$_" }) -join "`n")
     Assert-True 'the clone is built: the snapshot has the module manifest' (Test-Path -LiteralPath (Join-Path $snapshot $manifestRel) -PathType Leaf) $snapshot
-    [void](& $step 'git init' { & git init -q -b main $snapshot })
+    # One step, so the count of checks stays what it was: a failed init fails
+    # the config writes after it, and the step reports the last exit code.
+    [void](& $step 'git init' { (Invoke-P20TestGit init -q -b main $snapshot).Lines; Set-NoAutoMaintenance $snapshot })
     [void](& $step 'git add' { Invoke-Git $snapshot @('add', '-A') })
     [void](& $step 'the snapshot commit' { Invoke-Git $snapshot @('commit', '-q', '-m', 'a snapshot of the working tree') })
-    [void](& $step 'the bare clone' { & git clone -q --bare $snapshot $snapOrigin })
+    [void](& $step 'the bare clone' { Copy-Repo $snapshot $snapOrigin -Bare })
     $real = Join-Path $base 'c-real'
-    [void](& $step 'the clone' { & git clone -q $snapOrigin $real })
+    [void](& $step 'the clone' { Copy-Repo $snapOrigin $real })
     Assert-True 'the clone is built: the clone has the module manifest' (Test-Path -LiteralPath (Join-Path $real $manifestRel) -PathType Leaf) "$real`n$(@(Invoke-Git $real @('status', '--short')) -join "`n")"
 
     # A hub that is a plain folder: storeSync is 'none' by default, so Sync has
