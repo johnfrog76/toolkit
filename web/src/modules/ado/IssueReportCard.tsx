@@ -21,7 +21,7 @@
  */
 import { Body1, Caption1, Subtitle2, makeStyles, tokens } from "@fluentui/react-components";
 import { DataUsageRegular } from "@fluentui/react-icons";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { CardSpinner } from "../../shared/CardSpinner";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { StatTile, StatTiles } from "../../shared/StatTile";
@@ -52,7 +52,7 @@ export function IssueReportCard() {
   const { data, isLoading, isFetching, refetch } = useGetIssueReportQuery();
   if (data && !data.supported) return null;
   return (
-    <PageCard
+    <PanelFrame
       headerLeft={
         <>
           <DataUsageRegular />
@@ -90,6 +90,6 @@ export function IssueReportCard() {
           {data.reason ? <Caption1>{data.reason}</Caption1> : null}
         </>
       )}
-    </PageCard>
+    </PanelFrame>
   );
 }

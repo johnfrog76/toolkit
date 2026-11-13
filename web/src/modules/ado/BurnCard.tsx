@@ -1,7 +1,7 @@
 import { Body1, Button, Caption1, Subtitle2, makeStyles, tokens } from "@fluentui/react-components";
 import { DataUsageRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { StatTile, StatTiles } from "../../shared/StatTile";
 import { useGetBurnQuery, useRefreshBurnMutation } from "./api.usage";
@@ -158,7 +158,7 @@ export function BurnCard() {
   };
 
   return (
-    <PageCard
+    <PanelFrame
       className={styles.card}
       loading={isLoading}
       loadingLabel="Reading Claude Code usage..."
@@ -193,6 +193,6 @@ export function BurnCard() {
           <Notes data={data} />
         </>
       )}
-    </PageCard>
+    </PanelFrame>
   );
 }

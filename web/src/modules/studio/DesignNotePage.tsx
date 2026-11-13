@@ -9,7 +9,7 @@ import { STUDIO } from "../../shell/consts";
 import { BackButton } from "../../shared/BackButton";
 import { EmptyState } from "../../shared/EmptyState";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { useGetEnvQuery } from "../../shell/api";
 import { useGetIssueDetailQuery } from "../ado/api.ado";
@@ -21,7 +21,7 @@ import type { EnvStatus } from "../../shell/api";
 import { noteLinkBase } from "./noteLinks";
 
 // The reading room for ONE hub design note (Studio S2b) -- the house's reading
-// page, the frame a card, an issue or a repo's design is read in: PageCard, the
+// page, the frame a card, an issue or a repo's design is read in: PanelFrame, the
 // back arrow and the title on the left, compact controls on the right, and ONE
 // MarkdownViewer. Its links resolve through the one resolver (shared/docLinks).
 //
@@ -140,7 +140,7 @@ export function DesignNotePage() {
 
   return (
     <div className={styles.page}>
-      <PageCard
+      <PanelFrame
         loading={isLoading}
         loadingLabel="Reading the note..."
         empty={empty}
@@ -213,7 +213,7 @@ export function DesignNotePage() {
             style={{ marginTop: tokens.spacingVerticalS }}
           />
         )}
-      </PageCard>
+      </PanelFrame>
       <ConfirmDialog
         open={confirming}
         title="Promote this note?"

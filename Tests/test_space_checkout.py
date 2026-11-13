@@ -131,6 +131,7 @@ class TheConfiguredCheckout(unittest.TestCase):
         for url in (
             "https://dev.azure.com/acme/proj/_git/repo",
             "git@ssh.dev.azure.com:v3/acme/proj/repo",
+            "ssh://git@ssh.dev.azure.com/v3/acme/proj/repo.git",
             "https://acme.visualstudio.com/DefaultCollection/proj/_git/repo.git",
         ):
             _git(self.clone, "remote", "set-url", "origin", url)

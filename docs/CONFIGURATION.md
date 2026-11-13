@@ -431,7 +431,8 @@ repo. On an **Azure DevOps** Space it is the organisation the address names (`ht
 `https://<org>.visualstudio.com`), the one `projects[]` entry's name, and that entry's `repo` (the project's own
 name where it has none) -- and a clone's `origin` is that repository in any form Azure DevOps gives it:
 `https://dev.azure.com/<org>/<project>/_git/<repo>`, `https://<org>.visualstudio.com/[DefaultCollection/]<project>/_git/<repo>`,
-or `git@ssh.dev.azure.com:v3/<org>/<project>/<repo>` and `<org>@vs-ssh.visualstudio.com:v3/<org>/<project>/<repo>`,
+or `git@ssh.dev.azure.com:v3/<org>/<project>/<repo>` and `<org>@vs-ssh.visualstudio.com:v3/<org>/<project>/<repo>`
+(either ssh remote also as a URL, `ssh://git@ssh.dev.azure.com/v3/<org>/<project>/<repo>`, with or without the user and a port),
 the host in any case and a trailing `.git` optional. A Space with several projects names no single repository, so
 it has no clone to find. The patterns are `consts.json` `regex.adoOrigin*` and `regex.adoOrg*`. The agent asks the same question of the configured path alone for the Design tab
 (`agent/core/checkout.py`, on every `GET /api/design`, as `checkout`), and never searches; the path and
@@ -663,6 +664,9 @@ which `NewPrompt -Design` writes, and the corpus's hand-written `> Spec:` form, 
 and **the Studio's Prompts card's read** (`studio.promptsRoute`, which the agent mounts and the web asks,
 see [the Studio](modules/studio.md#the-web-ui)), and **the Spaces card's one read of every GitHub Space's
 ledger** (`studio.ledgerRoute`, the same, see [the Studio](modules/studio.md#the-routes)),
+and **the sentences Daily refuses a window with** (`billing.text`: `halfWindow`, `notADay` and
+`backwards` -- the billing script, the CLI's `Daily` and `GET /api/billing` say the same one, see
+[the CLI](CLI.md#the-third-line-billable)),
 and **the halves a test run
 covers** (`tests.halves`, `agent`, `cli`, `web` in the order `tkTest` runs them, and `tests.legacyHalf`,
 what a `test-summary.<machine>.json` entry with no `half` is read as: the CLI runner and `tkTest` write

@@ -103,3 +103,46 @@ function Invoke-P20RitualGh {
     foreach ($x in $parsed) { if ($null -ne $x) { [void]$list.Add($x) } }
     return @{ ok = $true; value = $list.ToArray() }
 }
+
+function Get-P20StandupDates {
+    # The standup's dates read for ONE repo: one `gh api graphql` per chunk of
+    # aliases (Get-P20StandupDatesLimits), the query in a temporary file and the
+    # owner and name as fields, so no quote in it crosses a native argument.
+    # -> @{ ok; commitDates; issueStarts } or @{ ok = $false; reason }. An alias
+    # GitHub could not resolve is null in an answer that still has data (gh
+    # exits 1 for it), so the answer is read from stdout whatever the exit code,
+    # and only an answer with no data is a failed read. The query and the parse
+    # are Standup-Rules.ps1's (Get-P20StandupDatesQuery, ConvertFrom-P20StandupDates).
+    param([string]$Repo, [string[]]$Hashes, [int[]]$Numbers, [string[]]$WorkerLabels)
+    $commits = @{}
+    $starts = @{}
+    $asks = New-Object System.Collections.ArrayList
+    foreach ($h in @($Hashes | Where-Object { $_ })) { [void]$asks.Add(@('c', [string]$h)) }
+    foreach ($n in @($Numbers | Where-Object { $null -ne $_ })) { [void]$asks.Add(@('i', [int]$n)) }
+    $owner, $name = ([string]$Repo).Split('/', 2)
+    $size = (Get-P20StandupDatesLimits).chunk
+    for ($at = 0; $at -lt $asks.Count; $at += $size) {
+        $chunk = @($asks.ToArray()[$at..([Math]::Min($at + $size, $asks.Count) - 1)])
+        $ch = [string[]]@($chunk | Where-Object { $_[0] -ceq 'c' } | ForEach-Object { [string]$_[1] })
+        $cn = [int[]]@($chunk | Where-Object { $_[0] -ceq 'i' } | ForEach-Object { [int]$_[1] })
+        $file = Join-Path ([System.IO.Path]::GetTempPath()) ('p20-gql-' + [guid]::NewGuid().ToString('N') + '.graphql')
+        try {
+            [System.IO.File]::WriteAllText($file, (Get-P20StandupDatesQuery -Hashes $ch -Numbers $cn), (New-Object System.Text.UTF8Encoding($false)))
+            $read = Invoke-P20TrackerRead 'gh' @('api', 'graphql', '-F', "query=@$file", '-f', "owner=$owner", '-f', "name=$name")
+        }
+        catch { return @{ ok = $false; reason = "gh did not answer ($($_.Exception.Message))" } }
+        finally { Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue }
+        $parsed = $null
+        try { $parsed = ConvertFrom-Json -InputObject (@($read.Out) -join "`n") } catch { $parsed = $null }
+        if ($null -eq $parsed -or $null -eq $parsed.PSObject.Properties['data'] -or $null -eq $parsed.data) {
+            $why = "gh did not answer for $Repo"
+            $err = @($read.Err | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
+            if ($err.Count -gt 0) { $why += ": $($err[0])" }
+            return @{ ok = $false; reason = $why }
+        }
+        $got = ConvertFrom-P20StandupDates -Repository $parsed.data.repository -Hashes $ch -Numbers $cn -WorkerLabels $WorkerLabels
+        foreach ($k in @($got.commitDates.Keys)) { $commits[$k] = $got.commitDates[$k] }
+        foreach ($k in @($got.issueStarts.Keys)) { $starts[$k] = $got.issueStarts[$k] }
+    }
+    return @{ ok = $true; commitDates = $commits; issueStarts = $starts }
+}

@@ -295,6 +295,7 @@ export const RITUALS = consts.rituals as {
     suggestNounCard: string;
     suggestNounIssue: string;
     suggestCommandStart: string;
+    suggestCommandLaunch: string;
     suggestCommandRoute: string;
     /** The PM Corner's lines; the page shows the served `line` verbatim, and the
      *  chevron is cornerChevron. cornerBrief / cornerBriefCommand are the brief's
@@ -355,6 +356,8 @@ export const RITUALS = consts.rituals as {
     countsClosed: string;
     countsStarted: string;
     countsInProgress: string;
+    /** Commits the dates read could not date, said after the commits. */
+    countsUndated: string;
   };
 };
 
@@ -441,6 +444,20 @@ export const USAGE = consts.usage as {
 export const REPLY_STATUSES_BY_TRACKER = consts.replyStatuses as {
   ado: string[];
   github: string[];
+};
+
+/**
+ * Daily's window (docs/CLI.md, "The third line: Billable"): the sentences the
+ * billing script, the CLI's Daily and GET /api/billing refuse a window with. The
+ * page sends only whole windows it built itself and shows the agent's `error`
+ * verbatim, so it types none of them.
+ */
+export const BILLING = consts.billing as {
+  text: {
+    halfWindow: string;
+    notADay: string;
+    backwards: string;
+  };
 };
 
 /** The contract's patterns, compiled once for this bundle. */
