@@ -240,7 +240,7 @@ section"](../web/README.md#the-configuration-section-and-what-it-does-not-do) ha
 schema itself is Configuration's](CONFIGURATION.md).
 
 **The avatar menu is the one Space switcher** (`src/shell/AvatarMenu.tsx`): Theme, Space and the
-registry's settings links. Its Space entry lists `config.spaces` from `/env` and a choice runs
+registry's settings links. Its Space entry lists the slugs in `config.switcherSpaces` from `/env` (`config.spaces` less a retired Space you are not in; `config.spaces` itself keeps it, for every other reader) and a choice runs
 `SwitchSpace` through the bridge. Up to `SPACE_QUICK_MENU_THRESHOLD` (8) Spaces it is a plain
 submenu; past it the same entry opens a searchable quick menu with **View all**
 (`src/shell/SpaceQuickMenu.tsx`) -- same call, same order, nothing new stored. [`web/README.md`, "The

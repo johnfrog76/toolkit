@@ -408,6 +408,20 @@ def offered_spaces(spaces: list[dict], active_slug: str, dismissed: bool) -> lis
     return [o for o in spaces if not (dismissed and o.get("example") is True and o.get("slug") != active_slug)]
 
 
+def switcher_spaces(spaces: list[dict], active_slug: str, dismissed: bool) -> list[dict]:
+    """The Spaces the avatar menu's switcher lists: what ``offered_spaces`` offers,
+    less a retired one (``status: archive``) unless it is the active Space. Only the
+    switcher reads this -- every other list keeps the retired Space, whose cards and
+    reviews stay readable. Scripts/Select-OfferedSpaces.ps1 is the CLI's copy, and
+    Tests/fixtures/offered-orgs/table.json holds the two to one table.
+    """
+    return [
+        o
+        for o in offered_spaces(spaces, active_slug, dismissed)
+        if o.get("slug") == active_slug or o.get("status") != "archive"
+    ]
+
+
 def card_types(cfg: dict | None = None) -> tuple[list[str], list[str]]:
     """(type names, file prefixes) from ``workItemTypes`` -- CardType, in config's
     order. Read per request when ``cfg`` is not given, like every other config
