@@ -1,0 +1,18 @@
+Standup -- Friday 2 October 2026
+"Can we not adjust scope."
+
+Waiting on you
+  Nothing is waiting on you.
+
+Fable
+  Mug        "Nothing on the board for me. All green, no blockers."
+Opus
+  Yesterday  nothing closed
+  Today      #170 (2 commits) Date the commits
+  Blockers   no blockers
+Widgets
+  Yesterday  nothing closed
+  Today      P4Q8 (started, 1 commit) Say the undated
+  Blockers   no blockers
+
+"Let's circle back."

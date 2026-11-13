@@ -1,4 +1,4 @@
-"""GET /api/ritual/milestones -- the Space's milestones, for Team Agile's Milestones tab.
+"""GET /api/ritual/milestones -- the Space's milestones, for Team Agile's Releases tab.
 
 The tab's read (docs/modules/solitaire-agile.md, "Milestones: the tab and the
 award"): one row per milestone of every repo the Space's tracker names, each with
@@ -67,7 +67,7 @@ def milestones_for(space: str = "", refresh: bool = False) -> Milestones:
     cfg = load_config()
     org, status, projects = accounting.space_scope(cfg, space)
     out = Milestones(space=space or cfg.get("activeSpace", ""))
-    repos, state = github_repos(org, status, projects, ritual="the Milestones tab", refresh=refresh)
+    repos, state = github_repos(org, status, projects, ritual="the Releases tab", refresh=refresh)
     rows: list[Milestone] = []
     if state["ok"]:
         for repo in repos:

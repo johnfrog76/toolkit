@@ -260,8 +260,7 @@ if ($trackerKind -eq 'github') {
         else {
             # The conversation tab has no "reply to": a new comment that says
             # which one it answers.
-            $lead = "In reply to $($kind.Url):"
-            if (-not $kind.Url) { $lead = "In reply to comment $($kind.Root):" }
+            $lead = New-P20GitHubReplyLead -Url $kind.Url -Id $kind.Root
             $post = Invoke-P20GhApiWrite "repos/$ghRepoFull/issues/$PullRequestId/comments" ([ordered]@{ body = "$lead`n`n$Reply" })
         }
         if ($post.Code -ne 0) {

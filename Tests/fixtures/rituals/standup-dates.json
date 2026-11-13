@@ -1,0 +1,175 @@
+{
+  "_": "The standup's dates read (docs/modules/solitaire-agile.md, \"What moved, and the window\"): ONE gh api graphql call per repo (per 50 aliases), the owner and name as variables. `query` is the text both halves send for its hashes and numbers, line for line (dates_query / Get-P20StandupDatesQuery): c<i> is the i-th hash's commit by object(expression:), i<n> issue n's labelled and assigned events. Each case is the parse of one answer's `repository` object (dates_from_answer / ConvertFrom-P20StandupDates): a commit is dated by its authoredDate only when GitHub resolved the hash to a commit whose oid begins with it -- an abbreviated hash resolves, a missing or ambiguous one answers null and is null here, never a guess; an issue's start is the earliest of a worker label being added and the issue being assigned, a label that routes to no worker is not a start, and an issue with no start is not a key of issueStarts. Asserted from tkTestToolkit -Rituals and Tests/test_rituals.py.",
+  "workerLabels": [
+    "fable",
+    "opus"
+  ],
+  "query": {
+    "hashes": [
+      "a0a1111",
+      "b0b2222"
+    ],
+    "numbers": [
+      171
+    ],
+    "lines": [
+      "query($owner: String!, $name: String!) {",
+      "  repository(owner: $owner, name: $name) {",
+      "    c0: object(expression: \"a0a1111\") { ... on Commit { oid authoredDate } }",
+      "    c1: object(expression: \"b0b2222\") { ... on Commit { oid authoredDate } }",
+      "    i171: issue(number: 171) { timelineItems(itemTypes: [LABELED_EVENT, ASSIGNED_EVENT], first: 50) { nodes { __typename ... on LabeledEvent { createdAt label { name } } ... on AssignedEvent { createdAt } } } }",
+      "  }",
+      "}"
+    ]
+  },
+  "cases": [
+    {
+      "name": "abbreviated-hash",
+      "hashes": [
+        "558e35a"
+      ],
+      "numbers": [],
+      "answer": {
+        "c0": {
+          "oid": "558e35a7de37c4680589419c3be2b848d075b86b",
+          "authoredDate": "2026-11-10T14:11:18Z"
+        }
+      },
+      "expected": {
+        "commitDates": {
+          "558e35a": "2026-11-10T14:11:18Z"
+        },
+        "issueStarts": {}
+      }
+    },
+    {
+      "name": "missing-object",
+      "hashes": [
+        "0000000",
+        "a0a1111"
+      ],
+      "numbers": [],
+      "answer": {
+        "c0": null
+      },
+      "expected": {
+        "commitDates": {
+          "0000000": null,
+          "a0a1111": null
+        },
+        "issueStarts": {}
+      }
+    },
+    {
+      "name": "oid-not-the-hash",
+      "hashes": [
+        "b0b2222"
+      ],
+      "numbers": [],
+      "answer": {
+        "c0": {
+          "oid": "ffff2222aaaabbbbccccddddeeeeffff00001111",
+          "authoredDate": "2026-10-01T10:00:00Z"
+        }
+      },
+      "expected": {
+        "commitDates": {
+          "b0b2222": null
+        },
+        "issueStarts": {}
+      }
+    },
+    {
+      "name": "non-worker-label-ignored",
+      "hashes": [],
+      "numbers": [
+        171
+      ],
+      "answer": {
+        "i171": {
+          "timelineItems": {
+            "nodes": [
+              {
+                "__typename": "LabeledEvent",
+                "createdAt": "2026-09-01T09:00:00Z",
+                "label": {
+                  "name": "enhancement"
+                }
+              },
+              {
+                "__typename": "LabeledEvent",
+                "createdAt": "2026-10-01T14:00:00Z",
+                "label": {
+                  "name": "opus"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "commitDates": {},
+        "issueStarts": {
+          "171": "2026-10-01T14:00:00Z"
+        }
+      }
+    },
+    {
+      "name": "earliest-of-label-and-assign",
+      "hashes": [],
+      "numbers": [
+        172
+      ],
+      "answer": {
+        "i172": {
+          "timelineItems": {
+            "nodes": [
+              {
+                "__typename": "LabeledEvent",
+                "createdAt": "2026-10-01T14:00:00Z",
+                "label": {
+                  "name": "fable"
+                }
+              },
+              {
+                "__typename": "AssignedEvent",
+                "createdAt": "2026-09-28T08:00:00Z"
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "commitDates": {},
+        "issueStarts": {
+          "172": "2026-09-28T08:00:00Z"
+        }
+      }
+    },
+    {
+      "name": "unassign-only",
+      "hashes": [],
+      "numbers": [
+        173,
+        174
+      ],
+      "answer": {
+        "i173": {
+          "timelineItems": {
+            "nodes": [
+              {
+                "__typename": "UnassignedEvent",
+                "createdAt": "2026-10-01T14:00:00Z"
+              }
+            ]
+          }
+        },
+        "i174": null
+      },
+      "expected": {
+        "commitDates": {},
+        "issueStarts": {}
+      }
+    }
+  ]
+}

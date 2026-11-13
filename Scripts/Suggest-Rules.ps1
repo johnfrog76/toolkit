@@ -147,7 +147,7 @@ function Get-P20SuggestionExcludedBy {
 
 function Get-P20SuggestionSentence {
     <# (shape, sentence, command) for one candidate, as @{ shape; sentence; command }. _sentence in the agent. #>
-    param($Item, [string]$HowIWork)
+    param($Item, [string]$HowIWork, [bool]$Launch = $false)
     $c = Get-P20Consts
     $t = $c.rituals.text
     $shapes = @($c.rituals.suggestShapes | ForEach-Object { [string]$_ })
@@ -179,7 +179,9 @@ function Get-P20SuggestionSentence {
         if (-not $size) { $size = $who }
         if ($title) {
             # Well defined is not a judgement: a size label and a milestone.
-            return @{ shape = $shapes[1]; sentence = (Format-P20SuggestTemplate ([string]$t.suggestDelegate) @{ ref = $ref; size = $size }); command = $startCommand }
+            $delegateCommand = $startCommand
+            if ($Launch) { $delegateCommand = Format-P20SuggestTemplate ([string]$t.suggestCommandLaunch) @{ arg = $arg } }
+            return @{ shape = $shapes[1]; sentence = (Format-P20SuggestTemplate ([string]$t.suggestDelegate) @{ ref = $ref; size = $size }); command = $delegateCommand }
         }
         # Sized, but no destination: route it to a milestone -- Route's write on an
         # issue, Plan's **Sprint:** line on a card (Route takes only -Assign there).
@@ -207,7 +209,7 @@ function Select-P20Suggestion {
       oldest created day first; none last), then the ref without its '#', ordinal.
       suggest() in the agent.
     #>
-    param($Items, [string]$HowIWork, [string[]]$Dismissed = @(), [string]$PackageRoot)
+    param($Items, [string]$HowIWork, [string[]]$Dismissed = @(), [string]$PackageRoot, [bool]$Launch = $false)
     $excluded = [ordered]@{}
     $kept = New-Object 'System.Collections.Generic.List[object]'
     foreach ($item in @($Items)) {
@@ -244,7 +246,7 @@ function Select-P20Suggestion {
         })
     $picked = New-Object System.Collections.ArrayList
     foreach ($k in $keyed) {
-        $said = Get-P20SuggestionSentence -Item $k.item -HowIWork $HowIWork
+        $said = Get-P20SuggestionSentence -Item $k.item -HowIWork $HowIWork -Launch $Launch
         [void]$picked.Add(@{ item = $k.item; ref = [string](Get-P20SuggestField $k.item 'ref'); shape = $said.shape; sentence = $said.sentence; command = $said.command })
     }
     return @{ picked = [object[]]$picked.ToArray(); excluded = $excluded }
@@ -386,9 +388,10 @@ function Add-P20StandupSuggestion {
       switch off, or with the tracker not answering. -Prefix is the CLI's, for
       the command the chair's line names; -Viewer the signed-in gh user's login
       (Get-P20RitualViewer, triage's one read), '' when gh cannot say -- then every
-      assignee is someone else's. attach_suggestions in the agent.
+      assignee is someone else's. -Launch is Test-P20StartWorkLaunch's answer: a
+      delegation's command ends in -Launch where it is true. attach_suggestions in the agent.
     #>
-    param([Parameter(Mandatory)]$Standup, $Labels, $Issues, $Cards, [string]$HowIWork, [bool]$On, [string]$Prefix, [string]$Viewer = '', [string]$PackageRoot)
+    param([Parameter(Mandatory)]$Standup, $Labels, $Issues, $Cards, [string]$HowIWork, [bool]$On, [string]$Prefix, [string]$Viewer = '', [string]$PackageRoot, [bool]$Launch = $false)
     $Standup['suggestions'] = [object[]]@()
     $Standup['suggestion'] = $null
     if (-not $On -or -not $Standup.tracker.ok) { return $Standup }
@@ -400,7 +403,7 @@ function Add-P20StandupSuggestion {
     $useIssues = @()
     if ([string]$Standup.source -ceq 'issues' -or [string]$Standup.source -ceq 'both') { $useIssues = @($Issues) }
     $items = @(Get-P20SuggestionItems -Labels $Labels -Issues $useIssues -Cards $Cards -Waiting ([string[]]$waiting.ToArray()) -Viewer $Viewer -PackageRoot $PackageRoot)
-    $chosen = Select-P20Suggestion -Items $items -HowIWork $HowIWork -PackageRoot $PackageRoot
+    $chosen = Select-P20Suggestion -Items $items -HowIWork $HowIWork -PackageRoot $PackageRoot -Launch $Launch
     $t = (Get-P20Consts).rituals.text
     $out = New-Object System.Collections.ArrayList
     foreach ($p in @($chosen.picked)) {

@@ -71,7 +71,9 @@ function StagedResult({ output, checkout }: { output: string; checkout: ProductC
         <pre className={styles.output}>{output}</pre>
       </Field>
       <Caption1 className={styles.what}>
-        This tab reads {checkout.repo} on GitHub, so the row moves once the commit is pushed.
+        {checkout.readsClone
+          ? "This tab reads the clone's working tree, so the row has moved already."
+          : `This tab reads ${checkout.repo} on GitHub, so the row moves once the commit is pushed.`}
       </Caption1>
     </div>
   );

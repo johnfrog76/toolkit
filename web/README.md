@@ -142,7 +142,7 @@ web/
     │   ├── index.tsx       export solitaireAgileModule: four routes (the standup, triage, milestones, the played view, chromeless), one nav entry, no cards elsewhere
     │   ├── paths.ts        the module's route paths and the played deck's id
     │   ├── api.solitaireAgile.ts   GET /api/ritual/standup, /triage and /milestones ?space=<slug>, read through @consts; POST /api/cmd/Route
-    │   ├── RitualPage      the Standup | Triage | Milestones strip, each tab an address, and the page under it
+    │   ├── RitualPage      the Standup | Triage | Releases strip, each tab an address, and the page under it
     │   ├── StandupPage     Agenda first, then the agent's text verbatim on Detail | Work | Brief: line one the header, the rest monospace, #<n> linked; Copy and Play in the header
     │   ├── AgendaLanes     the Agenda: Since <day> and Waiting on you, tiles from the board's face pieces (or rows), one button a waiting tile
     │   ├── agenda.ts       the Agenda's words: the long day, the lane heading, each tile's one fact
@@ -1132,7 +1132,13 @@ wordmark's default blob, and by no theme.
   it. The subtitle carries the one rule true of every hub -- the cards'
   dates decide -- and the sentence under the week (`billingNote`) carries what is conditional on the
   week that was built: whether git enriched it, and which cards were left off. A CLI instruction in
-  the GUI uses the machine's prefix (`env.cliPrefix`).
+  the GUI uses the machine's prefix (`env.cliPrefix`). The week is a stepper -- *Earlier week*, a
+  label, *Later week* -- that opens on "This week" and steps back a week at a time ("Last week",
+  then "Week of 19 Oct"); *Later week* is disabled on this week. This week and last week ask the
+  route `week=current|last`, so the script works them out; two or more back, the page sends that
+  week's Monday to Friday as `since`/`until`, worked out in local time (`billingWeek.ts`, with a
+  Sunday belonging to the week before, as the script has it). The CLI's `Daily -Since -Until` prints
+  the same week's copy text.
 
 ## The avatar menu, and arriving at a setting
 
@@ -1853,6 +1859,7 @@ paragraph:
 | `src/modules/ado/TrackerBadge.test.tsx` | The card's tracker chip as a table: `github` wears **gh**, `ado` wears **ado**, and `none`, an absent field (an older agent) or an unknown word wear nothing |
 | `src/modules/ado/Board.badge.test.tsx` | The board's card face in a mixed Space: a GitHub-born, an ADO-born and a custom card each wear their own chip, the custom one none |
 | `src/modules/ado/FilterDrawer.test.tsx` | The drawer's linkedness row: drawn in a mixed Space with counts from the cards, a badge sets its filter and the active one sets All back, absent where every card is custom, kept while a filter is active |
+| `src/modules/ado/Billing.test.tsx` | Daily Activity's week stepper: it opens on this week with *Later week* disabled, one step back asks `week=last`, three back ask that week's Monday to Friday as `since`/`until`; Monday found as the script finds it (a Sunday ends the week before) and a week in another year named with its year; the agent's `error` shown as the week that could not be built |
 | `src/modules/ado/billingNote.test.ts` | The sentence under the week on Daily Activity: what it was built from, and the cards that are NOT on it and why -- singular and plural, silence for a count of zero, and the git clause only for a hub that has git |
 | `src/modules/ado/useLandCard.test.tsx` | Land asks first, naming the card; Land runs `POST /api/cmd/Land` with the card's file and says once that it landed; a refusal keeps the confirm open with the verb's own sentence; Cancel runs nothing |
 | `src/modules/ado/useBillableToggle.test.ts` | The toggle offers the opposite of what the card says now, and says what the change means for Daily |
@@ -1866,7 +1873,7 @@ paragraph:
 | `src/shell/kinds/modulePanels.test.ts` | Every module's panels and pages, read for their kind with the reader `systemPanels.test.ts` uses (`panelKindFacts.ts`): a file under `src/modules/` that draws a panel or a page and maps entries to elements is a `ListPanel`, unless it is named with its reason on one of three lists held exact -- a fixed set of status, stat or chart rows; a page, a form or a scene whose rows are not records; a list of records not yet moved (Home's pull requests, review comments, milestones, deploys, builds and the matches inside a design search, and Team Agile's Releases). The twelve list panels are named, and the reader is tried on three shapes It cannot see a list split across files (the frame in one, the `.map()` in the other), so each such file is named on a fourth list, `ROWS_THROUGH_CHILDREN` (the Design tab's list and the Standup's agenda lanes), held exact. |
 | `src/shell/kinds/listRoom.test.ts` | The room a list has, from boxes handed in: from the list's top under its padding down to the foot, what sits above it and a line under the foot each taking its height, the foot row's room kept free while none is drawn, and nothing where the panel has no fixed height or there is no layout |
 | `src/shell/kinds/ListPanel.test.tsx` | The measured page size -- the formula at several rooms down to one item, the component following a handed-in room, watching the panel and what sits above the list, and keeping the page's first item in view when a resize changes the page; the page size as a sum over the panel's chrome, a full page always fitting and one more item never, four full items under one chip row at the one panel height, and more chrome never a bigger page; the pager at five and not at four, its `Page 2 of 5` and arrow keys; a chip, the search and a picker each returning to page 1, the page clamped when the list shrinks; `empty` against `filteredEmpty`; the header, foot, status and lead slots; the compact density (five a page, no description band), a smaller page under more chrome, and the panel's height the same at every density; and nine things a panel cannot say, as compile errors |
-| `src/shell/CardItem.test.tsx` | One item shape whatever the text: the same classes with a long title, a long description and none; the clamp in CSS and the text whole in the DOM; a plain element, not a Fluent `Card`; a plain-text title with no tooltip; one exposed action and the menu; the meta band's thumb, progress, badges and text; the meta band one gap under the description -- a track of the item's grid, the band on the row after it, no margin on a band, the same under one line, two or none; the compact item, the title line and the meta band at one shorter height; the one-band line item |
+| `src/shell/CardItem.test.tsx` | One item shape whatever the text: the same classes with a long title, a long description and none; the title's one line, the description's two and the line item's one line each read from the rules of that element's own classes, so another component's clamp cannot stand in for it, and the text whole in the DOM; a plain element, not a Fluent `Card`; a plain-text title with no tooltip; one exposed action and the menu; the meta band's thumb, progress, badges and text; the meta band one gap under the description -- a track of the item's grid, the band on the row after it, no margin on a band, the same under one line, two or none; the compact item, the title line and the meta band at one shorter height; the one-band line item |
 | `src/modules/ado/PromptStatus.test.tsx` | Active Cards as a list panel: four card items a page, the checklist's progress and the facts in the meta band, Open the way in, the state picker, and the two empty sentences |
 | `src/hooks/usePagination.test.ts` | Clamping a page that is out of range, paging independently of the filtered set's size, and controlled mode where the caller's `onPageChange` is the only writer |
 

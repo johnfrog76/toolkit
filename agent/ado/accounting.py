@@ -32,6 +32,7 @@ from ..core.clock import local_stamp
 from ..core.config import (
     ACTIVE_LEDGER_KEY,
     ISSUE_LIMIT_ALL,
+    ISSUE_LIMIT_LABELS,
     ISSUE_LIMIT_OPEN,
     REPO_ROOT,
     hub_root,
@@ -321,7 +322,6 @@ def gh_repo_reason(repo: str, why: str) -> str:
 
 
 def _gh_issues(repo: str, all_items: bool, state: str = "open", body: bool = False) -> tuple[list[dict], str | None]:
-    # A closed history is longer than an open backlog, so the opt-in reads further.
     limit = str(ISSUE_LIMIT_OPEN if state == "open" else ISSUE_LIMIT_ALL)
     fields = "number,title,state,labels,assignees,milestone,updatedAt,closedAt,url,isPinned"
     # The standup's work grain reads the design card an issue's body names; its
@@ -351,7 +351,7 @@ def _gh_labels(repo: str) -> tuple[list[dict], str | None]:
     whose description starts with WORKER_LABEL_PREFIX. Same timeout, same
     failure sentences as ``_gh_issues``.
     """
-    cmd = ["gh", "label", "list", "--repo", repo, "--limit", "200", "--json", "name,description"]
+    cmd = ["gh", "label", "list", "--repo", repo, "--limit", str(ISSUE_LIMIT_LABELS), "--json", "name,description"]
     try:
         result = run_read(cmd, 30)
     except Exception as exc:  # noqa: BLE001 -- gh missing, the clock ran out, or its output unreadable: a reason, never a raise

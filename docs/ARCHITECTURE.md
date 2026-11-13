@@ -93,7 +93,7 @@ in `agent/ado/accounting.py`), an undeclared slug a 404 naming it. `/api/visibil
 tier; `/api/status` and `/api/backlog` read that Space's `current/` and `backlog/` and ask no tracker. The Studio's Spaces card
 reads its non-GitHub rows through `/api/status?space=` -- one row per Space, none switched into -- and every
 GitHub row through ONE read, `GET /api/studio/ledger` (`consts.json` `studio.ledgerRoute`): the three answers
-above for every GitHub Space, from one `gh api graphql` call plus a `gh run list` per repository, kept on the
+above for every GitHub Space, and its product's design counts, from one `gh api graphql` call plus a `gh run list` per repository, kept on the
 agent's disk for 600 s ([`modules/studio.md`](modules/studio.md#the-routes)).
 
 **A route may read through a verb.** `GET /api/spaces/candidates` -- the repositories the Spaces card's
@@ -136,7 +136,7 @@ was added, dropped or changed; the played view reads it. It writes nothing to th
 `gh` answer a minute, shared with triage, and a dressed reply by its facts in the agent's cache -- and a Space
 with no reachable GitHub tracker still answers 200 with the ritual and the reason
 ([Team Agile](modules/solitaire-agile.md), "The file shape, and how a standup is read").
-`GET /api/ritual/milestones` is the Milestones tab's read, the ado core's milestone reader and its one
+`GET /api/ritual/milestones` is the Releases tab's read, the ado core's milestone reader and its one
 reached rule under the same gate, kept a minute, against `Tests/fixtures/rituals/milestones.json`.
 `GET /api/ritual/triage` (V1) is the same shape for triage, against `Tests/fixtures/rituals/triage.json`;
 its answers are the CLI's `Route`, which the web runs only as `POST /api/cmd/Route` -- the module's
@@ -240,7 +240,7 @@ section"](../web/README.md#the-configuration-section-and-what-it-does-not-do) ha
 schema itself is Configuration's](CONFIGURATION.md).
 
 **The avatar menu is the one Space switcher** (`src/shell/AvatarMenu.tsx`): Theme, Space and the
-registry's settings links. Its Space entry lists `config.spaces` from `/env` and a choice runs
+registry's settings links. Its Space entry lists the slugs in `config.switcherSpaces` from `/env` (`config.spaces` less a retired Space you are not in; `config.spaces` itself keeps it, for every other reader) and a choice runs
 `SwitchSpace` through the bridge. Up to `SPACE_QUICK_MENU_THRESHOLD` (8) Spaces it is a plain
 submenu; past it the same entry opens a searchable quick menu with **View all**
 (`src/shell/SpaceQuickMenu.tsx`) -- same call, same order, nothing new stored. [`web/README.md`, "The
@@ -468,7 +468,7 @@ agent/                  The FastAPI agent -- see agent/README.md
                           request_gate, surfaces, tier, usage -- always on
   ado/                    accounting, backlog, bridge (and bridge.ps1, the child it runs), design, docs,
                           pr_comments, repo_read, reporting, sprint, status
-  ado/Get-WeeklyBilling.ps1   Module-private: /billing shells out to it. Not a CLI command
+  ado/Get-WeeklyBilling.ps1   Run by path: /billing shells out to it, and the CLI's Daily runs it
   growth/                 growth, reviews, resume -- one router, gated on features.growth
   communication/          manager (the routes) + comms (the engine, carried whole)
   organize/               reminders -- gated on features.organize

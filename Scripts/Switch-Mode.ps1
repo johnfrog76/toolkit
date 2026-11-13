@@ -107,13 +107,13 @@ if ($Mode -eq "Status") {
             Write-Host "  Visibility    : $activeVisibility" -ForegroundColor $visibilityColor
         }
     }
-    # What is OFFERED, not what exists: a dismissed Example org is left out
+    # What is OFFERED, not what exists: a dismissed Example org and a retired Space are left out
     # unless you are in it. `SwitchSpace azure-demo` still works by name.
     . (Join-Path $PSScriptRoot 'Select-OfferedSpaces.ps1')
     $dismissed = $false
     if ($localCfg -and ($localCfg.PSObject.Properties.Name -contains 'isDemoDismissed')) { $dismissed = [bool]$localCfg.isDemoDismissed }
     elseif ($defaultCfg -and $defaultCfg.isDemoDismissed) { $dismissed = [bool]$defaultCfg.isDemoDismissed }
-    $offered = Select-P20OfferedSpaces -Spaces $spaces -ActiveSpace $activeSlug -Dismissed $dismissed
+    $offered = Select-P20SwitcherSpaces -Spaces $spaces -ActiveSpace $activeSlug -Dismissed $dismissed
     if ($offered.Count -gt 0) {
         Write-Host ""
         Write-Host "  Available Spaces:" -ForegroundColor DarkGray
