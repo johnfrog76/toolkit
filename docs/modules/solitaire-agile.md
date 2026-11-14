@@ -172,14 +172,17 @@ or exactly one repo in the Space's projects), and, while [the suggestion](#the-s
 is on, a third, `gh api user -q .login` -- who "me" is, best effort, the read Triage makes:
 
 ```text
-gh label list --repo <repo> --limit 500 --json name,description
-gh issue list --repo <repo> --state all --limit 500 --json number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees
+gh label list --repo <repo> --limit <n> --json name,description
+gh issue list --repo <repo> --state all --limit <n> --json number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees
 ```
+
+`<n>` is `consts.json` `ghReads` (`labels`, `allIssues` for the standup, `openIssues` for Triage), read by
+the CLI and the agent alike.
 
 `milestone` and `body` are the work grain's: an item groups by its milestone, else by the design card
 its body names. `createdAt` and `assignees` are the suggestion's: an item's age, and who has it.
 
-**Triage's reads**: `gh label list` as above, then `gh issue list --repo <repo> --state open --limit 500
+**Triage's reads**: `gh label list` as above, then `gh issue list --repo <repo> --state open --limit <n>
 --json number,title,state,labels,assignees,milestone,url`, then `gh api user -q .login` -- who "me" is,
 best effort: when `gh` cannot say, an issue assigned to you reads `@<login>` and the triage still answers.
 **Route's writes**, each its own call, nothing else:
@@ -260,7 +263,7 @@ The one stated refusal (`Error:`, `Hint:`, exit 2) is a `-Space` nobody declared
 
 | Route | Gate | Reads | Writes |
 | --- | --- | --- | --- |
-| `GET /api/ritual/standup?space=<slug>&since=<yyyy-MM-dd>&refresh=1` | `features.solitaireAgile` per request, with the active Space's answer applied (**404** unless the switch is on and the Space you are in works with agents; the detail names which is off); `space` scoped like `/api/issue-report` (an undeclared slug 404); `since` widens yesterday's window as `Standup -Since` does, and a `since` that is not a day, or is after today, is a **422** naming it; `refresh=1` reads the tracker again past the kept read ([below](#one-tracker-read-kept-a-minute)) | the same two `gh` reads as `Standup` (the issues with `milestone`, `body` and `createdAt`), and `gh api user` while the suggestion is on, through the same data files, kept a minute -- or, for a local Space, its cards. The limits are not yet the CLI's: the agent reads up to 300 issues in every state, 100 open, and 200 labels, where the CLI reads up to 500 issues for each read and 500 labels, so above those the terminal and the page can differ ([issue #276](https://github.com/johnfrog76/toolkit/issues/276)) | nothing |
+| `GET /api/ritual/standup?space=<slug>&since=<yyyy-MM-dd>&refresh=1` | `features.solitaireAgile` per request, with the active Space's answer applied (**404** unless the switch is on and the Space you are in works with agents; the detail names which is off); `space` scoped like `/api/issue-report` (an undeclared slug 404); `since` widens yesterday's window as `Standup -Since` does, and a `since` that is not a day, or is after today, is a **422** naming it; `refresh=1` reads the tracker again past the kept read ([below](#one-tracker-read-kept-a-minute)) | the same two `gh` reads as `Standup` (the issues with `milestone`, `body` and `createdAt`), and `gh api user` while the suggestion is on, through the same data files, kept a minute -- or, for a local Space, its cards. | nothing |
 | `GET /api/ritual/triage?space=<slug>&refresh=1` | the same | `gh label list`, `gh issue list --state open` with `milestone` and `assignees`, and `gh api user` (who "me" is, best effort), kept a minute and shared with the standup | nothing |
 | `GET /api/ritual/milestones?space=<slug>&refresh=1` | the same | one `gh api --method GET repos/{owner}/{repo}/milestones -f state=all -F per_page=100` per repo -- the ado core's own reader -- kept a minute ([Milestones](#milestones-the-tab-and-the-award)) | nothing |
 | `POST /api/cmd/Route` | the bridge: `Route` is in the CLI's command table only while the flag resolves on -- the switch on and the Space answered `agents` | -- | what `Route` writes, and nothing else |
@@ -272,7 +275,8 @@ bridge is how the page asks for it.
 
 ### One tracker read, kept a minute
 
-Each `gh` answer the two routes read -- a repo's labels, its issues in a state, the signed-in login -- is
+Each `gh` answer the two routes read -- a repo's labels, its issues in a state, the signed-in login, the
+standup's dates read ([What moved, and the window](#what-moved-and-the-window)) -- is
 kept in the agent's memory for 60 seconds (`READ_TTL_SECONDS` in `agent/solitaire/tracker.py`, the design
 list's `LIST_TTL_SECONDS`), and the standup and triage share them. A second GET inside the minute -- the
 standup re-mounted after attending, the Triage page opened after the standup -- starts no subprocess.
@@ -736,7 +740,9 @@ call returns as soon as the session has started -- on every host.
 `claude` is on the PATH, `not configured` otherwise, named by `tkEnv` and `tkMenu -All` as **StartWork
 launch** with its question, "Can it start the work in a session for me?". `GET /api/env` carries the
 same answer as a top-level boolean, `startWorkLaunch`, so the page offers a launch only where it would
-work; the copy box works either way.
+work; the copy box works either way. The standup's delegate suggestion reads the same answer
+([the suggestion](#the-suggestion-one-next-move-derived)): where the launch is on, its Next line ends in
+`StartWork <n> -Launch`.
 
 **Proving it.** `tkTestToolkit -StartWork` builds scratch clones (the Space's, with a commit; another
 repository's; the Space's with no commit) and puts a stub `claude` first on the PATH: `-WhatIf` and its
@@ -789,10 +795,17 @@ that row together.
 | How you work | Who | Shape | Sentence | Command |
 | --- | --- | --- | --- | --- |
 | `alone`, or `agents` with it yours: `me`, or sized `fable` -- the owner's own seat, never the crew (D-AR10; `rituals.suggestOwnerSeat`) | -- | start | `23A3 is the last open card in milestone B -- start it?` | `StartWork 23A3` |
-| `agents` | a crew size, and the item has a milestone | delegate | `#4 is sonnet-sized and well defined -- send it to the crew?` | `StartWork 4` |
+| `agents` | a crew size, and the item has a milestone | delegate | `#4 is sonnet-sized and well defined -- send it to the crew?` | `StartWork 4`; `StartWork 4 -Launch` where [the launch](#the-launch-the-block-handed-to-a-session) is on (`rituals.text.suggestCommandLaunch`) |
 | `agents` | a crew size, and no milestone | place | `#5 is sonnet-sized but has no milestone -- place it?` | `Route 5 -Milestone <title>` on an issue; `Plan K7M2 -Milestone <title>` on a card, which writes its `**Milestone:**` line |
 | `agents` | nobody | route | `#4 is the oldest open sev2 in milestone B and nobody has it -- route it?` | `Route 4 -Assign <me\|size>` |
 | any | nothing left after the exclusions | -- | `Next: nothing is waiting on you.` (today's line) | -- |
+
+The launch is an input of the rule, not something it looks up: `suggest(items, how, dismissed, launch)` in the
+agent and `Select-P20Suggestion -Launch` in the CLI take it, so the rule stays pure and the table's rows carry
+a `launch` field. The caller asks the one question `/env` and the inventory ask -- `start_work_launch()`
+(`agent/core/config.py`) and `Test-P20StartWorkLaunch` (`Scripts/Test-StartWorkLaunch.ps1`, which the
+inventory's row reads too): `claude` on the PATH. Only the delegate shape changes; the start, place and
+route commands are the same with it on.
 
 "Well defined" is not a judgement: a size label and a milestone. The reason clause is one of three
 shapes: `the last open <card|issue> in milestone <m>` when the item's milestone has one open item (it),
@@ -819,13 +832,11 @@ chair's line is today's.
 
 `Tests/fixtures/suggestion/table.json` is the one table, asserted from `tkTestToolkit -Rituals` against
 `Scripts/Suggest-Rules.ps1` and from `Tests/test_rituals.py` against `agent/solitaire/suggest.py`: the
-nearest milestone, every shape the rule distinguishes (a `sev1` beats a nearer milestone; two in one
+nearest milestone, every shape the rule distinguishes, the delegation with the launch off and on (a `sev1` beats a nearer milestone; two in one
 milestone pick the older; one left beats three left; no milestone sorts last; a crew-sized item on an
 `agents` Space is a delegation and a `fable`-sized one a start; a sized item with no milestone is placed in
 one; an unrouted item is a route; in flight, not billable, waiting-on-you and someone else's excluded; the empty Space; a dismissed item yields the next), the switch, and three chair's readings
 end to end whose goldens (`suggestion-<case>.brief.txt`) `Tests/regenerate_joined_goldens.py` writes.
-
-Known gap: [The suggestion hands off, it does not launch](../KNOWN-GAPS.md#the-suggestion-hands-off-it-does-not-launch).
 
 ## The PM Corner: the line, the chevron, the confetti
 
@@ -860,7 +871,24 @@ milestone: its open issues plus the open cards that name it (the one card reader
 that tracks an issue is that issue's row. An item in flight still counts toward what is left; it is never
 the pick, because the suggestion excludes it.
 
-**The brief** prints `Corner: <line> > (<prefix>StartWork <arg>)` when the line has a pick, else
+**The command** is `StartWork <arg>`, and the suggestion's choice where the suggestion has one to make:
+a pick the suggestion would send to the crew -- the delegate shape, on a Space that works with `agents` --
+names `StartWork <arg> -Launch` where [the launch](#the-launch-the-block-handed-to-a-session) is on
+(`rituals.text.suggestCommandLaunch`), exactly as the Next line does. So when the two lines share a pick,
+they name one command for it:
+
+```text
+Next: #5 is opus-sized and well defined -- send it to the crew? (tkStartWork 5 -Launch)
+Corner: 3 more issues to get milestone B - start #5 now > (tkStartWork 5 -Launch)
+```
+
+Every other shape -- a start on a Space worked `alone`, an item that is yours, one nobody has sized --
+keeps the plain `StartWork <arg>`, with the launch on or off. How the Space works and the launch are
+inputs of the rule, as they are of the suggestion's: `corner(items, closed, how, launch)` in the agent and
+`Get-P20CornerLine -HowIWork -Launch` in the CLI, handed the same two answers the suggestion was
+(`start_work_launch()`, `Test-P20StartWorkLaunch`). Neither changes the milestone, the pick or the count.
+
+**The brief** prints `Corner: <line> > (<prefix><command>)` when the line has a pick, else
 `Corner: <line>`, as its LAST line, after the Next line -- its own line, never in place of another.
 
 **The route** is the standup's own: `GET /api/ritual/standup` carries `corner` -- `shape`, `milestone`,
@@ -890,8 +918,10 @@ start from the raw read (gh's issues, and each card as its file's lines), so the
 whole `**Sprint:**` line are exercised -- one left, several left, reached by an issue and by a card, closed
 before the window, closed in it with one still open, nothing in reach, a card and its issue counted once, a
 card and an issue in one milestone whose title is longer than twenty characters, in flight counted but not
-picked, and the pick inside the nearest milestone rather than the suggestion's own; and three chair's
-readings end to end, whose goldens (`corner-<case>.brief.txt`) `Tests/regenerate_joined_goldens.py` writes.
+picked, the pick inside the nearest milestone rather than the suggestion's own, and a delegation with the
+launch off and on beside the two that stay a plain start with it on (a Space worked alone, an item nobody
+has sized); and four chair's readings end to end -- one with the launch on, where the Next line and the
+Corner end in the same `-Launch` -- whose goldens (`corner-<case>.brief.txt`) `Tests/regenerate_joined_goldens.py` writes.
 
 ## Milestones: the tab and the award
 
@@ -1061,21 +1091,44 @@ already says, so a line does not repeat them:
 | in yesterday (an issue closed, a card archived, in the window) | `closed` | `#153 Close the books`, or with commits `#153 (2 commits) Close the books` |
 | in today or the blockers, its card -- its own, or the card an issue's number names -- began in the window | `started` | `#151 (started) Count the commits`, or `#151 (started, 2 commits) ...` |
 | in today or the blockers, otherwise | `inProgress` | `#154 Read the label`, or `#152 (1 commit) Fold the window` |
-| an issue with no card | `closed` or `inProgress`, never `started` | no parenthesis: an issue alone has no commits |
+| an open issue with no card, given its worker label or assigned in the window | `started` | `#171 (started) Read the timeline` -- an issue alone has no commits |
+| an issue with no card, otherwise | `closed` or `inProgress` | no parenthesis |
 
 **Began** is the card's `**Started:**` day (`Move -To InProgress` writes it), else its `**Created:**` day
--- the card's own footer, read with its lane. An issue alone cannot say `started`: the read
-(`number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees`) carries no time its work began -- not when a
-worker label was added, not whether a branch exists -- and finding out is a timeline read per issue that
-the standup does not make. So an issue with no card is closed or in progress, said plainly; a team whose
-work runs on cards gets the three words from the cards.
+-- the card's own footer, read with its lane. A card decides its issue's start: its footer is the job
+record, so an issue whose card began before the window stays in progress whatever its timeline says.
+**An issue with no card began** when its timeline first says so: the earliest of a worker label being
+added and the issue being assigned (a label that routes to no worker does not count), read in the dates
+read below. It is `started` when that falls in the window, else in progress. Where the dates read was
+not made or did not answer, an issue alone is closed or in progress, as it was before the read existed.
+
+**The dates read.** On a GitHub Space the standup makes one more read after the issues: one `gh api
+graphql` call per repo, with the query in a file and the owner and name as fields. It asks two things at
+once, as aliased fields: for each hash the standup counts, the commit it names
+(`object(expression: "<hash>")` -- an abbreviated hash resolves, and its `authoredDate` is read), and for
+each open issue with no card that reads in progress, its labelled and assigned events
+(`timelineItems(itemTypes: [LABELED_EVENT, ASSIGNED_EVENT], first: 50)`). It is asked for what the fill
+counted and nothing else, so a Space with no card and no lone routed issue makes no call. One call holds
+at most 50 aliases; a standup that needs more makes one call per 50. The agent asks every repo of the
+Space for every hash (a card does not say which repo it was committed to) and each issue of its own repo;
+the CLI reads its one repo. The answer is kept for the minute like every other read
+([One tracker read, kept a minute](#one-tracker-read-kept-a-minute)). An Azure DevOps Space and a cards
+Space make no dates read, and their counts are what they were.
 
 **Commits** are the card's `- <hash>` bullets -- the same lines that put it In Progress
 (`regex.commitBullet`, the lane rule's own pattern, which captures the hash), so counting them is no
 new read and no second pattern. A hash is compared by its first seven characters, lowercase: a short and a full hash of one commit
 are one. A card with no bullets counts none; an issue with no card counts none; a not-billable card is
-not a row and adds nothing to one, its commits included. A card's commits are all it threads, not only
-the window's: a bullet has no date.
+not a row and adds nothing to one, its commits included.
+
+**Only commits authored in the window count.** A bullet has no date, so the date is the repository's:
+the dates read gives each hash its `authoredDate`, and a hash counts when that falls in `[since, asOf]`.
+Authored, not committed: a rebase resets the committer date and leaves the authored one, the clock Daily
+already bills by. A card worked over three weeks counts only the commits of the window on the day it
+closes. A hash the read cannot date -- not in the repository, ambiguous, or naming something that is not
+that commit -- is **undated**: not counted, and never guessed, but said after the commits on the counts
+line, `5 commits (2 undated)` (`rituals.text.countsUndated`; `undated` in each count). Where no dates read
+was made -- a cards Space, or a dates read that failed -- every bullet counts, as it did before the read.
 
 ```text
 Fable
@@ -1089,7 +1142,8 @@ Opus
 **The counts** (`counts` in the response) sum the slots per worker and in total -- closed, started, in
 progress and commits -- and **a hash is counted once however many cards thread it**, per worker and in
 the total. The brief opens on the total ([the chair's reading](#the-chairs-reading)):
-`Since Thursday 1 October 2026: 2 closed, 2 started, 2 in progress, 5 commits.` The counts are the
+`Since Thursday 1 October 2026: 2 closed, 2 started, 2 in progress, 5 commits.`, or with hashes the
+dates read could not date, `... 3 commits (2 undated).` The counts are the
 page's, at the top -- the brief sits above every grain -- and not the stage's: the played view speaks
 the work grain, one sentence a group, and the dress guard holds every number a sentence says to the
 group's own; a velocity line there would be a number the group does not carry.
@@ -1105,9 +1159,16 @@ The default stays the previous working day (D-SA3). `-Days` is not this: it is t
 a hash two cards thread counted once), `not-billable-counts` (a not-billable card absent from the
 counts) and `window-three-days` (a three-day window with a close on each day, listed and counted once, and a
 close the day before the window not), with `expected.motions` and `expected.counts`; card rows carry
-`begun` and `commits`, as `read_cards` / `Get-P20StandupCards` read them.
+`begun` and `commits`, as `read_cards` / `Get-P20StandupCards` read them. The dates read's cases carry
+`commitDates` and `issueStarts`: `commits-window` (commits before the window and after `asOf` dropped,
+undated ones said), `issue-labelled-in-window` (an issue alone reads `started`),
+`issue-assigned-before-window` (in progress, and a card's own start winning over its issue's timeline)
+and `dates-not-read` (the same cards with no dates read: every bullet counts).
+`Tests/fixtures/rituals/standup-dates.json` holds the query, line for line, and the parse of an answer
+into the two maps: an abbreviated hash, a missing object, an oid that is not the hash, a label that routes
+to no worker, the earliest of a label and an assignment, and a timeline with neither.
 
-Known gap: [What moved is counted from the cards](../KNOWN-GAPS.md#what-moved-is-counted-from-the-cards).
+Known gap: [The terminal's standup dates a commit from one repository, the page from every repository of the Space](../KNOWN-GAPS.md#the-terminals-standup-dates-a-commit-from-one-repository-the-page-from-every-repository-of-the-space).
 
 ### The two sources, joined
 
@@ -1447,7 +1508,7 @@ standup is complete and correct; nothing on screen says a dress was skipped.
 | --- | --- |
 | `tkTestToolkit -Rituals` | every case of `Tests/fixtures/rituals/standup.json` and of `standup-cards.json` (the cards alone: the one worker's slots and the walk queue by card id, the source and title tables, the card reader over real folders, a not-billable card nowhere) and of `standup-joined.json` (the two sources joined: every shape's walk, each worker's slots by ref, the `Check` lines and the links, the together case's detail, work and brief goldens and their JSON round trip, no card in play reading as the issues alone, the tracker down, rounds of one id; what moved: each item's motion and commits, the counts per worker and in total, the counts and window cases' goldens, the window rule and the hash rule in words) -- `since`, the day of the year, the chair's two lines, the queue, each worker's slots by number, `empty` and the status sentence -- and the rendered text against `standup-<name>.txt` and the chair's reading against `standup-<name>.brief.txt`, byte for byte, with `Standup -Brief` typed in a fresh shell printing that reading alone and `-AsJson` carrying it; the same object read back from JSON rendering the same text; no `fakeWork` line in any case; off is no verb, no function, no bridge entry and no `Menu -All` line; **`Standup` typed in a fresh shell** with only this package's manifest and `gh` stubbed as a function answering the friday case: the text the rule renders for now, the queue, the blocks, the window, `-AsJson` round-tripping to the same text, `gh` failing and an ADO Space each a `Tracker` line with exit 0 (ADO's the contract's sentence), a local Space filling from its scratch cards line for line with `source: cards` in `-AsJson`, the GitHub Space with `source: both` and, with scratch cards in its folder, the joined standup line for line (a card of its own under the Space's tile, a `Check` line for a card whose issue is closed, a not-billable card nowhere, the hub untouched), an undeclared `-Space` a stated refusal, `-Since` widening yesterday (an issue closed a month ago said, closed; the brief's counts line naming the day) and a day after today, a word that is not a day and `-Since -Remind` each a stated refusal, `-Help`, and the hub untouched; the work grain over `standup-work.json`, the same rows `Tests/test_rituals.py` asserts -- every group (name, `by`, count, refs, phrase) of the queue and of each worker's slots, the `heads`, `keys`, `types` and `counts` tables, `standup-work-<case>.txt` byte for byte and again after a JSON round trip, `Get-P20StandupGrainText`; the prose over `standup-prose.json`, the same rows the agent asserts -- every `sentences` row, each case's queue sentences and each worker's in order, `standup-prose-<case>.txt` byte for byte and again after a JSON round trip; the dress guard over `standup-dress.json`, the same rows the agent asserts -- every row's reason, every group's prose sentence passing its own guard, every guard of `rituals.dressGuards` with a row, the `verbs` family and the two `kinds`, and the reply that names a ref the group lacks keeping the prose for that group; and typed, `Standup -Grain work` printing the rule's work text for now and `-AsJson` carrying it, `-Grain detail` the standup as it always printed, `-Grain brief` the same as `-Brief`, and a word that is not a grain or `-Brief -Grain work` a stated refusal |
 | `Tests/test_rituals.py` | the agent's issues, cards and joined fills and the rendering over the same three tables and goldens (the joined goldens also against `Tests/regenerate_joined_goldens.py`'s output); the work grain over `standup-work.json` -- every group of the queue and of each worker's slots, the `heads`, `keys`, `types` and `counts` tables, `standup-work-<case>.txt` byte for byte, the JSON round trip, the work grain's own phrases; the prose over `standup-prose.json` -- every `sentences` row, each case's queue and worker sentences, `standup-prose-<case>.txt` byte for byte, the JSON round trip, the prose's own sentences, no word that is not the contract's or the tracker's; the dress over `standup-dress.json` -- every row, every guard with a row, the rows its issue asked for (a ref the group lacks refused, "20g of protein" kept), the reply that names one, and around it with the model STUBBED: the facts are the workers' group sentences and nothing else, the kinds counted from labels and a card's type, the prompt offering the `verbs` and no other family, a model that answers dressed and guarded, the same groups dressed once, no key / a failing model / a reply that is not JSON all the prose, nothing to dress asking nothing; the route with no key answering `spoken: null` and `work` unchanged, and with a stubbed model `spoken` beside `work` with `text`, `brief` and the register untouched; the route asking `gh` for `milestone`, `body` and `createdAt` and answering `work`; the Agenda (`TheAgenda`) -- what moved once each and dated in the standup's offset, waiting as Active cards, Code Review and routed issues and never In Progress, not billable, unrouted, someone else's or in `backlog/`, a card's face and file, the suggestion's pick first, nothing with no tracker, a cards Space its cards -- and the route carrying `agenda` with every tile's fields; `read_cards` over real folders (with each card's type, body and billable, and its `begun` day and commit hashes); what moved over `standup-joined.json` -- each item's motion and commits, the counts, the counts line opening the brief, the window rule, the hash rule; the route's `?since=` widening the window and a `since` that is not a day before today a 422 naming it; a local Space's route filling from its cards with no `gh` call; a GitHub Space's route joining its cards to its issues (`checks`, `links`, a card of its own on the Space's tile, a not-billable card nowhere, the hub unwritten); an ADO Space's `adoTracker` reason; 404 off; one tracker read per minute (QP33): two standups, two triages, and triage after the standup each one read, Refresh and a verb through the bridge reading again, a failed read not kept, an all-states read at its limit not answering for triage, the kept limits the reader's; the dress kept by its facts -- identical facts with no model call, across a restart from disk, a changed fact or model asked again, the guard run on a kept reply |
-| `tkTestToolkit -Rituals`, `Tests/test_rituals.py` -- the PM Corner | `Tests/fixtures/rituals/corner.json` from both halves: every row from the raw read through each half's card reader, the join and the window (shape, milestone, remaining, pick, noun, line, command), every shape of `rituals.cornerShapes` reached by a row, the long milestone read whole (and the card model's `sprint` not it), and the three `briefs` cases end to end -- `corner-<case>.brief.txt` byte for byte, the Corner the last line, again after a JSON round trip; typed, `Standup -Brief` ending on the Corner's line; the agent's route carrying `corner` (its fields, a shape of the contract, the brief's last line), none with the Space's switch off and none on an Azure DevOps Space |
+| `tkTestToolkit -Rituals`, `Tests/test_rituals.py` -- the PM Corner | `Tests/fixtures/rituals/corner.json` from both halves: every row from the raw read through each half's card reader, the join and the window (shape, milestone, remaining, pick, noun, line, command), every shape of `rituals.cornerShapes` reached by a row, the long milestone read whole (and the card model's `sprint` not it), the launch rows (a delegation's command with it off and on, differing in nothing else), and the four `briefs` cases end to end -- `corner-<case>.brief.txt` byte for byte, the Corner the last line, its command the suggestion's where the two share a delegated pick, again after a JSON round trip; typed, `Standup -Brief` ending on the Corner's line; the agent's route carrying `corner` (its fields, a shape of the contract, the brief's last line), none with the Space's switch off and none on an Azure DevOps Space |
 | `web/src/modules/solitaireAgile/PmCorner.test.tsx`, `celebrate.test.ts` | the Corner: the line verbatim, the chevron opening the hand-off for the pick (a card by its id), no chevron for reached or nothing in reach; reached ending in `: see Releases`, a link that goes to the tab; NO confetti -- not on first sight, not on the transition to reached, nothing marked; the mark held in memory when storage throws |
 | `Tests/test_ritual_milestones.py` | `GET /api/ritual/milestones` over `Tests/fixtures/rituals/milestones.json`: gh's rows in and the route's out, `reached` by shape (open, every issue closed with GitHub open and closed, closed on GitHub with one open, empty open and closed -- never reached), due dates with and without, the bar the tracker's numbers; the `gh` argv with fields and no `&` or `?`; one read a minute and `?refresh=1` reading again; no space the active one, an ADO Space and tier below 1 a tracker reason with `gh` never asked, `gh` failing a reason and not kept, an unknown Space a 404 naming it, the hub unwritten; 404 off |
 | `web/src/modules/solitaireAgile/MilestonesPage.test.tsx`, `RitualPage.test.tsx` | the tab over the same table: the Stats card's order, each bar's value the tracker's closed over total, the due date where there is one, the state words; the award rule as a table (every milestone's state, marked and not -- an empty one never awarded); the award: the first reached with no mark opens its dialog with the title, the line and the gold trophy by its accessible name (the only drawing in the box), one burst at the app's root and NOT inside the dialog, closing it opening the next, then both `awarded` and marked, a new visit no dialog and no burst; leaving mid-award never shows that one again; another Space's milestone its own; reduced motion the dialog and no rain; no tracker, no milestones, the agent away; and the confetti's one caller -- no file but `AwardDialog.tsx` imports `Confetti.tsx`, none but it imports `react-confetti`. The strip: three tabs, each an address; `registry.solitaireAgile.test.tsx` holds the old `/milestones` address redirecting to `/releases`. Dialog queries are awaited and by role, as a screen reader reaches them; a query that says there is no dialog passes `hidden: true`, so it means none in the tree at all |
@@ -1488,20 +1549,12 @@ Each of these is a block on [Known gaps](../KNOWN-GAPS.md), with its issue:
   there, a pull request on the tracker. The page has no window screen, one line per order saying cooking
   or ready ([the drive-through](#the-loop-as-a-drive-through)); you look at the tracker or the log
   ([A launched session does not report back to the page](../KNOWN-GAPS.md#a-launched-session-does-not-report-back-to-the-page)).
-- **The suggestion's delegation does not launch.** The launch exists (`StartWork <n> -Launch`, [a
-  session in a worktree](#the-launch-the-block-handed-to-a-session)), and the copy box offers it where `/env`
-  says so, but the chair's Next line still names `StartWork <n>`, the block carried by hand; the command
-  gaining `-Launch` where the launch is on is not built ([The suggestion hands off, it does not launch](../KNOWN-GAPS.md#the-suggestion-hands-off-it-does-not-launch)).
 - **The bell and Home's tips do not suggest yet.** They are the suggestion's later surfaces, behind the
   same switch; the chair's line and [the PM Corner](#the-pm-corner-the-line-the-chevron-the-confetti) are the two built
   ([The bell and Home's tips carry no suggestion](../KNOWN-GAPS.md#the-bell-and-homes-tips-carry-no-suggestion)).
 - **The celebration's mark is per browser.** Another browser, or one whose site data was cleared, celebrates a
   reached milestone once more on first sight
   ([A reached milestone celebrates once per browser](../KNOWN-GAPS.md#a-reached-milestone-celebrates-once-per-browser)).
-- **Only the issue read's rows are candidates.** The suggestion reads the standup's read, capped like it:
-  up to 500 issues in the CLI, up to 300 in every state and 100 open in the agent, so above those the
-  terminal and the page can suggest differently
-  ([The terminal and the page can read different issues](../KNOWN-GAPS.md#the-terminal-and-the-page-can-read-different-issues)).
 - **The guard reads names by their capital**. A capitalised word that is not in the facts is
   refused, so a persona's proper noun ("Dev-Hero") sends the prose instead, and an invented name written
   in lower case is not caught; numbers, refs and kind counts are checked exactly. A group whose own name is
@@ -1535,20 +1588,16 @@ Each of these is a block on [Known gaps](../KNOWN-GAPS.md), with its issue:
   `blocked` label is not read. A clause is the title's head as written -- not lower-cased, so a title
   that starts with a capital keeps it (`#<n>, Rename the slug`)
   ([The standup's prose reads no age, pull request or assignee](../KNOWN-GAPS.md#the-standups-prose-reads-no-age-pull-request-or-assignee)).
-- **An issue alone never says `started`.** The issue read carries no time its work began, so an issue
-  with no card is `closed` or `in progress` ([what moved](#what-moved-and-the-window)); `started` needs a
-  card. A card's commits are every bullet it carries, not only the window's -- a bullet has no date -- so
-  a card worked over weeks counts all of them the day it closes
-  ([What moved is counted from the cards](../KNOWN-GAPS.md#what-moved-is-counted-from-the-cards)).
+- **The dates read is GitHub's, and the CLI's covers one repo.** Commit dates and issue timelines come
+  from a GitHub repository ([what moved](#what-moved-and-the-window)); a cards Space, an Azure DevOps
+  Space, or a dates read that failed counts every bullet and reads an issue alone as `in progress`. A
+  timeline is read to its first 50 labelled and assigned events. On a Space of several repos the terminal
+  and the page can date different commits ([The terminal's standup dates a commit from one repository, the page from every repository of the Space](../KNOWN-GAPS.md#the-terminals-standup-dates-a-commit-from-one-repository-the-page-from-every-repository-of-the-space)).
 - **`decide` and `look` are always empty.** Their labels are an open item of the spec; only `walk` is
   filled ([The standup's decide and look queues are empty](../KNOWN-GAPS.md#the-standups-decide-and-look-queues-are-empty)).
 - **One repo per Space.** A Space spanning several repos says so on its `Tracker` line rather than
   merging them
   ([The terminal's standup refuses a Space with several repositories](../KNOWN-GAPS.md#the-terminals-standup-refuses-a-space-with-several-repositories)).
-- **The reads are capped, and not alike.** The CLI reads up to 500 issues for each read and 500
-  labels; the agent reads up to 300 issues in every state, 100 open, and 200 labels. A repo past a
-  cap loses its oldest issues from that read, and above the agent's caps the terminal and the page can
-  give different standups and triage lists ([The terminal and the page can read different issues](../KNOWN-GAPS.md#the-terminal-and-the-page-can-read-different-issues)).
 - **A live refusal reads differently in the two halves.** The fixture pins the `Tracker` line only for
   the reason it is GIVEN; the sentence each half writes for a live failure -- a Space that is not GitHub,
   a tier below 1, `gh` not answering -- is its own. The Azure DevOps sentence is now the contract's
@@ -1601,3 +1650,8 @@ These are how the rituals read, on purpose, and are not on that list:
   worker, and a card cannot be a blocker (there is no walk label on a card).
 - **The card read is every file in `archive/`.** Each archived card is read for its `**Closed:**` day on
   every standup; a hub with thousands of archived cards pays for it.
+- **Only the issue read's rows are candidates.** The suggestion reads the standup's read, capped like it:
+  the same `consts.json` `ghReads` numbers in the CLI and the agent, so the terminal and the page suggest from the same issues.
+- **The reads are capped, and alike.** Both halves read up to `consts.json` `ghReads` -- 500 open
+  issues, 500 issues in every state and 500 labels, one number per read, read by the CLI's scripts and the
+  agent. A repo past a cap loses its oldest issues from that read in both halves, and neither says so.

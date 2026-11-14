@@ -84,6 +84,7 @@ EXPECTED = {
     ("env", "agentPort"): "P20_AGENT_PORT",
     ("env", "teamsWebhookPrefix"): "TEAMS_WEBHOOK_",
     ("env", "testRunMarker"): "P20_TEST_RUN",
+    ("env", "standupAsOf"): "P20_STANDUP_AS_OF",
     ("agent", "bindHost"): "127.0.0.1",
     ("agent", "apiPrefix"): "/api",
     ("agent", "responseHeaders"): {
@@ -128,6 +129,9 @@ EXPECTED = {
     ("regex", "adoOrgVisualStudio"): r"^https?://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com(?:[/:]|$)",
     ("reminders", "buckets"): ["overdue", "today", "upcoming"],
     ("reminders", "snooze"): ["1h", "tomorrow", "nextweek"],
+    # A Teams recipient's type: the engine posts the first list and skips the second.
+    ("communication", "webhookRecipientTypes"): ["channel", "chat"],
+    ("communication", "deferredRecipientTypes"): ["person"],
     # The three halves a test run covers: Test writes them, log.py serves them.
     ("tests", "halves"): ["agent", "cli", "web"],
     ("tests", "legacyHalf"): "cli",
@@ -288,6 +292,7 @@ EXPECTED = {
         "suggestNounCard": "card",
         "suggestNounIssue": "issue",
         "suggestCommandStart": "StartWork {arg}",
+        "suggestCommandLaunch": "StartWork {arg} -Launch",
         "suggestCommandRoute": "Route {arg} -Assign <me|size>",
         "suggestCommandPlace": "Route {arg} -Milestone <title>",
         "suggestCommandPlaceCard": "Plan {arg} -Milestone <title>",
@@ -341,6 +346,7 @@ EXPECTED = {
         "countsClosed": "{n} closed",
         "countsStarted": "{n} started",
         "countsInProgress": "{n} in progress",
+        "countsUndated": "({n} undated)",
     },
     # StartWork's hand-off block (D-AR5): the CLI types these four, the web's copy
     # box finds the block's title by the first; Tests/fixtures/start-work/ holds
@@ -352,6 +358,10 @@ EXPECTED = {
     ("startWork", "howWeWorkNote"): "agentic/how-we-work.md",
     # The line HowWeWork prints for a repository's AGENTS.md; the web finds it by this shape.
     ("startWork", "howWeWorkLine"): "How we work here: {path}",
+    # The gh read limits both halves share (Standup/Triage and their routes).
+    ("ghReads", "openIssues"): 500,
+    ("ghReads", "allIssues"): 500,
+    ("ghReads", "labels"): 500,
     # Claude Code usage: /env's flag (the inventory row's key) and the burn route.
     ("usage", "envFlag"): "claudeUsage",
     ("usage", "burnRoute"): "/api/usage/burn",
@@ -360,6 +370,13 @@ EXPECTED = {
     ("replyStatuses", "github"): ["fixed", "closed", "active"],
     # The typed plan readings' subfolder of usage/: the CLI writes it, the agent fingerprints it.
     ("usage", "readingsFolder"): "readings",
+    # Daily's window: the billing script, the CLI's Daily and GET /api/billing refuse
+    # a window in these words (Scripts/Resolve-BillingWindow.ps1 is the rule).
+    ("billing", "text"): {
+        "halfWindow": "-Since and -Until go together: pass both (YYYY-MM-DD), or neither for this week.",
+        "notADay": "{name} '{value}' is not a day: yyyy-MM-dd.",
+        "backwards": "-Since {since} is after -Until {until}.",
+    },
     ("startWork", "text"): {
         "head": "# Start work: {kind} {id} -- {title}",
         "howWeWork": "## How we work in {space} ({source})",
@@ -379,9 +396,11 @@ class TheFileParses(unittest.TestCase):
             "regex",
             "status",
             "folders",
+            "ghReads",
             "reviews",
             "features",
             "reminders",
+            "communication",
             "env",
             "docs",
             "visibility",
@@ -390,6 +409,7 @@ class TheFileParses(unittest.TestCase):
             "design",
             "rituals",
             "startWork",
+            "billing",
             "assets",
             "tests",
             "agent",
@@ -539,9 +559,15 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.rituals_corner_shapes(), tuple(EXPECTED[("rituals", "cornerShapes")]))
         self.assertEqual(C.startwork_launch_env_flag(), EXPECTED[("startWork", "launchEnvFlag")])
         self.assertEqual(C.startwork_how_we_work_note(), EXPECTED[("startWork", "howWeWorkNote")])
+        self.assertEqual(C.gh_read_limit_open_issues(), EXPECTED[("ghReads", "openIssues")])
+        self.assertEqual(C.gh_read_limit_all_issues(), EXPECTED[("ghReads", "allIssues")])
+        self.assertEqual(C.gh_read_limit_labels(), EXPECTED[("ghReads", "labels")])
         self.assertEqual(C.usage_env_flag(), EXPECTED[("usage", "envFlag")])
         self.assertEqual(C.usage_burn_route(), EXPECTED[("usage", "burnRoute")])
         self.assertEqual(C.usage_readings_folder(), EXPECTED[("usage", "readingsFolder")])
+        self.assertEqual(C.billing_text(), EXPECTED[("billing", "text")])
+        self.assertEqual(C.webhook_recipient_types(), tuple(EXPECTED[("communication", "webhookRecipientTypes")]))
+        self.assertEqual(C.deferred_recipient_types(), tuple(EXPECTED[("communication", "deferredRecipientTypes")]))
 
     def test_the_worker_rule_reads_the_contract(self):
         """The pane's worker chips and the standup read one prefix, not two."""
@@ -600,6 +626,7 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("reviews.fileName", "review.md"),
         ("env.agentPort", "P20_AGENT_PORT"),
         ("env.testRunMarker", "P20_TEST_RUN"),
+        ("env.standupAsOf", "P20_STANDUP_AS_OF"),
         ("env.activeSpace", "P20_ACTIVE_SPACE"),
         ("env.features", "P20_FEATURES"),
         ("stamps.due", "**Due:**"),
@@ -629,7 +656,14 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("startWork.howWeWorkNote", "agentic/how-we-work.md"),
         # Claude Code usage: served through usage_env_flag() and usage_burn_route().
         ("usage.envFlag", "claudeUsage"),
+        # The gh read limits: served through gh_read_limit_*(), never typed as a --limit.
+        ("ghReads.labels", '"--limit", "200"'),
+        ("ghReads.openIssues", '"--limit", "100"'),
+        ("ghReads.allIssues", '"--limit", "300"'),
         ("usage.burnRoute", "/api/usage/burn"),
+        # Daily's window sentences: the route reads them through billing_text().
+        ("billing.text.halfWindow", "-Since and -Until go together"),
+        ("billing.text.notADay", "is not a day: yyyy-MM-dd"),
     ]
 
     # The allowlist, and why each entry is on it:

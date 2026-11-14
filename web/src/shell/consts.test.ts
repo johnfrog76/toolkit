@@ -15,6 +15,8 @@ import consts from "@consts";
 
 import {
   ASSETS,
+  BILLING,
+  COMMUNICATION,
   DESIGN,
   DOCS,
   FEATURES,
@@ -99,6 +101,9 @@ describe("consts.json", () => {
     // Where the machine's test history goes instead of its per-machine folder:
     // the test runners set it, the CLI and the agent read it.
     expect(consts.env.testHistoryDir).toBe("P20_TEST_HISTORY_DIR");
+    // The instant the CLI's Standup reads the clock as, in a test run only. The
+    // web never reads it; the name is stated on all three sides.
+    expect(consts.env.standupAsOf).toBe("P20_STANDUP_AS_OF");
     // The line a send writes under ## Sent, from the web button and from SendTeams -Session.
     expect(STAMPS.sent).toBe("Sent to");
     // Organize's reminders: the footer lines, the due pattern, and the two word lists.
@@ -136,6 +141,9 @@ describe("consts.json", () => {
     );
     expect(REMINDERS.buckets).toEqual(["overdue", "today", "upcoming"]);
     expect(REMINDERS.snooze).toEqual(["1h", "tomorrow", "nextweek"]);
+    // A Teams recipient's type: channel and chat post through their webhook, person never posts.
+    expect(COMMUNICATION.webhookRecipientTypes).toEqual(["channel", "chat"]);
+    expect(COMMUNICATION.deferredRecipientTypes).toEqual(["person"]);
     // The three halves a test run covers, in run order.
     expect(TESTS.halves).toEqual(["agent", "cli", "web"]);
     expect(TESTS.legacyHalf).toBe("cli");
@@ -342,6 +350,7 @@ describe("consts.json", () => {
         suggestNounCard: "card",
         suggestNounIssue: "issue",
         suggestCommandStart: "StartWork {arg}",
+        suggestCommandLaunch: "StartWork {arg} -Launch",
         suggestCommandRoute: "Route {arg} -Assign <me|size>",
         suggestCommandPlace: "Route {arg} -Milestone <title>",
         suggestCommandPlaceCard: "Plan {arg} -Milestone <title>",
@@ -395,6 +404,7 @@ describe("consts.json", () => {
         countsClosed: "{n} closed",
         countsStarted: "{n} started",
         countsInProgress: "{n} in progress",
+        countsUndated: "({n} undated)",
       },
     });
     // StartWork's hand-off block (D-AR5): the CLI types the four headings and the
@@ -412,6 +422,12 @@ describe("consts.json", () => {
         prompt: "## The prompt ({source})",
       },
     });
+    // The gh read limits the CLI and the agent share; the web reads none, so the
+    // contract's values are held here as the third half's statement of them.
+    const { _: ghDoc, ...ghKeys } = (consts as unknown as { ghReads: Record<string, unknown> })
+      .ghReads;
+    expect(ghDoc).toMatch(/Standup and Triage/);
+    expect(ghKeys).toEqual({ openIssues: 500, allIssues: 500, labels: 500 });
     // Claude Code usage: /env's flag (the CLI inventory row's key) and the burn route.
     const { _: usageDoc, ...usageKeys } = USAGE as typeof USAGE & { _: string };
     expect(usageDoc).toMatch(/Burn -AsJson/);
@@ -431,6 +447,17 @@ describe("consts.json", () => {
       "closed",
     ]);
     expect(REPLY_STATUSES_BY_TRACKER.github).toEqual(["fixed", "closed", "active"]);
+    // Daily's window: the sentences a window is refused with, in all three halves.
+    const { _: billingDoc, ...billingKeys } = BILLING as typeof BILLING & { _: string };
+    expect(billingDoc).toMatch(/Resolve-BillingWindow/);
+    expect(billingKeys).toEqual({
+      text: {
+        halfWindow:
+          "-Since and -Until go together: pass both (YYYY-MM-DD), or neither for this week.",
+        notADay: "{name} '{value}' is not a day: yyyy-MM-dd.",
+        backwards: "-Since {since} is after -Until {until}.",
+      },
+    });
   });
 
   // Every key of the contract is stated by this half, so a key added to
@@ -442,11 +469,14 @@ describe("consts.json", () => {
         "_README",
         "agent",
         "assets",
+        "billing",
+        "communication",
         "design",
         "docs",
         "env",
         "features",
         "folders",
+        "ghReads",
         "regex",
         "reminders",
         "replyStatuses",
@@ -580,6 +610,7 @@ describe("no half retypes a contract literal", () => {
     ["regex.commitBullet", consts.regex.commitBullet],
     ["env.agentPort", consts.env.agentPort],
     ["env.testRunMarker", consts.env.testRunMarker],
+    ["env.standupAsOf", consts.env.standupAsOf],
     ["env.activeSpace", consts.env.activeSpace],
     ["env.features", consts.env.features],
     // Solitaire Agile: the route, and the distinctive words of the rendering --

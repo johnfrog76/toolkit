@@ -165,11 +165,12 @@ module and you add a mock line to every one of these files.
 > The same goes for the per-shell overrides `P20_ACTIVE_SPACE` and `PROMPTS_ROOT` (`consts.json`
 > `env.activeSpace`, `env.promptsRoot`): the runners remove them for the run and put them back, so a
 > shell that holds them reads the same as one that does not; a suite that tests an override sets it itself.
+> `P20_STANDUP_AS_OF` (`env.standupAsOf`), the clock `Standup` reads under the run marker, goes with them.
 
 **Four test runners**, one per half plus one for the two together. Run the ones your change touches:
 
 ```powershell
-tkTestToolkit                 # the CLI -- 52 suites, 10222 assertions on this commit
+tkTestToolkit                 # the CLI -- 52 suites, 10614 assertions on this commit
 ```
 
 ```bash
@@ -426,6 +427,8 @@ Each step already done is skipped, so it is safe to re-run.
   **An argument PowerShell would split is quoted.** The helper has no `param` block, so a bare `--` is dropped
   before it runs, and `-c:x`, `-a.b`, a comma and `stash@{0}` each arrive as two arguments: write `'--'`, `'-c:x'`.
   Clause 23 fails on one written bare, and holds a table of what git is handed, on 5.1's argument passing as well.
+  The escaping for that passing is not the helper's own: it calls `ConvertTo-P20NativeArgument`, the shipped rule
+  (the 5.1 stderr bullet below), and the same table is run through `Invoke-P20TrackerRead`.
 - **A suite that runs a script directly does not test the verb.** A suite that drives
   `Move-PromptToArchive.ps1` with a stubbed `Get-PromptFolders` stays green while `Archive` typed as a
   verb can look in `<hub>/<org>/` and see no cards at all -- as it does when the module's own
@@ -441,7 +444,15 @@ Each step already done is skipped, so it is safe to re-run.
   read, so the verb prints gh's sentence through the generic block instead of its own answer; pwsh 7 reads it as text, so
   a run under pwsh 7 alone is green either way. `Invoke-P20TrackerRead` (`Scripts/Invoke-TrackerRead.ps1`, dot-sourced; it refuses a `.cmd` tool an argument cmd.exe would read, `Test-P20CmdArgument`) is the one way a
   script calls `gh`, `az` or `git`: it returns `Code`, `Lines`, `Out` and `Err`, and a raw `gh ... 2>&1` in a script is the bug --
-  `Test-Portability`'s Clause 15 fails naming the line. Its allow-list only shrinks: three ritual and helper files by reason, and `Sync-Prompts.ps1` at entry level -- only its two deliberate output-passthrough lines (the pull and the push) are allowed, so any other raw `git` call in that file is a hit.
+  `Test-Portability`'s Clause 15 fails naming the line. **It is also where an argument is made safe for a host that builds
+  the command line itself.** Windows PowerShell 5.1 (and PowerShell 7 set to `Legacy`) joins a native command's arguments into one
+  line: an empty one vanishes, a double quote is lost, and 5.1 wraps `C:\My Repos\r\` in quotes without doubling the last
+  backslash, so git reads the closing quote into the path and swallows the arguments after it. On such a host the reader passes
+  every argument through `ConvertTo-P20NativeArgument` (`Scripts/ConvertTo-NativeArgument.ps1`, behind
+  `Test-P20LegacyNativeArguments`) -- ONE rule, which `Invoke-P20TestGit` calls too, and Clause 23 fails on a second definition.
+  The `.cmd` rule reads each argument as written, first; only what passes is converted. So a path goes to `git -C` as it is:
+  do not trim or quote one at the call. A folder path read from configuration has its trailing separator taken off where it is
+  read (`Remove-P20TrailingSeparator`, same file; a drive root keeps its own), which is tidiness, not the fix. Clause 15's allow-list only shrinks: three ritual and helper files by reason, and `Sync-Prompts.ps1` at entry level -- only its two deliberate output-passthrough lines (the pull and the push) are allowed, so any other raw `git` call in that file is a hit.
 - **On Windows a child inherits every inheritable handle its launcher holds, not only the std ones.** Windows
   PowerShell 5.1 keeps a second inheritable copy of its stdout (the .NET Framework's, at startup), so clearing
   `GetStdHandle`'s is not enough and `powershell -c tkAgent | ...` waits for the agent. A long-lived

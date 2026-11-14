@@ -51,7 +51,36 @@ export interface RemindersResponse {
   asOf: string;
 }
 
-const organizeApi = api.enhanceEndpoints({ addTagTypes: ["Reminders"] });
+/** One reference document's header, as GET /api/reference reads it (docs/hub/reference.md). */
+export interface ReferenceDoc {
+  /** The file name -- the document's address. */
+  name: string;
+  title: string;
+  source: string;
+  /** "<from> to <to>" exactly as written, or "". */
+  valid: string;
+  added: string;
+  original: string;
+  /** The first line carrying a search word; "" when the list was not searched. */
+  line: string;
+  /** The start of the content after the header, as plain words. */
+  excerpt: string;
+}
+
+export interface ReferenceList {
+  count: number;
+  items: ReferenceDoc[];
+  query: string;
+}
+
+/** One document: its header and its whole text. */
+export interface ReferenceText extends ReferenceDoc {
+  body: string;
+  /** Where the file lives on the agent's machine, for the copy-path line. */
+  path: string;
+}
+
+const organizeApi = api.enhanceEndpoints({ addTagTypes: ["Reminders", "Reference"] });
 
 export const organizeEndpoints = organizeApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -59,6 +88,20 @@ export const organizeEndpoints = organizeApi.injectEndpoints({
     getReminders: builder.query<RemindersResponse, void>({
       query: () => "reminders",
       providesTags: ["Reminders"],
+      keepUnusedDataFor: CACHE_TTL,
+    }),
+
+    // GET /api/reference?q= -- the hub's reference documents; read only, there is no write.
+    getReference: builder.query<ReferenceList, string>({
+      query: (q) => ({ url: "reference", params: q ? { q } : undefined }),
+      providesTags: ["Reference"],
+      keepUnusedDataFor: CACHE_TTL,
+    }),
+
+    // GET /api/reference/{name} -- one document's text.
+    getReferenceDocument: builder.query<ReferenceText, string>({
+      query: (name) => `reference/${encodeURIComponent(name)}`,
+      providesTags: ["Reference"],
       keepUnusedDataFor: CACHE_TTL,
     }),
 
@@ -77,5 +120,10 @@ export const organizeEndpoints = organizeApi.injectEndpoints({
   }),
 });
 
-export const { useGetRemindersQuery, useRunRemindersMutation, useRunNewReminderMutation } =
-  organizeEndpoints;
+export const {
+  useGetRemindersQuery,
+  useGetReferenceQuery,
+  useGetReferenceDocumentQuery,
+  useRunRemindersMutation,
+  useRunNewReminderMutation,
+} = organizeEndpoints;

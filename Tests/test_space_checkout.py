@@ -43,13 +43,25 @@ def _git(path: Path, *args: str) -> None:
 
 class TheSharedTable(unittest.TestCase):
     def test_a_path_as_written(self):
+        # What counts as absolute is the platform's: a row that carries "os" runs
+        # only there, a row without one runs everywhere, and any other value fails.
+        here = "windows" if os.name == "nt" else "posix"
         for row in TABLE["paths"]:
             with self.subTest(written=row["written"]):
+                self.assertIn(row.get("os", here), ("posix", "windows"), "a row's os is posix, windows or absent")
+                if row.get("os", here) != here:
+                    continue
                 if "home" in row:
                     want = str(Path.home() / row["home"]) if row["home"] else str(Path.home())
                 else:
                     want = row["expect"]
                 self.assertEqual(checkout.checkout_path(row["written"]), want)
+
+    def test_a_trailing_separator_is_taken_off_and_a_root_keeps_its_own(self):
+        # Both separators named, as Windows reads a path, so its rows run here.
+        for row in TABLE["trailing"]:
+            with self.subTest(path=row["path"]):
+                self.assertEqual(checkout.trim_trailing_separator(row["path"], "\\/"), row["expect"])
 
     def test_the_repository_a_remote_names(self):
         for row in TABLE["origins"]:
@@ -161,14 +173,17 @@ class TheConfigLayer(unittest.TestCase):
 
 
 class TheDesignRoute(unittest.TestCase):
-    """GET /api/design carries the active Space's checkout, fresh on every request."""
+    """GET /api/design carries the active Space's checkout, fresh on every request,
+    and reads the listing from the clone once the checkout is ready."""
 
     def setUp(self):
         design.clear_cache()
         self.client = TestClient(app)
 
     def test_the_listing_carries_the_checkout_of_the_space_you_are_in(self):
-        listed = design.DesignListResponse(repo="o/r")
+        listed = design.DesignListResponse(repo="o/r", source="github")
+        local = design.DesignListResponse(repo="o/r", source="checkout")
+        roots = []
         answers = [
             checkout.SpaceCheckout(key="spaceCheckouts.prod.path"),
             checkout.SpaceCheckout(key="spaceCheckouts.prod.path", path="/c", root="/c", ready=True),
@@ -182,6 +197,7 @@ class TheDesignRoute(unittest.TestCase):
         with (
             mock.patch.object(design, "repo_gate", return_value="o/r"),
             mock.patch.object(design, "list_design", return_value=listed),
+            mock.patch.object(design, "list_design_local", side_effect=lambda repo, root: roots.append(root) or local),
             mock.patch.object(design, "load_config", return_value={"activeSpace": "prod"}),
             mock.patch.object(
                 design, "resolve_dirs", return_value=(Path("/nowhere/current"), Path("/nowhere/archive"))
@@ -194,6 +210,9 @@ class TheDesignRoute(unittest.TestCase):
         self.assertFalse(first["checkout"]["ready"])
         self.assertEqual(first["checkout"]["key"], "spaceCheckouts.prod.path")
         self.assertTrue(second["checkout"]["ready"])
+        # Not ready: GitHub's listing. Ready: the clone's, at its top level.
+        self.assertEqual((first["source"], second["source"]), ("github", "checkout"))
+        self.assertEqual(roots, [Path("/c")])
 
 
 if __name__ == "__main__":
