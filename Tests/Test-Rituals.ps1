@@ -842,7 +842,10 @@ foreach ($row in $cornerRows) {
     $cards = @(ConvertTo-CornerCardRows $row.cards)
     $items = @(Get-P20SuggestionItems -Labels @($cornerTable.workerLabels) -Issues @($row.issues) -Cards $cards -PackageRoot $pkgRoot)
     $closed = @(Get-P20CornerClosed -Issues @($row.issues) -Cards $cards -Since $cornerSince -AsOf $cornerAsOf)
-    $got = Get-P20CornerLine -Items $items -Closed $closed -PackageRoot $pkgRoot
+    # howIWork and launch are the row's when it names them: alone and off otherwise.
+    $rowHow = 'alone'
+    if ($row.PSObject.Properties['howIWork']) { $rowHow = [string]$row.howIWork }
+    $got = Get-P20CornerLine -Items $items -Closed $closed -PackageRoot $pkgRoot -HowIWork $rowHow -Launch ([bool]$row.launch)
     $exp = $row.expected
     $ok = ($got.shape -ceq [string]$exp.shape -and $got.milestone -ceq [string]$exp.milestone -and [int]$got.remaining -eq [int]$exp.remaining -and
         $got.ref -ceq [string]$exp.ref -and $got.kind -ceq [string]$exp.kind -and $got.noun -ceq [string]$exp.noun -and
@@ -857,11 +860,14 @@ foreach ($case in @($cb.cases)) {
     $s = Invoke-P20StandupJoinedFill -AsOf $cornerAsOf -Labels @($cornerTable.workerLabels) -Issues @($case.issues) -Tracker @{ ok = $true; reason = '' } `
         -Cards $cards -Space ([string]$cb.space) -SpaceName ([string]$cb.spaceName) -PackageRoot $pkgRoot
     $on = Test-P20SuggestionsOn -TeamAgile $true -Stored $case.suggestions
-    $null = Add-P20StandupSuggestion -Standup $s -Labels @($cornerTable.workerLabels) -Issues @($case.issues) -Cards $cards -HowIWork ([string]$case.howIWork) -On $on -Prefix ([string]$cb.prefix) -PackageRoot $pkgRoot
-    $null = Add-P20StandupCorner -Standup $s -Labels @($cornerTable.workerLabels) -Issues @($case.issues) -Cards $cards -On $on -Prefix ([string]$cb.prefix) -PackageRoot $pkgRoot
+    $null = Add-P20StandupSuggestion -Standup $s -Labels @($cornerTable.workerLabels) -Issues @($case.issues) -Cards $cards -HowIWork ([string]$case.howIWork) -On $on -Prefix ([string]$cb.prefix) -PackageRoot $pkgRoot -Launch ([bool]$case.launch)
+    $null = Add-P20StandupCorner -Standup $s -Labels @($cornerTable.workerLabels) -Issues @($case.issues) -Cards $cards -On $on -Prefix ([string]$cb.prefix) -PackageRoot $pkgRoot -HowIWork ([string]$case.howIWork) -Launch ([bool]$case.launch)
     $gotShape = $null
     if ($null -ne $s.corner) { $gotShape = $s.corner.shape }
     Assert-True "corner brief $($case.name): the shape" ("$gotShape" -ceq "$($case.expected.shape)") "got $gotShape"
+    if ($null -ne $s.corner -and $s.corner.command -and $null -ne $s.suggestion -and [string]$s.suggestion.ref -ceq [string]$s.corner.ref -and [string]$s.suggestion.shape -ceq [string]@($consts.rituals.suggestShapes)[1]) {
+        Assert-True "corner brief $($case.name): the Corner and the suggestion name one command for the pick they share" ([string]$s.corner.command -ceq [string]$s.suggestion.command) "corner '$($s.corner.command)', suggestion '$($s.suggestion.command)'"
+    }
     $brief = Format-P20StandupBrief -Standup $s -PackageRoot $pkgRoot
     $golden = [System.IO.File]::ReadAllText((Join-Path $fixtureDir ([string]$case.expected.brief)))
     Assert-True "corner brief $($case.name): $($case.expected.brief), byte for byte" ($brief -ceq $golden) ("`n--- got ---`n$brief--- want ---`n$golden")
@@ -1046,12 +1052,17 @@ try {
         Assert-True '-AsJson: an empty worker carries one status sentence from the nothing family' ($sonnet -and [bool]$sonnet.empty -and $nothing -contains [string]$sonnet.excuse) $j.Inner
     }
 
+    # The typed verb asks whether a launch would work on this host (claude on the
+    # PATH), and a delegation's command follows the answer on both lines; so do the
+    # expectations below, or they would hold only on a host without it.
+    . (Join-Path $pkgRoot 'Scripts/Test-StartWorkLaunch.ps1')
+    $launchNow = Test-P20StartWorkLaunch
     # -Brief: the chair's reading alone -- the rule's own bytes, and nothing of the long form.
     $br = Invoke-Standup 'tkStandup -Brief'
     # The verb attaches the suggestion and the PM Corner (its last line); so does the expectation.
     $briefNow = Invoke-P20StandupJoinedFill -AsOf ([DateTimeOffset]::Now) -Labels $ghLabels -Issues $ghIssues -Tracker @{ ok = $true; reason = '' } -Cards @() -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
-    $null = Add-P20StandupSuggestion -Standup $briefNow -Labels $ghLabels -Issues $ghIssues -Cards @() -HowIWork 'agents' -On $true -Prefix 'tk' -PackageRoot $pkgRoot
-    $null = Add-P20StandupCorner -Standup $briefNow -Labels $ghLabels -Issues $ghIssues -Cards @() -On $true -Prefix 'tk' -PackageRoot $pkgRoot
+    $null = Add-P20StandupSuggestion -Standup $briefNow -Labels $ghLabels -Issues $ghIssues -Cards @() -HowIWork 'agents' -On $true -Prefix 'tk' -PackageRoot $pkgRoot -Launch $launchNow
+    $null = Add-P20StandupCorner -Standup $briefNow -Labels $ghLabels -Issues $ghIssues -Cards @() -On $true -Prefix 'tk' -PackageRoot $pkgRoot -HowIWork 'agents' -Launch $launchNow
     $expectBrief = (Format-P20StandupBrief -Standup $briefNow -PackageRoot $pkgRoot).TrimEnd([char]10)
     Assert-True '-Brief: the PM Corner is its last line' ($null -ne $briefNow.corner -and $br.Inner.EndsWith([string]$briefNow.corner.brief)) $br.Inner
     Assert-True '-Brief exits 0 and prints the brief the rule renders for now, and only that' ($br.Exit -eq '0' -and $br.Inner -ceq $expectBrief) ("`n--- got ---`n$($br.Inner)`n--- want ---`n$expectBrief")
@@ -1088,8 +1099,8 @@ try {
     Assert-True '-Since widens yesterday: exit 0, the text the rule renders for that window, line for line' ($sw.Exit -eq '0' -and $sw.Inner -ceq $expectSinceText) ("`n--- got ---`n$($sw.Inner)`n--- want ---`n$expectSinceText")
     Assert-True '-Since: the issue closed a month ago is said, under yesterday' ($sw.Inner -match '(?m)^  Yesterday  #103 ' -and $r.Inner -notmatch '#103') $sw.Inner
     $sb = Invoke-Standup "tkStandup -Since $sinceDay -Brief"
-    $null = Add-P20StandupSuggestion -Standup $expectSince -Labels $ghLabels -Issues $ghIssues -Cards @() -HowIWork 'agents' -On $true -Prefix 'tk' -PackageRoot $pkgRoot
-    $null = Add-P20StandupCorner -Standup $expectSince -Labels $ghLabels -Issues $ghIssues -Cards @() -On $true -Prefix 'tk' -PackageRoot $pkgRoot
+    $null = Add-P20StandupSuggestion -Standup $expectSince -Labels $ghLabels -Issues $ghIssues -Cards @() -HowIWork 'agents' -On $true -Prefix 'tk' -PackageRoot $pkgRoot -Launch $launchNow
+    $null = Add-P20StandupCorner -Standup $expectSince -Labels $ghLabels -Issues $ghIssues -Cards @() -On $true -Prefix 'tk' -PackageRoot $pkgRoot -HowIWork 'agents' -Launch $launchNow
     $expectSinceBrief = (Format-P20StandupBrief -Standup $expectSince -PackageRoot $pkgRoot).TrimEnd([char]10)
     Assert-True '-Since -Brief: the counts line names the window''s first day' ($sb.Exit -eq '0' -and $sb.Inner -ceq $expectSinceBrief -and $sb.Inner -match '^Since \w+ ') ("`n--- got ---`n$($sb.Inner)`n--- want ---`n$expectSinceBrief")
     $tomorrow = [DateTimeOffset]::Now.AddDays(2).ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
@@ -1141,7 +1152,7 @@ try {
     $sj = Invoke-Standup 'tkStandup -AsJson'
     $sjParsed = $null
     try { $sjParsed = $sj.Inner | ConvertFrom-Json } catch { $sjParsed = $null }
-    $null = Add-P20StandupSuggestion -Standup $joinedNow -Labels $ghLabels -Issues $ghIssues -Cards $widgetCards -HowIWork 'agents' -On $true -Prefix 'tk' -PackageRoot $pkgRoot
+    $null = Add-P20StandupSuggestion -Standup $joinedNow -Labels $ghLabels -Issues $ghIssues -Cards $widgetCards -HowIWork 'agents' -On $true -Prefix 'tk' -PackageRoot $pkgRoot -Launch $launchNow
     $wantRefs = (@($joinedNow.suggestions | ForEach-Object { $_.ref })) -join ','
     $gotRefs = ''
     if ($sjParsed) { $gotRefs = (@($sjParsed.suggestions | ForEach-Object { [string]$_.ref })) -join ',' }

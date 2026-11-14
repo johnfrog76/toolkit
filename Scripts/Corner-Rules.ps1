@@ -13,7 +13,9 @@
     Nothing here is a second rule. The milestone is the suggestion's nearest
     (Get-P20NearestMilestones) over the suggestion's own candidates in the
     suggestion's own order (Select-P20Suggestion), the id is the suggestion's
-    pick inside it, and the remaining count is the joined list's own open count
+    pick inside it, the command is the suggestion's choice (a pick it would send
+    to the crew names StartWork <n> -Launch where a launch would work, as the
+    Next line does), and the remaining count is the joined list's own open count
     (Get-P20SuggestionItems): open issues that name the milestone plus open
     cards whose **Sprint:** line names it, WHOLE, once per id.
 
@@ -47,8 +49,14 @@ function Get-P20CornerLine {
          the pick's noun (card, issue); more names the remaining rows' -- cards,
          issues, or items for a mix.
       3. Else nothing in reach.
+
+      The command is StartWork <arg>, and StartWork <arg> -Launch where the
+      suggestion's own command for the pick is: a delegation (-HowIWork is the
+      Space's answer) with -Launch true -- Test-P20StartWorkLaunch's answer, an
+      input here as it is of Select-P20Suggestion. -HowIWork changes no pick and
+      no count.
     #>
-    param($Items, $Closed, [string]$PackageRoot)
+    param($Items, $Closed, [string]$PackageRoot, [string]$HowIWork = 'alone', [bool]$Launch = $false)
     $c = Get-P20Consts
     $t = $c.rituals.text
     $shapes = @($c.rituals.cornerShapes | ForEach-Object { [string]$_ })
@@ -94,7 +102,7 @@ function Get-P20CornerLine {
         $out.line = Format-P20SuggestTemplate ([string]$t.cornerReached) @{ milestone = $title }
         return $out
     }
-    $chosen = Select-P20Suggestion -Items @($Items) -HowIWork 'alone' -PackageRoot $PackageRoot
+    $chosen = Select-P20Suggestion -Items @($Items) -HowIWork $HowIWork -PackageRoot $PackageRoot -Launch $Launch
     $inReach = @($chosen.picked | Where-Object {
             $m = Get-P20SuggestField $_.item 'milestone'
             $null -ne $m -and [string](Get-P20SuggestField $m 'title')
@@ -129,7 +137,10 @@ function Get-P20CornerLine {
     $out.kind = $kind
     $out.noun = $noun
     $out.line = $line
+    # The suggestion's choice for the same pick: its delegation's command is the
+    # launch where one would work. Every other shape stays the plain start.
     $out.command = Format-P20SuggestTemplate ([string]$t.suggestCommandStart) @{ arg = $ref.TrimStart('#') }
+    if ($Launch -and [string]$pick.shape -ceq [string]@($c.rituals.suggestShapes)[1]) { $out.command = [string]$pick.command }
     return $out
 }
 
@@ -190,9 +201,11 @@ function Add-P20StandupCorner {
       D-AR8) or the tracker not answering. -Prefix is the CLI's, for the brief's
       command; -Viewer the signed-in gh user's login, as the suggestion takes it
       -- the pick is the suggestion's, so the exclusions are. attach_corner in
-      the agent.
+      the agent. -HowIWork and -Launch are the suggestion's too (the Space's
+      answer and Test-P20StartWorkLaunch's), so the two lines name one command
+      for one pick.
     #>
-    param([Parameter(Mandatory)]$Standup, $Labels, $Issues, $Cards, [bool]$On, [string]$Prefix, [string]$Viewer = '', [string]$PackageRoot)
+    param([Parameter(Mandatory)]$Standup, $Labels, $Issues, $Cards, [bool]$On, [string]$Prefix, [string]$Viewer = '', [string]$PackageRoot, [string]$HowIWork = 'alone', [bool]$Launch = $false)
     $Standup['corner'] = $null
     if (-not $On -or -not $Standup.tracker.ok) { return $Standup }
     $waiting = New-Object System.Collections.ArrayList
@@ -204,7 +217,7 @@ function Add-P20StandupCorner {
     if ([string]$Standup.source -ceq 'issues' -or [string]$Standup.source -ceq 'both') { $useIssues = @($Issues) }
     $items = @(Get-P20SuggestionItems -Labels $Labels -Issues $useIssues -Cards $Cards -Waiting ([string[]]$waiting.ToArray()) -Viewer $Viewer -PackageRoot $PackageRoot)
     $closed = @(Get-P20CornerClosed -Issues $useIssues -Cards $Cards -Since $Standup.since -AsOf $Standup.asOf)
-    $got = Get-P20CornerLine -Items $items -Closed $closed -PackageRoot $PackageRoot
+    $got = Get-P20CornerLine -Items $items -Closed $closed -PackageRoot $PackageRoot -HowIWork $HowIWork -Launch $Launch
     $t = (Get-P20Consts).rituals.text
     if ($got.command) {
         $got['brief'] = Format-P20SuggestTemplate ([string]$t.cornerBriefCommand) @{ line = $got.line; chevron = [string]$t.cornerChevron; command = ($Prefix + $got.command) }
