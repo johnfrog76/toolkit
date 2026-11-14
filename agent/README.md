@@ -94,7 +94,8 @@ agent/
 │   └── comms.py              the communication engine
 ├── organize/               opt-in, features.organize
 │   ├── __init__.py           the router `app.py` mounts, gated per request
-│   └── reminders.py          GET /reminders -- read only; every write is a verb through the bridge
+│   ├── reminders.py          GET /reminders -- read only; every write is a verb through the bridge
+│   └── reference.py          GET /reference, GET /reference/{name} -- the hub's reference documents, read only
 ├── studio/                 core, no flag (D-S13) -- always mounted
 │   ├── __init__.py           the router `app.py` mounts -- notes', spaces', prompts' and the ledger's together
 │   ├── ledger.py             GET /studio/ledger -- every GitHub Space's report, runs, visibility and design counts for the Spaces card: one gh api graphql call, kept on disk 600 s
@@ -346,7 +347,7 @@ remembering.
 built on, and a 403 says something different: that the route exists and you may not have it. It does
 not exist. With the flags off, `/api/growth`, `/api/manager`, `/api/resume`, `/api/reviews`,
 `/api/review-preview`, `/api/resume-preview`, `POST /api/comms/send`, `POST /api/rewrite`,
-`/api/reminders`, `/api/ritual/standup` (with `GET /api/ritual/standup/remind` and
+`/api/reminders`, `/api/reference`, `/api/ritual/standup` (with `GET /api/ritual/standup/remind` and
 `POST /api/ritual/standup/attend`, which sit on the same gated router), `/api/ritual/triage` and `/api/ritual/milestones` all answer 404. `/api/studio/design`
 always answers: a `features.studio` left in a config is ignored.
 
@@ -559,6 +560,8 @@ And the modules', gated per request on their flag and 404 when it is off:
 | `PUT /manager/{filename}` | `communication/manager` | one session | **that session** |
 | `POST /comms/send` | `communication/manager` | `/env`'s recipient registry, the webhook variable | **an outbound webhook** |
 | `POST /rewrite` | `communication/manager` | a model | — |
+| `GET /reference` | `organize/reference` | `{hub}/reference/current/` -- gated on `features.organize`, 404 when off; `?q=` keeps the documents with every word, any order, case ignored | — (a person files these by hand) |
+| `GET /reference/{name}` | `organize/reference` | one document in `{hub}/reference/current/` -- gated on `features.organize`, 404 when off | — |
 | `GET /reminders` | `organize/reminders` | `{hub}/reminders/current/` -- gated on `features.organize`, 404 when off; the bucket derived against the local clock | — (every reminder write is `NewReminder` / `Reminders` through the bridge) |
 
 | Route | Package | Gate | Reads | Writes |

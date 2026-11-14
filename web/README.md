@@ -135,7 +135,10 @@ web/
     │   ├── paths.ts        the module's route path, and the router state that opens a bucket
     │   ├── ReminderBell    the header bell: asleep (zz) or awake with the past-due count
     │   ├── useOverdueReminders  the past-due slice of the reminders read, polled each minute
-    │   ├── api.organize.ts tag type Reminders; GET /api/reminders and the two verbs via the bridge
+    │   ├── api.organize.ts tag types Reminders and Reference; GET /api/reminders, GET /api/reference and the two verbs via the bridge
+    │   ├── OrganizePages   the tab's pages under its in-page tabs: Reminders | Reference
+    │   ├── ReferenceCard   a list panel of the hub's reference documents: search, Open; read only
+    │   ├── ReferencePage   one document's reading room, rendered as markdown
     │   ├── reminderEntry   a stored due split into the Edit dialog's date and time, and joined back
     │   └── RemindersCard   a list panel: bucket chips, archive, the snooze menu, edit, the quick add
     ├── modules/solitaireAgile/   opt-in, features.solitaireAgile -- today's standup, read and played, and triage
