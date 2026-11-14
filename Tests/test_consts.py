@@ -84,6 +84,7 @@ EXPECTED = {
     ("env", "agentPort"): "P20_AGENT_PORT",
     ("env", "teamsWebhookPrefix"): "TEAMS_WEBHOOK_",
     ("env", "testRunMarker"): "P20_TEST_RUN",
+    ("env", "standupAsOf"): "P20_STANDUP_AS_OF",
     ("agent", "bindHost"): "127.0.0.1",
     ("agent", "apiPrefix"): "/api",
     ("agent", "responseHeaders"): {
@@ -625,6 +626,7 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("reviews.fileName", "review.md"),
         ("env.agentPort", "P20_AGENT_PORT"),
         ("env.testRunMarker", "P20_TEST_RUN"),
+        ("env.standupAsOf", "P20_STANDUP_AS_OF"),
         ("env.activeSpace", "P20_ACTIVE_SPACE"),
         ("env.features", "P20_FEATURES"),
         ("stamps.due", "**Due:**"),

@@ -219,6 +219,15 @@ if ($PSBoundParameters.ContainsKey('Remind')) {
 # open now. One clock for the check and the fill. Test-P20StandupSince holds the
 # rule, the agent's since_refusal the same one.
 $asOf = [DateTimeOffset]::Now
+# A suite pins that clock: while the test-run marker is set (consts.json
+# env.testRunMarker), env.standupAsOf names the instant the standup is read at,
+# so a suite builds its expectation from the same instant and not from a second
+# reading of now. Outside a test run it is not read at all.
+$clockNames = (Get-P20Consts).env
+if ([System.Environment]::GetEnvironmentVariable([string]$clockNames.testRunMarker)) {
+    $pinned = ConvertTo-P20RitualTime ([System.Environment]::GetEnvironmentVariable([string]$clockNames.standupAsOf))
+    if ($null -ne $pinned) { $asOf = $pinned }
+}
 $window = ''
 if ($PSBoundParameters.ContainsKey('Since')) {
     $why = Test-P20StandupSince -AsOf $asOf -Since $Since

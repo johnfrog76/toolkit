@@ -936,6 +936,12 @@ effect in that process -- the override wins, which is what it is for. Without it
 contract (`env.promptsRoot`, `env.activeSpace`, `env.features`): the two newer ones because both halves
 type them, and `PROMPTS_ROOT` because every test runner removes it for the run by that name.
 
+One more name is in that block and is not a setting: `P20_STANDUP_AS_OF` (`env.standupAsOf`) is the
+instant `Standup` reads the clock as, and it is read only while the test-run marker
+(`env.testRunMarker`) is set, so it does nothing in a shell you work in. `Tests/Test-Rituals.ps1`
+sets it for the children it starts, and every test runner removes it for the run with the two
+overrides above ([Testing](TESTING.md)).
+
 ## The agent's cache
 
 The agent keeps one thing on disk that is not a setting and not the hub's: what it has already read
