@@ -156,8 +156,10 @@ $runCli = {
         $rec.reason = 'Tests/Test-Toolkit.ps1 is not in this package'
         return $rec
     }
-    # The runner starts every suite in pwsh, so the CLI half needs it. The host
-    # this verb runs in is the answer when it is pwsh already.
+    # This verb starts the CLI runner in pwsh on every host, so the CLI half
+    # needs it; the runner then starts each suite in the host it is itself
+    # running in. The host this verb runs in is the answer when it is pwsh
+    # already.
     $pwshExe = ''
     if ($PSVersionTable.PSEdition -eq 'Core') {
         try { $pwshExe = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName } catch { $pwshExe = '' }

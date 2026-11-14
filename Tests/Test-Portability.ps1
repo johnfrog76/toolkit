@@ -43,7 +43,8 @@ if ($Help) {
             number, an archive pointer, a private repository or a machine path
   Clause 15 No gh, az or git call with a redirected stderr outside Invoke-TrackerRead.ps1
   Clause 22 Every suite starts its children through Invoke-P20TestHost (ratchet: the
-            allow-list only shrinks)
+            allow-list only shrinks), and the TestToolkit wrapper starts the runner in
+            the host it is typed in
   Clause 23 No file under Tests/ calls git with a redirected stderr outside Invoke-P20TestGit
             and no call of the helper writes an argument PowerShell splits or drops
             before the helper sees it; each argument reaches git as one value
@@ -1386,6 +1387,61 @@ $childPwshCases = @(
 foreach ($case in $childPwshCases) {
     $caseHits = @(Get-RawTrackerCalls $case.Body $childPwshPattern).Count
     Assert-True "Clause 22: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
+}
+
+# The verb that starts the runner is held to the same rule. TestToolkit typed
+# in Windows PowerShell 5.1 has to run the suites in 5.1, so its wrapper starts
+# the runner with Get-P20TestHost's answer and never with a host named in the
+# source. Read as syntax, so a comment or a string that names a host is not a
+# call.
+$runnerVerbAst = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $pkgRoot 'utilities.psm1'), [ref]$null, [ref]$null)
+$runnerVerbFn = @($runnerVerbAst.FindAll({ param($n) ($n -is [System.Management.Automation.Language.FunctionDefinitionAst]) -and ($n.Name -match '^(global:)?Test-P20Toolkit$') }, $true))
+$runnerVerbNamed = @()
+$runnerVerbAsks = 0
+if ($runnerVerbFn.Count -eq 1) {
+    foreach ($cmd in @($runnerVerbFn[0].Body.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true))) {
+        $cmdName = [string]$cmd.GetCommandName()
+        if ($cmdName -match '^(pwsh|powershell)(\.exe)?$') { $runnerVerbNamed += "$($cmd.Extent.StartLineNumber): $($cmd.Extent.Text)" }
+        if ($cmdName -eq 'Get-P20TestHost') { $runnerVerbAsks++ }
+    }
+}
+Assert-True "Clause 22: the TestToolkit wrapper names no host for the runner" (($runnerVerbFn.Count -eq 1) -and ($runnerVerbNamed.Count -eq 0)) ("start the runner with Get-P20TestHost's answer: " + ($runnerVerbNamed -join '; '))
+Assert-True "Clause 22: the TestToolkit wrapper asks Get-P20TestHost which host it runs in" ($runnerVerbAsks -eq 1) "calls of Get-P20TestHost in the wrapper: $runnerVerbAsks"
+
+# And typed: with a decoy named pwsh first on the PATH, the verb still starts
+# the real runner, in the host that typed it. A wrapper that names pwsh runs
+# the decoy instead and lists no suite.
+$runnerVerbBase = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-runner-host-" + [guid]::NewGuid().ToString('N'))
+try {
+    New-Item -ItemType Directory -Force -Path $runnerVerbBase | Out-Null
+    $runnerVerbEnc = New-Object System.Text.UTF8Encoding($false)
+    if ($env:OS -eq 'Windows_NT') {
+        [System.IO.File]::WriteAllText((Join-Path $runnerVerbBase 'pwsh.cmd'), "@echo off`r`necho DECOY-PWSH-RAN`r`n", $runnerVerbEnc)
+    }
+    else {
+        $runnerVerbDecoy = Join-Path $runnerVerbBase 'pwsh'
+        [System.IO.File]::WriteAllText($runnerVerbDecoy, "#!/bin/sh`necho DECOY-PWSH-RAN`n", $runnerVerbEnc)
+        & chmod +x $runnerVerbDecoy
+    }
+    # A file, not -Command: a child PowerShell 7 handed an encoded command
+    # answers in CLIXML, and its host lines would be drawn here as well.
+    $runnerVerbChild = Join-Path $runnerVerbBase 'child.ps1'
+    $runnerVerbBody = @'
+param([string]$Pkg, [string]$Bin)
+$env:PSModulePath = $Pkg
+$env:PATH = $Bin + [System.IO.Path]::PathSeparator + $env:PATH
+Import-Module (Join-Path (Join-Path $Pkg 'Prompt20Toolkit') 'Prompt20Toolkit.psd1') -Force -DisableNameChecking
+Test-P20Toolkit -List
+Write-Host ('RUNNER-VERB-RETURNED=' + $PSVersionTable.PSEdition)
+'@
+    [System.IO.File]::WriteAllText($runnerVerbChild, $runnerVerbBody, $runnerVerbEnc)
+    $runnerVerbOut = (Invoke-P20TestHost -File $runnerVerbChild -Arguments @('-Pkg', $pkgRoot, '-Bin', $runnerVerbBase) -NonInteractive | ForEach-Object { [string]$_ }) -join "`n"
+    Assert-True "Clause 22: TestToolkit, typed with a decoy pwsh first on the PATH, does not start the decoy" (($runnerVerbOut -notmatch 'DECOY-PWSH-RAN') -and ($runnerVerbOut -match ('RUNNER-VERB-RETURNED=' + $PSVersionTable.PSEdition))) $runnerVerbOut
+    Assert-True "Clause 22: and it reaches the real runner, which lists the suites" ($runnerVerbOut -match '(?m)^\s*-Portability\s+\[ok\]') $runnerVerbOut
+} catch {
+    Assert-True 'Clause 22: the typed case ran to the end without a terminating error' $false $_.Exception.Message
+} finally {
+    Remove-Item -LiteralPath $runnerVerbBase -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # -- Clause 23: a suite calls git through Invoke-P20TestGit --------------------

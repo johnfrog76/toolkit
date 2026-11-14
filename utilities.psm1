@@ -2499,7 +2499,12 @@ function global:Test-P20Toolkit {
     $forwardArgs = @()
     if ($Help) { $forwardArgs += '-Help' }
     if ($Rest) { $forwardArgs += $Rest }
-    & pwsh -NoProfile -File "$toolkitRoot\Tests\Test-Toolkit.ps1" @forwardArgs
+    # The runner starts in the host this verb was typed in: typed in Windows
+    # PowerShell 5.1, the suites run in 5.1. Get-P20TestHost is the one thing
+    # that names the running host, the same one the runner starts each suite with.
+    . "$toolkitRoot\Tests\Get-TestHost.ps1"
+    $runnerHost = Get-P20TestHost
+    & $runnerHost -NoProfile -File "$toolkitRoot\Tests\Test-Toolkit.ps1" @forwardArgs
 }
 
 # All three halves -- the agent's pytest, this runner, the web UI's npm test --
