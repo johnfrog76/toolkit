@@ -18,6 +18,10 @@
     Test-AdoEnabled.ps1: it reads no state, the caller hands it everything.
     agent/core/config.py's offered_orgs is the other half, and
     Tests/fixtures/offered-orgs/table.json holds the two to one table.
+
+    Select-P20SwitcherSpaces is the switcher's list: the offered Spaces less a
+    retired one (`status: archive`) unless it is the active Space. Only the
+    switcher uses it; a retired Space stays on every other list.
 #>
 
 function Select-P20OfferedSpaces {
@@ -34,4 +38,20 @@ function Select-P20OfferedSpaces {
         $offered += $o
     }
     return , $offered
+}
+
+function Select-P20SwitcherSpaces {
+    param(
+        [AllowNull()][object[]]$Spaces,
+        [AllowEmptyString()][AllowNull()][string]$ActiveSpace,
+        [bool]$Dismissed
+    )
+    $listed = @()
+    $offered = Select-P20OfferedSpaces -Spaces $Spaces -ActiveSpace $ActiveSpace -Dismissed $Dismissed
+    foreach ($o in $offered) {
+        $isRetired = ($o.PSObject.Properties.Name -contains 'status') -and ([string]$o.status -eq 'archive')
+        if ($isRetired -and [string]$o.slug -ne $ActiveSpace) { continue }
+        $listed += $o
+    }
+    return , $listed
 }

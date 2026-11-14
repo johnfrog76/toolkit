@@ -39,7 +39,9 @@ engineer's own machine state.
    files, so a shell that holds them points every test that copies
    ``samples/hub`` at a Space or folder that hub lacks. They are removed here for
    the run and put back afterwards, exactly as the webhooks are; a test that means
-   to exercise an override sets it itself.
+   to exercise an override sets it itself. ``P20_STANDUP_AS_OF``
+   (``env.standupAsOf``) goes with them: under the run marker the CLI's Standup
+   reads it as the clock, and a bridge child would inherit it.
 
 **The log redirect happens at IMPORT time, not in a fixture.** conftest is
 imported before test modules are collected, and collection runs module-level
@@ -83,7 +85,7 @@ WEBHOOK_PREFIX = _CONSTS["env"]["teamsWebhookPrefix"]
 AGENT_CACHE_ENV = _CONSTS["env"]["agentCacheDir"]
 TEST_HISTORY_ENV = _CONSTS["env"]["testHistoryDir"]
 TEST_RUN_MARKER = _CONSTS["env"]["testRunMarker"]
-RUN_OVERRIDES = (_CONSTS["env"]["activeSpace"], _CONSTS["env"]["promptsRoot"])
+RUN_OVERRIDES = (_CONSTS["env"]["activeSpace"], _CONSTS["env"]["promptsRoot"], _CONSTS["env"]["standupAsOf"])
 
 # See the module docstring: at import, because collection logs.
 USAGE_LOG_DIR = tempfile.mkdtemp(prefix="p20-test-logs-")

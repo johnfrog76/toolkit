@@ -60,13 +60,19 @@
     Windows PowerShell 5.1, and PowerShell 7 with
     $PSNativeCommandArgumentPassing set to Legacy, build a native command
     line by joining the arguments: an empty one vanishes and a double quote
-    inside one is not escaped. The helper escapes for that host
-    (ConvertTo-P20TestGitArgument), so '' and 'say "hi"' arrive as
-    themselves there too.
+    inside one is not escaped, and 5.1 wraps 'my dir\' in quotes without
+    doubling the backslash at its end. The helper escapes for that host with
+    the shipped rule, ConvertTo-P20NativeArgument
+    (Scripts/ConvertTo-NativeArgument.ps1, dot-sourced below), which
+    Invoke-P20TrackerRead applies too: there is one rule and no copy of it
+    here. So '', 'say "hi"' and 'my dir\' arrive as themselves there too.
 
 .NOTES
     PowerShell 5.1 compatible (ASCII only).
 #>
+
+# The one rule for a legacy host's arguments, shared with Invoke-P20TrackerRead.
+. (Join-Path (Join-Path (Split-Path -Parent $PSScriptRoot) 'Scripts') 'ConvertTo-NativeArgument.ps1')
 
 function Get-P20TestHost {
     <# The running host's own executable: pwsh, or powershell.exe on 5.1. #>
@@ -105,47 +111,14 @@ function Invoke-P20TestHost {
     & $exe @hostArgs 2>&1
 }
 
-function Test-P20TestLegacyNativeArguments {
-    <# True where the host joins a native command's arguments into one line
-       itself: Windows PowerShell 5.1, PowerShell 7.0 to 7.2, and a later one
-       whose $PSNativeCommandArgumentPassing is Legacy. #>
-    if ($PSVersionTable.PSVersion.Major -lt 6) { return $true }
-    $mode = Get-Variable -Name PSNativeCommandArgumentPassing -ValueOnly -ErrorAction SilentlyContinue
-    return ((-not $mode) -or ([string]$mode -eq 'Legacy'))
-}
-
-function ConvertTo-P20TestGitArgument {
-    <# One argument, as a legacy host has to be handed it for git to read the
-       value back. The host wraps an argument holding whitespace in double
-       quotes; it does nothing for an empty argument or for a double quote
-       inside one. So an empty one goes as "" and each double quote as \",
-       with the backslashes before it doubled, which is how the C runtime
-       reads a command line.
-
-       The trailing backslashes of a value it wraps are where the hosts part.
-       PowerShell 7's Legacy mode doubles them itself; Windows PowerShell 5.1
-       does not, so `my dir\` goes out as "my dir\" and the C runtime reads
-       \" as a quote, swallowing the next argument. On 5.1 the helper doubles
-       them; on 7 it leaves them, or they would be doubled twice. #>
-    param([AllowEmptyString()][string]$Value)
-    if ($Value.Length -eq 0) { return '""' }
-    if ($Value.IndexOf('"') -ge 0) {
-        $Value = [regex]::Replace($Value, '(\\*)"', '$1$1\"')
-    }
-    if ($PSVersionTable.PSEdition -eq 'Desktop' -and $Value -match '\s') {
-        $Value = [regex]::Replace($Value, '(\\+)$', '$1$1')
-    }
-    return $Value
-}
-
 function Invoke-P20TestGit {
     # No param block: a dash-led argument (-C, -c, --quiet) reaches git rather
     # than binding here. The header says which bare words PowerShell splits
     # before this function sees them.
     $ErrorActionPreference = 'Continue'
     $gitArgs = @($args | ForEach-Object { $_ } | ForEach-Object { [string]$_ })
-    if (Test-P20TestLegacyNativeArguments) {
-        $gitArgs = @($gitArgs | ForEach-Object { ConvertTo-P20TestGitArgument $_ })
+    if (Test-P20LegacyNativeArguments) {
+        $gitArgs = @($gitArgs | ForEach-Object { ConvertTo-P20NativeArgument $_ })
     }
     $global:LASTEXITCODE = 0
     $raw = @(& git @gitArgs 2>&1)

@@ -100,8 +100,14 @@ lives in the Lounge (spec D-L24). Never a Space switcher: the avatar menu is the
 **The Claude Code burn** comes last, on any Space and tier, **only where `/env`'s `claudeUsage` is true** --
 the **Claude Code usage** inventory row's rule, Claude Code's projects folder on the agent's machine. Off or
 absent, there is no tile and nothing asks `GET /api/usage/burn` (which is 404 there). So a connected machine
-with Claude Code shows five cards, a second page of System's pager, and a Tier 3 one four
+with Claude Code shows five cards and a Tier 3 one four
 (`web/src/shell/scenarios.test.tsx`, "System's Claude Code burn tile").
+
+**System's cards sit under in-page tabs**, the same tab row Home and Team Agile use, each tab an address:
+**Overview** (`/system`) holds Environment, Modules, Log and Test Health, and **Agents** (`/system/agents`)
+holds the Claude Code burn. A tab with no cards is absent, and with fewer than two tabs there is no strip,
+so a machine without Claude Code sees System exactly as before, with no pager (`web/src/shell/scenarios.test.tsx`,
+"System's tabs").
 
 | `claudeUsage` | Tier 1-2 | Tier 3 |
 | --- | --- | --- |
@@ -139,6 +145,11 @@ when the Space's repository is -- said, never asked (`ActionDialog.titles.test.t
 | solitaireAgile | + Team Agile, after the Studio and before the Lounge's place -- **on a GitHub Space answered With agents** | today's standup (M0). The switch is the engineer's, the answer the Space's: on an Azure DevOps Space, a Space with no tracker, or a GitHub Space answered Alone (or not yet), the agent serves the flag off and there is no tab -- the "How do I…" table below. An active GitHub Space fills from its issues and its cards, joined on the id; a local one from its cards |
 | lounge | + Lounge, **last** | you look up from the work, so the room stands apart |
 | all six | [Space] \| System · Daily · Growth · Organize · Studio · Team Agile · Lounge | Meetings and Decks are carried, not lost |
+
+**Organize's tab has two pages under in-page tabs**, the same tab row Home and Team Agile use: **Reminders**
+(`/organize`) and **Reference** (`/organize/reference`, the hub's reference documents, listed and searched,
+and `/organize/reference/<file name>` to read one). With organize off, none of the three is a route and
+`GET /api/reference` is 404 (`web/src/shell/scenarios.test.tsx`, "Organize's Reference page").
 
 The add-ons are the ENGINEER's, so the same nav shows on Demo (local) and on a GitHub space; only
 Home's strip differs there -- and Team Agile, which the Space's answer gates: Demo has no tracker,

@@ -20,6 +20,8 @@ own checkout -- and it need not be a git repository (`storeSync`, [Configuration
   resume/                   resume.md
   reminders/                reminders                              -- the engineer's
     current/  archive/
+  reference/                documents kept for reading             -- the engineer's, read by Organize
+    current/
   design/                   design notes that belong to no product yet -- the engineer's (Studio)
     archive/
   spec/                     the hub's specs, the four-folder road a product keeps too
@@ -40,6 +42,7 @@ own checkout -- and it need not be a git repository (`storeSync`, [Configuration
 | `reviews/` | `reviews/<slug-set>/<year>/<start>_<end>/review.md` -- a generated work review; `<slug-set>` is org slugs joined by `+`, and membership is SET membership, never a substring. `reviews/archive/` holds the ones put away, `**Closed:**` in their `review.md` ([growth](growth.md#a-review-put-away)) | the engineer | [the growth module](../modules/growth.md) (`NewWorkReview`); `consts.json` `reviews` | `samples/hub/reviews/` |
 | `resume/` | `resume.md` | the engineer | [the growth module](../modules/growth.md) (`UpdateResume`) | `samples/hub/resume/` |
 | `reminders/` | one reminder -- a note to yourself with a due date -- `current/` then `archive/` | the engineer | [`reminders.md`](reminders.md) | `samples/hub/reminders/`, `Tests/fixtures/hub/reminders/` |
+| `reference/` | one reference document -- kept for reading, not for doing: a holiday list, a policy guide -- in `current/`; filed by hand, never written by a verb | the engineer | [`reference.md`](reference.md) | `samples/hub/reference/`, `Tests/fixtures/reference/` |
 | `design/`, `design/archive/`, `spec/`, `spec/archive/` | one design note, or the spec it graduated to -- the same four folders a product's repo keeps, and the same state read from where the files are (Design, Spec, Complete, Archived) | the engineer | [`design.md`](design.md) | `Tests/fixtures/hub/design/`, `Tests/fixtures/design/states.json` |
 | `agentic/` | one prompt of yours, `<name>.prompt.md` -- listed on the Studio's Prompts card under **Your hub**, on every machine | the engineer | [A prompt of yours](#a-prompt-of-yours----agentic) below; [`agentic/README.md`](../../agentic/README.md) | `agentic/` in the package -- the shipped ones are the same shape |
 | `usage/` | `<yyyy-mm-dd>-<machine>.json` -- **the day's Claude Code usage** on one machine, read from Claude Code's own session files: tokens by model and by session, a cost derived from list prices. Written by `Burn -Log`, replaced whole on a re-run. And `readings/<week start>-<machine>.json` -- **the plan's weekly readings**, typed with `Burn -Reading`, appended | the engineer, per machine | [`usage.md`](usage.md) | `Tests/fixtures/usage/record.json` |

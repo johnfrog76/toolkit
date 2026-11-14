@@ -633,6 +633,26 @@ class EnvReportsGateTwo(ManagerRouteTestCase):
     def test_post_retro_summary_is_reported(self):
         self.assertTrue(self._block()["postRetroSummary"])
 
+    def test_sending_off_follows_the_run_marker(self):
+        # A server started for review or testing sets the marker, and nothing
+        # posts from it. /env says so, so a page can tell "sending is off here"
+        # from "no webhook is set".
+        marker = consts.env_test_run_marker()
+        with mock.patch.dict(os.environ, {marker: "1"}):
+            self.assertIs(self._block()["sendingOff"], True)
+        without = {k: v for k, v in os.environ.items() if k != marker}
+        with mock.patch.dict(os.environ, without, clear=True):
+            self.assertIs(self._block()["sendingOff"], False)
+
+    def test_sending_off_is_the_engine_s_own_answer(self):
+        # One rule for the page and the POST: where /env says sending is off,
+        # the engine refuses to post.
+        with mock.patch.dict(os.environ, {consts.env_test_run_marker(): "1"}):
+            self.assertTrue(self._block()["sendingOff"])
+            ok, detail = manager.comms._post_to_webhook(DUMMY_WEBHOOK, "x")
+        self.assertFalse(ok)
+        self.assertIn("refused", detail)
+
 
 class EnvWhenTheModuleCannotDescribeItself(ManagerRouteTestCase):
     """A module that raises while describing itself is left out of /env, and the

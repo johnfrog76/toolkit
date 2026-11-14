@@ -10,6 +10,11 @@
 //      data, no source. Each pass is a new browser context, so a request it
 //      counts is its own. The cases are docs/SCENARIOS.md's rows, "The nav, by
 //      module": one row per module, named on each case below.
+//      THE BOARD, BY TRACKER rides the matrix (boardLanesCheck, shared with
+//      the plain modes): before the first pass the fixture's Space has an
+//      Azure DevOps address, so the board draws four lanes and the planned
+//      card in Active; after the Team Agile pass the Space has a GitHub one,
+//      so it draws five, Backlog first, holding that card.
 //   2. THE FLIP with no restart -- flipCase, shared with --studio.
 //   3. FRESH AND HOSTILE STORAGE. Each surface that keeps a choice in the
 //      browser -- the Spaces card's filter, the Reminders card's filter, the
@@ -26,6 +31,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   answerWithAgents,
+  boardLanesCheck,
   flipCase,
   launchChromium,
   mainNavEntries,
@@ -179,6 +185,27 @@ async function matrixPass(browser, stack, check, mod) {
       }
     }
     check(`${label}: no page errors`, errors.length === 0, errors.join(" | "));
+  } finally {
+    await ctx.close();
+  }
+}
+
+// -- the board, by tracker ------------------------------------------------------
+
+/** The board's lanes on the Space as it stands: `expect` is the tracker the run has set up. */
+async function boardCase(browser, stack, check, expect) {
+  const { ctx, page, errors } = await newRecordedPage(browser);
+  try {
+    await boardLanesCheck({
+      page,
+      base: stack.base,
+      open: (route) => openRoute(page, stack.base, route),
+      check,
+      label: `board[${expect}]: `,
+      expect,
+      required: true,
+    });
+    check(`board[${expect}]: no page errors`, errors.length === 0, errors.join(" | "));
   } finally {
     await ctx.close();
   }
@@ -374,7 +401,9 @@ export async function runMatrix({ repoRoot, agentPort, webPort, python }) {
   }
   console.log(`smoke: ${stack.base} (agent ${stack.agentPort}, scratch package ${stack.pkg})`);
   try {
+    await boardCase(browser, stack, check, "ado");
     for (const mod of MODULES) await matrixPass(browser, stack, check, mod);
+    await boardCase(browser, stack, check, "github");
 
     const off = await setFlags(stack.base, allOff());
     check("flip: every module flag off first", off.status === "success", off.error ?? "");

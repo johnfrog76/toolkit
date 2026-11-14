@@ -37,7 +37,7 @@ READ_TTL_SECONDS = LIST_TTL_SECONDS
 _OPEN = "OPEN"
 
 # key -> (when, the answer). A key is ("labels", repo), ("issues", repo, state,
-# body), ("milestones", repo) -- the Milestones tab's read (milestones.py) --
+# body), ("milestones", repo) -- the Releases tab's read (milestones.py) --
 # ("dates", repo, hashes, numbers) -- the standup's commit dates and issue
 # timelines (``dates``) -- or ("viewer",).
 _reads: dict[tuple, tuple[float, object]] = {}

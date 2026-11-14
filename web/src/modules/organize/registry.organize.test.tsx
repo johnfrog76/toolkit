@@ -19,6 +19,8 @@ jest.mock("../growth", () => ({ growthModule: { id: "growth", feature: "growth",
 jest.mock("../communication", () => ({
   communicationModule: { id: "communication", feature: "communication", routes: [] },
 }));
+jest.mock("./OrganizePages", () => ({ OrganizeHome: () => null, OrganizeReference: () => null }));
+jest.mock("./ReferencePage", () => ({ ReferencePage: () => null }));
 jest.mock("./RemindersCard", () => ({ RemindersCard: () => null }));
 jest.mock("./ReminderBell", () => ({ ReminderBell: () => null }));
 
@@ -73,7 +75,11 @@ describe("the organize module's registry contract", () => {
 
   it("contributes its own tab when the flag is on, and no card elsewhere", () => {
     const active = activeModules(all, env({ organize: true }));
-    expect(moduleRoutes(active).map((r) => r.path)).toEqual(["/organize"]);
+    expect(moduleRoutes(active).map((r) => r.path)).toEqual([
+      "/organize",
+      "/organize/reference",
+      "/organize/reference/:name",
+    ]);
     expect(moduleNav(active, ctx).map((n) => n.label)).toEqual(["Organize"]);
     expect(moduleCards(active, ctx, "home")).toEqual([]);
     expect(moduleCards(active, ctx, "system")).toEqual([]);

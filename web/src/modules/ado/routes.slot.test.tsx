@@ -58,6 +58,7 @@ const pathOf = (id: string) => GH_STRIP.find((t) => t[0] === id)![2];
 const tabsValue = (): ShellValue => ({
   cards: { home: [], system: [] },
   homeTabs: GH_STRIP.map(([id, label, path]) => ({ id, label, path, cards: [] })),
+  systemTabs: [],
   slot: () => [],
   openSettings: () => {},
   pager: { page: 0, totalPages: 1, onPageChange: () => {} },

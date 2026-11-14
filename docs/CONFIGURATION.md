@@ -254,9 +254,13 @@ config file, and a build that asked for the port would refuse.
   "whatever ships ... follow the same pattern"; the demo Spaces are
   [the add-on's](modules/ado.md#the-demo-spaces-one-per-grain)). Set this `true` (Settings: **Hide Demo**) and those orgs are left out of every list a
   person picks an org from: the web's switcher, Settings, the Reviews page's org chips (all read `/env`'s
-  `config.spaces`, which the agent filters), and `tkSwitchSpace Status`. It is **never removed from
-  config**, `tkSwitchSpace azure-demo` still works, and the org you are IN is always shown. One rule in each
-  half -- `Scripts/Select-OfferedSpaces.ps1` and `offered_spaces` in `agent/core/config.py` -- held to one
+  `config.spaces`, which the agent filters). The switcher leaves off one more: a **retired** Space (`status: archive`,
+  `tkRetireSpace`), whatever this is set to. That list is `/env`'s `config.switcherSpaces` (slugs) and
+  `tkSwitchSpace Status`; `config.spaces` keeps the retired Space, so its cards, reviews and row under
+  Archive stay. Nothing is **removed from config**, `tkSwitchSpace azure-demo` (or a retired Space) still
+  works, and the org you are IN is always shown. The switcher rule is `Select-P20SwitcherSpaces`
+  (`Scripts/Select-OfferedSpaces.ps1`) and `switcher_spaces` in `agent/core/config.py`, on top of the offered
+  rule (`Select-P20OfferedSpaces`, `offered_spaces`); the switcher rule is held to one
   table, `Tests/fixtures/offered-orgs/table.json`. `tkStart` does not set it. Not an opt-in surface, so
   it has no row in the inventory.
 - **`commandPrefix`, and the name in `aliases.<name>`** -- become part of a command. A prefix is a
@@ -331,7 +335,8 @@ is no "not configured": the shipped config answers `none`.
   count that was true a minute ago.
 
 Every git call this makes is the CLI half's -- `Scripts/Get-HubSyncState.ps1`, through
-`Invoke-P20TrackerRead` -- so it reads the same on Windows PowerShell 5.1 as on 7. The hub must be the
+`Invoke-P20TrackerRead` -- so it reads the same on Windows PowerShell 5.1 as on 7, a hub whose path holds a
+space and ends in a separator included. The hub must be the
 root of its repository, the same question `Sync` asks before it writes; a hub with no upstream branch
 says so in git's words.
 
@@ -409,8 +414,9 @@ shipped file carries an empty `limits` block and nothing in it.
 
 Where a Space's own repository is cloned **on this machine**: `tkConfig -Set spaceCheckouts.toolkit.path=~/Repos/toolkit`,
 or the **This Space's checkout** row in Settings (the drawer lists the Space you are in; another Space's is set by
-its key). A folder anywhere inside the clone will do; the path is absolute or starts with `~`. Keyed by the
-Space's slug, and the slug must be a declared Space.
+its key). A folder anywhere inside the clone will do; the path is absolute or starts with `~`, and a separator
+at its end is ignored (`C:\My Repos\product\` reads as `C:\My Repos\product`; a drive root stays as written).
+Keyed by the Space's slug, and the slug must be a declared Space.
 
 **It is this machine's, and only ever this machine's.** It is written to `config.local.json` and nowhere else:
 `-Hub` with it is refused, and a `spaceCheckouts` block in `config.default.json` or `hub.json` is read by
@@ -446,6 +452,8 @@ the host in any case and a trailing `.git` optional. A Space with several projec
 it has no clone to find. The patterns are `consts.json` `regex.adoOrigin*` and `regex.adoOrg*`. The agent asks the same question of the configured path alone for the Design tab
 (`agent/core/checkout.py`, on every `GET /api/design`, as `checkout`), and never searches; the path and
 origin rules (GitHub's and Azure DevOps's) are one table both halves assert, `Tests/fixtures/space-checkout/table.json`.
+What counts as absolute is the platform's, so the table's absolute-path rows carry `os` (`posix` for `/srv/clones/r`,
+`windows` for `C:\clones\r`) and each suite runs the rows for the platform it is on; the `~` and relative rows run everywhere.
 
 Unset, a product row keeps its one link out, **Open on GitHub**, and the Design tab's foot names this setting;
 set to a folder that is not a clone of the Space's repository, the foot says why. `tkEnv` lists it under
@@ -927,6 +935,12 @@ and `Config` does not know them: they are a launcher's, not a setting. One conse
 effect in that process -- the override wins, which is what it is for. Without it, a shell that was open when another one wrote `activeSpace` (the GUI's switch, `Config -Set`) acts on the new Space from its next verb: the module compares the write times of `config.local.json` and `hub.json` before each verb and re-imports when either moved. `PROMPTS_ROOT` and `P20_ACTIVE_SPACE` are part of the same comparison, so one exported into a shell that had already loaded the toolkit (a profile that imports it at startup) is seen on the next verb exactly as a changed file is -- `Env`'s `Hub` check and its `Your hub` row then name one hub, and the verb acts on it, saying `Hub changed to <path> since this shell loaded (it was <path>); re-read.` once. All three names are in the
 contract (`env.promptsRoot`, `env.activeSpace`, `env.features`): the two newer ones because both halves
 type them, and `PROMPTS_ROOT` because every test runner removes it for the run by that name.
+
+One more name is in that block and is not a setting: `P20_STANDUP_AS_OF` (`env.standupAsOf`) is the
+instant `Standup` reads the clock as, and it is read only while the test-run marker
+(`env.testRunMarker`) is set, so it does nothing in a shell you work in. `Tests/Test-Rituals.ps1`
+sets it for the children it starts, and every test runner removes it for the run with the two
+overrides above ([Testing](TESTING.md)).
 
 ## The agent's cache
 

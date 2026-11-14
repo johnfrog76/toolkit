@@ -150,7 +150,7 @@ export function EnvCard({ className }: { className?: string }) {
                 {env.hubSync ? <HubSyncRow sync={env.hubSync} /> : null}
               </div>
               {env.features?.communication === true && communication ? (
-                <EnvRecipients recipients={communication.recipients} />
+                <EnvRecipients communication={communication} />
               ) : null}
             </>
           ) : null}

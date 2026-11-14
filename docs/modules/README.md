@@ -189,8 +189,8 @@ Where the things a person keeps in order live; reminders is its first surface. B
 | --- | --- |
 | Flag | `features.organize` -- top-level, engineer-scoped |
 | Verbs | `NewReminder`, `Reminders` (`-Snooze`, `-Due`, `-NoDue`, `-Title`, `-Source`, `-Ref`, `-Archive`, `-All`). Each answers `-Help`; flags are in [the command reference](../CLI.md#the-opt-in-modules-verbs) |
-| Agent | `agent/organize/` -- `reminders.py`, one gated router, `GET /api/reminders`, **reads only** |
-| Web UI | `web/src/modules/organize/index.tsx`, export `organizeModule` -- the `Organize` tab at `/organize`: the Meetings card through the `organize` slot when communication is on, then the Reminders card |
+| Agent | `agent/organize/` -- `reminders.py` and `reference.py`, one gated router, `GET /api/reminders`, `GET /api/reference` and `GET /api/reference/{name}`, **reads only** |
+| Web UI | `web/src/modules/organize/index.tsx`, export `organizeModule` -- the `Organize` tab at `/organize`, under in-page tabs **Reminders** (the Meetings card through the `organize` slot when communication is on, then the Reminders card) and **Reference** (`/organize/reference`, the hub's reference documents) |
 | Hub folder | `reminders/current/` and `reminders/archive/`, a hub-root sibling -- [`docs/hub/reminders.md`](../hub/reminders.md) is the file contract |
 | Everything else | [`docs/modules/organize.md`](organize.md) |
 

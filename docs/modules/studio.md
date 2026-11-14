@@ -549,8 +549,6 @@ Each of these is a block on [Known gaps](../KNOWN-GAPS.md), with its issue:
 - **No comment from the reading room.** The thread is read, not answered: commenting stays on github.com
   until a reply route exists (the S2 bullet left open)
   ([Promote files only into the Space you are in](../KNOWN-GAPS.md#promote-files-only-into-the-space-you-are-in)).
-- **A retired Space is still on the avatar menu's Space list** -- the switcher's offered rule was not
-  changed when retiring was built ([A retired Space stays on the Space list](../KNOWN-GAPS.md#a-retired-space-stays-on-the-space-list)).
 - **Every Space is read by the one `gh` login.** A second GitHub login (a work account beside a
   personal one) is not built: a repository only the other login can see reads `Visibility unknown` and
   `not visible to this login` in the **Add owner/name** row, and can still be added

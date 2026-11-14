@@ -94,7 +94,8 @@ agent/
 │   └── comms.py              the communication engine
 ├── organize/               opt-in, features.organize
 │   ├── __init__.py           the router `app.py` mounts, gated per request
-│   └── reminders.py          GET /reminders -- read only; every write is a verb through the bridge
+│   ├── reminders.py          GET /reminders -- read only; every write is a verb through the bridge
+│   └── reference.py          GET /reference, GET /reference/{name} -- the hub's reference documents, read only
 ├── studio/                 core, no flag (D-S13) -- always mounted
 │   ├── __init__.py           the router `app.py` mounts -- notes', spaces', prompts' and the ledger's together
 │   ├── ledger.py             GET /studio/ledger -- every GitHub Space's report, runs, visibility and design counts for the Spaces card: one gh api graphql call, kept on disk 600 s
@@ -106,7 +107,7 @@ agent/
     ├── standup.py            GET /ritual/standup -- the standup, derived from a GitHub Space's tracker; writes nothing to the hub
     ├── remind.py             GET /ritual/standup/remind, POST /ritual/standup/attend -- the reminder to attend; writes only through Organize's verbs
     ├── tracker.py            the one GitHub read the standup and triage share, each gh answer kept 60 s
-    ├── milestones.py         GET /ritual/milestones -- the Milestones tab: the core's milestone rows, gated, kept a minute
+    ├── milestones.py         GET /ritual/milestones -- the Releases tab: the core's milestone rows, gated, kept a minute
     └── triage.py             GET /ritual/triage -- the open issues by milestone (V1); the answers are Route, through the bridge
 ```
 
@@ -346,7 +347,7 @@ remembering.
 built on, and a 403 says something different: that the route exists and you may not have it. It does
 not exist. With the flags off, `/api/growth`, `/api/manager`, `/api/resume`, `/api/reviews`,
 `/api/review-preview`, `/api/resume-preview`, `POST /api/comms/send`, `POST /api/rewrite`,
-`/api/reminders`, `/api/ritual/standup` (with `GET /api/ritual/standup/remind` and
+`/api/reminders`, `/api/reference`, `/api/ritual/standup` (with `GET /api/ritual/standup/remind` and
 `POST /api/ritual/standup/attend`, which sit on the same gated router), `/api/ritual/triage` and `/api/ritual/milestones` all answer 404. `/api/studio/design`
 always answers: a `features.studio` left in a config is ignored.
 
@@ -446,7 +447,8 @@ without the module still serves `/env`.
   "recipients": [
     { "key": "manager", "display": "My Manager (DM via Workflow)", "type": "channel",
       "scope": "managerWorkflow", "webhookEnv": "TEAMS_WEBHOOK_MANAGER", "configured": false }
-  ]
+  ],
+  "sendingOff": false
 }
 ```
 
@@ -455,6 +457,10 @@ named environment variable is set, and `webhookEnv` names it so the UI can tell 
 rather than merely refusing; with `TEAMS_WEBHOOK_MANAGER` unset it is `false`, as above. **The URL
 itself is never in config and never in this response** --
 config names the variable, the environment holds the value.
+
+`sendingOff` is whether this server was started with sending turned off -- the run marker
+(`consts.json` `env.testRunMarker`) is set, which is what makes the engine refuse to post. The UI
+reads it to tell "sending is off on this server" from "no webhook is set".
 
 `scope` says which config block each entry came from: `managerWorkflow` for a recipient declared
 under `managerWorkflow.communication.recipients`, the same in every Space, or `org` for one declared
@@ -554,6 +560,8 @@ And the modules', gated per request on their flag and 404 when it is off:
 | `PUT /manager/{filename}` | `communication/manager` | one session | **that session** |
 | `POST /comms/send` | `communication/manager` | `/env`'s recipient registry, the webhook variable | **an outbound webhook** |
 | `POST /rewrite` | `communication/manager` | a model | — |
+| `GET /reference` | `organize/reference` | `{hub}/reference/current/` -- gated on `features.organize`, 404 when off; `?q=` keeps the documents with every word, any order, case ignored | — (a person files these by hand) |
+| `GET /reference/{name}` | `organize/reference` | one document in `{hub}/reference/current/` -- gated on `features.organize`, 404 when off | — |
 | `GET /reminders` | `organize/reminders` | `{hub}/reminders/current/` -- gated on `features.organize`, 404 when off; the bucket derived against the local clock | — (every reminder write is `NewReminder` / `Reminders` through the bridge) |
 
 | Route | Package | Gate | Reads | Writes |
@@ -567,7 +575,7 @@ And the modules', gated per request on their flag and 404 when it is off:
 | `GET /spaces/candidates` | `studio/spaces` | none -- core; not tier-gated, because these are the `gh` account's repositories, not the active Space's tracker (a local Demo Space is exactly when they are wanted) | `NewSpace -Discover -AsJson` through the bridge (`run_command`), `?owner=` as its `-Owner` (an organisation's, or `collaborator`), `?repo=owner/name` as its `-Repo` (the one repository typed into the dialog's search, read before it is added, with a `note` when the `gh` login cannot see it), with the `owners` the dialog's selector offers, the `ceiling` a list is read to and `more` when it stopped there: each repository with owner, visibility, `isArchived` (GitHub has archived it), `viewerPermission` and `readOnly` (you can read it and not write to it), the slug and name `NewSpace` would give it, and `space` when it already is one. Never refused: no `gh`, `gh` signed out, or a bridge that cannot run answers `available: false` and the sentence why | — (a Space is added by `NewSpace` through the bridge) |
 | `GET /ritual/standup` | `solitaire/standup` | `features.solitaireAgile` as resolved, per request -- the switch on AND the active Space answered `agents` (`how_i_work`); **404** when off, its detail naming which. `?space=<slug>` scoped like `/issue-report` (an unknown slug is 404); `?since=<yyyy-MM-dd>` widens yesterday's window back to that day, as `Standup -Since` does -- a `since` that is not a day, or is after today, is **422** naming it | the Space's `gh label list` and `gh issue list --state all` -- workers are the labels whose description starts `consts.json` `rituals.workerLabelPrefix`; slots, queue and the `Config/standup-vocabulary.json` pick per the spec's "The M0 build contract". A Space with no address, or a `local` one, reads its own `current/` and `archive/` instead (`source: cards`, no `gh`). An ADO Space (`rituals.text.adoTracker`), tier below 1 or a silent `gh` is still **200**, `tracker.ok` false and the reason in `text`. `text` is the CLI's `Standup` byte for byte for the same issues (`Tests/fixtures/rituals/`), both reading up to `consts.json` `ghReads`; `work` is the same standup at the grain of the work -- each slot's items grouped by milestone, design card or common stem, one phrase a group, each group spoken as one standup sentence (each worker's `prose`, and `queueProse`), and its `text` the CLI's `Standup -Grain work` (`standup-work.json`, `standup-prose.json`), for which the issue read also asks `gh` for `milestone` and `body`. Every slot item carries `motion` (`closed`, `started` or `inProgress`) and `commits`, its card's distinct hashes, and `counts` sums them per worker and in total -- the brief's first line (`standup-joined.json`'s `counts`, `not-billable-counts` and `window-three-days` cases). `spoken` is this route's alone: with `ANTHROPIC_API_KEY` set, each worker sentence re-said by the model (`core/model.py`, `ai.model`) and kept only where `dress_guard` finds no fact added, dropped or changed (`standup-dress.json`); null with no key -- the decline is logged, never a 412 -- and the played view then speaks `work`. A reply is kept by a hash of the model, the register and the facts, in memory and on disk (`core/disk_cache.py`), so a sentence is re-dressed only when its facts change; the guard runs on a kept reply too. Each `gh` answer is kept 60 s in `solitaire/tracker.py`, shared with `/ritual/triage`; `?refresh=1`, or any verb through the bridge, reads again | — |
 | `GET /ritual/triage` | `solitaire/triage` | as `/ritual/standup` | the Space's `gh label list` and `gh issue list --state open` with `milestone` -- the open issues grouped by milestone (none first, then most open), each with its worker (the size), severity and `deep-water`, each group's "N open, M routed, K unrouted"; the words, slots and severities are `Config/ceremonies.json`'s `triage`. No tracker is still **200** with a `Tracker` line. `text` is the CLI's `Triage` byte for byte for the same issues (`Tests/fixtures/rituals/triage*`), both reading up to `consts.json` `ghReads`. The reads are the standup's kept ones (`solitaire/tracker.py`, 60 s): the open issues come from the standup's all-states read while it is fresh and complete; `?refresh=1`, or any verb through the bridge, reads again | — (every answer is `Route` through the bridge) |
-| `GET /ritual/milestones` | `solitaire/milestones` | as `/ritual/standup` | one `gh api --method GET repos/{owner}/{repo}/milestones -f state=all -F per_page=100` per repo, through `ado/accounting`'s `github_milestone_rows` -- the rows `/milestones` serves, `reached` its one rule -- with `space`, `tracker` (`ok`, `reason`; any repo failing fails the read) and the tracker's kept read (60 s; `?refresh=1` or a verb through the bridge reads again). The Milestones tab and its award (`docs/modules/solitaire-agile.md`) | nothing |
+| `GET /ritual/milestones` | `solitaire/milestones` | as `/ritual/standup` | one `gh api --method GET repos/{owner}/{repo}/milestones -f state=all -F per_page=100` per repo, through `ado/accounting`'s `github_milestone_rows` -- the rows `/milestones` serves, `reached` its one rule -- with `space`, `tracker` (`ok`, `reason`; any repo failing fails the read) and the tracker's kept read (60 s; `?refresh=1` or a verb through the bridge reads again). The Releases tab and its award (`docs/modules/solitaire-agile.md`) | nothing |
 | `GET /ritual/standup/remind` | `solitaire/remind` | as `/ritual/standup` | the standup reminder as it stands, for the settings row: whether `features.organize` is on, and the open reminder's id, due, cadence (`HH:mm days`), time and days, from the hub's `reminders/current/` (source `standup`) | — |
 | `POST /ritual/standup/attend` | `solitaire/remind` | as `/ritual/standup` | the open standup reminder; once a day, the page calls it per view | nothing itself -- `Reminders <id> -Archive` and `NewReminder` through the bridge, the reminder's one writer. With `features.organize` off it does nothing and says so (`action: off`); not an error |
 

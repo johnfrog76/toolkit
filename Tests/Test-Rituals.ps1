@@ -842,7 +842,10 @@ foreach ($row in $cornerRows) {
     $cards = @(ConvertTo-CornerCardRows $row.cards)
     $items = @(Get-P20SuggestionItems -Labels @($cornerTable.workerLabels) -Issues @($row.issues) -Cards $cards -PackageRoot $pkgRoot)
     $closed = @(Get-P20CornerClosed -Issues @($row.issues) -Cards $cards -Since $cornerSince -AsOf $cornerAsOf)
-    $got = Get-P20CornerLine -Items $items -Closed $closed -PackageRoot $pkgRoot
+    # howIWork and launch are the row's when it names them: alone and off otherwise.
+    $rowHow = 'alone'
+    if ($row.PSObject.Properties['howIWork']) { $rowHow = [string]$row.howIWork }
+    $got = Get-P20CornerLine -Items $items -Closed $closed -PackageRoot $pkgRoot -HowIWork $rowHow -Launch ([bool]$row.launch)
     $exp = $row.expected
     $ok = ($got.shape -ceq [string]$exp.shape -and $got.milestone -ceq [string]$exp.milestone -and [int]$got.remaining -eq [int]$exp.remaining -and
         $got.ref -ceq [string]$exp.ref -and $got.kind -ceq [string]$exp.kind -and $got.noun -ceq [string]$exp.noun -and
@@ -857,11 +860,14 @@ foreach ($case in @($cb.cases)) {
     $s = Invoke-P20StandupJoinedFill -AsOf $cornerAsOf -Labels @($cornerTable.workerLabels) -Issues @($case.issues) -Tracker @{ ok = $true; reason = '' } `
         -Cards $cards -Space ([string]$cb.space) -SpaceName ([string]$cb.spaceName) -PackageRoot $pkgRoot
     $on = Test-P20SuggestionsOn -TeamAgile $true -Stored $case.suggestions
-    $null = Add-P20StandupSuggestion -Standup $s -Labels @($cornerTable.workerLabels) -Issues @($case.issues) -Cards $cards -HowIWork ([string]$case.howIWork) -On $on -Prefix ([string]$cb.prefix) -PackageRoot $pkgRoot
-    $null = Add-P20StandupCorner -Standup $s -Labels @($cornerTable.workerLabels) -Issues @($case.issues) -Cards $cards -On $on -Prefix ([string]$cb.prefix) -PackageRoot $pkgRoot
+    $null = Add-P20StandupSuggestion -Standup $s -Labels @($cornerTable.workerLabels) -Issues @($case.issues) -Cards $cards -HowIWork ([string]$case.howIWork) -On $on -Prefix ([string]$cb.prefix) -PackageRoot $pkgRoot -Launch ([bool]$case.launch)
+    $null = Add-P20StandupCorner -Standup $s -Labels @($cornerTable.workerLabels) -Issues @($case.issues) -Cards $cards -On $on -Prefix ([string]$cb.prefix) -PackageRoot $pkgRoot -HowIWork ([string]$case.howIWork) -Launch ([bool]$case.launch)
     $gotShape = $null
     if ($null -ne $s.corner) { $gotShape = $s.corner.shape }
     Assert-True "corner brief $($case.name): the shape" ("$gotShape" -ceq "$($case.expected.shape)") "got $gotShape"
+    if ($null -ne $s.corner -and $s.corner.command -and $null -ne $s.suggestion -and [string]$s.suggestion.ref -ceq [string]$s.corner.ref -and [string]$s.suggestion.shape -ceq [string]@($consts.rituals.suggestShapes)[1]) {
+        Assert-True "corner brief $($case.name): the Corner and the suggestion name one command for the pick they share" ([string]$s.corner.command -ceq [string]$s.suggestion.command) "corner '$($s.corner.command)', suggestion '$($s.suggestion.command)'"
+    }
     $brief = Format-P20StandupBrief -Standup $s -PackageRoot $pkgRoot
     $golden = [System.IO.File]::ReadAllText((Join-Path $fixtureDir ([string]$case.expected.brief)))
     Assert-True "corner brief $($case.name): $($case.expected.brief), byte for byte" ($brief -ceq $golden) ("`n--- got ---`n$brief--- want ---`n$golden")
@@ -878,20 +884,44 @@ $hub = Join-Path $scratch 'hub'
 $logDir = Join-Path $scratch 'log'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
+# One instant for the whole typed section. The verb runs in a child process, so
+# an expectation built from this process's clock is a second reading of now, and
+# the two disagree when a run crosses midnight. The suite reads the clock once,
+# to the second, hands that text to every child (Invoke-Standup) and builds every
+# expectation from it. The name is the contract's (consts.json env.standupAsOf).
+# Set in the environment of a suite run on its own, it names the instant instead,
+# which is how a run is put a second before midnight; a runner removes it first.
+$pinName = [string]$consts.env.standupAsOf
+$pin = ConvertTo-P20RitualTime ([string][System.Environment]::GetEnvironmentVariable($pinName))
+if ($null -eq $pin) { $pin = [DateTimeOffset]::Now }
+$pinText = Format-P20RitualTime $pin
+$pin = ConvertTo-P20RitualTime $pinText
+
 function Invoke-Standup {
     # A fresh shell per call: gh replaced by a function that answers from the
     # scratch files (and fails when P20_TEST_GH_DOWN is set), then the package's
     # own manifest and nothing else, the way a person types a verb (AGENTS.md,
     # "One toolkit per shell").
-    param([string]$Snippet, [bool]$On = $true, [switch]$GhDown)
+    param([string]$Snippet, [bool]$On = $true, [switch]$GhDown, [string]$AsOf = $pinText, [bool]$Marker = $true)
     $features = '{}'
     if ($On) { $features = '{ "solitaireAgile": true }' }
     [System.IO.File]::WriteAllText((Join-Path $pkg 'config.local.json'),
         "{ `"promptsRoot`": `"$($hub -replace '\\', '/')`", `"activeSpace`": `"widgets`", `"quietStart`": true, `"features`": $features }", $utf8)
     $q = { param($p) $p -replace "'", "''" }
+    # One instant for the verb and the expectation: the child reads the suite's
+    # pin and not its own clock, which the verb honours only in a test run.
+    $clock = "`$env:$([string]$consts.env.testRunMarker) = '1'`n`$env:$pinName = '$AsOf'`n"
+    if (-not $Marker) { $clock = "Remove-Item Env:\$([string]$consts.env.testRunMarker) -ErrorAction SilentlyContinue`n`$env:$pinName = '$AsOf'`n" }
+    # The stub's commit dates are counted from the same instant, never from the
+    # child's clock, so a commit a minute old cannot land after the pin.
+    $stubAt = ConvertTo-P20RitualTime $AsOf
+    if ($null -eq $stubAt) { $stubAt = $pin }
+    $stubAt = $stubAt.ToUniversalTime()
+    $stubWhen = $stubAt.AddMinutes(-1).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", [System.Globalization.CultureInfo]::InvariantCulture)
+    $stubOld = $stubAt.AddDays(-30).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", [System.Globalization.CultureInfo]::InvariantCulture)
     $down = ''
     if ($GhDown) { $down = "`$env:P20_TEST_GH_DOWN = '1'`n" }
-    $body = $down + @"
+    $body = $down + $clock + @"
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { `$null = `$_ }
 `$env:PSModulePath = '$(& $q $pkg)'
 `$env:PROMPTS_ROOT = ''
@@ -903,10 +933,10 @@ function global:gh {
     if (`$args[0] -eq 'label' -and `$args[1] -eq 'list') { return (Get-Content -Raw -LiteralPath '$(& $q (Join-Path $scratch 'labels.json'))') }
     if (`$args[0] -eq 'issue' -and `$args[1] -eq 'list') { return (Get-Content -Raw -LiteralPath '$(& $q (Join-Path $scratch 'issues.json'))') }
     if (`$args[0] -eq 'api' -and `$args[1] -eq 'graphql') {
-        # The dates read: every hash asked for authored a minute ago -- one starting d7, thirty days ago -- and every issue a timeline with no event.
+        # The dates read: every hash asked for authored a minute before the pinned instant -- one starting d7, thirty days before it -- and every issue a timeline with no event.
         `$query = Get-Content -Raw -Encoding UTF8 -LiteralPath ((@(`$args) | Where-Object { "`$_" -like 'query=@*' } | Select-Object -First 1).Substring(7))
-        `$when = [DateTimeOffset]::UtcNow.AddMinutes(-1).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", [System.Globalization.CultureInfo]::InvariantCulture)
-        `$old = [DateTimeOffset]::UtcNow.AddDays(-30).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", [System.Globalization.CultureInfo]::InvariantCulture)
+        `$when = '$stubWhen'
+        `$old = '$stubOld'
         `$repo = [ordered]@{}
         foreach (`$m in [regex]::Matches(`$query, '(c\d+): object\(expression: "([0-9a-f]+)"\)')) {
             `$at = `$when
@@ -968,10 +998,10 @@ try {
     # What the stub answers: the friday case's labels and issues, in gh's own
     # shape (labels as objects), with each closedAt moved to now -- one minute
     # ago for the issues the table puts in yesterday, thirty days ago for the
-    # rest -- so the verb, reading the real clock, fills the same slots.
+    # rest -- so the verb, reading the pinned clock, fills the same slots.
     $friday = @($cases | Where-Object { $_.name -eq 'friday' })[0]
     $yesterdayNumbers = @($friday.expected.workers | ForEach-Object { @($_.yesterday) } | ForEach-Object { [int]$_ })
-    $now = [DateTimeOffset]::UtcNow
+    $now = $pin.ToUniversalTime()
     $ghIssues = @(foreach ($iss in @($friday.issues)) {
             $closedAt = $null
             if ([string]$iss.state -eq 'CLOSED') {
@@ -1012,7 +1042,7 @@ try {
     $r = Invoke-Standup 'tkStandup'
     $after = Get-HubSnapshot
     # An active GitHub Space reads both; its folder has no card yet, so the text is the issues' alone.
-    $expectNow = Invoke-P20StandupJoinedFill -AsOf ([DateTimeOffset]::Now) -Labels $ghLabels -Issues $ghIssues -Tracker @{ ok = $true; reason = '' } -Cards @() -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
+    $expectNow = Invoke-P20StandupJoinedFill -AsOf $pin -Labels $ghLabels -Issues $ghIssues -Tracker @{ ok = $true; reason = '' } -Cards @() -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
     $expectText = (Format-P20StandupText -Standup $expectNow -PackageRoot $pkgRoot).TrimEnd([char]10)
     Assert-True 'Standup exits 0' ($r.Exit -eq '0') $r.All
     # A launch from a non-UTF-8 console (Git bash on Windows, code page 437)
@@ -1033,6 +1063,15 @@ try {
     Assert-True 'no fakeWork line reaches the terminal' (@($fakeWork | Where-Object { $r.Inner.Contains([string]$_) }).Count -eq 0)
     Assert-True 'nothing is written to the hub' ($before -ceq $after)
 
+    # The pin itself: a second before midnight on a day long gone, the verb's title
+    # is that day's and not the next; and outside a test run it is not read at all.
+    $lateText = '2001-03-09T23:59:59+00:00'
+    $lateTitle = ([string]$consts.rituals.text.title).Replace('{date}', (ConvertTo-P20RitualTime $lateText).ToString([string]$consts.rituals.text.dateFormat, [System.Globalization.CultureInfo]::InvariantCulture))
+    $late = Invoke-Standup 'tkStandup' -AsOf $lateText
+    Assert-True 'pinned a second before midnight, the standup is that day''s' ($late.Exit -eq '0' -and (@($late.Inner -split "`n")[0]) -ceq $lateTitle) ("`n--- got ---`n$($late.Inner)`n--- want ---`n$lateTitle")
+    $unpinned = Invoke-Standup 'tkStandup' -AsOf $lateText -Marker $false
+    Assert-True 'outside a test run the pin is not read: the standup is not that day''s' ($unpinned.Exit -eq '0' -and $unpinned.Inner -match '^Standup ' -and -not $unpinned.Inner.Contains('2001')) $unpinned.Inner
+
     $j = Invoke-Standup 'tkStandup -AsJson'
     $parsed = $null
     try { $parsed = $j.Inner | ConvertFrom-Json } catch { $parsed = $null }
@@ -1046,12 +1085,17 @@ try {
         Assert-True '-AsJson: an empty worker carries one status sentence from the nothing family' ($sonnet -and [bool]$sonnet.empty -and $nothing -contains [string]$sonnet.excuse) $j.Inner
     }
 
+    # The typed verb asks whether a launch would work on this host (claude on the
+    # PATH), and a delegation's command follows the answer on both lines; so do the
+    # expectations below, or they would hold only on a host without it.
+    . (Join-Path $pkgRoot 'Scripts/Test-StartWorkLaunch.ps1')
+    $launchNow = Test-P20StartWorkLaunch
     # -Brief: the chair's reading alone -- the rule's own bytes, and nothing of the long form.
     $br = Invoke-Standup 'tkStandup -Brief'
     # The verb attaches the suggestion and the PM Corner (its last line); so does the expectation.
-    $briefNow = Invoke-P20StandupJoinedFill -AsOf ([DateTimeOffset]::Now) -Labels $ghLabels -Issues $ghIssues -Tracker @{ ok = $true; reason = '' } -Cards @() -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
-    $null = Add-P20StandupSuggestion -Standup $briefNow -Labels $ghLabels -Issues $ghIssues -Cards @() -HowIWork 'agents' -On $true -Prefix 'tk' -PackageRoot $pkgRoot
-    $null = Add-P20StandupCorner -Standup $briefNow -Labels $ghLabels -Issues $ghIssues -Cards @() -On $true -Prefix 'tk' -PackageRoot $pkgRoot
+    $briefNow = Invoke-P20StandupJoinedFill -AsOf $pin -Labels $ghLabels -Issues $ghIssues -Tracker @{ ok = $true; reason = '' } -Cards @() -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
+    $null = Add-P20StandupSuggestion -Standup $briefNow -Labels $ghLabels -Issues $ghIssues -Cards @() -HowIWork 'agents' -On $true -Prefix 'tk' -PackageRoot $pkgRoot -Launch $launchNow
+    $null = Add-P20StandupCorner -Standup $briefNow -Labels $ghLabels -Issues $ghIssues -Cards @() -On $true -Prefix 'tk' -PackageRoot $pkgRoot -HowIWork 'agents' -Launch $launchNow
     $expectBrief = (Format-P20StandupBrief -Standup $briefNow -PackageRoot $pkgRoot).TrimEnd([char]10)
     Assert-True '-Brief: the PM Corner is its last line' ($null -ne $briefNow.corner -and $br.Inner.EndsWith([string]$briefNow.corner.brief)) $br.Inner
     Assert-True '-Brief exits 0 and prints the brief the rule renders for now, and only that' ($br.Exit -eq '0' -and $br.Inner -ceq $expectBrief) ("`n--- got ---`n$($br.Inner)`n--- want ---`n$expectBrief")
@@ -1081,18 +1125,18 @@ try {
 
     # -Since: yesterday widened back to a day -- the issue closed a month ago is said,
     # and the brief's counts line names the day. Today and the blockers do not move.
-    $sinceDay = [DateTimeOffset]::Now.AddDays(-40).ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
+    $sinceDay = $pin.AddDays(-40).ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
     $sw = Invoke-Standup "tkStandup -Since $sinceDay"
-    $expectSince = Invoke-P20StandupJoinedFill -AsOf ([DateTimeOffset]::Now) -Labels $ghLabels -Issues $ghIssues -Tracker @{ ok = $true; reason = '' } -Cards @() -Space 'widgets' -SpaceName 'Widgets' -Window $sinceDay -PackageRoot $pkgRoot
+    $expectSince = Invoke-P20StandupJoinedFill -AsOf $pin -Labels $ghLabels -Issues $ghIssues -Tracker @{ ok = $true; reason = '' } -Cards @() -Space 'widgets' -SpaceName 'Widgets' -Window $sinceDay -PackageRoot $pkgRoot
     $expectSinceText = (Format-P20StandupText -Standup $expectSince -PackageRoot $pkgRoot).TrimEnd([char]10)
     Assert-True '-Since widens yesterday: exit 0, the text the rule renders for that window, line for line' ($sw.Exit -eq '0' -and $sw.Inner -ceq $expectSinceText) ("`n--- got ---`n$($sw.Inner)`n--- want ---`n$expectSinceText")
     Assert-True '-Since: the issue closed a month ago is said, under yesterday' ($sw.Inner -match '(?m)^  Yesterday  #103 ' -and $r.Inner -notmatch '#103') $sw.Inner
     $sb = Invoke-Standup "tkStandup -Since $sinceDay -Brief"
-    $null = Add-P20StandupSuggestion -Standup $expectSince -Labels $ghLabels -Issues $ghIssues -Cards @() -HowIWork 'agents' -On $true -Prefix 'tk' -PackageRoot $pkgRoot
-    $null = Add-P20StandupCorner -Standup $expectSince -Labels $ghLabels -Issues $ghIssues -Cards @() -On $true -Prefix 'tk' -PackageRoot $pkgRoot
+    $null = Add-P20StandupSuggestion -Standup $expectSince -Labels $ghLabels -Issues $ghIssues -Cards @() -HowIWork 'agents' -On $true -Prefix 'tk' -PackageRoot $pkgRoot -Launch $launchNow
+    $null = Add-P20StandupCorner -Standup $expectSince -Labels $ghLabels -Issues $ghIssues -Cards @() -On $true -Prefix 'tk' -PackageRoot $pkgRoot -HowIWork 'agents' -Launch $launchNow
     $expectSinceBrief = (Format-P20StandupBrief -Standup $expectSince -PackageRoot $pkgRoot).TrimEnd([char]10)
     Assert-True '-Since -Brief: the counts line names the window''s first day' ($sb.Exit -eq '0' -and $sb.Inner -ceq $expectSinceBrief -and $sb.Inner -match '^Since \w+ ') ("`n--- got ---`n$($sb.Inner)`n--- want ---`n$expectSinceBrief")
-    $tomorrow = [DateTimeOffset]::Now.AddDays(2).ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
+    $tomorrow = $pin.AddDays(2).ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
     foreach ($badArg in @($tomorrow, 'yesterday')) {
         $sx = Invoke-Standup "tkStandup -Since $badArg"
         Assert-True "-Since $badArg is a stated refusal: exit 2, one Error block naming it" ($sx.Exit -eq '2' -and (@([regex]::Matches($sx.All, '(?m)^Error: ')).Count -eq 1) -and $sx.All.Contains($badArg) -and $sx.All -notmatch 'exit code') $sx.All
@@ -1124,9 +1168,9 @@ try {
     $afterJoined = Get-HubSnapshot
     $widgetCards = @(Get-P20StandupCards -CurrentDir $widgetsCurrent -ArchiveDir (Join-Path $hub 'widgets/archive') `
             -Pattern (Get-P20CardIdPattern -WorkItemTypes (Get-P20WorkItemTypes -Config $null)))
-    # The stub dates d74f5b2 thirty days ago and the others a minute ago: the verb's dates read drops the one before the window.
-    $stubDates = @{ 'd74f5b2' = [DateTimeOffset]::UtcNow.AddDays(-30); 'a41c2e9' = [DateTimeOffset]::UtcNow.AddMinutes(-1); 'b52d3f0' = [DateTimeOffset]::UtcNow.AddMinutes(-1) }
-    $joinedNow = Invoke-P20StandupJoinedFill -AsOf ([DateTimeOffset]::Now) -Labels $ghLabels -Issues $ghIssues -Tracker @{ ok = $true; reason = '' } `
+    # The stub dates d74f5b2 thirty days before the pinned instant and the others a minute before it: the verb's dates read drops the one before the window.
+    $stubDates = @{ 'd74f5b2' = $pin.ToUniversalTime().AddDays(-30); 'a41c2e9' = $pin.ToUniversalTime().AddMinutes(-1); 'b52d3f0' = $pin.ToUniversalTime().AddMinutes(-1) }
+    $joinedNow = Invoke-P20StandupJoinedFill -AsOf $pin -Labels $ghLabels -Issues $ghIssues -Tracker @{ ok = $true; reason = '' } `
         -Cards $widgetCards -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot -CommitDates $stubDates -IssueStarts @{}
     $joinedText = (Format-P20StandupText -Standup $joinedNow -PackageRoot $pkgRoot).TrimEnd([char]10)
     Assert-True 'a GitHub Space with cards: the joined standup, exit 0, line for line' ($jv.Exit -eq '0' -and $jv.Inner -ceq $joinedText) ("`n--- got ---`n$($jv.Inner)`n--- want ---`n$joinedText")
@@ -1141,7 +1185,7 @@ try {
     $sj = Invoke-Standup 'tkStandup -AsJson'
     $sjParsed = $null
     try { $sjParsed = $sj.Inner | ConvertFrom-Json } catch { $sjParsed = $null }
-    $null = Add-P20StandupSuggestion -Standup $joinedNow -Labels $ghLabels -Issues $ghIssues -Cards $widgetCards -HowIWork 'agents' -On $true -Prefix 'tk' -PackageRoot $pkgRoot
+    $null = Add-P20StandupSuggestion -Standup $joinedNow -Labels $ghLabels -Issues $ghIssues -Cards $widgetCards -HowIWork 'agents' -On $true -Prefix 'tk' -PackageRoot $pkgRoot -Launch $launchNow
     $wantRefs = (@($joinedNow.suggestions | ForEach-Object { $_.ref })) -join ','
     $gotRefs = ''
     if ($sjParsed) { $gotRefs = (@($sjParsed.suggestions | ForEach-Object { [string]$_.ref })) -join ',' }
@@ -1163,7 +1207,7 @@ try {
     # in review, one in flight, one not started, and one archived today.
     $soloDir = Join-Path $hub 'solo'
     New-Item -ItemType Directory -Path (Join-Path $soloDir 'current'), (Join-Path $soloDir 'archive') -Force | Out-Null
-    $today = [DateTimeOffset]::Now.ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
+    $today = $pin.ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
     [System.IO.File]::WriteAllText((Join-Path $soloDir 'current/K7M2-wire-the-board.prompt.md'), "# Task K7M2: Wire the board`n`n---`n`n**Review:** $today`n", $utf8)
     [System.IO.File]::WriteAllText((Join-Path $soloDir 'current/Task139-write-the-docs.prompt.md'), "# Task 139: Write the docs`n`n- a41c2e9 first`n", $utf8)
     [System.IO.File]::WriteAllText((Join-Path $soloDir 'current/214-not-started.prompt.md'), "# Bug 214: Not started`n", $utf8)
@@ -1173,7 +1217,7 @@ try {
     $afterSolo = Get-HubSnapshot
     $soloCards = @(Get-P20StandupCards -CurrentDir (Join-Path $soloDir 'current') -ArchiveDir (Join-Path $soloDir 'archive') `
             -Pattern (Get-P20CardIdPattern -WorkItemTypes (Get-P20WorkItemTypes -Config $null)))
-    $soloExpect = Invoke-P20StandupCardsFill -AsOf ([DateTimeOffset]::Now) -Cards $soloCards -Space 'solo' -SpaceName 'Solo Work' -PackageRoot $pkgRoot
+    $soloExpect = Invoke-P20StandupCardsFill -AsOf $pin -Cards $soloCards -Space 'solo' -SpaceName 'Solo Work' -PackageRoot $pkgRoot
     $soloText = (Format-P20StandupText -Standup $soloExpect -PackageRoot $pkgRoot).TrimEnd([char]10)
     Assert-True 'a local Space: the standup fills from its cards, exit 0, line for line' ($solo.Exit -eq '0' -and $solo.Inner -ceq $soloText) ("`n--- got ---`n$($solo.Inner)`n--- want ---`n$soloText")
     Assert-True 'one tile, named for the Space' ($solo.Inner -match '(?m)^Solo Work$') $solo.Inner

@@ -157,6 +157,8 @@ export interface EnvStatus {
     promptsFolder: string;
     activeSpace: string;
     spaces: SpaceInfo[];
+    /** Slugs the avatar menu's switcher lists: `spaces` less a retired Space you are not in. Only the switcher reads it. */
+    switcherSpaces?: string[];
     /** {contract word: display name} for the active org's four lanes. Display only. */
     laneNames?: Record<string, string>;
     /** `isDemoDismissed`: `spaces` above already leaves the demo Spaces out; this says why. */
