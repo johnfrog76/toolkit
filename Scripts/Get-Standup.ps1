@@ -5,7 +5,8 @@
 .DESCRIPTION
     The Ritual Engine's first ceremony, as text (docs/modules/solitaire-agile.md, "The file shape, and how a standup is read"). The human's queue first, then one block per worker label --
     yesterday, today and blockers, each line a real issue with its number, or the
-    mug and one status sentence ("Nothing on the board for me...") when a worker has nothing.
+    mug and one status sentence (the vocabulary's nothing family: the day around the
+    work, never tracker work) when a worker has nothing.
 
     The rule is Scripts/Standup-Rules.ps1's, shared with the suite; this script is
     the thin layer around it: which Space, which repo, the two gh reads, and the

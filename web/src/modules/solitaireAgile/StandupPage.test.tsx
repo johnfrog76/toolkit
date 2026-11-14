@@ -57,6 +57,7 @@ interface FixtureWorker {
   today: number[];
   blockers: number[];
   empty: boolean;
+  nothingIndex: number | null;
 }
 interface FixtureCase {
   name: string;
@@ -75,6 +76,16 @@ interface FixtureCase {
 const table = JSON.parse(fs.readFileSync(path.join(FIXTURES, "standup.json"), "utf8")) as {
   cases: FixtureCase[];
 };
+const vocab = JSON.parse(
+  fs.readFileSync(path.resolve(__dirname, "../../../..", RITUALS.vocabularyFile), "utf8"),
+) as { nothing: string[] };
+
+/** An empty worker's status sentence: the vocabulary's `nothing` line at the fixture's index. */
+function statusOf(caseName: string, label: string): string {
+  const w = table.cases.find((c) => c.name === caseName)?.expected.workers.find((x) => x.label === label);
+  if (!w || w.nothingIndex === null) throw new Error(`no empty worker ${label} in ${caseName}`);
+  return vocab.nothing[w.nothingIndex];
+}
 
 /** The route's response for one fixture case, per the contract's JSON (4b). */
 function responseFor(name: string): StandupResponse {
@@ -215,7 +226,7 @@ describe("the standup page", () => {
       "https://github.com/johnfrog76/toolkit/issues/101",
     );
     // The empty seat reports: the status sentence under the mug, never an excuse.
-    expect(shown()).toContain('Mug        "Nothing on the board for me. All green, no blockers."');
+    expect(shown()).toContain(`Mug        "${statusOf("friday", "sonnet")}"`);
     expect(shown()).not.toContain("The dog ate the sprint.");
     // Nothing to click but the issue numbers -- and Play.
     expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["Copy", "Play"]);

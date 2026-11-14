@@ -30,7 +30,7 @@
         "workers": [
           { "label": "fable",  "name": "Fable",  "yesterday": [107], "today": [],    "blockers": [104], "empty": false, "nothingIndex": null },
           { "label": "opus",   "name": "Opus",   "yesterday": [102], "today": [101], "blockers": [],    "empty": false, "nothingIndex": null },
-          { "label": "sonnet", "name": "Sonnet", "yesterday": [],    "today": [],    "blockers": [],    "empty": true,  "nothingIndex": 0 }
+          { "label": "sonnet", "name": "Sonnet", "yesterday": [],    "today": [],    "blockers": [],    "empty": true,  "nothingIndex": 17 }
         ],
         "text": "standup-friday.txt",
         "brief": "standup-friday.brief.txt"
@@ -51,8 +51,8 @@
         "chair": { "openIndex": 6, "closeIndex": 7 },
         "queue": { "walk": [], "decide": [], "look": [] },
         "workers": [
-          { "label": "fable",  "name": "Fable",  "yesterday": [],    "today": [], "blockers": [], "empty": true,  "nothingIndex": 0 },
-          { "label": "opus",   "name": "Opus",   "yesterday": [],    "today": [], "blockers": [], "empty": true,  "nothingIndex": 0 },
+          { "label": "fable",  "name": "Fable",  "yesterday": [],    "today": [], "blockers": [], "empty": true,  "nothingIndex": 18 },
+          { "label": "opus",   "name": "Opus",   "yesterday": [],    "today": [], "blockers": [], "empty": true,  "nothingIndex": 19 },
           { "label": "sonnet", "name": "Sonnet", "yesterday": [201], "today": [], "blockers": [], "empty": false, "nothingIndex": null }
         ],
         "text": "standup-monday.txt",
@@ -71,9 +71,9 @@
         "chair": { "openIndex": 4, "closeIndex": 5 },
         "queue": { "walk": [], "decide": [], "look": [] },
         "workers": [
-          { "label": "fable",  "name": "Fable",  "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 0 },
-          { "label": "opus",   "name": "Opus",   "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 0 },
-          { "label": "sonnet", "name": "Sonnet", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 0 }
+          { "label": "fable",  "name": "Fable",  "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 16 },
+          { "label": "opus",   "name": "Opus",   "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 17 },
+          { "label": "sonnet", "name": "Sonnet", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 18 }
         ],
         "text": null,
         "brief": "standup-saturday.brief.txt"

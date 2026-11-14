@@ -3,8 +3,8 @@ Standup -- Friday 2 October 2026
 
 Nothing is waiting on you.
 
-Fable: "Nothing on the board for me. All green, no blockers."
+Fable: "Read up on the design notes so I'm ready for what's next."
 Opus: Yesterday I closed one in Phase 6: #601, the clock drifts. Nothing blocked.
-Sonnet: "Nothing on the board for me. All green, no blockers."
+Sonnet: "Took a course module on the cloud platform."
 
 "Let's circle back."
