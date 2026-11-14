@@ -9,11 +9,18 @@
 
     The rule is Scripts/Standup-Rules.ps1's, shared with the suite; this script is
     the thin layer around it: which Space, which repo, the two gh reads, and the
-    printing. Two reads, both on the Space's ONE repo (Resolve-P20TrackerRepo, the
+    printing. Three reads, all on the Space's ONE repo (Resolve-P20TrackerRepo, the
     rule every GitHub verb uses):
 
-        gh label list --repo <repo> --limit 500 --json name,description
-        gh issue list --repo <repo> --state all --limit 500 --json number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees
+        gh label list --repo <repo> --limit <n> --json name,description
+        gh issue list --repo <repo> --state all --limit <n> --json number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees
+        gh api graphql -F query=@<file> -f owner=<owner> -f name=<name>
+
+    The third is the dates read (Get-P20StandupDates): when each commit the
+    standup counts was authored, so a card counts only the commits inside the
+    window and says the ones it cannot date; and when each open issue with no
+    card was first given a worker label or assigned, so it can read started.
+    One call per 50 aliases; none when there is nothing to ask.
 
     milestone and body are the work grain's: an item groups by its
     milestone, else by the design card its body names. createdAt and
@@ -274,10 +281,10 @@ elseif ($choice.source -eq 'both') {
     else {
         # -- The thin layer: two gh reads (Scripts/Ritual-Common.ps1) --------
         $repo = $target.Repo
-        $got = Invoke-P20RitualGh -Repo $repo -Arguments @('label', 'list', '--repo', $repo, '--limit', '500', '--json', 'name,description')
+        $got = Invoke-P20RitualGh -Repo $repo -Arguments @('label', 'list', '--repo', $repo, '--limit', [string](Get-P20Consts).ghReads.labels, '--json', 'name,description')
         if ($got.ok) {
             $labels = $got.value
-            $got = Invoke-P20RitualGh -Repo $repo -Arguments @('issue', 'list', '--repo', $repo, '--state', 'all', '--limit', '500',
+            $got = Invoke-P20RitualGh -Repo $repo -Arguments @('issue', 'list', '--repo', $repo, '--state', 'all', '--limit', [string](Get-P20Consts).ghReads.allIssues,
                 '--json', 'number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees')
         }
         if ($got.ok) {
@@ -313,6 +320,23 @@ if ($choice.source -eq 'cards') {
 elseif ($choice.source -eq 'both') {
     $standup = Invoke-P20StandupJoinedFill -AsOf $asOf -Labels $labels -Issues $issues -Tracker $tracker `
         -Cards $cards -Space $slug -SpaceName $spaceName -Window $window -PackageRoot $repoRoot
+    # -- The dates read: when the counted commits were authored, and when the
+    # open issues with no card began (Scripts/Ritual-Common.ps1). Asked for what
+    # the fill counted, then the fill again with the answer; nothing to ask, or
+    # a read that failed, keeps the fill as it is -- every bullet counts.
+    if ($tracker.ok) {
+        $slotNames = @((Get-P20RitualData -PackageRoot $repoRoot).Ceremony.slots | ForEach-Object { [string]$_ })
+        $asks = Get-P20StandupDateAsks -Standup $standup -Cards $cards -Slots $slotNames
+        if (@($asks.hashes).Count -gt 0 -or @($asks.numbers).Count -gt 0) {
+            $workerNames = [string[]]@(Get-P20StandupWorkers -Labels $labels -Prefix ([string](Get-P20Consts).rituals.workerLabelPrefix) | ForEach-Object { [string]$_.label })
+            $dates = Get-P20StandupDates -Repo $repo -Hashes $asks.hashes -Numbers $asks.numbers -WorkerLabels $workerNames
+            if ($dates.ok) {
+                $standup = Invoke-P20StandupJoinedFill -AsOf $asOf -Labels $labels -Issues $issues -Tracker $tracker `
+                    -Cards $cards -Space $slug -SpaceName $spaceName -Window $window -PackageRoot $repoRoot `
+                    -CommitDates $dates.commitDates -IssueStarts $dates.issueStarts
+            }
+        }
+    }
 }
 else {
     $standup = Invoke-P20StandupFill -AsOf $asOf -Labels $labels -Issues $issues -Tracker $tracker `
@@ -339,13 +363,14 @@ if ($choice.source -eq 'cards' -or $choice.source -eq 'both') {
     # where an issue read happened -- a cards Space has no assignee to compare.
     $viewer = ''
     if ($suggestOn -and $choice.source -eq 'both' -and $tracker.ok) { $viewer = Get-P20RitualViewer }
+    if (-not (Get-Command Test-P20StartWorkLaunch -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Test-StartWorkLaunch.ps1') }
     $null = Add-P20StandupSuggestion -Standup $standup -Labels $labels -Issues $issues -Cards $cards -HowIWork ([string]$how.answer) `
-        -On $suggestOn -Prefix (Get-CliPrefix) -Viewer $viewer -PackageRoot $repoRoot
+        -On $suggestOn -Prefix (Get-CliPrefix) -Viewer $viewer -PackageRoot $repoRoot -Launch (Test-P20StartWorkLaunch)
     # The PM Corner (Scripts/Corner-Rules.ps1): the suggestion's second surface --
     # the same switch, the same read, the same pick -- and the brief's last line.
     . (Join-Path $PSScriptRoot 'Corner-Rules.ps1')
     $null = Add-P20StandupCorner -Standup $standup -Labels $labels -Issues $issues -Cards $cards `
-        -On $suggestOn -Prefix (Get-CliPrefix) -Viewer $viewer -PackageRoot $repoRoot
+        -On $suggestOn -Prefix (Get-CliPrefix) -Viewer $viewer -PackageRoot $repoRoot -HowIWork ([string]$how.answer) -Launch (Test-P20StartWorkLaunch)
 }
 $standup.text = Format-P20StandupText -Standup $standup -PackageRoot $repoRoot
 $standup.work.text = Format-P20StandupWork -Standup $standup -PackageRoot $repoRoot

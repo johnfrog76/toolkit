@@ -115,6 +115,9 @@ export interface CommunicationEnv {
   postRetroSummary: boolean;
   retroChannel: string;
   recipients: CommunicationRecipient[];
+  /** The server was started with sending turned off (for review or testing):
+   *  nothing posts from it, whatever is set. Absent from an older agent. */
+  sendingOff?: boolean;
 }
 
 /** `EnvStatus` plus this module's block. Absent when the flag is off. */

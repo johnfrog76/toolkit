@@ -10,11 +10,14 @@ and ``tkTestToolkit -Rituals``.
 Nothing here is a second rule. The milestone is the suggestion's nearest
 (``suggest.nearest_milestones``), over the suggestion's own candidates in the
 suggestion's own order (``suggest.suggest``), and the id is the suggestion's pick
-inside that milestone. The remaining count is the joined list's own open count
+inside that milestone. The command is the suggestion's choice too: a pick the
+suggestion would send to the crew names ``StartWork <n> -Launch`` where a launch
+would work, as the Next line does. The remaining count is the joined list's own open count
 (``suggest.suggest_items``): the open issues that name the milestone plus the open
 cards whose ``**Sprint:**`` line names it, WHOLE, counted once per id.
 
-- ``corner`` -- PURE. The joined list's items and what closed in the window, in;
+- ``corner`` -- PURE. The joined list's items and what closed in the window, how
+  the Space works and whether a launch would work, in;
   the line out: its shape (``rituals.cornerShapes``), the milestone, the remaining
   count, the pick, the noun, the line and the command the chevron runs.
 - ``corner_closed`` -- PURE. The read's issues and card rows, and the standup's
@@ -30,7 +33,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from ..core.consts import folder_archive, rituals_corner_shapes, rituals_text
+from ..core.consts import folder_archive, rituals_corner_shapes, rituals_suggest_shapes, rituals_text
 from .standup import Corner, Standup
 from .suggest import _day, _fill, nearest_milestones, queue_refs, suggest, suggest_items
 
@@ -44,7 +47,7 @@ def _plural(kinds: set[str]) -> str:
     return t["cornerNounItems"]
 
 
-def corner(items: list[dict], closed: list[dict]) -> dict:
+def corner(items: list[dict], closed: list[dict], how: str = "alone", launch: bool = False) -> dict:
     """The Corner's line. Pure; the mirror of ``Get-P20CornerLine``.
 
     ``items`` is the joined list as ``suggest_items`` hands it (each milestone's
@@ -57,7 +60,12 @@ def corner(items: list[dict], closed: list[dict]) -> dict:
        first candidate in it, and the remaining count its ``open``. One left
        names the pick's noun (card, issue); more names the remaining rows' --
        cards, issues, or items for a mix.
-    3. Else nothing in reach."""
+    3. Else nothing in reach.
+
+    The command is ``StartWork <arg>``, and ``StartWork <arg> -Launch`` where the
+    suggestion's own command for the pick is: a delegation (``how`` is the Space's
+    answer) with ``launch`` true -- ``start_work_launch()``'s answer, an input here
+    as it is of ``suggest``. ``how`` changes no pick and no count."""
     one_left, many_left, reached, nothing = rituals_corner_shapes()
     t = rituals_text()
     open_titles: dict[str, set[str]] = {}
@@ -89,7 +97,7 @@ def corner(items: list[dict], closed: list[dict]) -> dict:
         # The latest close; a tie by title, ordinal (max keeps the first of the sorted titles).
         title = max(sorted(done), key=lambda k: done[k])
         return {**out, "shape": reached, "milestone": title, "line": _fill(t["cornerReached"], {"milestone": title})}
-    candidates, _excluded = suggest(items or [], "alone")
+    candidates, _excluded = suggest(items or [], how, launch=launch)
     in_reach = [c for c in candidates if (c.get("milestone") or {}).get("title")]
     if not in_reach:
         return out
@@ -117,7 +125,11 @@ def corner(items: list[dict], closed: list[dict]) -> dict:
         "kind": kind,
         "noun": noun,
         "line": line,
-        "command": _fill(t["suggestCommandStart"], {"arg": ref.lstrip("#")}),
+        # The suggestion's choice for the same pick: its delegation's command is the
+        # launch where one would work. Every other shape stays the plain start.
+        "command": pick["command"]
+        if launch and pick.get("shape") == rituals_suggest_shapes()[1]
+        else _fill(t["suggestCommandStart"], {"arg": ref.lstrip("#")}),
     }
 
 
@@ -187,12 +199,16 @@ def attach_corner(
     on: bool,
     prefix: str,
     viewer: str = "",
+    how: str = "alone",
+    launch: bool = False,
 ) -> Standup:
     """The Corner attached to a filled standup, in place: ``corner`` and nothing
     else. None with the switch off (the suggestion's -- the Corner is its second
     surface, D-AR8), or with the tracker not answering. ``prefix`` is the CLI's,
     for the brief's command; ``viewer`` the signed-in gh user's login, as the
-    suggestion takes it -- the pick is the suggestion's, so the exclusions are."""
+    suggestion takes it -- the pick is the suggestion's, so the exclusions are.
+    ``how`` and ``launch`` are the suggestion's too (the Space's answer and
+    ``start_work_launch()``'s), so the two lines name one command for one pick."""
     filled.corner = None
     if not on or not filled.tracker.ok:
         return filled
@@ -200,7 +216,7 @@ def attach_corner(
     items = suggest_items(labels, use, cards, queue_refs(filled), viewer)
     since = datetime.fromisoformat(filled.since)
     as_of = datetime.fromisoformat(filled.asOf)
-    got = corner(items, corner_closed(use, cards, since, as_of))
+    got = corner(items, corner_closed(use, cards, since, as_of), how, launch)
     t = rituals_text()
     if got["command"]:
         brief = _fill(

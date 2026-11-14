@@ -54,6 +54,10 @@ import { ALL, DESIGN_KINDS, designMatches, filterSummary, useDesignFilters } fro
 // the same vocabulary -- and the dialog runs MoveDesign -Space <slug> through
 // the bridge, staged in that clone and never committed. Where it does not, the
 // menu is what it was, and the card's foot names the setting.
+//
+// Where the checkout is ready the agent reads the list from that clone's
+// working tree, so a staged move shows on the re-read; otherwise from GitHub.
+// The card's foot says which, in the agent's own sentence.
 const useStyles = makeStyles({
   row: {
     marginTop: tokens.spacingVerticalS,
@@ -205,7 +209,12 @@ export function DesignList() {
   const checkout = data?.checkout;
   const product: ProductCheckout | undefined =
     checkout?.ready && checkout.space && data?.repo
-      ? { space: checkout.space, repo: data.repo, root: checkout.root }
+      ? {
+          space: checkout.space,
+          repo: data.repo,
+          root: checkout.root,
+          readsClone: data.source === "checkout",
+        }
       : undefined;
   // An older agent answers the flat list and no groups; it reads as no designs,
   // and its items stay counted in the chip so nothing looks lost.
@@ -283,7 +292,12 @@ export function DesignList() {
                       action: <LearnMoreLink />,
                     }
                   : undefined;
-  const footLine = data?.supported && designs.length > 0 ? checkoutLine(checkout, data.repo) : "";
+  // The foot: which source was read, then -- when the rows cannot move -- the
+  // setting that would let them.
+  const footLine =
+    data?.supported && designs.length > 0
+      ? [data.note, checkoutLine(checkout, data.repo)].filter(Boolean).join(" ")
+      : "";
   return (
     <>
       <PanelFrame
@@ -355,7 +369,7 @@ export function DesignList() {
           open
           checkout={product}
           onClose={() => setMove(null)}
-          // Staged: the tab re-reads (the row moves once the commit is pushed).
+          // Staged: the tab re-reads -- the clone, where the row has moved already.
           onMoved={() => void refetch()}
         />
       ) : null}

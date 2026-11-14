@@ -224,6 +224,29 @@
         "-No keeps the card off Daily and the standup; without it the card is billable again. A card is billable unless it says otherwise."
       ]
     },
+    "Daily": {
+      "category": "prompt",
+      "description": "Print a week's timesheet from the cards",
+      "usage": "{cliPrefix}Daily [-LastWeek] [-Since <yyyy-MM-dd> -Until <yyyy-MM-dd>] [-Compact] [-Help]",
+      "examples": [
+        "{cliPrefix}Daily",
+        "{cliPrefix}Daily -LastWeek",
+        "{cliPrefix}Daily -Since 2026-01-05 -Until 2026-01-09",
+        "{cliPrefix}Daily -LastWeek -Compact | Set-Clipboard"
+      ],
+      "switches": {
+        "-LastWeek": "The previous Monday to Friday. Default: this week, Monday to today",
+        "-Since <yyyy-MM-dd>": "The window's first day. Only with -Until",
+        "-Until <yyyy-MM-dd>": "The window's last day. Only with -Since; a window wins over -LastWeek",
+        "-Compact": "Each day as one line per status group -- the page's Short lines",
+        "-Help": "This"
+      },
+      "notes": [
+        "The same week the web UI's Daily page shows, built by the same script from the active Space's cards: each card on every working day from its **Created:** line to its **Closed:** line (or today), plus the days git saw it worked. A card marked {cliPrefix}Billable -No is left off, and said so.",
+        "Prints the text the page's Copy All copies, on the output stream, so it pipes. Nothing is written and the clipboard is not touched.",
+        "A window is both ends or neither, each a yyyy-MM-dd day, the first not after the last. Anything else is refused in the words the page uses."
+      ]
+    },
     "Cover": {
       "category": "prompt",
       "description": "Give a card a picture -- its cover, or the before",

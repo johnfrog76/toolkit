@@ -8,7 +8,7 @@ import {
 import { fluentThemeFor, noiseSvgUrl } from "./theme";
 import { BootSpinner } from "./BootSpinner";
 import { ThemePicker } from "./ThemePicker";
-import { AvatarMenu } from "./AvatarMenu";
+import { AvatarMenu, switcherChoices } from "./AvatarMenu";
 import { SpaceAnchor } from "./SpaceAnchor";
 import { PageHeading } from "./PageHeading";
 
@@ -21,8 +21,9 @@ import { useGetEnvQuery, useGetHealthQuery, useSwitchModeMutation } from "./api"
 import { AgentLostBanner, AgentUnreachable, NotFound, rememberCliPrefix } from "./ShellStates";
 import {
   activeModules,
-  moduleCards,
   moduleHeaderItems,
+  moduleSystemTabs,
+  systemTabFor,
   moduleHomeTabs,
   moduleNav,
   moduleNavSplit,
@@ -131,10 +132,6 @@ const useStyles = makeStyles({
   },
 });
 
-// The System page's cards, four to a page. Home has no pages: it has named
-// tabs (registry HOME_TABS), and a tab shows all of its cards.
-const PAGE_SIZE = 4;
-
 export function App() {
   const styles = useStyles();
   // FULL SKIN (D-L13; the owner: "it is full skin"):
@@ -183,7 +180,8 @@ export function App() {
   });
   const { data: statusData } = useGetStatusQuery();
 
-  const isSystem = location.pathname === "/system";
+  // /system and its tabs' addresses (registry SYSTEM_TABS).
+  const isSystem = location.pathname === "/system" || location.pathname.startsWith("/system/");
 
   // The drawer's six values live in the store (filtersSlice): a successful
   // Space switch resets them there, so nothing here has to.
@@ -275,10 +273,7 @@ export function App() {
   );
 
   const homeTabs = useMemo(() => moduleHomeTabs(active, cardContext), [active, cardContext]);
-  const systemCards = useMemo(
-    () => moduleCards(active, cardContext, "system"),
-    [active, cardContext],
-  );
+  const systemTabs = useMemo(() => moduleSystemTabs(active, cardContext), [active, cardContext]);
   const settingsSections = useMemo(
     () => moduleSettings(active, cardContext),
     [active, cardContext],
@@ -327,10 +322,12 @@ export function App() {
   // Edits a section is holding for a Save. They survive the drawer closing, so
   // the avatar has to say they exist -- otherwise a closed drawer hides them.
   const unsaved = useUnsavedTotal();
-  const [systemPage, setSystemPage] = useState(0);
-
-  const totalPages = Math.max(1, Math.ceil(systemCards.length / PAGE_SIZE));
-  const pageCards = systemCards.slice(systemPage * PAGE_SIZE, (systemPage + 1) * PAGE_SIZE);
+  // The System page has tabs, not pages: a tab shows all of its cards, as
+  // Home's do, so the pager is always one page.
+  const pageCards = useMemo(
+    () => systemTabFor(location.pathname, systemTabs)?.cards ?? [],
+    [location.pathname, systemTabs],
+  );
 
   const shellValue = useMemo(
     () => ({
@@ -339,6 +336,7 @@ export function App() {
         system: isSystem ? pageCards : [],
       },
       homeTabs: isSystem ? [] : homeTabs,
+      systemTabs: isSystem ? systemTabs : [],
       filters: {
         filterValue,
         setFilterValue,
@@ -354,12 +352,13 @@ export function App() {
       },
       slot: (name: string) => moduleSlot(active, cardContext, name),
       openSettings,
-      pager: { page: systemPage, totalPages, onPageChange: setSystemPage },
+      pager: { page: 0, totalPages: 1, onPageChange: () => {} },
     }),
     [
       isSystem,
       pageCards,
       homeTabs,
+      systemTabs,
       filterValue,
       setFilterValue,
       activeRepo,
@@ -374,8 +373,6 @@ export function App() {
       active,
       cardContext,
       openSettings,
-      systemPage,
-      totalPages,
     ],
   );
 
@@ -526,10 +523,7 @@ export function App() {
                   .filter(Boolean)
                   .join(" · ")}
                 unsaved={unsaved}
-                spaces={(env?.config?.spaces ?? []).map((o) => ({
-                  slug: o.slug,
-                  name: o.name ?? o.slug,
-                }))}
+                spaces={switcherChoices(env?.config)}
                 activeSpace={env?.config?.activeSpace ?? ""}
                 onSwitchSpace={(slug) => void switchMode({ mode: slug })}
                 links={settingsLinks}

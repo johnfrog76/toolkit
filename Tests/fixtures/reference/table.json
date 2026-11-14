@@ -1,0 +1,15 @@
+{
+  "_": "The reference document's header, held to one table by both halves: the agent's GET /api/reference (Tests/test_reference.py) and, when it lands, the CLI's Reference verb (#315). One row per file in current/ -- what is read from it. A file with no header lines reads empty fields and keeps its title; a file that is not .md is not a document.",
+  "documents": [
+    {"file": "bare-notes.md", "title": "Bare notes", "source": "", "valid": "", "added": "", "original": ""},
+    {"file": "days-off-2027.md", "title": "2027 Observed Days Off", "source": "Office announcement, emailed 2026-11-11", "valid": "2027-01-01 to 2027-12-31", "added": "2026-11-11", "original": "days-off-2027.pdf"},
+    {"file": "sample-notes.md", "title": "Sample Notes", "source": "a sample", "valid": "2026-01-01 to 2026-12-31", "added": "2026-02-02", "original": ""}
+  ],
+  "search": [
+    {"q": "holiday", "files": ["days-off-2027.md"]},
+    {"q": "HOLIDAY memorial", "files": ["days-off-2027.md"]},
+    {"q": "lorem tempor", "files": ["sample-notes.md"]},
+    {"q": "holiday lorem", "files": []},
+    {"q": "", "files": ["bare-notes.md", "days-off-2027.md", "sample-notes.md"]}
+  ]
+}

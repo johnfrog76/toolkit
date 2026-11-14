@@ -108,7 +108,7 @@ function GithubReads({
         : null;
   const facts = ledger.failed
     ? "Could not read this Space's issues -- the agent did not answer."
-    : foyerLine(entry?.report, entry?.deploys);
+    : foyerLine(entry?.report, entry?.deploys, undefined, entry?.design);
   const line = ledger.failed || entry ? githubRowLine(visibility, facts) : null;
   useReport(space.slug, line, ledger.fetching, onRead);
   return null;

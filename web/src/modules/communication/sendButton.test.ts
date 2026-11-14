@@ -45,7 +45,13 @@ const AGENDA =
 describe("the retro send button", () => {
   it("is enabled at the retro stage with a configured recipient", () => {
     const state = sendButtonState(env(), session("retro"));
-    expect(state).toEqual({ shown: true, enabled: true, reason: "", recipient: "manager" });
+    expect(state).toEqual({
+      shown: true,
+      enabled: true,
+      reason: "",
+      info: "",
+      recipient: "manager",
+    });
   });
 
   it("is absent when postRetroSummary is off", () => {
@@ -82,36 +88,77 @@ describe("the retro send button", () => {
     expect(sendButtonState(env(), undefined).enabled).toBe(false);
   });
 
-  it("names the environment variable when gate 2 is unmet", () => {
+  it("says Webhook not set when gate 2 is unmet, with the variable in the info text only", () => {
     const state = sendButtonState(
       env({ recipients: [{ ...env().recipients[0], configured: false }] }),
       session("retro"),
     );
     expect(state.enabled).toBe(false);
-    // The variable's name sends someone to a shell. "Not configured" sends them
-    // to the source.
-    expect(state.reason).toContain("TEAMS_WEBHOOK_MANAGER");
+    // A state in a few neutral words, not an instruction. The variable's name
+    // is how-to, and how-to is behind the info icon.
+    expect(state.reason).toBe("Webhook not set.");
+    expect(state.reason).not.toContain("TEAMS_WEBHOOK_MANAGER");
+    expect(state.info).toContain("TEAMS_WEBHOOK_MANAGER");
   });
 
-  it("names the environment variable BEFORE the Retro stage, with the stage reason after it", () => {
-    // Gate 2 is the one a person has to leave the page to fix, so it is named
-    // from the moment the page opens -- not revealed at the moment of sending.
-    // It used to return on the stage check first, and before Retro the only
-    // reason was ever "sent at the Retro stage".
+  it.each([true, false])(
+    "says Sending off on this server when the server says so (webhook set: %s)",
+    (configured) => {
+      // A server started for review or testing removes the webhooks and sets
+      // the run marker. Nothing is misconfigured and there is nothing to set,
+      // so neither the reason nor the info names the variable.
+      const state = sendButtonState(
+        env({ sendingOff: true, recipients: [{ ...env().recipients[0], configured }] }),
+        session("retro"),
+      );
+      expect(state.enabled).toBe(false);
+      expect(state.reason).toBe("Sending off on this server.");
+      expect(state.info).not.toContain("TEAMS_WEBHOOK_MANAGER");
+      expect(state.info).not.toBe("");
+    },
+  );
+
+  it("reads an agent that reports no sendingOff as one that can send", () => {
+    expect(sendButtonState(env({ sendingOff: undefined }), session("retro")).enabled).toBe(true);
+  });
+
+  it("asks a person recipient for no webhook", () => {
+    const state = sendButtonState(
+      env({ recipients: [{ ...env().recipients[0], type: "person", configured: false }] }),
+      session("retro"),
+    );
+    expect(state.enabled).toBe(false);
+    expect(state.reason).toBe("No webhook needed.");
+    expect(state.info).not.toContain("TEAMS_WEBHOOK_MANAGER");
+  });
+
+  it("carries no info when the recipient is not what holds the send back", () => {
+    expect(sendButtonState(env(), session("draft")).info).toBe("");
+  });
+
+  it("says the recipient's state BEFORE the Retro stage, with the stage reason after it", () => {
+    // The recipient is the one a person has to leave the page to fix, so it is
+    // said from the moment the page opens -- not revealed at the moment of
+    // sending. It used to return on the stage check first, and before Retro
+    // the only reason was ever "sent at the Retro stage".
     const state = sendButtonState(
       env({ recipients: [{ ...env().recipients[0], configured: false }] }),
       session("draft"),
     );
     expect(state.shown).toBe(true);
     expect(state.enabled).toBe(false);
-    expect(state.reason).toBe(
-      "Set TEAMS_WEBHOOK_MANAGER to this recipient's webhook URL. The retro summary is sent at the Retro stage.",
-    );
+    expect(state.reason).toBe("Webhook not set. The retro summary is sent at the Retro stage.");
   });
 
   it("is enabled with an Agenda that has content and nothing under ## Sent", () => {
     const state = sendButtonState(env(), session("retro", { sent: "", content: AGENDA }));
-    expect(state).toEqual({ shown: true, enabled: true, reason: "", recipient: "manager" });
+    expect(state).toEqual({
+      shown: true,
+      enabled: true,
+      reason: "",
+      info: "",
+      recipient: "manager",
+    });
   });
 
   it("is disabled once the file records a send, and says when", () => {
@@ -155,7 +202,7 @@ describe("the retro send button", () => {
       session("draft", { sent: "Sent to manager: 2026-02-05", content: "## Agenda\nTBD\n" }),
     );
     expect(state.reason).toBe(
-      "Set TEAMS_WEBHOOK_MANAGER to this recipient's webhook URL. " +
+      "Webhook not set. " +
         "The retro summary is sent at the Retro stage. " +
         "Already sent on 2026-02-05. " +
         "The Agenda is empty -- nothing to send.",

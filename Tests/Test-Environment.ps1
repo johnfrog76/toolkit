@@ -137,6 +137,11 @@ function New-EnvSandbox {
         aliases     = [ordered]@{
             Home = [ordered]@{ path = $hubDir; display = $true; description = 'The scratch hub' }
         }
+        # A second Teams recipient, beside the shipped manager: the Teams
+        # delivery row names both, from the one reader SendTeams' gate 2 uses.
+        managerWorkflow = [ordered]@{
+            communication = [ordered]@{ recipients = [ordered]@{ mom = [ordered]@{ type = 'chat'; display = 'Mom' } } }
+        }
     }
     [System.IO.File]::WriteAllText((Join-Path $pkgDir 'config.local.json'),
         ($local | ConvertTo-Json -Depth 6), (New-Object System.Text.UTF8Encoding($false)))
@@ -243,6 +248,11 @@ Assert-True 'the config line names the active Space, not a placeholder' `
     ($envOut -match 'spaces\.envtest\.features\.sprintAwareness=true') $envOut
 Assert-True 'and no repair hint teaches the old orgs.<slug> key path' `
     ($envOut -notmatch 'Config -Set orgs\.') $envOut
+
+# The Teams delivery row names the recipients declared -- the shipped one and
+# this machine's -- by key, and no variable is set, so it is not configured.
+Assert-True 'the Teams delivery row names the declared recipients' `
+    ($envOut -match 'Teams delivery\s+not configured -- gate 2 of a Teams send; recipients: manager, mom') $envOut
 
 # A row that is genuinely off must still read off: the fix must not have made
 # everything look configured.

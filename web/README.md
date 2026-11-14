@@ -88,7 +88,7 @@ web/
 ├── nginx.conf.template   static + /api -> host.docker.internal:${P20_AGENT_PORT}, substituted
 │                        by the nginx image's entrypoint at container start
 ├── docker-compose.yml    127.0.0.1:5174 -> container 5173; passes P20_AGENT_PORT in
-├── tests/smoke.mjs       Playwright, two modes (23 checks off / 30 on), raw `playwright` not @playwright/test
+├── tests/smoke.mjs       Playwright, two modes (28 checks off / 32 on), raw `playwright` not @playwright/test
 ├── tests/smokeStudio.mjs   its --studio cases; smokeStack.mjs starts the servers that mode owns
 ├── tests/smokeMatrix.mjs   its --matrix cases, on the same kind of servers
 ├── tests/smokeA11y.mjs     its --a11y audit, on the same kind of servers
@@ -99,7 +99,7 @@ web/
 ├── tests/routeModules.jest.cjs  jest only: a stub for react-router's one file that reads import.meta
 └── src/
     ├── shell/            the composition root -- owns chrome, owns no decisions
-    │   ├── App.tsx         theme, nav, the /env gate, Home's tabs, System's pager, the <Routes> table
+    │   ├── App.tsx         theme, nav, the /env gate, Home's tabs, System's tabs, the <Routes> table
     │   ├── SpaceAnchor.tsx the Space pill at the left of the nav, which IS the Home entry
     │   ├── SettingsDrawer.tsx  the one settings surface; the avatar in the nav bar opens it
     │   ├── main.tsx        Provider + BrowserRouter + ConfettiProvider + App
@@ -135,14 +135,17 @@ web/
     │   ├── paths.ts        the module's route path, and the router state that opens a bucket
     │   ├── ReminderBell    the header bell: asleep (zz) or awake with the past-due count
     │   ├── useOverdueReminders  the past-due slice of the reminders read, polled each minute
-    │   ├── api.organize.ts tag type Reminders; GET /api/reminders and the two verbs via the bridge
+    │   ├── api.organize.ts tag types Reminders and Reference; GET /api/reminders, GET /api/reference and the two verbs via the bridge
+    │   ├── OrganizePages   the tab's pages under its in-page tabs: Reminders | Reference
+    │   ├── ReferenceCard   a list panel of the hub's reference documents: search, Open; read only
+    │   ├── ReferencePage   one document's reading room, rendered as markdown
     │   ├── reminderEntry   a stored due split into the Edit dialog's date and time, and joined back
     │   └── RemindersCard   a list panel: bucket chips, archive, the snooze menu, edit, the quick add
     ├── modules/solitaireAgile/   opt-in, features.solitaireAgile -- today's standup, read and played, and triage
     │   ├── index.tsx       export solitaireAgileModule: four routes (the standup, triage, milestones, the played view, chromeless), one nav entry, no cards elsewhere
     │   ├── paths.ts        the module's route paths and the played deck's id
     │   ├── api.solitaireAgile.ts   GET /api/ritual/standup, /triage and /milestones ?space=<slug>, read through @consts; POST /api/cmd/Route
-    │   ├── RitualPage      the Standup | Triage | Milestones strip, each tab an address, and the page under it
+    │   ├── RitualPage      the Standup | Triage | Releases strip, each tab an address, and the page under it
     │   ├── StandupPage     Agenda first, then the agent's text verbatim on Detail | Work | Brief: line one the header, the rest monospace, #<n> linked; Copy and Play in the header
     │   ├── AgendaLanes     the Agenda: Since <day> and Waiting on you, tiles from the board's face pieces (or rows), one button a waiting tile
     │   ├── agenda.ts       the Agenda's words: the long day, the lane heading, each tile's one fact
@@ -964,8 +967,11 @@ wordmark's default blob, and by no theme.
   1px rule in the theme's stroke follows it, then the engineer's tabs; the data model still lists Home.
 - **A title per page**, from the nav entry that owns the path: `Daily · ToolKit`. A path with no
   entry is just `ToolKit`.
-- **The header holds what is true on every page** -- brand, org, nav, you; no pager. System's pager is under its cards, centred: the panels' own `ListPager`, `Page 1 of 3`, in a nav named
-  "More cards", from `pager` on the shell context. Home has no pager: it has named tabs (below).
+- **The header holds what is true on every page** -- brand, org, nav, you; no pager. No page has one for its cards. System's cards sit under in-page tabs,
+  **Overview** (`/system`) and **Agents** (`/system/agents`): `SYSTEM_TABS` in the registry, grouped by
+  `moduleSystemTabs`, each tab an address and showing all of its cards. The strip is placed as Team
+  Agile's is, in a `TabRows` above the cards, and with fewer than two tabs there is no strip. Home has
+  named tabs too (below).
 - **Home is named tabs -- Focus | Board | Sprint | Actions** on an Azure DevOps Space, and on a
   GitHub space the strip wears that tracker's words and its own order: **Issues | Board | Stats |
   Design | Docs** (Sprint is an ADO word; the issues come first because the board ceremony is optional on a
@@ -1132,7 +1138,13 @@ wordmark's default blob, and by no theme.
   it. The subtitle carries the one rule true of every hub -- the cards'
   dates decide -- and the sentence under the week (`billingNote`) carries what is conditional on the
   week that was built: whether git enriched it, and which cards were left off. A CLI instruction in
-  the GUI uses the machine's prefix (`env.cliPrefix`).
+  the GUI uses the machine's prefix (`env.cliPrefix`). The week is a stepper -- *Earlier week*, a
+  label, *Later week* -- that opens on "This week" and steps back a week at a time ("Last week",
+  then "Week of 19 Oct"); *Later week* is disabled on this week. This week and last week ask the
+  route `week=current|last`, so the script works them out; two or more back, the page sends that
+  week's Monday to Friday as `since`/`until`, worked out in local time (`billingWeek.ts`, with a
+  Sunday belonging to the week before, as the script has it). The CLI's `Daily -Since -Until` prints
+  the same week's copy text.
 
 ## The avatar menu, and arriving at a setting
 
@@ -1318,7 +1330,7 @@ are prompts, and agile lanes are a better view for how multiple items flow for h
 - **The tab row spans the centre block, flush both ends.** Home's row above the cards (`viewBar`: flex,
   space-between) has the tabs at its left edge, level with the cards below. **New card
   follows the explain text** on both rows: on the board, after the milestone, sprint and tag filters, at the row's end; the
-  text wraps inside itself so the buttons keep the row. The System page keeps its pager under the grid.
+  text wraps inside itself so the buttons keep the row. The System page has a tab strip of its own above its cards, and no pager.
 - **The board owns the height; a lane scrolls inside itself.** The owner: "they all expand to fill the
   space; if I have 20 cards in a single lane each lane has overflow-y." The lanes grid is
   `clamp(360px, 100vh - 290px, 1100px)` tall with `align-items: stretch`, so every lane is the same height
@@ -1774,12 +1786,15 @@ is pressing a button that posts to a real webhook.
 | State | When |
 | --- | --- |
 | **absent** | `postRetroSummary` is false. The workflow does not include a send, so there is nothing to explain |
-| **disabled** | The stage is not Retro, the recipient has no webhook, `## Sent` already records a send, or the Agenda holds only its placeholder -- and every reason that holds is rendered on the line below it, the recipient's first, **naming the environment variable** from the moment the page opens, before Retro as well as at it |
+| **disabled** | The stage is not Retro, the recipient has no webhook, sending is off on this server, `## Sent` already records a send, or the Agenda holds only its placeholder -- and every reason that holds is rendered on the line below it, the recipient's first, from the moment the page opens, before Retro as well as at it |
 | **enabled** | Retro stage, recipient configured, an Agenda with content, nothing under `## Sent` |
 
 Disabled-and-explained rather than hidden is the point: a button that vanishes teaches nobody what
-to set. The reason string is the whole fix -- `Set TEAMS_WEBHOOK_MANAGER to this recipient's webhook
-URL.`
+to set. The recipient's reason is its state in a few neutral words -- `Webhook not set`, or
+`Sending off on this server` where `/env` reports `sendingOff` -- and the fix, with the environment
+variable's name, is in the info icon beside it. Those words are the Environment card's too: both
+read `recipientState.ts` ([`docs/modules/communication.md`](../docs/modules/communication.md),
+"`/env`'s `communication` block").
 
 A click posts
 
@@ -1853,6 +1868,7 @@ paragraph:
 | `src/modules/ado/TrackerBadge.test.tsx` | The card's tracker chip as a table: `github` wears **gh**, `ado` wears **ado**, and `none`, an absent field (an older agent) or an unknown word wear nothing |
 | `src/modules/ado/Board.badge.test.tsx` | The board's card face in a mixed Space: a GitHub-born, an ADO-born and a custom card each wear their own chip, the custom one none |
 | `src/modules/ado/FilterDrawer.test.tsx` | The drawer's linkedness row: drawn in a mixed Space with counts from the cards, a badge sets its filter and the active one sets All back, absent where every card is custom, kept while a filter is active |
+| `src/modules/ado/Billing.test.tsx` | Daily Activity's week stepper: it opens on this week with *Later week* disabled, one step back asks `week=last`, three back ask that week's Monday to Friday as `since`/`until`; Monday found as the script finds it (a Sunday ends the week before) and a week in another year named with its year; the agent's `error` shown as the week that could not be built |
 | `src/modules/ado/billingNote.test.ts` | The sentence under the week on Daily Activity: what it was built from, and the cards that are NOT on it and why -- singular and plural, silence for a count of zero, and the git clause only for a hub that has git |
 | `src/modules/ado/useLandCard.test.tsx` | Land asks first, naming the card; Land runs `POST /api/cmd/Land` with the card's file and says once that it landed; a refusal keeps the confirm open with the verb's own sentence; Cancel runs nothing |
 | `src/modules/ado/useBillableToggle.test.ts` | The toggle offers the opposite of what the card says now, and says what the change means for Daily |
@@ -1926,7 +1942,8 @@ the filter changes, the choice kept after a reload, a fresh browser context open
 **`--matrix`** (`npm run smoke:matrix`) runs on the same kind of servers, over `Tests/fixtures/hub`:
 each module flag alone on -- its nav entry, page, data and source there, every other module's absent and
 never requested, one new browser context per pass, the cases being `docs/SCENARIOS.md`'s "The nav, by
-module" rows; `flipCase` on the Lounge; and each choice kept in browser storage (the Spaces filter, the
+module" rows; the board's lanes by tracker, four on the fixture's Azure DevOps address before the passes and
+five, Backlog first, on the GitHub one after them; `flipCase` on the Lounge; and each choice kept in browser storage (the Spaces filter, the
 Reminders filter, the theme, the Lounge's tic-tac-toe) in a fresh context and in one whose
 `localStorage` and `sessionStorage` throw on access. Chromium only, and opt-in because every flag write
 is a `Config` run through the bridge.
@@ -2015,7 +2032,8 @@ come on top of these; the totals are in [`docs/TESTING.md`](../docs/TESTING.md))
 | 1:1 data was requested | `/api/manager` was actually called |
 | The retro session has a send button | The third state of `sendButtonState`: shown, because `postRetroSummary` is on |
 | The send button is disabled | And an **enabled** one here is a reason to stop: it means a live webhook is configured in the agent's environment |
-| The send button names `TEAMS_WEBHOOK_MANAGER` | The disabled reason sends a reader to a shell rather than to source. This is the check the whole "read-only" rule exists to make possible -- the button is never pressed |
+| The send button says why | Its reason is the recipient's state in a few neutral words: `Sending off on this server` on a server started as a test run, which the fixture one is, or `Webhook not set` on any other. The button is never pressed |
+| The send button's reason is not an instruction to set a variable | The variable's name and the how-to are behind the info icon beside the reason, not in the reason itself |
 | Each meeting entry's menu offers Edit or send | The page the send button is on can be reached from the list: every entry of the Meetings panel has a `...` menu, and each menu holds **Edit or send** |
 | The read view offers `Edit / send` | And from the page a row lands on |
 | `Edit / send` lands on the session page | The button is pressed -- it navigates, it does not send -- and the URL is `/communication/sessions/2026-02-05.md` |
