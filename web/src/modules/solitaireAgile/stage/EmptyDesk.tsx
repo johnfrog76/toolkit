@@ -328,19 +328,30 @@ export function EmptyDesk({ look, tint = EMPTY_DESK_TINT }: { look: MugLook; tin
         {/* the room, dimmed: nobody has the light on */}
         <rect data-testid="empty-desk-dim" width="160" height="90" fill="#0d121e" opacity={0.5} />
 
-        {/* the chair, pushed back and turned a little: nobody is in it */}
-        <g data-testid="empty-desk-chair" transform="rotate(-7 66 50)">
+        {/* the chair, pushed back and turned a little: nobody is in it. A headrest
+            and arms, and no lines across the back: lines read as a page of text. */}
+        <g data-testid="empty-desk-chair" transform="translate(-9 0) rotate(-7 66 50)">
           <rect x={63.5} y={52} width={5} height={22} rx={1.5} fill="#000" opacity={0.45} />
-          <rect x={45} y={15} width={42} height={42} rx={9} fill="#000" opacity={0.34} />
-          <rect x={49} y={19} width={34} height={34} rx={6.5} fill="#fff" opacity={0.09} />
+          {/* the arms, each on its post */}
+          <rect x={40.5} y={50} width={3} height={14} rx={1.2} fill="#000" opacity={0.42} />
+          <rect x={88.5} y={50} width={3} height={14} rx={1.2} fill="#000" opacity={0.42} />
+          <rect x={36} y={47.5} width={12} height={4} rx={2} fill="#000" opacity={0.55} />
+          <rect x={84} y={47.5} width={12} height={4} rx={2} fill="#000" opacity={0.55} />
+          {/* the headrest on its neck */}
+          <rect x={64} y={11} width={4} height={10} rx={1.2} fill="#000" opacity={0.45} />
+          <rect x={53} y={3.5} width={26} height={11} rx={5.5} fill="#000" opacity={0.36} />
+          <rect x={56.5} y={6} width={19} height={6} rx={3} fill="#fff" opacity={0.09} />
+          {/* the back, wider at the shoulders than at the seat */}
           <path
-            d="M 53 30 H 79 M 53 38 H 79 M 53 46 H 79"
-            stroke="#000"
-            strokeWidth={1.3}
-            opacity={0.3}
+            d="M 47 26 Q 47 18 55 18 L 77 18 Q 85 18 85 26 L 82.5 53 Q 82 58 77 58 L 55 58 Q 50 58 49.5 53 Z"
+            fill="#000"
+            opacity={0.34}
           />
-          <rect x={38} y={50} width={9} height={3.6} rx={1.8} fill="#000" opacity={0.5} />
-          <rect x={85} y={50} width={9} height={3.6} rx={1.8} fill="#000" opacity={0.5} />
+          <path
+            d="M 51 27 Q 51 22 56 22 L 76 22 Q 81 22 81 27 L 79 51 Q 78.6 54 75.5 54 L 56.5 54 Q 53.4 54 53 51 Z"
+            fill="#fff"
+            opacity={0.09}
+          />
         </g>
 
         {/* the desk */}
