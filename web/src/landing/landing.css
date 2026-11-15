@@ -281,6 +281,10 @@ body {
   }
   .lp-way--left .lp-window {
     order: -1;
+    justify-self: start;
+  }
+  .lp-way--right .lp-window {
+    justify-self: end;
   }
 }
 
@@ -291,12 +295,7 @@ body {
   color: var(--lp-vibe, var(--lp-text));
 }
 
-/* Three vibes: each way's heading and its window's frame take one face's
-   colour (the stage's --sa-speaker is the frame's). */
-.lp-way {
-  --sa-speaker: var(--lp-vibe);
-}
-
+/* Three vibes: each way's heading takes one face's colour. */
 #way-alone {
   --lp-vibe: #5ee3f7;
 }
@@ -316,48 +315,71 @@ body {
 }
 
 .lp-window {
-  position: relative;
+  justify-self: center;
 }
 
-.lp-window-tile {
+/* The person's card, in the refined cast style: the portrait, a dark plate
+   on the picture's edge with their title, and their line. One soft shadow,
+   light from the top left. */
+.lp-card {
   position: relative;
-  aspect-ratio: 16 / 10;
+  box-sizing: border-box;
+  width: min(100%, 340px);
+  margin: 0;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #f7f4ec;
+  color: #1c2434;
+  box-shadow: 4px 6px 9px rgba(4, 8, 20, 0.34);
+}
+
+.lp-card-pic {
+  line-height: 0;
+}
+
+.lp-card-portrait {
+  display: block;
   width: 100%;
+  height: auto;
 }
 
-/* The bubble sits in the window over the figure, its tail on them, as the
-   standup's does on a tile. */
-.lp-bubble {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  width: 64%;
-  z-index: 2;
-  margin: 0;
-}
-
-.lp-bubble blockquote {
+.lp-card-plate {
   position: relative;
-  margin: 0;
-  padding: 10px 14px;
-  border-radius: 14px;
-  background: #ffffff;
-  color: #1b1b1f;
-  font-size: 0.95rem;
-  line-height: 1.4;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  z-index: 1;
+  display: block;
+  width: fit-content;
+  margin: -13px 0 0 18px;
+  padding: 6px 11px;
+  border-radius: 7px;
+  background: #1c2434;
+  color: #f6f1e4;
+  font-family: var(--lp-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  box-shadow: 3px 4px 6px rgba(4, 8, 20, 0.3);
 }
 
-.lp-bubble blockquote::after {
-  content: "";
-  position: absolute;
-  right: 26px;
-  bottom: -9px;
-  width: 20px;
-  height: 20px;
-  background: #ffffff;
-  rotate: 45deg;
-  border-radius: 3px;
+.lp-card-line {
+  margin: 0;
+  padding: 14px 22px 22px;
+  color: #2f3a52;
+  font-size: 1.02rem;
+  line-height: 1.5;
+}
+
+.lp-card-line::before {
+  content: "\201C";
+  content: "\201C" / "";
+  margin-right: 4px;
+  color: var(--lp-quote, #56627f);
+  font:
+    800 1.7rem Georgia,
+    serif;
+  line-height: 0;
+  vertical-align: -0.45rem;
 }
 
 /* Quick start: a real heading, and the lines coloured as a Solarized terminal would */
