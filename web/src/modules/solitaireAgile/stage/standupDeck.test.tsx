@@ -389,9 +389,7 @@ describe("the stage's bubbles", () => {
 
   it("the mug's status sentence is the speech surface's one line", () => {
     const { tile } = drawStage(4);
-    expect(speech(tile("minimalist"))!.textContent).toBe(
-      `My async status:\n"${SONNET_STATUS}"`,
-    );
+    expect(speech(tile("minimalist"))!.textContent).toBe(`My async status:\n"${SONNET_STATUS}"`);
   });
 
   it("a seated tile does not open with the async words; only the mug does", () => {

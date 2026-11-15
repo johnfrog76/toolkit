@@ -82,7 +82,9 @@ const vocab = JSON.parse(
 
 /** An empty worker's status sentence: the vocabulary's `nothing` line at the fixture's index. */
 function statusOf(caseName: string, label: string): string {
-  const w = table.cases.find((c) => c.name === caseName)?.expected.workers.find((x) => x.label === label);
+  const w = table.cases
+    .find((c) => c.name === caseName)
+    ?.expected.workers.find((x) => x.label === label);
   if (!w || w.nothingIndex === null) throw new Error(`no empty worker ${label} in ${caseName}`);
   return vocab.nothing[w.nothingIndex];
 }
