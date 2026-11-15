@@ -921,10 +921,9 @@ wordmark's default blob, and by no theme.
   button (a test holds it to AA), links on a card, and the logo's word over its face. A fourth is
   held by number: `brand.foreground2` is a brand tint badge's text, and `themeList.test.ts` holds it
   to AA on the ramp's tint background in every theme. The same file snapshots every named theme --
-  its record and the whole Fluent theme made of it -- against `shell/fixtures/themes-93d9d88.json`,
-  the themes as they were in 1.4.0, so a theme changes only on purpose (regenerate the fixture and
-  say so in the commit); `chips` and its Fluent tokens are left out of that comparison, being
-  later than it.
+  its record and the whole Fluent theme made of it -- against `shell/fixtures/themes-364.json`,
+  the six themes and the two skins as rendered with their chip colours, so a theme changes only on
+  purpose (regenerate the fixture and say so in the commit).
 - **A theme's `chips`** are the colours of the filter chip's four named appearances (`pink`,
   `purple`, `orange`, `blue`; `FilterBadge`, `COMPONENTS.md`). A record must name all four, the
   type makes it, and a fifth thing by number: each clears 4.5:1 on the theme's page and card, and the

@@ -13,6 +13,8 @@ import type { ToolkitTheme } from "./themeList";
 import { brandRamp, fluentThemeFor } from "./theme";
 import { AA_TEXT, contrastRatio } from "../shared/accent";
 
+const EVERY_THEME: ToolkitTheme[] = [...THEMES, ...Object.values(SKIN_THEMES)];
+
 function luminance(hex: string): number {
   const n = parseInt(hex.slice(1, 7), 16);
   const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
@@ -110,33 +112,33 @@ describe("themes", () => {
   });
 
   // Every named theme wears its OWN accent: the product's (shared/accent.ts)
-  // is the landing page's and the wordmark's default, never a theme's. So each
-  // theme renders exactly as it did before the accent was made one colour.
-  // fixtures/themes-93d9d88.json is that "before": every named theme's record
-  // and the whole Fluent theme fluentThemeFor() made of it, written by a
-  // throwaway jest test run against a checkout of commit 93d9d88 (the 1.4.0
-  // release, the last commit before the change) that JSON.stringify'd
-  // `{ record: t, fluent: fluentThemeFor(t) }` for each of THEMES. Each named
-  // theme is one mode, so one Fluent theme each. A theme that changes on
-  // purpose regenerates the fixture the same way and says so in its commit.
-  it("every named theme renders exactly as before the one-accent change", () => {
+  // is the landing page's and the wordmark's default, never a theme's. So a
+  // theme changes only on purpose. fixtures/themes-364.json is the themes as
+  // rendered when the filter chips' colours joined them (#364): every theme's
+  // record and the whole Fluent theme fluentThemeFor() made of it, the six
+  // named themes and the two skins, written by a throwaway jest test that
+  // JSON.stringify'd `{ record: t, fluent: fluentThemeFor(t) }` for each. It
+  // replaced themes-93d9d88.json (the 1.4.0 themes, before the one-accent
+  // change), whose every value it holds, plus `chips` and the four chip tokens.
+  // A theme that changes on purpose regenerates the fixture the same way and
+  // says so in its commit.
+  it("every theme renders exactly as the fixture says, chips included", () => {
     const before = JSON.parse(
-      fs.readFileSync(path.join(__dirname, "fixtures", "themes-93d9d88.json"), "utf8"),
+      fs.readFileSync(path.join(__dirname, "fixtures", "themes-364.json"), "utf8"),
     ) as Record<string, { record: unknown; fluent: unknown }>;
-    expect(THEMES.map((t) => t.id)).toEqual(Object.keys(before));
-    for (const t of THEMES) {
-      // `chips` (the filter chips' colours) came after the fixture and drew nothing then; so did their tokens on the Fluent theme.
-      const { chips: _chips, ...rest } = t;
-      expect({ id: t.id, record: JSON.parse(JSON.stringify(rest)) }).toEqual({
+    expect(EVERY_THEME.map((t) => t.id)).toEqual(Object.keys(before));
+    for (const t of EVERY_THEME) {
+      expect({ id: t.id, record: JSON.parse(JSON.stringify(t)) }).toEqual({
         id: t.id,
         record: before[t.id].record,
       });
-      const fluent = JSON.parse(JSON.stringify(fluentThemeFor(t))) as Record<string, string>;
-      for (const a of CHIP_APPEARANCES) delete fluent[chipToken(a)];
-      expect({ id: t.id, fluent }).toEqual({
+      expect({ id: t.id, fluent: JSON.parse(JSON.stringify(fluentThemeFor(t))) }).toEqual({
         id: t.id,
         fluent: before[t.id].fluent,
       });
+      // The four appearances, in all eight themes, on the record and on the Fluent theme.
+      const fluent = fluentThemeFor(t) as unknown as Record<string, string>;
+      for (const a of CHIP_APPEARANCES) expect(fluent[chipToken(a)]).toBe(t.chips[a]);
     }
   });
 
@@ -164,7 +166,6 @@ describe("brand foreground on a card", () => {
 
 // The filter chips' named appearances (shared/FilterBadge.tsx): a call site says "pink",
 // and each theme says what pink is. Eight themes: the six pickable and the two skins.
-const EVERY_THEME: ToolkitTheme[] = [...THEMES, ...Object.values(SKIN_THEMES)];
 const HEX = /^#[0-9a-f]{6}$/i;
 
 /** A chip's own backdrop in a theme: the page, and the card where it is an opaque hex. */
