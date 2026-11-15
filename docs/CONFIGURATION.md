@@ -653,8 +653,10 @@ written. It is declared in `consts.json` `features.spaceScoped`, so the hub keep
 and a top-level `features.teamSize` is ignored; being a number, it is not folded into the merged flag map
 `/env` serves -- the standup reads it off the Space and says it back as `team.size`. One rule per half --
 `Get-P20TeamSize` (`Scripts/Resolve-TeamSize.ps1`) and `team_size()` (`agent/solitaire/standup.py`), the
-`sizes` rows of `Tests/fixtures/rituals/standup-team.json`. The inventory row, `Team size`, reads `on` with
-the number once one of the three is set and `not configured` while nothing is (the room is nine), under
+`sizes` rows of `Tests/fixtures/rituals/standup-team.json`. The inventory row, `Team size`, rides Team Agile
+as the `Suggestions` row does: `off`, with `rides Team Agile, which is off in <slug>`, where Team Agile is
+off in that Space (the switch off, or the Space's `howIWork` not `agents`); where it is on, `on` with the
+number once one of the three is set and `not configured` while nothing is (the room is nine), under
 the question "How many are in my standup in \<Space>?"; the settings drawer draws that question as three
 radios, live on a GitHub Space, each writing the size through `PUT /api/config` with `-Hub`.
 

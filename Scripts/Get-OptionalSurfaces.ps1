@@ -471,9 +471,11 @@ function Get-P20OptionalSurfaces {
 
     # -- The team size: how many are in the standup, the chair included --------
     # spaces[].features.teamSize (Resolve-TeamSize.ps1): a NUMBER the Space states,
-    # one of rituals.teamSizes, so on with the number once set and `not configured`
-    # while it is not -- the room is then rituals.teamSizeDefault, and there is no
-    # answered no. A value that is not a size reads as unset, and the note says so.
+    # one of rituals.teamSizes. It rides Team Agile, as the suggestion's row does:
+    # where Team Agile is off here the row is off and says so; where it is on, on
+    # with the number once set and `not configured` while it is not -- the room is
+    # then rituals.teamSizeDefault, and there is no answered no. A value that is not
+    # a size reads as unset, and the note says so.
     $teamSpace = $null
     if ($Config -and $Config.ActiveSpace) {
         foreach ($sp in @($Config.Spaces)) {
@@ -482,9 +484,14 @@ function Get-P20OptionalSurfaces {
     }
     $team = Get-P20SpaceTeamSize -Space $teamSpace
     $teamSizes = @((Get-P20Consts).rituals.teamSizes | ForEach-Object { [string]$_ })
+    $teamTeamAgile = ($Features -and $Features.ContainsKey('solitaireAgile') -and $Features['solitaireAgile'])
     $teamState = $states.Unset
     $teamNote = "$($team.Size) in the room by default -- the chair and $($team.Size - 1) members; Team Agile's standup in $slug"
-    if ($team.Set) {
+    if (-not $teamTeamAgile) {
+        $teamState = $states.Off
+        $teamNote = "rides Team Agile, which is off in $slug"
+    }
+    elseif ($team.Set) {
         $teamState = $states.On
         $teamNote = "$($team.Size) in the room -- the chair and $($team.Size - 1) members; Team Agile's standup in $slug"
     }

@@ -293,7 +293,8 @@ waits for the switch.
 the Space's too: three radios -- *3*, *6*, *9*, the room with the chair counted -- live where Team Agile's
 standup runs. What is checked is the Space's own `spaces.<slug>.features.teamSize`, read off the entry
 `/env` declares, and nothing is checked while it is unset (the room is then nine; the row's chip says
-`not configured`). A pick writes it through `PUT /api/config` -> `Config -Set -Hub`, with the same Saving
+`not configured` where Team Agile is on, and `off` where it is off -- the row rides Team Agile, as the
+suggestion's does -- while the radios stay live by the tracker, as the suggestion's entry has no gate of its own). A pick writes it through `PUT /api/config` -> `Config -Set -Hub`, with the same Saving
 state; it asks for no how-we-work note and says nothing about Team Agile's switch (`scenarios.test.tsx`,
 "How many are in my standup in `<Space>`?: the Space's size is checked, live on GitHub"; the radios in
 `HowDoI.test.tsx`):
