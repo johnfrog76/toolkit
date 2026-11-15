@@ -1,5 +1,5 @@
 {
-  "_": "The standup's vocabulary (D-TA13, D-TA14, D-SA2, D-SA5, D-SA11): five families kept apart. phrasebook carries no nouns and is what the chair says; nothing is what the REAL register's worker with nothing on the board says -- a status, first person, that claims no work; excuses are plainly fiction and belong to the NONSENSE register beside fakeWork -- the real register never reads them, and a test says so; fakeWork is plausible and is the NONSENSE register's only -- the real register never reads it either; verbs carry no nouns and are the standup register's words, offered to the model that dresses a worker's sentences -- the only family it is shown. phrasebook and nothing are picked deterministically: index = (day of year + position) mod length.",
+  "_": "The standup's vocabulary (D-TA13, D-TA14, D-SA2, D-SA5, D-SA11): five families kept apart. phrasebook carries no nouns and is what the chair says; nothing is what the REAL register's worker with nothing on the board says -- a status, first person and plausible, about the day around the work (the environment, tools, hardware, the desk, learning, meetings, admin), that claims NO TRACKER WORK: never a pull request, review, merge, commit, bug, fix to code, card, issue, ticket, deploy, test run or release, and a test refuses a line that names one; excuses are plainly fiction and belong to the NONSENSE register beside fakeWork -- the real register never reads them, and a test says so; fakeWork is plausible and is the NONSENSE register's only -- the real register never reads it either; verbs carry no nouns and are the standup register's words, offered to the model that dresses a worker's sentences -- the only family it is shown. phrasebook and nothing are picked deterministically: index = (day of year + position) mod length.",
   "phrasebook": [
     "All green.",
     "No blockers on my side.",
@@ -11,7 +11,26 @@
     "Parking that."
   ],
   "nothing": [
-    "Nothing on the board for me. All green, no blockers."
+    "Set up my environment again; it builds clean now.",
+    "Fought my mechanical keyboard's Bluetooth for a while; it pairs now.",
+    "Fixed my standing desk; it goes up and down again.",
+    "Watched a couple of React tutorials to get my head into the new stack.",
+    "Caught up on email and chat after being out.",
+    "Mostly meetings yesterday; heads-down today.",
+    "Reinstalled Node; the real problem turned out to be my PATH.",
+    "Fought the VPN and certificates most of the day; I'm in now.",
+    "Read the docs for the library we're looking at; no opinion yet.",
+    "Onboarding paperwork in the morning, a training course in the afternoon.",
+    "Set up my second monitor and finally got the scaling right.",
+    "Cleaned up my local branches and my disk.",
+    "Spent some time learning the codebase's layout.",
+    "Updated my tools and editor extensions; everything's current.",
+    "Sorted out my access requests; I can reach everything now.",
+    "Read up on how the team works, so I'm ready for what's next.",
+    "Swapped my laptop dock; no more flicker.",
+    "Took a course module on the cloud platform.",
+    "Tidied my notes and my calendar for the week.",
+    "A quiet day for me: some learning and some setup."
   ],
   "excuses": [
     "My cat deleted my dev branch.",

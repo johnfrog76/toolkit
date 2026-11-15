@@ -3,7 +3,7 @@ Standup -- Friday 2 October 2026
 
 Nothing is waiting on you.
 
-Fable: "Nothing on the board for me. All green, no blockers."
+Fable: "Read up on how the team works, so I'm ready for what's next."
 Opus: Today I'm on #170, Date the commits. Nothing blocked.
 Widgets: Today I'm on P4Q8, Say the undated. Nothing blocked.
 

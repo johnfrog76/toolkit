@@ -119,6 +119,8 @@ function responseFor(name: string): StandupResponse {
 }
 
 const friday = responseFor("friday");
+// The friday case's one empty worker: its status sentence, picked by the fixture's index.
+const SONNET_STATUS = friday.workers.find((w) => w.label === "sonnet")!.excuse;
 const deck = buildStandupDeck(friday);
 const slides = deck.slides();
 const say = (i: number) => extractSayText(slides[i].notes);
@@ -224,13 +226,14 @@ describe("the standup deck, from Friday's fixture", () => {
   });
 
   it("Sonnet had nothing: the mug where the face would be, and its status as the one line (D-TA11)", () => {
-    expect(say(4)).toBe("My async status: Nothing on the board for me. All green, no blockers.");
+    expect(SONNET_STATUS).not.toBe("");
+    expect(say(4)).toBe(`My async status: ${SONNET_STATUS}`);
     const { tile, lit } = drawStage(4);
     expect(lit()).toEqual(["minimalist"]);
     expect(within(tile("minimalist")).getByText("MINIMALIST (sonnet)")).toBeTruthy();
     expect(within(tile("minimalist")).getByTestId("stage-mug")).toBeTruthy();
     expect(within(tile("minimalist")).getByTestId("stage-speech-text").textContent).toBe(
-      'My async status:\n"Nothing on the board for me. All green, no blockers."',
+      `My async status:\n"${SONNET_STATUS}"`,
     );
     // The worker had work: no mug on the tile.
     expect(within(tile("dev-hero")).queryByTestId("stage-mug")).toBeNull();
@@ -245,16 +248,14 @@ describe("the standup deck, from Friday's fixture", () => {
         today: [],
         blockers: [],
         empty: true,
-        excuse: "Nothing on the board for me. All green, no blockers.",
+        excuse: SONNET_STATUS,
       })),
     };
     const thinSlides = buildStandupDeck(thin).slides();
     const workerSlides = thinSlides.filter((s) => /-(fable|opus|sonnet)$/.test(s.id));
     expect(workerSlides).toHaveLength(3);
     for (const s of workerSlides) {
-      expect(extractSayText(s.notes)).toBe(
-        "My async status: Nothing on the board for me. All green, no blockers.",
-      );
+      expect(extractSayText(s.notes)).toBe(`My async status: ${SONNET_STATUS}`);
       const { unmount } = render(<>{s.content}</>);
       const lit = CAST.map((c) => c.id).filter(
         (id) => screen.getByTestId(`tile-${id}`).getAttribute("data-lit") === "true",
@@ -263,7 +264,7 @@ describe("the standup deck, from Friday's fixture", () => {
       const tile = screen.getByTestId(`tile-${lit[0]}`);
       expect(within(tile).getByTestId("stage-mug")).toBeTruthy();
       expect(within(tile).getByTestId("stage-speech-text").textContent).toBe(
-        'My async status:\n"Nothing on the board for me. All green, no blockers."',
+        `My async status:\n"${SONNET_STATUS}"`,
       );
       unmount();
     }
@@ -388,9 +389,7 @@ describe("the stage's bubbles", () => {
 
   it("the mug's status sentence is the speech surface's one line", () => {
     const { tile } = drawStage(4);
-    expect(speech(tile("minimalist"))!.textContent).toBe(
-      'My async status:\n"Nothing on the board for me. All green, no blockers."',
-    );
+    expect(speech(tile("minimalist"))!.textContent).toBe(`My async status:\n"${SONNET_STATUS}"`);
   });
 
   it("a seated tile does not open with the async words; only the mug does", () => {
@@ -702,7 +701,7 @@ describe("the standup deck at the work grain, as prose", () => {
   });
 
   it("an empty worker is still the mug and its status", () => {
-    expect(sayOf(4)).toBe("My async status: Nothing on the board for me. All green, no blockers.");
+    expect(sayOf(4)).toBe(`My async status: ${SONNET_STATUS}`);
   });
 
   it("an empty queue is the contract's sentence", () => {

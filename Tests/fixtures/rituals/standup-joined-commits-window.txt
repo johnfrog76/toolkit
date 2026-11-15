@@ -5,7 +5,7 @@ Waiting on you
   Nothing is waiting on you.
 
 Fable
-  Mug        "Nothing on the board for me. All green, no blockers."
+  Mug        "Read up on how the team works, so I'm ready for what's next."
 Opus
   Yesterday  nothing closed
   Today      #170 (2 commits) Date the commits
