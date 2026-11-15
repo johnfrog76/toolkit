@@ -40,7 +40,10 @@
                      keeping the prose for that group -- the rows the agent
                      asserts. Only the agent calls a model.
     3. No fake work  the real register never reads the vocabulary's fakeWork
-                     family (D-SA5): every case's text is grepped for it.
+                     family (D-SA5): every case's text is grepped for it. And no
+                     nothing line claims tracker work: none holds a word of
+                     standup-nothing-banned.json, the list the agent's suite reads;
+                     the family has more than one line and none twice.
     4. Off           with features.solitaireAgile unset there is no verb, no menu
                      line and nothing for the bridge to call.
     5. The verb      Standup typed in a fresh shell -- the package's own manifest
@@ -188,6 +191,36 @@ for ($n = 0; $n -lt $cases.Count; $n++) {
 }
 Assert-True 'the vocabulary has an excuses family (the nonsense register''s) and a nothing family (the empty worker''s)' ($excuses.Count -gt 0 -and $nothing.Count -gt 0)
 Assert-True 'the vocabulary has a fakeWork family to grep for' ($fakeWork.Count -gt 0)
+
+# A nothing line is the day around the work and claims NO TRACKER WORK -- no word of
+# standup-nothing-banned.json, whole word, any case; the same list Tests/test_rituals.py reads.
+# fix/fixed is not on it on purpose ("Fixed my standing desk"); a fix to code is a bug, a
+# commit or a pull request, which are.
+$bannedRaw = [System.IO.File]::ReadAllText((Join-Path $fixtureDir 'standup-nothing-banned.json'), [System.Text.Encoding]::UTF8)
+$banned = @(($bannedRaw | ConvertFrom-Json).words | ForEach-Object { [string]$_ })
+$trackerWord = {
+    param([string]$Line)
+    foreach ($word in $banned) {
+        $pattern = '\b' + ((@($word -split '\s+') | ForEach-Object { [regex]::Escape($_) }) -join '\s+') + '\b'
+        if ([regex]::IsMatch($Line, $pattern, [System.Text.RegularExpressions.RegexOptions]'IgnoreCase, CultureInvariant')) { return $word }
+    }
+    return ''
+}
+Assert-True "the nothing family has more than one line ($($nothing.Count)), so two idle workers say different lines" ($nothing.Count -gt 1)
+$nothingSeen = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+$nothingTwice = @($nothing | Where-Object { -not $nothingSeen.Add([string]$_) })
+Assert-True 'no nothing line appears twice' ($nothingTwice.Count -eq 0) ($nothingTwice -join ' | ')
+Assert-True "the tracker-word list has words ($($banned.Count))" ($banned.Count -gt 0)
+foreach ($line in $nothing) {
+    $hit = & $trackerWord ([string]$line)
+    Assert-True "no tracker work in the nothing line '$line'" ($hit -eq '') "says '$hit'"
+}
+foreach ($line in @('Opened a PR.', 'Went over the  Pull  Request.', 'Two cards moved.', 'Ran the tests.')) {
+    Assert-True "the tracker-word guard catches '$line'" ((& $trackerWord $line) -ne '')
+}
+foreach ($line in @('Fixed my standing desk.', 'Fixed my PATH.', 'Read the protest notes.', 'Carded nothing.')) {
+    Assert-True "the tracker-word guard passes '$line'" ((& $trackerWord $line) -eq '')
+}
 
 # A few rows the table implies, said in words.
 Write-Host ""

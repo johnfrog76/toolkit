@@ -60,6 +60,17 @@ def _fill(case: dict) -> "standup.Standup":
     return filled
 
 
+NOTHING_BANNED = json.loads((FIXTURES / "standup-nothing-banned.json").read_text(encoding="utf-8"))["words"]
+
+
+def _tracker_word(line: str) -> str:
+    """The first standup-nothing-banned.json word ``line`` holds, whole word, any case; "" for none."""
+    for word in NOTHING_BANNED:
+        if re.search(r"\b" + r"\s+".join(re.escape(part) for part in word.split()) + r"\b", line, re.IGNORECASE):
+            return word
+    return ""
+
+
 def _golden(name: str) -> str:
     # Bytes, not text mode: a CRLF checkout would be translated, and LF is the law.
     return (FIXTURES / name).read_bytes().decode("utf-8")
@@ -163,17 +174,44 @@ class TheTable(unittest.TestCase):
         self.assertNotIn('"excuses"', source)
 
     def test_an_empty_worker_reports_the_nothing_sentence_in_both_registers_of_text(self):
-        """#255: empty is the vocabulary's `nothing` line -- 'Nothing on the board for me.
-        All green, no blockers.' -- in the worker, the long text, the brief-free work text."""
-        want = VOCAB["nothing"][0]
-        self.assertEqual(want, "Nothing on the board for me. All green, no blockers.")
+        """Empty is the vocabulary's `nothing` line at (day of year + position) mod
+        length -- in the worker and the long text; two idle workers on one day say different lines."""
+        nothing = VOCAB["nothing"]
         for name in ("friday", "monday"):
-            filled = _fill(CASES[name])
-            empties = [w for w in filled.workers if w.empty]
+            case = CASES[name]
+            d = case["expected"]["dayOfYear"]
+            filled = _fill(case)
+            empties = [(i, w) for i, w in enumerate(filled.workers) if w.empty]
             self.assertTrue(empties, name)
-            for w in empties:
-                self.assertEqual(w.excuse, want)
-            self.assertIn(f'Mug        "{want}"', filled.text)
+            for i, w in empties:
+                with self.subTest(case=name, worker=w.label):
+                    self.assertEqual(w.excuse, nothing[(d + i) % len(nothing)])
+                    self.assertIn(f'Mug        "{w.excuse}"', filled.text)
+        monday = [w.excuse for w in _fill(CASES["monday"]).workers if w.empty]
+        self.assertEqual(len(monday), 2)
+        self.assertNotEqual(monday[0], monday[1])
+
+    def test_no_nothing_line_claims_tracker_work(self):
+        """A `nothing` line is the day around the work and never names what the tracker
+        would show -- no word of standup-nothing-banned.json, whole word, any case; the same list
+        tkTestToolkit -Rituals reads. More than one line, and none twice, so the pick rotates."""
+        nothing = VOCAB["nothing"]
+        self.assertGreater(len(nothing), 1)
+        self.assertEqual(len(nothing), len(set(nothing)), "a nothing line appears twice")
+        self.assertTrue(NOTHING_BANNED)
+        for line in nothing:
+            with self.subTest(line=line):
+                self.assertEqual(_tracker_word(line), "", line)
+
+    def test_the_tracker_word_guard_has_teeth(self):
+        """The guard's own rule over made-up lines: a banned word anywhere, in any case, is caught;
+        a word that only contains one is not."""
+        for line in ("Opened a PR.", "Went over the  Pull  Request.", "Two cards moved.", "Ran the tests."):
+            with self.subTest(line=line):
+                self.assertNotEqual(_tracker_word(line), "")
+        for line in ("Fixed my standing desk.", "Fixed my PATH.", "Read the protest notes.", "Carded nothing."):
+            with self.subTest(line=line):
+                self.assertEqual(_tracker_word(line), "")
 
     def test_the_nothing_family_is_picked_deterministically(self):
         """index = (day of year + position) mod length, so a longer family rotates."""

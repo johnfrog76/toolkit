@@ -1684,7 +1684,7 @@ function Format-P20StandupWork {
 
         Waiting on you to walk two in Phase 6.
         <worker>: Yesterday I closed two in Team Agile. Nothing blocked.
-        <worker>: "Nothing on the board for me. All green, no blockers."
+        <worker>: "Took a course module on the cloud platform."
 
       An empty slot says nothing; an empty worker is its status sentence. LF-joined,
       ending in one LF; every fixed word from rituals.text. Takes the fill's
