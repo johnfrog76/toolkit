@@ -678,7 +678,7 @@ $grainCase.work.text = Format-P20StandupWork -Standup $grainCase -PackageRoot $p
 $grainCase['brief'] = Format-P20StandupBrief -Standup $grainCase -PackageRoot $pkgRoot
 Assert-True 'Get-P20StandupGrainText: detail is the text, work the work text, brief the brief, anything else nothing' ((Get-P20StandupGrainText -Standup $grainCase -Grain 'detail') -ceq $grainCase.text -and (Get-P20StandupGrainText -Standup $grainCase -Grain 'work') -ceq $grainCase.work.text -and (Get-P20StandupGrainText -Standup $grainCase -Grain 'brief') -ceq $grainCase.brief -and $null -eq (Get-P20StandupGrainText -Standup $grainCase -Grain 'Work'))
 $standupJson = Invoke-P20StandupFill -AsOf $asOfTexts[0] -Labels @($fixture.workerLabels) -Issues @($cases[0].issues) -Tracker $cases[0].tracker -PackageRoot $pkgRoot
-Assert-True 'the response carries work beside text: queue, workers, the queue''s prose and its own text' ($standupJson.Contains('work') -and (((@($standupJson.work.Keys)) -join ',') -ceq 'queue,workers,queueProse,text')) ((@($standupJson.work.Keys)) -join ',')
+Assert-True 'the response carries work beside text: queue, workers, the queue''s prose, the chair''s turn and its own text' ($standupJson.Contains('work') -and (((@($standupJson.work.Keys)) -join ',') -ceq 'queue,workers,queueProse,chairProse,text')) ((@($standupJson.work.Keys)) -join ',')
 Assert-True 'a work row carries its prose after its three slots' ((((@($standupJson.work.workers[0].Keys)) -join ',') -ceq 'label,name,yesterday,today,blockers,prose')) ((@($standupJson.work.workers[0].Keys)) -join ',')
 
 # -- 1d. The prose ---------------------------------------------------------
@@ -735,6 +735,18 @@ for ($n = 0; $n -lt $proseCases.Count; $n++) {
         $got = ''
         if ($g) { $got = (@($g.prose | ForEach-Object { [string]$_ })) -join ' | ' }
         Assert-True "${name}: $($w.label)'s sentences" ($got -ceq $want) "`n  got  $got`n  want $want"
+    }
+    # The chair's own turn, last, in the workers' frame: the board again, or queueEmpty.
+    $want = (@($exp.chair | ForEach-Object { [string]$_ })) -join ' | '
+    $got = (@($s.work.chairProse | ForEach-Object { [string]$_ })) -join ' | '
+    Assert-True "${name}: the chair's own turn" ($got -ceq $want) "`n  got  $got`n  want $want"
+    # An idle worker says its two made-up items, then no blockers, in the frame.
+    foreach ($w in @($s.workers | Where-Object { $null -ne $_ -and $_.empty })) {
+        $g = @($gotWorkers | Where-Object { [string]$_.label -ceq [string]$w.label }) | Select-Object -First 1
+        $tt = $consts.rituals.text
+        $want = (@([string]$tt.turnOpen) + @($w.status | ForEach-Object { [string]$_ }) + @([string]$tt.proseBlockersNone, [string]$tt.turnClose)) -join ' | '
+        $got = (@($g.prose | ForEach-Object { [string]$_ })) -join ' | '
+        Assert-True "${name}: idle $($w.label) says its status in the frame" ($got -ceq $want) "`n  got  $got`n  want $want"
     }
     $text = Format-P20StandupWork -Standup $s -PackageRoot $pkgRoot
     $golden = [System.IO.File]::ReadAllText((Join-Path $fixtureDir ([string]$exp.text)))
@@ -1192,7 +1204,8 @@ try {
     $expectNow.work.text = Format-P20StandupWork -Standup $expectNow -PackageRoot $pkgRoot
     $expectWork = ([string]$expectNow.work.text).TrimEnd([char]10)
     Assert-True '-Grain work exits 0 and prints the work grain the rule renders for now' ($gw.Exit -eq '0' -and $gw.Inner -ceq $expectWork) ("`n--- got ---`n$($gw.Inner)`n--- want ---`n$expectWork")
-    Assert-True '-Grain work: one line a worker, spoken as prose, no slot labels padded to the column' ($gw.Inner -match '(?m)^Opus: Yesterday I closed ' -and $gw.Inner -notmatch '(?m)^  (Walk|Yesterday|Today|Blockers) ') $gw.Inner
+    $openTurn = [regex]::Escape([string]$consts.rituals.text.turnOpen)
+    Assert-True '-Grain work: one turn a worker, spoken as prose, no slot labels padded to the column' ($gw.Inner -match ('(?m)^Opus: ' + $openTurn + ' Yesterday I closed ') -and $gw.Inner -notmatch '(?m)^  (Walk|Yesterday|Today|Blockers) ') $gw.Inner
     if ($parsed) {
         Assert-True '-AsJson carries the work grain: its groups and the text -Grain work prints' (([string]$parsed.work.text).TrimEnd([char]10) -ceq $gw.Inner -and @($parsed.work.workers).Count -eq 3 -and $null -ne $parsed.work.queue) $j.Inner
     }

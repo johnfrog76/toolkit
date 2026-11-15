@@ -236,9 +236,9 @@ class WorkWorker(BaseModel):
     yesterday: list[WorkGroup] = []
     today: list[WorkGroup] = []
     blockers: list[WorkGroup] = []
-    # The prose: the worker's sentences, in order -- one a group, then
-    # "Nothing blocked." when it has something to say and no blockers. Empty for
-    # a worker with nothing, who is its status sentence.
+    # The prose: the worker's turn, in order -- turnOpen, one sentence a group
+    # (an idle worker's two made-up items), proseBlockersNone when nothing blocks
+    # it, then turnClose. Empty only when there is nothing to say.
     prose: list[str] = []
 
 
@@ -249,6 +249,9 @@ class Work(BaseModel):
     workers: list[WorkWorker] = []
     # The prose: the queue's sentences, one a group, kind by kind.
     queueProse: list[str] = []
+    # The chair's own turn, last, in the workers' frame: the queue's sentences
+    # again, or queueEmpty when nothing waits. Empty when no tracker answered.
+    chairProse: list[str] = []
     text: str = ""
 
 
@@ -1293,8 +1296,11 @@ def build_work(filled: Standup, key_of: dict[str, tuple[str, str]]) -> Work:
         for slot in cer["slots"]:
             slots[slot], said = groups(getattr(w, slot), slot)
             prose += said
-        workers.append(WorkWorker(label=w.label, name=w.name, prose=prose_close(prose, slots), **slots))
-    return Work(queue=WorkQueue(**queue), workers=workers, queueProse=queue_prose)
+        # An idle worker's sentences are its two made-up items, yesterday and today.
+        said = list(w.status) if w.empty else prose
+        workers.append(WorkWorker(label=w.label, name=w.name, prose=prose_turn(prose_close(said, slots)), **slots))
+    chair = prose_turn(queue_prose or [rituals_text()["queueEmpty"]])
+    return Work(queue=WorkQueue(**queue), workers=workers, queueProse=queue_prose, chairProse=chair)
 
 
 # -- The prose -----------------------------------------------------------
@@ -1394,11 +1400,21 @@ def prose_sentences(slot: str, groups: list[WorkGroup], titles: dict[str, str]) 
 
 
 def prose_close(said: list[str], slots: dict[str, list[WorkGroup]]) -> list[str]:
-    """A worker's sentences, closed: "Nothing blocked." after them when there are
+    """A worker's sentences, closed: proseBlockersNone after them when there are
     any and the blockers slot has none. A worker with nothing says nothing."""
     if said and not slots.get("blockers"):
         return said + [rituals_text()["proseBlockersNone"]]
     return said
+
+
+def prose_turn(said: list[str]) -> list[str]:
+    """Sentences as one turn: turnOpen before them and turnClose after, the frame
+    every speaker's status is said in. Nothing said is no turn. Pure; the mirror
+    of ``Get-P20StandupTurn``."""
+    if not said:
+        return []
+    t = rituals_text()
+    return [t["turnOpen"], *said, t["turnClose"]]
 
 
 # -- The dress (D-SA11) ---------------------------------------------------
@@ -1551,7 +1567,8 @@ def dress_facts(filled: Standup) -> list[dict]:
         w = by_label.get(ww.label)
         if w is None or w.empty:
             continue
-        at = 0
+        # The turn opens on turnOpen, which is the frame's and not dressed.
+        at = 1 if ww.prose else 0
         for slot in cer["slots"]:
             items = getattr(w, slot)
             titles = {(f"#{i.number}" if i.number is not None else (i.id or "")): i.title for i in items}
@@ -1897,11 +1914,13 @@ def render_standup(filled: Standup) -> str:
 
 
 def render_work(filled: Standup) -> str:
-    """The work grain's text, spoken as prose: the long form's frame --
-    the title, the chair's lines, the Tracker line when nothing answered -- with ONE
-    line for the queue (its sentences, or queueEmpty when it has none) and one per
-    worker (its name, then its sentences). An empty slot says nothing; an empty
-    worker is its status sentence. LF-joined and LF-terminated. Pure; the mirror of
+    """The work grain's text, spoken as prose: the round of the room. The long
+    form's frame -- the title, the chair's lines, the Tracker line when nothing
+    answered -- with ONE line for the queue (its sentences, or queueEmpty when it
+    has none), one per worker (its name, then its turn: turnOpen, its sentences,
+    turnClose; an idle worker's are its two made-up items), and the chair's own
+    turn last (``chairProse``: the queue again, in the same frame). An empty slot
+    says nothing. LF-joined and LF-terminated. Pure; the mirror of
     ``Format-P20StandupWork``, held by the ``standup-prose-*.txt`` goldens."""
     t = rituals_text()
     width = rituals_label_width()
@@ -1918,14 +1937,14 @@ def render_work(filled: Standup) -> str:
             lines.append(t["noWorkers"])
         grained = {w.label: w for w in filled.work.workers}
         for w in filled.workers:
-            if w.empty:
-                lines.append(f'{w.name}: "{w.excuse}"')
-                continue
             ww = grained.get(w.label)
             lines.append(f"{w.name}: {' '.join(ww.prose if ww else [])}")
         if filled.checks:
             lines.append("")
             lines += [f"{t['check']}: {c}" for c in filled.checks]
+        # The chair's own turn, last: the board again, in the same frame.
+        if filled.work.chairProse:
+            lines += ["", " ".join(filled.work.chairProse)]
     lines += ["", f'"{filled.chair.close}"']
     return "\n".join(lines) + "\n"
 

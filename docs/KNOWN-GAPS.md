@@ -338,7 +338,9 @@ out, or at once on the Triage page's Refresh.
 **What you see:** The played view draws one tile for each worker label, however many sessions that worker is running. The
 week's seat is always ghosted, and the tracker's seat lights only to say the tracker could not be read.
 The voice is the browser's own, whatever the machine has; there is no lock-screen play, pause or next;
-and the nonsense register's door is not drawn on the stage.
+and the nonsense register's door is not drawn on the stage. A worker with nothing on the tracker
+speaks its turn but its tile still shows the mug where its face would be, and the stage closes on the
+queue's sentences rather than the chair's own turn, which `Standup -Grain work` prints.
 
 **Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
 

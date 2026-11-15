@@ -3,8 +3,10 @@ Standup -- Friday 2 October 2026
 
 Waiting on you to walk two in Phase 6 (#515, #517). Also to walk #513, Verify the Studio tab draws on the PC.
 
-Fable: Today I'm on the Studio: #511, the archived-repository mark. I'm also on #512, Rename the slug. Blocked on #513, Verify the Studio tab draws on the PC.
-Opus: Yesterday I closed two in Team Agile (#501, #502). I also closed one in the Studio: #503, Count the foyer rows. Today I'm on two in Team Agile (#504, #505). Nothing blocked.
-Sonnet: "Took a course module on the cloud platform."
+Fable: Good morning. Today I'm on the Studio: #511, the archived-repository mark. I'm also on #512, Rename the slug. Blocked on #513, Verify the Studio tab draws on the PC. That's it for me.
+Opus: Good morning. Yesterday I closed two in Team Agile (#501, #502). I also closed one in the Studio: #503, Count the foyer rows. Today I'm on two in Team Agile (#504, #505). No blockers. That's it for me.
+Sonnet: Good morning. Took a course module on the cloud platform. Today I'll chase the last two access requests I'm waiting on. No blockers. That's it for me.
+
+Good morning. Waiting on you to walk two in Phase 6 (#515, #517). Also to walk #513, Verify the Studio tab draws on the PC. That's it for me.
 
 "Let's circle back."

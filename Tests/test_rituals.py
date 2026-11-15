@@ -207,7 +207,8 @@ class TheTable(unittest.TestCase):
                 with self.subTest(case=name, worker=w.label):
                     self.assertEqual(w.status, [nothing[(d + i) % len(nothing)], today[(d + i) % len(today)]])
                     self.assertEqual(w.excuse, w.status[0])
-                    self.assertIn(f'Mug        "{w.excuse}"', filled.text)
+                    row = C.rituals_text()["mug"].ljust(C.rituals_label_width())
+                    self.assertIn(f'  {row}  "{w.excuse}"', filled.text)
         monday = [w.status for w in _fill(CASES["monday"]).workers if w.empty]
         self.assertEqual(len(monday), 2)
         self.assertNotEqual(monday[0][0], monday[1][0])
@@ -947,6 +948,41 @@ class TheProseTable(unittest.TestCase):
             with self.subTest(case=name):
                 self.assertEqual(got, case["expected"]["workers"])
 
+    def test_the_chairs_own_turn(self):
+        """The chair gives its status last, in the workers' frame: the board again,
+        or queueEmpty when nothing waits; no turn when no tracker answered."""
+        for name, case in PROSE_CASES.items():
+            with self.subTest(case=name):
+                self.assertEqual(_fill_prose(case).work.chairProse, case["expected"]["chair"])
+
+    def test_every_turn_is_in_the_frame(self):
+        """turnOpen first, turnClose last, for every worker that says anything and for the chair."""
+        t = C.rituals_text()
+        for name, case in PROSE_CASES.items():
+            filled = _fill_prose(case)
+            for said in [w.prose for w in filled.work.workers] + [filled.work.chairProse]:
+                if not said:
+                    continue
+                with self.subTest(case=name, said=said[1]):
+                    self.assertEqual((said[0], said[-1]), (t["turnOpen"], t["turnClose"]))
+
+    def test_an_idle_worker_says_its_two_items_in_the_frame(self):
+        """A worker with nothing on the tracker says its status -- yesterday, then today --
+        and no blockers, inside the frame; never a made-up item beside a real one."""
+        t = C.rituals_text()
+        for name, case in PROSE_CASES.items():
+            filled = _fill_prose(case)
+            grained = {w.label: w for w in filled.work.workers}
+            for w in filled.workers:
+                with self.subTest(case=name, worker=w.label):
+                    if w.empty:
+                        self.assertEqual(
+                            grained[w.label].prose,
+                            [t["turnOpen"], *w.status, t["proseBlockersNone"], t["turnClose"]],
+                        )
+                    else:
+                        self.assertFalse(set(grained[w.label].prose) & set(VOCAB["nothing"] + VOCAB["nothingToday"]))
+
     def test_the_work_text_is_the_golden_file_byte_for_byte(self):
         for name, case in PROSE_CASES.items():
             with self.subTest(case=name):
@@ -954,11 +990,12 @@ class TheProseTable(unittest.TestCase):
 
     def test_the_issues_example_sentences(self):
         """The prose grain's own words: "Yesterday I closed two in Team Agile (...). Today I'm on the Studio:
-        #<n>, the archived-repository mark. Nothing blocked." -- as this table spells them."""
+        #<n>, the archived-repository mark. No blockers." -- as this table spells them, in the turn's frame."""
+        t = C.rituals_text()
         text = _fill_prose(PROSE_CASES["friday"]).work.text
-        self.assertIn("Opus: Yesterday I closed two in Team Agile (#501, #502). ", text)
-        self.assertIn("Fable: Today I'm on the Studio: #511, the archived-repository mark. ", text)
-        self.assertIn(" Nothing blocked.\n", text)
+        self.assertIn(f"Opus: {t['turnOpen']} Yesterday I closed two in Team Agile (#501, #502). ", text)
+        self.assertIn(f"Fable: {t['turnOpen']} Today I'm on the Studio: #511, the archived-repository mark. ", text)
+        self.assertIn(f" {t['proseBlockersNone']} {t['turnClose']}\n", text)
 
     def test_the_json_round_trip_renders_the_same_text(self):
         for name, case in PROSE_CASES.items():
@@ -1056,25 +1093,23 @@ class TheDressTable(unittest.TestCase):
         )
 
     def test_a_reply_that_names_999_keeps_the_prose_for_that_group(self):
+        """The groups' ids are their places in a turn: the opener is place 0 and is never dressed."""
         reply = DRESS_TABLE["reply"]
-        filled = standup.Standup(
-            work=standup.Work(
-                workers=[
-                    standup.WorkWorker(
-                        label="opus", name="Opus", prose=[g["floor"] for g in DRESS_GROUPS] + ["Nothing blocked."]
-                    )
-                ]
-            )
-        )
+        t = C.rituals_text()
+        turn = [t["turnOpen"], *[g["floor"] for g in DRESS_GROUPS], t["proseBlockersNone"], t["turnClose"]]
+        filled = standup.Standup(work=standup.Work(workers=[standup.WorkWorker(label="opus", name="Opus", prose=turn)]))
         spoken = standup.spoken_from(filled, DRESS_GROUPS, reply["answer"], "m")
-        self.assertEqual(spoken.workers[0].prose, reply["said"] + ["Nothing blocked."])
+        self.assertEqual(
+            spoken.workers[0].prose, [t["turnOpen"], *reply["said"], t["proseBlockersNone"], t["turnClose"]]
+        )
         self.assertEqual((spoken.dressed, spoken.refused, spoken.model), (reply["dressed"], reply["refused"], "m"))
 
     def test_the_facts_are_the_workers_sentences_and_nothing_else(self):
         filled = _fill_prose(PROSE_CASES["friday"])
         facts = standup.dress_facts(filled)
         prose = {w.label: w.prose for w in filled.work.workers}
-        self.assertEqual([f["id"] for f in facts], ["fable/0", "fable/1", "fable/2", "opus/0", "opus/1", "opus/2"])
+        # Position 0 is the turn's opener, which is the frame's and never dressed.
+        self.assertEqual([f["id"] for f in facts], ["fable/1", "fable/2", "fable/3", "opus/1", "opus/2", "opus/3"])
         for f in facts:
             label, at = f["id"].split("/")
             with self.subTest(fact=f["id"]):
@@ -1083,7 +1118,10 @@ class TheDressTable(unittest.TestCase):
         said = {f["floor"] for f in facts}
         self.assertNotIn(C.rituals_text()["proseBlockersNone"], said)
         self.assertFalse(said & set(filled.work.queueProse), "the queue's sentences are the chair's, not dressed")
-        opus = next(f for f in facts if f["id"] == "opus/0")
+        self.assertFalse(
+            said & {C.rituals_text()["turnOpen"], C.rituals_text()["turnClose"]}, "the frame is not dressed"
+        )
+        opus = next(f for f in facts if f["id"] == "opus/1")
         self.assertEqual(
             (opus["name"], opus["count"], opus["refs"], opus["first"], opus["slot"]),
             ("Team Agile", 2, ["#501", "#502"], True, "yesterday"),
@@ -1098,14 +1136,14 @@ class TheDressTable(unittest.TestCase):
         prose = {w.label: w.prose for w in filled.work.workers}
         self.assertEqual(
             sorted(facts),
-            ["fable/0", "fable/1", "opus/0", "opus/1", "sonnet/0", "sonnet/1", "sonnet/2", "sonnet/3", "sonnet/4"],
+            ["fable/1", "fable/2", "opus/1", "opus/2", "sonnet/1", "sonnet/2", "sonnet/3", "sonnet/4", "sonnet/5"],
         )
         for f in facts.values():
             label, at = f["id"].split("/")
             with self.subTest(fact=f["id"]):
                 self.assertEqual(f["floor"], prose[label][int(at)])
                 self.assertEqual(standup.dress_guard(f, f["floor"]), "")
-        fable, opus = facts["fable/1"], facts["opus/1"]
+        fable, opus = facts["fable/2"], facts["opus/2"]
         self.assertEqual((fable["name"], fable["count"], fable["refs"], fable["first"]), ("", 7, [], False))
         self.assertEqual((opus["name"], opus["count"], opus["refs"]), ("Phase 6, Phase 7, the Studio and Docs", 4, []))
         self.assertEqual(
@@ -1129,9 +1167,9 @@ class TheDressTable(unittest.TestCase):
             if issue["number"] == 504:
                 issue["labels"].append("enhancement")
         facts = {f["id"]: f for f in standup.dress_facts(_fill_prose(case))}
-        self.assertEqual(facts["opus/0"]["kinds"], {"bugs": 2})
-        self.assertEqual(facts["opus/2"]["kinds"], {"features": 1})
-        self.assertEqual(facts["opus/1"]["kinds"], {})
+        self.assertEqual(facts["opus/1"]["kinds"], {"bugs": 2})
+        self.assertEqual(facts["opus/3"]["kinds"], {"features": 1})
+        self.assertEqual(facts["opus/2"]["kinds"], {})
         cards = {f["id"]: f for f in standup.dress_facts(_fill_prose(PROSE_CASES["cards"]))}
         bug = next(f for f in cards.values() if f["name"] == "Bug")
         self.assertEqual(bug["kinds"], {"bugs": bug["count"]})
@@ -1151,8 +1189,8 @@ class TheDressTable(unittest.TestCase):
         filled = _fill_prose(PROSE_CASES["friday"])
         complete, calls = _answering(
             {
-                "opus/0": "Smashed two in Team Agile (#501, #502).",
-                "opus/2": "Plumbing for two in Team Agile (#504, #505), and #999.",
+                "opus/1": "Smashed two in Team Agile (#501, #502).",
+                "opus/3": "Plumbing for two in Team Agile (#504, #505), and #999.",
             }
         )
         with mock.patch.object(standup.model, "complete", complete):
@@ -1160,7 +1198,7 @@ class TheDressTable(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         opus = next(w for w in spoken.workers if w.label == "opus")
         work = next(w for w in filled.work.workers if w.label == "opus")
-        self.assertEqual(opus.prose, ["Smashed two in Team Agile (#501, #502).", *work.prose[1:]])
+        self.assertEqual(opus.prose, [work.prose[0], "Smashed two in Team Agile (#501, #502).", *work.prose[2:]])
         fable = next(w for w in spoken.workers if w.label == "fable")
         self.assertEqual(fable.prose, next(w for w in filled.work.workers if w.label == "fable").prose)
         self.assertEqual((spoken.dressed, spoken.refused), (1, 5))
@@ -1170,7 +1208,7 @@ class TheDressTable(unittest.TestCase):
 
     def test_the_same_groups_are_dressed_once(self):
         filled = _fill_prose(PROSE_CASES["friday"])
-        complete, calls = _answering({"opus/0": "Smashed two in Team Agile (#501, #502)."})
+        complete, calls = _answering({"opus/1": "Smashed two in Team Agile (#501, #502)."})
         with mock.patch.object(standup.model, "complete", complete):
             first = asyncio.run(standup.dress_standup(filled))
             second = asyncio.run(standup.dress_standup(_fill_prose(PROSE_CASES["friday"])))
@@ -1630,7 +1668,7 @@ def _brief_less_corner(body: dict) -> str:
     return brief
 
 
-WORK_FIELDS = {"queue", "workers", "queueProse", "text"}
+WORK_FIELDS = {"queue", "workers", "queueProse", "chairProse", "text"}
 GROUP_FIELDS = {"name", "by", "count", "refs", "phrase"}
 WORKER_FIELDS = {"label", "name", "yesterday", "today", "blockers", "empty", "excuse", "status"}
 WALK_FIELDS = {"number", "id", "title", "url", "path", "motion", "commits", "worker"}
@@ -2298,7 +2336,7 @@ class TheDressIsKeptByItsFacts(unittest.TestCase):
     across a restart; a changed fact or model is asked again; and the guard runs on
     every kept reply as on a fresh one. The model is stubbed: no test calls one."""
 
-    REPLY = {"opus/0": "Smashed two in Team Agile (#501, #502)."}
+    REPLY = {"opus/1": "Smashed two in Team Agile (#501, #502)."}
 
     def _dress(self, filled, complete):
         with mock.patch.object(standup.model, "complete", complete):
@@ -2335,7 +2373,7 @@ class TheDressIsKeptByItsFacts(unittest.TestCase):
         complete, calls = _answering(self.REPLY)
         self._dress(_fill_prose(PROSE_CASES["friday"]), complete)
         changed = _fill_prose(PROSE_CASES["friday"])
-        changed.work.workers[0].prose[0] += " Also on a new one."
+        changed.work.workers[0].prose[1] += " Also on a new one."
         self._dress(changed, complete)
         self.assertEqual(len(calls), 2)
 
@@ -2352,8 +2390,8 @@ class TheDressIsKeptByItsFacts(unittest.TestCase):
         key = standup.dress_key(standup.model.model_id(), filled.register_, facts)
         # Kept before the guard learned better: one sentence it refuses, one it passes.
         kept = {
-            "opus/0": "Smashed two in Team Agile (#501, #502) and #999.",
-            "opus/2": "Plumbing for two in Team Agile (#504, #505).",
+            "opus/1": "Smashed two in Team Agile (#501, #502) and #999.",
+            "opus/3": "Plumbing for two in Team Agile (#504, #505).",
         }
         self.assertTrue(disk_cache.put_json({"reply": kept}, standup.DRESS_CACHE, f"{key}.json"))
         complete, calls = _answering({})
@@ -2361,9 +2399,9 @@ class TheDressIsKeptByItsFacts(unittest.TestCase):
         self.assertEqual(calls, [], "a kept reply is not asked again")
         opus = next(w for w in spoken.workers if w.label == "opus")
         work = next(w for w in filled.work.workers if w.label == "opus")
-        self.assertEqual(opus.prose[0], work.prose[0], "the refused sentence is the prose")
-        self.assertEqual(standup.dress_guard(next(f for f in facts if f["id"] == "opus/2"), kept["opus/2"]), "")
-        self.assertEqual(opus.prose[2], kept["opus/2"])
+        self.assertEqual(opus.prose[1], work.prose[1], "the refused sentence is the prose")
+        self.assertEqual(standup.dress_guard(next(f for f in facts if f["id"] == "opus/3"), kept["opus/3"]), "")
+        self.assertEqual(opus.prose[3], kept["opus/3"])
         self.assertEqual((spoken.dressed, spoken.refused), (1, len(facts) - 1))
 
     def test_a_kept_file_that_is_not_a_reply_is_a_miss(self):

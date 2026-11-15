@@ -5,9 +5,9 @@ Waiting on you
   Nothing is waiting on you.
 
 Fable
-  Mug        "Tidied my notes and my calendar for the week."
+  Status     "Tidied my notes and my calendar for the week."
 Opus
-  Mug        "A quiet day for me: some learning and some setup."
+  Status     "A quiet day for me: some learning and some setup."
 Sonnet
   Yesterday  #201 Add the registry mock
   Today      nothing in flight

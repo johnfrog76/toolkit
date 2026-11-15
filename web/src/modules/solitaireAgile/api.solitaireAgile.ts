@@ -90,9 +90,9 @@ export interface WorkWorker {
   yesterday: WorkGroup[];
   today: WorkGroup[];
   blockers: WorkGroup[];
-  /** The prose: this worker's sentences, in order -- one a group, then
-   *  "Nothing blocked." when it has something to say and no blockers; empty
-   *  for a worker with nothing, who is its status sentence. */
+  /** The prose: this worker's turn, in order -- `turnOpen`, one sentence a
+   *  group (a worker with nothing says its two made-up items), then
+   *  `proseBlockersNone` when nothing blocks it, then `turnClose`. */
   prose: string[];
 }
 
@@ -102,6 +102,9 @@ export interface StandupWork {
   workers: WorkWorker[];
   /** The prose: the queue's sentences, one a group, kind by kind. */
   queueProse: string[];
+  /** The chair's own turn, last, in the workers' frame: the queue's sentences
+   *  again, or `queueEmpty`. Absent from an agent that predates it. */
+  chairProse?: string[];
   /** One line for the queue and one a worker, each its sentences, LF-joined --
    *  the same string `Standup -Grain work` prints. */
   text: string;

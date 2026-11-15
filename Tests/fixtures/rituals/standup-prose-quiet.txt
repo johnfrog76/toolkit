@@ -3,8 +3,10 @@ Standup -- Friday 2 October 2026
 
 Nothing is waiting on you.
 
-Fable: "Read up on how the team works, so I'm ready for what's next."
-Opus: Yesterday I closed one in Phase 6: #601, the clock drifts. Nothing blocked.
-Sonnet: "Took a course module on the cloud platform."
+Fable: Good morning. Read up on how the team works, so I'm ready for what's next. Today I'll move my shell to the new terminal and pick a theme. No blockers. That's it for me.
+Opus: Good morning. Yesterday I closed one in Phase 6: #601, the clock drifts. No blockers. That's it for me.
+Sonnet: Good morning. Took a course module on the cloud platform. Today I'll chase the last two access requests I'm waiting on. No blockers. That's it for me.
+
+Good morning. Nothing is waiting on you. That's it for me.
 
 "Let's circle back."

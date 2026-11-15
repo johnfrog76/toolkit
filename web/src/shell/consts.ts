@@ -338,6 +338,8 @@ export const RITUALS = consts.rituals as {
     proseBlockers: string;
     proseBlockersAlso: string;
     proseBlockersNone: string;
+    turnOpen: string;
+    turnClose: string;
     proseWalk: string;
     proseWalkAlso: string;
     proseDecide: string;

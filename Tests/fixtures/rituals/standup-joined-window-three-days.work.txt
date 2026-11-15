@@ -3,8 +3,10 @@ Standup -- Friday 2 October 2026
 
 Nothing is waiting on you.
 
-Fable: Yesterday I closed #162, Ship the stage. Nothing blocked.
-Opus: Yesterday I closed #161, Ship the foyer. Nothing blocked.
-Widgets: Yesterday I closed W4X9, Ship the docs. Nothing blocked.
+Fable: Good morning. Yesterday I closed #162, Ship the stage. No blockers. That's it for me.
+Opus: Good morning. Yesterday I closed #161, Ship the foyer. No blockers. That's it for me.
+Widgets: Good morning. Yesterday I closed W4X9, Ship the docs. No blockers. That's it for me.
+
+Good morning. Nothing is waiting on you. That's it for me.
 
 "Let's circle back."

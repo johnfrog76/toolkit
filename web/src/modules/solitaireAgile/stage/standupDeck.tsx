@@ -143,11 +143,12 @@ function asyncScript(w: StandupWorker): Script {
   };
 }
 
-/** A worker at the work grain, spoken as prose: its sentences, one bubble
- *  line and one Say line each -- the dressed ones (`spoken`) when a model
- *  answered, the prose otherwise. An empty worker is async (above). */
+/** A worker at the work grain, spoken as prose: its turn, one bubble
+ *  line and one Say line a sentence -- the dressed ones (`spoken`) when a model
+ *  answered, the prose otherwise. An empty worker's turn is its two made-up
+ *  items in the same frame; from an agent whose prose has none, it is async (above). */
 function workerWorkScript(w: StandupWorker, ww: WorkWorker, dressed?: string[]): Script {
-  if (w.empty) return asyncScript(w);
+  if (w.empty && !ww.prose?.length) return asyncScript(w);
   const said = dressed ?? ww.prose ?? [];
   return { lines: [...said], say: [...said] };
 }

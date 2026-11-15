@@ -14,6 +14,6 @@ Opus
   Today      #101 Build the foyer counts — Chloé’s “Ïle” row
   Blockers   no blockers
 Sonnet
-  Mug        "Took a course module on the cloud platform."
+  Status     "Took a course module on the cloud platform."
 
 "Let's circle back."

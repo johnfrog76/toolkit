@@ -3,8 +3,10 @@ Standup -- Friday 2 October 2026
 
 Nothing is waiting on you.
 
-Fable: "Read up on how the team works, so I'm ready for what's next."
-Opus: Today I'm on #170, Date the commits. Nothing blocked.
-Widgets: Today I'm on P4Q8, Say the undated. Nothing blocked.
+Fable: Good morning. Read up on how the team works, so I'm ready for what's next. Today I'll move my shell to the new terminal and pick a theme. No blockers. That's it for me.
+Opus: Good morning. Today I'm on #170, Date the commits. No blockers. That's it for me.
+Widgets: Good morning. Today I'm on P4Q8, Say the undated. No blockers. That's it for me.
+
+Good morning. Nothing is waiting on you. That's it for me.
 
 "Let's circle back."

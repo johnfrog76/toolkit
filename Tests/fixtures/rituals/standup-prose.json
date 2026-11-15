@@ -1,5 +1,5 @@
 {
-  "_": "The standup's PROSE, as a table (#199; D-SA10; docs/modules/solitaire-agile.md, \"The prose\"): the work grain (#137) spoken as standup language -- issue facts in, sentences out, a grammar and no model. Both halves -- tkTestToolkit -Rituals (Get-P20StandupProseSentence, Format-P20StandupWork) and Tests/test_rituals.py (prose_sentence, render_work) -- assert every row of `sentences` (one group, in its slot, first or not, as one sentence) and fill each case, then assert the queue's sentences, each worker's sentences in order, and the work text against standup-prose-<name>.txt in this folder, byte for byte (LF). A sentence is text.proseSentence over a lead (text.prose<Slot>, or text.prose<Slot>Also after the slot's first group) and a body: text.proseBare when a group of one is named by its item's own clause, else text.prose<Slot>One / text.proseOne for one, text.prose<Slot>Many / text.proseMany for more; the item is the ref and the title's head (workHeadRegex). A slot with a text.prose<Slot>Fold template (today's) folds when two or more groups follow its first (D-SA9): the first group is its sentence and the rest ONE sentence -- the Also lead, then text.prose<Slot>Fold ({n} the groups, {names} their names, proseNameSeparator and proseNameLast between them, no refs), or past proseFoldNames groups text.prose<Slot>FoldCount, the count alone; `folds` is that rule's table, every row asserted against prose_sentences / Get-P20StandupProse. A worker with something to say and no blockers closes on text.proseBlockersNone; a worker with nothing is its excuse. The shapes: one item, several, none; closed (yesterday) and in review (a walk, a card in Code Review); a blocked item; a queue item routed to nobody; a worker with nothing to say; eight groups in flight, folded to a count, and five, named.",
+  "_": "The standup's PROSE, as a table (#199; D-SA10; docs/modules/solitaire-agile.md, \"The prose\"): the work grain (#137) spoken as standup language -- issue facts in, sentences out, a grammar and no model. Both halves -- tkTestToolkit -Rituals (Get-P20StandupProseSentence, Format-P20StandupWork) and Tests/test_rituals.py (prose_sentence, render_work) -- assert every row of `sentences` (one group, in its slot, first or not, as one sentence) and fill each case, then assert the queue's sentences, each worker's sentences in order, and the work text against standup-prose-<name>.txt in this folder, byte for byte (LF). A sentence is text.proseSentence over a lead (text.prose<Slot>, or text.prose<Slot>Also after the slot's first group) and a body: text.proseBare when a group of one is named by its item's own clause, else text.prose<Slot>One / text.proseOne for one, text.prose<Slot>Many / text.proseMany for more; the item is the ref and the title's head (workHeadRegex). A slot with a text.prose<Slot>Fold template (today's) folds when two or more groups follow its first (D-SA9): the first group is its sentence and the rest ONE sentence -- the Also lead, then text.prose<Slot>Fold ({n} the groups, {names} their names, proseNameSeparator and proseNameLast between them, no refs), or past proseFoldNames groups text.prose<Slot>FoldCount, the count alone; `folds` is that rule's table, every row asserted against prose_sentences / Get-P20StandupProse. A worker with something to say and no blockers closes on text.proseBlockersNone, and every worker's prose is its turn: text.turnOpen first and text.turnClose last; a worker with nothing says its two made-up items (status) in the same turn. `chair` is the chair's own turn, last (work.chairProse): the queue's sentences again, or text.queueEmpty, in the same frame; none when no tracker answered. The shapes: one item, several, none; closed (yesterday) and in review (a walk, a card in Code Review); a blocked item; a queue item routed to nobody; a worker with nothing to say; eight groups in flight, folded to a count, and five, named.",
   "workerLabels": [
     { "name": "fable",  "description": "Routed to Fable -- the deep or risky work" },
     { "name": "opus",   "description": "Routed to Opus -- the crash-through volume" },
@@ -61,22 +61,36 @@
           {
             "label": "fable",
             "prose": [
+              "Good morning.",
               "Today I'm on the Studio: #511, the archived-repository mark.",
               "I'm also on #512, Rename the slug.",
-              "Blocked on #513, Verify the Studio tab draws on the PC."
+              "Blocked on #513, Verify the Studio tab draws on the PC.",
+              "That's it for me."
             ]
           },
           {
             "label": "opus",
             "prose": [
+              "Good morning.",
               "Yesterday I closed two in Team Agile (#501, #502).",
               "I also closed one in the Studio: #503, Count the foyer rows.",
               "Today I'm on two in Team Agile (#504, #505).",
-              "Nothing blocked."
+              "No blockers.",
+              "That's it for me."
             ]
           },
-          { "label": "sonnet", "prose": [] }
+          {
+            "label": "sonnet",
+            "prose": [
+              "Good morning.",
+              "Took a course module on the cloud platform.",
+              "Today I'll chase the last two access requests I'm waiting on.",
+              "No blockers.",
+              "That's it for me."
+            ]
+          }
         ],
+        "chair": ["Good morning.", "Waiting on you to walk two in Phase 6 (#515, #517).", "Also to walk #513, Verify the Studio tab draws on the PC.", "That's it for me."],
         "text": "standup-prose-friday.txt"
       }
     },
@@ -91,16 +105,37 @@
       "expected": {
         "queue": [],
         "workers": [
-          { "label": "fable", "prose": [] },
+          {
+            "label": "fable",
+            "prose": [
+              "Good morning.",
+              "Read up on how the team works, so I'm ready for what's next.",
+              "Today I'll move my shell to the new terminal and pick a theme.",
+              "No blockers.",
+              "That's it for me."
+            ]
+          },
           {
             "label": "opus",
             "prose": [
+              "Good morning.",
               "Yesterday I closed one in Phase 6: #601, the clock drifts.",
-              "Nothing blocked."
+              "No blockers.",
+              "That's it for me."
             ]
           },
-          { "label": "sonnet", "prose": [] }
+          {
+            "label": "sonnet",
+            "prose": [
+              "Good morning.",
+              "Took a course module on the cloud platform.",
+              "Today I'll chase the last two access requests I'm waiting on.",
+              "No blockers.",
+              "That's it for me."
+            ]
+          }
         ],
+        "chair": ["Good morning.", "Nothing is waiting on you.", "That's it for me."],
         "text": "standup-prose-quiet.txt"
       }
     },
@@ -113,6 +148,7 @@
       "expected": {
         "queue": [],
         "workers": [],
+        "chair": [],
         "text": "standup-prose-no-tracker.txt"
       }
     },
@@ -135,12 +171,15 @@
           {
             "label": "widgets",
             "prose": [
+              "Good morning.",
               "Yesterday I closed one in Bug: 198, Fix the export.",
               "Today I'm on two in Task (139, 140).",
-              "Nothing blocked."
+              "No blockers.",
+              "That's it for me."
             ]
           }
         ],
+        "chair": ["Good morning.", "Waiting on you to walk one in Task: 140, Read the board.", "That's it for me."],
         "text": "standup-prose-cards.txt"
       }
     },
@@ -178,31 +217,38 @@
           {
             "label": "fable",
             "prose": [
+              "Good morning.",
               "Today I'm on two in Going public (#701, #702).",
               "I'm also on seven more designs.",
-              "Nothing blocked."
+              "No blockers.",
+              "That's it for me."
             ]
           },
           {
             "label": "opus",
             "prose": [
+              "Good morning.",
               "Today I'm on two in Team Agile (#710, #711).",
               "I'm also on four more: Phase 6, Phase 7, the Studio and Docs.",
-              "Nothing blocked."
+              "No blockers.",
+              "That's it for me."
             ]
           },
           {
             "label": "sonnet",
             "prose": [
+              "Good morning.",
               "Yesterday I closed one in Phase 6: #716, Trim the log.",
               "I also closed one in Phase 7: #717, Name the column.",
               "I also closed one in Docs: #718, Link the guide.",
               "Today I'm on Phase 6: #719, Trim the menu.",
               "I'm also on two more: Phase 7 and Docs.",
-              "Nothing blocked."
+              "No blockers.",
+              "That's it for me."
             ]
           }
         ],
+        "chair": ["Good morning.", "Nothing is waiting on you.", "That's it for me."],
         "text": "standup-prose-eight-groups.txt"
       }
     }

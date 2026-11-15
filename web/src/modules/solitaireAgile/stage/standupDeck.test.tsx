@@ -690,10 +690,16 @@ describe("the standup deck at the work grain, as prose", () => {
     expect(sayOf(0)).toBe(pr.queue.join(" "));
   });
 
-  it("Opus speaks its sentences as the agent wrote them, one Say line each", () => {
-    expect(sayOf(3)).toBe(
-      "Yesterday I closed two in Team Agile (#501, #502). I also closed one in the Studio: #503, Count the foyer rows. Today I'm on two in Team Agile (#504, #505). Nothing blocked.",
-    );
+  const proseOf = (label: string) => pr.workers.find((w) => w.label === label)!.prose;
+
+  it("Opus speaks its turn as the agent wrote it, one Say line a sentence, in the frame", () => {
+    const opus = proseOf("opus");
+    expect([opus[0], opus[opus.length - 1]]).toEqual([
+      RITUALS.text.turnOpen,
+      RITUALS.text.turnClose,
+    ]);
+    expect(opus).toContain(RITUALS.text.proseBlockersNone);
+    expect(sayOf(3)).toBe(opus.join(" "));
     render(<>{s[3].content}</>);
     const tile = screen.getByTestId("tile-vibemancer");
     expect(
@@ -704,13 +710,35 @@ describe("the standup deck at the work grain, as prose", () => {
   });
 
   it("Fable, with nothing yesterday, says nothing for it and names the blocker", () => {
-    expect(sayOf(2)).toBe(
-      "Today I'm on the Studio: #511, the archived-repository mark. I'm also on #512, Rename the slug. Blocked on #513, Verify the Studio tab draws on the PC.",
-    );
+    const fable = proseOf("fable");
+    expect(fable.some((x) => x.startsWith(RITUALS.text.proseYesterday))).toBe(false);
+    expect(fable.some((x) => x.startsWith(RITUALS.text.proseBlockers))).toBe(true);
+    expect(fable).not.toContain(RITUALS.text.proseBlockersNone);
+    expect(sayOf(2)).toBe(fable.join(" "));
   });
 
-  it("an empty worker is still the mug and its status", () => {
-    expect(sayOf(4)).toBe(`My async status: ${SONNET_STATUS}`);
+  it("an empty worker speaks its turn: its two made-up items in the frame, not async", () => {
+    const sonnet = proseOf("sonnet");
+    expect(sonnet).toEqual([
+      RITUALS.text.turnOpen,
+      ...friday.workers.find((w) => w.label === "sonnet")!.status,
+      RITUALS.text.proseBlockersNone,
+      RITUALS.text.turnClose,
+    ]);
+    expect(sayOf(4)).toBe(sonnet.join(" "));
+  });
+
+  it("an empty worker from an agent whose prose has no turn is still async", () => {
+    const old = {
+      ...data,
+      work: {
+        ...data.work!,
+        workers: data.work!.workers.map((w) => (w.label === "sonnet" ? { ...w, prose: [] } : w)),
+      },
+    };
+    expect(extractSayText(buildStandupDeck(old).slides()[4].notes)).toBe(
+      `My async status: ${SONNET_STATUS}`,
+    );
   });
 
   it("an empty queue is the contract's sentence", () => {
@@ -737,7 +765,12 @@ describe("the standup deck at the work grain, as prose", () => {
     ) as {
       reply: { said: string[]; dressed: number; refused: number };
     };
-    const opusSaid = [...dressTable.reply.said, RITUALS.text.proseBlockersNone];
+    const opusSaid = [
+      RITUALS.text.turnOpen,
+      ...dressTable.reply.said,
+      RITUALS.text.proseBlockersNone,
+      RITUALS.text.turnClose,
+    ];
     const dressed: StandupResponse = {
       ...data,
       spoken: {

@@ -239,8 +239,9 @@ describe("the standup page", () => {
     expect(screen.getByRole("link", { name: "#101" }).getAttribute("href")).toBe(
       "https://github.com/johnfrog76/toolkit/issues/101",
     );
-    // The empty seat reports: the status sentence under the mug, never an excuse.
-    expect(shown()).toContain(`Mug        "${statusOf("friday", "sonnet")}"`);
+    // The empty seat reports: its status sentence on the contract's row, never an excuse.
+    const row = RITUALS.text.mug.padEnd(RITUALS.labelWidth);
+    expect(shown()).toContain(`  ${row}  "${statusOf("friday", "sonnet")}"`);
     expect(shown()).not.toContain("The dog ate the sprint.");
     // Nothing to click but the issue numbers -- and Play.
     expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["Copy", "Play"]);
@@ -448,9 +449,11 @@ describe("the grain", () => {
     render(<StandupPage />);
     fireEvent.click(screen.getByRole("tab", { name: "Work" }));
     expect(shown()).toBe(data.work!.text);
-    expect(shown()).toContain("Opus: Yesterday I closed two in Team Agile (#501, #502).");
+    // Each worker's line is its turn, in the contract's frame.
+    const open = RITUALS.text.turnOpen;
+    expect(shown()).toContain(`Opus: ${open} Yesterday I closed two in Team Agile (#501, #502).`);
     expect(shown()).toContain(
-      "Fable: Today I'm on the Studio: #511, the archived-repository mark.",
+      `Fable: ${open} Today I'm on the Studio: #511, the archived-repository mark.`,
     );
     expect(screen.getByTestId("standup-brief")).toBeTruthy();
     await act(async () => {

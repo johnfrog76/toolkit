@@ -47,7 +47,8 @@
       Get-P20StandupProseSentence  the prose: one group as one standup
                                sentence -- a grammar over the groups, no model.
       Format-P20StandupWork    the filled object -> the work grain's text, its
-                               prose: one line for the queue, one per worker.
+                               prose: one line for the queue, one turn per
+                               worker, and the chair's own turn last.
       Test-P20StandupDress     the dress guard: a model's sentence and its
                                group's facts -> '' or the guard it fails. The
                                CLI calls no model; the guard is the contract.
@@ -1375,14 +1376,40 @@ function New-P20StandupWork {
             $row[$slot] = Group-P20StandupWork -Entries $rows -First (Get-P20StandupWorkTemplate $slot) -Rest ([string]$t.workGroup)
             foreach ($said in @(Get-P20StandupProse -Slot $slot -Groups $row[$slot] -Rows $rows)) { [void]$prose.Add($said) }
         }
-        # Something said and no blockers: the worker closes on "Nothing blocked.".
+        # An idle worker's sentences are its two made-up items, yesterday and today.
+        if ($w.empty) {
+            $prose = New-Object System.Collections.ArrayList
+            foreach ($said in @($w.status | Where-Object { $null -ne $_ })) { [void]$prose.Add([string]$said) }
+        }
+        # Something said and no blockers: the worker closes on proseBlockersNone.
         if ($prose.Count -gt 0 -and @($row['blockers'] | Where-Object { $null -ne $_ }).Count -eq 0) {
             [void]$prose.Add([string]$t.proseBlockersNone)
         }
-        $row['prose'] = [object[]]$prose.ToArray()
+        $row['prose'] = Get-P20StandupTurn -Said $prose.ToArray()
         [void]$workers.Add($row)
     }
-    return [ordered]@{ queue = $queue; workers = [object[]]$workers.ToArray(); queueProse = [object[]]$queueProse.ToArray(); text = '' }
+    # The chair's own turn, last: the queue's sentences again, or queueEmpty.
+    $board = $queueProse.ToArray()
+    if ($board.Count -eq 0) { $board = @([string]$t.queueEmpty) }
+    $chair = Get-P20StandupTurn -Said $board
+    return [ordered]@{ queue = $queue; workers = [object[]]$workers.ToArray(); queueProse = [object[]]$queueProse.ToArray(); chairProse = $chair; text = '' }
+}
+
+function Get-P20StandupTurn {
+    <#
+      Sentences as one turn: text.turnOpen before them and text.turnClose after,
+      the frame every speaker's status is said in. Nothing said is no turn (an
+      empty array). Pure; prose_turn in the agent.
+    #>
+    param([object[]]$Said)
+    $said = @($Said | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_ })
+    if ($said.Count -eq 0) { return , ([object[]]@()) }
+    $t = (Get-P20Consts).rituals.text
+    $turn = New-Object System.Collections.ArrayList
+    [void]$turn.Add([string]$t.turnOpen)
+    foreach ($x in $said) { [void]$turn.Add($x) }
+    [void]$turn.Add([string]$t.turnClose)
+    return , ([object[]]$turn.ToArray())
 }
 
 # -- The prose -------------------------------------------------------------
@@ -1700,22 +1727,23 @@ function New-P20StandupWorkEmpty {
     param([string[]]$QueueKinds)
     $queue = [ordered]@{}
     foreach ($kind in $QueueKinds) { $queue[$kind] = [object[]]@() }
-    return [ordered]@{ queue = $queue; workers = [object[]]@(); queueProse = [object[]]@(); text = '' }
+    return [ordered]@{ queue = $queue; workers = [object[]]@(); queueProse = [object[]]@(); chairProse = [object[]]@(); text = '' }
 }
 
 function Format-P20StandupWork {
     <#
-      The filled object -> the work grain's text, spoken as prose:
-      the same frame as the long form -- the title, the chair's lines, the
-      Tracker line when nothing answered -- with ONE line for the queue (its
-      sentences, or "Nothing is waiting on you.") and one per worker (its name,
-      then its sentences):
+      The filled object -> the work grain's text, spoken as prose: the round of
+      the room. The same frame as the long form -- the title, the chair's lines,
+      the Tracker line when nothing answered -- with ONE line for the queue (its
+      sentences, or "Nothing is waiting on you."), one per worker (its name, then
+      its turn), and the chair's own turn last (work.chairProse):
 
         Waiting on you to walk two in Phase 6.
-        <worker>: Yesterday I closed two in Team Agile. Nothing blocked.
-        <worker>: "Took a course module on the cloud platform."
+        <worker>: Good morning. Yesterday I closed two in Team Agile. No blockers. That's it for me.
+        <worker>: Good morning. <made-up yesterday> <made-up today> No blockers. That's it for me.
+        Good morning. Waiting on you to walk two in Phase 6. That's it for me.
 
-      An empty slot says nothing; an empty worker is its status sentence. LF-joined,
+      An empty slot says nothing; an idle worker's sentences are its two made-up items. LF-joined,
       ending in one LF; every fixed word from rituals.text. Takes the fill's
       dictionary or the same shape read back from JSON. render_work in the
       agent is the same rule; the goldens standup-prose-<case>.txt are the law.
@@ -1744,7 +1772,6 @@ function Format-P20StandupWork {
         if ($workers.Count -eq 0) { $lines.Add([string]$t.noWorkers) }
         $grained = @($Standup.work.workers | Where-Object { $null -ne $_ })
         foreach ($w in $workers) {
-            if ($w.empty) { $lines.Add([string]$w.name + ': "' + [string]$w.excuse + '"'); continue }
             $ww = @($grained | Where-Object { [string]$_.label -ceq [string]$w.label }) | Select-Object -First 1
             $said = @()
             if ($ww) { $said = @($ww.prose | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_ }) }
@@ -1754,6 +1781,12 @@ function Format-P20StandupWork {
         if ($checks.Count -gt 0) {
             $lines.Add('')
             foreach ($check in $checks) { $lines.Add([string]$t.check + ': ' + $check) }
+        }
+        # The chair's own turn, last: the board again, in the same frame.
+        $chair = @($Standup.work.chairProse | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_ })
+        if ($chair.Count -gt 0) {
+            $lines.Add('')
+            $lines.Add($chair -join ' ')
         }
     }
     $lines.Add('')
