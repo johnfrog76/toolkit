@@ -370,6 +370,7 @@ export function Dashboard() {
                 <FilterBadge
                   key={`${proj.project}/${proj.repo}`}
                   label={`${getProjectTag(proj.project)} / ${proj.repo}`}
+                  count={null} // a tab between repos, and the page holds no per-repo count
                   active={activeTab?.project === proj.project && activeTab?.repo === proj.repo}
                   onClick={() => {
                     setActiveTab({ project: proj.project, repo: proj.repo });

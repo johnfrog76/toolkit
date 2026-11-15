@@ -115,6 +115,21 @@ export function archivedByOutcome(rows: Design[], outcome: string): Design[] {
   return rows.filter((d) => d.outcome === outcome);
 }
 
+/** What each outcome chip counts: the archived designs, whole, by what became of them. */
+export function outcomeCountsOf(archived: Design[]): {
+  all: number;
+  none: number;
+  byOutcome: Record<string, number>;
+} {
+  const byOutcome: Record<string, number> = {};
+  for (const o of DESIGN.outcomes) byOutcome[o] = archivedByOutcome(archived, o).length;
+  return {
+    all: archived.length,
+    none: archivedByOutcome(archived, NO_OUTCOME).length,
+    byOutcome,
+  };
+}
+
 /** The line under a list about the files that are not designs, with Learn more. */
 export function NotShownLine({
   notShown,
@@ -157,6 +172,10 @@ export function DesignGroups({
         const open = !collapsible || searching || !!opened[state];
         const isArchived = state === archivedState;
         const shown = isArchived ? archivedByOutcome(rows, outcome) : rows;
+        // Each chip counts the whole Archived group, so a chip says what choosing it leaves.
+        const outcomeCounts = outcomeCountsOf(
+          totals.find((t) => t.state === state)?.designs ?? rows,
+        );
         return (
           <section key={state} className={styles.group} aria-label={`${state} designs`}>
             <div className={styles.groupHeader}>
@@ -181,6 +200,7 @@ export function DesignGroups({
                 <div role="radiogroup" aria-label="Archived outcome" className={styles.outcomes}>
                   <FilterBadge
                     label="any outcome"
+                    count={outcomeCounts.all}
                     appearance="pink"
                     active={outcome === ALL_OUTCOMES}
                     onClick={() => setOutcome(ALL_OUTCOMES)}
@@ -189,6 +209,7 @@ export function DesignGroups({
                     <FilterBadge
                       key={o}
                       label={o}
+                      count={outcomeCounts.byOutcome[o] ?? 0}
                       appearance="pink"
                       active={outcome === o}
                       onClick={() => setOutcome(outcome === o ? ALL_OUTCOMES : o)}
@@ -196,6 +217,7 @@ export function DesignGroups({
                   ))}
                   <FilterBadge
                     label="nothing said"
+                    count={outcomeCounts.none}
                     appearance="pink"
                     active={outcome === NO_OUTCOME}
                     onClick={() => setOutcome(outcome === NO_OUTCOME ? ALL_OUTCOMES : NO_OUTCOME)}

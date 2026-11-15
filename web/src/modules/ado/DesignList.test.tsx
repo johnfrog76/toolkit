@@ -547,22 +547,22 @@ describe("the outcome filter", () => {
     fireEvent.click(screen.getByRole("button", { name: "Show Archived" }));
     const chips = within(screen.getByRole("radiogroup", { name: "Archived outcome" }));
     expect(chips.getAllByRole("radio").map((r) => r.textContent)).toEqual([
-      "any outcome",
-      "shipped",
-      "dropped",
-      "nothing said",
+      "any outcome3",
+      "shipped1",
+      "dropped1",
+      "nothing said1",
     ]);
     const archived = () => within(screen.getByRole("region", { name: "Archived designs" }));
     expect(archived().getAllByRole("button", { name: "Open the document" })).toHaveLength(3);
-    fireEvent.click(chips.getByRole("radio", { name: "dropped" }));
+    fireEvent.click(chips.getByRole("radio", { name: /^dropped\s*\d*$/ }));
     expect(archived().getAllByRole("button", { name: "Open the document" })).toHaveLength(1);
     expect(archived().getByText("A second room")).toBeTruthy();
     expect(archived().getByText("1 of 3")).toBeTruthy();
-    fireEvent.click(chips.getByRole("radio", { name: "nothing said" }));
+    fireEvent.click(chips.getByRole("radio", { name: /^nothing said\s*\d*$/ }));
     expect(archived().getByText("An old note")).toBeTruthy();
     expect(archived().queryByText("A shipped deck")).toBeNull();
     // The same chip again is off.
-    fireEvent.click(chips.getByRole("radio", { name: "nothing said" }));
+    fireEvent.click(chips.getByRole("radio", { name: /^nothing said\s*\d*$/ }));
     expect(archived().getAllByRole("button", { name: "Open the document" })).toHaveLength(3);
   });
 
@@ -571,7 +571,7 @@ describe("the outcome filter", () => {
     fireEvent.click(screen.getByRole("button", { name: "Show Archived" }));
     fireEvent.click(
       within(screen.getByRole("radiogroup", { name: "Archived outcome" })).getByRole("radio", {
-        name: "shipped",
+        name: /^shipped\s*\d*$/,
       }),
     );
     expect(

@@ -40,6 +40,7 @@ jest.mock("../../shell/api", () => ({
 jest.mock("./api.ado", () => ({
   useGetStatusQuery: () => ({ data: { count: 0, prompts: [] } }),
   useGetWorkItemsQuery: () => ({ data: { count: 0, items: [] }, isFetching: false }),
+  useGetDesignQuery: () => ({ data: undefined }),
   useGetDocsQuery: () => ({ data: { supported: true, repo: "o/r", readme: null, items: [] } }),
   useGetEngagementSummaryQuery: () => ({ isLoading: false }),
   useGetEngagementWorkBreakdownQuery: () => ({ isLoading: false }),
