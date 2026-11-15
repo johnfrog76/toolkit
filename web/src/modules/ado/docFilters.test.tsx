@@ -303,10 +303,10 @@ describe("the drawer's rows", () => {
       within(row)
         .getAllByRole("radio")
         .map((r) => r.textContent),
-    ).toEqual(["any kind", "design note", "spec"]);
-    fireEvent.click(within(row).getByRole("radio", { name: "spec" }));
+    ).toEqual(["any kind3", "design note2", "spec1"]);
+    fireEvent.click(within(row).getByRole("radio", { name: /^spec\s*\d*$/ }));
     expect(window.localStorage.getItem(DESIGN_KIND_KEY)).toBe("spec");
-    fireEvent.click(within(row).getByRole("radio", { name: "spec" }));
+    fireEvent.click(within(row).getByRole("radio", { name: /^spec\s*\d*$/ }));
     expect(window.localStorage.getItem(DESIGN_KIND_KEY)).toBe("all");
     fireEvent.change(screen.getByPlaceholderText("Title"), { target: { value: "lounge" } });
     expect(window.localStorage.getItem(DESIGN_TEXT_KEY)).toBe("lounge");
@@ -320,8 +320,8 @@ describe("the drawer's rows", () => {
       within(row)
         .getAllByRole("radio")
         .map((r) => r.textContent),
-    ).toEqual(["all folders", "docs/", "docs/hub/", "docs/modules/"]);
-    fireEvent.click(within(row).getByRole("radio", { name: "docs/modules/" }));
+    ).toEqual(["all folders5", "docs/2", "docs/hub/2", "docs/modules/1"]);
+    fireEvent.click(within(row).getByRole("radio", { name: /^docs\/modules\/\s*\d*$/ }));
     expect(window.localStorage.getItem(DOCS_FOLDER_KEY)).toBe("docs/modules");
   });
 });

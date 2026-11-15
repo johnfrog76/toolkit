@@ -915,7 +915,7 @@ The product's own accent (rose, below) is worn in exactly two places, the landin
 wordmark's default blob, and by no theme.
 
 - **`shell/themeList.ts`** is the themes as data: name, mode, kind, page colour and gradient, grain,
-  the logo's colour, the card, five accent colours. It imports nothing from Fluent, because
+  the logo's colour, the card, five accent colours, and `chips`. It imports nothing from Fluent, because
   `useCurrentTheme` reads it and that hook is pulled into vite-node by the deck voice-bake.
   **Adding a theme is adding a record**, and checking three things by eye: white on the primary
   button (a test holds it to AA), links on a card, and the logo's word over its face. A fourth is
@@ -923,7 +923,14 @@ wordmark's default blob, and by no theme.
   to AA on the ramp's tint background in every theme. The same file snapshots every named theme --
   its record and the whole Fluent theme made of it -- against `shell/fixtures/themes-93d9d88.json`,
   the themes as they were in 1.4.0, so a theme changes only on purpose (regenerate the fixture and
-  say so in the commit).
+  say so in the commit); `chips` and its Fluent tokens are left out of that comparison, being
+  later than it.
+- **A theme's `chips`** are the colours of the filter chip's four named appearances (`pink`,
+  `purple`, `orange`, `blue`; `FilterBadge`, `COMPONENTS.md`). A record must name all four, the
+  type makes it, and a fifth thing by number: each clears 4.5:1 on the theme's page and card, and the
+  four stay well apart. `theme.ts` writes them onto the Fluent theme as `toolkitChipPink` and so
+  on, which the provider turns into CSS custom properties, so a chip reads its colour from whatever
+  theme it is drawn under, a worn skin included.
 - **`shell/theme.ts`** makes a record into a Fluent theme. Fluent derives some forty tokens from a
   sixteen-step brand ramp; overriding the five obvious ones left the rest Fluent's blue, so the ramp
   is generated from the theme's accent (`brandRamp`) and the five are set on top.

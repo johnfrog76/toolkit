@@ -13,7 +13,7 @@
 import { makeStyles, tokens } from "@fluentui/react-components";
 import { FilterBadge } from "../../shared/FilterBadge";
 import { useGetWorkItemsQuery } from "./api.ado";
-import { ASSIGNEE_CHIPS, KIND_CHOICES, SEV_CHOICES, STATE_CHIPS } from "./issueAxes";
+import { ASSIGNEE_CHIPS, KIND_CHOICES, SEV_CHOICES, STATE_CHIPS, issueKind } from "./issueAxes";
 import { effectiveIssueChoice, useIssueChoices } from "./useIssueChoices";
 
 const useStyles = makeStyles({
@@ -31,7 +31,12 @@ export function IssueFilterRows() {
   const c = useIssueChoices();
   // The same cache entry the list reads -- no second fetch.
   const { data, isFetching } = useGetWorkItemsQuery(c.queryArg);
-  const { choice, workers, milestones } = effectiveIssueChoice(c.stored, data?.items ?? []);
+  const items = data?.items ?? [];
+  const { choice, workers, milestones } = effectiveIssueChoice(c.stored, items);
+  // The state and assignee chips are the agent's questions, and only the answer to the one
+  // asked is held, so they carry no count (null, on purpose). Every other chip counts the
+  // rows that answer holds.
+  const n = (keep: (i: (typeof items)[number]) => boolean) => items.filter(keep).length;
   return (
     <div data-issue-filters="">
       <div className={styles.row} role="radiogroup" aria-label="Issue state">
@@ -39,6 +44,7 @@ export function IssueFilterRows() {
           <FilterBadge
             key={s.value}
             label={s.label}
+            count={null}
             active={choice.state === s.value}
             onClick={() => {
               if (!isFetching) c.setState(s.value);
@@ -51,6 +57,7 @@ export function IssueFilterRows() {
           <FilterBadge
             key={a.value}
             label={a.label}
+            count={null}
             active={choice.assignee === a.value}
             onClick={() => {
               if (!isFetching) c.setAssignee(a.value);
@@ -62,6 +69,7 @@ export function IssueFilterRows() {
         <div className={styles.row} role="radiogroup" aria-label="Worked by">
           <FilterBadge
             label="all"
+            count={items.length}
             active={choice.worker === "all"}
             onClick={() => c.setWorker("all")}
           />
@@ -69,6 +77,7 @@ export function IssueFilterRows() {
             <FilterBadge
               key={w}
               label={w}
+              count={n((i) => i.worker === w)}
               appearance="orange"
               active={choice.worker === w}
               onClick={() => c.setWorker(choice.worker === w ? "all" : w)}
@@ -79,6 +88,7 @@ export function IssueFilterRows() {
       <div className={styles.row} role="radiogroup" aria-label="Kind">
         <FilterBadge
           label="any kind"
+          count={items.length}
           appearance="pink"
           active={choice.kind === "all"}
           onClick={() => c.setKind("all")}
@@ -87,6 +97,7 @@ export function IssueFilterRows() {
           <FilterBadge
             key={k}
             label={k}
+            count={n((i) => issueKind(i) === k)}
             appearance="pink"
             active={choice.kind === k}
             onClick={() => c.setKind(choice.kind === k ? "all" : k)}
@@ -96,6 +107,7 @@ export function IssueFilterRows() {
       <div className={styles.row} role="radiogroup" aria-label="Severity">
         <FilterBadge
           label="any sev"
+          count={items.length}
           appearance="pink"
           active={choice.sev === "all"}
           onClick={() => c.setSev("all")}
@@ -104,6 +116,7 @@ export function IssueFilterRows() {
           <FilterBadge
             key={s}
             label={s}
+            count={n((i) => (i.labels ?? []).includes(s))}
             appearance="pink"
             active={choice.sev === s}
             onClick={() => c.setSev(choice.sev === s ? "all" : s)}
@@ -114,6 +127,7 @@ export function IssueFilterRows() {
         <div className={styles.row} role="radiogroup" aria-label="Milestone">
           <FilterBadge
             label="any milestone"
+            count={items.length}
             active={choice.milestone === "all"}
             onClick={() => c.setMilestone("all")}
           />
@@ -121,6 +135,7 @@ export function IssueFilterRows() {
             <FilterBadge
               key={m}
               label={m}
+              count={n((i) => i.sprint === m)}
               active={choice.milestone === m}
               onClick={() => c.setMilestone(choice.milestone === m ? "all" : m)}
             />

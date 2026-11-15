@@ -7,8 +7,15 @@
  */
 import { makeStyles, tokens } from "@fluentui/react-components";
 import { FilterBadge } from "../../shared/FilterBadge";
-import { useGetDocsQuery } from "./api.ado";
-import { ALL, DESIGN_KINDS, docFolders, useDesignFilters, useDocsFilters } from "./docFilters";
+import { useGetDesignQuery, useGetDocsQuery } from "./api.ado";
+import {
+  ALL,
+  DESIGN_KINDS,
+  designMatches,
+  docFolders,
+  useDesignFilters,
+  useDocsFilters,
+} from "./docFilters";
 
 const useStyles = makeStyles({
   row: {
@@ -23,10 +30,14 @@ const useStyles = makeStyles({
 export function DesignKindRow() {
   const styles = useStyles();
   const { kind, setKind } = useDesignFilters();
+  // The same cache entry the Design tab reads -- no second fetch.
+  const { data } = useGetDesignQuery();
+  const designs = data?.designs ?? [];
   return (
     <div className={styles.row} role="radiogroup" aria-label="Design kind">
       <FilterBadge
         label="any kind"
+        count={designs.length}
         appearance="pink"
         active={kind === ALL}
         onClick={() => setKind(ALL)}
@@ -35,6 +46,7 @@ export function DesignKindRow() {
         <FilterBadge
           key={k.value}
           label={k.label}
+          count={designs.filter((d) => designMatches(d, "", k.value)).length}
           appearance="pink"
           active={kind === k.value}
           onClick={() => setKind(kind === k.value ? ALL : k.value)}
@@ -52,15 +64,22 @@ export function DocsFolderRow() {
   // does not. A remembered folder the tree no longer has still shows (and
   // clears), so the way back never disappears.
   const { data } = useGetDocsQuery();
-  const folders = docFolders(data?.items ?? []);
+  const items = data?.items ?? [];
+  const folders = docFolders(items);
   if (folder !== ALL && !folders.includes(folder)) folders.push(folder);
   return (
     <div className={styles.row} role="radiogroup" aria-label="Docs folder">
-      <FilterBadge label="all folders" active={folder === ALL} onClick={() => setFolder(ALL)} />
+      <FilterBadge
+        label="all folders"
+        count={items.length}
+        active={folder === ALL}
+        onClick={() => setFolder(ALL)}
+      />
       {folders.map((f) => (
         <FilterBadge
           key={f}
           label={`${f}/`}
+          count={items.filter((d) => d.folder === f).length}
           active={folder === f}
           onClick={() => setFolder(folder === f ? ALL : f)}
         />

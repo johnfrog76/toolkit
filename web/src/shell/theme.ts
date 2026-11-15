@@ -1,6 +1,6 @@
 import { createDarkTheme, createLightTheme } from "@fluentui/react-components";
 import type { BrandVariants, Theme } from "@fluentui/react-components";
-import { themeById } from "./themeList";
+import { CHIP_APPEARANCES, chipToken, themeById } from "./themeList";
 import type { ToolkitTheme } from "./themeList";
 
 // A named theme (themeList.ts, plain data) made into a Fluent theme. Fluent's
@@ -64,6 +64,8 @@ export function fluentThemeFor(t: ToolkitTheme): Theme {
     colorCompoundBrandBackgroundPressed: t.brand.pressed,
     colorCompoundBrandStroke: t.brand.background,
     colorCompoundBrandForeground1: t.brand.foreground1,
+    // The filter chips' named appearances, as tokens of the same theme (see chipToken).
+    ...Object.fromEntries(CHIP_APPEARANCES.map((a) => [chipToken(a), t.chips[a]])),
     ...(t.card
       ? { colorNeutralBackgroundAlpha: t.card, colorNeutralBackgroundAlpha2: t.card }
       : {}),
