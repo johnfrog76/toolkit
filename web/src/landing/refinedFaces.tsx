@@ -28,13 +28,18 @@ interface Refined {
   mouth: "calm" | "grin";
   /** Drawn before the body: hair that falls behind the shoulders. */
   back?: ReactNode;
+  /** Long hair covers the ears, so they are not drawn: their edge would show past it. */
+  earsCovered?: boolean;
   /** On the shirt. */
   detail?: ReactNode;
   hair: ReactNode;
 }
 
 const TORSO = "M 16 114 C 16 87 28 75.5 47 72 L 73 72 C 92 75.5 104 87 104 114 Z";
-const CROP = "M 37.6 37 C 35 9 85 9 82.4 37 C 78 27 70 22.5 60 22.5 C 50 22.5 42 27 37.6 37 Z";
+// Long hair covers the crown: its outer edge is an arc a little larger than the
+// head's own ellipse (60, 38, 22 by 24), so no skin shows above or beside it.
+const CROP =
+  "M 36.8 37.5 A 23.2 25.2 0 0 1 83.2 37.5 C 78 27 70 22.5 60 22.5 C 50 22.5 42 27 36.8 37.5 Z";
 const MOUTH = {
   calm: "M 54.5 49.5 Q 60 52.8 65.5 49.5",
   grin: "M 52.5 48.5 Q 60 55.5 67.5 48.5",
@@ -43,7 +48,7 @@ const MOUTH = {
 const REFINED: Record<CastId, Refined> = {
   minimalist: {
     tint: "#e8ecef",
-    quote: "#8b9098",
+    quote: "#6c727c",
     shirt: "#454b54",
     shirtShade: "#373d48",
     skin: "#e8b88a",
@@ -69,7 +74,8 @@ const REFINED: Record<CastId, Refined> = {
     earLeft: "#e0ba96",
     ink: "#3e393c",
     mouth: "grin",
-    back: <path d="M 35 32 C 28 50 30 68 35 82 L 85 82 C 90 68 92 50 85 32 Z" fill="#5e3c20" />,
+    earsCovered: true,
+    back: <path d="M 38.5 30 C 28 50 30 68 35 82 L 85 82 C 90 68 92 50 81.5 30 Z" fill="#5e3c20" />,
     detail: (
       <>
         <path
@@ -86,8 +92,8 @@ const REFINED: Record<CastId, Refined> = {
     hair: (
       <>
         <path d={CROP} fill="#7a4a20" />
-        <path d="M 37 30 C 31 46 32 64 36 78 L 45 77 C 41 62 40.5 46 42 31 Z" fill="#7a4a20" />
-        <path d="M 83 30 C 89 46 88 64 84 78 L 75 77 C 79 62 79.5 46 78 31 Z" fill="#7a4a20" />
+        <path d="M 38.5 29 C 31 46 32 64 36 78 L 45 77 C 41 62 40.5 46 42 31 Z" fill="#7a4a20" />
+        <path d="M 81.5 29 C 89 46 88 64 84 78 L 75 77 C 79 62 79.5 46 78 31 Z" fill="#7a4a20" />
       </>
     ),
   },
@@ -186,8 +192,12 @@ export function RefinedPortrait({ castId }: { castId: CastId }) {
           </g>
           {r.detail}
           <rect x="52" y="52" width="16" height="25" rx="8" fill={r.skinShade} />
-          <circle cx="38.6" cy="41" r="4" fill={r.earLeft} />
-          <circle cx="81.4" cy="41" r="4" fill={r.skinShade} />
+          {!r.earsCovered && (
+            <>
+              <circle cx="38.6" cy="41" r="4" fill={r.earLeft} />
+              <circle cx="81.4" cy="41" r="4" fill={r.skinShade} />
+            </>
+          )}
           <ellipse cx="60" cy="38" rx="22" ry="24" fill={r.skinShade} />
           <g clipPath={`url(#${id}-head)`}>
             <ellipse cx="56" cy="34.5" rx="22" ry="24" fill={r.skin} />
