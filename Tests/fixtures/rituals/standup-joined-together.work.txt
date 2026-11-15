@@ -10,6 +10,6 @@ Widgets: Good morning. Yesterday I closed 198, Fix the export. I also closed Q3R
 Check: #142 Port the cast atoms -- the card is archived, but the issue is still open.
 Check: #143 Rename the slug -- the issue is closed, but the card is not archived.
 
-Good morning. Waiting on you to walk #146, Verify the Studio tab draws on the PC. Also to walk K7M2, Wire the board. That's it for me.
+Good morning. Yesterday I tidied my notes and my calendar for the week. Today I'll walk #146 and K7M2. No blockers. That's it for me.
 
 "Let's circle back."

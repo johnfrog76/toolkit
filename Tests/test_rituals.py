@@ -907,7 +907,7 @@ class TheProseTable(unittest.TestCase):
     -Rituals asserts against Get-P20StandupProseSentence and Format-P20StandupWork."""
 
     def test_the_table_has_its_cases(self):
-        self.assertEqual(set(PROSE_CASES), {"friday", "quiet", "no-tracker", "cards", "eight-groups"})
+        self.assertEqual(set(PROSE_CASES), {"friday", "quiet", "no-tracker", "cards", "eight-groups", "walked"})
 
     def test_every_fold_row(self):
         """The also-ons fold (D-SA9): one sentence for the groups after today's first --
@@ -954,11 +954,49 @@ class TheProseTable(unittest.TestCase):
                 self.assertEqual(got, case["expected"]["workers"])
 
     def test_the_chairs_own_turn(self):
-        """The chair gives its status last, in the workers' frame: the board again,
-        or queueEmpty when nothing waits; no turn when no tracker answered."""
+        """The chair gives its status last, in the workers' frame and its own first
+        person: a yesterday, a today, no blockers; no turn when no tracker answered."""
         for name, case in PROSE_CASES.items():
             with self.subTest(case=name):
                 self.assertEqual(_fill_prose(case).work.chairProse, case["expected"]["chair"])
+
+    def test_every_chair_yesterday_row(self):
+        rows = PROSE_TABLE["chairYesterday"]
+        limit = C.rituals_prose_fold_names()
+        self.assertTrue(
+            {0, 1, 2, limit, limit + 1} <= {len(r["walked"]) for r in rows}, "a row each side of every edge"
+        )
+        for row in rows:
+            with self.subTest(sentence=row["sentence"]):
+                self.assertEqual(standup.chair_yesterday(row["walked"], row["day"], row["workers"]), row["sentence"])
+
+    def test_a_chair_with_nothing_walked_takes_the_place_after_the_last_worker(self):
+        nothing = VOCAB["nothing"]
+        for row in (r for r in PROSE_TABLE["chairYesterday"] if not r["walked"]):
+            with self.subTest(day=row["day"], workers=row["workers"]):
+                self.assertEqual(row["sentence"], nothing[(row["day"] + row["workers"]) % len(nothing)])
+
+    def test_every_chair_today_row(self):
+        for row in PROSE_TABLE["chairToday"]:
+            with self.subTest(sentence=row["sentence"]):
+                self.assertEqual(standup.chair_today(row["queue"]), row["sentence"])
+
+    def test_the_chair_never_says_the_board_or_you(self):
+        """Its own voice: no queue sentence again, and never the word "you"."""
+        for name, case in PROSE_CASES.items():
+            filled = _fill_prose(case)
+            with self.subTest(case=name):
+                self.assertFalse(set(filled.work.chairProse) & set(filled.work.queueProse))
+                self.assertFalse([x for x in filled.work.chairProse if re.search(r"\byou\b", x, re.IGNORECASE)])
+        for row in PROSE_TABLE["chairYesterday"] + PROSE_TABLE["chairToday"]:
+            with self.subTest(sentence=row["sentence"]):
+                self.assertNotRegex(row["sentence"], r"(?i)\byou\b")
+
+    def test_the_chair_walked_what_closed_with_the_walk_label_in_the_window(self):
+        """chair.walked: the walk items closed inside the window, worker or none, by number."""
+        got = {name: [i.number for i in _fill_prose(case).chair.walked] for name, case in PROSE_CASES.items()}
+        self.assertEqual(got["walked"], [530, 531])
+        self.assertEqual({k: v for k, v in got.items() if k != "walked"}, {k: [] for k in got if k != "walked"})
 
     def test_every_turn_is_in_the_frame(self):
         """turnOpen first, turnClose last, for every worker that says anything and for the chair."""
@@ -1206,6 +1244,8 @@ class TheDressTable(unittest.TestCase):
         said = {f["floor"] for f in facts}
         self.assertNotIn(C.rituals_text()["proseBlockersNone"], said)
         self.assertFalse(said & set(filled.work.queueProse), "the queue's sentences are the chair's, not dressed")
+        self.assertFalse(said & set(filled.work.chairProse), "the chair's own turn is not dressed")
+        self.assertFalse(said & set(VOCAB["nothing"] + VOCAB["nothingToday"]), "a made-up item is not dressed")
         self.assertFalse(
             said & {C.rituals_text()["turnOpen"], C.rituals_text()["turnClose"]}, "the frame is not dressed"
         )
@@ -1978,7 +2018,7 @@ class TheRoute(unittest.TestCase):
         for tile in tiles:
             self.assertEqual(set(tile), AGENDA_FIELDS)
         self.assertEqual(set(body["tracker"]), {"ok", "reason"})
-        self.assertEqual(set(body["chair"]), {"open", "close"})
+        self.assertEqual(set(body["chair"]), {"open", "close", "walked"})
         self.assertEqual(set(body["team"]), {"size"})
         self.assertEqual(set(body["queue"]), {"walk", "decide", "look"})
         self.assertEqual(set(body["queue"]["walk"][0]), WALK_FIELDS)

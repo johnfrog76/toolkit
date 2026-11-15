@@ -6,6 +6,6 @@ Waiting on you to walk one in Phase 6: #803, Verify the clock on Windows.
 Haiku: Good morning. Today I'm on Phase 6: #801, Trim the export header. No blockers. That's it for me.
 Sonnet: Good morning. Yesterday I closed one in Phase 6: #802, Rename the column. Blocked on one in Phase 6: #803, Verify the clock on Windows. That's it for me.
 
-Good morning. Waiting on you to walk one in Phase 6: #803, Verify the clock on Windows. That's it for me.
+Good morning. Yesterday I had a quiet day: some learning and some setup. Today I'll walk #803. No blockers. That's it for me.
 
 "Let's circle back."

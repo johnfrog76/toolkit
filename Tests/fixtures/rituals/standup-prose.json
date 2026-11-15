@@ -1,5 +1,5 @@
 {
-  "_": "The standup's PROSE, as a table (#199; D-SA10; docs/modules/solitaire-agile.md, \"The prose\"): the work grain (#137) spoken as standup language -- issue facts in, sentences out, a grammar and no model. Both halves -- tkTestToolkit -Rituals (Get-P20StandupProseSentence, Format-P20StandupWork) and Tests/test_rituals.py (prose_sentence, render_work) -- assert every row of `sentences` (one group, in its slot, first or not, as one sentence) and fill each case, then assert the queue's sentences, each worker's sentences in order, and the work text against standup-prose-<name>.txt in this folder, byte for byte (LF). A sentence is text.proseSentence over a lead (text.prose<Slot>, or text.prose<Slot>Also after the slot's first group) and a body: text.proseBare when a group of one is named by its item's own clause, else text.prose<Slot>One / text.proseOne for one, text.prose<Slot>Many / text.proseMany for more; the item is the ref and the title's head (workHeadRegex). A slot with a text.prose<Slot>Fold template (today's) folds when two or more groups follow its first (D-SA9): the first group is its sentence and the rest ONE sentence -- the Also lead, then text.prose<Slot>Fold ({n} the groups, {names} their names, proseNameSeparator and proseNameLast between them, no refs), or past proseFoldNames groups text.prose<Slot>FoldCount, the count alone; `folds` is that rule's table, every row asserted against prose_sentences / Get-P20StandupProse. A worker with something to say and no blockers closes on text.proseBlockersNone, and every worker's prose is its turn: text.turnOpen first and text.turnClose last; a worker with nothing says its two made-up items (status) in the same turn. `chair` is the chair's own turn, last (work.chairProse): the queue's sentences again, or text.queueEmpty, in the same frame; none when no tracker answered. The shapes: one item, several, none; closed (yesterday) and in review (a walk, a card in Code Review); a blocked item; a queue item routed to nobody; a worker with nothing to say; eight groups in flight, folded to a count, and five, named.",
+  "_": "The standup's PROSE, as a table (#199; D-SA10; docs/modules/solitaire-agile.md, \"The prose\"): the work grain (#137) spoken as standup language -- issue facts in, sentences out, a grammar and no model. Both halves -- tkTestToolkit -Rituals (Get-P20StandupProseSentence, Format-P20StandupWork) and Tests/test_rituals.py (prose_sentence, render_work) -- assert every row of `sentences` (one group, in its slot, first or not, as one sentence) and fill each case, then assert the queue's sentences, each worker's sentences in order, and the work text against standup-prose-<name>.txt in this folder, byte for byte (LF). A sentence is text.proseSentence over a lead (text.prose<Slot>, or text.prose<Slot>Also after the slot's first group) and a body: text.proseBare when a group of one is named by its item's own clause, else text.prose<Slot>One / text.proseOne for one, text.prose<Slot>Many / text.proseMany for more; the item is the ref and the title's head (workHeadRegex). A slot with a text.prose<Slot>Fold template (today's) folds when two or more groups follow its first (D-SA9): the first group is its sentence and the rest ONE sentence -- the Also lead, then text.prose<Slot>Fold ({n} the groups, {names} their names, proseNameSeparator and proseNameLast between them, no refs), or past proseFoldNames groups text.prose<Slot>FoldCount, the count alone; `folds` is that rule's table, every row asserted against prose_sentences / Get-P20StandupProse. A worker with something to say and no blockers closes on text.proseBlockersNone, and every worker's prose is its turn: text.turnOpen first and text.turnClose last; a worker with nothing says its two made-up items (status) in the same turn. `chair` is the chair's own turn, last (work.chairProse), in the same frame and its own first person, never the board's sentences again: its yesterday, its today and text.proseBlockersNone; none when no tracker answered. `chairYesterday` is its yesterday's table (chair_yesterday / Get-P20StandupChairYesterday): the walk items closed in the window, by ref, as text.chairYesterday, or past proseFoldNames their count as text.chairYesterdayMany; with none, the made-up nothing[(day + workers) mod len]. `chairToday` is its today's table (chair_today / Get-P20StandupChairToday): each queue kind's groups' refs as text.chair<Kind>, or past proseFoldNames text.chair<Kind>Many, joined by chairClauseSeparator and chairClauseLast in text.chairToday; with nothing waiting, text.chairTodayNone. Every sentence in both tables, and every expected array in the cases, is written from the agent's fill, never typed. The `walked` case is a real yesterday: two walk items closed inside the window, one before it, one still open. The shapes: one item, several, none; closed (yesterday) and in review (a walk, a card in Code Review); a blocked item; a queue item routed to nobody; a worker with nothing to say; walk items closed in the window; eight groups in flight, folded to a count, and five, named.",
   "workerLabels": [
     { "name": "fable",  "description": "Routed to Fable -- the deep or risky work" },
     { "name": "opus",   "description": "Routed to Opus -- the crash-through volume" },
@@ -31,6 +31,25 @@
     { "slot": "today", "groups": [{"name": "Team Agile", "count": 2, "refs": ["#414", "#415"]}, {"name": "#999", "count": 1, "refs": ["#418"]}, {"name": "Design lifecycle L3", "count": 1, "refs": ["#419"]}], "titles": {}, "sentences": ["Today I'm on two in Team Agile (#414, #415).", "I'm also on two more: #999 and Design lifecycle L3."] },
     { "slot": "yesterday", "groups": [{"name": "Going public", "count": 2, "refs": ["#20", "#21"]}, {"name": "flights", "count": 1, "refs": ["#30"]}, {"name": "workflow settings", "count": 1, "refs": ["#31"]}, {"name": "the Studio", "count": 1, "refs": ["#32"]}], "titles": {"#30": "Book the flights", "#31": "Group the settings", "#32": "Draw the foyer"}, "sentences": ["Yesterday I closed two in Going public (#20, #21).", "I also closed one in flights: #30, Book the flights.", "I also closed one in workflow settings: #31, Group the settings.", "I also closed one in the Studio: #32, Draw the foyer."] },
     { "slot": "blockers", "groups": [{"name": "Going public", "count": 2, "refs": ["#20", "#21"]}, {"name": "flights", "count": 1, "refs": ["#30"]}, {"name": "workflow settings", "count": 1, "refs": ["#31"]}], "titles": {"#30": "Book the flights", "#31": "Group the settings"}, "sentences": ["Blocked on two in Going public (#20, #21).", "Also blocked on one in flights: #30, Book the flights.", "Also blocked on one in workflow settings: #31, Group the settings."] }
+  ],
+  "chairYesterday": [
+    {"walked": ["#407"], "day": 275, "workers": 3, "sentence": "Yesterday I walked #407."},
+    {"walked": ["#407", "#408"], "day": 275, "workers": 3, "sentence": "Yesterday I walked #407 and #408."},
+    {"walked": ["#401", "#402", "#403", "#404"], "day": 275, "workers": 3, "sentence": "Yesterday I walked #401, #402, #403 and #404."},
+    {"walked": ["#401", "#402", "#403", "#404", "#405"], "day": 275, "workers": 3, "sentence": "Yesterday I did five walks."},
+    {"walked": [], "day": 275, "workers": 3, "sentence": "Yesterday I tidied my notes and my calendar for the week."},
+    {"walked": [], "day": 275, "workers": 0, "sentence": "Yesterday I read up on how the team works, so I'm ready for what's next."},
+    {"walked": [], "day": 300, "workers": 8, "sentence": "Yesterday I read the docs for the library we're looking at; no opinion yet."}
+  ],
+  "chairToday": [
+    {"queue": {}, "sentence": "Today I'll keep the board moving."},
+    {"queue": {"walk": [["#416"]]}, "sentence": "Today I'll walk #416."},
+    {"queue": {"walk": [["#416"], ["#417"], ["#421"]]}, "sentence": "Today I'll walk #416, #417 and #421."},
+    {"queue": {"walk": [["#416", "#417"]], "decide": [["#421"]]}, "sentence": "Today I'll walk #416 and #417, and decide #421."},
+    {"queue": {"walk": [["#1", "#2", "#3"], ["#4", "#5"]], "decide": [["#9"]], "look": [["#10"], ["#11"]]}, "sentence": "Today I'll do five walks, decide #9, and look at #10 and #11."},
+    {"queue": {"decide": [["#1", "#2", "#3", "#4", "#5", "#6"]]}, "sentence": "Today I'll make six decisions."},
+    {"queue": {"look": [["#1", "#2"], ["#3", "#4", "#5"]]}, "sentence": "Today I'll look at five items."},
+    {"queue": {"walk": [["140"]]}, "sentence": "Today I'll walk 140."}
   ],
   "cases": [
     {
@@ -83,14 +102,14 @@
             "label": "sonnet",
             "prose": [
               "Good morning.",
-              "Took a course module on the cloud platform.",
-              "Today I'll chase the last two access requests I'm waiting on.",
+              "Yesterday I took a course module on the cloud platform.",
+              "Today I'll set up the password manager on my phone.",
               "No blockers.",
               "That's it for me."
             ]
           }
         ],
-        "chair": ["Good morning.", "Waiting on you to walk two in Phase 6 (#515, #517).", "Also to walk #513, Verify the Studio tab draws on the PC.", "That's it for me."],
+        "chair": ["Good morning.", "Yesterday I tidied my notes and my calendar for the week.", "Today I'll walk #515, #517 and #513.", "No blockers.", "That's it for me."],
         "text": "standup-prose-friday.txt"
       }
     },
@@ -109,7 +128,7 @@
             "label": "fable",
             "prose": [
               "Good morning.",
-              "Read up on how the team works, so I'm ready for what's next.",
+              "Yesterday I read up on how the team works, so I'm ready for what's next.",
               "Today I'll move my shell to the new terminal and pick a theme.",
               "No blockers.",
               "That's it for me."
@@ -128,14 +147,14 @@
             "label": "sonnet",
             "prose": [
               "Good morning.",
-              "Took a course module on the cloud platform.",
-              "Today I'll chase the last two access requests I'm waiting on.",
+              "Yesterday I took a course module on the cloud platform.",
+              "Today I'll set up the password manager on my phone.",
               "No blockers.",
               "That's it for me."
             ]
           }
         ],
-        "chair": ["Good morning.", "Nothing is waiting on you.", "That's it for me."],
+        "chair": ["Good morning.", "Yesterday I tidied my notes and my calendar for the week.", "Today I'll keep the board moving.", "No blockers.", "That's it for me."],
         "text": "standup-prose-quiet.txt"
       }
     },
@@ -179,7 +198,7 @@
             ]
           }
         ],
-        "chair": ["Good morning.", "Waiting on you to walk one in Task: 140, Read the board.", "That's it for me."],
+        "chair": ["Good morning.", "Yesterday I swapped my laptop dock; no more flicker.", "Today I'll walk 140.", "No blockers.", "That's it for me."],
         "text": "standup-prose-cards.txt"
       }
     },
@@ -248,8 +267,136 @@
             ]
           }
         ],
-        "chair": ["Good morning.", "Nothing is waiting on you.", "That's it for me."],
+        "chair": ["Good morning.", "Yesterday I tidied my notes and my calendar for the week.", "Today I'll keep the board moving.", "No blockers.", "That's it for me."],
         "text": "standup-prose-eight-groups.txt"
+      }
+    },
+    {
+      "name": "walked",
+      "source": "issues",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "tracker": {
+        "ok": true,
+        "reason": ""
+      },
+      "issues": [
+        {
+          "number": 530,
+          "title": "Verify the clock on Windows",
+          "state": "CLOSED",
+          "labels": [
+            "fable",
+            "verify-close"
+          ],
+          "closedAt": "2026-10-01T16:00:00Z",
+          "url": "https://github.com/acme/widgets/issues/530",
+          "milestone": {
+            "title": "Phase 6"
+          },
+          "body": ""
+        },
+        {
+          "number": 531,
+          "title": "Verify the export on the PC",
+          "state": "CLOSED",
+          "labels": [
+            "verify-close"
+          ],
+          "closedAt": "2026-10-01T19:00:00Z",
+          "url": "https://github.com/acme/widgets/issues/531",
+          "milestone": null,
+          "body": ""
+        },
+        {
+          "number": 532,
+          "title": "Verify the old menu",
+          "state": "CLOSED",
+          "labels": [
+            "verify-close"
+          ],
+          "closedAt": "2026-09-25T15:00:00Z",
+          "url": "https://github.com/acme/widgets/issues/532",
+          "milestone": null,
+          "body": ""
+        },
+        {
+          "number": 533,
+          "title": "Verify the foyer counts",
+          "state": "OPEN",
+          "labels": [
+            "verify-close"
+          ],
+          "closedAt": null,
+          "url": "https://github.com/acme/widgets/issues/533",
+          "milestone": {
+            "title": "the Studio"
+          },
+          "body": ""
+        },
+        {
+          "number": 534,
+          "title": "Trim the log",
+          "state": "OPEN",
+          "labels": [
+            "opus"
+          ],
+          "closedAt": null,
+          "url": "https://github.com/acme/widgets/issues/534",
+          "milestone": {
+            "title": "Phase 6"
+          },
+          "body": ""
+        },
+        {
+          "number": 535,
+          "title": "Rename the column",
+          "state": "CLOSED",
+          "labels": [
+            "opus"
+          ],
+          "closedAt": "2026-10-01T14:00:00Z",
+          "url": "https://github.com/acme/widgets/issues/535",
+          "milestone": null,
+          "body": ""
+        }
+      ],
+      "expected": {
+        "queue": [
+          "Waiting on you to walk one in the Studio: #533, Verify the foyer counts."
+        ],
+        "workers": [
+          {
+            "label": "fable",
+            "prose": [
+              "Good morning.",
+              "Yesterday I closed one in Phase 6: #530, Verify the clock on Windows.",
+              "No blockers.",
+              "That's it for me."
+            ]
+          },
+          {
+            "label": "opus",
+            "prose": [
+              "Good morning.",
+              "Yesterday I closed #535, Rename the column.",
+              "Today I'm on Phase 6: #534, Trim the log.",
+              "No blockers.",
+              "That's it for me."
+            ]
+          },
+          {
+            "label": "sonnet",
+            "prose": [
+              "Good morning.",
+              "Yesterday I took a course module on the cloud platform.",
+              "Today I'll set up the password manager on my phone.",
+              "No blockers.",
+              "That's it for me."
+            ]
+          }
+        ],
+        "chair": ["Good morning.", "Yesterday I walked #530 and #531.", "Today I'll walk #533.", "No blockers.", "That's it for me."],
+        "text": "standup-prose-walked.txt"
       }
     }
   ]

@@ -92,13 +92,15 @@ function idleOf(row: object): { excuse: string; status: string[] } {
   return { excuse: status[0], status };
 }
 
-/** An empty worker's status sentence: the vocabulary's `nothing` line at the fixture's index. */
-function statusOf(caseName: string, label: string): string {
+/** An empty worker's two made-up items, yesterday then today: the vocabulary's `nothing`
+ *  and `nothingToday` lines at the fixture's indexes. */
+function statusOf(caseName: string, label: string): string[] {
   const w = table.cases
     .find((c) => c.name === caseName)
     ?.expected.workers.find((x) => x.label === label);
-  if (!w || w.nothingIndex === null) throw new Error(`no empty worker ${label} in ${caseName}`);
-  return vocab.nothing[w.nothingIndex];
+  if (!w || w.nothingIndex === null || w.nothingTodayIndex === null)
+    throw new Error(`no empty worker ${label} in ${caseName}`);
+  return [vocab.nothing[w.nothingIndex], vocab.nothingToday[w.nothingTodayIndex]];
 }
 
 /** The route's response for one fixture case, per the contract's JSON (4b). */
@@ -239,9 +241,11 @@ describe("the standup page", () => {
     expect(screen.getByRole("link", { name: "#101" }).getAttribute("href")).toBe(
       "https://github.com/johnfrog76/toolkit/issues/101",
     );
-    // The empty seat reports: its status sentence on the contract's row, never an excuse.
+    // The empty seat reports: its two made-up items, one row each on the contract's
+    // label, yesterday's then today's -- never an excuse.
     const row = RITUALS.text.mug.padEnd(RITUALS.labelWidth);
-    expect(shown()).toContain(`  ${row}  "${statusOf("friday", "sonnet")}"`);
+    const [said, plan] = statusOf("friday", "sonnet");
+    expect(shown()).toContain(`  ${row}  "${said}"\n  ${row}  "${plan}"\n`);
     expect(shown()).not.toContain("The dog ate the sprint.");
     // Nothing to click but the issue numbers -- and Play.
     expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["Copy", "Play"]);

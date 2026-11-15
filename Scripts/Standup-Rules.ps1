@@ -548,6 +548,8 @@ function Invoke-P20StandupFill {
     $slots = @($data.Ceremony.slots | ForEach-Object { [string]$_ })
     $kinds = @($data.Ceremony.queue | ForEach-Object { [string]$_ })
     $workers = New-Object System.Collections.ArrayList
+    # What you walked: a walk item closed inside the window, worker or none.
+    $walked = New-Object System.Collections.ArrayList
     # The work grain's key for every item: '<ref>|<path>' -> @{ name; by }.
     $keyOf = @{}
     if ($ok) { $keyOf = Get-P20StandupIssueKeys -Issues $Issues }
@@ -588,6 +590,12 @@ function Invoke-P20StandupFill {
                 if ($worker) { $workerName = [string]$worker.name }
                 [void]$queueLists['walk'].Add([ordered]@{ number = $item.number; id = $null; title = $item.title; url = $item.url; path = ''; motion = $motion; commits = 0; worker = $workerName })
             }
+            if ($isWalk -and $state -eq 'CLOSED') {
+                $done = ConvertTo-P20RitualTime $issue.closedAt
+                if ($null -ne $done -and $done -ge $since -and $done -le $at) {
+                    [void]$walked.Add([ordered]@{ number = $item.number; id = $null; title = $item.title; url = $item.url; path = ''; motion = $motion; commits = 0 })
+                }
+            }
             if (-not $worker) { continue }
             $lists = $fills[$worker.label]
             if ($isOpen) {
@@ -616,8 +624,9 @@ function Invoke-P20StandupFill {
 
     $queue = [ordered]@{}
     foreach ($kind in $queueLists.Keys) { $queue[$kind] = [object[]]@($queueLists[$kind] | Sort-Object { [int]$_.number }) }
+    $walkedSorted = [object[]]@($walked | Sort-Object { [int]$_.number })
     $work = New-P20StandupWorkEmpty -QueueKinds $kinds
-    if ($ok) { $work = New-P20StandupWork -Standup @{ queue = $queue; workers = $workers.ToArray() } -KeyOf $keyOf -QueueKinds $kinds -Slots $slots }
+    if ($ok) { $work = New-P20StandupWork -Standup @{ queue = $queue; workers = $workers.ToArray(); walked = $walkedSorted; day = $d; nothing = @($data.Vocabulary.nothing) } -KeyOf $keyOf -QueueKinds $kinds -Slots $slots }
     $counts = Get-P20StandupCounts -Standup @{ workers = $workers.ToArray() } -Hashes @{} -Slots $slots
 
     $open = ''
@@ -635,7 +644,7 @@ function Invoke-P20StandupFill {
         space    = $Space
         source   = $(if ($ok) { 'issues' } else { 'none' })
         tracker  = [ordered]@{ ok = $ok; reason = $reason }
-        chair    = [ordered]@{ open = $open; close = $close }
+        chair    = [ordered]@{ open = $open; close = $close; walked = $walkedSorted }
         team     = [ordered]@{ size = $size }
         queue    = $queue
         workers  = [object[]]$workers.ToArray()
@@ -976,7 +985,7 @@ function Invoke-P20StandupCardsFill {
     $queue = [ordered]@{}
     foreach ($kind in @($data.Ceremony.queue)) { $queue[[string]$kind] = [object[]]@() }
     if ($queue.Contains('walk')) { $queue['walk'] = [object[]]$tile.walk }
-    $work = New-P20StandupWork -Standup @{ queue = $queue; workers = @($w) } -KeyOf $tile.keyOf -QueueKinds $kinds -Slots $slots
+    $work = New-P20StandupWork -Standup @{ queue = $queue; workers = @($w); walked = @(); day = $d; nothing = @($data.Vocabulary.nothing) } -KeyOf $tile.keyOf -QueueKinds $kinds -Slots $slots
     $counts = Get-P20StandupCounts -Standup @{ workers = @($w) } -Hashes $tile.hashes -Slots $slots
 
     $open = ''
@@ -993,7 +1002,7 @@ function Invoke-P20StandupCardsFill {
         space    = $Space
         source   = 'cards'
         tracker  = [ordered]@{ ok = $true; reason = '' }
-        chair    = [ordered]@{ open = $open; close = $close }
+        chair    = [ordered]@{ open = $open; close = $close; walked = [object[]]@() }
         team     = [ordered]@{ size = $size }
         queue    = $queue
         workers  = [object[]]@($w)
@@ -1172,7 +1181,7 @@ function Invoke-P20StandupJoinedFill {
     }
     $keyOf = Get-P20StandupIssueKeys -Issues $Issues
     foreach ($k in @($tile.keyOf.Keys)) { $keyOf[$k] = $tile.keyOf[$k] }
-    $out.work = New-P20StandupWork -Standup @{ queue = $out.queue; workers = $out.workers } -KeyOf $keyOf -QueueKinds $kinds -Slots $slots
+    $out.work = New-P20StandupWork -Standup @{ queue = $out.queue; workers = $out.workers; walked = @($out.chair.walked); day = $at.DayOfYear; nothing = @($data.Vocabulary.nothing) } -KeyOf $keyOf -QueueKinds $kinds -Slots $slots
     $out.checks = [object[]]$checks.ToArray()
     $out.links = [object[]]$links.ToArray()
     $out.counts = Get-P20StandupCounts -Standup @{ workers = $out.workers } -Hashes $hashesOf -Slots $slots -Undated $undatedOf
@@ -1383,6 +1392,8 @@ function New-P20StandupWork {
     <#
       The filled standup's work grain: [ordered]@{ queue; workers; text = '' }.
       KeyOf maps an item's '<ref>|<path>' to its Get-P20StandupWorkKey answer.
+      Standup also carries walked (chair.walked), day (the day of the year) and
+      nothing (the vocabulary's family), which the chair's turn reads.
       queue: each kind's groups; workers: each worker's label, name and three
       slots' groups. Pure.
     #>
@@ -1433,11 +1444,100 @@ function New-P20StandupWork {
         $row['prose'] = Get-P20StandupTurn -Said $prose.ToArray()
         [void]$workers.Add($row)
     }
-    # The chair's own turn, last: the queue's sentences again, or queueEmpty.
-    $board = $queueProse.ToArray()
-    if ($board.Count -eq 0) { $board = @([string]$t.queueEmpty) }
-    $chair = Get-P20StandupTurn -Said $board
+    # The chair's own turn, last, in its own first person: what you walked, what waits.
+    $refsOf = [ordered]@{}
+    foreach ($kind in $QueueKinds) {
+        $refsOf[$kind] = [object[]]@($queue[$kind] | Where-Object { $null -ne $_ } | ForEach-Object { , ([object[]]@($_.refs | ForEach-Object { [string]$_ })) })
+    }
+    $walkedRefs = @($Standup.walked | Where-Object { $null -ne $_ } | ForEach-Object { Get-P20StandupItemRef $_ })
+    $everyone = @($Standup.workers | Where-Object { $null -ne $_ }).Count
+    $chair = Get-P20StandupChairTurn -Walked $walkedRefs -Day ([int]$Standup.day) -Workers $everyone -Nothing $Standup.nothing -Queue $refsOf -QueueKinds $QueueKinds
     return [ordered]@{ queue = $queue; workers = [object[]]$workers.ToArray(); queueProse = [object[]]$queueProse.ToArray(); chairProse = $chair; text = '' }
+}
+
+function Join-P20StandupRefList {
+    <# Refs as a sentence says them: one alone, two joined by proseNameLast, more by proseNameSeparator and the last by proseNameLast. #>
+    param([string[]]$Refs)
+    $refs = @($Refs | Where-Object { $null -ne $_ })
+    if ($refs.Count -lt 2) { return ($refs -join '') }
+    $head = $refs[0..($refs.Count - 2)] -join (Get-P20StandupProseText 'proseNameSeparator')
+    return $head + (Get-P20StandupProseText 'proseNameLast') + $refs[$refs.Count - 1]
+}
+
+function Get-P20StandupChairRefs {
+    <#
+      text.<Key> with its refs, or past proseFoldNames of them text.<Key>Many
+      with their count: the chair names a few and counts a crowd.
+    #>
+    param([string]$Key, [string[]]$Refs)
+    $refs = @($Refs | Where-Object { $null -ne $_ })
+    if ($refs.Count -gt [int](Get-P20Consts).rituals.proseFoldNames) {
+        return (Format-P20ProseTemplate (Get-P20StandupProseText ($Key + 'Many')) @{ n = (Get-P20StandupCountWord $refs.Count) })
+    }
+    return (Format-P20ProseTemplate (Get-P20StandupProseText $Key) @{ refs = (Join-P20StandupRefList $refs) })
+}
+
+function Get-P20StandupChairYesterday {
+    <#
+      The chair's yesterday: what you walked (Walked, the refs of chair.walked)
+      as text.chairYesterday; with none, the made-up nothing[(d + n) mod len] --
+      d the day of the year, n the number of workers, the position after the
+      last; '' with the family empty. Pure; chair_yesterday in the agent;
+      standup-prose.json's `chairYesterday` rows.
+    #>
+    param([string[]]$Walked, [int]$Day, [int]$Workers, $Nothing)
+    $walked = @($Walked | Where-Object { $null -ne $_ -and $_ -ne '' })
+    if ($walked.Count -gt 0) { return (Get-P20StandupChairRefs -Key 'chairYesterday' -Refs $walked) }
+    $madeUp = @($Nothing | Where-Object { $null -ne $_ })
+    if ($madeUp.Count -eq 0) { return '' }
+    return [string]$madeUp[($Day + $Workers) % $madeUp.Count]
+}
+
+function Get-P20StandupChairToday {
+    <#
+      The chair's today, from what waits: Queue maps a queue kind to its groups'
+      refs (an array of arrays). One clause a kind that has items, in QueueKinds'
+      order -- text.chair<Kind> with its refs in the groups' order, or
+      text.chair<Kind>Many past proseFoldNames -- joined by chairClauseSeparator,
+      the last by chairClauseLast, in text.chairToday; with nothing waiting,
+      text.chairTodayNone. Pure; chair_today in the agent; standup-prose.json's
+      `chairToday` rows.
+    #>
+    param($Queue, [string[]]$QueueKinds)
+    $clauses = New-Object System.Collections.Generic.List[string]
+    foreach ($kind in $QueueKinds) {
+        $refs = New-Object System.Collections.Generic.List[string]
+        if ($null -ne $Queue -and $Queue.Contains($kind)) {
+            foreach ($g in @($Queue[$kind])) {
+                foreach ($r in @($g | Where-Object { $null -ne $_ })) { $refs.Add([string]$r) }
+            }
+        }
+        if ($refs.Count -eq 0) { continue }
+        $cap = $kind.Substring(0, 1).ToUpperInvariant() + $kind.Substring(1)
+        $clauses.Add((Get-P20StandupChairRefs -Key ('chair' + $cap) -Refs $refs.ToArray()))
+    }
+    if ($clauses.Count -eq 0) { return (Get-P20StandupProseText 'chairTodayNone') }
+    $body = $clauses[0]
+    if ($clauses.Count -gt 1) {
+        $head = $clauses.GetRange(0, $clauses.Count - 1).ToArray() -join (Get-P20StandupProseText 'chairClauseSeparator')
+        $body = $head + (Get-P20StandupProseText 'chairClauseLast') + $clauses[$clauses.Count - 1]
+    }
+    return (Format-P20ProseTemplate (Get-P20StandupProseText 'chairToday') @{ body = $body })
+}
+
+function Get-P20StandupChairTurn {
+    <#
+      The chair's own turn, in its own first person and never the board's words:
+      text.turnOpen, its yesterday, its today, text.proseBlockersNone,
+      text.turnClose. Pure; chair_turn in the agent.
+    #>
+    param([string[]]$Walked, [int]$Day, [int]$Workers, $Nothing, $Queue, [string[]]$QueueKinds)
+    $said = New-Object System.Collections.ArrayList
+    $yesterday = Get-P20StandupChairYesterday -Walked $Walked -Day $Day -Workers $Workers -Nothing $Nothing
+    if ($yesterday) { [void]$said.Add($yesterday) }
+    [void]$said.Add((Get-P20StandupChairToday -Queue $Queue -QueueKinds $QueueKinds))
+    [void]$said.Add((Get-P20StandupProseText 'proseBlockersNone'))
+    return (Get-P20StandupTurn -Said $said.ToArray())
 }
 
 function Get-P20StandupTurn {
@@ -1787,7 +1887,7 @@ function Format-P20StandupWork {
         Waiting on you to walk two in Phase 6.
         <worker>: Good morning. Yesterday I closed two in Team Agile. No blockers. That's it for me.
         <worker>: Good morning. <made-up yesterday> <made-up today> No blockers. That's it for me.
-        Good morning. Waiting on you to walk two in Phase 6. That's it for me.
+        Good morning. <made-up yesterday, or what was walked> Today I'll walk #<n> and #<n>. No blockers. That's it for me.
 
       An empty slot says nothing; an idle worker's sentences are its two made-up items. LF-joined,
       ending in one LF; every fixed word from rituals.text. Takes the fill's
@@ -1830,7 +1930,7 @@ function Format-P20StandupWork {
             $lines.Add('')
             foreach ($check in $checks) { $lines.Add([string]$t.check + ': ' + $check) }
         }
-        # The chair's own turn, last: the board again, in the same frame.
+        # The chair's own turn, last, in the same frame and its own voice.
         $chair = @($Standup.work.chairProse | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_ })
         if ($chair.Count -gt 0) {
             $lines.Add('')
@@ -1898,7 +1998,10 @@ function Format-P20StandupText {
         foreach ($w in $workers) {
             $lines.Add([string]$w.name)
             if ($w.empty) {
-                $lines.Add((& $row $t.mug ('"' + [string]$w.excuse + '"')))
+                # Its made-up items, one row each, as a slot repeats its label.
+                $status = @($w.status | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_ })
+                if ($status.Count -eq 0) { $status = @([string]$w.excuse) }
+                foreach ($said in $status) { $lines.Add((& $row $t.mug ('"' + $said + '"'))) }
                 continue
             }
             foreach ($slot in @($data.Ceremony.slots)) {

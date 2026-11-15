@@ -700,7 +700,7 @@ $proseRaw = [System.IO.File]::ReadAllText((Join-Path $fixtureDir 'standup-prose.
 $proseTable = $proseRaw | ConvertFrom-Json
 $proseCases = @($proseTable.cases)
 $proseAsOf = @([regex]::Matches($proseRaw, '"asOf"\s*:\s*"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
-Assert-True 'the prose table is read: five cases, an asOf each' ($proseCases.Count -eq 5 -and $proseAsOf.Count -eq 5) "$($proseCases.Count) cases, $($proseAsOf.Count) asOf"
+Assert-True 'the prose table is read: six cases, an asOf each' ($proseCases.Count -eq 6 -and $proseAsOf.Count -eq 6) "$($proseCases.Count) cases, $($proseAsOf.Count) asOf"
 
 foreach ($row in @($proseTable.sentences)) {
     $titles = @{}
@@ -719,6 +719,31 @@ foreach ($row in $foldRows) {
     $want = (@($row.sentences | ForEach-Object { [string]$_ })) -join ' | '
     $got = (@(Get-P20StandupProse -Slot ([string]$row.slot) -Groups @($row.groups) -Rows $rows)) -join ' | '
     Assert-True "fold: $($row.slot), $(@($row.groups).Count) groups" ($got -ceq $want) "`n  got  $got`n  want $want"
+}
+
+# The chair's own voice: its yesterday (what you walked, else the made-up line at
+# the place after the last worker) and its today (what waits, kind by kind).
+$queueKinds = @($data.Ceremony.queue | ForEach-Object { [string]$_ })
+$chairYesterdays = @($proseTable.chairYesterday)
+$foldCap = [int]$consts.rituals.proseFoldNames
+$walkedSizes = @($chairYesterdays | ForEach-Object { @($_.walked).Count })
+Assert-True 'the chair''s yesterday table has a row each side of every edge' ((@(0, 1, 2, $foldCap, ($foldCap + 1)) | Where-Object { $walkedSizes -notcontains $_ }).Count -eq 0) ($walkedSizes -join ',')
+foreach ($row in $chairYesterdays) {
+    $got = Get-P20StandupChairYesterday -Walked @($row.walked | ForEach-Object { [string]$_ }) -Day ([int]$row.day) -Workers ([int]$row.workers) -Nothing $nothing
+    Assert-True "chair yesterday: $($row.sentence)" ($got -ceq [string]$row.sentence) "got '$got'"
+    if (@($row.walked).Count -eq 0) {
+        Assert-True "chair yesterday: day $($row.day), $($row.workers) workers is nothing[(d + n) mod len]" ([string]$row.sentence -ceq [string]$nothing[([int]$row.day + [int]$row.workers) % $nothing.Count])
+    }
+    Assert-True "chair yesterday never says you: $($row.sentence)" ([string]$row.sentence -notmatch '(?i)\byou\b')
+}
+foreach ($row in @($proseTable.chairToday)) {
+    $q = [ordered]@{}
+    foreach ($p in $row.queue.PSObject.Properties) {
+        $q[[string]$p.Name] = [object[]]@($p.Value | ForEach-Object { , ([object[]]@($_ | ForEach-Object { [string]$_ })) })
+    }
+    $got = Get-P20StandupChairToday -Queue $q -QueueKinds $queueKinds
+    Assert-True "chair today: $($row.sentence)" ($got -ceq [string]$row.sentence) "got '$got'"
+    Assert-True "chair today never says you: $($row.sentence)" ([string]$row.sentence -notmatch '(?i)\byou\b')
 }
 
 for ($n = 0; $n -lt $proseCases.Count; $n++) {
@@ -743,10 +768,17 @@ for ($n = 0; $n -lt $proseCases.Count; $n++) {
         if ($g) { $got = (@($g.prose | ForEach-Object { [string]$_ })) -join ' | ' }
         Assert-True "${name}: $($w.label)'s sentences" ($got -ceq $want) "`n  got  $got`n  want $want"
     }
-    # The chair's own turn, last, in the workers' frame: the board again, or queueEmpty.
+    # The chair's own turn, last, in the workers' frame and its own voice.
     $want = (@($exp.chair | ForEach-Object { [string]$_ })) -join ' | '
     $got = (@($s.work.chairProse | ForEach-Object { [string]$_ })) -join ' | '
     Assert-True "${name}: the chair's own turn" ($got -ceq $want) "`n  got  $got`n  want $want"
+    $board = @($s.work.queueProse | ForEach-Object { [string]$_ })
+    $echo = @($s.work.chairProse | Where-Object { $board -ccontains [string]$_ -or [string]$_ -match '(?i)\byou\b' })
+    Assert-True "${name}: the chair speaks in its own voice: no board sentence again, never you" ($echo.Count -eq 0) ($echo -join ' | ')
+    $wantWalked = ''
+    if ([string]$case.name -ceq 'walked') { $wantWalked = '530,531' }
+    $gotWalked = (@($s.chair.walked | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_.number })) -join ','
+    Assert-True "${name}: chair.walked is the walk items closed in the window" ($gotWalked -ceq $wantWalked) "got [$gotWalked] want [$wantWalked]"
     # An idle worker says its two made-up items, then no blockers, in the frame.
     foreach ($w in @($s.workers | Where-Object { $null -ne $_ -and $_.empty })) {
         $g = @($gotWorkers | Where-Object { [string]$_.label -ceq [string]$w.label }) | Select-Object -First 1

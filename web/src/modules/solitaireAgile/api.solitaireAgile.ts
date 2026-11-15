@@ -107,8 +107,10 @@ export interface StandupWork {
   workers: WorkWorker[];
   /** The prose: the queue's sentences, one a group, kind by kind. */
   queueProse: string[];
-  /** The chair's own turn, last, in the workers' frame: the queue's sentences
-   *  again, or `queueEmpty`. Absent from an agent that predates it. */
+  /** The chair's own turn, last, in the workers' frame and its own first person:
+   *  `turnOpen`, its yesterday (what you walked, else a made-up line), its today
+   *  (what waits, kind by kind, or `chairTodayNone`), `proseBlockersNone`,
+   *  `turnClose`. Never the queue's sentences again. Absent from an agent that predates it. */
   chairProse?: string[];
   /** One line for the queue and one a worker, each its sentences, LF-joined --
    *  the same string `Standup -Grain work` prints. */
@@ -138,7 +140,10 @@ export interface StandupResponse {
   source?: "issues" | "cards" | "both" | "none";
   /** false: no tracker answered. The ritual still happens (principle 3). */
   tracker: { ok: boolean; reason: string };
-  chair: { open: string; close: string };
+  /** The chair's two phrasebook lines, and `walked`: the walk items closed inside
+   *  the window, by number -- what the chair's turn says it walked. `walked` is
+   *  absent from an agent that predates it. */
+  chair: { open: string; close: string; walked?: RitualItem[] };
   /** The room: its windows, the chair included (`spaces.<slug>.features.teamSize`,
    *  3, 6 or 9, unset 9) -- `size - 1` workers sit. The web never reads the setting;
    *  it draws what this says. Absent from an agent that predates it. */

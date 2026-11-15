@@ -5,14 +5,17 @@ Waiting on you
   Nothing is waiting on you.
 
 Fable
-  Status     "Read up on how the team works, so I'm ready for what's next."
+  Status     "Yesterday I read up on how the team works, so I'm ready for what's next."
+  Status     "Today I'll move my shell to the new terminal and pick a theme."
 Haiku
   Yesterday  nothing closed
   Today      #801 Trim the export header
   Blockers   no blockers
 Opus
-  Status     "Took a course module on the cloud platform."
+  Status     "Yesterday I took a course module on the cloud platform."
+  Status     "Today I'll set up the password manager on my phone."
 Sonnet
-  Status     "Tidied my notes and my calendar for the week."
+  Status     "Yesterday I tidied my notes and my calendar for the week."
+  Status     "Today I'll pair with a teammate to learn how the build runs."
 
 "Let's circle back."

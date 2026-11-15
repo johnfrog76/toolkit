@@ -5,7 +5,8 @@ Waiting on you
   Nothing is waiting on you.
 
 Fable
-  Status     "Read up on how the team works, so I'm ready for what's next."
+  Status     "Yesterday I read up on how the team works, so I'm ready for what's next."
+  Status     "Today I'll move my shell to the new terminal and pick a theme."
 Opus
   Yesterday  nothing closed
   Today      #170 (2 commits) Date the commits

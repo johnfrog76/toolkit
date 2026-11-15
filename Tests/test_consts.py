@@ -325,6 +325,18 @@ EXPECTED = {
         "proseBlockersNone": "No blockers.",
         "turnOpen": "Good morning.",
         "turnClose": "That's it for me.",
+        "chairYesterday": "Yesterday I walked {refs}.",
+        "chairYesterdayMany": "Yesterday I did {n} walks.",
+        "chairToday": "Today I'll {body}.",
+        "chairTodayNone": "Today I'll keep the board moving.",
+        "chairWalk": "walk {refs}",
+        "chairWalkMany": "do {n} walks",
+        "chairDecide": "decide {refs}",
+        "chairDecideMany": "make {n} decisions",
+        "chairLook": "look at {refs}",
+        "chairLookMany": "look at {n} items",
+        "chairClauseSeparator": ", ",
+        "chairClauseLast": ", and ",
         "proseWalk": "Waiting on you to walk",
         "proseWalkAlso": "Also to walk",
         "proseDecide": "Waiting on you to decide",
@@ -658,6 +670,8 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         # The turn's frame: standup.py reads it from rituals.text.
         ("rituals.text.turnOpen", "Good morning."),
         ("rituals.text.turnClose", "That's it for me."),
+        # The chair's own turn: standup.py reads it from rituals.text.
+        ("rituals.text.chairTodayNone", "Today I'll keep the board moving."),
         ("rituals.text.proseYesterday", "Yesterday I closed"),
         ("visibility.publicLine", "This repository is public"),
         # The /env field for StartWork's launch: served through startwork_launch_env_flag().

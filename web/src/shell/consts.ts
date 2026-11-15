@@ -345,6 +345,18 @@ export const RITUALS = consts.rituals as {
     proseBlockersNone: string;
     turnOpen: string;
     turnClose: string;
+    chairYesterday: string;
+    chairYesterdayMany: string;
+    chairToday: string;
+    chairTodayNone: string;
+    chairWalk: string;
+    chairWalkMany: string;
+    chairDecide: string;
+    chairDecideMany: string;
+    chairLook: string;
+    chairLookMany: string;
+    chairClauseSeparator: string;
+    chairClauseLast: string;
     proseWalk: string;
     proseWalkAlso: string;
     proseDecide: string;
