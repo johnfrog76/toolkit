@@ -93,7 +93,7 @@ table; this is the shape of it:
 | Scope | Keys | Goes to |
 | --- | --- | --- |
 | **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `web.agentPort`, `web.corsOrigins`, `limits.inPlay`, `burn.weekStarts`, `burn.cacheHours`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display`, `spaceCheckouts.<slug>.path`, `managerWorkflow.communication.recipients.<key>.type` / `.display` / `.webhookEnv` | `config.local.json`, created as a sparse patch if it is not there |
-| **org** | `spaces.<slug>.name` / `.status` / `.orgType` / `.org` / `.tenant` / `.promptsFolder` / `.projects` / `.howIWork` / `.features.sprintAwareness` / `.features.suggestions` / `.features.trainingHoursPerQuarter` / `.communication.recipients.<key>.type` / `.display` / `.webhookEnv` | the hub's `hub.json` -- or `config.local.json`'s `spaces.<slug>` patch with **`-Local`** |
+| **org** | `spaces.<slug>.name` / `.status` / `.orgType` / `.org` / `.tenant` / `.promptsFolder` / `.projects` / `.howIWork` / `.features.sprintAwareness` / `.features.suggestions` / `.features.trainingHoursPerQuarter` / `.features.teamSize` / `.communication.recipients.<key>.type` / `.display` / `.webhookEnv` | the hub's `hub.json` -- or `config.local.json`'s `spaces.<slug>` patch with **`-Local`** |
 | **hub** | `storeSync`, `folders.<name>` | the hub's `hub.json`, and only with **`-Hub`** |
 | **default** | `commands`, `workItemTypes`, `cliVersion`, `managerWorkflow` (all of it but its recipients) | nowhere. These are the team's, and a `-Set` on one is refused by name |
 
@@ -630,6 +630,34 @@ row, `Suggestions`, reads `not configured` where Team Agile is on and nothing is
 `on` where it is set true, and `off` where it is set false or Team Agile is off in that Space -- each
 with the line that changes it, under the question "Can it tell me what to do next?".
 
+## `spaces[].features.teamSize` -- how many are in the standup
+
+A number, Space-scoped (like `trainingHoursPerQuarter`): the windows of Team Agile's standup in this
+Space, **the chair included** -- one of **3, 6 or 9** (`consts.json` `rituals.teamSizes`), so 2, 5 or 8
+members sit. **Unset is 9** (`rituals.teamSizeDefault`), the whole 3x3 grid, and so is any stored value
+that is not one of the three -- a hand-edited 4, a string, a fraction -- so a typo never empties a room.
+The members are still the Space's worker labels; the size only says how many of them are in today's
+standup: the ones with work first, then the idle, each in label order, and the rest are absent. The
+round -- `Standup -Grain work`, the played stage -- speaks the present; the detail, the counts and the
+brief keep everyone ([the team size](modules/solitaire-agile.md#the-team-size-who-is-in-the-room)).
+
+```powershell
+tkConfig -Set spaces.<slug>.features.teamSize=3 -Hub   # the chair and two members
+tkConfig -Set spaces.<slug>.features.teamSize=4 -Hub   # refused (exit 2): "... is one of: 3, 6, 9 -- got '4'."
+tkConfig -Unset spaces.<slug>.features.teamSize -Hub   # back to nine
+```
+
+`Config -Set` is the one writer: the schema row is an `int` with allowed values (`int(3|6|9)` in
+`Config -Schema`), so any other number is a stated refusal whose hint names the three, and nothing is
+written. It is declared in `consts.json` `features.spaceScoped`, so the hub keeps it on the Space's entry
+and a top-level `features.teamSize` is ignored; being a number, it is not folded into the merged flag map
+`/env` serves -- the standup reads it off the Space and says it back as `team.size`. One rule per half --
+`Get-P20TeamSize` (`Scripts/Resolve-TeamSize.ps1`) and `team_size()` (`agent/solitaire/standup.py`), the
+`sizes` rows of `Tests/fixtures/rituals/standup-team.json`. The inventory row, `Team size`, reads `on` with
+the number once one of the three is set and `not configured` while nothing is (the room is nine), under
+the question "How many are in my standup in \<Space>?"; the settings drawer draws that question as three
+radios, live on a GitHub Space, each writing the size through `PUT /api/config` with `-Hub`.
+
 ## `features.ado` is not like the other flags
 
 Every other flag under `features` is a module's on / off switch, off until someone sets it. **`features.ado`
@@ -663,7 +691,7 @@ read by `Get-P20MilestoneOrder` and `milestone_order()` -- [milestones](hub/mile
 card's state, **the shape of a card's id** (`regex.cardId`: a work item number, or the
 four-character id of a card with no work item -- at least one letter and one digit, no look-alike
 characters, uppercase; see [The workflow](CLI.md#the-workflow) and [the card](hub/cards.md), "The filename"),
-and **which feature flags are the org's** (`features.spaceScoped`, today `["sprintAwareness", "trainingHoursPerQuarter", "suggestions"]`: the
+and **which feature flags are the org's** (`features.spaceScoped`, today `["sprintAwareness", "trainingHoursPerQuarter", "suggestions", "teamSize"]`: the
 flags read from `spaces[].features` rather than the top-level block -- `SpaceScopedFeatures` in
 `utilities.psm1`, `SPACE_FEATURES` in `agent/core/config.py` and `FEATURES.spaceScoped` in
 `web/src/shell/consts.ts` all read this list, so a new org-scoped flag is added in one place
@@ -1010,16 +1038,20 @@ is the active Space); `walk` is a journey -- the connect wizard, below -- offere
 the entry names an anchor or a route, and otherwise shown as its sentence; `sentence` is the whole
 answer, for the environment variables this tool never writes.
 
-**An entry that asks** carries `answers`, `answerKey` and `why` too -- one does today, **How do you want to
-work in {space}?** ([`spaces[].howIWork`](#spaceshowiwork----how-you-work-in-this-space)). `{space}`
+**An entry that asks** carries `answers`, `answerKey` and `why` too -- two do today, **How do you want to
+work in {space}?** ([`spaces[].howIWork`](#spaceshowiwork----how-you-work-in-this-space)) and **How many
+are in my standup in {space}?** ([`spaces[].features.teamSize`](#spacesfeaturesteamsize----how-many-are-in-the-standup)). `{space}`
 in a question is the Space you are in, by name ("this Space" when none is known), in the CLI's inventory
 and in the drawer alike. Each answer is a `label`, the `value` it writes to `answerKey` (`{slug}` the
 active Space) with `-Hub`, its `sentence`, and the trackers it is `live` on; `why` is one sentence per
 tracker saying why the others are disabled. The drawer draws every answer -- one the Space cannot make is
-disabled, never hidden -- checks the one `/env`'s `howIWork` names, and on a pick shows it at once with a
+disabled, never hidden -- checks, for How do you want to work?, the one `/env`'s `howIWork` names, and for
+any other the value the active Space's own entry holds at `answerKey` (none while it is unset; that
+entry's answers are live by `/env`'s `tracker`), and on a pick shows it at once with a
 tiny **Saving…** spinner beside the group, the other answers locked and the group `aria-busy` while
 `Config -Set` runs; a refusal puts the pick back and shows the CLI's sentence. The entry's door
-still goes to its `anchor`, Team Agile's own switch.
+still goes to its `anchor` -- for How do you want to work?, Team Agile's own switch. Only that entry's
+pick of *With agents* also runs `HowWeWork`, and only it says when the answer waits on the switch.
 
 **An entry that names a `space`** is about that one Space -- the demo Spaces, one per grain
 ([the add-on's demo Spaces](modules/ado.md#the-demo-spaces-one-per-grain)) -- and its tip is not

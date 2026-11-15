@@ -1,0 +1,18 @@
+Standup -- Friday 2 October 2026
+"Can we not adjust scope."
+
+Waiting on you
+  Nothing is waiting on you.
+
+Fable
+  Status     "Read up on how the team works, so I'm ready for what's next."
+Haiku
+  Yesterday  nothing closed
+  Today      #801 Trim the export header
+  Blockers   no blockers
+Opus
+  Status     "Took a course module on the cloud platform."
+Sonnet
+  Status     "Tidied my notes and my calendar for the week."
+
+"Let's circle back."

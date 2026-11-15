@@ -20,6 +20,7 @@ A machine is in exactly one cell of each axis at a time:
 | **Modules** | `growth`, `communication`, `deck`, `organize`, `solitaireAgile`, `lounge`, each on / off / not configured | top-level `features` in `config.local.json`; the engineer's, never an org's (`Tests/test_features.py`). The Studio is not on this axis: it is core (D-S13), and a `features.studio` left in a config is ignored |
 | **Sprint awareness** | on, off | `spaces[].features.sprintAwareness` -- a Space-scoped flag |
 | **Suggestions** | on (unset, or true), off | `spaces[].features.suggestions` -- a Space-scoped switch riding Team Agile: where Team Agile is on, unset is on; `false` takes the suggestion out of the standup -- the `switch` rows of `Tests/fixtures/suggestion/table.json`, read by `tkTestToolkit -Rituals` and `Tests/test_rituals.py` |
+| **Team size** | 3, 6, 9 (unset reads 9) | `spaces[].features.teamSize` -- a Space-scoped NUMBER, the standup's windows with the chair counted: the fill keeps every worker and marks each `present`, the ones with work seated first; the round (the work grain, the stage) speaks the present, the detail and the brief keep everyone -- **the one shared table**, `Tests/fixtures/rituals/standup-team.json`, read by `tkTestToolkit -Rituals` and `Tests/test_rituals.py` |
 | **How you work here** | `agents`, `alone`, `team` | `spaces[].howIWork` -- the other Space-scoped switch: asked on a GitHub Space (`alone` until answered), derived elsewhere (`team` on Azure DevOps, `alone` with no tracker). Team Agile is on only where its switch is on AND the answer is `agents` -- **the one shared table**, `Tests/fixtures/how-i-work/table.json`, read by `tkTestToolkit -Environment` and `Tests/test_how_i_work.py` |
 
 **Off means absent** (AGENTS.md): a module that is off contributes no verb, no route (404, not 403),
@@ -288,6 +289,22 @@ through the bridge. On success the spinner goes; a refusal puts the pick back an
 under the radios. With *With agents* chosen and Team Agile's own switch off, one more line says the answer
 waits for the switch.
 
+**How many are in my standup in `<Space>`?** is the second question that is asked, and the answer is
+the Space's too: three radios -- *3*, *6*, *9*, the room with the chair counted -- live where Team Agile's
+standup runs. What is checked is the Space's own `spaces.<slug>.features.teamSize`, read off the entry
+`/env` declares, and nothing is checked while it is unset (the room is then nine; the row's chip says
+`not configured`). A pick writes it through `PUT /api/config` -> `Config -Set -Hub`, with the same Saving
+state; it asks for no how-we-work note and says nothing about Team Agile's switch (`scenarios.test.tsx`,
+"How many are in my standup in `<Space>`?: the Space's size is checked, live on GitHub"; the radios in
+`HowDoI.test.tsx`):
+
+| The Space | Checked | Can be picked | The sentence under the radios | A pick writes |
+| --- | --- | --- | --- | --- |
+| GitHub, nothing set | none | 3, 6, 9 | none | `spaces.<slug>.features.teamSize=<size> -Hub` |
+| GitHub, 6 | 6 | 3, 6, 9 | none | the same |
+| Azure DevOps | none | none | Team Agile's standup is a GitHub Space's; this Space's tracker is Azure DevOps. | nothing |
+| no tracker (your own cards) | none | none | Team Agile's standup is a GitHub Space's; connect a tracker to hold one. | nothing |
+
 ### The Studio's Prompts card, by how you work (`scenarios.test.tsx`, "the Studio's Prompts card, by how you work"; the card in `PromptsCard.test.tsx`)
 
 The card is core, on every Space, and it is three filters (the house's `FilterBadge` radios). Its **ToolKit**
@@ -444,6 +461,10 @@ Team Agile section (the reminder: a time and the days), saved through `POST /api
 `stage/standupDeck.test.tsx` and `stage/StandupPlay.test.tsx`. On the joined source the stage reads an
 item as the page does: an issue is `#<n>` (spoken `issue <n>`), linked; a card of its own is its id
 (spoken `card <id>`), with no link (`scenarios.test.tsx`, "the played standup names an issue").
+
+In a room smaller than the Space's members (`spaces.<slug>.features.teamSize`), Work shows the round --
+the present only, `standup-team-<case>.work.txt` -- while Detail and Brief keep every worker; the page
+draws what the response says and reads no setting of its own.
 
 The text is the shared fixture's golden (`Tests/fixtures/rituals/`), the same bytes the CLI's
 `Standup` and `Tests/test_rituals.py` assert.

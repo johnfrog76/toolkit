@@ -11,7 +11,9 @@ import path from "node:path";
 import {
   WORKFLOW_ENTRIES,
   answerLive,
+  answerStored,
   answerTarget,
+  asksHowIWork,
   entryAnchor,
   entryQuestion,
   entryConfigLines,
@@ -22,6 +24,7 @@ import {
   tippableEntries,
 } from "./settingsWorkflows";
 import type { SurfaceRow } from "./api";
+import { RITUALS } from "./consts";
 
 const row = (key: string, state: SurfaceRow["state"]): SurfaceRow => ({
   key,
@@ -67,24 +70,48 @@ describe("the list", () => {
     for (const feature of named) expect([...registeredModuleFeatures(), "ado"]).toContain(feature);
   });
 
-  it("an entry that asks names the Space, writes a Space's key, and says why for every tracker", () => {
+  it("an entry that asks names the Space, writes a Space's key, and says why wherever an answer is not live", () => {
     const asking = WORKFLOW_ENTRIES.filter((e) => e.answers);
-    expect(asking.map((e) => e.id)).toEqual(["solitaireAgile"]);
+    expect(asking.map((e) => e.id)).toEqual(["team-size", "solitaireAgile"]);
     for (const e of asking) {
-      expect(e.question).toBe("How do you want to work in {space}?");
+      expect(e.question).toMatch(/ in \{space\}\?$/);
       expect(e.door).toBe("change");
-      expect(e.anchor).toBe("features.solitaireAgile");
-      expect(e.answerKey).toBe("spaces.{slug}.howIWork");
-      expect(e.answers!.map((a) => [a.label, a.value])).toEqual([
-        ["With agents", "agents"],
-        ["Alone", "alone"],
-        ["On a team in Azure", "team"],
-      ]);
+      expect(e.answerKey).toMatch(/^spaces\.\{slug\}\./);
       for (const a of e.answers!) expect(a.sentence.length).toBeGreaterThan(10);
-      // team is derived from an Azure DevOps address and never written.
-      expect(e.answers!.find((a) => a.value === "team")!.live).toEqual([]);
-      for (const t of ["github", "ado", "none"] as const) expect(e.why?.[t]).toBeTruthy();
+      for (const t of ["github", "ado", "none"] as const)
+        if (e.answers!.some((a) => !a.live.includes(t))) expect(e.why?.[t]).toBeTruthy();
     }
+    const how = WORKFLOW_ENTRIES.find((e) => e.id === "solitaireAgile")!;
+    expect(how.question).toBe("How do you want to work in {space}?");
+    expect(how.anchor).toBe("features.solitaireAgile");
+    expect(how.answerKey).toBe("spaces.{slug}.howIWork");
+    expect(how.answers!.map((a) => [a.label, a.value])).toEqual([
+      ["With agents", "agents"],
+      ["Alone", "alone"],
+      ["On a team in Azure", "team"],
+    ]);
+    // team is derived from an Azure DevOps address and never written.
+    expect(how.answers!.find((a) => a.value === "team")!.live).toEqual([]);
+    // The team size: the room's three sizes, the contract's (consts.json
+    // rituals.teamSizes), live where Team Agile's standup runs.
+    const team = WORKFLOW_ENTRIES.find((e) => e.id === "team-size")!;
+    expect(team.question).toBe("How many are in my standup in {space}?");
+    expect(team.anchor).toBe("spaces.{slug}.features.teamSize");
+    expect(team.answerKey).toBe("spaces.{slug}.features.teamSize");
+    expect(team.answers!.map((a) => a.value)).toEqual(RITUALS.teamSizes.map(String));
+    for (const a of team.answers!) expect(a.live).toEqual(["github"]);
+  });
+
+  it("an answer other than howIWork is read off the Space's own entry, at its key", () => {
+    const team = WORKFLOW_ENTRIES.find((e) => e.id === "team-size")!;
+    const how = WORKFLOW_ENTRIES.find((e) => e.id === "solitaireAgile")!;
+    expect(asksHowIWork(how)).toBe(true);
+    expect(asksHowIWork(team)).toBe(false);
+    expect(answerStored(team, { slug: "x", features: { teamSize: 6 } })).toBe("6");
+    expect(answerStored(team, { slug: "x", features: {} })).toBeUndefined();
+    expect(answerStored(team, { slug: "x" })).toBeUndefined();
+    expect(answerStored(team, undefined)).toBeUndefined();
+    expect(answerStored(how, { slug: "x", howIWork: "agents" })).toBe("agents");
   });
 
   // The radios carry the detail, so the words around them stay short: the

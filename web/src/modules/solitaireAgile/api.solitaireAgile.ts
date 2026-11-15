@@ -70,6 +70,11 @@ export interface StandupWorker {
   /** The empty worker's two made-up items, `[yesterday, today]` (the `nothing` and
    *  `nothingToday` families); `[]` for a worker with something to say. */
   status: string[];
+  /** In the room today (the team size, docs/modules/solitaire-agile.md, "The team
+   *  size: who is in the room"): the round -- `work.workers`, the stage -- is the
+   *  present only; the detail and the brief keep every worker. Absent from an agent
+   *  that predates the room, which reads as present. */
+  present?: boolean;
 }
 
 /** One group at the work grain (D-TA20): what a slot's items belong to --
@@ -134,6 +139,10 @@ export interface StandupResponse {
   /** false: no tracker answered. The ritual still happens (principle 3). */
   tracker: { ok: boolean; reason: string };
   chair: { open: string; close: string };
+  /** The room: its windows, the chair included (`spaces.<slug>.features.teamSize`,
+   *  3, 6 or 9, unset 9) -- `size - 1` workers sit. The web never reads the setting;
+   *  it draws what this says. Absent from an agent that predates it. */
+  team?: { size: number };
   queue: { walk: QueueItem[]; decide: QueueItem[]; look: QueueItem[] };
   workers: StandupWorker[];
   /** The work grain: the items grouped, one phrase a group. Absent from

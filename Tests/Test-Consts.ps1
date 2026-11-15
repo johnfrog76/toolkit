@@ -130,7 +130,7 @@ $expected = [ordered]@{
     'reviews.fileName'        = 'review.md'
     'reviews.slugSetSeparator' = '+'
     # A list travels as its elements joined with a comma, so the table stays flat.
-    'features.spaceScoped'      = 'sprintAwareness,trainingHoursPerQuarter,suggestions'
+    'features.spaceScoped'      = 'sprintAwareness,trainingHoursPerQuarter,suggestions,teamSize'
     'env.activeSpace'         = 'P20_ACTIVE_SPACE'
     'env.promptsRoot'         = 'PROMPTS_ROOT'
     'env.agentCacheDir'       = 'P20_AGENT_CACHE_DIR'
@@ -265,6 +265,9 @@ $expected = [ordered]@{
     'rituals.suggestShapes'      = 'start,delegate,route,place'
     'rituals.suggestOwnerSeat'   = 'fable'
     'rituals.cornerShapes'       = 'oneLeft,manyLeft,reached,nothingInReach'
+    # The standup room's sizes, the chair included, and what unset reads as.
+    'rituals.teamSizes'          = '3,6,9'
+    'rituals.teamSizeDefault'    = '9'
     'rituals.suggestExclusions'  = 'notBillable,waiting,inFlight,theirs,dismissed'
     # StartWork's hand-off block (D-AR5): the head line and the three section
     # headings the CLI types and the web's copy box finds; Tests/fixtures/start-work/

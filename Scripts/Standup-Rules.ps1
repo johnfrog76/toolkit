@@ -46,9 +46,12 @@
                                titles' common stem, one phrase per group.
       Get-P20StandupProseSentence  the prose: one group as one standup
                                sentence -- a grammar over the groups, no model.
+      Set-P20StandupPresent    the team size: who is in the room today -- every
+                               worker kept and marked present or absent, the
+                               ones with work seated first.
       Format-P20StandupWork    the filled object -> the work grain's text, its
                                prose: one line for the queue, one turn per
-                               worker, and the chair's own turn last.
+                               PRESENT worker, and the chair's own turn last.
       Test-P20StandupDress     the dress guard: a model's sentence and its
                                group's facts -> '' or the guard it fails. The
                                CLI calls no model; the guard is the contract.
@@ -81,6 +84,8 @@ if (-not (Get-Command Resolve-P20Tracker -ErrorAction SilentlyContinue)) { . (Jo
 if (-not (Get-Command Get-P20CardId -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Resolve-CardName.ps1') }
 # Get-PromptFileStatus.ps1 also holds Test-P20CardBillable, the one reader of **Billable:**.
 if (-not (Get-Command Test-P20CardBillable -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Get-PromptFileStatus.ps1') }
+# The room's size, a Space's features.teamSize read the one way.
+if (-not (Get-Command Get-P20TeamSize -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Resolve-TeamSize.ps1') }
 
 function Get-P20RitualData {
     <# The rituals contract plus the two data files it names, read from the package. #>
@@ -464,6 +469,30 @@ function Set-P20StandupIdle {
     }
 }
 
+function Set-P20StandupPresent {
+    <#
+      Who is in the room today. The room is Size windows, the chair's one of
+      them, so Size - 1 workers sit. Every worker stays on the response and gets
+      present = $true or $false: the workers with something to say (a yesterday,
+      today or blockers item -- not empty) take the seats first, then the idle,
+      each run in the order of Workers (the label order, the card tile last);
+      the rest are absent. With no more workers than seats, everyone is present.
+      The round -- the work grain -- speaks the present only; the ledger keeps
+      every worker. set_present in the agent; standup-team.json's `seats` rows.
+    #>
+    param(
+        $Workers,
+        [int]$Size
+    )
+    $all = @($Workers | Where-Object { $null -ne $_ })
+    $seats = $Size - 1
+    if ($seats -lt 0) { $seats = 0 }
+    $order = New-Object System.Collections.ArrayList
+    foreach ($w in $all) { if (-not $w.empty) { [void]$order.Add($w) } }
+    foreach ($w in $all) { if ($w.empty) { [void]$order.Add($w) } }
+    for ($i = 0; $i -lt $order.Count; $i++) { $order[$i]['present'] = ($i -lt $seats) }
+}
+
 function Invoke-P20StandupFill {
     <#
       The fill. Pure over its inputs: no gh, no clock, no file but the two data
@@ -482,7 +511,9 @@ function Invoke-P20StandupFill {
       day of the year of asOf (1-based), i its position (0-based). The chair
       opens on phrasebook[d mod len] and closes on phrasebook[(d + 1) mod len].
       With tracker.ok false the queue and the workers are empty -- the ritual
-      happens anyway.
+      happens anyway. TeamSize is the Space's features.teamSize as stored
+      (Get-P20TeamSize reads it; unset, or not a size, is the default): the
+      response's team.size, and who is present (Set-P20StandupPresent).
     #>
     param(
         [Parameter(Mandatory)]$AsOf,
@@ -491,8 +522,10 @@ function Invoke-P20StandupFill {
         $Tracker,
         [string]$Space = '',
         [string]$Window = '',
-        [string]$PackageRoot
+        [string]$PackageRoot,
+        $TeamSize = $null
     )
+    $size = (Get-P20TeamSize -Stored $TeamSize).Size
     $data = Get-P20RitualData -PackageRoot $PackageRoot
     $rituals = $data.Rituals
     $motions = @($rituals.motions | ForEach-Object { [string]$_ })
@@ -578,6 +611,7 @@ function Invoke-P20StandupFill {
             [void]$workers.Add($w)
         }
         Set-P20StandupIdle -Workers $workers.ToArray() -Day $d -Vocabulary $data.Vocabulary
+        Set-P20StandupPresent -Workers $workers.ToArray() -Size $size
     }
 
     $queue = [ordered]@{}
@@ -602,6 +636,7 @@ function Invoke-P20StandupFill {
         source   = $(if ($ok) { 'issues' } else { 'none' })
         tracker  = [ordered]@{ ok = $ok; reason = $reason }
         chair    = [ordered]@{ open = $open; close = $close }
+        team     = [ordered]@{ size = $size }
         queue    = $queue
         workers  = [object[]]$workers.ToArray()
         work     = $work
@@ -917,8 +952,10 @@ function Invoke-P20StandupCardsFill {
         [string]$Space = '',
         [string]$SpaceName = '',
         [string]$Window = '',
-        [string]$PackageRoot
+        [string]$PackageRoot,
+        $TeamSize = $null
     )
+    $size = (Get-P20TeamSize -Stored $TeamSize).Size
     $data = Get-P20RitualData -PackageRoot $PackageRoot
     $at = ConvertTo-P20RitualTime $AsOf
     if ($null -eq $at) { throw "asOf '$AsOf' is not a time." }
@@ -934,6 +971,7 @@ function Invoke-P20StandupCardsFill {
     $w = $tile.worker
     # The tile is a worker like any other: its made-up items are picked by its position.
     Set-P20StandupIdle -Workers @($w) -Day $d -Vocabulary $data.Vocabulary
+    Set-P20StandupPresent -Workers @($w) -Size $size
 
     $queue = [ordered]@{}
     foreach ($kind in @($data.Ceremony.queue)) { $queue[[string]$kind] = [object[]]@() }
@@ -956,6 +994,7 @@ function Invoke-P20StandupCardsFill {
         source   = 'cards'
         tracker  = [ordered]@{ ok = $true; reason = '' }
         chair    = [ordered]@{ open = $open; close = $close }
+        team     = [ordered]@{ size = $size }
         queue    = $queue
         workers  = [object[]]@($w)
         work     = $work
@@ -1011,9 +1050,10 @@ function Invoke-P20StandupJoinedFill {
         [string]$Window = '',
         [string]$PackageRoot,
         $CommitDates,
-        $IssueStarts
+        $IssueStarts,
+        $TeamSize = $null
     )
-    $out = Invoke-P20StandupFill -AsOf $AsOf -Labels $Labels -Issues $Issues -Tracker $Tracker -Space $Space -Window $Window -PackageRoot $PackageRoot
+    $out = Invoke-P20StandupFill -AsOf $AsOf -Labels $Labels -Issues $Issues -Tracker $Tracker -Space $Space -Window $Window -PackageRoot $PackageRoot -TeamSize $TeamSize
     if (-not $out.tracker.ok) { return $out }
     $out.source = 'both'
     $data = Get-P20RitualData -PackageRoot $PackageRoot
@@ -1121,6 +1161,8 @@ function Invoke-P20StandupJoinedFill {
     $workers = New-Object System.Collections.ArrayList
     foreach ($w in @($out.workers | Where-Object { $null -ne $_ })) { [void]$workers.Add($w) }
     if (-not $tile.worker.empty) { [void]$workers.Add($tile.worker) }
+    # The card tile is a member like the labels: seated by the same rule, after them.
+    Set-P20StandupPresent -Workers $workers.ToArray() -Size ([int]$out.team.size)
     $out.workers = [object[]]$workers.ToArray()
     if ($out.queue.Contains('walk')) {
         $walk = New-Object System.Collections.ArrayList
@@ -1369,6 +1411,9 @@ function New-P20StandupWork {
     }
     $workers = New-Object System.Collections.ArrayList
     foreach ($w in @($Standup.workers | Where-Object { $null -ne $_ })) {
+        # The round speaks the present only (Set-P20StandupPresent); a worker
+        # with no present key -- an older reading -- is in the room.
+        if ($false -eq $w.present) { continue }
         $row = [ordered]@{ label = $w.label; name = $w.name }
         $prose = New-Object System.Collections.ArrayList
         foreach ($slot in $Slots) {
@@ -1735,8 +1780,9 @@ function Format-P20StandupWork {
       The filled object -> the work grain's text, spoken as prose: the round of
       the room. The same frame as the long form -- the title, the chair's lines,
       the Tracker line when nothing answered -- with ONE line for the queue (its
-      sentences, or "Nothing is waiting on you."), one per worker (its name, then
-      its turn), and the chair's own turn last (work.chairProse):
+      sentences, or "Nothing is waiting on you."), one per PRESENT worker (its
+      name, then its turn; an absent worker says nothing, Set-P20StandupPresent),
+      and the chair's own turn last (work.chairProse):
 
         Waiting on you to walk two in Phase 6.
         <worker>: Good morning. Yesterday I closed two in Team Agile. No blockers. That's it for me.
@@ -1772,6 +1818,8 @@ function Format-P20StandupWork {
         if ($workers.Count -eq 0) { $lines.Add([string]$t.noWorkers) }
         $grained = @($Standup.work.workers | Where-Object { $null -ne $_ })
         foreach ($w in $workers) {
+            # An absent worker is not in today's round: no line, not even its name.
+            if ($false -eq $w.present) { continue }
             $ww = @($grained | Where-Object { [string]$_.label -ceq [string]$w.label }) | Select-Object -First 1
             $said = @()
             if ($ww) { $said = @($ww.prose | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_ }) }

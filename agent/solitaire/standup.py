@@ -88,6 +88,8 @@ from ..core.consts import (
     rituals_number_words,
     rituals_prose_fold_names,
     rituals_route,
+    rituals_team_size_default,
+    rituals_team_sizes,
     rituals_text,
     rituals_vocabulary_file,
     rituals_walk_label,
@@ -166,6 +168,12 @@ class Chair(BaseModel):
     close: str = ""
 
 
+class Team(BaseModel):
+    # The room: how many windows the standup has, the chair included
+    # (spaces[].features.teamSize, ``team_size``) -- so ``size - 1`` workers sit.
+    size: int = Field(default_factory=rituals_team_size_default)
+
+
 class SlotItem(BaseModel):
     # The same five keys whichever source filled the item: an issue has a
     # number and a url, and its id is null and its path ""; a card has an id
@@ -211,6 +219,10 @@ class Worker(BaseModel):
     # The empty worker's two made-up items, [yesterday, today]: the `nothing` and
     # `nothingToday` families (``set_idle``); [] for a worker with something to say.
     status: list[str] = []
+    # In the room today (``set_present``): the round -- the work grain, the stage --
+    # speaks the present only; the ledger -- the detail, the counts, the brief --
+    # keeps every worker. True for a reader that knows nothing of the room.
+    present: bool = True
 
 
 class WorkGroup(BaseModel):
@@ -391,6 +403,8 @@ class Standup(BaseModel):
     source: str = "none"
     tracker: TrackerState = TrackerState()
     chair: Chair = Chair()
+    # The room's size (spaces[].features.teamSize), the chair included.
+    team: Team = Field(default_factory=Team)
     queue: Queue = Queue()
     workers: list[Worker] = []
     # The work grain: the items grouped, one phrase a group.
@@ -685,8 +699,37 @@ def set_idle(workers: list[Worker], d: int, words: dict) -> None:
             w.excuse = w.status[0]
 
 
+def team_size(stored) -> int:
+    """A Space's ``features.teamSize`` as the room's size: the stored value when it
+    is a whole JSON number in ``rituals.teamSizes`` (a string, a boolean or a
+    fraction is not one), else ``rituals.teamSizeDefault`` -- unset reads the
+    default too. The mirror of ``Get-P20TeamSize``; standup-team.json's ``sizes``."""
+    if isinstance(stored, int) and not isinstance(stored, bool) and stored in rituals_team_sizes():
+        return stored
+    return rituals_team_size_default()
+
+
+def set_present(workers: list[Worker], size: int) -> None:
+    """Who is in the room today. The room is ``size`` windows, the chair's one of
+    them, so ``size - 1`` workers sit. Every worker stays and gets ``present``:
+    the workers with something to say (a yesterday, today or blockers item --
+    not ``empty``) take the seats first, then the idle, each run in the order of
+    ``workers`` (the label order, the card tile last); the rest are absent. The
+    mirror of ``Set-P20StandupPresent``; standup-team.json's ``seats`` rows."""
+    seats = max(size - 1, 0)
+    order = [w for w in workers if not w.empty] + [w for w in workers if w.empty]
+    for i, w in enumerate(order):
+        w.present = i < seats
+
+
 def fill_standup(
-    as_of: datetime, labels: list[dict], issues: list[dict], tracker_state: dict, space: str = "", window: str = ""
+    as_of: datetime,
+    labels: list[dict],
+    issues: list[dict],
+    tracker_state: dict,
+    space: str = "",
+    window: str = "",
+    size=None,
 ) -> Standup:
     """The standup's slots, queue and vocabulary from labels and issues. Pure.
 
@@ -694,6 +737,8 @@ def fill_standup(
     ``tracker_state`` is ``{"ok": bool, "reason": str}``; when it is not ok the
     labels and issues are not read -- the ritual is the chair's lines and the reason.
     ``window`` is ``since``'s day (``window_start``); "" is the previous working day.
+    ``size`` is the Space's ``features.teamSize`` as stored (``team_size`` reads it):
+    the response's ``team.size``, and who is present (``set_present``).
     """
     words = vocabulary()
     phrasebook = words["phrasebook"]
@@ -707,6 +752,7 @@ def fill_standup(
         space=space,
         tracker=state,
         chair=Chair(open=phrasebook[d % len(phrasebook)], close=phrasebook[(d + 1) % len(phrasebook)]),
+        team=Team(size=team_size(size)),
     )
     if not state.ok:
         return out
@@ -749,6 +795,7 @@ def fill_standup(
     for w in out.workers:
         w.empty = not (w.yesterday or w.today or w.blockers)
     set_idle(out.workers, d, words)
+    set_present(out.workers, out.team.size)
     out.work = build_work(out, key_of)
     out.counts = standup_counts(out, {})
     return out
@@ -932,7 +979,7 @@ def _cards_tile(
 
 
 def fill_cards_standup(
-    as_of: datetime, cards: list[dict], space: str = "", space_name: str = "", window: str = ""
+    as_of: datetime, cards: list[dict], space: str = "", space_name: str = "", window: str = "", size=None
 ) -> Standup:
     """The second fill, from card rows. Pure; the mirror of ``Invoke-P20StandupCardsFill``.
 
@@ -953,6 +1000,7 @@ def fill_cards_standup(
         source="cards",
         tracker=TrackerState(ok=True, reason=""),
         chair=Chair(open=phrasebook[d % len(phrasebook)], close=phrasebook[(d + 1) % len(phrasebook)]),
+        team=Team(size=team_size(size)),
     )
     worker, walk, key_of, hashes, _undated = _cards_tile(as_of, cards_in_play(cards), space, name, out._marks, since)
     worker.empty = not (worker.yesterday or worker.today or worker.blockers)
@@ -960,6 +1008,7 @@ def fill_cards_standup(
     out.workers = [worker]
     # The tile is a worker like any other: its made-up items are picked by its position.
     set_idle(out.workers, d, words)
+    set_present(out.workers, out.team.size)
     out.work = build_work(out, key_of)
     out.counts = standup_counts(out, hashes)
     return out
@@ -1000,6 +1049,7 @@ def fill_joined_standup(
     window: str = "",
     commit_dates: dict | None = None,
     issue_starts: dict | None = None,
+    size=None,
 ) -> Standup:
     """The issues fill, joined with the cards on the id. Pure; the mirror of
     ``Invoke-P20StandupJoinedFill``. With the tracker not answering it is the
@@ -1013,7 +1063,7 @@ def fill_joined_standup(
     number -> its timeline's start) says started for an open issue with no card
     whose work began in the window. None for either is not read, and today's
     rule stands: every bullet counts, and an issue alone is in progress."""
-    out = fill_standup(as_of, labels, issues, tracker_state, space=space, window=window)
+    out = fill_standup(as_of, labels, issues, tracker_state, space=space, window=window, size=size)
     if not out.tracker.ok:
         return out
     out.source = "both"
@@ -1082,6 +1132,8 @@ def fill_joined_standup(
     )
     if tile.yesterday or tile.today or tile.blockers:
         out.workers.append(tile)
+    # The card tile is a member like the labels: seated by the same rule, after them.
+    set_present(out.workers, out.team.size)
     out.queue.walk.extend(walk)
     out.work = build_work(out, {**issue_keys(issues), **card_keys})
     out.counts = standup_counts(out, {**hashes, **tile_hashes}, {**undated, **tile_undated})
@@ -1290,7 +1342,8 @@ def build_work(filled: Standup, key_of: dict[str, tuple[str, str]]) -> Work:
         queue[kind], said = groups(getattr(filled.queue, kind), kind)
         queue_prose += said
     workers = []
-    for w in filled.workers:
+    # The round speaks the present only (``set_present``): an absent worker has no row.
+    for w in (w for w in filled.workers if w.present):
         slots: dict[str, list[WorkGroup]] = {}
         prose: list[str] = []
         for slot in cer["slots"]:
@@ -1917,8 +1970,9 @@ def render_work(filled: Standup) -> str:
     """The work grain's text, spoken as prose: the round of the room. The long
     form's frame -- the title, the chair's lines, the Tracker line when nothing
     answered -- with ONE line for the queue (its sentences, or queueEmpty when it
-    has none), one per worker (its name, then its turn: turnOpen, its sentences,
-    turnClose; an idle worker's are its two made-up items), and the chair's own
+    has none), one per PRESENT worker (its name, then its turn: turnOpen, its
+    sentences, turnClose; an idle worker's are its two made-up items; an absent
+    worker says nothing -- ``set_present``), and the chair's own
     turn last (``chairProse``: the queue again, in the same frame). An empty slot
     says nothing. LF-joined and LF-terminated. Pure; the mirror of
     ``Format-P20StandupWork``, held by the ``standup-prose-*.txt`` goldens."""
@@ -1937,6 +1991,9 @@ def render_work(filled: Standup) -> str:
             lines.append(t["noWorkers"])
         grained = {w.label: w for w in filled.work.workers}
         for w in filled.workers:
+            # An absent worker is not in today's round: no line, not even its name.
+            if not w.present:
+                continue
             ww = grained.get(w.label)
             lines.append(f"{w.name}: {' '.join(ww.prose if ww else [])}")
         if filled.checks:
@@ -2104,6 +2161,7 @@ def _dated(
         window=since,
         commit_dates=commit_dates,
         issue_starts=issue_starts,
+        size=filled.team.size,
     )
 
 
@@ -2120,6 +2178,9 @@ def standup_for(space: str = "", as_of: datetime | None = None, since: str = "",
         raise HTTPException(status_code=422, detail=why)
     slug = space or cfg.get("activeSpace", "")
     source, reason = standup_source(org, status)
+    # The room (spaces[].features.teamSize, the chair included): the fill reads it
+    # through team_size, keeps every worker and marks who is present.
+    size = (_space_entry(cfg, space).get("features") or {}).get("teamSize")
     cards: list[dict] = []
     name = ""
     if source in ("cards", "both"):
@@ -2131,10 +2192,12 @@ def standup_for(space: str = "", as_of: datetime | None = None, since: str = "",
         cards = read_cards(org_folder(entry), type_names, prefixes)
         name = str(entry.get("name") or "")
     if source == "cards":
-        filled = fill_cards_standup(now, cards, space=slug, space_name=name, window=since)
+        filled = fill_cards_standup(now, cards, space=slug, space_name=name, window=since, size=size)
     elif source == "both":
         labels, issues, state = read_tracker(org, status, projects, state="all", body=True, refresh=refresh)
-        filled = fill_joined_standup(now, labels, issues, state, cards, space=slug, space_name=name, window=since)
+        filled = fill_joined_standup(
+            now, labels, issues, state, cards, space=slug, space_name=name, window=since, size=size
+        )
         if filled.tracker.ok:
             filled = _dated(filled, org, projects, labels, issues, cards, now, slug, name, since, refresh)
     else:
@@ -2142,7 +2205,7 @@ def standup_for(space: str = "", as_of: datetime | None = None, since: str = "",
             labels, issues, state = [], [], {"ok": False, "reason": reason}
         else:
             labels, issues, state = read_tracker(org, status, projects, state="all", body=True, refresh=refresh)
-        filled = fill_standup(now, labels, issues, state, space=slug, window=since)
+        filled = fill_standup(now, labels, issues, state, space=slug, window=since, size=size)
     # The suggestion (suggest.py): over the same read, before the brief renders it.
     from ..core.config import how_i_work, start_work_launch
     from .suggest import attach_suggestions, suggestions_on

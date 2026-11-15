@@ -68,7 +68,7 @@ import {
 } from "../modules/studio/foyer";
 import { visibilityLabel } from "../shared/visibility";
 import { STATUS, USAGE, VISIBILITY } from "./consts";
-import { WORKFLOW_ENTRIES, answerLive, answerTarget } from "./settingsWorkflows";
+import { WORKFLOW_ENTRIES, answerLive, answerStored, answerTarget } from "./settingsWorkflows";
 import type { SpaceBucket, SpaceLifecycleAction } from "../modules/studio/foyer";
 import { promptSets, spaceWorkflow } from "../modules/studio/prompts";
 import type { PromptRow, PromptWorkflow } from "../modules/studio/api.studio";
@@ -835,6 +835,52 @@ describe("the scenario grid: what each configuration shows", () => {
         "Connect a tracker to unlock working with agents.",
         "nothing",
         false,
+      ],
+    ]);
+  });
+
+  // "How many are in my standup in <Space>?" (docs/SCENARIOS.md, the "How do I…"
+  // section): the Space's own spaces[].features.teamSize checks its radio -- none
+  // while unset, when the room is nine -- and the sizes are live where Team Agile's
+  // standup runs, a GitHub Space. The web never re-reads the size for the standup:
+  // the response says team.size and who is present.
+  it("How many are in my standup in <Space>?: the Space's size is checked, live on GitHub", () => {
+    const entry = WORKFLOW_ENTRIES.find((e) => e.id === "team-size")!;
+    const cases: [string, Tracker, number | undefined][] = [
+      ["GitHub, nothing set", "github", undefined],
+      ["GitHub, 6", "github", 6],
+      ["Azure DevOps", "ado", undefined],
+      ["no tracker", "none", undefined],
+    ];
+    const grid = cases.map(([name, tracker, size]) => {
+      const space = { slug: "x", features: size === undefined ? {} : { teamSize: size } };
+      const checked = entry.answers!.find((a) => a.value === answerStored(entry, space))?.label;
+      const live = entry.answers!.filter((a) => answerLive(a, tracker, false)).map((a) => a.label);
+      const writes = live.length ? `${answerTarget(entry, "x")}=<size> -Hub` : "nothing";
+      return [name, checked ?? "none", live, entry.why?.[tracker] ?? "", writes];
+    });
+    expect(grid).toEqual([
+      [
+        "GitHub, nothing set",
+        "none",
+        ["3", "6", "9"],
+        "",
+        "spaces.x.features.teamSize=<size> -Hub",
+      ],
+      ["GitHub, 6", "6", ["3", "6", "9"], "", "spaces.x.features.teamSize=<size> -Hub"],
+      [
+        "Azure DevOps",
+        "none",
+        [],
+        "Team Agile's standup is a GitHub Space's; this Space's tracker is Azure DevOps.",
+        "nothing",
+      ],
+      [
+        "no tracker",
+        "none",
+        [],
+        "Team Agile's standup is a GitHub Space's; connect a tracker to hold one.",
+        "nothing",
       ],
     ]);
   });

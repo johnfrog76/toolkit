@@ -644,6 +644,18 @@ def rituals_corner_shapes() -> tuple[str, ...]:
     return tuple(consts()["rituals"]["cornerShapes"])
 
 
+def rituals_team_sizes() -> tuple[int, ...]:
+    """The room sizes a Space may state as ``spaces[].features.teamSize``: 3, 6, 9 --
+    the standup's windows, the chair included (docs/modules/solitaire-agile.md,
+    "The team size: who is in the room")."""
+    return tuple(int(n) for n in consts()["rituals"]["teamSizes"])
+
+
+def rituals_team_size_default() -> int:
+    """The room size an unset ``teamSize``, or one not in ``rituals_team_sizes``, reads as: 9."""
+    return int(consts()["rituals"]["teamSizeDefault"])
+
+
 # -- The dress (D-SA11) ---------------------------------------------------
 
 

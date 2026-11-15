@@ -75,6 +75,7 @@ describe("consts.json", () => {
       "sprintAwareness",
       "trainingHoursPerQuarter",
       "suggestions",
+      "teamSize",
     ]);
     // Read by vite.config.ts (outside src/), not by the bundle: the name of the
     // variable Start-Web.ps1 sets and the dev proxy reads.
@@ -296,6 +297,9 @@ describe("consts.json", () => {
       suggestShapes: ["start", "delegate", "route", "place"],
       suggestOwnerSeat: "fable",
       cornerShapes: ["oneLeft", "manyLeft", "reached", "nothingInReach"],
+      // The standup room's sizes, the chair included, and what unset reads as.
+      teamSizes: [3, 6, 9],
+      teamSizeDefault: 9,
       suggestExclusions: ["notBillable", "waiting", "inFlight", "theirs", "dismissed"],
       text: {
         title: "Standup -- {date}",

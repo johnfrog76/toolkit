@@ -1,0 +1,22 @@
+Standup -- Friday 2 October 2026
+"Can we not adjust scope."
+
+Waiting on you
+  Walk       #803 Verify the clock on Windows
+
+Fable
+  Yesterday  nothing closed
+  Today      #804 Draft the migration plan
+  Blockers   no blockers
+Haiku
+  Yesterday  nothing closed
+  Today      #801 Trim the export header
+  Blockers   no blockers
+Opus
+  Status     "Took a course module on the cloud platform."
+Sonnet
+  Yesterday  #802 Rename the column
+  Today      nothing in flight
+  Blockers   #803 Verify the clock on Windows (verify-close)
+
+"Let's circle back."

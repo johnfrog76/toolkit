@@ -75,7 +75,7 @@ EXPECTED = {
     ("folders", "backlog"): "backlog",
     ("reviews", "fileName"): "review.md",
     ("reviews", "slugSetSeparator"): "+",
-    ("features", "spaceScoped"): ["sprintAwareness", "trainingHoursPerQuarter", "suggestions"],
+    ("features", "spaceScoped"): ["sprintAwareness", "trainingHoursPerQuarter", "suggestions", "teamSize"],
     ("env", "activeSpace"): "P20_ACTIVE_SPACE",
     ("env", "promptsRoot"): "PROMPTS_ROOT",
     ("env", "agentCacheDir"): "P20_AGENT_CACHE_DIR",
@@ -238,6 +238,9 @@ EXPECTED = {
     ("rituals", "suggestShapes"): ["start", "delegate", "route", "place"],
     ("rituals", "suggestOwnerSeat"): "fable",
     ("rituals", "cornerShapes"): ["oneLeft", "manyLeft", "reached", "nothingInReach"],
+    # The standup room's sizes, the chair included, and what unset reads as.
+    ("rituals", "teamSizes"): [3, 6, 9],
+    ("rituals", "teamSizeDefault"): 9,
     ("rituals", "suggestExclusions"): ["notBillable", "waiting", "inFlight", "theirs", "dismissed"],
     ("rituals", "text"): {
         "title": "Standup -- {date}",
@@ -559,6 +562,8 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.rituals_suggest_exclusions(), tuple(EXPECTED[("rituals", "suggestExclusions")]))
         self.assertEqual(C.rituals_suggest_owner_seat(), EXPECTED[("rituals", "suggestOwnerSeat")])
         self.assertEqual(C.rituals_corner_shapes(), tuple(EXPECTED[("rituals", "cornerShapes")]))
+        self.assertEqual(C.rituals_team_sizes(), tuple(EXPECTED[("rituals", "teamSizes")]))
+        self.assertEqual(C.rituals_team_size_default(), EXPECTED[("rituals", "teamSizeDefault")])
         self.assertEqual(C.startwork_launch_env_flag(), EXPECTED[("startWork", "launchEnvFlag")])
         self.assertEqual(C.startwork_how_we_work_note(), EXPECTED[("startWork", "howWeWorkNote")])
         self.assertEqual(C.gh_read_limit_open_issues(), EXPECTED[("ghReads", "openIssues")])

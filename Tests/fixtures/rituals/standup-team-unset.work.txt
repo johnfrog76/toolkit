@@ -1,0 +1,13 @@
+Standup -- Friday 2 October 2026
+"Can we not adjust scope."
+
+Waiting on you to walk one in Phase 6: #803, Verify the clock on Windows.
+
+Fable: Good morning. Read up on how the team works, so I'm ready for what's next. Today I'll move my shell to the new terminal and pick a theme. No blockers. That's it for me.
+Haiku: Good morning. Today I'm on Phase 6: #801, Trim the export header. No blockers. That's it for me.
+Opus: Good morning. Took a course module on the cloud platform. Today I'll chase the last two access requests I'm waiting on. No blockers. That's it for me.
+Sonnet: Good morning. Yesterday I closed one in Phase 6: #802, Rename the column. Blocked on one in Phase 6: #803, Verify the clock on Windows. That's it for me.
+
+Good morning. Waiting on you to walk one in Phase 6: #803, Verify the clock on Windows. That's it for me.
+
+"Let's circle back."

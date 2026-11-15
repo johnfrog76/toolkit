@@ -234,6 +234,11 @@ export const RITUALS = consts.rituals as {
   workSmallWordRegex: string;
   /** The also-ons fold (D-SA9): the most groups a folded sentence names. */
   proseFoldNames: number;
+  /** The standup room's sizes, the chair included (spaces[].features.teamSize):
+   *  the CLI and the agent read them; the web states them only, as the drawer's
+   *  answers (Config/settings-workflows.json) must be these. */
+  teamSizes: number[];
+  teamSizeDefault: number;
   /** The dress guard: its checks in order, and the patterns it reads a
    *  model's sentence with. The agent and the CLI run it; the web reads `spoken`. */
   dressGuards: string[];
