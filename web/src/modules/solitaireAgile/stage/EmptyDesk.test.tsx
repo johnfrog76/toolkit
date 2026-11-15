@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { EMPTY_DESK_CSS, EmptyDesk, MUG_LOOKS, dealMugLooks } from "./EmptyDesk";
+import { EMPTY_DESK_CSS, EMPTY_DESK_TINT, EmptyDesk, MUG_LOOKS, dealMugLooks } from "./EmptyDesk";
 
 describe("the mugs", () => {
   it("come in at least six looks, each named once", () => {
@@ -65,6 +65,27 @@ describe("the empty desk", () => {
     expect(screen.queryByTestId("empty-desk-chair")).not.toBeNull();
     expect(screen.queryByTestId("empty-desk-mug")).not.toBeNull();
     expect(screen.getByTestId("empty-desk-steam").querySelectorAll(".ed-wisp")).toHaveLength(3);
+  });
+
+  it("sits on its window's tint, dimmed, and on the stage's slate when given none", () => {
+    const { unmount } = render(<EmptyDesk look="heart" tint="#f2994a" />);
+    expect(screen.getByTestId("empty-desk").style.background).toBe("rgb(242, 153, 74)");
+    expect(screen.queryByTestId("empty-desk-dim")).not.toBeNull();
+    unmount();
+    render(<EmptyDesk look="heart" />);
+    const slate = document.createElement("div");
+    slate.style.background = EMPTY_DESK_TINT;
+    expect(screen.getByTestId("empty-desk").style.background).toBe(slate.style.background);
+  });
+
+  it("is drawn flat: no gradient, so two desks on one stage share no ids", () => {
+    const { container } = render(
+      <>
+        <EmptyDesk look="tall" />
+        <EmptyDesk look="tall" />
+      </>,
+    );
+    expect(container.querySelectorAll("linearGradient, radialGradient, [id]")).toHaveLength(0);
   });
 
   it("is one picture to a screen reader, and no face", () => {

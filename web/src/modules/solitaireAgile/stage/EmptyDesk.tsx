@@ -10,9 +10,10 @@ import { pf } from "./cast";
 // (dealMugLooks), which says which mug each empty window gets. The stage is not
 // wired to either yet.
 //
-// The scene is one SVG in the stage's own palette (./cast.tsx `pf`). The stage
-// is a picture of a video call and is drawn the same in every theme, so the
-// desk follows the stage, not the shell's theme.
+// The scene is one flat SVG in the stage's own palette (./cast.tsx `pf`), on
+// the tint of the window it sits in. The stage is a picture of a video call and
+// is drawn the same in every theme, so the desk follows the stage, not the
+// shell's theme.
 
 /** The mugs, in the order the deal shuffles. Add a look here and it is dealt. */
 export const MUG_LOOKS = [
@@ -287,11 +288,18 @@ function Steam({ x, y, scale }: { x: number; y: number; scale: number }) {
   );
 }
 
+/** The tint an empty desk takes when its window gives it none: the stage's own slate. */
+export const EMPTY_DESK_TINT = "#3d4a66";
+
 /**
  * A window with nobody in it: fills its tile. `look` picks the mug -- deal a
  * room's empty windows with dealMugLooks so each gets a different one.
+ *
+ * The room is flat, like the cast's tiles: the window's `tint`, dimmed, with
+ * the chair and the desk as darker and lighter cuts of it. Only the mug keeps
+ * its full colour, so the mug is what tells one empty desk from the next.
  */
-export function EmptyDesk({ look }: { look: MugLook }) {
+export function EmptyDesk({ look, tint = EMPTY_DESK_TINT }: { look: MugLook; tint?: string }) {
   const mug = MUGS[look];
   // Where the mug stands on the desk, in the scene's 160 x 90 space.
   const mugX = 108;
@@ -306,7 +314,7 @@ export function EmptyDesk({ look }: { look: MugLook }) {
       data-look={look}
       role="img"
       aria-label="An empty desk with a steaming mug"
-      style={{ position: "absolute", inset: 0, background: "#1a2134" }}
+      style={{ position: "absolute", inset: 0, background: tint }}
     >
       <style>{EMPTY_DESK_CSS}</style>
       <svg
@@ -317,51 +325,35 @@ export function EmptyDesk({ look }: { look: MugLook }) {
         style={{ display: "block" }}
         aria-hidden
       >
-        <defs>
-          <linearGradient id={`ed-wall-${look}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#222b44" />
-            <stop offset="1" stopColor="#161c2d" />
-          </linearGradient>
-          <radialGradient id={`ed-lamp-${look}`} cx="0.68" cy="0.6" r="0.55">
-            <stop offset="0" stopColor="#ffd9a0" stopOpacity="0.3" />
-            <stop offset="1" stopColor="#ffd9a0" stopOpacity="0" />
-          </radialGradient>
-          <linearGradient id={`ed-wood-${look}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#6b5038" />
-            <stop offset="1" stopColor="#3d2c20" />
-          </linearGradient>
-        </defs>
-
-        {/* the room: a wall, a window blind's light, the lamp's pool */}
-        <rect width="160" height="90" fill={`url(#ed-wall-${look})`} />
-        <g opacity={0.1} fill="#cfe0ff">
-          {[12, 17, 22, 27, 32].map((y) => (
-            <rect key={y} x={12} y={y} width={30} height={2.4} rx={1} />
-          ))}
-        </g>
-        <rect width="160" height="90" fill={`url(#ed-lamp-${look})`} />
+        {/* the room, dimmed: nobody has the light on */}
+        <rect data-testid="empty-desk-dim" width="160" height="90" fill="#0d121e" opacity={0.5} />
 
         {/* the chair, pushed back and turned a little: nobody is in it */}
         <g data-testid="empty-desk-chair" transform="rotate(-7 66 50)">
-          <rect x={63.5} y={52} width={5} height={22} rx={1.5} fill="#151b2b" />
-          <rect x={45} y={15} width={42} height={42} rx={9} fill="#2d3856" />
-          <rect x={49} y={19} width={34} height={34} rx={6.5} fill="#364469" />
-          <path d="M 53 30 H 79 M 53 38 H 79 M 53 46 H 79" stroke="#2d3856" strokeWidth={1.3} />
-          <rect x={38} y={50} width={9} height={3.6} rx={1.8} fill="#1f2740" />
-          <rect x={85} y={50} width={9} height={3.6} rx={1.8} fill="#1f2740" />
+          <rect x={63.5} y={52} width={5} height={22} rx={1.5} fill="#000" opacity={0.45} />
+          <rect x={45} y={15} width={42} height={42} rx={9} fill="#000" opacity={0.34} />
+          <rect x={49} y={19} width={34} height={34} rx={6.5} fill="#fff" opacity={0.09} />
+          <path
+            d="M 53 30 H 79 M 53 38 H 79 M 53 46 H 79"
+            stroke="#000"
+            strokeWidth={1.3}
+            opacity={0.3}
+          />
+          <rect x={38} y={50} width={9} height={3.6} rx={1.8} fill="#000" opacity={0.5} />
+          <rect x={85} y={50} width={9} height={3.6} rx={1.8} fill="#000" opacity={0.5} />
         </g>
 
         {/* the desk */}
-        <rect x={0} y={deskTop} width={160} height={90 - deskTop} fill={`url(#ed-wood-${look})`} />
-        <rect x={0} y={deskTop} width={160} height={1.6} fill="#a07c58" opacity={0.75} />
+        <rect x={0} y={deskTop} width={160} height={90 - deskTop} fill="#0b0f19" opacity={0.62} />
+        <rect x={0} y={deskTop} width={160} height={1.4} fill="#fff" opacity={0.2} />
 
         {/* a closed laptop, its light still on */}
-        <path d="M 24 67.5 L 60 67.5 L 63 72.5 L 21 72.5 Z" fill="#c3cbdb" />
-        <path d="M 21 72.5 L 63 72.5 L 63 74 L 21 74 Z" fill="#8791a8" />
+        <path d="M 24 67.5 L 60 67.5 L 63 72.5 L 21 72.5 Z" fill="#aab3c6" />
+        <path d="M 21 72.5 L 63 72.5 L 63 74 L 21 74 Z" fill="#6f7990" />
         <circle cx={58} cy={73.2} r={0.7} fill={pf.green} />
 
         {/* the mug, its shadow and its steam */}
-        <ellipse cx={mugX + 1.5} cy={mugY + 0.8} rx={18} ry={3.2} fill="#000" opacity={0.3} />
+        <ellipse cx={mugX + 1.5} cy={mugY + 0.8} rx={18} ry={3.2} fill="#000" opacity={0.35} />
         <g data-testid="empty-desk-mug" transform={`translate(${mugX} ${mugY}) scale(${scale})`}>
           {mug.art}
         </g>
