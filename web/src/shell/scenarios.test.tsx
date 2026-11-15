@@ -68,7 +68,13 @@ import {
 } from "../modules/studio/foyer";
 import { visibilityLabel } from "../shared/visibility";
 import { STATUS, USAGE, VISIBILITY } from "./consts";
-import { WORKFLOW_ENTRIES, answerLive, answerStored, answerTarget } from "./settingsWorkflows";
+import {
+  WORKFLOW_ENTRIES,
+  answerLive,
+  answerStored,
+  answerTarget,
+  entryAnchor,
+} from "./settingsWorkflows";
 import type { SpaceBucket, SpaceLifecycleAction } from "../modules/studio/foyer";
 import { promptSets, spaceWorkflow } from "../modules/studio/prompts";
 import type { PromptRow, PromptWorkflow } from "../modules/studio/api.studio";
@@ -80,6 +86,7 @@ import { resetCelebrateMemory } from "../modules/solitaireAgile/celebrate";
 import type { Milestone } from "../modules/ado/api.ado";
 import type { AgendaItem, StandupResponse } from "../modules/solitaireAgile/api.solitaireAgile";
 import { agendaArg, agendaFact, sinceHeading } from "../modules/solitaireAgile/agenda";
+import { MEMBER_SEATS, ROOM_WINDOWS, dealRoom } from "../modules/solitaireAgile/stage/seats";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -572,6 +579,38 @@ describe("the scenario grid: what each configuration shows", () => {
     expect([itemSpoken(issue), itemSpoken(card)]).toEqual(["issue 143, A", "card 2HNU, B"]);
     expect(itemFacts(issue).url).toBe("https://example.test/143");
     expect(itemFacts(card)).toEqual({ title: "B", label: "2HNU", path: "current/x.md" });
+  });
+
+  // The played standup's room (docs/SCENARIOS.md, "Team Agile's standup"): nine windows
+  // whatever the Space's size -- the chair, the members the response marks present in
+  // its order, and an empty desk in every other window, each with its own mug -- and
+  // the page's door to the size is the settings entry's own anchor. Held in full by
+  // stage/standupDeck.test.tsx ("no silent face").
+  it("the played standup seats the present by position and an empty desk in the rest", () => {
+    const worker = (label: string, present?: boolean) => ({
+      label,
+      name: label,
+      yesterday: [],
+      today: [],
+      blockers: [],
+      empty: true,
+      excuse: "",
+      status: [],
+      ...(present === undefined ? {} : { present }),
+    });
+    const room = (workers: StandupResponse["workers"]) => {
+      const r = dealRoom({ asOf: "2026-10-02T09:00:00-04:00", workers });
+      return [r.members.length, r.desks.length, new Set(r.desks.map((d) => d.look)).size];
+    };
+    // A room of three: two present, six desks, six mugs.
+    expect(room([worker("a", true), worker("b", false), worker("c", true)])).toEqual([2, 6, 6]);
+    // No worker at all: the chair alone, eight desks.
+    expect(room([])).toEqual([0, MEMBER_SEATS, MEMBER_SEATS]);
+    // An older agent (no present): everyone, capped at the room.
+    expect(room(Array.from({ length: 10 }, (_, i) => worker(`w${i}`)))).toEqual([8, 0, 0]);
+    expect(ROOM_WINDOWS).toBe(MEMBER_SEATS + 1);
+    const entry = WORKFLOW_ENTRIES.find((e) => e.id === "team-size")!;
+    expect(entryAnchor(entry, "x")).toBe("spaces.x.features.teamSize");
   });
 
   // Team Agile's Triage is a second page under the ONE Team Agile

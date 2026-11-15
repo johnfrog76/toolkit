@@ -9,7 +9,7 @@
 people.** The engineer is the bottleneck, not the agents, and the one thing this add-on exists to show
 is **what is waiting on the human**. Its first ritual is the **standup**: the human's queue at the top,
 then one block per worker -- Fable, Opus, Sonnet, whatever the Space's labels route to -- with
-yesterday, today and blockers, each line a real issue with its number, or the mug and one status sentence when a worker has nothing on the tracker -- what the day held around the
+yesterday, today and blockers, each line a real issue with its number, or two made-up items when a worker has nothing on the tracker -- what the day held around the
 work ("Fought the VPN and certificates most of the day; I'm in now."), never anything the tracker would show. The generator is the **Ritual Engine**. The contract is
 [the file shape, and how a standup is read](#the-file-shape-and-how-a-standup-is-read), below.
 
@@ -116,7 +116,7 @@ its one worker, and an active GitHub Space reads its cards beside its issues, jo
 | --- | --- | --- |
 | CLI | `Config/solitaireAgile.commands.psd1` + `.ps1` (four wrappers); `Scripts/Start-Work.ps1` (the hand-off block: the id through `Resolve-P20CardArgument`, else the Space's issue; the Space's note or its `howIWork` sentence, `Get-P20HowIWorkSentence` in `Scripts/Resolve-HowIWork.ps1`; the kind's prompt); `Scripts/Get-Standup.ps1` (the verb: which Space, which source, the two `gh` reads or the card read, the printing); `Scripts/Standup-Rules.ps1` (the issues, cards and joined fills and the rendering, pure; the source rule; the card reader); `Scripts/Suggest-Rules.ps1` (the suggestion: the nearest milestone, the rule, the joined list as its items, the switch, pure); `Scripts/Resolve-TeamSize.ps1` (the room's size, a Space's `features.teamSize` read the one way, shared with the inventory row); `Scripts/Get-Triage.ps1` and `Scripts/Triage-Rules.ps1` (triage's read, and its grouping and text, pure); `Scripts/Set-Route.ps1` (the one write: one `gh issue edit` per switch); `Scripts/Ritual-Common.ps1` (the skeleton the three verb scripts share -- which Space, and the two-reads-to-`@{ ok; value }` gh layer Standup and Triage call; Route keeps its own gh-call shape but shares the Space resolution); the inventory row (from the psd1) and its question in `Config/settings-workflows.json`; the menu heading `Team Agile` (category `rituals`) | `Scripts/Resolve-Tracker.ps1` -- which repo a GitHub Space means, shared with every GitHub verb; the card rules a standup reads cards through -- `Resolve-CardName.ps1` (the id), `Get-PromptFileStatus.ps1` (the state, and `Test-P20CardBillable`) |
 | Agent | `agent/solitaire/standup.py` and `triage.py` -- one gated router, with `suggest.py` the suggestion's rule beside them, `GET /api/ritual/standup` and `GET /api/ritual/triage`, **reads only**; a triage answer reaches the tracker only as `POST /api/cmd/Route`, the bridge | `space_scope` in `agent/ado/accounting.py`, the `?space=` rule `/issue-report` uses; `card_id` and the state rule in `agent/core/parsers.py` |
-| Web | `web/src/modules/solitaireAgile/` -- the descriptor, the Standup \| Triage strip (`RitualPage.tsx`), the standup page, the Triage page, the hand-off's copy box (`StartWorkBox.tsx`, a `lazyPart`), the suggestion's dismiss (`suggestDismiss.ts`), and `stage/`: the cast atoms (by copy), the seats, the generated deck and the played route | the shell; the deck engine (`web/src/modules/deck/engine/`) and its second resolver `GeneratedDeckHost.tsx`, which the played view borrows |
+| Web | `web/src/modules/solitaireAgile/` -- the descriptor, the Standup \| Triage strip (`RitualPage.tsx`), the standup page, the Triage page, the hand-off's copy box (`StartWorkBox.tsx`, a `lazyPart`), the suggestion's dismiss (`suggestDismiss.ts`), and `stage/`: the cast atoms (by copy), the room (`seats.ts`), the empty desk (`EmptyDesk.tsx`), the generated deck and the played route | the shell; the deck engine (`web/src/modules/deck/engine/`) and its second resolver `GeneratedDeckHost.tsx`, which the played view borrows |
 | Data | `Config/ceremonies.json` (the standup's slots, queue kinds, registers and `kinds` -- the bug and feature kinds a dressed sentence may count by; triage's three question slots, its severities `sev1`-`sev3`, its `deepWaterLabel` and the words of its text) and `Config/standup-vocabulary.json` (`phrasebook`, `nothing`, `nothingToday`, `excuses`, `fakeWork`, and `verbs`, the standup register's words offered to the model), read by both halves, never typed in code (D-SA2) | the model profile, `agent/core/model.py` (`ai.model`, `ANTHROPIC_API_KEY`), which the dress calls through and the PR review and the notes tidy-up share |
 | Contract | `consts.json` `rituals`: the route, `triageRoute`, the two data files, `workerLabelPrefix`, `walkLabel`, `labelWidth`, every fixed word of the text (the suggestion's among them, `rituals.text.suggest*`, with `rituals.suggestShapes` and `rituals.suggestExclusions`); `consts.json` `features.spaceScoped`'s `suggestions` and `teamSize`; `consts.json` `rituals.teamSizes` (3, 6, 9) and `rituals.teamSizeDefault` (9); `consts.json` `startWork.text`: the hand-off block's head line and three section headings | -- |
 | Configuration | `config.default.json` `startWork.prompts`: which `agentic/` prompt the hand-off carries for each kind, set with `Config -Set startWork.prompts.<kind>=<path>` | the prompts themselves, `agentic/`, which are the package's |
@@ -358,7 +358,7 @@ each verbatim; a response from an agent that predates `work` shows Detail for it
 response gives it -- the grain on screen, or, on the Agenda, the last grain read (`text` in a fresh
 browser): the same text Copy carried before the Agenda existed. The text and the brief are drawn on the
 three text tabs only, never on the Agenda. When nothing waits and the Space's switch is on, the brief's last line is [the suggestion](#the-suggestion-one-next-move-derived), drawn as a row of its own with its action and a dismiss -- under the brief on the text tabs, and on the Agenda as its first line after the sentence, above the lanes. At the head of the page, above the card, sits [the PM Corner](#the-pm-corner-the-line-the-chevron-the-confetti): one line, its chevron, and, when a milestone is reached, a link to the Releases tab. The other thing
-to click is **Play**, quiet, in the header (V1, below). With `tracker.ok` false the page still draws the ritual -- the chair's lines and the
+to click is **Play**, quiet, in the header (V1, below), and beside it **Team size**, the door to the room's size: it opens the settings drawer at the **How many are in my standup in \<Space>?** entry's own anchor (`spaces.<slug>.features.teamSize`, [the team size](#the-team-size-who-is-in-the-room)) -- the drawer is the one writer, so the page has no control of its own. An issue's popover names the worker it is routed to by the plate that worker wears on the stage today, `PERSONA (label)` (`StandupPage.workerChip`, the stage's own deal), and names none for a worker out today. With `tracker.ok` false the page still draws the ritual -- the chair's lines and the
 `Tracker` reason -- and when the agent does not answer it says so as an error, never as an empty standup.
 `StandupPage.test.tsx` builds the response from `Tests/fixtures/rituals/standup.json` and asserts the
 page's text against the same golden files the CLI and the agent assert; `registry.solitaireAgile.test.tsx`
@@ -473,7 +473,7 @@ chromeless like any deck, and it plays **with `features.deck` off**: the page, t
 engine are one lazy chunk fetched when Play is pressed.
 
 - **The atoms, by copy.** `stage/cast.tsx` carries the Remote Standup's `Person`, `ZoomTile`, the two
-  bubbles (below), `Mug`, the nine webcam scenes and the keyframes from a private repository, the way the trailer came over
+  bubbles (below), the nine webcam scenes and the keyframes from a private repository, the way the trailer came over
   -- with no dependency on that repo, and without the cast's bios, dossiers and lines: every word a tile
   says is the Ritual Engine's. Under `prefers-reduced-motion: reduce` the stage is still: no tile pops,
   no steam rises, the speech bubble is simply there, and the thought cloud does not float.
@@ -481,15 +481,16 @@ engine are one lazy chunk fetched when Play is pressed.
   and placed by the engine (`positioning`, `withArrow`, no fixed offset -- it flips and shifts, as the
   issue popover does). The **speech bubble** is open for the speaking (lit) tile, its tail at the
   speaker's FACE: the engine points it at a small anchor element over the head of the tile's
-  scene (`tile-<seat>-face`, a head position per scene in `standupDeck.tsx`; the rim of the mug on a mug
-  tile), `above` and centred on it, never at the tile's box -- so it does not hang off a corner or land
+  scene (`tile-<seat>-face`, a head position per scene in `standupDeck.tsx`; an empty desk has none),
+  `above` and centred on it, never at the tile's box -- so it does not hang off a corner or land
   on a neighbour. A top-row tile has no room above, so it falls to `below` with the tail still at the
   face, and the stage is the overflow boundary, so it is held inside the grid rather than shifted
   sideways. The surface itself does not clip (its tail is drawn outside it). The text shows at most
-  **four lines** and ends the last in an ellipsis: a fixed CSS line clamp on the text element
-  (`SPEECH_MAX_LINES`), no scrollbar, "because it is real" -- four lines always fit below the face, so the
-  bubble never covers the speaker. Nothing is lost: the voice (the slide's Say lines) and the thought
-  cloud still carry every line. It carries that tile's slot lines -- the sentence the voice reads.
+  **nine lines** and ends the last in an ellipsis: a fixed CSS line clamp on the text element
+  (`SPEECH_MAX_LINES`), no scrollbar -- enough for one whole turn in its frame, `Good morning.` to
+  `That's it for me.`, so the frame is read to its end. A tall bubble over a top-row tile rises over the
+  stage's title plate rather than over the speaker's face. Nothing is lost past the ninth line: the voice
+  (the slide's Say lines) and the thought cloud still carry every line. It carries that tile's slot lines -- the sentence the voice reads.
   The **copy panel** beside the stage (the deck engine's right-hand column, what the stage leaves) does not repeat them: it is the
   speaker's character -- the title, the persona and the motto, the Wasteland's own words carried in
   `CAST` -- and, on a worker's slide, the worker's label, the one real noun. The motto is who the
@@ -497,48 +498,61 @@ engine are one lazy chunk fetched when Play is pressed.
   The **thought bubble** is the same surface as a cloud with the dotted trail: the tile's `...` button
   (a real button, so click, Enter and Space) opens it, Escape closes it, and so does the deck advancing
   (a slide's tiles are keyed by the slide). It lists the detail behind the sentence -- each slot with
-  its items, each `#n` an issue popover -- on a worker's tile and the queue's chair; a mug has none.
+  its items, each `#n` an issue popover -- on a member with work and the chair; an idle member and an empty desk have none.
   The voice reads the slide's notes, never either bubble, so narration and duration are unchanged.
 - **Who is talking** (`stage/cast.tsx` `ZoomTile`, `stage/standupDeck.tsx` `Tile`). A tile has one of
   three looks, and one tile is in colour, ever. **Speaking** -- its bubble is open (`data-speaking="true"`,
   `data-look="speaking"`): colour, a 3px outline in the active theme's brand primary (`outlineOffset: -3px`, so
   the grid does not move; its own `stage-frame` element over the tile, because an outline on the tile itself is
-  painted under the picture), and the green name-dot. **Named** -- lit with no bubble (the queue slides' Walk,
-  Decide and Look seats, and the Tracker's when it is down; `data-look="named"`): black and white at full
-  brightness, the green dot kept (the filter is on the picture layer, not the dot) -- the dot is the signal
-  light, colour is the speaker's alone. **Everyone else** -- the ghost, as before: grayscale, dimmed, a grey
-  dot (`data-look="ghost"`). The frame's colour is the stage's own green, `pf.green` -- the colour of the register badge at the top right and of the speaker's name-dot -- handed to the tiles as the CSS variable `--sa-speaker`. It is never a theme's brand token: the room is the engine's default dark whatever the app wears, and the frame is the same on every theme. There is no pulse, so reduced motion has none to
+  painted under the picture), and the green name-dot. **Named** -- a face that is there and not speaking:
+  the chair, every present member, and the member the chair has just called (`data-look="named"`): black and
+  white at full brightness, the green dot kept (the filter is on the picture layer, not the dot) -- the dot is
+  the signal light, colour is the speaker's alone. **An empty desk** -- the ghost: grayscale, dimmed, a grey
+  dot, never lit (`data-look="ghost"`): nobody is there. The frame's colour is the stage's own green, `pf.green` -- the colour of the register badge at the top right and of the speaker's name-dot -- handed to the tiles as the CSS variable `--sa-speaker`. It is never a theme's brand token: the room is the engine's default dark whatever the app wears, and the frame is the same on every theme. There is no pulse, so reduced motion has none to
   still.
-- **The seats** (`stage/seats.ts`, the card's table). Nine, always: **Fable** in `TEAM LEAD · DEV-HERO
-  (fable)`, **Opus** in `AI VIBEMANCER (opus)`, **Sonnet** in `MINIMALIST (sonnet)`, the chair in
-  `CHAIR · PM`, the queue's three kinds in `WALK · QA ALCHEMIST`, `DECIDE · NEW HIRE` and `LOOK ·
-  DESIGNER`, and the two reads in `TRACKER · OPS-DEV` and `THE WEEK · ULTRAWIDE OVERLORD`. A worker
-  label with no seat kept for it takes a free worker seat; past three it does not sit, and the chair's
-  closing line names who is also standing. A seat with no one, or nothing, today is the ghosted tile with
-  its plate; the tracker's seat lights only when the tracker could not be read.
-  The three personas prefer the labels `fable`, `opus` and `sonnet` because the sample team is a model crew;
-  the engine reads workers from any tracker label carrying the worker prefix, so another team's labels take the seats in label order.
-- **The script** (`stage/standupDeck.tsx`). Three slide kinds, in this order: the **queue** (the plate
-  is the standup's first line; the chair reads what is waiting on you, or the tracker's reason), the
-  **chair** opening with its phrasebook line, **one slide per seated worker** in seat order (the tile
-  lit, the others ghosted, its bubble the worker's turn), the chair closing, and the **queue again**
-  (D-TA6). Every slide carries the ritual's plate and **`REGISTER · REAL`** (D-TA13). The deck plays at
-  the **work grain**, spoken as prose: a bubble is one line a SENTENCE, and the voice one
-  `Say` line a sentence -- `Good morning.`, `Yesterday I closed two in Team Agile (#<n>, #<n>).`,
-  `No blockers.`, `That's it for me.` -- read as written from the response's `work.queueProse` and each
-  work row's `prose`, the worker's turn in the frame the text says it in -- or, for a worker
-  the model dressed, that worker's `spoken` sentences: the stage reads `spoken` when present and
-  `work` otherwise ([the agentic layer](#the-agentic-layer)) -- so the engine's
-  narration and its length estimate work as for any deck; an empty slot says nothing, an empty queue
-  is `Nothing is waiting on you.` **A worker with nothing gives status too** (D-TA11, as it now reads:
-  the mug is a window with nobody in it, and an idle member keeps their face): its turn is its two
+- **The room** (`stage/seats.ts`). Nine windows, always (`ROOM_WINDOWS`, the one constant the stage
+  reads; `MEMBER_SEATS` is the room less the chair's window). The chair keeps its own, `CHAIR · PM`. The
+  other eight are the member windows, the cast in its grid order -- `DEV-HERO`, `OPS-DEV`, `MINIMALIST`,
+  `NEW HIRE`, `AI VIBEMANCER`, `ULTRAWIDE OVERLORD`, `QA ALCHEMIST`, `DESIGNER` -- and the team is dealt onto
+  them by position: the workers the response marks `present` (every worker, capped at the room, from an
+  agent that predates `present`), in the response's order -- the order the round speaks them -- take member
+  window 1, 2, 3 and on, each plated `PERSONA (label)` (`DEV-HERO (fable)`). No label has a window of its
+  own, and no window is a role: a face is a persona dealt by position, and it does not change window
+  because its work changed. **Every other window is an empty desk** (`stage/EmptyDesk.tsx`): an empty
+  chair, a desk and a steaming mug on that window's tint, plated `EMPTY DESK`, the ghost look, never lit,
+  never a bubble, never a slide. The desks in one room each get a different mug, dealt by
+  `dealMugLooks(day, desks)` in window order, `day` the standup's day of the year (1-based, from `asOf`'s
+  own date, as the fill counts it), so the same day always deals the same mugs. An absent worker is silent
+  and unseen: no window, no line, no name. The web never reads the team-size setting: a Space sized three
+  draws two members and six desks because the response marks two present. Grid order, top row first: the
+  first three member windows; then the fourth, fifth and sixth; then the seventh, the chair, the eighth.
+- **The script** (`stage/standupDeck.tsx`). The round of the room, in this order: the **board** (the
+  plate is the standup's first line; the chair reads what is waiting on you, or -- the tracker's alarm --
+  the tracker's reason; no other window lights for it), the **chair** opening with its phrasebook line,
+  then for each present member in seat order **the call** -- the chair says the member's name and a full
+  stop (`Fable.`, from the worker's name), the member's window named, listening -- and **the turn** -- the
+  member's window lit and speaking --, then **the chair's own status**, last, and the chair's phrasebook
+  **close**. The call is a slide of its own because a slide has one speaker: the chair speaks it, and the
+  member answers on the next. Every slide carries the ritual's plate and **`REGISTER · REAL`** (D-TA13).
+  The deck plays at the **work grain**, spoken as prose: a bubble is one line a SENTENCE, and the voice
+  one `Say` line a sentence -- `Good morning.`, `Yesterday I closed two in Team Agile (#<n>, #<n>).`,
+  `No blockers.`, `That's it for me.` -- read as written from the response's `work.queueProse`, each work
+  row's `prose`, the member's turn in the frame the text says it in, and `work.chairProse`, the chair's
+  own turn -- or, for a worker the model dressed, that worker's `spoken` sentences: the stage reads
+  `spoken` when present and `work` otherwise ([the agentic layer](#the-agentic-layer)) -- so the
+  engine's narration and its length estimate work as for any deck; an empty slot says nothing, an empty
+  queue is `Nothing is waiting on you.` **A member with nothing gives status too** (D-TA11, as it now
+  reads: the mug is a window with nobody in it, and an idle member keeps their face): its turn is its two
   made-up items, yesterday then today, in the same frame, so the stage says what `Standup -Grain work`
-  prints. Until the stage seats the room by position (#454), an idle worker's tile still draws the
-  **mug** where the face would be, and from an agent whose `prose` has no turn for an idle worker the
-  bubble opens `My async status:` and its status sentence, as before. The chair's own turn
-  (`work.chairProse`, in its own voice) is on the response; the stage's last slide still reads the queue's sentences. A
-  response without `work` (an older agent) plays one `Say` line a slot, item by item. Slide ids are
-  `standup-<date>-<seat>` and survive a rebuild.
+  prints. The chair's status from an agent that predates `work.chairProse` is the board again, as the
+  stage closed before; with the tracker down its turn is empty, as the text prints none, and the chair
+  has the board, the open and the close. An idle member from an agent whose `prose` has no turn for it
+  says its made-up items as they came (the pair, or the one sentence of an agent older still), and a
+  response without `work` plays one `Say` line a slot, item by item. **No face is silent**: every window
+  that draws a face has a slide where it speaks. The narrator reads a slide's title before its lines, so
+  a call is heard as `The chair. Fable.` and the turn after it as `Fable. Good morning. ...`. Slide ids are
+  `standup-<date>-<part>` -- `queue`, `chair-open`, `call-<label>`, `<label>`, `chair-status`,
+  `chair-close` -- and survive a rebuild.
 - **Audiobook mode, at any width.** The deck sets the engine's `audiobook` hint (docs/modules/deck.md,
   "Audiobook decks") and its host opens it in Audiobook mode, narrating, on the viewer's bar, with
   **previous and next either side of the play ring**, so a tile can be skipped without leaving the
@@ -1313,7 +1327,7 @@ read the way `Status` reads it, and it maps to a slot like this:
 
 **One worker.** A local Space has one worker, the engineer, so the standup has one tile: labelled with
 the Space's slug and named with its display name (the slug when it has none). `blockers` is always
-empty -- a card carries no walk label -- and a day with nothing in either slot is the mug and its status sentence
+empty -- a card carries no walk label -- and a day with nothing in either slot is two made-up items
 (the same two made-up items, picked by the tile's position among the workers -- the first, so `nothing[d mod len]` and `nothingToday[d mod len2]`). Within a slot, cards are in file-name order. **The text
 is the same rendering**, with the card's id (what `Get-P20CardId` returns: `K7M2`, `139` -- the id every
 verb takes) where an issue has `#<number>`, and no link:
@@ -1619,8 +1633,8 @@ standup is complete and correct; nothing on screen says a dress was skipped.
 | `Tests/test_bridge.py`, "StartWorkThroughTheBridge" | `StartWork` in the bridge's table with Team Agile on and `rejected` with it off; through the bridge, `expected-card.md` byte for byte; a refusal `status: error` with the verb's sentence |
 | `web/src/modules/solitaireAgile/StartWorkBox.test.tsx` | the copy box: one `StartWork` call, `expected-card.md` shown verbatim with its head as the title, Copy copying exactly the block, a refusal shown as the verb's sentence with no Copy, the agent away said so; no **Launch** while `/env` does not say `startWorkLaunch` is true, and with it, one more `StartWork` call with `-Launch` and what it printed or refused with |
 | `tkTestToolkit -Consts`, `Tests/test_consts.py`, `web/src/shell/consts.test.ts` | the `startWork.text` headings; the `rituals` values (`triageRoute`, `milestonesRoute`, `grains`, `numberWords`, the four `work*Regex` patterns, the `work*` phrases and the `prose*` words among them, the dress's `dressGuards` and four `dress*Regex` patterns, and what moved's `motions`, the `itemMotion`, `motion*`, `commit*` and `counts*` words, and the room's `teamSizes` and `teamSizeDefault`), stated from all three halves; the turn's `turnOpen` and `turnClose`; `{n} to walk`, `No blockers.`, `Good morning.`, `That's it for me.` and `Yesterday I closed` never retyped in the CLI's scripts or the agent; `Waiting on you`, `nothing in flight` and `Routed to` never retyped in the CLI's scripts |
-| `web/src/modules/solitaireAgile/StandupPage.test.tsx` | the page over the shared fixture and goldens (above); the Agenda -- a fresh page on it with its one sentence and no text, the two lanes and their headings (`Since Thursday 1 October`, `Waiting on you`), no action on what moved, one button a waiting tile with the suggestion's pick first, the suggestion row the first line after the sentence and above the lanes with no brief (a dismiss bringing an unrouted pick and its Open Triage), no Yesterday or Today word and no lane badge, each tile's fact and long date, a card's cover and progress and an issue's neither, **Work it now** one `StartWork` call with the number (a card by its id) and none before it is pressed, **Review it** a card's page or the walked issue, the cards / list toggle remembered with the list the same groups and buttons, **Copy and Play carrying exactly the text they carried before** (`standup-friday.txt` read from disk, and a stored Work or Brief grain), the tab remembered, an agent with no `agenda` both lanes empty; the counts line the first line at the top of the page, and an item's motion in the text; the grain: three tabs from `rituals.grains` after the Agenda, Detail the grain by default, Work showing `work.text` (`standup-prose-friday.txt`, the prose) verbatim and Copy copying it, Brief the brief as the body once, the choice remembered by the browser, a stored word that is not a grain read as Detail; the chair's suggestion over `suggestion-suggested.brief.txt` -- the Next line as its own row, its **Work it now** (the tiles' label) making one `StartWork` call with the number, a dismiss yielding the next (a route's action Open Triage) and holding for the session, none left the line today's, another session nothing dismissed, a browser that refuses storage still drawing it, the Brief grain showing it once, no row while something waits or with the switch off; the PM Corner over `corner-many-left.brief.txt` and `corner-reached.brief.txt` -- at the head of the page, the brief below stopping above its line while the suggestion still stands, the chevron one `StartWork` call, the Brief grain without the Corner's line and Copy the brief as it came, reached one burst and a fresh draw none, no Corner when the response has none |
-| `web/src/modules/solitaireAgile/stage/standupDeck.test.tsx` | at the work grain, spoken as prose over `standup-prose.json`'s `friday`: the queue's sentences as one Say line each, Opus's and Fable's sentences as the agent wrote them with nothing for an empty slot, an empty queue the contract's sentence, the mug unchanged, the tracker's line whatever `work` says; dressed, from `standup-dress.json`'s reply: a worker in `spoken` speaking and showing its spoken sentences, a worker not in it its prose, `spoken: null` the prose, the queue and the mug never dressed, the slide ids unchanged; and the played deck built from the shared fixture's `friday` and `no-tracker` cases: the slides in order with their ids, the plates, the Say lines, the mug on Sonnet, nine tiles and the register on every slide, reduced motion; the deal of workers onto seats |
+| `web/src/modules/solitaireAgile/StandupPage.test.tsx` | the page over the shared fixture and goldens (above); the Agenda -- a fresh page on it with its one sentence and no text, the two lanes and their headings (`Since Thursday 1 October`, `Waiting on you`), no action on what moved, one button a waiting tile with the suggestion's pick first, the suggestion row the first line after the sentence and above the lanes with no brief (a dismiss bringing an unrouted pick and its Open Triage), no Yesterday or Today word and no lane badge, each tile's fact and long date, a card's cover and progress and an issue's neither, **Work it now** one `StartWork` call with the number (a card by its id) and none before it is pressed, **Review it** a card's page or the walked issue, the cards / list toggle remembered with the list the same groups and buttons, **Copy and Play carrying exactly the text they carried before**, **Team size** beside them opening the drawer at the team-size entry's anchor, the worker chip reading the stage's deal (`PERSONA (label)`, none for a worker out today) (`standup-friday.txt` read from disk, and a stored Work or Brief grain), the tab remembered, an agent with no `agenda` both lanes empty; the counts line the first line at the top of the page, and an item's motion in the text; the grain: three tabs from `rituals.grains` after the Agenda, Detail the grain by default, Work showing `work.text` (`standup-prose-friday.txt`, the prose) verbatim and Copy copying it, Brief the brief as the body once, the choice remembered by the browser, a stored word that is not a grain read as Detail; the chair's suggestion over `suggestion-suggested.brief.txt` -- the Next line as its own row, its **Work it now** (the tiles' label) making one `StartWork` call with the number, a dismiss yielding the next (a route's action Open Triage) and holding for the session, none left the line today's, another session nothing dismissed, a browser that refuses storage still drawing it, the Brief grain showing it once, no row while something waits or with the switch off; the PM Corner over `corner-many-left.brief.txt` and `corner-reached.brief.txt` -- at the head of the page, the brief below stopping above its line while the suggestion still stands, the chevron one `StartWork` call, the Brief grain without the Corner's line and Copy the brief as it came, reached one burst and a fresh draw none, no Corner when the response has none |
+| `web/src/modules/solitaireAgile/stage/standupDeck.test.tsx` | the room: nine windows (`ROOM_WINDOWS`, the cast's count and the largest `rituals.teamSizes`), the eight member windows in cast order, the day of the year as the fill counts it (every `standup.json` case's `dayOfYear`), member i in window i, the desks' mugs `dealMugLooks` in window order, a face not moving when its work changes, only the present seated and an older agent's everyone capped at the room; the deck from the shared fixture's `friday` and `no-tracker` cases: the round in order with its ids (the board, the open, a call and a turn per member, the chair's status, the close), the call the member's name with its window named, the board lighting the chair alone, the plates (`CHAIR · PM`, `PERSONA (label)`, `EMPTY DESK`) and no role word on any slide, an idle member keeping its face and saying its pair, never async, nine windows and the register on every slide, reduced motion; the three looks -- one speaker a slide, every face there named, every desk the ghost, never lit, with no face anchor, bubble or thought; at the work grain over `standup-prose.json`: the queue's sentences, each turn as the agent wrote it, the chair's own status last and never the board again, the tracker down leaving the chair no status; dressed, from `standup-dress.json`'s reply: a dressed worker's sentences, an undressed one's prose, `spoken: null` the prose, the board, calls, chair's status and an idle member never dressed; **no silent face** -- every face has a slide where it speaks and every desk none, with a mug of its own, over the owner's demo room (the chair, two members with tracker work, three idle each with its own pair, three desks), a Space with no worker labels on the issues (the chair alone, eight desks) and on its cards (the engineer's tile a member), `standup-team.json`'s `absent` case (two members, six desks, the absent never named), ten labels marked present by the fill and from an older agent (eight sit), and a response with no `work` |
 | `web/src/modules/solitaireAgile/stage/StandupPlay.test.tsx`, `web/src/modules/deck/engine/DeckPlayer.audiobook.test.tsx`, `web/src/modules/deck/GeneratedDeckHost.mute.test.tsx` | the mute, the played route's loading, error and Audiobook states; the audiobook hint at desktop width with prev and next either side of the ring, the browser voice, and a deck without the hint untouched |
 | `tkTestToolkit -Environment`, `Tests/test_surfaces.py` | its inventory row has its question; the Space's answer over `Tests/fixtures/how-i-work/table.json` -- every row and every gate row -- and, typed in a fresh shell with the switch on, a GitHub Space answered with agents (`on`, `Standup` a verb), one nobody answered (`not configured`), an Azure DevOps Space and one with no tracker (`off`, derived, no verb), each with the line that changes it, and the question naming the Space |
 | `Tests/test_how_i_work.py` | the agent's half of the same table; `load_config` serving the gated flag and `howIWork` with the switch as set, Space by Space, a local patch answering too, and the routes' 404 naming the answer or the switch |
@@ -1668,12 +1682,13 @@ Each of these is a block on [Known gaps](../KNOWN-GAPS.md), with its issue:
   when the minute runs out, or at once on the Triage page's Refresh
   ([A Route typed in a terminal reaches the page a minute later](../KNOWN-GAPS.md#a-route-typed-in-a-terminal-reaches-the-page-a-minute-later)).
 - **The played view is a first cut.** One tile a worker label: "a worker is many" (`QA DEV (Opus 1)`)
-  waits on the agent half knowing its running instances. The week's seat is always ghosted, and the
-  tracker's lights only to say it could not be read. No neural voice (V2's `/narrate`); the browser's
-  voice is whatever the machine has, and an authored fifteen seconds a tile is not imposed -- a slide
+  waits on the agent half knowing its running instances. The faces are the deck series' cast, dealt by
+  position; a cast of their own is later. No neural voice (V2's `/narrate`); the browser's
+  voice is whatever the machine has, reads each slide's title before its lines (so a call is heard as the
+  chair's tag and then the name), and an authored fifteen seconds a tile is not imposed -- a slide
   lasts as long as its lines take to read, plus the engine's dwell. No Media Session (lock-screen play,
-  pause, next). The nonsense register's door is not drawn on the stage. An idle worker's tile still
-  draws the mug, and the stage does not yet speak the chair's own turn (`work.chairProse`)
+  pause, next). The nonsense register's door is not drawn on the stage. An absent member is not named
+  aloud: the chair does not yet say who is out today
   ([The played standup is a first cut](../KNOWN-GAPS.md#the-played-standup-is-a-first-cut)).
 - **A linked card follows its issue, even to nowhere.** A card whose id is an issue's number adds no
   row of its own ([the join](#the-join)), so when that issue is open and no worker label routes it, the

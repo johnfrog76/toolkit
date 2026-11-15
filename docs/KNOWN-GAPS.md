@@ -335,12 +335,12 @@ out, or at once on the Triage page's Refresh.
 
 ### The played standup is a first cut
 
-**What you see:** The played view draws one tile for each worker label, however many sessions that worker is running. The
-week's seat is always ghosted, and the tracker's seat lights only to say the tracker could not be read.
-The voice is the browser's own, whatever the machine has; there is no lock-screen play, pause or next;
-and the nonsense register's door is not drawn on the stage. A worker with nothing on the tracker
-speaks its turn but its tile still shows the mug where its face would be, and the stage closes on the
-queue's sentences rather than the chair's own turn, which `Standup -Grain work` prints.
+**What you see:** The played view draws one window for each worker label in the room, however many sessions that
+worker is running. The faces are the deck series' cast, dealt by position. The voice is the browser's own,
+whatever the machine has, and it reads each slide's title before its lines, so the chair's call is heard as
+"The chair. Fable." and the answer as "Fable. Good morning. ..."; there is no lock-screen play, pause or next;
+and the nonsense register's door is not drawn on the stage. A worker out today is silent and unseen, and
+the chair does not yet say who is out.
 
 **Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
 

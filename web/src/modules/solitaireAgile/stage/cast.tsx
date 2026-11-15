@@ -382,12 +382,12 @@ export const BUBBLE_Z_INDEX = 30;
 
 /**
  * The speech bubble shows at most this many lines and ends the last in an
- * ellipsis: a fixed count, "because it is real" -- a listener takes in
- * about that much. The voice and the copy panel still carry every line, and
- * four lines always fit below the face, so the bubble never covers the speaker.
+ * ellipsis: a fixed count. It holds one whole turn -- "Good morning.", what
+ * the member did and will do, "No blockers.", "That's it for me." -- so the
+ * frame is read to its end; past that the voice still carries every line.
  * No scrollbar: a speech bubble that scrolls is not a shape anyone knows.
  */
-export const SPEECH_MAX_LINES = 4;
+export const SPEECH_MAX_LINES = 9;
 
 /** The clamp itself: a line clamp on the text element, standard CSS for what browsers still spell with a prefix. */
 export const speechTextClamp = {

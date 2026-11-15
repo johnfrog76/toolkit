@@ -1,96 +1,83 @@
-import type { StandupWorker } from "../api.solitaireAgile";
+import type { StandupResponse, StandupWorker } from "../api.solitaireAgile";
+import { CAST } from "./cast";
+import { dealMugLooks } from "./EmptyDesk";
+import type { MugLook } from "./EmptyDesk";
 
-// ── The nine seats (docs/modules/solitaire-agile.md, "The played view") ──────
+// ── The room (docs/modules/solitaire-agile.md, "The played view") ────────────
 //
-// The stage always has nine tiles in the Remote Standup's composition
-// (D-TA17, D-TA18); the team is DEALT onto them. Three are workers' seats, one
-// is the chair's, three are the human's queue kinds, and two are derived reads
-// -- the tracker and the week -- which V1 draws ghosted with their plate (the
-// tracker's lights only when it could not be read, to say so).
+// The stage is always nine windows, the Zoom grid (D-TA17). The chair keeps
+// its own window; the other eight are the members' windows, in CAST order, and
+// the team is DEALT onto them by position: member i, in the response's order,
+// sits in member window i. A window with nobody in it is an empty desk.
 //
-// The plate carries all three names: the role, the
-// persona, then the worker label in parentheses -- the label is the real noun,
-// the same word the issue carries, so a tile can always be read back to the
-// tracker.
+// The web never reads the team-size setting. It draws what the response gives
+// it: the workers marked `present` (all of them, from an agent that predates
+// the room), in their order, capped at the room. So a Space sized three draws
+// two members and six desks because only two are present, not because the
+// stage knows the number.
 
-export type SeatKind = "worker" | "chair" | "walk" | "decide" | "look" | "tracker" | "week";
+/** The room's windows, the chair's included: the 3x3 grid. Read everywhere; never typed again. */
+export const ROOM_WINDOWS = 9;
+/** The windows a member can sit in: the room less the chair's. */
+export const MEMBER_SEATS = ROOM_WINDOWS - 1;
 
-export interface Seat {
-  /** The cast member whose tile this is (./cast.tsx). */
+/** The cast member whose window is the chair's. */
+export const CHAIR_CAST_ID = "pm";
+/** The chair's plate. */
+export const CHAIR_PLATE = "CHAIR · PM";
+/** The plate on a window with nobody in it. */
+export const EMPTY_DESK_PLATE = "EMPTY DESK";
+
+/** One member window: its cast member and the persona on its plate. */
+export interface MemberWindow {
   castId: string;
-  kind: SeatKind;
-  /** The role on the plate, before the persona; none for a plain worker seat. */
-  role?: string;
-  /** The persona on the plate. */
   persona: string;
-  /** A worker seat's own label: the worker this seat is kept for. */
-  workerLabel?: string;
 }
 
-/** In the card's seat order: the workers, the chair, the queue, the reads. */
-export const SEATS: readonly Seat[] = [
-  {
-    castId: "dev-hero",
-    kind: "worker",
-    role: "TEAM LEAD",
-    persona: "DEV-HERO",
-    workerLabel: "fable",
-  },
-  { castId: "vibemancer", kind: "worker", persona: "AI VIBEMANCER", workerLabel: "opus" },
-  { castId: "minimalist", kind: "worker", persona: "MINIMALIST", workerLabel: "sonnet" },
-  { castId: "pm", kind: "chair", role: "CHAIR", persona: "PM" },
-  { castId: "qa", kind: "walk", role: "WALK", persona: "QA ALCHEMIST" },
-  { castId: "new-hire", kind: "decide", role: "DECIDE", persona: "NEW HIRE" },
-  { castId: "designer", kind: "look", role: "LOOK", persona: "DESIGNER" },
-  { castId: "ops-dev", kind: "tracker", role: "TRACKER", persona: "OPS-DEV" },
-  { castId: "ultrawide", kind: "week", role: "THE WEEK", persona: "ULTRAWIDE OVERLORD" },
-];
+/** The eight member windows, in CAST order: the faces, dealt by position. */
+export const MEMBER_WINDOWS: readonly MemberWindow[] = CAST.filter(
+  (c) => c.id !== CHAIR_CAST_ID,
+).map((c) => ({ castId: c.id, persona: c.label }));
 
-export function seatOf(kind: Exclude<SeatKind, "worker">): Seat {
-  const s = SEATS.find((x) => x.kind === kind);
-  if (!s) throw new Error(`no ${kind} seat`);
-  return s;
+/** A member's plate: `PERSONA (label)`. */
+export function memberPlate(window: MemberWindow, label: string): string {
+  return `${window.persona} (${label})`;
 }
 
-/** `ROLE · PERSONA (label)`, each part only when it is there. */
-export function plateFor(seat: Seat, label?: string): string {
-  const name = seat.role ? `${seat.role} · ${seat.persona}` : seat.persona;
-  return label ? `${name} (${label})` : name;
+/** The standup's day of the year, 1-based, from the date part of `asOf` as written
+ *  (its own offset) -- the day the fills count. */
+export function standupDayOfYear(asOf: string): number {
+  const [y, m, d] = asOf.slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return 1;
+  return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(y, 0, 1)) / 86_400_000) + 1;
 }
 
-export interface Dealt {
-  /** Each worker seat that has someone in it today, in seat order. */
-  seated: { seat: Seat; worker: StandupWorker }[];
-  /** Workers with no seat left: the chair counts them (nine is the ceiling). */
-  standing: StandupWorker[];
+export interface Seated extends MemberWindow {
+  worker: StandupWorker;
+}
+
+export interface EmptyWindow extends MemberWindow {
+  look: MugLook;
+}
+
+export interface Room {
+  /** The present members, in speaking order, each in its window. */
+  members: Seated[];
+  /** Every member window nobody sits in, in window order, with its mug. */
+  desks: EmptyWindow[];
 }
 
 /**
- * Deal today's workers onto the three worker seats. A worker whose label a
- * seat is kept for sits there; any other worker takes the first free worker
- * seat, in the response's (label) order; past three, the worker is standing.
- * "A worker is many" -- one seat per running instance -- waits on the agent
- * half knowing its workers (the card's open item), so V1 is one tile a label.
+ * Seat today's standup. The present members (every worker, from an agent that
+ * predates `present`) take the member windows in the response's order -- the
+ * order the round speaks them -- up to the room. The windows left are empty
+ * desks, dealt their mugs by the day in window order, so the desks in one room
+ * all differ and the same day always deals the same.
  */
-export function dealSeats(workers: readonly StandupWorker[]): Dealt {
-  const workerSeats = SEATS.filter((s) => s.kind === "worker");
-  const taken = new Map<string, StandupWorker>();
-  const rest: StandupWorker[] = [];
-  for (const w of workers) {
-    const own = workerSeats.find((s) => s.workerLabel === w.label.toLowerCase());
-    if (own && !taken.has(own.castId)) taken.set(own.castId, w);
-    else rest.push(w);
-  }
-  const standing: StandupWorker[] = [];
-  for (const w of rest) {
-    const free = workerSeats.find(
-      (s) => !taken.has(s.castId) && !workers.some((x) => x.label.toLowerCase() === s.workerLabel),
-    );
-    if (free) taken.set(free.castId, w);
-    else standing.push(w);
-  }
-  const seated = workerSeats
-    .filter((s) => taken.has(s.castId))
-    .map((seat) => ({ seat, worker: taken.get(seat.castId)! }));
-  return { seated, standing };
+export function dealRoom(data: Pick<StandupResponse, "asOf" | "workers">): Room {
+  const present = (data.workers ?? []).filter((w) => w.present !== false).slice(0, MEMBER_SEATS);
+  const members = present.map((worker, i) => ({ ...MEMBER_WINDOWS[i], worker }));
+  const open = MEMBER_WINDOWS.slice(members.length);
+  const looks = dealMugLooks(standupDayOfYear(data.asOf), open.length);
+  return { members, desks: open.map((w, i) => ({ ...w, look: looks[i] })) };
 }

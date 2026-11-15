@@ -10,13 +10,18 @@ import {
 } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
+import { ShellProvider } from "../../shell/cards";
+import type { ShellValue } from "../../shell/cards";
 import { RITUALS } from "../../shell/consts";
+import { entryAnchor } from "../../shell/settingsWorkflows";
 import { chairSuggestion } from "./suggestion";
 import {
   AGENDA_VIEW_KEY,
   GRAIN_KEY,
   TAB_KEY,
   StandupPage,
+  TEAM_SIZE_DOOR,
+  TEAM_SIZE_ENTRY,
   grainParts,
   issueFacts,
   slotState,
@@ -191,6 +196,29 @@ jest.mock("../../shell/api", () => ({
   useGetEnvQuery: () => ({ isLoading: false, data: { config: { activeSpace: "toolkit" } } }),
 }));
 
+/** The shell around the page, for the one test that reads what the page asks of it. */
+const shellValue: ShellValue = {
+  cards: { home: [], system: [] },
+  homeTabs: [],
+  systemTabs: [],
+  slot: () => [],
+  openSettings: () => {},
+  pager: { page: 0, totalPages: 1, onPageChange: () => {} },
+  filters: {
+    filterValue: "",
+    setFilterValue: () => {},
+    activeRepo: null,
+    setActiveRepo: () => {},
+    stateFilter: "All",
+    setStateFilter: () => {},
+    stateOptions: ["All"],
+    typeFilter: "All",
+    setTypeFilter: () => {},
+    linkFilter: "All",
+    setLinkFilter: () => {},
+  },
+};
+
 /** What the page shows, put back together: the header line, LF, the body. */
 function shown(): string {
   const header = screen.getByRole("heading", { level: 1 }).textContent ?? "";
@@ -247,8 +275,12 @@ describe("the standup page", () => {
     const [said, plan] = statusOf("friday", "sonnet");
     expect(shown()).toContain(`  ${row}  "${said}"\n  ${row}  "${plan}"\n`);
     expect(shown()).not.toContain("The dog ate the sprint.");
-    // Nothing to click but the issue numbers -- and Play.
-    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["Copy", "Play"]);
+    // Nothing to click but the issue numbers -- and Play, and the door to the room's size.
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Copy",
+      "Play",
+      TEAM_SIZE_DOOR,
+    ]);
     // The text scrolls sideways, so it is a named region a keyboard reaches.
     const region = screen.getByRole("region", { name: "Standup text" });
     expect(region).toBe(screen.getByTestId("standup-text"));
@@ -297,6 +329,23 @@ describe("the standup page", () => {
     render(<StandupPage />);
     fireEvent.click(screen.getByRole("button", { name: "Play" }));
     expect(screen.getByText("played")).toBeTruthy();
+  });
+
+  it("beside Play, a door to the room's size: the drawer opened at the settings entry's own anchor", () => {
+    answer = { data: responseFor("friday") };
+    const openSettings = jest.fn();
+    render(
+      <ShellProvider value={{ ...shellValue, openSettings }}>
+        <StandupPage />
+      </ShellProvider>,
+    );
+    expect(TEAM_SIZE_ENTRY?.question).toBe("How many are in my standup in {space}?");
+    const door = screen.getByRole("button", { name: "How many are in my standup in toolkit?" });
+    expect(door.textContent).toBe(TEAM_SIZE_DOOR);
+    fireEvent.click(door);
+    // The entry's own door: the drawer is the one writer, so the page has no control of its own.
+    expect(openSettings).toHaveBeenCalledWith(entryAnchor(TEAM_SIZE_ENTRY!, "toolkit"));
+    expect(openSettings).toHaveBeenCalledWith("spaces.toolkit.features.teamSize");
   });
 
   it("with no tracker, shows the ritual anyway: the golden, and no links", () => {
@@ -444,7 +493,11 @@ describe("the grain", () => {
     expect(tabs.map((t) => t.getAttribute("aria-selected"))).toEqual(["true", "false", "false"]);
     expect(shown()).toBe(withWork(responseFor("friday")).text);
     // The tabs are not buttons: nothing else to click was added beside the text.
-    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["Copy", "Play"]);
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Copy",
+      "Play",
+      TEAM_SIZE_DOOR,
+    ]);
   });
 
   it("work shows work.text verbatim, keeps the brief above it, and Copy copies it", async () => {
@@ -873,8 +926,8 @@ describe("the issue popover", () => {
     const title = data.queue.walk.find((i) => i.number === 104)!.title;
     const text = surface().textContent ?? "";
     expect(text).toContain(title);
-    // Issue 104 is a blocker: the chip is ROLE · PERSONA (label).
-    expect(text).toContain("TEAM LEAD · DEV-HERO (fable)");
+    // Issue 104 is a blocker: the chip is the plate Fable wears on the stage, PERSONA (label).
+    expect(text).toContain("DEV-HERO (fable)");
     expect(text).toContain("sev2");
     expect(text).toContain("Ship the standup");
     expect(text).toContain("Open");
@@ -944,13 +997,18 @@ describe("the issue popover", () => {
     await waitFor(() => expect(screen.queryByTestId("issue-popover")).toBeNull());
   });
 
-  it("the chip is left out when the seat is not known", () => {
+  it("the chip reads the stage's deal: any label sits by its place in the room, and a worker out today has none", () => {
     const data = responseFor("friday");
+    expect(issueFacts(data).get(102)?.worker).toBe("OPS-DEV (opus)");
+    // A label the cast was never named for sits by position, like any other.
     data.workers[0].label = "someone-else";
     data.workers[0].name = "Someone";
+    expect(issueFacts(data).get(104)?.worker).toBe("DEV-HERO (someone-else)");
+    // Out today (not present): no window on the stage, so no chip; the others move up a window.
+    data.workers[0].present = false;
     const facts = issueFacts(data);
     expect(facts.get(104)?.worker).toBeUndefined();
-    expect(facts.get(102)?.worker).toBe("AI VIBEMANCER (opus)");
+    expect(facts.get(102)?.worker).toBe("DEV-HERO (opus)");
   });
 
   it("a card's surface shows its id, title and path, and no external link", async () => {
