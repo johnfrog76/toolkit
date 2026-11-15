@@ -18,6 +18,7 @@ import {
   CastScene,
   castById,
   SPEAKER_COLOR_VAR,
+  STAGE_GRID_CLASS,
   SpeechBubble,
   STAGE_CLASS,
   StandupKeyframes,
@@ -187,6 +188,8 @@ interface TileState {
   lit?: boolean;
   /** Someone is in this window today: a face, its signal light on. */
   present?: boolean;
+  /** The member the chair has just called: in colour, unframed, about to answer. */
+  called?: boolean;
   /** Nobody is in this window: the empty desk, with this mug. Never lit, never a bubble. */
   desk?: MugLook;
   /** The bubble's lines, on a lit tile. */
@@ -238,11 +241,17 @@ function Tile({ id, label, t }: { id: string; label: string; t: TileState }) {
   // over the speaker's face, not the tile's box. The stage is the boundary the
   // bubble is kept inside.
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const boundary = anchor?.closest<HTMLElement>(`.${STAGE_CLASS}`) ?? null;
+  const boundary = anchor?.closest<HTMLElement>(`.${STAGE_GRID_CLASS}`) ?? null;
   const detail = (t.detail ?? []).filter((s) => s.items.length > 0);
   // Speaking is "its bubble is open"; named is a face that is there without one.
   const speaking = !!t.lit && !!t.bubble && t.bubble.length > 0;
-  const look: TileLook = speaking ? "speaking" : t.lit || t.present ? "named" : "ghost";
+  const look: TileLook = speaking
+    ? "speaking"
+    : t.called
+      ? "called"
+      : t.lit || t.present
+        ? "named"
+        : "ghost";
   return (
     <div
       data-testid={`tile-${id}`}
@@ -366,6 +375,7 @@ function StageView({
       </div>
       <div
         data-testid="stage-grid"
+        className={STAGE_GRID_CLASS}
         style={{
           flex: 1,
           minHeight: 0,
@@ -393,9 +403,10 @@ function StageView({
 // ── The copy panel (the engine's right-hand column) ─────────────────────────────────
 // Who is speaking, not what they said: the bubble shows the sentence and
 // the voice reads it, so a third copy beside the stage was noise. The panel is
-// the speaker's character: the title, the persona with the worker's label beside
-// it (the one real noun, the same word the issue carries), and the motto in the
-// character's own voice.
+// the speaker's character: the title and the persona with the worker's label
+// beside it (the one real noun, the same word the issue carries). No motto: a
+// made-up line in a character's voice beside a real status would read as a claim
+// of work the tracker did not say.
 
 function Copy({ castId, label }: { castId: string; label?: string }) {
   const member = castById(castId);
@@ -424,7 +435,7 @@ function Copy({ castId, label }: { castId: string; label?: string }) {
       </p>
       <h2
         style={{
-          margin: "0 0 16px",
+          margin: 0,
           fontSize: "1.9rem",
           fontWeight: 800,
           lineHeight: 1.25,
@@ -433,17 +444,6 @@ function Copy({ castId, label }: { castId: string; label?: string }) {
       >
         {label ? `${member.label} (${label})` : member.label}
       </h2>
-      <p
-        style={{
-          margin: 0,
-          fontSize: "1.05rem",
-          fontStyle: "italic",
-          lineHeight: 1.5,
-          color: pf.muted,
-        }}
-      >
-        &mdash; {member.motto}
-      </p>
     </div>
   );
 }
@@ -502,17 +502,17 @@ export function buildStandupDeck(data: StandupResponse): Deck {
         ]
       : [];
 
-  /** One slide where the chair speaks; `called` is the member it names, lit and listening. */
+  /** One slide where the chair speaks; `called` is the member it names, in colour, listening. */
   const chairSays = (
     id: string,
-    slideTitle: string,
+    slideTitle: string | undefined,
     script: Script,
     detail: DetailSlot[] = [],
     called?: string,
   ): Slide => {
     const tiles = base();
     tiles.set(CHAIR_CAST_ID, { present: true, lit: true, bubble: script.lines, detail });
-    if (called) tiles.set(called, { present: true, lit: true });
+    if (called) tiles.set(called, { present: true, lit: true, called: true });
     return {
       id,
       title: slideTitle,
@@ -546,12 +546,14 @@ export function buildStandupDeck(data: StandupResponse): Deck {
   // The dress: read when present, the prose (`work`) otherwise.
   const dressed = new Map((data.spoken?.workers ?? []).map((w) => [w.label, w.prose]));
 
-  // The chair calls the member by name; the member's window is lit, listening.
+  // The chair calls the member by name; the member's window is in colour, listening.
+  // No title: the narrator reads a slide's title before its lines, and the call is
+  // heard as the chair saying the name and nothing else.
   const callSlide = ({ castId, worker }: Seated): Slide => {
     const line = callLine(worker.name || worker.label);
     return chairSays(
       `${stem}-call-${worker.label}`,
-      CHAIR_TITLE,
+      undefined,
       { lines: [line], say: [line] },
       [],
       castId,
@@ -574,9 +576,9 @@ export function buildStandupDeck(data: StandupResponse): Deck {
           ],
     });
     const id = `${stem}-${worker.label}`;
+    // No title either: the chair has just said the name, so the turn is not announced again.
     return {
       id,
-      title: worker.name,
       content: stage(id, tiles),
       copy: <Copy castId={castId} label={worker.label} />,
       notes: notesOf(script.say),

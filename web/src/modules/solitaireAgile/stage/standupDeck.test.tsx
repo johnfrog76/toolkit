@@ -16,7 +16,10 @@ import {
   SPEECH_MAX_LINES,
   THOUGHT_MAX_HEIGHT,
   REDUCED_MOTION_RULE,
+  SPEECH_EDGE_PADDING,
+  SPEECH_MAX_WIDTH,
   STAGE_CLASS,
+  STAGE_GRID_CLASS,
 } from "./cast";
 import { MUG_LOOKS, dealMugLooks } from "./EmptyDesk";
 import {
@@ -30,6 +33,7 @@ import {
   standupDayOfYear,
 } from "./seats";
 import { buildStandupDeck, callLine } from "./standupDeck";
+import { slideSpokenText } from "../../deck/engine/sayText";
 
 // The engine's placement needs layout, which jsdom has none of, so the bubbles'
 // `positioning` is recorded as the Popover is drawn and the real Popover
@@ -296,46 +300,68 @@ describe("the standup deck, from Friday's fixture", () => {
     expect(within(tile("pm")).getByText(/Walk #104 Verify the Studio tab/)).toBeTruthy();
   });
 
-  it("the call: the chair says the member's name, and the member's window is lit, listening", () => {
+  it("the call: the chair says the member's name, and the member's window is called -- in colour, unframed, listening", () => {
     for (const w of friday.workers) {
       const i = at(`call-${w.label}`);
       expect(say(i)).toBe(callLine(w.name));
       expect(callLine(w.name)).toBe(`${w.name}.`);
+      // The narrator hears the name once: no title is read before it.
+      expect(slideSpokenText(slides[i])).toBe(`${w.name}.`);
       const { view, tile, lit } = drawStage(i);
       const seat = dealRoom(friday).members.find((m) => m.worker.label === w.label)!.castId;
       expect(lit()).toEqual(CAST.map((c) => c.id).filter((id) => id === "pm" || id === seat));
       expect(tile("pm").getAttribute("data-look")).toBe("speaking");
-      expect(tile(seat).getAttribute("data-look")).toBe("named");
+      expect(tile(seat).getAttribute("data-look")).toBe("called");
+      expect(within(tile(seat)).getByTestId("stage-layer").style.filter).toBe("");
+      expect(within(tile(seat)).queryByTestId("stage-frame")).toBeNull();
+      expect(within(tile(seat)).queryByTestId("stage-speech")).toBeNull();
+      expect(view.container.querySelectorAll('[data-testid="stage-frame"]')).toHaveLength(1);
       expect(within(tile("pm")).getByTestId("stage-speech-text").textContent).toBe(`${w.name}.`);
-      // The member answers on the next slide.
+      // The member answers on the next slide, and the narrator does not say the name again.
       expect(idOf(slides[i + 1])).toBe(w.label);
+      expect(slideSpokenText(slides[i + 1])).toBe(say(i + 1));
+      expect(slideSpokenText(slides[i + 1]).startsWith(w.name)).toBe(false);
       view.unmount();
     }
   });
 
-  it("the copy panel is the speaker's character, not the bubble again", () => {
-    // A worker's slide: title, persona with the label, the motto in its own voice.
+  it("the copy panel is the speaker's character -- no motto -- not the bubble again", () => {
+    // A worker's slide: title and persona with the label; no motto beside a real status.
     const dev = render(<>{slides[at("fable")].copy}</>);
     const copy = dev.getByTestId("standup-copy");
     const hero = castById("dev-hero");
     expect(copy.textContent).toContain(hero.title);
     expect(copy.textContent).toContain(`${hero.label} (fable)`);
-    expect(copy.textContent).toContain(hero.motto);
+    expect(copy.textContent).not.toContain(hero.motto);
     expect(copy.textContent).not.toMatch(/#107|Port the cast atoms|Yesterday/);
     dev.unmount();
     // The chair's slides, the call's included: the PM, no label.
     for (const part of ["chair-open", "call-fable", "chair-status"]) {
       const chair = render(<>{slides[at(part)].copy}</>);
       const pm = castById("pm");
-      expect(chair.getByTestId("standup-copy").textContent).toContain(pm.motto);
+      expect(chair.getByTestId("standup-copy").textContent).not.toContain(pm.motto);
       expect(chair.getByTestId("standup-copy").textContent).toContain(pm.label);
       expect(chair.getByTestId("standup-copy").textContent).not.toMatch(/\((fable|opus|sonnet)\)/);
       chair.unmount();
     }
-    // Every character has a title and a motto that is theirs, not a status.
-    for (const c of CAST) {
-      expect(c.title.length).toBeGreaterThan(0);
-      expect(c.motto).toMatch(/^[IMT]/);
+    // Every character has a title.
+    for (const c of CAST) expect(c.title.length).toBeGreaterThan(0);
+  });
+
+  it("no motto of the cast reaches any slide of the played standup -- not the panel, the stage or the voice", () => {
+    const mottos = CAST.map((c) => c.motto);
+    for (const s of slides) {
+      const view = render(
+        <>
+          {s.content}
+          {s.copy}
+        </>,
+      );
+      for (const m of mottos) {
+        expect(view.container.textContent).not.toContain(m);
+        expect(slideSpokenText(s)).not.toContain(m);
+      }
+      view.unmount();
     }
   });
 
@@ -518,15 +544,22 @@ describe("the stage's bubbles", () => {
     expect(pos.align).toBe("center");
   });
 
-  it("a top-row speaker's bubble falls to below, tail still at the face, kept inside the stage -- never shifted sideways", () => {
+  it("a bubble is kept inside the grid of windows, off the stage's title, with a margin: beside the face, then below, when it does not fit above", () => {
     mockPopovers.length = 0;
     const { view } = drawStage(0); // the chair speaks the board; every speaker takes the same positioning
     const speechPop = mockPopovers.filter((p) => p.positioning && "target" in p.positioning);
     expect(speechPop.length).toBeGreaterThan(0);
     const pos = speechPop[0].positioning!;
-    expect(pos.fallbackPositions).toEqual(["below"]);
-    expect(pos.overflowBoundary).toBe(view.container.querySelector(`.${STAGE_CLASS}`));
-    expect(pos.overflowBoundary).not.toBeNull();
+    expect(pos.fallbackPositions).toEqual(["after", "before", "below"]);
+    const grid = view.container.querySelector(`.${STAGE_GRID_CLASS}`);
+    expect(grid).toBe(screen.getByTestId("stage-grid"));
+    expect(pos.overflowBoundary).toBe(grid);
+    expect(pos.flipBoundary).toBe(grid);
+    expect(pos.overflowBoundaryPadding).toBe(SPEECH_EDGE_PADDING);
+    expect(SPEECH_EDGE_PADDING).toBeGreaterThan(0);
+    // The title row is outside the boundary.
+    expect(grid!.contains(screen.getByTestId("stage-plate"))).toBe(false);
+    expect(screen.getByTestId("stage-speech").style.maxWidth).toBe(SPEECH_MAX_WIDTH);
   });
 
   it("an empty desk has no face to point at, no bubble and no thought", () => {
@@ -542,12 +575,15 @@ describe("the stage's bubbles", () => {
     }
   });
 
-  it("the thought bubble's placement is unchanged: its trigger, above, start-aligned", () => {
+  it("the thought's trigger sits in the window's top-right corner, clear of the plate and the face; its cloud opens below it", () => {
     mockPopovers.length = 0;
-    drawStage(FABLE);
+    const { tile } = drawStage(FABLE);
     const thought = mockPopovers.filter((p) => p.positioning && !("target" in p.positioning));
     expect(thought.length).toBeGreaterThan(0);
-    expect(thought[0].positioning).toEqual({ position: "above", align: "start" });
+    expect(thought[0].positioning).toEqual({ position: "below", align: "end" });
+    const trigger = within(tile("dev-hero")).getByTestId("stage-thought-trigger");
+    expect([trigger.style.top, trigger.style.right]).toEqual(["8px", "8px"]);
+    expect([trigger.style.bottom, trigger.style.left]).toEqual(["", ""]);
   });
 
   it("an idle member's two made-up items are the speech surface's lines", () => {
@@ -702,6 +738,11 @@ describe("the speaker's frame and the three looks", () => {
       expect(dot(speaking[0]).style.background).toBe(GREEN);
       // nobody else is framed
       for (const c of CAST) if (tile(c.id) !== speaking[0]) expect(framed(tile(c.id))).toBe(false);
+      // In colour: the speaker, and on a call slide the one called -- nobody else.
+      const coloured = CAST.map((c) => c.id).filter((id) => layer(tile(id)).style.filter === "");
+      const called = view.container.querySelectorAll('[data-look="called"]');
+      expect(called.length).toBe(idOf(slides[i]).startsWith("call-") ? 1 : 0);
+      expect(coloured).toHaveLength(1 + called.length);
       view.unmount();
     }
   });
@@ -712,6 +753,7 @@ describe("the speaker's frame and the three looks", () => {
       for (const id of [CHAIR_CAST_ID, ...members.map((m) => m.castId)]) {
         const t = tile(id);
         if (t.getAttribute("data-speaking") === "true") continue;
+        if (t.getAttribute("data-look") === "called") continue;
         expect(t.getAttribute("data-look")).toBe("named");
         expect(layer(t).style.filter).toBe("grayscale(1)");
         expect(layer(t).style.filter).not.toMatch(/brightness/);

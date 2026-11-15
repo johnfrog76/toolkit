@@ -51,6 +51,8 @@ export const mono = "'Cascadia Code', 'Fira Code', 'Consolas', monospace";
 // reduced-animation switch is not the deck engine's to read today (the engine
 // exposes none), so the media query is the one rule.
 export const STAGE_CLASS = "sa-stage";
+/** The stage's grid of nine windows, below its title row: the room a speech bubble is kept inside. */
+export const STAGE_GRID_CLASS = "sa-stage-grid";
 
 export const REDUCED_MOTION_RULE = `@media (prefers-reduced-motion: reduce) { .${STAGE_CLASS}, .${STAGE_CLASS} * { animation: none !important; transition: none !important; } }`;
 
@@ -224,16 +226,19 @@ export function Person({
 }
 
 /**
- * The three looks of a tile on the played standup, and the contract the
- * three of them keep: one tile in colour, ever.
+ * The four looks of a tile on the played standup, and the contract they keep:
+ * one tile framed, ever, and colour only for the speaker -- and, on the slide
+ * the chair calls a name, for the one called.
  *
  *  - `speaking` -- its bubble is open: colour, the speaker's frame, a green dot.
+ *  - `called`   -- the member the chair has just named, about to answer: colour
+ *                  and a green dot, but no frame and no bubble.
  *  - `named`    -- lit, no bubble (the queue's Walk / Decide / Look seats, the
  *                  tracker's alarm): black and white at full brightness, a green
  *                  dot. The dot is the signal light; colour is the speaker's alone.
  *  - `ghost`    -- everyone else: grayscale, dimmed, a grey dot. The outage register.
  */
-export type TileLook = "speaking" | "named" | "ghost";
+export type TileLook = "speaking" | "called" | "named" | "ghost";
 
 /** The speaker's frame: 3px, inside the tile's box so the grid does not move. */
 export const SPEAKER_OUTLINE_WIDTH = "3px";
@@ -245,6 +250,7 @@ export const SPEAKER_COLOR_VAR = "--sa-speaker";
 
 export const LOOK_FILTER: Record<TileLook, string | undefined> = {
   speaking: undefined,
+  called: undefined,
   named: "grayscale(1)",
   ghost: "grayscale(1) brightness(0.6)",
 };
@@ -423,21 +429,46 @@ const bubbleSurface = {
   border: "none",
 } as const;
 
+/** How wide the speech bubble may grow: wide enough that a whole turn reads in a few lines. */
+export const SPEECH_MAX_WIDTH = "380px";
+
+/** The gap the speech bubble keeps from the edge of the room it is kept inside. */
+export const SPEECH_EDGE_PADDING = 8;
+
+/**
+ * How far the bubble's tail stands off the face's anchor (the top of the head):
+ * a little above it, and, beside the face, past the head's width so the bubble
+ * does not lie over the speaker.
+ */
+export const SPEECH_OFFSET = { above: 8, beside: 44 } as const;
+
+/** The offset the engine asks for, by the side the bubble landed on. */
+export function speechOffset({ position }: { position: string }): number {
+  return position === "after" || position === "before" ? SPEECH_OFFSET.beside : SPEECH_OFFSET.above;
+}
+
 /**
  * Where the speech bubble's tail points: the speaker's face, not the
  * tile's box. `target` is a small anchor element over the head of the scene
- * (centre-top; at the mug on a mug tile), so the bubble sits `above` it with the
- * tail at the person. A top-row tile has no room above, so the engine flips to
- * `below` -- the tail still at the face -- and `overflowBoundary` is the stage, so
- * the bubble is kept inside the grid rather than shifted sideways into a neighbour.
+ * (centre-top), so the bubble sits `above` it with the tail at the person. The
+ * boundary is the stage's GRID -- the nine windows, not the title row above
+ * them -- with SPEECH_EDGE_PADDING inside it: a bubble that does not fit above
+ * goes beside the face, then below it (the tail always at the face), and one that
+ * would cross the grid's edge is shifted back inside it, never onto the title or
+ * flush on the edge.
  */
 export function speechPositioning(target: HTMLElement, boundary: HTMLElement | null) {
   return {
     target,
     position: "above" as const,
     align: "center" as const,
-    fallbackPositions: ["below" as const],
+    // Above the face first; a top-row window with no room above puts the bubble
+    // beside the face (over a neighbour, never over the speaker), and below only last.
+    fallbackPositions: ["after" as const, "before" as const, "below" as const],
     overflowBoundary: boundary,
+    flipBoundary: boundary,
+    overflowBoundaryPadding: SPEECH_EDGE_PADDING,
+    offset: speechOffset,
   };
 }
 
@@ -455,12 +486,20 @@ export function SpeechBubble({
   return (
     <Popover open inline withArrow positioning={speechPositioning(anchor, boundary)}>
       {/* The surface does not clip: the tail is drawn outside its box. The
-          four-line clamp is the text element's. */}
+          line clamp is the text element's. */}
       <PopoverSurface
         aria-label="Says"
         role="status"
         data-testid="stage-speech"
-        style={{ ...bubbleSurface, overflowY: "visible", borderRadius: "14px" }}
+        style={{
+          ...bubbleSurface,
+          // As wide as the turn needs up to the cap -- not the window's width, which an
+          // inline surface would otherwise shrink to.
+          width: "max-content",
+          maxWidth: SPEECH_MAX_WIDTH,
+          overflowY: "visible",
+          borderRadius: "14px",
+        }}
       >
         <div style={{ animation: "rs-bubble 0.45s ease-out 0.3s both" }}>
           <span data-testid="stage-speech-text" style={speechTextClamp}>
@@ -478,6 +517,10 @@ export function SpeechBubble({
  * Space), closed by Escape or by the slide changing. The cloud floats; reduced
  * motion stills it through the stage's own rule (REDUCED_MOTION_RULE).
  */
+/** The thought's trigger sits in the window's top-right corner -- clear of the plate
+ *  (bottom left) and of the face -- so its cloud opens below it, aligned to its end. */
+export const THOUGHT_POSITIONING = { position: "below", align: "end" } as const;
+
 export function ThoughtBubble({ label, children }: { label: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   // The deck's own window listener (deck/engine/DeckController.tsx) takes Escape
@@ -498,7 +541,7 @@ export function ThoughtBubble({ label, children }: { label: string; children: Re
       inline
       open={open}
       onOpenChange={(_, d) => setOpen(d.open)}
-      positioning={{ position: "above", align: "start" }}
+      positioning={THOUGHT_POSITIONING}
     >
       <PopoverTrigger disableButtonEnhancement>
         <button
@@ -508,8 +551,8 @@ export function ThoughtBubble({ label, children }: { label: string; children: Re
           onKeyDown={keep}
           style={{
             position: "absolute",
-            left: "6px",
-            bottom: "30px",
+            right: "8px",
+            top: "8px",
             zIndex: 4,
             width: "26px",
             height: "26px",

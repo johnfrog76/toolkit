@@ -337,8 +337,7 @@ out, or at once on the Triage page's Refresh.
 
 **What you see:** The played view draws one window for each worker label in the room, however many sessions that
 worker is running. The faces are the deck series' cast, dealt by position. The voice is the browser's own,
-whatever the machine has, and it reads each slide's title before its lines, so the chair's call is heard as
-"The chair. Fable." and the answer as "Fable. Good morning. ..."; there is no lock-screen play, pause or next;
+whatever the machine has; there is no lock-screen play, pause or next;
 and the nonsense register's door is not drawn on the stage. A worker out today is silent and unseen, and
 the chair does not yet say who is out.
 
