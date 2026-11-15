@@ -1,5 +1,5 @@
 {
-  "_": "The standup's vocabulary (D-TA13, D-TA14, D-SA2, D-SA5, D-SA11): five families kept apart. phrasebook carries no nouns and is what the chair says; nothing is what the REAL register's worker with nothing on the board says -- a status, first person and plausible, about the day around the work (the environment, tools, hardware, the desk, learning, meetings, admin), that claims NO TRACKER WORK: never a pull request, review, merge, commit, bug, fix to code, card, issue, ticket, deploy, test run or release, and a test refuses a line that names one; excuses are plainly fiction and belong to the NONSENSE register beside fakeWork -- the real register never reads them, and a test says so; fakeWork is plausible and is the NONSENSE register's only -- the real register never reads it either; verbs carry no nouns and are the standup register's words, offered to the model that dresses a worker's sentences -- the only family it is shown. phrasebook and nothing are picked deterministically: index = (day of year + position) mod length.",
+  "_": "The standup's vocabulary (D-TA13, D-TA14, D-SA2, D-SA5, D-SA11): six families kept apart. phrasebook carries no nouns and is what the chair says; nothing and nothingToday are what the REAL register's worker with nothing on the board says, two made-up items in its one turn -- nothing its yesterday, in the past tense, nothingToday its today, in the intent form (\"Today I'll ...\"), each a whole sentence, first person and plausible, about the day around the work (the environment, tools, hardware, the desk, learning, meetings, admin), that claims NO TRACKER WORK: never a pull request, review, merge, commit, bug, fix to code, card, issue, ticket, deploy, test run or release, and a test refuses a line that names one, and another a sentence that is in both; excuses are plainly fiction and belong to the NONSENSE register beside fakeWork -- the real register never reads them, and a test says so; fakeWork is plausible and is the NONSENSE register's only -- the real register never reads it either; verbs carry no nouns and are the standup register's words, offered to the model that dresses a worker's sentences -- the only family it is shown. phrasebook, nothing and nothingToday are picked deterministically: index = (day of year + position) mod length, each by its own length -- the two made-up families have lengths with no common factor, so the pair a worker says does not repeat in step.",
   "phrasebook": [
     "All green.",
     "No blockers on my side.",
@@ -31,6 +31,27 @@
     "Took a course module on the cloud platform.",
     "Tidied my notes and my calendar for the week.",
     "A quiet day for me: some learning and some setup."
+  ],
+  "nothingToday": [
+    "Today I will change the colour of my computer desktop.",
+    "Today I'll get the office printer to see my laptop.",
+    "Today I'll finish setting up my dotfiles on the new laptop.",
+    "Today I'll get my headset's microphone working in calls.",
+    "Today I'll work through the next module of the security training.",
+    "Today I'll answer the chat threads I owe people.",
+    "Today I'll tidy the cables under my desk.",
+    "Today I'll read the architecture notes before the design meeting.",
+    "Today I'll file my expenses and book my time off.",
+    "Today I'll move my shell to the new terminal and pick a theme.",
+    "Today I'll update my operating system and restart everything once.",
+    "Today I'll chase the last two access requests I'm waiting on.",
+    "Today I'll pair with a teammate to learn how the build runs.",
+    "Today I'll set up my editor's formatter to match the team's.",
+    "Today I'll practise the keyboard shortcuts I keep forgetting.",
+    "Today I'll sit in on the planning meeting and take notes.",
+    "Today I'll swap the batteries in my mouse and keyboard.",
+    "Today I'll clear out my downloads folder and back up my notes.",
+    "Today I'll read a chapter of the language book on my desk."
   ],
   "excuses": [
     "My cat deleted my dev branch.",

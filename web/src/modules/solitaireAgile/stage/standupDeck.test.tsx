@@ -70,6 +70,7 @@ interface FixtureCase {
       blockers: number[];
       empty: boolean;
       nothingIndex: number | null;
+      nothingTodayIndex: number | null;
     }[];
     text: string | null;
   };
@@ -81,6 +82,7 @@ const table = JSON.parse(fs.readFileSync(path.join(FIXTURES, "standup.json"), "u
 const vocab = JSON.parse(fs.readFileSync(path.join(ROOT, RITUALS.vocabularyFile), "utf8")) as {
   phrasebook: string[];
   nothing: string[];
+  nothingToday: string[];
   excuses: string[];
 };
 
@@ -113,6 +115,10 @@ function responseFor(name: string): StandupResponse {
       blockers: items(w.blockers),
       empty: w.empty,
       excuse: w.nothingIndex === null ? "" : vocab.nothing[w.nothingIndex],
+      status:
+        w.nothingIndex === null || w.nothingTodayIndex === null
+          ? []
+          : [vocab.nothing[w.nothingIndex], vocab.nothingToday[w.nothingTodayIndex]],
     })),
     text: fs.readFileSync(path.join(FIXTURES, c.expected.text), "utf8"),
   };
@@ -121,6 +127,8 @@ function responseFor(name: string): StandupResponse {
 const friday = responseFor("friday");
 // The friday case's one empty worker: its status sentence, picked by the fixture's index.
 const SONNET_STATUS = friday.workers.find((w) => w.label === "sonnet")!.excuse;
+// ... and its two made-up items, yesterday's then today's, the first its status sentence.
+const SONNET_PAIR = friday.workers.find((w) => w.label === "sonnet")!.status;
 const deck = buildStandupDeck(friday);
 const slides = deck.slides();
 const say = (i: number) => extractSayText(slides[i].notes);
@@ -249,6 +257,7 @@ describe("the standup deck, from Friday's fixture", () => {
         blockers: [],
         empty: true,
         excuse: SONNET_STATUS,
+        status: SONNET_PAIR,
       })),
     };
     const thinSlides = buildStandupDeck(thin).slides();
@@ -793,6 +802,7 @@ describe("dealing the seats", () => {
     blockers: [],
     empty: true,
     excuse: "",
+    status: [],
   });
 
   it("a worker sits in the seat kept for its label, whatever order it arrives in", () => {

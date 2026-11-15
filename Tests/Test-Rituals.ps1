@@ -6,7 +6,8 @@
 .DESCRIPTION
     1. The table     Tests/fixtures/rituals/standup.json, every case: since, the
                      day of the year, the chair's two lines, the queue, each
-                     worker's slots by issue number, empty and its status sentence -- the
+                     worker's slots by issue number, empty and its two made-up
+                     items (status, and excuse its first) -- the
                      same table Tests/test_rituals.py asserts against the agent.
     2. The goldens   the rendered text against standup-<name>.txt, byte for byte
                      (LF), wherever a case names one; every case rendered again
@@ -100,8 +101,39 @@ $consts = Get-P20Consts
 $data = Get-P20RitualData -PackageRoot $pkgRoot
 $phrases = @($data.Vocabulary.phrasebook)
 $nothing = @($data.Vocabulary.nothing)
+$nothingToday = @($data.Vocabulary.nothingToday)
 $excuses = @($data.Vocabulary.excuses)
 $fakeWork = @($data.Vocabulary.fakeWork)
+
+# An idle worker's two made-up items from a fixture row's two indexes, as one
+# comparable string: 'excuse | yesterday | today', or ' | ' parts empty for a
+# worker with something to say. The same string is built from what the fill wrote.
+$idleWant = {
+    param($Row)
+    # A row with no first index has no second either; one that does fails here.
+    if ($null -eq $Row.nothingIndex) { return ' || ' + "$($Row.nothingTodayIndex)" }
+    $y = [string]$nothing[[int]$Row.nothingIndex]
+    $t = [string]$nothingToday[[int]$Row.nothingTodayIndex]
+    return "$y | $y | $t"
+}
+$idleGot = {
+    param($W)
+    $pair = @($W.status | Where-Object { $null -ne $_ })
+    if ($pair.Count -eq 0) { return ([string]$W.excuse) + ' || ' }
+    return ([string]$W.excuse) + ' | ' + ((@($pair | ForEach-Object { [string]$_ })) -join ' | ')
+}
+$idleSays = {
+    param($Row)
+    if ($null -eq $Row.nothingIndex) { return 'says no made-up item (excuse empty, status empty)' }
+    return "says nothing[$($Row.nothingIndex)] and nothingToday[$($Row.nothingTodayIndex)], excuse the first"
+}
+# A filled worker's two indexes, as a fixture row of standup-joined.json states them.
+$idleIndexes = {
+    param($W)
+    $pair = @($W.status | Where-Object { $null -ne $_ })
+    if ($pair.Count -eq 0) { return 'null/null' }
+    return "$([array]::IndexOf($nothing, [string]$pair[0]))/$([array]::IndexOf($nothingToday, [string]$pair[1]))"
+}
 
 $fixtureDir = Join-Path $scriptDir 'fixtures/rituals'
 $fixturePath = Join-Path $fixtureDir 'standup.json'
@@ -156,9 +188,9 @@ for ($n = 0; $n -lt $cases.Count; $n++) {
             Assert-True "${name}: $($w.label).$slot is [$want]" ($got -eq $want) "got [$got]"
         }
         Assert-True "${name}: $($w.label).empty is $($w.empty)" ([bool]$g.empty -eq [bool]$w.empty)
-        $wantExcuse = ''
-        if ($null -ne $w.nothingIndex) { $wantExcuse = $nothing[[int]$w.nothingIndex] }
-        Assert-True "${name}: $($w.label)'s status sentence is nothing[$($w.nothingIndex)]" ($g.excuse -ceq $wantExcuse) "got '$($g.excuse)', want '$wantExcuse'"
+        $want = & $idleWant $w
+        $got = & $idleGot $g
+        Assert-True "${name}: $($w.label) $(& $idleSays $w)" ($got -ceq $want) "got '$got', want '$want'"
     }
 
     $text = Format-P20StandupText -Standup $s -PackageRoot $pkgRoot
@@ -189,7 +221,7 @@ for ($n = 0; $n -lt $cases.Count; $n++) {
     Assert-True "${name}: no fakeWork line in the real register ($($fakeWork.Count) checked)" (@($fakeWork | Where-Object { $text.Contains([string]$_) }).Count -eq 0)
     Assert-True "${name}: no excuses line in the real register ($($excuses.Count) checked)" (@($excuses | Where-Object { $text.Contains([string]$_) }).Count -eq 0)
 }
-Assert-True 'the vocabulary has an excuses family (the nonsense register''s) and a nothing family (the empty worker''s)' ($excuses.Count -gt 0 -and $nothing.Count -gt 0)
+Assert-True 'the vocabulary has an excuses family (the nonsense register''s) and nothing and nothingToday families (the empty worker''s)' ($excuses.Count -gt 0 -and $nothing.Count -gt 0 -and $nothingToday.Count -gt 0)
 Assert-True 'the vocabulary has a fakeWork family to grep for' ($fakeWork.Count -gt 0)
 
 # A nothing line is the day around the work and claims NO TRACKER WORK -- no word of
@@ -206,15 +238,28 @@ $trackerWord = {
     }
     return ''
 }
-Assert-True "the nothing family has more than one line ($($nothing.Count)), so two idle workers say different lines" ($nothing.Count -gt 1)
-$nothingSeen = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
-$nothingTwice = @($nothing | Where-Object { -not $nothingSeen.Add([string]$_) })
-Assert-True 'no nothing line appears twice' ($nothingTwice.Count -eq 0) ($nothingTwice -join ' | ')
 Assert-True "the tracker-word list has words ($($banned.Count))" ($banned.Count -gt 0)
-foreach ($line in $nothing) {
-    $hit = & $trackerWord ([string]$line)
-    Assert-True "no tracker work in the nothing line '$line'" ($hit -eq '') "says '$hit'"
+foreach ($family in @('nothing', 'nothingToday')) {
+    $lines = @($data.Vocabulary.$family)
+    Assert-True "the $family family has more than one line ($($lines.Count)), so two idle workers say different lines" ($lines.Count -gt 1)
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+    $twice = @($lines | Where-Object { -not $seen.Add([string]$_) })
+    Assert-True "no $family line appears twice" ($twice.Count -eq 0) ($twice -join ' | ')
+    foreach ($line in $lines) {
+        $hit = & $trackerWord ([string]$line)
+        Assert-True "no tracker work in the $family line '$line'" ($hit -eq '') "says '$hit'"
+    }
 }
+# A worker's yesterday and today are two different items: no sentence is in both
+# families, and their lengths share no factor, so the pair does not repeat in step.
+$yesterdaySet = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+foreach ($line in $nothing) { [void]$yesterdaySet.Add([string]$line) }
+$inBoth = @($nothingToday | Where-Object { $yesterdaySet.Contains([string]$_) })
+Assert-True 'no sentence is in both the nothing and the nothingToday family' ($inBoth.Count -eq 0) ($inBoth -join ' | ')
+$ga = $nothing.Count
+$gb = $nothingToday.Count
+while ($gb -ne 0) { $gr = $ga % $gb; $ga = $gb; $gb = $gr }
+Assert-True "the two families' lengths ($($nothing.Count), $($nothingToday.Count)) share no factor, so they never run in step" ($ga -eq 1) "their greatest common divisor is $ga"
 foreach ($line in @('Opened a PR.', 'Went over the  Pull  Request.', 'Two cards moved.', 'Ran the tests.')) {
     Assert-True "the tracker-word guard catches '$line'" ((& $trackerWord $line) -ne '')
 }
@@ -290,9 +335,9 @@ for ($n = 0; $n -lt $cardCases.Count; $n++) {
             Assert-True "${name}: $slot is [$want]" ($got -ceq $want) "got [$got]"
         }
         Assert-True "${name}: empty is $($w.empty)" ([bool]$ws[0].empty -eq [bool]$w.empty)
-        $wantExcuse = ''
-        if ($null -ne $w.nothingIndex) { $wantExcuse = $nothing[[int]$w.nothingIndex] }
-        Assert-True "${name}: the status sentence is nothing[$($w.nothingIndex)]" ($ws[0].excuse -ceq $wantExcuse) "got '$($ws[0].excuse)', want '$wantExcuse'"
+        $want = & $idleWant $w
+        $got = & $idleGot $ws[0]
+        Assert-True "${name}: the worker $(& $idleSays $w)" ($got -ceq $want) "got '$got', want '$want'"
     }
 
     $brief = Format-P20StandupBrief -Standup $s -PackageRoot $pkgRoot
@@ -441,9 +486,9 @@ foreach ($case in $joinedCases) {
     $want = (@($exp.walk | ForEach-Object { [string]$_ })) -join ','
     $got = Get-Refs $s.queue.walk
     Assert-True "${name}: the walk is [$want]" ($got -ceq $want) "got [$got]"
-    $wantWorkers = (@($exp.workers | ForEach-Object { "$($_.label)/$($_.name) y[$((@($_.yesterday)) -join ',')] t[$((@($_.today)) -join ',')] b[$((@($_.blockers)) -join ',')] $([bool]$_.empty)" })) -join ' | '
-    $gotWorkers = (@($s.workers | ForEach-Object { "$($_.label)/$($_.name) y[$(Get-Refs $_.yesterday)] t[$(Get-Refs $_.today)] b[$(Get-Refs $_.blockers)] $([bool]$_.empty)" })) -join ' | '
-    Assert-True "${name}: every worker's slots by ref" ($gotWorkers -ceq $wantWorkers) ("`n got: $gotWorkers`nwant: $wantWorkers")
+    $wantWorkers = (@($exp.workers | ForEach-Object { "$($_.label)/$($_.name) y[$((@($_.yesterday)) -join ',')] t[$((@($_.today)) -join ',')] b[$((@($_.blockers)) -join ',')] $([bool]$_.empty) $(if ($null -eq $_.nothingIndex) { 'null' } else { $_.nothingIndex })/$(if ($null -eq $_.nothingTodayIndex) { 'null' } else { $_.nothingTodayIndex })" })) -join ' | '
+    $gotWorkers = (@($s.workers | ForEach-Object { "$($_.label)/$($_.name) y[$(Get-Refs $_.yesterday)] t[$(Get-Refs $_.today)] b[$(Get-Refs $_.blockers)] $([bool]$_.empty) $(& $idleIndexes $_)" })) -join ' | '
+    Assert-True "${name}: every worker's slots by ref, and an idle one's two made-up items by index" ($gotWorkers -ceq $wantWorkers) ("`n got: $gotWorkers`nwant: $wantWorkers")
     $wantChecks = (@($exp.checks | ForEach-Object { ([string]$consts.rituals.text.([string]$_.key)).Replace('{item}', [string]$_.item) })) -join "`n"
     $gotChecks = (@($s.checks | ForEach-Object { [string]$_ })) -join "`n"
     Assert-True "${name}: the Check lines ($(@($exp.checks).Count))" ($gotChecks -ceq $wantChecks) ("`n got: $gotChecks`nwant: $wantChecks")
@@ -1116,6 +1161,10 @@ try {
         Assert-True '-AsJson keeps empty slots as arrays' ($j.Inner -match '"decide"\s*:\s*\[\s*\]') $j.Inner
         $sonnet = @($parsed.workers | Where-Object { $_.label -eq 'sonnet' })[0]
         Assert-True '-AsJson: an empty worker carries one status sentence from the nothing family' ($sonnet -and [bool]$sonnet.empty -and $nothing -contains [string]$sonnet.excuse) $j.Inner
+        $sonnetPair = @($sonnet.status)
+        Assert-True '-AsJson: and its status is two items, nothing''s then nothingToday''s, the first its excuse' ($sonnetPair.Count -eq 2 -and [string]$sonnetPair[0] -ceq [string]$sonnet.excuse -and $nothingToday -contains [string]$sonnetPair[1]) $j.Inner
+        $busy = @($parsed.workers | Where-Object { -not [bool]$_.empty })
+        Assert-True '-AsJson: a worker with something to say carries an empty status list' ($busy.Count -gt 0 -and @($busy | Where-Object { @($_.status).Count -ne 0 -or [string]$_.excuse -ne '' }).Count -eq 0 -and $j.Inner -match '"status"\s*:\s*\[\s*\]') $j.Inner
     }
 
     # The typed verb asks whether a launch would work on this host (claude on the

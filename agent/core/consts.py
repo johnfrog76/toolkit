@@ -516,7 +516,7 @@ def rituals_ceremonies_file() -> str:
 
 
 def rituals_vocabulary_file() -> str:
-    """phrasebook, nothing, excuses, fakeWork -- relative to the package root."""
+    """phrasebook, nothing, nothingToday, excuses, fakeWork, verbs -- relative to the package root."""
     return consts()["rituals"]["vocabularyFile"]
 
 

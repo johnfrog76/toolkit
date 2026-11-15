@@ -64,8 +64,12 @@ export interface StandupWorker {
   blockers: RitualItem[];
   /** All three slots empty: the worker renders the mug and its one status sentence. */
   empty: boolean;
-  /** The empty worker's status sentence (the `nothing` family). The name is historical. */
+  /** The empty worker's status sentence: the first of `status`, kept for a reader that
+   *  knows only this field. The name is historical. */
   excuse: string;
+  /** The empty worker's two made-up items, `[yesterday, today]` (the `nothing` and
+   *  `nothingToday` families); `[]` for a worker with something to say. */
+  status: string[];
 }
 
 /** One group at the work grain (D-TA20): what a slot's items belong to --

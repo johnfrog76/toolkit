@@ -71,6 +71,27 @@ def _tracker_word(line: str) -> str:
     return ""
 
 
+def _idle_said(exp: dict) -> tuple[str, list[str]]:
+    """A fixture worker row's ``excuse`` and ``status``, from its two indexes: an idle
+    worker says nothing[nothingIndex] and nothingToday[nothingTodayIndex], and its
+    excuse is the first; a worker with something to say has neither."""
+    if exp["nothingIndex"] is None:
+        assert exp["nothingTodayIndex"] is None, exp
+        return "", []
+    pair = [VOCAB["nothing"][exp["nothingIndex"]], VOCAB["nothingToday"][exp["nothingTodayIndex"]]]
+    return pair[0], pair
+
+
+def _indexes(w) -> dict:
+    """A filled worker's two indexes into the made-up families, as a fixture row states them."""
+    if not w.status:
+        return {"nothingIndex": None, "nothingTodayIndex": None}
+    return {
+        "nothingIndex": VOCAB["nothing"].index(w.status[0]),
+        "nothingTodayIndex": VOCAB["nothingToday"].index(w.status[1]),
+    }
+
+
 def _golden(name: str) -> str:
     # Bytes, not text mode: a CRLF checkout would be translated, and LF is the law.
     return (FIXTURES / name).read_bytes().decode("utf-8")
@@ -121,10 +142,7 @@ class TheTable(unittest.TestCase):
                     self.assertEqual([i.number for i in got.today], exp["today"])
                     self.assertEqual([i.number for i in got.blockers], exp["blockers"])
                     self.assertEqual(got.empty, exp["empty"])
-                    if exp["nothingIndex"] is None:
-                        self.assertEqual(got.excuse, "")
-                    else:
-                        self.assertEqual(got.excuse, VOCAB["nothing"][exp["nothingIndex"]])
+                    self.assertEqual((got.excuse, got.status), _idle_said(exp))
 
     def test_the_text_is_the_golden_file_byte_for_byte(self):
         for name, case in CASES.items():
@@ -174,9 +192,11 @@ class TheTable(unittest.TestCase):
         self.assertNotIn('"excuses"', source)
 
     def test_an_empty_worker_reports_the_nothing_sentence_in_both_registers_of_text(self):
-        """Empty is the vocabulary's `nothing` line at (day of year + position) mod
-        length -- in the worker and the long text; two idle workers on one day say different lines."""
-        nothing = VOCAB["nothing"]
+        """Empty is two made-up items, the vocabulary's `nothing` line and its `nothingToday`
+        line, each at (day of year + position) mod its own length -- on the wire as
+        ``status``, with ``excuse`` its first, which the long text says; two idle workers on
+        one day say different lines."""
+        nothing, today = VOCAB["nothing"], VOCAB["nothingToday"]
         for name in ("friday", "monday"):
             case = CASES[name]
             d = case["expected"]["dayOfYear"]
@@ -185,23 +205,42 @@ class TheTable(unittest.TestCase):
             self.assertTrue(empties, name)
             for i, w in empties:
                 with self.subTest(case=name, worker=w.label):
-                    self.assertEqual(w.excuse, nothing[(d + i) % len(nothing)])
+                    self.assertEqual(w.status, [nothing[(d + i) % len(nothing)], today[(d + i) % len(today)]])
+                    self.assertEqual(w.excuse, w.status[0])
                     self.assertIn(f'Mug        "{w.excuse}"', filled.text)
-        monday = [w.excuse for w in _fill(CASES["monday"]).workers if w.empty]
+        monday = [w.status for w in _fill(CASES["monday"]).workers if w.empty]
         self.assertEqual(len(monday), 2)
-        self.assertNotEqual(monday[0], monday[1])
+        self.assertNotEqual(monday[0][0], monday[1][0])
+        self.assertNotEqual(monday[0][1], monday[1][1])
+        for w in _fill(CASES["friday"]).workers:
+            if not w.empty:
+                with self.subTest(worker=w.label):
+                    self.assertEqual((w.excuse, w.status), ("", []))
 
     def test_no_nothing_line_claims_tracker_work(self):
-        """A `nothing` line is the day around the work and never names what the tracker
-        would show -- no word of standup-nothing-banned.json, whole word, any case; the same list
-        tkTestToolkit -Rituals reads. More than one line, and none twice, so the pick rotates."""
-        nothing = VOCAB["nothing"]
-        self.assertGreater(len(nothing), 1)
-        self.assertEqual(len(nothing), len(set(nothing)), "a nothing line appears twice")
+        """A `nothing` or `nothingToday` line is the day around the work and never names what
+        the tracker would show -- no word of standup-nothing-banned.json, whole word, any case;
+        the same list tkTestToolkit -Rituals reads. Each family has more than one line, and none
+        twice, so the pick rotates."""
         self.assertTrue(NOTHING_BANNED)
-        for line in nothing:
-            with self.subTest(line=line):
-                self.assertEqual(_tracker_word(line), "", line)
+        for family in ("nothing", "nothingToday"):
+            lines = VOCAB[family]
+            with self.subTest(family=family):
+                self.assertGreater(len(lines), 1)
+                self.assertEqual(len(lines), len(set(lines)), f"a {family} line appears twice")
+            for line in lines:
+                with self.subTest(family=family, line=line):
+                    self.assertEqual(_tracker_word(line), "", line)
+
+    def test_the_two_made_up_families_are_apart_and_never_in_step(self):
+        """A worker's yesterday and today are two different items: no sentence is in both
+        families, and their lengths share no factor, so the pair a worker says does not
+        repeat in step."""
+        from math import gcd
+
+        nothing, today = VOCAB["nothing"], VOCAB["nothingToday"]
+        self.assertEqual(sorted(set(nothing) & set(today)), [])
+        self.assertEqual(gcd(len(nothing), len(today)), 1, (len(nothing), len(today)))
 
     def test_the_tracker_word_guard_has_teeth(self):
         """The guard's own rule over made-up lines: a banned word anywhere, in any case, is caught;
@@ -214,13 +253,24 @@ class TheTable(unittest.TestCase):
                 self.assertEqual(_tracker_word(line), "")
 
     def test_the_nothing_family_is_picked_deterministically(self):
-        """index = (day of year + position) mod length, so a longer family rotates."""
-        longer = dict(VOCAB, nothing=["A.", "B.", "C."])
+        """index = (day of year + position) mod length, each family by its own length, so a
+        longer family rotates; the cards tile is picked by its position the same way."""
+        longer = dict(VOCAB, nothing=["A.", "B.", "C."], nothingToday=["X.", "Y."])
         for as_of, d in (("2026-10-02T09:00:00-04:00", 275), ("2026-10-03T09:00:00-04:00", 276)):
             with mock.patch.object(standup, "vocabulary", return_value=longer):
                 labels = [{"name": f"w{i}", "description": C.rituals_worker_label_prefix() + f"W{i}"} for i in range(3)]
                 filled = standup.fill_standup(datetime.fromisoformat(as_of), labels, [], {"ok": True, "reason": ""})
-            self.assertEqual([w.excuse for w in filled.workers], [longer["nothing"][(d + i) % 3] for i in range(3)])
+                cards = standup.fill_cards_standup(datetime.fromisoformat(as_of), [], space="widgets")
+            want = [[longer["nothing"][(d + i) % 3], longer["nothingToday"][(d + i) % 2]] for i in range(3)]
+            self.assertEqual([w.status for w in filled.workers], want)
+            self.assertEqual([w.excuse for w in filled.workers], [p[0] for p in want])
+            self.assertEqual([w.status for w in cards.workers], want[:1])
+        later = [standup.Worker(label=f"w{i}", name=f"W{i}", empty=True) for i in range(3)]
+        standup.set_idle(later, 275, longer)
+        self.assertEqual([w.status for w in later], [["C.", "Y."], ["A.", "X."], ["B.", "Y."]])
+        without = [standup.Worker(label="w", name="W", empty=True)]
+        standup.set_idle(without, 275, dict(longer, nothingToday=[]))
+        self.assertEqual((without[0].excuse, without[0].status), ("", []))
 
     def test_the_tracker_reason_is_in_the_text_when_it_does_not_answer(self):
         filled = _fill(CASES["no-tracker"])
@@ -343,8 +393,7 @@ class TheCardsTable(unittest.TestCase):
                 self.assertEqual([i.id for i in w.today], exp["today"])
                 self.assertEqual([i.id for i in w.blockers], exp["blockers"])
                 self.assertEqual(w.empty, exp["empty"])
-                want_excuse = "" if exp["nothingIndex"] is None else VOCAB["nothing"][exp["nothingIndex"]]
-                self.assertEqual(w.excuse, want_excuse)
+                self.assertEqual((w.excuse, w.status), _idle_said(exp))
 
     def test_a_card_item_has_an_id_and_a_path_and_no_number_or_url(self):
         filled = _fill_cards(CARD_CASES["friday"])
@@ -639,6 +688,7 @@ class TheJoinedTable(unittest.TestCase):
                     "name": w.name,
                     **{slot: [_ref(i) for i in getattr(w, slot)] for slot in ("yesterday", "today", "blockers")},
                     "empty": w.empty,
+                    **_indexes(w),
                 }
                 for w in filled.workers
             ]
@@ -1091,7 +1141,7 @@ class TheDressTable(unittest.TestCase):
         system, prompt = standup.dress_prompt(facts)
         for verb in VOCAB["verbs"]:
             self.assertIn(verb, system)
-        for family in ("fakeWork", "excuses", "phrasebook"):
+        for family in ("fakeWork", "excuses", "phrasebook", "nothing", "nothingToday"):
             for phrase in VOCAB[family]:
                 with self.subTest(family=family, phrase=phrase):
                     self.assertNotIn(phrase, system + prompt)
@@ -1582,7 +1632,7 @@ def _brief_less_corner(body: dict) -> str:
 
 WORK_FIELDS = {"queue", "workers", "queueProse", "text"}
 GROUP_FIELDS = {"name", "by", "count", "refs", "phrase"}
-WORKER_FIELDS = {"label", "name", "yesterday", "today", "blockers", "empty", "excuse"}
+WORKER_FIELDS = {"label", "name", "yesterday", "today", "blockers", "empty", "excuse", "status"}
 WALK_FIELDS = {"number", "id", "title", "url", "path", "motion", "commits", "worker"}
 ITEM_FIELDS = {"number", "id", "title", "url", "path", "motion", "commits"}
 COUNT_FIELDS = {"label", "name", "closed", "started", "inProgress", "commits", "undated"}

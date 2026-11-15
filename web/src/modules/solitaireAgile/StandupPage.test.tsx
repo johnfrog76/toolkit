@@ -58,6 +58,7 @@ interface FixtureWorker {
   blockers: number[];
   empty: boolean;
   nothingIndex: number | null;
+  nothingTodayIndex: number | null;
 }
 interface FixtureCase {
   name: string;
@@ -78,7 +79,18 @@ const table = JSON.parse(fs.readFileSync(path.join(FIXTURES, "standup.json"), "u
 };
 const vocab = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, "../../../..", RITUALS.vocabularyFile), "utf8"),
-) as { nothing: string[] };
+) as { nothing: string[]; nothingToday: string[] };
+
+/** A fixture worker row's two made-up items, from its two indexes into the vocabulary's
+ *  `nothing` and `nothingToday` families: `excuse` is the first, `status` both; a worker
+ *  with something to say has neither. */
+function idleOf(row: object): { excuse: string; status: string[] } {
+  const w = row as { nothingIndex?: unknown; nothingTodayIndex?: unknown };
+  if (typeof w.nothingIndex !== "number" || typeof w.nothingTodayIndex !== "number")
+    return { excuse: "", status: [] };
+  const status = [vocab.nothing[w.nothingIndex], vocab.nothingToday[w.nothingTodayIndex]];
+  return { excuse: status[0], status };
+}
 
 /** An empty worker's status sentence: the vocabulary's `nothing` line at the fixture's index. */
 function statusOf(caseName: string, label: string): string {
@@ -118,7 +130,7 @@ function responseFor(name: string): StandupResponse {
       today: items(w.today),
       blockers: items(w.blockers),
       empty: w.empty,
-      excuse: "",
+      ...idleOf(w),
     })),
     text,
     brief: fs.readFileSync(path.join(FIXTURES, c.expected.brief), "utf8"),
@@ -396,7 +408,7 @@ describe("copy and the joined text", () => {
         today: slot(w, "today"),
         blockers: slot(w, "blockers"),
         empty: Boolean(w.empty),
-        excuse: "",
+        ...idleOf(w),
       })),
       text,
     };

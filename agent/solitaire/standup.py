@@ -204,9 +204,13 @@ class Worker(BaseModel):
     today: list[SlotItem] = []
     blockers: list[SlotItem] = []
     empty: bool = False
-    # The wire name is historical: it is the empty worker's one status sentence,
-    # from the `nothing` family, not an excuse. Both renderers and every golden read it.
+    # The first of ``status``, kept for a reader that knows only this field. The
+    # wire name is historical: it is a status sentence, not an excuse. Both
+    # renderers and every golden read it.
     excuse: str = ""
+    # The empty worker's two made-up items, [yesterday, today]: the `nothing` and
+    # `nothingToday` families (``set_idle``); [] for a worker with something to say.
+    status: list[str] = []
 
 
 class WorkGroup(BaseModel):
@@ -661,6 +665,23 @@ def issue_keys(issues: list[dict]) -> dict[str, tuple[str, str]]:
     }
 
 
+def set_idle(workers: list[Worker], d: int, words: dict) -> None:
+    """The idle worker's turn: each of ``workers`` (in order) that is ``empty``
+    says two made-up items, ``status = [yesterday, today]`` --
+    ``nothing[(d + i) mod len]`` and ``nothingToday[(d + i) mod len2]``, ``d`` the
+    day of the year (1-based), ``i`` the worker's position among ``workers``
+    (0-based). The two lengths share no factor, so the pair does not repeat in
+    step. ``excuse`` is the first of the two, for a reader that knows only that
+    field. A worker with something to say gets ``""`` and ``[]``. With either
+    family empty, no worker says a made-up item. The mirror of ``Set-P20StandupIdle``."""
+    yesterday, today = words.get("nothing") or [], words.get("nothingToday") or []
+    for i, w in enumerate(workers):
+        w.excuse, w.status = "", []
+        if w.empty and yesterday and today:
+            w.status = [yesterday[(d + i) % len(yesterday)], today[(d + i) % len(today)]]
+            w.excuse = w.status[0]
+
+
 def fill_standup(
     as_of: datetime, labels: list[dict], issues: list[dict], tracker_state: dict, space: str = "", window: str = ""
 ) -> Standup:
@@ -672,7 +693,7 @@ def fill_standup(
     ``window`` is ``since``'s day (``window_start``); "" is the previous working day.
     """
     words = vocabulary()
-    phrasebook, nothing = words["phrasebook"], words["nothing"]
+    phrasebook = words["phrasebook"]
     d = as_of.timetuple().tm_yday
     since = window_start(as_of, window)
     state = TrackerState(ok=bool(tracker_state.get("ok")), reason=str(tracker_state.get("reason") or ""))
@@ -721,12 +742,10 @@ def fill_standup(
                 w.yesterday.append(_item(issue))
 
     out.queue = Queue(walk=walk)
-    for i, (label, _name) in enumerate(routes):
-        w = workers[label]
-        if not (w.yesterday or w.today or w.blockers):
-            w.empty = True
-            w.excuse = nothing[(d + i) % len(nothing)]
     out.workers = [workers[label] for label, _ in routes]
+    for w in out.workers:
+        w.empty = not (w.yesterday or w.today or w.blockers)
+    set_idle(out.workers, d, words)
     out.work = build_work(out, key_of)
     out.counts = standup_counts(out, {})
     return out
@@ -919,7 +938,7 @@ def fill_cards_standup(
     Within a slot, file-name order.
     """
     words = vocabulary()
-    phrasebook, nothing = words["phrasebook"], words["nothing"]
+    phrasebook = words["phrasebook"]
     d = as_of.timetuple().tm_yday
     since = window_start(as_of, window)
     name = space_name or space
@@ -933,11 +952,11 @@ def fill_cards_standup(
         chair=Chair(open=phrasebook[d % len(phrasebook)], close=phrasebook[(d + 1) % len(phrasebook)]),
     )
     worker, walk, key_of, hashes, _undated = _cards_tile(as_of, cards_in_play(cards), space, name, out._marks, since)
-    if not (worker.yesterday or worker.today or worker.blockers):
-        worker.empty = True
-        worker.excuse = nothing[d % len(nothing)]
+    worker.empty = not (worker.yesterday or worker.today or worker.blockers)
     out.queue = Queue(walk=walk)
     out.workers = [worker]
+    # The tile is a worker like any other: its made-up items are picked by its position.
+    set_idle(out.workers, d, words)
     out.work = build_work(out, key_of)
     out.counts = standup_counts(out, hashes)
     return out

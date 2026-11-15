@@ -59,8 +59,8 @@
 
     The real register never reads the vocabulary's fakeWork family (D-SA5) --
     nor excuses (the nonsense register's) -- only phrasebook (the chair)
-    and nothing (the empty worker's status) -- and the suite greps every
-    rendered case for fakeWork.
+    and nothing and nothingToday (the empty worker's yesterday and today) --
+    and the suite greps every rendered case for fakeWork.
 
     Times are DateTimeOffset throughout and compared with their offsets. A value
     may arrive as a string (5.1's ConvertFrom-Json, a fixture) or a [datetime]
@@ -431,6 +431,38 @@ function Get-P20StandupIssueKeys {
     return $keys
 }
 
+function Set-P20StandupIdle {
+    <#
+      The idle worker's turn: each worker of Workers (in order) whose slots are
+      all empty says two made-up items, as status = @(yesterday, today) --
+      nothing[(d + i) mod len] and nothingToday[(d + i) mod len2], d the day of
+      the year (1-based), i the worker's position among Workers (0-based). The
+      two lengths share no factor, so the pair does not repeat in step. excuse
+      is the first of the two, for a reader that knows only that field. A
+      worker with something to say gets excuse '' and status empty. With
+      either family empty, no worker says a made-up item. set_idle in the agent.
+    #>
+    param(
+        $Workers,
+        [int]$Day,
+        $Vocabulary
+    )
+    $yesterday = @($Vocabulary.nothing)
+    $today = @($Vocabulary.nothingToday)
+    $i = 0
+    foreach ($w in @($Workers)) {
+        if ($null -eq $w) { continue }
+        $w['excuse'] = ''
+        $w['status'] = [object[]]@()
+        if ($w.empty -and $yesterday.Count -gt 0 -and $today.Count -gt 0) {
+            $pair = [object[]]@([string]$yesterday[($Day + $i) % $yesterday.Count], [string]$today[($Day + $i) % $today.Count])
+            $w['excuse'] = $pair[0]
+            $w['status'] = $pair
+        }
+        $i++
+    }
+}
+
 function Invoke-P20StandupFill {
     <#
       The fill. Pure over its inputs: no gh, no clock, no file but the two data
@@ -445,7 +477,7 @@ function Invoke-P20StandupFill {
 
       An issue's worker is its first worker label. An open issue with neither a
       worker label nor the walk label appears nowhere. A worker whose slots are
-      all empty is empty and carries one status sentence (the wire field is still named excuse): nothing[(d + i) mod len], d the
+      all empty is empty and says two made-up items (Set-P20StandupIdle): d the
       day of the year of asOf (1-based), i its position (0-based). The chair
       opens on phrasebook[d mod len] and closes on phrasebook[(d + 1) mod len].
       With tracker.ok false the queue and the workers are empty -- the ritual
@@ -469,7 +501,6 @@ function Invoke-P20StandupFill {
     $d = $at.DayOfYear
 
     $phrases = @($data.Vocabulary.phrasebook)
-    $nothing = @($data.Vocabulary.nothing)
 
     $ok = $true
     $reason = ''
@@ -534,7 +565,6 @@ function Invoke-P20StandupFill {
             }
         }
 
-        $i = 0
         foreach ($def in $defs) {
             $w = [ordered]@{ label = $def.label; name = $def.name }
             $empty = $true
@@ -544,11 +574,9 @@ function Invoke-P20StandupFill {
                 $w[$slot] = $sorted
             }
             $w['empty'] = $empty
-            $w['excuse'] = ''
-            if ($empty -and $nothing.Count -gt 0) { $w['excuse'] = [string]$nothing[($d + $i) % $nothing.Count] }
             [void]$workers.Add($w)
-            $i++
         }
+        Set-P20StandupIdle -Workers $workers.ToArray() -Day $d -Vocabulary $data.Vocabulary
     }
 
     $queue = [ordered]@{}
@@ -867,6 +895,7 @@ function Get-P20StandupCardTile {
     }
     $w['empty'] = $empty
     $w['excuse'] = ''
+    $w['status'] = [object[]]@()
     return @{ worker = $w; walk = [object[]]$walk.ToArray(); keyOf = $keyOf; hashes = $hashesOf; undated = $undatedOf }
 }
 
@@ -895,7 +924,6 @@ function Invoke-P20StandupCardsFill {
     $since = Get-P20StandupSince -AsOf $at -Window $Window
     $d = $at.DayOfYear
     $phrases = @($data.Vocabulary.phrasebook)
-    $nothing = @($data.Vocabulary.nothing)
 
     $name = $SpaceName
     if (-not $name) { $name = $Space }
@@ -903,7 +931,8 @@ function Invoke-P20StandupCardsFill {
     $kinds = @($data.Ceremony.queue | ForEach-Object { [string]$_ })
     $tile = Get-P20StandupCardTile -AsOf $at -Cards @(Get-P20StandupCardsInPlay -Cards $Cards) -Label $Space -Name $name -Slots $slots -From $since
     $w = $tile.worker
-    if ($w.empty -and $nothing.Count -gt 0) { $w['excuse'] = [string]$nothing[$d % $nothing.Count] }
+    # The tile is a worker like any other: its made-up items are picked by its position.
+    Set-P20StandupIdle -Workers @($w) -Day $d -Vocabulary $data.Vocabulary
 
     $queue = [ordered]@{}
     foreach ($kind in @($data.Ceremony.queue)) { $queue[[string]$kind] = [object[]]@() }
