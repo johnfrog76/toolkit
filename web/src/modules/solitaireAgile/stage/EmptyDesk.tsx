@@ -337,6 +337,8 @@ export function EmptyDesk({ look, tint = EMPTY_DESK_TINT }: { look: MugLook; tin
           <rect x={88.5} y={50} width={3} height={14} rx={1.2} fill="#000" opacity={0.42} />
           <rect x={36} y={47.5} width={12} height={4} rx={2} fill="#000" opacity={0.55} />
           <rect x={84} y={47.5} width={12} height={4} rx={2} fill="#000" opacity={0.55} />
+          {/* the seat, seen just over the desk's edge, joining the arms */}
+          <rect x={41} y={58} width={50} height={7} rx={3.5} fill="#000" opacity={0.4} />
           {/* the headrest on its neck */}
           <rect x={64} y={11} width={4} height={10} rx={1.2} fill="#000" opacity={0.45} />
           <rect x={53} y={3.5} width={26} height={11} rx={5.5} fill="#000" opacity={0.36} />
