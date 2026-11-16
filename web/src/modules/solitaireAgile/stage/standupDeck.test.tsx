@@ -16,8 +16,7 @@ import {
   SPEECH_MAX_LINES,
   THOUGHT_MAX_HEIGHT,
   REDUCED_MOTION_RULE,
-  SPEECH_EDGE_PADDING,
-  SPEECH_MAX_WIDTH,
+  SPEECH_SIZES,
   STAGE_CLASS,
   STAGE_GRID_CLASS,
 } from "./cast";
@@ -314,6 +313,14 @@ describe("the standup deck, from Friday's fixture", () => {
       expect(tile(seat).getAttribute("data-look")).toBe("called");
       expect(within(tile(seat)).getByTestId("stage-layer").style.filter).toBe("");
       expect(within(tile(seat)).queryByTestId("stage-frame")).toBeNull();
+      // The called mark shows on any tint: on the called window, and on no other.
+      expect(view.container.querySelectorAll('[data-testid="stage-called-mark"]')).toHaveLength(1);
+      expect(within(tile(seat)).getByTestId("stage-called-mark").style.outline).toMatch(
+        /3px dashed/,
+      );
+      expect(within(tile(seat)).getByTestId("stage-called-mark").style.outline).toContain(
+        `var(${SPEAKER_COLOR_VAR}`,
+      );
       expect(within(tile(seat)).queryByTestId("stage-speech")).toBeNull();
       expect(view.container.querySelectorAll('[data-testid="stage-frame"]')).toHaveLength(1);
       expect(within(tile("pm")).getByTestId("stage-speech-text").textContent).toBe(`${w.name}.`);
@@ -340,7 +347,9 @@ describe("the standup deck, from Friday's fixture", () => {
       const chair = render(<>{slides[at(part)].copy}</>);
       const pm = castById("pm");
       expect(chair.getByTestId("standup-copy").textContent).not.toContain(pm.motto);
-      expect(chair.getByTestId("standup-copy").textContent).toContain(pm.label);
+      // The chair's panel reads its plate, not the persona's old word.
+      expect(chair.getByTestId("standup-copy").textContent).toContain(CHAIR_PLATE);
+      expect(chair.getByTestId("standup-copy").textContent).not.toContain(pm.label);
       expect(chair.getByTestId("standup-copy").textContent).not.toMatch(/\((fable|opus|sonnet)\)/);
       chair.unmount();
     }
@@ -529,37 +538,41 @@ describe("the stage's bubbles", () => {
     for (const c of CAST) if (c.id !== "dev-hero") expect(speech(tile(c.id))).toBeNull();
   });
 
-  it("the speech surface points at the speaker's face, not the tile's box", () => {
-    mockPopovers.length = 0;
+  it("the speech surface is the speaking window's own, laid out unseen until the stage has placed it", () => {
     const { tile } = drawStage(FABLE);
-    const face = screen.getByTestId("tile-dev-hero-face");
-    expect(tile("dev-hero").contains(face)).toBe(true);
-    expect(face).not.toBe(tile("dev-hero"));
-    const speechPop = mockPopovers.filter((p) => p.positioning && "target" in p.positioning);
-    expect(speechPop).toHaveLength(1);
-    const pos = speechPop[0].positioning!;
-    expect(pos.target).toBe(face);
-    expect(pos.target).not.toBe(tile("dev-hero"));
-    expect(pos.position).toBe("above");
-    expect(pos.align).toBe("center");
+    const s = speech(tile("dev-hero"))!;
+    // A test's DOM has no layout, so nothing is measured and it is never placed: unseen.
+    expect(s.style.visibility).toBe("hidden");
+    expect(s.style.position).toBe("absolute");
+    expect(s.style.maxWidth).toBe(`${SPEECH_SIZES[0].maxWidth}px`);
+    expect(within(s).getByTestId("stage-speech-text").style.fontSize).toBe(
+      SPEECH_SIZES[0].fontSize,
+    );
+    expect(within(s).queryByTestId("stage-speech-tail")).toBeNull();
   });
 
-  it("a bubble is kept inside the grid of windows, off the stage's title, with a margin: beside the face, then below, when it does not fit above", () => {
-    mockPopovers.length = 0;
-    const { view } = drawStage(0); // the chair speaks the board; every speaker takes the same positioning
-    const speechPop = mockPopovers.filter((p) => p.positioning && "target" in p.positioning);
-    expect(speechPop.length).toBeGreaterThan(0);
-    const pos = speechPop[0].positioning!;
-    expect(pos.fallbackPositions).toEqual(["after", "before", "below"]);
-    const grid = view.container.querySelector(`.${STAGE_GRID_CLASS}`);
+  it("the stage marks what a bubble must keep off: every face there is, and every plate", () => {
+    const { view } = drawStage(FABLE);
+    const faces = [...view.container.querySelectorAll("[data-face]")].map((f) =>
+      f.getAttribute("data-testid")!.replace(/^tile-|-face$/g, ""),
+    );
+    const { members } = dealRoom(friday);
+    expect(faces.sort()).toEqual([CHAIR_CAST_ID, ...members.map((m) => m.castId)].sort());
+    expect(view.container.querySelectorAll('[data-testid="stage-plate-label"]')).toHaveLength(
+      ROOM_WINDOWS,
+    );
+    // The bubble is placed inside the grid of windows: the title row is not part of it.
+    const grid = view.container.querySelector(`.${STAGE_GRID_CLASS}`)!;
     expect(grid).toBe(screen.getByTestId("stage-grid"));
-    expect(pos.overflowBoundary).toBe(grid);
-    expect(pos.flipBoundary).toBe(grid);
-    expect(pos.overflowBoundaryPadding).toBe(SPEECH_EDGE_PADDING);
-    expect(SPEECH_EDGE_PADDING).toBeGreaterThan(0);
-    // The title row is outside the boundary.
-    expect(grid!.contains(screen.getByTestId("stage-plate"))).toBe(false);
-    expect(screen.getByTestId("stage-speech").style.maxWidth).toBe(SPEECH_MAX_WIDTH);
+    expect(grid.contains(screen.getByTestId("stage-plate"))).toBe(false);
+  });
+
+  it("the bubble's sizes step down -- narrower, then one type step smaller -- and the first is the widest", () => {
+    expect(SPEECH_SIZES.length).toBeGreaterThan(1);
+    expect(SPEECH_SIZES[0].maxWidth).toBe(Math.max(...SPEECH_SIZES.map((x) => x.maxWidth)));
+    const px = (f: string) => Number(f.replace("rem", ""));
+    for (let k = 1; k < SPEECH_SIZES.length; k++)
+      expect(px(SPEECH_SIZES[k].fontSize)).toBeLessThanOrEqual(px(SPEECH_SIZES[k - 1].fontSize));
   });
 
   it("an empty desk has no face to point at, no bubble and no thought", () => {
@@ -575,15 +588,15 @@ describe("the stage's bubbles", () => {
     }
   });
 
-  it("the thought's trigger sits in the window's top-right corner, clear of the plate and the face; its cloud opens below it", () => {
+  it("the thought's trigger sits in the window's bottom-right corner, clear of the plate and the face; its cloud opens above it", () => {
     mockPopovers.length = 0;
     const { tile } = drawStage(FABLE);
     const thought = mockPopovers.filter((p) => p.positioning && !("target" in p.positioning));
     expect(thought.length).toBeGreaterThan(0);
-    expect(thought[0].positioning).toEqual({ position: "below", align: "end" });
+    expect(thought[0].positioning).toEqual({ position: "above", align: "end" });
     const trigger = within(tile("dev-hero")).getByTestId("stage-thought-trigger");
-    expect([trigger.style.top, trigger.style.right]).toEqual(["8px", "8px"]);
-    expect([trigger.style.bottom, trigger.style.left]).toEqual(["", ""]);
+    expect([trigger.style.bottom, trigger.style.right]).toEqual(["10px", "8px"]);
+    expect([trigger.style.top, trigger.style.left]).toEqual(["", ""]);
   });
 
   it("an idle member's two made-up items are the speech surface's lines", () => {
@@ -743,6 +756,10 @@ describe("the speaker's frame and the three looks", () => {
       const called = view.container.querySelectorAll('[data-look="called"]');
       expect(called.length).toBe(idOf(slides[i]).startsWith("call-") ? 1 : 0);
       expect(coloured).toHaveLength(1 + called.length);
+      // The called mark is the called window's alone: none on any other slide.
+      expect(view.container.querySelectorAll('[data-testid="stage-called-mark"]')).toHaveLength(
+        called.length,
+      );
       view.unmount();
     }
   });

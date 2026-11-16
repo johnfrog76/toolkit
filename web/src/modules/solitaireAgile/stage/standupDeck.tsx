@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import type { Deck, Slide } from "../../deck/decks/types";
 import { Say } from "../../deck/engine/PresenterNoteKit";
@@ -18,6 +18,7 @@ import {
   CastScene,
   castById,
   SPEAKER_COLOR_VAR,
+  SPEECH_SIZES,
   STAGE_GRID_CLASS,
   SpeechBubble,
   STAGE_CLASS,
@@ -32,6 +33,8 @@ import { EmptyDesk } from "./EmptyDesk";
 import type { MugLook } from "./EmptyDesk";
 import { CHAIR_CAST_ID, CHAIR_PLATE, EMPTY_DESK_PLATE, dealRoom, memberPlate } from "./seats";
 import type { Seated } from "./seats";
+import { HEADS, HEAD_FALLBACK, faceBox, leastOverlap, placeBubble } from "./geometry";
+import type { BubbleSide, Rect } from "./geometry";
 
 // ── The standup, played (docs/modules/solitaire-agile.md, "The played view") ─────────
 //
@@ -198,24 +201,6 @@ interface TileState {
   detail?: DetailSlot[];
 }
 
-/**
- * Where each scene's head is, as the top of the head in the tile: the
- * nine scenes are drawn differently (the minimalist sits low, the ultrawide's
- * head is near the top), so one fixed spot would hang the bubble over a
- * different part of each. The bubble's tail points here.
- */
-const HEADS: Record<string, { left: string; top: string }> = {
-  "dev-hero": { left: "50%", top: "38%" },
-  "ops-dev": { left: "50%", top: "58%" },
-  minimalist: { left: "50%", top: "66%" },
-  "new-hire": { left: "23%", top: "60%" },
-  vibemancer: { left: "50%", top: "53%" },
-  ultrawide: { left: "50%", top: "16%" },
-  qa: { left: "44%", top: "45%" },
-  pm: { left: "50%", top: "45%" },
-  designer: { left: "50%", top: "42%" },
-};
-
 /** A window with nobody in it: the ghost look, the signal light off, and nothing to say. */
 function DeskTile({ id, label, look }: { id: string; label: string; look: MugLook }) {
   const tint = castById(id).tint;
@@ -234,14 +219,108 @@ function DeskTile({ id, label, look }: { id: string; label: string; look: MugLoo
   );
 }
 
+/**
+ * The speaking window's bubble, placed: measure the grid, every face and every
+ * plate (and this window's own thought button), then ask ./geometry.ts for a
+ * clean place, trying each of SPEECH_SIZES in turn and taking the last with the
+ * least overlap. The bubble is drawn unseen until it has a place. Without
+ * layout (a test's DOM) nothing measures, and the bubble stays at its origin.
+ */
+function useBubblePlace(speaking: boolean) {
+  const wrap = useRef<HTMLDivElement | null>(null);
+  const bubble = useRef<HTMLDivElement | null>(null);
+  const [step, setStep] = useState(0);
+  const [place, setPlace] = useState<{
+    left: number;
+    top: number;
+    side: BubbleSide;
+    tail: number;
+  } | null>(null);
+  const [tick, setTick] = useState(0);
+  const wrapRef = useCallback((el: HTMLDivElement | null) => {
+    wrap.current = el;
+  }, []);
+  const bubbleRef = useCallback((el: HTMLDivElement | null) => {
+    bubble.current = el;
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!speaking) return;
+    const w = wrap.current;
+    const b = bubble.current;
+    const grid = w?.closest<HTMLElement>(`.${STAGE_GRID_CLASS}`);
+    if (!w || !b || !grid) return;
+    const g = grid.getBoundingClientRect();
+    if (g.width === 0 || g.height === 0) return;
+    const rel = (r: DOMRect): Rect => ({
+      x: r.left - g.left,
+      y: r.top - g.top,
+      w: r.width,
+      h: r.height,
+    });
+    const faces = [...grid.querySelectorAll<HTMLElement>("[data-face]")].map((f) => {
+      const p = f.getBoundingClientRect();
+      return faceBox(
+        { x: p.left - g.left, y: p.top - g.top },
+        rel(f.parentElement!.getBoundingClientRect()),
+      );
+    });
+    const plates = [...grid.querySelectorAll<HTMLElement>('[data-testid="stage-plate-label"]')].map(
+      (el) => rel(el.getBoundingClientRect()),
+    );
+    const own = w.querySelector<HTMLElement>('[data-testid="stage-thought-trigger"]');
+    const ownFace = w.querySelector<HTMLElement>("[data-face]")!.getBoundingClientRect();
+    const face = faceBox(
+      { x: ownFace.left - g.left, y: ownFace.top - g.top },
+      rel(w.getBoundingClientRect()),
+    );
+    const keepOut = [...faces, ...plates, ...(own ? [rel(own.getBoundingClientRect())] : [])];
+    const args = {
+      grid: { w: g.width, h: g.height },
+      face,
+      size: { w: b.offsetWidth, h: b.offsetHeight },
+      keepOut,
+    };
+    const last = step >= SPEECH_SIZES.length - 1;
+    const found = placeBubble(args) ?? (last ? leastOverlap(args) : null);
+    if (!found) {
+      setStep(step + 1);
+      return;
+    }
+    const tile = rel(w.getBoundingClientRect());
+    setPlace({
+      left: found.left - tile.x,
+      top: found.top - tile.y,
+      side: found.side,
+      tail: found.tail,
+    });
+  }, [speaking, step, tick]);
+
+  // A stage that changes size places its bubble again, from the first size.
+  useLayoutEffect(() => {
+    if (!speaking || typeof ResizeObserver === "undefined") return;
+    const grid = wrap.current?.closest<HTMLElement>(`.${STAGE_GRID_CLASS}`);
+    if (!grid) return;
+    let first = true;
+    const ro = new ResizeObserver(() => {
+      if (first) {
+        first = false;
+        return;
+      }
+      setPlace(null);
+      setStep(0);
+      setTick((n) => n + 1);
+    });
+    ro.observe(grid);
+    return () => ro.disconnect();
+  }, [speaking]);
+
+  return { wrapRef, bubbleRef, place, size: SPEECH_SIZES[Math.min(step, SPEECH_SIZES.length - 1)] };
+}
+
 /** A tile and what it says: the speech bubble while it speaks, the thought bubble where there is detail. */
 function Tile({ id, label, t }: { id: string; label: string; t: TileState }) {
   const tint = castById(id).tint;
-  // The anchor the engine points the speech bubble at: a small element
-  // over the speaker's face, not the tile's box. The stage is the boundary the
-  // bubble is kept inside.
-  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const boundary = anchor?.closest<HTMLElement>(`.${STAGE_GRID_CLASS}`) ?? null;
   const detail = (t.detail ?? []).filter((s) => s.items.length > 0);
   // Speaking is "its bubble is open"; named is a face that is there without one.
   const speaking = !!t.lit && !!t.bubble && t.bubble.length > 0;
@@ -252,8 +331,10 @@ function Tile({ id, label, t }: { id: string; label: string; t: TileState }) {
       : t.lit || t.present
         ? "named"
         : "ghost";
+  const { wrapRef, bubbleRef, place, size } = useBubblePlace(speaking);
   return (
     <div
+      ref={wrapRef}
       data-testid={`tile-${id}`}
       data-lit={t.lit ? "true" : "false"}
       data-look={look}
@@ -264,20 +345,20 @@ function Tile({ id, label, t }: { id: string; label: string; t: TileState }) {
         <CastScene id={id} parked />
       </ZoomTile>
       <div
-        ref={setAnchor}
         data-testid={`tile-${id}-face`}
+        data-face
         aria-hidden
         style={{
           position: "absolute",
           width: "1px",
           height: "1px",
           pointerEvents: "none",
-          ...(HEADS[id] ?? { left: "50%", top: "40%" }),
+          ...(HEADS[id] ?? HEAD_FALLBACK),
         }}
       />
-      {t.lit && t.bubble && t.bubble.length > 0 && (
-        <SpeechBubble anchor={anchor} boundary={boundary}>
-          {t.bubble.join("\n")}
+      {speaking && (
+        <SpeechBubble bubbleRef={bubbleRef} place={place} size={size}>
+          {t.bubble!.join("\n")}
         </SpeechBubble>
       )}
       {t.lit && detail.length > 0 && (
@@ -442,7 +523,11 @@ function Copy({ castId, label }: { castId: string; label?: string }) {
           color: pf.text,
         }}
       >
-        {label ? `${member.label} (${label})` : member.label}
+        {castId === CHAIR_CAST_ID
+          ? CHAIR_PLATE
+          : label
+            ? `${member.label} (${label})`
+            : member.label}
       </h2>
     </div>
   );
