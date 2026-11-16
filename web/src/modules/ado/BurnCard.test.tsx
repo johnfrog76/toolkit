@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { BurnCard, costText, machinesText } from "./BurnCard";
+import { USAGE } from "../../shell/consts";
 import type { BurnResponse, BurnWindow } from "./api.usage";
 
 // The System page's Claude Code burn tile: the verb's figures, facts only.
@@ -71,7 +72,7 @@ function answer(o: Partial<BurnResponse> = {}): BurnResponse {
     cost: {
       derived: true,
       currency: "USD",
-      priceTableAsOf: "2026-10-06",
+      priceTableAsOf: "2026-11-16",
       note: "list prices; not the plan's allocation",
       priceNotes: [{ model: "claude-haiku-5-5", note: "priced at its lower rate card" }],
     },
@@ -99,6 +100,21 @@ describe("the burn tile", () => {
     expect(within(week).getAllByText("Cost, derived")).toHaveLength(1);
     expect(within(week).getByText("claude-haiku-5-5")).toBeTruthy();
     expect(within(week).getByText("mini (session files); laptop (2 day records)")).toBeTruthy();
+  });
+
+  it("says in the cost itself what an unpriced model leaves out, in the plain tone", () => {
+    data = answer({
+      week: win({ unpriced: ["claude-new-1", "claude-new-2"] }),
+    });
+    const { container } = render(<BurnCard />);
+    const week = document.querySelector('[data-burn-window="This week"]') as HTMLElement;
+    const today = document.querySelector('[data-burn-window="Today"]') as HTMLElement;
+    expect(
+      within(week).getByText(`$1.23, ${USAGE.unpricedPhrase} claude-new-1, claude-new-2`),
+    ).toBeTruthy();
+    expect(within(today).queryByText(new RegExp(USAGE.unpricedPhrase))).toBeNull();
+    expect(container.querySelectorAll("[data-stat-tile] span[style]")).toHaveLength(0);
+    expect(container.querySelector("[role=alert]")).toBeNull();
   });
 
   it("says Haiku is priced at its lower rate card, and never the plan's share", () => {

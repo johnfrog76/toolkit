@@ -142,6 +142,13 @@ class TheRoute(unittest.TestCase):
         self.assertIs(body["fromCache"], False)
         self.assertTrue(body["fetchedAt"].endswith("Z"))
 
+    def test_each_window_carries_its_unpriced_models_for_the_cost_line(self):
+        self.reply["today"]["unpriced"] = []
+        self.reply["week"]["unpriced"] = ["claude-new-1"]
+        body = self.client.get(self.path).json()
+        self.assertEqual(body["today"]["unpriced"], [])
+        self.assertEqual(body["week"]["unpriced"], ["claude-new-1"])
+
     def test_kept_for_the_hour_then_refresh_goes_past_it(self):
         first = self.client.get(self.path).json()
         second = self.client.get(self.path).json()

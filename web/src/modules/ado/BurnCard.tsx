@@ -1,6 +1,7 @@
 import { Body1, Button, Caption1, Subtitle2, makeStyles, tokens } from "@fluentui/react-components";
 import { DataUsageRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
+import { USAGE } from "../../shell/consts";
 import { PanelFrame } from "../../shared/PanelFrame";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { StatTile, StatTiles } from "../../shared/StatTile";
@@ -52,8 +53,9 @@ const useStyles = makeStyles({
 const TOKENS = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 });
 
 /** A derived cost, or the fact that nothing in it is priced. */
-export function costText(value: number | null): string {
-  return value == null ? "no priced model" : `$${value.toFixed(2)}`;
+export function costText(value: number | null, unpriced: string[] = []): string {
+  const base = value == null ? "no priced model" : `$${value.toFixed(2)}`;
+  return unpriced.length > 0 ? `${base}, ${USAGE.unpricedPhrase} ${unpriced.join(", ")}` : base;
 }
 
 /** "from Fri 30 Oct, 05:00" -- a window's start on this browser's clock. */
@@ -84,7 +86,7 @@ function Window({ title, w }: { title: string; w: BurnWindow }) {
       </Body1>
       <StatTiles>
         <StatTile count={w.totals.messages} label="Messages" />
-        <StatTile count={costText(w.totals.costUsdDerived)} label="Cost, derived" />
+        <StatTile count={costText(w.totals.costUsdDerived, w.unpriced)} label="Cost, derived" />
       </StatTiles>
       {w.byModel.length > 0 && (
         <table className={styles.table}>
