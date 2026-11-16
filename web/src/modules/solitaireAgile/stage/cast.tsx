@@ -408,12 +408,12 @@ export const BUBBLE_Z_INDEX = 30;
 
 /**
  * The speech bubble shows at most this many lines and ends the last in an
- * ellipsis: a fixed count. It holds one whole turn -- "Good morning.", what
- * the member did and will do, "No blockers.", "That's it for me." -- so the
- * frame is read to its end; past that the voice still carries every line.
- * No scrollbar: a speech bubble that scrolls is not a shape anyone knows.
+ * ellipsis: a fixed count, "because it is real" -- a listener takes in about
+ * that much. A turn's first lines show; the voice (the slide's Say lines)
+ * carries every line of it. No scrollbar: a speech bubble that scrolls is not a
+ * shape anyone knows.
  */
-export const SPEECH_MAX_LINES = 9;
+export const SPEECH_MAX_LINES = 4;
 
 /** The clamp itself: a line clamp on the text element, standard CSS for what browsers still spell with a prefix. */
 export const speechTextClamp = {
@@ -450,16 +450,12 @@ const bubbleSurface = {
 } as const;
 
 /**
- * The speech bubble's sizes, tried in order until one has a clean place on the
- * stage (./geometry.ts): as wide as a turn needs up to the first width, then
- * narrower, then one type step smaller. The last is taken whatever it overlaps.
+ * The speech bubble's width: as wide as its lines need, up to 260px and never
+ * wider than its own window -- the size it has always had (an inline popover
+ * shrank to its window). Drawn at `max-content` within this cap, so where the
+ * stage places it does not change how wide it is.
  */
-export const SPEECH_SIZES: readonly { maxWidth: number; fontSize: string }[] = [
-  { maxWidth: 380, fontSize: "0.6rem" },
-  { maxWidth: 300, fontSize: "0.6rem" },
-  { maxWidth: 380, fontSize: "0.54rem" },
-  { maxWidth: 260, fontSize: "0.54rem" },
-];
+export const SPEECH_MAX_WIDTH = "min(260px, 100%)";
 
 /** The tail's size: a small square turned 45 degrees on the edge that faces the speaker. */
 const TAIL = 12;
@@ -473,13 +469,11 @@ const TAIL = 12;
 export function SpeechBubble({
   bubbleRef,
   place,
-  size,
   children,
 }: {
   bubbleRef: (el: HTMLDivElement | null) => void;
   /** Where to draw it, relative to the speaking window; null while it is measured. */
   place: { left: number; top: number; side: BubbleSide; tail: number } | null;
-  size: { maxWidth: number; fontSize: string };
   children: ReactNode;
 }) {
   const tailEdge: Record<BubbleSide, CSSProperties> = {
@@ -502,7 +496,7 @@ export function SpeechBubble({
         top: place?.top ?? 0,
         visibility: place ? "visible" : "hidden",
         width: "max-content",
-        maxWidth: `${size.maxWidth}px`,
+        maxWidth: SPEECH_MAX_WIDTH,
         overflowY: "visible",
         borderRadius: "14px",
       }}
@@ -522,10 +516,7 @@ export function SpeechBubble({
         />
       )}
       <div style={{ position: "relative", animation: "rs-bubble 0.45s ease-out 0.3s both" }}>
-        <span
-          data-testid="stage-speech-text"
-          style={{ ...speechTextClamp, fontSize: size.fontSize }}
-        >
+        <span data-testid="stage-speech-text" style={speechTextClamp}>
           {children}
         </span>
       </div>
@@ -539,11 +530,6 @@ export function SpeechBubble({
  * Space), closed by Escape or by the slide changing. The cloud floats; reduced
  * motion stills it through the stage's own rule (REDUCED_MOTION_RULE).
  */
-/** The thought's trigger sits in the window's bottom-right corner -- clear of the plate
- *  (bottom left) and of the face, and kept clear of the speech bubble by the bubble's
- *  own rule (./geometry.ts) -- so its cloud opens above it, aligned to its end. */
-export const THOUGHT_POSITIONING = { position: "above", align: "end" } as const;
-
 export function ThoughtBubble({ label, children }: { label: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   // The deck's own window listener (deck/engine/DeckController.tsx) takes Escape
@@ -564,7 +550,7 @@ export function ThoughtBubble({ label, children }: { label: string; children: Re
       inline
       open={open}
       onOpenChange={(_, d) => setOpen(d.open)}
-      positioning={THOUGHT_POSITIONING}
+      positioning={{ position: "above", align: "start" }}
     >
       <PopoverTrigger disableButtonEnhancement>
         <button
@@ -574,8 +560,8 @@ export function ThoughtBubble({ label, children }: { label: string; children: Re
           onKeyDown={keep}
           style={{
             position: "absolute",
-            right: "8px",
-            bottom: "10px",
+            left: "6px",
+            bottom: "30px",
             zIndex: 4,
             width: "26px",
             height: "26px",

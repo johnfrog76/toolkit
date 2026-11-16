@@ -35,41 +35,37 @@ function room() {
       w: 36 + words.length * 7.4,
       h: 26,
     };
-    // The thought button, in the window's bottom-right corner.
-    const button: Rect = { x: win.x + win.w - 8 - 26, y: win.y + win.h - 10 - 26, w: 26, h: 26 };
+    // The thought button, at the window's left above the plate.
+    const button: Rect = { x: win.x + 6, y: win.y + win.h - 30 - 26, w: 26, h: 26 };
     return { id: c.id, win, face, plate, button };
   });
 }
 
-/** A short turn (a name called) and a long one (a whole turn in its frame), at each size. */
+/** A short turn (a name called) and a long one (a turn clamped at four lines), at the
+ *  bubble's size: up to 260px wide, four lines of 0.6rem text and the padding. */
 const SHORT = [{ w: 90, h: 38 }];
-const LONG = [
-  { w: 330, h: 108 },
-  { w: 300, h: 124 },
-  { w: 330, h: 96 },
-  { w: 260, h: 124 },
-];
+const LONG = [{ w: 260, h: 74 }];
 
-/** Where each bubble lands at the stage's usual size: the side, and the size step it took. */
+/** Where each bubble lands at the stage's usual size: the side it takes. */
 const SEEN = [
-  "dev-hero short: above at size 0",
-  "dev-hero long: after at size 0",
-  "ops-dev short: above at size 0",
-  "ops-dev long: below at size 0",
-  "minimalist short: above at size 0",
-  "minimalist long: above at size 0",
-  "new-hire short: above at size 0",
-  "new-hire long: above at size 0",
-  "vibemancer short: above at size 0",
-  "vibemancer long: above at size 0",
-  "ultrawide short: before at size 0",
-  "ultrawide long: before at size 0",
-  "qa short: above at size 0",
-  "qa long: above at size 2",
-  "pm short: above at size 0",
-  "pm long: above at size 2",
-  "designer short: above at size 0",
-  "designer long: above at size 2",
+  "dev-hero short: above",
+  "dev-hero long: after",
+  "ops-dev short: above",
+  "ops-dev long: above",
+  "minimalist short: above",
+  "minimalist long: above",
+  "new-hire short: above",
+  "new-hire long: above",
+  "vibemancer short: above",
+  "vibemancer long: above",
+  "ultrawide short: before",
+  "ultrawide long: before",
+  "qa short: above",
+  "qa long: above",
+  "pm short: above",
+  "pm long: above",
+  "designer short: above",
+  "designer long: above",
 ];
 const overlaps = (a: Rect, b: Rect) =>
   Math.min(a.x + a.w, b.x + b.w) > Math.max(a.x, b.x) &&
@@ -125,10 +121,8 @@ describe("the bubble's place on the stage", () => {
     expect(over.face.y + over.face.h).toBeGreaterThan(me.face.y - 10 - SHORT[0].h);
   });
 
-  it("records where each bubble lands, side and size, so a change to the room is seen", () => {
-    expect(table.map(([id, turn, p]) => `${id} ${turn}: ${p.side} at size ${p.step}`)).toEqual(
-      SEEN,
-    );
+  it("records where each bubble lands, so a change to the room is seen", () => {
+    expect(table.map(([id, turn, p]) => `${id} ${turn}: ${p.side}`)).toEqual(SEEN);
   });
 
   it("tries the sides in order -- above, after, before, below -- and slides along a side to clear a keep-out", () => {

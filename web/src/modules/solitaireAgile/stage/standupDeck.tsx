@@ -18,7 +18,6 @@ import {
   CastScene,
   castById,
   SPEAKER_COLOR_VAR,
-  SPEECH_SIZES,
   STAGE_GRID_CLASS,
   SpeechBubble,
   STAGE_CLASS,
@@ -222,14 +221,12 @@ function DeskTile({ id, label, look }: { id: string; label: string; look: MugLoo
 /**
  * The speaking window's bubble, placed: measure the grid, every face and every
  * plate (and this window's own thought button), then ask ./geometry.ts for a
- * clean place, trying each of SPEECH_SIZES in turn and taking the last with the
- * least overlap. The bubble is drawn unseen until it has a place. Without
+ * clean place, or, when no side is clean, the one with the least overlap. The bubble is drawn unseen until it has a place. Without
  * layout (a test's DOM) nothing measures, and the bubble stays at its origin.
  */
 function useBubblePlace(speaking: boolean) {
   const wrap = useRef<HTMLDivElement | null>(null);
   const bubble = useRef<HTMLDivElement | null>(null);
-  const [step, setStep] = useState(0);
   const [place, setPlace] = useState<{
     left: number;
     top: number;
@@ -281,12 +278,8 @@ function useBubblePlace(speaking: boolean) {
       size: { w: b.offsetWidth, h: b.offsetHeight },
       keepOut,
     };
-    const last = step >= SPEECH_SIZES.length - 1;
-    const found = placeBubble(args) ?? (last ? leastOverlap(args) : null);
-    if (!found) {
-      setStep(step + 1);
-      return;
-    }
+    const found = placeBubble(args) ?? leastOverlap(args);
+    if (!found) return;
     const tile = rel(w.getBoundingClientRect());
     setPlace({
       left: found.left - tile.x,
@@ -294,9 +287,9 @@ function useBubblePlace(speaking: boolean) {
       side: found.side,
       tail: found.tail,
     });
-  }, [speaking, step, tick]);
+  }, [speaking, tick]);
 
-  // A stage that changes size places its bubble again, from the first size.
+  // A stage that changes size places its bubble again.
   useLayoutEffect(() => {
     if (!speaking || typeof ResizeObserver === "undefined") return;
     const grid = wrap.current?.closest<HTMLElement>(`.${STAGE_GRID_CLASS}`);
@@ -308,14 +301,13 @@ function useBubblePlace(speaking: boolean) {
         return;
       }
       setPlace(null);
-      setStep(0);
       setTick((n) => n + 1);
     });
     ro.observe(grid);
     return () => ro.disconnect();
   }, [speaking]);
 
-  return { wrapRef, bubbleRef, place, size: SPEECH_SIZES[Math.min(step, SPEECH_SIZES.length - 1)] };
+  return { wrapRef, bubbleRef, place };
 }
 
 /** A tile and what it says: the speech bubble while it speaks, the thought bubble where there is detail. */
@@ -331,7 +323,7 @@ function Tile({ id, label, t }: { id: string; label: string; t: TileState }) {
       : t.lit || t.present
         ? "named"
         : "ghost";
-  const { wrapRef, bubbleRef, place, size } = useBubblePlace(speaking);
+  const { wrapRef, bubbleRef, place } = useBubblePlace(speaking);
   return (
     <div
       ref={wrapRef}
@@ -357,7 +349,7 @@ function Tile({ id, label, t }: { id: string; label: string; t: TileState }) {
         }}
       />
       {speaking && (
-        <SpeechBubble bubbleRef={bubbleRef} place={place} size={size}>
+        <SpeechBubble bubbleRef={bubbleRef} place={place}>
           {t.bubble!.join("\n")}
         </SpeechBubble>
       )}
@@ -484,10 +476,9 @@ function StageView({
 // ── The copy panel (the engine's right-hand column) ─────────────────────────────────
 // Who is speaking, not what they said: the bubble shows the sentence and
 // the voice reads it, so a third copy beside the stage was noise. The panel is
-// the speaker's character: the title and the persona with the worker's label
-// beside it (the one real noun, the same word the issue carries). No motto: a
-// made-up line in a character's voice beside a real status would read as a claim
-// of work the tracker did not say.
+// the speaker's character: the title, the persona with the worker's label beside
+// it (the one real noun, the same word the issue carries), and the motto in the
+// character's own voice.
 
 function Copy({ castId, label }: { castId: string; label?: string }) {
   const member = castById(castId);
@@ -516,19 +507,26 @@ function Copy({ castId, label }: { castId: string; label?: string }) {
       </p>
       <h2
         style={{
-          margin: 0,
+          margin: "0 0 16px",
           fontSize: "1.9rem",
           fontWeight: 800,
           lineHeight: 1.25,
           color: pf.text,
         }}
       >
-        {castId === CHAIR_CAST_ID
-          ? CHAIR_PLATE
-          : label
-            ? `${member.label} (${label})`
-            : member.label}
+        {label ? `${member.label} (${label})` : member.label}
       </h2>
+      <p
+        style={{
+          margin: 0,
+          fontSize: "1.05rem",
+          fontStyle: "italic",
+          lineHeight: 1.5,
+          color: pf.muted,
+        }}
+      >
+        &mdash; {member.motto}
+      </p>
     </div>
   );
 }

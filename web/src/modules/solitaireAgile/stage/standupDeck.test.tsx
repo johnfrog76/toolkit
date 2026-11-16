@@ -16,7 +16,7 @@ import {
   SPEECH_MAX_LINES,
   THOUGHT_MAX_HEIGHT,
   REDUCED_MOTION_RULE,
-  SPEECH_SIZES,
+  SPEECH_MAX_WIDTH,
   STAGE_CLASS,
   STAGE_GRID_CLASS,
 } from "./cast";
@@ -332,45 +332,29 @@ describe("the standup deck, from Friday's fixture", () => {
     }
   });
 
-  it("the copy panel is the speaker's character -- no motto -- not the bubble again", () => {
-    // A worker's slide: title and persona with the label; no motto beside a real status.
+  it("the copy panel is the speaker's character, not the bubble again", () => {
+    // A worker's slide: title, persona with the label, the motto in its own voice.
     const dev = render(<>{slides[at("fable")].copy}</>);
     const copy = dev.getByTestId("standup-copy");
     const hero = castById("dev-hero");
     expect(copy.textContent).toContain(hero.title);
     expect(copy.textContent).toContain(`${hero.label} (fable)`);
-    expect(copy.textContent).not.toContain(hero.motto);
+    expect(copy.textContent).toContain(hero.motto);
     expect(copy.textContent).not.toMatch(/#107|Port the cast atoms|Yesterday/);
     dev.unmount();
     // The chair's slides, the call's included: the PM, no label.
     for (const part of ["chair-open", "call-fable", "chair-status"]) {
       const chair = render(<>{slides[at(part)].copy}</>);
       const pm = castById("pm");
-      expect(chair.getByTestId("standup-copy").textContent).not.toContain(pm.motto);
-      // The chair's panel reads its plate, not the persona's old word.
-      expect(chair.getByTestId("standup-copy").textContent).toContain(CHAIR_PLATE);
-      expect(chair.getByTestId("standup-copy").textContent).not.toContain(pm.label);
+      expect(chair.getByTestId("standup-copy").textContent).toContain(pm.motto);
+      expect(chair.getByTestId("standup-copy").textContent).toContain(pm.label);
       expect(chair.getByTestId("standup-copy").textContent).not.toMatch(/\((fable|opus|sonnet)\)/);
       chair.unmount();
     }
-    // Every character has a title.
-    for (const c of CAST) expect(c.title.length).toBeGreaterThan(0);
-  });
-
-  it("no motto of the cast reaches any slide of the played standup -- not the panel, the stage or the voice", () => {
-    const mottos = CAST.map((c) => c.motto);
-    for (const s of slides) {
-      const view = render(
-        <>
-          {s.content}
-          {s.copy}
-        </>,
-      );
-      for (const m of mottos) {
-        expect(view.container.textContent).not.toContain(m);
-        expect(slideSpokenText(s)).not.toContain(m);
-      }
-      view.unmount();
+    // Every character has a title and a motto that is theirs, not a status.
+    for (const c of CAST) {
+      expect(c.title.length).toBeGreaterThan(0);
+      expect(c.motto).toMatch(/^[IMT]/);
     }
   });
 
@@ -544,10 +528,10 @@ describe("the stage's bubbles", () => {
     // A test's DOM has no layout, so nothing is measured and it is never placed: unseen.
     expect(s.style.visibility).toBe("hidden");
     expect(s.style.position).toBe("absolute");
-    expect(s.style.maxWidth).toBe(`${SPEECH_SIZES[0].maxWidth}px`);
-    expect(within(s).getByTestId("stage-speech-text").style.fontSize).toBe(
-      SPEECH_SIZES[0].fontSize,
-    );
+    // Main's size: up to 260px and never wider than its window, the text at 0.6rem.
+    expect(SPEECH_MAX_WIDTH).toBe("min(260px, 100%)");
+    expect(s.style.maxWidth).toBe(SPEECH_MAX_WIDTH);
+    expect(within(s).getByTestId("stage-speech-text").style.fontSize).toBe("0.6rem");
     expect(within(s).queryByTestId("stage-speech-tail")).toBeNull();
   });
 
@@ -567,12 +551,14 @@ describe("the stage's bubbles", () => {
     expect(grid.contains(screen.getByTestId("stage-plate"))).toBe(false);
   });
 
-  it("the bubble's sizes step down -- narrower, then one type step smaller -- and the first is the widest", () => {
-    expect(SPEECH_SIZES.length).toBeGreaterThan(1);
-    expect(SPEECH_SIZES[0].maxWidth).toBe(Math.max(...SPEECH_SIZES.map((x) => x.maxWidth)));
-    const px = (f: string) => Number(f.replace("rem", ""));
-    for (let k = 1; k < SPEECH_SIZES.length; k++)
-      expect(px(SPEECH_SIZES[k].fontSize)).toBeLessThanOrEqual(px(SPEECH_SIZES[k - 1].fontSize));
+  it("the bubble shows a turn's first four lines and the voice says all of it", () => {
+    expect(SPEECH_MAX_LINES).toBe(4);
+    const { tile } = drawStage(at("opus"));
+    const text = within(tile("ops-dev")).getByTestId("stage-speech-text");
+    expect(text.style.getPropertyValue("-webkit-line-clamp")).toBe("4");
+    // The clamp is paint only: the text node holds every line, and the voice says them.
+    expect(text.textContent!.split("\n").length).toBeGreaterThanOrEqual(3);
+    expect(say(at("opus")).length).toBeGreaterThan(0);
   });
 
   it("an empty desk has no face to point at, no bubble and no thought", () => {
@@ -588,15 +574,15 @@ describe("the stage's bubbles", () => {
     }
   });
 
-  it("the thought's trigger sits in the window's bottom-right corner, clear of the plate and the face; its cloud opens above it", () => {
+  it("the thought bubble's placement is unchanged: its trigger, above, start-aligned", () => {
     mockPopovers.length = 0;
     const { tile } = drawStage(FABLE);
     const thought = mockPopovers.filter((p) => p.positioning && !("target" in p.positioning));
     expect(thought.length).toBeGreaterThan(0);
-    expect(thought[0].positioning).toEqual({ position: "above", align: "end" });
+    expect(thought[0].positioning).toEqual({ position: "above", align: "start" });
+    // ...and its button where it has always been, at the window's left above the plate.
     const trigger = within(tile("dev-hero")).getByTestId("stage-thought-trigger");
-    expect([trigger.style.bottom, trigger.style.right]).toEqual(["10px", "8px"]);
-    expect([trigger.style.top, trigger.style.left]).toEqual(["", ""]);
+    expect([trigger.style.left, trigger.style.bottom]).toEqual(["6px", "30px"]);
   });
 
   it("an idle member's two made-up items are the speech surface's lines", () => {
