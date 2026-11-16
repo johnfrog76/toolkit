@@ -75,7 +75,7 @@ EXPECTED = {
     ("folders", "backlog"): "backlog",
     ("reviews", "fileName"): "review.md",
     ("reviews", "slugSetSeparator"): "+",
-    ("features", "spaceScoped"): ["sprintAwareness", "trainingHoursPerQuarter", "suggestions"],
+    ("features", "spaceScoped"): ["sprintAwareness", "trainingHoursPerQuarter", "suggestions", "teamSize"],
     ("env", "activeSpace"): "P20_ACTIVE_SPACE",
     ("env", "promptsRoot"): "PROMPTS_ROOT",
     ("env", "agentCacheDir"): "P20_AGENT_CACHE_DIR",
@@ -238,6 +238,9 @@ EXPECTED = {
     ("rituals", "suggestShapes"): ["start", "delegate", "route", "place"],
     ("rituals", "suggestOwnerSeat"): "fable",
     ("rituals", "cornerShapes"): ["oneLeft", "manyLeft", "reached", "nothingInReach"],
+    # The standup room's sizes, the chair included, and what unset reads as.
+    ("rituals", "teamSizes"): [3, 6, 9],
+    ("rituals", "teamSizeDefault"): 9,
     ("rituals", "suggestExclusions"): ["notBillable", "waiting", "inFlight", "theirs", "dismissed"],
     ("rituals", "text"): {
         "title": "Standup -- {date}",
@@ -249,7 +252,7 @@ EXPECTED = {
         "yesterday": "Yesterday",
         "today": "Today",
         "blockers": "Blockers",
-        "mug": "Mug",
+        "mug": "Status",
         "yesterdayEmpty": "nothing closed",
         "todayEmpty": "nothing in flight",
         "blockersEmpty": "no blockers",
@@ -319,7 +322,25 @@ EXPECTED = {
         "proseTodayAlso": "I'm also on",
         "proseBlockers": "Blocked on",
         "proseBlockersAlso": "Also blocked on",
-        "proseBlockersNone": "Nothing blocked.",
+        "proseBlockersNone": "No blockers.",
+        "proseYesterdayNone": "Yesterday I picked up where I left off.",
+        "proseYesterdayWorked": "Yesterday I worked on {refs}.",
+        "proseYesterdayWorkedMany": "Yesterday I worked on {n} items.",
+        "proseTodayNone": "Today I'll pick up the next item from the board.",
+        "turnOpen": "Good morning.",
+        "turnClose": "That's it for me.",
+        "chairYesterday": "Yesterday I walked {refs}.",
+        "chairYesterdayMany": "Yesterday I did {n} walks.",
+        "chairToday": "Today I'll {body}.",
+        "chairTodayNone": "Today I'll keep the board moving.",
+        "chairWalk": "walk {refs}",
+        "chairWalkMany": "do {n} walks",
+        "chairDecide": "decide {refs}",
+        "chairDecideMany": "make {n} decisions",
+        "chairLook": "look at {refs}",
+        "chairLookMany": "look at {n} items",
+        "chairClauseSeparator": ", ",
+        "chairClauseLast": ", and ",
         "proseWalk": "Waiting on you to walk",
         "proseWalkAlso": "Also to walk",
         "proseDecide": "Waiting on you to decide",
@@ -560,6 +581,8 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.rituals_suggest_exclusions(), tuple(EXPECTED[("rituals", "suggestExclusions")]))
         self.assertEqual(C.rituals_suggest_owner_seat(), EXPECTED[("rituals", "suggestOwnerSeat")])
         self.assertEqual(C.rituals_corner_shapes(), tuple(EXPECTED[("rituals", "cornerShapes")]))
+        self.assertEqual(C.rituals_team_sizes(), tuple(EXPECTED[("rituals", "teamSizes")]))
+        self.assertEqual(C.rituals_team_size_default(), EXPECTED[("rituals", "teamSizeDefault")])
         self.assertEqual(C.startwork_launch_env_flag(), EXPECTED[("startWork", "launchEnvFlag")])
         self.assertEqual(C.startwork_how_we_work_note(), EXPECTED[("startWork", "howWeWorkNote")])
         self.assertEqual(C.gh_read_limit_open_issues(), EXPECTED[("ghReads", "openIssues")])
@@ -651,7 +674,15 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("studio.promptsRoute", "/api/studio/prompts"),
         ("studio.ledgerRoute", "/api/studio/ledger"),
         ("rituals.text.workBlockers", "{n} to walk"),
-        ("rituals.text.proseBlockersNone", "Nothing blocked."),
+        ("rituals.text.proseBlockersNone", "No blockers."),
+        # A slot with nothing beside one with something: standup.py reads the lines from rituals.text.
+        ("rituals.text.proseYesterdayNone", "Yesterday I picked up where I left off."),
+        ("rituals.text.proseTodayNone", "Today I'll pick up the next item from the board."),
+        # The turn's frame: standup.py reads it from rituals.text.
+        ("rituals.text.turnOpen", "Good morning."),
+        ("rituals.text.turnClose", "That's it for me."),
+        # The chair's own turn: standup.py reads it from rituals.text.
+        ("rituals.text.chairTodayNone", "Today I'll keep the board moving."),
         ("rituals.text.proseYesterday", "Yesterday I closed"),
         ("visibility.publicLine", "This repository is public"),
         # The /env field for StartWork's launch: served through startwork_launch_env_flag().

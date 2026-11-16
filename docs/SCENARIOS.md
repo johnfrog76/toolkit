@@ -20,6 +20,7 @@ A machine is in exactly one cell of each axis at a time:
 | **Modules** | `growth`, `communication`, `deck`, `organize`, `solitaireAgile`, `lounge`, each on / off / not configured | top-level `features` in `config.local.json`; the engineer's, never an org's (`Tests/test_features.py`). The Studio is not on this axis: it is core (D-S13), and a `features.studio` left in a config is ignored |
 | **Sprint awareness** | on, off | `spaces[].features.sprintAwareness` -- a Space-scoped flag |
 | **Suggestions** | on (unset, or true), off | `spaces[].features.suggestions` -- a Space-scoped switch riding Team Agile: where Team Agile is on, unset is on; `false` takes the suggestion out of the standup -- the `switch` rows of `Tests/fixtures/suggestion/table.json`, read by `tkTestToolkit -Rituals` and `Tests/test_rituals.py` |
+| **Team size** | 3, 6, 9 (unset reads 9) | `spaces[].features.teamSize` -- a Space-scoped NUMBER, the standup's windows with the chair counted: the fill keeps every worker and marks each `present`, the ones with work seated first; the round (the work grain, the stage) speaks the present, the detail and the brief keep everyone -- **the one shared table**, `Tests/fixtures/rituals/standup-team.json`, read by `tkTestToolkit -Rituals` and `Tests/test_rituals.py` |
 | **How you work here** | `agents`, `alone`, `team` | `spaces[].howIWork` -- the other Space-scoped switch: asked on a GitHub Space (`alone` until answered), derived elsewhere (`team` on Azure DevOps, `alone` with no tracker). Team Agile is on only where its switch is on AND the answer is `agents` -- **the one shared table**, `Tests/fixtures/how-i-work/table.json`, read by `tkTestToolkit -Environment` and `Tests/test_how_i_work.py` |
 
 **Off means absent** (AGENTS.md): a module that is off contributes no verb, no route (404, not 403),
@@ -288,6 +289,23 @@ through the bridge. On success the spinner goes; a refusal puts the pick back an
 under the radios. With *With agents* chosen and Team Agile's own switch off, one more line says the answer
 waits for the switch.
 
+**How many are in my standup in `<Space>`?** is the second question that is asked, and the answer is
+the Space's too: three radios -- *3*, *6*, *9*, the room with the chair counted -- live where Team Agile's
+standup runs. What is checked is the Space's own `spaces.<slug>.features.teamSize`, read off the entry
+`/env` declares, and nothing is checked while it is unset (the room is then nine; the row's chip says
+`not configured` where Team Agile is on, and `off` where it is off -- the row rides Team Agile, as the
+suggestion's does -- while the radios stay live by the tracker, as the suggestion's entry has no gate of its own). A pick writes it through `PUT /api/config` -> `Config -Set -Hub`, with the same Saving
+state; it asks for no how-we-work note and says nothing about Team Agile's switch (`scenarios.test.tsx`,
+"How many are in my standup in `<Space>`?: the Space's size is checked, live on GitHub"; the radios in
+`HowDoI.test.tsx`):
+
+| The Space | Checked | Can be picked | The sentence under the radios | A pick writes |
+| --- | --- | --- | --- | --- |
+| GitHub, nothing set | none | 3, 6, 9 | none | `spaces.<slug>.features.teamSize=<size> -Hub` |
+| GitHub, 6 | 6 | 3, 6, 9 | none | the same |
+| Azure DevOps | none | none | Team Agile's standup is a GitHub Space's; this Space's tracker is Azure DevOps. | nothing |
+| no tracker (your own cards) | none | none | Team Agile's standup is a GitHub Space's; connect a tracker to hold one. | nothing |
+
 ### The Studio's Prompts card, by how you work (`scenarios.test.tsx`, "the Studio's Prompts card, by how you work"; the card in `PromptsCard.test.tsx`)
 
 The card is core, on every Space, and it is three filters (the house's `FilterBadge` radios). Its **ToolKit**
@@ -427,14 +445,14 @@ Team Agile section (the reminder: a time and the days), saved through `POST /api
 
 | The route answers | The page shows |
 | --- | --- |
-| the tracker read (`tracker.ok` true), a fresh browser | **the Agenda**, the first tab of **Agenda \| Detail \| Work \| Brief**: its one sentence (`Here you can see the work items you can in fact kick off now, with the Work it now button.`), a **Cards \| List** toggle (cards; remembered), the chair's suggestion row when it has one (the Agenda's first line, above the lanes; an unrouted pick, which no lane carries, is named only there, with **Open Triage**), and two lanes from the response's `agenda` -- **Since `<day>`** (`Since Friday 23 October`: the issues closed and the cards archived in the window, no action) and **Waiting on you** (Active and Code Review cards and routed open issues, the top tile the pick when the pick can be started, each with ONE button: **Work it now**, the hand-off box, or **Review it** on what waits on a review). No In Progress card, no `backlog/` card, no lane badge, no Yesterday or Today: each tile is the board's cover, title and progress and one fact with a long date (`Active since Friday 23 October`, `In review since ...`, `Closed Saturday 24 October`, `Archived ...`). No text and no brief on it; **Copy** carries the text it carried before (the last grain read, `text` in a fresh browser) and **Play** plays the same standup (`scenarios.test.tsx`, "the Agenda") |
-| the same, on Detail, Work or Brief | the standup's first line as the card's header, every line after it verbatim in a monospace block; each `#<n>` the response names links to its issue, and each item says what moved after its number where it adds to the slot (`(started)`, `(started, 2 commits)`, `(2 commits)`). Above it, the chair's reading -- the `brief`, one small line each -- opens on the counts line, `Since <day>: ...`, so the velocity is at the top of the page. Besides the numbers: **Copy** (the grain on screen, exactly; "Copied!" for a moment) and **Play**, quiet, in the header. The Agenda's **Work it now** opens the hand-off block in a copy box -- one `POST /api/cmd/StartWork`, the block verbatim, one **Copy**; a refusal shows the verb's sentence |
+| the tracker read (`tracker.ok` true), a fresh browser | **the Agenda**, the first tab of **Agenda \| Detail \| Work \| Brief**: its one sentence (`Here you can see the work items you can in fact kick off now, with the Work it now button.`), a **Cards \| List** toggle (cards; remembered), the chair's suggestion row when it has one (the Agenda's first line, above the lanes; an unrouted pick, which no lane carries, is named only there, with **Open Triage**), and two lanes from the response's `agenda` -- **Since `<day>`** (`Since Friday 23 October`: the issues closed and the cards archived in the window, no action) and **Waiting on you** (Active and Code Review cards and routed open issues, the top tile the pick when the pick can be started, each with ONE button: **Work it now**, the hand-off box, or **Review it** on what waits on a review). No In Progress card, no `backlog/` card, no lane badge, no Yesterday or Today: each tile is the board's cover, title and progress and one fact with a long date (`Active since Friday 23 October`, `In review since ...`, `Closed Saturday 24 October`, `Archived ...`). No text and no brief on it; **Copy** carries the text it carried before (the last grain read, `text` in a fresh browser), **Play** plays the same standup, and **Team size** opens the settings drawer at the team-size entry (`scenarios.test.tsx`, "the Agenda") |
+| the same, on Detail, Work or Brief | the standup's first line as the card's header, every line after it verbatim in a monospace block; each `#<n>` the response names links to its issue, and each item says what moved after its number where it adds to the slot (`(started)`, `(started, 2 commits)`, `(2 commits)`). Above it, the chair's reading -- the `brief`, one small line each -- opens on the counts line, `Since <day>: ...`, so the velocity is at the top of the page. Besides the numbers: **Copy** (the grain on screen, exactly; "Copied!" for a moment), **Play** and **Team size**, quiet, in the header. The Agenda's **Work it now** opens the hand-off block in a copy box -- one `POST /api/cmd/StartWork`, the block verbatim, one **Copy**; a refusal shows the verb's sentence |
 | the tracker and the cards read, joined (`source: both`, a GitHub Space) | the same page: each `#<n>` links to its issue, a card of its own shows its id with no link, and a `Check` line (a card and its issue disagreeing) is text like any other line |
 | a suggestion, the Space's switch on (unset or true), and nothing waiting on you | the chair's reading's last line is the suggestion, drawn as its own row -- under the brief on Detail and Work, under the body on Brief, and on the Agenda as its first line above the lanes: the line verbatim (`Next: #141 is opus-sized and well defined -- send it to the crew? (tkStartWork 141)`), its action -- **Work it now** (the hand-off box, the Agenda tiles' words) for a start or a delegation, **Open Triage** for a route -- and a dismiss. A dismiss shows the next candidate's line, and with none left today's `Next: nothing is waiting on you.`; it holds for the session, per item, in this browser only (`scenarios.test.tsx`, "the chair's suggestion") |
 | something waiting on you, or `spaces.<slug>.features.suggestions=false` | no suggestion row: the brief as it came, its Next line the queue's (`Next: the walk -- 1 on the PC.`) or today's |
 | the suggestion on (the PM Corner) | at the head of the page, above the card, the Corner's line verbatim (`3 more issues to get milestone B - start #5 now`) and its chevron, which opens the same hand-off box as **Work it now**; the brief below stops above the Corner's line; with the switch off, on an Azure DevOps Space or with the tracker down, no Corner (`scenarios.test.tsx`, "the PM Corner") |
 | a milestone reached in the window | the Corner reads `milestone B reached: see Releases`, no chevron; the link opens the Releases tab. The standup never throws confetti |
-| no tracker (`tracker.ok` false) | the same page: the chair's two lines and the `Tracker` line with the reason -- the ritual happens anyway; no links; Play |
+| no tracker (`tracker.ok` false) | the same page: the chair's two lines and the `Tracker` line with the reason -- the ritual happens anyway; no links; Play and Team size |
 | nothing (the agent is away) | `Could not read today's standup` -- an error, never an empty standup; no Play |
 
 **Play** opens `/deck/ritual/standup`, the same standup played on the Remote Standup's stage
@@ -444,6 +462,19 @@ Team Agile section (the reminder: a time and the days), saved through `POST /api
 `stage/standupDeck.test.tsx` and `stage/StandupPlay.test.tsx`. On the joined source the stage reads an
 item as the page does: an issue is `#<n>` (spoken `issue <n>`), linked; a card of its own is its id
 (spoken `card <id>`), with no link (`scenarios.test.tsx`, "the played standup names an issue").
+
+The stage is nine windows whatever the response: the chair, the members the response marks present in its
+order (everyone, capped at eight, from an agent that predates `present`), each plated `PERSONA (label)` --
+`fable`, `opus` and `sonnet` in their own personas' windows, any other label by position -- and an
+**empty desk** -- a chair, a desk and a steaming mug, ghosted, plated `EMPTY DESK`, a different mug each -- in
+every other window. A Space with no worker labels plays the chair and eight desks; its cards' own tile, where
+it reads cards, is a member. The chair opens the board, calls each member by name, the member answers, the
+chair gives its own status and closes; a desk never speaks (`scenarios.test.tsx`, "the played standup seats
+the present by position"; `stage/standupDeck.test.tsx`, "no silent face").
+
+In a room smaller than the Space's members (`spaces.<slug>.features.teamSize`), Work shows the round --
+the present only, `standup-team-<case>.work.txt` -- while Detail and Brief keep every worker; the page
+draws what the response says and reads no setting of its own.
 
 The text is the shared fixture's golden (`Tests/fixtures/rituals/`), the same bytes the CLI's
 `Standup` and `Tests/test_rituals.py` assert.

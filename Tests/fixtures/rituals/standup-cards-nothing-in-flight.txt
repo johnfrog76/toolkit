@@ -5,6 +5,7 @@ Waiting on you
   Nothing is waiting on you.
 
 Widgets
-  Mug        "Tidied my notes and my calendar for the week."
+  Status     "Yesterday I tidied my notes and my calendar for the week."
+  Status     "Today I'll pair with a teammate to learn how the build runs."
 
 "Parking that."

@@ -234,6 +234,11 @@ export const RITUALS = consts.rituals as {
   workSmallWordRegex: string;
   /** The also-ons fold (D-SA9): the most groups a folded sentence names. */
   proseFoldNames: number;
+  /** The standup room's sizes, the chair included (spaces[].features.teamSize):
+   *  the CLI and the agent read them; the web states them only, as the drawer's
+   *  answers (Config/settings-workflows.json) must be these. */
+  teamSizes: number[];
+  teamSizeDefault: number;
   /** The dress guard: its checks in order, and the patterns it reads a
    *  model's sentence with. The agent and the CLI run it; the web reads `spoken`. */
   dressGuards: string[];
@@ -338,6 +343,27 @@ export const RITUALS = consts.rituals as {
     proseBlockers: string;
     proseBlockersAlso: string;
     proseBlockersNone: string;
+    /** A slot with nothing in it, beside a slot with something: the fixed honest line
+     *  (prose<Slot>None), or for yesterday the open items worked inside the window
+     *  (proseYesterdayWorked, proseYesterdayWorkedMany past proseFoldNames). */
+    proseYesterdayNone: string;
+    proseYesterdayWorked: string;
+    proseYesterdayWorkedMany: string;
+    proseTodayNone: string;
+    turnOpen: string;
+    turnClose: string;
+    chairYesterday: string;
+    chairYesterdayMany: string;
+    chairToday: string;
+    chairTodayNone: string;
+    chairWalk: string;
+    chairWalkMany: string;
+    chairDecide: string;
+    chairDecideMany: string;
+    chairLook: string;
+    chairLookMany: string;
+    chairClauseSeparator: string;
+    chairClauseLast: string;
     proseWalk: string;
     proseWalkAlso: string;
     proseDecide: string;

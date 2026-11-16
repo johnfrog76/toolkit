@@ -428,6 +428,13 @@ function Get-P20SpaceFieldSchema {
     $fields += [PSCustomObject]@{ key = 'features.sprintAwareness'; scope = 'org'; type = 'bool'; allowed = @();             required = $false; help = 'A SPACE-scoped feature flag -- it describes this Space''s board. Every other flag is the engineer''s and lives in the top-level features block.' }
     $fields += [PSCustomObject]@{ key = 'features.suggestions'; scope = 'org'; type = 'bool'; allowed = @();                 required = $false; help = 'A SPACE-scoped switch: whether Team Agile suggests your next move here -- the chair''s Next line in Standup -Brief and on the Team Agile page. Unset is on wherever Team Agile is on; false turns the line back to "Next: nothing is waiting on you."' }
     $fields += [PSCustomObject]@{ key = 'features.trainingHoursPerQuarter'; scope = 'org'; type = 'int'; allowed = @(); required = $false; help = 'Training hours this Space''s engagement requires each calendar quarter, whole hours. Unset means no requirement and the Growth page says nothing about one.' }
+    # The standup room's size: an int with allowed values, so -Set refuses a number
+    # that is not one of them by name (Test-P20ConfigValue's int branch). The sizes
+    # and the default are the contract's (consts.json rituals.teamSizes, teamSizeDefault).
+    $teamSizes = @((Get-P20Consts).rituals.teamSizes | ForEach-Object { [string]$_ })
+    $teamDefault = [string](Get-P20Consts).rituals.teamSizeDefault
+    $teamSeats = @($teamSizes | ForEach-Object { [string]([int]$_ - 1) })
+    $fields += [PSCustomObject]@{ key = 'features.teamSize'; scope = 'org'; type = 'int'; allowed = $teamSizes; required = $false; help = "How many are in Team Agile's standup in this Space: the room, the chair included, so $($teamSeats[0..($teamSeats.Count - 2)] -join ', ') or $($teamSeats[-1]) members sit. Members with work take the seats first, then the idle; the rest are absent today and say nothing in the round, while the detail and the brief keep them. Unset is $teamDefault." }
     return $fields
 }
 
@@ -640,9 +647,17 @@ function Test-P20ConfigValue {
         }
         'int' {
             $parsed = 0
-            if ([int]::TryParse($raw.Trim(), [ref]$parsed)) { $result.Ok = $true; $result.Value = $parsed; return $result }
-            $result.Reason = "$($Row.key) is a whole number -- got '$raw'."
-            return $result
+            if (-not [int]::TryParse($raw.Trim(), [ref]$parsed)) {
+                $result.Reason = "$($Row.key) is a whole number -- got '$raw'."
+                return $result
+            }
+            # An int with allowed values (a Space's teamSize) takes only those.
+            $allowed = @($Row.allowed | Where-Object { $null -ne $_ -and [string]$_ -ne '' } | ForEach-Object { [string]$_ })
+            if ($allowed.Count -gt 0 -and $allowed -notcontains [string]$parsed) {
+                $result.Reason = "$($Row.key) is one of: $($allowed -join ', ') -- got '$($raw.Trim())'."
+                return $result
+            }
+            $result.Ok = $true; $result.Value = $parsed; return $result
         }
         'array' {
             $trimmed = $raw.Trim()
