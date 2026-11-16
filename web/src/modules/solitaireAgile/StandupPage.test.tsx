@@ -1008,18 +1008,19 @@ describe("the issue popover", () => {
     await waitFor(() => expect(screen.queryByTestId("issue-popover")).toBeNull());
   });
 
-  it("the chip reads the stage's deal: any label sits by its place in the room, and a worker out today has none", () => {
+  it("the chip reads the stage's deal: a kept label its own persona, any other by position, and a worker out today none", () => {
     const data = responseFor("friday");
-    expect(issueFacts(data).get(102)?.worker).toBe("OPS-DEV (opus)");
+    expect(issueFacts(data).get(102)?.worker).toBe("AI VIBEMANCER (opus)");
+    expect(issueFacts(data).get(104)?.worker).toBe("DEV-HERO (fable)");
     // A label the cast was never named for sits by position, like any other.
     data.workers[0].label = "someone-else";
     data.workers[0].name = "Someone";
     expect(issueFacts(data).get(104)?.worker).toBe("DEV-HERO (someone-else)");
-    // Out today (not present): no window on the stage, so no chip; the others move up a window.
+    // Out today (not present): no window on the stage, so no chip; a kept face does not move.
     data.workers[0].present = false;
     const facts = issueFacts(data);
     expect(facts.get(104)?.worker).toBeUndefined();
-    expect(facts.get(102)?.worker).toBe("DEV-HERO (opus)");
+    expect(facts.get(102)?.worker).toBe("AI VIBEMANCER (opus)");
   });
 
   it("a card's surface shows its id, title and path, and no external link", async () => {

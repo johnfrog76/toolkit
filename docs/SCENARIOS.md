@@ -464,7 +464,8 @@ item as the page does: an issue is `#<n>` (spoken `issue <n>`), linked; a card o
 (spoken `card <id>`), with no link (`scenarios.test.tsx`, "the played standup names an issue").
 
 The stage is nine windows whatever the response: the chair, the members the response marks present in its
-order (everyone, capped at eight, from an agent that predates `present`), each plated `PERSONA (label)`, and an
+order (everyone, capped at eight, from an agent that predates `present`), each plated `PERSONA (label)` --
+`fable`, `opus` and `sonnet` in their own personas' windows, any other label by position -- and an
 **empty desk** -- a chair, a desk and a steaming mug, ghosted, plated `EMPTY DESK`, a different mug each -- in
 every other window. A Space with no worker labels plays the chair and eight desks; its cards' own tile, where
 it reads cards, is a member. The chair opens the board, calls each member by name, the member answers, the

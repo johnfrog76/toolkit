@@ -28,6 +28,7 @@ import {
   MEMBER_SEATS,
   MEMBER_WINDOWS,
   ROOM_WINDOWS,
+  KEPT_WINDOWS,
   dealRoom,
   standupDayOfYear,
 } from "./seats";
@@ -213,17 +214,99 @@ describe("the room", () => {
     expect(standupDayOfYear("2028-12-31T23:59:00-12:00")).toBe(366);
   });
 
-  it("seats member i in member window i, in the response's order, and deals the rest their mugs by the day", () => {
+  it("seats a kept label in its own persona's window, in speaking order, and deals the rest their mugs by the day", () => {
+    expect(KEPT_WINDOWS).toEqual({ fable: "dev-hero", opus: "vibemancer", sonnet: "minimalist" });
+    // One label to a window.
+    expect(new Set(Object.values(KEPT_WINDOWS)).size).toBe(Object.keys(KEPT_WINDOWS).length);
     const room = dealRoom(friday);
     expect(room.members.map((m) => [m.castId, m.worker.label])).toEqual([
       ["dev-hero", "fable"],
-      ["ops-dev", "opus"],
+      ["vibemancer", "opus"],
       ["minimalist", "sonnet"],
     ]);
-    expect(room.desks.map((d) => d.castId)).toEqual(MEMBER_WINDOWS.slice(3).map((w) => w.castId));
+    expect(room.desks.map((d) => d.castId)).toEqual([
+      "ops-dev",
+      "new-hire",
+      "ultrawide",
+      "qa",
+      "designer",
+    ]);
     expect(room.desks.map((d) => d.look)).toEqual(
       dealMugLooks(standupDayOfYear(friday.asOf), MEMBER_SEATS - 3),
     );
+  });
+
+  it("a kept label matches whatever its case, and keeps its window whatever order it arrives in", () => {
+    const [fable, opus, sonnet] = friday.workers;
+    const room = dealRoom({ ...friday, workers: [sonnet, { ...opus, label: "Opus" }, fable] });
+    expect(room.members.map((m) => [m.castId, m.worker.label])).toEqual([
+      ["minimalist", "sonnet"],
+      ["vibemancer", "Opus"],
+      ["dev-hero", "fable"],
+    ]);
+  });
+
+  it("any other label is dealt by position into the free windows, in cast order", () => {
+    const w = (label: string) => ({ ...friday.workers[2], label, name: label });
+    const room = dealRoom({ ...friday, workers: [w("haiku"), w("opus"), w("gemini")] });
+    expect(room.members.map((m) => [m.castId, m.worker.label])).toEqual([
+      ["dev-hero", "haiku"],
+      ["vibemancer", "opus"],
+      ["ops-dev", "gemini"],
+    ]);
+  });
+
+  it("a kept label out today leaves its window empty -- nobody else's face takes it -- so no face moves when it is back", () => {
+    const [fable, opus, sonnet] = friday.workers;
+    const extra = (label: string) => ({ ...sonnet, label, name: label });
+    const today = dealRoom({
+      ...friday,
+      workers: [{ ...fable, present: false }, extra("haiku"), opus, sonnet],
+    });
+    expect(today.members.map((m) => [m.castId, m.worker.label])).toEqual([
+      ["ops-dev", "haiku"],
+      ["vibemancer", "opus"],
+      ["minimalist", "sonnet"],
+    ]);
+    expect(today.desks.map((d) => d.castId)).toContain("dev-hero");
+    const back = dealRoom({ ...friday, workers: [fable, extra("haiku"), opus, sonnet] });
+    for (const m of today.members)
+      expect(back.members.find((x) => x.worker.label === m.worker.label)!.castId).toBe(m.castId);
+  });
+
+  it("a kept window this Space has no label for is an ordinary window, dealt by position", () => {
+    const w = (label: string) => ({ ...friday.workers[2], label, name: label });
+    const room = dealRoom({ ...friday, workers: ["a", "b", "c", "d", "e", "f", "g", "h"].map(w) });
+    expect(room.members.map((m) => m.castId)).toEqual(MEMBER_WINDOWS.map((m) => m.castId));
+    expect(room.desks).toEqual([]);
+  });
+
+  it("never drops a present member: when the free windows run out, a kept window an absent member left takes the next", () => {
+    const [fable, opus, sonnet] = friday.workers;
+    const w = (label: string) => ({ ...sonnet, label, name: label });
+    const others = ["a", "b", "c", "d", "e", "f", "g"].map(w);
+    const room = dealRoom({
+      ...friday,
+      workers: [{ ...fable, present: false }, opus, { ...sonnet, present: false }, ...others],
+    });
+    expect(room.members).toHaveLength(MEMBER_SEATS);
+    expect(room.desks).toEqual([]);
+    expect(room.members.find((m) => m.worker.label === "opus")!.castId).toBe("vibemancer");
+    // The five free windows first, in cast order, then the kept windows left empty, in cast order.
+    expect(room.members.filter((m) => m.worker.label !== "opus").map((m) => m.castId)).toEqual([
+      "ops-dev",
+      "new-hire",
+      "ultrawide",
+      "qa",
+      "designer",
+      "dev-hero",
+      "minimalist",
+    ]);
+    // Speaking order is the response's, whichever window each sits in.
+    expect(room.members.map((m) => m.worker.label)).toEqual([
+      "opus",
+      ...others.map((o) => o.label),
+    ]);
   });
 
   it("a face never changes window because its work changed", () => {
@@ -380,10 +463,10 @@ describe("the standup deck, from Friday's fixture", () => {
     ).toBeTruthy();
   });
 
-  it("Opus's tile wears its plate, in the second member window", () => {
+  it("Opus's tile wears its plate, in its own persona's window", () => {
     const { tile, lit } = drawStage(at("opus"));
-    expect(lit()).toEqual(["ops-dev"]);
-    expect(within(tile("ops-dev")).getByText("OPS-DEV (opus)")).toBeTruthy();
+    expect(lit()).toEqual(["vibemancer"]);
+    expect(within(tile("vibemancer")).getByText("AI VIBEMANCER (opus)")).toBeTruthy();
   });
 
   it("Sonnet had nothing: it keeps its face and says its two made-up items, never async", () => {
@@ -482,7 +565,7 @@ describe("the standup deck, from Friday's fixture", () => {
       expect(screen.getByTestId("stage-register").textContent).toBe("REGISTER · REAL");
       expect(within(tile("pm")).getByText(CHAIR_PLATE)).toBeTruthy();
       expect(within(tile("dev-hero")).getByText("DEV-HERO (fable)")).toBeTruthy();
-      expect(within(tile("ops-dev")).getByText("OPS-DEV (opus)")).toBeTruthy();
+      expect(within(tile("vibemancer")).getByText("AI VIBEMANCER (opus)")).toBeTruthy();
       expect(within(tile("minimalist")).getByText("MINIMALIST (sonnet)")).toBeTruthy();
       for (const d of desks) {
         expect(within(tile(d.castId)).getByText(EMPTY_DESK_PLATE)).toBeTruthy();
@@ -554,7 +637,7 @@ describe("the stage's bubbles", () => {
   it("the bubble shows a turn's first four lines and the voice says all of it", () => {
     expect(SPEECH_MAX_LINES).toBe(4);
     const { tile } = drawStage(at("opus"));
-    const text = within(tile("ops-dev")).getByTestId("stage-speech-text");
+    const text = within(tile("vibemancer")).getByTestId("stage-speech-text");
     expect(text.style.getPropertyValue("-webkit-line-clamp")).toBe("4");
     // The clamp is paint only: the text node holds every line, and the voice says them.
     expect(text.textContent!.split("\n").length).toBeGreaterThanOrEqual(3);
@@ -903,7 +986,7 @@ describe("the standup deck at the work grain, as prose", () => {
     expect(opus).toContain(T.proseBlockersNone);
     expect(sayOf(at("opus"))).toBe(opus.join(" "));
     render(<>{s[at("opus")].content}</>);
-    const tile = screen.getByTestId("tile-ops-dev");
+    const tile = screen.getByTestId("tile-vibemancer");
     expect(
       within(tile).getByText(/Yesterday I closed two in Team Agile \(#501, #502\)\./),
     ).toBeTruthy();
@@ -983,7 +1066,7 @@ describe("the standup deck at the work grain, as prose", () => {
     it("a worker the model dressed speaks the spoken sentences, one Say line and one bubble line each", () => {
       expect(extractSayText(d[at("opus")].notes)).toBe(opusSaid.join(" "));
       render(<>{d[at("opus")].content}</>);
-      const tile = screen.getByTestId("tile-ops-dev");
+      const tile = screen.getByTestId("tile-vibemancer");
       expect(
         within(tile).getByText(/Plumbing for the Studio: #503, counted the foyer rows\./),
       ).toBeTruthy();
@@ -998,7 +1081,7 @@ describe("the standup deck at the work grain, as prose", () => {
       const slide = buildStandupDeck(talky).slides()[at("opus")];
       expect(extractSayText(slide.notes)).toBe(long.join(" "));
       render(<>{slide.content}</>);
-      const text = within(screen.getByTestId("tile-ops-dev")).getByTestId("stage-speech-text");
+      const text = within(screen.getByTestId("tile-vibemancer")).getByTestId("stage-speech-text");
       expect(text.style.getPropertyValue("-webkit-line-clamp")).toBe(String(SPEECH_MAX_LINES));
       // The clamp is paint only: the text node still holds all nine lines.
       expect(text.textContent).toBe(long.join("\n"));
@@ -1164,13 +1247,13 @@ describe("no silent face", () => {
       room = expectNoSilentFace(data, 5);
     });
 
-    it("seats the five in the first five member windows, in label order, and leaves three desks", () => {
+    it("seats the kept three in their own windows and the other two by position, and leaves three desks", () => {
       expect(members.map((m) => [m.castId, m.worker.label])).toEqual([
         ["dev-hero", "fable"],
         ["ops-dev", "haiku"],
-        ["minimalist", "opus"],
-        ["new-hire", "sonnet"],
-        ["vibemancer", "widgets"],
+        ["vibemancer", "opus"],
+        ["minimalist", "sonnet"],
+        ["new-hire", "widgets"],
       ]);
       expect(desks.map((d) => d.castId)).toEqual(["ultrawide", "qa", "designer"]);
       expect(new Set(desks.map((d) => d.look)).size).toBe(3);

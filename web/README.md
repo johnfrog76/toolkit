@@ -155,7 +155,7 @@ web/
     │   ├── Trophy          the award's picture: a gold trophy, an inline SVG
     │   └── stage/          the played view: one lazy chunk with the deck engine
     │       ├── cast.tsx        the Remote Standup's atoms, by copy from the Wasteland (no bios); reduced motion stills them
-    │       ├── seats.ts        the room: nine windows (ROOM_WINDOWS), the present dealt by position, PERSONA (label) plates, empty desks and their mugs
+    │       ├── seats.ts        the room: nine windows (ROOM_WINDOWS), kept labels in their own window, the rest dealt by position, PERSONA (label) plates, empty desks and their mugs
     │       ├── EmptyDesk.tsx   a window with nobody in it: a chair, a desk and a steaming mug in eight looks, and the day's deal of them
     │       ├── standupDeck.tsx the standup response -> an audiobook Deck: the board, the open, a call and a turn a member, the chair's status, the close
     │       └── StandupPlay     /deck/ritual/standup: the resolver, handed to the deck engine's GeneratedDeckHost

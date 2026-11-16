@@ -6,9 +6,10 @@ import type { MugLook } from "./EmptyDesk";
 // ── The room (docs/modules/solitaire-agile.md, "The played view") ────────────
 //
 // The stage is always nine windows, the Zoom grid (D-TA17). The chair keeps
-// its own window; the other eight are the members' windows, in CAST order, and
-// the team is DEALT onto them by position: member i, in the response's order,
-// sits in member window i. A window with nobody in it is an empty desk.
+// its own window; the other eight are the members' windows, in CAST order. A
+// label in KEPT_WINDOWS keeps its own persona's window; the rest of the team is
+// DEALT onto the free windows by position. A window with nobody in it is an
+// empty desk.
 //
 // The web never reads the team-size setting. It draws what the response gives
 // it: the workers marked `present` (all of them, from an agent that predates
@@ -68,16 +69,57 @@ export interface Room {
 }
 
 /**
- * Seat today's standup. The present members (every worker, from an agent that
- * predates `present`) take the member windows in the response's order -- the
- * order the round speaks them -- up to the room. The windows left are empty
- * desks, dealt their mugs by the day in window order, so the desks in one room
- * all differ and the same day always deals the same.
+ * The labels that keep a face of their own: each sits in its own persona's
+ * window whatever the day, so its persona and tagline never change with who
+ * else is in the room. The sample team is a model crew; any other label is
+ * dealt by position. One label to a window.
+ */
+export const KEPT_WINDOWS: Readonly<Record<string, string>> = {
+  fable: "dev-hero",
+  opus: "vibemancer",
+  sonnet: "minimalist",
+};
+
+/**
+ * Seat today's standup.
+ *
+ * - The present members (every worker, from an agent that predates `present`),
+ *   in the response's order, up to the room -- the order the round speaks them,
+ *   whichever window each sits in.
+ * - A present member whose label is in KEPT_WINDOWS sits in its own window.
+ * - A kept window whose label is in the response but out today stays EMPTY, so
+ *   no other face takes it and nobody moves when that member is back; a kept
+ *   window whose label this Space does not have is an ordinary window.
+ * - Every other present member takes the free windows in CAST order; only when
+ *   those run out does it take a kept window left empty by an absent member, so
+ *   no present member is ever dropped.
+ * - The windows left are empty desks, dealt their mugs by the day in window order.
  */
 export function dealRoom(data: Pick<StandupResponse, "asOf" | "workers">): Room {
-  const present = (data.workers ?? []).filter((w) => w.present !== false).slice(0, MEMBER_SEATS);
-  const members = present.map((worker, i) => ({ ...MEMBER_WINDOWS[i], worker }));
-  const open = MEMBER_WINDOWS.slice(members.length);
-  const looks = dealMugLooks(standupDayOfYear(data.asOf), open.length);
-  return { members, desks: open.map((w, i) => ({ ...w, look: looks[i] })) };
+  const workers = data.workers ?? [];
+  const present = workers.filter((w) => w.present !== false).slice(0, MEMBER_SEATS);
+  const keptOf = (w: StandupWorker) => KEPT_WINDOWS[w.label.toLowerCase()];
+  const reserved = new Set(workers.map(keptOf).filter((id): id is string => !!id));
+  const byCast = new Map<string, StandupWorker>();
+  for (const w of present) {
+    const own = keptOf(w);
+    if (own && !byCast.has(own)) byCast.set(own, w);
+  }
+  const seatedKept = new Set(byCast.values());
+  const free = MEMBER_WINDOWS.filter((m) => !reserved.has(m.castId));
+  const spare = MEMBER_WINDOWS.filter((m) => reserved.has(m.castId) && !byCast.has(m.castId));
+  const open = [...free, ...spare];
+  for (const w of present) {
+    if (seatedKept.has(w)) continue;
+    const at = open.shift()!;
+    byCast.set(at.castId, w);
+  }
+  const windowOf = new Map([...byCast].map(([castId, w]) => [w, castId]));
+  const members = present.map((worker) => ({
+    ...MEMBER_WINDOWS.find((m) => m.castId === windowOf.get(worker))!,
+    worker,
+  }));
+  const empty = MEMBER_WINDOWS.filter((m) => !byCast.has(m.castId));
+  const looks = dealMugLooks(standupDayOfYear(data.asOf), empty.length);
+  return { members, desks: empty.map((w, i) => ({ ...w, look: looks[i] })) };
 }
