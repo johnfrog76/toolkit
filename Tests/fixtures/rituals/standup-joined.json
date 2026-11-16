@@ -88,7 +88,9 @@
         ],
         "checks": [],
         "links": [{ "number": 160, "id": "160", "lane": "In Progress" }],
-        "text": null
+        "text": "standup-joined-linked-card-issue-unrouted.txt",
+        "work": "standup-joined-linked-card-issue-unrouted.work.txt",
+        "brief": "standup-joined-linked-card-issue-unrouted.brief.txt"
       }
     },
     {

@@ -345,17 +345,6 @@ the chair does not yet say who is out.
 
 **Issue:** [#389](https://github.com/johnfrog76/toolkit/issues/389)
 
-### A card linked to an unrouted issue is in no slot
-
-**What you see:** A card whose id is an issue's number adds no row of its own to the standup. When that issue is open and
-carries no worker label, the issue is in no slot and neither is the card's work: the card's lane is in
-the response's `links[]`, and the text says nothing about it. Give the issue a worker label and it
-shows.
-
-**Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
-
-**Issue:** [#390](https://github.com/johnfrog76/toolkit/issues/390)
-
 ### The standup's prose reads no age, pull request or assignee
 
 **What you see:** *Blocked* is only the blockers slot, an open, routed `verify-close` issue waiting on your walk: a
