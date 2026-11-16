@@ -246,7 +246,7 @@ function Lines({ lines, width, height }: ReturnType<typeof layoutChart>) {
             key={`${from.position.id}-${to.position.id}`}
             d={`M ${from.cx} ${y1} V ${mid} H ${to.cx} V ${y2}`}
             fill="none"
-            stroke={tokens.colorNeutralStroke1}
+            stroke={tokens.colorNeutralStrokeAccessible}
             strokeWidth="2.2"
             strokeLinejoin="round"
             strokeLinecap="round"
@@ -296,7 +296,6 @@ export function OrgPage() {
   const empty = isLoading ? undefined : !data || error ? (
     <EmptyState {...noChart(error, icon)} />
   ) : undefined;
-  const machines = data?.tree.machines ?? [];
 
   return (
     <div className={styles.body}>
@@ -311,7 +310,6 @@ export function OrgPage() {
             {data && !error ? (
               <Caption1 className={styles.subtitle} data-testid="org-subtitle">
                 {data.tree.name}
-                {machines.length ? ` · ${machines.join(", ")}` : ""}
               </Caption1>
             ) : null}
           </>

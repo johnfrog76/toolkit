@@ -61,7 +61,7 @@ describe("the chart, over the table's tree shaped like ours", () => {
     const levels = ["owner", "vp-product", "pm", "team-lead", "builder"].map(top);
     expect(levels).toEqual([...levels].sort((a, b) => a - b));
     expect(new Set(levels).size).toBe(5);
-    expect(screen.getByTestId("org-subtitle").textContent).toBe("Laptop and mini · laptop, mini");
+    expect(screen.getByTestId("org-subtitle").textContent).toBe("Laptop and mini");
   });
 
   it("the lead's three seats are a row of three cards in one office, the vacant one last", () => {

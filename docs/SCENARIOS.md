@@ -492,7 +492,7 @@ page under Team Agile's one entry"). The page is a read: no tree to choose, no `
 
 | `GET /api/ritual/org` answers | The page shows |
 | --- | --- |
-| the tree in use | the heading `Org chart` and the tree's name and machines; one office a position, a row a level from the owner down, the walls coloured by level, lines from each office to its reports; a card a seat with a bust and a plate, `POSITION · model` and where it sits (`toolkit on mini`); the prompt's title over each office that has one |
+| the tree in use | the heading `Org chart` and the tree's name; one office a position, a row a level from the owner down, the walls coloured by level, lines from each office to its reports; a card a seat with a bust and a plate, `POSITION · model` and where it sits (`toolkit on mini`); the prompt's title over each office that has one |
 | a position with several seats | a row of cards in one office |
 | a vacant seat | `POSITION · vacant` on a dimmed office with a dashed outline -- a placeholder for the empty desk, the size of a staffed card |
 | the owner's seat (a person) | `Owner · <name>`, no model, not a link |
