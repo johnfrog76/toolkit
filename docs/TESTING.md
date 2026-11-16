@@ -410,7 +410,7 @@ the bytes and the content type that arrive. Nothing beyond the machine is contac
 the 5.1 shell because a `powershell.exe` started from `pwsh` can inherit PowerShell 7's module folders, and 5.1
 then loads PowerShell 7's copies of a module. The two jobs' times are on the run.
 
-**16 of 52 CLI suites start every child in the host they run in.** Those suites start their children through
+**17 of 53 CLI suites start every child in the host they run in.** Those suites start their children through
 `Invoke-P20TestHost` (`Tests/Get-TestHost.ps1`), so under Windows PowerShell 5.1 the verbs they type run on 5.1
 too. The rest still type `& pwsh`, so under 5.1 their own code runs there but their verbs run on PowerShell 7,
 and a child's first stderr line can stop the suite under `Stop`. Clause 22 of `Tests/Test-Portability.ps1`
