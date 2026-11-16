@@ -492,7 +492,9 @@ engine are one lazy chunk fetched when Play is pressed.
   (`SPEECH_SIZES`: as wide as the turn needs up to 380px, then 300px, then one type step smaller) and
   only at the last size takes the side with the least overlap. The tail sits on the edge that faces the
   speaker, at the head. The bubble is laid out unseen until it is placed, and placed again when the
-  stage changes size. `stage/geometry.test.ts` holds the rule as a table over the nine windows and a
+  stage changes size. The played stage is drawn for desktop browsers: from 576px wide up it is laid
+  out at its own size, never scaled, and the bubble placement is not held at phone width, where the deck
+  engine shrinks the whole stage with a transform. `stage/geometry.test.ts` holds the rule as a table over the nine windows and a
   short and a long turn at the stage's usual size: every row clean. The text shows at most **nine
   lines** and ends the last in an ellipsis (`SPEECH_MAX_LINES`), no scrollbar -- a ceiling a turn does
   not reach. Nothing is lost past it: the voice (the slide's Say lines) and the thought cloud still carry
