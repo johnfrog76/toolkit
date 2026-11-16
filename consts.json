@@ -408,6 +408,11 @@
     "readingsFolder": "readings"
   },
 
+  "org": {
+    "_": "The org chart's hub file (docs/hub/org.md): the name of the file at the hub root, beside hub.json, that holds the org's trees, positions and seats. The CLI reads it (Scripts/Read-OrgChart.ps1, the OrgChart verb and the inventory row), the agent will serve it, and the web will draw it, so all three type the name from here.",
+    "file": "org.json"
+  },
+
   "replyStatuses": {
     "_": "The thread statuses a reply may set, per tracker (ReplyPR -Status; the PR Comments page's status box). ado is every status Azure DevOps keeps, in the order the box lists them, and the list ReplyPR checks -Status against on either tracker. The agent has no reader: a reply goes through the bridge to the verb. github is the three GitHub keeps -- a review thread is only resolved or unresolved: fixed and closed resolve it, active reopens it. byDesign, pending and wontFix carry a reason GitHub has nowhere to keep, so ReplyPR refuses them there, nothing posted, and the page does not offer them.",
     "ado": ["fixed", "active", "pending", "byDesign", "wontFix", "closed"],

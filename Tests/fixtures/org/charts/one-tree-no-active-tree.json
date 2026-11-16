@@ -1,0 +1,29 @@
+{
+  "activeTree": "solo",
+  "tree": {
+    "id": "solo",
+    "name": "solo",
+    "machines": [],
+    "positions": [
+      {
+        "id": "boss",
+        "title": "boss",
+        "prompt": null,
+        "reportsTo": null,
+        "defaultModel": null,
+        "level": 0,
+        "seats": [
+          {
+            "id": "boss",
+            "model": null,
+            "person": "Sam",
+            "machine": null,
+            "space": null,
+            "active": null,
+            "state": "staffed"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -80,7 +80,7 @@ is refused), its verbs `NewDesign`, `StampDesign`, `MoveDesign`, `NewSpace`, `Re
 autoload manifest, its agent routes ungated, its web descriptor with no `feature` (its pages still lazy);
 `docs/modules/studio.md`. **solitaireAgile** (Team Agile in the web UI) is a
 team's rituals with the tracker as the board -- the standup, `Standup` and its route, both halves,
-writing nothing; triage -- `Triage`, `GET /api/ritual/triage` and a Triage page; and `Route`, its one write, a real label, assignee or milestone on the tracker through `gh`, and on a card one `**Assigned:**` line; and `StartWork`, the hand-off block a cold agent starts from, which the Team Agile page copies through the bridge; `docs/modules/solitaire-agile.md`.
+writing nothing; triage -- `Triage`, `GET /api/ritual/triage` and a Triage page; and `Route`, its one write, a real label, assignee or milestone on the tracker through `gh`, and on a card one `**Assigned:**` line; and `StartWork`, the hand-off block a cold agent starts from, which the Team Agile page copies through the bridge; and `OrgChart`, the org's tree -- positions, who reports to whom, which model or person sits in each seat -- read from `org.json` at the hub root (`consts.json` `org.file`, `docs/hub/org.md`), a CLI read for now that writes nothing and is absent wherever Team Agile is off; `docs/modules/solitaire-agile.md`.
 
 One flag switches a whole module, in all three halves at once:
 
@@ -117,9 +117,9 @@ exception and is not: the gate is checked **per request**, so flipping a flag in
 needs no restart **of the agent or the web UI**; a shell that is already open keeps the verbs it
 registered at import (`docs/CONFIGURATION.md`, "A module flag and an open shell").
 
-The fifteen verbs the modules contribute: `NewGrowth`, `NewWorkReview`, `PublishWorkReview`,
+The sixteen verbs the modules contribute: `NewGrowth`, `NewWorkReview`, `PublishWorkReview`,
 `WorkReview`, `LogPeerReview`, `UpdateResume` (growth); `SendTeams`, `NewMeeting`, `MeetingAgenda`
-(communication); `NewReminder`, `Reminders` (organize); `Standup`, `Triage`, `Route`, `StartWork` (solitaireAgile).
+(communication); `NewReminder`, `Reminders` (organize); `Standup`, `Triage`, `Route`, `StartWork`, `OrgChart` (solitaireAgile).
 (`NewDesign`, `StampDesign`, `MoveDesign`, `NewSpace`, `RetireSpace`, `RemoveSpace` and `HowWeWork` are the Studio's, and core.) **A module closes its own data.** `Archive` is org-scoped and cannot see a hub-root
 sibling like `manager/` or `growth/`, and the answer is not to teach it: it is
 `MeetingAgenda -Close`, which moves the session to `manager/archive/` and stamps `**Closed:**` from
@@ -174,7 +174,7 @@ module and you add a mock line to every one of these files.
 **Four test runners**, one per half plus one for the two together. Run the ones your change touches:
 
 ```powershell
-tkTestToolkit                 # the CLI -- 52 suites, 10917 assertions on this commit
+tkTestToolkit                 # the CLI -- 53 suites, 11165 assertions on this commit
 ```
 
 ```bash
@@ -221,10 +221,11 @@ anywhere).
 | deck module | `features.deck` | `config.local.json`, top-level -- web UI only, it adds no verbs |
 | lounge module | `features.lounge` | `config.local.json`, top-level -- web UI only, the ambient room; while NOT CONFIGURED, Home's foot carries its discovery tip |
 | organize module | `features.organize` | `config.local.json`, top-level -- both halves: `NewReminder`, `Reminders` and the Organize tab |
-| Team Agile module | `features.solitaireAgile`, and the Space's `howIWork` | the switch in `config.local.json`, top-level; the answer in `hub.json` -- on only where both say so: `on`, `off` (derived or chosen) or `not configured` (a GitHub Space nobody has answered). Both halves: `Standup`, `Triage`, `Route` and `StartWork`, `GET /api/ritual/standup` and `/triage`, and its tab; writes only what `Route` writes -- a label, an assignee or a milestone on the tracker, and on a card one `**Assigned:**` line |
+| Team Agile module | `features.solitaireAgile`, and the Space's `howIWork` | the switch in `config.local.json`, top-level; the answer in `hub.json` -- on only where both say so: `on`, `off` (derived or chosen) or `not configured` (a GitHub Space nobody has answered). Both halves: `Standup`, `Triage`, `Route` and `StartWork`, `GET /api/ritual/standup` and `/triage`, and its tab; and `OrgChart`, a CLI read of the hub's `org.json` so far; writes only what `Route` writes -- a label, an assignee or a milestone on the tracker, and on a card one `**Assigned:**` line |
 | Design lifecycle | `design` | DERIVED (`Scripts/Read-DesignTree.ps1`, through `Get-OptionalSurfaces.ps1`): `on` when the repository you stand in has `design/` and every file in the four folders carries an `id:`, `off` with the count when some do not, `not configured` with no `design/` to read, or none with a note in it; the hub's own count in the note. `docs/hub/design.md`, "The CLI names it" |
 | Sprint awareness | `spaces[].features.sprintAwareness` | `hub.json` -- a Space-scoped flag (the other Space-scoped switches are `howIWork`, above, and `suggestions`, below) |
 | Suggestions | `spaces[].features.suggestions` | `hub.json` -- a Space-scoped switch riding Team Agile: `not configured` (on, by default, where Team Agile is on), `on`, or `off` (set false, or Team Agile off in that Space); `false` turns the chair's Next line back to `Next: nothing is waiting on you.` |
+| Org chart | `org.json` at the hub root | DERIVED, riding Team Agile like the Suggestions row: `off` where Team Agile is off in the Space (or where the file is there and fails its checks, the note carrying the sentence), `not configured` with no file, `on` with the active tree's name and its seat count. The file is the hub's, hand-edited and read-only to the tool -- its name is `consts.json` `org.file`, its shape `docs/hub/org.md`; `OrgChart` prints it |
 | Team size | `spaces[].features.teamSize` | `hub.json` -- `Config -Set spaces.<slug>.features.teamSize=<3\|6\|9> -Hub`, any other number refused by name. A Space-scoped NUMBER, not a switch: the standup's windows with the chair counted. Its row rides Team Agile as `Suggestions` does: `off` where Team Agile is off in that Space; where it is on, `on` with the number, `not configured` while unset, when the room is nine. The fill keeps every worker and marks each `present` (the ones with work seated first); the round -- `Standup -Grain work`, the stage -- speaks the present, the detail and the brief keep everyone. Asked in the drawer as "How many are in my standup in `<Space>`?", three radios. `docs/modules/solitaire-agile.md`, "The team size: who is in the room" |
 | Prompt store git sync | `storeSync` | `hub.json`, overridable per machine |
 | ADO identity | `email` | `config.local.json`, else `az login` |

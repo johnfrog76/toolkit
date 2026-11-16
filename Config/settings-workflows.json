@@ -88,6 +88,15 @@
       "anchor": "spaces.{slug}.features.suggestions"
     },
     {
+      "id": "org-chart",
+      "question": "Who sits in which seat in my org?",
+      "sentence": "Where Team Agile is on, OrgChart prints your org as a tree: the positions, who each reports to, and the model or person sitting in each seat. It reads one file, org.json, at the top of your hub beside hub.json, and writes nothing; no file, nothing is shown.",
+      "surfaces": [
+        "orgChart"
+      ],
+      "door": "sentence"
+    },
+    {
       "id": "team-size",
       "question": "How many are in my standup in {space}?",
       "sentence": "The room counts the chair; members with work sit first, and unset is nine.",

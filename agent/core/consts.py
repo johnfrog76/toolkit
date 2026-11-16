@@ -724,6 +724,12 @@ def usage_readings_folder() -> str:
     return consts()["usage"]["readingsFolder"]
 
 
+def org_file() -> str:
+    """``org.json`` -- the org chart's file at the hub root, beside ``hub.json``
+    (docs/hub/org.md). The CLI reads it today; the agent will serve it."""
+    return consts()["org"]["file"]
+
+
 def billing_text() -> dict[str, str]:
     """Daily's window sentences -- ``halfWindow``, ``notADay`` ({name}, {value}) and
     ``backwards`` ({since}, {until}): the billing script, the CLI's Daily and

@@ -1,0 +1,135 @@
+{
+  "activeTree": "main",
+  "tree": {
+    "id": "main",
+    "name": "Laptop and mini",
+    "machines": [
+      "laptop",
+      "mini"
+    ],
+    "positions": [
+      {
+        "id": "owner",
+        "title": "Owner",
+        "prompt": null,
+        "reportsTo": null,
+        "defaultModel": null,
+        "level": 0,
+        "seats": [
+          {
+            "id": "owner",
+            "model": null,
+            "person": "Sam",
+            "machine": null,
+            "space": null,
+            "active": null,
+            "state": "staffed"
+          }
+        ]
+      },
+      {
+        "id": "vp-product",
+        "title": "VP of product",
+        "prompt": "vp-of-product.prompt.md",
+        "reportsTo": "owner",
+        "defaultModel": "fable",
+        "level": 1,
+        "seats": [
+          {
+            "id": "vp-product",
+            "model": "fable",
+            "person": null,
+            "machine": "laptop",
+            "space": null,
+            "active": null,
+            "state": "staffed"
+          }
+        ]
+      },
+      {
+        "id": "vp-engineering",
+        "title": "VP of engineering",
+        "prompt": "vp-of-engineering.prompt.md",
+        "reportsTo": "owner",
+        "defaultModel": "fable",
+        "level": 1,
+        "seats": [
+          {
+            "id": "vp-engineering",
+            "model": "fable",
+            "person": null,
+            "machine": "mini",
+            "space": null,
+            "active": null,
+            "state": "staffed"
+          }
+        ]
+      },
+      {
+        "id": "pm",
+        "title": "PM",
+        "prompt": "pm.prompt.md",
+        "reportsTo": "vp-engineering",
+        "defaultModel": "opus",
+        "level": 2,
+        "seats": [
+          {
+            "id": "pm",
+            "model": "opus",
+            "person": null,
+            "machine": "laptop",
+            "space": null,
+            "active": null,
+            "state": "staffed"
+          }
+        ]
+      },
+      {
+        "id": "team-lead",
+        "title": "Team lead",
+        "prompt": "team-lead.prompt.md",
+        "reportsTo": "pm",
+        "defaultModel": "opus",
+        "level": 3,
+        "seats": [
+          {
+            "id": "alpha",
+            "model": "fable",
+            "person": null,
+            "machine": "mini",
+            "space": "alpha",
+            "active": null,
+            "state": "staffed"
+          },
+          {
+            "id": "beta",
+            "model": "opus",
+            "person": null,
+            "machine": "mini",
+            "space": "beta",
+            "active": null,
+            "state": "staffed"
+          },
+          {
+            "id": "gamma",
+            "model": null,
+            "person": null,
+            "machine": "mini",
+            "space": "gamma",
+            "active": null,
+            "state": "vacant"
+          }
+        ]
+      },
+      {
+        "id": "builder",
+        "title": "Builder",
+        "prompt": null,
+        "reportsTo": "team-lead",
+        "defaultModel": "sonnet for crew cards, opus across halves, fable for art on the owner's word",
+        "level": 4,
+        "seats": []
+      }
+    ]
+  }
+}

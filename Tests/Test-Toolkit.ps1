@@ -85,6 +85,7 @@ param(
     [switch]$StandupRemind,
     [switch]$Triage,
     [switch]$StartWork,
+    [switch]$OrgChart,
     [switch]$SendTeams,
     [switch]$NewMeeting,
     [switch]$MeetingAgenda,

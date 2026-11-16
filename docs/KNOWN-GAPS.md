@@ -140,7 +140,7 @@ back instead.
 
 ### Most CLI suites run their verbs on PowerShell 7 under 5.1
 
-**What you see:** 16 of 52 CLI suites start every child in the host they run in. The rest start `pwsh`
+**What you see:** 17 of 53 CLI suites start every child in the host they run in. The rest start `pwsh`
 by name, so a run of the CLI suites in Windows PowerShell 5.1 proves their own code on 5.1 but the verbs
 they type on PowerShell 7, and a defect only 5.1 shows can pass there; Clause 22 of
 `Tests/Test-Portability.ps1` lists them and holds this count to its list. The `ps51` CI job runs every
@@ -386,6 +386,16 @@ DevOps sentence is shared by both.
 **Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
 
 **Issue:** [#392](https://github.com/johnfrog76/toolkit/issues/392)
+
+### The org chart has no route or page yet
+
+**What you see:** `OrgChart` prints the org's tree in a terminal, and `OrgChart -AsJson` prints the response the agent will
+serve, but the agent has no route for it and the Team Agile page has no Org tab. The chart is read from
+`org.json` at the hub root by the CLI alone, and only where Team Agile is on.
+
+**Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
+
+**Issue:** [#456](https://github.com/johnfrog76/toolkit/issues/456)
 
 ## True by design
 

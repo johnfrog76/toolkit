@@ -1,0 +1,92 @@
+{
+  "activeTree": "main",
+  "trees": [
+    {
+      "id": "main",
+      "name": "Laptop and mini",
+      "machines": ["laptop", "mini"],
+      "positions": [
+        {
+          "id": "owner",
+          "title": "Owner",
+          "seats": [
+            { "id": "owner", "person": "Sam" }
+          ]
+        },
+        {
+          "id": "vp-product",
+          "title": "VP of product",
+          "prompt": "vp-of-product.prompt.md",
+          "reportsTo": "owner",
+          "defaultModel": "fable",
+          "seats": [
+            { "id": "vp-product", "model": "fable", "machine": "laptop" }
+          ]
+        },
+        {
+          "id": "vp-engineering",
+          "title": "VP of engineering",
+          "prompt": "vp-of-engineering.prompt.md",
+          "reportsTo": "owner",
+          "defaultModel": "fable",
+          "seats": [
+            { "id": "vp-engineering", "model": "fable", "machine": "mini" }
+          ]
+        },
+        {
+          "id": "pm",
+          "title": "PM",
+          "prompt": "pm.prompt.md",
+          "reportsTo": "vp-engineering",
+          "defaultModel": "opus",
+          "seats": [
+            { "id": "pm", "model": "opus", "machine": "laptop" }
+          ]
+        },
+        {
+          "id": "team-lead",
+          "title": "Team lead",
+          "prompt": "team-lead.prompt.md",
+          "reportsTo": "pm",
+          "defaultModel": "opus",
+          "seats": [
+            { "id": "alpha", "model": "fable", "machine": "mini", "space": "alpha" },
+            { "id": "beta", "model": "opus", "machine": "mini", "space": "beta" },
+            { "id": "gamma", "machine": "mini", "space": "gamma" }
+          ]
+        },
+        {
+          "id": "builder",
+          "title": "Builder",
+          "reportsTo": "team-lead",
+          "defaultModel": "sonnet for crew cards, opus across halves, fable for art on the owner's word",
+          "seats": []
+        }
+      ]
+    },
+    {
+      "id": "branch",
+      "name": "One machine",
+      "machines": ["mini"],
+      "positions": [
+        {
+          "id": "owner",
+          "title": "Owner",
+          "seats": [
+            { "id": "owner", "person": "Sam" }
+          ]
+        },
+        {
+          "id": "team-lead",
+          "title": "Team lead",
+          "prompt": "team-lead.prompt.md",
+          "reportsTo": "owner",
+          "defaultModel": "opus",
+          "seats": [
+            { "id": "alpha", "model": "opus", "machine": "mini", "space": "alpha", "active": true }
+          ]
+        }
+      ]
+    }
+  ]
+}
