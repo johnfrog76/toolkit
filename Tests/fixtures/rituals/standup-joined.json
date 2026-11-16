@@ -1,5 +1,5 @@
 {
-  "_": "The standup's two sources JOINED on the id (docs/modules/solitaire-agile.md, \"The two sources, joined\"): an active GitHub Space reads its issues AND its cards. Both halves -- tkTestToolkit -Rituals and Tests/test_rituals.py -- feed each case's labels, issues and card rows to their joined fill (fill_joined_standup / Invoke-P20StandupJoinedFill) and assert the source, the walk queue and every worker's slots by ref (#<n> for an issue, the id for a card), the Check lines and the links; a case that names goldens is rendered and compared byte for byte (LF): standup-joined-<name>.txt (the detail), standup-joined-<name>.work.txt (the work grain) and standup-joined-<name>.brief.txt (the chair's reading). One case per shape, then all of them on one day. A card row is what the thin layer reads (read_cards / Get-P20StandupCards); `billable: false` is a card that says **Billable:** no, and a row without the key is billable. What moved: a card row's `begun` is the day its work began (its **Started:** day, else its **Created:** day) and `commits` the hashes of its `- <hash>` bullets; a row without them began outside any window and threads none. A case's `window` is Standup -Since's day (yesterday's lower bound moved back; `expected.since` then says where it landed). `expected.motions` is each item's motion and commit count by ref; `expected.counts` is the counts per worker and in total. The goldens are generated from this table -- and from standup.json and standup-cards.json -- by Tests/regenerate_joined_goldens.py, never typed. The dates read (a GitHub Space, docs/modules/solitaire-agile.md, \"What moved, and the window\"): a case's `commitDates` is hash -> its authored instant, or null where the read gave none, and `issueStarts` is issue number -> its timeline's start (the first worker label added, or the first assignment). With them, a card counts only the commits authored inside the window, a hash with no date is not counted but counted undated (`expected.counts.*.undated`, 0 when absent), and an open issue with no card is started when its start is in the window -- a joined card still decides its issue's start. A case with neither key is a Space whose dates were not read, and today's rule stands.",
+  "_": "The standup's two sources JOINED on the id (docs/modules/solitaire-agile.md, \"The two sources, joined\"): an active GitHub Space reads its issues AND its cards. Both halves -- tkTestToolkit -Rituals and Tests/test_rituals.py -- feed each case's labels, issues and card rows to their joined fill (fill_joined_standup / Invoke-P20StandupJoinedFill) and assert the source, the walk queue and every worker's slots by ref (#<n> for an issue, the id for a card) with an idle worker's two made-up items by index (`nothingIndex`, `nothingTodayIndex`, as standup.json states them), the Check lines and the links; a case that names goldens is rendered and compared byte for byte (LF): standup-joined-<name>.txt (the detail), standup-joined-<name>.work.txt (the work grain) and standup-joined-<name>.brief.txt (the chair's reading). One case per shape, then all of them on one day. A card row is what the thin layer reads (read_cards / Get-P20StandupCards); `billable: false` is a card that says **Billable:** no, and a row without the key is billable. What moved: a card row's `begun` is the day its work began (its **Started:** day, else its **Created:** day) and `commits` the hashes of its `- <hash>` bullets; a row without them began outside any window and threads none. A case's `window` is Standup -Since's day (yesterday's lower bound moved back; `expected.since` then says where it landed). `expected.motions` is each item's motion and commit count by ref; `expected.counts` is the counts per worker and in total. The goldens are generated from this table -- and from standup.json and standup-cards.json -- by Tests/regenerate_joined_goldens.py, never typed. The dates read (a GitHub Space, docs/modules/solitaire-agile.md, \"What moved, and the window\"): a case's `commitDates` is hash -> its authored instant, or null where the read gave none, and `issueStarts` is issue number -> its timeline's start (the first worker label added, or the first assignment). With them, a card counts only the commits authored inside the window, a hash with no date is not counted but counted undated (`expected.counts.*.undated`, 0 when absent), and an open issue with no card is started when its start is in the window -- a joined card still decides its issue's start. A case with neither key is a Space whose dates were not read, and today's rule stands.",
   "asOf": "2026-10-02T09:00:00-04:00",
   "since": "2026-10-01T00:00:00-04:00",
   "space": "widgets",
@@ -22,8 +22,8 @@
       "expected": {
         "walk": [],
         "workers": [
-          { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true },
-          { "label": "opus", "name": "Opus", "yesterday": [], "today": ["#141"], "blockers": [], "empty": false }
+          { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 15, "nothingTodayIndex": 9 },
+          { "label": "opus", "name": "Opus", "yesterday": [], "today": ["#141"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null }
         ],
         "checks": [],
         "links": [{ "number": 141, "id": "141", "lane": "In Progress" }],
@@ -42,8 +42,8 @@
       "expected": {
         "walk": [],
         "workers": [
-          { "label": "fable", "name": "Fable", "yesterday": [], "today": ["#142"], "blockers": [], "empty": false },
-          { "label": "opus", "name": "Opus", "yesterday": [], "today": [], "blockers": [], "empty": true }
+          { "label": "fable", "name": "Fable", "yesterday": [], "today": ["#142"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null },
+          { "label": "opus", "name": "Opus", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 16, "nothingTodayIndex": 10 }
         ],
         "checks": [{ "key": "checkCardArchived", "item": "#142 Port the cast atoms" }],
         "links": [{ "number": 142, "id": "142", "lane": "Done" }],
@@ -62,8 +62,8 @@
       "expected": {
         "walk": [],
         "workers": [
-          { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true },
-          { "label": "opus", "name": "Opus", "yesterday": ["#143"], "today": [], "blockers": [], "empty": false }
+          { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 15, "nothingTodayIndex": 9 },
+          { "label": "opus", "name": "Opus", "yesterday": ["#143"], "today": [], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null }
         ],
         "checks": [{ "key": "checkIssueClosed", "item": "#143 Rename the slug" }],
         "links": [{ "number": 143, "id": "143", "lane": "Code Review" }],
@@ -82,9 +82,9 @@
       "expected": {
         "walk": [],
         "workers": [
-          { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true },
-          { "label": "opus", "name": "Opus", "yesterday": [], "today": [], "blockers": [], "empty": true },
-          { "label": "widgets", "name": "Widgets", "yesterday": [], "today": ["160"], "blockers": [], "empty": false }
+          { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 15, "nothingTodayIndex": 9 },
+          { "label": "opus", "name": "Opus", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 16, "nothingTodayIndex": 10 },
+          { "label": "widgets", "name": "Widgets", "yesterday": [], "today": ["160"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null }
         ],
         "checks": [],
         "links": [{ "number": 160, "id": "160", "lane": "In Progress" }],
@@ -104,9 +104,9 @@
       "expected": {
         "walk": ["K7M2"],
         "workers": [
-          { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true },
-          { "label": "opus", "name": "Opus", "yesterday": [], "today": [], "blockers": [], "empty": true },
-          { "label": "widgets", "name": "Widgets", "yesterday": ["198", "Q3R9"], "today": ["K7M2"], "blockers": [], "empty": false }
+          { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 15, "nothingTodayIndex": 9 },
+          { "label": "opus", "name": "Opus", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 16, "nothingTodayIndex": 10 },
+          { "label": "widgets", "name": "Widgets", "yesterday": ["198", "Q3R9"], "today": ["K7M2"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null }
         ],
         "checks": [],
         "links": [],
@@ -123,8 +123,8 @@
       "expected": {
         "walk": [],
         "workers": [
-          { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true },
-          { "label": "opus", "name": "Opus", "yesterday": [], "today": ["#144"], "blockers": [], "empty": false }
+          { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 15, "nothingTodayIndex": 9 },
+          { "label": "opus", "name": "Opus", "yesterday": [], "today": ["#144"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null }
         ],
         "checks": [],
         "links": [],
@@ -144,8 +144,8 @@
       "expected": {
         "walk": [],
         "workers": [
-          { "label": "fable", "name": "Fable", "yesterday": [], "today": ["#145"], "blockers": [], "empty": false },
-          { "label": "opus", "name": "Opus", "yesterday": [], "today": [], "blockers": [], "empty": true }
+          { "label": "fable", "name": "Fable", "yesterday": [], "today": ["#145"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null },
+          { "label": "opus", "name": "Opus", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 16, "nothingTodayIndex": 10 }
         ],
         "checks": [],
         "links": [],
@@ -177,9 +177,9 @@
       "expected": {
         "walk": ["#146", "K7M2"],
         "workers": [
-          { "label": "fable", "name": "Fable", "yesterday": [], "today": ["#142", "#145"], "blockers": ["#146"], "empty": false },
-          { "label": "opus", "name": "Opus", "yesterday": ["#143"], "today": ["#141", "#144"], "blockers": [], "empty": false },
-          { "label": "widgets", "name": "Widgets", "yesterday": ["198", "Q3R9"], "today": ["K7M2"], "blockers": [], "empty": false }
+          { "label": "fable", "name": "Fable", "yesterday": [], "today": ["#142", "#145"], "blockers": ["#146"], "empty": false, "nothingIndex": null, "nothingTodayIndex": null },
+          { "label": "opus", "name": "Opus", "yesterday": ["#143"], "today": ["#141", "#144"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null },
+          { "label": "widgets", "name": "Widgets", "yesterday": ["198", "Q3R9"], "today": ["K7M2"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null }
         ],
         "checks": [
           { "key": "checkCardArchived", "item": "#142 Port the cast atoms" },
@@ -214,9 +214,9 @@
       "expected": {
         "walk": [],
         "workers": [
-          { "label": "fable", "name": "Fable", "yesterday": ["#153"], "today": ["#154"], "blockers": [], "empty": false },
-          { "label": "opus", "name": "Opus", "yesterday": [], "today": ["#151", "#152"], "blockers": [], "empty": false },
-          { "label": "widgets", "name": "Widgets", "yesterday": ["199"], "today": ["M7K3"], "blockers": [], "empty": false }
+          { "label": "fable", "name": "Fable", "yesterday": ["#153"], "today": ["#154"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null },
+          { "label": "opus", "name": "Opus", "yesterday": [], "today": ["#151", "#152"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null },
+          { "label": "widgets", "name": "Widgets", "yesterday": ["199"], "today": ["M7K3"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null }
         ],
         "checks": [],
         "links": [
@@ -258,8 +258,8 @@
       "expected": {
         "walk": [],
         "workers": [
-          { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true },
-          { "label": "opus", "name": "Opus", "yesterday": [], "today": ["#155"], "blockers": [], "empty": false }
+          { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 15, "nothingTodayIndex": 9 },
+          { "label": "opus", "name": "Opus", "yesterday": [], "today": ["#155"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null }
         ],
         "checks": [],
         "links": [],
@@ -291,9 +291,9 @@
         "since": "2026-09-29T00:00:00-04:00",
         "walk": [],
         "workers": [
-          { "label": "fable", "name": "Fable", "yesterday": ["#162"], "today": [], "blockers": [], "empty": false },
-          { "label": "opus", "name": "Opus", "yesterday": ["#161"], "today": [], "blockers": [], "empty": false },
-          { "label": "widgets", "name": "Widgets", "yesterday": ["W4X9"], "today": [], "blockers": [], "empty": false }
+          { "label": "fable", "name": "Fable", "yesterday": ["#162"], "today": [], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null },
+          { "label": "opus", "name": "Opus", "yesterday": ["#161"], "today": [], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null },
+          { "label": "widgets", "name": "Widgets", "yesterday": ["W4X9"], "today": [], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null }
         ],
         "checks": [],
         "links": [{ "number": 161, "id": "161", "lane": "Done" }],
@@ -326,9 +326,9 @@
       "expected": {
         "walk": [],
         "workers": [
-          {"label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true},
-          {"label": "opus", "name": "Opus", "yesterday": [], "today": ["#170"], "blockers": [], "empty": false},
-          {"label": "widgets", "name": "Widgets", "yesterday": [], "today": ["P4Q8"], "blockers": [], "empty": false}
+          {"label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 15, "nothingTodayIndex": 9},
+          {"label": "opus", "name": "Opus", "yesterday": [], "today": ["#170"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null},
+          {"label": "widgets", "name": "Widgets", "yesterday": [], "today": ["P4Q8"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null}
         ],
         "checks": [],
         "links": [{"number": 170, "id": "170", "lane": "In Progress"}],
@@ -358,8 +358,8 @@
       "expected": {
         "walk": [],
         "workers": [
-          {"label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true},
-          {"label": "opus", "name": "Opus", "yesterday": [], "today": ["#171"], "blockers": [], "empty": false}
+          {"label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 15, "nothingTodayIndex": 9},
+          {"label": "opus", "name": "Opus", "yesterday": [], "today": ["#171"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null}
         ],
         "checks": [],
         "links": [],
@@ -389,8 +389,8 @@
       "expected": {
         "walk": [],
         "workers": [
-          {"label": "fable", "name": "Fable", "yesterday": [], "today": ["#172", "#173"], "blockers": [], "empty": false},
-          {"label": "opus", "name": "Opus", "yesterday": [], "today": [], "blockers": [], "empty": true}
+          {"label": "fable", "name": "Fable", "yesterday": [], "today": ["#172", "#173"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null},
+          {"label": "opus", "name": "Opus", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 16, "nothingTodayIndex": 10}
         ],
         "checks": [],
         "links": [{"number": 173, "id": "173", "lane": "In Progress"}],
@@ -418,9 +418,9 @@
       "expected": {
         "walk": [],
         "workers": [
-          {"label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true},
-          {"label": "opus", "name": "Opus", "yesterday": [], "today": ["#170"], "blockers": [], "empty": false},
-          {"label": "widgets", "name": "Widgets", "yesterday": [], "today": ["P4Q8"], "blockers": [], "empty": false}
+          {"label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 15, "nothingTodayIndex": 9},
+          {"label": "opus", "name": "Opus", "yesterday": [], "today": ["#170"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null},
+          {"label": "widgets", "name": "Widgets", "yesterday": [], "today": ["P4Q8"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null}
         ],
         "checks": [],
         "links": [{"number": 170, "id": "170", "lane": "In Progress"}],

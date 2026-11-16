@@ -10,13 +10,18 @@ import {
 } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
+import { ShellProvider } from "../../shell/cards";
+import type { ShellValue } from "../../shell/cards";
 import { RITUALS } from "../../shell/consts";
+import { entryAnchor } from "../../shell/settingsWorkflows";
 import { chairSuggestion } from "./suggestion";
 import {
   AGENDA_VIEW_KEY,
   GRAIN_KEY,
   TAB_KEY,
   StandupPage,
+  TEAM_SIZE_DOOR,
+  TEAM_SIZE_ENTRY,
   grainParts,
   issueFacts,
   slotState,
@@ -58,6 +63,7 @@ interface FixtureWorker {
   blockers: number[];
   empty: boolean;
   nothingIndex: number | null;
+  nothingTodayIndex: number | null;
 }
 interface FixtureCase {
   name: string;
@@ -78,15 +84,28 @@ const table = JSON.parse(fs.readFileSync(path.join(FIXTURES, "standup.json"), "u
 };
 const vocab = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, "../../../..", RITUALS.vocabularyFile), "utf8"),
-) as { nothing: string[] };
+) as { nothing: string[]; nothingToday: string[] };
 
-/** An empty worker's status sentence: the vocabulary's `nothing` line at the fixture's index. */
-function statusOf(caseName: string, label: string): string {
+/** A fixture worker row's two made-up items, from its two indexes into the vocabulary's
+ *  `nothing` and `nothingToday` families: `excuse` is the first, `status` both; a worker
+ *  with something to say has neither. */
+function idleOf(row: object): { excuse: string; status: string[] } {
+  const w = row as { nothingIndex?: unknown; nothingTodayIndex?: unknown };
+  if (typeof w.nothingIndex !== "number" || typeof w.nothingTodayIndex !== "number")
+    return { excuse: "", status: [] };
+  const status = [vocab.nothing[w.nothingIndex], vocab.nothingToday[w.nothingTodayIndex]];
+  return { excuse: status[0], status };
+}
+
+/** An empty worker's two made-up items, yesterday then today: the vocabulary's `nothing`
+ *  and `nothingToday` lines at the fixture's indexes. */
+function statusOf(caseName: string, label: string): string[] {
   const w = table.cases
     .find((c) => c.name === caseName)
     ?.expected.workers.find((x) => x.label === label);
-  if (!w || w.nothingIndex === null) throw new Error(`no empty worker ${label} in ${caseName}`);
-  return vocab.nothing[w.nothingIndex];
+  if (!w || w.nothingIndex === null || w.nothingTodayIndex === null)
+    throw new Error(`no empty worker ${label} in ${caseName}`);
+  return [vocab.nothing[w.nothingIndex], vocab.nothingToday[w.nothingTodayIndex]];
 }
 
 /** The route's response for one fixture case, per the contract's JSON (4b). */
@@ -118,7 +137,7 @@ function responseFor(name: string): StandupResponse {
       today: items(w.today),
       blockers: items(w.blockers),
       empty: w.empty,
-      excuse: "",
+      ...idleOf(w),
     })),
     text,
     brief: fs.readFileSync(path.join(FIXTURES, c.expected.brief), "utf8"),
@@ -177,6 +196,29 @@ jest.mock("../../shell/api", () => ({
   useGetEnvQuery: () => ({ isLoading: false, data: { config: { activeSpace: "toolkit" } } }),
 }));
 
+/** The shell around the page, for the one test that reads what the page asks of it. */
+const shellValue: ShellValue = {
+  cards: { home: [], system: [] },
+  homeTabs: [],
+  systemTabs: [],
+  slot: () => [],
+  openSettings: () => {},
+  pager: { page: 0, totalPages: 1, onPageChange: () => {} },
+  filters: {
+    filterValue: "",
+    setFilterValue: () => {},
+    activeRepo: null,
+    setActiveRepo: () => {},
+    stateFilter: "All",
+    setStateFilter: () => {},
+    stateOptions: ["All"],
+    typeFilter: "All",
+    setTypeFilter: () => {},
+    linkFilter: "All",
+    setLinkFilter: () => {},
+  },
+};
+
 /** What the page shows, put back together: the header line, LF, the body. */
 function shown(): string {
   const header = screen.getByRole("heading", { level: 1 }).textContent ?? "";
@@ -227,11 +269,18 @@ describe("the standup page", () => {
     expect(screen.getByRole("link", { name: "#101" }).getAttribute("href")).toBe(
       "https://github.com/johnfrog76/toolkit/issues/101",
     );
-    // The empty seat reports: the status sentence under the mug, never an excuse.
-    expect(shown()).toContain(`Mug        "${statusOf("friday", "sonnet")}"`);
+    // The empty seat reports: its two made-up items, one row each on the contract's
+    // label, yesterday's then today's -- never an excuse.
+    const row = RITUALS.text.mug.padEnd(RITUALS.labelWidth);
+    const [said, plan] = statusOf("friday", "sonnet");
+    expect(shown()).toContain(`  ${row}  "${said}"\n  ${row}  "${plan}"\n`);
     expect(shown()).not.toContain("The dog ate the sprint.");
-    // Nothing to click but the issue numbers -- and Play.
-    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["Copy", "Play"]);
+    // Nothing to click but the issue numbers -- and Play, and the door to the room's size.
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Copy",
+      "Play",
+      TEAM_SIZE_DOOR,
+    ]);
     // The text scrolls sideways, so it is a named region a keyboard reaches.
     const region = screen.getByRole("region", { name: "Standup text" });
     expect(region).toBe(screen.getByTestId("standup-text"));
@@ -280,6 +329,26 @@ describe("the standup page", () => {
     render(<StandupPage />);
     fireEvent.click(screen.getByRole("button", { name: "Play" }));
     expect(screen.getByText("played")).toBeTruthy();
+  });
+
+  it("beside Play, a door to the room's size: the drawer opened at the settings entry's own anchor", () => {
+    answer = { data: responseFor("friday") };
+    const openSettings = jest.fn();
+    render(
+      <ShellProvider value={{ ...shellValue, openSettings }}>
+        <StandupPage />
+      </ShellProvider>,
+    );
+    expect(TEAM_SIZE_ENTRY?.question).toBe("How many are in my standup in {space}?");
+    // The accessible name starts with the words on the button, then the entry's question.
+    const door = screen.getByRole("button", {
+      name: `${TEAM_SIZE_DOOR}: How many are in my standup in toolkit?`,
+    });
+    expect(door.textContent).toBe(TEAM_SIZE_DOOR);
+    fireEvent.click(door);
+    // The entry's own door: the drawer is the one writer, so the page has no control of its own.
+    expect(openSettings).toHaveBeenCalledWith(entryAnchor(TEAM_SIZE_ENTRY!, "toolkit"));
+    expect(openSettings).toHaveBeenCalledWith("spaces.toolkit.features.teamSize");
   });
 
   it("with no tracker, shows the ritual anyway: the golden, and no links", () => {
@@ -396,7 +465,7 @@ describe("copy and the joined text", () => {
         today: slot(w, "today"),
         blockers: slot(w, "blockers"),
         empty: Boolean(w.empty),
-        excuse: "",
+        ...idleOf(w),
       })),
       text,
     };
@@ -427,7 +496,11 @@ describe("the grain", () => {
     expect(tabs.map((t) => t.getAttribute("aria-selected"))).toEqual(["true", "false", "false"]);
     expect(shown()).toBe(withWork(responseFor("friday")).text);
     // The tabs are not buttons: nothing else to click was added beside the text.
-    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["Copy", "Play"]);
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Copy",
+      "Play",
+      TEAM_SIZE_DOOR,
+    ]);
   });
 
   it("work shows work.text verbatim, keeps the brief above it, and Copy copies it", async () => {
@@ -436,9 +509,22 @@ describe("the grain", () => {
     render(<StandupPage />);
     fireEvent.click(screen.getByRole("tab", { name: "Work" }));
     expect(shown()).toBe(data.work!.text);
-    expect(shown()).toContain("Opus: Yesterday I closed two in Team Agile (#501, #502).");
-    expect(shown()).toContain(
-      "Fable: Today I'm on the Studio: #511, the archived-repository mark.",
+    // Each worker's line is its turn, in the contract's frame: the shared prose
+    // table's friday turns, as the fill wrote them -- the first worker's yesterday is
+    // the fixed line, since it closed nothing and nothing it holds began in the window.
+    const open = RITUALS.text.turnOpen;
+    const prose = JSON.parse(
+      fs.readFileSync(path.join(FIXTURES, "standup-prose.json"), "utf8"),
+    ) as {
+      cases: { name: string; expected: { workers: { label: string; prose: string[] }[] } }[];
+    };
+    const turns = prose.cases.find((c) => c.name === "friday")!.expected.workers;
+    const turn = (label: string) => turns.find((w) => w.label === label)!.prose.join(" ");
+    expect(shown()).toContain(`Opus: ${open} Yesterday I closed two in Team Agile (#501, #502).`);
+    expect(shown()).toContain(`Opus: ${turn("opus")}\n`);
+    expect(shown()).toContain(`Fable: ${turn("fable")}\n`);
+    expect(turn("fable")).toContain(
+      `${open} ${RITUALS.text.proseYesterdayNone} Today I'm on the Studio:`,
     );
     expect(screen.getByTestId("standup-brief")).toBeTruthy();
     await act(async () => {
@@ -854,8 +940,8 @@ describe("the issue popover", () => {
     const title = data.queue.walk.find((i) => i.number === 104)!.title;
     const text = surface().textContent ?? "";
     expect(text).toContain(title);
-    // Issue 104 is a blocker: the chip is ROLE · PERSONA (label).
-    expect(text).toContain("TEAM LEAD · DEV-HERO (fable)");
+    // The blocker item: its chip is the plate that worker wears on the stage, PERSONA (label).
+    expect(text).toContain("DEV-HERO (fable)");
     expect(text).toContain("sev2");
     expect(text).toContain("Ship the standup");
     expect(text).toContain("Open");
@@ -925,10 +1011,16 @@ describe("the issue popover", () => {
     await waitFor(() => expect(screen.queryByTestId("issue-popover")).toBeNull());
   });
 
-  it("the chip is left out when the seat is not known", () => {
+  it("the chip reads the stage's deal: a kept label its own persona, any other by position, and a worker out today none", () => {
     const data = responseFor("friday");
+    expect(issueFacts(data).get(102)?.worker).toBe("AI VIBEMANCER (opus)");
+    expect(issueFacts(data).get(104)?.worker).toBe("DEV-HERO (fable)");
+    // A label the cast was never named for sits by position, like any other.
     data.workers[0].label = "someone-else";
     data.workers[0].name = "Someone";
+    expect(issueFacts(data).get(104)?.worker).toBe("DEV-HERO (someone-else)");
+    // Out today (not present): no window on the stage, so no chip; a kept face does not move.
+    data.workers[0].present = false;
     const facts = issueFacts(data);
     expect(facts.get(104)?.worker).toBeUndefined();
     expect(facts.get(102)?.worker).toBe("AI VIBEMANCER (opus)");

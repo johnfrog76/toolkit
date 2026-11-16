@@ -99,7 +99,11 @@ module: Team Agile is on only where `features.solitaireAgile` is on AND the answ
 where the flags are resolved (`Scripts/Resolve-HowIWork.ps1`, `how_i_work()`, one shared table). And
 `spaces[].features.suggestions` turns off Team Agile's suggestion -- the chair's one derived next move --
 in that Space; unset is on wherever Team Agile is on (`docs/modules/solitaire-agile.md`, "The suggestion:
-one next move, derived").
+one next move, derived"). Beside the three switches a Space states two numbers, which switch nothing:
+`spaces[].features.trainingHoursPerQuarter`, and `spaces[].features.teamSize`, the room of Team Agile's
+standup -- 3, 6 or 9 windows with the chair counted, unset 9 -- which decides who of the Space's members are
+present today and so who speaks in the round (`docs/modules/solitaire-agile.md`, "The team size: who is in
+the room").
 
 **Off means absent.** No verb, no line in `Menu`, no `-Help`, nothing for the bridge to call, no
 agent route (**404, not 403**), no nav entry, no page, no card, and nothing fetches the module's
@@ -170,7 +174,7 @@ module and you add a mock line to every one of these files.
 **Four test runners**, one per half plus one for the two together. Run the ones your change touches:
 
 ```powershell
-tkTestToolkit                 # the CLI -- 52 suites, 10649 assertions on this commit
+tkTestToolkit                 # the CLI -- 52 suites, 10917 assertions on this commit
 ```
 
 ```bash
@@ -221,6 +225,7 @@ anywhere).
 | Design lifecycle | `design` | DERIVED (`Scripts/Read-DesignTree.ps1`, through `Get-OptionalSurfaces.ps1`): `on` when the repository you stand in has `design/` and every file in the four folders carries an `id:`, `off` with the count when some do not, `not configured` with no `design/` to read, or none with a note in it; the hub's own count in the note. `docs/hub/design.md`, "The CLI names it" |
 | Sprint awareness | `spaces[].features.sprintAwareness` | `hub.json` -- a Space-scoped flag (the other Space-scoped switches are `howIWork`, above, and `suggestions`, below) |
 | Suggestions | `spaces[].features.suggestions` | `hub.json` -- a Space-scoped switch riding Team Agile: `not configured` (on, by default, where Team Agile is on), `on`, or `off` (set false, or Team Agile off in that Space); `false` turns the chair's Next line back to `Next: nothing is waiting on you.` |
+| Team size | `spaces[].features.teamSize` | `hub.json` -- `Config -Set spaces.<slug>.features.teamSize=<3\|6\|9> -Hub`, any other number refused by name. A Space-scoped NUMBER, not a switch: the standup's windows with the chair counted. Its row rides Team Agile as `Suggestions` does: `off` where Team Agile is off in that Space; where it is on, `on` with the number, `not configured` while unset, when the room is nine. The fill keeps every worker and marks each `present` (the ones with work seated first); the round -- `Standup -Grain work`, the stage -- speaks the present, the detail and the brief keep everyone. Asked in the drawer as "How many are in my standup in `<Space>`?", three radios. `docs/modules/solitaire-agile.md`, "The team size: who is in the room" |
 | Prompt store git sync | `storeSync` | `hub.json`, overridable per machine |
 | ADO identity | `email` | `config.local.json`, else `az login` |
 | Web UI and agent | `web.agentPort` | `config.local.json`; started with `{prefix}Web -Dev` |

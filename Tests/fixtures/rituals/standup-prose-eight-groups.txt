@@ -3,8 +3,10 @@ Standup -- Friday 2 October 2026
 
 Nothing is waiting on you.
 
-Fable: Today I'm on two in Going public (#701, #702). I'm also on seven more designs. Nothing blocked.
-Opus: Today I'm on two in Team Agile (#710, #711). I'm also on four more: Phase 6, Phase 7, the Studio and Docs. Nothing blocked.
-Sonnet: Yesterday I closed one in Phase 6: #716, Trim the log. I also closed one in Phase 7: #717, Name the column. I also closed one in Docs: #718, Link the guide. Today I'm on Phase 6: #719, Trim the menu. I'm also on two more: Phase 7 and Docs. Nothing blocked.
+Fable: Good morning. Yesterday I picked up where I left off. Today I'm on two in Going public (#701, #702). I'm also on seven more designs. No blockers. That's it for me.
+Opus: Good morning. Yesterday I picked up where I left off. Today I'm on two in Team Agile (#710, #711). I'm also on four more: Phase 6, Phase 7, the Studio and Docs. No blockers. That's it for me.
+Sonnet: Good morning. Yesterday I closed one in Phase 6: #716, Trim the log. I also closed one in Phase 7: #717, Name the column. I also closed one in Docs: #718, Link the guide. Today I'm on Phase 6: #719, Trim the menu. I'm also on two more: Phase 7 and Docs. No blockers. That's it for me.
+
+Good morning. Yesterday I tidied my notes and my calendar for the week. Today I'll keep the board moving. No blockers. That's it for me.
 
 "Let's circle back."

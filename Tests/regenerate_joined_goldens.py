@@ -1,5 +1,5 @@
-"""Regenerate the rituals' goldens: the standup's -- standup-joined.json's, standup.json's and
-standup-cards.json's -- and triage's, triage.json's triage-<name>.txt.
+"""Regenerate the rituals' goldens: the standup's -- standup-joined.json's, standup.json's,
+standup-cards.json's and standup-team.json's -- and triage's, triage.json's triage-<name>.txt.
 
 Goldens are generated, never typed: every case that names a ``text``, ``work``
 or ``brief`` file is filled by the agent's fill for its table (the joined fill,
@@ -12,6 +12,10 @@ write: those two tables name only ``text``, and it is the work text. Triage's
 goldens are filled by agent/solitaire/triage.py's fill over triage.json (each
 case's labels, issues, tracker and viewer) and rendered; tkTestToolkit -Triage
 holds the CLI's rendering to the same files.
+
+The team size's goldens (Tests/fixtures/rituals/standup-team.json, its ``cases``) are
+the issues fill over the table's ``workerLabels`` with the case's stored teamSize:
+the detail, the work grain (the round, the present only) and the brief.
 
 The suggestion table's chair readings (Tests/fixtures/suggestion/table.json,
 its ``briefs`` cases) are written beside it the same way: the joined fill, the
@@ -44,6 +48,7 @@ CARDS_TABLE_FILE = "standup-cards.json"
 TRIAGE_TABLE_FILE = "triage.json"
 SUGGEST_DIR = REPO_ROOT / "Tests" / "fixtures" / "suggestion"
 CORNER_TABLE_FILE = "corner.json"
+TEAM_TABLE_FILE = "standup-team.json"
 
 
 def filled_triage_case(table: dict, case: dict) -> "triage.Triage":
@@ -86,6 +91,20 @@ def filled_issues_case(table: dict, case: dict) -> "standup.Standup":
     return _rendered(
         standup.fill_standup(
             datetime.fromisoformat(case["asOf"]), labels, case["issues"], case["tracker"], space="toolkit"
+        )
+    )
+
+
+def filled_team_case(table: dict, case: dict) -> "standup.Standup":
+    """A standup-team.json case (the issues fill, the case's stored teamSize), filled and rendered."""
+    return _rendered(
+        standup.fill_standup(
+            datetime.fromisoformat(case["asOf"]),
+            table["workerLabels"],
+            case["issues"],
+            {"ok": True, "reason": ""},
+            space="widgets",
+            size=case["teamSize"],
         )
     )
 
@@ -189,6 +208,9 @@ def goldens() -> dict[str, str]:
     cards = json.loads((FIXTURES / CARDS_TABLE_FILE).read_text(encoding="utf-8"))
     for case in cards["cases"]:
         take(case["expected"], filled_cards_case(case), ("text", "brief"))
+    team = json.loads((FIXTURES / TEAM_TABLE_FILE).read_text(encoding="utf-8"))
+    for case in team["cases"]:
+        take(case["expected"], filled_team_case(team, case), ("text", "work", "brief"))
     tri = json.loads((FIXTURES / TRIAGE_TABLE_FILE).read_text(encoding="utf-8"))
     for case in tri["cases"]:
         out[case["expected"]["text"]] = filled_triage_case(tri, case).text

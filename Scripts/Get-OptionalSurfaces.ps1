@@ -60,6 +60,10 @@ if (-not (Get-Command Read-P20CommunicationConfig -ErrorAction SilentlyContinue)
 if (-not (Get-Command Invoke-P20TrackerRead -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 }
+# The standup room's size, read the one way (Resolve-TeamSize.ps1) -- the team size row.
+if (-not (Get-Command Get-P20SpaceTeamSize -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Resolve-TeamSize.ps1')
+}
 
 function Get-P20SurfaceStates {
     <#
@@ -464,6 +468,38 @@ function Get-P20OptionalSurfaces {
     if ($trainingHours -gt 0) { $trainingState = $states.On; $trainingNote = "$trainingHours hours a quarter; growth module" }
     $rows += New-P20SurfaceRow -Key 'trainingHoursPerQuarter' -Title 'Training hours per quarter' -State $trainingState `
         -Config "$($Prefix)Config -Set spaces.$slug.features.trainingHoursPerQuarter=<hours> -Hub" -Note $trainingNote
+
+    # -- The team size: how many are in the standup, the chair included --------
+    # spaces[].features.teamSize (Resolve-TeamSize.ps1): a NUMBER the Space states,
+    # one of rituals.teamSizes. It rides Team Agile, as the suggestion's row does:
+    # where Team Agile is off here the row is off and says so; where it is on, on
+    # with the number once set and `not configured` while it is not -- the room is
+    # then rituals.teamSizeDefault, and there is no answered no. A value that is not
+    # a size reads as unset, and the note says so.
+    $teamSpace = $null
+    if ($Config -and $Config.ActiveSpace) {
+        foreach ($sp in @($Config.Spaces)) {
+            if ($sp -and [string]$sp.slug -eq [string]$Config.ActiveSpace) { $teamSpace = $sp }
+        }
+    }
+    $team = Get-P20SpaceTeamSize -Space $teamSpace
+    $teamSizes = @((Get-P20Consts).rituals.teamSizes | ForEach-Object { [string]$_ })
+    $teamTeamAgile = ($Features -and $Features.ContainsKey('solitaireAgile') -and $Features['solitaireAgile'])
+    $teamState = $states.Unset
+    $teamNote = "$($team.Size) in the room by default -- the chair and $($team.Size - 1) members; Team Agile's standup in $slug"
+    if (-not $teamTeamAgile) {
+        $teamState = $states.Off
+        $teamNote = "rides Team Agile, which is off in $slug"
+    }
+    elseif ($team.Set) {
+        $teamState = $states.On
+        $teamNote = "$($team.Size) in the room -- the chair and $($team.Size - 1) members; Team Agile's standup in $slug"
+    }
+    elseif ($teamSpace -and $teamSpace.features -and $teamSpace.features.PSObject.Properties['teamSize']) {
+        $teamNote = "'$($teamSpace.features.teamSize)' is not a team size ($($teamSizes -join ', ')), so the room is $($team.Size); Team Agile's standup in $slug"
+    }
+    $rows += New-P20SurfaceRow -Key 'teamSize' -Title 'Team size' -State $teamState `
+        -Config "$($Prefix)Config -Set spaces.$slug.features.teamSize=<$($teamSizes -join '|')> -Hub" -Note $teamNote
 
     # -- The WIP limit: a number the machine states, never a gate ---------------
     # limits.inPlay: on with the number once set, `not configured` while it is

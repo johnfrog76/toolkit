@@ -2,7 +2,7 @@
 // docs/images/stage.png, the picture the README's first screen shows.
 //
 // Run by hand when the cast (web/src/modules/solitaireAgile/stage/cast.tsx) or
-// the seats (seats.ts) change, and commit the PNG. Never part of a build or a
+// the room's plates (seats.ts) change, and commit the PNG. Never part of a build or a
 // test run: a render needs a browser, and the README needs a file.
 //
 // The page is the cast's own components -- the tiles, the scenes, the palette
@@ -34,7 +34,7 @@ const VIRTUAL = "virtual:render-cast";
 const STAGE_WIDTH = 960;
 const SCALE = 2;
 
-/** The page's one module: the nine seats in the card's order, none speaking. */
+/** The page's one module: the nine windows in the grid's order, every face in its own, none speaking. */
 const ENTRY = `
 import { createElement as h } from "react";
 import { createRoot } from "react-dom/client";
@@ -47,9 +47,17 @@ import {
   pf,
   mono,
 } from "/src/modules/solitaireAgile/stage/cast.tsx";
-import { SEATS, plateFor } from "/src/modules/solitaireAgile/stage/seats.ts";
+import {
+  CHAIR_CAST_ID,
+  CHAIR_PLATE,
+  MEMBER_WINDOWS,
+} from "/src/modules/solitaireAgile/stage/seats.ts";
 
-const plates = new Map(SEATS.map((s) => [s.castId, plateFor(s)]));
+// The roster: the chair's plate, and each member window's persona (no label: nobody is dealt).
+const plates = new Map([
+  [CHAIR_CAST_ID, CHAIR_PLATE],
+  ...MEMBER_WINDOWS.map((w) => [w.castId, w.persona]),
+]);
 const tiles = CAST.map((c) =>
   h(
     "div",

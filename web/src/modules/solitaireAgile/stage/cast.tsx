@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { Popover, PopoverSurface, PopoverTrigger } from "@fluentui/react-components";
+import type { BubbleSide } from "./geometry";
 
 // ── The stage's cast, by copy ────────────────────────────────────────────────
 //
@@ -51,6 +52,8 @@ export const mono = "'Cascadia Code', 'Fira Code', 'Consolas', monospace";
 // reduced-animation switch is not the deck engine's to read today (the engine
 // exposes none), so the media query is the one rule.
 export const STAGE_CLASS = "sa-stage";
+/** The stage's grid of nine windows, below its title row: the room a speech bubble is kept inside. */
+export const STAGE_GRID_CLASS = "sa-stage-grid";
 
 export const REDUCED_MOTION_RULE = `@media (prefers-reduced-motion: reduce) { .${STAGE_CLASS}, .${STAGE_CLASS} * { animation: none !important; transition: none !important; } }`;
 
@@ -224,19 +227,27 @@ export function Person({
 }
 
 /**
- * The three looks of a tile on the played standup, and the contract the
- * three of them keep: one tile in colour, ever.
+ * The four looks of a tile on the played standup, and the contract they keep:
+ * one tile framed, ever, and colour only for the speaker -- and, on the slide
+ * the chair calls a name, for the one called.
  *
  *  - `speaking` -- its bubble is open: colour, the speaker's frame, a green dot.
+ *  - `called`   -- the member the chair has just named, about to answer: colour,
+ *                  a green dot and the called mark (a dashed ring in the speaker's
+ *                  colour, inset from the edge), but no frame and no bubble. The
+ *                  mark is what shows on any tint; colour alone does not.
  *  - `named`    -- lit, no bubble (the queue's Walk / Decide / Look seats, the
  *                  tracker's alarm): black and white at full brightness, a green
  *                  dot. The dot is the signal light; colour is the speaker's alone.
  *  - `ghost`    -- everyone else: grayscale, dimmed, a grey dot. The outage register.
  */
-export type TileLook = "speaking" | "named" | "ghost";
+export type TileLook = "speaking" | "called" | "named" | "ghost";
 
 /** The speaker's frame: 3px, inside the tile's box so the grid does not move. */
 export const SPEAKER_OUTLINE_WIDTH = "3px";
+/** The called mark: a dashed ring, inset from the window's edge so it never reads as the frame. */
+export const CALLED_MARK_OUTLINE = "3px dashed";
+export const CALLED_MARK_INSET = "7px";
 /**
  * The CSS variable the stage sets to its own green, `pf.green` -- the register badge's: a colour
  * of the room's palette, never a theme's brand token, so nothing of the app bleeds in.
@@ -245,6 +256,7 @@ export const SPEAKER_COLOR_VAR = "--sa-speaker";
 
 export const LOOK_FILTER: Record<TileLook, string | undefined> = {
   speaking: undefined,
+  called: undefined,
   named: "grayscale(1)",
   ghost: "grayscale(1) brightness(0.6)",
 };
@@ -294,6 +306,7 @@ export function ZoomTile({
         {children}
       </div>
       <div
+        data-testid="stage-plate-label"
         style={{
           position: "absolute",
           left: "10px",
@@ -340,6 +353,19 @@ export function ZoomTile({
           }}
         />
       )}
+      {look === "called" && (
+        <div
+          data-testid="stage-called-mark"
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: CALLED_MARK_INSET,
+            borderRadius: "10px",
+            pointerEvents: "none",
+            outline: `${CALLED_MARK_OUTLINE} var(${SPEAKER_COLOR_VAR}, ${pf.brand})`,
+          }}
+        />
+      )}
       {pillState && (
         <div
           style={{
@@ -366,11 +392,11 @@ export function ZoomTile({
 }
 
 // ── The bubbles ───────────────────────────────────────────────────────
-// Two surfaces of one Fluent Popover, placed by the engine (`positioning`,
-// `withArrow`: it flips and shifts and follows its anchor -- no fixed offset,
-// the way IssuePopover.tsx does it). Both are `inline`, so they stay inside the
-// tile that owns them. Neither is a Say line: the voice reads the slide's notes,
-// and these live in the slide's content.
+// Two surfaces on one white ground. The speech bubble is placed by the stage's
+// own rule (./geometry.ts), which knows the faces and plates it must keep off; the
+// thought cloud is a Fluent Popover opened from its window's button. Both live in
+// the tile that owns them. Neither is a Say line: the voice reads the slide's
+// notes, and these live in the slide's content.
 
 /**
  * Above everything a tile draws. Nothing in ZoomTile or CastScene sets a
@@ -382,10 +408,10 @@ export const BUBBLE_Z_INDEX = 30;
 
 /**
  * The speech bubble shows at most this many lines and ends the last in an
- * ellipsis: a fixed count, "because it is real" -- a listener takes in
- * about that much. The voice and the copy panel still carry every line, and
- * four lines always fit below the face, so the bubble never covers the speaker.
- * No scrollbar: a speech bubble that scrolls is not a shape anyone knows.
+ * ellipsis: a fixed count, "because it is real" -- a listener takes in about
+ * that much. A turn's first lines show; the voice (the slide's Say lines)
+ * carries every line of it. No scrollbar: a speech bubble that scrolls is not a
+ * shape anyone knows.
  */
 export const SPEECH_MAX_LINES = 4;
 
@@ -424,51 +450,77 @@ const bubbleSurface = {
 } as const;
 
 /**
- * Where the speech bubble's tail points: the speaker's face, not the
- * tile's box. `target` is a small anchor element over the head of the scene
- * (centre-top; at the mug on a mug tile), so the bubble sits `above` it with the
- * tail at the person. A top-row tile has no room above, so the engine flips to
- * `below` -- the tail still at the face -- and `overflowBoundary` is the stage, so
- * the bubble is kept inside the grid rather than shifted sideways into a neighbour.
+ * The speech bubble's width: as wide as its lines need, up to 260px and never
+ * wider than its own window -- the size it has always had (an inline popover
+ * shrank to its window). Drawn at `max-content` within this cap, so where the
+ * stage places it does not change how wide it is.
  */
-export function speechPositioning(target: HTMLElement, boundary: HTMLElement | null) {
-  return {
-    target,
-    position: "above" as const,
-    align: "center" as const,
-    fallbackPositions: ["below" as const],
-    overflowBoundary: boundary,
-  };
-}
+export const SPEECH_MAX_WIDTH = "min(260px, 100%)";
 
-/** The speech bubble: open for as long as its tile speaks, its tail at the speaker's face. */
+/** The tail's size: a small square turned 45 degrees on the edge that faces the speaker. */
+const TAIL = 12;
+
+/**
+ * The speech bubble: open for as long as its tile speaks, placed by the stage
+ * (./geometry.ts placeBubble) and drawn here at that place, its tail on the edge
+ * that faces the speaker, at the face. Until it is placed it is laid out
+ * unseen, so the stage can measure it.
+ */
 export function SpeechBubble({
-  anchor,
-  boundary = null,
+  bubbleRef,
+  place,
   children,
 }: {
-  anchor: HTMLElement | null;
-  boundary?: HTMLElement | null;
+  bubbleRef: (el: HTMLDivElement | null) => void;
+  /** Where to draw it, relative to the speaking window; null while it is measured. */
+  place: { left: number; top: number; side: BubbleSide; tail: number } | null;
   children: ReactNode;
 }) {
-  if (!anchor) return null;
+  const tailEdge: Record<BubbleSide, CSSProperties> = {
+    above: { bottom: -TAIL / 2, left: (place?.tail ?? 0) - TAIL / 2 },
+    below: { top: -TAIL / 2, left: (place?.tail ?? 0) - TAIL / 2 },
+    after: { left: -TAIL / 2, top: (place?.tail ?? 0) - TAIL / 2 },
+    before: { right: -TAIL / 2, top: (place?.tail ?? 0) - TAIL / 2 },
+  };
   return (
-    <Popover open inline withArrow positioning={speechPositioning(anchor, boundary)}>
-      {/* The surface does not clip: the tail is drawn outside its box. The
-          four-line clamp is the text element's. */}
-      <PopoverSurface
-        aria-label="Says"
-        role="status"
-        data-testid="stage-speech"
-        style={{ ...bubbleSurface, overflowY: "visible", borderRadius: "14px" }}
-      >
-        <div style={{ animation: "rs-bubble 0.45s ease-out 0.3s both" }}>
-          <span data-testid="stage-speech-text" style={speechTextClamp}>
-            {children}
-          </span>
-        </div>
-      </PopoverSurface>
-    </Popover>
+    <div
+      ref={bubbleRef}
+      aria-label="Says"
+      role="status"
+      data-testid="stage-speech"
+      data-side={place?.side}
+      style={{
+        ...bubbleSurface,
+        position: "absolute",
+        left: place?.left ?? 0,
+        top: place?.top ?? 0,
+        visibility: place ? "visible" : "hidden",
+        width: "max-content",
+        maxWidth: SPEECH_MAX_WIDTH,
+        overflowY: "visible",
+        borderRadius: "14px",
+      }}
+    >
+      {place && (
+        <span
+          aria-hidden
+          data-testid="stage-speech-tail"
+          style={{
+            position: "absolute",
+            width: TAIL,
+            height: TAIL,
+            background: "#ffffff",
+            transform: "rotate(45deg)",
+            ...tailEdge[place.side],
+          }}
+        />
+      )}
+      <div style={{ position: "relative", animation: "rs-bubble 0.45s ease-out 0.3s both" }}>
+        <span data-testid="stage-speech-text" style={speechTextClamp}>
+          {children}
+        </span>
+      </div>
+    </div>
   );
 }
 

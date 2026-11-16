@@ -68,7 +68,13 @@ import {
 } from "../modules/studio/foyer";
 import { visibilityLabel } from "../shared/visibility";
 import { STATUS, USAGE, VISIBILITY } from "./consts";
-import { WORKFLOW_ENTRIES, answerLive, answerTarget } from "./settingsWorkflows";
+import {
+  WORKFLOW_ENTRIES,
+  answerLive,
+  answerStored,
+  answerTarget,
+  entryAnchor,
+} from "./settingsWorkflows";
 import type { SpaceBucket, SpaceLifecycleAction } from "../modules/studio/foyer";
 import { promptSets, spaceWorkflow } from "../modules/studio/prompts";
 import type { PromptRow, PromptWorkflow } from "../modules/studio/api.studio";
@@ -80,6 +86,7 @@ import { resetCelebrateMemory } from "../modules/solitaireAgile/celebrate";
 import type { Milestone } from "../modules/ado/api.ado";
 import type { AgendaItem, StandupResponse } from "../modules/solitaireAgile/api.solitaireAgile";
 import { agendaArg, agendaFact, sinceHeading } from "../modules/solitaireAgile/agenda";
+import { MEMBER_SEATS, ROOM_WINDOWS, dealRoom } from "../modules/solitaireAgile/stage/seats";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -574,6 +581,38 @@ describe("the scenario grid: what each configuration shows", () => {
     expect(itemFacts(card)).toEqual({ title: "B", label: "2HNU", path: "current/x.md" });
   });
 
+  // The played standup's room (docs/SCENARIOS.md, "Team Agile's standup"): nine windows
+  // whatever the Space's size -- the chair, the members the response marks present in
+  // its order, and an empty desk in every other window, each with its own mug -- and
+  // the page's door to the size is the settings entry's own anchor. Held in full by
+  // stage/standupDeck.test.tsx ("no silent face").
+  it("the played standup seats the present by position and an empty desk in the rest", () => {
+    const worker = (label: string, present?: boolean) => ({
+      label,
+      name: label,
+      yesterday: [],
+      today: [],
+      blockers: [],
+      empty: true,
+      excuse: "",
+      status: [],
+      ...(present === undefined ? {} : { present }),
+    });
+    const room = (workers: StandupResponse["workers"]) => {
+      const r = dealRoom({ asOf: "2026-10-02T09:00:00-04:00", workers });
+      return [r.members.length, r.desks.length, new Set(r.desks.map((d) => d.look)).size];
+    };
+    // A room of three: two present, six desks, six mugs.
+    expect(room([worker("a", true), worker("b", false), worker("c", true)])).toEqual([2, 6, 6]);
+    // No worker at all: the chair alone, eight desks.
+    expect(room([])).toEqual([0, MEMBER_SEATS, MEMBER_SEATS]);
+    // An older agent (no present): everyone, capped at the room.
+    expect(room(Array.from({ length: 10 }, (_, i) => worker(`w${i}`)))).toEqual([8, 0, 0]);
+    expect(ROOM_WINDOWS).toBe(MEMBER_SEATS + 1);
+    const entry = WORKFLOW_ENTRIES.find((e) => e.id === "team-size")!;
+    expect(entryAnchor(entry, "x")).toBe("spaces.x.features.teamSize");
+  });
+
   // Team Agile's Triage is a second page under the ONE Team Agile
   // entry: the nav does not grow, the page has the chrome, and it is absent
   // with features.solitaireAgile off.
@@ -835,6 +874,52 @@ describe("the scenario grid: what each configuration shows", () => {
         "Connect a tracker to unlock working with agents.",
         "nothing",
         false,
+      ],
+    ]);
+  });
+
+  // "How many are in my standup in <Space>?" (docs/SCENARIOS.md, the "How do I…"
+  // section): the Space's own spaces[].features.teamSize checks its radio -- none
+  // while unset, when the room is nine -- and the sizes are live where Team Agile's
+  // standup runs, a GitHub Space. The web never re-reads the size for the standup:
+  // the response says team.size and who is present.
+  it("How many are in my standup in <Space>?: the Space's size is checked, live on GitHub", () => {
+    const entry = WORKFLOW_ENTRIES.find((e) => e.id === "team-size")!;
+    const cases: [string, Tracker, number | undefined][] = [
+      ["GitHub, nothing set", "github", undefined],
+      ["GitHub, 6", "github", 6],
+      ["Azure DevOps", "ado", undefined],
+      ["no tracker", "none", undefined],
+    ];
+    const grid = cases.map(([name, tracker, size]) => {
+      const space = { slug: "x", features: size === undefined ? {} : { teamSize: size } };
+      const checked = entry.answers!.find((a) => a.value === answerStored(entry, space))?.label;
+      const live = entry.answers!.filter((a) => answerLive(a, tracker, false)).map((a) => a.label);
+      const writes = live.length ? `${answerTarget(entry, "x")}=<size> -Hub` : "nothing";
+      return [name, checked ?? "none", live, entry.why?.[tracker] ?? "", writes];
+    });
+    expect(grid).toEqual([
+      [
+        "GitHub, nothing set",
+        "none",
+        ["3", "6", "9"],
+        "",
+        "spaces.x.features.teamSize=<size> -Hub",
+      ],
+      ["GitHub, 6", "6", ["3", "6", "9"], "", "spaces.x.features.teamSize=<size> -Hub"],
+      [
+        "Azure DevOps",
+        "none",
+        [],
+        "Team Agile's standup is a GitHub Space's; this Space's tracker is Azure DevOps.",
+        "nothing",
+      ],
+      [
+        "no tracker",
+        "none",
+        [],
+        "Team Agile's standup is a GitHub Space's; connect a tracker to hold one.",
+        "nothing",
       ],
     ]);
   });
