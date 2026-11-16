@@ -377,15 +377,6 @@ numbers from two repositories can collide.
 
 **Issue:** [#347](https://github.com/johnfrog76/toolkit/issues/347)
 
-### The org chart has no page yet
-
-**What you see:** `GET /api/ritual/org` serves the org's tree, and `OrgChart` prints it in a terminal, but the Team
-Agile page has no Org tab. The chart is read from `org.json` at the hub root, and only where Team Agile is on.
-
-**Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
-
-**Issue:** [#456](https://github.com/johnfrog76/toolkit/issues/456)
-
 ## True by design
 
 Some things are true by design rather than by omission, and are not on that list. The deck narration

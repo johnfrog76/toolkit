@@ -500,7 +500,7 @@ status line is a fixed three lines.
 
 ### Team Agile's releases (on; `web/src/modules/solitaireAgile/MilestonesPage.test.tsx`)
 
-The strip reads **Standup | Triage | Releases**; Releases is `/solitaire-agile/releases`, under the ONE
+The strip reads **Standup | Triage | Releases | Org**; Releases is `/solitaire-agile/releases`, under the ONE
 Team Agile entry, with the chrome, and absent with the flag off (`scenarios.test.tsx`, "Releases: a page
 under Team Agile's one entry"). The old `/solitaire-agile/milestones` address redirects to it. Until
 tag-based releases are built the rows are GitHub milestones, and the panel says so.
@@ -514,6 +514,24 @@ tag-based releases are built the rows are GitHub milestones, and the panel says 
 | no tracker (`tracker.ok` false) | `Could not read the milestones`, with the reason |
 | no milestones | `No GitHub milestones yet`, with `GitHub milestones are made on the tracker; each one shows here with its progress.` |
 | nothing (the agent is away) | `Could not read the milestones` -- an error |
+
+### Team Agile's org chart (on; `web/src/modules/solitaireAgile/OrgPage.test.tsx`)
+
+The strip reads **Standup | Triage | Releases | Org**; Org is `/solitaire-agile/org`, under the ONE Team Agile
+entry, with the chrome, and absent with the flag off whatever `org.json` says (`scenarios.test.tsx`, "Org: a
+page under Team Agile's one entry"). The page is a read: no tree to choose, no `active` state, no write.
+
+| `GET /api/ritual/org` answers | The page shows |
+| --- | --- |
+| the tree in use | the heading `Org chart` and the tree's name; one office a position, a row a level from the owner down, the walls coloured by level, lines from each office to its reports; a card a seat with a bust and a plate, `POSITION · model` and where it sits (`toolkit on mini`); the prompt's title over each office that has one |
+| a position with several seats | a row of cards in one office |
+| a vacant seat | `POSITION · vacant` on a dimmed office with a dashed outline -- a placeholder for the empty desk, the size of a staffed card |
+| the owner's seat (a person) | `Owner · <name>`, no model, not a link |
+| a position with no seats (the pool) | one wider card, `POSITION · pool`, its default-model line under it, not a link |
+| a position with a prompt | the office is a link: the prompt in the Studio's reading room (`/studio/prompts/yours/<name>`) |
+| 404 `missing` (no `org.json`) or `no-hub` | `No org chart yet`, with the agent's sentence (`There is no org.json in the hub.`) |
+| 409 (the file fails its checks) | `The org chart could not be read`, with the agent's sentence -- an error |
+| nothing (the agent is away) | `Could not read the org chart` -- an error |
 
 ### The Lounge (on)
 

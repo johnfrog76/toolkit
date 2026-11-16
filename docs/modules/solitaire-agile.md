@@ -439,6 +439,30 @@ Space's GitHub milestones, and says so: the panel's subtitle and every row read 
 [its own section](#milestones-the-tab-and-the-award): one row per GitHub milestone with its bar, and the
 award dialog -- the one place the module throws confetti.
 
+**Org** is the fourth page, at `/solitaire-agile/org`, and the strip reads **Standup | Triage | Releases |
+Org**. It is a chunk of its own, fetched when the tab is first opened, and like its siblings it is there only
+where Team Agile is on. It reads `GET /api/ritual/org` (`rituals.orgRoute`; [the response](../hub/org.md#the-response))
+and draws the tree it is given, in the refined cast: one office a position, a row a level from the owner down,
+each position centred over the ones that report to it, joined by lines. The office walls are coloured by level,
+the cast-skin mock's five colours (owner, the VPs, the PM, the leads, the builders; a deeper level takes the
+builders'). Each seat is a card -- a bust in the office's door and a plate under it, `POSITION · model`, with
+where the seat is (`toolkit on mini`, `on laptop`) when the file says. A position with several seats, the team
+lead's, is a row of cards in one office; a position with no seats is a pool, one wider card with a few faces,
+`POSITION · pool` and its default-model line; the owner's seat is a person, `Owner · <name>`, with no model. A
+staffed seat is in colour; a vacant one reads `POSITION · vacant` and has the standup's empty desk in its door
+-- the chair pushed back, the desk and a steaming mug, on the level's wall dimmed -- the size of a staffed card,
+its mug picked from the seat's id so the same seat always has the same one. Over an office with a prompt is the prompt's title (`promptTitle`),
+and the office is a link to the prompt in the Studio's reading room (`promptPath(promptRef)`); the owner, the
+pool and a prompt the room does not list are not links. The faces are the web's choice, never the file's:
+`orgChart.ts` maps a position's id to its faces, as the mock staffs it, and a position it does not name takes
+its level's. With no `org.json` the page says `No org chart yet` and the agent's sentence; a file that fails its
+checks (409) is said plainly too, `The org chart could not be read` and its sentence; a tree the file does not have (422, `unknown-tree`) is said plainly in
+the page's own words, `That org chart is not in the file` and `The chart asked for is not one of the trees in the
+hub's org.json. Nothing was drawn.`, decided by the kind and never the agent's sentence, which is the
+terminal's (the page asks for no tree today, so it meets this only if that changes); no answer is `Could not read the org chart`, the one state drawn as an error: the error tone is kept for the agent being away or failing, and a thing to know about the file is not one. The page chooses no
+tree, draws no `active` state and writes nothing. `OrgPage.test.tsx` and `orgChart.test.ts` draw the shared
+table's charts (`Tests/fixtures/org/charts/`).
+
 ### The page
 
 The Team Agile page opens on **the Agenda**: the standup's two questions -- what moved, and what is
@@ -1820,9 +1844,6 @@ Each of these is a block on [Known gaps](../KNOWN-GAPS.md), with its issue:
   and concatenates issues, and fails the whole read if any repo's read fails. Issue numbers from two
   repos could collide. Both are M0 choices; one rule belongs in the contract
   ([The terminal's standup refuses a Space with several repositories](../KNOWN-GAPS.md#the-terminals-standup-refuses-a-space-with-several-repositories)).
-- **The org chart has a route and no page yet.** `GET /api/ritual/org` and `OrgChart` serve the tree, but there
-  is no Org tab; the page is built on the file's shape ([`docs/hub/org.md`](../hub/org.md))
-  ([The org chart has no page yet](../KNOWN-GAPS.md#the-org-chart-has-no-page-yet)).
 
 ### True by design
 
