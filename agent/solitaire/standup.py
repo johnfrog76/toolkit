@@ -266,8 +266,9 @@ class Work(BaseModel):
     workers: list[WorkWorker] = []
     # The prose: the queue's sentences, one a group, kind by kind.
     queueProse: list[str] = []
-    # The chair's own turn, last, in the workers' frame: the queue's sentences
-    # again, or queueEmpty when nothing waits. Empty when no tracker answered.
+    # The chair's own turn, last, in the workers' frame and in its own first
+    # person: its yesterday, its today, its blockers line -- never the queue's
+    # sentences again (``chair_turn``). Empty when no tracker answered.
     chairProse: list[str] = []
     text: str = ""
 
