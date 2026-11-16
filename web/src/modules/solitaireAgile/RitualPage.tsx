@@ -5,19 +5,28 @@ import { TriagePage } from "./TriagePage";
 import { MilestonesPage } from "./MilestonesPage";
 import { ROUTES } from "./paths";
 import { TabRows } from "../../shared/TabRows";
+import { lazyPart } from "../../shell/lazy";
 
-// The Team Agile tab's pages, Standup | Triage | Releases: one nav entry,
+// The Team Agile tab's pages, Standup | Triage | Releases | Org: one nav entry,
 // and under it a strip of in-page tabs, each an ADDRESS -- the shape Home's
 // Focus | Board | Sprint | Actions strip has, so a tab can be linked and
 // Back walks between them. The pages themselves know nothing about the strip:
 // StandupPage is drawn exactly as it was, Play and the attend call with it.
 
-export type Ceremony = "standup" | "triage" | "releases";
+export type Ceremony = "standup" | "triage" | "releases" | "org";
+
+// The Org page and the faces it draws are a chunk of their own, fetched when
+// the Org tab is first opened: the standup never pays for them.
+const OrgPage = lazyPart(
+  () => import("./OrgPage"),
+  (m) => m.OrgPage,
+);
 
 const CEREMONIES: { id: Ceremony; label: string; to: string }[] = [
   { id: "standup", label: "Standup", to: ROUTES.home },
   { id: "triage", label: "Triage", to: ROUTES.triage },
   { id: "releases", label: "Releases", to: ROUTES.releases },
+  { id: "org", label: "Org", to: ROUTES.org },
 ];
 
 const useStyles = makeStyles({
@@ -56,6 +65,8 @@ export function RitualPage({ ceremony }: { ceremony: Ceremony }) {
         <TriagePage />
       ) : ceremony === "releases" ? (
         <MilestonesPage />
+      ) : ceremony === "org" ? (
+        <OrgPage />
       ) : (
         <StandupPage />
       )}

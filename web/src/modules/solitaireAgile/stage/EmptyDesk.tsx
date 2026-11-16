@@ -7,8 +7,8 @@ import { pf } from "./cast";
 // a steaming mug. It is never a face and it never speaks; the round passes it.
 //
 // Two things live here and nothing else: the scene (EmptyDesk) and the deal
-// (dealMugLooks), which says which mug each empty window gets. The stage is not
-// wired to either yet.
+// (dealMugLooks), which says which mug each empty window gets. The stage uses
+// both; the Org page draws the scene in a vacant seat and picks its mug itself.
 //
 // The scene is one flat SVG in the stage's own palette (./cast.tsx `pf`), on
 // the tint of the window it sits in. The stage is a picture of a video call and
