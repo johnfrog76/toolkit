@@ -69,9 +69,13 @@
     item with its number; work is the ritual's grain: each worker's items grouped
     by milestone, else the design card the issue names, else the titles' common
     stem, and spoken as standup prose -- one sentence a group, a grammar over
-    the groups and no model; brief is -Brief's reading, and like -Brief it is
-    a read, not attending. Anything else is a stated refusal. -AsJson carries all
-    three whatever this says.
+    the groups and no model -- the round of the room, in which only the
+    workers present today speak: the Space's spaces.<slug>.features.teamSize
+    (3, 6 or 9, the chair included; unset is 9) seats the ones with work first,
+    then the idle, and the rest are absent. detail and brief keep every worker.
+    brief is -Brief's reading, and like -Brief it is a read, not attending.
+    Anything else is a stated refusal. -AsJson carries all three whatever this
+    says, with every worker's present and the room's team.size.
 .PARAMETER Remind
     HH:mm. Write the reminder to attend (D-TA15): ONE Organize reminder,
     source standup, through NewReminder -- or, when one is open, rewrite its due
@@ -154,7 +158,8 @@ if ($Help) {
     Write-Host ""
     Write-Host "  The queue waiting on you, then one block per worker label. Writes nothing"
     Write-Host "  to the tracker. -Brief prints only the chair's reading, in a few lines. -Grain work speaks"
-    Write-Host "  at the grain of the work: items grouped by milestone or feature, one sentence a group."
+    Write-Host "  at the grain of the work: items grouped by milestone or feature, one sentence a group --"
+    Write-Host "  the round, where only the workers present today speak (spaces.<slug>.features.teamSize)."
     Write-Host "  Each item says what moved -- closed, started or in progress, and its card's commits -- and the"
     Write-Host "  brief opens on the counts. -Since <yyyy-MM-dd> widens yesterday back to that day."
     Write-Host "  -Remind sets an Organize reminder to attend (features.organize);"
@@ -299,6 +304,15 @@ elseif ($choice.source -eq 'both') {
     }
 }
 
+# -- The room ---------------------------------------------------------------
+# spaces.<slug>.features.teamSize: how many are in the standup, the chair
+# included (Scripts/Resolve-TeamSize.ps1 reads it; unset is the default). The
+# fill keeps every worker and marks who is present; the round speaks those.
+$teamEntry = $null
+if ($cfg -and $cfg.Spaces) { $teamEntry = @($cfg.Spaces | Where-Object { $_ -and [string]$_.slug -eq $slug }) | Select-Object -First 1 }
+$teamStored = $null
+if ($teamEntry -and $teamEntry.features -and $teamEntry.features.PSObject.Properties['teamSize']) { $teamStored = $teamEntry.features.teamSize }
+
 # -- The fill, the rendering, the printing --------------------------------------
 $cards = @()
 if ($choice.source -eq 'cards' -or $choice.source -eq 'both') {
@@ -316,11 +330,11 @@ if ($choice.source -eq 'cards' -or $choice.source -eq 'both') {
 }
 if ($choice.source -eq 'cards') {
     $standup = Invoke-P20StandupCardsFill -AsOf $asOf -Cards $cards -Space $slug -SpaceName $spaceName `
-        -Window $window -PackageRoot $repoRoot
+        -Window $window -PackageRoot $repoRoot -TeamSize $teamStored
 }
 elseif ($choice.source -eq 'both') {
     $standup = Invoke-P20StandupJoinedFill -AsOf $asOf -Labels $labels -Issues $issues -Tracker $tracker `
-        -Cards $cards -Space $slug -SpaceName $spaceName -Window $window -PackageRoot $repoRoot
+        -Cards $cards -Space $slug -SpaceName $spaceName -Window $window -PackageRoot $repoRoot -TeamSize $teamStored
     # -- The dates read: when the counted commits were authored, and when the
     # open issues with no card began (Scripts/Ritual-Common.ps1). Asked for what
     # the fill counted, then the fill again with the answer; nothing to ask, or
@@ -334,14 +348,14 @@ elseif ($choice.source -eq 'both') {
             if ($dates.ok) {
                 $standup = Invoke-P20StandupJoinedFill -AsOf $asOf -Labels $labels -Issues $issues -Tracker $tracker `
                     -Cards $cards -Space $slug -SpaceName $spaceName -Window $window -PackageRoot $repoRoot `
-                    -CommitDates $dates.commitDates -IssueStarts $dates.issueStarts
+                    -CommitDates $dates.commitDates -IssueStarts $dates.issueStarts -TeamSize $teamStored
             }
         }
     }
 }
 else {
     $standup = Invoke-P20StandupFill -AsOf $asOf -Labels $labels -Issues $issues -Tracker $tracker `
-        -Space $slug -Window $window -PackageRoot $repoRoot
+        -Space $slug -Window $window -PackageRoot $repoRoot -TeamSize $teamStored
 }
 # -- The suggestion ---------------------------------------------------------
 # One derived next move over the same read (Scripts/Suggest-Rules.ps1), before

@@ -88,7 +88,11 @@ export function EnvCard({ className }: { className?: string }) {
       className={mergeClasses(className, minHeight)}
       loading={loading}
       loadingLabel="Checking environment..."
-      headerLeft={<Subtitle2>Environment</Subtitle2>}
+      headerLeft={
+        <Subtitle2 as="h2" style={{ margin: 0 }}>
+          Environment
+        </Subtitle2>
+      }
       headerRight={
         env ? (
           <>

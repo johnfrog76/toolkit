@@ -521,7 +521,7 @@ def rituals_ceremonies_file() -> str:
 
 
 def rituals_vocabulary_file() -> str:
-    """phrasebook, nothing, excuses, fakeWork -- relative to the package root."""
+    """phrasebook, nothing, nothingToday, excuses, fakeWork, verbs -- relative to the package root."""
     return consts()["rituals"]["vocabularyFile"]
 
 
@@ -647,6 +647,18 @@ def rituals_corner_shapes() -> tuple[str, ...]:
     """The PM Corner's shapes, by index: oneLeft, manyLeft, reached, nothingInReach --
     which line it reads (docs/modules/solitaire-agile.md, "The PM Corner")."""
     return tuple(consts()["rituals"]["cornerShapes"])
+
+
+def rituals_team_sizes() -> tuple[int, ...]:
+    """The room sizes a Space may state as ``spaces[].features.teamSize``: 3, 6, 9 --
+    the standup's windows, the chair included (docs/modules/solitaire-agile.md,
+    "The team size: who is in the room")."""
+    return tuple(int(n) for n in consts()["rituals"]["teamSizes"])
+
+
+def rituals_team_size_default() -> int:
+    """The room size an unset ``teamSize``, or one not in ``rituals_team_sizes``, reads as: 9."""
+    return int(consts()["rituals"]["teamSizeDefault"])
 
 
 # -- The dress (D-SA11) ---------------------------------------------------

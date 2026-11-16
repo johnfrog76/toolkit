@@ -530,6 +530,23 @@ try {
     Assert-True 'and nothing of it reached config.local.json' ((Get-LocalConfigText $box) -notlike '*suggestions*') (Get-LocalConfigText $box)
     [void](Invoke-Config $box @('-Unset', 'spaces.acme.features.suggestions', '-Hub'))
 
+    # The team size: a Space-scoped NUMBER with allowed values (consts.json
+    # rituals.teamSizes), written onto the Space's hub entry as an int; a number
+    # that is not a size is a stated refusal naming the sizes, and writes nothing.
+    $team = Invoke-Config $box @('-Set', 'spaces.acme.features.teamSize=3', '-Hub')
+    Assert-Equal 'spaces.<slug>.features.teamSize=3 -Hub exits 0' 0 $team.ExitCode
+    $teamSpace = Get-HubSpace $box 'acme'
+    Assert-True 'the size lands on the Space''s features as the number 3' ($teamSpace.features -and ($teamSpace.features.teamSize -is [int] -or $teamSpace.features.teamSize -is [long]) -and [int]$teamSpace.features.teamSize -eq 3) (Get-HubText $box)
+    Assert-True 'and nothing of it reached config.local.json' ((Get-LocalConfigText $box) -notlike '*teamSize*') (Get-LocalConfigText $box)
+    foreach ($bad in @('4', '0', '12', 'nine')) {
+        $refusedTeam = Invoke-Config $box @('-Set', "spaces.acme.features.teamSize=$bad", '-Hub')
+        Assert-Equal "teamSize=$bad is a stated refusal (exit 2)" 2 $refusedTeam.ExitCode
+        Assert-True "...naming the sizes a Space may state" ($refusedTeam.Output -match '3, 6, 9') $refusedTeam.Output
+    }
+    Assert-Equal 'a refused size leaves the stored one as it was' 3 ([int](Get-HubSpace $box 'acme').features.teamSize)
+    [void](Invoke-Config $box @('-Unset', 'spaces.acme.features.teamSize', '-Hub'))
+    Assert-True '-Unset takes the size off the Space again' (-not ((Get-HubSpace $box 'acme').features -and (Get-HubSpace $box 'acme').features.PSObject.Properties['teamSize'])) (Get-HubText $box)
+
     # The first write of the Azure on-ramp. Setting a field on the
     # SHIPPED org must patch it -- not add an org called "test" (its slug then) with status
     # local, which merged over Example and switched ADO off.

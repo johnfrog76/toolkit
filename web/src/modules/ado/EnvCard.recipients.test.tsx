@@ -84,6 +84,19 @@ describe("the Environment card's Teams recipients", () => {
     expect(document.body.textContent).not.toContain("DM via Workflow");
   });
 
+  it("keeps the card's headings in order: the card title is a level two, its Teams section a level three", async () => {
+    env = { ...base, features: { communication: true }, communication };
+    render(<EnvCard />);
+    await screen.findByText("Teams messages");
+    const outline = screen
+      .getAllByRole("heading")
+      .map((h) => [Number(h.tagName.slice(1)), h.textContent]);
+    expect(outline).toEqual([
+      [2, "Environment"],
+      [3, "Teams messages"],
+    ]);
+  });
+
   it("reads a recipient whose webhook is set as Ready", async () => {
     env = { ...base, features: { communication: true }, communication };
     render(<EnvCard />);
