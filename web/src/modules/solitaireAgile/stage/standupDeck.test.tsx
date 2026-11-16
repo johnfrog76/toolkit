@@ -1062,7 +1062,7 @@ function expectNoSilentFace(data: StandupResponse, members: number) {
 }
 
 // The owner's demo room, held: the chair; two members with tracker work (the prose
-// table's Fable and Opus); three idle members, each saying its own made-up pair by the
+// table's two working members); three idle members, each saying its own made-up pair by the
 // fill's rule; three empty desks. The members' labels and names are the fixtures'
 // own -- the team table's four and the joined table's card tile -- in label order.
 const teamTable = readJson<{

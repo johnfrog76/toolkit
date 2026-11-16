@@ -937,7 +937,7 @@ describe("the issue popover", () => {
     const title = data.queue.walk.find((i) => i.number === 104)!.title;
     const text = surface().textContent ?? "";
     expect(text).toContain(title);
-    // Issue 104 is a blocker: the chip is the plate Fable wears on the stage, PERSONA (label).
+    // The blocker item: its chip is the plate that worker wears on the stage, PERSONA (label).
     expect(text).toContain("DEV-HERO (fable)");
     expect(text).toContain("sev2");
     expect(text).toContain("Ship the standup");
