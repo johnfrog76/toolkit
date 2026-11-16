@@ -473,6 +473,7 @@ export const USAGE = consts.usage as {
   envFlag: string;
   burnRoute: string;
   readingsFolder: string;
+  unpricedPhrase: string;
 };
 
 /**

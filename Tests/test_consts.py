@@ -392,6 +392,8 @@ EXPECTED = {
     ("replyStatuses", "github"): ["fixed", "closed", "active"],
     # The typed plan readings' subfolder of usage/: the CLI writes it, the agent fingerprints it.
     ("usage", "readingsFolder"): "readings",
+    # The words a cost line puts before the models it leaves out: the CLI and the web read them.
+    ("usage", "unpricedPhrase"): "not counting",
     # The org chart's hub file: the agent reads it through org_file().
     ("org", "file"): "org.json",
     # Daily's window: the billing script, the CLI's Daily and GET /api/billing refuse
@@ -700,6 +702,7 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("ghReads.openIssues", '"--limit", "100"'),
         ("ghReads.allIssues", '"--limit", "300"'),
         ("usage.burnRoute", "/api/usage/burn"),
+        ("usage.unpricedPhrase", "not counting"),
         # Daily's window sentences: the route reads them through billing_text().
         ("billing.text.halfWindow", "-Since and -Until go together"),
         ("billing.text.notADay", "is not a day: yyyy-MM-dd"),

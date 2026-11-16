@@ -693,7 +693,8 @@ this machine into the hub's `usage/`. It never writes in Claude Code's folder. W
   there, and a subagent's tokens count to the session that started it.
 - **The cost is derived, and says so.** `costUsdDerived` is the tokens priced from one table,
   `Config/claude-prices.json` -- list prices, dated in the record as `cost.priceTableAsOf` -- never a share of
-  a plan's allocation. A model the table does not price is counted, named under `unpriced`, and has no cost.
+  a plan's allocation. A model the table does not price is counted, named under `unpriced`, and has no cost; the cost line itself then ends `, not counting <model>`
+  (`Burn`, `Burn -Log` and the System page's burn tile), so the figure is never read as the whole.
   Haiku is priced at its lower rate card (prompts up to 100K tokens) only, and the record says so in
   `cost.priceNotes`.
 - **No path and no name.** A session is its id, a project its last folder name (`~` for a home folder), the
