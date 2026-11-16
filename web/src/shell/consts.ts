@@ -448,6 +448,15 @@ export const USAGE = consts.usage as {
 };
 
 /**
+ * The org chart's hub file (docs/hub/org.md): the name of the file at the hub
+ * root, beside hub.json, that holds the org's trees, positions and seats. The CLI
+ * reads it; the agent will serve it and the web will draw what the agent serves.
+ */
+export const ORG = consts.org as {
+  file: string;
+};
+
+/**
  * The thread statuses a reply may set, per tracker. Azure DevOps keeps all six;
  * GitHub keeps what a review thread can be (resolved or unresolved), so the PR
  * Comments status box offers only these there, and ReplyPR refuses the rest.

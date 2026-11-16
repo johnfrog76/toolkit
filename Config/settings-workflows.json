@@ -88,6 +88,15 @@
       "anchor": "spaces.{slug}.features.suggestions"
     },
     {
+      "id": "org-chart",
+      "question": "Who sits in which seat in my org?",
+      "sentence": "Where Team Agile is on, OrgChart prints your org as a tree: the positions, who each reports to, and the model or person sitting in each seat. It reads one file, org.json, at the top of your hub beside hub.json, and writes nothing; no file, nothing is shown.",
+      "surfaces": [
+        "orgChart"
+      ],
+      "door": "sentence"
+    },
+    {
       "id": "training-hours",
       "question": "How many training hours does my quarter require?",
       "sentence": "If this Space's engagement requires training each quarter, say how many hours. The Growth page then adds up the trainings dated this quarter and says where you stand. Leave it unset and nothing is shown.",

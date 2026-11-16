@@ -20,6 +20,11 @@
     card or issue, the kind's agentic prompt -- printed for a cold agent.
     It writes nothing; the web's copy box runs it through the bridge.
 
+    OrgChart prints the org's tree -- positions, who reports to whom, which
+    model or person sits in each seat -- from the hub's org file
+    (docs/hub/org.md). It rides Team Agile, so it is absent wherever Team
+    Agile is off, and it writes nothing.
+
     Commands is a PLAIN hashtable: Import-PowerShellDataFile, the only reader
     the loader uses, refuses a type cast such as [ordered].
 #>
@@ -31,8 +36,9 @@
         'Triage'  = 'Get-P20Triage'
         'Route'   = 'Set-P20Route'
         'StartWork' = 'Get-P20StartWork'
+        'OrgChart' = 'Get-P20OrgChart'
     }
-    Order = @('Standup', 'Triage', 'Route', 'StartWork')
+    Order = @('Standup', 'Triage', 'Route', 'StartWork', 'OrgChart')
 
     Help     = @{
         'Standup' = @{
@@ -112,6 +118,21 @@
                 '{cliPrefix}StartWork 23A3 -Clip',
                 '{cliPrefix}StartWork 4 -Prompt agentic/new-issue.prompt.md',
                 '{cliPrefix}StartWork 23A3 -Launch -WhatIf'
+            )
+        }
+        'OrgChart' = @{
+            category    = 'rituals'
+            description = 'The org''s tree: who sits in each seat'
+            notes       = @(
+                'One line per seat -- the position, a middle dot, the model, then [space] and (machine) -- indented by level. A vacant seat says vacant; the owner''s line shows the person and no model; a position with no seats is a pool, one line with its default-model text. The positions are the hub''s org file (org.json at the hub root, beside hub.json; docs/hub/org.md), one tree of it in use.',
+                '-Tree <id> prints another tree of the file by id. -AsJson prints the tree as the agent will serve it: the active tree''s id, and the tree with its machines and its positions in tree order, each with its level, prompt, reports-to, default model and seats, a seat''s state derived (staffed when a model or a person is named, vacant when neither is).',
+                'Reads one file and writes nothing. The file is checked first -- a duplicate id, a reportsTo that names no position, a loop, not exactly one root, a prompt that is not a file in the hub''s agentic folder -- and a file that fails is a stated refusal naming what is wrong. No hub configured, or no org file in it, is refused too. A key the tool does not read is ignored with a warning.'
+            )
+            usage       = '{cliPrefix}OrgChart [-Tree <id>] [-AsJson] [-Help]'
+            examples    = @(
+                '{cliPrefix}OrgChart',
+                '{cliPrefix}OrgChart -AsJson',
+                '{cliPrefix}OrgChart -Tree branch'
             )
         }
     }

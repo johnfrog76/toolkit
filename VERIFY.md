@@ -39,8 +39,8 @@ halves talking to each other, and the flag that makes a whole module appear and 
 three halves at once. A check that can be automated belongs in a suite; one that cannot is a gate here,
 or it is not verified.
 
-Every verb `config.default.json` defines is in the table below -- 49 always-on, and the 15 the modules
-contribute through `Config/*.commands.psd1` (64 in all; `docs/CLI.md` prints both counts) -- with the
+Every verb `config.default.json` defines is in the table below -- 49 always-on, and the 16 the modules
+contribute through `Config/*.commands.psd1` (65 in all; `docs/CLI.md` prints both counts) -- with the
 suite that types it and the gate that walks it. `Tests/Test-DocCounts.ps1` reads the table back, so a
 verb added without a row fails a suite. **A row that says "neither" is a verb nothing verifies**; it is
 left in the table rather than dropped, because a verb the reader cannot see in it is indistinguishable
@@ -117,6 +117,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `Triage` | `Triage` (typed, with `gh` stubbed) | neither |
 | `Route` | `Triage` (typed, with `gh` stubbed -- the exact argv per switch, never a real write) | 12 (one real write against a GitHub Space) |
 | `StartWork` | `StartWork` (typed, the block byte for byte; `gh` stubbed for an issue) | 12 (the cold-agent walk) |
+| `OrgChart` | `OrgChart` (typed in a fresh shell over a scratch copy of `samples/hub`: off means no verb, the text and `-AsJson` against `Tests/fixtures/org/`, every refusal exit 2 writing nothing) | 12 (Windows PowerShell 5.1: the row under "Rows added by a fix") |
 
 Gate numbers are this file's `## Gate N` headings (8c is gate 8c). The four `Test*` verbs after
 `Test` are the CLI runner itself, so their rows say what covers the runner.
@@ -1318,6 +1319,14 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `$PSNativeCommandArgumentPassing` does, which is PowerShell 7, so a line of it means the verb started the runner
   in `pwsh`. The four `Clause 22` lines that name `TestToolkit` pass there too. In `pwsh`, the same command prints
   36. The suite holds the wrapper on every host; this row is the verb typed in 5.1.
+- [ ] **OrgChart reads the hub's `org.json` under Windows PowerShell 5.1 (Refs #456).** In `powershell` (5.1), run
+  `tkTestToolkit -OrgChart`: green, and its shared-table half (`Tests/fixtures/org/table.json`) passing every case. Then,
+  in a Space answered `agents` with `features.solitaireAgile` on, copy `samples/hub/org.json` to a scratch hub's root,
+  point `PROMPTS_ROOT` at it and run `tkOrgChart`: you should see the header (`Org chart: My team (mine)`), the machines
+  line, and one line per seat with the middle dot between the position and the model -- in a console set to UTF-8
+  (`chcp 65001`) it reads `·`, never `Â·`; if the default code page garbles it, say so here. `tkOrgChart -AsJson |
+  ConvertFrom-Json` parses, and its `tree.positions[0].seats[0].state` is `staffed`. Then break the file (point a
+  `reportsTo` at a name that is not there): `tkOrgChart` exits 2 with the one sentence and no stack trace.
 
 ## Recording a run
 

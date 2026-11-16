@@ -370,6 +370,8 @@ EXPECTED = {
     ("replyStatuses", "github"): ["fixed", "closed", "active"],
     # The typed plan readings' subfolder of usage/: the CLI writes it, the agent fingerprints it.
     ("usage", "readingsFolder"): "readings",
+    # The org chart's hub file: the agent reads it through org_file().
+    ("org", "file"): "org.json",
     # Daily's window: the billing script, the CLI's Daily and GET /api/billing refuse
     # a window in these words (Scripts/Resolve-BillingWindow.ps1 is the rule).
     ("billing", "text"): {
@@ -412,6 +414,7 @@ class TheFileParses(unittest.TestCase):
             "billing",
             "assets",
             "tests",
+            "org",
             "agent",
         ):
             self.assertIn(group, raw)
@@ -565,6 +568,7 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.usage_env_flag(), EXPECTED[("usage", "envFlag")])
         self.assertEqual(C.usage_burn_route(), EXPECTED[("usage", "burnRoute")])
         self.assertEqual(C.usage_readings_folder(), EXPECTED[("usage", "readingsFolder")])
+        self.assertEqual(C.org_file(), EXPECTED[("org", "file")])
         self.assertEqual(C.billing_text(), EXPECTED[("billing", "text")])
         self.assertEqual(C.webhook_recipient_types(), tuple(EXPECTED[("communication", "webhookRecipientTypes")]))
         self.assertEqual(C.deferred_recipient_types(), tuple(EXPECTED[("communication", "deferredRecipientTypes")]))
@@ -656,6 +660,8 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("startWork.howWeWorkNote", "agentic/how-we-work.md"),
         # Claude Code usage: served through usage_env_flag() and usage_burn_route().
         ("usage.envFlag", "claudeUsage"),
+        # The org chart's file name: served through org_file(), never typed.
+        ("org.file", "org.json"),
         # The gh read limits: served through gh_read_limit_*(), never typed as a --limit.
         ("ghReads.labels", '"--limit", "200"'),
         ("ghReads.openIssues", '"--limit", "100"'),

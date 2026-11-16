@@ -21,6 +21,7 @@ import {
   DOCS,
   FEATURES,
   FOLDERS,
+  ORG,
   RE,
   REMINDERS,
   RITUALS,
@@ -437,6 +438,11 @@ describe("consts.json", () => {
       readingsFolder: "readings",
     });
 
+    // The org chart's hub file (docs/hub/org.md): the name all three halves type from here.
+    const { _: orgDoc, ...orgKeys } = ORG as typeof ORG & { _: string };
+    expect(orgDoc).toMatch(/docs\/hub\/org\.md/);
+    expect(orgKeys).toEqual({ file: "org.json" });
+
     // The statuses a reply may set, per tracker.
     expect(REPLY_STATUSES_BY_TRACKER.ado).toEqual([
       "fixed",
@@ -477,6 +483,7 @@ describe("consts.json", () => {
         "features",
         "folders",
         "ghReads",
+        "org",
         "regex",
         "reminders",
         "replyStatuses",

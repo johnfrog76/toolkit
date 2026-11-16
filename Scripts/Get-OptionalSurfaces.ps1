@@ -56,6 +56,10 @@ if (-not (Get-Command Get-P20ClaudeProjectsRoot -ErrorAction SilentlyContinue)) 
 if (-not (Get-Command Read-P20CommunicationConfig -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Read-CommunicationConfig.ps1')
 }
+# The org chart's reader -- the Org chart row's state (docs/hub/org.md).
+if (-not (Get-Command Read-P20OrgChart -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Read-OrgChart.ps1')
+}
 # The one way this file calls git with stderr read as text (Invoke-TrackerRead.ps1).
 if (-not (Get-Command Invoke-P20TrackerRead -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
@@ -445,6 +449,39 @@ function Get-P20OptionalSurfaces {
         }
     }
     $rows += New-P20SurfaceRow -Key 'suggestions' -Title 'Suggestions' -State $sugState -Config $sugLine -Note $sugNote
+
+    # -- The org chart: who sits in which seat (docs/hub/org.md) -----------------
+    # The hub's org file, read by OrgChart. It rides Team Agile, like the
+    # suggestion: where Team Agile is off here the row says so and is off. Where
+    # it is on, no file is `not configured` -- nobody has written one -- a valid
+    # file is `on` with the tree's name and its seats, and a file that is there
+    # but fails its checks is `off` with the sentence that says why: it is not
+    # on, and `not configured` would hide that someone wrote it.
+    $orgFile = Get-P20OrgFileName
+    $orgState = $states.Off
+    $orgNote = "rides Team Agile, which is off in $sugSlug"
+    $orgLine = "$($Prefix)Config -Set features.solitaireAgile=true"
+    if ($sugTeamAgile) {
+        $orgRoot = ''
+        if ($Config -and $Config.PromptsRoot) { $orgRoot = [string]$Config.PromptsRoot }
+        $orgRead = Read-P20OrgChart -PromptsRoot $orgRoot -PackageRoot $PackageRoot
+        $orgLine = "add $orgFile at the hub root, beside hub.json (docs/hub/org.md)"
+        if ($orgRead.Status -eq 'missing') {
+            $orgState = $states.Unset
+            $orgNote = "no $orgFile in the hub; samples/hub/$orgFile is one to copy"
+        }
+        elseif ($orgRead.Status -eq 'ok') {
+            $orgState = $states.On
+            $orgLine = "edit $orgFile at the hub root (docs/hub/org.md)"
+            $seatWord = 'seats'
+            if ($orgRead.SeatCount -eq 1) { $seatWord = 'seat' }
+            $orgNote = "$($orgRead.Chart.tree.name), $($orgRead.SeatCount) $seatWord; $($Prefix)OrgChart prints it"
+        }
+        else {
+            $orgNote = "$orgFile is there but not valid: $($orgRead.Message)"
+        }
+    }
+    $rows += New-P20SurfaceRow -Key 'orgChart' -Title 'Org chart' -State $orgState -Config $orgLine -Note $orgNote
 
     # -- Training hours per quarter: a Space's requirement ---------------------
     # A NUMBER the Space states, not a flag, so its state is on (a requirement is

@@ -41,6 +41,10 @@ Three files, and the split is the whole of it:
 | `config.local.json` | **no** (gitignored) | Your machine: paths, active org, prefix, `email`, your feature flags. | `tkConfig -Set <key>=<value>` |
 | `<promptsRoot>/hub.json` | it is your hub's | **Your orgs**, the hub-root folder names, `storeSync`. | `tkConfig -Set spaces.<slug>.<field>=<value>` |
 
+A fourth file sits beside `hub.json` and is **not configuration**: `<promptsRoot>/org.json`, the hub's
+org chart -- positions, who reports to whom, which model or person sits in each seat. It is data the
+tool reads, hand-edited, and `Config` does not write it; see [The org chart in the hub](#the-org-chart-in-the-hub).
+
 `config.default.json` ships a **template** org, not a real one -- no ADO URL, no tenant, no
 email. Nothing that identifies a person or an organisation is committed. Your real values go in
 `config.local.json`, which patches the shipped org by slug:
@@ -850,6 +854,18 @@ keeps its default, which is its own name.
 `storeSync` is the same argument applied to a scalar: whether the store is a repository is the
 hub's fact, so one hub kept in sync from two machines declares it once, in the file both share. A value that is neither `git` nor `none` warns and the configured value
 stands.
+
+### The org chart in the hub
+
+`org.json` is a second file at the hub root, beside `hub.json` -- `consts.json` `org.file`, the one name
+the CLI, the agent and the web all read it from. `hub.json` stays as it is (orgs, folder names and
+`storeSync`, "and nothing else"): positions and seats are not a Space's declaration, so they have a file of
+their own rather than a key a manifest would have to learn. It is found where the hub is (`PROMPTS_ROOT`,
+else `promptsRoot`), is read as UTF-8, and is validated whole before anything is drawn. Its shape, each
+field, the states and the checks are [`docs/hub/org.md`](hub/org.md); `OrgChart` prints it, and it is read
+only where Team Agile is on ([the scope](hub/org.md#the-scope----where-it-is-and-is-not-there)). No key in
+any config file turns it on: a file at the hub root is all it takes, and the inventory names it either way
+(`tkEnv`, the **Org chart** row).
 
 Nothing about this is required. **A hub with no `hub.json` declares nothing** and the other two files
 decide everything, a malformed
