@@ -193,11 +193,18 @@ def _modified(path: Path) -> str:
     return time.strftime("%Y-%m-%d", time.localtime(path.stat().st_mtime))
 
 
+def listed(file_name: str) -> bool:
+    """Whether a file of that name is a prompt the Studio lists and reads:
+    ``<name>.prompt.md``, the name a plain word. The one test ``_files`` and
+    the org chart's prompt links share."""
+    return file_name.endswith(PROMPT_SUFFIX) and bool(_NAME.match(stem(file_name)))
+
+
 def _files(folder: Path) -> list[Path]:
     if not folder.is_dir():
         return []
     return sorted(
-        (p for p in folder.iterdir() if p.is_file() and p.name.endswith(PROMPT_SUFFIX) and _NAME.match(stem(p.name))),
+        (p for p in folder.iterdir() if p.is_file() and listed(p.name)),
         key=lambda p: p.name.lower(),
     )
 

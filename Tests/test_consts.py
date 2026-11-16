@@ -177,6 +177,7 @@ EXPECTED = {
     ("rituals", "route"): "/api/ritual/standup",
     ("rituals", "triageRoute"): "/api/ritual/triage",
     ("rituals", "milestonesRoute"): "/api/ritual/milestones",
+    ("rituals", "orgRoute"): "/api/ritual/org",
     ("rituals", "assignMe"): "me",
     ("rituals", "ceremoniesFile"): "Config/ceremonies.json",
     ("rituals", "vocabularyFile"): "Config/standup-vocabulary.json",
@@ -558,6 +559,7 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.rituals_route(), EXPECTED[("rituals", "route")])
         self.assertEqual(C.rituals_triage_route(), EXPECTED[("rituals", "triageRoute")])
         self.assertEqual(C.rituals_milestones_route(), EXPECTED[("rituals", "milestonesRoute")])
+        self.assertEqual(C.rituals_org_route(), EXPECTED[("rituals", "orgRoute")])
         self.assertEqual(C.rituals_ceremonies_file(), EXPECTED[("rituals", "ceremoniesFile")])
         self.assertEqual(C.rituals_vocabulary_file(), EXPECTED[("rituals", "vocabularyFile")])
         self.assertEqual(C.rituals_worker_label_prefix(), EXPECTED[("rituals", "workerLabelPrefix")])

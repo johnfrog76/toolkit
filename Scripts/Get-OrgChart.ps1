@@ -10,7 +10,7 @@
     seat says vacant, the owner's line shows the person, and a position with no
     seats is a pool, one line with its default-model text.
 
-    -AsJson prints the response the agent will serve, as one JSON document:
+    -AsJson prints the response the agent serves, as one JSON document:
     docs/hub/org.md, "The response".
 
     Reads one file and writes nothing: not the hub, not the tracker. The file is

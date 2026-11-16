@@ -10,6 +10,9 @@ what the Space's GitHub tracker says -- read at most once a minute
 ``features.solitaireAgile`` and answers 404 when that is off -- the status a
 module that was never written would give.
 
+The org chart (``org.py``) is the one route with no tracker behind it: it reads the
+hub's org file, behind the same gate.
+
 Every route but one is a READ. The CLI's ``Standup`` renders the same text from
 the same two data files, and one fixture holds both halves to it. The one that
 is not -- attending, in ``remind.py`` -- writes nothing itself either: it
@@ -19,6 +22,7 @@ the bridge.
 
 from . import (
     milestones,  # noqa: F401 -- registers GET /api/ritual/milestones (the Releases tab)
+    org,  # noqa: F401 -- registers GET /api/ritual/org (the org chart, read from the hub's org file)
     remind,  # noqa: F401 -- registers the reminder's two routes on ``api``
     triage,  # noqa: F401  -- registers GET /api/ritual/triage on the same router (V1)
 )

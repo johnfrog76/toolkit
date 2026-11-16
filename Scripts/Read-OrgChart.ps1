@@ -8,7 +8,7 @@
 #
 # It finds the file at the hub root the way hub.json is found (the root is the
 # caller's: the module's resolved promptsRoot), reads it as UTF-8, validates it
-# and returns the tree in use as the response the agent will serve. It never
+# and returns the tree in use as the response the agent serves. It never
 # throws and never writes: every way the file can be wrong is a result with a
 # KIND (a code both halves agree on, Tests/fixtures/org/table.json) and a
 # MESSAGE (one sentence).

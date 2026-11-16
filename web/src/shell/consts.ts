@@ -205,6 +205,8 @@ export const RITUALS = consts.rituals as {
   triageRoute: string;
   /** The Releases tab's read: the tracker's milestones with its own counts. */
   milestonesRoute: string;
+  /** The org chart's read: the tree in use, with each position's prompt title and reading-room ref. */
+  orgRoute: string;
   /** "me": the one answer to who takes an item that is not a size (D-AR10) --
    *  what the Triage page sends as `Route -Assign`, and an item's `who` when it is yours. */
   assignMe: string;
@@ -476,7 +478,7 @@ export const USAGE = consts.usage as {
 /**
  * The org chart's hub file (docs/hub/org.md): the name of the file at the hub
  * root, beside hub.json, that holds the org's trees, positions and seats. The CLI
- * reads it; the agent will serve it and the web will draw what the agent serves.
+ * reads it; the agent serves it and the web will draw what the agent serves.
  */
 export const ORG = consts.org as {
   file: string;

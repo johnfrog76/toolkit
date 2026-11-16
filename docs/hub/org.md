@@ -5,8 +5,8 @@ whoever sits in it), who each one reports to, and which model or person sits in 
 file, one reader, and nothing in it is derived from the cards: it is what you say your org is, and the
 tool draws it back so a change in who sits where is something you can see.
 
-It rides [Team Agile](../modules/solitaire-agile.md): `OrgChart` reads it, and where Team Agile is off in
-the Space you are in there is no verb, so the chart is absent there -- see
+It rides [Team Agile](../modules/solitaire-agile.md): `OrgChart` and `GET /api/ritual/org` read it, and where
+Team Agile is off in the Space you are in there is no verb and the route is a 404, so the chart is absent there -- see
 [The scope](#the-scope----where-it-is-and-is-not-there). The file name is `consts.json` `org.file`, typed
 by the CLI, the agent and the web from there and never retyped.
 
@@ -138,13 +138,14 @@ root) and `unknown-tree` (`-Tree` names a tree the file does not have).
 
 The table is one file, [`Tests/fixtures/org/table.json`](../../Tests/fixtures/org/table.json), a case per
 row above and per way a valid file reads; `tkTestToolkit -OrgChart` asserts it for the CLI's reader, and
-the agent's reader is held to the same file, **the `kind` being the contract** and the sentence the CLI's
-wording.
+the agent's reader (`agent/solitaire/org.py`, a mirror of the CLI's: the same checks in the same order, the
+same tolerance of an unknown key, the same derived state) is held to the same file by `Tests/test_org.py`,
+**the `kind` being the contract** and the sentence the CLI's wording.
 
 ## The response
 
-`OrgChart -AsJson` prints it, and the agent serves the same document: the tree in use (or the one `-Tree`
-asks for) with its positions in **tree order** -- the root, then each position's reports in the file's
+`OrgChart -AsJson` prints it, and `GET /api/ritual/org` (`consts.json` `rituals.orgRoute`) serves the same
+document: the tree in use (or the one `-Tree` / `?tree=<id>` asks for) with its positions in **tree order** -- the root, then each position's reports in the file's
 order, depth first -- each with its `level`, root 0. Every key is always there; one that is not set is
 `null` (an array that is not set is `[]`), so both halves serialise one shape.
 
@@ -174,6 +175,37 @@ order, depth first -- each with its `level`, root 0. Every key is always there; 
 `activeTree` is always the file's own choice, so a reader asked for another tree still knows which is in
 use. [`Tests/fixtures/org/charts/`](../../Tests/fixtures/org/charts/) holds the responses the table states.
 
+**The one difference between the two halves: the prompt fields.** The route adds two keys to every
+position, which `OrgChart -AsJson` does not print -- the CLI has no prompt reader, and the Studio's is the
+agent's:
+
+| Key | Is | From |
+| --- | --- | --- |
+| `promptTitle` | the prompt's title: its front matter's `title`, else its one `#` heading, else the file's name without `.prompt.md` | `agent/studio/prompts.py`'s `record`, the one reader every prompt goes through -- not a second parser |
+| `promptRef` | the address after `/studio/prompts/` that opens the prompt in the Studio's reading room: `yours/<name>`, the `ref` a Studio prompt row carries (the web builds the link with `promptPath(ref)`) | the same rule the Studio lists by; `null` for a file the room does not list (not `<name>.prompt.md`, or a name that is not a plain word), which still has its title |
+
+Both are `null` on a position with no `prompt`. The file read is the one the reading room opens -- the
+machine's `agenticExtensionPath` copy where there is one, else the hub's. Everything else in the response
+is byte for byte the CLI's (`Tests/test_org.py` strips the two keys and compares the rest to the table's
+responses).
+
+### What the route answers when there is no chart
+
+Every refusal's `detail` is `{ "kind": ..., "message": ... }`, so a caller tells a missing file from an
+invalid one without reading the sentence; the gate's own 404 (the module is off) is a plain string.
+
+| Status | `kind` | When |
+| --- | --- | --- |
+| 404 | `no-hub` | no hub is configured (nobody said where it is) |
+| 404 | `missing` | no `org.json` at the hub root, or the hub's folder is not there |
+| 409 | any in [What is checked](#what-is-checked) | the file is there and fails its checks: the request is fine and the stored file conflicts |
+| 422 | `unknown-tree` | `?tree=` names a tree the file does not have (the sentence lists the trees) |
+| 404 | -- (string detail) | Team Agile is off in the Space you are in, whatever the file says |
+
+`?tree=` is trimmed, as `-Tree` is. A key the tool does not read is said once in the agent's log and is not
+in the response. There is no `space` parameter: the file is the engineer's, and the Space you are in only
+decides whether the module is on.
+
 ## The CLI names it
 
 `OrgChart` prints the text, `OrgChart -Tree <id>` another tree of the file, `OrgChart -AsJson` the response
@@ -202,8 +234,8 @@ even though the file is. That is the module rule, not a fault; to see the chart 
 ## What is not in v1
 
 No writer (`Config` and a `Staff` verb come later), no `active` drawn, no count of builders from the cards
-in flight, and no join with the standup's workers. The agent route and the web page read this file and are
-built on this shape.
+in flight, and no join with the standup's workers. The route is built; the web's Org page reads it and is
+not yet ([Known gaps](../KNOWN-GAPS.md#the-org-chart-has-no-page-yet)).
 
 ## An example to copy
 

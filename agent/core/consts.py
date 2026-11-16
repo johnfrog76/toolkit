@@ -503,6 +503,11 @@ def rituals_milestones_route() -> str:
     return consts()["rituals"]["milestonesRoute"]
 
 
+def rituals_org_route() -> str:
+    """The org chart's route, with the /api prefix: ``/api/ritual/org``."""
+    return consts()["rituals"]["orgRoute"]
+
+
 def rituals_assign_me() -> str:
     """``me`` -- the one answer to who takes an item that is not a size (D-AR10):
     ``Route -Assign me``, a card's ``**Assigned:** me``, and a triage item's
@@ -726,7 +731,7 @@ def usage_readings_folder() -> str:
 
 def org_file() -> str:
     """``org.json`` -- the org chart's file at the hub root, beside ``hub.json``
-    (docs/hub/org.md). The CLI reads it today; the agent will serve it."""
+    (docs/hub/org.md). The CLI and the agent read it."""
     return consts()["org"]["file"]
 
 
