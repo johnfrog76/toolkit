@@ -489,7 +489,7 @@ export function StandupPage() {
                 <Button
                   appearance="subtle"
                   icon={<PeopleSettingsRegular />}
-                  aria-label={entryQuestion(TEAM_SIZE_ENTRY, spaceName)}
+                  aria-label={`${TEAM_SIZE_DOOR}: ${entryQuestion(TEAM_SIZE_ENTRY, spaceName)}`}
                   onClick={() => openSettings(teamSizeAt)}
                 >
                   {TEAM_SIZE_DOOR}

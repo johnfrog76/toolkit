@@ -340,7 +340,10 @@ describe("the standup page", () => {
       </ShellProvider>,
     );
     expect(TEAM_SIZE_ENTRY?.question).toBe("How many are in my standup in {space}?");
-    const door = screen.getByRole("button", { name: "How many are in my standup in toolkit?" });
+    // The accessible name starts with the words on the button, then the entry's question.
+    const door = screen.getByRole("button", {
+      name: `${TEAM_SIZE_DOOR}: How many are in my standup in toolkit?`,
+    });
     expect(door.textContent).toBe(TEAM_SIZE_DOOR);
     fireEvent.click(door);
     // The entry's own door: the drawer is the one writer, so the page has no control of its own.
