@@ -377,16 +377,6 @@ numbers from two repositories can collide.
 
 **Issue:** [#347](https://github.com/johnfrog76/toolkit/issues/347)
 
-### A failed tracker read is worded differently in the terminal and on the page
-
-**What you see:** When the standup cannot read the tracker (the Space is not on GitHub, the tier is too low, `gh` does not
-answer), the terminal and the page each write their own sentence on the `Tracker` line. Only the Azure
-DevOps sentence is shared by both.
-
-**Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
-
-**Issue:** [#392](https://github.com/johnfrog76/toolkit/issues/392)
-
 ### The org chart has no page yet
 
 **What you see:** `GET /api/ritual/org` serves the org's tree, and `OrgChart` prints it in a terminal, but the Team
