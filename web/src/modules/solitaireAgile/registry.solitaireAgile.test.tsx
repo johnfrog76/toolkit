@@ -95,6 +95,7 @@ describe("the solitaireAgile module's registry contract", () => {
       "/solitaire-agile",
       "/solitaire-agile/triage",
       "/solitaire-agile/releases",
+      "/solitaire-agile/org",
       "/solitaire-agile/milestones",
       "/deck/ritual/standup",
     ]);
@@ -105,9 +106,13 @@ describe("the solitaireAgile module's registry contract", () => {
     expect(solitaireAgileModule.headerItems).toBeUndefined();
   });
 
-  it("Triage and Releases are pages under the ONE Team Agile entry, and not chromeless", () => {
+  it("Triage, Releases and Org are pages under the ONE Team Agile entry, and not chromeless", () => {
     const [entry] = moduleNav(activeModules(all, env({ solitaireAgile: true })), ctx);
-    for (const page of ["/solitaire-agile/triage", "/solitaire-agile/releases"]) {
+    for (const page of [
+      "/solitaire-agile/triage",
+      "/solitaire-agile/releases",
+      "/solitaire-agile/org",
+    ]) {
       expect(entry.match(page)).toBe(true);
       expect(solitaireAgileModule.chromeless?.(page)).toBe(false);
     }

@@ -386,10 +386,12 @@ DevOps sentence is shared by both.
 
 **Issue:** [#392](https://github.com/johnfrog76/toolkit/issues/392)
 
-### The org chart has no page yet
+### The org chart's vacant seat is a placeholder
 
-**What you see:** `GET /api/ritual/org` serves the org's tree, and `OrgChart` prints it in a terminal, but the Team
-Agile page has no Org tab. The chart is read from `org.json` at the hub root, and only where Team Agile is on.
+**What you see:** On Team Agile's Org tab, a seat nobody sits in is drawn as a dimmed office with the dashed
+outline of a bust and a plate reading `<position> · vacant`, not yet as the empty desk with its steaming mug
+that the design draws. The placeholder is one component (`VacantSeat.tsx`), the size of a staffed card, and the
+empty desk replaces its inside.
 
 **Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
 

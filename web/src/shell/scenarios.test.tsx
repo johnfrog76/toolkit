@@ -768,6 +768,30 @@ describe("the scenario grid: what each configuration shows", () => {
     resetCelebrateMemory();
   });
 
+  // Team Agile's Org (docs/SCENARIOS.md, "Team Agile's org chart"): a fourth page
+  // under the ONE Team Agile entry, with the chrome, and absent with the flag off --
+  // the chart rides the module's gate, whatever org.json says.
+  it("Org: a page under Team Agile's one entry, there only with the flag", () => {
+    const at = (features: Record<string, boolean>) => {
+      const e = env({ status: "active", tier: 1, tracker: "github", features });
+      const active = activeModules(modules, e);
+      const ctx = { env: e } as CardContext;
+      return {
+        route: moduleRoutes(active).some((r) => r.path === "/solitaire-agile/org"),
+        chromeless: isChromeless(active, "/solitaire-agile/org"),
+        nav: moduleNavSplit(active, ctx)
+          .tabs.filter((n) => n.match("/solitaire-agile/org"))
+          .map((n) => n.label),
+      };
+    };
+    expect(at({ solitaireAgile: true })).toEqual({
+      route: true,
+      chromeless: false,
+      nav: ["Team Agile"],
+    });
+    expect(at({ solitaireAgile: false })).toEqual({ route: false, chromeless: false, nav: [] });
+  });
+
   // "How do you want to work in <Space>?" (docs/SCENARIOS.md, the "How do
   // I…" section): one row per kind of Space, Team Agile's own switch on. The
   // agent resolves the answer and serves features.solitaireAgile with the gate

@@ -234,8 +234,9 @@ even though the file is. That is the module rule, not a fault; to see the chart 
 ## What is not in v1
 
 No writer (`Config` and a `Staff` verb come later), no `active` drawn, no count of builders from the cards
-in flight, and no join with the standup's workers. The route is built; the web's Org page reads it and is
-not yet ([Known gaps](../KNOWN-GAPS.md#the-org-chart-has-no-page-yet)).
+in flight, and no join with the standup's workers. The web's Org tab draws the tree the route serves
+([Team Agile, the web UI](../modules/solitaire-agile.md#the-web-ui)); its vacant seat is still a placeholder
+([Known gaps](../KNOWN-GAPS.md#the-org-charts-vacant-seat-is-a-placeholder)).
 
 ## An example to copy
 

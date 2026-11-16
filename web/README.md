@@ -141,11 +141,11 @@ web/
     │   ├── ReferencePage   one document's reading room, rendered as markdown
     │   ├── reminderEntry   a stored due split into the Edit dialog's date and time, and joined back
     │   └── RemindersCard   a list panel: bucket chips, archive, the snooze menu, edit, the quick add
-    ├── modules/solitaireAgile/   opt-in, features.solitaireAgile -- today's standup, read and played, and triage
-    │   ├── index.tsx       export solitaireAgileModule: four routes (the standup, triage, milestones, the played view, chromeless), one nav entry, no cards elsewhere
+    ├── modules/solitaireAgile/   opt-in, features.solitaireAgile -- today's standup, read and played, triage, releases and the org chart
+    │   ├── index.tsx       export solitaireAgileModule: its routes (the standup, triage, releases, org, the old milestones address, the played view, chromeless), one nav entry, no cards elsewhere
     │   ├── paths.ts        the module's route paths and the played deck's id
-    │   ├── api.solitaireAgile.ts   GET /api/ritual/standup, /triage and /milestones ?space=<slug>, read through @consts; POST /api/cmd/Route
-    │   ├── RitualPage      the Standup | Triage | Releases strip, each tab an address, and the page under it
+    │   ├── api.solitaireAgile.ts   GET /api/ritual/standup, /triage and /milestones ?space=<slug>, and /org, read through @consts; POST /api/cmd/Route
+    │   ├── RitualPage      the Standup | Triage | Releases | Org strip, each tab an address, and the page under it (Org a chunk of its own)
     │   ├── StandupPage     Agenda first, then the agent's text verbatim on Detail | Work | Brief: line one the header, the rest monospace, #<n> linked; Copy and Play in the header
     │   ├── AgendaLanes     the Agenda: Since <day> and Waiting on you, tiles from the board's face pieces (or rows), one button a waiting tile
     │   ├── agenda.ts       the Agenda's words: the long day, the lane heading, each tile's one fact
@@ -153,6 +153,10 @@ web/
     │   ├── MilestonesPage  one row per milestone, its bar the tracker's numbers; the award queue (award.ts)
     │   ├── AwardDialog     the award -- congratulations, what it took, the trophy -- and useConfetti()'s one caller
     │   ├── Trophy          the award's picture: a gold trophy, an inline SVG
+    │   ├── OrgPage         the org chart: offices by level, walls by level, a card a seat, an office a link to its prompt
+    │   ├── orgChart.ts     the chart's rules: the position-to-face map, the walls, the plates' words, the tidy-tree layout
+    │   ├── OrgParts        an office door (frame, wall, sill) and the plate under it
+    │   ├── VacantSeat      a seat nobody sits in -- today a placeholder; the empty desk scene replaces its inside
     │   └── stage/          the played view: one lazy chunk with the deck engine
     │       ├── cast.tsx        the Remote Standup's atoms, by copy from the Wasteland (no bios); reduced motion stills them
     │       ├── seats.ts        the nine seats, the plates (role · persona (label)), the deal of workers onto seats
@@ -168,6 +172,7 @@ web/
     │                     StatusMessage (a live region: role=status, role=alert for an error), StatTile (the one way a card counts), CardActions,
     │                     ConfirmDialog and CreateButton (one grammar for acting), ToolKitLogo over Wordmark (the SVG mark, its outlines in wordmarkPaths.ts),
     │                     usePersistedState, faces, health, Confetti (the one wrapper over react-confetti; the root mounts it),
+    │                     refinedFaces (the refined cast's busts: the landing page's portraits and the org chart's offices),
 │                     thinScrollbar (the one themed scrollbar -- spread it, never retype it), ...
     ├── hooks/            reusable logic: useWornTheme (and the store's useCurrentTheme), usePagination, useFacePref,
     │                     chartPalette, useUserRefetch, useConfetti (the one way to throw confetti)
@@ -1495,7 +1500,7 @@ rose for the bullets' dots and the links. `Landing.tsx` sets them on the page as
 | Band | What it holds |
 | --- | --- |
 | The banner | The wordmark (`src/shared/Wordmark.tsx`: one SVG, the letters and the face as outlines so no font is asked for and every machine draws the same bytes; colours, size and the face are its arguments; named `ToolKit` for a screen reader), the offering, three bullets, the call to action **Play Introducing ToolKit**, and at right the many faces of ToolKit: every face the app's logo can wear as a grid of twelve small wordmarks, the blobs cycling through the palette (`src/landing/Faces.tsx`), with one line under them |
-| The three ways | Under an eyebrow, each way of working in turn: its heading and copy on one side, one of the cast on a testimonial card on the other -- their portrait in the refined cast style, a dark plate with their title, and their line quoted under it; the sides alternate. `src/landing/people.ts` says who stands for which way, their title and their line; the portraits are `src/landing/refinedFaces.tsx`, drawn for the landing page alone (the portrait is hidden from a screen reader, the plate and the line carry the meaning) |
+| The three ways | Under an eyebrow, each way of working in turn: its heading and copy on one side, one of the cast on a testimonial card on the other -- their portrait in the refined cast style, a dark plate with their title, and their line quoted under it; the sides alternate. `src/landing/people.ts` says who stands for which way, their title and their line; the portraits are the refined cast's, `src/shared/refinedFaces.tsx`, which the Team Agile org chart draws its offices' busts from too -- a change there reaches both pages, and `refinedFaces.test.tsx` holds these three to the markup they had before the faces were shared (the portrait is hidden from a screen reader, the plate and the line carry the meaning) |
 | Quick start | A real heading over the five lines, coloured the way a terminal would colour them (verb, flags, strings, the comment after `#`; `src/landing/Code.tsx`) on the page's own ground, with Nimbus, the Azure Butler from the commercial's second window, standing beside the shell at about its height (`src/landing/Butler.tsx`, drawn by the deck's own exported function) |
 | The footer | The repository, the documents, and the narration disclosure |
 
