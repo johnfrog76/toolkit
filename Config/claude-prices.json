@@ -12,7 +12,7 @@
     "claude-opus-5-5": { "input": 4, "output": 20, "cacheRead": 0.20 },
     "claude-sonnet-5-5": { "input": 2, "output": 10, "cacheRead": 0.20 },
     "claude-sonnet-5": { "input": 2, "output": 10, "cacheRead": 0.20 },
-    "claude-haiku-4-5-20251001": { "input": 1, "output": 5, "cacheRead": 0.10 },
+    "claude-haiku-4-5": { "input": 1, "output": 5, "cacheRead": 0.10 },
     "claude-haiku-5-5": { "input": 0.10, "output": 0.50, "cacheRead": 0.01, "note": "priced at its lower rate card, for prompts up to 100K tokens; a longer prompt is billed higher and is not priced so here" }
   }
 }
