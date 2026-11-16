@@ -470,14 +470,14 @@ Props:
 | Prop | Type | Notes |
 | --- | --- | --- |
 | `label` | `string` | The chip's text. |
-| `count` | `number` | A count beside the label. |
+| `count` | `number \| null` | Required: the count beside the label, zero drawn too. `null` says no count on purpose, for a chip that is a tab and not a filter. |
 | `active` | `boolean` | Selected. |
 | `onClick` | `() => void` | Toggle; Space and Enter work too. |
-| `appearance` | `FilterBadgeAppearance` | `pink`, `purple` (default) or `orange`, the selected border colour. |
+| `appearance` | `FilterBadgeAppearance` | `pink`, `purple` (default), `orange` or `blue`. A name, not a colour: the selected border takes that name's colour from the theme in force (`chips` in `shell/themeList.ts`), so it follows dark and light, and each row of chips keeps one colour. |
 | `children` | `ReactNode` | Extra content after the label. |
 | `multi` | `boolean` | Checkbox semantics instead of radio. |
 
-**Used by:** the doc filters, Create Prompt, the Dashboard and the design groups. **Pattern:** an ARIA radio or checkbox on a div. **Test:** none of its own yet.
+**Used by:** the doc filters, Create Prompt, the Dashboard and the design groups. **Pattern:** an ARIA radio or checkbox on a div. **Test:** [`FilterBadge.test.tsx`](src/shared/FilterBadge.test.tsx), and `themeList.test.ts` for the colours.
 
 ## `StatTiles`
 

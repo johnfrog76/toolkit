@@ -21,9 +21,40 @@
 // light theme and its darkest in a dark one -- 4.5:1 at the badge's 10px, which
 // themeList.test.ts holds for every record. Fluent's own order is the
 // safe one: foreground2 a step DARKER than foreground1 in a light theme, a
-// step LIGHTER in a dark one.
+// step LIGHTER in a dark one. And `chips`, the filter chips' four named colours, which
+// the same test holds to 4.5:1 on the page and the card, and well apart from each other.
 
 export type ThemeMode = "dark" | "light";
+
+/** The named appearances of a filter chip (shared/FilterBadge.tsx). A call site names one;
+ *  each theme says what colour it is. One colour marks one group of filters, so a page
+ *  with several chip rows reads row by row. */
+export const CHIP_APPEARANCES = ["pink", "purple", "orange", "blue"] as const;
+export type ChipAppearance = (typeof CHIP_APPEARANCES)[number];
+export type ChipColours = Record<ChipAppearance, string>;
+
+/** The name a chip appearance has on the Fluent theme (`toolkitChipPink`), which Fluent's
+ *  provider writes out as a CSS custom property of the same name, so a chip reads its
+ *  colour from whichever theme it is drawn under. */
+export function chipToken(a: ChipAppearance): string {
+  return `toolkitChip${a[0].toUpperCase()}${a.slice(1)}`;
+}
+
+// Light tones for a dark page, deep tones for a light one. Every record below names its
+// own set, so a theme can restyle them; themeList.test.ts holds each set to 4.5:1 on
+// that theme's own page (and card), and the four apart from each other.
+const CHIPS_ON_DARK: ChipColours = {
+  pink: "#f472b6",
+  purple: "#a78bfa",
+  orange: "#fb923c",
+  blue: "#60a5fa",
+};
+const CHIPS_ON_LIGHT: ChipColours = {
+  pink: "#be185d",
+  purple: "#6d28d9",
+  orange: "#b43c0b",
+  blue: "#1d4ed8",
+};
 
 export interface ToolkitTheme {
   id: string;
@@ -47,6 +78,8 @@ export interface ToolkitTheme {
     foreground1: string;
     foreground2: string;
   };
+  /** What each named chip appearance is, in this theme: the selected chip's border. */
+  chips: ChipColours;
 }
 
 export const THEMES: ToolkitTheme[] = [
@@ -69,6 +102,7 @@ export const THEMES: ToolkitTheme[] = [
       foreground1: "#67e8f9",
       foreground2: "#22d3ee",
     },
+    chips: CHIPS_ON_DARK,
   },
   {
     id: "aurora",
@@ -89,6 +123,7 @@ export const THEMES: ToolkitTheme[] = [
       foreground1: "#818CF8",
       foreground2: "#A5B4FC",
     },
+    chips: CHIPS_ON_DARK,
   },
   {
     id: "basement",
@@ -107,6 +142,7 @@ export const THEMES: ToolkitTheme[] = [
       foreground1: "#fbbf24",
       foreground2: "#f59e0b",
     },
+    chips: CHIPS_ON_DARK,
   },
   {
     id: "seaglass",
@@ -127,6 +163,7 @@ export const THEMES: ToolkitTheme[] = [
       foreground1: "#0F766E",
       foreground2: "#115E59",
     },
+    chips: CHIPS_ON_LIGHT,
   },
   {
     id: "sunny",
@@ -147,6 +184,7 @@ export const THEMES: ToolkitTheme[] = [
       foreground1: "#be123c",
       foreground2: "#9f1239",
     },
+    chips: CHIPS_ON_LIGHT,
   },
   {
     id: "office",
@@ -165,6 +203,7 @@ export const THEMES: ToolkitTheme[] = [
       foreground1: "#0F766E",
       foreground2: "#115E59",
     },
+    chips: CHIPS_ON_LIGHT,
   },
 ];
 
@@ -198,6 +237,7 @@ export const SKIN_THEMES: Record<"temple" | "tank", ToolkitTheme> = {
       foreground1: "#e9c87a",
       foreground2: "#e8d9b0",
     },
+    chips: CHIPS_ON_DARK,
   },
   tank: {
     id: "skin-tank",
@@ -221,6 +261,7 @@ export const SKIN_THEMES: Record<"temple" | "tank", ToolkitTheme> = {
       foreground1: "#7fd4c0",
       foreground2: "#8fe8cc",
     },
+    chips: CHIPS_ON_DARK,
   },
 };
 

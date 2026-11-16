@@ -916,15 +916,21 @@ The product's own accent (rose, below) is worn in exactly two places, the landin
 wordmark's default blob, and by no theme.
 
 - **`shell/themeList.ts`** is the themes as data: name, mode, kind, page colour and gradient, grain,
-  the logo's colour, the card, five accent colours. It imports nothing from Fluent, because
+  the logo's colour, the card, five accent colours, and `chips`. It imports nothing from Fluent, because
   `useCurrentTheme` reads it and that hook is pulled into vite-node by the deck voice-bake.
   **Adding a theme is adding a record**, and checking three things by eye: white on the primary
   button (a test holds it to AA), links on a card, and the logo's word over its face. A fourth is
   held by number: `brand.foreground2` is a brand tint badge's text, and `themeList.test.ts` holds it
   to AA on the ramp's tint background in every theme. The same file snapshots every named theme --
-  its record and the whole Fluent theme made of it -- against `shell/fixtures/themes-93d9d88.json`,
-  the themes as they were in 1.4.0, so a theme changes only on purpose (regenerate the fixture and
-  say so in the commit).
+  its record and the whole Fluent theme made of it -- against `shell/fixtures/themes-364.json`,
+  the six themes and the two skins as rendered with their chip colours, so a theme changes only on
+  purpose (regenerate the fixture and say so in the commit).
+- **A theme's `chips`** are the colours of the filter chip's four named appearances (`pink`,
+  `purple`, `orange`, `blue`; `FilterBadge`, `COMPONENTS.md`). A record must name all four, the
+  type makes it, and a fifth thing by number: each clears 4.5:1 on the theme's page and card, and the
+  four stay well apart. `theme.ts` writes them onto the Fluent theme as `toolkitChipPink` and so
+  on, which the provider turns into CSS custom properties, so a chip reads its colour from whatever
+  theme it is drawn under, a worn skin included.
 - **`shell/theme.ts`** makes a record into a Fluent theme. Fluent derives some forty tokens from a
   sixteen-step brand ramp; overriding the five obvious ones left the rest Fluent's blue, so the ramp
   is generated from the theme's accent (`brandRamp`) and the five are set on top.
@@ -1490,7 +1496,7 @@ rose for the bullets' dots and the links. `Landing.tsx` sets them on the page as
 | Band | What it holds |
 | --- | --- |
 | The banner | The wordmark (`src/shared/Wordmark.tsx`: one SVG, the letters and the face as outlines so no font is asked for and every machine draws the same bytes; colours, size and the face are its arguments; named `ToolKit` for a screen reader), the offering, three bullets, the call to action **Play Introducing ToolKit**, and at right the many faces of ToolKit: every face the app's logo can wear as a grid of twelve small wordmarks, the blobs cycling through the palette (`src/landing/Faces.tsx`), with one line under them |
-| The three ways | Under an eyebrow, each way of working in turn: its heading and copy on one side, one of the cast in their Zoom window on the other, delivering one line from a bubble; the sides alternate. `src/landing/people.ts` says who stands for which way and their line; the window and the figure come from the stage's cast source, parked |
+| The three ways | Under an eyebrow, each way of working in turn: its heading and copy on one side, one of the cast on a testimonial card on the other -- their portrait in the refined cast style, a dark plate with their title, and their line quoted under it; the sides alternate. `src/landing/people.ts` says who stands for which way, their title and their line; the portraits are `src/landing/refinedFaces.tsx`, drawn for the landing page alone (the portrait is hidden from a screen reader, the plate and the line carry the meaning) |
 | Quick start | A real heading over the five lines, coloured the way a terminal would colour them (verb, flags, strings, the comment after `#`; `src/landing/Code.tsx`) on the page's own ground, with Nimbus, the Azure Butler from the commercial's second window, standing beside the shell at about its height (`src/landing/Butler.tsx`, drawn by the deck's own exported function) |
 | The footer | The repository, the documents, and the narration disclosure |
 

@@ -116,7 +116,7 @@ const useStyles = makeStyles({
 export interface FilterChip {
   id: string;
   label: string;
-  /** Left out, the chip draws no number. */
+  /** Left out, the chip draws no number (a zero is left out on purpose by the cards that do). */
   count?: number;
   active: boolean;
   onSelect: () => void;
@@ -516,7 +516,7 @@ export function ListPanel<T>(props: ListPanelProps<T>) {
                           <FilterBadge
                             key={chip.id}
                             label={chip.label}
-                            count={chip.count}
+                            count={chip.count ?? null}
                             active={chip.active}
                             onClick={chip.onSelect}
                           />
