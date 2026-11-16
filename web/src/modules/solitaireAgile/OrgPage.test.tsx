@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import type { OrgResponse } from "./api.solitaireAgile";
-import { OrgPage } from "./OrgPage";
+import { OrgPage, UNKNOWN_TREE_DETAIL } from "./OrgPage";
 import { orgResponse } from "./orgFixture";
 
 // The Org tab (docs/modules/solitaire-agile.md, "The web UI"): the tree the
@@ -82,13 +82,29 @@ describe("the chart, over the table's tree shaped like ours", () => {
     expect(wheres(vp)).toEqual(["on laptop"]);
   });
 
-  it("a vacant seat: the placeholder in the door, no bust, POSITION · vacant", () => {
+  it("a vacant seat: the empty desk in the door's opening, its mug by the seat, no bust", () => {
     draw();
     const lead = office("team-lead");
     const vacant = within(lead)
       .getAllByTestId("org-seat")
       .find((s) => s.dataset.state === "vacant")!;
-    expect(within(vacant).getByTestId("org-vacant-placeholder")).toBeTruthy();
+    const opening = within(vacant).getByTestId("org-vacant-desk");
+    expect(opening.tagName.toLowerCase()).toBe("foreignobject");
+    expect(opening.closest("svg")?.getAttribute("width")).toBe("124");
+    expect(opening.closest("svg")?.getAttribute("height")).toBe("104");
+    expect(["x", "y", "width", "height"].map((a) => opening.getAttribute(a))).toEqual([
+      "7",
+      "7",
+      "110",
+      "90",
+    ]);
+    const desk = within(vacant).getByTestId("empty-desk");
+    expect(desk.dataset.look).toBe("straw");
+    expect(desk.style.background).toBe("rgb(168, 219, 187)");
+    expect(within(desk).getByTestId("empty-desk-chair")).toBeTruthy();
+    expect(within(desk).getByTestId("empty-desk-mug")).toBeTruthy();
+    expect(within(desk).getByTestId("empty-desk-steam")).toBeTruthy();
+    expect(desk.querySelector("style")?.textContent).toContain("@keyframes ed-steam");
     expect(vacant.querySelector("svg[data-refined]")).toBeNull();
   });
 
@@ -190,6 +206,31 @@ describe("when there is no chart", () => {
     const alert = screen.getByRole("alert");
     expect(within(alert).getByText("The org chart could not be read")).toBeTruthy();
     expect(within(alert).getByText(message)).toBeTruthy();
+  });
+
+  it("a tree the file does not have (422): the page's own sentence, not the terminal's", () => {
+    const message = "-Tree names 'other', which is not a tree in org.json. Trees: ours.";
+    response = {
+      isLoading: false,
+      error: { status: 422, data: { detail: { kind: "unknown-tree", message } } },
+    };
+    draw();
+    const alert = screen.getByRole("alert");
+    expect(within(alert).getByText("That org chart is not in the file")).toBeTruthy();
+    expect(within(alert).getByText(UNKNOWN_TREE_DETAIL)).toBeTruthy();
+    expect(alert.textContent).not.toContain("-Tree");
+    expect(screen.queryByText(message)).toBeNull();
+    expect(screen.queryByTestId("org-chart")).toBeNull();
+  });
+
+  it("a 422 of another kind is not read as an unknown tree", () => {
+    response = {
+      isLoading: false,
+      error: { status: 422, data: { detail: { kind: "bad-query", message: "Nope." } } },
+    };
+    draw();
+    expect(screen.queryByText("That org chart is not in the file")).toBeNull();
+    expect(screen.getByText("Could not read the org chart")).toBeTruthy();
   });
 
   it("no answer from the agent: an error that says nothing was read", () => {

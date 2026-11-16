@@ -423,13 +423,17 @@ builders'). Each seat is a card -- a bust in the office's door and a plate under
 where the seat is (`toolkit on mini`, `on laptop`) when the file says. A position with several seats, the team
 lead's, is a row of cards in one office; a position with no seats is a pool, one wider card with a few faces,
 `POSITION · pool` and its default-model line; the owner's seat is a person, `Owner · <name>`, with no model. A
-staffed seat is in colour; a vacant one reads `POSITION · vacant` and is, for now, a placeholder the size of a
-staffed card ([Known gaps](#known-gaps)). Over an office with a prompt is the prompt's title (`promptTitle`),
+staffed seat is in colour; a vacant one reads `POSITION · vacant` and has the standup's empty desk in its door
+-- the chair pushed back, the desk and a steaming mug, on the level's wall dimmed -- the size of a staffed card,
+its mug picked from the seat's id so the same seat always has the same one. Over an office with a prompt is the prompt's title (`promptTitle`),
 and the office is a link to the prompt in the Studio's reading room (`promptPath(promptRef)`); the owner, the
 pool and a prompt the room does not list are not links. The faces are the web's choice, never the file's:
 `orgChart.ts` maps a position's id to its faces, as the mock staffs it, and a position it does not name takes
 its level's. With no `org.json` the page says `No org chart yet` and the agent's sentence; a file that fails its
-checks (409) is an error with its sentence; no answer is `Could not read the org chart`. The page chooses no
+checks (409) is an error with its sentence; a tree the file does not have (422, `unknown-tree`) is an error in
+the page's own words, `That org chart is not in the file` and `The chart asked for is not one of the trees in the
+hub's org.json. Nothing was drawn.`, decided by the kind and never the agent's sentence, which is the
+terminal's (the page asks for no tree today, so it meets this only if that changes); no answer is `Could not read the org chart`. The page chooses no
 tree, draws no `active` state and writes nothing. `OrgPage.test.tsx` and `orgChart.test.ts` draw the shared
 table's charts (`Tests/fixtures/org/charts/`).
 
@@ -1820,9 +1824,6 @@ Each of these is a block on [Known gaps](../KNOWN-GAPS.md), with its issue:
   and concatenates issues, and fails the whole read if any repo's read fails. Issue numbers from two
   repos could collide. Both are M0 choices; one rule belongs in the contract
   ([The terminal's standup refuses a Space with several repositories](../KNOWN-GAPS.md#the-terminals-standup-refuses-a-space-with-several-repositories)).
-- **The org chart's vacant seat is a placeholder.** The Org tab draws a seat nobody sits in as a dimmed office
-  with a dashed outline, not yet as the empty desk and its mug
-  ([The org chart's vacant seat is a placeholder](../KNOWN-GAPS.md#the-org-charts-vacant-seat-is-a-placeholder)).
 
 ### True by design
 

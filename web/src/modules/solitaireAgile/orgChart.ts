@@ -1,5 +1,7 @@
 import type { FaceId } from "../../shared/refinedFaces";
 import type { OrgPosition, OrgSeat } from "./api.solitaireAgile";
+import { MUG_LOOKS } from "./stage/EmptyDesk";
+import type { MugLook } from "./stage/EmptyDesk";
 
 // The Org page's rules, apart from its drawing: which face sits in which seat,
 // the colour of each level's walls, what a plate says, and where every office
@@ -85,6 +87,17 @@ export function plateWho(seat: OrgSeat): string {
 export function seatWhere(seat: OrgSeat): string {
   const on = seat.machine ? `on ${seat.machine}` : "";
   return [seat.space ?? "", on].filter(Boolean).join(" ");
+}
+
+/**
+ * The mug on a vacant seat's empty desk, from the seat's id: the same seat
+ * always has the same mug, and no clock is read. The standup deals its mugs by
+ * the day; a chart is not a day's, so it deals by the seat.
+ */
+export function vacantMug(seatId: string): MugLook {
+  let sum = 0;
+  for (const ch of seatId) sum = (sum + (ch.codePointAt(0) ?? 0)) % MUG_LOOKS.length;
+  return MUG_LOOKS[sum];
 }
 
 // -- Where each office goes -----------------------------------------------

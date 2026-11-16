@@ -235,8 +235,7 @@ even though the file is. That is the module rule, not a fault; to see the chart 
 
 No writer (`Config` and a `Staff` verb come later), no `active` drawn, no count of builders from the cards
 in flight, and no join with the standup's workers. The web's Org tab draws the tree the route serves
-([Team Agile, the web UI](../modules/solitaire-agile.md#the-web-ui)); its vacant seat is still a placeholder
-([Known gaps](../KNOWN-GAPS.md#the-org-charts-vacant-seat-is-a-placeholder)).
+([Team Agile, the web UI](../modules/solitaire-agile.md#the-web-ui)); a vacant seat is drawn as an empty desk.
 
 ## An example to copy
 

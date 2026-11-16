@@ -189,6 +189,7 @@ function Office({ office }: { office: PlacedOffice }) {
             seat.state === "vacant" ? (
               <VacantSeat
                 key={seat.id}
+                seatId={seat.id}
                 position={p.title}
                 level={p.level}
                 where={seatWhere(seat) || undefined}
@@ -270,8 +271,13 @@ export function orgRefusal(error: unknown): { status?: number | string } & Parti
   return { status: e?.status, message: typeof detail === "string" ? detail : undefined };
 }
 
-/** The no-chart states: no file (404), a file that fails its checks (409), and
- *  anything else as the error it is. */
+/** What the page says for a tree the org file does not have. */
+export const UNKNOWN_TREE_DETAIL =
+  "The chart asked for is not one of the trees in the hub's org.json. Nothing was drawn.";
+
+/** The no-chart states: no file (404), a file that fails its checks (409), a
+ *  tree the file does not have (422, said in the page's words: the agent's
+ *  sentence is the terminal's), and anything else as the error it is. */
 function noChart(error: unknown, icon: EmptyMessage["icon"]): EmptyMessage {
   const r = orgRefusal(error);
   if (r.status === 404 && (r.kind === "missing" || r.kind === "no-hub")) {
@@ -279,6 +285,14 @@ function noChart(error: unknown, icon: EmptyMessage["icon"]): EmptyMessage {
   }
   if (r.status === 409 && r.kind) {
     return { icon, tone: "error", title: "The org chart could not be read", detail: r.message };
+  }
+  if (r.status === 422 && r.kind === "unknown-tree") {
+    return {
+      icon,
+      tone: "error",
+      title: "That org chart is not in the file",
+      detail: UNKNOWN_TREE_DETAIL,
+    };
   }
   return {
     icon,

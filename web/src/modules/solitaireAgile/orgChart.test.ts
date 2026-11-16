@@ -12,7 +12,9 @@ import {
   positionFaces,
   seatFace,
   seatWhere,
+  vacantMug,
 } from "./orgChart";
+import { MUG_LOOKS } from "./stage/EmptyDesk";
 import { chartNames, orgResponse } from "./orgFixture";
 
 // The Org page's rules apart from its drawing, over the shared table's charts
@@ -77,6 +79,16 @@ describe("the walls and the plates", () => {
     expect(seatWhere(by("alpha"))).toBe("alpha on mini");
     expect(seatWhere(by("pm"))).toBe("on laptop");
     expect(seatWhere(by("owner"))).toBe("");
+  });
+});
+
+describe("a vacant seat's mug", () => {
+  it("comes from the seat's id: the same seat the same mug, every look reachable", () => {
+    expect(vacantMug("gamma")).toBe("straw");
+    expect(vacantMug("gamma")).toBe(vacantMug("gamma"));
+    expect(vacantMug("")).toBe(MUG_LOOKS[0]);
+    const seen = new Set(Array.from({ length: 64 }, (_, i) => vacantMug(`seat-${i}`)));
+    expect(seen).toEqual(new Set(MUG_LOOKS));
   });
 });
 
