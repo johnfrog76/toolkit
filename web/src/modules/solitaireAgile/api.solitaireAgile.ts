@@ -64,8 +64,17 @@ export interface StandupWorker {
   blockers: RitualItem[];
   /** All three slots empty: the worker renders the mug and its one status sentence. */
   empty: boolean;
-  /** The empty worker's status sentence (the `nothing` family). The name is historical. */
+  /** The empty worker's status sentence: the first of `status`, kept for a reader that
+   *  knows only this field. The name is historical. */
   excuse: string;
+  /** The empty worker's two made-up items, `[yesterday, today]` (the `nothing` and
+   *  `nothingToday` families); `[]` for a worker with something to say. */
+  status: string[];
+  /** In the room today (the team size, docs/modules/solitaire-agile.md, "The team
+   *  size: who is in the room"): the round -- `work.workers`, the stage -- is the
+   *  present only; the detail and the brief keep every worker. Absent from an agent
+   *  that predates the room, which reads as present. */
+  present?: boolean;
 }
 
 /** One group at the work grain (D-TA20): what a slot's items belong to --
@@ -86,9 +95,11 @@ export interface WorkWorker {
   yesterday: WorkGroup[];
   today: WorkGroup[];
   blockers: WorkGroup[];
-  /** The prose: this worker's sentences, in order -- one a group, then
-   *  "Nothing blocked." when it has something to say and no blockers; empty
-   *  for a worker with nothing, who is its status sentence. */
+  /** The prose: this worker's turn, in order -- `turnOpen`, one sentence a
+   *  group, a slot with nothing beside one with something its fixed line
+   *  (`proseYesterdayNone`, `proseYesterdayWorked`, `proseTodayNone`), a worker
+   *  with nothing at all its two made-up items, then `proseBlockersNone` when
+   *  nothing blocks it, then `turnClose`. */
   prose: string[];
 }
 
@@ -98,6 +109,11 @@ export interface StandupWork {
   workers: WorkWorker[];
   /** The prose: the queue's sentences, one a group, kind by kind. */
   queueProse: string[];
+  /** The chair's own turn, last, in the workers' frame and its own first person:
+   *  `turnOpen`, its yesterday (what you walked, else a made-up line), its today
+   *  (what waits, kind by kind, or `chairTodayNone`), `proseBlockersNone`,
+   *  `turnClose`. Never the queue's sentences again. Absent from an agent that predates it. */
+  chairProse?: string[];
   /** One line for the queue and one a worker, each its sentences, LF-joined --
    *  the same string `Standup -Grain work` prints. */
   text: string;
@@ -126,7 +142,14 @@ export interface StandupResponse {
   source?: "issues" | "cards" | "both" | "none";
   /** false: no tracker answered. The ritual still happens (principle 3). */
   tracker: { ok: boolean; reason: string };
-  chair: { open: string; close: string };
+  /** The chair's two phrasebook lines, and `walked`: the walk items closed inside
+   *  the window, by number -- what the chair's turn says it walked. `walked` is
+   *  absent from an agent that predates it. */
+  chair: { open: string; close: string; walked?: RitualItem[] };
+  /** The room: its windows, the chair included (`spaces.<slug>.features.teamSize`,
+   *  3, 6 or 9, unset 9) -- `size - 1` workers sit. The web never reads the setting;
+   *  it draws what this says. Absent from an agent that predates it. */
+  team?: { size: number };
   queue: { walk: QueueItem[]; decide: QueueItem[]; look: QueueItem[] };
   workers: StandupWorker[];
   /** The work grain: the items grouped, one phrase a group. Absent from

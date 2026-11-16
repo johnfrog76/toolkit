@@ -535,6 +535,28 @@ foreach ($case in $sugCases) {
     Assert-True "the Suggestions row, $($case.Name): $($case.State), and the line that changes it" ($sugRow -and $sugRow.state -ceq $case.State -and ([string]$sugRow.config).EndsWith($case.Line)) "$($sugRow.state) | $($sugRow.config) | $($sugRow.note)"
 }
 
+# The team size (spaces[].features.teamSize): a NUMBER the Space states. It rides
+# Team Agile as the suggestion's row does: off, saying so, where Team Agile is off
+# (the switch, or the Space's howIWork, resolved before the row is read); where it
+# is on, on with the number or not configured (the room is then nine), and a value
+# that is not a size reads unset and the note says so. Read off the active Space.
+$teamCases = @(
+    @{ Name = 'Team Agile off, nothing set'; TeamAgile = $false; Space = [pscustomobject]@{ slug = 'gh' }; State = 'off'; Note = 'rides Team Agile, which is off in gh' },
+    @{ Name = 'Team Agile off, set 3'; TeamAgile = $false; Space = [pscustomobject]@{ slug = 'gh'; features = [pscustomobject]@{ teamSize = 3 } }; State = 'off'; Note = 'rides Team Agile, which is off in gh' },
+    @{ Name = 'nothing set'; Space = [pscustomobject]@{ slug = 'gh' }; State = 'not configured'; Note = '9 in the room by default' },
+    @{ Name = 'set 3'; Space = [pscustomobject]@{ slug = 'gh'; features = [pscustomobject]@{ teamSize = 3 } }; State = 'on'; Note = '3 in the room -- the chair and 2 members' },
+    @{ Name = 'set 6'; Space = [pscustomobject]@{ slug = 'gh'; features = [pscustomobject]@{ teamSize = 6 } }; State = 'on'; Note = '6 in the room -- the chair and 5 members' },
+    @{ Name = 'a stored 4'; Space = [pscustomobject]@{ slug = 'gh'; features = [pscustomobject]@{ teamSize = 4 } }; State = 'not configured'; Note = "'4' is not a team size (3, 6, 9), so the room is 9" }
+)
+foreach ($case in $teamCases) {
+    $teamAgile = $true
+    if ($case.ContainsKey('TeamAgile')) { $teamAgile = [bool]$case.TeamAgile }
+    $rowsNow = @(Get-P20OptionalSurfaces -Config @{ ActiveSpace = 'gh'; Spaces = @($case.Space) } -Features @{ solitaireAgile = $teamAgile } -Prefix 'tk' -PackageRoot $pkgRoot)
+    $teamRow = @($rowsNow | Where-Object { $_.key -eq 'teamSize' })[0]
+    Assert-True "the Team size row, $($case.Name): $($case.State), its note, and the line that changes it" ($teamRow -and $teamRow.state -ceq $case.State -and ([string]$teamRow.note).StartsWith($case.Note) -and ([string]$teamRow.config).EndsWith('spaces.gh.features.teamSize=<3|6|9> -Hub')) "$($teamRow.state) | $($teamRow.config) | $($teamRow.note)"
+}
+Assert-True 'the Team size row asks its question, naming the Space' (@(Get-P20OptionalSurfaces -Config @{ ActiveSpace = 'gh'; Spaces = @([pscustomobject]@{ slug = 'gh'; name = 'GH' }) } -Features @{} -Prefix 'tk' -PackageRoot $pkgRoot | Where-Object { $_.key -eq 'teamSize' -and ([string]$_.question).StartsWith('How many are in my standup in ') }).Count -eq 1)
+
 $howCases = @(
     @{ Space = 'envgh';    On = 'True';  Row = 'Team Agile module\s+on \(chosen: with agents in envgh\)'; Line = 'spaces\.envgh\.howIWork=alone -Hub' },
     @{ Space = 'envfresh'; On = 'False'; Row = 'Team Agile module\s+not configured \(nobody has answered for envfresh'; Line = 'spaces\.envfresh\.howIWork=agents -Hub' },

@@ -111,6 +111,27 @@ export function answerTarget(entry: WorkflowEntry, activeSpace: string): string 
   return entry.answerKey?.replace("{slug}", activeSpace || "<slug>");
 }
 
+/** Whether an entry asks How do you want to work here? -- the one whose answer
+ *  the agent resolves (/env howIWork) rather than reads off the Space. */
+export function asksHowIWork(entry: WorkflowEntry): boolean {
+  return !!entry.answerKey?.endsWith(".howIWork");
+}
+
+/** The value a Space's own entry holds at an asking entry's key -- the key after
+ *  `spaces.{slug}.`, walked through the entry /env declares -- as the string an
+ *  answer's `value` is; undefined while it is unset, or for a key that is not a
+ *  Space's. What is checked for any entry but howIWork (D-W1: one list). */
+export function answerStored(entry: WorkflowEntry, space: object | undefined): string | undefined {
+  const prefix = "spaces.{slug}.";
+  if (!space || !entry.answerKey?.startsWith(prefix)) return undefined;
+  let at: unknown = space;
+  for (const part of entry.answerKey.slice(prefix.length).split(".")) {
+    if (!at || typeof at !== "object") return undefined;
+    at = (at as Record<string, unknown>)[part];
+  }
+  return typeof at === "string" || typeof at === "number" ? String(at) : undefined;
+}
+
 /** Whether an answer can be picked on a Space whose tracker is `tracker`: the
  *  rule's other half is the agent's (how_i_work) -- an answer is never live
  *  where the Space's answer is LOCKED, which /env says. */

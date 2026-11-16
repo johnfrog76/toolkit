@@ -743,7 +743,14 @@ foreach ($pair in (ConvertTo-SetPairs $Set)) {
     }
     $checked = Test-P20ConfigValue -Row $row -Value $rawValue
     if (-not $checked.Ok) {
-        Deny $checked.Reason 'Run Config -Schema to see the values this setting takes.'
+        # A setting with a short list of values names them in the hint too.
+        $valueHint = 'Run Config -Schema to see the values this setting takes.'
+        $rowAllowed = @($row.allowed | Where-Object { $null -ne $_ -and [string]$_ -ne '' } | ForEach-Object { [string]$_ })
+        if ($row.type -eq 'int' -and $rowAllowed.Count -gt 0) {
+            $valueHint = "It takes $($rowAllowed -join ', '): $($cliPrefix)Config -Set $key=$($rowAllowed[-1])"
+            if ($resolvedKey.Slug -and -not $Local) { $valueHint += ' -Hub' }
+        }
+        Deny $checked.Reason $valueHint
     }
     $value = $checked.Value
 

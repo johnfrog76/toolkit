@@ -52,9 +52,14 @@ def _labels(case: dict) -> list[dict]:
     return TABLE["workerLabels"] if case["labels"] == "workerLabels" else case["labels"]
 
 
-def _fill(case: dict) -> "standup.Standup":
+def _fill(case: dict, size=None) -> "standup.Standup":
     filled = standup.fill_standup(
-        datetime.fromisoformat(case["asOf"]), _labels(case), case["issues"], case["tracker"], space="toolkit"
+        datetime.fromisoformat(case["asOf"]),
+        _labels(case),
+        case["issues"],
+        case["tracker"],
+        space="toolkit",
+        size=size,
     )
     filled.text = standup.render_standup(filled)
     return filled
@@ -69,6 +74,27 @@ def _tracker_word(line: str) -> str:
         if re.search(r"\b" + r"\s+".join(re.escape(part) for part in word.split()) + r"\b", line, re.IGNORECASE):
             return word
     return ""
+
+
+def _idle_said(exp: dict) -> tuple[str, list[str]]:
+    """A fixture worker row's ``excuse`` and ``status``, from its two indexes: an idle
+    worker says nothing[nothingIndex] and nothingToday[nothingTodayIndex], and its
+    excuse is the first; a worker with something to say has neither."""
+    if exp["nothingIndex"] is None:
+        assert exp["nothingTodayIndex"] is None, exp
+        return "", []
+    pair = [VOCAB["nothing"][exp["nothingIndex"]], VOCAB["nothingToday"][exp["nothingTodayIndex"]]]
+    return pair[0], pair
+
+
+def _indexes(w) -> dict:
+    """A filled worker's two indexes into the made-up families, as a fixture row states them."""
+    if not w.status:
+        return {"nothingIndex": None, "nothingTodayIndex": None}
+    return {
+        "nothingIndex": VOCAB["nothing"].index(w.status[0]),
+        "nothingTodayIndex": VOCAB["nothingToday"].index(w.status[1]),
+    }
 
 
 def _golden(name: str) -> str:
@@ -121,10 +147,7 @@ class TheTable(unittest.TestCase):
                     self.assertEqual([i.number for i in got.today], exp["today"])
                     self.assertEqual([i.number for i in got.blockers], exp["blockers"])
                     self.assertEqual(got.empty, exp["empty"])
-                    if exp["nothingIndex"] is None:
-                        self.assertEqual(got.excuse, "")
-                    else:
-                        self.assertEqual(got.excuse, VOCAB["nothing"][exp["nothingIndex"]])
+                    self.assertEqual((got.excuse, got.status), _idle_said(exp))
 
     def test_the_text_is_the_golden_file_byte_for_byte(self):
         for name, case in CASES.items():
@@ -174,9 +197,11 @@ class TheTable(unittest.TestCase):
         self.assertNotIn('"excuses"', source)
 
     def test_an_empty_worker_reports_the_nothing_sentence_in_both_registers_of_text(self):
-        """Empty is the vocabulary's `nothing` line at (day of year + position) mod
-        length -- in the worker and the long text; two idle workers on one day say different lines."""
-        nothing = VOCAB["nothing"]
+        """Empty is two made-up items, the vocabulary's `nothing` line and its `nothingToday`
+        line, each at (day of year + position) mod its own length -- on the wire as
+        ``status``, with ``excuse`` its first, which the long text says; two idle workers on
+        one day say different lines."""
+        nothing, today = VOCAB["nothing"], VOCAB["nothingToday"]
         for name in ("friday", "monday"):
             case = CASES[name]
             d = case["expected"]["dayOfYear"]
@@ -185,23 +210,43 @@ class TheTable(unittest.TestCase):
             self.assertTrue(empties, name)
             for i, w in empties:
                 with self.subTest(case=name, worker=w.label):
-                    self.assertEqual(w.excuse, nothing[(d + i) % len(nothing)])
-                    self.assertIn(f'Mug        "{w.excuse}"', filled.text)
-        monday = [w.excuse for w in _fill(CASES["monday"]).workers if w.empty]
+                    self.assertEqual(w.status, [nothing[(d + i) % len(nothing)], today[(d + i) % len(today)]])
+                    self.assertEqual(w.excuse, w.status[0])
+                    row = C.rituals_text()["mug"].ljust(C.rituals_label_width())
+                    self.assertIn(f'  {row}  "{w.excuse}"', filled.text)
+        monday = [w.status for w in _fill(CASES["monday"]).workers if w.empty]
         self.assertEqual(len(monday), 2)
-        self.assertNotEqual(monday[0], monday[1])
+        self.assertNotEqual(monday[0][0], monday[1][0])
+        self.assertNotEqual(monday[0][1], monday[1][1])
+        for w in _fill(CASES["friday"]).workers:
+            if not w.empty:
+                with self.subTest(worker=w.label):
+                    self.assertEqual((w.excuse, w.status), ("", []))
 
     def test_no_nothing_line_claims_tracker_work(self):
-        """A `nothing` line is the day around the work and never names what the tracker
-        would show -- no word of standup-nothing-banned.json, whole word, any case; the same list
-        tkTestToolkit -Rituals reads. More than one line, and none twice, so the pick rotates."""
-        nothing = VOCAB["nothing"]
-        self.assertGreater(len(nothing), 1)
-        self.assertEqual(len(nothing), len(set(nothing)), "a nothing line appears twice")
+        """A `nothing` or `nothingToday` line is the day around the work and never names what
+        the tracker would show -- no word of standup-nothing-banned.json, whole word, any case;
+        the same list tkTestToolkit -Rituals reads. Each family has more than one line, and none
+        twice, so the pick rotates."""
         self.assertTrue(NOTHING_BANNED)
-        for line in nothing:
-            with self.subTest(line=line):
-                self.assertEqual(_tracker_word(line), "", line)
+        for family in ("nothing", "nothingToday"):
+            lines = VOCAB[family]
+            with self.subTest(family=family):
+                self.assertGreater(len(lines), 1)
+                self.assertEqual(len(lines), len(set(lines)), f"a {family} line appears twice")
+            for line in lines:
+                with self.subTest(family=family, line=line):
+                    self.assertEqual(_tracker_word(line), "", line)
+
+    def test_the_two_made_up_families_are_apart_and_never_in_step(self):
+        """A worker's yesterday and today are two different items: no sentence is in both
+        families, and their lengths share no factor, so the pair a worker says does not
+        repeat in step."""
+        from math import gcd
+
+        nothing, today = VOCAB["nothing"], VOCAB["nothingToday"]
+        self.assertEqual(sorted(set(nothing) & set(today)), [])
+        self.assertEqual(gcd(len(nothing), len(today)), 1, (len(nothing), len(today)))
 
     def test_the_tracker_word_guard_has_teeth(self):
         """The guard's own rule over made-up lines: a banned word anywhere, in any case, is caught;
@@ -214,13 +259,24 @@ class TheTable(unittest.TestCase):
                 self.assertEqual(_tracker_word(line), "")
 
     def test_the_nothing_family_is_picked_deterministically(self):
-        """index = (day of year + position) mod length, so a longer family rotates."""
-        longer = dict(VOCAB, nothing=["A.", "B.", "C."])
+        """index = (day of year + position) mod length, each family by its own length, so a
+        longer family rotates; the cards tile is picked by its position the same way."""
+        longer = dict(VOCAB, nothing=["A.", "B.", "C."], nothingToday=["X.", "Y."])
         for as_of, d in (("2026-10-02T09:00:00-04:00", 275), ("2026-10-03T09:00:00-04:00", 276)):
             with mock.patch.object(standup, "vocabulary", return_value=longer):
                 labels = [{"name": f"w{i}", "description": C.rituals_worker_label_prefix() + f"W{i}"} for i in range(3)]
                 filled = standup.fill_standup(datetime.fromisoformat(as_of), labels, [], {"ok": True, "reason": ""})
-            self.assertEqual([w.excuse for w in filled.workers], [longer["nothing"][(d + i) % 3] for i in range(3)])
+                cards = standup.fill_cards_standup(datetime.fromisoformat(as_of), [], space="widgets")
+            want = [[longer["nothing"][(d + i) % 3], longer["nothingToday"][(d + i) % 2]] for i in range(3)]
+            self.assertEqual([w.status for w in filled.workers], want)
+            self.assertEqual([w.excuse for w in filled.workers], [p[0] for p in want])
+            self.assertEqual([w.status for w in cards.workers], want[:1])
+        later = [standup.Worker(label=f"w{i}", name=f"W{i}", empty=True) for i in range(3)]
+        standup.set_idle(later, 275, longer)
+        self.assertEqual([w.status for w in later], [["C.", "Y."], ["A.", "X."], ["B.", "Y."]])
+        without = [standup.Worker(label="w", name="W", empty=True)]
+        standup.set_idle(without, 275, dict(longer, nothingToday=[]))
+        self.assertEqual((without[0].excuse, without[0].status), ("", []))
 
     def test_the_tracker_reason_is_in_the_text_when_it_does_not_answer(self):
         filled = _fill(CASES["no-tracker"])
@@ -343,8 +399,7 @@ class TheCardsTable(unittest.TestCase):
                 self.assertEqual([i.id for i in w.today], exp["today"])
                 self.assertEqual([i.id for i in w.blockers], exp["blockers"])
                 self.assertEqual(w.empty, exp["empty"])
-                want_excuse = "" if exp["nothingIndex"] is None else VOCAB["nothing"][exp["nothingIndex"]]
-                self.assertEqual(w.excuse, want_excuse)
+                self.assertEqual((w.excuse, w.status), _idle_said(exp))
 
     def test_a_card_item_has_an_id_and_a_path_and_no_number_or_url(self):
         filled = _fill_cards(CARD_CASES["friday"])
@@ -639,6 +694,7 @@ class TheJoinedTable(unittest.TestCase):
                     "name": w.name,
                     **{slot: [_ref(i) for i in getattr(w, slot)] for slot in ("yesterday", "today", "blockers")},
                     "empty": w.empty,
+                    **_indexes(w),
                 }
                 for w in filled.workers
             ]
@@ -839,6 +895,19 @@ def _fill_prose(case: dict) -> "standup.Standup":
     at = datetime.fromisoformat(case["asOf"])
     if case["source"] == "cards":
         filled = standup.fill_cards_standup(at, case["cards"], space=case["space"], space_name=case["spaceName"])
+    elif case["source"] == "both":
+        # The joined fill, with the case's dates read when it has one (absent is not read).
+        filled = standup.fill_joined_standup(
+            at,
+            PROSE_TABLE["workerLabels"],
+            case["issues"],
+            case["tracker"],
+            case["cards"],
+            space=case["space"],
+            space_name=case["spaceName"],
+            commit_dates=case.get("commitDates"),
+            issue_starts=case.get("issueStarts"),
+        )
     else:
         filled = standup.fill_standup(at, PROSE_TABLE["workerLabels"], case["issues"], case["tracker"])
     filled.text = standup.render_standup(filled)
@@ -851,7 +920,76 @@ class TheProseTable(unittest.TestCase):
     -Rituals asserts against Get-P20StandupProseSentence and Format-P20StandupWork."""
 
     def test_the_table_has_its_cases(self):
-        self.assertEqual(set(PROSE_CASES), {"friday", "quiet", "no-tracker", "cards", "eight-groups"})
+        self.assertEqual(
+            set(PROSE_CASES),
+            {"friday", "quiet", "no-tracker", "cards", "eight-groups", "walked", "one-slot", "worked", "cards-worked"},
+        )
+
+    def test_every_unsaid_row(self):
+        """A slot a member with something to say has nothing in says its fixed line,
+        or for yesterday the refs of its open items worked in the window -- named up to
+        proseFoldNames, counted past it -- and never a made-up item."""
+        rows = PROSE_TABLE["unsaid"]
+        limit = C.rituals_prose_fold_names()
+        sizes = {len(r["worked"]) for r in rows if r["slot"] == "yesterday"}
+        self.assertTrue({0, 1, 2, limit, limit + 1} <= sizes, "a row each side of every edge")
+        made_up = set(VOCAB["nothing"] + VOCAB["nothingToday"])
+        for row in rows:
+            with self.subTest(slot=row["slot"], worked=row["worked"]):
+                self.assertEqual(standup.prose_unsaid(row["slot"], row["worked"]), row["lines"])
+                self.assertFalse(set(row["lines"]) & made_up)
+
+    def test_an_item_worked_in_the_window_is_a_start_or_a_dated_commit(self):
+        """The real yesterday: an open item whose work began in the window, or whose card
+        threads a commit authored in it -- known only where the dates were read. An item
+        merely in progress, or with commits nobody dated, is no fact; a closed one is yesterday's."""
+        rows = PROSE_TABLE["itemWorked"]
+        self.assertEqual({r["motion"] for r in rows}, set(C.rituals_motions()), "a row for every motion")
+        for row in rows:
+            with self.subTest(row=row):
+                item = standup.SlotItem(number=1, motion=row["motion"], commits=row["commits"])
+                self.assertEqual(standup.item_worked(item, row["dated"]), row["worked"])
+
+    def test_a_member_with_something_has_a_yesterday_and_a_today(self):
+        """Every present member that is not idle says a yesterday and a today: its real
+        sentences, else the fixed line for the slot (prose_unsaid) -- the made-up lists
+        are only an idle member's."""
+        t = C.rituals_text()
+        made_up = set(VOCAB["nothing"] + VOCAB["nothingToday"])
+        unsaid = {t["proseYesterdayNone"], t["proseTodayNone"]}
+        for name, case in PROSE_CASES.items():
+            filled = _fill_prose(case)
+            grained = {w.label: w for w in filled.work.workers}
+            for w in (w for w in filled.workers if w.present and not w.empty):
+                prose = grained[w.label].prose
+                with self.subTest(case=name, worker=w.label):
+                    self.assertTrue(prose[1].startswith("Yesterday I "), prose)
+                    self.assertTrue(any(x.startswith(("Today I'm on", "Today I'll")) for x in prose), prose)
+                    self.assertFalse(set(prose) & made_up)
+                    if not w.yesterday:
+                        self.assertTrue(prose[1] in unsaid or prose[1].startswith("Yesterday I worked on"), prose)
+                    if not w.today:
+                        self.assertIn(t["proseTodayNone"], prose)
+                    else:
+                        self.assertNotIn(t["proseTodayNone"], prose)
+
+    def test_the_four_branches_are_in_the_table(self):
+        """Missing today; missing yesterday with a real fact (a start, a dated commit, a
+        timeline, a card's start) and with none; blockers only -- each pinned by a case."""
+        t = C.rituals_text()
+        turns = {(n, w.label): w.prose for n, c in PROSE_CASES.items() for w in _fill_prose(c).work.workers}
+        one = {k[1]: v for k, v in turns.items() if k[0] == "one-slot"}
+        self.assertEqual(one["fable"][1:3], [t["proseYesterdayNone"], t["proseTodayNone"]], "blockers only")
+        self.assertEqual(one["opus"][2], t["proseTodayNone"], "missing today")
+        self.assertEqual(one["sonnet"][1], t["proseYesterdayNone"], "missing yesterday, no fact")
+        worked = {k[1]: v[1] for k, v in turns.items() if k[0] == "worked"}
+        self.assertEqual(worked["fable"], t["proseYesterdayWorked"].replace("{refs}", "#911"), "a card's start")
+        self.assertEqual(worked["opus"], t["proseYesterdayWorked"].replace("{refs}", "#921"), "a dated commit")
+        self.assertEqual(
+            worked["sonnet"], t["proseYesterdayWorkedMany"].replace("{n}", C.rituals_number_words()[5]), "timelines"
+        )
+        cards = turns[("cards-worked", "widgets")][1]
+        self.assertEqual(cards, t["proseYesterdayWorked"].replace("{refs}", "150"), "undated commits are no fact")
 
     def test_every_fold_row(self):
         """The also-ons fold (D-SA9): one sentence for the groups after today's first --
@@ -897,6 +1035,79 @@ class TheProseTable(unittest.TestCase):
             with self.subTest(case=name):
                 self.assertEqual(got, case["expected"]["workers"])
 
+    def test_the_chairs_own_turn(self):
+        """The chair gives its status last, in the workers' frame and its own first
+        person: a yesterday, a today, no blockers; no turn when no tracker answered."""
+        for name, case in PROSE_CASES.items():
+            with self.subTest(case=name):
+                self.assertEqual(_fill_prose(case).work.chairProse, case["expected"]["chair"])
+
+    def test_every_chair_yesterday_row(self):
+        rows = PROSE_TABLE["chairYesterday"]
+        limit = C.rituals_prose_fold_names()
+        self.assertTrue(
+            {0, 1, 2, limit, limit + 1} <= {len(r["walked"]) for r in rows}, "a row each side of every edge"
+        )
+        for row in rows:
+            with self.subTest(sentence=row["sentence"]):
+                self.assertEqual(standup.chair_yesterday(row["walked"], row["day"], row["workers"]), row["sentence"])
+
+    def test_a_chair_with_nothing_walked_takes_the_place_after_the_last_worker(self):
+        nothing = VOCAB["nothing"]
+        for row in (r for r in PROSE_TABLE["chairYesterday"] if not r["walked"]):
+            with self.subTest(day=row["day"], workers=row["workers"]):
+                self.assertEqual(row["sentence"], nothing[(row["day"] + row["workers"]) % len(nothing)])
+
+    def test_every_chair_today_row(self):
+        for row in PROSE_TABLE["chairToday"]:
+            with self.subTest(sentence=row["sentence"]):
+                self.assertEqual(standup.chair_today(row["queue"]), row["sentence"])
+
+    def test_the_chair_never_says_the_board_or_you(self):
+        """Its own voice: no queue sentence again, and never the word "you"."""
+        for name, case in PROSE_CASES.items():
+            filled = _fill_prose(case)
+            with self.subTest(case=name):
+                self.assertFalse(set(filled.work.chairProse) & set(filled.work.queueProse))
+                self.assertFalse([x for x in filled.work.chairProse if re.search(r"\byou\b", x, re.IGNORECASE)])
+        for row in PROSE_TABLE["chairYesterday"] + PROSE_TABLE["chairToday"]:
+            with self.subTest(sentence=row["sentence"]):
+                self.assertNotRegex(row["sentence"], r"(?i)\byou\b")
+
+    def test_the_chair_walked_what_closed_with_the_walk_label_in_the_window(self):
+        """chair.walked: the walk items closed inside the window, worker or none, by number."""
+        got = {name: [i.number for i in _fill_prose(case).chair.walked] for name, case in PROSE_CASES.items()}
+        self.assertEqual(got["walked"], [530, 531])
+        self.assertEqual({k: v for k, v in got.items() if k != "walked"}, {k: [] for k in got if k != "walked"})
+
+    def test_every_turn_is_in_the_frame(self):
+        """turnOpen first, turnClose last, for every worker that says anything and for the chair."""
+        t = C.rituals_text()
+        for name, case in PROSE_CASES.items():
+            filled = _fill_prose(case)
+            for said in [w.prose for w in filled.work.workers] + [filled.work.chairProse]:
+                if not said:
+                    continue
+                with self.subTest(case=name, said=said[1]):
+                    self.assertEqual((said[0], said[-1]), (t["turnOpen"], t["turnClose"]))
+
+    def test_an_idle_worker_says_its_two_items_in_the_frame(self):
+        """A worker with nothing on the tracker says its status -- yesterday, then today --
+        and no blockers, inside the frame; never a made-up item beside a real one."""
+        t = C.rituals_text()
+        for name, case in PROSE_CASES.items():
+            filled = _fill_prose(case)
+            grained = {w.label: w for w in filled.work.workers}
+            for w in filled.workers:
+                with self.subTest(case=name, worker=w.label):
+                    if w.empty:
+                        self.assertEqual(
+                            grained[w.label].prose,
+                            [t["turnOpen"], *w.status, t["proseBlockersNone"], t["turnClose"]],
+                        )
+                    else:
+                        self.assertFalse(set(grained[w.label].prose) & set(VOCAB["nothing"] + VOCAB["nothingToday"]))
+
     def test_the_work_text_is_the_golden_file_byte_for_byte(self):
         for name, case in PROSE_CASES.items():
             with self.subTest(case=name):
@@ -904,11 +1115,16 @@ class TheProseTable(unittest.TestCase):
 
     def test_the_issues_example_sentences(self):
         """The prose grain's own words: "Yesterday I closed two in Team Agile (...). Today I'm on the Studio:
-        #<n>, the archived-repository mark. Nothing blocked." -- as this table spells them."""
+        #<n>, the archived-repository mark. No blockers." -- as this table spells them, in the turn's frame."""
+        t = C.rituals_text()
         text = _fill_prose(PROSE_CASES["friday"]).work.text
-        self.assertIn("Opus: Yesterday I closed two in Team Agile (#501, #502). ", text)
-        self.assertIn("Fable: Today I'm on the Studio: #511, the archived-repository mark. ", text)
-        self.assertIn(" Nothing blocked.\n", text)
+        self.assertIn(f"Opus: {t['turnOpen']} Yesterday I closed two in Team Agile (#501, #502). ", text)
+        self.assertIn(
+            f"Fable: {t['turnOpen']} {t['proseYesterdayNone']} "
+            "Today I'm on the Studio: #511, the archived-repository mark. ",
+            text,
+        )
+        self.assertIn(f" {t['proseBlockersNone']} {t['turnClose']}\n", text)
 
     def test_the_json_round_trip_renders_the_same_text(self):
         for name, case in PROSE_CASES.items():
@@ -967,6 +1183,89 @@ def _answering(reply: dict):
     return complete, calls
 
 
+TEAM_TABLE = json.loads((FIXTURES / "standup-team.json").read_text(encoding="utf-8"))
+
+
+def _fill_team(case: dict) -> "standup.Standup":
+    """A standup-team.json case: the issues fill over the table's labels with its stored teamSize."""
+    filled = standup.fill_standup(
+        datetime.fromisoformat(case["asOf"]),
+        TEAM_TABLE["workerLabels"],
+        case["issues"],
+        {"ok": True, "reason": ""},
+        space="widgets",
+        size=case["teamSize"],
+    )
+    filled.text = standup.render_standup(filled)
+    filled.work.text = standup.render_work(filled)
+    filled.brief = standup.render_brief(filled)
+    return filled
+
+
+class TheTeamTable(unittest.TestCase):
+    """Every row of standup-team.json -- the same rows tkTestToolkit -Rituals asserts
+    against Get-P20TeamSize, Set-P20StandupPresent and Invoke-P20StandupFill."""
+
+    def test_the_table_has_its_sections(self):
+        self.assertGreaterEqual(len(TEAM_TABLE["sizes"]), 8)
+        self.assertGreaterEqual(len(TEAM_TABLE["seats"]), 6)
+        self.assertEqual({c["name"] for c in TEAM_TABLE["cases"]}, {"absent", "idle-sits", "unset", "work-unsaid"})
+
+    def test_every_size_row(self):
+        for row in TEAM_TABLE["sizes"]:
+            with self.subTest(stored=row["stored"]):
+                self.assertEqual(standup.team_size(row["stored"]), row["size"])
+                self.assertEqual(row["stored"] == row["size"] and not isinstance(row["stored"], bool), row["set"])
+
+    def test_the_sizes_and_the_default_are_the_contracts(self):
+        self.assertEqual(standup.team_size(None), C.rituals_team_size_default())
+        for n in C.rituals_team_sizes():
+            self.assertEqual(standup.team_size(n), n)
+
+    def test_every_seat_row(self):
+        for row in TEAM_TABLE["seats"]:
+            with self.subTest(row=row["name"]):
+                workers = [standup.Worker(label=w["label"], name=w["label"], empty=w["empty"]) for w in row["workers"]]
+                standup.set_present(workers, row["size"])
+                self.assertEqual([w.label for w in workers], [w["label"] for w in row["workers"]], "the order is kept")
+                self.assertEqual([w.label for w in workers if w.present], row["present"])
+
+    def test_every_case_end_to_end(self):
+        for case in TEAM_TABLE["cases"]:
+            exp = case["expected"]
+            with self.subTest(case=case["name"]):
+                filled = _fill_team(case)
+                self.assertEqual(filled.team.model_dump(), exp["team"])
+                got = [
+                    {"label": w.label, "name": w.name, "empty": w.empty, "present": w.present} for w in filled.workers
+                ]
+                self.assertEqual(got, exp["workers"])
+                # The round is the present only, in the workers' order.
+                self.assertEqual(
+                    [w.label for w in filled.work.workers], [w["label"] for w in exp["workers"] if w["present"]]
+                )
+                # The counts keep every worker.
+                self.assertEqual([c.label for c in filled.counts.workers], [w["label"] for w in exp["workers"]])
+                self.assertEqual(filled.text, _golden(exp["text"]))
+                self.assertEqual(filled.work.text, _golden(exp["work"]))
+                self.assertEqual(filled.brief, _golden(exp["brief"]))
+                # The dress is offered the present only: an absent worker's facts are never asked for.
+                said = {f["id"].split("/")[0] for f in standup.dress_facts(filled)}
+                self.assertTrue(said <= {w["label"] for w in exp["workers"] if w["present"]}, said)
+
+    def test_an_absent_worker_keeps_its_made_up_items_by_its_label_position(self):
+        """The idle pick's i is the worker's place in the label order, whoever is absent:
+        a worker's made-up items do not move when the room's size does."""
+        case = next(c for c in TEAM_TABLE["cases"] if c["name"] == "absent")
+        small = _fill_team(case)
+        whole = _fill_team({**case, "teamSize": None})
+        self.assertEqual([w.status for w in small.workers], [w.status for w in whole.workers])
+
+    def test_the_cards_tile_and_the_joined_tile_are_seated_too(self):
+        cards = standup.fill_cards_standup(datetime.fromisoformat("2026-10-02T09:00:00-04:00"), [], space="s", size=3)
+        self.assertEqual((cards.team.size, [w.present for w in cards.workers]), (3, [True]))
+
+
 class TheDressTable(unittest.TestCase):
     """Every row of standup-dress.json -- the same rows tkTestToolkit -Rituals asserts
     against Test-P20StandupDress -- and the dress around it, the model stubbed: no
@@ -1006,25 +1305,24 @@ class TheDressTable(unittest.TestCase):
         )
 
     def test_a_reply_that_names_999_keeps_the_prose_for_that_group(self):
+        """The groups' ids are their places in a turn: the opener is place 0 and is never dressed."""
         reply = DRESS_TABLE["reply"]
-        filled = standup.Standup(
-            work=standup.Work(
-                workers=[
-                    standup.WorkWorker(
-                        label="opus", name="Opus", prose=[g["floor"] for g in DRESS_GROUPS] + ["Nothing blocked."]
-                    )
-                ]
-            )
-        )
+        t = C.rituals_text()
+        turn = [t["turnOpen"], *[g["floor"] for g in DRESS_GROUPS], t["proseBlockersNone"], t["turnClose"]]
+        filled = standup.Standup(work=standup.Work(workers=[standup.WorkWorker(label="opus", name="Opus", prose=turn)]))
         spoken = standup.spoken_from(filled, DRESS_GROUPS, reply["answer"], "m")
-        self.assertEqual(spoken.workers[0].prose, reply["said"] + ["Nothing blocked."])
+        self.assertEqual(
+            spoken.workers[0].prose, [t["turnOpen"], *reply["said"], t["proseBlockersNone"], t["turnClose"]]
+        )
         self.assertEqual((spoken.dressed, spoken.refused, spoken.model), (reply["dressed"], reply["refused"], "m"))
 
     def test_the_facts_are_the_workers_sentences_and_nothing_else(self):
         filled = _fill_prose(PROSE_CASES["friday"])
         facts = standup.dress_facts(filled)
         prose = {w.label: w.prose for w in filled.work.workers}
-        self.assertEqual([f["id"] for f in facts], ["fable/0", "fable/1", "fable/2", "opus/0", "opus/1", "opus/2"])
+        # Position 0 is the turn's opener, which is the frame's and never dressed.
+        # The first worker's yesterday is the fixed line at position 1, which is not a fact either.
+        self.assertEqual([f["id"] for f in facts], ["fable/2", "fable/3", "fable/4", "opus/1", "opus/2", "opus/3"])
         for f in facts:
             label, at = f["id"].split("/")
             with self.subTest(fact=f["id"]):
@@ -1033,12 +1331,35 @@ class TheDressTable(unittest.TestCase):
         said = {f["floor"] for f in facts}
         self.assertNotIn(C.rituals_text()["proseBlockersNone"], said)
         self.assertFalse(said & set(filled.work.queueProse), "the queue's sentences are the chair's, not dressed")
-        opus = next(f for f in facts if f["id"] == "opus/0")
+        self.assertFalse(said & set(filled.work.chairProse), "the chair's own turn is not dressed")
+        self.assertFalse(said & set(VOCAB["nothing"] + VOCAB["nothingToday"]), "a made-up item is not dressed")
+        self.assertFalse(
+            said & {C.rituals_text()["turnOpen"], C.rituals_text()["turnClose"]}, "the frame is not dressed"
+        )
+        self.assertNotIn(C.rituals_text()["proseYesterdayNone"], said, "a fixed line is not dressed")
+        opus = next(f for f in facts if f["id"] == "opus/1")
         self.assertEqual(
             (opus["name"], opus["count"], opus["refs"], opus["first"], opus["slot"]),
             ("Team Agile", 2, ["#501", "#502"], True, "yesterday"),
         )
         self.assertEqual(opus["titles"]["#501"], "Feature: Team Agile -- wire the stage")
+
+    def test_no_unsaid_line_is_a_fact(self):
+        """A slot with nothing says a fixed line, or the refs worked in the window: neither
+        is a group, so neither goes to the model -- every case, every member."""
+        t = C.rituals_text()
+        for name, case in PROSE_CASES.items():
+            filled = _fill_prose(case)
+            facts = standup.dress_facts(filled)
+            prose = {w.label: w.prose for w in filled.work.workers}
+            fixed = {t["proseYesterdayNone"], t["proseTodayNone"]}
+            with self.subTest(case=name):
+                for f in facts:
+                    label, at = f["id"].split("/")
+                    self.assertEqual(f["floor"], prose[label][int(at)])
+                    self.assertNotIn(f["floor"], fixed)
+                    self.assertFalse(f["floor"].startswith("Yesterday I worked on"), f["floor"])
+                    self.assertTrue(f["refs"] or f["count"], f)
 
     def test_a_folded_sentence_is_one_fact(self):
         """The dress is handed the folded sentence as it is handed any other: one entry,
@@ -1048,14 +1369,14 @@ class TheDressTable(unittest.TestCase):
         prose = {w.label: w.prose for w in filled.work.workers}
         self.assertEqual(
             sorted(facts),
-            ["fable/0", "fable/1", "opus/0", "opus/1", "sonnet/0", "sonnet/1", "sonnet/2", "sonnet/3", "sonnet/4"],
+            ["fable/2", "fable/3", "opus/2", "opus/3", "sonnet/1", "sonnet/2", "sonnet/3", "sonnet/4", "sonnet/5"],
         )
         for f in facts.values():
             label, at = f["id"].split("/")
             with self.subTest(fact=f["id"]):
                 self.assertEqual(f["floor"], prose[label][int(at)])
                 self.assertEqual(standup.dress_guard(f, f["floor"]), "")
-        fable, opus = facts["fable/1"], facts["opus/1"]
+        fable, opus = facts["fable/3"], facts["opus/3"]
         self.assertEqual((fable["name"], fable["count"], fable["refs"], fable["first"]), ("", 7, [], False))
         self.assertEqual((opus["name"], opus["count"], opus["refs"]), ("Phase 6, Phase 7, the Studio and Docs", 4, []))
         self.assertEqual(
@@ -1079,9 +1400,9 @@ class TheDressTable(unittest.TestCase):
             if issue["number"] == 504:
                 issue["labels"].append("enhancement")
         facts = {f["id"]: f for f in standup.dress_facts(_fill_prose(case))}
-        self.assertEqual(facts["opus/0"]["kinds"], {"bugs": 2})
-        self.assertEqual(facts["opus/2"]["kinds"], {"features": 1})
-        self.assertEqual(facts["opus/1"]["kinds"], {})
+        self.assertEqual(facts["opus/1"]["kinds"], {"bugs": 2})
+        self.assertEqual(facts["opus/3"]["kinds"], {"features": 1})
+        self.assertEqual(facts["opus/2"]["kinds"], {})
         cards = {f["id"]: f for f in standup.dress_facts(_fill_prose(PROSE_CASES["cards"]))}
         bug = next(f for f in cards.values() if f["name"] == "Bug")
         self.assertEqual(bug["kinds"], {"bugs": bug["count"]})
@@ -1091,7 +1412,7 @@ class TheDressTable(unittest.TestCase):
         system, prompt = standup.dress_prompt(facts)
         for verb in VOCAB["verbs"]:
             self.assertIn(verb, system)
-        for family in ("fakeWork", "excuses", "phrasebook"):
+        for family in ("fakeWork", "excuses", "phrasebook", "nothing", "nothingToday"):
             for phrase in VOCAB[family]:
                 with self.subTest(family=family, phrase=phrase):
                     self.assertNotIn(phrase, system + prompt)
@@ -1101,8 +1422,8 @@ class TheDressTable(unittest.TestCase):
         filled = _fill_prose(PROSE_CASES["friday"])
         complete, calls = _answering(
             {
-                "opus/0": "Smashed two in Team Agile (#501, #502).",
-                "opus/2": "Plumbing for two in Team Agile (#504, #505), and #999.",
+                "opus/1": "Smashed two in Team Agile (#501, #502).",
+                "opus/3": "Plumbing for two in Team Agile (#504, #505), and #999.",
             }
         )
         with mock.patch.object(standup.model, "complete", complete):
@@ -1110,7 +1431,7 @@ class TheDressTable(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         opus = next(w for w in spoken.workers if w.label == "opus")
         work = next(w for w in filled.work.workers if w.label == "opus")
-        self.assertEqual(opus.prose, ["Smashed two in Team Agile (#501, #502).", *work.prose[1:]])
+        self.assertEqual(opus.prose, [work.prose[0], "Smashed two in Team Agile (#501, #502).", *work.prose[2:]])
         fable = next(w for w in spoken.workers if w.label == "fable")
         self.assertEqual(fable.prose, next(w for w in filled.work.workers if w.label == "fable").prose)
         self.assertEqual((spoken.dressed, spoken.refused), (1, 5))
@@ -1120,7 +1441,7 @@ class TheDressTable(unittest.TestCase):
 
     def test_the_same_groups_are_dressed_once(self):
         filled = _fill_prose(PROSE_CASES["friday"])
-        complete, calls = _answering({"opus/0": "Smashed two in Team Agile (#501, #502)."})
+        complete, calls = _answering({"opus/1": "Smashed two in Team Agile (#501, #502)."})
         with mock.patch.object(standup.model, "complete", complete):
             first = asyncio.run(standup.dress_standup(filled))
             second = asyncio.run(standup.dress_standup(_fill_prose(PROSE_CASES["friday"])))
@@ -1532,6 +1853,7 @@ TOP_FIELDS = {
     "source",
     "tracker",
     "chair",
+    "team",
     "queue",
     "workers",
     "work",
@@ -1580,9 +1902,9 @@ def _brief_less_corner(body: dict) -> str:
     return brief
 
 
-WORK_FIELDS = {"queue", "workers", "queueProse", "text"}
+WORK_FIELDS = {"queue", "workers", "queueProse", "chairProse", "text"}
 GROUP_FIELDS = {"name", "by", "count", "refs", "phrase"}
-WORKER_FIELDS = {"label", "name", "yesterday", "today", "blockers", "empty", "excuse"}
+WORKER_FIELDS = {"label", "name", "yesterday", "today", "blockers", "empty", "excuse", "status", "present"}
 WALK_FIELDS = {"number", "id", "title", "url", "path", "motion", "commits", "worker"}
 ITEM_FIELDS = {"number", "id", "title", "url", "path", "motion", "commits"}
 COUNT_FIELDS = {"label", "name", "closed", "started", "inProgress", "commits", "undated"}
@@ -1631,6 +1953,8 @@ class TheRoute(unittest.TestCase):
     features = {"solitaireAgile": True}
     # The toolkit Space's own features block (spaces[].features): the suggestion's switch lives there.
     space_features: dict | None = None
+    # The room the Space states (spaces[].features.teamSize), as the fill is handed it.
+    room = None
     # With the suggestion on, the standup asks who "me" is once (triage's gh api user).
     viewer_reads: list = [["gh", "api", "user"]]
 
@@ -1720,12 +2044,12 @@ class TheRoute(unittest.TestCase):
     def test_no_model_key_is_spoken_null_and_the_prose_stands(self):
         body = self._get("/api/ritual/standup?space=toolkit")[0].json()
         self.assertIsNone(body["spoken"])
-        filled = _fill(CASES["friday"])
+        filled = _fill(CASES["friday"], self.room)
         filled.work.text = standup.render_work(filled)
         self.assertEqual(body["work"]["text"], filled.work.text)
 
     def test_a_model_that_answers_is_spoken_beside_work_and_text_and_brief_are_untouched(self):
-        filled = _fill(CASES["friday"])
+        filled = _fill(CASES["friday"], self.room)
         facts = standup.dress_facts(filled)
         self.assertGreater(len(facts), 1)
         complete, calls = _answering(
@@ -1773,9 +2097,22 @@ class TheRoute(unittest.TestCase):
         self.assertIn("body", fields)
         # An open issue's age: the suggestion's order and the Agenda's "Open since" read it, as the CLI's read does.
         self.assertIn("createdAt", fields)
-        filled = _fill(CASES["friday"])
+        filled = _fill(CASES["friday"], self.room)
         filled.work.text = standup.render_work(filled)
         self.assertEqual(body["work"]["text"], filled.work.text)
+
+    def test_the_room_is_the_spaces_team_size(self):
+        """spaces[].features.teamSize, read per request: the response's team.size, every
+        worker kept and marked present -- the detail and the brief keep them all, the
+        round (work.workers, work.text) speaks the present only."""
+        body = self._get("/api/ritual/standup?space=toolkit")[0].json()
+        self.assertEqual(body["team"], {"size": standup.team_size(self.room)})
+        filled = _fill(CASES["friday"], self.room)
+        self.assertEqual([w["present"] for w in body["workers"]], [w.present for w in filled.workers])
+        self.assertEqual(
+            [w["label"] for w in body["work"]["workers"]], [w["label"] for w in body["workers"] if w["present"]]
+        )
+        self.assertEqual(body["text"], _golden("standup-friday.txt"))
 
     def test_the_response_field_names_are_section_4bs(self):
         body = self._get("/api/ritual/standup")[0].json()
@@ -1786,7 +2123,8 @@ class TheRoute(unittest.TestCase):
         for tile in tiles:
             self.assertEqual(set(tile), AGENDA_FIELDS)
         self.assertEqual(set(body["tracker"]), {"ok", "reason"})
-        self.assertEqual(set(body["chair"]), {"open", "close"})
+        self.assertEqual(set(body["chair"]), {"open", "close", "walked"})
+        self.assertEqual(set(body["team"]), {"size"})
         self.assertEqual(set(body["queue"]), {"walk", "decide", "look"})
         self.assertEqual(set(body["queue"]["walk"][0]), WALK_FIELDS)
         self.assertEqual(set(body["work"]), WORK_FIELDS)
@@ -2049,6 +2387,7 @@ class TheRouteWithTheFlagOff(TheRoute):
     test_a_github_space_joins_its_cards_to_its_issues = None
     test_the_suggestion_rides_the_same_read = None
     test_the_corner_rides_the_same_read = None
+    test_the_room_is_the_spaces_team_size = None
 
 
 class TheRouteWithSuggestionsOff(TheRoute):
@@ -2066,6 +2405,25 @@ class TheRouteWithSuggestionsOff(TheRoute):
         body = self._get("/api/ritual/standup?space=toolkit")[0].json()
         self.assertIsNone(body["corner"])
         self.assertNotIn(C.rituals_text()["cornerBrief"].split("{")[0], body["brief"])
+
+
+class TheRouteInARoomOfThree(TheRoute):
+    """spaces.toolkit.features.teamSize=3: two seats. The friday case's two workers with work
+    sit and its idle third is absent -- the detail and the brief are friday's, the round is two."""
+
+    space_features = {"teamSize": 3}
+    room = 3
+
+    def test_sonnet_is_absent_from_the_round_and_kept_in_the_ledger(self):
+        body = self._get("/api/ritual/standup?space=toolkit")[0].json()
+        self.assertEqual(body["team"], {"size": 3})
+        self.assertEqual(
+            [(w["label"], w["present"]) for w in body["workers"]], [("fable", True), ("opus", True), ("sonnet", False)]
+        )
+        self.assertEqual([w["label"] for w in body["work"]["workers"]], ["fable", "opus"])
+        self.assertNotIn("Sonnet:", body["work"]["text"])
+        self.assertIn("Sonnet", body["text"])
+        self.assertIn("Sonnet:", _brief_less_corner(body))
 
 
 class TheAppMountsIt(unittest.TestCase):
@@ -2248,7 +2606,7 @@ class TheDressIsKeptByItsFacts(unittest.TestCase):
     across a restart; a changed fact or model is asked again; and the guard runs on
     every kept reply as on a fresh one. The model is stubbed: no test calls one."""
 
-    REPLY = {"opus/0": "Smashed two in Team Agile (#501, #502)."}
+    REPLY = {"opus/1": "Smashed two in Team Agile (#501, #502)."}
 
     def _dress(self, filled, complete):
         with mock.patch.object(standup.model, "complete", complete):
@@ -2285,7 +2643,8 @@ class TheDressIsKeptByItsFacts(unittest.TestCase):
         complete, calls = _answering(self.REPLY)
         self._dress(_fill_prose(PROSE_CASES["friday"]), complete)
         changed = _fill_prose(PROSE_CASES["friday"])
-        changed.work.workers[0].prose[0] += " Also on a new one."
+        # Position 2: the first worker's first sentence that says a group (position 1 is its fixed yesterday line).
+        changed.work.workers[0].prose[2] += " Also on a new one."
         self._dress(changed, complete)
         self.assertEqual(len(calls), 2)
 
@@ -2302,8 +2661,8 @@ class TheDressIsKeptByItsFacts(unittest.TestCase):
         key = standup.dress_key(standup.model.model_id(), filled.register_, facts)
         # Kept before the guard learned better: one sentence it refuses, one it passes.
         kept = {
-            "opus/0": "Smashed two in Team Agile (#501, #502) and #999.",
-            "opus/2": "Plumbing for two in Team Agile (#504, #505).",
+            "opus/1": "Smashed two in Team Agile (#501, #502) and #999.",
+            "opus/3": "Plumbing for two in Team Agile (#504, #505).",
         }
         self.assertTrue(disk_cache.put_json({"reply": kept}, standup.DRESS_CACHE, f"{key}.json"))
         complete, calls = _answering({})
@@ -2311,9 +2670,9 @@ class TheDressIsKeptByItsFacts(unittest.TestCase):
         self.assertEqual(calls, [], "a kept reply is not asked again")
         opus = next(w for w in spoken.workers if w.label == "opus")
         work = next(w for w in filled.work.workers if w.label == "opus")
-        self.assertEqual(opus.prose[0], work.prose[0], "the refused sentence is the prose")
-        self.assertEqual(standup.dress_guard(next(f for f in facts if f["id"] == "opus/2"), kept["opus/2"]), "")
-        self.assertEqual(opus.prose[2], kept["opus/2"])
+        self.assertEqual(opus.prose[1], work.prose[1], "the refused sentence is the prose")
+        self.assertEqual(standup.dress_guard(next(f for f in facts if f["id"] == "opus/3"), kept["opus/3"]), "")
+        self.assertEqual(opus.prose[3], kept["opus/3"])
         self.assertEqual((spoken.dressed, spoken.refused), (1, len(facts) - 1))
 
     def test_a_kept_file_that_is_not_a_reply_is_a_miss(self):

@@ -3,8 +3,10 @@ Standup -- Friday 2 October 2026
 
 Nothing is waiting on you.
 
-Fable: Yesterday I closed #153, Close the books. Today I'm on #154, Read the label. Nothing blocked.
-Opus: Today I'm on #151, Count the commits. I'm also on #152, Fold the window. Nothing blocked.
-Widgets: Yesterday I closed 199, Write the counts docs. Today I'm on M7K3, Draw the counts line. Nothing blocked.
+Fable: Good morning. Yesterday I closed #153, Close the books. Today I'm on #154, Read the label. No blockers. That's it for me.
+Opus: Good morning. Yesterday I worked on #151. Today I'm on #151, Count the commits. I'm also on #152, Fold the window. No blockers. That's it for me.
+Widgets: Good morning. Yesterday I closed 199, Write the counts docs. Today I'm on M7K3, Draw the counts line. No blockers. That's it for me.
+
+Good morning. Yesterday I tidied my notes and my calendar for the week. Today I'll keep the board moving. No blockers. That's it for me.
 
 "Let's circle back."

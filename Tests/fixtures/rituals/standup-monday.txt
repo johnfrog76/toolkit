@@ -5,9 +5,11 @@ Waiting on you
   Nothing is waiting on you.
 
 Fable
-  Mug        "Tidied my notes and my calendar for the week."
+  Status     "Yesterday I tidied my notes and my calendar for the week."
+  Status     "Today I'll pair with a teammate to learn how the build runs."
 Opus
-  Mug        "A quiet day for me: some learning and some setup."
+  Status     "Yesterday I had a quiet day: some learning and some setup."
+  Status     "Today I'll set up my editor's formatter to match the team's."
 Sonnet
   Yesterday  #201 Add the registry mock
   Today      nothing in flight
