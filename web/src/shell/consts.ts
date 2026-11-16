@@ -343,6 +343,13 @@ export const RITUALS = consts.rituals as {
     proseBlockers: string;
     proseBlockersAlso: string;
     proseBlockersNone: string;
+    /** A slot with nothing in it, beside a slot with something: the fixed honest line
+     *  (prose<Slot>None), or for yesterday the open items worked inside the window
+     *  (proseYesterdayWorked, proseYesterdayWorkedMany past proseFoldNames). */
+    proseYesterdayNone: string;
+    proseYesterdayWorked: string;
+    proseYesterdayWorkedMany: string;
+    proseTodayNone: string;
     turnOpen: string;
     turnClose: string;
     chairYesterday: string;

@@ -1181,7 +1181,7 @@ function Invoke-P20StandupJoinedFill {
     }
     $keyOf = Get-P20StandupIssueKeys -Issues $Issues
     foreach ($k in @($tile.keyOf.Keys)) { $keyOf[$k] = $tile.keyOf[$k] }
-    $out.work = New-P20StandupWork -Standup @{ queue = $out.queue; workers = $out.workers; walked = @($out.chair.walked); day = $at.DayOfYear; nothing = @($data.Vocabulary.nothing) } -KeyOf $keyOf -QueueKinds $kinds -Slots $slots
+    $out.work = New-P20StandupWork -Standup @{ queue = $out.queue; workers = $out.workers; walked = @($out.chair.walked); day = $at.DayOfYear; nothing = @($data.Vocabulary.nothing); dated = ($null -ne $CommitDates) } -KeyOf $keyOf -QueueKinds $kinds -Slots $slots
     $out.checks = [object[]]$checks.ToArray()
     $out.links = [object[]]$links.ToArray()
     $out.counts = Get-P20StandupCounts -Standup @{ workers = $out.workers } -Hashes $hashesOf -Slots $slots -Undated $undatedOf
@@ -1393,7 +1393,9 @@ function New-P20StandupWork {
       The filled standup's work grain: [ordered]@{ queue; workers; text = '' }.
       KeyOf maps an item's '<ref>|<path>' to its Get-P20StandupWorkKey answer.
       Standup also carries walked (chair.walked), day (the day of the year) and
-      nothing (the vocabulary's family), which the chair's turn reads.
+      nothing (the vocabulary's family), which the chair's turn reads, and
+      dated: whether the commit dates were read, so a card's commits are only
+      those inside the window (Test-P20StandupItemWorked); absent is not read.
       queue: each kind's groups; workers: each worker's label, name and three
       slots' groups. Pure.
     #>
@@ -1426,20 +1428,42 @@ function New-P20StandupWork {
         # with no present key -- an older reading -- is in the room.
         if ($false -eq $w.present) { continue }
         $row = [ordered]@{ label = $w.label; name = $w.name }
-        $prose = New-Object System.Collections.ArrayList
+        $sentences = @{}
         foreach ($slot in $Slots) {
             $rows = & $entriesOf $w.$slot
             $row[$slot] = Group-P20StandupWork -Entries $rows -First (Get-P20StandupWorkTemplate $slot) -Rest ([string]$t.workGroup)
-            foreach ($said in @(Get-P20StandupProse -Slot $slot -Groups $row[$slot] -Rows $rows)) { [void]$prose.Add($said) }
+            $sentences[$slot] = @(Get-P20StandupProse -Slot $slot -Groups $row[$slot] -Rows $rows)
         }
-        # An idle worker's sentences are its two made-up items, yesterday and today.
         if ($w.empty) {
+            # An idle worker's sentences are its two made-up items, yesterday and today.
             $prose = New-Object System.Collections.ArrayList
             foreach ($said in @($w.status | Where-Object { $null -ne $_ })) { [void]$prose.Add([string]$said) }
+            # Something said and no blockers: the worker closes on proseBlockersNone.
+            if ($prose.Count -gt 0 -and @($row['blockers'] | Where-Object { $null -ne $_ }).Count -eq 0) {
+                [void]$prose.Add([string]$t.proseBlockersNone)
+            }
         }
-        # Something said and no blockers: the worker closes on proseBlockersNone.
-        if ($prose.Count -gt 0 -and @($row['blockers'] | Where-Object { $null -ne $_ }).Count -eq 0) {
-            [void]$prose.Add([string]$t.proseBlockersNone)
+        else {
+            # Real facts where there are any; a slot with none says its fixed line
+            # (Get-P20StandupProseUnsaid) -- never a made-up item beside a real one.
+            $mine = @{}
+            foreach ($slot in $Slots) {
+                foreach ($item in @($w.$slot | Where-Object { $null -ne $_ })) {
+                    if (Test-P20StandupItemWorked -Item $item -Dated ([bool]$Standup.dated)) { $mine[(Get-P20StandupItemRef $item)] = $true }
+                }
+            }
+            $worked = New-Object System.Collections.Generic.List[string]
+            foreach ($slot in $Slots) {
+                foreach ($g in @($row[$slot] | Where-Object { $null -ne $_ })) {
+                    foreach ($r in @($g.refs | Where-Object { $null -ne $_ })) { if ($mine.ContainsKey([string]$r)) { $worked.Add([string]$r) } }
+                }
+            }
+            $prose = New-Object System.Collections.ArrayList
+            foreach ($slot in $Slots) {
+                $said = @($sentences[$slot])
+                if ($said.Count -eq 0) { $said = @(Get-P20StandupProseUnsaid -Slot $slot -Worked $worked.ToArray()) }
+                foreach ($x in $said) { if ($null -ne $x) { [void]$prose.Add([string]$x) } }
+            }
         }
         $row['prose'] = Get-P20StandupTurn -Said $prose.ToArray()
         [void]$workers.Add($row)
@@ -1453,6 +1477,44 @@ function New-P20StandupWork {
     $everyone = @($Standup.workers | Where-Object { $null -ne $_ }).Count
     $chair = Get-P20StandupChairTurn -Walked $walkedRefs -Day ([int]$Standup.day) -Workers $everyone -Nothing $Standup.nothing -Queue $refsOf -QueueKinds $QueueKinds
     return [ordered]@{ queue = $queue; workers = [object[]]$workers.ToArray(); queueProse = [object[]]$queueProse.ToArray(); chairProse = $chair; text = '' }
+}
+
+function Test-P20StandupItemWorked {
+    <#
+      Whether an open item holds real work inside the window, the fact a
+      yesterday may say when it closed nothing: its work began inside it (its
+      motion is started -- a card's **Started:** or **Created:** day, or an
+      issue's timeline) or, where the commit dates were read (Dated), its card
+      threads a commit authored inside it. Undated commits prove nothing, and an
+      item merely in progress is no fact. Pure; item_worked in the agent.
+    #>
+    param($Item, [bool]$Dated)
+    $m = @((Get-P20Consts).rituals.motions | ForEach-Object { [string]$_ })
+    $motion = [string]$Item.motion
+    if ($motion -ceq $m[0]) { return $false }
+    if ($motion -ceq $m[1]) { return $true }
+    return ($Dated -and [int]$Item.commits -gt 0)
+}
+
+function Get-P20StandupProseUnsaid {
+    <#
+      What a member with something to say says for a slot it has nothing in:
+      text.prose<Slot>Worked with Worked (the refs of its open items worked
+      inside the window, Test-P20StandupItemWorked) where the slot has that
+      template and there are some -- prose<Slot>WorkedMany with their count past
+      proseFoldNames -- else the fixed line text.prose<Slot>None; nothing when
+      the slot has neither. Never a made-up item. Pure; prose_unsaid in the
+      agent; standup-prose.json's `unsaid` rows.
+    #>
+    param([string]$Slot, [string[]]$Worked)
+    $cap = $Slot.Substring(0, 1).ToUpperInvariant() + $Slot.Substring(1)
+    $worked = @($Worked | Where-Object { $null -ne $_ -and $_ -ne '' })
+    if ($worked.Count -gt 0 -and (Get-P20StandupProseText ('prose' + $cap + 'Worked'))) {
+        return [string[]]@(Get-P20StandupChairRefs -Key ('prose' + $cap + 'Worked') -Refs $worked)
+    }
+    $line = Get-P20StandupProseText ('prose' + $cap + 'None')
+    if ($line) { return [string[]]@($line) }
+    return [string[]]@()
 }
 
 function Join-P20StandupRefList {
@@ -1583,7 +1645,10 @@ function Get-P20StandupTurn {
 #         past it: text.prose<Slot>FoldCount    "seven more designs"
 #
 # No ref in a folded sentence: the thought bubble keeps every number.
-# A worker with something to say and no blockers ends on text.proseBlockersNone.
+# A worker with something to say and no blockers ends on text.proseBlockersNone,
+# and says a yesterday and a today: a slot it has nothing in says text.prose<Slot>None
+# -- for yesterday, first the refs of its open items worked inside the window,
+# text.prose<Slot>Worked. Only a worker with nothing at all says made-up items.
 # agent/solitaire/standup.py's prose_sentence and prose_sentences are the same
 # rule; Tests/fixtures/rituals/standup-prose.json holds the two to one table.
 
@@ -1889,7 +1954,7 @@ function Format-P20StandupWork {
         <worker>: Good morning. <made-up yesterday> <made-up today> No blockers. That's it for me.
         Good morning. <made-up yesterday, or what was walked> Today I'll walk #<n> and #<n>. No blockers. That's it for me.
 
-      An empty slot says nothing; an idle worker's sentences are its two made-up items. LF-joined,
+      An empty slot beside a filled one says its fixed line (Get-P20StandupProseUnsaid); an idle worker's sentences are its two made-up items. LF-joined,
       ending in one LF; every fixed word from rituals.text. Takes the fill's
       dictionary or the same shape read back from JSON. render_work in the
       agent is the same rule; the goldens standup-prose-<case>.txt are the law.

@@ -908,9 +908,13 @@ describe("the standup deck at the work grain, as prose", () => {
     expect(within(tile).queryByText(new RegExp(T.blockersEmpty))).toBeNull();
   });
 
-  it("Fable, with nothing yesterday, says nothing for it and names the blocker", () => {
+  it("Fable, with nothing yesterday, says the fixed line for it and names the blocker", () => {
     const fable = proseOf("fable");
     expect(fable.some((x) => x.startsWith(T.proseYesterday))).toBe(false);
+    // Nothing closed and nothing it holds began in the window: the fixed honest line,
+    // never a made-up item beside its real today.
+    expect(fable[1]).toBe(T.proseYesterdayNone);
+    expect(fable.filter((x) => SONNET_PAIR.includes(x))).toEqual([]);
     expect(fable.some((x) => x.startsWith(T.proseBlockers))).toBe(true);
     expect(fable).not.toContain(T.proseBlockersNone);
     expect(sayOf(at("fable"))).toBe(fable.join(" "));

@@ -895,6 +895,19 @@ def _fill_prose(case: dict) -> "standup.Standup":
     at = datetime.fromisoformat(case["asOf"])
     if case["source"] == "cards":
         filled = standup.fill_cards_standup(at, case["cards"], space=case["space"], space_name=case["spaceName"])
+    elif case["source"] == "both":
+        # The joined fill, with the case's dates read when it has one (absent is not read).
+        filled = standup.fill_joined_standup(
+            at,
+            PROSE_TABLE["workerLabels"],
+            case["issues"],
+            case["tracker"],
+            case["cards"],
+            space=case["space"],
+            space_name=case["spaceName"],
+            commit_dates=case.get("commitDates"),
+            issue_starts=case.get("issueStarts"),
+        )
     else:
         filled = standup.fill_standup(at, PROSE_TABLE["workerLabels"], case["issues"], case["tracker"])
     filled.text = standup.render_standup(filled)
@@ -907,7 +920,76 @@ class TheProseTable(unittest.TestCase):
     -Rituals asserts against Get-P20StandupProseSentence and Format-P20StandupWork."""
 
     def test_the_table_has_its_cases(self):
-        self.assertEqual(set(PROSE_CASES), {"friday", "quiet", "no-tracker", "cards", "eight-groups", "walked"})
+        self.assertEqual(
+            set(PROSE_CASES),
+            {"friday", "quiet", "no-tracker", "cards", "eight-groups", "walked", "one-slot", "worked", "cards-worked"},
+        )
+
+    def test_every_unsaid_row(self):
+        """A slot a member with something to say has nothing in says its fixed line,
+        or for yesterday the refs of its open items worked in the window -- named up to
+        proseFoldNames, counted past it -- and never a made-up item."""
+        rows = PROSE_TABLE["unsaid"]
+        limit = C.rituals_prose_fold_names()
+        sizes = {len(r["worked"]) for r in rows if r["slot"] == "yesterday"}
+        self.assertTrue({0, 1, 2, limit, limit + 1} <= sizes, "a row each side of every edge")
+        made_up = set(VOCAB["nothing"] + VOCAB["nothingToday"])
+        for row in rows:
+            with self.subTest(slot=row["slot"], worked=row["worked"]):
+                self.assertEqual(standup.prose_unsaid(row["slot"], row["worked"]), row["lines"])
+                self.assertFalse(set(row["lines"]) & made_up)
+
+    def test_an_item_worked_in_the_window_is_a_start_or_a_dated_commit(self):
+        """The real yesterday: an open item whose work began in the window, or whose card
+        threads a commit authored in it -- known only where the dates were read. An item
+        merely in progress, or with commits nobody dated, is no fact; a closed one is yesterday's."""
+        rows = PROSE_TABLE["itemWorked"]
+        self.assertEqual({r["motion"] for r in rows}, set(C.rituals_motions()), "a row for every motion")
+        for row in rows:
+            with self.subTest(row=row):
+                item = standup.SlotItem(number=1, motion=row["motion"], commits=row["commits"])
+                self.assertEqual(standup.item_worked(item, row["dated"]), row["worked"])
+
+    def test_a_member_with_something_has_a_yesterday_and_a_today(self):
+        """Every present member that is not idle says a yesterday and a today: its real
+        sentences, else the fixed line for the slot (prose_unsaid) -- the made-up lists
+        are only an idle member's."""
+        t = C.rituals_text()
+        made_up = set(VOCAB["nothing"] + VOCAB["nothingToday"])
+        unsaid = {t["proseYesterdayNone"], t["proseTodayNone"]}
+        for name, case in PROSE_CASES.items():
+            filled = _fill_prose(case)
+            grained = {w.label: w for w in filled.work.workers}
+            for w in (w for w in filled.workers if w.present and not w.empty):
+                prose = grained[w.label].prose
+                with self.subTest(case=name, worker=w.label):
+                    self.assertTrue(prose[1].startswith("Yesterday I "), prose)
+                    self.assertTrue(any(x.startswith(("Today I'm on", "Today I'll")) for x in prose), prose)
+                    self.assertFalse(set(prose) & made_up)
+                    if not w.yesterday:
+                        self.assertTrue(prose[1] in unsaid or prose[1].startswith("Yesterday I worked on"), prose)
+                    if not w.today:
+                        self.assertIn(t["proseTodayNone"], prose)
+                    else:
+                        self.assertNotIn(t["proseTodayNone"], prose)
+
+    def test_the_four_branches_are_in_the_table(self):
+        """Missing today; missing yesterday with a real fact (a start, a dated commit, a
+        timeline, a card's start) and with none; blockers only -- each pinned by a case."""
+        t = C.rituals_text()
+        turns = {(n, w.label): w.prose for n, c in PROSE_CASES.items() for w in _fill_prose(c).work.workers}
+        one = {k[1]: v for k, v in turns.items() if k[0] == "one-slot"}
+        self.assertEqual(one["fable"][1:3], [t["proseYesterdayNone"], t["proseTodayNone"]], "blockers only")
+        self.assertEqual(one["opus"][2], t["proseTodayNone"], "missing today")
+        self.assertEqual(one["sonnet"][1], t["proseYesterdayNone"], "missing yesterday, no fact")
+        worked = {k[1]: v[1] for k, v in turns.items() if k[0] == "worked"}
+        self.assertEqual(worked["fable"], t["proseYesterdayWorked"].replace("{refs}", "#911"), "a card's start")
+        self.assertEqual(worked["opus"], t["proseYesterdayWorked"].replace("{refs}", "#921"), "a dated commit")
+        self.assertEqual(
+            worked["sonnet"], t["proseYesterdayWorkedMany"].replace("{n}", C.rituals_number_words()[5]), "timelines"
+        )
+        cards = turns[("cards-worked", "widgets")][1]
+        self.assertEqual(cards, t["proseYesterdayWorked"].replace("{refs}", "150"), "undated commits are no fact")
 
     def test_every_fold_row(self):
         """The also-ons fold (D-SA9): one sentence for the groups after today's first --
@@ -1037,7 +1119,11 @@ class TheProseTable(unittest.TestCase):
         t = C.rituals_text()
         text = _fill_prose(PROSE_CASES["friday"]).work.text
         self.assertIn(f"Opus: {t['turnOpen']} Yesterday I closed two in Team Agile (#501, #502). ", text)
-        self.assertIn(f"Fable: {t['turnOpen']} Today I'm on the Studio: #511, the archived-repository mark. ", text)
+        self.assertIn(
+            f"Fable: {t['turnOpen']} {t['proseYesterdayNone']} "
+            "Today I'm on the Studio: #511, the archived-repository mark. ",
+            text,
+        )
         self.assertIn(f" {t['proseBlockersNone']} {t['turnClose']}\n", text)
 
     def test_the_json_round_trip_renders_the_same_text(self):
@@ -1235,7 +1321,8 @@ class TheDressTable(unittest.TestCase):
         facts = standup.dress_facts(filled)
         prose = {w.label: w.prose for w in filled.work.workers}
         # Position 0 is the turn's opener, which is the frame's and never dressed.
-        self.assertEqual([f["id"] for f in facts], ["fable/1", "fable/2", "fable/3", "opus/1", "opus/2", "opus/3"])
+        # The first worker's yesterday is the fixed line at position 1, which is not a fact either.
+        self.assertEqual([f["id"] for f in facts], ["fable/2", "fable/3", "fable/4", "opus/1", "opus/2", "opus/3"])
         for f in facts:
             label, at = f["id"].split("/")
             with self.subTest(fact=f["id"]):
@@ -1249,12 +1336,30 @@ class TheDressTable(unittest.TestCase):
         self.assertFalse(
             said & {C.rituals_text()["turnOpen"], C.rituals_text()["turnClose"]}, "the frame is not dressed"
         )
+        self.assertNotIn(C.rituals_text()["proseYesterdayNone"], said, "a fixed line is not dressed")
         opus = next(f for f in facts if f["id"] == "opus/1")
         self.assertEqual(
             (opus["name"], opus["count"], opus["refs"], opus["first"], opus["slot"]),
             ("Team Agile", 2, ["#501", "#502"], True, "yesterday"),
         )
         self.assertEqual(opus["titles"]["#501"], "Feature: Team Agile -- wire the stage")
+
+    def test_no_unsaid_line_is_a_fact(self):
+        """A slot with nothing says a fixed line, or the refs worked in the window: neither
+        is a group, so neither goes to the model -- every case, every member."""
+        t = C.rituals_text()
+        for name, case in PROSE_CASES.items():
+            filled = _fill_prose(case)
+            facts = standup.dress_facts(filled)
+            prose = {w.label: w.prose for w in filled.work.workers}
+            fixed = {t["proseYesterdayNone"], t["proseTodayNone"]}
+            with self.subTest(case=name):
+                for f in facts:
+                    label, at = f["id"].split("/")
+                    self.assertEqual(f["floor"], prose[label][int(at)])
+                    self.assertNotIn(f["floor"], fixed)
+                    self.assertFalse(f["floor"].startswith("Yesterday I worked on"), f["floor"])
+                    self.assertTrue(f["refs"] or f["count"], f)
 
     def test_a_folded_sentence_is_one_fact(self):
         """The dress is handed the folded sentence as it is handed any other: one entry,
@@ -1264,14 +1369,14 @@ class TheDressTable(unittest.TestCase):
         prose = {w.label: w.prose for w in filled.work.workers}
         self.assertEqual(
             sorted(facts),
-            ["fable/1", "fable/2", "opus/1", "opus/2", "sonnet/1", "sonnet/2", "sonnet/3", "sonnet/4", "sonnet/5"],
+            ["fable/2", "fable/3", "opus/2", "opus/3", "sonnet/1", "sonnet/2", "sonnet/3", "sonnet/4", "sonnet/5"],
         )
         for f in facts.values():
             label, at = f["id"].split("/")
             with self.subTest(fact=f["id"]):
                 self.assertEqual(f["floor"], prose[label][int(at)])
                 self.assertEqual(standup.dress_guard(f, f["floor"]), "")
-        fable, opus = facts["fable/2"], facts["opus/2"]
+        fable, opus = facts["fable/3"], facts["opus/3"]
         self.assertEqual((fable["name"], fable["count"], fable["refs"], fable["first"]), ("", 7, [], False))
         self.assertEqual((opus["name"], opus["count"], opus["refs"]), ("Phase 6, Phase 7, the Studio and Docs", 4, []))
         self.assertEqual(
@@ -2538,7 +2643,8 @@ class TheDressIsKeptByItsFacts(unittest.TestCase):
         complete, calls = _answering(self.REPLY)
         self._dress(_fill_prose(PROSE_CASES["friday"]), complete)
         changed = _fill_prose(PROSE_CASES["friday"])
-        changed.work.workers[0].prose[1] += " Also on a new one."
+        # Position 2: the first worker's first sentence that says a group (position 1 is its fixed yesterday line).
+        changed.work.workers[0].prose[2] += " Also on a new one."
         self._dress(changed, complete)
         self.assertEqual(len(calls), 2)
 

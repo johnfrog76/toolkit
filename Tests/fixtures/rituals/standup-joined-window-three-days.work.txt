@@ -3,9 +3,9 @@ Standup -- Friday 2 October 2026
 
 Nothing is waiting on you.
 
-Fable: Good morning. Yesterday I closed #162, Ship the stage. No blockers. That's it for me.
-Opus: Good morning. Yesterday I closed #161, Ship the foyer. No blockers. That's it for me.
-Widgets: Good morning. Yesterday I closed W4X9, Ship the docs. No blockers. That's it for me.
+Fable: Good morning. Yesterday I closed #162, Ship the stage. Today I'll pick up the next item from the board. No blockers. That's it for me.
+Opus: Good morning. Yesterday I closed #161, Ship the foyer. Today I'll pick up the next item from the board. No blockers. That's it for me.
+Widgets: Good morning. Yesterday I closed W4X9, Ship the docs. Today I'll pick up the next item from the board. No blockers. That's it for me.
 
 Good morning. Yesterday I tidied my notes and my calendar for the week. Today I'll keep the board moving. No blockers. That's it for me.
 

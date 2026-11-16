@@ -506,11 +506,22 @@ describe("the grain", () => {
     render(<StandupPage />);
     fireEvent.click(screen.getByRole("tab", { name: "Work" }));
     expect(shown()).toBe(data.work!.text);
-    // Each worker's line is its turn, in the contract's frame.
+    // Each worker's line is its turn, in the contract's frame: the shared prose
+    // table's friday turns, as the fill wrote them -- the first worker's yesterday is
+    // the fixed line, since it closed nothing and nothing it holds began in the window.
     const open = RITUALS.text.turnOpen;
+    const prose = JSON.parse(
+      fs.readFileSync(path.join(FIXTURES, "standup-prose.json"), "utf8"),
+    ) as {
+      cases: { name: string; expected: { workers: { label: string; prose: string[] }[] } }[];
+    };
+    const turns = prose.cases.find((c) => c.name === "friday")!.expected.workers;
+    const turn = (label: string) => turns.find((w) => w.label === label)!.prose.join(" ");
     expect(shown()).toContain(`Opus: ${open} Yesterday I closed two in Team Agile (#501, #502).`);
-    expect(shown()).toContain(
-      `Fable: ${open} Today I'm on the Studio: #511, the archived-repository mark.`,
+    expect(shown()).toContain(`Opus: ${turn("opus")}\n`);
+    expect(shown()).toContain(`Fable: ${turn("fable")}\n`);
+    expect(turn("fable")).toContain(
+      `${open} ${RITUALS.text.proseYesterdayNone} Today I'm on the Studio:`,
     );
     expect(screen.getByTestId("standup-brief")).toBeTruthy();
     await act(async () => {

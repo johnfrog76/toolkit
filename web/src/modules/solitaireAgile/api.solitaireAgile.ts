@@ -96,8 +96,10 @@ export interface WorkWorker {
   today: WorkGroup[];
   blockers: WorkGroup[];
   /** The prose: this worker's turn, in order -- `turnOpen`, one sentence a
-   *  group (a worker with nothing says its two made-up items), then
-   *  `proseBlockersNone` when nothing blocks it, then `turnClose`. */
+   *  group, a slot with nothing beside one with something its fixed line
+   *  (`proseYesterdayNone`, `proseYesterdayWorked`, `proseTodayNone`), a worker
+   *  with nothing at all its two made-up items, then `proseBlockersNone` when
+   *  nothing blocks it, then `turnClose`. */
   prose: string[];
 }
 

@@ -29,7 +29,9 @@
                      Standup -Grain work|detail|brief and its two refusals.
     2c. The prose    Tests/fixtures/rituals/standup-prose.json: every
                      sentence row (one group as one sentence), every fold row
-                     (today's also-ons as one sentence, D-SA9), and every case's
+                     (today's also-ons as one sentence, D-SA9), every unsaid row
+                     (a slot's fixed line, or the refs worked in the window) and
+                     itemWorked row, and every case's
                      queue sentences, each worker's sentences and the work text
                      against standup-prose-<name>.txt, byte for byte, again
                      after a JSON round trip -- the same rows the agent asserts.
@@ -700,7 +702,7 @@ $proseRaw = [System.IO.File]::ReadAllText((Join-Path $fixtureDir 'standup-prose.
 $proseTable = $proseRaw | ConvertFrom-Json
 $proseCases = @($proseTable.cases)
 $proseAsOf = @([regex]::Matches($proseRaw, '"asOf"\s*:\s*"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
-Assert-True 'the prose table is read: six cases, an asOf each' ($proseCases.Count -eq 6 -and $proseAsOf.Count -eq 6) "$($proseCases.Count) cases, $($proseAsOf.Count) asOf"
+Assert-True 'the prose table is read: nine cases, an asOf each' ($proseCases.Count -eq 9 -and $proseAsOf.Count -eq 9) "$($proseCases.Count) cases, $($proseAsOf.Count) asOf"
 
 foreach ($row in @($proseTable.sentences)) {
     $titles = @{}
@@ -720,6 +722,31 @@ foreach ($row in $foldRows) {
     $got = (@(Get-P20StandupProse -Slot ([string]$row.slot) -Groups @($row.groups) -Rows $rows)) -join ' | '
     Assert-True "fold: $($row.slot), $(@($row.groups).Count) groups" ($got -ceq $want) "`n  got  $got`n  want $want"
 }
+
+# A slot a member with something to say has nothing in: the fixed honest line,
+# or for yesterday the refs of its open items worked inside the window -- never a
+# made-up item. The `unsaid` rows, the same ones the agent asserts against prose_unsaid.
+$unsaidRows = @($proseTable.unsaid)
+$workedSizes = @($unsaidRows | Where-Object { [string]$_.slot -ceq 'yesterday' } | ForEach-Object { @($_.worked).Count })
+$unsaidCap = [int]$consts.rituals.proseFoldNames
+Assert-True 'the unsaid table has a yesterday row each side of every edge' ((@(0, 1, 2, $unsaidCap, ($unsaidCap + 1)) | Where-Object { $workedSizes -notcontains $_ }).Count -eq 0) ($workedSizes -join ',')
+foreach ($row in $unsaidRows) {
+    $want = (@($row.lines | ForEach-Object { [string]$_ })) -join ' | '
+    $got = (@(Get-P20StandupProseUnsaid -Slot ([string]$row.slot) -Worked @($row.worked | ForEach-Object { [string]$_ }))) -join ' | '
+    Assert-True "unsaid: $($row.slot), $(@($row.worked).Count) worked" ($got -ceq $want) "`n  got  $got`n  want $want"
+    $made = @($row.lines | Where-Object { ($nothing + @($data.Vocabulary.nothingToday)) -ccontains [string]$_ })
+    Assert-True "unsaid: $($row.slot) says no made-up item" ($made.Count -eq 0) ($made -join ' | ')
+}
+
+# The real yesterday: an open item whose work began in the window, or whose card
+# threads a commit authored in it -- known only where the dates were read.
+foreach ($row in @($proseTable.itemWorked)) {
+    $item = [ordered]@{ number = 1; id = $null; title = ''; url = ''; path = ''; motion = [string]$row.motion; commits = [int]$row.commits }
+    $got = Test-P20StandupItemWorked -Item $item -Dated ([bool]$row.dated)
+    Assert-True "item worked: $($row.motion), $($row.commits) commits, dated $($row.dated)" ($got -eq [bool]$row.worked) "got $got"
+}
+$workedMotions = (@($proseTable.itemWorked | ForEach-Object { [string]$_.motion } | Sort-Object -Unique)) -join ','
+Assert-True 'the item-worked table has a row for every motion' ($workedMotions -ceq ((@($consts.rituals.motions | ForEach-Object { [string]$_ } | Sort-Object -Unique)) -join ',')) $workedMotions
 
 # The chair's own voice: its yesterday (what you walked, else the made-up line at
 # the place after the last worker) and its today (what waits, kind by kind).
@@ -753,6 +780,12 @@ for ($n = 0; $n -lt $proseCases.Count; $n++) {
     if ([string]$case.source -eq 'cards') {
         $s = Invoke-P20StandupCardsFill -AsOf $proseAsOf[$n] -Cards @($case.cards) -Space ([string]$case.space) -SpaceName ([string]$case.spaceName) -PackageRoot $pkgRoot
     }
+    elseif ([string]$case.source -eq 'both') {
+        # The joined fill, with the case's dates read when it has one (absent is not read).
+        $s = Invoke-P20StandupJoinedFill -AsOf $proseAsOf[$n] -Labels @($proseTable.workerLabels) -Issues @($case.issues) -Tracker $case.tracker `
+            -Cards @($case.cards) -Space ([string]$case.space) -SpaceName ([string]$case.spaceName) -PackageRoot $pkgRoot `
+            -CommitDates (ConvertTo-P20StandupMap $case.commitDates) -IssueStarts (ConvertTo-P20StandupMap $case.issueStarts)
+    }
     else {
         $s = Invoke-P20StandupFill -AsOf $proseAsOf[$n] -Labels @($proseTable.workerLabels) -Issues @($case.issues) -Tracker $case.tracker -PackageRoot $pkgRoot
     }
@@ -779,6 +812,18 @@ for ($n = 0; $n -lt $proseCases.Count; $n++) {
     if ([string]$case.name -ceq 'walked') { $wantWalked = '530,531' }
     $gotWalked = (@($s.chair.walked | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_.number })) -join ','
     Assert-True "${name}: chair.walked is the walk items closed in the window" ($gotWalked -ceq $wantWalked) "got [$gotWalked] want [$wantWalked]"
+    # A member with something to say has a yesterday and a today: its sentences, else
+    # the slot's fixed line (Get-P20StandupProseUnsaid); never a made-up item.
+    $tt = $consts.rituals.text
+    $madeUp = @($nothing) + @($data.Vocabulary.nothingToday)
+    foreach ($w in @($s.workers | Where-Object { $null -ne $_ -and -not $_.empty -and $false -ne $_.present })) {
+        $g = @($gotWorkers | Where-Object { [string]$_.label -ceq [string]$w.label }) | Select-Object -First 1
+        $said = @($g.prose | ForEach-Object { [string]$_ })
+        $ok = $said[1].StartsWith('Yesterday I ') -and @($said | Where-Object { $madeUp -ccontains $_ }).Count -eq 0
+        if (@($w.today | Where-Object { $null -ne $_ }).Count -eq 0) { $ok = $ok -and ($said -ccontains [string]$tt.proseTodayNone) }
+        else { $ok = $ok -and -not ($said -ccontains [string]$tt.proseTodayNone) }
+        Assert-True "${name}: $($w.label) says a yesterday and a today, no made-up item" $ok ($said -join ' | ')
+    }
     # An idle worker says its two made-up items, then no blockers, in the frame.
     foreach ($w in @($s.workers | Where-Object { $null -ne $_ -and $_.empty })) {
         $g = @($gotWorkers | Where-Object { [string]$_.label -ceq [string]$w.label }) | Select-Object -First 1

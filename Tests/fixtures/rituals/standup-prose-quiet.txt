@@ -4,7 +4,7 @@ Standup -- Friday 2 October 2026
 Nothing is waiting on you.
 
 Fable: Good morning. Yesterday I read up on how the team works, so I'm ready for what's next. Today I'll move my shell to the new terminal and pick a theme. No blockers. That's it for me.
-Opus: Good morning. Yesterday I closed one in Phase 6: #601, the clock drifts. No blockers. That's it for me.
+Opus: Good morning. Yesterday I closed one in Phase 6: #601, the clock drifts. Today I'll pick up the next item from the board. No blockers. That's it for me.
 Sonnet: Good morning. Yesterday I took a course module on the cloud platform. Today I'll set up the password manager on my phone. No blockers. That's it for me.
 
 Good morning. Yesterday I tidied my notes and my calendar for the week. Today I'll keep the board moving. No blockers. That's it for me.

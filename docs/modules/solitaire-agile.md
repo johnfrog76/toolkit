@@ -310,7 +310,8 @@ turn says it walked), `team` (`size`: the room's windows, the chair included -- 
 as [the team size](#the-team-size-who-is-in-the-room) reads it, 9 when unset), `queue` (`walk`, `decide`, `look`), `workers` (EVERY worker, in label order and the card tile last, each `label`, `name`, `yesterday`,
 `today`, `blockers`, `empty`, `excuse` -- the empty worker's status sentence, the first of `status`, kept for a reader that knows only this field; the name is historical --, `status`, the empty worker's two made-up items `[yesterday, today]`, `[]` for a worker with something to say, and `present`, whether it is in the room today), `work` (the work grain: `queue` -- each kind's groups --,
 `workers` -- the PRESENT workers only, in the same order, each `label`, `name`, the three slots' groups and `prose`, its turn: `turnOpen`, its
-sentences (an idle worker's two made-up items), `proseBlockersNone` when nothing blocks it, `turnClose` --,
+sentences (for a slot it has nothing in, that slot's fixed line -- or, for yesterday, the open items it worked
+inside the window; an idle worker's two made-up items), `proseBlockersNone` when nothing blocks it, `turnClose` --,
 `queueProse`, the queue's sentences, `chairProse`, the chair's own turn (in the same frame and its
 own first person -- a yesterday, a today, `No blockers.` -- never the queue's sentences again; empty
 when no tracker answered), and `text`, the prose; a group is `name`, `by`, `count`, `refs`,
@@ -1391,8 +1392,9 @@ are grouped the same way. The phrase is the group's data; what the work text SAY
 as prose ([the prose](#the-prose)). It keeps the long form's frame -- the title, the chair's
 lines, the `Tracker` line when nothing answered -- with one line for the queue, one turn per worker
 PRESENT today ([the team size](#the-team-size-who-is-in-the-room): an absent worker has no line) and
-the chair's own turn last; an empty slot says nothing, and a worker with nothing says its two made-up
-items. This table's `friday` case, in a room of nine:
+the chair's own turn last; an empty slot beside a filled one says its fixed line, and a worker with
+nothing at all says its two made-up items ([the prose](#the-prose), "The round of the room"). This table's
+`friday` case, in a room of nine:
 
 ```text
 Standup -- Friday 2 October 2026
@@ -1466,6 +1468,8 @@ each group as one standup sentence -- a grammar over the groups, no model. One r
 | fold | today's groups after the first, when there are two or more | ONE sentence, not one a group: the `Also` lead and `proseTodayFold`, `{n} more: {names}` -- `two more: #<n> and Design lifecycle L3`; `{n}` the number of groups, `{names}` their names joined by `proseNameSeparator` (`, `), the last by `proseNameLast` (` and `), and no ref <!-- markdownlint-disable-line MD038 -- the spans show separators with their spaces --> |
 | fold | past `rituals.proseFoldNames` (4) of them | `proseTodayFoldCount`, `{n} more designs` -- `I'm also on seven more designs.` |
 | close | a worker with something to say and no blockers | `proseBlockersNone`, "No blockers." |
+| unsaid | a worker with something to say and nothing yesterday | `proseYesterdayWorked`, "Yesterday I worked on {refs}." -- the open items it worked inside the window, named as the chair names its walks; past `proseFoldNames` (4) `proseYesterdayWorkedMany`, "Yesterday I worked on {n} items."; with none, `proseYesterdayNone`, "Yesterday I picked up where I left off." |
+| unsaid | a worker with something to say and nothing today | `proseTodayNone`, "Today I'll pick up the next item from the board." |
 | turn | every speaker's status, a worker's or the chair's | `turnOpen`, "Good morning.", before its sentences; `turnClose`, "That's it for me.", after them |
 
 **The also-ons fold** (D-SA9: a group and a count, never a list). A worker on eight things
@@ -1487,11 +1491,48 @@ sentences are its kinds' in the ceremony's order, and a queue item routed to nob
 in no worker's line. Every noun, number and clause is the tracker's; every other word is the contract's.
 
 **The round of the room.** Everyone there gives status, in one frame: `Good morning.`, what they did
-yesterday, what they will do today, `No blockers.` (or what blocks them), `That's it for me.` A worker
-with work fills it from the tracker with the sentences above and says only the slots it has -- a worker
-with nothing yesterday says no yesterday, never a made-up one beside a real today. A worker with nothing in
-any slot fills yesterday and today with its two made-up items (`status`: `nothing`, then
-`nothingToday`, which is written `Today I'll ...`). Each worker's line opens with its name: the chair
+yesterday, what they will do today, `No blockers.` (or what blocks them), `That's it for me.` Every
+member's turn has a yesterday and a today, and the rule is three lines:
+
+- **Real facts where there are any.** A slot with work in it says that work, in the sentences above.
+- **A fixed honest line where a slot has none beside a real one.** Nothing today beside a real
+  yesterday (it closed something, nothing is in flight) says `Today I'll pick up the next item from the
+  board.` Nothing yesterday beside real work says, first, a real fact the fill already holds, if there is
+  one: the open items of that member's (today's and the blockers') whose work began inside the window --
+  their motion is `started`: a card's `**Started:**` day, else its `**Created:**` day, or on a GitHub
+  Space an issue's timeline -- or whose card threads a commit authored inside it, which is known only
+  where the dates were read ([what moved, and the window](#what-moved-and-the-window)): `Yesterday I
+  worked on #<n>.`, the refs named as the chair names its walks and counted past `proseFoldNames`
+  (`Yesterday I worked on five items.`). With no such fact it says `Yesterday I picked up where I left
+  off.` An issue merely in progress today is not a yesterday, and a commit nobody dated is not one
+  either. A member whose only items are blockers has neither a yesterday nor a today, so it says both
+  lines, beside its real blocker.
+- **The made-up lists only for a member with nothing at all.** A member with nothing in any slot fills
+  yesterday and today with its two made-up items (`status`: `nothing`, then `nothingToday`, which is
+  written `Today I'll ...`); no other member ever says one.
+
+`standup-prose.json` holds it from both suites: its `unsaid` table (`prose_unsaid`,
+`Get-P20StandupProseUnsaid`), its `itemWorked` table (the real-yesterday fact, `item_worked`,
+`Test-P20StandupItemWorked`), and the cases `one-slot` (blockers only, yesterday only, today only),
+`worked` (a card's start, a dated commit beside an undated one and one outside the window, five
+timelines) and `cards-worked` (a card's start beside commits nobody dated):
+
+```text
+Standup -- Friday 2 October 2026
+"Can we not adjust scope."
+
+Waiting on you to walk one in Phase 6: #<n>, Verify the export on the PC.
+
+Fable: Good morning. Yesterday I picked up where I left off. Today I'll pick up the next item from the board. Blocked on one in Phase 6: #<n>, Verify the export on the PC. That's it for me.
+Opus: Good morning. Yesterday I closed #<n>, Rename the export. Today I'll pick up the next item from the board. No blockers. That's it for me.
+Sonnet: Good morning. Yesterday I picked up where I left off. Today I'm on Phase 7: #<n>, Trim the menu. No blockers. That's it for me.
+
+Good morning. Yesterday I tidied my notes and my calendar for the week. Today I'll walk #<n>. No blockers. That's it for me.
+
+"Let's circle back."
+```
+
+Each worker's line opens with its name: the chair
 calls each member by name, in label order, and the member answers. The chair gives its own status
 LAST, in the same frame and in its own first person, and never says the board's sentences again: the
 opening line has already read the queue (D-TA6), so the chair says what it did and what it will do.
@@ -1517,7 +1558,7 @@ Standup -- Friday 2 October 2026
 
 Waiting on you to walk two in Phase 6 (#<n>, #<n>). Also to walk #<n>, Verify the Studio tab draws on the PC.
 
-Fable: Good morning. Today I'm on the Studio: #<n>, the archived-repository mark. I'm also on #<n>, Rename the slug. Blocked on #<n>, Verify the Studio tab draws on the PC. That's it for me.
+Fable: Good morning. Yesterday I picked up where I left off. Today I'm on the Studio: #<n>, the archived-repository mark. I'm also on #<n>, Rename the slug. Blocked on #<n>, Verify the Studio tab draws on the PC. That's it for me.
 Opus: Good morning. Yesterday I closed two in Team Agile (#<n>, #<n>). I also closed one in the Studio: #<n>, Count the foyer rows. Today I'm on two in Team Agile (#<n>, #<n>). No blockers. That's it for me.
 Sonnet: Good morning. Yesterday I took a course module on the cloud platform. Today I'll set up the password manager on my phone. No blockers. That's it for me.
 
@@ -1531,11 +1572,13 @@ text), and the played view speaks each sentence as a `Say` line. `standup-prose.
 table pins every shape row for row -- one item named or bare, several, the first group and the rest, each
 slot and the walk queue, a count past twelve, a clause found by its head -- its `chairYesterday` and
 `chairToday` tables the chair's two sentences, row for row (none walked, one, two, `proseFoldNames` and
-one past it; each queue kind, several kinds, a crowd counted) -- and its six cases (`friday`, `quiet`,
-`no-tracker`, `cards`, `eight-groups`, `walked`) the sentences, the chair's turn and the goldens
+one past it; each queue kind, several kinds, a crowd counted), its `unsaid` and `itemWorked` tables
+the fixed lines and the real-yesterday fact -- and its nine cases (`friday`, `quiet`, `no-tracker`, `cards`,
+`eight-groups`, `walked`, `one-slot`, `worked`, `cards-worked`) the sentences, the chair's turn and the goldens
 `standup-prose-<case>.txt`: closed and in review (a walk; a card in Code Review), a blocked item, a
-queue item routed to nobody, a worker with nothing to say, a slot with nothing, a queue with nothing,
-and walk items closed in the window (`walked`, the one case whose chair has a real yesterday).
+queue item routed to nobody, a worker with nothing to say, a slot with nothing beside one with
+something, a queue with nothing, walk items closed in the window (`walked`, the one case whose chair has a
+real yesterday), and a yesterday said from work begun or committed in the window (`worked`, `cards-worked`).
 
 ### The agentic layer
 
@@ -1557,7 +1600,8 @@ its type is the kind's type (`Config/ceremonies.json` `standup.kinds`: `bug`/`Bu
 `Config/standup-vocabulary.json` ("wired up", "plumbing for", "smashed", "landed", "chased",
 "unblocked") -- the only family it is shown: never `fakeWork`, `excuses`, `nothing`, `nothingToday` or `phrasebook`, and a test says
 so. Not dressed: the queue's sentences and the chair's turn (the chair's, not a worker's first person), the
-turn's frame (`Good morning.`, `No blockers.`, `That's it for me.`), an idle worker's made-up items. A
+turn's frame (`Good morning.`, `No blockers.`, `That's it for me.`), a slot's fixed line and the
+yesterday said from work in the window (no group speaks them), an idle worker's made-up items. A
 fact's `id` is the worker's label and the sentence's place in its turn (`opus/1`; place 0 is the opener).
 
 **The guard** -- `dress_guard` in the agent, `Test-P20StandupDress` in `Scripts/Standup-Rules.ps1`, one
@@ -1606,7 +1650,7 @@ a document keeps the derived prose, which is true by construction:
 | --- | --- | --- |
 | The played view (the stage) | `spoken` for a worker the model dressed, else `work` | a sentence is heard once, in the register, and a refused one costs nothing |
 | The page's Work grain, Copy, `Standup -Grain work` | `work` (the prose), never `spoken` | they are the record a person pastes or a script reads, so they must be the same words on every machine, key or not; the CLI calls no model |
-| The queue's sentences, the chair's turn, the turn's frame, an idle worker's made-up items | the prose, always | they are never sent to the model |
+| The queue's sentences, the chair's turn, the turn's frame, a slot's fixed line, an idle worker's made-up items | the prose, always | they are never sent to the model |
 
 What turns the dress off, and what the reader sees then. In each case the stage speaks the prose, and the
 standup is complete and correct; nothing on screen says a dress was skipped.
@@ -1746,7 +1790,7 @@ These are how the rituals read, on purpose, and are not on that list:
 - **Only the played view is dressed** (why, and what the reader sees when it is off, under
   [the agentic layer](#the-agentic-layer), "Where the dressed text shows"). `spoken` is the agent's and the stage's: `Standup -Grain work`
   and the page's Work grain show the prose, Copy copies it, and the queue's sentences, the chair's turn, the turn's
-  frame and an idle worker's made-up items are never sent to the model. The decline when no key is set is written to the usage
+  frame, a slot's fixed line and an idle worker's made-up items are never sent to the model. The decline when no key is set is written to the usage
   log, not into the response -- `spoken: null` says only that nothing was dressed, and `GET /api/env`'s
   `anthropicConfigured` says whether a key is there.
 - **Triage's milestones are the Space you are in.** The page's picker reads `GET /api/milestones`, which

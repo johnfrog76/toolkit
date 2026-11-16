@@ -323,6 +323,10 @@ EXPECTED = {
         "proseBlockers": "Blocked on",
         "proseBlockersAlso": "Also blocked on",
         "proseBlockersNone": "No blockers.",
+        "proseYesterdayNone": "Yesterday I picked up where I left off.",
+        "proseYesterdayWorked": "Yesterday I worked on {refs}.",
+        "proseYesterdayWorkedMany": "Yesterday I worked on {n} items.",
+        "proseTodayNone": "Today I'll pick up the next item from the board.",
         "turnOpen": "Good morning.",
         "turnClose": "That's it for me.",
         "chairYesterday": "Yesterday I walked {refs}.",
@@ -667,6 +671,9 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("studio.ledgerRoute", "/api/studio/ledger"),
         ("rituals.text.workBlockers", "{n} to walk"),
         ("rituals.text.proseBlockersNone", "No blockers."),
+        # A slot with nothing beside one with something: standup.py reads the lines from rituals.text.
+        ("rituals.text.proseYesterdayNone", "Yesterday I picked up where I left off."),
+        ("rituals.text.proseTodayNone", "Today I'll pick up the next item from the board."),
         # The turn's frame: standup.py reads it from rituals.text.
         ("rituals.text.turnOpen", "Good morning."),
         ("rituals.text.turnClose", "That's it for me."),

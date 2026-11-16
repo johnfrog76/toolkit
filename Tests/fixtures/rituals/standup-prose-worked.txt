@@ -1,0 +1,12 @@
+Standup -- Friday 2 October 2026
+"Can we not adjust scope."
+
+Nothing is waiting on you.
+
+Fable: Good morning. Yesterday I worked on #911. Today I'm on two in Team Agile (#911, #912). No blockers. That's it for me.
+Opus: Good morning. Yesterday I worked on #921. Today I'm on #921, Date the commits. I'm also on two more: Count the window and Say the undated. No blockers. That's it for me.
+Sonnet: Good morning. Yesterday I worked on five items. Today I'm on five in Phase 6 (#931, #932, #933, #934, #935). No blockers. That's it for me.
+
+Good morning. Yesterday I tidied my notes and my calendar for the week. Today I'll keep the board moving. No blockers. That's it for me.
+
+"Let's circle back."

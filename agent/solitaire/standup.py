@@ -252,9 +252,10 @@ class WorkWorker(BaseModel):
     yesterday: list[WorkGroup] = []
     today: list[WorkGroup] = []
     blockers: list[WorkGroup] = []
-    # The prose: the worker's turn, in order -- turnOpen, one sentence a group
-    # (an idle worker's two made-up items), proseBlockersNone when nothing blocks
-    # it, then turnClose. Empty only when there is nothing to say.
+    # The prose: the worker's turn, in order -- turnOpen, one sentence a group,
+    # a slot with nothing its fixed line (``prose_unsaid``; an idle worker's two
+    # made-up items instead), proseBlockersNone when nothing blocks it, then
+    # turnClose. Empty only when there is nothing to say.
     prose: list[str] = []
 
 
@@ -1144,7 +1145,7 @@ def fill_joined_standup(
     # The card tile is a member like the labels: seated by the same rule, after them.
     set_present(out.workers, out.team.size)
     out.queue.walk.extend(walk)
-    out.work = build_work(out, {**issue_keys(issues), **card_keys})
+    out.work = build_work(out, {**issue_keys(issues), **card_keys}, dated=commit_dates is not None)
     out.counts = standup_counts(out, {**hashes, **tile_hashes}, {**undated, **tile_undated})
     return out
 
@@ -1330,9 +1331,40 @@ def work_template(slot: str) -> str:
     return t.get(f"work{slot[:1].upper()}{slot[1:]}") or t["workGroup"]
 
 
-def build_work(filled: Standup, key_of: dict[str, tuple[str, str]]) -> Work:
+def item_worked(item: SlotItem, dated: bool) -> bool:
+    """Whether an open item holds real work inside the window, the fact a
+    yesterday may say when it closed nothing: its work began inside it (its
+    motion is started -- a card's **Started:** or **Created:** day, or an issue's
+    timeline) or, where the commit dates were read (``dated``), its card threads a
+    commit authored inside it. Undated commits prove nothing, and an item merely
+    in progress is no fact. Pure; the mirror of ``Test-P20StandupItemWorked``."""
+    closed, started, _in_progress = rituals_motions()
+    if item.motion == closed:
+        return False
+    return item.motion == started or (dated and item.commits > 0)
+
+
+def prose_unsaid(slot: str, worked: list[str]) -> list[str]:
+    """What a member with something to say says for a slot it has nothing in:
+    ``text.prose<Slot>Worked`` with ``worked`` (the refs of its open items worked
+    inside the window, ``item_worked``) where the slot has that template and
+    there are some -- ``prose<Slot>WorkedMany`` with their count past
+    proseFoldNames -- else the fixed line ``text.prose<Slot>None``; nothing when
+    the slot has neither. Never a made-up item. Pure; the mirror of
+    ``Get-P20StandupProseUnsaid``; standup-prose.json's ``unsaid`` rows."""
+    t = rituals_text()
+    cap = slot[:1].upper() + slot[1:]
+    if worked and t.get(f"prose{cap}Worked"):
+        return [_chair_refs(f"prose{cap}Worked", worked)]
+    line = t.get(f"prose{cap}None") or ""
+    return [line] if line else []
+
+
+def build_work(filled: Standup, key_of: dict[str, tuple[str, str]], dated: bool = False) -> Work:
     """The filled standup's work grain, text left empty. ``key_of`` maps an item's
-    ``<ref>|<path>`` to its ``work_key``. Pure."""
+    ``<ref>|<path>`` to its ``work_key``; ``dated`` is whether the commit dates
+    were read, so a card's commits are only those inside the window
+    (``item_worked``). Pure."""
     rest = rituals_text()["workGroup"]
 
     def groups(items, slot: str) -> tuple[list[WorkGroup], list[str]]:
@@ -1354,13 +1386,24 @@ def build_work(filled: Standup, key_of: dict[str, tuple[str, str]]) -> Work:
     # The round speaks the present only (``set_present``): an absent worker has no row.
     for w in (w for w in filled.workers if w.present):
         slots: dict[str, list[WorkGroup]] = {}
-        prose: list[str] = []
+        sentences: dict[str, list[str]] = {}
         for slot in cer["slots"]:
-            slots[slot], said = groups(getattr(w, slot), slot)
-            prose += said
-        # An idle worker's sentences are its two made-up items, yesterday and today.
-        said = list(w.status) if w.empty else prose
-        workers.append(WorkWorker(label=w.label, name=w.name, prose=prose_turn(prose_close(said, slots)), **slots))
+            slots[slot], sentences[slot] = groups(getattr(w, slot), slot)
+        if w.empty:
+            # An idle worker's sentences are its two made-up items, yesterday and today.
+            said = prose_close(list(w.status), slots)
+        else:
+            # Real facts where there are any; a slot with none says its fixed line
+            # (prose_unsaid) -- never a made-up item beside a real one.
+            mine = {
+                (f"#{i.number}" if i.number is not None else (i.id or ""))
+                for slot in cer["slots"]
+                for i in getattr(w, slot)
+                if item_worked(i, dated)
+            }
+            worked = [r for slot in cer["slots"] for g in slots[slot] for r in g.refs if r in mine]
+            said = [x for slot in cer["slots"] for x in (sentences[slot] or prose_unsaid(slot, worked))]
+        workers.append(WorkWorker(label=w.label, name=w.name, prose=prose_turn(said), **slots))
     chair = chair_turn(filled, queue) if filled.tracker.ok else []
     return Work(queue=WorkQueue(**queue), workers=workers, queueProse=queue_prose, chairProse=chair)
 
@@ -1392,7 +1435,10 @@ def build_work(filled: Standup, key_of: dict[str, tuple[str, str]]) -> Work:
 #         past it: text.prose<Slot>FoldCount    "seven more designs"
 #
 # No ref in a folded sentence: the thought bubble keeps every number.
-# A worker with something to say and no blockers ends on text.proseBlockersNone.
+# A worker with something to say and no blockers ends on text.proseBlockersNone,
+# and says a yesterday and a today: a slot it has nothing in says text.prose<Slot>None
+# -- for yesterday, first the refs of its open items worked inside the window,
+# text.prose<Slot>Worked. Only a worker with nothing at all says made-up items.
 # The mirror of the CLI's Get-P20StandupProseSentence and Get-P20StandupProse;
 # standup-prose.json is the table.
 
@@ -1462,8 +1508,8 @@ def prose_sentences(slot: str, groups: list[WorkGroup], titles: dict[str, str]) 
 
 
 def prose_close(said: list[str], slots: dict[str, list[WorkGroup]]) -> list[str]:
-    """A worker's sentences, closed: proseBlockersNone after them when there are
-    any and the blockers slot has none. A worker with nothing says nothing."""
+    """An idle worker's sentences, closed: proseBlockersNone after them when there
+    are any and the blockers slot has none. No sentences say nothing."""
     if said and not slots.get("blockers"):
         return said + [rituals_text()["proseBlockersNone"]]
     return said
@@ -1680,7 +1726,9 @@ def dress_guard(facts: dict, sentence: str) -> str:
 
 def dress_facts(filled: Standup) -> list[dict]:
     """The facts the model is given: one entry per worker sentence that says a
-    group -- not the closing proseBlockersNone, not the queue's sentences (they
+    group -- not the closing proseBlockersNone, not a slot's line from
+    ``prose_unsaid`` (a fixed line, or the refs worked in the window: no group
+    speaks it), not the queue's sentences (they
     are the chair's, not a worker's first person), not an excuse (the empty worker reports "nothing").
     A folded sentence (prose_folds) is one entry: its name is the names it says
     (none past proseFoldNames), its count the groups', and its refs only what
@@ -1698,6 +1746,12 @@ def dress_facts(filled: Standup) -> list[dict]:
             items = getattr(w, slot)
             titles = {(f"#{i.number}" if i.number is not None else (i.id or "")): i.title for i in items}
             groups = getattr(ww, slot)
+            if not groups:
+                # A slot with nothing says its line from prose_unsaid -- a fixed
+                # line, or the refs worked in the window -- and no group: not a
+                # fact to reword, so it is passed over like the frame.
+                at += len(prose_unsaid(slot, []))
+                continue
             if prose_folds(slot, groups):
                 if at < len(ww.prose):
                     facts.append(_fact(filled, ww, slot, True, at, groups[0], titles))
@@ -2047,7 +2101,7 @@ def render_work(filled: Standup) -> str:
     sentences, turnClose; an idle worker's are its two made-up items; an absent
     worker says nothing -- ``set_present``), and the chair's own
     turn last (``chairProse``: its own voice, in the same frame). An empty slot
-    says nothing. LF-joined and LF-terminated. Pure; the mirror of
+    beside a filled one says its fixed line (``prose_unsaid``). LF-joined and LF-terminated. Pure; the mirror of
     ``Format-P20StandupWork``, held by the ``standup-prose-*.txt`` goldens."""
     t = rituals_text()
     width = rituals_label_width()
