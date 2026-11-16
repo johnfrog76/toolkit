@@ -138,6 +138,8 @@ with no reachable GitHub tracker still answers 200 with the ritual and the reaso
 ([Team Agile](modules/solitaire-agile.md), "The file shape, and how a standup is read").
 `GET /api/ritual/milestones` is the Releases tab's read, the ado core's milestone reader and its one
 reached rule under the same gate, kept a minute, against `Tests/fixtures/rituals/milestones.json`.
+`GET /api/ritual/org` is the org chart's read: the hub's `org.json` through `agent/solitaire/org.py`, a mirror of the CLI's reader held to
+`Tests/fixtures/org/table.json`, under the same gate, with each position's prompt title and reading-room ref from the Studio's prompt record.
 `GET /api/ritual/triage` (V1) is the same shape for triage, against `Tests/fixtures/rituals/triage.json`;
 its answers are the CLI's `Route`, which the web runs only as `POST /api/cmd/Route` -- the module's
 first write is a tracker label, through the bridge like every other. The hand-off block (`StartWork`)
@@ -474,7 +476,7 @@ agent/                  The FastAPI agent -- see agent/README.md
   organize/               reminders -- gated on features.organize
   studio/                 notes (the hub's design/ notes), spaces (the + dialog's repositories, NewSpace -Discover),
                           ledger (the Spaces card's read) and prompts (the Prompts card) -- core, mounted with no gate (D-S13)
-  solitaire/              standup, triage, agenda, milestones, remind (the standup's attend and remind),
+  solitaire/              standup, triage, agenda, milestones, org (the org chart), remind (the standup's attend and remind),
                           corner (the PM Corner), suggest (the suggestion) and tracker (the read they share),
                           from a GitHub Space's tracker -- gated on features.solitaireAgile
 web/                    The React shell + modules -- see web/README.md

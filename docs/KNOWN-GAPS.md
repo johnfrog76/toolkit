@@ -386,11 +386,10 @@ DevOps sentence is shared by both.
 
 **Issue:** [#392](https://github.com/johnfrog76/toolkit/issues/392)
 
-### The org chart has no route or page yet
+### The org chart has no page yet
 
-**What you see:** `OrgChart` prints the org's tree in a terminal, and `OrgChart -AsJson` prints the response the agent will
-serve, but the agent has no route for it and the Team Agile page has no Org tab. The chart is read from
-`org.json` at the hub root by the CLI alone, and only where Team Agile is on.
+**What you see:** `GET /api/ritual/org` serves the org's tree, and `OrgChart` prints it in a terminal, but the Team
+Agile page has no Org tab. The chart is read from `org.json` at the hub root, and only where Team Agile is on.
 
 **Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
 

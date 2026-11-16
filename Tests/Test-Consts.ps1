@@ -229,6 +229,7 @@ $expected = [ordered]@{
     'rituals.route'             = '/api/ritual/standup'
     'rituals.triageRoute'       = '/api/ritual/triage'
     'rituals.milestonesRoute'   = '/api/ritual/milestones'
+    'rituals.orgRoute'          = '/api/ritual/org'
     'rituals.assignMe'          = 'me'
     'rituals.ceremoniesFile'    = 'Config/ceremonies.json'
     'rituals.vocabularyFile'    = 'Config/standup-vocabulary.json'
