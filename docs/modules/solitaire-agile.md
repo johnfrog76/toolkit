@@ -430,10 +430,10 @@ and the office is a link to the prompt in the Studio's reading room (`promptPath
 pool and a prompt the room does not list are not links. The faces are the web's choice, never the file's:
 `orgChart.ts` maps a position's id to its faces, as the mock staffs it, and a position it does not name takes
 its level's. With no `org.json` the page says `No org chart yet` and the agent's sentence; a file that fails its
-checks (409) is an error with its sentence; a tree the file does not have (422, `unknown-tree`) is an error in
+checks (409) is said plainly too, `The org chart could not be read` and its sentence; a tree the file does not have (422, `unknown-tree`) is said plainly in
 the page's own words, `That org chart is not in the file` and `The chart asked for is not one of the trees in the
 hub's org.json. Nothing was drawn.`, decided by the kind and never the agent's sentence, which is the
-terminal's (the page asks for no tree today, so it meets this only if that changes); no answer is `Could not read the org chart`. The page chooses no
+terminal's (the page asks for no tree today, so it meets this only if that changes); no answer is `Could not read the org chart`, the one state drawn as an error: the error tone is kept for the agent being away or failing, and a thing to know about the file is not one. The page chooses no
 tree, draws no `active` state and writes nothing. `OrgPage.test.tsx` and `orgChart.test.ts` draw the shared
 table's charts (`Tests/fixtures/org/charts/`).
 

@@ -196,16 +196,16 @@ describe("when there is no chart", () => {
     expect(screen.queryByTestId("org-chart")).toBeNull();
   });
 
-  it("an invalid file (409): the agent's sentence, as an error", () => {
+  it("an invalid file (409): the agent's sentence, plainly, not as an error", () => {
     const message = "Positions in tree 'a' report to each other in a loop: p -> r -> q -> p.";
     response = {
       isLoading: false,
       error: { status: 409, data: { detail: { kind: "cycle", message } } },
     };
     draw();
-    const alert = screen.getByRole("alert");
-    expect(within(alert).getByText("The org chart could not be read")).toBeTruthy();
-    expect(within(alert).getByText(message)).toBeTruthy();
+    expect(screen.getByText("The org chart could not be read")).toBeTruthy();
+    expect(screen.getByText(message)).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("a tree the file does not have (422): the page's own sentence, not the terminal's", () => {
@@ -215,10 +215,10 @@ describe("when there is no chart", () => {
       error: { status: 422, data: { detail: { kind: "unknown-tree", message } } },
     };
     draw();
-    const alert = screen.getByRole("alert");
-    expect(within(alert).getByText("That org chart is not in the file")).toBeTruthy();
-    expect(within(alert).getByText(UNKNOWN_TREE_DETAIL)).toBeTruthy();
-    expect(alert.textContent).not.toContain("-Tree");
+    expect(screen.getByText("That org chart is not in the file")).toBeTruthy();
+    expect(screen.getByText(UNKNOWN_TREE_DETAIL)).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(document.body.textContent).not.toContain("-Tree");
     expect(screen.queryByText(message)).toBeNull();
     expect(screen.queryByTestId("org-chart")).toBeNull();
   });

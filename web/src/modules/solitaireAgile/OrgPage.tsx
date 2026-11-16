@@ -277,19 +277,20 @@ export const UNKNOWN_TREE_DETAIL =
 
 /** The no-chart states: no file (404), a file that fails its checks (409), a
  *  tree the file does not have (422, said in the page's words: the agent's
- *  sentence is the terminal's), and anything else as the error it is. */
+ *  sentence is the terminal's). Each of those is something to know, said
+ *  plainly. The error tone is kept for what is left: the agent did not answer,
+ *  or answered with a failure of its own. */
 function noChart(error: unknown, icon: EmptyMessage["icon"]): EmptyMessage {
   const r = orgRefusal(error);
   if (r.status === 404 && (r.kind === "missing" || r.kind === "no-hub")) {
     return { icon, title: "No org chart yet", detail: r.message };
   }
   if (r.status === 409 && r.kind) {
-    return { icon, tone: "error", title: "The org chart could not be read", detail: r.message };
+    return { icon, title: "The org chart could not be read", detail: r.message };
   }
   if (r.status === 422 && r.kind === "unknown-tree") {
     return {
       icon,
-      tone: "error",
       title: "That org chart is not in the file",
       detail: UNKNOWN_TREE_DETAIL,
     };
