@@ -497,3 +497,73 @@ export const milestonesEndpoints = api.injectEndpoints({
 });
 
 export const { useGetRitualMilestonesQuery } = milestonesEndpoints;
+
+// -- The org chart (the Org tab) ------------------------------------------
+//
+// The hub's org.json, the tree in use, as GET /api/ritual/org serves it
+// (docs/hub/org.md, "The response"): the positions in tree order, each with its
+// level and seats, and the two fields only the agent adds -- the prompt's title
+// and the ref that opens it in the Studio's reading room. A READ: nothing here
+// writes, and there is no Space parameter -- the file is the engineer's.
+
+/** One seat of a position: a model, or a person (the owner), or nobody. */
+export interface OrgSeat {
+  id: string;
+  model: string | null;
+  person: string | null;
+  machine: string | null;
+  space: string | null;
+  /** Allowed by the file's shape; nothing draws it yet. */
+  active: boolean | null;
+  /** Derived by the reader: vacant is a seat with no model and no person. */
+  state: "staffed" | "vacant";
+}
+
+export interface OrgPosition {
+  id: string;
+  title: string;
+  prompt: string | null;
+  reportsTo: string | null;
+  defaultModel: string | null;
+  /** The root is 0. */
+  level: number;
+  /** Empty for a pool (the builders): its default-model line is what it says. */
+  seats: OrgSeat[];
+  /** The prompt's title, as the reading room reads it; null with no prompt. */
+  promptTitle: string | null;
+  /** The address after /studio/prompts/ (promptPath); null with no prompt, or one
+   *  the reading room does not list. */
+  promptRef: string | null;
+}
+
+export interface OrgTree {
+  id: string;
+  name: string;
+  machines: string[];
+  positions: OrgPosition[];
+}
+
+export interface OrgResponse {
+  activeTree: string;
+  tree: OrgTree;
+}
+
+/** A refusal's detail: the kind is the contract, the message the sentence. */
+export interface OrgRefusal {
+  kind: string;
+  message: string;
+}
+
+export const ORG_QUERY = underBase(RITUALS.orgRoute);
+
+export const orgEndpoints = api.injectEndpoints({
+  endpoints: (builder) => ({
+    // GET /api/ritual/org -- the tree in use, read from the hub's org.json
+    getOrgChart: builder.query<OrgResponse, void>({
+      query: () => ORG_QUERY,
+      keepUnusedDataFor: CACHE_TTL,
+    }),
+  }),
+});
+
+export const { useGetOrgChartQuery } = orgEndpoints;

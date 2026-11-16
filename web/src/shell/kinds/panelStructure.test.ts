@@ -110,6 +110,7 @@ const FRAME_EXEMPT: Record<string, string> = {
   "modules/growth/SkillsPage.tsx": "a detail page: the skills behind the snapshot",
   "modules/organize/ReferencePage.tsx": "a document page: one reference document, read only",
   "modules/solitaireAgile/StandupPage.tsx": "the Standup page",
+  "modules/solitaireAgile/OrgPage.tsx": "the Org page: the org chart, a scene of offices",
   "modules/solitaireAgile/TriagePage.tsx": "the Triage page",
   "modules/studio/DesignNotePage.tsx": "a document page: one hub design note",
   "modules/studio/PromptPage.tsx": "a document page: one prompt",
