@@ -261,6 +261,19 @@ EXPECTED = {
         "noWorkers": "No worker labels in this Space.",
         "adoTracker": "Azure DevOps is the human team's board, and its standup is the one the team holds; "
         "Team Agile reads a GitHub Space's issues and cards, or a local Space's cards.",
+        "trackerNotGitHub": "This Space's tracker is not GitHub -- {ritual} reads a GitHub Space's issues.",
+        "trackerNotAsked": "This Space is {status}, so its tracker is not asked.",
+        "trackerTier": "The tracker is not reachable from here (tier {tier}).",
+        "trackerNoRepo": "This GitHub Space names no repository -- "
+        "give its address a repository, or add one to its projects.",
+        "trackerManyRepos": "Issue numbers are per-repository, and this board has {n}: {repos}.",
+        "trackerGhMissing": "gh is not installed, so the tracker was not asked.",
+        "trackerGhNoAnswer": "gh did not answer for {repo}: {error}",
+        "trackerGhSilent": "gh did not answer for {repo}",
+        "trackerRepoUnreadable": "gh cannot read {repo} -- "
+        "it does not exist yet, or it is private to an account this gh login is not",
+        "trackerNotJson": "gh answered for {repo} with something that is not JSON",
+        "trackerReadFailed": "The tracker read failed: {error}",
         "check": "Check",
         "checkCardArchived": "{item} -- the card is archived, but the issue is still open.",
         "checkIssueClosed": "{item} -- the issue is closed, but the card is not archived.",
@@ -384,6 +397,7 @@ EXPECTED = {
     ("ghReads", "openIssues"): 500,
     ("ghReads", "allIssues"): 500,
     ("ghReads", "labels"): 500,
+    ("ghReads", "repoMissing"): ["could not resolve to a repository", "not found (http 404)", "http 404"],
     # Claude Code usage: /env's flag (the inventory row's key) and the burn route.
     ("usage", "envFlag"): "claudeUsage",
     ("usage", "burnRoute"): "/api/usage/burn",
@@ -592,6 +606,7 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.gh_read_limit_open_issues(), EXPECTED[("ghReads", "openIssues")])
         self.assertEqual(C.gh_read_limit_all_issues(), EXPECTED[("ghReads", "allIssues")])
         self.assertEqual(C.gh_read_limit_labels(), EXPECTED[("ghReads", "labels")])
+        self.assertEqual(list(C.gh_repo_missing_markers()), EXPECTED[("ghReads", "repoMissing")])
         self.assertEqual(C.usage_env_flag(), EXPECTED[("usage", "envFlag")])
         self.assertEqual(C.usage_burn_route(), EXPECTED[("usage", "burnRoute")])
         self.assertEqual(C.usage_readings_folder(), EXPECTED[("usage", "readingsFolder")])
@@ -706,6 +721,12 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         # Daily's window sentences: the route reads them through billing_text().
         ("billing.text.halfWindow", "-Since and -Until go together"),
         ("billing.text.notADay", "is not a day: yyyy-MM-dd"),
+        # The Tracker line's sentences: agent/solitaire/tracker.py reads them through rituals_text().
+        ("rituals.text.trackerTier", "The tracker is not reachable from here"),
+        ("rituals.text.trackerNotGitHub", "reads a GitHub Space's issues"),
+        ("rituals.text.trackerReadFailed", "The tracker read failed"),
+        # A repository gh cannot read: accounting.py reads the words through gh_repo_missing_markers().
+        ("ghReads.repoMissing", "could not resolve to a repository"),
     ]
 
     # The allowlist, and why each entry is on it:

@@ -18,6 +18,7 @@
     { "event": "pull_request", "paths": ["docs/KNOWN-GAPS.md"], "cli": false, "agent": false, "web": false, "contract": true, "why": "the known gaps: DocCounts, Menu and Portability read it, all in the contract set" },
     { "event": "pull_request", "paths": ["docs/modules/deep/x.md"], "cli": true, "agent": true, "web": true, "contract": false, "why": "only the module documents themselves: a folder under docs/modules/ is shared" },
     { "event": "pull_request", "paths": ["docs/CLI.md"], "cli": true, "agent": true, "web": true, "contract": false, "why": "the control: docs/CLI.md's command rows are asserted by the CLI's Menu, so it stays shared" },
+    { "event": "pull_request", "paths": ["docs/TEST-COUNTS.md", "consts.json"], "cli": true, "agent": true, "web": true, "contract": false, "why": "the counts file, written in a release pull request beside the version: shared, all three, so the release's counts are run" },
     { "event": "pull_request", "paths": ["docs/CONFIGURATION.md"], "cli": true, "agent": true, "web": true, "contract": false, "why": "docs/CONFIGURATION.md: shared" },
     { "event": "pull_request", "paths": ["docs/hub/cards.md"], "cli": true, "agent": true, "web": true, "contract": false, "why": "docs/hub/: shared; test_growth.py reads docs/hub/growth.md" },
     { "event": "pull_request", "paths": ["consts.json"], "cli": true, "agent": true, "web": true, "contract": false, "why": "consts.json: shared" },

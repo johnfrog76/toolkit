@@ -279,10 +279,10 @@ if ($choice.source -eq 'none') {
 elseif ($choice.source -eq 'both') {
     $target = Resolve-P20TrackerRepo -OrgUrl $org -Projects $projects -CliPrefix (Get-CliPrefix)
     if ($target.Reason) {
-        $tracker.reason = $target.Reason
+        $tracker.reason = Get-P20TrackerRepoReason -Target $target
     }
     elseif (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-        $tracker.reason = 'gh is not installed, so the tracker was not asked.'
+        $tracker.reason = Format-P20TrackerReason -Key 'trackerGhMissing'
     }
     else {
         # -- The thin layer: two gh reads (Scripts/Ritual-Common.ps1) --------

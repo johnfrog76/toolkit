@@ -97,7 +97,7 @@ This file is the front door. Each subject has one document that owns it; the oth
 | **[Quick start](docs/QUICKSTART.md)** | Requirements, install, autoload on both PowerShell hosts, the first run (`tkStart`), a first card, the web UI up, and the supported platforms: macOS and Windows verified, Linux's suites green in CI |
 | **[Configuration](docs/CONFIGURATION.md)** | `tkConfig`, the three files and who writes each, `consts.json`, the hub's `hub.json` and its Spaces |
 | **[The CLI](docs/CLI.md)** | The prefix, the workflow and its three state machines, the command reference, tiers, errors, the log, AI review, the agentic workflows |
-| **[Testing](docs/TESTING.md)** | `tkSetup`, the four runners, every suite and its count, one toolkit per shell |
+| **[Testing](docs/TESTING.md)** | `tkSetup`, the four runners, every suite, where the counts live, one toolkit per shell |
 | **[The agent and the web UI](docs/ARCHITECTURE.md)** | How the three halves fit, and the overview of the other two: routes, `/env`, the bridge, the shell, Docker, the repo layout |
 | **[The modules](docs/modules/README.md)** | The add-ons -- Azure DevOps, growth, communication, organize, deck, lounge -- and the Studio, which is core; what each one's document must contain, "off means absent", how a module contributes commands (D-CM) |
 | **[Known gaps](docs/KNOWN-GAPS.md)** | What it does not do, what you see if you try, where you meet it, and the issue that carries each |

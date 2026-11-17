@@ -101,9 +101,11 @@ tkTest -Half agent       # one half: cli, agent or web
 Or run the half you touched with its own runner -- `tkTestToolkit` for the CLI, `python3 -m pytest Tests/`
 for the agent (on Windows: `python` or `py -3`), and `npm test` from `web/` for the web UI --
 and `npm run smoke` from `web/` when a change shows in the browser. Run the ones your change touches,
-and read the summary line rather than the total: a skip is not a pass. What each suite guards, the
-counts a green run prints, and the one rule for a shell with two checkouts in it (one toolkit per
-shell) are in [Testing](TESTING.md). The runners remove any `TEAMS_WEBHOOK_*` variable from their own
+and read the summary line rather than the total: a skip is not a pass. A pull request states no test
+count, and a count typed into a document fails `tkTestToolkit -DocCounts`: the counts live in
+[`docs/TEST-COUNTS.md`](TEST-COUNTS.md), written at a release. What each suite guards, how those counts are
+written, and the one rule for a shell with two checkouts in it (one toolkit per shell) are in
+[Testing](TESTING.md). The runners remove any `TEAMS_WEBHOOK_*` variable from their own
 processes, so a suite never posts to a real channel.
 
 ## The refusal contract

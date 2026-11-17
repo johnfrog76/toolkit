@@ -27,10 +27,41 @@ from collections.abc import Callable
 
 from ..ado import accounting
 from ..ado.design import LIST_TTL_SECONDS
+from ..core.child import ChildReadError
 from ..core.config import ISSUE_LIMIT_ALL, ISSUE_LIMIT_OPEN, tracker, tracker_repos
+from ..core.consts import rituals_text
 from ..core.tier import _resolve_tier
 
-NO_REPO_REASON = "This GitHub space names no repository."
+
+def tracker_reason(key: str, **values: object) -> str:
+    """Why the tracker was not read, as the one sentence the Tracker line
+    carries: consts.json rituals.text.<key>, each {name} filled from ``values``.
+    The CLI words the same reasons from the same keys (Scripts/Ritual-Common.ps1,
+    Format-P20TrackerReason); Tests/fixtures/rituals/tracker-reasons.json holds
+    both halves to one table."""
+    text = rituals_text()[key]
+    for name, value in values.items():
+        text = text.replace("{" + name + "}", str(value))
+    return text
+
+
+def gh_reason(failure: accounting.GhFailure) -> str:
+    """A failed gh list read, as the Tracker line's sentence."""
+    repo = failure.repo
+    if failure.kind == "missing":
+        return tracker_reason("trackerGhMissing")
+    if failure.kind == "raised":
+        exc = failure.exc
+        error = str(exc) if isinstance(exc, ChildReadError) else exc.__class__.__name__
+        return tracker_reason("trackerGhNoAnswer", repo=repo, error=error)
+    if failure.kind == "exit":
+        if not failure.line:
+            return tracker_reason("trackerGhSilent", repo=repo)
+        if accounting.repo_missing(failure.line):
+            return tracker_reason("trackerRepoUnreadable", repo=repo)
+        return tracker_reason("trackerGhNoAnswer", repo=repo, error=failure.line)
+    return tracker_reason("trackerNotJson", repo=repo)
+
 
 # How long one gh answer is served again: the design list's TTL.
 READ_TTL_SECONDS = LIST_TTL_SECONDS
@@ -69,7 +100,7 @@ def remember(key: tuple, refresh: bool, read: Callable[[], tuple[object, str | N
 
 
 def labels(repo: str, refresh: bool = False) -> tuple[list[dict], str | None]:
-    rows, why = remember(("labels", repo), refresh, lambda: accounting._gh_labels(repo))
+    rows, why = remember(("labels", repo), refresh, lambda: accounting._gh_labels(repo, say=gh_reason))
     return copy.deepcopy(rows), why  # a copy: a caller never edits what is kept
 
 
@@ -94,7 +125,9 @@ def issues(repo: str, state: str, body: bool = False, refresh: bool = False) -> 
         if derived is not None and _fresh(("issues", repo, state, body)) is None:
             return copy.deepcopy(derived), None
     rows, why = remember(
-        ("issues", repo, state, body), refresh, lambda: accounting._gh_issues(repo, True, state, body=body)
+        ("issues", repo, state, body),
+        refresh,
+        lambda: accounting._gh_issues(repo, True, state, body=body, say=gh_reason),
     )
     return copy.deepcopy(rows), why
 
@@ -162,14 +195,13 @@ def github_repos(
     """(the Space's repos, tracker state) -- the checks every ceremony makes before
     asking gh anything: a GitHub Space, tier 1, and at least one repo. Never raises."""
     if tracker(org) != "github":
-        reason = f"This Space's tracker is not GitHub -- {ritual} reads a GitHub Space's issues."
-        return [], {"ok": False, "reason": reason}
+        return [], {"ok": False, "reason": tracker_reason("trackerNotGitHub", ritual=ritual)}
     tier, _ = _resolve_tier(org, status, refresh)
     if tier != 1:
-        return [], {"ok": False, "reason": f"The tracker is not reachable from here (tier {tier})."}
+        return [], {"ok": False, "reason": tracker_reason("trackerTier", tier=tier)}
     repos = tracker_repos(org, projects)
     if not repos:
-        return [], {"ok": False, "reason": NO_REPO_REASON}
+        return [], {"ok": False, "reason": tracker_reason("trackerNoRepo")}
     return repos, {"ok": True, "reason": ""}
 
 
@@ -207,5 +239,6 @@ def read_tracker(
                 return [], [], {"ok": False, "reason": why}
             rows_in += rows
     except Exception as exc:  # noqa: BLE001 -- a reader that raised is a tracker that did not answer
-        return [], [], {"ok": False, "reason": f"The tracker read failed: {exc.__class__.__name__}: {exc}"}
+        error = f"{exc.__class__.__name__}: {exc}"
+        return [], [], {"ok": False, "reason": tracker_reason("trackerReadFailed", error=error)}
     return list(found.values()), rows_in, {"ok": True, "reason": ""}

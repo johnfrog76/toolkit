@@ -1858,7 +1858,8 @@ for the next person which ports they are allowed to use.
 npm test
 ```
 
-How many suites and tests the shell has, and every suite's count, is
+How many suites and tests the shell had at the last release is
+[`docs/TEST-COUNTS.md`](../docs/TEST-COUNTS.md); what each suite guards is
 [`docs/TESTING.md`](../docs/TESTING.md), which lists them all. The ones whose contract is worth a
 paragraph:
 

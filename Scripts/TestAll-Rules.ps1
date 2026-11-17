@@ -27,18 +27,25 @@
                                    with nothing passed is not a pass.
                                    The smoke is read by it too, though it is
                                    not one of Test's halves.
-      Read-P20ExpectedCounts       the three totals docs/TESTING.md prints.
-      Get-P20PasteBlock            docs/TESTING.md's paste block, each line given
-                                   to the half it belongs to -- the one rule the
-                                   drift check and CI's carried-lines check read.
-      Get-P20CountLinePatterns     the count lines {cliPrefix}TestToolkit -DocCounts
-                                   reads in docs/TESTING.md, AGENTS.md and VERIFY.md.
-      Get-P20CountOnlyPaths        which of those files a diff changes in its
-                                   count lines and nowhere else.
+      Get-P20TestCountsFile        where the counts live (docs/TEST-COUNTS.md),
+                                   its writer, and the headings the runners
+                                   print above a run's counts.
+      Get-P20CountLinePatterns     the shapes of a run's four count lines: as a
+                                   block's lines, and as typed into a document.
+      ConvertFrom-P20CountsBlock   a full run's printed block (or a transcript
+                                   holding one) -> its four lines, and every way
+                                   it is not a full run's.
+      Format-P20TestCountsFile     docs/TEST-COUNTS.md's text from a block and a
+                                   version: what Scripts/Write-TestCounts.ps1
+                                   writes.
+      Read-P20TestCountsFile       docs/TEST-COUNTS.md read back and held to that.
+      Read-P20ExpectedCounts       the three totals docs/TEST-COUNTS.md states.
+      Get-P20TypedCountLines       every count line typed into a document other
+                                   than docs/TEST-COUNTS.md.
+      Get-P20TestCountsChangeFindings  a change to docs/TEST-COUNTS.md that does
+                                   not change consts.json's version.
       Get-P20CiScope               which of CI's jobs a change runs, from the
                                    event and the files it changed.
-      Get-P20CarriedCountFindings  a pull request's paste lines for the halves
-                                   that did not run, against main's.
       Read-P20TestSummary          the summary file, as nested hashtables.
       Merge-P20TestSummary         write some halves into the summary file and
                                    keep the others' entries as they were.
@@ -338,226 +345,266 @@ function Get-P20CiHalfVerdict {
     return $out
 }
 
-function Read-P20ExpectedCounts {
+function Get-P20TestCountsFile {
     <#
-      The totals docs/TESTING.md prints at its head, which are pasted
-      from a macOS run after a merge: the tkTestToolkit line, the pytest line
-      and the npm test line of its opening code blocks. Information for Test's
-      `expected vs actual` lines, never a verdict. A line that is not there is
-      $null in its slot.
+      Where the test counts live, and the line each runner prints above them.
+      Path is the one document that may state a run's figures. Heading is
+      tkTest's, above the four lines Scripts/Write-TestCounts.ps1 takes;
+      CliHeading is tkTestToolkit's, above the CLI's two (tkTest reads them
+      from its child's output by it).
     #>
-    param([Parameter(Mandatory)][string]$Path)
-    $out = @{ cli = $null; agent = $null; web = $null }
-    if (-not (Test-Path -LiteralPath $Path)) { return $out }
-    $text = [System.IO.File]::ReadAllText($Path)
-    $m = [regex]::Match($text, '(?m)^\s*\w*TestToolkit\s+#\s*(\d+) suites, (\d+) assertions')
-    if ($m.Success) { $out.cli = @{ Suites = [int]$m.Groups[1].Value; Total = [int]$m.Groups[2].Value } }
-    $m = [regex]::Match($text, '(?m)-m pytest Tests/\s+#\s*(\d+) passed(?:, (\d+) skipped)?')
-    if ($m.Success) {
-        $skipped = 0
-        if ($m.Groups[2].Success) { $skipped = [int]$m.Groups[2].Value }
-        $out.agent = @{ Passed = [int]$m.Groups[1].Value; Skipped = $skipped }
+    return [ordered]@{
+        Path       = 'docs/TEST-COUNTS.md'
+        Heading    = 'Counts for docs/TEST-COUNTS.md, from this run:'
+        CliHeading = 'CLI counts for docs/TEST-COUNTS.md, from this run:'
+        Writer     = 'Scripts/Write-TestCounts.ps1'
     }
-    $m = [regex]::Match($text, '(?m)npm test\s+#[^\r\n]*?(\d+) suites, (\d+) tests')
-    if ($m.Success) { $out.web = @{ Suites = [int]$m.Groups[1].Value; Total = [int]$m.Groups[2].Value } }
-    return $out
-}
-
-function Get-P20PasteBlockMatch {
-    <#
-      Where docs/TESTING.md's paste block is: the regex match whose first group
-      is the block's text, between its ```text fence and the closing one. $null
-      when there is none. Get-P20PasteBlock reads its lines from it, and
-      Get-P20CountLineNumbers its line numbers.
-    #>
-    param([AllowEmptyString()][string]$Text)
-    if (-not $Text) { return $null }
-    $m = [regex]::Match($Text, '(?s)\*\*The counts, after a merge\.\*\*.*?```text\r?\n(.*?)\r?\n```')
-    if (-not $m.Success) { return $null }
-    return $m
 }
 
 function Get-P20CountLinePatterns {
     <#
-      The count lines the documents state, one regex each -- the patterns
-      Tests/Test-DocCounts.ps1 and Tests/Get-TestingDocDrift.ps1 read them
-      with, so CI's count-line exemption (Get-P20CountOnlyPaths) cannot cover a
-      line they do not check:
-        TestingRow       docs/TESTING.md's `tkTestToolkit` table row
-        TestingCliTotal  its command block's `tkTestToolkit # N suites, M assertions`
-                         (group 1 the figure, group 2 the suite count)
-        TestingPytest    its command block's pytest totals (group 1)
-        TestingWeb       its command block's npm test totals (group 1)
-        AgentsCli        AGENTS.md's `tkTestToolkit # the CLI -- N suites, M assertions`
-                         (group 1 the figure, group 2 the suite count)
-        VerifyCli        VERIFY.md's Gate 4 `On this commit that is **N suites, M assertions**`
-                         (the same two groups)
-      docs/TESTING.md's paste block is the seventh, found by Get-P20PasteBlockMatch.
+      The shapes of the four lines a full run prints, in one place. The
+      anchored four read one trimmed line of a block (the writer's check and
+      the counts file's): SuiteLine the CLI per suite, CliTotal
+      `N suites, M assertions`, Pytest `pytest: N passed[, N skipped][, N subtests]`
+      and Web `web: N suites, N tests`. The Typed four find the same figures
+      typed anywhere in a line of a document, which
+      {cliPrefix}TestToolkit -DocCounts refuses outside docs/TEST-COUNTS.md:
+      a run of five or more `Name N` pairs, `N suites, M assertions`, a pytest
+      total, `N passed, N skipped`, and `N suites, N tests`.
     #>
     return [ordered]@{
-        TestingRow      = '^\|\s*`tkTestToolkit`\s*\|'
-        TestingCliTotal = 'tkTestToolkit\s+#\s*((\d+) suites, \d+ assertions)'
-        TestingPytest   = 'pytest Tests/\s+#\s*(.+?)\s+--'
-        TestingWeb      = 'npm test\s+#\s*(?:.*?then\s+)?(\d+ suites, \d+ tests)'
-        AgentsCli       = 'tkTestToolkit\s+#\s*the CLI -- ((\d+) suites, \d+ assertions)'
-        VerifyCli       = 'is \*\*((\d+) suites, \d+ assertions)\*\*'
+        SuiteLine      = '^[A-Z][A-Za-z]+ \d+(?:, [A-Z][A-Za-z]+ \d+)*$'
+        CliTotal       = '^(\d+) suites, (\d+) assertions$'
+        Pytest         = '^pytest: (\d+) passed(?:, (\d+) skipped)?(?:, (\d+) subtests)?$'
+        Web            = '^web: (\d+) suites, (\d+) tests$'
+        TypedSuiteList = '(?:[A-Z][A-Za-z]+ \d+, ){4,}[A-Z][A-Za-z]+ \d+'
+        TypedCliTotal  = '\b\d+ suites, \d+ assertions\b'
+        TypedPytest    = '(?:\bpytest:|pytest Tests/\s+#)\s*\d+ passed\b|\b\d+ passed, \d+ skipped\b'
+        TypedWeb       = '\b\d+ suites, \d+ tests\b'
     }
 }
 
-function Get-P20CountLineRules {
-    <# The files that carry count lines, each with its patterns and whether it holds the paste block. #>
-    $p = Get-P20CountLinePatterns
-    return [ordered]@{
-        'docs/TESTING.md' = @{ Patterns = @($p.TestingRow, $p.TestingCliTotal, $p.TestingPytest, $p.TestingWeb); PasteBlock = $true }
-        'AGENTS.md'       = @{ Patterns = @($p.AgentsCli); PasteBlock = $false }
-        'VERIFY.md'       = @{ Patterns = @($p.VerifyCli); PasteBlock = $false }
-    }
-}
-
-function Get-P20CountLineNumbers {
+function ConvertFrom-P20CountsBlock {
     <#
-      The 1-based numbers of the count lines in one file's text: every line a
-      pattern of its rule matches, and for docs/TESTING.md every line inside the
-      paste block's fence. A file with no rule has none.
-    #>
-    param([string]$Path, [AllowEmptyString()][string]$Text)
-    $nums = @{}
-    $rules = Get-P20CountLineRules
-    if (-not $rules.Contains($Path) -or -not $Text) { return $nums }
-    $rule = $rules[$Path]
-    $lines = @($Text -split "\r?\n")
-    for ($i = 0; $i -lt $lines.Count; $i++) {
-        foreach ($pat in $rule.Patterns) {
-            if ($lines[$i] -match $pat) { $nums[$i + 1] = $true; break }
-        }
-    }
-    if ($rule.PasteBlock) {
-        $m = Get-P20PasteBlockMatch -Text $Text
-        if ($null -ne $m) {
-            $g = $m.Groups[1]
-            $first = ([regex]::Matches($Text.Substring(0, $g.Index), "\n")).Count + 1
-            $count = ([regex]::Matches($g.Value, "\n")).Count + 1
-            for ($n = $first; $n -lt $first + $count; $n++) { $nums[$n] = $true }
-        }
-    }
-    return $nums
-}
-
-function Get-P20DiffChangedLines {
-    <#
-      The changed lines of a `git diff -U0`: one @{ Path; Side; Line; Text } per
-      removed line (Side old, its number in the old file) and per added line
-      (Side new, its number in the new file). Each hunk is read by the counts
-      its header states, so a removed line that itself starts with `--` is
-      still a line.
-    #>
-    param([AllowEmptyString()][string]$Diff)
-    $out = @()
-    if (-not $Diff) { return $out }
-    $lines = @($Diff -split "\r?\n")
-    $path = ''; $oldPath = ''
-    $i = 0
-    while ($i -lt $lines.Count) {
-        $l = $lines[$i]
-        if ($l.StartsWith('diff --git ')) { $path = ''; $oldPath = ''; $i++; continue }
-        if ($l.StartsWith('--- ')) { $oldPath = $l.Substring(4) -replace '^a/', ''; $i++; continue }
-        if ($l.StartsWith('+++ ')) {
-            $path = $l.Substring(4) -replace '^b/', ''
-            if ($path -eq '/dev/null') { $path = $oldPath }
-            $i++; continue
-        }
-        $h = [regex]::Match($l, '^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@')
-        if (-not $h.Success) { $i++; continue }
-        $oldAt = [int]$h.Groups[1].Value; $oldLeft = 1; if ($h.Groups[2].Success) { $oldLeft = [int]$h.Groups[2].Value }
-        $newAt = [int]$h.Groups[3].Value; $newLeft = 1; if ($h.Groups[4].Success) { $newLeft = [int]$h.Groups[4].Value }
-        $i++
-        while (($oldLeft + $newLeft) -gt 0 -and $i -lt $lines.Count) {
-            $c = $lines[$i]
-            if ($c.StartsWith('-') -and $oldLeft -gt 0) {
-                $out += @{ Path = $path; Side = 'old'; Line = $oldAt; Text = $c.Substring(1) }
-                $oldAt++; $oldLeft--
-            }
-            elseif ($c.StartsWith('+') -and $newLeft -gt 0) {
-                $out += @{ Path = $path; Side = 'new'; Line = $newAt; Text = $c.Substring(1) }
-                $newAt++; $newLeft--
-            }
-            elseif (-not $c.StartsWith('\')) { break }
-            $i++
-        }
-    }
-    return $out
-}
-
-function Get-P20CountOnlyPaths {
-    <#
-      Which files a diff changes in their count lines alone. -Diff is
-      `git diff -U0` over docs/TESTING.md, AGENTS.md and VERIFY.md; -BaseTexts
-      and -HeadTexts map each path to its text before and after. A removed line
-      is a count line when its number is one in the base text, an added line
-      when its number is one in the head text (Get-P20CountLineNumbers).
-      Returns path -> @{ CountOnly; Other }, Other the first changed line that
-      is not a count line. A path with no rule is never count-only.
-    #>
-    param(
-        [AllowEmptyString()][string]$Diff,
-        [hashtable]$BaseTexts = @{},
-        [hashtable]$HeadTexts = @{}
-    )
-    $out = [ordered]@{}
-    $nums = @{}
-    foreach ($c in @(Get-P20DiffChangedLines -Diff $Diff)) {
-        $key = $c.Side + '|' + $c.Path
-        if (-not $nums.ContainsKey($key)) {
-            $t = ''
-            if ($c.Side -eq 'old' -and $BaseTexts.ContainsKey($c.Path)) { $t = [string]$BaseTexts[$c.Path] }
-            if ($c.Side -eq 'new' -and $HeadTexts.ContainsKey($c.Path)) { $t = [string]$HeadTexts[$c.Path] }
-            $nums[$key] = Get-P20CountLineNumbers -Path $c.Path -Text $t
-        }
-        if (-not $out.Contains($c.Path)) { $out[$c.Path] = @{ CountOnly = $true; Other = '' } }
-        if ($out[$c.Path].CountOnly -and -not $nums[$key].ContainsKey($c.Line)) {
-            $out[$c.Path].CountOnly = $false
-            $said = $c.Text.Trim()
-            if ($said.Length -gt 100) { $said = $said.Substring(0, 100) + '...' }
-            $out[$c.Path].Other = "$($c.Side) line $($c.Line): $said"
-        }
-    }
-    return $out
-}
-
-function Get-P20PasteLineHalf {
-    <#
-      The half one trimmed paste-block line belongs to: `N suites, M assertions`
-      and the per-suite line (`Consts 208, Compat 1756, ...`) are the CLI's,
-      `pytest: ...` the agent's, `web: ...` the web UI's. Any other line -- the
-      block's own heading -- is no half's, and the answer is ''.
-    #>
-    param([string]$Line)
-    if ($Line -match '^\d+ suites, \d+ assertions$') { return 'cli' }
-    if ($Line -match '^pytest: ') { return 'agent' }
-    if ($Line -match '^web: ') { return 'web' }
-    if ($Line -match '(?<=^|,\s)[A-Z][A-Za-z]+ \d+(?=,|$)') { return 'cli' }
-    return ''
-}
-
-function Get-P20PasteBlock {
-    <#
-      docs/TESTING.md's paste block: the first ```text fence after
-      "**The counts, after a merge.**", each line trimmed and blank lines
-      dropped. Lines holds them all in order; cli, agent and web hold each
-      half's own lines (Get-P20PasteLineHalf). $null when there is no block.
-      Tests/Get-TestingDocDrift.ps1 and CI's carried-lines check read the
-      block through this, so the two cannot find different lines.
+      A full run's printed block -> its four lines, read. -Text is the block,
+      or a whole transcript: when a line ends `from this run:` (the heading
+      tkTest prints), the block is the lines after the LAST such heading, up to
+      the first blank line after them; otherwise it is every non-blank line.
+      Each line is trimmed and colour codes dropped, and a pytest line's
+      `(via <python>)` -- which interpreter ran it, information for the
+      person reading -- is not kept.
+      Returns Lines (the four, as they are written), Suites (one @(name, n)
+      each, in order), SuiteCount, Assertions, Pytest (Passed, Skipped,
+      Subtests), Web (Suites, Total) and Findings: one sentence per way the
+      block is not a full run's -- not four lines, a line not in its shape
+      (a half that did not run prints a sentence in its place), a suite named
+      twice, a suite count that is not the number of suites listed, a total
+      that is not their sum. A block with no finding is one the writer takes.
     #>
     param([AllowEmptyString()][string]$Text)
-    $m = Get-P20PasteBlockMatch -Text $Text
-    if ($null -eq $m) { return $null }
-    $lines = @($m.Groups[1].Value -split "\r?\n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-    $out = [ordered]@{ Lines = $lines; cli = @(); agent = @(); web = @() }
-    foreach ($l in $lines) {
-        $h = Get-P20PasteLineHalf -Line $l
-        if ($h) { $out[$h] = @($out[$h]) + @($l) }
+    $p = Get-P20CountLinePatterns
+    $out = [ordered]@{ Lines = @(); Suites = @(); SuiteCount = 0; Assertions = 0; Pytest = $null; Web = $null; Findings = @() }
+    $raw = @(([string]$Text) -split "\r?\n" | ForEach-Object { ($_ -replace '\x1b\[[0-9;]*m', '') })
+    $start = 0
+    $fromHeading = $false
+    for ($i = 0; $i -lt $raw.Count; $i++) {
+        if ($raw[$i] -match 'from this run:\s*$') { $start = $i + 1; $fromHeading = $true }
+    }
+    $lines = @()
+    for ($i = $start; $i -lt $raw.Count; $i++) {
+        $t = $raw[$i].Trim()
+        if (-not $t) {
+            if ($fromHeading -and $lines.Count -gt 0) { break }
+            continue
+        }
+        $lines += ($t -replace '^(pytest: .*?)\s+\(via [^)]*\)$', '$1')
+    }
+    $out.Lines = $lines
+    $shape = 'a full run prints four: the per-suite line, "N suites, M assertions", "pytest: ..." and "web: ..."'
+    if ($lines.Count -ne 4) {
+        $out.Findings = @("the block has $($lines.Count) line(s); $shape")
+        return $out
+    }
+    $f = @()
+    if ($lines[0] -cnotmatch $p.SuiteLine) { $f += "the first line is not the per-suite line ('Name N, Name N, ...'): '$($lines[0])'" }
+    else {
+        $seen = @{}
+        foreach ($m in [regex]::Matches($lines[0], '([A-Z][A-Za-z]+) (\d+)')) {
+            $name = $m.Groups[1].Value
+            if ($seen.ContainsKey($name)) { $f += "the per-suite line names $name twice" }
+            $seen[$name] = $true
+            $out.Suites += , @($name, [int]$m.Groups[2].Value)
+        }
+    }
+    $tm = [regex]::Match($lines[1], $p.CliTotal)
+    if (-not $tm.Success) { $f += "the second line is not ""N suites, M assertions"": '$($lines[1])'" }
+    else {
+        $out.SuiteCount = [int]$tm.Groups[1].Value
+        $out.Assertions = [int]$tm.Groups[2].Value
+        if ($out.Suites.Count -gt 0) {
+            $sum = 0
+            foreach ($s in $out.Suites) { $sum += $s[1] }
+            if ($out.SuiteCount -ne $out.Suites.Count) { $f += "the total says $($out.SuiteCount) suites and the per-suite line lists $($out.Suites.Count)" }
+            if ($out.Assertions -ne $sum) { $f += "the total says $($out.Assertions) assertions and the per-suite line sums to $sum" }
+        }
+    }
+    $pm = [regex]::Match($lines[2], $p.Pytest)
+    if (-not $pm.Success) { $f += "the third line is not a pytest count: '$($lines[2])' -- write from a tkTest run that ran the agent half and passed" }
+    else {
+        $out.Pytest = [ordered]@{ Passed = [int]$pm.Groups[1].Value; Skipped = 0; Subtests = 0 }
+        if ($pm.Groups[2].Success) { $out.Pytest.Skipped = [int]$pm.Groups[2].Value }
+        if ($pm.Groups[3].Success) { $out.Pytest.Subtests = [int]$pm.Groups[3].Value }
+    }
+    $wm = [regex]::Match($lines[3], $p.Web)
+    if (-not $wm.Success) { $f += "the fourth line is not a web count: '$($lines[3])' -- write from a tkTest run that ran the web half and passed" }
+    else { $out.Web = [ordered]@{ Suites = [int]$wm.Groups[1].Value; Total = [int]$wm.Groups[2].Value } }
+    $out.Findings = $f
+    return $out
+}
+
+function Format-P20TestCountsFile {
+    <#
+      docs/TEST-COUNTS.md's whole text, LF, from a block's four lines and the
+      version they are as of. The one place the page's words are: the writer
+      writes this, and -DocCounts holds the committed file to it.
+    #>
+    param([Parameter(Mandatory)][string[]]$Lines, [Parameter(Mandatory)][string]$Version)
+    $doc = @(
+        '# Test counts',
+        '',
+        "The counts a full run printed, as of version **$Version**: the CLI per suite and in total, the",
+        'agent''s `pytest` and the web UI''s `npm test`. `Scripts/Write-TestCounts.ps1` writes this page in the',
+        'release pull request, from a full `tkTest` run, and it changes only with the version: between',
+        'releases `main` moves on and these figures stay where the last release left them. No other document',
+        'states them. [Testing](TESTING.md), "The counts", says how they are written.',
+        '',
+        '```text'
+    ) + @($Lines) + @('```')
+    return ($doc -join "`n") + "`n"
+}
+
+function Read-P20TestCountsFile {
+    <#
+      docs/TEST-COUNTS.md read back: Version (the one it is as of, '' when it
+      states none), Block (ConvertFrom-P20CountsBlock over its text fence, or
+      $null) and Findings -- no version, no fence, a block that is not a full
+      run's, or a text that is not exactly what the writer writes from them
+      (Format-P20TestCountsFile; line endings aside, so a CRLF checkout reads
+      the same). -ExpectedVersion, when given, is consts.json's version, and a
+      file as of another is a finding too.
+    #>
+    param([AllowEmptyString()][string]$Text, [string]$ExpectedVersion)
+    $out = [ordered]@{ Version = ''; Block = $null; Findings = @() }
+    $f = @()
+    $norm = ([string]$Text) -replace "`r`n", "`n"
+    $vm = [regex]::Match($norm, 'as of version \*\*([0-9A-Za-z.+-]+)\*\*')
+    if ($vm.Success) { $out.Version = $vm.Groups[1].Value }
+    else { $f += 'it states no version ("as of version **x.y.z**")' }
+    $fm = [regex]::Match($norm, '(?s)```text\n(.*?)\n```')
+    if (-not $fm.Success) { $f += 'it has no ```text block' }
+    else {
+        $out.Block = ConvertFrom-P20CountsBlock -Text $fm.Groups[1].Value
+        foreach ($b in @($out.Block.Findings)) { $f += "its block: $b" }
+    }
+    if ($f.Count -eq 0) {
+        $want = Format-P20TestCountsFile -Lines @($out.Block.Lines) -Version $out.Version
+        if ($norm -cne $want) { $f += 'its text is not what the writer writes: it was edited by hand' }
+    }
+    if ($PSBoundParameters.ContainsKey('ExpectedVersion') -and $out.Version -and ($out.Version -cne $ExpectedVersion)) {
+        $f += "it is as of version $($out.Version) and consts.json says $($ExpectedVersion): the release pull request sets the version and writes this page together"
+    }
+    $out.Findings = $f
+    return $out
+}
+
+function Read-P20ExpectedCounts {
+    <#
+      The totals docs/TEST-COUNTS.md states, for Test's `expected vs actual`
+      lines: information, never a verdict -- the page is written at a release
+      and main moves on between them. -Path is the page. A line that is not
+      there, or not a count, is $null in its slot.
+    #>
+    param([Parameter(Mandatory)][string]$Path)
+    $out = @{ cli = $null; agent = $null; web = $null }
+    if (-not (Test-Path -LiteralPath $Path)) { return $out }
+    $text = [System.IO.File]::ReadAllText($Path) -replace "`r`n", "`n"
+    $fm = [regex]::Match($text, '(?s)```text\n(.*?)\n```')
+    if (-not $fm.Success) { return $out }
+    $p = Get-P20CountLinePatterns
+    foreach ($l in @($fm.Groups[1].Value -split "`n" | ForEach-Object { $_.Trim() })) {
+        $m = [regex]::Match($l, $p.CliTotal)
+        if ($m.Success) { $out.cli = @{ Suites = [int]$m.Groups[1].Value; Total = [int]$m.Groups[2].Value }; continue }
+        $m = [regex]::Match($l, $p.Pytest)
+        if ($m.Success) {
+            $skipped = 0
+            if ($m.Groups[2].Success) { $skipped = [int]$m.Groups[2].Value }
+            $out.agent = @{ Passed = [int]$m.Groups[1].Value; Skipped = $skipped }
+            continue
+        }
+        $m = [regex]::Match($l, $p.Web)
+        if ($m.Success) { $out.web = @{ Suites = [int]$m.Groups[1].Value; Total = [int]$m.Groups[2].Value } }
     }
     return $out
+}
+
+function Get-P20TypedCountLines {
+    <#
+      Every line of a document that types a test count. -Docs maps a
+      package-relative path to its text; docs/TEST-COUNTS.md is the one page
+      allowed them and is not read. A line is a count line when a Typed
+      pattern of Get-P20CountLinePatterns matches it, inside a code fence or
+      out. One sentence per line, naming the file and its line number, in path
+      order.
+    #>
+    param([System.Collections.IDictionary]$Docs = @{})
+    $p = Get-P20CountLinePatterns
+    $cf = Get-P20TestCountsFile
+    $typed = @($p.TypedSuiteList, $p.TypedCliTotal, $p.TypedPytest, $p.TypedWeb)
+    $paths = [string[]]@($Docs.Keys)
+    [array]::Sort($paths, [System.StringComparer]::Ordinal)
+    $found = @()
+    foreach ($path in $paths) {
+        if ($path -ceq $cf.Path) { continue }
+        $lines = @(([string]$Docs[$path]) -split "\r?\n")
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            foreach ($pat in $typed) {
+                $m = [regex]::Match($lines[$i], $pat)
+                if (-not $m.Success) { continue }
+                $said = $m.Value
+                if ($said.Length -gt 60) { $said = $said.Substring(0, 60) + '...' }
+                $found += "$path, line $($i + 1): '$said' is a test count, and the counts live in $($cf.Path) alone -- link to it ($($cf.Writer) writes it at a release)"
+                break
+            }
+        }
+    }
+    return $found
+}
+
+function Get-P20TestCountsChangeFindings {
+    <#
+      The counts file changes only with the version. -Paths is a pull
+      request's changed files; -BaseVersion and -HeadVersion are consts.json's
+      `version` at its base and at its head; -BaseHadPage says whether
+      docs/TEST-COUNTS.md existed at the base. A change that touches the page
+      -- edits or deletes it -- and leaves the version as it was is one
+      finding, naming the release step. The one exemption is the page being
+      introduced: it did not exist at the base. Any other change, none.
+    #>
+    param(
+        [string[]]$Paths = @(),
+        [AllowEmptyString()][string]$BaseVersion = '',
+        [AllowEmptyString()][string]$HeadVersion = '',
+        [bool]$BaseHadPage = $true
+    )
+    $cf = Get-P20TestCountsFile
+    $clean = @($Paths | ForEach-Object { ([string]$_).Trim() -replace '\\', '/' } | Where-Object { $_ })
+    if ($clean -cnotcontains $cf.Path) { return @() }
+    if (-not $BaseHadPage) { return @() }
+    if ($BaseVersion -and ($BaseVersion -cne $HeadVersion)) { return @() }
+    $was = $BaseVersion
+    if (-not $was) { $was = '(none)' }
+    return @("this change edits $($cf.Path) and leaves consts.json's version at $($was): the counts are written only in a release pull request, which sets the new version and runs $($cf.Writer) from a full run's block (AGENTS.md, ""A release is a tag on main"")")
 }
 
 function Get-P20CiPathClass {
@@ -605,17 +652,13 @@ function Get-P20CiScope {
       request runs the three halves. A pull request runs the half each changed
       path can affect (Get-P20CiPathClass), the union over its paths; a pull
       request that lists no path runs everything. A changelog or prose path
-      reaches the contract job alone. A path in -CountOnly
-      (Get-P20CountOnlyPaths: docs/TESTING.md, AGENTS.md or VERIFY.md changed
-      in its count lines alone) reaches nothing by itself; a pull request whose
-      every path is one runs everything. The contract job runs on a
-      pull request where a half is left out: the cross-half suites of the halves
-      that did not run, the markdown lint when the web job did not, and the
-      carried-lines check.
+      reaches the contract job alone. The contract job runs on a pull request
+      where a half is left out: the cross-half suites of the halves that did
+      not run, and the markdown lint when the web job did not.
       Returns cli, agent, web and contract as booleans, and Paths: each path
       with its class, in the order given.
     #>
-    param([string]$Event, [string[]]$Paths = @(), [string[]]$CountOnly = @())
+    param([string]$Event, [string[]]$Paths = @())
     $out = [ordered]@{ cli = $false; agent = $false; web = $false; contract = $false; Paths = @() }
     $all = @(Get-P20TestHalves)
     $clean = @($Paths | ForEach-Object { ([string]$_).Trim() -replace '\\', '/' } | Where-Object { $_ })
@@ -624,71 +667,23 @@ function Get-P20CiScope {
         return $out
     }
     $rows = @()
-    $contractOnly = $false
     foreach ($p in $clean) {
-        if (@($CountOnly) -ccontains $p) { $rows += , @($p, 'count lines'); continue }
         $c = Get-P20CiPathClass -Path $p
         foreach ($h in $c.Halves) { $out[$h] = $true }
-        if (@($c.Halves).Count -eq 0) { $contractOnly = $true }
         $rows += , @($p, $c.Class)
     }
     $out.Paths = $rows
-    # Count lines alone reach no half; a change of nothing else runs every half,
-    # so a paste of all three lines is held by the runs it pastes from. A
-    # changelog or prose path beside them is the contract job's alone.
-    if (@($all | Where-Object { $out[$_] }).Count -eq 0 -and -not $contractOnly) {
-        foreach ($h in $all) { $out[$h] = $true }
-        return $out
-    }
     $out.contract = (@($all | Where-Object { -not $out[$_] }).Count -gt 0)
     return $out
 }
 
-function Get-P20CarriedCountFindings {
-    <#
-      A pull request that did not run a half carries that half's paste lines
-      from main: it cannot have a new count for a half it never ran. So the
-      paste-block lines of each half not in -Ran must be main's, line for line
-      and case for case; a difference is a count somebody typed. -BaseText is
-      main's docs/TESTING.md, -HeadText the change's. Returns one finding per
-      half that differs, naming the line; empty when they agree, and empty when
-      every half ran.
-    #>
-    param(
-        [AllowEmptyString()][string]$BaseText,
-        [AllowEmptyString()][string]$HeadText,
-        [string[]]$Ran = @()
-    )
-    $carried = @(Get-P20TestHalves | Where-Object { @($Ran) -notcontains $_ })
-    if ($carried.Count -eq 0) { return @() }
-    $base = Get-P20PasteBlock -Text $BaseText
-    $head = Get-P20PasteBlock -Text $HeadText
-    if ($null -eq $base) { return @("main's docs/TESTING.md has no paste block under `"The counts, after a merge`"") }
-    if ($null -eq $head) { return @("this change's docs/TESTING.md has no paste block under `"The counts, after a merge`"") }
-    $findings = @()
-    foreach ($h in $carried) {
-        $b = @($base[$h])
-        $t = @($head[$h])
-        $n = [Math]::Max($b.Count, $t.Count)
-        for ($i = 0; $i -lt $n; $i++) {
-            $bl = '(none)'; if ($i -lt $b.Count) { $bl = $b[$i] }
-            $tl = '(none)'; if ($i -lt $t.Count) { $tl = $t[$i] }
-            if ($bl -cne $tl) {
-                $findings += "the $h half's paste line '$tl' is not main's '$bl': the $h job did not run on this pull request, so the line is carried from main as it stands"
-                break
-            }
-        }
-    }
-    return $findings
-}
-
 function Get-P20PasteLines {
     <#
-      The lines docs/TESTING.md's paste block holds, built from one tkTest run: the
+      The four lines tkTest prints for docs/TEST-COUNTS.md, built from one run: the
       CLI's per-suite line and total (as the CLI runner printed them, passed in
       -CliLines), then `pytest: ...` and `web: ...`. A half that did not run, or
       did not pass, prints a line that SAYS so in that line's place -- never a
-      number to copy. Tests/Get-TestingDocDrift.ps1 holds the same shapes.
+      number to copy -- and ConvertFrom-P20CountsBlock refuses it.
     #>
     param(
         [Parameter(Mandatory)][System.Collections.IDictionary]$Records,
