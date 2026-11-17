@@ -115,7 +115,7 @@ export const THEMES: ToolkitTheme[] = [
       foreground1: "#67e8f9",
       foreground2: "#22d3ee",
     },
-    tabColors: ["#a5b4fc", "#86efac", "#fcd34d"],
+    tabColors: ["#f0abfc", "#86efac", "#fcd34d"],
   }),
   defineTheme({
     id: "aurora",
