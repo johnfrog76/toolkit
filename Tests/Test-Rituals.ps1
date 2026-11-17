@@ -381,6 +381,50 @@ foreach ($row in @($cardsTable.sources)) {
 }
 
 Write-Host ""
+Write-Host "-- Why the tracker was not read --" -ForegroundColor Cyan
+# Tests/fixtures/rituals/tracker-reasons.json, the SAME rows Tests/test_rituals.py
+# asserts: every reason's Tracker line from its rituals.text key, and the readers
+# that word it -- Invoke-P20RitualGh over a stubbed gh, Get-P20TrackerRepoReason
+# over Resolve-P20TrackerRepo's refusal. The stub lives in this block's scope only.
+$reasonsTable = [System.IO.File]::ReadAllText((Join-Path $fixtureDir 'tracker-reasons.json')) | ConvertFrom-Json
+& {
+    . (Join-Path $pkgRoot 'Scripts/Ritual-Common.ps1')
+    $ghAnswer = @{ row = $null }
+    function Invoke-P20TrackerRead {
+        param([string]$Tool, [string[]]$Arguments)
+        $g = $ghAnswer.row.gh
+        if ($g.PSObject.Properties['raises']) { throw ([string]$g.raises) }
+        $err = @(([string]$g.stderr) -split "`n" | Where-Object { $_ })
+        return [PSCustomObject]@{ Code = [int]$g.exit; Lines = @(); Out = @([string]$g.stdout); Err = $err }
+    }
+    $textKeys = @($consts.rituals.text.PSObject.Properties | Where-Object { $_.Name -cmatch '^tracker[A-Z]' -or $_.Name -ceq 'adoTracker' } | ForEach-Object { $_.Name } | Sort-Object)
+    $rowKeys = @($reasonsTable.rows | ForEach-Object { [string]$_.key } | Sort-Object -Unique)
+    Assert-True 'reasons: every tracker key of rituals.text has a row, and every row a key' (($textKeys -join ',') -ceq ($rowKeys -join ',')) "keys [$($textKeys -join ',')] rows [$($rowKeys -join ',')]"
+    foreach ($row in @($reasonsTable.rows)) {
+        $values = @{}
+        foreach ($v in @($row.values.PSObject.Properties)) { $values[$v.Name] = $v.Value }
+        $said = Format-P20TrackerReason -Key ([string]$row.key) -Values $values
+        Assert-True "reasons $($row.reason): $($row.key) says the line" ($said -ceq [string]$row.line) "got '$said'"
+        if ($row.PSObject.Properties['gh'] -and @($row.halves) -contains 'cli') {
+            $ghAnswer.row = $row
+            $got = Invoke-P20RitualGh -Repo ([string]$reasonsTable.repo) -Arguments @('label', 'list')
+            Assert-True "reasons $($row.reason): the gh read says it" (-not $got.ok -and [string]$got.reason -ceq [string]$row.line) "got '$($got.reason)'"
+        }
+        if ($row.PSObject.Properties['target'] -and @($row.halves) -contains 'cli') {
+            $projects = @($row.target.repos | ForEach-Object { [pscustomobject]@{ repo = [string]$_ } })
+            $target = Resolve-P20TrackerRepo -OrgUrl ([string]$row.target.org) -Projects $projects
+            $got = Get-P20TrackerRepoReason -Target $target
+            Assert-True "reasons $($row.reason): the repository rule says it" ($got -ceq [string]$row.line) "got '$got'"
+        }
+    }
+    $ado = @($reasonsTable.rows | Where-Object { $_.reason -ceq 'ado' })[0]
+    $src = Get-P20StandupSource -Address 'https://dev.azure.com/acme-org' -Status 'active'
+    Assert-True 'reasons ado: the source rule says it' ($src.reason -ceq [string]$ado.line) "got '$($src.reason)'"
+    $repoTarget = Resolve-P20TrackerRepo -OrgUrl 'https://github.com/acme/widgets' -Projects @()
+    Assert-True 'reasons: a Space that names its repository has no reason' ((Get-P20TrackerRepoReason -Target $repoTarget) -ceq '') "got '$(Get-P20TrackerRepoReason -Target $repoTarget)'"
+}
+
+Write-Host ""
 Write-Host "-- A card's title from its heading --" -ForegroundColor Cyan
 foreach ($row in @($cardsTable.titles)) {
     $got = Get-P20StandupCardTitle -Content ([string]$row.content) -File ([string]$row.file) -Id ([string]$row.id)

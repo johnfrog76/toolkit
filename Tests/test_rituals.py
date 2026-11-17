@@ -65,6 +65,7 @@ def _fill(case: dict, size=None) -> "standup.Standup":
     return filled
 
 
+REASONS = json.loads((FIXTURES / "tracker-reasons.json").read_text(encoding="utf-8"))
 NOTHING_BANNED = json.loads((FIXTURES / "standup-nothing-banned.json").read_text(encoding="utf-8"))["words"]
 
 
@@ -441,6 +442,59 @@ class TheCardsTable(unittest.TestCase):
             with self.subTest(address=row["address"], status=row["status"]):
                 reason = C.rituals_text()[row["reason"]] if row["reason"] else ""
                 self.assertEqual(standup.standup_source(row["address"], row["status"]), (row["source"], reason))
+
+    # -- why the tracker was not read: Tests/fixtures/rituals/tracker-reasons.json,
+    # the SAME rows Tests/Test-Rituals.ps1 asserts from the CLI.
+    def test_every_tracker_key_has_a_reason_row(self):
+        keys = {k for k in C.rituals_text() if re.match(r"^tracker[A-Z]", k) or k == "adoTracker"}
+        self.assertEqual(keys, {row["key"] for row in REASONS["rows"]})
+
+    def test_every_reason_says_its_line_from_its_key(self):
+        for row in REASONS["rows"]:
+            with self.subTest(reason=row["reason"]):
+                self.assertEqual(solitaire_tracker.tracker_reason(row["key"], **row["values"]), row["line"])
+
+    def test_the_gh_reader_says_each_failure_as_its_row(self):
+        repo = REASONS["repo"]
+        for row in REASONS["rows"]:
+            if "gh" not in row or "agent" not in row["halves"]:
+                continue
+            gh = row["gh"]
+
+            def run(argv, _timeout, gh=gh, **_kw):
+                if "raises" in gh:
+                    raise getattr(subprocess, gh["raises"])(argv, 30)
+                return subprocess.CompletedProcess(argv, gh["exit"], gh.get("stdout", ""), gh.get("stderr", ""))
+
+            with self.subTest(reason=row["reason"]), mock.patch.object(accounting, "run_read", side_effect=run):
+                solitaire_tracker.forget()
+                self.assertEqual(solitaire_tracker.labels(repo, refresh=True), ([], row["line"]))
+                self.assertEqual(solitaire_tracker.issues(repo, "all", body=True, refresh=True), ([], row["line"]))
+
+    def test_no_gh_to_run_is_the_missing_row(self):
+        line = next(r["line"] for r in REASONS["rows"] if r["reason"] == "gh-missing")
+        with mock.patch.object(accounting, "run_read", side_effect=FileNotFoundError("gh")):
+            solitaire_tracker.forget()
+            self.assertEqual(solitaire_tracker.labels(REASONS["repo"], refresh=True), ([], line))
+
+    def test_the_checks_before_gh_say_their_rows(self):
+        lines = {r["reason"]: r for r in REASONS["rows"]}
+        with mock.patch.object(solitaire_tracker, "_resolve_tier", return_value=(1, True)):
+            row = lines["no-repo"]
+            got = solitaire_tracker.github_repos(row["target"]["org"], "active", [], ritual="the standup")
+            self.assertEqual(got, ([], {"ok": False, "reason": row["line"]}))
+            got = solitaire_tracker.github_repos("https://dev.azure.com/acme-org", "active", [], ritual="triage")
+            self.assertEqual(got, ([], {"ok": False, "reason": lines["not-github"]["line"]}))
+        with mock.patch.object(solitaire_tracker, "_resolve_tier", return_value=(2, False)):
+            got = solitaire_tracker.github_repos("https://github.com/acme/widgets", "active", [], ritual="the standup")
+            self.assertEqual(got, ([], {"ok": False, "reason": lines["tier"]["line"]}))
+        with (
+            mock.patch.object(solitaire_tracker, "_resolve_tier", return_value=(1, True)),
+            mock.patch.object(accounting, "_gh_labels", side_effect=ValueError("boom")),
+        ):
+            got = solitaire_tracker.read_tracker("https://github.com/acme/widgets", "active", [], state="all")
+            self.assertEqual(got, ([], [], {"ok": False, "reason": lines["read-failed"]["line"]}))
+        self.assertEqual(standup.standup_source("https://dev.azure.com/acme-org", "active")[1], lines["ado"]["line"])
 
     def test_a_cards_title_from_its_heading(self):
         for row in CARDS_TABLE["titles"]:
@@ -2278,10 +2332,9 @@ class TheRoute(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         body = res.json()
         self.assertEqual(
-            body["tracker"], {"ok": False, "reason": "johnfrog76/toolkit: gh did not answer (TimeoutExpired)"}
+            body["tracker"], {"ok": False, "reason": "gh did not answer for johnfrog76/toolkit: TimeoutExpired"}
         )
-        # The golden's reason has no repo in front of it; otherwise the bytes are the same.
-        self.assertEqual(body["text"].replace("johnfrog76/toolkit: ", ""), _golden("standup-no-tracker.txt"))
+        self.assertEqual(body["text"], _golden("standup-no-tracker.txt"))
 
     # -- on Windows the child is read as UTF-8, and an unreadable answer is not empty --
     def _get_windows(self, path: str, run):
@@ -2332,7 +2385,9 @@ class TheRoute(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         tracker = res.json()["tracker"]
         self.assertFalse(tracker["ok"])
-        self.assertEqual(tracker["reason"], "johnfrog76/toolkit: gh's output could not be read (exit code 0)")
+        self.assertEqual(
+            tracker["reason"], "gh did not answer for johnfrog76/toolkit: gh's output could not be read (exit code 0)"
+        )
 
     def test_a_reader_that_raises_is_a_tracker_that_did_not_answer(self):
         with mock.patch.object(accounting, "_gh_labels", side_effect=ValueError("boom")):
