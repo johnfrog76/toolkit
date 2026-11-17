@@ -293,19 +293,19 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **53 suites, 11204 assertions** with a `config.local.json`, every one
-of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
-`hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
-sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
-fewer on the same commit, every suite green on both -- `docs/TESTING.md`, "The CLI total is per
-platform".
+findings, with a `config.local.json`, every suite reporting. What the last release counted is
+[`docs/TEST-COUNTS.md`](docs/TEST-COUNTS.md); a run on a later commit, or on another host, reads differently
+on purpose, and the gate is the green, not the number. `Sync`'s hook-interaction cases skip on their own
+where there is no `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`:
+the Compat sweep does not descend into `web/node_modules`. A Windows run reads a few fewer on the same
+commit, every suite green on both -- `docs/TESTING.md`, "The CLI total is per platform".
 
 Then the other two halves -- or all three at once with `tkTest`, which runs these same three and
 names any half it had to skip:
 
 ```bash
 python -m pytest Tests/      # Windows (python3 is the Store stub there); macOS/Linux: python3 -m pytest Tests/
-cd web && npm test           # the shell; the current counts are in docs/TESTING.md
+cd web && npm test           # the shell; the last release's counts are in docs/TEST-COUNTS.md
 ```
 
 - [ ] All suites pass

@@ -190,10 +190,10 @@ $runCli = {
     }
     $rec.seconds = [math]::Round(((Get-Date) - $start).TotalSeconds, 1)
     $c = ConvertFrom-P20ToolkitOutput -Text $run.Text
-    # The CLI runner's own paste lines (a full, green run prints them): kept for
-    # the paste block at the foot of this run's summary.
+    # The CLI runner's own two count lines (a full, green run prints them): kept
+    # for the counts block at the foot of this run's summary.
     $script:cliPasteLines = @()
-    $pm = [regex]::Match($run.Text, '(?m)^\s*Counts for docs/TESTING\.md''s combined row, from this run:\s*\r?\n\s*(\S[^\r\n]*?)\s*\r?\n\s*(\d+ suites, \d+ assertions)\s*$')
+    $pm = [regex]::Match($run.Text, '(?m)^\s*' + [regex]::Escape((Get-P20TestCountsFile).CliHeading) + '\s*\r?\n\s*(\S[^\r\n]*?)\s*\r?\n\s*(\d+ suites, \d+ assertions)\s*$')
     if ($pm.Success) { $script:cliPasteLines = @($pm.Groups[1].Value, $pm.Groups[2].Value) }
     $v = Get-P20HalfVerdict -Counts $c -ExitCode $run.ExitCode
     $rec.result = $v.Result; $rec.detail = $v.Detail
@@ -339,7 +339,8 @@ if (Get-Command Write-P20TestResult -ErrorAction SilentlyContinue) {
 }
 
 # -- One summary -----------------------------------------------------------------
-$expected = Read-P20ExpectedCounts -Path (Join-Path (Join-Path $packageRoot 'docs') 'TESTING.md')
+$countsFile = Get-P20TestCountsFile
+$expected = Read-P20ExpectedCounts -Path (Join-Path $packageRoot ($countsFile.Path -replace '/', [System.IO.Path]::DirectorySeparatorChar))
 $rule = '  ' + ('-' * 66)
 Write-Host ""
 Write-Host "  ${prefix}Test -- the three halves" -ForegroundColor Cyan
@@ -369,11 +370,11 @@ foreach ($h in @($records.Keys)) {
 Write-Host $rule -ForegroundColor Cyan
 Write-Host ('  {0,-12} {1}' -f 'Elapsed', ('{0:N1}s' -f $overallSeconds)) -ForegroundColor DarkGray
 
-# Expected vs actual: information, never the verdict. The counts in
-# docs/TESTING.md are pasted from a macOS run after a merge, so
-# a branch, a partial run or another platform reads differently on purpose.
+# Expected vs actual: information, never the verdict. docs/TEST-COUNTS.md is
+# written at a release, from a run on the host that built it, so main between
+# releases, a branch, a partial run or another platform reads differently on purpose.
 Write-Host ""
-Write-Host "  Expected (docs/TESTING.md) vs actual:" -ForegroundColor Cyan
+Write-Host "  Expected ($($countsFile.Path)) vs actual:" -ForegroundColor Cyan
 $differs = @()
 foreach ($h in @($records.Keys)) {
     $r = $records[$h]
@@ -406,20 +407,21 @@ foreach ($h in @($records.Keys)) {
     Write-Host ('    {0,-6} expected {1}; actual {2}{3}' -f $h, $expText, $actText, $mark) -ForegroundColor Gray
 }
 if ($differs.Count -gt 0) {
-    Write-Host "  Note: $($differs -join ', ') differs from docs/TESTING.md. Information, not a failure: the merger pastes those counts from the Mac's run after a merge, and a branch or another platform reads differently." -ForegroundColor DarkGray
+    Write-Host "  Note: $($differs -join ', ') differs from $($countsFile.Path). Information, not a failure: that page is written at a release, and main since then, a branch or another platform reads differently." -ForegroundColor DarkGray
 }
 
-# -- The paste block ----------------------------------------------------------
-# docs/TESTING.md's "The counts, after a merge" holds three figures: the CLI's
-# per-suite line and total, the pytest totals and the web totals. This is the
-# runner that has all three. A half that did not run says so in its line's place.
+# -- The counts block -----------------------------------------------------------
+# docs/TEST-COUNTS.md holds four lines: the CLI's per-suite line and total, the
+# pytest totals and the web totals. This is the runner that has all of them, and
+# Scripts/Write-TestCounts.ps1 takes them, heading and all, at a release. A half
+# that did not run says so in its line's place, which the writer refuses.
 Write-Host ""
 if ($halves.Count -eq 3 -and -not $Fast) {
-    Write-Host "  Counts for docs/TESTING.md's paste block, from this run:" -ForegroundColor Cyan
+    Write-Host "  $($countsFile.Heading)" -ForegroundColor Cyan
     foreach ($pl in @(Get-P20PasteLines -Records $records -CliLines $script:cliPasteLines)) { Write-Host "  $pl" }
 }
 else {
-    Write-Host "  No paste block: it needs all three halves and no -Fast." -ForegroundColor DarkGray
+    Write-Host "  No counts block: it needs all three halves and no -Fast." -ForegroundColor DarkGray
 }
 
 # -- One verdict -----------------------------------------------------------------

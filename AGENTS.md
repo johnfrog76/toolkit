@@ -174,7 +174,7 @@ module and you add a mock line to every one of these files.
 **Four test runners**, one per half plus one for the two together. Run the ones your change touches:
 
 ```powershell
-tkTestToolkit                 # the CLI -- 53 suites, 11204 assertions on this commit
+tkTestToolkit                 # the CLI -- every suite in the registry
 ```
 
 ```bash
@@ -187,9 +187,10 @@ cd web && npm run smoke       # both, in a browser -- needs the agent and the de
 
 A skip is not a pass. Read the summary line, not the total.
 
-The counts in `docs/TESTING.md` come from one paste block of three lines (the CLI's, `pytest:` and `web:`),
-which `tkTest` prints; `tkTestToolkit -DocCounts` holds the table row and the command block's totals to it.
-Paste all three, never type one.
+**A pull request never states a test count.** The counts live in `docs/TEST-COUNTS.md` alone, as of the
+version it names, written at a release by `Scripts/Write-TestCounts.ps1` from a full `tkTest` run's block;
+link to it, never type a figure. `tkTestToolkit -DocCounts` fails on a count line in any other document, and
+CI refuses a change to the page that does not change `consts.json`'s version (`docs/TESTING.md`, "The counts").
 
 ## Opt in by configuration
 
@@ -749,7 +750,9 @@ What a release does, in one small pull request on main: fold the entries in, wit
 in `## [Unreleased]`, after any written there by hand, and its file is deleted; then rename
 `## [Unreleased]` to `## [x.y.z] - YYYY-MM-DD` and open a fresh empty `## [Unreleased]` above it; set the same version in the three places that state
 it, `Prompt20Toolkit/Prompt20Toolkit.psd1` (`ModuleVersion`), `consts.json` (`version`) and
-`web/package.json` (`version`); merge; then push the tag, `git tag vx.y.z && git push origin vx.y.z`.
+`web/package.json` (`version`); write the counts from a full `tkTest` run on that tree,
+`pwsh -NoProfile -File Scripts/Write-TestCounts.ps1 -Path <the run's saved output>` (`-WhatIf` first), the
+only change `docs/TEST-COUNTS.md` gets; merge; then push the tag, `git tag vx.y.z && git push origin vx.y.z`.
 `.github/workflows/release.yml` makes the GitHub Release from the changelog section with that
 version and refuses a tag that has none, or one cut while `changelog.d/` still holds an entry, so a
 release never ships with empty or missing notes. Only the owner

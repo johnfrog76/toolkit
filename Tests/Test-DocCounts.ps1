@@ -1,27 +1,32 @@
 <#
 .SYNOPSIS
-    The documented CLI suite count agrees with the real one, and with itself.
+    The test counts live in one machine-written file, and the documents keep
+    to their shapes.
 .DESCRIPTION
-    AGENTS.md, docs/TESTING.md and VERIFY.md each record "N suites, M
-    assertions on this commit". Nothing checked them, so a commit that added a
-    suite (or removed one) left the three sentences saying a number the runner
-    no longer produces -- found only by a cold start.
+    The counts a full run prints -- the CLI per suite and in total, the pytest
+    totals, the web totals -- used to be typed into AGENTS.md, VERIFY.md and
+    docs/TESTING.md, and every pull request that added a test rewrote them, so
+    two such pull requests always conflicted on the same lines. Now they live
+    in docs/TEST-COUNTS.md alone, written at a release by
+    Scripts/Write-TestCounts.ps1 from a full run's block, and this suite holds
+    both sides of that:
 
-    This suite closes the SUITE-COUNT half of that gap: it reads the three
-    sentences back with a regex anchored to each file's own wording, and
-    checks all three agree with each other and with
-    Get-ToolkitSuiteRegistry.ps1's real count -- the same table
-    Test-Toolkit.ps1 runs. Deliberately NOT the ASSERTION count: that number
-    moves with a machine's config.local.json (an extra nav alias adds rows to
-    Menu's own coverage; a local org adds Autoload's), which is legitimate
-    variance this suite would otherwise have to model exactly to avoid being
-    wrong on someone else's machine. The suite count has no such variance --
-    it is exactly the registry's size, on any host. The assertion counts are
-    printed instead: a full run of Test-Toolkit.ps1 ends with the combined
-    per-suite line and the total, ready to paste, and this suite holds
-    the SHAPE they are pasted into -- docs/TESTING.md's combined row names every
-    registry suite once in the runner's order, and no single-suite row carries
-    a count of its own to go stale beside it.
+      - no document it reads (the root's, docs/'s, web/'s, agent/'s and
+        agentic/'s Markdown) types a count line outside docs/TEST-COUNTS.md --
+        a per-suite list, `N suites, M assertions`, a pytest total or a web
+        total -- and a finding names the file and the line;
+      - docs/TEST-COUNTS.md is exactly the writer's text for its own block, the
+        block is a full run's (four lines in their shapes, a total that is the
+        sum of its suites), and it is as of consts.json's version;
+      - the writer itself: a block round-trips, a malformed one or one from
+        another tree is refused with exit 2 and a stated reason, -WhatIf
+        writes nothing.
+
+    It does NOT compare the counts with a run, or with the registry: between
+    releases main moves on and the page does not, on purpose. The writer holds
+    a block to the registry when it is written. The rule that the page changes
+    only with the version is CI's (Scripts/Test-TestCountsChange.ps1, held by
+    {cliPrefix}TestToolkit -TestAll).
 
     It also holds the root README to its job as the front door: at most
     120 lines, no build-history phrases, every relative link resolving, and the
@@ -62,143 +67,150 @@ function Assert-Equal {
 }
 
 Write-Host ""
-Write-Host "  DocCounts -- the documented suite count agrees with the real one" -ForegroundColor Cyan
-Write-Host "  -----------------------------------------------------------------" -ForegroundColor DarkGray
+Write-Host "  DocCounts -- the test counts live in one file, and the documents keep their shapes" -ForegroundColor Cyan
+Write-Host "  -----------------------------------------------------------------------------------" -ForegroundColor DarkGray
 Write-Host ""
 
-# -- The real count --------------------------------------------------------------
 . (Join-Path $scriptDir 'Get-ToolkitSuiteRegistry.ps1')
-$realCount = (Get-P20ToolkitSuiteRegistry).Count
-Write-Host "  Registry:  $realCount suites (Get-ToolkitSuiteRegistry.ps1)" -ForegroundColor DarkGray
-
-# -- Each document's own sentence, read back with an anchor unique to it --------
-# A file whose wording changes has to change the anchor here too -- that is the
-# point: a silent rewording is a silent way to stop being checked.
-function Get-DocSuiteCount {
-    param([string]$Path, [string]$Pattern, [string]$Label, [int]$Group = 1)
-    if (-not (Test-Path -LiteralPath $Path)) {
-        Assert-True "$Label exists" $false "not found: $Path"
-        return $null
-    }
-    $text = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
-    $m = [regex]::Match($text, $Pattern)
-    Assert-True "$Label states its CLI suite count in the expected shape" $m.Success `
-        "pattern not found in $Path -- has the sentence been reworded?"
-    if (-not $m.Success) { return $null }
-    return [int]$m.Groups[$Group].Value
-}
+. (Join-Path $pkgRoot 'Scripts/TestAll-Rules.ps1')
+. (Join-Path $scriptDir 'Get-TestHost.ps1')
+. (Join-Path $scriptDir 'Get-TestingDocDrift.ps1')
+$driftDir = Join-Path $scriptDir 'fixtures/doc-counts'
 
 $agentsPath = Join-Path $pkgRoot 'AGENTS.md'
 $testingPath = Join-Path $pkgRoot 'docs/TESTING.md'
 $verifyPath = Join-Path $pkgRoot 'VERIFY.md'
-
-# The patterns are Get-P20CountLinePatterns (Scripts/TestAll-Rules.ps1): the count
-# lines CI's count-line exemption reads, so the two cannot drift apart.
-. (Join-Path $pkgRoot 'Scripts/TestAll-Rules.ps1')
-$countPatterns = Get-P20CountLinePatterns
-$agentsCount = Get-DocSuiteCount -Path $agentsPath -Label 'AGENTS.md' -Pattern $countPatterns.AgentsCli -Group 2
-$testingCount = Get-DocSuiteCount -Path $testingPath -Label 'docs/TESTING.md' -Pattern $countPatterns.TestingCliTotal -Group 2
-$verifyCount = Get-DocSuiteCount -Path $verifyPath -Label 'VERIFY.md' -Pattern $countPatterns.VerifyCli -Group 2
-
-if ($null -ne $agentsCount) { Write-Host "  AGENTS.md:       $agentsCount suites" -ForegroundColor DarkGray }
-if ($null -ne $testingCount) { Write-Host "  docs/TESTING.md: $testingCount suites" -ForegroundColor DarkGray }
-if ($null -ne $verifyCount) { Write-Host "  VERIFY.md:       $verifyCount suites" -ForegroundColor DarkGray }
-Write-Host ""
-
-# -- Agreement --------------------------------------------------------------------
-if ($null -ne $agentsCount) {
-    Assert-Equal 'AGENTS.md matches the real suite count' $realCount $agentsCount
-}
-if ($null -ne $testingCount) {
-    Assert-Equal 'docs/TESTING.md matches the real suite count' $realCount $testingCount
-}
-if ($null -ne $verifyCount) {
-    Assert-Equal 'VERIFY.md matches the real suite count' $realCount $verifyCount
-}
-
-# -- Per-suite counts live in ONE row -----------------------------------------
-# docs/TESTING.md prints the CLI's per-suite counts once, in the `tkTestToolkit`
-# row, and a full run of the runner prints that row ready to paste. A count typed
-# into a single suite's own row is a half-measure: nothing reads it
-# back, so it goes stale while the combined row beside it is refreshed.
-Write-Host ""
-Write-Host "  Per-suite counts live in one row" -ForegroundColor Cyan
 $testingText = ''
 if (Test-Path -LiteralPath $testingPath) { $testingText = Get-Content -LiteralPath $testingPath -Raw -Encoding UTF8 }
 $testingRows = @($testingText -split "\r?\n")
 
-$combinedRow = @($testingRows | Where-Object { $_ -match $countPatterns.TestingRow })
-Assert-True 'docs/TESTING.md has one combined `tkTestToolkit` row' ($combinedRow.Count -eq 1) "$($combinedRow.Count) rows"
-if ($combinedRow.Count -eq 1) {
-    # The names in the row, in order, are the registry's -- the same line the
-    # runner prints, so a paste lands in the shape this reads.
-    $named = @([regex]::Matches($combinedRow[0], '(?<=[\s,.])([A-Z][A-Za-z]+) \d+(?=[,.])') | ForEach-Object { $_.Groups[1].Value })
-    $registryNames = @((Get-P20ToolkitSuiteRegistry).Keys)
-    Assert-Equal 'the combined row names every registry suite once, in the runner''s order' ($registryNames -join ', ') ($named -join ', ')
+$cf = Get-P20TestCountsFile
+$countsPath = Join-Path $pkgRoot $cf.Path
+$constsVersion = [string]((Get-Content -LiteralPath (Join-Path $pkgRoot 'consts.json') -Raw -Encoding UTF8 | ConvertFrom-Json).version)
+
+# -- The counts file ---------------------------------------------------------------
+# The page the writer wrote, read back: its own block in its shapes, the writer's
+# words exactly, and consts.json's version. The release pull request sets the
+# version and runs the writer together, so a version bump alone fails here.
+Write-Host "  The counts file" -ForegroundColor Cyan
+Assert-True "$($cf.Path) exists" (Test-Path -LiteralPath $countsPath -PathType Leaf)
+$countsText = ''
+if (Test-Path -LiteralPath $countsPath -PathType Leaf) { $countsText = Get-Content -LiteralPath $countsPath -Raw -Encoding UTF8 }
+$countsRead = Read-P20TestCountsFile -Text $countsText -ExpectedVersion $constsVersion
+Assert-True "$($cf.Path) is the writer's page for a full run's block, as of consts.json's version ($constsVersion)" `
+    (@($countsRead.Findings).Count -eq 0) (@($countsRead.Findings) -join ' | ')
+if ($null -ne $countsRead.Block -and @($countsRead.Block.Findings).Count -eq 0) {
+    Write-Host "  As of $($countsRead.Version): $($countsRead.Block.Lines[1]); $($countsRead.Block.Lines[2]); $($countsRead.Block.Lines[3])" -ForegroundColor DarkGray
 }
 
-
-# The paste block under "The counts, after a merge" is what a full run prints:
-# the per-suite line and the total line. It went stale once -- a deleted suite
-# still listed, a total that was no one's sum -- because nothing read it. Read it
-# back against the registry: the same suite count, the same names in the same
-# order, and a total that is the sum of its own lines. Deliberately not against a
-# live run: assertion counts move with a machine's config.local.json (see above).
-# The block is read by Get-P20PasteBlock (Scripts/TestAll-Rules.ps1), the one rule
-# the drift check below and CI's carried-lines check read it with.
-. (Join-Path $pkgRoot 'Scripts/TestAll-Rules.ps1')
-$pasteBlock = Get-P20PasteBlock -Text $testingText
-Assert-True 'docs/TESTING.md has the paste block under "The counts, after a merge"' ($null -ne $pasteBlock) 'fenced block not found -- has the heading been reworded?'
-if ($null -ne $pasteBlock) {
-    $pasteLines = @($pasteBlock.cli)
-    $pasteNames = @()
-    $pasteSum = 0
-    $pasteTotal = $null
-    foreach ($pl in $pasteLines) {
-        $tm = [regex]::Match($pl, '^\s*(\d+) suites, (\d+) assertions\s*$')
-        if ($tm.Success) { $pasteTotal = $tm; continue }
-        $parts = @([regex]::Matches($pl, '(?<=^\s*|,\s)([A-Z][A-Za-z]+) (\d+)(?=,|\s*$)'))
-        if ($parts.Count -gt 0) {
-            foreach ($pm in $parts) { $pasteNames += $pm.Groups[1].Value; $pasteSum += [int]$pm.Groups[2].Value }
-        }
-    }
-    Assert-Equal 'the paste block lists as many suites as the registry has' $realCount $pasteNames.Count
-    Assert-Equal 'the paste block names every registry suite once, in the runner''s order' ($registryNames -join ', ') ($pasteNames -join ', ')
-    Assert-True 'the paste block ends with its "N suites, M assertions" line' ($null -ne $pasteTotal) 'line not found'
-    if ($null -ne $pasteTotal) {
-        Assert-Equal 'the paste block''s suite count is the registry''s' $realCount $pasteTotal.Groups[1].Value
-        Assert-Equal 'the paste block''s total is the sum of its own per-suite lines' $pasteSum $pasteTotal.Groups[2].Value
-
-        # AGENTS.md and VERIFY.md state the same total. The paste block is the one
-        # record, so each is held to its `N suites, M assertions` text.
-        $pasteTotalText = ($pasteTotal.Value).Trim()
-        $totalDocs = @(
-            @('AGENTS.md', $agentsPath, $countPatterns.AgentsCli),
-            @('VERIFY.md', $verifyPath, $countPatterns.VerifyCli)
-        )
-        foreach ($td in $totalDocs) {
-            if (-not (Test-Path -LiteralPath $td[1])) { continue }
-            $tm = [regex]::Match((Get-Content -LiteralPath $td[1] -Raw -Encoding UTF8), $td[2])
-            if ($tm.Success) { Assert-Equal "$($td[0])'s total is the paste block's" $pasteTotalText $tm.Groups[1].Value }
-        }
-    }
-}
-
-# One row per stale total: the pattern must read the whole `N suites, M assertions`
-# text, so a total that differs from the paste block's is a difference to report.
-$totalTable = @(
-    # name, pattern, text, the total the paste block says, whether it agrees
-    @('AGENTS.md total agrees', $countPatterns.AgentsCli, 'tkTestToolkit                 # the CLI -- 3 suites, 60 assertions on this commit', '3 suites, 60 assertions', $true),
-    @('AGENTS.md stale total', $countPatterns.AgentsCli, 'tkTestToolkit                 # the CLI -- 3 suites, 59 assertions on this commit', '3 suites, 60 assertions', $false),
-    @('VERIFY.md total agrees', $countPatterns.VerifyCli, 'findings. On this commit that is **3 suites, 60 assertions** with a config', '3 suites, 60 assertions', $true),
-    @('VERIFY.md stale total', $countPatterns.VerifyCli, 'findings. On this commit that is **3 suites, 61 assertions** with a config', '3 suites, 60 assertions', $false)
+# One row per shape the page can be wrong in, against a page the writer's own
+# formatter made. No run and no registry: the page is held to itself.
+$goodLines = @('Consts 10, Compat 20, Menu 30, Archive 5, Setup 5', '5 suites, 70 assertions', 'pytest: 12 passed, 1 skipped', 'web: 7 suites, 55 tests')
+$goodPage = Format-P20TestCountsFile -Lines $goodLines -Version '1.2.3'
+$pageTable = @(
+    # why, text, consts.json's version, finding count, a fragment the finding must contain
+    @('the writer''s page, as of consts.json''s version', $goodPage, '1.2.3', 0, ''),
+    @('the same page checked out CRLF', $goodPage.Replace("`n", "`r`n"), '1.2.3', 0, ''),
+    @('a page as of another version than consts.json''s', $goodPage, '1.2.4', 1, 'is as of version 1.2.3 and consts.json says 1.2.4'),
+    @('a page that states no version', $goodPage.Replace('**1.2.3**', '1.2.3'), '1.2.3', 1, 'states no version'),
+    @('a page with no block', $goodPage.Replace('```text', '```'), '1.2.3', 1, 'text block'),
+    @('a total that is not the sum', $goodPage.Replace('70 assertions', '71 assertions'), '1.2.3', 1, 'the per-suite line sums to 70'),
+    @('a suite count that is not the suites listed', $goodPage.Replace('5 suites, 70', '6 suites, 70'), '1.2.3', 1, 'the per-suite line lists 5'),
+    @('a half that did not run', $goodPage.Replace('pytest: 12 passed, 1 skipped', 'pytest: not run -- this run did not include the agent half'), '1.2.3', 1, 'is not a pytest count'),
+    @('a block of three lines', $goodPage.Replace("web: 7 suites, 55 tests`n", ''), '1.2.3', 1, 'has 3 line(s)'),
+    @('words edited by hand', $goodPage.Replace('# Test counts', '# Test counts, by hand'), '1.2.3', 1, 'edited by hand')
 )
-foreach ($tc in $totalTable) {
-    $m = [regex]::Match($tc[2], $tc[1])
-    $agrees = $m.Success -and ($m.Groups[1].Value -eq $tc[3])
-    Assert-True "total fixture, $($tc[0])" ($m.Success -and ($agrees -eq $tc[4])) "read '$($m.Groups[1].Value)' against '$($tc[3])'"
+foreach ($pc in $pageTable) {
+    $got = @((Read-P20TestCountsFile -Text $pc[1] -ExpectedVersion $pc[2]).Findings)
+    $okCase = ($got.Count -eq $pc[3]) -and (($pc[3] -eq 0) -or ($got[0] -like "*$($pc[4])*"))
+    Assert-True "counts page fixture, $($pc[0]): $($pc[3]) finding(s)" $okCase ($got -join ' | ')
 }
 
+# -- The writer ----------------------------------------------------------------------
+# Scripts/Write-TestCounts.ps1 run as the release runs it, on a scratch root that
+# holds a consts.json: a block made of the registry's own suites round-trips, and
+# everything else is refused before anything is written.
+Write-Host ""
+Write-Host "  The writer, Scripts/Write-TestCounts.ps1" -ForegroundColor Cyan
+$writer = Join-Path $pkgRoot 'Scripts/Write-TestCounts.ps1'
+$registryNames = @((Get-P20ToolkitSuiteRegistry).Keys)
+$parts = @(); $sum = 0; $n = 0
+foreach ($name in $registryNames) { $n++; $parts += "$name $n"; $sum += $n }
+$blockLines = @(($parts -join ', '), "$($registryNames.Count) suites, $sum assertions", 'pytest: 12 passed, 1 skipped, 40 subtests', 'web: 7 suites, 55 tests')
+$writeScratch = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-test-counts-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+try {
+    $root = Join-Path $writeScratch 'root'
+    New-Item -ItemType Directory -Path $root -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $root 'consts.json'), '{ "version": "1.2.3" }', $utf8)
+    $page = Join-Path $root 'docs/TEST-COUNTS.md'
+    $blockFile = Join-Path $writeScratch 'block.txt'
+    [System.IO.File]::WriteAllText($blockFile, (($blockLines | ForEach-Object { "  $_" }) -join "`n") + "`n", $utf8)
+    $want = Format-P20TestCountsFile -Lines $blockLines -Version '1.2.3'
+
+    $said = (Invoke-P20TestHost -File $writer -Arguments @('-Root', $root, '-Path', $blockFile, '-WhatIf') | ForEach-Object { [string]$_ }) -join "`n"
+    Assert-True '-WhatIf prints the page and writes nothing, exit 0' (($LASTEXITCODE -eq 0) -and -not (Test-Path -LiteralPath $page) -and ($said -match [regex]::Escape($blockLines[1]))) "exit $LASTEXITCODE -- $said"
+
+    $said = (Invoke-P20TestHost -File $writer -Arguments @('-Root', $root, '-Path', $blockFile) | ForEach-Object { [string]$_ }) -join "`n"
+    Assert-True 'a full run''s block is written, exit 0' (($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $page)) "exit $LASTEXITCODE -- $said"
+    $bytes = @()
+    if (Test-Path -LiteralPath $page) { $bytes = [System.IO.File]::ReadAllBytes($page) }
+    Assert-True 'the page is UTF-8 with no BOM and LF only' (($bytes.Count -gt 3) -and -not ($bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB) -and (@($bytes | Where-Object { $_ -eq 13 }).Count -eq 0))
+    $written = ''
+    if (Test-Path -LiteralPath $page) { $written = [System.IO.File]::ReadAllText($page, $utf8) }
+    Assert-True 'the page is the formatter''s text for the block and the version' ($written -ceq $want)
+    $back = Read-P20TestCountsFile -Text $written -ExpectedVersion '1.2.3'
+    Assert-True 'and it reads back: no finding, the same four lines' ((@($back.Findings).Count -eq 0) -and ((@($back.Block.Lines) -join '|') -ceq ($blockLines -join '|'))) (@($back.Findings) -join ' | ')
+
+    # The whole transcript of a tkTest run, CRLF, the pytest line with its python:
+    # the block is read after the heading and the page comes out the same.
+    $transcript = Join-Path $writeScratch 'run.log'
+    $runText = "  tkTest -- the three halves`r`n  cli    PASS  ...`r`n`r`n  $($cf.Heading)`r`n  $($blockLines[0])`r`n  $($blockLines[1])`r`n  pytest: 12 passed, 1 skipped, 40 subtests (via ~/.venv-toolkit/bin/python)`r`n  $($blockLines[3])`r`n`r`n  All three halves passed.`r`n"
+    [System.IO.File]::WriteAllText($transcript, $runText, $utf8)
+    $said = (Invoke-P20TestHost -File $writer -Arguments @('-Root', $root, '-Path', $transcript) | ForEach-Object { [string]$_ }) -join "`n"
+    Assert-True 'a CRLF transcript of the run gives the same page, so nothing is written' (($LASTEXITCODE -eq 0) -and ($said -match 'Nothing was written') -and ([System.IO.File]::ReadAllText($page, $utf8) -ceq $want)) "exit $LASTEXITCODE -- $said"
+
+    # Piped in from PowerShell, as the help's third example.
+    $root2 = Join-Path $writeScratch 'root2'
+    New-Item -ItemType Directory -Path $root2 -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $root2 'consts.json'), '{ "version": "1.2.3" }', $utf8)
+    $null = Invoke-P20TestHost -Command "Get-Content -LiteralPath '$blockFile' -Encoding UTF8 | & '$writer' -Root '$root2'"
+    $page2 = Join-Path $root2 'docs/TEST-COUNTS.md'
+    Assert-True 'lines piped in are written the same' ((Test-Path -LiteralPath $page2) -and ([System.IO.File]::ReadAllText($page2, $utf8) -ceq $want))
+
+    # Every refusal: exit 2, an Error: line with the reason, and the page as it was.
+    $refusals = @(
+        # why, block text, extra arguments, a fragment of the reason
+        @('a half that did not run', ($blockLines[0..1] + @('pytest: NOT AVAILABLE -- no python with pytest was found: x', $blockLines[3])), @(), 'not a pytest count'),
+        @('a block of two lines (tkTestToolkit alone)', $blockLines[0..1], @(), 'has 2 line(s)'),
+        @('a total that is not the sum', ($blockLines[0], "$($registryNames.Count) suites, $($sum + 1) assertions", $blockLines[2], $blockLines[3]), @(), "sums to $sum"),
+        @('a block from another tree', ((($parts | Select-Object -Skip 1) -join ', '), "$($registryNames.Count - 1) suites, $($sum - 1) assertions", $blockLines[2], $blockLines[3]), @(), 'registry'),
+        @('a -Version that is not consts.json''s', $blockLines, @('-Version', '9.9.9'), 'consts.json says 1.2.3')
+    )
+    foreach ($rf in $refusals) {
+        $bad = Join-Path $writeScratch 'bad.txt'
+        [System.IO.File]::WriteAllText($bad, (@($rf[1]) -join "`n") + "`n", $utf8)
+        $said = (Invoke-P20TestHost -File $writer -Arguments (@('-Root', $root, '-Path', $bad) + @($rf[2])) | ForEach-Object { [string]$_ }) -join "`n"
+        $code = $LASTEXITCODE
+        $same = ([System.IO.File]::ReadAllText($page, $utf8) -ceq $want)
+        Assert-True "the writer refuses $($rf[0]): exit 2, the reason stated, nothing written" `
+            (($code -eq 2) -and ($said -match '(?m)^Error: ') -and ($said -like "*$($rf[3])*") -and $same) "exit $code -- $said"
+    }
+    $said = (Invoke-P20TestHost -File $writer -Arguments @('-Root', $root, '-Path', (Join-Path $writeScratch 'absent.txt')) | ForEach-Object { [string]$_ }) -join "`n"
+    Assert-True 'the writer refuses a path with no file: exit 2, stated' (($LASTEXITCODE -eq 2) -and ($said -match '(?m)^Error: There is no file')) "exit $LASTEXITCODE -- $said"
+}
+catch {
+    Assert-True 'the writer cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally {
+    Remove-Item -LiteralPath $writeScratch -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# -- A single suite's row carries no count ------------------------------------------
+# docs/TESTING.md says what each suite guards; how many assertions it has is the
+# counts file's. A count typed into a single suite's own row goes stale.
+Write-Host ""
+Write-Host "  A single suite's row carries no count" -ForegroundColor Cyan
 $suiteRows = @($testingRows | Where-Object { $_ -match '^\|\s*`tkTestToolkit -[A-Za-z]+`\s*\|' })
 Assert-True 'docs/TESTING.md has single-suite rows to check' ($suiteRows.Count -gt 0)
 foreach ($row in $suiteRows) {
@@ -208,40 +220,11 @@ foreach ($row in $suiteRows) {
     Assert-True "docs/TESTING.md's -$suiteName row carries no count of its own" (-not $bare) $row.Substring(0, [Math]::Min(120, $row.Length))
 }
 
-# -- The paste owns every count in docs/TESTING.md ----------------------------
-# The paste block is the one record: the CLI's per-suite line and total, a pytest
-# line and a web line (tkTest prints all three). The table row's list and the
-# command block's three totals are held to it, from the text alone -- no run and
-# no machine-local file is read, so it holds in CI as it does anywhere.
+# -- What tkTest prints for the counts file -----------------------------------------
+# The four lines under tkTest's heading: a half that did not run says so in its
+# line's place, and the writer's block rule takes the first shape and refuses that.
 Write-Host ""
-Write-Host "  The paste block owns the table row and the command block's totals" -ForegroundColor Cyan
-. (Join-Path $scriptDir 'Get-TestingDocDrift.ps1')
-$driftFindings = @(Get-P20TestingDocDrift -Text $testingText)
-Assert-True 'docs/TESTING.md: the table row and the command block agree with the paste block' ($driftFindings.Count -eq 0) ($driftFindings -join ' | ')
-
-# One fixture per drift shape: the clause must name the stale line, and for a
-# stale row the first suite whose number differs.
-$driftDir = Join-Path $scriptDir 'fixtures/doc-counts'
-$driftTable = @(
-    # file, expected finding count, a fragment the finding must contain
-    @('agree.md', 0, ''),
-    @('stale-row.md', 1, "first difference is suite 2, row says 'Compat 19', paste says 'Compat 20'"),
-    @('stale-pytest.md', 1, "the command block's pytest line is stale: it says '11 passed"),
-    @('stale-web.md', 1, "the command block's web line is stale: it says '7 suites, 54 tests'"),
-    @('stale-cli-line.md', 1, "the command block's tkTestToolkit line is stale: it says '3 suites, 59 assertions'"),
-    @('pytest-not-run.md', 1, "the paste block's pytest line is not a count"),
-    @('pytest-not-available.md', 1, "the paste block's pytest line is not a count"),
-    @('agree-via.md', 0, '')
-)
-foreach ($case in $driftTable) {
-    $fx = Get-Content -LiteralPath (Join-Path $driftDir $case[0]) -Raw -Encoding UTF8
-    $got = @(Get-P20TestingDocDrift -Text $fx)
-    $okCase = ($got.Count -eq $case[1]) -and (($case[1] -eq 0) -or ($got[0] -like "*$($case[2])*"))
-    Assert-True "drift fixture $($case[0]): $($case[1]) finding(s)" $okCase ($got -join ' | ')
-}
-
-# What tkTest prints for the paste: a half that did not run says so in its line's place.
-. (Join-Path $pkgRoot 'Scripts/TestAll-Rules.ps1')
+Write-Host "  What tkTest prints for the counts file" -ForegroundColor Cyan
 $recAgent = [ordered]@{ result = 'pass'; line = '12 passed, 1 skipped, 40 subtests passed in 3.0s' }
 $recWeb = [ordered]@{ result = 'pass'; suites = 7; total = 55 }
 $cliTwo = @('Consts 10, Compat 20, Menu 30', '3 suites, 60 assertions')
@@ -253,14 +236,17 @@ $pasteTable = @(
 )
 foreach ($pc in $pasteTable) {
     $pasted = @(Get-P20PasteLines -Records $pc[1] -CliLines $pc[2])
-    Assert-Equal "tkTest's paste block, $($pc[0])" $pc[3] ($pasted -join '|')
+    Assert-Equal "tkTest's counts block, $($pc[0])" $pc[3] ($pasted -join '|')
+    $blockTaken = (@((ConvertFrom-P20CountsBlock -Text ($pasted -join "`n")).Findings).Count -eq 0)
+    $shouldTake = ($pc[0] -eq 'all three ran' -or $pc[0] -eq 'agent ran through a venv')
+    Assert-True "and the writer's block rule $(if ($shouldTake) { 'takes' } else { 'refuses' }) it" ($blockTaken -eq $shouldTake)
 }
 
 # -- The front door stays the commercial ------------------------------------
 # The root README is what every cold reader, and every cold model, reads first:
 # what the product is, the three halves, the five verbs, the quick start and the
 # Documentation table, in about a hundred lines. It prints no counts (those live in
-# AGENTS.md, docs/TESTING.md and VERIFY.md, checked above), no build history, and
+# docs/TEST-COUNTS.md, checked below), no build history, and
 # the known gaps are one link down in docs/KNOWN-GAPS.md. A commercial that grows
 # back, or starts dating itself, is the regression this block names.
 Write-Host ""
@@ -579,6 +565,39 @@ foreach ($gc in $gapChecks) {
     Assert-True "known gaps: $($gc[1])" (($hits.Count -eq 0) -and ($gc[0] -ne 'gaps' -or $gapCount -gt 0)) ($hits -join ' | ')
 }
 
+# -- No document types a count ------------------------------------------------------
+# The same documents: a count line typed anywhere in one -- prose, a table row, a
+# code fence -- is a finding naming the file and the line, except in
+# docs/TEST-COUNTS.md, the one page that states them. The shapes are
+# Get-P20CountLinePatterns' Typed four (Scripts/TestAll-Rules.ps1).
+Write-Host ""
+Write-Host "  No document but $($cf.Path) types a test count" -ForegroundColor Cyan
+$readDocs = @('AGENTS.md', 'VERIFY.md', 'docs/TESTING.md', $cf.Path)
+$unread = @($readDocs | Where-Object { -not $gapDocs.ContainsKey($_) })
+Assert-True "the documents read include $($readDocs -join ', ')" ($unread.Count -eq 0) ($unread -join ', ')
+$typedFindings = @(Get-P20TypedCountLines -Docs $gapDocs)
+Assert-True "no document types a count line outside $($cf.Path) ($($gapDocs.Count) documents read)" ($typedFindings.Count -eq 0) ($typedFindings -join ' | ')
+
+# One row per shape and per document the counts used to be typed in. Each must be
+# named by its file and line; a placeholder, a link and the counts page itself pass.
+$typedTable = @(
+    # why, path, text, finding count, the finding's start
+    @('AGENTS.md''s runner line with a CLI total', 'AGENTS.md', "# A`n`n``````powershell`ntkTestToolkit   # the CLI -- 53 suites, 11177 assertions on this commit`n```````n", 1, "AGENTS.md, line 4: '53 suites, 11177 assertions'"),
+    @('VERIFY.md''s Gate 4 sentence', 'VERIFY.md', "# V`n`nfindings. On this commit that is **53 suites, 11177 assertions** with a config`n", 1, "VERIFY.md, line 3: '53 suites, 11177 assertions'"),
+    @('docs/TESTING.md''s per-suite row', 'docs/TESTING.md', "# T`n`n| ``tkTestToolkit`` | The CLI, per suite: Consts 244, Compat 1912, Menu 2205, Environment 86, Archive 217. |`n", 1, "docs/TESTING.md, line 3: 'Consts 244, Compat 1912"),
+    @('docs/TESTING.md''s pytest command line', 'docs/TESTING.md', "# T`n`n``````bash`npython3 -m pytest Tests/     # 1585 passed, 6 skipped -- the agent`n```````n", 1, 'docs/TESTING.md, line 4:'),
+    @('docs/TESTING.md''s web command line', 'docs/TESTING.md', "# T`n`ncd web && npm test           # 5 build-contract checks, then 185 suites, 2307 tests`n", 1, "docs/TESTING.md, line 3: '185 suites, 2307 tests'"),
+    @('a pasted block in another document', 'docs/CONTRIBUTING.md', "# C`n`n  pytest: 1585 passed`n", 1, "docs/CONTRIBUTING.md, line 3: 'pytest: 1585 passed'"),
+    @('two typed lines, two findings', 'VERIFY.md', "a 3 suites, 4 assertions`nb`nc web: 7 suites, 55 tests`n", 2, 'VERIFY.md, line 1:'),
+    @('placeholders and a link to the counts page', 'AGENTS.md', "The total, ``N suites, M assertions``, is in [the counts](docs/TEST-COUNTS.md).`n", 0, ''),
+    @('the counts page itself', $cf.Path, $goodPage, 0, '')
+)
+foreach ($tc in $typedTable) {
+    $got = @(Get-P20TypedCountLines -Docs @{ $tc[1] = $tc[2] })
+    $okCase = ($got.Count -eq $tc[3]) -and (($tc[3] -eq 0) -or ($got[0].StartsWith($tc[4])))
+    Assert-True "typed count fixture, $($tc[0]): $($tc[3]) finding(s)" $okCase ($got -join ' | ')
+}
+
 # -- The runner counts a suite that did not report as a failure -------------
 # Test-Toolkit.ps1 reads each child's score through Get-P20SuiteVerdict. A suite
 # that threw before its Results line used to count 0/0 and leave the Total green.
@@ -757,10 +776,9 @@ if ($script:errors.Count -gt 0) {
     Write-Host "  Failures:" -ForegroundColor Red
     foreach ($e in $script:errors) { Write-Host $e -ForegroundColor Red }
     Write-Host ""
-    Write-Host "  A suite was added or removed without updating the three counts, or one of" -ForegroundColor Yellow
-    Write-Host "  them was reworded so its anchor no longer matches. Update AGENTS.md," -ForegroundColor Yellow
-    Write-Host "  docs/TESTING.md and VERIFY.md's suite-count sentences in the same commit;" -ForegroundColor Yellow
-    Write-Host "  a full tkTestToolkit run prints the combined row and the total to paste." -ForegroundColor Yellow
+    Write-Host "  A count typed into a document belongs in docs/TEST-COUNTS.md alone: link to it." -ForegroundColor Yellow
+    Write-Host "  That page is written at a release, from a full tkTest run's block, by" -ForegroundColor Yellow
+    Write-Host "  Scripts/Write-TestCounts.ps1 -Path <the run's output> (docs/TESTING.md, ""The counts"")." -ForegroundColor Yellow
 }
 Write-Host ""
 
