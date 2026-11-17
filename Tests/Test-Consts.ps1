@@ -288,6 +288,8 @@ $expected = [ordered]@{
     'replyStatuses.ado'         = 'fixed,active,pending,byDesign,wontFix,closed'
     'replyStatuses.github'      = 'fixed,closed,active'
     'usage.readingsFolder'      = 'readings'
+    # The words a cost line puts before the models it leaves out: Write-BurnLog.ps1 and the burn tile read them.
+    'usage.unpricedPhrase'      = 'not counting'
     # The org chart's hub file: Read-OrgChart.ps1 reads (Get-P20Consts).org.file.
     'org.file'                  = 'org.json'
     # Daily's window: the billing script, Daily and GET /api/billing refuse a
@@ -539,6 +541,8 @@ $guarded = [ordered]@{
     # The Claude Code usage row's key IS /env's flag: Get-OptionalSurfaces.ps1
     # reads (Get-P20Consts).usage.envFlag.
     'usage.envFlag'              = 'claudeUsage'
+    # The cost line's unpriced phrase: Write-BurnLog.ps1 reads (Get-P20Consts).usage.unpricedPhrase.
+    'usage.unpricedPhrase'       = 'not counting'
     # The org chart's file name: Scripts read (Get-P20Consts).org.file.
     'org.file'                   = 'org.json'
     # Daily's window sentence: Resolve-BillingWindow.ps1 reads it from

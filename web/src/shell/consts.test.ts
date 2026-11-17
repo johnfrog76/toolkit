@@ -478,6 +478,7 @@ describe("consts.json", () => {
       envFlag: "claudeUsage",
       burnRoute: "/api/usage/burn",
       readingsFolder: "readings",
+      unpricedPhrase: "not counting",
     });
 
     // The org chart's hub file (docs/hub/org.md): the name all three halves type from here.
@@ -669,6 +670,7 @@ describe("no half retypes a contract literal", () => {
     ["studio.ledgerRoute", STUDIO.ledgerRoute],
     // The burn tile's read: the System page asks the route by the contract's name.
     ["usage.burnRoute", USAGE.burnRoute],
+    ["usage.unpricedPhrase", USAGE.unpricedPhrase],
     ["visibility.publicLine", VISIBILITY.publicLine],
     ["rituals.text.title", RITUALS.text.title],
     ["rituals.text.queueHeading", RITUALS.text.queueHeading],

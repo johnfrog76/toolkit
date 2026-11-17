@@ -1329,7 +1329,8 @@ export const adoEndpoints = adoApi.injectEndpoints({
         }
       },
       // A write changes what the inventory says (D-W2): the "How do I" rows and the tips re-read it.
-      invalidatesTags: ["Env", "Surfaces"],
+      // The standup is sized by a setting (teamSize), so it re-reads too.
+      invalidatesTags: ["Env", "Surfaces", "Standup"],
     }),
 
     // GET /api/engagement/:slug/summary
