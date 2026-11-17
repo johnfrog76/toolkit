@@ -78,7 +78,7 @@ export function IssueFilterRows() {
               key={w}
               label={w}
               count={n((i) => i.worker === w)}
-              appearance="orange"
+              appearance="tabColorThree"
               active={choice.worker === w}
               onClick={() => c.setWorker(choice.worker === w ? "all" : w)}
             />
@@ -89,7 +89,7 @@ export function IssueFilterRows() {
         <FilterBadge
           label="any kind"
           count={items.length}
-          appearance="pink"
+          appearance="tabColorTwo"
           active={choice.kind === "all"}
           onClick={() => c.setKind("all")}
         />
@@ -98,7 +98,7 @@ export function IssueFilterRows() {
             key={k}
             label={k}
             count={n((i) => issueKind(i) === k)}
-            appearance="pink"
+            appearance="tabColorTwo"
             active={choice.kind === k}
             onClick={() => c.setKind(choice.kind === k ? "all" : k)}
           />
@@ -108,7 +108,7 @@ export function IssueFilterRows() {
         <FilterBadge
           label="any sev"
           count={items.length}
-          appearance="pink"
+          appearance="tabColorTwo"
           active={choice.sev === "all"}
           onClick={() => c.setSev("all")}
         />
@@ -117,7 +117,7 @@ export function IssueFilterRows() {
             key={s}
             label={s}
             count={n((i) => (i.labels ?? []).includes(s))}
-            appearance="pink"
+            appearance="tabColorTwo"
             active={choice.sev === s}
             onClick={() => c.setSev(choice.sev === s ? "all" : s)}
           />

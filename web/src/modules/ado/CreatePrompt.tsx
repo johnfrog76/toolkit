@@ -368,35 +368,35 @@ export function PromptActions() {
     <div className={styles.tabBar}>
       <FilterBadge
         label="Create from Work Item"
-        appearance="pink"
+        appearance="tabColorTwo"
         count={null}
         active={activeTab === "create"}
         onClick={() => setActiveTab("create")}
       />
       <FilterBadge
         label="Fetch PR Comments"
-        appearance="pink"
+        appearance="tabColorTwo"
         count={null}
         active={activeTab === "fetch"}
         onClick={() => setActiveTab("fetch")}
       />
       <FilterBadge
         label="Resolve Work Item"
-        appearance="pink"
+        appearance="tabColorTwo"
         count={null}
         active={activeTab === "resolve"}
         onClick={() => setActiveTab("resolve")}
       />
       <FilterBadge
         label="Create PR"
-        appearance="pink"
+        appearance="tabColorTwo"
         count={null}
         active={activeTab === "pr"}
         onClick={() => setActiveTab("pr")}
       />
       <FilterBadge
         label="New ADO Item"
-        appearance="pink"
+        appearance="tabColorTwo"
         count={null}
         active={activeTab === "new-item"}
         onClick={() => setActiveTab("new-item")}

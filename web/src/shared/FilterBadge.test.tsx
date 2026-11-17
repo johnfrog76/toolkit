@@ -52,7 +52,7 @@ describe("FilterBadge", () => {
   });
 
   it("an unselected chip draws no appearance colour", () => {
-    expect(ruleFor(chip("pink", false))).not.toContain(chipToken("pink"));
+    expect(ruleFor(chip("tabColorTwo", false))).not.toContain(chipToken("tabColorTwo"));
   });
 
   it("draws its count, a zero included, and null draws none", () => {

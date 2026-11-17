@@ -164,8 +164,8 @@ describe("brand foreground on a card", () => {
   );
 });
 
-// The filter chips' named appearances (shared/FilterBadge.tsx): a call site says "pink",
-// and each theme says what pink is. Eight themes: the six pickable and the two skins.
+// The filter chips' named appearances (shared/FilterBadge.tsx): a call site names a slot,
+// and each theme says what the slot is. Eight themes: the six pickable and the two skins.
 const HEX = /^#[0-9a-f]{6}$/i;
 
 /** A chip's own backdrop in a theme: the page, and the card where it is an opaque hex. */
@@ -185,7 +185,12 @@ function rgbDistance(a: string, b: string): number {
 describe("filter chip appearances", () => {
   it("there are eight themes, and the appearances are the four named ones", () => {
     expect(EVERY_THEME).toHaveLength(8);
-    expect([...CHIP_APPEARANCES]).toEqual(["pink", "purple", "orange", "blue"]);
+    expect([...CHIP_APPEARANCES]).toEqual([
+      "tabColorOne",
+      "tabColorTwo",
+      "tabColorThree",
+      "tabColorFour",
+    ]);
   });
 
   it.each(EVERY_THEME.map((t) => [t.id, t] as const))(
@@ -198,7 +203,7 @@ describe("filter chip appearances", () => {
   );
 
   it("a theme that leaves an appearance out is caught", () => {
-    const { blue: _blue, ...three } = THEMES[0].chips;
+    const { tabColorFour: _four, ...three } = THEMES[0].chips;
     const broken = { ...THEMES[0], chips: three } as unknown as ToolkitTheme;
     expect(Object.keys(broken.chips).sort()).not.toEqual([...CHIP_APPEARANCES].sort());
   });
@@ -234,6 +239,18 @@ describe("filter chip appearances", () => {
           });
         }
       }
+    },
+  );
+
+  // The issue's first requirement: slot one IS the interactive colour, in every theme, on the
+  // Fluent theme as well as the record -- the one its links and tab strip read.
+  it.each(EVERY_THEME.map((t) => [t.id, t] as const))(
+    "%s: tabColorOne is the theme's link and tab-strip colour",
+    (_id, t) => {
+      const f = fluentThemeFor(t);
+      expect(t.chips.tabColorOne).toBe(t.brand.foreground1);
+      expect(t.chips.tabColorOne).toBe(f.colorBrandForeground1);
+      expect(t.chips.tabColorOne).toBe(f.colorCompoundBrandForeground1);
     },
   );
 
