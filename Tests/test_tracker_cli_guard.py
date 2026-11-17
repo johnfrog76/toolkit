@@ -4,10 +4,13 @@ The guard is proved the way the overrides are: a child pytest runs the cases in
 ``Tests/fixtures/tracker-cli/guard_cases.py`` under this same conftest, and this
 file reads how each one ended. A call nobody stood in for fails its test and the
 message names the command, whether this process made it or a child found the
-tool on the PATH; a marked call and a stubbed one pass.
+tool on the PATH (through the shell, or a child PowerShell as the bridge starts
+one); a marked call and a stubbed one pass. The Windows CI job runs this file:
+there the stand-ins are ``.cmd`` files beside a real ``gh.exe``.
 """
 
 import os
+import shutil
 import subprocess
 import sys
 import unittest
@@ -45,6 +48,19 @@ class AnUnaskedCallFailsItsTest(unittest.TestCase):
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertIn("1 failed", done.stdout)
         self.assertIn("az account show", done.stdout)
+
+    def test_gh_from_a_child_through_the_shell_fails_and_is_named(self):
+        done = _run_case("test_an_unasked_gh_from_a_child_through_the_shell")
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("1 failed", done.stdout)
+        self.assertIn("gh auth status", done.stdout)
+
+    @unittest.skipUnless(shutil.which("pwsh") or shutil.which("powershell"), "no PowerShell on this machine")
+    def test_a_call_from_a_child_powershell_fails_and_is_named(self):
+        done = _run_case("test_an_unasked_call_from_a_child_powershell")
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("1 failed", done.stdout)
+        self.assertIn("gh repo list", done.stdout)
 
     def test_a_mark_for_another_tool_does_not_cover_it(self):
         done = _run_case("test_a_mark_covers_only_the_tools_it_names")

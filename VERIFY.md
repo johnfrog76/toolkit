@@ -1007,13 +1007,6 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   tab and search for `a&b` and for `"quoted"`, and you should see an ordinary result or none, with the tab still
   answering. On an Azure DevOps Space, `tkDashboard` and the web UI's work items list as before; `az` still answers.
 
-- [ ] **The agent's tests keep `az` and `gh` out of reach on Windows (#483).** On the Windows PC, signed in to
-  both tools, `python -m pytest Tests/test_tracker_cli_guard.py Tests/test_child_windows.py Tests/test_bridge.py`
-  passes (the Windows CI job runs the same files). The stand-ins there are `.cmd` files, and a process started
-  without the shell walks past a `.cmd` to the real `.exe`, so the check in the test's own process is what holds
-  `gh`: this run is what shows it does. Then `python -m pytest Tests/` ends with the totals it had before, and no
-  failure says a test `reached a tracker tool it did not stand in for`.
-
 - [ ] **`Land` and `az.cmd` on Windows.** On the Windows PC, on an Azure DevOps Space, `tkTestToolkit -Land` passes,
   including its two `.cmd` rows, which run only there. Then `tkEditItem <id> -Title "R&D work"` with `-WhatIf` off on a test
   item: the title arrives whole, because an argument with a space is quoted. And `tkLand` on a real merged pull request of
