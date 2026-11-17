@@ -201,7 +201,7 @@ export function DesignGroups({
                   <FilterBadge
                     label="any outcome"
                     count={outcomeCounts.all}
-                    appearance="tabColorTwo"
+                    appearance="tabColorOne"
                     active={outcome === ALL_OUTCOMES}
                     onClick={() => setOutcome(ALL_OUTCOMES)}
                   />
@@ -210,7 +210,7 @@ export function DesignGroups({
                       key={o}
                       label={o}
                       count={outcomeCounts.byOutcome[o] ?? 0}
-                      appearance="tabColorTwo"
+                      appearance="tabColorOne"
                       active={outcome === o}
                       onClick={() => setOutcome(outcome === o ? ALL_OUTCOMES : o)}
                     />
@@ -218,7 +218,7 @@ export function DesignGroups({
                   <FilterBadge
                     label="nothing said"
                     count={outcomeCounts.none}
-                    appearance="tabColorTwo"
+                    appearance="tabColorOne"
                     active={outcome === NO_OUTCOME}
                     onClick={() => setOutcome(outcome === NO_OUTCOME ? ALL_OUTCOMES : NO_OUTCOME)}
                   />
