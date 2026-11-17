@@ -7,8 +7,8 @@ releases `main` moves on and these figures stay where the last release left them
 states them. [Testing](TESTING.md), "The counts", says how they are written.
 
 ```text
-Consts 244, Compat 1912, Menu 2205, Environment 86, Archive 217, PRComments 284, BackfillStamps 50, Changelog 90, Update 68, Start 87, PullRequest 10, CloseWorkItem 51, PromptStatus 125, ThreadHash 86, Setup 82, Move 51, Billable 46, Plan 114, Tag 34, Backlog 56, Cover 106, Design 270, NewPrompt 159, ExitCodes 133, Autoload 86, GitRoot 17, Sync 86, Connect 62, NewSpace 149, HowWeWork 42, EditItem 69, Land 139, Burn 198, PublishPR 39, Config 397, HubJson 186, Portability 289, Web 165, Agent 129, TestAll 333, ModuleCommands 88, Reminders 71, Rituals 983, StandupRemind 85, Triage 121, StartWork 85, OrgChart 195, Review 82, WorkReview 36, SendTeams 56, NewMeeting 63, MeetingAgenda 178, DocCounts 182
-53 suites, 11177 assertions
-pytest: 1585 passed, 6 skipped
-web: 184 suites, 2306 tests
+Consts 248, Compat 1925, Menu 2211, Environment 86, Archive 217, PRComments 284, BackfillStamps 50, Changelog 90, Update 68, Start 87, PullRequest 10, CloseWorkItem 51, PromptStatus 125, ThreadHash 86, Setup 82, Move 51, Billable 46, Plan 114, Tag 34, Backlog 56, Cover 106, Design 270, NewPrompt 159, ExitCodes 133, Autoload 86, GitRoot 17, Sync 86, Connect 62, NewSpace 149, HowWeWork 42, EditItem 69, Land 139, Burn 198, PublishPR 39, Config 397, HubJson 186, Portability 289, Web 165, Agent 129, TestAll 320, ModuleCommands 88, Reminders 71, Rituals 1006, StandupRemind 85, Triage 121, StartWork 85, OrgChart 195, Review 82, WorkReview 36, SendTeams 56, NewMeeting 63, MeetingAgenda 178, DocCounts 193
+53 suites, 11221 assertions
+pytest: 1590 passed, 6 skipped
+web: 185 suites, 2307 tests
 ```
