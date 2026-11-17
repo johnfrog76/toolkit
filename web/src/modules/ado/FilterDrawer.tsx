@@ -239,7 +239,7 @@ export function FilterDrawer({
                 label="All"
                 count={cardCount}
                 active={typeFilter === "All"}
-                appearance="pink"
+                appearance="tabColorTwo"
                 onClick={() => onTypeChange("All")}
               />
               {typeRow.map((t) => (
@@ -248,7 +248,7 @@ export function FilterDrawer({
                   label={t.label}
                   count={t.count}
                   active={typeFilter === t.label}
-                  appearance="pink"
+                  appearance="tabColorTwo"
                   onClick={() => onTypeChange(typeFilter === t.label ? "All" : t.label)}
                 />
               ))}
@@ -317,7 +317,7 @@ export function FilterDrawer({
                 label="All"
                 count={cardCount}
                 active={stateFilter === "All"}
-                appearance="orange"
+                appearance="tabColorThree"
                 onClick={() => onStateChange("All")}
               />
               {stateOptions
@@ -328,7 +328,7 @@ export function FilterDrawer({
                     label={stateLabel(s)}
                     count={stateCounts[s] ?? 0}
                     active={stateFilter === s}
-                    appearance="orange"
+                    appearance="tabColorThree"
                     onClick={() => onStateChange(stateFilter === s ? "All" : s)}
                   />
                 ))}

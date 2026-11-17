@@ -26,35 +26,48 @@
 
 export type ThemeMode = "dark" | "light";
 
-/** The named appearances of a filter chip (shared/FilterBadge.tsx). A call site names one;
- *  each theme says what colour it is. One colour marks one group of filters, so a page
- *  with several chip rows reads row by row. */
-export const CHIP_APPEARANCES = ["pink", "purple", "orange", "blue"] as const;
+/** The named appearances of a filter chip (shared/FilterBadge.tsx), by SLOT and not by hue.
+ *  A call site names a slot; each theme says what colour it is. `tabColorOne` is the theme's
+ *  interactive colour -- its links, selected nav item and in-page tab strip -- and the default,
+ *  so a row of one colour reads as the same kind of control. `tabColorTwo` to `tabColorFour`
+ *  are for rows that group by colour, where several appear together. */
+export const CHIP_APPEARANCES = [
+  "tabColorOne",
+  "tabColorTwo",
+  "tabColorThree",
+  "tabColorFour",
+] as const;
 export type ChipAppearance = (typeof CHIP_APPEARANCES)[number];
 export type ChipColours = Record<ChipAppearance, string>;
 
-/** The name a chip appearance has on the Fluent theme (`toolkitChipPink`), which Fluent's
+/** The name a chip appearance has on the Fluent theme (`toolkitChipTabColorOne`), which Fluent's
  *  provider writes out as a CSS custom property of the same name, so a chip reads its
  *  colour from whichever theme it is drawn under. */
 export function chipToken(a: ChipAppearance): string {
   return `toolkitChip${a[0].toUpperCase()}${a.slice(1)}`;
 }
 
-// Light tones for a dark page, deep tones for a light one. Every record below names its
-// own set, so a theme can restyle them; themeList.test.ts holds each set to 4.5:1 on
-// that theme's own page (and card), and the four apart from each other.
-const CHIPS_ON_DARK: ChipColours = {
-  pink: "#f472b6",
-  purple: "#a78bfa",
-  orange: "#fb923c",
-  blue: "#60a5fa",
-};
-const CHIPS_ON_LIGHT: ChipColours = {
-  pink: "#be185d",
-  purple: "#6d28d9",
-  orange: "#b43c0b",
-  blue: "#1d4ed8",
-};
+/** What a theme declares for its chips: the three grouping colours, once, in its own palette.
+ *  Slot one is not here -- `defineTheme` takes it from `brand.foreground1`, so it cannot drift
+ *  from the colour the theme's links and tab strip use. Each is held to 4.5:1 on the theme's page
+ *  and card and well apart from the others by themeList.test.ts: light tones on a dark page,
+ *  deep tones on a light one. */
+export type TabColors = [two: string, three: string, four: string];
+
+type ThemeInput = Omit<ToolkitTheme, "chips"> & { tabColors: TabColors };
+
+function defineTheme({ tabColors, ...t }: ThemeInput): ToolkitTheme {
+  const [two, three, four] = tabColors;
+  return {
+    ...t,
+    chips: {
+      tabColorOne: t.brand.foreground1,
+      tabColorTwo: two,
+      tabColorThree: three,
+      tabColorFour: four,
+    },
+  };
+}
 
 export interface ToolkitTheme {
   id: string;
@@ -78,12 +91,12 @@ export interface ToolkitTheme {
     foreground1: string;
     foreground2: string;
   };
-  /** What each named chip appearance is, in this theme: the selected chip's border. */
+  /** What each chip slot is, in this theme: the selected chip's border. Built by `defineTheme`. */
   chips: ChipColours;
 }
 
 export const THEMES: ToolkitTheme[] = [
-  {
+  defineTheme({
     id: "atlantis",
     name: "Atlantis",
     mode: "dark",
@@ -102,9 +115,9 @@ export const THEMES: ToolkitTheme[] = [
       foreground1: "#67e8f9",
       foreground2: "#22d3ee",
     },
-    chips: CHIPS_ON_DARK,
-  },
-  {
+    tabColors: ["#f0abfc", "#86efac", "#fcd34d"],
+  }),
+  defineTheme({
     id: "aurora",
     name: "Aurora",
     mode: "dark",
@@ -123,9 +136,9 @@ export const THEMES: ToolkitTheme[] = [
       foreground1: "#818CF8",
       foreground2: "#A5B4FC",
     },
-    chips: CHIPS_ON_DARK,
-  },
-  {
+    tabColors: ["#34d399", "#f472b6", "#38bdf8"],
+  }),
+  defineTheme({
     id: "basement",
     name: "Basement",
     mode: "dark",
@@ -142,9 +155,9 @@ export const THEMES: ToolkitTheme[] = [
       foreground1: "#fbbf24",
       foreground2: "#f59e0b",
     },
-    chips: CHIPS_ON_DARK,
-  },
-  {
+    tabColors: ["#fb7185", "#86efac", "#7dd3fc"],
+  }),
+  defineTheme({
     id: "seaglass",
     name: "Seaglass",
     mode: "light",
@@ -163,9 +176,9 @@ export const THEMES: ToolkitTheme[] = [
       foreground1: "#0F766E",
       foreground2: "#115E59",
     },
-    chips: CHIPS_ON_LIGHT,
-  },
-  {
+    tabColors: ["#6d28d9", "#be185d", "#a16207"],
+  }),
+  defineTheme({
     id: "sunny",
     name: "Sunny",
     mode: "light",
@@ -184,9 +197,9 @@ export const THEMES: ToolkitTheme[] = [
       foreground1: "#be123c",
       foreground2: "#9f1239",
     },
-    chips: CHIPS_ON_LIGHT,
-  },
-  {
+    tabColors: ["#b45309", "#0f766e", "#4338ca"],
+  }),
+  defineTheme({
     id: "office",
     name: "Office",
     mode: "light",
@@ -203,8 +216,8 @@ export const THEMES: ToolkitTheme[] = [
       foreground1: "#0F766E",
       foreground2: "#115E59",
     },
-    chips: CHIPS_ON_LIGHT,
-  },
+    tabColors: ["#1d4ed8", "#6d28d9", "#b43c0b"],
+  }),
 ];
 
 /**
@@ -218,7 +231,7 @@ export const THEMES: ToolkitTheme[] = [
  * no scrim dials the background back.
  */
 export const SKIN_THEMES: Record<"temple" | "tank", ToolkitTheme> = {
-  temple: {
+  temple: defineTheme({
     id: "skin-temple",
     name: "Zen Temple",
     mode: "dark",
@@ -237,9 +250,9 @@ export const SKIN_THEMES: Record<"temple" | "tank", ToolkitTheme> = {
       foreground1: "#e9c87a",
       foreground2: "#e8d9b0",
     },
-    chips: CHIPS_ON_DARK,
-  },
-  tank: {
+    tabColors: ["#e8786a", "#6fcf97", "#8fb4e8"],
+  }),
+  tank: defineTheme({
     id: "skin-tank",
     name: "Fish Tank",
     mode: "dark",
@@ -261,8 +274,8 @@ export const SKIN_THEMES: Record<"temple" | "tank", ToolkitTheme> = {
       foreground1: "#7fd4c0",
       foreground2: "#8fe8cc",
     },
-    chips: CHIPS_ON_DARK,
-  },
+    tabColors: ["#f0a35e", "#b79cf0", "#f08aa8"],
+  }),
 };
 
 /** What a browser that has never chosen shows: by the system, once. */

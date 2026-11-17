@@ -20,10 +20,10 @@
         "foreground2": "#22d3ee"
       },
       "chips": {
-        "pink": "#f472b6",
-        "purple": "#a78bfa",
-        "orange": "#fb923c",
-        "blue": "#60a5fa"
+        "tabColorOne": "#67e8f9",
+        "tabColorTwo": "#f0abfc",
+        "tabColorThree": "#86efac",
+        "tabColorFour": "#fcd34d"
       }
     },
     "fluent": {
@@ -486,10 +486,10 @@
       "shadow16Brand": "0 0 2px rgba(0,0,0,0.30), 0 8px 16px rgba(0,0,0,0.25)",
       "shadow28Brand": "0 0 8px rgba(0,0,0,0.30), 0 14px 28px rgba(0,0,0,0.25)",
       "shadow64Brand": "0 0 8px rgba(0,0,0,0.30), 0 32px 64px rgba(0,0,0,0.25)",
-      "toolkitChipPink": "#f472b6",
-      "toolkitChipPurple": "#a78bfa",
-      "toolkitChipOrange": "#fb923c",
-      "toolkitChipBlue": "#60a5fa"
+      "toolkitChipTabColorOne": "#67e8f9",
+      "toolkitChipTabColorTwo": "#f0abfc",
+      "toolkitChipTabColorThree": "#86efac",
+      "toolkitChipTabColorFour": "#fcd34d"
     }
   },
   "aurora": {
@@ -513,10 +513,10 @@
         "foreground2": "#A5B4FC"
       },
       "chips": {
-        "pink": "#f472b6",
-        "purple": "#a78bfa",
-        "orange": "#fb923c",
-        "blue": "#60a5fa"
+        "tabColorOne": "#818CF8",
+        "tabColorTwo": "#34d399",
+        "tabColorThree": "#f472b6",
+        "tabColorFour": "#38bdf8"
       }
     },
     "fluent": {
@@ -979,10 +979,10 @@
       "shadow16Brand": "0 0 2px rgba(0,0,0,0.30), 0 8px 16px rgba(0,0,0,0.25)",
       "shadow28Brand": "0 0 8px rgba(0,0,0,0.30), 0 14px 28px rgba(0,0,0,0.25)",
       "shadow64Brand": "0 0 8px rgba(0,0,0,0.30), 0 32px 64px rgba(0,0,0,0.25)",
-      "toolkitChipPink": "#f472b6",
-      "toolkitChipPurple": "#a78bfa",
-      "toolkitChipOrange": "#fb923c",
-      "toolkitChipBlue": "#60a5fa"
+      "toolkitChipTabColorOne": "#818CF8",
+      "toolkitChipTabColorTwo": "#34d399",
+      "toolkitChipTabColorThree": "#f472b6",
+      "toolkitChipTabColorFour": "#38bdf8"
     }
   },
   "basement": {
@@ -1007,10 +1007,10 @@
         "foreground2": "#f59e0b"
       },
       "chips": {
-        "pink": "#f472b6",
-        "purple": "#a78bfa",
-        "orange": "#fb923c",
-        "blue": "#60a5fa"
+        "tabColorOne": "#fbbf24",
+        "tabColorTwo": "#fb7185",
+        "tabColorThree": "#86efac",
+        "tabColorFour": "#7dd3fc"
       }
     },
     "fluent": {
@@ -1473,10 +1473,10 @@
       "shadow16Brand": "0 0 2px rgba(0,0,0,0.30), 0 8px 16px rgba(0,0,0,0.25)",
       "shadow28Brand": "0 0 8px rgba(0,0,0,0.30), 0 14px 28px rgba(0,0,0,0.25)",
       "shadow64Brand": "0 0 8px rgba(0,0,0,0.30), 0 32px 64px rgba(0,0,0,0.25)",
-      "toolkitChipPink": "#f472b6",
-      "toolkitChipPurple": "#a78bfa",
-      "toolkitChipOrange": "#fb923c",
-      "toolkitChipBlue": "#60a5fa"
+      "toolkitChipTabColorOne": "#fbbf24",
+      "toolkitChipTabColorTwo": "#fb7185",
+      "toolkitChipTabColorThree": "#86efac",
+      "toolkitChipTabColorFour": "#7dd3fc"
     }
   },
   "seaglass": {
@@ -1500,10 +1500,10 @@
         "foreground2": "#115E59"
       },
       "chips": {
-        "pink": "#be185d",
-        "purple": "#6d28d9",
-        "orange": "#b43c0b",
-        "blue": "#1d4ed8"
+        "tabColorOne": "#0F766E",
+        "tabColorTwo": "#6d28d9",
+        "tabColorThree": "#be185d",
+        "tabColorFour": "#a16207"
       }
     },
     "fluent": {
@@ -1966,10 +1966,10 @@
       "shadow16Brand": "0 0 2px rgba(0,0,0,0.30), 0 8px 16px rgba(0,0,0,0.25)",
       "shadow28Brand": "0 0 8px rgba(0,0,0,0.30), 0 14px 28px rgba(0,0,0,0.25)",
       "shadow64Brand": "0 0 8px rgba(0,0,0,0.30), 0 32px 64px rgba(0,0,0,0.25)",
-      "toolkitChipPink": "#be185d",
-      "toolkitChipPurple": "#6d28d9",
-      "toolkitChipOrange": "#b43c0b",
-      "toolkitChipBlue": "#1d4ed8"
+      "toolkitChipTabColorOne": "#0F766E",
+      "toolkitChipTabColorTwo": "#6d28d9",
+      "toolkitChipTabColorThree": "#be185d",
+      "toolkitChipTabColorFour": "#a16207"
     }
   },
   "sunny": {
@@ -1993,10 +1993,10 @@
         "foreground2": "#9f1239"
       },
       "chips": {
-        "pink": "#be185d",
-        "purple": "#6d28d9",
-        "orange": "#b43c0b",
-        "blue": "#1d4ed8"
+        "tabColorOne": "#be123c",
+        "tabColorTwo": "#b45309",
+        "tabColorThree": "#0f766e",
+        "tabColorFour": "#4338ca"
       }
     },
     "fluent": {
@@ -2459,10 +2459,10 @@
       "shadow16Brand": "0 0 2px rgba(0,0,0,0.30), 0 8px 16px rgba(0,0,0,0.25)",
       "shadow28Brand": "0 0 8px rgba(0,0,0,0.30), 0 14px 28px rgba(0,0,0,0.25)",
       "shadow64Brand": "0 0 8px rgba(0,0,0,0.30), 0 32px 64px rgba(0,0,0,0.25)",
-      "toolkitChipPink": "#be185d",
-      "toolkitChipPurple": "#6d28d9",
-      "toolkitChipOrange": "#b43c0b",
-      "toolkitChipBlue": "#1d4ed8"
+      "toolkitChipTabColorOne": "#be123c",
+      "toolkitChipTabColorTwo": "#b45309",
+      "toolkitChipTabColorThree": "#0f766e",
+      "toolkitChipTabColorFour": "#4338ca"
     }
   },
   "office": {
@@ -2487,10 +2487,10 @@
         "foreground2": "#115E59"
       },
       "chips": {
-        "pink": "#be185d",
-        "purple": "#6d28d9",
-        "orange": "#b43c0b",
-        "blue": "#1d4ed8"
+        "tabColorOne": "#0F766E",
+        "tabColorTwo": "#1d4ed8",
+        "tabColorThree": "#6d28d9",
+        "tabColorFour": "#b43c0b"
       }
     },
     "fluent": {
@@ -2953,10 +2953,10 @@
       "shadow16Brand": "0 0 2px rgba(0,0,0,0.30), 0 8px 16px rgba(0,0,0,0.25)",
       "shadow28Brand": "0 0 8px rgba(0,0,0,0.30), 0 14px 28px rgba(0,0,0,0.25)",
       "shadow64Brand": "0 0 8px rgba(0,0,0,0.30), 0 32px 64px rgba(0,0,0,0.25)",
-      "toolkitChipPink": "#be185d",
-      "toolkitChipPurple": "#6d28d9",
-      "toolkitChipOrange": "#b43c0b",
-      "toolkitChipBlue": "#1d4ed8"
+      "toolkitChipTabColorOne": "#0F766E",
+      "toolkitChipTabColorTwo": "#1d4ed8",
+      "toolkitChipTabColorThree": "#6d28d9",
+      "toolkitChipTabColorFour": "#b43c0b"
     }
   },
   "skin-temple": {
@@ -2981,10 +2981,10 @@
         "foreground2": "#e8d9b0"
       },
       "chips": {
-        "pink": "#f472b6",
-        "purple": "#a78bfa",
-        "orange": "#fb923c",
-        "blue": "#60a5fa"
+        "tabColorOne": "#e9c87a",
+        "tabColorTwo": "#e8786a",
+        "tabColorThree": "#6fcf97",
+        "tabColorFour": "#8fb4e8"
       }
     },
     "fluent": {
@@ -3447,10 +3447,10 @@
       "shadow16Brand": "0 0 2px rgba(0,0,0,0.30), 0 8px 16px rgba(0,0,0,0.25)",
       "shadow28Brand": "0 0 8px rgba(0,0,0,0.30), 0 14px 28px rgba(0,0,0,0.25)",
       "shadow64Brand": "0 0 8px rgba(0,0,0,0.30), 0 32px 64px rgba(0,0,0,0.25)",
-      "toolkitChipPink": "#f472b6",
-      "toolkitChipPurple": "#a78bfa",
-      "toolkitChipOrange": "#fb923c",
-      "toolkitChipBlue": "#60a5fa"
+      "toolkitChipTabColorOne": "#e9c87a",
+      "toolkitChipTabColorTwo": "#e8786a",
+      "toolkitChipTabColorThree": "#6fcf97",
+      "toolkitChipTabColorFour": "#8fb4e8"
     }
   },
   "skin-tank": {
@@ -3475,10 +3475,10 @@
         "foreground2": "#8fe8cc"
       },
       "chips": {
-        "pink": "#f472b6",
-        "purple": "#a78bfa",
-        "orange": "#fb923c",
-        "blue": "#60a5fa"
+        "tabColorOne": "#7fd4c0",
+        "tabColorTwo": "#f0a35e",
+        "tabColorThree": "#b79cf0",
+        "tabColorFour": "#f08aa8"
       }
     },
     "fluent": {
@@ -3941,10 +3941,10 @@
       "shadow16Brand": "0 0 2px rgba(0,0,0,0.30), 0 8px 16px rgba(0,0,0,0.25)",
       "shadow28Brand": "0 0 8px rgba(0,0,0,0.30), 0 14px 28px rgba(0,0,0,0.25)",
       "shadow64Brand": "0 0 8px rgba(0,0,0,0.30), 0 32px 64px rgba(0,0,0,0.25)",
-      "toolkitChipPink": "#f472b6",
-      "toolkitChipPurple": "#a78bfa",
-      "toolkitChipOrange": "#fb923c",
-      "toolkitChipBlue": "#60a5fa"
+      "toolkitChipTabColorOne": "#7fd4c0",
+      "toolkitChipTabColorTwo": "#f0a35e",
+      "toolkitChipTabColorThree": "#b79cf0",
+      "toolkitChipTabColorFour": "#f08aa8"
     }
   }
 }
