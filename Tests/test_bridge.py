@@ -93,7 +93,7 @@ class AllowlistIsTheCommandTable(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertIn(name, bridge.command_map())
 
-    @unreachable("gh")
+    @unreachable("az", "gh")
     @unittest.skipUnless(HAVE_PWSH, "needs pwsh to run a command")
     def test_a_cheap_command_runs_for_real(self):
         """Env reads the machine and prints -- it writes nothing anywhere."""
