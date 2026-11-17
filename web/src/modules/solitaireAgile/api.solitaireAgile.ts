@@ -308,6 +308,7 @@ export const solitaireAgileEndpoints = ritualsApi.injectEndpoints({
     // GET /api/ritual/standup?space=<slug> -- today's standup, derived now
     getStandup: builder.query<StandupResponse, string>({
       query: standupQuery,
+      providesTags: ["Standup"],
       keepUnusedDataFor: CACHE_TTL,
     }),
 
