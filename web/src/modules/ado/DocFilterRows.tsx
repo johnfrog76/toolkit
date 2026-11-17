@@ -38,7 +38,7 @@ export function DesignKindRow() {
       <FilterBadge
         label="any kind"
         count={designs.length}
-        appearance="pink"
+        appearance="tabColorOne"
         active={kind === ALL}
         onClick={() => setKind(ALL)}
       />
@@ -47,7 +47,7 @@ export function DesignKindRow() {
           key={k.value}
           label={k.label}
           count={designs.filter((d) => designMatches(d, "", k.value)).length}
-          appearance="pink"
+          appearance="tabColorOne"
           active={kind === k.value}
           onClick={() => setKind(kind === k.value ? ALL : k.value)}
         />

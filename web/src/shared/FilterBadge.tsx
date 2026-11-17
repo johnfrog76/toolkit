@@ -31,10 +31,10 @@ const useStyles = makeStyles({
       backgroundColor: tokens.colorNeutralBackground1Hover,
     },
   },
-  pink: border("pink"),
-  purple: border("purple"),
-  orange: border("orange"),
-  blue: border("blue"),
+  tabColorOne: border("tabColorOne"),
+  tabColorTwo: border("tabColorTwo"),
+  tabColorThree: border("tabColorThree"),
+  tabColorFour: border("tabColorFour"),
 });
 
 /** The named appearances (shell/themeList.ts CHIP_APPEARANCES): the name is the call site's,
@@ -61,7 +61,7 @@ export function FilterBadge({
   count,
   active,
   onClick,
-  appearance = "purple",
+  appearance = "tabColorOne",
   children,
   multi = false,
 }: FilterBadgeProps) {
