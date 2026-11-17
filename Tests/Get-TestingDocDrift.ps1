@@ -1,96 +1,17 @@
 <#
 .SYNOPSIS
-    Holds the counts docs/TESTING.md writes in several places to the one paste block.
+    Holds the per-file pytest counts docs/TESTING.md states to the files they count.
 .DESCRIPTION
-    tkTest prints a paste block of three figures (Get-P20PasteLines in
-    Scripts/TestAll-Rules.ps1): the CLI's per-suite line and `N suites, M assertions`,
-    then `pytest: ...` and `web: ...`. The seat pastes it into docs/TESTING.md under
-    "The counts, after a merge". The same figures are written in more places, and a paste
-    used to refresh some and not the rest. The paste block is the source; this reads the
-    other places back against it, from the text alone -- no run, no machine-local file --
-    so it holds on every machine and in CI.
+    docs/TESTING.md's agent row gives each test file a plain "(N)", and a standalone
+    `pytest Tests/test_x.py` row may state "N" or "N (+ subtests)". Each is held to the
+    file's `def test_` count, one counting rule for both places, from the text and the
+    tree alone -- no run, no machine-local file -- so it holds on every machine and in CI.
+    A run's totals are not here: they live in docs/TEST-COUNTS.md alone
+    (Get-P20TestCountsFile in Scripts/TestAll-Rules.ps1).
 
-      1. the `tkTestToolkit` table row's per-suite list == the paste block's per-suite line
-      2. the command block's `tkTestToolkit # N suites, M assertions` == the paste's total
-      3. the command block's pytest totals == the paste block's `pytest:` line
-      4. the command block's web totals == the paste block's `web:` line
-
-    A paste line that says "not run" (a half the run lacked) or "NOT AVAILABLE" (no python
-    with pytest) is not a count and is a
-    finding of its own: it is information for the person pasting, never a figure to keep.
-
-    Returns an array of findings (empty when everything agrees); each names the stale line,
-    and for the table row the first suite whose number differs.
+    Returns an array of findings (empty when everything agrees); each names the file,
+    where the document states it, and the two numbers.
 #>
-if (-not (Get-Command Get-P20CountLinePatterns -ErrorAction SilentlyContinue)) {
-    . (Join-Path (Split-Path -Parent $PSScriptRoot) 'Scripts/TestAll-Rules.ps1')
-}
-
-function Get-P20TestingDocDrift {
-    [CmdletBinding()]
-    param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
-
-    $findings = @()
-    # The block and which half each line belongs to: Get-P20PasteBlock, the rule CI's
-    # carried-lines check reads it with too (Scripts/TestAll-Rules.ps1).
-    $block = Get-P20PasteBlock -Text $Text
-    if ($null -eq $block) { return @('the paste block under "The counts, after a merge" was not found') }
-
-    $pasteSuites = @()
-    $pasteTotal = $null; $pastePytest = $null; $pasteWeb = $null
-    foreach ($l in @($block.cli)) {
-        if ($l -match '^(\d+ suites, \d+ assertions)$') { $pasteTotal = $Matches[1]; continue }
-        foreach ($pm in [regex]::Matches($l, '(?<=^|,\s)([A-Z][A-Za-z]+) (\d+)(?=,|$)')) { $pasteSuites += , @($pm.Groups[1].Value, $pm.Groups[2].Value) }
-    }
-    # `pytest: 12 passed (via ~/.venv-toolkit/bin/python)`: which python ran it is
-    # information for the person pasting, not part of the count.
-    foreach ($l in @($block.agent)) { if ($l -match '^pytest: (.+)$') { $pastePytest = ($Matches[1] -replace '\s+\(via [^)]*\)$', '') } }
-    foreach ($l in @($block.web)) { if ($l -match '^web: (.+)$') { $pasteWeb = $Matches[1] } }
-
-    # 1. the table row's list
-    $countPatterns = Get-P20CountLinePatterns
-    $row = @($Text -split "\r?\n" | Where-Object { $_ -match $countPatterns.TestingRow })
-    if ($row.Count -ne 1) { $findings += "the tkTestToolkit table row was not found exactly once ($($row.Count))" }
-    else {
-        $rm = [regex]::Match($row[0], 'per suite: (.*?)\.(?: |$)')
-        if (-not $rm.Success) { $findings += 'the tkTestToolkit table row has no "per suite: ..." list' }
-        else {
-            $rowSuites = @([regex]::Matches($rm.Groups[1].Value, '([A-Z][A-Za-z]+) (\d+)') | ForEach-Object { , @($_.Groups[1].Value, $_.Groups[2].Value) })
-            $n = [Math]::Max($rowSuites.Count, $pasteSuites.Count)
-            for ($i = 0; $i -lt $n; $i++) {
-                $r = '(none)'; if ($i -lt $rowSuites.Count) { $r = "$($rowSuites[$i][0]) $($rowSuites[$i][1])" }
-                $p = '(none)'; if ($i -lt $pasteSuites.Count) { $p = "$($pasteSuites[$i][0]) $($pasteSuites[$i][1])" }
-                if ($r -ne $p) {
-                    $findings += "the tkTestToolkit table row is stale against the paste block: first difference is suite $($i + 1), row says '$r', paste says '$p'"
-                    break
-                }
-            }
-        }
-    }
-
-    # 2. the command block's CLI line
-    $cmdTotal = [regex]::Match($Text, $countPatterns.TestingCliTotal)
-    if (-not $pasteTotal) { $findings += 'the paste block has no "N suites, M assertions" line' }
-    elseif (-not $cmdTotal.Success) { $findings += 'the command block has no "tkTestToolkit # N suites, M assertions" line' }
-    elseif ($cmdTotal.Groups[1].Value -ne $pasteTotal) { $findings += "the command block's tkTestToolkit line is stale: it says '$($cmdTotal.Groups[1].Value)', the paste block says '$pasteTotal'" }
-
-    # 3. pytest
-    $cmdPytest = [regex]::Match($Text, $countPatterns.TestingPytest)
-    if (-not $pastePytest) { $findings += 'the paste block has no "pytest: ..." line' }
-    elseif ($pastePytest -notmatch '^\d+ passed(, \d+ skipped)?(, \d+ subtests)?$') { $findings += "the paste block's pytest line is not a count ('$pastePytest'): paste from a tkTest run that ran the agent half" }
-    elseif (-not $cmdPytest.Success) { $findings += 'the command block has no pytest totals line' }
-    elseif ($cmdPytest.Groups[1].Value -ne $pastePytest) { $findings += "the command block's pytest line is stale: it says '$($cmdPytest.Groups[1].Value)', the paste block says '$pastePytest'" }
-
-    # 4. web
-    $cmdWeb = [regex]::Match($Text, $countPatterns.TestingWeb)
-    if (-not $pasteWeb) { $findings += 'the paste block has no "web: ..." line' }
-    elseif ($pasteWeb -notmatch '^\d+ suites, \d+ tests$') { $findings += "the paste block's web line is not a count ('$pasteWeb'): paste from a tkTest run that ran the web half" }
-    elseif (-not $cmdWeb.Success) { $findings += 'the command block has no web totals line' }
-    elseif ($cmdWeb.Groups[1].Value -ne $pasteWeb) { $findings += "the command block's web line is stale: it says '$($cmdWeb.Groups[1].Value)', the paste block says '$pasteWeb'" }
-
-    return $findings
-}
-
 # The one rule for a pytest file's real count: its `def test_` occurrences.
 function Get-P20PytestDefCount {
     param([string]$Path)

@@ -442,7 +442,8 @@ docs/                   The documentation. The root README is the map; each subj
   QUICKSTART.md           Requirements, install, the first run, a first card, the web UI up
   CONFIGURATION.md        tkConfig, the three config files, consts.json, the hub's hub.json
   CLI.md                  The prefix, the workflow, the command reference, tiers, errors, the log
-  TESTING.md              tkSetup, the four runners, the suites and their counts
+  TESTING.md              tkSetup, the four runners, the suites, and how the counts are written
+  TEST-COUNTS.md          A full run's counts as of the last release, written by Scripts/Write-TestCounts.ps1
   ARCHITECTURE.md         How the three halves fit; the agent and the web UI in overview; this layout
   SCENARIOS.md            Every configuration a machine can be in, what it shows, the test that holds it
   KNOWN-GAPS.md           The roadmap of known gaps, each with what you see and its issue

@@ -926,9 +926,9 @@ command-map row and no `{prefix}` form.
 ## Tests
 
 The agent's suite is Python, and it lives in the repo's shared `Tests/` folder rather than in a
-folder of its own, because it tests one contract from two sides. The runner, the current counts and
-every file's one-line summary are [`docs/TESTING.md`](../docs/TESTING.md); this section is what the
-agent's own files guard.
+folder of its own, because it tests one contract from two sides. The runner and
+every file's one-line summary are [`docs/TESTING.md`](../docs/TESTING.md), and the last release's counts
+[`docs/TEST-COUNTS.md`](../docs/TEST-COUNTS.md); this section is what the agent's own files guard.
 
 ```bash
 python3 -m pip install -r requirements-dev.txt   # once -- pytest, httpx and ruff  (Windows: python or py -3)
