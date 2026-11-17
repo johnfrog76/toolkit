@@ -369,6 +369,11 @@ Without `-Keep` the folder is removed after the summary, whatever the verdict, a
 never followed. With `-Keep` it stays, so a failure can be read afterwards: the run's history is in its
 `history/` folder. Remove it yourself when you are done.
 
+**A known limit: the shell you type it in.** Only the child is isolated. The PowerShell that runs
+`tkTest -Isolated` itself started before the switch was read, so it read the real home's startup caches, and it
+writes them again when it exits. Pairs of isolated runs started in the same second have passed with this
+in place, so it is left as it is; if two runs ever do crash at the launcher's own start, start them a moment apart.
+
 **macOS only, in this version.** On Linux and Windows `-Isolated` refuses and says so (exit 2), and so does
 `-Keep` without `-Isolated` everywhere. There, run one `tkTest` at a time. `tkTestToolkit -TestAll` holds the
 plan (what each variable is set to, what is carried, the socket-path budget), the two refusals on every host,
