@@ -222,7 +222,9 @@ export const API_BASE = AGENT.apiPrefix;
 export const api = createApi({
   reducerPath: "api",
   baseQuery: fetchBaseQuery({ baseUrl: API_BASE, timeout: 120_000 }),
-  tagTypes: ["Env", "Surfaces"],
+  // "Standup" is Team Agile's read, named here because a configuration write (the ado
+  // module's) must be able to invalidate it: the room is sized by a setting.
+  tagTypes: ["Env", "Surfaces", "Standup"],
   endpoints: (builder) => ({
     // GET /api/env
     getEnv: builder.query<EnvStatus, void>({
