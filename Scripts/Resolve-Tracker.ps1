@@ -79,7 +79,9 @@ function Get-P20TrackerOwner {
  With several the number is ambiguous -- a guess could act on the wrong
  repo's issue of that number -- so the answer is a stated reason instead, and the caller
  refuses with it. Returns a hashtable: @{ Repo = 'owner/name' }, or
- @{ Reason = ...; Hint = ... }.
+ @{ Kind = 'noRepo' | 'manyRepos'; Reason = ...; Hint = ... } -- a manyRepos
+ answer also carries Repos, the names it found. The rituals word the Tracker line
+ from Kind (Get-P20TrackerRepoReason, Scripts/Ritual-Common.ps1).
 #>
 <#
  Every repository a GitHub READ may span -- 'owner/name' each. A repo-grained
@@ -178,11 +180,14 @@ function Resolve-P20TrackerRepo {
     if ($repos.Count -eq 1) { return @{ Repo = "$owner/$($repos[0])" } }
     if ($repos.Count -eq 0) {
         return @{
+            Kind   = 'noRepo'
             Reason = 'This GitHub board names no repository.'
             Hint   = "Make the address repo-grained (${CliPrefix}Config -Set spaces.<slug>.org=https://github.com/$owner/<repo>) or add the repo to spaces.<slug>.projects."
         }
     }
     return @{
+        Kind   = 'manyRepos'
+        Repos  = $repos
         Reason = "Issue numbers are per-repository, and this board has $($repos.Count): $($repos -join ', ')."
         Hint   = "Say which: make the address repo-grained (https://github.com/$owner/<repo>), or keep one repo in spaces.<slug>.projects."
     }

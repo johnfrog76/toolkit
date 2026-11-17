@@ -93,18 +93,18 @@ $issues = @()
 $kind = Resolve-P20Tracker -OrgUrl $org
 if ($kind -ne 'github') {
     # The worker labels, severities and milestones are GitHub's; ADO's door is a later spike.
-    $tracker.reason = "This Space's tracker is not GitHub -- triage reads a GitHub Space's issues."
+    $tracker.reason = Format-P20TrackerReason -Key 'trackerNotGitHub' -Values @{ ritual = 'triage' }
 }
 elseif ($status -eq 'local' -or $status -eq 'archive') {
-    $tracker.reason = "This Space is $status, so its tracker is not asked."
+    $tracker.reason = Format-P20TrackerReason -Key 'trackerNotAsked' -Values @{ status = $status }
 }
 else {
     $target = Resolve-P20TrackerRepo -OrgUrl $org -Projects $projects -CliPrefix (Get-CliPrefix)
     if ($target.Reason) {
-        $tracker.reason = $target.Reason
+        $tracker.reason = Get-P20TrackerRepoReason -Target $target
     }
     elseif (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-        $tracker.reason = 'gh is not installed, so the tracker was not asked.'
+        $tracker.reason = Format-P20TrackerReason -Key 'trackerGhMissing'
     }
     else {
         # -- The thin layer: two gh reads (Scripts/Ritual-Common.ps1) --------

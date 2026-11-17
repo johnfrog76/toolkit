@@ -101,7 +101,7 @@
     {
       "name": "no-tracker",
       "space": "toolkit",
-      "tracker": { "ok": false, "reason": "gh did not answer" },
+      "tracker": { "ok": false, "reason": "gh did not answer for johnfrog76/toolkit: TimeoutExpired" },
       "issues": [
         { "number": 140, "title": "Not read when the tracker did not answer", "state": "OPEN", "labels": [], "milestone": null, "url": "https://github.com/johnfrog76/toolkit/issues/140" }
       ],

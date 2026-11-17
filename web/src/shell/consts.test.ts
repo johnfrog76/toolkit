@@ -321,6 +321,20 @@ describe("consts.json", () => {
         noWorkers: "No worker labels in this Space.",
         adoTracker:
           "Azure DevOps is the human team's board, and its standup is the one the team holds; Team Agile reads a GitHub Space's issues and cards, or a local Space's cards.",
+        trackerNotGitHub:
+          "This Space's tracker is not GitHub -- {ritual} reads a GitHub Space's issues.",
+        trackerNotAsked: "This Space is {status}, so its tracker is not asked.",
+        trackerTier: "The tracker is not reachable from here (tier {tier}).",
+        trackerNoRepo:
+          "This GitHub Space names no repository -- give its address a repository, or add one to its projects.",
+        trackerManyRepos: "Issue numbers are per-repository, and this board has {n}: {repos}.",
+        trackerGhMissing: "gh is not installed, so the tracker was not asked.",
+        trackerGhNoAnswer: "gh did not answer for {repo}: {error}",
+        trackerGhSilent: "gh did not answer for {repo}",
+        trackerRepoUnreadable:
+          "gh cannot read {repo} -- it does not exist yet, or it is private to an account this gh login is not",
+        trackerNotJson: "gh answered for {repo} with something that is not JSON",
+        trackerReadFailed: "The tracker read failed: {error}",
         check: "Check",
         checkCardArchived: "{item} -- the card is archived, but the issue is still open.",
         checkIssueClosed: "{item} -- the issue is closed, but the card is not archived.",
@@ -451,7 +465,12 @@ describe("consts.json", () => {
     const { _: ghDoc, ...ghKeys } = (consts as unknown as { ghReads: Record<string, unknown> })
       .ghReads;
     expect(ghDoc).toMatch(/Standup and Triage/);
-    expect(ghKeys).toEqual({ openIssues: 500, allIssues: 500, labels: 500 });
+    expect(ghKeys).toEqual({
+      openIssues: 500,
+      allIssues: 500,
+      labels: 500,
+      repoMissing: ["could not resolve to a repository", "not found (http 404)", "http 404"],
+    });
     // Claude Code usage: /env's flag (the CLI inventory row's key) and the burn route.
     const { _: usageDoc, ...usageKeys } = USAGE as typeof USAGE & { _: string };
     expect(usageDoc).toMatch(/Burn -AsJson/);

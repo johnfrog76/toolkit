@@ -710,6 +710,12 @@ def gh_read_limit_labels() -> int:
     return int(consts()["ghReads"]["labels"])
 
 
+def gh_repo_missing_markers() -> tuple[str, ...]:
+    """The lowercased words that mark gh's first stderr line as a repository it
+    cannot read -- it does not exist, or this login cannot see it."""
+    return tuple(str(m) for m in consts()["ghReads"]["repoMissing"])
+
+
 def usage_env_flag() -> str:
     """``claudeUsage`` -- the name of the top-level boolean ``GET /api/env`` carries for
     Claude Code usage on this machine, and the inventory row's key; the System page's
