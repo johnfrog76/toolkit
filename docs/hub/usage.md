@@ -306,8 +306,9 @@ back, edit the file. A file there that is not a readings record is refused rathe
 [`Tests/fixtures/usage/burndown.json`](../../Tests/fixtures/usage/burndown.json) is the table, one row per
 case: no reading, one bucket typed, behind, ahead, on pace, the rounding, two readings across machines,
 stale, the renewal's exact moment, a reading from before the reset, one after now, one at the week's first
-instant. `Get-P20Burndown` (`Scripts/Read-BurnReadings.ps1`) is the CLI's, and the web asserts the same
-table where it draws the burndown.
+instant. `Get-P20Burndown` (`Scripts/Read-BurnReadings.ps1`) is the CLI's, and `tkTestToolkit -Burn` is the one
+suite that reads the table. The agent passes the verb's answer through and implements no rule of its own, and
+the web does not draw the burndown yet.
 
 - **The week** is `burn.weekStarts`'s -- Friday 05:00 local by default, the reset -- to the next week start.
   A reading counts toward the week holding its time: at or after the week's start, before the reset, and
@@ -350,7 +351,7 @@ No record is written unless someone runs `Burn -Log`: nothing schedules it, so a
 today is as old as its last log. The ratio of the burn to the work it bought, and a weekly chart, are later
 work on the records this logs.
 
-The weekly burndown is in the terminal and in `GET /api/usage/burn`'s answer; the System page does not
-draw it yet.
+The weekly burndown is in the terminal and in `GET /api/usage/burn`'s answer; the System page's burn tile does not
+draw it yet, so nothing in the web half reads the table above.
 
 Known gap: [The plan's weekly usage is typed, not read](../KNOWN-GAPS.md#the-plans-weekly-usage-is-typed-not-read).
