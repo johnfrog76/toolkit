@@ -1360,7 +1360,7 @@ Assert-True 'and hands its children a scratch one, put back in the finally' ($ru
 Assert-True 'its own records go to the folder it resolved, by name' (([regex]::Matches($runnerSource, 'Write-P20TestResult [^\r\n]*-Dir \$historyDir')).Count -eq 2)
 $verbSource = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'Scripts/Invoke-TestAll.ps1'))
 Assert-True 'Test resolves the folder once, before the web half sets the marker' ($verbSource -match '(?s)\$historyDir = Get-P20TestHistoryDir.*\$runWeb = ')
-$isoBlock = [regex]::Match($verbSource, '(?s)if \(\$Isolated\) \{.*?\n    exit \$code\n\}').Value
+$isoBlock = [regex]::Match($verbSource, '(?s)if \(\$Isolated\) \{.*?\r?\n    exit \$code\r?\n\}').Value
 Assert-True '-Isolated is handled before any half runs, and ends in its own exit' ($isoBlock -and $verbSource.IndexOf($isoBlock) -lt $verbSource.IndexOf('$runners = @{'))
 Assert-True 'and changes no variable in the launcher: the child gets the plan''s' ($isoBlock -notmatch '(?m)^\s*\$env:\w+\s*=' -and $isoBlock -notmatch 'SetEnvironmentVariable' -and $isoBlock -match 'Invoke-P20IsolatedChild [^\r\n]*-Variables \$plan\.Variables')
 Assert-True 'and the folder is removed in a finally unless -Keep' ($isoBlock -match '(?s)finally \{.*if \(\$Keep\).*Remove-P20IsolatedRunDir')
