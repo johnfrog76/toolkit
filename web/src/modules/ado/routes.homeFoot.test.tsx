@@ -4,6 +4,7 @@ import { ShellProvider } from "../../shell/cards";
 import type { ShellValue } from "../../shell/cards";
 import { AdoHome } from "./routes";
 import { DOCS } from "../../shell/consts";
+import { createFabOffset, createFabReserve } from "../../shell/layoutTokens";
 
 // Home's foot links the public landing page (issue #10), the same address
 // consts.json's docs.landingUrl holds -- always there, on every tab, never
@@ -78,5 +79,27 @@ describe("Home's foot", () => {
     expect(link.getAttribute("href")).toBe(DOCS.landingUrl);
     expect(link.getAttribute("target")).toBe("_blank");
     expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+
+  it("reserves room under the last row for the floating create button", () => {
+    at("/");
+    const fab = screen.getByRole("button", { name: "Create" });
+    expect(fab.style.bottom).toBe(createFabOffset);
+    expect(fab.style.right).toBe(createFabOffset);
+    const foot = screen.getByRole("link", { name: "What is ToolKit?" })
+      .parentElement as HTMLElement;
+    // The foot is the page's last block; its bottom padding is the button, its
+    // offset and a step of air, from the one constant the button's style reads.
+    expect(getComputedStyle(foot).paddingBottom).toBe(createFabReserve);
+  });
+
+  it("draws no button, and so reserves nothing to cover, for an archived space", () => {
+    ENV.spaceStatus = "archive";
+    try {
+      at("/");
+      expect(screen.queryByRole("button", { name: "Create" })).toBeNull();
+    } finally {
+      ENV.spaceStatus = "active";
+    }
   });
 });

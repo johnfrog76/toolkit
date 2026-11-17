@@ -78,3 +78,16 @@ export const tabRowGap = tokens.spacingVerticalS;
 
 /** `tabRowGap`, in px. */
 export const tabRowGapPx = 8;
+
+/** Home's floating create button: how far it sits in from the viewport's right
+ *  and bottom edges, and how tall a large round button is. The button's style
+ *  and the room reserved under the page's last row both read these two, so the
+ *  button never covers an item's menu at the end of the list. */
+export const createFabOffset = "28px";
+
+/** A large round button's height (Fluent's `size="large"`). */
+export const createFabSize = "40px";
+
+/** The room Home keeps clear at the foot of its page: the button, its offset,
+ *  and one Fluent spacing step of air above it. */
+export const createFabReserve = `calc(${createFabOffset} + ${createFabSize} + ${tokens.spacingVerticalM})`;

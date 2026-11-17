@@ -45,7 +45,7 @@ import { drawerSections } from "./homeTabs";
 import { trackerName } from "./TrackerBadge";
 import { GH_EXPLAIN } from "./ghExplain";
 import { TabRows } from "../../shared/TabRows";
-import { controlRowsSpace } from "../../shell/layoutTokens";
+import { controlRowsSpace, createFabOffset, createFabReserve } from "../../shell/layoutTokens";
 
 const useStyles = makeStyles({
   // The row above Home's cards spans the whole centre block: the tabs at its
@@ -95,6 +95,9 @@ const useStyles = makeStyles({
   homeFoot: {
     marginTop: tokens.spacingVerticalS,
     padding: `0 ${tokens.spacingHorizontalS}`,
+    // Room under the page's last row for the floating create button, so it
+    // never sits over an item's ... menu when the page is scrolled to its end.
+    paddingBottom: createFabReserve,
     color: tokens.colorNeutralForeground3,
   },
 });
@@ -362,7 +365,12 @@ export function AdoHome() {
               icon={<AddRegular />}
               aria-label="Create"
               title="Create"
-              style={{ position: "fixed", right: "28px", bottom: "28px", zIndex: 10 }}
+              style={{
+                position: "fixed",
+                right: createFabOffset,
+                bottom: createFabOffset,
+                zIndex: 10,
+              }}
               onClick={() => setCreating(true)}
             />
           ) : null}
