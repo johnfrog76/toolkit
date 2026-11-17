@@ -473,7 +473,7 @@ Props:
 | `count` | `number \| null` | Required: the count beside the label, zero drawn too. `null` says no count on purpose, for a chip that is a tab and not a filter. |
 | `active` | `boolean` | Selected. |
 | `onClick` | `() => void` | Toggle; Space and Enter work too. |
-| `appearance` | `FilterBadgeAppearance` | `pink`, `purple` (default), `orange` or `blue`. A name, not a colour: the selected border takes that name's colour from the theme in force (`chips` in `shell/themeList.ts`), so it follows dark and light, and each row of chips keeps one colour. |
+| `appearance` | `FilterBadgeAppearance` | A slot, not a colour: `tabColorOne` (default), `tabColorTwo`, `tabColorThree` or `tabColorFour`. `tabColorOne` is the theme's interactive colour, the one its links, selected nav item and tab strip use; the other three are for rows that group by colour. The selected border takes the slot's colour from the theme in force (`chips` in `shell/themeList.ts`), so it follows dark and light, and each row of chips keeps one colour. |
 | `children` | `ReactNode` | Extra content after the label. |
 | `multi` | `boolean` | Checkbox semantics instead of radio. |
 
