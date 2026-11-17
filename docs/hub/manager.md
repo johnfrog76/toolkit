@@ -129,9 +129,9 @@ A session gets the same contract a card gets, through the same writer --
   close shows up as one added line rather than as a whole-file diff.
 - **LF, because a session is a file the tool creates.** Both scaffolds (`NewMeeting`, which the web's
   create also runs, and `MeetingAgenda -Plan`) call the writer with `-New`,
-  which normalises CRLF to LF. The template is not copied byte for byte: on a Windows clone, where
-  `* text=auto` plus `core.autocrlf=true` checks `templates/ManagerSession.template.md` out CRLF, that
-  would write CRLF sessions beside the Mac's LF ones in the same hub.
+  which normalises CRLF to LF. The template is not copied byte for byte: the package checks it out
+  LF everywhere, but a Windows clone that predates that line still has it CRLF, and a byte-for-byte
+  copy would write CRLF sessions beside the Mac's LF ones in the same hub.
   A stage change is an EDIT: it rewrites the whole file and keeps the terminator it finds, so a
   session you edited on Windows stays CRLF.
 

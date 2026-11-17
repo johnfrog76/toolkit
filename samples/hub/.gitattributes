@@ -1,0 +1,4 @@
+# Every text file in this hub checks out with LF line endings on every machine, Windows
+# included, so a card reads the same wherever it was opened. text=auto keeps binary files
+# binary. The tool reads a CRLF card too, so a file written before this line still reads.
+* text=auto eol=lf
