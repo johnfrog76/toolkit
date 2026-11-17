@@ -104,7 +104,8 @@ jobs:
       # The changed files, then the rule over them (Get-P20CiScope in
       # Scripts/TestAll-Rules.ps1). --no-renames lists a moved file at both ends, so
       # a file moved out of a shared folder still counts as a change there. A pull
-      # request also writes consts.json as it stood at the base, for the next step.
+      # request also writes consts.json as it stood at the base, and whether the
+      # counts page existed there, for the next step.
       # Any other event lists nothing, and the script answers every half.
       - name: The files changed, and the jobs they need
         id: scope
@@ -114,20 +115,24 @@ jobs:
         run: |
           : > "$RUNNER_TEMP/changed.txt"
           : > "$RUNNER_TEMP/base-consts.json"
+          base_page=true
           if [ "$EVENT" = "pull_request" ]; then
             git diff --name-only --no-renames "$BASE...HEAD" > "$RUNNER_TEMP/changed.txt"
             from=$(git merge-base "$BASE" HEAD)
             git show "$from:consts.json" > "$RUNNER_TEMP/base-consts.json" 2>/dev/null || :
+            git cat-file -e "$from:docs/TEST-COUNTS.md" 2>/dev/null || base_page=false
           fi
+          echo "base_counts=$base_page" >> "$GITHUB_OUTPUT"
           pwsh -NoProfile -File Scripts/Get-CiScope.ps1 -Event "$EVENT" -PathsFile "$RUNNER_TEMP/changed.txt"
 
       # The counts file changes only with the version: docs/TEST-COUNTS.md is
       # written in a release pull request, which sets consts.json's version beside
-      # it, and any other change to it is refused (Get-P20TestCountsChangeFindings).
-      # A refusal fails this job, so Verify fails with it.
+      # it, and any other change to it -- an edit or a deletion -- is refused, unless
+      # the base has no page and this change introduces it
+      # (Get-P20TestCountsChangeFindings). A refusal fails this job, so Verify fails with it.
       - name: The counts file changes only with the version
         if: ${{ github.event_name == 'pull_request' }}
-        run: pwsh -NoProfile -File Scripts/Test-TestCountsChange.ps1 -PathsFile "$RUNNER_TEMP/changed.txt" -BaseConstsPath "$RUNNER_TEMP/base-consts.json"
+        run: pwsh -NoProfile -File Scripts/Test-TestCountsChange.ps1 -PathsFile "$RUNNER_TEMP/changed.txt" -BaseConstsPath "$RUNNER_TEMP/base-consts.json" -BaseHadPage "${{ steps.scope.outputs.base_counts }}"
 
   cli:
     name: The CLI on Ubuntu

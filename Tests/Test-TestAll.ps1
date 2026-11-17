@@ -266,6 +266,8 @@ Assert-True 'the scope step diffs against the base sha and runs Get-CiScope.ps1 
     (($scopeSteps.Count -eq 2) -and ($jChanges -match 'github\.event\.pull_request\.base\.sha') -and ($jChanges -match 'git diff --name-only --no-renames "\$BASE\.\.\.HEAD" > "\$RUNNER_TEMP/changed\.txt"') -and ($jChanges -match 'Scripts/Get-CiScope\.ps1 -Event "\$EVENT" -PathsFile "\$RUNNER_TEMP/changed\.txt"\s*\r?\n')) "$($scopeSteps.Count) named step(s)"
 Assert-True 'and writes consts.json as it stood at the base, for the counts step' `
     ($jChanges -match 'git show "\$from:consts\.json" > "\$RUNNER_TEMP/base-consts\.json"')
+Assert-True 'and whether the counts page existed at the base, as a step output the counts step passes on' `
+    (($jChanges -match 'git cat-file -e "\$from:docs/TEST-COUNTS\.md" 2>/dev/null \|\| base_page=false') -and ($jChanges -match 'echo "base_counts=\$base_page" >> "\$GITHUB_OUTPUT"') -and ($jChanges -match '-BaseHadPage "\$\{\{ steps\.scope\.outputs\.base_counts \}\}"'))
 Assert-True 'the second step, on a pull request only, holds the counts file to the version through Test-TestCountsChange.ps1' `
     (($jChanges -match "(?ms)- name: The counts file changes only with the version\s*\r?\n\s+if: \`$\{\{ github\.event_name == 'pull_request' \}\}\s*\r?\n\s+run: pwsh -NoProfile -File Scripts/Test-TestCountsChange\.ps1 -PathsFile `"\`$RUNNER_TEMP/changed\.txt`" -BaseConstsPath `"\`$RUNNER_TEMP/base-consts\.json`""))
 
@@ -424,8 +426,11 @@ Write-Host ""
 Write-Host "-- CI's rule: the counts file changes only with the version --" -ForegroundColor Cyan
 # Get-P20TestCountsChangeFindings, both ways, then the script as the changes job runs it.
 $countsTable = @(
-    # why, changed paths, base version, head version, finding count
+    # why, changed paths, base version, head version, finding count, whether the base had the page
     @('the counts file changed and the version did not', @('docs/TEST-COUNTS.md', 'Tests/Test-Menu.ps1'), '1.6.0', '1.6.0', 1),
+    @('the counts file introduced: the base has none, the version unchanged', @('docs/TEST-COUNTS.md', 'Scripts/Write-TestCounts.ps1'), '1.6.0', '1.6.0', 0, $false),
+    @('the counts file deleted (it is in the list, the base had it), the version unchanged', @('docs/TEST-COUNTS.md'), '1.6.0', '1.6.0', 1, $true),
+    @('the counts file deleted with the version bumped', @('docs/TEST-COUNTS.md', 'consts.json'), '1.6.0', '1.7.0', 0, $true),
     @('the counts file changed with the version', @('docs/TEST-COUNTS.md', 'consts.json', 'CHANGELOG.md'), '1.6.0', '1.7.0', 0),
     @('the version changed and the counts file did not', @('consts.json'), '1.6.0', '1.7.0', 0),
     @('neither changed', @('web/src/App.tsx', 'docs/TESTING.md'), '1.6.0', '1.6.0', 0),
@@ -433,7 +438,9 @@ $countsTable = @(
     @('a file that only resembles it', @('docs/TEST-COUNTS.md.bak', 'docs/test-counts.md'), '1.6.0', '1.6.0', 0)
 )
 foreach ($row in $countsTable) {
-    $got = @(Get-P20TestCountsChangeFindings -Paths $row[1] -BaseVersion $row[2] -HeadVersion $row[3])
+    $hadPage = $true
+    if ($row.Count -gt 5) { $hadPage = [bool]$row[5] }
+    $got = @(Get-P20TestCountsChangeFindings -Paths $row[1] -BaseVersion $row[2] -HeadVersion $row[3] -BaseHadPage $hadPage)
     $okRow = ($got.Count -eq $row[4]) -and (($row[4] -eq 0) -or (($got[0] -match 'docs/TEST-COUNTS\.md') -and ($got[0] -match 'release pull request') -and ($got[0] -match 'Write-TestCounts\.ps1')))
     Assert-True "counts file rule: $($row[0]) -- $($row[4]) finding(s)" $okRow ($got -join ' | ')
 }
@@ -455,6 +462,10 @@ try {
         (($LASTEXITCODE -eq 2) -and ($said -match '(?m)^Error: this change edits docs/TEST-COUNTS\.md') -and ($said -match 'A release is a tag on main') -and ($said -match '(?m)^Hint: ')) "exit $LASTEXITCODE -- $said"
     $said = (Invoke-P20TestHost -File $countsScript -Arguments @('-PathsFile', $list, '-BaseConstsPath', $baseConsts, '-HeadConstsPath', $headBumped) | ForEach-Object { [string]$_ }) -join "`n"
     Assert-True 'with the version bumped beside it, exit 0' (($LASTEXITCODE -eq 0) -and ($said -match '1\.6\.0 to 1\.7\.0')) "exit $LASTEXITCODE -- $said"
+    $said = (Invoke-P20TestHost -File $countsScript -Arguments @('-PathsFile', $list, '-BaseConstsPath', $baseConsts, '-HeadConstsPath', $headSame, '-BaseHadPage', 'false') | ForEach-Object { [string]$_ }) -join "`n"
+    Assert-True 'with -BaseHadPage false, the page introduced with the version unchanged, exit 0' (($LASTEXITCODE -eq 0) -and ($said -match 'introduced')) "exit $LASTEXITCODE -- $said"
+    $said = (Invoke-P20TestHost -File $countsScript -Arguments @('-PathsFile', $list, '-BaseConstsPath', $baseConsts, '-HeadConstsPath', $headSame, '-BaseHadPage', 'true') | ForEach-Object { [string]$_ }) -join "`n"
+    Assert-True 'with -BaseHadPage true, the same change (an edit or a deletion) is refused, exit 2' ($LASTEXITCODE -eq 2) "exit $LASTEXITCODE -- $said"
     [System.IO.File]::WriteAllText($list, "web/src/App.tsx`n")
     $null = Invoke-P20TestHost -File $countsScript -Arguments @('-PathsFile', $list, '-BaseConstsPath', (Join-Path $countsScratch 'absent.json'))
     Assert-True 'a change that leaves the counts file alone exits 0, whatever the base''s consts.json' ($LASTEXITCODE -eq 0) "exit $LASTEXITCODE"

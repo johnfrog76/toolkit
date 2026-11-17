@@ -585,18 +585,22 @@ function Get-P20TestCountsChangeFindings {
     <#
       The counts file changes only with the version. -Paths is a pull
       request's changed files; -BaseVersion and -HeadVersion are consts.json's
-      `version` at its base and at its head. A change that touches
-      docs/TEST-COUNTS.md and leaves the version as it was is one finding,
-      naming the release step; any other change, none.
+      `version` at its base and at its head; -BaseHadPage says whether
+      docs/TEST-COUNTS.md existed at the base. A change that touches the page
+      -- edits or deletes it -- and leaves the version as it was is one
+      finding, naming the release step. The one exemption is the page being
+      introduced: it did not exist at the base. Any other change, none.
     #>
     param(
         [string[]]$Paths = @(),
         [AllowEmptyString()][string]$BaseVersion = '',
-        [AllowEmptyString()][string]$HeadVersion = ''
+        [AllowEmptyString()][string]$HeadVersion = '',
+        [bool]$BaseHadPage = $true
     )
     $cf = Get-P20TestCountsFile
     $clean = @($Paths | ForEach-Object { ([string]$_).Trim() -replace '\\', '/' } | Where-Object { $_ })
     if ($clean -cnotcontains $cf.Path) { return @() }
+    if (-not $BaseHadPage) { return @() }
     if ($BaseVersion -and ($BaseVersion -cne $HeadVersion)) { return @() }
     $was = $BaseVersion
     if (-not $was) { $was = '(none)' }

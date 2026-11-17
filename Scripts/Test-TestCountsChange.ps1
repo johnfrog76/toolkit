@@ -15,9 +15,11 @@
         pwsh -NoProfile -File Scripts/Test-TestCountsChange.ps1 -PathsFile changed.txt -BaseConstsPath base-consts.json
 
     The rule is Get-P20TestCountsChangeFindings (Scripts/TestAll-Rules.ps1): a
-    change that touches docs/TEST-COUNTS.md and leaves consts.json's `version`
-    as the base had it is refused. -HeadConstsPath is the change's consts.json
-    (this package's, by default).
+    change that touches docs/TEST-COUNTS.md -- edits or deletes it -- and leaves
+    consts.json's `version` as the base had it is refused, unless the page did
+    not exist at the base (-BaseHadPage false: it is being introduced; the step
+    asks git cat-file -e). -HeadConstsPath is the change's consts.json (this
+    package's, by default).
 
     Exit 0 when the counts file is untouched or the version moved with it; 2,
     after an Error: line naming the release step, when it changed alone, or
@@ -30,7 +32,8 @@
 param(
     [Parameter(Mandatory)][string]$PathsFile,
     [Parameter(Mandatory)][string]$BaseConstsPath,
-    [string]$HeadConstsPath
+    [string]$HeadConstsPath,
+    [ValidateSet('true', 'false')][string]$BaseHadPage = 'true'
 )
 
 . (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
@@ -49,6 +52,10 @@ $touched = (@($paths | ForEach-Object { ([string]$_).Trim() -replace '\\', '/' }
 Write-Host ''
 if (-not $touched) {
     Write-Host "  The counts file: $($cf.Path) is not changed"
+    exit 0
+}
+if ($BaseHadPage -eq 'false') {
+    Write-Host "  The counts file: $($cf.Path) is introduced by this change (the base has none)"
     exit 0
 }
 
