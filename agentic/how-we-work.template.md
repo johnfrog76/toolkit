@@ -48,10 +48,12 @@ A session can end at any moment, and the next one starts cold. So:
   anything else.
 - **`tkStartWork` builds the block.** `tkStartWork <id>` prints one block a cold session starts from:
   this file, the card whole, and the prompt for its kind. Hand that block over; do not retell the card.
-- **The card names the agent that works it.** Handing a card to an agent, tell it to write
-  `**Agent:** <its model id>` in the card's footer, beside `**Assigned:**`, before its first commit: the
-  person owns the card, the agent is who did the work. A card a person works alone has no Agent line,
-  and the line is never written as `Agent: none`.
+- **The lead signs the card off with who did the work.** Before the pull request, the seat that ships
+  the card writes one `**Agent:** <model id>` line in its footer, beside `**Assigned:**`: its own model if
+  it did the work, or the crew's model if it handed the work on. The crew does not write the line. The
+  person owns the card; the Agent line says who did the work. A commit's `Co-Authored-By` trailer only
+  says who made the commit, so it does not stand in for the line. A card a person works alone has no
+  Agent line, and the line is never written as `Agent: none`.
 - **Commit and push as you go.** Work that sits uncommitted is lost to the next seat.
 
 ## The relay rule
