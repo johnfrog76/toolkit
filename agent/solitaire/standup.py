@@ -2305,7 +2305,10 @@ def render_brief(filled: Standup) -> str:
         else:
             bits.append(t["blockersEmpty"])
         lines.append(f"{w.name}: {', '.join(bits)}.")
-    if not filled.workers:
+    # The line the members end on is about the tracker: with no worker label the Space routes nothing,
+    # the engineer (the Space itself, on a joined read) notwithstanding.
+    labelled = [w for w in filled.workers if not (filled.source == "both" and w.label == filled.space)]
+    if not filled.workers or (issues and not labelled):
         lines.append(t["noWorkers"])
     elif issues:
         lines.append(t["briefInFlightUnknown"])
