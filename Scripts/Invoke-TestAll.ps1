@@ -30,6 +30,12 @@
     (Get-TestHistoryDir.ps1), the same for every checkout, and each half's record
     says which checkout and commit it ran from.
 
+    -Isolated (macOS only) runs the same halves in a child with a home, a temp
+    folder, PowerShell's caches and a test history of its own, so two runs can
+    start at once (Scripts/TestAll-Isolated.ps1); the folder is removed after,
+    or kept and named with -Keep. Elsewhere, and -Keep without -Isolated, it is
+    a stated refusal.
+
 .NOTES
     PowerShell 5.1 compatible: ASCII only, no ternary, no null-coalescing.
 #>
@@ -39,6 +45,8 @@ param(
     [ValidateSet('cli', 'agent', 'web')]
     [string]$Half,
     [switch]$Fast,
+    [switch]$Isolated,
+    [switch]$Keep,
     [switch]$Help
 )
 
@@ -59,6 +67,75 @@ if ($Help) {
     Show-P20ConfigHelp -CommandName 'Test' -RepoRoot $packageRoot -Prefix $prefix `
         -Fallback 'config.default.json is missing its commands.Test entry.'
     exit 0
+}
+
+# -- -Isolated: the same run, in a child with per-run state ---------------------
+# Two runs started together share PowerShell's startup caches under the home
+# folder and the machine's test history. This starts the run below -- this
+# script, without the switch -- in a child whose home, temp folder, caches and
+# history are a folder of its own, and removes the folder after.
+if ($Keep -and -not $Isolated) {
+    Write-CliError -Message '-Keep keeps an isolated run''s folder, and this run has none.' `
+        -Hint "Use '$($prefix)Test -Isolated -Keep', or drop -Keep."
+    exit 2
+}
+if ($Isolated) {
+    if ((Get-P20TestHistoryPlatform) -ne 'macos') {
+        Write-CliError -Message '-Isolated runs on macOS only in this version.' `
+            -Hint "Run '$($prefix)Test' without it, one run at a time (docs/TESTING.md, ""Two runs at once: -Isolated"")."
+        exit 2
+    }
+    . (Join-Path $scriptsDir 'TestAll-Isolated.ps1')
+    $isoExe = ''
+    try { $isoExe = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName } catch { $isoExe = '' }
+    if (-not $isoExe -or ([System.IO.Path]::GetFileNameWithoutExtension($isoExe) -ne 'pwsh')) {
+        $found = Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+        $isoExe = ''
+        if ($found) { $isoExe = $found.Source }
+    }
+    if (-not $isoExe) {
+        Write-CliError -Message '-Isolated starts the run in pwsh, and there is no pwsh on the PATH.' -Hint 'Install PowerShell 7 (docs/QUICKSTART.md, "Requirements").'
+        exit 2
+    }
+    $isoEnv = @{}
+    foreach ($v in @(Get-ChildItem Env:)) { $isoEnv[$v.Name] = $v.Value }
+    $runDir = Join-Path (Get-P20IsolatedRunPrefix).Base (Get-P20IsolatedRunName -ProcessId $PID)
+    $plan = Get-P20IsolatedRunPlan -RunDir $runDir -Environment $isoEnv
+    # The child is this script without -Isolated or -Keep. With the module loaded
+    # here, the child loads this package's module too, so it writes the same
+    # records a plain run does.
+    $q = { param([string]$Text) "'" + ($Text -replace "'", "''") + "'" }
+    $childLine = '& ' + (& $q $PSCommandPath)
+    if ($Half) { $childLine += ' -Half ' + (& $q $Half) }
+    if ($Fast) { $childLine += ' -Fast' }
+    $childLine += '; exit $LASTEXITCODE'
+    $manifest = Join-Path (Join-Path $packageRoot 'Prompt20Toolkit') 'Prompt20Toolkit.psd1'
+    if ((Get-Command Write-P20TestResult -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath $manifest)) {
+        $childLine = '$env:PSModulePath = ' + (& $q $packageRoot) + '; Import-Module ' + (& $q $manifest) + ' -Force; ' + $childLine
+    }
+    $code = 2
+    try {
+        $null = Initialize-P20IsolatedRun -Plan $plan
+        Write-Host ""
+        Write-Host "  ${prefix}Test -Isolated: this run's home, temp folder, caches and test history are in $runDir" -ForegroundColor DarkGray
+        $code = Invoke-P20IsolatedChild -Exe $isoExe -Arguments @('-NoProfile', '-Command', $childLine) -WorkDir $packageRoot -Variables $plan.Variables
+    }
+    catch {
+        Write-CliError -Message "-Isolated could not start its run: $($_.Exception.Message)" -Hint "Run '$($prefix)Test -Isolated -Keep' to keep the folder and read it."
+        $code = 2
+    }
+    finally {
+        if ($Keep) {
+            if (Test-Path -LiteralPath $runDir) {
+                Write-Host "  Kept $runDir -- this run's test history is in its history folder." -ForegroundColor DarkGray
+                Write-Host ""
+            }
+        }
+        elseif (-not (Remove-P20IsolatedRunDir -Path $runDir)) {
+            Write-Warning "Could not remove $runDir; remove it by hand."
+        }
+    }
+    exit $code
 }
 
 $onWindows = ($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows

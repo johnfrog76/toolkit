@@ -101,6 +101,15 @@ function Resolve-P20Python {
     return $null
 }
 
+function Get-P20TestVenvHomeName {
+    <#
+      The test venv's folder name in the home folder. One place, because
+      {cliPrefix}Test -Isolated gives its run a home of its own and links this
+      folder into it (Scripts/TestAll-Isolated.ps1).
+    #>
+    return '.venv-toolkit'
+}
+
 function Get-P20TestVenvPythons {
     <#
       The test environments to try before the PATH, in order: a `.venv` inside the
@@ -121,7 +130,8 @@ function Get-P20TestVenvPythons {
     if ($Windows) { $rel = 'Scripts/python.exe' }
     $homeDir = [System.Environment]::GetFolderPath('UserProfile')
     $roots = @(@{ Path = (Join-Path $PackageRoot '.venv'); Label = '.venv' })
-    if ($homeDir) { $roots += @{ Path = (Join-Path $homeDir '.venv-toolkit'); Label = '~/.venv-toolkit' } }
+    $venvName = Get-P20TestVenvHomeName
+    if ($homeDir) { $roots += @{ Path = (Join-Path $homeDir $venvName); Label = "~/$venvName" } }
     $found = @()
     foreach ($r in $roots) {
         $exe = Join-Path $r.Path $rel
