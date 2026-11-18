@@ -20,7 +20,7 @@ A machine is in exactly one cell of each axis at a time:
 | **Modules** | `growth`, `communication`, `deck`, `organize`, `solitaireAgile`, `lounge`, each on / off / not configured | top-level `features` in `config.local.json`; the engineer's, never an org's (`Tests/test_features.py`). The Studio is not on this axis: it is core (D-S13), and a `features.studio` left in a config is ignored |
 | **Sprint awareness** | on, off | `spaces[].features.sprintAwareness` -- a Space-scoped flag |
 | **Suggestions** | on (unset, or true), off | `spaces[].features.suggestions` -- a Space-scoped switch riding Team Agile: where Team Agile is on, unset is on; `false` takes the suggestion out of the standup -- the `switch` rows of `Tests/fixtures/suggestion/table.json`, read by `tkTestToolkit -Rituals` and `Tests/test_rituals.py` |
-| **Team size** | 3, 6, 9 (unset reads 9) | `spaces[].features.teamSize` -- a Space-scoped NUMBER, the standup's windows with the chair counted: the fill keeps every worker and marks each `present`, the ones with work seated first; the round (the work grain, the stage) speaks the present, the detail and the brief keep everyone -- **the one shared table**, `Tests/fixtures/rituals/standup-team.json`, read by `tkTestToolkit -Rituals` and `Tests/test_rituals.py` |
+| **Team size** | 3, 6, 9 (unset reads 9) | `spaces[].features.teamSize` -- a Space-scoped NUMBER, how many people are in the standup, the chair counted: every seat the size counts is filled -- the engineer, the labelled workers with work, the idle ones, then invented cast members -- and the empty desks are the windows past it; the fill keeps every worker of the record and marks each `present`; the round (the work grain) speaks the room, the detail and the brief keep the record and never an invented member; the stage still seats the record ([Known gaps](KNOWN-GAPS.md#the-played-standup-seats-the-record-not-the-room)) -- **the one shared table**, `Tests/fixtures/rituals/standup-team.json`, read by `tkTestToolkit -Rituals` and `Tests/test_rituals.py` |
 | **How you work here** | `agents`, `alone`, `team` | `spaces[].howIWork` -- the other Space-scoped switch: asked on a GitHub Space (`alone` until answered), derived elsewhere (`team` on Azure DevOps, `alone` with no tracker). Team Agile is on only where its switch is on AND the answer is `agents` -- **the one shared table**, `Tests/fixtures/how-i-work/table.json`, read by `tkTestToolkit -Environment` and `Tests/test_how_i_work.py` |
 
 **Off means absent** (AGENTS.md): a module that is off contributes no verb, no route (404, not 403),
@@ -472,9 +472,12 @@ it reads cards, is a member. The chair opens the board, calls each member by nam
 chair gives its own status and closes; a desk never speaks (`scenarios.test.tsx`, "the played standup seats
 the present by position"; `stage/standupDeck.test.tsx`, "no silent face").
 
-In a room smaller than the Space's members (`spaces.<slug>.features.teamSize`), Work shows the round --
-the present only, `standup-team-<case>.work.txt` -- while Detail and Brief keep every worker; the page
-draws what the response says and reads no setting of its own.
+The Space's size (`spaces.<slug>.features.teamSize`) is its team. Work shows the round -- the seated
+members, the engineer first, then the invented cast members that fill the seats left,
+`standup-team-<case>.work.txt` -- while Detail and Brief keep every worker of the record and never an
+invented one; the page draws what the response says and reads no setting of its own. The played view
+seats the record, so an invented member's window is an empty desk there
+([Known gaps](KNOWN-GAPS.md#the-played-standup-seats-the-record-not-the-room)).
 
 The text is the shared fixture's golden (`Tests/fixtures/rituals/`), the same bytes the CLI's
 `Standup` and `Tests/test_rituals.py` assert.

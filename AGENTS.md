@@ -101,9 +101,9 @@ where the flags are resolved (`Scripts/Resolve-HowIWork.ps1`, `how_i_work()`, on
 in that Space; unset is on wherever Team Agile is on (`docs/modules/solitaire-agile.md`, "The suggestion:
 one next move, derived"). Beside the three switches a Space states two numbers, which switch nothing:
 `spaces[].features.trainingHoursPerQuarter`, and `spaces[].features.teamSize`, the room of Team Agile's
-standup -- 3, 6 or 9 windows with the chair counted, unset 9 -- which decides who of the Space's members are
-present today and so who speaks in the round (`docs/modules/solitaire-agile.md`, "The team size: who is in
-the room").
+standup -- 3, 6 or 9 people with the chair counted, unset 9 -- which is the team: it decides who of the
+Space's members are present today, and how many invented cast members fill the seats they leave, and so who
+speaks in the round (`docs/modules/solitaire-agile.md`, "The team size: who is in the room").
 
 **Off means absent.** No verb, no line in `Menu`, no `-Help`, nothing for the bridge to call, no
 agent route (**404, not 403**), no nav entry, no page, no card, and nothing fetches the module's
@@ -227,7 +227,7 @@ anywhere).
 | Sprint awareness | `spaces[].features.sprintAwareness` | `hub.json` -- a Space-scoped flag (the other Space-scoped switches are `howIWork`, above, and `suggestions`, below) |
 | Suggestions | `spaces[].features.suggestions` | `hub.json` -- a Space-scoped switch riding Team Agile: `not configured` (on, by default, where Team Agile is on), `on`, or `off` (set false, or Team Agile off in that Space); `false` turns the chair's Next line back to `Next: nothing is waiting on you.` |
 | Org chart | `org.json` at the hub root | DERIVED, riding Team Agile like the Suggestions row: `off` where Team Agile is off in the Space (or where the file is there and fails its checks, the note carrying the sentence), `not configured` with no file, `on` with the active tree's name and its seat count. The file is the hub's, hand-edited and read-only to the tool -- its name is `consts.json` `org.file`, its shape `docs/hub/org.md`; `OrgChart` prints it |
-| Team size | `spaces[].features.teamSize` | `hub.json` -- `Config -Set spaces.<slug>.features.teamSize=<3\|6\|9> -Hub`, any other number refused by name. A Space-scoped NUMBER, not a switch: the standup's windows with the chair counted. Its row rides Team Agile as `Suggestions` does: `off` where Team Agile is off in that Space; where it is on, `on` with the number, `not configured` while unset, when the room is nine. The fill keeps every worker and marks each `present` (the ones with work seated first); the round -- `Standup -Grain work`, the stage -- speaks the present, the detail and the brief keep everyone. Asked in the drawer as "How many are in my standup in `<Space>`?", three radios. `docs/modules/solitaire-agile.md`, "The team size: who is in the room" |
+| Team size | `spaces[].features.teamSize` | `hub.json` -- `Config -Set spaces.<slug>.features.teamSize=<3\|6\|9> -Hub`, any other number refused by name. A Space-scoped NUMBER, not a switch: how many people are in the standup, the chair counted. Its row rides Team Agile as `Suggestions` does: `off` where Team Agile is off in that Space; where it is on, `on` with the number, `not configured` while unset, when the room is nine. The size is the team: the seats go to the engineer, the workers with work, then the idle, each marked `present`, and seats still open are filled by invented cast members from `consts.json` `rituals.room`, so the empty desks are only the windows past the size. The round -- `Standup -Grain work` -- speaks the room; the detail and the brief keep every worker and never an invented one. Asked in the drawer as "How many are in my standup in `<Space>`?", three radios. `docs/modules/solitaire-agile.md`, "The team size: who is in the room" |
 | Prompt store git sync | `storeSync` | `hub.json`, overridable per machine |
 | ADO identity | `email` | `config.local.json`, else `az login` |
 | Web UI and agent | `web.agentPort` | `config.local.json`; started with `{prefix}Web -Dev` |

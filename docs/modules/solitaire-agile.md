@@ -95,8 +95,9 @@ the line that changes it.
 
 A fourth, the Space's too, is a number: `spaces[].features.teamSize`, **How many are in my standup in
 \<Space>?** -- 3, 6 or 9, the room's windows with the chair counted, unset 9
-([the team size](#the-team-size-who-is-in-the-room)). It gates nothing either: it decides who of the
-Space's members are present today, and so who speaks in the round. Its inventory row, `Team size`, rides
+([the team size](#the-team-size-who-is-in-the-room)). It gates nothing either: it is how many people
+are in the room -- who of the Space's members are present today, and how many invented cast members
+fill the seats they leave -- and so who speaks in the round. Its inventory row, `Team size`, rides
 Team Agile as `Suggestions` does: `off` with `rides Team Agile, which is off in <slug>` where Team Agile is
 off in that Space (the switch off, or the Space's answer not `agents`); where it is on, `on` with the
 number, or `not configured` while it is unset (the room is then nine) -- each with the line that
@@ -173,7 +174,7 @@ every module is off), so it answers once any `tk*` command has loaded the module
 
 | Verb | Does | Touches a file |
 | --- | --- | --- |
-| `Standup [-Space <slug>] [-AsJson] [-Brief] [-Grain <detail\|work\|brief>] [-Since <yyyy-MM-dd>] [-Remind <HH:mm>] [-Days <Mon,Tue,...>] [-Walk]` | prints today's standup for the Space you are in, or the declared Space `-Space` names, read without switching into it. `-AsJson` prints the response the agent serves, `text`, `work` and `brief` included -- the bridge's shape and the parity test's. `-Brief` prints only the chair's reading (below) and, being a read, does not re-arm the reminder. `-Grain` picks the register of detail ([the work grain](#the-work-grain)): `detail`, the default, is the text as it always printed; `work` is the ritual's grain, spoken as standup prose ([the prose](#the-prose)); `brief` is `-Brief`. A word that is not a grain, or `-Brief` with another grain, is a stated refusal (exit 2). `-Since <yyyy-MM-dd>` widens yesterday back to that day ([what moved](#what-moved-and-the-window)) -- not `-Days`, which is the reminder's cadence; a day that is not one, or is after today, or `-Since` with `-Remind`, is a stated refusal. With nothing waiting on you, the brief's last line is [the suggestion](#the-suggestion-one-next-move-derived), and `-AsJson` carries every candidate as `suggestions` and the first as `suggestion`. The work grain is the round of the room: only the workers present today speak ([the team size](#the-team-size-who-is-in-the-room)); `detail` and `brief` keep every worker, and `-AsJson` carries each worker's `present` and the room's `team.size` | none |
+| `Standup [-Space <slug>] [-AsJson] [-Brief] [-Grain <detail\|work\|brief>] [-Since <yyyy-MM-dd>] [-Remind <HH:mm>] [-Days <Mon,Tue,...>] [-Walk]` | prints today's standup for the Space you are in, or the declared Space `-Space` names, read without switching into it. `-AsJson` prints the response the agent serves, `text`, `work` and `brief` included -- the bridge's shape and the parity test's. `-Brief` prints only the chair's reading (below) and, being a read, does not re-arm the reminder. `-Grain` picks the register of detail ([the work grain](#the-work-grain)): `detail`, the default, is the text as it always printed; `work` is the ritual's grain, spoken as standup prose ([the prose](#the-prose)); `brief` is `-Brief`. A word that is not a grain, or `-Brief` with another grain, is a stated refusal (exit 2). `-Since <yyyy-MM-dd>` widens yesterday back to that day ([what moved](#what-moved-and-the-window)) -- not `-Days`, which is the reminder's cadence; a day that is not one, or is after today, or `-Since` with `-Remind`, is a stated refusal. With nothing waiting on you, the brief's last line is [the suggestion](#the-suggestion-one-next-move-derived), and `-AsJson` carries every candidate as `suggestions` and the first as `suggestion`. The work grain is the round of the room, as many people as the Space's team size says: the workers present today, the engineer first, then the invented cast members that fill the seats left ([the team size](#the-team-size-who-is-in-the-room)); `detail` and `brief` keep every worker and never an invented one, and `-AsJson` carries each worker's `present`, each speaker's `cast` and the room's `team.size` | none |
 | `Triage [-Space <slug>] [-AsJson]` | prints the Space's open issues grouped by milestone -- no milestone first, then most open first -- each milestone under its context line, each issue one line: number, title, who has it ([who](#who-takes-it)) -- `me`, `@<login>`, its worker (its size), or `nobody` -- severity or `--`, `deep-water` marked. `-AsJson` is the route's shape | none |
 | `Route <n\|id> [-Size <label>] [-Assign <me\|size>] [-Milestone <title>] [-Severity <sev>] [-DeepWater] [-Space <slug>] [-WhatIf]` | answers triage's questions for issue `<n>`: **one `gh issue edit` per switch given**, in that order. `-Assign` says who takes it ([who](#who-takes-it)); on a card with no issue behind it, `-Assign` is the one switch and writes the card's `**Assigned:**` line. `-WhatIf` prints every write and makes none | none for an issue -- it writes the tracker; a card's `**Assigned:**` line |
 | `StartWork <id> [-Clip] [-Prompt <path>] [-Space <slug>] [-Launch] [-WhatIf]` | prints the hand-off block for a card in `current/`, or for the Space's GitHub issue `<id>` when no card carries it ([below](#startwork-the-hand-off-block)). `-Clip` puts it on the clipboard and says so in one line; `-Prompt` carries another prompt for this call. `-Launch` hands the same block to a session in a new worktree of the Space's repository, the model from the item's size, and returns with its PID and log ([-Launch](#the-launch-the-block-handed-to-a-session)); `-WhatIf` prints what a launch would run | none -- it reads. With `-Launch`, in the repository you stand in: a worktree under `.claude/worktrees/`, three `*.log` files in its git folder (`git rev-parse --git-path startwork`, never the working tree), and `/.claude/worktrees/` added to its local exclude file unless a rule already ignores it |
@@ -344,9 +345,9 @@ The response is the spec's ("The M0 build contract"): `ceremony`, `register` (`r
 `source` (`issues`, `cards`, or `none` when `tracker.ok` is false), `tracker` (`ok`, `reason`), `chair`
 (`open`, `close`, and `walked` -- the walk items closed inside the window, by number, what the chair's
 turn says it walked), `team` (`size`: the room's windows, the chair included -- the Space's `features.teamSize`
-as [the team size](#the-team-size-who-is-in-the-room) reads it, 9 when unset), `queue` (`walk`, `decide`, `look`), `workers` (EVERY worker, in label order and the card tile last, each `label`, `name`, `yesterday`,
+as [the team size](#the-team-size-who-is-in-the-room) reads it, 9 when unset), `queue` (`walk`, `decide`, `look`), `workers` (the record: EVERY labelled worker in label order, then on a GitHub or a local Space the engineer -- the card tile, always there --, each `label`, `name`, `yesterday`,
 `today`, `blockers`, `empty`, `excuse` -- the empty worker's status sentence, the first of `status`, kept for a reader that knows only this field; the name is historical --, `status`, the empty worker's two made-up items `[yesterday, today]`, `[]` for a worker with something to say, and `present`, whether it is in the room today), `work` (the work grain: `queue` -- each kind's groups --,
-`workers` -- the PRESENT workers only, in the same order, each `label`, `name`, the three slots' groups and `prose`, its turn: `turnOpen`, its
+`workers` -- the round, in seat order: the PRESENT members, the engineer first, then the invented cast members that fill the seats left, each `label`, `name`, the three slots' groups, `cast` (true for an invented member) and `prose`, its turn: `turnOpen`, its
 sentences (for a slot it has nothing in, that slot's fixed line -- or, for yesterday, the open items it worked
 inside the window; an idle worker's two made-up items), `proseBlockersNone` when nothing blocks it, `turnClose` --,
 `queueProse`, the queue's sentences, `chairProse`, the chair's own turn (in the same frame and its
@@ -893,37 +894,87 @@ block `StartWork` prints, whole. What only Windows or a real `claude` can show i
 ## The team size: who is in the room
 
 The standup is a room of nine windows, the Zoom grid, and the chair (the PM) always has one. The
-Space says how many windows its standup uses: `spaces[].features.teamSize`, one of **3, 6 or 9**
-(`consts.json` `rituals.teamSizes`), the chair counted -- so 2, 5 or 8 members sit. Unset, or any
-value that is not one of the three (a hand-edited 4, a string, a fraction), reads **9**
-(`rituals.teamSizeDefault`). The members are the Space's worker labels, as ever ([what it
-owns](#what-it-owns)), and on a GitHub Space read beside its cards the card tile is one more, after the
-labels; the size creates no member.
+Space says how many people are in it: `spaces[].features.teamSize`, one of **3, 6 or 9**
+(`consts.json` `rituals.teamSizes`), the chair counted. Unset, or any value that is not one of the
+three (a hand-edited 4, a string, a fraction), reads **9** (`rituals.teamSizeDefault`).
 
-**Who is present.** With no more members than seats, everyone is. With more, the fill seats the
-members **with work** first -- a member with anything in yesterday, today or blockers, which is to say
-one whose `empty` is false -- then the **idle**, each run in the members' own order (the label order,
-the card tile last); the rest are **absent** today. Work first loses the least: absence falls on the
-idle before anyone with something to report, and when more members have work than there are seats,
-some work goes unsaid today -- the room's account is incomplete on purpose, as a real one is when
-someone is out. A member's place in the label order is unchanged by any of this.
+**The size is the team.** A size of 9 is nine people in the room and no empty desk; every seat the
+size counts is filled, and the empty desks are only the windows past it -- `9 - size`: 0, 3 or 6.
+The seats after the chair's are filled in this order, until the size is reached:
 
-**Absent is a fact on the worker, not a deletion.** The fill keeps EVERY worker on the response and
-marks each `present: true|false`; the response carries the room as `team: { size }`. Then:
+1. **the engineer** -- you, the card tile, named for the Space. Always, with or without work;
+2. **the labelled workers with work** -- anything in yesterday, today or blockers, which is to say
+   `empty` is false -- in label order;
+3. **the labelled workers with nothing routed**, in label order;
+4. **invented cast members**, in the cast's grid order.
+
+Whoever is past the size is **absent** today, and nobody reports for them. So four workers with work
+and a size of 3 seat the chair and two of them, and an idle engineer still sits ahead of three working
+labels. Work first loses the least among the labels: absence falls on the idle before anyone with
+something to report.
+
+**An invented cast member fills a seat nobody takes.** It is one of the stage's own cast: its label is
+its cast id (`ops-dev`), its name the plate (`OPS-DEV`), and it is marked `cast: true`. It has no work,
+so its turn is two made-up items, as an idle member's is. It is in the **round** only -- never in the
+record, so the detail, the brief and the counts never name it.
+
+**The cast is shared data**, `consts.json` `rituals.room`: `windows`, the nine windows in grid order,
+each a cast `id` and the `plate` its persona wears; `chair`, the cast id whose window is the chair's
+(`pm`); `kept`, the windows three labels keep (`fable` `dev-hero`, `opus` `vibemancer`, `sonnet`
+`minimalist`); and `engineer`, the engineer's window (`dev-hero`). Who sits where:
+
+- A window is a member's **own** when its label is a key of `kept`, or is itself a member window's cast
+  id (a label `qa` sits in `qa`). A seated member sits in its own window; an absent one keeps it empty,
+  so nobody moves when it is back.
+- **The engineer** takes `rituals.room.engineer` unless a member of the record owns that window: a
+  label's kept window wins over the engineer's.
+- Everyone else is dealt the free windows in grid order -- the engineer first, then the labels in label
+  order -- and takes a window an absent member keeps only when the free ones run out.
+- An invented member sits in the window its cast id names, so it skips a window anyone has taken or
+  keeps.
+
+The engineer in a room with no labels, at each size:
+
+| Size | In the room | Empty desks |
+| --- | --- | --- |
+| 3 | the chair; the engineer; one invented cast member (`OPS-DEV`) | 6 |
+| 6 | the chair; the engineer; four invented cast members | 3 |
+| 9 | the chair; the engineer; seven invented cast members | 0 |
+
+**The record is not the round.** The fill keeps EVERY member of the record on the response -- the
+labelled workers in label order, then the engineer -- and marks each `present: true|false`; the
+response carries the room as `team: { size }`. Then:
 
 | Reads | Who |
 | --- | --- |
-| **The round** -- the work grain (`Standup -Grain work`, `work.workers`, `work.text`), the dress, the played stage | the present only, in the members' order; an absent member has no line, not even its name |
-| **The ledger** -- the detail grain (`text`), the brief's count lines (`counts`, `brief`), the Agenda | every worker, as before |
+| **The round** -- the work grain (`Standup -Grain work`, `work.workers`, `work.text`), the dress | the room: the seated members, then the invented cast members; an absent member has no line, not even its name |
+| **The record** -- the detail grain (`text`), the brief's count lines (`counts`, `brief`), the Agenda | every labelled worker and the engineer, present or not; never an invented member |
 
-An absent member is silent in this build: nothing in the round names the absence. An idle member's two
-made-up items are picked by its place among ALL the workers (`(d + i) mod len`, `i` in the label order),
-present or not, so changing the size never changes what anyone says. One rule per half,
-`Set-P20StandupPresent` (`Scripts/Standup-Rules.ps1`, with `Get-P20TeamSize` in
-`Scripts/Resolve-TeamSize.ps1`) and `set_present` / `team_size` in `agent/solitaire/standup.py`;
-**one table**, `Tests/fixtures/rituals/standup-team.json` -- its `sizes` (a stored value in, the room
-out), its `seats` (who is present, the work-first order among them) and four cases end to end with
-their detail, work and brief goldens, `standup-team-<case>*.txt`.
+**The turns go in seat order**: the engineer, the labelled workers with work, the labelled workers with
+nothing routed, the invented cast members, and the chair last.
+
+The record reads as it always has, with one row more: on a GitHub Space the engineer is always in it.
+With no card in play it is idle, and its rows are the made-up `Status` pair an idle labelled worker
+has; the brief says `<Space>: nothing today.`
+
+An absent member is silent in this build: nothing in the round names the absence. The two made-up
+items are picked by place, `(d + i) mod len`: `i` is a member's place in the record (the labels in
+label order, then the engineer), present or not, so changing the size never changes what a member
+says; the invented members take the places after the record's last, and the chair's own made-up
+yesterday the place after theirs. A full idle room -- eight members with nothing to say -- is sixteen
+different lines on any day of the year, and the chair's is none of them. One rule per half:
+`Get-P20StandupRoomSeats` and `Set-P20StandupRoom` (`Scripts/Standup-Rules.ps1`, with
+`Get-P20TeamSize` in `Scripts/Resolve-TeamSize.ps1`) and `room_seats`, `seat_room` and `team_size` in
+`agent/solitaire/standup.py`; **one table**, `Tests/fixtures/rituals/standup-team.json` -- its `sizes`
+(a stored value in, the room out), its `seats` (labels only: who sits), its `room` rows (who sits, the
+window each speaker sits in, and the desks left) and eight cases end to end with their detail, work and
+brief goldens, `standup-team-<case>*.txt`. The `room` rows carry every seat, so the stage can be held
+to the same table.
+
+**The stage does not draw an invented member yet.** The played view seats the record: the labelled
+workers and the engineer, in the response's order. A window an invented member sits in is drawn as an
+empty desk there, and the invented member has no turn on the stage, until the stage reads this table
+([Known gaps](#known-gaps)).
 
 The setting is written by `Config -Set spaces.<slug>.features.teamSize=<3|6|9> -Hub`, which refuses any
 other number by name (exit 2), and asked in the settings drawer as **How many are in my standup in
@@ -1388,7 +1439,7 @@ number, or an id of the card's own.
 | ... archived, and the issue is open | the issue's row, and one `Check` line: `#<n> <title> -- the card is archived, but the issue is still open.` (`rituals.text.checkCardArchived`) |
 | ... in `current/`, and the issue is closed | the issue's row, and one `Check` line: `#<n> <title> -- the issue is closed, but the card is not archived.` (`rituals.text.checkIssueClosed`) |
 | ... the issue is open with no worker label, so the issues fill gives it no slot at all | the card -- when it is itself in `current/` -- is **its own row, under you**, in the slot its lane maps to, exactly as a card of its own is (the next row): named by its id, `Today  160 Fix the loader with no route` for a card in progress, and on the walk too in Code Review. It is one row, never two, and the link is still in `links[]`. A routed issue's card is unaffected: it follows its issue |
-| an id of its own, or a number the read has no issue for | **its own row, under you**: one tile labelled with the Space's slug and named for it, in the slot its lane maps to ([the cards alone](#the-cards-alone)), after the worker tiles -- and only when it has something to say; its Code Review cards follow the issues on the walk |
+| an id of its own, or a number the read has no issue for | **its own row, under you**: one tile labelled with the Space's slug and named for it, in the slot its lane maps to ([the cards alone](#the-cards-alone)), after the worker tiles. The tile is the engineer and is always there: with no card to say it is idle, as a labelled worker with nothing routed is. Its Code Review cards follow the issues on the walk |
 | not billable | nothing |
 
 **When the two disagree, it is said, and nothing is written.** The `Check` lines (`checks[]`, by issue
@@ -1431,7 +1482,7 @@ read the way `Status` reads it, and it maps to a slot like this:
 **One worker.** A local Space has one worker, the engineer, so the standup has one tile: labelled with
 the Space's slug and named with its display name (the slug when it has none). `blockers` is always
 empty -- a card carries no walk label -- and a day with nothing in either slot is two made-up items
-(the same two made-up items, picked by the tile's position among the workers -- the first, so `nothing[d mod len]` and `nothingToday[d mod len2]`). Within a slot, cards are in file-name order. **The text
+(the same two made-up items, picked by the tile's position among the workers -- the first, so `nothing[d mod len]` and `nothingToday[d mod len2]`). The engineer takes the first seat, and invented cast members fill the others the Space's size counts ([the team size](#the-team-size-who-is-in-the-room)). Within a slot, cards are in file-name order. **The text
 is the same rendering**, with the card's id (what `Get-P20CardId` returns: `K7M2`, `139` -- the id every
 verb takes) where an issue has `#<number>`, and no link:
 
@@ -1500,10 +1551,13 @@ Fable: Good morning. Yesterday I closed two in Design lifecycle (#<n>, #<n>). I 
 Opus: Good morning. Yesterday I closed three in Team Agile (#<n>, #<n>, #<n>). I also closed one in the Studio: #<n>, Count the foyer rows. Today I'm on two in Team Agile (#<n>, #<n>). No blockers. That's it for me.
 Sonnet: Good morning. Yesterday I took a course module on the cloud platform. Today I'll set up the password manager on my phone. No blockers. That's it for me.
 
-Good morning. Yesterday I tidied my notes and my calendar for the week. Today I'll walk #<n>, #<n> and #<n>. No blockers. That's it for me.
+Good morning. Yesterday I watched a couple of React tutorials to get my head into the new stack. Today I'll walk #<n>, #<n> and #<n>. No blockers. That's it for me.
 
 "Let's circle back."
 ```
+
+The room here is nine, so five invented cast members speak between Sonnet and the chair, each with two
+made-up items of its own ([the team size](#the-team-size-who-is-in-the-room)); their lines are left out above.
 
 **The grain is configurable** (`rituals.grains`: `detail`, `work`, `brief`): `Standup -Grain <grain>`
 in the terminal (`detail` the default, `brief` the same as `-Brief`), a per-browser setting on the page
@@ -1621,21 +1675,26 @@ Fable: Good morning. Yesterday I picked up where I left off. Today I'll pick up 
 Opus: Good morning. Yesterday I closed #<n>, Rename the export. Today I'll pick up the next item from the board. No blockers. That's it for me.
 Sonnet: Good morning. Yesterday I picked up where I left off. Today I'm on Phase 7: #<n>, Trim the menu. No blockers. That's it for me.
 
-Good morning. Yesterday I tidied my notes and my calendar for the week. Today I'll walk #<n>. No blockers. That's it for me.
+Good morning. Yesterday I watched a couple of React tutorials to get my head into the new stack. Today I'll walk #<n>. No blockers. That's it for me.
 
 "Let's circle back."
 ```
 
-Each worker's line opens with its name: the chair
-calls each member by name, in label order, and the member answers. The chair gives its own status
+The room here is nine, so five invented cast members speak between Sonnet and the chair, each with two
+made-up items of its own ([the team size](#the-team-size-who-is-in-the-room)); their lines are left out above.
+
+Each speaker's line opens with its name: the chair
+calls each member by name, in seat order -- the engineer, the labelled workers with work, the idle
+ones, then the invented cast members ([the team size](#the-team-size-who-is-in-the-room)) -- and the
+member answers. The chair gives its own status
 LAST, in the same frame and in its own first person, and never says the board's sentences again: the
 opening line has already read the queue (D-TA6), so the chair says what it did and what it will do.
 Its **yesterday** is what you walked: the issues carrying `verify-close` that were CLOSED inside the
 window (`chair.walked`, the issues read the fill already holds -- no other call),
 `Yesterday I walked #<n> and #<n>.` (`text.chairYesterday`, the refs joined as a name list; past `proseFoldNames` of them
 the count, `Yesterday I did five walks.`). With nothing walked it is a made-up line, `nothing[(d + n)
-mod len]`, `n` the number of workers -- the place after the last, so it is never a worker's line that
-day. A cards Space has no walk to close (its walk is a card in Code Review), so its chair's yesterday is
+mod len]`, `n` the number of members -- the record's and the invented cast members' -- so the place
+after the last, and it is never a member's line that day. A cards Space has no walk to close (its walk is a card in Code Review), so its chair's yesterday is
 always the made-up line. Its **today** is what waits, kind by kind in the ceremony's order:
 `Today I'll walk #<n> and #<n>, and decide #<n>.` (`text.chairToday` over `text.chair<Kind>`, each
 kind's refs in its groups' order, the clauses joined by `chairClauseSeparator` and the last by
@@ -1656,10 +1715,13 @@ Fable: Good morning. Yesterday I picked up where I left off. Today I'm on the St
 Opus: Good morning. Yesterday I closed two in Team Agile (#<n>, #<n>). I also closed one in the Studio: #<n>, Count the foyer rows. Today I'm on two in Team Agile (#<n>, #<n>). No blockers. That's it for me.
 Sonnet: Good morning. Yesterday I took a course module on the cloud platform. Today I'll set up the password manager on my phone. No blockers. That's it for me.
 
-Good morning. Yesterday I tidied my notes and my calendar for the week. Today I'll walk #<n>, #<n> and #<n>. No blockers. That's it for me.
+Good morning. Yesterday I watched a couple of React tutorials to get my head into the new stack. Today I'll walk #<n>, #<n> and #<n>. No blockers. That's it for me.
 
 "Let's circle back."
 ```
+
+The room here is nine, so five invented cast members speak between Sonnet and the chair, each with two
+made-up items of its own ([the team size](#the-team-size-who-is-in-the-room)); their lines are left out above.
 
 `Standup -Grain work` prints it, the page's Work grain shows it (each `#<n>` linked, as in the detail
 text), and the played view speaks each sentence as a `Say` line. `standup-prose.json`'s `sentences`
@@ -1773,7 +1835,7 @@ standup is complete and correct; nothing on screen says a dress was skipped.
 | `web/src/shell/ConfettiProvider.test.tsx`, and `MilestonesPage.test.tsx`'s "one mount, one hook, one caller" | the root's burst: a throw draws one, a throw while it rains is absorbed, the next throw after it ends is a fresh burst, reduced motion draws nothing, and with no provider the hook is a no-op; the package imported by `shared/Confetti.tsx` alone, the wrapper mounted (as a lazy part) by `shell/ConfettiProvider.tsx` alone, the provider mounted once in `shell/main.tsx`, and `AwardDialog.tsx` the one file that calls `useConfetti()` |
 | `tkTestToolkit -Triage` | every case of `Tests/fixtures/rituals/triage.json` -- the groups in order, each group's counts, context and numbers, each issue's worker, size, who, severity and deep-water, the sizes -- and the text against `triage-<name>.txt` byte for byte, again after a JSON round trip; the who rule; `Tests/fixtures/parsers/assigned-lines.json` through `Get-P20CardAssigned`; off is no `Triage`, no `Route`, no `-Assign`, no bridge entry; `Triage` typed with `gh` stubbed (who: `me`, `@<login>`, `nobody`); **`Route` typed with `gh` stubbed as a function that writes down every call**: the exact `gh issue edit` argv for each switch, alone and all four in order, `-Assign me` (`--add-assignee @me`, and under `-WhatIf` printed and not made), `-Assign <size>` the `-Size` write byte for byte, `-WhatIf` writing nothing, the two moves printed, every refusal exit 2 with one `Error:` block and no write, the hub untouched; `-Assign` on a card -- the `**Assigned:**` line above `**Created:**`, LF and CRLF kept, no BOM, an unchanged card not written, the sizes from the repo, a local Space's card taking `-Assign me` alone, and its refusals (a size with no repository to read labels from among them) |
 | `tkTestToolkit -Rituals`, `Tests/test_rituals.py` -- the suggestion | who "me" is (the viewer's assignee `me` and a candidate, another's `@<login>` excluded `theirs`, no viewer every assignee theirs; the route asking `gh api user` once with the suggestion on, never with it off); `Tests/fixtures/suggestion/table.json` from both halves: every `nearest` row (the order and the nearest), every `rows` row (the candidates in order, the pick, its shape, sentence and command, each excluded ref with the first exclusion it met), every shape and every exclusion of the contract reached by a row, every `switch` row, and the three `briefs` cases end to end -- the joined fill, the suggestion attached, the candidates, the pick and `suggestion-<case>.brief.txt` byte for byte (with something waiting the Next line is the queue's; switched off it is today's), again after a JSON round trip; the card reader's milestone (whole), Created day, Tags and Assigned, and `Tests/fixtures/parsers/card-milestone.json` through both halves' readers; typed, `Standup -AsJson` carrying the rule's candidates with each line naming the prefixed command, the brief's Next line staying the queue's while walks wait, and `spaces.<slug>.features.suggestions=false` in the hub leaving no candidate; the agent's route carrying `suggestions` (the fields, the order, the line) and none with the Space's switch off |
-| `tkTestToolkit -Rituals`, `Tests/test_rituals.py` -- the team size | `Tests/fixtures/rituals/standup-team.json` from both halves: every `sizes` row (a stored `teamSize` read as the room -- 3, 6 and 9 themselves, unset, another number, a string, a boolean and a fraction 9 -- and whether it was set), the sizes and the default the contract's, every `seats` row (who is present: fewer members than seats, the work-first order with an idle member earlier in label order absent while a working one later sits, the first idle taking a seat the working leave, more members with work than seats, nine in the full grid, a room of six, none), and the four cases end to end -- `team.size`, every worker kept in label order with its `empty` and `present`, the round the present only, the counts every worker, and the detail, work and brief against `standup-team-<case>*.txt` byte for byte, the work again after a JSON round trip; an absent worker's made-up items unmoved by the size; the cards fill carrying the room; typed, `spaces.<slug>.features.teamSize=3` in the hub giving `team.size` 3, every worker kept, two present and the round those two, and no `teamSize` the room of nine with everyone present; the agent's route carrying `team` and each worker's `present` -- in a room of three Sonnet absent from `work` and kept in `text` and the brief |
+| `tkTestToolkit -Rituals`, `Tests/test_rituals.py` -- the team size | `Tests/fixtures/rituals/standup-team.json` from both halves: every `sizes` row (a stored `teamSize` read as the room -- 3, 6 and 9 themselves, unset, another number, a string, a boolean and a fraction 9 -- and whether it was set), the sizes and the default the contract's, every `seats` row (labels only -- who sits: fewer members than seats, the work-first order with an idle member earlier in label order absent while a working one later sits, the first idle taking a seat the working leave, more members with work than seats, nine in the full grid, a room of six, none), and every `room` row -- who sits, each speaker's window and the desks left: the three walk rows (no labels, the engineer with work, at 3, 6 and 9), no labels with an idle engineer at each size, two and one members short of the size and exactly the size, working and idle labels together, an idle engineer ahead of three working labels, more workers with work than the size, a kept window an invented member skips, a kept window beating the engineer's, a label that is a cast id, an absent label keeping its window, and a fill with no engineer -- with every seat the size counts filled, the desks the windows past it, and no window or label shared; the eight cases end to end -- `team.size`, every worker of the record kept with its `empty` and `present`, the round the seated in seat order then the invented cast members, the counts every worker and never an invented one, an invented member named in the work and in neither the detail nor the brief, and the detail, work and brief against `standup-team-<case>*.txt` byte for byte, the work again after a JSON round trip; a full idle room never repeating a made-up line on any day of a year, the chair's among them; an absent worker's made-up items unmoved by the size; the cards fill seating the engineer and filling the room; typed, `spaces.<slug>.features.teamSize=3` in the hub giving `team.size` 3, every worker kept, two present and the round those two -- the engineer, then the first worker with work --, and no `teamSize` the room of nine with everyone present and the invented filling the seats left; the agent's route carrying `team`, each worker's `present` and each speaker's `cast` -- in a room of three the engineer and Fable in `work`, Opus and Sonnet absent from it and kept in `text` and the brief |
 | `Tests/test_triage.py` | the agent's grouping, who and text over the same table and goldens, the goldens the regeneration script's; the route's `gh` calls (with `assignees`, then `gh api user`); a viewer `gh` cannot name; ADO and tier below 1 a `Tracker` line; 404 off |
 | `tkTestToolkit -StartWork` | the hand-off block, typed in a fresh shell over a scratch hub built from `Tests/fixtures/start-work/`: off is no verb and no bridge entry; `StartWork 23A3` is `expected-card.md` byte for byte, and so is the card in CRLF, the id in lower case and the full filename; `39` never assembles `Task139`; a `how-we-work.md` switches section one's heading to its path -- `agentic/how-we-work.md`, which `HowWeWork` writes, over one at the Space's folder root, which is still read alone; issue 41, which no card carries, is `expected-issue.md` with one `gh issue view`; `-Prompt` absolute and package-relative; a partial name named in a terminal and refused for a non-interactive caller; and every refusal exit 2 with one `Error:` block and the hub untouched -- no row for the kind (naming `startWork.prompts.Meeting`), a row whose file is missing, a `-Prompt` that is no file, no id, nothing matching, an archived card, a closed issue, a pull request, an Azure DevOps Space, an undeclared `-Space`. And `-Launch`, from scratch clones with a stub `claude` first on the PATH: `-WhatIf` prints the worktree add, the block file, the exact command and the log and leaves nothing; the model from the `**Assigned:**` line, the Tags, an issue's label and the issue behind a numbered card; `fable` on a card and on an issue, no size, `me`, a size with no model, no git repository, another repository's origin, a failed worktree add, no `claude`, `-Clip` with `-Launch` and `-WhatIf` alone each refused with nothing started; off Windows the launch itself, read through a pipe -- back while the stub lives on, and the log's first message the block, whole |
 | `tkTestToolkit -OrgChart` | the org chart: the reader over `Tests/fixtures/org/table.json` (a case per row of [what is checked](../hub/org.md#what-is-checked) and per way a valid file reads, which `Tests/test_org.py` holds the agent's reader to as well), `OrgChart` typed in a fresh shell over a scratch copy of `samples/hub` (off is no verb, the text and `-AsJson` against the table, every refusal exit 2 writing nothing), the `Org chart` inventory row's four states, and `samples/hub/org.json` valid |
@@ -1815,6 +1877,11 @@ Each of these is a block on [Known gaps](../KNOWN-GAPS.md), with its issue:
 - **The bell and Home's tips do not suggest yet.** They are the suggestion's later surfaces, behind the
   same switch; the chair's line and [the PM Corner](#the-pm-corner-the-line-the-chevron-the-confetti) are the two built
   ([The bell and Home's tips carry no suggestion](../KNOWN-GAPS.md#the-bell-and-homes-tips-carry-no-suggestion)).
+- **The stage draws no invented cast member.** The terminal's round and the agent's `work.workers` fill
+  the room to the Space's size; the played view still seats the record -- the labelled workers and the
+  engineer, in the response's order -- so a window an invented member sits in is an empty desk there, and
+  the engineer speaks in the response's place and not first
+  ([The played standup seats the record, not the room](../KNOWN-GAPS.md#the-played-standup-seats-the-record-not-the-room)).
 - **The celebration's mark is per browser.** Another browser, or one whose site data was cleared, celebrates a
   reached milestone once more on first sight
   ([A reached milestone celebrates once per browser](../KNOWN-GAPS.md#a-reached-milestone-celebrates-once-per-browser)).

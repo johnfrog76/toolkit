@@ -636,17 +636,25 @@ with the line that changes it, under the question "Can it tell me what to do nex
 
 ## `spaces[].features.teamSize` -- how many are in the standup
 
-A number, Space-scoped (like `trainingHoursPerQuarter`): the windows of Team Agile's standup in this
-Space, **the chair included** -- one of **3, 6 or 9** (`consts.json` `rituals.teamSizes`), so 2, 5 or 8
-members sit. **Unset is 9** (`rituals.teamSizeDefault`), the whole 3x3 grid, and so is any stored value
-that is not one of the three -- a hand-edited 4, a string, a fraction -- so a typo never empties a room.
-The members are still the Space's worker labels; the size only says how many of them are in today's
-standup: the ones with work first, then the idle, each in label order, and the rest are absent. The
-round -- `Standup -Grain work`, the played stage -- speaks the present; the detail, the counts and the
-brief keep everyone ([the team size](modules/solitaire-agile.md#the-team-size-who-is-in-the-room)).
+A number, Space-scoped (like `trainingHoursPerQuarter`): how many people are in Team Agile's standup in
+this Space, **the chair included** -- one of **3, 6 or 9** (`consts.json` `rituals.teamSizes`), so 2, 5
+or 8 members sit. **Unset is 9** (`rituals.teamSizeDefault`), the whole 3x3 grid, and so is any stored
+value that is not one of the three -- a hand-edited 4, a string, a fraction -- so a typo never empties a
+room. **The size is the team**: every seat it counts is filled, and the empty desks are only the windows
+past it. The seats go to the engineer, then the Space's labelled workers with work, then the idle ones,
+each in label order; workers past the size are absent, and seats still open are filled by invented cast
+members, who report made-up status. The round -- `Standup -Grain work` -- speaks the room; the detail,
+the counts and the brief keep every worker and never an invented one
+([the team size](modules/solitaire-agile.md#the-team-size-who-is-in-the-room)).
+
+| `teamSize` | In the room, on a Space with no worker labels | Empty desks |
+| --- | --- | --- |
+| 3 | the chair, the engineer, one invented cast member | 6 |
+| 6 | the chair, the engineer, four invented cast members | 3 |
+| 9, or unset | the chair, the engineer, seven invented cast members | 0 |
 
 ```powershell
-tkConfig -Set spaces.<slug>.features.teamSize=3 -Hub   # the chair and two members
+tkConfig -Set spaces.<slug>.features.teamSize=3 -Hub   # three in the room: the chair and two members
 tkConfig -Set spaces.<slug>.features.teamSize=4 -Hub   # refused (exit 2): "... is one of: 3, 6, 9 -- got '4'."
 tkConfig -Unset spaces.<slug>.features.teamSize -Hub   # back to nine
 ```
@@ -657,7 +665,8 @@ written. It is declared in `consts.json` `features.spaceScoped`, so the hub keep
 and a top-level `features.teamSize` is ignored; being a number, it is not folded into the merged flag map
 `/env` serves -- the standup reads it off the Space and says it back as `team.size`. One rule per half --
 `Get-P20TeamSize` (`Scripts/Resolve-TeamSize.ps1`) and `team_size()` (`agent/solitaire/standup.py`), the
-`sizes` rows of `Tests/fixtures/rituals/standup-team.json`. The inventory row, `Team size`, rides Team Agile
+`sizes` rows of `Tests/fixtures/rituals/standup-team.json`; who sits where is its `room` rows, over the
+cast in `consts.json` `rituals.room`. The inventory row, `Team size`, rides Team Agile
 as the `Suggestions` row does: `off`, with `rides Team Agile, which is off in <slug>`, where Team Agile is
 off in that Space (the switch off, or the Space's `howIWork` not `agents`); where it is on, `on` with the
 number once one of the three is set and `not configured` while nothing is (the room is nine), under
