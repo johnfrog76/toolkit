@@ -76,7 +76,7 @@ a card is the engineer's, even when the commits in a local checkout name a model
 
 **Where you meet it:** [Team Agile](modules/solitaire-agile.md#where-the-rooms-members-come-from), "Where the room's members come from"
 
-**Issue:** [#500](https://github.com/johnfrog76/toolkit/issues/500), out of scope there and to be filed on its own
+**Issue:** [#503](https://github.com/johnfrog76/toolkit/issues/503)
 
 ### The foyer's design counts can differ from the Design tab's
 

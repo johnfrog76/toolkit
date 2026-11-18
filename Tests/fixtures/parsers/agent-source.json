@@ -1530,6 +1530,23 @@
         "family": "fable",
         "source": "line"
       }
+    },
+    {
+      "name": "Assigned Opus, in capitals: the size matches ignoring case",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Assigned:** Opus",
+        "**Created:** 2026-10-17"
+      ],
+      "label": "",
+      "messages": null,
+      "expected": {
+        "id": "claude-opus-5-5",
+        "family": "opus",
+        "source": "assigned"
+      }
     }
   ],
   "coAuthors": [

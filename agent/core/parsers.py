@@ -310,7 +310,7 @@ def resolve_card_agent(
     - ``assigned``: a card with NO Agent line whose ``**Assigned:**``
       value (``card_assigned``) names a worker -- a size, which
       ``Route -Assign <size>`` writes on a card with no issue. Read tolerantly: a
-      key of the map's ``current`` block is its model, id ``current[size]`` and
+      key of the map's ``current`` block (ignoring case) is its model, id ``current[size]`` and
       family that id's (else the id as written); any other value is the worker
       as written, id None and family the value. Empty, ``rituals.assignMe``
       (``me``, in any case) and an ``@<login>`` do not answer.
@@ -336,7 +336,8 @@ def resolve_card_agent(
     # the shipped map, else what the caller passes (none is empty).
     if current is None:
         current = read_model_current() if models is None else {}
-    sizes = {str(k): v for k, v in (current or {}).items()} if isinstance(current, dict) else {}
+    # Keyed in lower case: a size matches ignoring case, as models.current_model matches it.
+    sizes = {str(k).lower(): v for k, v in (current or {}).items()} if isinstance(current, dict) else {}
     for source in model_agent_sources() if order is None else order:
         if source == "line":
             mid = card_agent(content or "")
@@ -352,7 +353,7 @@ def resolve_card_agent(
             size = card_assigned(content or "")
             if not size or size.lower() == rituals_assign_me().lower() or size.startswith("@"):
                 continue
-            mid = sizes.get(size)
+            mid = sizes.get(size.lower())
             if not mid:
                 return {"id": None, "family": size, "source": "assigned"}
             row = rows.get(mid)

@@ -2888,7 +2888,7 @@
         "workers": [
           {
             "label": "acme-coder-1",
-            "name": "Acme-coder-1",
+            "name": "acme-coder-1",
             "empty": false,
             "present": true,
             "plate": "ACME-CODER-1"
@@ -2930,7 +2930,7 @@
           },
           {
             "label": "acme-coder-1",
-            "name": "Acme-coder-1",
+            "name": "acme-coder-1",
             "cast": false
           },
           {

@@ -1175,16 +1175,17 @@ class _CardMembers:
         self.rows, self.sizes = read_model_map(), read_model_current()
 
     def dest(self, card: dict) -> Worker | None:
-        family = resolve_card_agent(
-            str(card.get("body") or ""), "", self.messages, self.rows, None, current=self.sizes
-        )["family"]
+        answer = resolve_card_agent(str(card.get("body") or ""), "", self.messages, self.rows, None, current=self.sizes)
+        family = answer["family"]
         if not family:
             return None
         low = str(family).lower()
         if low in self.by_low:
             return self.by_low[low]
         if low not in self.members:
-            self.members[low] = card_member(str(family))
+            # An id the map does not know is seated, and named, as written.
+            unknown = bool(answer["id"]) and answer["id"] not in self.rows
+            self.members[low] = card_member(str(family), as_written=unknown)
         return self.members[low]
 
     def seated(self) -> list[Worker]:
@@ -1193,13 +1194,15 @@ class _CardMembers:
         return [w for w in self.members.values() if w.yesterday or w.today or w.blockers]
 
 
-def card_member(family: str) -> Worker:
+def card_member(family: str, as_written: bool = False) -> Worker:
     """A member a card names that no worker label routes to: labelled with the
-    family as written, named with its first letter in capitals, and wearing the
+    family as written, named with its first letter in capitals -- or, for an id
+    the map does not know (``as_written``), named as written -- and wearing the
     family in capitals on its plate unless the family keeps a window
     (``rituals.room.kept``). The mirror of ``New-P20StandupCardMember``."""
     plate = "" if family.lower() in rituals_room()["kept"] else family.upper()
-    return Worker(label=family, name=family[:1].upper() + family[1:], plate=plate)
+    name = family if as_written else family[:1].upper() + family[1:]
+    return Worker(label=family, name=name, plate=plate)
 
 
 def _slot_order(w: Worker) -> None:

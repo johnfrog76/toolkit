@@ -943,7 +943,7 @@ label and no card is routed work not yet started: it stays with the label's work
 today, and a worker label seats its worker as it always has, idle or not. A card -- one joined to an issue,
 or one of its own -- is reported by the member its agent names, by the one reader of a card's agent
 ([the card](../hub/cards.md#how-a-cards-agent-is-worked-out)) in the shipped order: its `**Agent:**` line,
-else an older card's `**Assigned:** <size>` (a size reads as that family's current model, a team's own
+else an older card's `**Assigned:** <size>` (a size, in any case, reads as that family's current model, a team's own
 worker such as `backend` as written), else the `Co-Authored-By` trailers of the commits its bullets name
 -- read in [the dates read](#what-moved-and-the-window), on a connected GitHub Space only
 ([A card's commit trailers are read from GitHub only](../KNOWN-GAPS.md#a-cards-commit-trailers-are-read-from-github-only)) -- else nobody,
@@ -953,7 +953,7 @@ commits credit Opus is Opus's to report, and one that names nobody is the engine
 | Who the card names | Who reports it |
 | --- | --- |
 | a family a worker label routes to (`opus` and the `opus` label, compared ignoring case) | that labelled worker |
-| any other family (`grok`), or an id the map does not know (`acme-coder-1`), or a worker name (`backend`) | a member of its own, labelled with it, named with its first letter in capitals (`Grok`) |
+| any other family (`grok`), or an id the map does not know (`acme-coder-1`), or a worker name (`backend`) | a member of its own, labelled with it, named with its first letter in capitals (`Grok`, `Backend`) -- an id the map does not know is named as written (`acme-coder-1`) |
 | nobody | the engineer |
 
 **The members are derived from the cards.** The room's members are the labelled workers, as before,
@@ -1997,7 +1997,8 @@ Each of these is a block on [Known gaps](../KNOWN-GAPS.md), with its issue:
   model a card's commits credit ride the standup's dates read, so a cards Space, an Azure DevOps Space or a
   dates read that failed reads a card's Agent line and its Assigned worker alone, and a card that names
   neither is the engineer's. Nothing is read from a local checkout
-  ([A card's commit trailers are read from GitHub only](../KNOWN-GAPS.md#a-cards-commit-trailers-are-read-from-github-only)).
+  ([A card's commit trailers are read from GitHub only](../KNOWN-GAPS.md#a-cards-commit-trailers-are-read-from-github-only),
+  [#503](https://github.com/johnfrog76/toolkit/issues/503)).
 - **`decide` and `look` are always empty.** Their labels are an open item of the spec; only `walk` is
   filled ([The standup's decide and look queues are empty](../KNOWN-GAPS.md#the-standups-decide-and-look-queues-are-empty)).
 - **One repo per Space.** A Space spanning several repos says so on its `Tracker` line rather than

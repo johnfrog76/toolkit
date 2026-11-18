@@ -1195,16 +1195,19 @@ function New-P20StandupCardRoute {
 function New-P20StandupCardMember {
     <#
       A member a card names that no worker label routes to: labelled with the
-      family as written, named with its first letter in capitals, and wearing
+      family as written, named with its first letter in capitals -- or, for an
+      id the map does not know (-AsWritten), named as written -- and wearing
       the family in capitals on its plate unless the family keeps a window
       (rituals.room.kept). card_member in the agent.
     #>
-    param([string]$Family, [string[]]$Slots)
+    param([string]$Family, [string[]]$Slots, [switch]$AsWritten)
     $kept = @{}
     foreach ($p in (Get-P20Consts).rituals.room.kept.PSObject.Properties) { $kept[[string]$p.Name] = $true }
     $plate = ''
     if (-not $kept.ContainsKey($Family.ToLowerInvariant())) { $plate = $Family.ToUpperInvariant() }
-    $w = [ordered]@{ label = $Family; name = ($Family.Substring(0, 1).ToUpperInvariant() + $Family.Substring(1)) }
+    $name = $Family.Substring(0, 1).ToUpperInvariant() + $Family.Substring(1)
+    if ($AsWritten) { $name = $Family }
+    $w = [ordered]@{ label = $Family; name = $name }
     foreach ($slot in $Slots) { $w[$slot] = [object[]]@() }
     $w['plate'] = $plate
     return $w
@@ -1213,12 +1216,19 @@ function New-P20StandupCardMember {
 function Get-P20StandupCardMember {
     <# The worker a card is reported by: a labelled worker, a card member (made the first time a card names its family), or $null, the engineer. #>
     param($Route, $Card, [string[]]$Slots)
-    $family = [string](Resolve-P20CardAgent -Content ([string]$Card.body) -Messages $Route.messages -Models $Route.map -Current $Route.current).family
+    $answer = Resolve-P20CardAgent -Content ([string]$Card.body) -Messages $Route.messages -Models $Route.map -Current $Route.current
+    $family = [string]$answer.family
     if (-not $family) { return $null }
     $low = $family.ToLowerInvariant()
     if ($Route.byLow.ContainsKey($low)) { return $Route.byLow[$low] }
     if (-not $Route.memberLow.ContainsKey($low)) {
-        $m = New-P20StandupCardMember -Family $family -Slots $Slots
+        # An id the map does not know is seated, and named, as written.
+        $unknown = $false
+        if ($answer.id) {
+            $unknown = $true
+            foreach ($k in @($Route.map.Keys)) { if ([string]$k -ceq [string]$answer.id) { $unknown = $false } }
+        }
+        $m = New-P20StandupCardMember -Family $family -Slots $Slots -AsWritten:$unknown
         $Route.memberLow[$low] = $m
         [void]$Route.members.Add($m)
     }

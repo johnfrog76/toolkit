@@ -4,7 +4,7 @@ Standup -- Friday 2 October 2026
 Waiting on you
   Nothing is waiting on you.
 
-Acme-coder-1
+acme-coder-1
   Yesterday  nothing closed
   Today      U9X2 (started) Try the new model
   Blockers   no blockers

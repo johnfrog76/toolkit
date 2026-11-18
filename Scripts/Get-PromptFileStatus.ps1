@@ -297,7 +297,7 @@ function Resolve-P20CardAgent {
         assigned a card with NO Agent line whose **Assigned:** value
                  (Get-P20CardAssigned) names a worker -- a size, which Route
                  -Assign <size> writes on a card with no issue. Read tolerantly:
-                 a key of the map's `current` block is its model, id
+                 a key of the map's `current` block (ignoring case) is its model, id
                  current[size] and family that id's (else the id as written);
                  any other value is the worker as written, id $null and family
                  the value. Empty, rituals.assignMe (`me`, in any case) and an
@@ -360,7 +360,8 @@ function Resolve-P20CardAgent {
             $size = Get-P20CardAssigned -Content $Content
             if (-not $size -or $size -ieq [string]$c.rituals.assignMe -or $size.StartsWith('@')) { continue }
             $id = $null
-            foreach ($k in @($cur.Keys)) { if ([string]$k -ceq $size) { $id = [string]$cur[$k]; break } }
+            # Matched ignoring case, as Get-P20ModelForSize matches a size.
+            foreach ($k in @($cur.Keys)) { if ([string]$k -ieq $size) { $id = [string]$cur[$k]; break } }
             if (-not $id) { return [pscustomobject][ordered]@{ id = $null; family = $size; source = 'assigned' } }
             $family = $id
             foreach ($k in @($map.Keys)) {
