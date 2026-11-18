@@ -148,6 +148,217 @@ function Get-P20ModelInfo {
     return [pscustomobject]@{ id = $mid; known = $true; provider = [string]$row.provider; family = [string]$row.family; name = $name }
 }
 
+# -- Who worked a card: the one reader over its sources --------------------------
+# Resolve-P20CardAgent and its pieces. agent/core/parsers.py's resolve_card_agent,
+# commit_co_authors and git_messages, and agent/core/models.py's
+# model_by_co_author, are the same rules; Tests/fixtures/parsers/agent-source.json
+# holds the two halves to one table (docs/hub/cards.md, "How a card's agent is
+# worked out"). Every piece is pure but Get-P20ModelMap, which reads one file.
+
+function Get-P20ModelMap {
+    <#
+      The model map (consts.json models.file) read ONCE, for a caller that asks
+      about many ids or trailers: an ordered, case-sensitive dictionary of id ->
+      its row, in the file's order. A missing or unreadable file reads as an empty
+      map, never a throw -- every id is then unknown and no trailer names a model.
+      Pass the answer to Resolve-P20CardAgent and Get-P20ModelByCoAuthor as -Models.
+    #>
+    param(
+        # The package root the map's path is relative to; the one consts.json sits in by default.
+        [string]$PackageRoot
+    )
+    $map = New-Object System.Collections.Specialized.OrderedDictionary
+    try {
+        if (-not $PackageRoot) { $PackageRoot = Split-Path (Get-P20ConstsPath) -Parent }
+        $path = Join-Path $PackageRoot ([string](Get-P20Consts).models.file)
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $map }
+        $rows = (Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json).models
+        if ($null -ne $rows) {
+            foreach ($p in @($rows.PSObject.Properties)) { $map[[string]$p.Name] = $p.Value }
+        }
+    } catch {
+        return (New-Object System.Collections.Specialized.OrderedDictionary)
+    }
+    return $map
+}
+
+function ConvertTo-P20ModelMap {
+    <# -Models as a dictionary: $null reads the shipped map (Get-P20ModelMap), a dictionary is kept, an object (a JSON block) becomes one. #>
+    param($Models)
+    if ($null -eq $Models) { return (Get-P20ModelMap) }
+    if ($Models -is [System.Collections.IDictionary]) { return $Models }
+    $map = New-Object System.Collections.Specialized.OrderedDictionary
+    foreach ($p in @($Models.PSObject.Properties)) { $map[[string]$p.Name] = $p.Value }
+    return $map
+}
+
+function Get-P20CommitCoAuthors {
+    <#
+      The names a commit message's Co-Authored-By trailers carry, trimmed, in the
+      order they are written: one per line that matches consts.json
+      regex.coAuthorTrailer (the key in any case -- `Co-Authored-By`,
+      `Co-authored-by` -- and the name before an <email>). A person's name is a
+      name too; whether it names a model is Get-P20ModelByCoAuthor's question.
+      commit_co_authors in the agent.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Message)
+    $names = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($m in [regex]::Matches("$Message", [string](Get-P20Consts).regex.coAuthorTrailer)) {
+        $name = $m.Groups[1].Value.Trim()
+        if ($name) { $names.Add($name) }
+    }
+    return , ([string[]]$names.ToArray())
+}
+
+function Get-P20ModelByCoAuthor {
+    <#
+      The model id whose row's coAuthor is this trailer name -- both trimmed,
+      compared ignoring case -- or $null. A lookup, never a parse: a name no row
+      carries (a person, a model the map does not know) names no model, and a
+      row with no coAuthor is never named by a trailer. -Models is the map
+      (Get-P20ModelMap's answer, or a JSON block); $null reads the shipped one.
+      models.model_by_co_author in the agent.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Name, $Models)
+    $want = "$Name".Trim()
+    if (-not $want) { return $null }
+    $map = ConvertTo-P20ModelMap $Models
+    foreach ($k in @($map.Keys)) {
+        $co = $map[$k].coAuthor
+        if ($null -eq $co) { continue }
+        if ([string]::Equals(([string]$co).Trim(), $want, [System.StringComparison]::OrdinalIgnoreCase)) { return [string]$k }
+    }
+    return $null
+}
+
+function ConvertFrom-P20GitMessages {
+    <#
+      The output of `git log --no-walk=unsorted --ignore-missing
+      --format=%x00%H%x1f%B <hashes>` -> an ordered dictionary of short hash (its
+      first seven characters, lower case) -> the commit's message, its trailing
+      line endings removed. A record with no unit separator, or whose hash is not
+      7 to 40 hex characters, is skipped; a commit given twice keeps the first.
+      Pure: the caller runs git. git_messages in the agent.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Raw)
+    $map = New-Object System.Collections.Specialized.OrderedDictionary
+    foreach ($rec in ("$Raw").Split([char]0)) {
+        $cut = $rec.IndexOf([char]0x1f)
+        if ($cut -lt 0) { continue }
+        $hash = $rec.Substring(0, $cut).Trim().ToLowerInvariant()
+        if ($hash -cnotmatch '^[0-9a-f]{7,40}$') { continue }
+        $key = $hash.Substring(0, 7)
+        if ($map.Contains($key)) { continue }
+        $map[$key] = $rec.Substring($cut + 1).TrimEnd([char]13, [char]10)
+    }
+    return $map
+}
+
+function Resolve-P20CardAgent {
+    <#
+      Who worked a card, worked out every time it is read and never written into
+      it: [pscustomobject]@{ id; family; source }. The sources are tried in
+      -Order (default consts.json models.agentSources) and the first that answers
+      wins:
+
+        line     the card's **Agent:** line (Get-P20CardAgent): id as written;
+                 family from the id's row, else the id as written
+        trailer  only when -Messages is given: the card's own commit bullets
+                 (regex.commitBullet, the squash-merged bullet among them --
+                 distinct by their first seven characters, in bullet order)
+                 looked up in -Messages; each commit votes once for every model
+                 its Co-Authored-By trailers name (Get-P20ModelByCoAuthor), most
+                 votes wins, a tie to the first seen in bullet then trailer
+                 order; a name no row carries is ignored, a hash with no message
+                 skipped
+        label    -Label, the card's issue's worker label, trimmed: id $null,
+                 family the label as written
+        none     a person worked it alone: id and family $null
+
+      An order that leaves none out still ends in it. -Messages is short hash ->
+      message (ConvertFrom-P20GitMessages's answer; a longer key is cut to seven)
+      or $null for not read; -Models the map (Get-P20ModelMap's answer, read once
+      by the caller), $null for the shipped one. resolve_card_agent in the agent.
+    #>
+    param(
+        [AllowEmptyString()][AllowNull()][string]$Content,
+        [AllowEmptyString()][AllowNull()][string]$Label,
+        $Messages,
+        $Models,
+        [string[]]$Order
+    )
+    $c = Get-P20Consts
+    if (-not $PSBoundParameters.ContainsKey('Order') -or $null -eq $Order) {
+        $Order = @($c.models.agentSources | ForEach-Object { [string]$_ })
+    }
+    $map = ConvertTo-P20ModelMap $Models
+    foreach ($source in @($Order)) {
+        if ($source -ceq 'line') {
+            $id = Get-P20CardAgent -Content $Content
+            if (-not $id) { continue }
+            $family = $id
+            foreach ($k in @($map.Keys)) {
+                if ([string]$k -ceq $id) {
+                    $f = $map[$k].family
+                    if ($f) { $family = [string]$f }
+                    break
+                }
+            }
+            return [pscustomobject][ordered]@{ id = $id; family = $family; source = 'line' }
+        }
+        if ($source -ceq 'trailer') {
+            if ($null -eq $Messages) { continue }
+            $msgs = @{}
+            $pairs = @()
+            if ($Messages -is [System.Collections.IDictionary]) {
+                foreach ($k in @($Messages.Keys)) { $pairs += , @([string]$k, $Messages[$k]) }
+            } else {
+                foreach ($p in @($Messages.PSObject.Properties)) { $pairs += , @([string]$p.Name, $p.Value) }
+            }
+            foreach ($pair in $pairs) {
+                $key = $pair[0].Trim().ToLowerInvariant()
+                if ($key.Length -gt 7) { $key = $key.Substring(0, 7) }
+                if ($key -and -not $msgs.ContainsKey($key)) { $msgs[$key] = [string]$pair[1] }
+            }
+            $hashes = New-Object 'System.Collections.Generic.List[string]'
+            foreach ($m in [regex]::Matches("$Content", [string]$c.regex.commitBullet)) {
+                $key = $m.Groups[1].Value.ToLowerInvariant()
+                if ($key.Length -gt 7) { $key = $key.Substring(0, 7) }
+                if (-not $hashes.Contains($key)) { $hashes.Add($key) }
+            }
+            $votes = New-Object 'System.Collections.Generic.Dictionary[string,int]'
+            $seen = New-Object 'System.Collections.Generic.List[string]'
+            foreach ($h in $hashes) {
+                if (-not $msgs.ContainsKey($h)) { continue }
+                $named = New-Object 'System.Collections.Generic.List[string]'
+                $names = Get-P20CommitCoAuthors -Message $msgs[$h]
+                foreach ($name in $names) {
+                    $mid = Get-P20ModelByCoAuthor -Name $name -Models $map
+                    if ($mid -and -not $named.Contains($mid)) { $named.Add($mid) }
+                }
+                foreach ($mid in $named) {
+                    if ($votes.ContainsKey($mid)) { $votes[$mid] = $votes[$mid] + 1 }
+                    else { $votes[$mid] = 1; $seen.Add($mid) }
+                }
+            }
+            if ($seen.Count -eq 0) { continue }
+            $best = $seen[0]
+            foreach ($mid in $seen) { if ($votes[$mid] -gt $votes[$best]) { $best = $mid } }
+            $family = $best
+            $f = $map[$best].family
+            if ($f) { $family = [string]$f }
+            return [pscustomobject][ordered]@{ id = $best; family = $family; source = 'trailer' }
+        }
+        if ($source -ceq 'label') {
+            $l = "$Label".Trim()
+            if (-not $l) { continue }
+            return [pscustomobject][ordered]@{ id = $null; family = $l; source = 'label' }
+        }
+        if ($source -ceq 'none') { break }
+    }
+    return [pscustomobject][ordered]@{ id = $null; family = $null; source = 'none' }
+}
+
 function Get-P20CardLineValue {
     <#
       The value of a card's FIRST `<stamp> value` line, trimmed: @{ Present; Value }.

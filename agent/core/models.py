@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import functools
 import json
+from pathlib import Path
 
 from .consts import CONSTS_PATH, models_file
 
@@ -47,3 +48,36 @@ def model_info(model_id: str | None) -> dict:
         "family": row.get("family"),
         "name": row.get("name") or mid,
     }
+
+
+def read_model_map(path=None) -> dict[str, dict]:
+    """The map's rows by id, for the readers that must never throw: a missing or
+    unreadable file reads as an empty map, so every id is unknown and no trailer
+    names a model. ``path`` defaults to the package's model map. The mirror of
+    ``Get-P20ModelMap``."""
+    target = CONSTS_PATH.parent / models_file() if path is None else path
+    try:
+        rows = json.loads(Path(target).read_text(encoding="utf-8-sig")).get("models")
+    except (OSError, ValueError, AttributeError):
+        return {}
+    return rows if isinstance(rows, dict) else {}
+
+
+def model_by_co_author(name: str | None, models: dict[str, dict] | None = None) -> str | None:
+    """The model id whose row's ``coAuthor`` is this trailer name -- both trimmed,
+    compared ignoring case -- or None.
+
+    A lookup, never a parse: a name no row carries (a person, a model the map
+    does not know) names no model, and a row with no ``coAuthor`` is never named
+    by a trailer. ``models`` is the map; None reads the shipped one. The mirror of
+    ``Get-P20ModelByCoAuthor``; ``Tests/fixtures/parsers/agent-source.json`` holds
+    the two to one table."""
+    want = (name or "").strip().lower()
+    if not want:
+        return None
+    rows = read_model_map() if models is None else models
+    for mid, row in rows.items():
+        co = row.get("coAuthor") if isinstance(row, dict) else None
+        if co is not None and str(co).strip().lower() == want:
+            return mid
+    return None

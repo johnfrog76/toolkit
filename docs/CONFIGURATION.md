@@ -737,6 +737,10 @@ checkout; `env.testHistoryDir`, `P20_TEST_HISTORY_DIR`, the override the test ru
 and `agent/core/log.py` compute it by one rule, held to `Tests/fixtures/test-history/paths.json` --
 [Testing, "Where the record lives"](TESTING.md#where-the-record-lives)),
 and **the package's own repository** (`repository.url`: what the agent compares a Space's repository with when the package has no git origin to read, so ToolKit connected to itself still reads as itself on the Prompts card -- a checkout's origin wins when it is there),
+and **how a card's agent is worked out** (`models.file`, the model map `Config/models.json`; `models.agentSources`,
+`["line", "trailer", "label", "none"]`, the order the sources are tried in, so changing the order is one edit here;
+and `regex.coAuthorTrailer`, a commit's `Co-Authored-By` trailer with the key in any case -- `Resolve-P20CardAgent`
+and `resolve_card_agent` read all three, see [the card](hub/cards.md), "How a card's agent is worked out"),
 and **the product's version** (`version`, the one top-level value that is not a group: `Env` prints it
 in its first block, `GET /api/env` serves it and the System page's Environment card shows it).
 Two files carry a copy because they must hold their own literal -- `ModuleVersion` in

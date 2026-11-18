@@ -200,6 +200,66 @@ class StatusMetadataTests(unittest.TestCase):
             with self.subTest(row=row["name"]):
                 self.assertEqual(model_info(row["id"]), row["expected"])
 
+    def test_who_worked_a_card_by_its_sources_by_the_shared_table(self):
+        """The one reader of a card's agent (docs/hub/cards.md, "How a card's agent
+        is worked out"): its Agent line, else its commits' Co-Authored-By trailers,
+        else its issue's worker label, else none -- in the order consts.json
+        models.agentSources names, and under any order a row states. The CLI's
+        Resolve-P20CardAgent and its pieces assert the SAME table,
+        Tests/fixtures/parsers/agent-source.json, against the table's own model map."""
+        import json
+
+        from agent.core.consts import model_agent_sources
+        from agent.core.models import model_by_co_author
+        from agent.core.parsers import commit_co_authors, git_messages, resolve_card_agent
+
+        table = json.loads((FIXTURES / "agent-source.json").read_text(encoding="utf-8"))
+        models = table["models"]
+        self.assertGreaterEqual(len(table["rows"]), 20)
+        self.assertEqual(model_agent_sources(), ("line", "trailer", "label", "none"))
+        orders = {tuple(r["order"]) for r in table["rows"] if "order" in r}
+        self.assertIn(("line", "trailer", "label", "none"), orders)
+        self.assertIn(("line", "label", "trailer", "none"), orders)
+        for source in ("line", "trailer", "label", "none"):
+            self.assertTrue(any(r["expected"]["source"] == source for r in table["rows"]), source)
+        for row in table["rows"]:
+            with self.subTest(row=row["name"]):
+                eol = "\r\n" if row["crlf"] else "\n"
+                text = eol.join(row["lines"]) + eol
+                got = resolve_card_agent(text, row["label"], row["messages"], models, row.get("order"))
+                self.assertEqual(got, row["expected"])
+        for row in table["coAuthors"]:
+            with self.subTest(coAuthors=row["name"]):
+                self.assertEqual(commit_co_authors(row["message"]), row["expected"])
+        for row in table["byCoAuthor"]:
+            with self.subTest(byCoAuthor=row["name"]):
+                self.assertEqual(model_by_co_author(row["name"], models), row["expected"])
+        for row in table["gitLog"]:
+            with self.subTest(gitLog=row["name"]):
+                self.assertEqual(git_messages(row["raw"]), row["expected"])
+
+    def test_a_missing_or_unreadable_model_map_reads_as_empty(self):
+        """The trailer source must never throw on a machine whose map is gone or
+        broken: the map reads as empty, and no trailer names a model."""
+        from agent.core.models import model_by_co_author, read_model_map
+        from agent.core.parsers import resolve_card_agent
+
+        with tempfile.TemporaryDirectory() as tmp:
+            missing = Path(tmp) / "models.json"
+            self.assertEqual(read_model_map(missing), {})
+            broken = Path(tmp) / "broken.json"
+            broken.write_text("{ not json", encoding="utf-8")
+            self.assertEqual(read_model_map(broken), {})
+            listed = Path(tmp) / "list.json"
+            listed.write_text("[1, 2]", encoding="utf-8")
+            self.assertEqual(read_model_map(listed), {})
+        self.assertIsNone(model_by_co_author("Claude Opus 5.5", {}))
+        card = "# Task K7M2: x\n\n- 1a2b3c4 one\n"
+        msgs = {"1a2b3c4": "One\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"}
+        self.assertEqual(resolve_card_agent(card, "", msgs, {}), {"id": None, "family": None, "source": "none"})
+        # The shipped map knows the shipped trailer: the default reads it.
+        self.assertEqual(resolve_card_agent(card, "", msgs)["source"], "trailer")
+
     def test_the_meeting_a_card_came_from_by_the_shared_table(self):
         """The `**From:**` footer line (docs/hub/cards.md, consts.json stamps.from):
         the meeting record an agenda line came from, by its file stem. NewPrompt -From

@@ -215,6 +215,27 @@ written with semicolons (`Tags: enhancement; sev3`) -- as an Azure DevOps work i
 as `NewPrompt` and `StartWork` join a GitHub issue's labels -- reads as two tags, and a line
 with both separators reads every tag; `Tag` rewrites the line it changes with commas.
 
+### How a card's agent is worked out
+
+Which model worked a card is worked out every time it is read, and **nothing is written into the card**. One
+reader a half does it -- `Resolve-P20CardAgent` in `Scripts/Get-PromptFileStatus.ps1` and `resolve_card_agent()`
+in `agent/core/parsers.py`, held to one table, `Tests/fixtures/parsers/agent-source.json` -- and it answers
+with the model's id (or none), its family, and the source the answer came from. The sources are tried in
+the order `consts.json` `models.agentSources` names, `line`, `trailer`, `label`, `none`, and the first
+that answers wins:
+
+| Source | Reads | Answers |
+| --- | --- | --- |
+| `line` | the card's first `**Agent:**` line (`stamps.agent`) | the id as written; the family from the id's row in `Config/models.json`, else the id as written. An empty line does not answer |
+| `trailer` | the commits the card's own bullets name (`regex.commitBullet`, the `#<n> squash-merged` bullet among them, each commit once by its first seven characters), when the caller has read their messages | each commit votes once for every model its `Co-Authored-By` trailers name (`regex.coAuthorTrailer`, the key in any case); most votes wins, a tie to the first seen in bullet then trailer order. A trailer name is looked up in the map's `coAuthor`, trimmed and ignoring case, never parsed: a person's name, or a model the map does not know, names nothing |
+| `label` | the card's issue's worker label, as the caller passes it | no id; the family is the label as written |
+| `none` | -- | no id and no family: a person worked the card alone |
+
+The caller supplies what is not in the card: the label, and the commit messages, as one
+`git log --no-walk=unsorted --ignore-missing --format=%x00%H%x1f%B <hashes>` read parsed by
+`ConvertFrom-P20GitMessages` / `git_messages()`. With no messages the trailer source is skipped, not
+guessed. A missing or unreadable model map reads as empty, so the reader never throws for it.
+
 ### A card's pictures -- `<space>/assets/`
 
 A card can carry a picture: a screen snap of what was wrong (`**Before:**`) and of what landed
