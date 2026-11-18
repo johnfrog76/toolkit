@@ -667,6 +667,15 @@ def rituals_team_size_default() -> int:
     return int(consts()["rituals"]["teamSizeDefault"])
 
 
+def rituals_room() -> dict:
+    """The standup's room (docs/modules/solitaire-agile.md, "The team size: who is
+    in the room"): ``windows``, the nine windows in grid order, each a cast ``id``
+    and the ``plate`` its persona wears; ``chair``, the cast id whose window is the
+    chair's; ``kept``, a worker label -> the window it keeps; ``engineer``, the
+    window the engineer takes when no member owns it."""
+    return consts()["rituals"]["room"]
+
+
 # -- The dress (D-SA11) ---------------------------------------------------
 
 

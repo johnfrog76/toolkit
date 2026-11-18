@@ -345,6 +345,18 @@ the chair does not yet say who is out.
 
 **Issue:** [#389](https://github.com/johnfrog76/toolkit/issues/389)
 
+### The played standup seats the record, not the room
+
+**What you see:** A Space's team size is how many people are in its standup, and the terminal's round fills every seat:
+the engineer, the labelled workers, then invented cast members. The played view on the Team Agile page seats only the
+labelled workers and the engineer. A window an invented member sits in is drawn as an empty desk, that member has no
+turn, and the engineer speaks after the labelled workers and not first. A Space with no worker labels shows the chair,
+the engineer and seven empty desks at every size.
+
+**Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
+
+**Issue:** [#465](https://github.com/johnfrog76/toolkit/issues/465)
+
 ### The standup's prose reads no age, pull request or assignee
 
 **What you see:** *Blocked* is only the blockers slot, an open, routed `verify-close` issue waiting on your walk: a

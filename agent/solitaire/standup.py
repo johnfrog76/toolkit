@@ -87,6 +87,7 @@ from ..core.consts import (
     rituals_motions,
     rituals_number_words,
     rituals_prose_fold_names,
+    rituals_room,
     rituals_route,
     rituals_team_size_default,
     rituals_team_sizes,
@@ -223,7 +224,7 @@ class Worker(BaseModel):
     # The empty worker's two made-up items, [yesterday, today]: the `nothing` and
     # `nothingToday` families (``set_idle``); [] for a worker with something to say.
     status: list[str] = []
-    # In the room today (``set_present``): the round -- the work grain, the stage --
+    # In the room today (``seat_room``): the round -- the work grain, the stage --
     # speaks the present only; the ledger -- the detail, the counts, the brief --
     # keeps every worker. True for a reader that knows nothing of the room.
     present: bool = True
@@ -257,6 +258,10 @@ class WorkWorker(BaseModel):
     # made-up items instead), proseBlockersNone when nothing blocks it, then
     # turnClose. Empty only when there is nothing to say.
     prose: list[str] = []
+    # An invented cast member (``seat_room``): it fills a seat the team size counts
+    # and no member takes. Its label is its cast id, its name the plate; it is in
+    # the round only -- never in ``workers``, the counts or the brief.
+    cast: bool = False
 
 
 class Work(BaseModel):
@@ -445,6 +450,12 @@ class Standup(BaseModel):
     # What kind each item is: ref -> its label names (an issue) or its
     # type (a card), read against the ceremony's kinds. Not served.
     _marks: dict[str, list[str]] = PrivateAttr(default_factory=dict)
+    # The round (``seat_room``): who speaks, in seat order -- the seated members,
+    # then the invented cast members, the last ``_invented`` of it. None for a
+    # standup nobody seated: the round is then the present workers, in their order.
+    # Not served: ``work.workers`` is the round as the response carries it.
+    _round: list[Worker] | None = PrivateAttr(default=None)
+    _invented: int = PrivateAttr(default=0)
 
 
 # -- The rule -----------------------------------------------------------------
@@ -688,17 +699,19 @@ def issue_keys(issues: list[dict]) -> dict[str, tuple[str, str]]:
     }
 
 
-def set_idle(workers: list[Worker], d: int, words: dict) -> None:
+def set_idle(workers: list[Worker], d: int, words: dict, start: int = 0) -> None:
     """The idle worker's turn: each of ``workers`` (in order) that is ``empty``
     says two made-up items, ``status = [yesterday, today]`` --
     ``nothing[(d + i) mod len]`` and ``nothingToday[(d + i) mod len2]``, ``d`` the
     day of the year (1-based), ``i`` the worker's position among ``workers``
-    (0-based). The two lengths share no factor, so the pair does not repeat in
+    (0-based) after ``start`` -- the places before it are someone else's (the
+    record's, when ``workers`` are the invented cast members: ``seat_room``).
+    The two lengths share no factor, so the pair does not repeat in
     step. ``excuse`` is the first of the two, for a reader that knows only that
     field. A worker with something to say gets ``""`` and ``[]``. With either
     family empty, no worker says a made-up item. The mirror of ``Set-P20StandupIdle``."""
     yesterday, today = words.get("nothing") or [], words.get("nothingToday") or []
-    for i, w in enumerate(workers):
+    for i, w in enumerate(workers, start):
         w.excuse, w.status = "", []
         if w.empty and yesterday and today:
             w.status = [yesterday[(d + i) % len(yesterday)], today[(d + i) % len(today)]]
@@ -715,17 +728,97 @@ def team_size(stored) -> int:
     return rituals_team_size_default()
 
 
-def set_present(workers: list[Worker], size: int) -> None:
-    """Who is in the room today. The room is ``size`` windows, the chair's one of
-    them, so ``size - 1`` workers sit. Every worker stays and gets ``present``:
-    the workers with something to say (a yesterday, today or blockers item --
-    not ``empty``) take the seats first, then the idle, each run in the order of
-    ``workers`` (the label order, the card tile last); the rest are absent. The
-    mirror of ``Set-P20StandupPresent``; standup-team.json's ``seats`` rows."""
+def room_seats(size: int, engineer: tuple[str, bool] | None, labels: list[tuple[str, bool]]) -> dict:
+    """The room, from who there is. Pure over plain data; the mirror of
+    ``Get-P20StandupRoomSeats``; standup-team.json's ``room`` rows.
+
+    ``size`` is the room's windows, the chair's one of them, so ``size - 1``
+    members sit. ``engineer`` is ``(label, empty)`` or None for a fill with no
+    engineer; ``labels`` the labelled workers as ``(label, empty)``, in label order.
+
+    - The seats go to the engineer, then the labelled workers with something to
+      say, then the idle ones, each run in label order. Whoever is past the seats
+      is absent.
+    - A seat nobody takes is filled by an invented cast member: the member
+      windows nobody sits in, in grid order (``rituals.room.windows``, the chair's
+      left out), each labelled with its cast id.
+    - A window is a member's own when its label is a key of ``rituals.room.kept``
+      or is itself a member window's cast id (compared in lowercase). A seated
+      member sits in its own window; an absent one keeps it empty. The engineer
+      otherwise takes ``rituals.room.engineer`` when no member of the record owns
+      it. Everyone else is dealt the free windows in grid order -- the engineer
+      first, then the labels in their order -- and takes a window an absent
+      member keeps only when the free ones run out.
+
+    Returns ``present`` (the labels seated, in seat order), ``round`` (each
+    speaker in turn order: ``label``, ``cast``, ``window``) and ``desks`` (the
+    member windows left empty, in grid order)."""
+    room = rituals_room()
+    members = [w["id"] for w in room["windows"] if w["id"] != room["chair"]]
+    kept = room["kept"]
+
+    def own(label: str) -> str:
+        low = label.lower()
+        return kept.get(low) or (low if low in members else "")
+
     seats = max(size - 1, 0)
-    order = [w for w in workers if not w.empty] + [w for w in workers if w.empty]
-    for i, w in enumerate(order):
-        w.present = i < seats
+    people = ([engineer] if engineer else []) + list(labels)
+    order = (
+        ([engineer[0]] if engineer else [])
+        + [label for label, empty in labels if not empty]
+        + [label for label, empty in labels if empty]
+    )
+    seated = order[:seats]
+    reserved = {own(label) for label, _ in people if own(label)}
+    window: dict[str, str] = {}
+    dealing = [label for label, _ in people if label in seated]
+    for label in dealing:
+        if own(label) and own(label) not in window.values():
+            window[label] = own(label)
+    if engineer and engineer[0] in seated and engineer[0] not in window and room["engineer"] not in reserved:
+        window[engineer[0]] = room["engineer"]
+    taken = set(window.values())
+    opened = [m for m in members if m not in reserved and m not in taken]
+    opened += [m for m in members if m in reserved and m not in taken]
+    for label in dealing:
+        if label not in window:
+            window[label] = opened.pop(0)
+    taken = set(window.values())
+    invented = [m for m in members if m not in taken and m not in reserved][: max(seats - len(seated), 0)]
+    spoken = [{"label": label, "cast": False, "window": window[label]} for label in seated]
+    spoken += [{"label": m, "cast": True, "window": m} for m in invented]
+    filled = taken | set(invented)
+    return {"present": seated, "round": spoken, "desks": [m for m in members if m not in filled]}
+
+
+def seat_room(out: Standup, engineer: Worker | None, d: int, words: dict) -> None:
+    """Seat ``out``: the team size is the team. ``out.workers`` is the record --
+    the labelled workers in label order, then ``engineer`` (the card tile) when
+    the fill has one -- and it is kept whole: each member gets its made-up items
+    when idle (``set_idle``, by its place in the record) and ``present`` by
+    ``room_seats``. The round (``out._round``) is who speaks, in seat order: the
+    seated members, then the invented cast members that fill the seats left --
+    each an idle worker named by its plate, its made-up items picked at the
+    places after the record's last. The mirror of ``Set-P20StandupRoom``."""
+    set_idle(out.workers, d, words)
+    labels = [w for w in out.workers if w is not engineer]
+    room = room_seats(
+        out.team.size,
+        (engineer.label, engineer.empty) if engineer is not None else None,
+        [(w.label, w.empty) for w in labels],
+    )
+    by_label: dict[str, Worker] = {}
+    for w in ([engineer] if engineer is not None else []) + labels:
+        by_label.setdefault(w.label, w)
+    seated = [by_label[label] for label in room["present"]]
+    for w in out.workers:
+        w.present = any(w is s for s in seated)
+    plates = {w["id"]: w["plate"] for w in rituals_room()["windows"]}
+    invented = [Worker(label=r["label"], name=plates[r["label"]], empty=True) for r in room["round"] if r["cast"]]
+    # Their made-up items follow the record's: the same picker, the places after it.
+    set_idle(invented, d, words, start=len(out.workers))
+    out._round = seated + invented
+    out._invented = len(invented)
 
 
 def fill_standup(
@@ -744,7 +837,8 @@ def fill_standup(
     labels and issues are not read -- the ritual is the chair's lines and the reason.
     ``window`` is ``since``'s day (``window_start``); "" is the previous working day.
     ``size`` is the Space's ``features.teamSize`` as stored (``team_size`` reads it):
-    the response's ``team.size``, and who is present (``set_present``).
+    the response's ``team.size``, and who is in the room (``seat_room``). This fill
+    has no engineer: the seats its labels leave are the invented cast members'.
     """
     words = vocabulary()
     phrasebook = words["phrasebook"]
@@ -805,8 +899,7 @@ def fill_standup(
     out.workers = [workers[label] for label, _ in routes]
     for w in out.workers:
         w.empty = not (w.yesterday or w.today or w.blockers)
-    set_idle(out.workers, d, words)
-    set_present(out.workers, out.team.size)
+    seat_room(out, None, d, words)
     out.work = build_work(out, key_of)
     out.counts = standup_counts(out, {})
     return out
@@ -1019,9 +1112,8 @@ def fill_cards_standup(
     worker.empty = not (worker.yesterday or worker.today or worker.blockers)
     out.queue = Queue(walk=walk)
     out.workers = [worker]
-    # The tile is a worker like any other: its made-up items are picked by its position.
-    set_idle(out.workers, d, words)
-    set_present(out.workers, out.team.size)
+    # The tile is the engineer: the first seat, and the record's one member.
+    seat_room(out, worker, d, words)
     out.work = build_work(out, key_of)
     out.counts = standup_counts(out, hashes)
     return out
@@ -1040,9 +1132,10 @@ def fill_cards_standup(
 #     else the archived one closed last.
 #   any other card -- an id of its own, or a number the read has no issue for --
 #     is its own row, under you: one tile labelled with the Space's slug and
-#     named for it, by the cards fill's mapping, after the worker tiles, and
-#     only when it has something to say. Its Code Review cards follow the
-#     issues on the walk.
+#     named for it, by the cards fill's mapping, after the worker tiles. The
+#     tile is the engineer, and it is always there: with no card to say, it is
+#     idle, as a labelled worker with nothing routed is. Its Code Review cards
+#     follow the issues on the walk.
 #   a linked card whose issue got no slot at all (no worker label, so the
 #     issues fill placed it nowhere) still gives the issue its link and its
 #     row stays the issue's alone -- but when that card is itself in
@@ -1143,10 +1236,10 @@ def fill_joined_standup(
     tile, walk, card_keys, tile_hashes, tile_undated = _cards_tile(
         as_of, tile_cards, space, space_name or space, out._marks, since, commit_dates
     )
-    if tile.yesterday or tile.today or tile.blockers:
-        out.workers.append(tile)
-    # The card tile is a member like the labels: seated by the same rule, after them.
-    set_present(out.workers, out.team.size)
+    # The engineer is always in the room: the record's last member, the first seat.
+    tile.empty = not (tile.yesterday or tile.today or tile.blockers)
+    out.workers.append(tile)
+    seat_room(out, tile, as_of.timetuple().tm_yday, vocabulary())
     out.queue.walk.extend(walk)
     out.work = build_work(out, {**issue_keys(issues), **card_keys}, dated=commit_dates is not None)
     out.counts = standup_counts(out, {**hashes, **tile_hashes}, {**undated, **tile_undated})
@@ -1386,8 +1479,12 @@ def build_work(filled: Standup, key_of: dict[str, tuple[str, str]], dated: bool 
         queue[kind], said = groups(getattr(filled.queue, kind), kind)
         queue_prose += said
     workers = []
-    # The round speaks the present only (``set_present``): an absent worker has no row.
-    for w in (w for w in filled.workers if w.present):
+    # The round (``seat_room``): the seated members in seat order, then the invented
+    # cast members. An absent worker has no row. A standup nobody seated speaks
+    # its present workers, in their order.
+    speakers = filled._round if filled._round is not None else [w for w in filled.workers if w.present]
+    first_cast = len(speakers) - filled._invented
+    for at, w in enumerate(speakers):
         slots: dict[str, list[WorkGroup]] = {}
         sentences: dict[str, list[str]] = {}
         for slot in cer["slots"]:
@@ -1406,7 +1503,7 @@ def build_work(filled: Standup, key_of: dict[str, tuple[str, str]], dated: bool 
             }
             worked = [r for slot in cer["slots"] for g in slots[slot] for r in g.refs if r in mine]
             said = [x for slot in cer["slots"] for x in (sentences[slot] or prose_unsaid(slot, worked))]
-        workers.append(WorkWorker(label=w.label, name=w.name, prose=prose_turn(said), **slots))
+        workers.append(WorkWorker(label=w.label, name=w.name, prose=prose_turn(said), cast=at >= first_cast, **slots))
     chair = chair_turn(filled, queue) if filled.tracker.ok else []
     return Work(queue=WorkQueue(**queue), workers=workers, queueProse=queue_prose, chairProse=chair)
 
@@ -1577,7 +1674,9 @@ def chair_turn(filled: Standup, queue: dict[str, list[WorkGroup]]) -> list[str]:
     d = datetime.fromisoformat(filled.asOf).timetuple().tm_yday
     walked = [f"#{i.number}" for i in filled.chair.walked]
     today = chair_today({kind: [g.refs for g in groups] for kind, groups in queue.items()})
-    said = [x for x in (chair_yesterday(walked, d, len(filled.workers)), today) if x]
+    # Its made-up yesterday is picked at the place after the last member's: the
+    # record's, then the invented cast members'.
+    said = [x for x in (chair_yesterday(walked, d, len(filled.workers) + filled._invented), today) if x]
     return prose_turn([*said, rituals_text()["proseBlockersNone"]])
 
 
@@ -1740,7 +1839,9 @@ def dress_facts(filled: Standup) -> list[dict]:
     by_label = {w.label: w for w in filled.workers}
     facts: list[dict] = []
     for ww in filled.work.workers:
-        w = by_label.get(ww.label)
+        # An invented cast member says made-up items only, and its label is a cast
+        # id, which a worker label may also be: it is never read against the record.
+        w = None if ww.cast else by_label.get(ww.label)
         if w is None or w.empty:
             continue
         # The turn opens on turnOpen, which is the frame's and not dressed.
@@ -2101,8 +2202,9 @@ def render_work(filled: Standup) -> str:
     form's frame -- the title, the chair's lines, the Tracker line when nothing
     answered -- with ONE line for the queue (its sentences, or queueEmpty when it
     has none), one per PRESENT worker (its name, then its turn: turnOpen, its
-    sentences, turnClose; an idle worker's are its two made-up items; an absent
-    worker says nothing -- ``set_present``), and the chair's own
+    sentences, turnClose; an idle worker's are its two made-up items, and so are
+    an invented cast member's; an absent worker says nothing -- ``seat_room``),
+    in seat order, and the chair's own
     turn last (``chairProse``: its own voice, in the same frame). An empty slot
     beside a filled one says its fixed line (``prose_unsaid``). LF-joined and LF-terminated. Pure; the mirror of
     ``Format-P20StandupWork``, held by the ``standup-prose-*.txt`` goldens."""
@@ -2117,15 +2219,12 @@ def render_work(filled: Standup) -> str:
         said = filled.work.queueProse
         lines.append(" ".join(said) if said else t["queueEmpty"])
         lines.append("")
-        if not filled.workers:
+        if not filled.work.workers:
             lines.append(t["noWorkers"])
-        grained = {w.label: w for w in filled.work.workers}
-        for w in filled.workers:
-            # An absent worker is not in today's round: no line, not even its name.
-            if not w.present:
-                continue
-            ww = grained.get(w.label)
-            lines.append(f"{w.name}: {' '.join(ww.prose if ww else [])}")
+        # The round, in seat order: an absent worker is not in it, so it has no
+        # line, not even its name; an invented cast member has one.
+        for ww in filled.work.workers:
+            lines.append(f"{ww.name}: {' '.join(ww.prose)}")
         if filled.checks:
             lines.append("")
             lines += [f"{t['check']}: {c}" for c in filled.checks]

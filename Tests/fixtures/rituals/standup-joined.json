@@ -23,7 +23,8 @@
         "walk": [],
         "workers": [
           { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 15, "nothingTodayIndex": 9 },
-          { "label": "opus", "name": "Opus", "yesterday": [], "today": ["#141"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null }
+          { "label": "opus", "name": "Opus", "yesterday": [], "today": ["#141"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null },
+          { "label": "widgets", "name": "Widgets", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 17, "nothingTodayIndex": 11 }
         ],
         "checks": [],
         "links": [{ "number": 141, "id": "141", "lane": "In Progress" }],
@@ -43,7 +44,8 @@
         "walk": [],
         "workers": [
           { "label": "fable", "name": "Fable", "yesterday": [], "today": ["#142"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null },
-          { "label": "opus", "name": "Opus", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 16, "nothingTodayIndex": 10 }
+          { "label": "opus", "name": "Opus", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 16, "nothingTodayIndex": 10 },
+          { "label": "widgets", "name": "Widgets", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 17, "nothingTodayIndex": 11 }
         ],
         "checks": [{ "key": "checkCardArchived", "item": "#142 Port the cast atoms" }],
         "links": [{ "number": 142, "id": "142", "lane": "Done" }],
@@ -63,7 +65,8 @@
         "walk": [],
         "workers": [
           { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 15, "nothingTodayIndex": 9 },
-          { "label": "opus", "name": "Opus", "yesterday": ["#143"], "today": [], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null }
+          { "label": "opus", "name": "Opus", "yesterday": ["#143"], "today": [], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null },
+          { "label": "widgets", "name": "Widgets", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 17, "nothingTodayIndex": 11 }
         ],
         "checks": [{ "key": "checkIssueClosed", "item": "#143 Rename the slug" }],
         "links": [{ "number": 143, "id": "143", "lane": "Code Review" }],
@@ -126,7 +129,8 @@
         "walk": [],
         "workers": [
           { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 15, "nothingTodayIndex": 9 },
-          { "label": "opus", "name": "Opus", "yesterday": [], "today": ["#144"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null }
+          { "label": "opus", "name": "Opus", "yesterday": [], "today": ["#144"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null },
+          { "label": "widgets", "name": "Widgets", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 17, "nothingTodayIndex": 11 }
         ],
         "checks": [],
         "links": [],
@@ -147,7 +151,8 @@
         "walk": [],
         "workers": [
           { "label": "fable", "name": "Fable", "yesterday": [], "today": ["#145"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null },
-          { "label": "opus", "name": "Opus", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 16, "nothingTodayIndex": 10 }
+          { "label": "opus", "name": "Opus", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 16, "nothingTodayIndex": 10 },
+          { "label": "widgets", "name": "Widgets", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 17, "nothingTodayIndex": 11 }
         ],
         "checks": [],
         "links": [],
@@ -261,7 +266,8 @@
         "walk": [],
         "workers": [
           { "label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 15, "nothingTodayIndex": 9 },
-          { "label": "opus", "name": "Opus", "yesterday": [], "today": ["#155"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null }
+          { "label": "opus", "name": "Opus", "yesterday": [], "today": ["#155"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null },
+          { "label": "widgets", "name": "Widgets", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 17, "nothingTodayIndex": 11 }
         ],
         "checks": [],
         "links": [],
@@ -269,7 +275,8 @@
         "counts": {
           "workers": [
             { "label": "fable", "closed": 0, "started": 0, "inProgress": 0, "commits": 0 },
-            { "label": "opus", "closed": 0, "started": 0, "inProgress": 1, "commits": 0 }
+            { "label": "opus", "closed": 0, "started": 0, "inProgress": 1, "commits": 0 },
+            { "label": "widgets", "closed": 0, "started": 0, "inProgress": 0, "commits": 0 }
           ],
           "total": { "closed": 0, "started": 0, "inProgress": 1, "commits": 0 }
         },
@@ -361,7 +368,8 @@
         "walk": [],
         "workers": [
           {"label": "fable", "name": "Fable", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 15, "nothingTodayIndex": 9},
-          {"label": "opus", "name": "Opus", "yesterday": [], "today": ["#171"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null}
+          {"label": "opus", "name": "Opus", "yesterday": [], "today": ["#171"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null},
+          {"label": "widgets", "name": "Widgets", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 17, "nothingTodayIndex": 11}
         ],
         "checks": [],
         "links": [],
@@ -369,7 +377,8 @@
         "counts": {
           "workers": [
             {"label": "fable", "closed": 0, "started": 0, "inProgress": 0, "commits": 0},
-            {"label": "opus", "closed": 0, "started": 1, "inProgress": 0, "commits": 0}
+            {"label": "opus", "closed": 0, "started": 1, "inProgress": 0, "commits": 0},
+            {"label": "widgets", "closed": 0, "started": 0, "inProgress": 0, "commits": 0}
           ],
           "total": {"closed": 0, "started": 1, "inProgress": 0, "commits": 0}
         },
@@ -392,7 +401,8 @@
         "walk": [],
         "workers": [
           {"label": "fable", "name": "Fable", "yesterday": [], "today": ["#172", "#173"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null},
-          {"label": "opus", "name": "Opus", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 16, "nothingTodayIndex": 10}
+          {"label": "opus", "name": "Opus", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 16, "nothingTodayIndex": 10},
+          {"label": "widgets", "name": "Widgets", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 17, "nothingTodayIndex": 11}
         ],
         "checks": [],
         "links": [{"number": 173, "id": "173", "lane": "In Progress"}],
@@ -400,7 +410,8 @@
         "counts": {
           "workers": [
             {"label": "fable", "closed": 0, "started": 0, "inProgress": 2, "commits": 0},
-            {"label": "opus", "closed": 0, "started": 0, "inProgress": 0, "commits": 0}
+            {"label": "opus", "closed": 0, "started": 0, "inProgress": 0, "commits": 0},
+            {"label": "widgets", "closed": 0, "started": 0, "inProgress": 0, "commits": 0}
           ],
           "total": {"closed": 0, "started": 0, "inProgress": 2, "commits": 0}
         },

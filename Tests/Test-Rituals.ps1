@@ -41,7 +41,11 @@
                      and every case's team.size, present flags and detail, work
                      and brief against standup-team-<name>*.txt -- the rows the
                      agent asserts; typed, teamSize=3 in the hub keeps every
-                     worker and speaks the present only.
+                     worker and speaks the present only. The room's rules over
+                     every room row and every case: the size seen is the size
+                     picked, everyone speaks (an idle member its made-up pair),
+                     the desks are past the size, the engineer sits; and a day
+                     with no work is a case at every size.
     2d. The dress    Tests/fixtures/rituals/standup-dress.json: every
                      row of the dress guard (a dressed sentence and its group's
                      facts in, kept or the guard it fails out), every group's
@@ -597,7 +601,30 @@ $fridayCase = @($cases | Where-Object { $_.name -eq 'friday' })[0]
 $fridayAsOf = $asOfTexts[[array]::IndexOf(@($cases | ForEach-Object { $_.name }), 'friday')]
 $aloneFill = Invoke-P20StandupFill -AsOf $fridayAsOf -Labels @($fixture.workerLabels) -Issues @($fridayCase.issues) -Tracker @{ ok = $true; reason = '' } -Space 'toolkit' -PackageRoot $pkgRoot
 $joinedFill = Invoke-P20StandupJoinedFill -AsOf $fridayAsOf -Labels @($fixture.workerLabels) -Issues @($fridayCase.issues) -Tracker @{ ok = $true; reason = '' } -Cards @() -Space 'toolkit' -SpaceName 'Toolkit' -PackageRoot $pkgRoot
-Assert-True 'no card in play: the issues'' own text and brief, only the source says both' ($joinedFill.source -ceq 'both' -and (Format-P20StandupText -Standup $joinedFill -PackageRoot $pkgRoot) -ceq (Format-P20StandupText -Standup $aloneFill -PackageRoot $pkgRoot) -and (Format-P20StandupBrief -Standup $joinedFill -PackageRoot $pkgRoot) -ceq (Format-P20StandupBrief -Standup $aloneFill -PackageRoot $pkgRoot))
+# A rendering with the engineer's rows set aside: the detail's block under Name
+# (the name line and its indented rows) and the brief's 'Name: ...' line. What
+# is left is the labelled workers' own, which the issues fill's goldens hold.
+function Remove-EngineerRows {
+    param([string]$Text, [string]$Name)
+    $out = New-Object System.Collections.Generic.List[string]
+    $skipping = $false
+    foreach ($line in $Text.Split([char]10)) {
+        if ($line -ceq $Name) { $skipping = $true; continue }
+        if ($skipping -and $line.StartsWith('  ')) { continue }
+        $skipping = $false
+        if ($line.StartsWith($Name + ': ')) { continue }
+        $out.Add($line)
+    }
+    return ($out -join "`n")
+}
+$joinedText = Format-P20StandupText -Standup $joinedFill -PackageRoot $pkgRoot
+$joinedBrief = Format-P20StandupBrief -Standup $joinedFill -PackageRoot $pkgRoot
+$aloneText = Format-P20StandupText -Standup $aloneFill -PackageRoot $pkgRoot
+$aloneBrief = Format-P20StandupBrief -Standup $aloneFill -PackageRoot $pkgRoot
+$joinedEngineer = @($joinedFill.workers)[-1]
+Assert-True 'no card in play: the issues'' own rows, then the engineer''s -- idle, present, named for the Space -- and the source says both' ($joinedFill.source -ceq 'both' -and @($joinedFill.workers).Count -eq (@($aloneFill.workers).Count + 1) -and [string]$joinedEngineer.label -ceq 'toolkit' -and [string]$joinedEngineer.name -ceq 'Toolkit' -and $joinedEngineer.empty -and $joinedEngineer.present -and @($joinedEngineer.status).Count -eq 2) ((@($joinedFill.workers | ForEach-Object { $_.label })) -join ',')
+Assert-True 'no card in play: the text and the brief are the issues'' own once the engineer''s rows are set aside, and differ by them' ($joinedText -cne $aloneText -and (Remove-EngineerRows $joinedText 'Toolkit') -ceq $aloneText -and $joinedBrief -cne $aloneBrief -and (Remove-EngineerRows $joinedBrief 'Toolkit') -ceq $aloneBrief) ("`n" + $joinedText + $joinedBrief)
+Assert-True 'no card in play: the engineer takes the round''s first turn' ([string]@($joinedFill.work.workers)[0].label -ceq 'toolkit' -and -not @($joinedFill.work.workers)[0].cast)
 $together = @($joinedCases | Where-Object { $_.name -eq 'together' })[0]
 $downFill = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @($joinedTable.workerLabels) -Issues @($together.issues) -Tracker @{ ok = $false; reason = 'gh did not answer' } -Cards @($together.cards) -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
 Assert-True 'the tracker not answering: the Tracker line, no worker, no Check line, no link' ($downFill.source -ceq 'none' -and @($downFill.workers).Count -eq 0 -and @($downFill.checks).Count -eq 0 -and @($downFill.links).Count -eq 0)
@@ -696,9 +723,13 @@ for ($n = 0; $n -lt $workCases.Count; $n++) {
         $got = Get-GroupLines $s.work.queue.$kind
         Assert-True "${name}: queue.$kind groups" ($got -ceq $want) "`n  got  $got`n  want $want"
     }
-    $gotWorkers = @($s.work.workers)
+    # The table's rows are the members'; the invented cast members that fill the
+    # room follow them, with no group: the golden text holds their lines.
+    $gotWorkers = @($s.work.workers | Where-Object { -not $_.cast })
+    $gotCast = @($s.work.workers | Where-Object { $_.cast })
     $wantWorkers = @($exp.workers)
-    Assert-True "${name}: one work row per worker, in label order" (((@($gotWorkers | ForEach-Object { $_.label })) -join ',') -ceq ((@($wantWorkers | ForEach-Object { $_.label })) -join ',')) ((@($gotWorkers | ForEach-Object { $_.label })) -join ',')
+    Assert-True "${name}: one work row per member, in seat order" (((@($gotWorkers | ForEach-Object { $_.label })) -join ',') -ceq ((@($wantWorkers | ForEach-Object { $_.label })) -join ',')) ((@($gotWorkers | ForEach-Object { $_.label })) -join ',')
+    Assert-True "${name}: the invented cast members come after the members, with no group" (((@($s.work.workers | Select-Object -Skip $gotWorkers.Count | ForEach-Object { [string]$_.cast })) -join ',') -ceq ((@($gotCast | ForEach-Object { 'True' })) -join ',') -and @($gotCast | Where-Object { @($_.yesterday).Count + @($_.today).Count + @($_.blockers).Count -gt 0 }).Count -eq 0)
     foreach ($w in $wantWorkers) {
         $g = @($gotWorkers | Where-Object { [string]$_.label -ceq [string]$w.label }) | Select-Object -First 1
         foreach ($slot in @('yesterday', 'today', 'blockers')) {
@@ -745,7 +776,7 @@ $grainCase['brief'] = Format-P20StandupBrief -Standup $grainCase -PackageRoot $p
 Assert-True 'Get-P20StandupGrainText: detail is the text, work the work text, brief the brief, anything else nothing' ((Get-P20StandupGrainText -Standup $grainCase -Grain 'detail') -ceq $grainCase.text -and (Get-P20StandupGrainText -Standup $grainCase -Grain 'work') -ceq $grainCase.work.text -and (Get-P20StandupGrainText -Standup $grainCase -Grain 'brief') -ceq $grainCase.brief -and $null -eq (Get-P20StandupGrainText -Standup $grainCase -Grain 'Work'))
 $standupJson = Invoke-P20StandupFill -AsOf $asOfTexts[0] -Labels @($fixture.workerLabels) -Issues @($cases[0].issues) -Tracker $cases[0].tracker -PackageRoot $pkgRoot
 Assert-True 'the response carries work beside text: queue, workers, the queue''s prose, the chair''s turn and its own text' ($standupJson.Contains('work') -and (((@($standupJson.work.Keys)) -join ',') -ceq 'queue,workers,queueProse,chairProse,text')) ((@($standupJson.work.Keys)) -join ',')
-Assert-True 'a work row carries its prose after its three slots' ((((@($standupJson.work.workers[0].Keys)) -join ',') -ceq 'label,name,yesterday,today,blockers,prose')) ((@($standupJson.work.workers[0].Keys)) -join ',')
+Assert-True 'a work row carries its prose after its three slots, then whether it is an invented cast member' ((((@($standupJson.work.workers[0].Keys)) -join ',') -ceq 'label,name,yesterday,today,blockers,prose,cast')) ((@($standupJson.work.workers[0].Keys)) -join ',')
 
 # -- 1d. The prose ---------------------------------------------------------
 # Tests/fixtures/rituals/standup-prose.json, every row and every case, the SAME
@@ -849,8 +880,12 @@ for ($n = 0; $n -lt $proseCases.Count; $n++) {
     $want = (@($exp.queue | ForEach-Object { [string]$_ })) -join ' | '
     $got = (@($s.work.queueProse | ForEach-Object { [string]$_ })) -join ' | '
     Assert-True "${name}: the queue's sentences" ($got -ceq $want) "`n  got  $got`n  want $want"
-    $gotWorkers = @($s.work.workers)
-    Assert-True "${name}: one prose row per worker, in label order" (((@($gotWorkers | ForEach-Object { $_.label })) -join ',') -ceq ((@($exp.workers | ForEach-Object { $_.label })) -join ','))
+    # The table's rows are the members'; an invented cast member says two made-up
+    # items in the same frame, and the golden text holds its line.
+    $gotWorkers = @($s.work.workers | Where-Object { -not $_.cast })
+    Assert-True "${name}: one prose row per member, in seat order" (((@($gotWorkers | ForEach-Object { $_.label })) -join ',') -ceq ((@($exp.workers | ForEach-Object { $_.label })) -join ',')) ((@($gotWorkers | ForEach-Object { $_.label })) -join ',')
+    $offCast = @($s.work.workers | Where-Object { $_.cast } | Where-Object { $p = @($_.prose); $p.Count -ne 5 -or [string]$p[0] -cne [string]$consts.rituals.text.turnOpen -or @($data.Vocabulary.nothing) -cnotcontains [string]$p[1] -or @($data.Vocabulary.nothingToday) -cnotcontains [string]$p[2] -or [string]$p[3] -cne [string]$consts.rituals.text.proseBlockersNone -or [string]$p[4] -cne [string]$consts.rituals.text.turnClose })
+    Assert-True "${name}: an invented cast member's turn is two made-up items in the frame" ($offCast.Count -eq 0) ((@($offCast | ForEach-Object { $_.label })) -join ',')
     foreach ($w in @($exp.workers)) {
         $g = @($gotWorkers | Where-Object { [string]$_.label -ceq [string]$w.label }) | Select-Object -First 1
         $want = (@($w.prose | ForEach-Object { [string]$_ })) -join ' | '
@@ -901,16 +936,18 @@ for ($n = 0; $n -lt $proseCases.Count; $n++) {
 # -- 1d'. The team size ----------------------------------------------------
 # Tests/fixtures/rituals/standup-team.json, every row and every case, the SAME
 # rows Tests/test_rituals.py asserts: a Space's stored teamSize read as the
-# room's size, who is present in a room of that size, and the issues fill end
-# to end -- team.size, every worker kept with its present, and the detail, the
-# work (the round: the present only) and the brief against their goldens.
+# room's size; who sits in a room of that size, in which window, and the
+# invented cast members that fill the seats left (the size is the team); and a
+# fill end to end -- team.size, every worker of the record kept with its
+# present, the round, and the detail, the work and the brief against their goldens.
 Write-Host ""
 Write-Host "-- The team size --" -ForegroundColor Cyan
 $teamRaw = [System.IO.File]::ReadAllText((Join-Path $fixtureDir 'standup-team.json'))
 $teamTable = $teamRaw | ConvertFrom-Json
 $teamCases = @($teamTable.cases)
 $teamAsOf = @([regex]::Matches($teamRaw, '"asOf"\s*:\s*"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
-Assert-True 'the team table is read: its sizes, its seats and four cases, an asOf each' (@($teamTable.sizes).Count -ge 8 -and @($teamTable.seats).Count -ge 6 -and $teamCases.Count -eq 4 -and $teamAsOf.Count -eq 4) "$(@($teamTable.sizes).Count) sizes, $(@($teamTable.seats).Count) seats, $($teamCases.Count) cases"
+$teamNames = (@($teamCases | ForEach-Object { [string]$_.name })) -join ','
+Assert-True 'the team table is read: its sizes, its seats, its room rows and ten cases, an asOf each' (@($teamTable.sizes).Count -ge 8 -and @($teamTable.seats).Count -ge 6 -and @($teamTable.room).Count -ge 16 -and $teamNames -ceq 'absent,idle-sits,unset,work-unsaid,walk-size-3,walk-size-6,walk-size-9,idle-room,idle-room-3,idle-room-6' -and $teamAsOf.Count -eq $teamCases.Count) "$(@($teamTable.sizes).Count) sizes, $(@($teamTable.seats).Count) seats, $(@($teamTable.room).Count) room rows, cases $teamNames"
 
 foreach ($row in @($teamTable.sizes)) {
     $got = Get-P20TeamSize -Stored $row.stored
@@ -919,27 +956,109 @@ foreach ($row in @($teamTable.sizes)) {
 $sizesNow = @($consts.rituals.teamSizes | ForEach-Object { [int]$_ })
 Assert-True 'the sizes and the default are the contract''s' ((Get-P20TeamSize -Stored $null).Size -eq [int]$consts.rituals.teamSizeDefault -and @($sizesNow | Where-Object { (Get-P20TeamSize -Stored ([int]$_)).Size -ne $_ }).Count -eq 0) ($sizesNow -join ',')
 
+# Labels only: who sits, said in the workers' own order.
 foreach ($row in @($teamTable.seats)) {
-    $ws = @(@($row.workers) | ForEach-Object { [ordered]@{ label = [string]$_.label; empty = [bool]$_.empty } })
-    Set-P20StandupPresent -Workers $ws -Size ([int]$row.size)
+    $labels = @(@($row.workers) | ForEach-Object { @{ label = [string]$_.label; empty = [bool]$_.empty } })
+    $seated = @((Get-P20StandupRoomSeats -Size ([int]$row.size) -Engineer $null -Labels $labels).present)
     $want = (@($row.present | ForEach-Object { [string]$_ })) -join ','
-    $got = (@($ws | Where-Object { $_.present } | ForEach-Object { [string]$_.label })) -join ','
-    $order = (@($ws | ForEach-Object { [string]$_.label })) -join ','
-    Assert-True "seats: $($row.name)" ($got -ceq $want -and $order -ceq ((@($row.workers | ForEach-Object { [string]$_.label })) -join ',')) "got [$got] want [$want]"
+    $got = (@($row.workers | Where-Object { $seated -ccontains [string]$_.label } | ForEach-Object { [string]$_.label })) -join ','
+    Assert-True "seats: $($row.name)" ($got -ceq $want) "got [$got] want [$want]"
 }
+
+# The room's rules (docs/modules/solitaire-agile.md, "The room's rules"), each
+# stated once, so a failure names the rule it broke; Tests/test_rituals.py states
+# the same four over the same rows. Held as scriptblocks, called with &.
+$ruleSizeSeen = {
+    param([string]$Where, [int]$Size, [int]$Speakers)
+    Assert-True "the size seen is the size picked: $Where -- the round and the chair make $Size" (($Speakers + 1) -eq $Size) "got $($Speakers + 1)"
+}
+$ruleDesks = {
+    param([string]$Where, [int]$Size, [int]$Desks)
+    $windowCount = @($consts.rituals.room.windows).Count
+    Assert-True "the empty desks are only the windows past the size: $Where -- $($windowCount - $Size) desks" ($Desks -eq ($windowCount - $Size)) "got $Desks"
+}
+$ruleEngineer = {
+    param([string]$Where, $Speakers, $Engineer)
+    # $Engineer is $null for a fill with none, else @{ label; name } (name optional).
+    if ($null -eq $Engineer) { return }
+    $first = @($Speakers)[0]
+    $ok = ($null -ne $first) -and ([string]$first.label -ceq [string]$Engineer.label) -and (-not [bool]$first.cast)
+    if ($ok -and $Engineer.Contains('name')) { $ok = ([string]$first.name -ceq [string]$Engineer.name) }
+    Assert-True "the engineer's seat is the owner's: $Where -- first in the round, never invented, under the Space's name" $ok
+}
+$idlePairs = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+foreach ($y in $nothing) { foreach ($t in $nothingToday) { [void]$idlePairs.Add("$y $t $([string]$consts.rituals.text.proseBlockersNone)") } }
+$ruleEveryoneSpeaks = {
+    param([string]$Where, $Speakers, [string]$WorkText)
+    $open = [string]$consts.rituals.text.turnOpen
+    $close = [string]$consts.rituals.text.turnClose
+    $lines = @($WorkText -split "`n")
+    $at = -1
+    $bad = @()
+    foreach ($sp in @($Speakers)) {
+        $head = [string]$sp.name + ': '
+        $found = @(for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i].StartsWith($head, [System.StringComparison]::Ordinal)) { $i } })
+        if ($found.Count -ne 1 -or $found[0] -le $at) { $bad += "$($sp.name): no one turn of its own, in round order"; continue }
+        $at = $found[0]
+        $line = $lines[$at].Substring($head.Length)
+        if (-not $line.StartsWith("$open ", [System.StringComparison]::Ordinal) -or -not $line.EndsWith(" $close", [System.StringComparison]::Ordinal)) { $bad += "$($sp.name): the turn is not framed"; continue }
+        $body = $line.Substring($open.Length + 1, $line.Length - $open.Length - $close.Length - 2)
+        if (-not $body.Trim()) { $bad += "$($sp.name): the turn says nothing" }
+        elseif ($sp.idle -and -not $idlePairs.Contains($body)) { $bad += "$($sp.name): idle, and the turn is not a made-up pair: $body" }
+    }
+    Assert-True "everyone speaks: $Where -- every member of the round has a turn in the work grain, an idle one its made-up pair" ($bad.Count -eq 0) ($bad -join '; ')
+}
+
+# The size is the team: who sits, each speaker's window, and the desks left.
+$roomMembers =@($consts.rituals.room.windows | Where-Object { [string]$_.id -cne [string]$consts.rituals.room.chair } | ForEach-Object { [string]$_.id })
+$seatLine = { param($Round) (@($Round | ForEach-Object { "$($_.label)/$([bool]$_.cast)/$($_.window)" })) -join ',' }
+foreach ($row in @($teamTable.room)) {
+    $labels = @(@($row.labels) | Where-Object { $null -ne $_ } | ForEach-Object { @{ label = [string]$_.label; empty = [bool]$_.empty } })
+    $engineer = $null
+    if ($null -ne $row.engineer) { $engineer = @{ label = [string]$row.engineer.label; empty = [bool]$row.engineer.empty } }
+    $got = Get-P20StandupRoomSeats -Size ([int]$row.size) -Engineer $engineer -Labels $labels
+    $wantRound = & $seatLine @($row.round)
+    $gotRound = & $seatLine @($got.round)
+    $wantRest = ((@($row.present | ForEach-Object { [string]$_ })) -join ',') + ' | ' + ((@($row.desks | ForEach-Object { [string]$_ })) -join ',')
+    $gotRest = ((@($got.present | ForEach-Object { [string]$_ })) -join ',') + ' | ' + ((@($got.desks | ForEach-Object { [string]$_ })) -join ',')
+    Assert-True "room: $($row.name)" ($gotRound -ceq $wantRound -and $gotRest -ceq $wantRest) "`n  got  $gotRound -- $gotRest`n  want $wantRound -- $wantRest"
+    # Every seat the size counts is filled, so the desks are the windows past it;
+    # nobody shares a window or a label.
+    $seats = [int]$row.size - 1
+    $everyone = $labels.Count
+    if ($null -ne $engineer) { $everyone++ }
+    $wantCast = $seats - $everyone
+    if ($wantCast -lt 0) { $wantCast = 0 }
+    $windows = @(@($got.round) | ForEach-Object { [string]$_.window }) + @($got.desks)
+    & $ruleSizeSeen "room: $($row.name)" ([int]$row.size) @($got.round).Count
+    & $ruleDesks "room: $($row.name)" ([int]$row.size) @($got.desks).Count
+    & $ruleEngineer "room: $($row.name)" @($got.round) $engineer
+    Assert-True "room: $($row.name) -- $seats seats filled, $($roomMembers.Count - $seats) desks, $wantCast invented" (@($got.round).Count -eq $seats -and @($got.desks).Count -eq ($roomMembers.Count - $seats) -and ((@($windows | Sort-Object)) -join ',') -ceq ((@($roomMembers | Sort-Object)) -join ',') -and @(@($got.round) | ForEach-Object { [string]$_.label } | Sort-Object -Unique).Count -eq $seats -and @(@($got.round) | Where-Object { $_.cast }).Count -eq $wantCast -and @(@($got.round) | Where-Object { $_.cast -and [string]$_.window -cne [string]$_.label }).Count -eq 0) $gotRound
+}
+$walkRooms = @($teamTable.room | Where-Object { ([string]$_.name).StartsWith('walk-size-') })
+Assert-True 'the walk rows are the three rooms: no labels, the engineer with work in its own window, and 1, 4 and 7 invented with 6, 3 and 0 desks' ($walkRooms.Count -eq 3 -and ((@($walkRooms | ForEach-Object { "$($_.size):$(@($_.round | Where-Object { $_.cast }).Count):$(@($_.desks).Count)" })) -join ',') -ceq '3:1:6,6:4:3,9:7:0' -and @($walkRooms | Where-Object { @($_.labels).Count -ne 0 -or [string]$_.round[0].label -cne 'widgets' -or [string]$_.round[0].window -cne [string]$consts.rituals.room.engineer }).Count -eq 0)
 
 for ($n = 0; $n -lt $teamCases.Count; $n++) {
     $case = $teamCases[$n]
     $name = 'team-' + [string]$case.name
     $exp = $case.expected
-    $s = Invoke-P20StandupFill -AsOf $teamAsOf[$n] -Labels @($teamTable.workerLabels) -Issues @($case.issues) -Tracker ([pscustomobject]@{ ok = $true; reason = '' }) -Space 'widgets' -PackageRoot $pkgRoot -TeamSize $case.teamSize
+    if ($case.PSObject.Properties['cards']) {
+        # A case that states its cards is the joined fill over its own labels, issues and cards.
+        $s = Invoke-P20StandupJoinedFill -AsOf $teamAsOf[$n] -Labels @($case.labels) -Issues @($case.issues) -Tracker ([pscustomobject]@{ ok = $true; reason = '' }) `
+            -Cards @($case.cards) -Space ([string]$case.space) -SpaceName ([string]$case.spaceName) -PackageRoot $pkgRoot -TeamSize $case.teamSize
+    }
+    else {
+        $s = Invoke-P20StandupFill -AsOf $teamAsOf[$n] -Labels @($teamTable.workerLabels) -Issues @($case.issues) -Tracker ([pscustomobject]@{ ok = $true; reason = '' }) -Space 'widgets' -PackageRoot $pkgRoot -TeamSize $case.teamSize
+    }
     Assert-True "${name}: team.size is $($exp.team.size)" ([int]$s.team.size -eq [int]$exp.team.size) "got $($s.team.size)"
     $want = (@($exp.workers | ForEach-Object { "$($_.label)/$($_.name)/$([bool]$_.empty)/$([bool]$_.present)" })) -join ','
     $got = (@($s.workers | ForEach-Object { "$($_.label)/$($_.name)/$([bool]$_.empty)/$([bool]$_.present)" })) -join ','
     Assert-True "${name}: every worker kept, in label order, each marked present or absent" ($got -ceq $want) "`n  got  $got`n  want $want"
-    $wantRound = (@($exp.workers | Where-Object { $_.present } | ForEach-Object { [string]$_.label })) -join ','
-    $gotRound = (@($s.work.workers | ForEach-Object { [string]$_.label })) -join ','
-    Assert-True "${name}: the round is the present only, in the workers' order" ($gotRound -ceq $wantRound) "got [$gotRound] want [$wantRound]"
+    $wantRound = (@($exp.round | ForEach-Object { "$($_.label)/$($_.name)/$([bool]$_.cast)" })) -join ','
+    $gotRound = (@($s.work.workers | ForEach-Object { "$($_.label)/$($_.name)/$([bool]$_.cast)" })) -join ','
+    Assert-True "${name}: the round is the seated in seat order, then the invented cast members" ($gotRound -ceq $wantRound) "`n  got  $gotRound`n  want $wantRound"
+    $seatedNow = (@($s.work.workers | Where-Object { -not $_.cast } | ForEach-Object { [string]$_.label } | Sort-Object)) -join ','
+    Assert-True "${name}: the members who speak are the workers marked present" ($seatedNow -ceq ((@($exp.workers | Where-Object { $_.present } | ForEach-Object { [string]$_.label } | Sort-Object)) -join ','))
     $gotCounts = (@($s.counts.workers | ForEach-Object { [string]$_.label })) -join ','
     Assert-True "${name}: the counts keep every worker" ($gotCounts -ceq ((@($exp.workers | ForEach-Object { [string]$_.label })) -join ',')) "got [$gotCounts]"
     $renders = @{
@@ -951,6 +1070,24 @@ for ($n = 0; $n -lt $teamCases.Count; $n++) {
         $golden = [System.IO.File]::ReadAllText((Join-Path $fixtureDir ([string]$exp.$grain)))
         Assert-True "${name}: the $grain is $($exp.$grain), byte for byte" ($renders[$grain] -ceq $golden) ("`n--- got ---`n$($renders[$grain])--- want ---`n$golden")
     }
+    # The room's rules, over the round as the work grain renders it. An invented
+    # member is idle always; a member of the record by its own empty.
+    $recordEmpty = @{}
+    foreach ($w in @($s.workers)) { $recordEmpty[[string]$w.label] = [bool]$w.empty }
+    $speakers = @(@($s.work.workers) | ForEach-Object {
+        $idle = [bool]$_.cast
+        if (-not $idle) { $idle = (-not $recordEmpty.ContainsKey([string]$_.label)) -or $recordEmpty[[string]$_.label] }
+        [pscustomobject]@{ label = [string]$_.label; name = [string]$_.name; cast = [bool]$_.cast; idle = $idle }
+    })
+    & $ruleSizeSeen $name ([int]$s.team.size) $speakers.Count
+    & $ruleDesks $name ([int]$s.team.size) (@($consts.rituals.room.windows).Count - 1 - $speakers.Count)
+    & $ruleEveryoneSpeaks $name $speakers $renders.work
+    $caseEngineer = $null
+    if ($case.PSObject.Properties['cards']) { $caseEngineer = @{ label = [string]$case.space; name = [string]$case.spaceName } }
+    & $ruleEngineer $name $speakers $caseEngineer
+    # An invented cast member is in the round only: not in the detail, not in the brief.
+    $leaked =@($s.work.workers | Where-Object { $_.cast } | Where-Object { -not $renders.work.Contains([string]$_.name + ': ') -or $renders.text.Contains([string]$_.name) -or $renders.brief.Contains([string]$_.name) })
+    Assert-True "${name}: an invented cast member has a line in the round and none in the detail or the brief" ($leaked.Count -eq 0) ((@($leaked | ForEach-Object { $_.name })) -join ',')
     # What -AsJson prints is enough to speak the same round.
     $back = ($s | ConvertTo-Json -Depth 12) | ConvertFrom-Json
     $back.asOf = $s.asOf
@@ -966,7 +1103,38 @@ $smallSaid = (@($small.workers | ForEach-Object { (@($_.status) -join '/') })) -
 $wholeSaid = (@($whole.workers | ForEach-Object { (@($_.status) -join '/') })) -join ' | '
 Assert-True 'an absent worker keeps its made-up items by its label position' ($smallSaid -ceq $wholeSaid) "`n  small $smallSaid`n  whole $wholeSaid"
 $cardsRoom = Invoke-P20StandupCardsFill -AsOf $absentAt -Cards @() -Space 's' -PackageRoot $pkgRoot -TeamSize 3
-Assert-True 'the cards fill carries the room too, its one tile present' ([int]$cardsRoom.team.size -eq 3 -and @($cardsRoom.workers | Where-Object { $_.present }).Count -eq 1)
+Assert-True 'the cards fill seats the engineer and fills the room: its one tile present, and one invented cast member beside it' ([int]$cardsRoom.team.size -eq 3 -and @($cardsRoom.workers | Where-Object { $_.present }).Count -eq 1 -and ((@($cardsRoom.work.workers | ForEach-Object { "$($_.label)/$([bool]$_.cast)" })) -join ',') -ceq 's/False,ops-dev/True')
+# A full idle room never repeats a made-up line: eight idle members -- the
+# engineer and seven invented -- say two different items each, none repeated on
+# one day, and the chair's own made-up yesterday is none of them. Every day of
+# a year, leap day included, through the one picker and the chair's.
+$repeats = New-Object System.Collections.Generic.List[string]
+for ($day = 1; $day -le 366; $day++) {
+    $idleRoom = @(1..8 | ForEach-Object { [ordered]@{ label = "m$_"; empty = $true } })
+    Set-P20StandupIdle -Workers @($idleRoom[0]) -Day $day -Vocabulary $data.Vocabulary
+    Set-P20StandupIdle -Workers @($idleRoom | Select-Object -Skip 1) -Day $day -Vocabulary $data.Vocabulary -Start 1
+    $said = @($idleRoom | ForEach-Object { @($_.status) })
+    $chairSays = Get-P20StandupChairYesterday -Walked @() -Day $day -Workers 8 -Nothing @($data.Vocabulary.nothing)
+    if ($said.Count -ne 16 -or @($said | Sort-Object -Unique).Count -ne 16 -or $said -ccontains [string]$chairSays -or -not $chairSays) { $repeats.Add([string]$day) }
+}
+Assert-True 'a full idle room never repeats a made-up line, any day of a year: 8 members, 16 lines, and the chair''s is none of them' ($repeats.Count -eq 0) ("days " + ($repeats -join ','))
+$idleRoomCase = @($teamCases | Where-Object { [string]$_.name -eq 'idle-room' })[0]
+$idleRoomFill = Invoke-P20StandupJoinedFill -AsOf $teamAsOf[[array]::IndexOf(@($teamCases | ForEach-Object { [string]$_.name }), 'idle-room')] -Labels @() -Issues @() -Tracker ([pscustomobject]@{ ok = $true; reason = '' }) -Cards @() -Space ([string]$idleRoomCase.space) -SpaceName ([string]$idleRoomCase.spaceName) -PackageRoot $pkgRoot -TeamSize 9
+$idleLines = @($idleRoomFill.work.workers | ForEach-Object { @($_.prose)[1]; @($_.prose)[2] })
+Assert-True 'the idle-room case end to end: eight speakers, sixteen different made-up lines, and the chair''s yesterday is none of them' (@($idleRoomFill.work.workers).Count -eq 8 -and @($idleLines | Sort-Object -Unique).Count -eq 16 -and $idleLines -cnotcontains [string]@($idleRoomFill.work.chairProse)[1]) ($idleLines -join ' | ')
+# The standup always runs: a day with no work at all -- no labels, no issues, no
+# card -- is a case at every size, and the chair still speaks last.
+$idleSizes = @()
+for ($n = 0; $n -lt $teamCases.Count; $n++) {
+    $case = $teamCases[$n]
+    if (-not ([string]$case.name).StartsWith('idle-room')) { continue }
+    $idleSizes += [int]$case.teamSize
+    $quiet = Invoke-P20StandupJoinedFill -AsOf $teamAsOf[$n] -Labels @() -Issues @() -Tracker ([pscustomobject]@{ ok = $true; reason = '' }) -Cards @() -Space ([string]$case.space) -SpaceName ([string]$case.spaceName) -PackageRoot $pkgRoot -TeamSize $case.teamSize
+    $quietWork = Format-P20StandupWork -Standup $quiet -PackageRoot $pkgRoot
+    $chairLine = (@($quiet.work.chairProse) | ForEach-Object { [string]$_ }) -join ' '
+    Assert-True "the standup always runs: $($case.name) -- no work at all, a room of $($case.teamSize), every speaker idle, and the chair's turn last" (@($case.labels).Count -eq 0 -and @($case.issues).Count -eq 0 -and @($case.cards).Count -eq 0 -and [int]$quiet.team.size -eq [int]$case.teamSize -and @($quiet.workers | Where-Object { -not $_.empty }).Count -eq 0 -and $quietWork.Contains("`n$chairLine`n")) $quietWork
+}
+Assert-True 'the standup always runs: a day with no work is a case at every size' (((@($idleSizes | Sort-Object)) -join ',') -ceq ((@($consts.rituals.teamSizes | ForEach-Object { [int]$_ } | Sort-Object)) -join ',')) ($idleSizes -join ',')
 
 # -- 1e. The dress guard -----------------------------------------------------
 # Tests/fixtures/rituals/standup-dress.json, every row, the SAME rows
@@ -1418,7 +1586,7 @@ try {
     $openTurn = [regex]::Escape([string]$consts.rituals.text.turnOpen)
     Assert-True '-Grain work: one turn a worker, spoken as prose, no slot labels padded to the column' ($gw.Inner -match ('(?m)^Opus: ' + $openTurn + ' Yesterday I closed ') -and $gw.Inner -notmatch '(?m)^  (Walk|Yesterday|Today|Blockers) ') $gw.Inner
     if ($parsed) {
-        Assert-True '-AsJson carries the work grain: its groups and the text -Grain work prints' (([string]$parsed.work.text).TrimEnd([char]10) -ceq $gw.Inner -and @($parsed.work.workers).Count -eq 3 -and $null -ne $parsed.work.queue) $j.Inner
+        Assert-True '-AsJson carries the work grain: its groups, a full room -- every member, then the invented cast members -- and the text -Grain work prints' (([string]$parsed.work.text).TrimEnd([char]10) -ceq $gw.Inner -and @($parsed.work.workers).Count -eq ([int]$consts.rituals.teamSizeDefault - 1) -and @($parsed.work.workers | Where-Object { -not $_.cast }).Count -eq @($parsed.workers).Count -and $null -ne $parsed.work.queue) $j.Inner
     }
     $gd = Invoke-Standup 'tkStandup -Grain detail'
     Assert-True '-Grain detail is the standup as it always printed' ($gd.Exit -eq '0' -and $gd.Inner -ceq $r.Inner) $gd.All
@@ -1508,7 +1676,8 @@ try {
     try { $soffParsed = $soff.Inner | ConvertFrom-Json } catch { $soffParsed = $null }
     Assert-True 'typed: spaces.<slug>.features.suggestions=false -- no candidate, no suggestion, the standup unchanged' ($soffParsed -and @($soffParsed.suggestions).Count -eq 0 -and $null -eq $soffParsed.suggestion -and ([string]$soffParsed.text) -ceq ([string]$sjParsed.text)) $soff.All
     # The room: spaces.widgets.features.teamSize=3 in the hub -- two seats. Every
-    # worker stays on the response; the round speaks the present only.
+    # worker stays on the response; the engineer takes the first seat and the
+    # first worker with work the second, and nobody is invented.
     [System.IO.File]::WriteAllText($hubJsonPath, $savedHub.Replace('"howIWork": "agents" }', '"howIWork": "agents", "features": { "teamSize": 3 } }'), $utf8)
     $room = Invoke-Standup 'tkStandup -AsJson'
     [System.IO.File]::WriteAllText($hubJsonPath, $savedHub, $utf8)
@@ -1517,9 +1686,14 @@ try {
     $roomPresent = @()
     if ($roomParsed) { $roomPresent = @($roomParsed.workers | Where-Object { $_.present } | ForEach-Object { [string]$_.label }) }
     $roomSaid = ''
-    if ($roomParsed) { $roomSaid = (@($roomParsed.work.workers | ForEach-Object { [string]$_.label })) -join ',' }
-    Assert-True 'typed: spaces.<slug>.features.teamSize=3 -- team.size 3, every worker kept, two present, and the round is those two' ($roomParsed -and [int]$roomParsed.team.size -eq 3 -and @($roomParsed.workers).Count -eq @($sjParsed.workers).Count -and $roomPresent.Count -eq 2 -and $roomSaid -ceq ($roomPresent -join ',') -and ([string]$roomParsed.text) -ceq ([string]$sjParsed.text)) $room.All
-    Assert-True 'typed: with no teamSize the room is nine and everyone of the friday read is present' ($sjParsed -and [int]$sjParsed.team.size -eq [int]$consts.rituals.teamSizeDefault -and @($sjParsed.workers | Where-Object { -not $_.present }).Count -eq 0) $sj.Inner
+    $roomEngineer = ''
+    if ($roomParsed) {
+        $roomSaid = (@($roomParsed.work.workers | ForEach-Object { "$($_.label)/$([bool]$_.cast)" })) -join ','
+        $roomEngineer = [string]@($roomParsed.workers)[-1].label
+    }
+    $roomOther = @($roomPresent | Where-Object { $_ -cne $roomEngineer })
+    Assert-True 'typed: spaces.<slug>.features.teamSize=3 -- team.size 3, every worker kept, two present, and the round is those two: the engineer, then the first worker with work' ($roomParsed -and [int]$roomParsed.team.size -eq 3 -and @($roomParsed.workers).Count -eq @($sjParsed.workers).Count -and $roomPresent.Count -eq 2 -and $roomOther.Count -eq 1 -and $roomSaid -ceq "$roomEngineer/False,$($roomOther[0])/False" -and ([string]$roomParsed.text) -ceq ([string]$sjParsed.text)) $room.All
+    Assert-True 'typed: with no teamSize the room is nine, everyone of the friday read is present, and the invented cast members fill the seats left' ($sjParsed -and [int]$sjParsed.team.size -eq [int]$consts.rituals.teamSizeDefault -and @($sjParsed.workers | Where-Object { -not $_.present }).Count -eq 0 -and @($sjParsed.work.workers).Count -eq ([int]$consts.rituals.teamSizeDefault - 1) -and @($sjParsed.work.workers | Where-Object { $_.cast }).Count -eq ([int]$consts.rituals.teamSizeDefault - 1 - @($sjParsed.workers).Count)) $sj.Inner
     foreach ($k in $joinedFiles.Keys) { Remove-Item -LiteralPath (Join-Path $widgetsCurrent $k) -Force }
 
     # A local Space: its cards, not gh. The scratch hub's solo/ has a card
