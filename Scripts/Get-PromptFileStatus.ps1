@@ -99,6 +99,124 @@ function Get-P20CardAssigned {
     return ''
 }
 
+function Get-P20CardAgent {
+    <#
+      Who did the work, when an agent did: the value of the card's first
+      `**Agent:**` line (stamps.agent), trimmed -- a model id, as written -- and
+      '' when it has none (a person worked it alone). The line sits beside
+      `**Assigned:**`: the person owns the card, the agent worked it. The value is
+      never parsed here; Get-P20ModelInfo looks it up in the model map. The CLI's
+      one reader of the stamp; agent/core/parsers.py's card_agent is the same
+      rule, and Tests/fixtures/parsers/agent-lines.json holds the two to one table.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Content)
+    $stamp = [string](Get-P20Consts).stamps.agent
+    $m = [regex]::Match("$Content", '(?m)^' + [regex]::Escape($stamp) + '[ \t]*([^\r\n]*?)[ \t]*\r?$')
+    if ($m.Success) { return $m.Groups[1].Value }
+    return ''
+}
+
+function Get-P20CardWorker {
+    <#
+      Who works the card, as a FAMILY-shaped string the standup, the suggestion
+      and StartWork -Launch compare against sizes: when the card has an
+      `**Agent:**` line, the model map's family for its id if the id is known,
+      else the id as written; with no Agent line, exactly the `**Assigned:**`
+      line's value, as those readers took it before (a size, me, or '').
+
+      A BRIDGE: it stands in for the shared resolver of a card's agent
+      (Resolve-P20CardAgent) until that lands, and that change
+      removes it. Its three callers are Standup-Rules.ps1's card rows and
+      Start-Work.ps1's -Launch size check; add none. agent/core/parsers.py's
+      card_worker is the same rule, and Tests/fixtures/parsers/card-worker.json
+      holds the two to one table.
+    #>
+    param(
+        [Parameter(Position = 0)][AllowEmptyString()][AllowNull()][string]$Text,
+        [string]$PackageRoot
+    )
+    $agentId = Get-P20CardAgent -Content $Text
+    if (-not $agentId) { return (Get-P20CardAssigned -Content $Text) }
+    $info = if ($PackageRoot) { Get-P20ModelInfo -Id $agentId -PackageRoot $PackageRoot } else { Get-P20ModelInfo -Id $agentId }
+    if ($info.known -and $info.family) { return [string]$info.family }
+    return $agentId
+}
+
+function Get-P20ModelInfo {
+    <#
+      What the model map (consts.json models.file, Config/models.json) says about
+      a model id: [pscustomobject]@{ id; known; provider; family; name }. A known
+      id takes its provider, family and display name from its row; an unknown one
+      is reported, never guessed at -- known $false, name the id as written,
+      provider and family $null. The id is never parsed for a family.
+      agent/core/models.py's model_info is the same rule, and
+      Tests/fixtures/parsers/models.json holds the two to one table.
+    #>
+    param(
+        [AllowEmptyString()][AllowNull()][string]$Id,
+        # The package root the map's path is relative to; the one consts.json sits in by default.
+        [string]$PackageRoot
+    )
+    if (-not $PackageRoot) { $PackageRoot = Split-Path (Get-P20ConstsPath) -Parent }
+    $mid = "$Id"
+    $path = Join-Path $PackageRoot ([string](Get-P20Consts).models.file)
+    # A map that is missing, unreadable or not JSON reads as EMPTY: every id is
+    # unknown and reads as written, and nothing throws.
+    $map = $null
+    if (Test-Path -LiteralPath $path -PathType Leaf) {
+        try {
+            $raw = Get-Content -LiteralPath $path -Raw -Encoding UTF8 -ErrorAction Stop
+            if ($raw) { $map = (ConvertFrom-Json -InputObject $raw -ErrorAction Stop).models }
+        }
+        catch { $map = $null }
+    }
+    if ($map -isnot [System.Management.Automation.PSCustomObject]) { $map = $null }
+    $row = $null
+    if ($mid -and $map) {
+        $prop = $map.PSObject.Properties | Where-Object { $_.Name -ceq $mid } | Select-Object -First 1
+        if ($prop) { $row = $prop.Value }
+    }
+    if ($null -eq $row) {
+        return [pscustomobject]@{ id = $mid; known = $false; provider = $null; family = $null; name = $mid }
+    }
+    $name = [string]$row.name
+    if (-not $name) { $name = $mid }
+    return [pscustomobject]@{ id = $mid; known = $true; provider = [string]$row.provider; family = [string]$row.family; name = $name }
+}
+
+function Get-P20ModelForSize {
+    <#
+      The id a worker size (a family: sonnet, opus) resolves to when a card is
+      routed to it: the model map's `current` entry (consts.json models.file),
+      matched ignoring case, and '' for a size the map has no entry for or a map
+      that is missing or broken. A size is a family alias, not an id, so this is
+      the one place it becomes one. agent/core/models.py's current_model is the
+      same rule, and Tests/fixtures/parsers/models.json holds the two to one table.
+    #>
+    param(
+        [AllowEmptyString()][AllowNull()][string]$Size,
+        # The package root the map's path is relative to; the one consts.json sits in by default.
+        [string]$PackageRoot
+    )
+    if (-not $PackageRoot) { $PackageRoot = Split-Path (Get-P20ConstsPath) -Parent }
+    $want = "$Size".Trim()
+    if (-not $want) { return '' }
+    $path = Join-Path $PackageRoot ([string](Get-P20Consts).models.file)
+    $current = $null
+    if (Test-Path -LiteralPath $path -PathType Leaf) {
+        try {
+            $raw = Get-Content -LiteralPath $path -Raw -Encoding UTF8 -ErrorAction Stop
+            if ($raw) { $current = (ConvertFrom-Json -InputObject $raw -ErrorAction Stop).current }
+        }
+        catch { $current = $null }
+    }
+    if ($current -isnot [System.Management.Automation.PSCustomObject]) { return '' }
+    foreach ($prop in $current.PSObject.Properties) {
+        if ($prop.Name -ieq $want -and $prop.Value -is [string] -and $prop.Value) { return [string]$prop.Value }
+    }
+    return ''
+}
+
 function Get-P20CardLineValue {
     <#
       The value of a card's FIRST `<stamp> value` line, trimmed: @{ Present; Value }.

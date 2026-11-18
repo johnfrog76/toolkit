@@ -86,9 +86,12 @@ export interface PromptInfo {
   tracker?: "github" | "ado" | "none";
   /** False only when the card says `**Billable:** no`. No line means billable. */
   billable: boolean;
-  /** Who takes it: the card's `**Assigned:**` line -- "me", or a size -- "" for
-   *  nobody (D-AR10; `Route -Assign` writes it). Absent from an older agent. */
+  /** Who takes it: the card's `**Assigned:**` line -- the person, "me" (`Route -Assign me`
+   *  writes it; a size there is legacy) -- "" for nobody (D-AR10). Absent from an older agent. */
   assigned?: string;
+  /** Who did the work, when an agent did: the card's `**Agent:**` line -- a model id,
+   *  as written -- "" for a card a person worked alone. Absent from an older agent. */
+  agent?: string;
   title: string;
   sprint: string;
   /** The card's milestone, WHOLE: its `**Milestone:**` line, else -- a card with none,

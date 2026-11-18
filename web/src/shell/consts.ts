@@ -47,6 +47,8 @@ export const STAMPS = consts.stamps as {
   /** A card's two planning lines, each its own: `**Milestone:**` (Plan -Milestone) and `**Sprint:**` (Plan -Sprint). */
   milestone: string;
   sprint: string;
+  /** Who did the work on a card an agent worked: `**Agent:** <model id>`, beside the Assigned line. */
+  agent: string;
   /** A person's In Progress and Code Review -- for a card with nothing checked in, or no pull request. */
   started: string;
   review: string;
@@ -482,6 +484,15 @@ export const USAGE = consts.usage as {
  * reads it; the agent serves it and the web will draw what the agent serves.
  */
 export const ORG = consts.org as {
+  file: string;
+};
+
+/**
+ * The model map's file (Config/models.json, relative to the package root): every
+ * reader of a card's `**Agent:**` line takes provider, family and display name
+ * from it, never from the id itself (docs/hub/cards.md, "The Agent line").
+ */
+export const MODELS = consts.models as {
   file: string;
 };
 
