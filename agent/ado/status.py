@@ -68,8 +68,8 @@ class PromptInfo(BaseModel):
     # none. Declared here or Pydantic drops the key (ecb2bb7's lesson).
     tracker: str = "none"
     billable: bool = True
-    # Who takes it: the card's **Assigned:** line -- "me", or a size -- "" for
-    # nobody (D-AR10; Route -Assign writes it). docs/hub/cards.md.
+    # Who takes it: the card's **Assigned:** line -- the person, "me" (Route -Assign
+    # me writes it); a size there is legacy -- "" for nobody (D-AR10). docs/hub/cards.md.
     assigned: str = ""
     # Who did the work, when an agent did: the card's **Agent:** line -- a model
     # id, as written, looked up in the model map by its reader -- "" for a card a

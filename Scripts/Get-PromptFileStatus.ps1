@@ -425,6 +425,39 @@ function Resolve-P20CardAgent {
     return [pscustomobject][ordered]@{ id = $null; family = $null; source = 'none' }
 }
 
+function Get-P20ModelForSize {
+    <#
+      The id a worker size (a family: sonnet, opus) resolves to when a card is
+      routed to it: the model map's `current` entry (consts.json models.file),
+      matched ignoring case, and '' for a size the map has no entry for or a map
+      that is missing or broken. A size is a family alias, not an id, so this is
+      the one place it becomes one. agent/core/models.py's current_model is the
+      same rule, and Tests/fixtures/parsers/models.json holds the two to one table.
+    #>
+    param(
+        [AllowEmptyString()][AllowNull()][string]$Size,
+        # The package root the map's path is relative to; the one consts.json sits in by default.
+        [string]$PackageRoot
+    )
+    if (-not $PackageRoot) { $PackageRoot = Split-Path (Get-P20ConstsPath) -Parent }
+    $want = "$Size".Trim()
+    if (-not $want) { return '' }
+    $path = Join-Path $PackageRoot ([string](Get-P20Consts).models.file)
+    $current = $null
+    if (Test-Path -LiteralPath $path -PathType Leaf) {
+        try {
+            $raw = Get-Content -LiteralPath $path -Raw -Encoding UTF8 -ErrorAction Stop
+            if ($raw) { $current = (ConvertFrom-Json -InputObject $raw -ErrorAction Stop).current }
+        }
+        catch { $current = $null }
+    }
+    if ($current -isnot [System.Management.Automation.PSCustomObject]) { return '' }
+    foreach ($prop in $current.PSObject.Properties) {
+        if ($prop.Name -ieq $want -and $prop.Value -is [string] -and $prop.Value) { return [string]$prop.Value }
+    }
+    return ''
+}
+
 function Get-P20CardLineValue {
     <#
       The value of a card's FIRST `<stamp> value` line, trimmed: @{ Present; Value }.

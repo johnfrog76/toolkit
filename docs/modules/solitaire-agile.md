@@ -176,7 +176,7 @@ every module is off), so it answers once any `tk*` command has loaded the module
 | --- | --- | --- |
 | `Standup [-Space <slug>] [-AsJson] [-Brief] [-Grain <detail\|work\|brief>] [-Since <yyyy-MM-dd>] [-Remind <HH:mm>] [-Days <Mon,Tue,...>] [-Walk]` | prints today's standup for the Space you are in, or the declared Space `-Space` names, read without switching into it. `-AsJson` prints the response the agent serves, `text`, `work` and `brief` included -- the bridge's shape and the parity test's. `-Brief` prints only the chair's reading (below) and, being a read, does not re-arm the reminder. `-Grain` picks the register of detail ([the work grain](#the-work-grain)): `detail`, the default, is the text as it always printed; `work` is the ritual's grain, spoken as standup prose ([the prose](#the-prose)); `brief` is `-Brief`. A word that is not a grain, or `-Brief` with another grain, is a stated refusal (exit 2). `-Since <yyyy-MM-dd>` widens yesterday back to that day ([what moved](#what-moved-and-the-window)) -- not `-Days`, which is the reminder's cadence; a day that is not one, or is after today, or `-Since` with `-Remind`, is a stated refusal. With nothing waiting on you, the brief's last line is [the suggestion](#the-suggestion-one-next-move-derived), and `-AsJson` carries every candidate as `suggestions` and the first as `suggestion`. The work grain is the round of the room, as many people as the Space's team size says: the workers present today, the engineer first, then the invented cast members that fill the seats left ([the team size](#the-team-size-who-is-in-the-room)); `detail` and `brief` keep every worker and never an invented one, and `-AsJson` carries each worker's `present`, each speaker's `cast` and the room's `team.size` | none |
 | `Triage [-Space <slug>] [-AsJson]` | prints the Space's open issues grouped by milestone -- no milestone first, then most open first -- each milestone under its context line, each issue one line: number, title, who has it ([who](#who-takes-it)) -- `me`, `@<login>`, its worker (its size), or `nobody` -- severity or `--`, `deep-water` marked. `-AsJson` is the route's shape | none |
-| `Route <n\|id> [-Size <label>] [-Assign <me\|size>] [-Milestone <title>] [-Severity <sev>] [-DeepWater] [-Space <slug>] [-WhatIf]` | answers triage's questions for issue `<n>`: **one `gh issue edit` per switch given**, in that order. `-Assign` says who takes it ([who](#who-takes-it)); on a card with no issue behind it, `-Assign` is the one switch and writes the card's `**Assigned:**` line. `-WhatIf` prints every write and makes none | none for an issue -- it writes the tracker; a card's `**Assigned:**` line |
+| `Route <n\|id> [-Size <label>] [-Assign <me\|size>] [-Milestone <title>] [-Severity <sev>] [-DeepWater] [-Space <slug>] [-WhatIf]` | answers triage's questions for issue `<n>`: **one `gh issue edit` per switch given**, in that order. `-Assign` says who takes it ([who](#who-takes-it)); on a card with no issue behind it, `-Assign` is the one switch: `-Assign me` writes the card's `**Assigned:** me` line, and `-Assign <size>` writes (or rewrites) its one `**Agent:**` line with the size's current model id. `-WhatIf` prints every write and makes none | none for an issue -- it writes the tracker; a card's `**Assigned:**` or `**Agent:**` line |
 | `StartWork <id> [-Clip] [-Prompt <path>] [-Space <slug>] [-Launch] [-WhatIf]` | prints the hand-off block for a card in `current/`, or for the Space's GitHub issue `<id>` when no card carries it ([below](#startwork-the-hand-off-block)). `-Clip` puts it on the clipboard and says so in one line; `-Prompt` carries another prompt for this call. `-Launch` hands the same block to a session in a new worktree of the Space's repository, the model from the item's size, and returns with its PID and log ([-Launch](#the-launch-the-block-handed-to-a-session)); `-WhatIf` prints what a launch would run | none -- it reads. With `-Launch`, in the repository you stand in: a worktree under `.claude/worktrees/`, three `*.log` files in its git folder (`git rev-parse --git-path startwork`, never the working tree), and `/.claude/worktrees/` added to its local exclude file unless a rule already ignores it |
 | `OrgChart [-Tree <id>] [-AsJson]` | prints the org as a tree from the hub's `org.json`, one line per seat -- `Position · model [space] (machine)`, indented by level; a vacant seat says `vacant`, the owner's line shows the person, a position with no seats is a pool shown once with its default-model text. `-Tree` prints another tree of the file by id; `-AsJson` prints the response the agent serves at `GET /api/ritual/org`, less the two prompt fields only the agent adds ([the shape](../hub/org.md#the-response)). The file is checked whole first, and a failing one is refused with the sentence ([what is checked](../hub/org.md#what-is-checked)); no hub configured and no `org.json` are refused too, all exit 2. A read like `StartWork`'s | no -- one file in, nothing written |
 
@@ -238,17 +238,24 @@ the label is the size). `fable` is the owner's own seat, never a crew builder; i
 here. `-Assign` and `-Size` that name different sizes are a stated refusal.
 
 On a **card** -- a card with an id of its own (`K7M2`), or any card in a Space with no tracker or a
-`local` one -- there is no issue to write, so `Route <id> -Assign me|<size>` writes ONE footer line,
-`**Assigned:** me` or `**Assigned:** <size>` (`consts.json` `stamps.assigned`), through `Set-P20CardLine`
-and `Write-CardText` -- above `**Created:**`, the card's own line endings kept, an unchanged card not
-written -- and nothing else. The card is found the way every verb finds one (`Resolve-P20CardArgument`:
+`local` one -- there is no issue to write, so `Route <id> -Assign me|<size>` writes ONE footer line
+through `Set-P20CardLine` and `Write-CardText` -- the card's own line endings kept, an unchanged card not
+written -- and nothing else. **`me` is the person**: `**Assigned:** me` (`consts.json` `stamps.assigned`),
+above `**Created:**`. **A size is the model**: `**Agent:** <id>` (`stamps.agent`), under the Assigned line
+when there is one, else above `**Created:**`, where `<id>` is the size's current id in the model map
+(`Config/models.json`'s `current` block, `Get-P20ModelForSize`): a size is a family alias, not an id. The
+Agent line means who is working it, or did. Route writes it at the hand-off; the lead rewrites it whenever
+the work changes hands, and confirms it at sign-off ([cards](../hub/cards.md#the-agent-line)). A card
+holds one Agent line, so a second `-Assign <size>` rewrites it, and the Assigned line is left as it is.
+Route still refuses a size that has no `current` entry, exit 2, naming the map. The card is found the way every verb finds one (`Resolve-P20CardArgument`:
 an id is never a partial name; a partial name from the bridge is refused). Its sizes are the repo's worker
 labels on a connected GitHub Space (the list `-Size` reads), and there is no second list (D-AR10): in a
 Space with no connected GitHub repository there are no worker labels to read, so a card there takes
 `-Assign me` alone and `-Assign <size>` is a stated refusal saying so. A card takes `-Assign` alone; any other switch
-is a stated refusal. `-WhatIf` prints the line it would write. Both halves read the line back --
-`card_assigned`, `Get-P20CardAssigned` -- as the card model's `assigned`
-([cards](../hub/cards.md)).
+is a stated refusal. `-WhatIf` prints the line it would write. Both halves read the lines back --
+`card_assigned`, `Get-P20CardAssigned` and `card_agent`, `Get-P20CardAgent` -- as the card model's
+`assigned` and `agent` ([cards](../hub/cards.md)). A card routed before this rule may carry a size on its
+Assigned line; that is legacy.
 
 Triage says who has each issue, one rule a half (`Get-P20TriageWho`, `who()`): its first assignee --
 `me` (`consts.json` `rituals.assignMe`) when that is the signed-in `gh` user, `@<login>` otherwise -- else

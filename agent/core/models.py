@@ -24,17 +24,23 @@ from pathlib import Path
 from .consts import CONSTS_PATH, models_file
 
 
+def _map_file() -> dict:
+    """The whole model map file; {} when it is missing, unreadable or not a JSON object."""
+    path = CONSTS_PATH.parent / models_file()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 @functools.lru_cache(maxsize=1)
 def model_map() -> dict[str, dict]:
     """The map's rows by id, read once per process from the package's model map.
 
     A map that is missing, unreadable or not the expected JSON reads as EMPTY, so
     every id is unknown and reads as written -- a card is never refused for it."""
-    path = CONSTS_PATH.parent / models_file()
-    try:
-        rows = json.loads(path.read_text(encoding="utf-8-sig")).get("models")
-    except (OSError, ValueError, AttributeError):
-        return {}
+    rows = _map_file().get("models")
     return rows if isinstance(rows, dict) else {}
 
 
@@ -101,3 +107,19 @@ def read_model_current(path=None) -> dict[str, str]:
     except (OSError, ValueError, AttributeError):
         return {}
     return {str(k): str(v) for k, v in block.items()} if isinstance(block, dict) else {}
+
+
+def current_model(family: str | None) -> str | None:
+    """The id a worker size (a family: ``sonnet``, ``opus``) resolves to when a card
+    is routed to it -- the map's ``current`` entry, matched ignoring case -- else
+    None: a size the map has no entry for, or a map that is missing or broken.
+    A size is a family alias, not an id, so this is the one place it becomes one.
+    The CLI's mirror is ``Get-P20ModelForSize``."""
+    want = ("" if family is None else str(family)).strip().lower()
+    current = _map_file().get("current")
+    if not want or not isinstance(current, dict):
+        return None
+    for size, mid in current.items():
+        if str(size).lower() == want and isinstance(mid, str) and mid:
+            return mid
+    return None

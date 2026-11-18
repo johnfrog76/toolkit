@@ -30,8 +30,13 @@
     IS the -Size write -- one worker label, the others removed. On a CARD -- an
     id of its own (K7M2), or any card in a Space with no tracker or a local one
     -- it writes one footer line through Set-P20CardLine (Write-CardText's
-    bytes): `**Assigned:** me` or `**Assigned:** <size>` (consts.json
-    stamps.assigned), and nothing else. A card's sizes are the repo's worker
+    bytes), and nothing else: -Assign me writes `**Assigned:** me` (the person,
+    consts.json stamps.assigned), and -Assign <size> writes `**Agent:** <id>`
+    (stamps.agent) -- who is working it, or did -- with the size's current id
+    from the model map (consts.json models.file, its current block; a size is a
+    family alias, not an id). The card holds ONE Agent line: a second -Assign
+    <size> rewrites it, and the Assigned line is left as it is. A size with no
+    current id in the map is refused. A card's sizes are the repo's worker
     labels on a connected GitHub Space; a Space with no connected GitHub
     repository has none to read, so there -Assign <size> is refused and a card
     takes -Assign me alone. fable is the owner's own seat, a size like the others.
@@ -47,7 +52,8 @@
     milestone that is not one of its open milestones (the hint lists them); a gh
     write that fails; on a card, any switch but -Assign, a value that is neither
     me nor a size, a size in a Space with no connected GitHub repository (no
-    worker labels to read), or an id no card in current/ carries.
+    worker labels to read), a size with no current id in the model map, or an
+    id no card in current/ carries.
 
 .PARAMETER Number
     The issue's number on the Space's repo (a leading # is allowed), or with
@@ -117,7 +123,8 @@ if ($Help) {
     Write-Host ""
     Write-Host "  One gh write per switch: a size (a worker label), an assignee, a milestone, a severity, deep-water."
     Write-Host "  -Assign me takes the issue yourself; -Assign <size> is -Size. On a card with no issue behind it,"
-    Write-Host "  -Assign writes one **Assigned:** line and nothing else. -WhatIf prints the writes and makes none."
+    Write-Host "  -Assign me writes one **Assigned:** me line, and -Assign <size> writes (or rewrites) the card's"
+    Write-Host "  one Agent line with the size's current model id. -WhatIf prints the writes and makes none."
     Write-Host ""
     return
 }
@@ -190,7 +197,7 @@ if (-not $cardMode -and $trackerKind -ne 'github') {
     exit 2
 }
 
-# -- A card: one **Assigned:** line, and nothing else ---------------------------
+# -- A card: one **Assigned:** line for me, one **Agent:** line for a size ------
 if ($cardMode) {
     if ($Size -or $Milestone -or $Severity -or $DeepWater) {
         Write-CliError -Message 'A card takes only -Assign: -Size, -Milestone, -Severity and -DeepWater write a GitHub issue.' `
@@ -200,6 +207,9 @@ if ($cardMode) {
     . (Join-Path $PSScriptRoot 'Resolve-HubConfig.ps1')
     . (Join-Path $PSScriptRoot 'Resolve-CardName.ps1')
     . (Join-Path $PSScriptRoot 'Set-CardLine.ps1')
+    if (-not (Get-Command Get-P20ModelForSize -ErrorAction SilentlyContinue)) {
+        . (Join-Path $PSScriptRoot 'Get-PromptFileStatus.ps1')
+    }
     $hubRoot = ''
     if ($cfg) { $hubRoot = [string]$cfg.PromptsRoot }
     if (-not (Test-P20HubRoot $hubRoot)) {
@@ -290,17 +300,38 @@ if ($cardMode) {
             exit 2
         }
     }
-    $stamp = [string](Get-P20Consts).stamps.assigned
+    # Who takes it, on a card (#466): me is the person, on the **Assigned:** line;
+    # a size is the model that will work it, on the **Agent:** line -- the size's
+    # current id from the model map (a size is a family alias, not an id). The
+    # one Agent line is REWRITTEN when the work changes hands; Assigned is left
+    # as it is. A size the map has no current id for is refused.
+    $assignedStamp = [string](Get-P20Consts).stamps.assigned
+    $stamp = $assignedStamp
+    $lineValue = $value
+    $insertAfter = @()
+    if (-not $assignMe) {
+        $lineValue = Get-P20ModelForSize -Size $value -PackageRoot $repoRoot
+        if (-not $lineValue) {
+            $mapFile = [string](Get-P20Consts).models.file
+            Write-CliError -Message "'$value' has no current model in $mapFile, so Route cannot say which model works the card, and nothing was written." `
+                -Hint "Give the size a current id in ${mapFile}'s current block, or -Assign $meWord."
+            exit 2
+        }
+        $stamp = [string](Get-P20Consts).stamps.agent
+        $insertAfter = @('^' + [regex]::Escape($assignedStamp))
+    }
     $label = Get-P20CardId -Name $file.Name -Pattern (Get-P20CardIdPattern -WorkItemTypes $types)
     if (-not $label) { $label = $file.Name }
     if ($WhatIf) {
-        Write-Output "  [WhatIf] $($file.Name): $stamp $value"
+        Write-Output "  [WhatIf] $($file.Name): $stamp $lineValue"
         Write-Output "  [WhatIf] No changes were made."
         exit 0
     }
-    $changed = Set-P20CardLine -Path $file.FullName -Stamp $stamp -Value $value
-    if ($changed) { Write-Output "Assigned $label to ${value}: $stamp $value ($($file.Name))." }
-    else { Write-Output "$label already says $stamp $value -- nothing written." }
+    $changed = Set-P20CardLine -Path $file.FullName -Stamp $stamp -Value $lineValue -InsertAfter $insertAfter
+    $verb = 'Assigned'
+    if (-not $assignMe) { $verb = 'Routed' }
+    if ($changed) { Write-Output "$verb $label to ${value}: $stamp $lineValue ($($file.Name))." }
+    else { Write-Output "$label already says $stamp $lineValue -- nothing written." }
     exit 0
 }
 

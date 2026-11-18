@@ -20,28 +20,34 @@ decided, and what changed all end up written in it, not only in this chat.
    acceptance criteria or definition of done, and any questions already written down. If it names a
    spec, a design note or a document, read that too before you change anything. Start the work from
    what is written; ask only about something the card does not answer and you cannot find out.
-2. **Name yourself on the card.** If you are an AI agent, write one footer line,
-   `**Agent:** <your model id>`, beside the card's `**Assigned:**` line (or above `**Created:**` when it
-   has none) -- the model's own id, as its provider writes it (`claude-sonnet-5-5`, `gpt-5`), not a
-   display name. The person who owns the card stays on `**Assigned:**`; the Agent line says who did the
-   work. A card already carrying an Agent line keeps its first one. A person working alone writes
-   nothing here, and the line is never written as `Agent: none`.
-3. **Take the branch from current main.** The card's `## Branch` section names it. In the code
+2. **Take the branch from current main.** The card's `## Branch` section names it. In the code
    repository: `git fetch origin`, then `git switch -c <branch> origin/main` -- or, if the branch already
    exists, `git switch <branch>` and bring it up to date with main. An issue with no card: name the
    branch for the issue's number and title.
-4. **Do what the card says**, in small commits that each say what changed and why. Run the
+3. **Do what the card says**, in small commits that each say what changed and why. Run the
    repository's own tests for what you touch, and change its documentation in the same commit as the
    behaviour it describes.
-5. **Thread each commit into the card**: run `tkThreadHash` from the code repository after
+4. **Thread each commit into the card**: run `tkThreadHash` from the code repository after
    committing. It writes every commit on the branch into the card as its own `- <hash> <message>` bullet,
    which is what moves the card to In Progress; never type a hash in by hand, and never amend a commit
    to backfill one.
-6. **Write the card as you go.** Fill `## Summary` (what was done and why, in plain words),
+5. **Write the card as you go.** Fill `## Summary` (what was done and why, in plain words),
    `## Described Changes` (up to five bullets -- the pull request's description is built from them) and
    `## Implementation Details` (one row per file you changed, matching `git diff --stat` against main).
    Write the diagnosis and every decision -- and the alternative you rejected, and why -- into the card,
    not only into this conversation.
+6. **Sign off: confirm who did the work.** The card's `**Agent:** <model id>` line means who is working
+   it, or did. `Route <id> -Assign <size>` writes it at the hand-off, with the size's current model id
+   (and refuses a size the model map has no `current` entry for); the lead rewrites it whenever the work
+   changes hands, and confirms it at sign-off. So the session that ships the card makes sure the card
+   carries one such line, beside `**Assigned:**` (or above `**Created:**` when it has none): its own model
+   if it did the work, or the builder's model if it handed the work on. Write the model's own id, as its
+   provider writes it (`claude-sonnet-5-5`, `gpt-5`), not a display name. A builder handed this card by a
+   lead leaves the line to the lead. The card carries ONE Agent line: when the work changes hands -- you
+   take it back from a builder, or hand it on -- rewrite that line, so it always names who is doing the
+   work now, and never add a second one. Earlier values live in the hub's history. A person working
+   alone writes nothing here, and the line is never written as `Agent: none`. A commit's
+   `Co-Authored-By` trailer only says who made the commit, so it does not stand in for the line.
 7. **When the code is ready**, run [pr-ship](pr-ship.prompt.md): it checks those three sections against
    the diff, then commits, pushes and opens the draft pull request with `tkNewPR`. Stop there.
 
@@ -52,7 +58,7 @@ decided, and what changed all end up written in it, not only in this chat.
 | Read the card, the issue and the documents it names | yes | -- |
 | Create or update the branch from current main | yes | -- |
 | Change code, tests and documentation the card asks for | yes | -- |
-| Write the card's `**Agent:**` line, when an agent does the work | yes | -- |
+| Confirm the card's `**Agent:**` line at sign-off, naming the model that did the work | yes, the session that ships the card, rewriting its one line whenever the work changes hands (`Route <id> -Assign <size>` writes it at the hand-off); a builder handed it by a lead leaves it to the lead | -- |
 | Thread commits into the card (`tkThreadHash`) | yes | -- |
 | Write Summary, Described Changes and Implementation Details | yes, as the work goes | reviews |
 | Push to or merge into main | never | yes |
