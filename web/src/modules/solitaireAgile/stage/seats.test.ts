@@ -43,8 +43,9 @@ interface TeamCase {
   space?: string;
   expected: {
     team: { size: number };
-    workers: { label: string; name: string; empty: boolean; present: boolean }[];
+    workers: { label: string; name: string; empty: boolean; present: boolean; plate?: string }[];
     round: Speaker[];
+    windows?: Record<string, string>;
   };
 }
 const table = JSON.parse(fs.readFileSync(path.join(FIXTURES, "standup-team.json"), "utf8")) as {
@@ -150,8 +151,21 @@ describe("the stage seats every row of the shared room table", () => {
     it(`the ${c.name} case: its round in turn order, a cast member in its own window, ${
       ROOM_WINDOWS - Math.max(c.expected.team.size, 1 + c.expected.round.length)
     } desks`, () => {
-      const record = c.expected.workers.map((w) => worker(w.label, w.empty, w.present, w.name));
+      const record = c.expected.workers.map((w) => ({
+        ...worker(w.label, w.empty, w.present, w.name),
+        plate: w.plate ?? "",
+      }));
       const room = dealRoom(responseOf(record, c.expected.round, c.space ?? null));
+      // Each member in the window the table names, and wearing the plate the
+      // response gives -- its family in capitals for one that keeps no window.
+      if (c.expected.windows)
+        for (const m of room.members.filter((x) => !x.cast))
+          expect([m.worker.label, m.castId]).toEqual([
+            m.worker.label,
+            c.expected.windows[m.worker.label],
+          ]);
+      for (const m of room.members.filter((x) => !x.cast))
+        expect(seatedPlate(m)).toBe(m.worker.plate || `${m.persona} (${m.worker.label})`);
       expect(room.members.map((m) => [m.worker.label, m.cast])).toEqual(
         c.expected.round.map((r) => [r.label, r.cast]),
       );
@@ -162,6 +176,21 @@ describe("the stage seats every row of the shared room table", () => {
         expect(room.desks).toHaveLength(ROOM_WINDOWS - c.expected.team.size);
     });
   }
+});
+
+describe("a member a card names whose family keeps no window", () => {
+  it("wears its family in capitals, the plate the response gives, in the next free window", () => {
+    const c = table.cases.find((x) => x.name === "no-kept-window")!;
+    const record = c.expected.workers.map((w) => ({
+      ...worker(w.label, w.empty, w.present, w.name),
+      plate: w.plate ?? "",
+    }));
+    const grok = dealRoom(responseOf(record, c.expected.round, c.space ?? null)).members.find(
+      (m) => m.worker.label === "grok",
+    )!;
+    expect(seatedPlate(grok)).toBe("GROK");
+    expect(grok.castId).toBe(c.expected.windows!.grok);
+  });
 });
 
 describe("a response the round does not account for is seated by its record", () => {
