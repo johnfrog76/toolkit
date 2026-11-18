@@ -433,8 +433,7 @@ function Get-P20SpaceFieldSchema {
     # and the default are the contract's (consts.json rituals.teamSizes, teamSizeDefault).
     $teamSizes = @((Get-P20Consts).rituals.teamSizes | ForEach-Object { [string]$_ })
     $teamDefault = [string](Get-P20Consts).rituals.teamSizeDefault
-    $teamSeats = @($teamSizes | ForEach-Object { [string]([int]$_ - 1) })
-    $fields += [PSCustomObject]@{ key = 'features.teamSize'; scope = 'org'; type = 'int'; allowed = $teamSizes; required = $false; help = "How many are in Team Agile's standup in this Space: the room, the chair included, so $($teamSeats[0..($teamSeats.Count - 2)] -join ', ') or $($teamSeats[-1]) members sit. Members with work take the seats first, then the idle; the rest are absent today and say nothing in the round, while the detail and the brief keep them. Unset is $teamDefault." }
+    $fields += [PSCustomObject]@{ key = 'features.teamSize'; scope = 'org'; type = 'int'; allowed = $teamSizes; required = $false; help = "How many developers attend standup? Unset is $teamDefault, the full team." }
     return $fields
 }
 

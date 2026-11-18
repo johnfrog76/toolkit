@@ -1267,10 +1267,12 @@ function demoChair(day: number, n: number): string[] {
 }
 
 describe("no silent face", () => {
-  it("the chair's made-up yesterday here is the fill's: the prose table's, in its room of three", () => {
+  it("the chair's made-up yesterday here is the fill's: the prose table's, in its full room", () => {
+    // The table's friday room is full: its three members and the invented cast
+    // members that fill the seats left, so the chair picks after the eighth.
     const day = standupDayOfYear(friday.asOf);
     expect(proseCase("friday").workers).toHaveLength(3);
-    expect(demoChair(day, 3)).toEqual(proseCase("friday").chair);
+    expect(demoChair(day, MEMBER_SEATS)).toEqual(proseCase("friday").chair);
   });
 
   it("the idle pair rule here is the fill's: it gives the shared table's indices", () => {
