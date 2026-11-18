@@ -125,6 +125,7 @@ After a `---` rule, bold-label lines. **This is the part of the model that is st
 **From:** client-weekly-2026-09-11
 **Billable:** no
 **Assigned:** me
+**Agent:** claude-sonnet-5-5
 **Before:** ../assets/214/before.png
 **Cover:** ../assets/214/cover.png
 **Created:** 2026-09-14
@@ -140,6 +141,7 @@ After a `---` rule, bold-label lines. **This is the part of the model that is st
 | `**From:**` | The meeting record an agenda line came from, by its file stem: `YYYY-MM-DD` for the 1:1, `<series>-YYYY-MM-DD` for a series -- which says the series and the date. **No line means the card came from no meeting.** The value is the first such line's, trimmed; an empty line names none | `NewPrompt -From <record>`, at birth, directly above `**Created:**` ([communication](../modules/communication.md#an-agenda-line-becomes-a-card)) | the model's `from_record` (`card_from_record`, held to `Tests/fixtures/parsers/from-lines.json`; the CLI writes the line and has no reader of it). `stamps.from` |
 | `**Billable:**` | `no` takes the card off Daily and the standup. **No line means billable** -- "billable again" removes the line | `Billable -No`, through `Set-P20CardLine` | Daily and Team Agile's standup (one reader a half: `card_billable`, `Test-P20CardBillable`); the *Not billable* tag. `stamps.billable` |
 | `**Assigned:**` | Who takes the card: `me`, or a size -- a worker label (`sonnet`, `opus`, `fable`; `fable` is the owner's own seat). **No line means nobody.** The value is the first such line's, trimmed. On a GitHub issue the tracker's own fields say who -- the assignee, or the worker label -- so the line is for a card with no issue behind it | `Route <id> -Assign me\|<size>` (Team Agile, D-AR10), through `Set-P20CardLine` | the model's `assigned` (one reader a half: `card_assigned`, `Get-P20CardAssigned`, held to `Tests/fixtures/parsers/assigned-lines.json` from both suites). `stamps.assigned` |
+| `**Agent:**` | Who did the work, when an AI agent did: the model's id, as its provider writes it (`claude-sonnet-5-5`, `gpt-5`). The person owns the card on `**Assigned:**`; the agent worked it. **No line means a person worked it alone**, and the line is never written as `Agent: none`. The value is the first such line's, trimmed, and is never parsed: what it shows comes from the model map ([below](#the-agent-line)) | the agent that works the card, by hand, as the shipped build prompt (every `StartWork` block) and the how-we-work note tell it to -- no verb writes it | the model's `agent` (one reader a half: `card_agent`, `Get-P20CardAgent`, held to `Tests/fixtures/parsers/agent-lines.json` from both suites). `stamps.agent` |
 | `**Cover:**` | The card's picture: a path relative to the card's folder, `../assets/<card key>/cover.<ext>`. **No line means no picture**; a line whose file is missing, or that resolves outside the Space's `assets/`, reads as none too | `Cover`, or `NewPrompt -Cover`, through `Set-P20CardLine` | the board's card face, the list's thumbnail, the card page; the model's `cover`. `stamps.cover` |
 | `**Before:**` | The other half of a before/after proof, the same way: `../assets/<card key>/before.<ext>` | `Cover -Before`, or `NewPrompt -Before` | the card page, side by side with the cover; the model's `before`. `stamps.before` |
 | `**Created:**` | `yyyy-MM-dd`, the day the card was made -- or the day the work was, with `NewPrompt -Date` | `NewPrompt` | Daily, reviews, the engagement timeline. `stamps.created` |
@@ -162,6 +164,27 @@ with the package, so it is never recounted -- only re-aimed at the latest earlie
 renames a plain one to `-r1`. A fourth, `> Design:` (the table above), points at a design and is **never
 repaired**: its link is for the person reading the file and may go stale when the design moves; the id
 after it is what the agent resolves.
+
+### The Agent line
+
+A card says who worked it on the same line whatever its tracker -- Azure DevOps, GitHub, or none -- so
+every reader gets one answer from one record, not from a commit trailer or a tracker label. The value is a
+**model id**, the same id `Config/claude-prices.json` and `Burn -Log`'s usage records use, so a card can be
+joined to what its work cost.
+
+What an id MEANS is one map, `Config/models.json` (`consts.json` `models.file`), read by every half: a row
+per known id with its `provider` (`anthropic`, `openai`, `xai`, ...), its `family` (`sonnet`, `gpt`, ...),
+its display `name` (`Sonnet 5.5`) and, where there is one, the `coAuthor` name a commit trailer carries.
+Adding a model is one row. The lookup is `model_info` (`agent/core/models.py`) and `Get-P20ModelInfo`
+(`Scripts/Get-PromptFileStatus.ps1`), both answering `{ id, known, provider, family, name }`:
+
+- a **known** id takes its provider, family and name from its row;
+- an id with **no row** reads as written -- `known` false, `name` the id, `provider` and `family` null --
+  and is reported, never guessed at. Nothing parses an id for a family, and an unknown id is left out of
+  any cost, since only the price table's rows can be priced.
+
+`Tests/fixtures/parsers/models.json` holds the two lookups to one table. The card keeps the id; a reader
+that shows it shows the map's name.
 
 ### Milestone and sprint: two lines
 
@@ -449,6 +472,7 @@ fields, so nothing downstream parses a heading or a filename (`PromptInfo`, `age
 | `pinned` | NOT read from the file -- asked of the tracker: the card's `tracker` is `github`, its `**ADO Link:**` is an issue of the Space's own repository, and that number is in the repository's pinned set (one `gh api graphql` `pinnedIssues` call per repo, held 60 seconds and dropped when `EditItem` runs) | `false` unless all three hold **and** the Space is GitHub at Tier 1; at Tier 2, on Azure DevOps and on no tracker `gh` is not asked. The board's card face wears the pin and "Pinned on GitHub" in its meta line and sorts pinned cards first within a lane; the list and the detail route do not carry it |
 | `billable` | no `**Billable:** no` line | default `true` |
 | `assigned` | the first `**Assigned:**` line's value, trimmed | `me`, a size, or `""` -- nobody; on the list and the detail route |
+| `agent` | the first `**Agent:**` line's value, trimmed | the model id as written, or `""` -- a person worked it alone; on the list and the detail route. Its provider, family and name are the model map's ([the Agent line](#the-agent-line)), not the field's |
 | `from_record` | the first `**From:**` line's value, trimmed | the meeting record's stem (`2026-10-28`, `client-weekly-2026-10-28`), or `null` -- no line, or an empty one; on the list and the detail route. Named `from_record` because `from` is a Python keyword |
 | `status` | derived, above | `Backlog`, `Active`, `In Progress`, `Code Review` (and `Done` for archive readers) |
 | `progress`, `checked`, `total` | the checkboxes | `--` when there are none |
@@ -482,6 +506,7 @@ rule -- the file's own line ending, no BOM -- for the one hub file it does edit,
 | `GetPRComments` | writes `PR URL:` if absent; appends review rounds under `## PR Review Comments`. Append-only, safe to re-run. It also writes a side record, `pr-comments/<date>-<repository>-PR<id>.md` in the Space, added to rather than replaced by a second fetch the same day, except with `-OutputFile`, which writes only the file it names ([CLI](../CLI.md)) |
 | `Billable` | adds or removes `**Billable:** no` |
 | `Route <id> -Assign` | writes `**Assigned:** me` or `**Assigned:** <size>` on a card with no issue behind it -- a card with an id of its own, or any card in a Space with no tracker or a local one; nothing else in the file moves (Team Agile) |
+| (the agent working the card) | writes `**Agent:** <its model id>` beside `**Assigned:**`, by hand, as the build prompt says -- no verb writes the line |
 | `NewItem -FromCard` | files the card as a GitHub issue -- its name and Summary, the body ending `Toolkit card: <id>` -- and writes the issue's URL into `**ADO Link:**`; refuses a card that is already linked |
 | `Cover` | copies a picture into `<space>/assets/<card key>/` and writes `**Cover:**` (or `**Before:**`); `-Remove` deletes both. `NewPrompt -Cover` / `-Before` attach the same way at birth |
 | `Move` | adds `**Started:**` or `**Review:**` with today's date (a `backlog/` card moved to `current/` first); `-To Done` is `Archive`; `-To Active` / `-To Backlog` move the file between `backlog/` and `current/` and write nothing |
