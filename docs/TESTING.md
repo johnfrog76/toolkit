@@ -380,7 +380,22 @@ so two runs cannot collide on one. The browser smoke, which does use the dev ser
 
 Without `-Keep` the folder is removed after the summary, whatever the verdict, and a link inside it is unlinked,
 never followed. With `-Keep` it stays, so a failure can be read afterwards: the run's history is in its
-`history/` folder. Remove it yourself when you are done.
+`history/` folder. Remove it yourself when you are done. A kept folder holds a `.p20-kept` marker file, which is
+how a later run knows to leave it.
+
+**A run that is stopped.** Ctrl+C reaches the same `finally` that ends a normal run, so a stopped run removes its
+folder too (after the child has exited). A run that is killed outright runs no `finally`, and its folder stays.
+Every `-Isolated` run therefore starts by sweeping `/tmp` for those, and says `Removed <folder>, left by an earlier
+isolated run that was stopped.` for each one it removes. The sweep takes a folder only when all of this holds:
+
+- its name is a run folder's (`p20-isolated-<process id>-<random>`) and it is a real folder, never a link; nothing
+  else in `/tmp` is read or touched;
+- it was last written more than a day ago;
+- it holds no `.p20-kept` marker, so a folder `-Keep` left is never swept, however old;
+- the process id in its name is not alive, so a run that is still going is never removed. An id the system has
+  reused keeps a dead run's folder until that process ends, which errs on the side of leaving it.
+
+The age, the marker's name and the line are in `Get-P20IsolatedRunPrefix` (`Scripts/TestAll-Isolated.ps1`).
 
 **A known limit: the shell you type it in.** Only the child is isolated. The PowerShell that runs
 `tkTest -Isolated` itself started before the switch was read, so it read the real home's startup caches, and it
@@ -390,7 +405,7 @@ in place, so it is left as it is; if two runs ever do crash at the launcher's ow
 **macOS only, in this version.** On Linux and Windows `-Isolated` refuses and says so (exit 2), and so does
 `-Keep` without `-Isolated` everywhere. There, run one `tkTest` at a time. `tkTestToolkit -TestAll` holds the
 plan (what each variable is set to, what is carried, the socket-path budget), the two refusals on every host,
-and on macOS a stubbed isolated run end to end.
+the sweep of stale folders (in a scratch base: stale, fresh, kept, live and unrelated folders), and on macOS a stubbed isolated run end to end.
 
 ## In CI
 
