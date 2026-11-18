@@ -242,6 +242,24 @@ EXPECTED = {
     # The standup room's sizes, the chair included, and what unset reads as.
     ("rituals", "teamSizes"): [3, 6, 9],
     ("rituals", "teamSizeDefault"): 9,
+    # The standup's room: the nine windows in grid order (a cast id and its plate),
+    # the chair's, the windows three labels keep, and the engineer's.
+    ("rituals", "room"): {
+        "windows": [
+            {"id": "dev-hero", "plate": "DEV-HERO"},
+            {"id": "ops-dev", "plate": "OPS-DEV"},
+            {"id": "minimalist", "plate": "MINIMALIST"},
+            {"id": "new-hire", "plate": "NEW HIRE"},
+            {"id": "vibemancer", "plate": "AI VIBEMANCER"},
+            {"id": "ultrawide", "plate": "ULTRAWIDE OVERLORD"},
+            {"id": "qa", "plate": "QA ALCHEMIST"},
+            {"id": "pm", "plate": "PM (TREADMILL)"},
+            {"id": "designer", "plate": "DESIGNER"},
+        ],
+        "chair": "pm",
+        "kept": {"fable": "dev-hero", "opus": "vibemancer", "sonnet": "minimalist"},
+        "engineer": "dev-hero",
+    },
     ("rituals", "suggestExclusions"): ["notBillable", "waiting", "inFlight", "theirs", "dismissed"],
     ("rituals", "text"): {
         "title": "Standup -- {date}",
@@ -601,6 +619,7 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.rituals_corner_shapes(), tuple(EXPECTED[("rituals", "cornerShapes")]))
         self.assertEqual(C.rituals_team_sizes(), tuple(EXPECTED[("rituals", "teamSizes")]))
         self.assertEqual(C.rituals_team_size_default(), EXPECTED[("rituals", "teamSizeDefault")])
+        self.assertEqual(C.rituals_room(), EXPECTED[("rituals", "room")])
         self.assertEqual(C.startwork_launch_env_flag(), EXPECTED[("startWork", "launchEnvFlag")])
         self.assertEqual(C.startwork_how_we_work_note(), EXPECTED[("startWork", "howWeWorkNote")])
         self.assertEqual(C.gh_read_limit_open_issues(), EXPECTED[("ghReads", "openIssues")])

@@ -302,6 +302,24 @@ describe("consts.json", () => {
       // The standup room's sizes, the chair included, and what unset reads as.
       teamSizes: [3, 6, 9],
       teamSizeDefault: 9,
+      // The standup's room: the nine windows in grid order (a cast id and its
+      // plate), the chair's, the windows three labels keep, and the engineer's.
+      room: {
+        windows: [
+          { id: "dev-hero", plate: "DEV-HERO" },
+          { id: "ops-dev", plate: "OPS-DEV" },
+          { id: "minimalist", plate: "MINIMALIST" },
+          { id: "new-hire", plate: "NEW HIRE" },
+          { id: "vibemancer", plate: "AI VIBEMANCER" },
+          { id: "ultrawide", plate: "ULTRAWIDE OVERLORD" },
+          { id: "qa", plate: "QA ALCHEMIST" },
+          { id: "pm", plate: "PM (TREADMILL)" },
+          { id: "designer", plate: "DESIGNER" },
+        ],
+        chair: "pm",
+        kept: { fable: "dev-hero", opus: "vibemancer", sonnet: "minimalist" },
+        engineer: "dev-hero",
+      },
       suggestExclusions: ["notBillable", "waiting", "inFlight", "theirs", "dismissed"],
       text: {
         title: "Standup -- {date}",

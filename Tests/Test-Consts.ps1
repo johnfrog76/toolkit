@@ -269,6 +269,10 @@ $expected = [ordered]@{
     # The standup room's sizes, the chair included, and what unset reads as.
     'rituals.teamSizes'          = '3,6,9'
     'rituals.teamSizeDefault'    = '9'
+    # The standup's room: the nine windows in grid order (a cast id and its plate),
+    # the chair's, the windows three labels keep, and the engineer's. A nested
+    # object travels as PowerShell writes it.
+    'rituals.room'               = 'windows=@{id=dev-hero; plate=DEV-HERO} @{id=ops-dev; plate=OPS-DEV} @{id=minimalist; plate=MINIMALIST} @{id=new-hire; plate=NEW HIRE} @{id=vibemancer; plate=AI VIBEMANCER} @{id=ultrawide; plate=ULTRAWIDE OVERLORD} @{id=qa; plate=QA ALCHEMIST} @{id=pm; plate=PM (TREADMILL)} @{id=designer; plate=DESIGNER},chair=pm,kept=@{fable=dev-hero; opus=vibemancer; sonnet=minimalist},engineer=dev-hero'
     'rituals.suggestExclusions'  = 'notBillable,waiting,inFlight,theirs,dismissed'
     # StartWork's hand-off block (D-AR5): the head line and the three section
     # headings the CLI types and the web's copy box finds; Tests/fixtures/start-work/
@@ -321,7 +325,20 @@ foreach ($entry in $expected.GetEnumerator()) {
     $parts = $entry.Key.Split('.')
     $actual = $c.($parts[0]).($parts[1])
     if ($actual -is [array]) { $actual = ($actual -join ',') }
-    elseif ($actual -is [System.Management.Automation.PSCustomObject]) { $actual = (@($actual.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ',') }
+    elseif ($actual -is [System.Management.Automation.PSCustomObject]) {
+        # A value that is itself a list of objects (rituals.room.windows) is written
+        # object by object, the way PowerShell writes one: @{id=...; plate=...}.
+        $actual = (@($actual.PSObject.Properties | ForEach-Object {
+                    $value = $_.Value
+                    if ($value -is [array]) {
+                        $value = (@($value | ForEach-Object {
+                                    if ($_ -is [System.Management.Automation.PSCustomObject]) { '@{' + ((@($_.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" })) -join '; ') + '}' }
+                                    else { [string]$_ }
+                                }) -join ' ')
+                    }
+                    "$($_.Name)=$value"
+                }) -join ',')
+    }
     Assert-Equal $entry.Key $entry.Value $actual
 }
 

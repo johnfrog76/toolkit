@@ -241,6 +241,17 @@ export const RITUALS = consts.rituals as {
    *  answers (Config/settings-workflows.json) must be these. */
   teamSizes: number[];
   teamSizeDefault: number;
+  /** The standup's room (docs/modules/solitaire-agile.md, "The team size: who is
+   *  in the room"): the nine windows in grid order, each a cast id and the plate
+   *  its persona wears; the cast id whose window is the chair's; the window a
+   *  worker label keeps; and the window the engineer takes when no member owns
+   *  it. The CLI and the agent seat the room from it. */
+  room: {
+    windows: { id: string; plate: string }[];
+    chair: string;
+    kept: Record<string, string>;
+    engineer: string;
+  };
   /** The dress guard: its checks in order, and the patterns it reads a
    *  model's sentence with. The agent and the CLI run it; the web reads `spoken`. */
   dressGuards: string[];
