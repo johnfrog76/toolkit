@@ -164,6 +164,42 @@ class StatusMetadataTests(unittest.TestCase):
                 # The model carries it as the card's `assigned`.
                 self.assertEqual(_parse_status_metadata(text)["assigned"], row["expected"])
 
+    def test_who_worked_a_card_by_the_shared_table(self):
+        """The `**Agent:**` footer line (docs/hub/cards.md, consts.json
+        stamps.agent): the model id of the agent that worked the card, beside the
+        Assigned line and read apart from it. The CLI reads it with
+        Get-P20CardAgent; tkTestToolkit -Triage asserts the SAME table,
+        Tests/fixtures/parsers/agent-lines.json, so the two readers cannot drift."""
+        import json
+
+        from agent.core.parsers import card_agent, card_assigned
+
+        table = json.loads((FIXTURES / "agent-lines.json").read_text(encoding="utf-8"))
+        self.assertGreaterEqual(len(table["rows"]), 10)
+        for row in table["rows"]:
+            with self.subTest(row=row["name"]):
+                eol = "\r\n" if row["crlf"] else "\n"
+                text = eol.join(row["lines"]) + eol
+                self.assertEqual(card_agent(text), row["expected"])
+                self.assertEqual(card_assigned(text), row["assigned"])
+
+    def test_what_the_model_map_says_by_the_shared_table(self):
+        """A card's Agent id looked up in the model map (consts.json models.file;
+        docs/hub/cards.md, "The Agent line"): provider, family and name from the
+        id's row, and an id with no row reported as written, never guessed at. The
+        CLI's Get-P20ModelInfo asserts the SAME table, Tests/fixtures/parsers/models.json."""
+        import json
+
+        from agent.core.models import model_info
+
+        table = json.loads((FIXTURES / "models.json").read_text(encoding="utf-8"))
+        self.assertGreaterEqual(len(table["rows"]), 5)
+        self.assertTrue(any(r["expected"]["known"] for r in table["rows"]))
+        self.assertTrue(any(not r["expected"]["known"] for r in table["rows"]))
+        for row in table["rows"]:
+            with self.subTest(row=row["name"]):
+                self.assertEqual(model_info(row["id"]), row["expected"])
+
     def test_the_meeting_a_card_came_from_by_the_shared_table(self):
         """The `**From:**` footer line (docs/hub/cards.md, consts.json stamps.from):
         the meeting record an agenda line came from, by its file stem. NewPrompt -From

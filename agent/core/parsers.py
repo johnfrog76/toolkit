@@ -26,6 +26,7 @@ from .consts import (
     re_review_line,
     re_started_line,
     re_tag_separator,
+    stamp_agent,
     stamp_assigned,
     stamp_billable,
     stamp_created,
@@ -198,6 +199,21 @@ def card_assigned(content: str) -> str:
     mirror is ``Get-P20CardAssigned`` in ``Scripts/Get-PromptFileStatus.ps1``,
     and ``Tests/fixtures/parsers/assigned-lines.json`` holds the two to one table."""
     m = re.search(r"(?m)^" + re.escape(stamp_assigned()) + r"[ \t]*([^\r\n]*?)[ \t]*\r?$", content or "")
+    return m.group(1) if m else ""
+
+
+def card_agent(content: str) -> str:
+    """Who did the work, when an agent did: the value of the card's first
+    ``**Agent:**`` line, trimmed -- a model id, as written -- and "" when it has
+    none (a person worked it alone).
+
+    The line sits beside ``**Assigned:**``: the person owns the card, the agent
+    worked it. The value is never parsed here; ``agent/core/models.py``'s
+    ``model_info`` looks it up in the model map. The one reader of
+    ``stamps.agent`` in this half; the CLI's mirror is ``Get-P20CardAgent`` in
+    ``Scripts/Get-PromptFileStatus.ps1``, and ``Tests/fixtures/parsers/agent-lines.json``
+    holds the two to one table."""
+    m = re.search(r"(?m)^" + re.escape(stamp_agent()) + r"[ \t]*([^\r\n]*?)[ \t]*\r?$", content or "")
     return m.group(1) if m else ""
 
 
