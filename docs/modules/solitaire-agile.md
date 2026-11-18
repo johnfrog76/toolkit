@@ -915,6 +915,13 @@ The seats after the chair's are filled in this order, until the size is reached:
 3. **the labelled workers with nothing routed**, in label order;
 4. **invented cast members**, in the cast's grid order.
 
+**The engineer and a labelled worker are told apart by what they are, not by their label.** A Space
+whose slug is also one of its tracker's worker labels (a Space called `opus` on a repository with an
+`opus` label) has two members that share a name: the engineer, and the worker that label routes to.
+Both sit and both report, at every size with a seat for each, under the same name they wear today. The
+fill keys a member by its kind and its label together, in both halves, so the second of the pair never
+reads as absent.
+
 Whoever is past the size is **absent** today, and nobody reports for them. So four workers with work
 and a size of 3 seat the chair and two of them, and an idle engineer still sits ahead of three working
 labels. Work first loses the least among the labels: absence falls on the idle before anyone with
