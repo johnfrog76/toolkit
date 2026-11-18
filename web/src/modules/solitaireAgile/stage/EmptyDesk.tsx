@@ -3,12 +3,15 @@ import { pf } from "./cast";
 
 // ── The empty desk ───────────────────────────────────────────────────────────
 //
-// A window of the standup's room with nobody in it: an empty chair, a desk and
-// a steaming mug. It is never a face and it never speaks; the round passes it.
+// A window with nobody in it: an empty chair, a desk and a steaming mug. It is
+// never a face and it never speaks; the standup's round passes it.
 //
-// Two things live here and nothing else: the scene (EmptyDesk) and the deal
-// (dealMugLooks), which says which mug each empty window gets. The stage uses
-// both; the Org page draws the scene in a vacant seat and picks its mug itself.
+// Two things live here and nothing else: the deal (MUG_LOOKS and dealMugLooks),
+// which says which mug each of the standup's empty windows gets, and the scene
+// (EmptyDesk) the Org page draws in a vacant seat, picking its mug itself. The
+// standup's room takes the deal, the mugs' names and the steam's rule from
+// here and draws its own desk in the refined cast (./RefinedDesk.tsx); this
+// scene is the Org page's, and is left as that page has always drawn it.
 //
 // The scene is one flat SVG in the stage's own palette (./cast.tsx `pf`), on
 // the tint of the window it sits in. The stage is a picture of a video call and

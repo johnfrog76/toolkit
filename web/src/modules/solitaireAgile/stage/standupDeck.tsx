@@ -28,8 +28,8 @@ import {
   pf,
 } from "./cast";
 import type { TileLook } from "./cast";
-import { EmptyDesk } from "./EmptyDesk";
 import type { MugLook } from "./EmptyDesk";
+import { RefinedDesk } from "./RefinedDesk";
 import { CHAIR_CAST_ID, CHAIR_PLATE, EMPTY_DESK_PLATE, dealRoom, memberPlate } from "./seats";
 import type { Seated } from "./seats";
 import { HEADS, HEAD_FALLBACK, faceBox, leastOverlap, placeBubble } from "./geometry";
@@ -200,7 +200,7 @@ interface TileState {
   detail?: DetailSlot[];
 }
 
-/** A window with nobody in it: the ghost look, the signal light off, and nothing to say. */
+/** A window with nobody in it: the empty desk in full colour, the signal light off, and nothing to say. */
 function DeskTile({ id, label, look }: { id: string; label: string; look: MugLook }) {
   const tint = castById(id).tint;
   return (
@@ -212,7 +212,7 @@ function DeskTile({ id, label, look }: { id: string; label: string; look: MugLoo
       style={{ position: "relative", minHeight: 0 }}
     >
       <ZoomTile tint={tint} label={label} look="ghost">
-        <EmptyDesk look={look} tint={tint} />
+        <RefinedDesk look={look} tint={tint} />
       </ZoomTile>
     </div>
   );

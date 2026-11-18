@@ -11,7 +11,6 @@ import {
   BUBBLE_Z_INDEX,
   CAST,
   castById,
-  LOOK_FILTER,
   SPEAKER_COLOR_VAR,
   SPEECH_MAX_LINES,
   THOUGHT_MAX_HEIGHT,
@@ -797,14 +796,15 @@ describe("the stage's bubbles", () => {
 
 describe("the speaker's frame and the three looks", () => {
   const GREEN = "rgb(111, 207, 151)"; // pf.green
-  const GREY = "rgb(102, 102, 102)"; // the ghost's dot
+  const GREY = "rgb(102, 102, 102)"; // an empty desk's dot
   const layer = (tile: HTMLElement) => within(tile).getByTestId("stage-layer");
+  const plate = (tile: HTMLElement) => within(tile).getByTestId("stage-plate-label");
   const dot = (tile: HTMLElement) => within(tile).getByTestId("stage-dot");
   const frame = (tile: HTMLElement) => within(tile).queryByTestId("stage-frame");
   const framed = (tile: HTMLElement) => frame(tile) !== null;
   const { members, desks } = dealRoom(friday);
 
-  it("exactly one tile a slide is the speaker: data-speaking, the 3px frame inside the box, in colour, a green dot", () => {
+  it("exactly one tile a slide is the speaker: data-speaking, the 3px frame inside the box, a green dot", () => {
     for (let i = 0; i < slides.length; i++) {
       const { view, tile } = drawStage(i);
       const speaking = [
@@ -820,11 +820,9 @@ describe("the speaker's frame and the three looks", () => {
       expect(dot(speaking[0]).style.background).toBe(GREEN);
       // nobody else is framed
       for (const c of CAST) if (tile(c.id) !== speaking[0]) expect(framed(tile(c.id))).toBe(false);
-      // In colour: the speaker, and on a call slide the one called -- nobody else.
-      const coloured = CAST.map((c) => c.id).filter((id) => layer(tile(id)).style.filter === "");
+      // On a call slide one more window is marked, the one called -- nobody else.
       const called = view.container.querySelectorAll('[data-look="called"]');
       expect(called.length).toBe(idOf(slides[i]).startsWith("call-") ? 1 : 0);
-      expect(coloured).toHaveLength(1 + called.length);
       // The called mark is the called window's alone: none on any other slide.
       expect(view.container.querySelectorAll('[data-testid="stage-called-mark"]')).toHaveLength(
         called.length,
@@ -833,7 +831,40 @@ describe("the speaker's frame and the three looks", () => {
     }
   });
 
-  it("a face that is there and not speaking is named: black and white at full brightness, its green dot", () => {
+  it("every window is in full colour on every slide: no picture and no plate is filtered, and nothing is dimmed", () => {
+    for (let i = 0; i < slides.length; i++) {
+      const { view, tile } = drawStage(i);
+      for (const c of CAST) {
+        const t = tile(c.id);
+        expect(layer(t).style.filter).toBe("");
+        expect(layer(t).style.opacity).toBe("");
+        expect(plate(t).style.filter).toBe("");
+        expect(t.style.filter).toBe("");
+      }
+      // Nothing on the stage is drawn in black and white or turned down: not a
+      // tile, not a layer, not a plate, not a drawing inside one.
+      for (const el of view.container.querySelectorAll<HTMLElement>(`.${STAGE_CLASS} *`)) {
+        expect(el.style.filter).not.toMatch(/grayscale|brightness|saturate|contrast/);
+      }
+      view.unmount();
+    }
+  });
+
+  it("the speaker is told apart by its frame alone, and the called window by its ring alone", () => {
+    for (let i = 0; i < slides.length; i++) {
+      const { view } = drawStage(i);
+      const frames = view.container.querySelectorAll('[data-testid="stage-frame"]');
+      expect(frames).toHaveLength(1);
+      expect(frames[0].closest('[data-look="speaking"]')).not.toBeNull();
+      for (const mark of view.container.querySelectorAll('[data-testid="stage-called-mark"]')) {
+        expect(mark.closest('[data-look="called"]')).not.toBeNull();
+        expect((mark as HTMLElement).style.outline).toMatch(/3px dashed/);
+      }
+      view.unmount();
+    }
+  });
+
+  it("a face that is there and not speaking is named: in colour, its green dot, no frame", () => {
     for (let i = 0; i < slides.length; i++) {
       const { view, tile } = drawStage(i);
       for (const id of [CHAIR_CAST_ID, ...members.map((m) => m.castId)]) {
@@ -841,9 +872,8 @@ describe("the speaker's frame and the three looks", () => {
         if (t.getAttribute("data-speaking") === "true") continue;
         if (t.getAttribute("data-look") === "called") continue;
         expect(t.getAttribute("data-look")).toBe("named");
-        expect(layer(t).style.filter).toBe("grayscale(1)");
-        expect(layer(t).style.filter).not.toMatch(/brightness/);
-        // the dot is outside the filtered picture, so the signal light stays green
+        expect(layer(t).style.filter).toBe("");
+        // the dot is the plate's, outside the picture: the signal light
         expect(layer(t).contains(dot(t))).toBe(false);
         expect(dot(t).style.background).toBe(GREEN);
         expect(framed(t)).toBe(false);
@@ -852,7 +882,7 @@ describe("the speaker's frame and the three looks", () => {
     }
   });
 
-  it("an empty desk is the ghost on every slide -- grayscale, dimmed, the grey dot, unframed: nobody is there", () => {
+  it("an empty desk is in colour on every slide -- the drink on it, the grey dot, unframed: nobody is there", () => {
     expect(desks.length).toBeGreaterThan(0);
     for (let i = 0; i < slides.length; i++) {
       const { view, tile } = drawStage(i);
@@ -860,16 +890,31 @@ describe("the speaker's frame and the three looks", () => {
         const t = tile(d.castId);
         expect(t.getAttribute("data-look")).toBe("ghost");
         expect(t.getAttribute("data-lit")).toBe("false");
-        expect(layer(t).style.filter).toBe(LOOK_FILTER.ghost);
+        expect(layer(t).style.filter).toBe("");
+        expect(plate(t).style.filter).toBe("");
+        // What says the seat is empty is the drink on the desk, the one the day dealt.
+        expect(within(t).getByTestId("empty-desk").getAttribute("data-look")).toBe(d.look);
+        expect(within(t).queryByTestId("empty-desk-mug")).not.toBeNull();
+        expect(within(t).queryByTestId("empty-desk-chair")).not.toBeNull();
+        expect(t.querySelector("[data-refined]")).toBeNull();
         expect(dot(t).style.background).toBe(GREY);
         expect(framed(t)).toBe(false);
       }
       view.unmount();
     }
-    expect(LOOK_FILTER.ghost).toBe("grayscale(1) brightness(0.6)");
   });
 
-  it("an idle member is a speaker too: the one tile in colour and in the frame", () => {
+  it("every face is the refined cast's, matched by the cast id of its window", () => {
+    const { tile } = drawStage(0);
+    for (const id of [CHAIR_CAST_ID, ...members.map((m) => m.castId)]) {
+      const busts = tile(id).querySelectorAll("[data-refined]");
+      expect(busts).toHaveLength(1);
+      expect(busts[0].getAttribute("data-refined")).toBe(id);
+      expect(busts[0].getAttribute("aria-hidden")).toBe("true");
+    }
+  });
+
+  it("an idle member is a speaker too: the one tile in the frame", () => {
     const { tile } = drawStage(at("sonnet"));
     expect(tile("minimalist").getAttribute("data-speaking")).toBe("true");
     expect(framed(tile("minimalist"))).toBe(true);

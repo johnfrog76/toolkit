@@ -158,9 +158,11 @@ web/
     │   ├── OrgParts        an office door (frame, wall, sill) and the plate under it
     │   ├── VacantSeat      a seat nobody sits in -- today a placeholder; the empty desk scene replaces its inside
     │   └── stage/          the played view: one lazy chunk with the deck engine
-    │       ├── cast.tsx        the Remote Standup's atoms, by copy from the Wasteland (no bios); reduced motion stills them
+    │       ├── cast.tsx        the Remote Standup's tiles, bubbles and nine scenes, by copy from the Wasteland (no bios), drawn in the refined cast; reduced motion stills them
+    │       ├── refined.tsx     the refined style for the stage's own drawings: the shade, the wall's light, the one shadow
     │       ├── seats.ts        the room: nine windows (ROOM_WINDOWS), kept labels in their own window, the rest dealt by position, PERSONA (label) plates, empty desks and their mugs
-    │       ├── EmptyDesk.tsx   a window with nobody in it: a chair, a desk and a steaming mug in eight looks, and the day's deal of them
+    │       ├── EmptyDesk.tsx   the eight mug looks and the day's deal of them, and the desk the Org page draws in a vacant seat
+    │       ├── RefinedDesk.tsx a window with nobody in it, in the refined cast and full colour: a flat-backed chair, a shut laptop and a steaming drink
     │       ├── standupDeck.tsx the standup response -> an audiobook Deck: the board, the open, a call and a turn a member, the chair's status, the close
     │       └── StandupPlay     /deck/ritual/standup: the resolver, handed to the deck engine's GeneratedDeckHost
     ├── landing/          the landing page: no router, no store, no agent (see "The landing page")
