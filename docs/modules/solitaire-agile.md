@@ -1912,11 +1912,6 @@ Each of these is a block on [Known gaps](../KNOWN-GAPS.md), with its issue:
 - **The bell and Home's tips do not suggest yet.** They are the suggestion's later surfaces, behind the
   same switch; the chair's line and [the PM Corner](#the-pm-corner-the-line-the-chevron-the-confetti) are the two built
   ([The bell and Home's tips carry no suggestion](../KNOWN-GAPS.md#the-bell-and-homes-tips-carry-no-suggestion)).
-- **The stage draws no invented cast member.** The terminal's round and the agent's `work.workers` fill
-  the room to the Space's size; the played view still seats the record -- the labelled workers and the
-  engineer, in the response's order -- so a window an invented member sits in is an empty desk there, and
-  the engineer speaks in the response's place and not first
-  ([The played standup seats the record, not the room](../KNOWN-GAPS.md#the-played-standup-seats-the-record-not-the-room)).
 - **The celebration's mark is per browser.** Another browser, or one whose site data was cleared, celebrates a
   reached milestone once more on first sight
   ([A reached milestone celebrates once per browser](../KNOWN-GAPS.md#a-reached-milestone-celebrates-once-per-browser)).
