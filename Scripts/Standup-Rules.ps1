@@ -284,11 +284,15 @@ function Get-P20StandupIssueStart {
 function Get-P20StandupDatesQuery {
     <#
       The one GraphQL query a dates read sends for a repo: c<i> the i-th hash's
-      commit, i<n> issue n's labelled and assigned events; the owner and name
-      travel as variables. A hash that is not 7 to 40 hex characters is never
-      written into it. LF-joined, LF-terminated. dates_query in the agent.
+      commit, i<n> issue n's labelled and assigned events, then t<i> the i-th
+      trailer hash's commit with its message -- the hashes whose co-author
+      trailers the standup reads (Get-P20StandupTrailerAsks), riding the same
+      call; the owner and name travel as variables. With no trailer hashes the
+      text is what it was before they existed. A hash that is not 7 to 40 hex
+      characters is never written into it. LF-joined, LF-terminated.
+      dates_query in the agent.
     #>
-    param([string[]]$Hashes, [int[]]$Numbers)
+    param([string[]]$Hashes, [int[]]$Numbers, [string[]]$Trailers)
     $lines = New-Object 'System.Collections.Generic.List[string]'
     $lines.Add('query($owner: String!, $name: String!) {')
     $lines.Add('  repository(owner: $owner, name: $name) {')
@@ -301,6 +305,11 @@ function Get-P20StandupDatesQuery {
     foreach ($n in @($Numbers | Where-Object { $null -ne $_ })) {
         $lines.Add("    i${n}: issue(number: $n) { timelineItems(itemTypes: [LABELED_EVENT, ASSIGNED_EVENT], first: $first) { nodes { __typename ... on LabeledEvent { createdAt label { name } } ... on AssignedEvent { createdAt } } } }")
     }
+    $t = 0
+    foreach ($h in @($Trailers | Where-Object { $_ })) {
+        if ([string]$h -cmatch '^[0-9a-f]{7,40}$') { $lines.Add("    t${t}: object(expression: `"$h`") { ... on Commit { oid authoredDate message } }") }
+        $t++
+    }
     $lines.Add('  }')
     $lines.Add('}')
     return (($lines.ToArray()) -join "`n") + "`n"
@@ -308,13 +317,17 @@ function Get-P20StandupDatesQuery {
 
 function ConvertFrom-P20StandupDates {
     <#
-      A dates answer's repository object -> @{ commitDates; issueStarts }:
-      hash -> its authored instant, or $null; issue number (as a string) -> its
-      start. A commit is dated only when GitHub resolved the hash to a commit
+      A dates answer's repository object -> @{ commitDates; issueStarts;
+      messages }: hash -> its authored instant, or $null; issue number (as a
+      string) -> its start; and a trailer hash's first seven characters, lower
+      case -> its commit message (the shape Resolve-P20CardAgent -Messages
+      takes). A commit is dated only when GitHub resolved the hash to a commit
       whose oid begins with it -- a missing or ambiguous hash is $null, never a
-      guess. An issue with no start is not a key. dates_from_answer in the agent.
+      guess. A trailer hash GitHub resolved dates its commit too when it has no
+      date yet; one it did not (a null object) is skipped. An issue with no
+      start is not a key. dates_from_answer in the agent.
     #>
-    param($Repository, [string[]]$Hashes, [int[]]$Numbers, [string[]]$WorkerLabels)
+    param($Repository, [string[]]$Hashes, [int[]]$Numbers, [string[]]$WorkerLabels, [string[]]$Trailers)
     $commits = @{}
     $starts = @{}
     $i = 0
@@ -337,7 +350,64 @@ function ConvertFrom-P20StandupDates {
         $start = Get-P20StandupIssueStart -Nodes $nodes -WorkerLabels $WorkerLabels
         if ($null -ne $start) { $starts[[string]$n] = $start }
     }
-    return @{ commitDates = $commits; issueStarts = $starts }
+    $messages = @{}
+    $t = 0
+    foreach ($h in @($Trailers | Where-Object { $_ })) {
+        $node = $null
+        if ($null -ne $Repository -and $Repository.PSObject.Properties["t$t"]) { $node = $Repository."t$t" }
+        $t++
+        if ($null -eq $node) { continue }
+        $oid = ([string]$node.oid).ToLowerInvariant()
+        if (-not $oid -or -not $oid.StartsWith([string]$h, [System.StringComparison]::Ordinal)) { continue }
+        $key = ([string]$h).ToLowerInvariant()
+        if ($key.Length -gt 7) { $key = $key.Substring(0, 7) }
+        if (-not $messages.ContainsKey($key)) { $messages[$key] = [string]$node.message }
+        $hasDate = ($commits.ContainsKey([string]$h) -and $null -ne $commits[[string]$h])
+        if (-not $hasDate -and $null -ne (ConvertTo-P20RitualTime $node.authoredDate)) { $commits[[string]$h] = $node.authoredDate }
+    }
+    return @{ commitDates = $commits; issueStarts = $starts; messages = $messages }
+}
+
+function Get-P20StandupTrailerAsks {
+    <#
+      The hashes whose co-author trailers the standup reads, from its own fill:
+      the commits of every card the fill places that has no **Agent:** line
+      (Get-P20CardAgent) -- a card item in a slot, by its own path, and every
+      card joined to an issue in the read, by its link's path (the issues read
+      is the open ones and the ones closed in the window). Never the whole
+      archive, and never a card whose line already answers. Distinct by the
+      first seven characters, in first-seen order. trailer_asks in the agent.
+    #>
+    param($Standup, $Cards, [string[]]$Slots)
+    $byPath = @{}
+    foreach ($card in @($Cards)) {
+        if ($null -eq $card) { continue }
+        $p = [string]$card.path
+        if (-not $p) { $p = ([string]$card.folder) + '/' + [string]$card.file }
+        $byPath[$p] = $card
+    }
+    $paths = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($w in @($Standup.workers | Where-Object { $null -ne $_ })) {
+        foreach ($slot in $Slots) {
+            foreach ($it in @($w.$slot | Where-Object { $null -ne $_ })) {
+                if ($null -ne $it.number -and "$($it.number)" -ne '') { continue }
+                $p = [string]$it.path
+                if ($p -and -not $paths.Contains($p)) { $paths.Add($p) }
+            }
+        }
+    }
+    foreach ($lk in @($Standup.links | Where-Object { $null -ne $_ })) {
+        $p = [string]$lk.path
+        if ($p -and -not $paths.Contains($p)) { $paths.Add($p) }
+    }
+    $hashes = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($p in $paths) {
+        if (-not $byPath.ContainsKey($p)) { continue }
+        $card = $byPath[$p]
+        if (Get-P20CardAgent -Content ([string]$card.body)) { continue }
+        foreach ($h in (Get-P20StandupCardHashes $card)) { if ($h -and -not $hashes.Contains($h)) { $hashes.Add($h) } }
+    }
+    return , ([string[]]$hashes.ToArray())
 }
 
 function Get-P20StandupDateAsks {
@@ -1206,8 +1276,12 @@ function Invoke-P20StandupJoinedFill {
         [string]$PackageRoot,
         $CommitDates,
         $IssueStarts,
-        $TeamSize = $null
+        $TeamSize = $null,
+        # The trailer read's messages (ConvertFrom-P20StandupDates), held for the
+        # reader of a card's agent: accepted and not yet read.
+        $Messages = $null
     )
+    $null = $Messages
     $out = Invoke-P20StandupFill -AsOf $AsOf -Labels $Labels -Issues $Issues -Tracker $Tracker -Space $Space -Window $Window -PackageRoot $PackageRoot -TeamSize $TeamSize
     if (-not $out.tracker.ok) { return $out }
     $out.source = 'both'

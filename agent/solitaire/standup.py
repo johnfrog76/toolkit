@@ -105,7 +105,15 @@ from ..core.consts import (
     status_done,
     status_in_progress,
 )
-from ..core.parsers import _parse_status_metadata, card_assigned, card_billable, card_id, card_milestone, card_tags
+from ..core.parsers import (
+    _parse_status_metadata,
+    card_agent,
+    card_assigned,
+    card_billable,
+    card_id,
+    card_milestone,
+    card_tags,
+)
 from .tracker import read_tracker
 
 FEATURE = "solitaireAgile"
@@ -585,11 +593,14 @@ def issue_started(nodes: list, worker_labels: list[str]) -> str | None:
     return best[1] if best else None
 
 
-def dates_query(hashes: list[str], numbers: list[int]) -> str:
+def dates_query(hashes: list[str], numbers: list[int], trailers: list[str] | None = None) -> str:
     """The one GraphQL query a dates read sends for a repo: ``c<i>`` the
-    i-th hash's commit, ``i<n>`` issue n's labelled and assigned events. The
-    owner and name travel as variables. The mirror of ``Get-P20StandupDatesQuery``;
-    standup-dates.json holds the text."""
+    i-th hash's commit, ``i<n>`` issue n's labelled and assigned events, then
+    ``t<i>`` the i-th trailer hash's commit with its message -- the hashes whose
+    co-author trailers the standup reads (``trailer_asks``), riding the same
+    call. With no trailer hashes the text is what it was before they existed.
+    The owner and name travel as variables. The mirror of
+    ``Get-P20StandupDatesQuery``; standup-dates.json holds the text."""
     lines = ["query($owner: String!, $name: String!) {", "  repository(owner: $owner, name: $name) {"]
     for i, h in enumerate(hashes):
         if _HASH.match(h):
@@ -600,18 +611,29 @@ def dates_query(hashes: list[str], numbers: list[int]) -> str:
             f"first: {TIMELINE_FIRST}) {{ nodes {{ __typename ... on LabeledEvent {{ createdAt label {{ name }} }} "
             "... on AssignedEvent { createdAt } } } }"
         )
+    for i, h in enumerate(trailers or []):
+        if _HASH.match(h):
+            lines.append(f'    t{i}: object(expression: "{h}") {{ ... on Commit {{ oid authoredDate message }} }}')
     lines += ["  }", "}"]
     return "\n".join(lines) + "\n"
 
 
 def dates_from_answer(
-    repository: dict | None, hashes: list[str], numbers: list[int], worker_labels: list[str]
-) -> tuple[dict[str, str | None], dict[int, str]]:
+    repository: dict | None,
+    hashes: list[str],
+    numbers: list[int],
+    worker_labels: list[str],
+    trailers: list[str] | None = None,
+) -> tuple[dict[str, str | None], dict[int, str], dict[str, str]]:
     """A dates answer's ``repository`` object -> (hash -> its authored instant,
-    or None; issue number -> its start). A commit is dated only when the object
-    GitHub resolved is a commit whose oid begins with the hash asked -- a
-    missing or ambiguous hash is None, never a guess. An issue with no start is
-    not a key. The mirror of ``ConvertFrom-P20StandupDates``."""
+    or None; issue number -> its start; a trailer hash's first seven
+    characters, lower case -> its commit message, the shape
+    ``parsers.resolve_card_agent``'s ``messages`` takes). A commit is dated only
+    when the object GitHub resolved is a commit whose oid begins with the hash
+    asked -- a missing or ambiguous hash is None, never a guess. A trailer hash
+    GitHub resolved dates its commit too when it has no date yet; one it did not
+    (a null object) is skipped. An issue with no start is not a key. The mirror
+    of ``ConvertFrom-P20StandupDates``."""
     repo = repository if isinstance(repository, dict) else {}
     commits: dict[str, str | None] = {}
     for i, h in enumerate(hashes):
@@ -627,7 +649,49 @@ def dates_from_answer(
         start = issue_started((timeline or {}).get("nodes") or [], worker_labels)
         if start:
             starts[int(n)] = start
-    return commits, starts
+    messages: dict[str, str] = {}
+    for i, h in enumerate(trailers or []):
+        node = repo.get(f"t{i}")
+        if not isinstance(node, dict):
+            continue
+        oid = str(node.get("oid") or "").lower()
+        if not oid or not oid.startswith(h):
+            continue
+        messages.setdefault(h.lower()[:7], str(node.get("message") or ""))
+        when = node.get("authoredDate")
+        if not commits.get(h) and _when(when) is not None:
+            commits[h] = str(when)
+    return commits, starts, messages
+
+
+def trailer_asks(filled: Standup, cards: list[dict]) -> list[str]:
+    """The hashes whose co-author trailers the standup reads, from its own
+    fill: the commits of every card the fill places that has no ``**Agent:**``
+    line (``parsers.card_agent``) -- a card item in a slot, by its own path, and
+    every card joined to an issue in the read, by its link's path (the issues
+    read is the open ones and the ones closed in the window). Never the whole
+    archive, and never a card whose line already answers. Distinct by the first
+    seven characters, in first-seen order. The mirror of
+    ``Get-P20StandupTrailerAsks``."""
+    by_path = {str(c.get("path") or f"{c.get('folder', '')}/{c.get('file', '')}"): c for c in cards or []}
+    paths: list[str] = []
+    for w in filled.workers:
+        for slot in ceremonies()[CEREMONY]["slots"]:
+            for it in getattr(w, slot):
+                if it.number is None and it.path and it.path not in paths:
+                    paths.append(it.path)
+    for lk in filled.links:
+        if lk.path and lk.path not in paths:
+            paths.append(lk.path)
+    hashes: list[str] = []
+    for p in paths:
+        card = by_path.get(p)
+        if card is None or card_agent(str(card.get("body") or "")):
+            continue
+        for h in card_hashes(card):
+            if h not in hashes:
+                hashes.append(h)
+    return hashes
 
 
 def date_asks(filled: Standup, cards: list[dict]) -> tuple[list[str], list[int]]:
@@ -1154,6 +1218,7 @@ def fill_joined_standup(
     commit_dates: dict | None = None,
     issue_starts: dict | None = None,
     size=None,
+    messages: dict | None = None,
 ) -> Standup:
     """The issues fill, joined with the cards on the id. Pure; the mirror of
     ``Invoke-P20StandupJoinedFill``. With the tracker not answering it is the
@@ -1166,7 +1231,10 @@ def fill_joined_standup(
     inside the window and counts the rest undated; ``issue_starts`` (issue
     number -> its timeline's start) says started for an open issue with no card
     whose work began in the window. None for either is not read, and today's
-    rule stands: every bullet counts, and an issue alone is in progress."""
+    rule stands: every bullet counts, and an issue alone is in progress.
+    ``messages`` (short hash -> commit message, the trailer read's) is held for
+    the reader of a card's agent: accepted and not yet read."""
+    del messages
     out = fill_standup(as_of, labels, issues, tracker_state, space=space, window=window, size=size)
     if not out.tracker.ok:
         return out
@@ -2365,7 +2433,8 @@ def _dated(
     from . import tracker as tracker_read
 
     hashes, numbers = date_asks(filled, cards)
-    if not hashes and not numbers:
+    trailers = trailer_asks(filled, cards)
+    if not hashes and not numbers and not trailers:
         return filled
     repos = tracker_repos(org, projects)
     by_number = {int(i.get("number", 0)): i for i in issues or []}
@@ -2374,8 +2443,12 @@ def _dated(
         numbers_by_repo.setdefault(_issue_repo(by_number.get(n, {}), repos), []).append(n)
     prefix = rituals_worker_label_prefix()
     workers = [str(lab.get("name", "")) for lab in labels or [] if str(lab.get("description") or "").startswith(prefix)]
-    commit_dates, issue_starts, why = tracker_read.dates(repos, hashes, numbers_by_repo, workers, refresh)
-    if why:
+    commit_dates, issue_starts, messages, why = tracker_read.dates(
+        repos, hashes, numbers_by_repo, workers, refresh, trailers=trailers
+    )
+    # Trailers alone, with no date asked: the read is kept for the agent's
+    # reader, and the fill stands as it was -- every bullet counts.
+    if why or (not hashes and not numbers):
         return filled
     return fill_joined_standup(
         now,
@@ -2389,6 +2462,7 @@ def _dated(
         commit_dates=commit_dates,
         issue_starts=issue_starts,
         size=filled.team.size,
+        messages=messages,
     )
 
 

@@ -1356,6 +1356,21 @@ the CLI reads its one repo. The answer is kept for the minute like every other r
 ([One tracker read, kept a minute](#one-tracker-read-kept-a-minute)). An Azure DevOps Space and a cards
 Space make no dates read, and their counts are what they were.
 
+**The trailers ride the same call.** The standup also reads the `Co-Authored-By` trailers of the commits a
+card names, for the reader of a card's agent ([the card](../hub/cards.md), "How a card's agent is worked
+out"). It asks only for the cards the fill places that have no `**Agent:**` line -- a card in a slot, and
+each card joined to an issue in the read (the open issues and the ones closed in the window), never the
+whole archive -- their bullets' hashes, distinct by seven characters (`Get-P20StandupTrailerAsks`,
+`trailer_asks`). Each is one more alias in the same query, after the commits and the issues:
+`t<i>: object(expression: "<hash>") { ... on Commit { oid authoredDate message } }`. A hash asked for its
+date and its trailers is asked once, as a `t` alias, which dates it too; the 50-alias limit counts them
+all; with no such hash the query is the one above, unchanged. The parse returns `messages`, a resolved
+hash's first seven characters, lower case, to its message -- the shape the reader takes -- and skips a
+hash GitHub could not resolve. A standup with trailers to read and no date to ask still makes the call,
+but keeps its fill: with no date asked, every bullet counts. A failed read keeps today's standup. The
+messages are held beside the commit dates and passed to the joined fill, which does not read them yet:
+nobody's seat moves on them.
+
 **Commits** are the card's `- <hash>` bullets -- the same lines that put it In Progress
 (`regex.commitBullet`, the lane rule's own pattern, which captures the hash), so counting them is no
 new read and no second pattern. A hash is compared by its first seven characters, lowercase: a short and a full hash of one commit

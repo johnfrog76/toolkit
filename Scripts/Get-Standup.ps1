@@ -21,7 +21,9 @@
     standup counts was authored, so a card counts only the commits inside the
     window and says the ones it cannot date; and when each open issue with no
     card was first given a worker label or assigned, so it can read started.
-    One call per 50 aliases; none when there is nothing to ask.
+    The same call reads the message of each commit a placed card with no
+    **Agent:** line names, for its co-author trailers. One call per 50
+    aliases; none when there is nothing to ask.
 
     milestone and body are the work grain's: an item groups by its
     milestone, else by the design card its body names. createdAt and
@@ -343,17 +345,28 @@ elseif ($choice.source -eq 'both') {
     # -- The dates read: when the counted commits were authored, and when the
     # open issues with no card began (Scripts/Ritual-Common.ps1). Asked for what
     # the fill counted, then the fill again with the answer; nothing to ask, or
-    # a read that failed, keeps the fill as it is -- every bullet counts.
+    # a read that failed, keeps the fill as it is -- every bullet counts. The
+    # same call reads the co-author trailers of the commits of every card the
+    # fill places with no **Agent:** line (Get-P20StandupTrailerAsks), as t
+    # aliases; their messages are kept in $trailerMessages for the reader of a
+    # card's agent. Trailers alone, with no date to ask, still make the call,
+    # but the fill is not run again: with no date asked, every bullet counts.
+    $trailerMessages = $null
     if ($tracker.ok) {
         $slotNames = @((Get-P20RitualData -PackageRoot $repoRoot).Ceremony.slots | ForEach-Object { [string]$_ })
         $asks = Get-P20StandupDateAsks -Standup $standup -Cards $cards -Slots $slotNames
-        if (@($asks.hashes).Count -gt 0 -or @($asks.numbers).Count -gt 0) {
+        $trailerAsks = Get-P20StandupTrailerAsks -Standup $standup -Cards $cards -Slots $slotNames
+        $datesAsked = (@($asks.hashes).Count -gt 0 -or @($asks.numbers).Count -gt 0)
+        if ($datesAsked -or @($trailerAsks).Count -gt 0) {
             $workerNames = [string[]]@(Get-P20StandupWorkers -Labels $labels -Prefix ([string](Get-P20Consts).rituals.workerLabelPrefix) | ForEach-Object { [string]$_.label })
-            $dates = Get-P20StandupDates -Repo $repo -Hashes $asks.hashes -Numbers $asks.numbers -WorkerLabels $workerNames
+            $dates = Get-P20StandupDates -Repo $repo -Hashes $asks.hashes -Numbers $asks.numbers -WorkerLabels $workerNames -Trailers $trailerAsks
             if ($dates.ok) {
-                $standup = Invoke-P20StandupJoinedFill -AsOf $asOf -Labels $labels -Issues $issues -Tracker $tracker `
-                    -Cards $cards -Space $slug -SpaceName $spaceName -Window $window -PackageRoot $repoRoot `
-                    -CommitDates $dates.commitDates -IssueStarts $dates.issueStarts -TeamSize $teamStored
+                $trailerMessages = $dates.messages
+                if ($datesAsked) {
+                    $standup = Invoke-P20StandupJoinedFill -AsOf $asOf -Labels $labels -Issues $issues -Tracker $tracker `
+                        -Cards $cards -Space $slug -SpaceName $spaceName -Window $window -PackageRoot $repoRoot `
+                        -CommitDates $dates.commitDates -IssueStarts $dates.issueStarts -TeamSize $teamStored -Messages $trailerMessages
+                }
             }
         }
     }

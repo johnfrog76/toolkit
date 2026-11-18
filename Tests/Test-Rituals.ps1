@@ -644,6 +644,22 @@ $loneCase = @($joinedCases | Where-Object { $_.name -eq 'issue-assigned-before-w
 $loneFill = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @($joinedTable.workerLabels) -Issues @($loneCase.issues) -Tracker @{ ok = $true; reason = '' } -Cards @($loneCase.cards) -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
 $loneAsks = Get-P20StandupDateAsks -Standup $loneFill -Cards @($loneCase.cards) -Slots @('yesterday', 'today', 'blockers')
 Assert-True 'and the open issues with no card, by number (agent: the same)' (@($loneAsks.hashes).Count -eq 0 -and (($loneAsks.numbers) -join ',') -ceq '172') "$($loneAsks.numbers -join ',')"
+# The trailer asks: the commits of every card the fill places with no Agent line.
+$slotsT = @('yesterday', 'today', 'blockers')
+$plainTrailers = Get-P20StandupTrailerAsks -Standup $plainFill -Cards @($plainCase.cards) -Slots $slotsT
+Assert-True 'the trailer asks: the slots'' own cards, then the joined ones (agent: the same)' (($plainTrailers -join ',') -ceq 'e0e5555,f0f6666,a0a1111,b0b2222,c0c3333,d0d4444,a0a9999') ($plainTrailers -join ',')
+$linedCards = @($plainCase.cards | ForEach-Object { $_ | Select-Object * })
+$linedCards[0] | Add-Member -NotePropertyName body -NotePropertyValue "# Task 170: Date the commits`n`n**Agent:** claude-opus-5-5`n" -Force
+$linedTrailers = Get-P20StandupTrailerAsks -Standup $plainFill -Cards $linedCards -Slots $slotsT
+Assert-True 'the trailer asks: never a card whose Agent line answers (agent: the same)' (($linedTrailers -join ',') -ceq 'e0e5555,f0f6666') ($linedTrailers -join ',')
+$oldCard = [pscustomobject]@{ file = 'Task120-long-ago.prompt.md'; folder = 'archive'; status = 'Done'; closed = '2026-01-05'; title = 'Long ago'; id = '120'; path = 'archive/Task120-long-ago.prompt.md'; commits = @('9a9a9a9') }
+$withOld = @(@($plainCase.cards) + $oldCard)
+$oldFill = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @($joinedTable.workerLabels) -Issues @($plainCase.issues) -Tracker @{ ok = $true; reason = '' } -Cards $withOld -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
+# One array back, as Get-P20StandupCardHashes gives one: not wrapped again in @().
+$oldTrailers = Get-P20StandupTrailerAsks -Standup $oldFill -Cards $withOld -Slots $slotsT
+Assert-True 'the trailer asks: never the whole archive (agent: the same)' ($oldTrailers.Count -gt 0 -and -not ($oldTrailers -contains '9a9a9a9')) ($oldTrailers -join ',')
+$loneTrailers = Get-P20StandupTrailerAsks -Standup $loneFill -Cards @($loneCase.cards) -Slots $slotsT
+Assert-True 'the trailer asks: an issue alone asks none (agent: the same)' ($loneTrailers.Count -eq 0) ($loneTrailers -join ',')
 
 # -- The dates read: its query and its parse ----------------------------------
 # Tests/fixtures/rituals/standup-dates.json, the SAME rows Tests/test_rituals.py
@@ -656,8 +672,20 @@ $wantQuery = ((@($dq.lines | ForEach-Object { [string]$_ })) -join "`n") + "`n"
 $gotQuery = Get-P20StandupDatesQuery -Hashes ([string[]]@($dq.hashes)) -Numbers ([int[]]@($dq.numbers))
 Assert-True 'dates: the query, line for line' ($gotQuery -ceq $wantQuery) ("`n--- got ---`n$gotQuery--- want ---`n$wantQuery")
 Assert-True 'dates: a hash that is not hex is never written into the query' (-not (Get-P20StandupDatesQuery -Hashes @('a0a1111") { x } evil: object(expression: "') -Numbers @()).Contains('evil'))
+$tq = $datesTable.trailerQuery
+$wantTQuery = ((@($tq.lines | ForEach-Object { [string]$_ })) -join "`n") + "`n"
+$gotTQuery = Get-P20StandupDatesQuery -Hashes ([string[]]@($tq.hashes)) -Numbers ([int[]]@($tq.numbers)) -Trailers ([string[]]@($tq.trailers))
+Assert-True 'dates: the trailer aliases ride after the others, line for line' ($gotTQuery -ceq $wantTQuery) ("`n--- got ---`n$gotTQuery--- want ---`n$wantTQuery")
+Assert-True 'dates: no trailer hashes is the query unchanged' ((Get-P20StandupDatesQuery -Hashes ([string[]]@($dq.hashes)) -Numbers ([int[]]@($dq.numbers)) -Trailers @()) -ceq $wantQuery)
+Assert-True 'dates: a trailer hash that is not hex is never written into the query' (-not (Get-P20StandupDatesQuery -Hashes @() -Numbers @() -Trailers @('a0a1111") { x } evil: object(expression: "')).Contains('evil'))
 foreach ($dc in @($datesTable.cases)) {
-    $got = ConvertFrom-P20StandupDates -Repository $dc.answer -Hashes ([string[]]@($dc.hashes)) -Numbers ([int[]]@($dc.numbers)) -WorkerLabels ([string[]]@($datesTable.workerLabels))
+    $trailersOf = [string[]]@()
+    if ($dc.PSObject.Properties['trailers']) { $trailersOf = [string[]]@($dc.trailers) }
+    $got = ConvertFrom-P20StandupDates -Repository $dc.answer -Hashes ([string[]]@($dc.hashes)) -Numbers ([int[]]@($dc.numbers)) -WorkerLabels ([string[]]@($datesTable.workerLabels)) -Trailers $trailersOf
+    $wantM = ''
+    if ($dc.expected.PSObject.Properties['messages']) { $wantM = (@($dc.expected.messages.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" }) | Sort-Object) -join '|' }
+    $gotM = (@($got.messages.Keys | ForEach-Object { "$_=$($got.messages[$_])" }) | Sort-Object) -join '|'
+    Assert-True "dates $($dc.name): the messages" ($gotM -ceq $wantM) "got [$gotM] want [$wantM]"
     $instant = { param($v) $t = ConvertTo-P20RitualTime $v; if ($null -eq $t) { 'null' } else { $t.UtcTicks } }
     $wantC = (@($dc.expected.commitDates.PSObject.Properties | ForEach-Object { "$($_.Name)=$(& $instant $_.Value)" }) | Sort-Object) -join ','
     $gotC = (@($got.commitDates.Keys | ForEach-Object { "$_=$(& $instant $got.commitDates[$_])" }) | Sort-Object) -join ','
@@ -1315,10 +1343,12 @@ function global:gh {
         `$when = '$stubWhen'
         `$old = '$stubOld'
         `$repo = [ordered]@{}
-        foreach (`$m in [regex]::Matches(`$query, '(c\d+): object\(expression: "([0-9a-f]+)"\)')) {
+        foreach (`$m in [regex]::Matches(`$query, '\b([ct]\d+): object\(expression: "([0-9a-f]+)"\)')) {
             `$at = `$when
             if (`$m.Groups[2].Value.StartsWith('d7')) { `$at = `$old }
             `$repo[`$m.Groups[1].Value] = [ordered]@{ oid = `$m.Groups[2].Value.PadRight(40, '0'); authoredDate = `$at }
+            # A t alias is a trailer read: its commit's message, with no trailer.
+            if (`$m.Groups[1].Value.StartsWith('t')) { `$repo[`$m.Groups[1].Value]['message'] = 'A commit' }
         }
         foreach (`$m in [regex]::Matches(`$query, '\b(i\d+): issue\(')) { `$repo[`$m.Groups[1].Value] = [ordered]@{ timelineItems = [ordered]@{ nodes = @() } } }
         return (ConvertTo-Json -InputObject ([ordered]@{ data = [ordered]@{ repository = `$repo } }) -Depth 6 -Compress)
