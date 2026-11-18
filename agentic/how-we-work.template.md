@@ -51,7 +51,9 @@ A session can end at any moment, and the next one starts cold. So:
 - **The lead signs the card off with who did the work.** Before the pull request, the seat that ships
   the card writes one `**Agent:** <model id>` line in its footer, beside `**Assigned:**`: its own model if
   it did the work, or the crew's model if it handed the work on. The crew does not write the line. The
-  person owns the card; the Agent line says who did the work. A commit's `Co-Authored-By` trailer only
+  card holds ONE Agent line: when the work changes hands -- taken back from the crew, or handed on --
+  the lead rewrites it to name who is doing the work now, and never adds a second; the hub's history
+  keeps the earlier values. The person owns the card; the Agent line says who did the work. A commit's `Co-Authored-By` trailer only
   says who made the commit, so it does not stand in for the line. A card a person works alone has no
   Agent line, and the line is never written as `Agent: none`.
 - **Commit and push as you go.** Work that sits uncommitted is lost to the next seat.
