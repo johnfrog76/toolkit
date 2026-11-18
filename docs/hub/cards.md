@@ -141,7 +141,7 @@ After a `---` rule, bold-label lines. **This is the part of the model that is st
 | `**From:**` | The meeting record an agenda line came from, by its file stem: `YYYY-MM-DD` for the 1:1, `<series>-YYYY-MM-DD` for a series -- which says the series and the date. **No line means the card came from no meeting.** The value is the first such line's, trimmed; an empty line names none | `NewPrompt -From <record>`, at birth, directly above `**Created:**` ([communication](../modules/communication.md#an-agenda-line-becomes-a-card)) | the model's `from_record` (`card_from_record`, held to `Tests/fixtures/parsers/from-lines.json`; the CLI writes the line and has no reader of it). `stamps.from` |
 | `**Billable:**` | `no` takes the card off Daily and the standup. **No line means billable** -- "billable again" removes the line | `Billable -No`, through `Set-P20CardLine` | Daily and Team Agile's standup (one reader a half: `card_billable`, `Test-P20CardBillable`); the *Not billable* tag. `stamps.billable` |
 | `**Assigned:**` | Who takes the card: `me`, or a size -- a worker label (`sonnet`, `opus`, `fable`; `fable` is the owner's own seat). **No line means nobody.** The value is the first such line's, trimmed. On a GitHub issue the tracker's own fields say who -- the assignee, or the worker label -- so the line is for a card with no issue behind it | `Route <id> -Assign me\|<size>` (Team Agile, D-AR10), through `Set-P20CardLine` | the model's `assigned` (one reader a half: `card_assigned`, `Get-P20CardAssigned`, held to `Tests/fixtures/parsers/assigned-lines.json` from both suites). `stamps.assigned` |
-| `**Agent:**` | Who did the work, when an AI agent did: the model's id, as its provider writes it (`claude-sonnet-5-5`, `gpt-5`). The person owns the card on `**Assigned:**`; the agent worked it. **No line means a person worked it alone**, and the line is never written as `Agent: none`. The value is the first such line's, trimmed, and is never parsed: what it shows comes from the model map ([below](#the-agent-line)) | the lead -- the session that ships the card -- by hand, at sign-off before the pull request, naming the model that did the work: its own, or the builder's it handed the work to. A builder does not write it. The shipped build prompt (every `StartWork` block) and the how-we-work note make it the lead's step; no verb writes it | the model's `agent` (one reader a half: `card_agent`, `Get-P20CardAgent`, held to `Tests/fixtures/parsers/agent-lines.json` from both suites). `stamps.agent` |
+| `**Agent:**` | Who did the work, when an AI agent did: the model's id, as its provider writes it (`claude-sonnet-5-5`, `gpt-5`). The person owns the card on `**Assigned:**`; the agent worked it. **No line means a person worked it alone**, and the line is never written as `Agent: none`. The value is the first such line's, trimmed, and is never parsed: what it shows comes from the model map ([below](#the-agent-line)) | the lead -- the session that ships the card -- by hand, at sign-off before the pull request, naming the model that did the work: its own, or the builder's it handed the work to. A builder does not write it. When the work changes hands the lead rewrites the one line rather than adding another. The shipped build prompt (every `StartWork` block) and the how-we-work note make it the lead's step; no verb writes it | the model's `agent` (one reader a half: `card_agent`, `Get-P20CardAgent`, held to `Tests/fixtures/parsers/agent-lines.json` from both suites). `stamps.agent` |
 | `**Cover:**` | The card's picture: a path relative to the card's folder, `../assets/<card key>/cover.<ext>`. **No line means no picture**; a line whose file is missing, or that resolves outside the Space's `assets/`, reads as none too | `Cover`, or `NewPrompt -Cover`, through `Set-P20CardLine` | the board's card face, the list's thumbnail, the card page; the model's `cover`. `stamps.cover` |
 | `**Before:**` | The other half of a before/after proof, the same way: `../assets/<card key>/before.<ext>` | `Cover -Before`, or `NewPrompt -Before` | the card page, side by side with the cover; the model's `before`. `stamps.before` |
 | `**Created:**` | `yyyy-MM-dd`, the day the card was made -- or the day the work was, with `NewPrompt -Date` | `NewPrompt` | Daily, reviews, the engagement timeline. `stamps.created` |
@@ -176,6 +176,11 @@ handed the work to a builder names the builder's. A builder does not write the l
 `Co-Authored-By` trailer only records who made the commit -- often the lead, who makes the squash -- so it is
 at most a fallback another reader may use for a card with no line, never the answer.
 
+**One line, the current answer.** The line can change while the card is worked: when the lead takes the
+work back from a builder, or hands it on, it REWRITES the line (a `claude-sonnet-5-5` card the lead
+finishes itself becomes `claude-opus-5-5`, say). A card holds one Agent line, never a second; the hub's git
+history keeps the earlier values.
+
 The value is a **model id**, the same id `Config/claude-prices.json` and `Burn -Log`'s usage records use, so a card can be
 joined to what its work cost.
 
@@ -194,7 +199,8 @@ Adding a model is one row. The lookup is `model_info` (`agent/core/models.py`) a
 
 The reader takes the FIRST line that starts with `**Agent:**`, as the Assigned reader does, wherever it
 sits in the file -- so a card's body that quotes the line at the start of a line, above the footer, would be
-read as the line; quote it indented or in backticks.
+read as the line; quote it indented or in backticks. A second Agent line is ignored for the same reason,
+which is why the lead keeps one line by rewriting it rather than adding another.
 
 `Tests/fixtures/parsers/models.json` holds the two lookups to one table. The card keeps the id; a reader
 that shows it shows the map's name.
