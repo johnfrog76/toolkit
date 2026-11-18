@@ -1,5 +1,5 @@
 {
-  "_": "ONE table, read by both readers of a card's agent (docs/hub/cards.md, \"How a card's agent is worked out\"): Scripts/Get-PromptFileStatus.ps1 Resolve-P20CardAgent, Get-P20CommitCoAuthors, Get-P20ModelByCoAuthor and ConvertFrom-P20GitMessages (tkTestToolkit -Triage), and agent/core/parsers.py resolve_card_agent, commit_co_authors and git_messages, with agent/core/models.py model_by_co_author (Tests/test_parsers.py). models is the map every row is read against -- its own, so the table does not move when Config/models.json grows. rows: each row's lines are joined with LF, or CRLF when crlf is true, into a card's text; label is the card's issue's worker label ('' for none); messages is short hash -> commit message, or null for not read; order is the sources' order, and a row with none runs under the shipped one, consts.json models.agentSources (line, trailer, none: it never reads the label, which a caller asks for by passing an order that names it). expected is {id, family, source}. coAuthors: a commit message -> the names its Co-Authored-By trailers carry, in order. byCoAuthor: a trailer name -> the model id whose coAuthor it is, trimmed and ignoring case, or null. gitLog: git log's --format=%x00%H%x1f%B output -> short hash (seven characters, lower case) -> message, trailing line endings removed. If the two halves ever disagree about a row, one of them is wrong.",
+  "_": "ONE table, read by both readers of a card's agent (docs/hub/cards.md, \"How a card's agent is worked out\"): Scripts/Get-PromptFileStatus.ps1 Resolve-P20CardAgent, Get-P20CommitCoAuthors, Get-P20ModelByCoAuthor and ConvertFrom-P20GitMessages (tkTestToolkit -Triage), and agent/core/parsers.py resolve_card_agent, commit_co_authors and git_messages, with agent/core/models.py model_by_co_author (Tests/test_parsers.py). models is the map every row is read against -- its own, so the table does not move when Config/models.json grows -- and current its current block (a worker size -> the model id it means today); a row with current null is read against a map with no current block. rows: each row's lines are joined with LF, or CRLF when crlf is true, into a card's text; label is the card's issue's worker label ('' for none); messages is short hash -> commit message, or null for not read; order is the sources' order, and a row with none runs under the shipped one, consts.json models.agentSources (line, assigned, trailer, none: it never reads the label, which a caller asks for by passing an order that names it). expected is {id, family, source}. coAuthors: a commit message -> the names its Co-Authored-By trailers carry, in order. byCoAuthor: a trailer name -> the model id whose coAuthor it is, trimmed and ignoring case, or null. gitLog: git log's --format=%x00%H%x1f%B output -> short hash (seven characters, lower case) -> message, trailing line endings removed. If the two halves ever disagree about a row, one of them is wrong.",
   "models": {
     "claude-opus-5-5": {
       "provider": "anthropic",
@@ -28,6 +28,11 @@
       "provider": "local",
       "name": "House model"
     }
+  },
+  "current": {
+    "fable": "claude-fable-5-2",
+    "opus": "claude-opus-5-5",
+    "sonnet": "claude-sonnet-5-5"
   },
   "rows": [
     {
@@ -1096,6 +1101,314 @@
         "id": null,
         "family": null,
         "source": "none"
+      }
+    },
+    {
+      "name": "Assigned sonnet and no Agent line: the size's current model",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Created:** 2026-11-02",
+        "",
+        "## Commits",
+        "",
+        "**Assigned:** sonnet"
+      ],
+      "label": "",
+      "messages": null,
+      "expected": {
+        "id": "claude-sonnet-5-5",
+        "family": "sonnet",
+        "source": "assigned"
+      }
+    },
+    {
+      "name": "Assigned me falls through to the next source",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Created:** 2026-11-02",
+        "",
+        "## Commits",
+        "- 1a2b3c4 the change",
+        "",
+        "**Assigned:** me"
+      ],
+      "label": "",
+      "messages": {
+        "1a2b3c4": "The change\n\nA body line.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+      },
+      "expected": {
+        "id": "claude-opus-5-5",
+        "family": "opus",
+        "source": "trailer"
+      }
+    },
+    {
+      "name": "Assigned Me, in another case, falls through to none",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Created:** 2026-11-02",
+        "",
+        "## Commits",
+        "",
+        "**Assigned:** Me"
+      ],
+      "label": "",
+      "messages": null,
+      "expected": {
+        "id": null,
+        "family": null,
+        "source": "none"
+      }
+    },
+    {
+      "name": "Assigned @someone falls through",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Created:** 2026-11-02",
+        "",
+        "## Commits",
+        "- 1a2b3c4 the change",
+        "",
+        "**Assigned:** @someone"
+      ],
+      "label": "",
+      "messages": {
+        "1a2b3c4": "The change\n\nA body line.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+      },
+      "expected": {
+        "id": "claude-opus-5-5",
+        "family": "opus",
+        "source": "trailer"
+      }
+    },
+    {
+      "name": "Assigned empty falls through",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Created:** 2026-11-02",
+        "",
+        "## Commits",
+        "",
+        "**Assigned:**"
+      ],
+      "label": "",
+      "messages": null,
+      "expected": {
+        "id": null,
+        "family": null,
+        "source": "none"
+      }
+    },
+    {
+      "name": "Assigned backend, a size not in current: the worker as written",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Created:** 2026-11-02",
+        "",
+        "## Commits",
+        "",
+        "**Assigned:** backend"
+      ],
+      "label": "",
+      "messages": null,
+      "expected": {
+        "id": null,
+        "family": "backend",
+        "source": "assigned"
+      }
+    },
+    {
+      "name": "Assigned backend with a trailer naming Opus: the Assigned line",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Created:** 2026-11-02",
+        "",
+        "## Commits",
+        "- 1a2b3c4 the change",
+        "",
+        "**Assigned:** backend"
+      ],
+      "label": "",
+      "messages": {
+        "1a2b3c4": "The change\n\nA body line.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+      },
+      "expected": {
+        "id": null,
+        "family": "backend",
+        "source": "assigned"
+      }
+    },
+    {
+      "name": "Assigned sonnet with an Agent line naming an Opus id: the line",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Created:** 2026-11-02",
+        "",
+        "## Commits",
+        "",
+        "**Assigned:** sonnet",
+        "**Agent:** claude-opus-5-5"
+      ],
+      "label": "",
+      "messages": null,
+      "expected": {
+        "id": "claude-opus-5-5",
+        "family": "opus",
+        "source": "line"
+      }
+    },
+    {
+      "name": "Assigned sonnet with a trailer naming Opus: the Assigned line",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Created:** 2026-11-02",
+        "",
+        "## Commits",
+        "- 1a2b3c4 the change",
+        "",
+        "**Assigned:** sonnet"
+      ],
+      "label": "",
+      "messages": {
+        "1a2b3c4": "The change\n\nA body line.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+      },
+      "expected": {
+        "id": "claude-sonnet-5-5",
+        "family": "sonnet",
+        "source": "assigned"
+      }
+    },
+    {
+      "name": "Assigned sonnet with an empty Agent line: the Assigned line",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Created:** 2026-11-02",
+        "",
+        "## Commits",
+        "",
+        "**Assigned:** sonnet",
+        "**Agent:**"
+      ],
+      "label": "",
+      "messages": null,
+      "expected": {
+        "id": "claude-sonnet-5-5",
+        "family": "sonnet",
+        "source": "assigned"
+      }
+    },
+    {
+      "name": "Assigned sonnet with no current block: the worker as written, no id",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Created:** 2026-11-02",
+        "",
+        "## Commits",
+        "",
+        "**Assigned:** sonnet"
+      ],
+      "label": "",
+      "messages": null,
+      "current": null,
+      "expected": {
+        "id": null,
+        "family": "sonnet",
+        "source": "assigned"
+      }
+    },
+    {
+      "name": "an order without assigned never reads the Assigned line",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Created:** 2026-11-02",
+        "",
+        "## Commits",
+        "- 1a2b3c4 the change",
+        "",
+        "**Assigned:** sonnet"
+      ],
+      "label": "",
+      "messages": {
+        "1a2b3c4": "The change\n\nA body line.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+      },
+      "order": [
+        "line",
+        "trailer",
+        "none"
+      ],
+      "expected": {
+        "id": "claude-opus-5-5",
+        "family": "opus",
+        "source": "trailer"
+      }
+    },
+    {
+      "name": "an order that puts assigned first still skips a card with an Agent line",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Created:** 2026-11-02",
+        "",
+        "## Commits",
+        "",
+        "**Agent:** claude-opus-5-5",
+        "**Assigned:** sonnet"
+      ],
+      "label": "",
+      "messages": null,
+      "order": [
+        "assigned",
+        "none"
+      ],
+      "expected": {
+        "id": null,
+        "family": null,
+        "source": "none"
+      }
+    },
+    {
+      "name": "an Agent line naming a bare unknown word: the word is the id and the family",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Created:** 2026-11-02",
+        "",
+        "## Commits",
+        "",
+        "**Agent:** sonnet"
+      ],
+      "label": "",
+      "messages": null,
+      "expected": {
+        "id": "sonnet",
+        "family": "sonnet",
+        "source": "line"
       }
     }
   ],

@@ -28,6 +28,7 @@ from .consts import (
     re_review_line,
     re_started_line,
     re_tag_separator,
+    rituals_assign_me,
     stamp_agent,
     stamp_assigned,
     stamp_billable,
@@ -44,7 +45,7 @@ from .consts import (
     token_previous_round,
     token_tags,
 )
-from .models import model_by_co_author, read_model_map
+from .models import model_by_co_author, read_model_current, read_model_map
 
 # The state vocabulary and the two patterns that derive it come from
 # consts.json, the package's contract file -- NOT from literals here. This
@@ -298,6 +299,7 @@ def resolve_card_agent(
     messages: dict | None = None,
     models: dict | None = None,
     order: list[str] | tuple[str, ...] | None = None,
+    current: dict | None = None,
 ) -> dict:
     """Who worked a card, worked out every time it is read and never written into
     it: ``{id, family, source}``. The sources are tried in ``order`` (default
@@ -305,6 +307,13 @@ def resolve_card_agent(
 
     - ``line``: the card's Agent line, as ``card_agent`` reads it -- the id
       as written; family from the id's row, else the id as written.
+    - ``assigned``: a card with NO Agent line whose ``**Assigned:**``
+      value (``card_assigned``) names a worker -- a size, which
+      ``Route -Assign <size>`` writes on a card with no issue. Read tolerantly: a
+      key of the map's ``current`` block is its model, id ``current[size]`` and
+      family that id's (else the id as written); any other value is the worker
+      as written, id None and family the value. Empty, ``rituals.assignMe``
+      (``me``, in any case) and an ``@<login>`` do not answer.
     - ``trailer``: only when ``messages`` is given -- the card's own commit
       bullets (``regex.commitBullet``, the squash-merged bullet among them,
       distinct by their first seven characters, in bullet order) looked up in
@@ -319,10 +328,15 @@ def resolve_card_agent(
 
     An order that leaves ``none`` out still ends in it. ``messages`` is short
     hash -> message (``git_messages``; a longer key is cut to seven) or None for
-    not read; ``models`` the map, None for the shipped one. The mirror of
+    not read; ``models`` the map, None for the shipped one; ``current`` its ``current`` block. The mirror of
     ``Resolve-P20CardAgent``; ``Tests/fixtures/parsers/agent-source.json`` holds
     the two to one table."""
     rows = read_model_map() if models is None else models
+    # The map's ``current`` block (worker size -> model id): the shipped one with
+    # the shipped map, else what the caller passes (none is empty).
+    if current is None:
+        current = read_model_current() if models is None else {}
+    sizes = {str(k): v for k, v in (current or {}).items()} if isinstance(current, dict) else {}
     for source in model_agent_sources() if order is None else order:
         if source == "line":
             mid = card_agent(content or "")
@@ -330,6 +344,20 @@ def resolve_card_agent(
                 row = rows.get(mid)
                 family = row.get("family") if isinstance(row, dict) else None
                 return {"id": mid, "family": family or mid, "source": "line"}
+        elif source == "assigned":
+            # A size's model may come from #466's models.current_model (the CLI's
+            # Get-P20ModelForSize) once merged; this step stays here either way.
+            if card_agent(content or ""):
+                continue
+            size = card_assigned(content or "")
+            if not size or size.lower() == rituals_assign_me().lower() or size.startswith("@"):
+                continue
+            mid = sizes.get(size)
+            if not mid:
+                return {"id": None, "family": size, "source": "assigned"}
+            row = rows.get(mid)
+            family = row.get("family") if isinstance(row, dict) else None
+            return {"id": str(mid), "family": family or str(mid), "source": "assigned"}
         elif source == "trailer":
             if messages is None:
                 continue

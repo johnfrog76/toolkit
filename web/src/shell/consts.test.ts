@@ -517,7 +517,7 @@ describe("consts.json", () => {
     expect(modelsKeys).toEqual({
       file: "Config/models.json",
       // The order a card's agent is worked out in: the first source that answers wins.
-      agentSources: ["line", "trailer", "none"],
+      agentSources: ["line", "assigned", "trailer", "none"],
     });
 
     // The statuses a reply may set, per tracker.

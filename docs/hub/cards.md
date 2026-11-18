@@ -251,12 +251,13 @@ reader a half does it -- `Resolve-P20CardAgent` in `Scripts/Get-PromptFileStatus
 in `agent/core/parsers.py`, held to one table, `Tests/fixtures/parsers/agent-source.json` -- and it answers
 with the model's id (or none), its family, and the source the answer came from. The sources are tried in
 the order `consts.json` `models.agentSources` names, and the first that answers wins. The shipped order
-is three sources, `line`, `trailer`, `none`: **a tracker's worker label does not decide who worked a card**,
+is four sources, `line`, `assigned`, `trailer`, `none`: **a tracker's worker label does not decide who worked a card**,
 since it says who was meant to do the work, not who did.
 
 | Source | Reads | Answers |
 | --- | --- | --- |
 | `line` | the card's first `**Agent:**` line (`stamps.agent`) | the id as written; the family from the id's row in `Config/models.json`, else the id as written. An empty line does not answer |
+| `assigned` | on a card with no Agent line, the first `**Assigned:**` value (`stamps.assigned`) when it names a worker. `Route <id> -Assign <size>` writes it on a card with no issue, so on an older card it is the worker, and it is read tolerantly: a known family -- a key of the model map's `current` block, which says which model id a size (`sonnet`, `opus`) means today -- as its current model, and any other worker's name as written. An empty value, `me` (`rituals.assignMe`, in any case) and an `@<login>` do not answer | a known family: the id `current` gives, and the family from that id's row (else the id as written). Any other name: no id, the family the name as written. An Agent line still wins; this beats a trailer |
 | `trailer` | the commits the card's own bullets name (`regex.commitBullet`, the `#<n> squash-merged` bullet among them, each commit once by its first seven characters), when the caller has read their messages | each commit votes once for every model its `Co-Authored-By` trailers name (`regex.coAuthorTrailer`, the key in any case); most votes wins, a tie to the first seen in bullet then trailer order. A trailer name is looked up in the map's `coAuthor`, trimmed and ignoring case, never parsed: a person's name, or a model the map does not know, names nothing |
 | `label` | **not in the shipped order.** The card's issue's worker label, as the caller passes it, read only by a caller that passes an order naming `label` | no id; the family is the label as written |
 | `none` | -- | no id and no family: a person worked the card alone |

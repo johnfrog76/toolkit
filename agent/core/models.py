@@ -88,3 +88,16 @@ def model_by_co_author(name: str | None, models: dict[str, dict] | None = None) 
         if co is not None and str(co).strip().lower() == want:
             return mid
     return None
+
+
+def read_model_current(path=None) -> dict[str, str]:
+    """The map's top-level ``current`` block -- a worker size (a family alias:
+    ``sonnet``, ``opus``) -> the model id it resolves to today. Absent, missing or
+    unreadable reads as empty, never a throw. ``parsers.resolve_card_agent``'s
+    ``assigned`` source reads it. The mirror of ``Get-P20ModelCurrent``."""
+    target = CONSTS_PATH.parent / models_file() if path is None else path
+    try:
+        block = json.loads(Path(target).read_text(encoding="utf-8-sig")).get("current")
+    except (OSError, ValueError, AttributeError):
+        return {}
+    return {str(k): str(v) for k, v in block.items()} if isinstance(block, dict) else {}

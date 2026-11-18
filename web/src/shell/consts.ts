@@ -506,7 +506,7 @@ export const ORG = consts.org as {
  */
 export const MODELS = consts.models as {
   file: string;
-  /** The shipped order a card's agent is worked out in: `line`, `trailer`, `none` -- never the label
+  /** The shipped order a card's agent is worked out in: `line`, `assigned`, `trailer`, `none` -- never the label
    *  (docs/hub/cards.md, "How a card's agent is worked out"). The agent works it
    *  out and serves the answer; this half states it. */
   agentSources: string[];

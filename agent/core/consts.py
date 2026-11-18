@@ -769,7 +769,7 @@ def models_file() -> str:
 
 
 def model_agent_sources() -> tuple[str, ...]:
-    """``line``, ``trailer``, ``none`` -- the shipped order a card's agent is worked
+    """``line``, ``assigned``, ``trailer``, ``none`` -- the shipped order a card's agent is worked
     out in (``parsers.resolve_card_agent``): the first source that answers wins. It
     never reads ``label``, which a caller asks for by passing an order naming it."""
     return tuple(consts()["models"]["agentSources"])

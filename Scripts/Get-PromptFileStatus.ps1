@@ -192,6 +192,27 @@ function Get-P20ModelMap {
     return $map
 }
 
+function Get-P20ModelCurrent {
+    <#
+      The model map's top-level `current` block -- a worker size (a family alias:
+      sonnet, opus) -> the model id it resolves to today -- as a hashtable; absent,
+      missing or unreadable reads as empty, never a throw. Resolve-P20CardAgent's
+      assigned source reads it. read_model_current in the agent.
+    #>
+    param([string]$PackageRoot)
+    $cur = @{}
+    try {
+        if (-not $PackageRoot) { $PackageRoot = Split-Path (Get-P20ConstsPath) -Parent }
+        $path = Join-Path $PackageRoot ([string](Get-P20Consts).models.file)
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $cur }
+        $block = (Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json).current
+        if ($null -ne $block) { foreach ($p in @($block.PSObject.Properties)) { $cur[[string]$p.Name] = [string]$p.Value } }
+    } catch {
+        return @{}
+    }
+    return $cur
+}
+
 function ConvertTo-P20ModelMap {
     <# -Models as a dictionary: $null reads the shipped map (Get-P20ModelMap), a dictionary is kept, an object (a JSON block) becomes one. #>
     param($Models)
@@ -273,6 +294,14 @@ function Resolve-P20CardAgent {
 
         line     the card's **Agent:** line (Get-P20CardAgent): id as written;
                  family from the id's row, else the id as written
+        assigned a card with NO Agent line whose **Assigned:** value
+                 (Get-P20CardAssigned) names a worker -- a size, which Route
+                 -Assign <size> writes on a card with no issue. Read tolerantly:
+                 a key of the map's `current` block is its model, id
+                 current[size] and family that id's (else the id as written);
+                 any other value is the worker as written, id $null and family
+                 the value. Empty, rituals.assignMe (`me`, in any case) and an
+                 `@<login>` do not answer
         trailer  only when -Messages is given: the card's own commit bullets
                  (regex.commitBullet, the squash-merged bullet among them --
                  distinct by their first seven characters, in bullet order)
@@ -296,13 +325,21 @@ function Resolve-P20CardAgent {
         [AllowEmptyString()][AllowNull()][string]$Label,
         $Messages,
         $Models,
-        [string[]]$Order
+        [string[]]$Order,
+        # The map's `current` block (worker size -> model id). With -Models $null
+        # it is read from the shipped map; with a -Models given and no -Current, empty.
+        $Current
     )
     $c = Get-P20Consts
     if (-not $PSBoundParameters.ContainsKey('Order') -or $null -eq $Order) {
         $Order = @($c.models.agentSources | ForEach-Object { [string]$_ })
     }
     $map = ConvertTo-P20ModelMap $Models
+    $curGiven = $Current
+    if ($null -eq $curGiven -and $null -eq $Models) { $curGiven = Get-P20ModelCurrent }
+    $cur = @{}
+    if ($curGiven -is [System.Collections.IDictionary]) { foreach ($k in @($curGiven.Keys)) { $cur[[string]$k] = $curGiven[$k] } }
+    elseif ($null -ne $curGiven) { foreach ($p in @($curGiven.PSObject.Properties)) { $cur[[string]$p.Name] = $p.Value } }
     foreach ($source in @($Order)) {
         if ($source -ceq 'line') {
             $id = Get-P20CardAgent -Content $Content
@@ -316,6 +353,24 @@ function Resolve-P20CardAgent {
                 }
             }
             return [pscustomobject][ordered]@{ id = $id; family = $family; source = 'line' }
+        }
+        if ($source -ceq 'assigned') {
+            # The size's model may come from #466's Get-P20ModelForSize (models.current_model) once merged; this step stays here.
+            if (Get-P20CardAgent -Content $Content) { continue }
+            $size = Get-P20CardAssigned -Content $Content
+            if (-not $size -or $size -ieq [string]$c.rituals.assignMe -or $size.StartsWith('@')) { continue }
+            $id = $null
+            foreach ($k in @($cur.Keys)) { if ([string]$k -ceq $size) { $id = [string]$cur[$k]; break } }
+            if (-not $id) { return [pscustomobject][ordered]@{ id = $null; family = $size; source = 'assigned' } }
+            $family = $id
+            foreach ($k in @($map.Keys)) {
+                if ([string]$k -ceq $id) {
+                    $f = $map[$k].family
+                    if ($f) { $family = [string]$f }
+                    break
+                }
+            }
+            return [pscustomobject][ordered]@{ id = $id; family = $family; source = 'assigned' }
         }
         if ($source -ceq 'trailer') {
             if ($null -eq $Messages) { continue }

@@ -205,10 +205,11 @@ class StatusMetadataTests(unittest.TestCase):
 
     def test_who_worked_a_card_by_its_sources_by_the_shared_table(self):
         """The one reader of a card's agent (docs/hub/cards.md, "How a card's agent
-        is worked out"): its Agent line, else its commits' Co-Authored-By trailers,
-        else none -- the shipped order, consts.json models.agentSources, which never
-        reads the label -- and under any order a row states, the label among them
-        where the order names it. The CLI's
+        is worked out"): its Agent line, else its Assigned line when that names a
+        worker, else its commits' Co-Authored-By trailers, else none -- the shipped
+        order, consts.json models.agentSources, which never reads the label -- and
+        under any order a row states, the label among them where the order names
+        it. The CLI's
         Resolve-P20CardAgent and its pieces assert the SAME table,
         Tests/fixtures/parsers/agent-source.json, against the table's own model map."""
         import json
@@ -220,7 +221,7 @@ class StatusMetadataTests(unittest.TestCase):
         table = json.loads((FIXTURES / "agent-source.json").read_text(encoding="utf-8"))
         models = table["models"]
         self.assertGreaterEqual(len(table["rows"]), 20)
-        self.assertEqual(model_agent_sources(), ("line", "trailer", "none"))
+        self.assertEqual(model_agent_sources(), ("line", "assigned", "trailer", "none"))
         orders = {tuple(r["order"]) for r in table["rows"] if "order" in r}
         self.assertIn(("line", "trailer", "label", "none"), orders)
         self.assertIn(("line", "label", "trailer", "none"), orders)
@@ -228,7 +229,7 @@ class StatusMetadataTests(unittest.TestCase):
             self.assertTrue(any(r["expected"]["source"] == source for r in table["rows"]), source)
         # The shipped order, on rows that state none: each of its sources, and a label passed and not read.
         shipped = [r for r in table["rows"] if "order" not in r]
-        for source in ("line", "trailer", "none"):
+        for source in ("line", "assigned", "trailer", "none"):
             self.assertTrue(any(r["expected"]["source"] == source for r in shipped), source)
         self.assertTrue(any(r["label"] and r["expected"]["source"] == "none" for r in shipped))
         self.assertFalse(any(r["expected"]["source"] == "label" for r in shipped))
@@ -236,7 +237,10 @@ class StatusMetadataTests(unittest.TestCase):
             with self.subTest(row=row["name"]):
                 eol = "\r\n" if row["crlf"] else "\n"
                 text = eol.join(row["lines"]) + eol
-                got = resolve_card_agent(text, row["label"], row["messages"], models, row.get("order"))
+                current = row["current"] if "current" in row else table["current"]
+                got = resolve_card_agent(
+                    text, row["label"], row["messages"], models, row.get("order"), current=current or {}
+                )
                 self.assertEqual(got, row["expected"])
         for row in table["coAuthors"]:
             with self.subTest(coAuthors=row["name"]):
@@ -263,6 +267,17 @@ class StatusMetadataTests(unittest.TestCase):
             listed = Path(tmp) / "list.json"
             listed.write_text("[1, 2]", encoding="utf-8")
             self.assertEqual(read_model_map(listed), {})
+            # The current block (worker size -> model id): the same, absent is empty.
+            from agent.core.models import read_model_current
+
+            self.assertEqual(read_model_current(missing), {})
+            self.assertEqual(read_model_current(broken), {})
+            plain = Path(tmp) / "plain.json"
+            plain.write_text('{"models": {}}', encoding="utf-8")
+            self.assertEqual(read_model_current(plain), {})
+            sized = Path(tmp) / "sized.json"
+            sized.write_text('{"models": {}, "current": {"opus": "claude-opus-5-5"}}', encoding="utf-8")
+            self.assertEqual(read_model_current(sized), {"opus": "claude-opus-5-5"})
         self.assertIsNone(model_by_co_author("Claude Opus 5.5", {}))
         card = "# Task K7M2: x\n\n- 1a2b3c4 one\n"
         msgs = {"1a2b3c4": "One\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"}

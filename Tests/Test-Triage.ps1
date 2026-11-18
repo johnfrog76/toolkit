@@ -188,7 +188,7 @@ finally { Remove-Item -LiteralPath $mapRoot -Recurse -Force -ErrorAction Silentl
 $sourceTable = [System.IO.File]::ReadAllText((Join-Path $scriptDir 'fixtures/parsers/agent-source.json')) | ConvertFrom-Json
 $fixtureModels = $sourceTable.models
 Assert-True 'the agent-source table has its rows' (@($sourceTable.rows).Count -ge 20)
-Assert-True 'models.agentSources is the shipped order, which never reads the label' ((@((Get-P20Consts).models.agentSources) -join ',') -ceq 'line,trailer,none')
+Assert-True 'models.agentSources is the shipped order, which never reads the label' ((@((Get-P20Consts).models.agentSources) -join ',') -ceq 'line,assigned,trailer,none')
 $orderNames = @($sourceTable.rows | Where-Object { $_.PSObject.Properties['order'] } | ForEach-Object { @($_.order) -join ',' })
 Assert-True 'the table runs rows under the order with the label after the trailer' ($orderNames -contains 'line,trailer,label,none')
 Assert-True 'the table runs rows under the label-first order' ($orderNames -contains 'line,label,trailer,none')
@@ -204,7 +204,10 @@ foreach ($srow in @($sourceTable.rows)) {
         $messages = @{}
         foreach ($p in @($srow.messages.PSObject.Properties)) { $messages[$p.Name] = [string]$p.Value }
     }
-    $call = @{ Content = $text; Label = [string]$srow.label; Messages = $messages; Models = $fixtureModels }
+    $current = $sourceTable.current
+    if ($srow.PSObject.Properties['current']) { $current = $srow.current }
+    if ($null -eq $current) { $current = @{} }
+    $call = @{ Content = $text; Label = [string]$srow.label; Messages = $messages; Models = $fixtureModels; Current = $current }
     if ($srow.PSObject.Properties['order']) { $call['Order'] = [string[]]@($srow.order) }
     $got = Resolve-P20CardAgent @call
     $want = $srow.expected
@@ -241,6 +244,10 @@ Assert-True 'Get-P20ModelMap: a missing map reads as empty' ($null -ne $emptyMap
 [System.IO.File]::WriteAllText((Join-Path $mapScratch ([string](Get-P20Consts).models.file)), '{ not json')
 $brokenMap = Get-P20ModelMap -PackageRoot $mapScratch
 Assert-True 'Get-P20ModelMap: an unreadable map reads as empty' ($null -ne $brokenMap -and $brokenMap.Count -eq 0)
+Assert-True 'Get-P20ModelCurrent: an unreadable map has no current block' ((Get-P20ModelCurrent -PackageRoot $mapScratch).Count -eq 0)
+[System.IO.File]::WriteAllText((Join-Path $mapScratch ([string](Get-P20Consts).models.file)), '{ "models": {}, "current": { "opus": "claude-opus-5-5" } }')
+$sizedCurrent = Get-P20ModelCurrent -PackageRoot $mapScratch
+Assert-True 'Get-P20ModelCurrent: the current block, size -> id' ($sizedCurrent.Count -eq 1 -and [string]$sizedCurrent['opus'] -ceq 'claude-opus-5-5')
 Remove-Item -LiteralPath $mapScratch -Recurse -Force
 $shipped = Get-P20ModelMap
 Assert-True 'Get-P20ModelMap: the shipped map, in its order' ($shipped.Count -gt 0 -and @($shipped.Keys)[0] -ceq @((Get-Content -LiteralPath (Join-Path $pkgRoot 'Config/models.json') -Raw -Encoding UTF8 | ConvertFrom-Json).models.PSObject.Properties)[0].Name)
