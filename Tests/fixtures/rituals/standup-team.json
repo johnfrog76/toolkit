@@ -1895,6 +1895,99 @@
         "work": "standup-team-idle-room.work.txt",
         "brief": "standup-team-idle-room.brief.txt"
       }
+    },
+    {
+      "name": "idle-room-3",
+      "shape": "a day with no work at size three: no worker labels and no card in play -- the standup still runs, the chair, the idle engineer and one invented cast member, each member giving its two made-up items; six empty desks. The joined fill.",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "teamSize": 3,
+      "labels": [],
+      "issues": [],
+      "cards": [],
+      "space": "widgets",
+      "spaceName": "Widgets",
+      "expected": {
+        "team": {
+          "size": 3
+        },
+        "workers": [
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "empty": true,
+            "present": true
+          }
+        ],
+        "round": [
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "cast": false
+          },
+          {
+            "label": "ops-dev",
+            "name": "OPS-DEV",
+            "cast": true
+          }
+        ],
+        "text": "standup-team-idle-room-3.txt",
+        "work": "standup-team-idle-room-3.work.txt",
+        "brief": "standup-team-idle-room-3.brief.txt"
+      }
+    },
+    {
+      "name": "idle-room-6",
+      "shape": "a day with no work at size six: no worker labels and no card in play -- the standup still runs, the chair, the idle engineer and four invented cast members, each member giving its two made-up items; three empty desks. The joined fill.",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "teamSize": 6,
+      "labels": [],
+      "issues": [],
+      "cards": [],
+      "space": "widgets",
+      "spaceName": "Widgets",
+      "expected": {
+        "team": {
+          "size": 6
+        },
+        "workers": [
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "empty": true,
+            "present": true
+          }
+        ],
+        "round": [
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "cast": false
+          },
+          {
+            "label": "ops-dev",
+            "name": "OPS-DEV",
+            "cast": true
+          },
+          {
+            "label": "minimalist",
+            "name": "MINIMALIST",
+            "cast": true
+          },
+          {
+            "label": "new-hire",
+            "name": "NEW HIRE",
+            "cast": true
+          },
+          {
+            "label": "vibemancer",
+            "name": "AI VIBEMANCER",
+            "cast": true
+          }
+        ],
+        "text": "standup-team-idle-room-6.txt",
+        "work": "standup-team-idle-room-6.work.txt",
+        "brief": "standup-team-idle-room-6.brief.txt"
+      }
     }
   ]
 }
