@@ -32,7 +32,7 @@
   },
 
   "stamps": {
-    "_": "Written by Scripts/Write-CardText.ps1's callers; read by the engagement summary's billed days and the web's session cards. assigned is who takes a card with no issue behind it -- `**Assigned:** me`, or a size (a worker label) -- written by Route -Assign and read by the card model's `assigned` (docs/hub/cards.md). from is the meeting record an agenda line came from -- `**From:** <series>-YYYY-MM-DD`, or the bare date for the 1:1: the record's file stem, which says the series and the date -- written by NewPrompt -From and read by the card model's `from_record` (docs/hub/cards.md; docs/modules/communication.md). milestone and sprint are a card's two planning lines, each its own (docs/hub/cards.md, \"Milestone and sprint: two lines\"): Plan -Milestone writes the first and Plan -Sprint the second; a card's milestone is its first milestone line (a parenthesised placeholder is none), else -- for a card with no milestone line, which is every card written before the two were separate -- its first sprint line, as it always read. Tests/fixtures/parsers/card-milestone.json holds both halves to one table.",
+    "_": "Written by Scripts/Write-CardText.ps1's callers; read by the engagement summary's billed days and the web's session cards. assigned is who takes a card with no issue behind it -- `**Assigned:** me`, or a size (a worker label) -- written by Route -Assign and read by the card model's `assigned` (docs/hub/cards.md). from is the meeting record an agenda line came from -- `**From:** <series>-YYYY-MM-DD`, or the bare date for the 1:1: the record's file stem, which says the series and the date -- written by NewPrompt -From and read by the card model's `from_record` (docs/hub/cards.md; docs/modules/communication.md). milestone and sprint are a card's two planning lines, each its own (docs/hub/cards.md, \"Milestone and sprint: two lines\"): Plan -Milestone writes the first and Plan -Sprint the second; a card's milestone is its first milestone line (a parenthesised placeholder is none), else -- for a card with no milestone line, which is every card written before the two were separate -- its first sprint line, as it always read. Tests/fixtures/parsers/card-milestone.json holds both halves to one table. agent is who did the work on a card an agent worked -- `**Agent:** <model id>`, beside the Assigned line, never written for a card a person worked alone -- read by the card model's `agent`, with its provider, family and display name looked up in models.file (docs/hub/cards.md).",
     "closed": "**Closed:**",
     "created": "**Created:**",
     "billable": "**Billable:**",
@@ -48,7 +48,13 @@
     "assigned": "**Assigned:**",
     "from": "**From:**",
     "milestone": "**Milestone:**",
-    "sprint": "**Sprint:**"
+    "sprint": "**Sprint:**",
+    "agent": "**Agent:**"
+  },
+
+  "models": {
+    "_": "The model map's file (Config/models.json): every reader of a card's Agent line takes provider, family and display name from it.",
+    "file": "Config/models.json"
   },
 
   "tokens": {

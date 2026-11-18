@@ -99,6 +99,55 @@ function Get-P20CardAssigned {
     return ''
 }
 
+function Get-P20CardAgent {
+    <#
+      Who did the work, when an agent did: the value of the card's first
+      `**Agent:**` line (stamps.agent), trimmed -- a model id, as written -- and
+      '' when it has none (a person worked it alone). The line sits beside
+      `**Assigned:**`: the person owns the card, the agent worked it. The value is
+      never parsed here; Get-P20ModelInfo looks it up in the model map. The CLI's
+      one reader of the stamp; agent/core/parsers.py's card_agent is the same
+      rule, and Tests/fixtures/parsers/agent-lines.json holds the two to one table.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Content)
+    $stamp = [string](Get-P20Consts).stamps.agent
+    $m = [regex]::Match("$Content", '(?m)^' + [regex]::Escape($stamp) + '[ \t]*([^\r\n]*?)[ \t]*\r?$')
+    if ($m.Success) { return $m.Groups[1].Value }
+    return ''
+}
+
+function Get-P20ModelInfo {
+    <#
+      What the model map (consts.json models.file, Config/models.json) says about
+      a model id: [pscustomobject]@{ id; known; provider; family; name }. A known
+      id takes its provider, family and display name from its row; an unknown one
+      is reported, never guessed at -- known $false, name the id as written,
+      provider and family $null. The id is never parsed for a family.
+      agent/core/models.py's model_info is the same rule, and
+      Tests/fixtures/parsers/models.json holds the two to one table.
+    #>
+    param(
+        [AllowEmptyString()][AllowNull()][string]$Id,
+        # The package root the map's path is relative to; the one consts.json sits in by default.
+        [string]$PackageRoot
+    )
+    if (-not $PackageRoot) { $PackageRoot = Split-Path (Get-P20ConstsPath) -Parent }
+    $mid = "$Id"
+    $path = Join-Path $PackageRoot ([string](Get-P20Consts).models.file)
+    $map = (Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json).models
+    $row = $null
+    if ($mid -and $map) {
+        $prop = $map.PSObject.Properties | Where-Object { $_.Name -ceq $mid } | Select-Object -First 1
+        if ($prop) { $row = $prop.Value }
+    }
+    if ($null -eq $row) {
+        return [pscustomobject]@{ id = $mid; known = $false; provider = $null; family = $null; name = $mid }
+    }
+    $name = [string]$row.name
+    if (-not $name) { $name = $mid }
+    return [pscustomobject]@{ id = $mid; known = $true; provider = [string]$row.provider; family = [string]$row.family; name = $name }
+}
+
 function Get-P20CardLineValue {
     <#
       The value of a card's FIRST `<stamp> value` line, trimmed: @{ Present; Value }.

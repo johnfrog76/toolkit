@@ -1,0 +1,15 @@
+{
+  "_comment": "The ONE map of known model ids, read by the CLI, the agent and the web UI (consts.json models.file; docs/hub/cards.md, \"The Agent line\"). A card's **Agent:** line carries a model id; every reader takes its provider, family and display name from here and never parses the id. family is what the standup groups by and matches to a kept window; name is the display name; coAuthor, where present, is the name a commit's Co-Authored-By trailer carries, so a trailer maps to an id by lookup. An id with no row reads as written, with no provider or family, and is left out of any cost. Adding a model is one row.",
+  "models": {
+    "claude-fable-5-2": { "provider": "anthropic", "family": "fable", "name": "Fable 5.2", "coAuthor": "Claude Fable 5.2" },
+    "claude-fable-5-1": { "provider": "anthropic", "family": "fable", "name": "Fable 5.1", "coAuthor": "Claude Fable 5.1" },
+    "claude-opus-5-5": { "provider": "anthropic", "family": "opus", "name": "Opus 5.5", "coAuthor": "Claude Opus 5.5" },
+    "claude-opus-5": { "provider": "anthropic", "family": "opus", "name": "Opus 5", "coAuthor": "Claude Opus 5" },
+    "claude-sonnet-5-5": { "provider": "anthropic", "family": "sonnet", "name": "Sonnet 5.5", "coAuthor": "Claude Sonnet 5.5" },
+    "claude-sonnet-5": { "provider": "anthropic", "family": "sonnet", "name": "Sonnet 5", "coAuthor": "Claude Sonnet 5" },
+    "claude-haiku-5-5": { "provider": "anthropic", "family": "haiku", "name": "Haiku 5.5", "coAuthor": "Claude Haiku 5.5" },
+    "claude-haiku-4-5": { "provider": "anthropic", "family": "haiku", "name": "Haiku 4.5", "coAuthor": "Claude Haiku 4.5" },
+    "gpt-5": { "provider": "openai", "family": "gpt", "name": "GPT-5" },
+    "grok-4": { "provider": "xai", "family": "grok", "name": "Grok 4" }
+  }
+}

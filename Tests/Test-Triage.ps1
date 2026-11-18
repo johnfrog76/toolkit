@@ -139,6 +139,30 @@ foreach ($arow in @($assignedTable.rows)) {
     Assert-True "Get-P20CardAssigned: $($arow.name)" ($got -ceq [string]$arow.expected) "got '$got'"
 }
 
+# -- Who worked it: a card's **Agent:** line, and the model map ------------------
+$agentTable = [System.IO.File]::ReadAllText((Join-Path $scriptDir 'fixtures/parsers/agent-lines.json')) | ConvertFrom-Json
+Assert-True 'the **Agent:** table has its rows' (@($agentTable.rows).Count -ge 10)
+foreach ($grow in @($agentTable.rows)) {
+    $eol = "`n"
+    if ($grow.crlf) { $eol = "`r`n" }
+    $text = (@($grow.lines) -join $eol) + $eol
+    $got = Get-P20CardAgent -Content $text
+    $gotAssigned = Get-P20CardAssigned -Content $text
+    Assert-True "Get-P20CardAgent: $($grow.name)" ($got -ceq [string]$grow.expected -and $gotAssigned -ceq [string]$grow.assigned) "got '$got', assigned '$gotAssigned'"
+}
+$modelsTable = [System.IO.File]::ReadAllText((Join-Path $scriptDir 'fixtures/parsers/models.json')) | ConvertFrom-Json
+Assert-True 'the model map table has its rows' (@($modelsTable.rows).Count -ge 5)
+foreach ($mrow in @($modelsTable.rows)) {
+    $info = Get-P20ModelInfo -Id ([string]$mrow.id)
+    $want = $mrow.expected
+    $same = ($info.id -ceq [string]$want.id) -and ($info.known -eq [bool]$want.known) -and ($info.name -ceq [string]$want.name)
+    foreach ($field in 'provider', 'family') {
+        if ($null -eq $want.$field) { $same = $same -and ($null -eq $info.$field) }
+        else { $same = $same -and ($info.$field -ceq [string]$want.$field) }
+    }
+    Assert-True "Get-P20ModelInfo: $($mrow.name)" $same "got $($info | ConvertTo-Json -Compress)"
+}
+
 # -- The scratch package and hub -------------------------------------------------
 $scratch = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-triage-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
 $pkg = Join-Path $scratch 'pkg'
