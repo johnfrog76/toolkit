@@ -1,8 +1,8 @@
 Since Thursday 1 October 2026: 3 closed, 6 in progress.
 Waiting on you: 2 walks.
-Fable: nothing yesterday, 3 open, none in flight, 1 blocker.
-Opus: 1 closed yesterday, 2 open, none in flight, no blockers.
-Widgets: 2 closed yesterday, 1 open, no blockers.
+Fable: nothing yesterday, 2 open, none in flight, 1 blocker.
+Opus: nothing yesterday, 1 open, none in flight, no blockers.
+Widgets: 3 closed yesterday, 3 open, no blockers.
 In flight is not yet known: every routed issue reads as open.
 Check: #142 Port the cast atoms -- the card is archived, but the issue is still open.
 Check: #143 Rename the slug -- the issue is closed, but the card is not archived.

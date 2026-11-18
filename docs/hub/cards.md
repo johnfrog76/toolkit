@@ -453,7 +453,15 @@ too, joined to its issues on the id: a card whose id is an issue's number adds i
 row (and a `Check` line where the two disagree), and any other card goes in the tile below. A card that
 says `**Billable:** no` is in neither. For a card of its own:
 the derived state above, plus the `**Closed:**` day of an archived card, puts each card in at most one
-slot of the engineer's one tile, read fresh every time and never written back. The days are the
+slot, read fresh every time and never written back.
+
+**Who reports a card is the card's.** The standup asks the one reader of a card's agent
+([above](#how-a-cards-agent-is-worked-out)), in the shipped order and never with the issue's worker label:
+the card is reported by the member its Agent line, an older card's Assigned worker or, on a connected
+GitHub Space, its commits' trailers name -- a labelled worker of that family, else a member of its own --
+and by the engineer's tile when it names nobody. A card joined to an issue moves that issue's row to the
+same member; an issue with no card stays with its label's worker
+([Team Agile](../modules/solitaire-agile.md#where-the-rooms-members-come-from)). The days are the
 standup's window: `since` is the start of the previous working day (or the day `Standup -Since`
 names), `asOf` is now.
 

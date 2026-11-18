@@ -1210,6 +1210,82 @@
         }
       ],
       "desks": []
+    },
+    {
+      "name": "a family with no kept window: grok, a member a card names, is dealt the next free window after the engineer's; the labelled keep theirs",
+      "size": 9,
+      "engineer": {
+        "label": "widgets",
+        "empty": false
+      },
+      "labels": [
+        {
+          "label": "fable",
+          "empty": true
+        },
+        {
+          "label": "grok",
+          "empty": false
+        },
+        {
+          "label": "opus",
+          "empty": true
+        },
+        {
+          "label": "sonnet",
+          "empty": true
+        }
+      ],
+      "present": [
+        "widgets",
+        "grok",
+        "fable",
+        "opus",
+        "sonnet"
+      ],
+      "round": [
+        {
+          "label": "widgets",
+          "cast": false,
+          "window": "ops-dev"
+        },
+        {
+          "label": "grok",
+          "cast": false,
+          "window": "new-hire"
+        },
+        {
+          "label": "fable",
+          "cast": false,
+          "window": "dev-hero"
+        },
+        {
+          "label": "opus",
+          "cast": false,
+          "window": "vibemancer"
+        },
+        {
+          "label": "sonnet",
+          "cast": false,
+          "window": "minimalist"
+        },
+        {
+          "label": "ultrawide",
+          "cast": true,
+          "window": "ultrawide"
+        },
+        {
+          "label": "qa",
+          "cast": true,
+          "window": "qa"
+        },
+        {
+          "label": "designer",
+          "cast": true,
+          "window": "designer"
+        }
+      ],
+      "desks": []
     }
   ],
   "workerLabels": [
@@ -1894,6 +1970,1428 @@
         "text": "standup-team-idle-room.txt",
         "work": "standup-team-idle-room.work.txt",
         "brief": "standup-team-idle-room.brief.txt"
+      }
+    },
+    {
+      "name": "agent-line",
+      "shape": "a card of its own whose Agent line names a Sonnet id: Sonnet reports it, not the engineer; the issue with no card stays with its label's worker (Opus)",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "teamSize": 9,
+      "labels": [
+        {
+          "name": "fable",
+          "description": "Routed to Fable -- the deep or risky work"
+        },
+        {
+          "name": "opus",
+          "description": "Routed to Opus -- the crash-through volume"
+        },
+        {
+          "name": "sonnet",
+          "description": "Routed to Sonnet -- well-scoped, pattern-following work"
+        }
+      ],
+      "issues": [
+        {
+          "number": 701,
+          "title": "Seed the import",
+          "state": "OPEN",
+          "labels": [
+            "opus"
+          ],
+          "closedAt": null,
+          "url": "https://github.com/acme/widgets/issues/701",
+          "body": "",
+          "milestone": {
+            "title": "Phase 7"
+          }
+        }
+      ],
+      "cards": [
+        {
+          "file": "TaskK7M2-wire-the-board.prompt.md",
+          "folder": "current",
+          "status": "In Progress",
+          "closed": null,
+          "title": "Wire the board",
+          "id": "K7M2",
+          "type": "Task",
+          "body": "# Task K7M2: Wire the board\n\n\n---\n\n**Agent:** claude-sonnet-5-5\n**Created:** 2026-10-01\n",
+          "begun": "2026-10-01",
+          "commits": []
+        }
+      ],
+      "space": "widgets",
+      "spaceName": "Widgets",
+      "expected": {
+        "team": {
+          "size": 9
+        },
+        "workers": [
+          {
+            "label": "fable",
+            "name": "Fable",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "empty": false,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "sonnet",
+            "name": "Sonnet",
+            "empty": false,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          }
+        ],
+        "round": [
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "cast": false
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "cast": false
+          },
+          {
+            "label": "sonnet",
+            "name": "Sonnet",
+            "cast": false
+          },
+          {
+            "label": "fable",
+            "name": "Fable",
+            "cast": false
+          },
+          {
+            "label": "new-hire",
+            "name": "NEW HIRE",
+            "cast": true
+          },
+          {
+            "label": "ultrawide",
+            "name": "ULTRAWIDE OVERLORD",
+            "cast": true
+          },
+          {
+            "label": "qa",
+            "name": "QA ALCHEMIST",
+            "cast": true
+          },
+          {
+            "label": "designer",
+            "name": "DESIGNER",
+            "cast": true
+          }
+        ],
+        "agents": {
+          "K7M2": {
+            "id": "claude-sonnet-5-5",
+            "family": "sonnet",
+            "source": "line"
+          }
+        },
+        "windows": {
+          "widgets": "ops-dev",
+          "opus": "vibemancer",
+          "sonnet": "minimalist",
+          "fable": "dev-hero"
+        },
+        "text": "standup-team-agent-line.txt",
+        "work": "standup-team-agent-line.work.txt",
+        "brief": "standup-team-agent-line.brief.txt"
+      }
+    },
+    {
+      "name": "trailer-only",
+      "shape": "a card joined to a Sonnet-labelled issue, with no Agent line and no Assigned worker, whose commit's trailer credits Opus: Opus reports #702, and Sonnet, with nothing routed it has not started, is idle",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "teamSize": 9,
+      "labels": [
+        {
+          "name": "fable",
+          "description": "Routed to Fable -- the deep or risky work"
+        },
+        {
+          "name": "opus",
+          "description": "Routed to Opus -- the crash-through volume"
+        },
+        {
+          "name": "sonnet",
+          "description": "Routed to Sonnet -- well-scoped, pattern-following work"
+        }
+      ],
+      "issues": [
+        {
+          "number": 702,
+          "title": "Count the window",
+          "state": "OPEN",
+          "labels": [
+            "sonnet"
+          ],
+          "closedAt": null,
+          "url": "https://github.com/acme/widgets/issues/702",
+          "body": "",
+          "milestone": {
+            "title": "Phase 7"
+          }
+        }
+      ],
+      "cards": [
+        {
+          "file": "Task702-count-the-window.prompt.md",
+          "folder": "current",
+          "status": "In Progress",
+          "closed": null,
+          "title": "Count the window",
+          "id": "702",
+          "type": "Task",
+          "body": "# Task 702: Count the window\n\n- a7a7777 count the window\n\n---\n\n**Created:** 2026-10-01\n",
+          "begun": "2026-10-01",
+          "commits": [
+            "a7a7777"
+          ]
+        }
+      ],
+      "messages": {
+        "a7a7777": "Count the window\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+      },
+      "space": "widgets",
+      "spaceName": "Widgets",
+      "expected": {
+        "team": {
+          "size": 9
+        },
+        "workers": [
+          {
+            "label": "fable",
+            "name": "Fable",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "empty": false,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "sonnet",
+            "name": "Sonnet",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          }
+        ],
+        "round": [
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "cast": false
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "cast": false
+          },
+          {
+            "label": "fable",
+            "name": "Fable",
+            "cast": false
+          },
+          {
+            "label": "sonnet",
+            "name": "Sonnet",
+            "cast": false
+          },
+          {
+            "label": "new-hire",
+            "name": "NEW HIRE",
+            "cast": true
+          },
+          {
+            "label": "ultrawide",
+            "name": "ULTRAWIDE OVERLORD",
+            "cast": true
+          },
+          {
+            "label": "qa",
+            "name": "QA ALCHEMIST",
+            "cast": true
+          },
+          {
+            "label": "designer",
+            "name": "DESIGNER",
+            "cast": true
+          }
+        ],
+        "agents": {
+          "702": {
+            "id": "claude-opus-5-5",
+            "family": "opus",
+            "source": "trailer"
+          }
+        },
+        "windows": {
+          "widgets": "ops-dev",
+          "opus": "vibemancer",
+          "fable": "dev-hero",
+          "sonnet": "minimalist"
+        },
+        "text": "standup-team-trailer-only.txt",
+        "work": "standup-team-trailer-only.work.txt",
+        "brief": "standup-team-trailer-only.brief.txt"
+      }
+    },
+    {
+      "name": "neither",
+      "shape": "a card joined to a Sonnet-labelled issue that names nobody -- no Agent line, no Assigned worker, no trailer: the engineer reports #703, whatever label its issue carries",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "teamSize": 9,
+      "labels": [
+        {
+          "name": "fable",
+          "description": "Routed to Fable -- the deep or risky work"
+        },
+        {
+          "name": "opus",
+          "description": "Routed to Opus -- the crash-through volume"
+        },
+        {
+          "name": "sonnet",
+          "description": "Routed to Sonnet -- well-scoped, pattern-following work"
+        }
+      ],
+      "issues": [
+        {
+          "number": 703,
+          "title": "Fold the counts",
+          "state": "OPEN",
+          "labels": [
+            "sonnet"
+          ],
+          "closedAt": null,
+          "url": "https://github.com/acme/widgets/issues/703",
+          "body": "",
+          "milestone": {
+            "title": "Phase 7"
+          }
+        }
+      ],
+      "cards": [
+        {
+          "file": "Task703-fold-the-counts.prompt.md",
+          "folder": "current",
+          "status": "In Progress",
+          "closed": null,
+          "title": "Fold the counts",
+          "id": "703",
+          "type": "Task",
+          "body": "# Task 703: Fold the counts\n\n- b7b7777 fold the counts\n\n---\n\n**Created:** 2026-10-01\n",
+          "begun": "2026-10-01",
+          "commits": [
+            "b7b7777"
+          ]
+        }
+      ],
+      "messages": {
+        "b7b7777": "Fold the counts"
+      },
+      "space": "widgets",
+      "spaceName": "Widgets",
+      "expected": {
+        "team": {
+          "size": 9
+        },
+        "workers": [
+          {
+            "label": "fable",
+            "name": "Fable",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "sonnet",
+            "name": "Sonnet",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "empty": false,
+            "present": true,
+            "plate": ""
+          }
+        ],
+        "round": [
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "cast": false
+          },
+          {
+            "label": "fable",
+            "name": "Fable",
+            "cast": false
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "cast": false
+          },
+          {
+            "label": "sonnet",
+            "name": "Sonnet",
+            "cast": false
+          },
+          {
+            "label": "new-hire",
+            "name": "NEW HIRE",
+            "cast": true
+          },
+          {
+            "label": "ultrawide",
+            "name": "ULTRAWIDE OVERLORD",
+            "cast": true
+          },
+          {
+            "label": "qa",
+            "name": "QA ALCHEMIST",
+            "cast": true
+          },
+          {
+            "label": "designer",
+            "name": "DESIGNER",
+            "cast": true
+          }
+        ],
+        "agents": {
+          "703": {
+            "id": null,
+            "family": null,
+            "source": "none"
+          }
+        },
+        "windows": {
+          "widgets": "ops-dev",
+          "fable": "dev-hero",
+          "opus": "vibemancer",
+          "sonnet": "minimalist"
+        },
+        "text": "standup-team-neither.txt",
+        "work": "standup-team-neither.work.txt",
+        "brief": "standup-team-neither.brief.txt"
+      }
+    },
+    {
+      "name": "label-differs",
+      "shape": "a card whose Agent line names a Sonnet id, joined to an issue labelled for Fable: the card decides -- Sonnet reports #704 and Fable is idle",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "teamSize": 9,
+      "labels": [
+        {
+          "name": "fable",
+          "description": "Routed to Fable -- the deep or risky work"
+        },
+        {
+          "name": "opus",
+          "description": "Routed to Opus -- the crash-through volume"
+        },
+        {
+          "name": "sonnet",
+          "description": "Routed to Sonnet -- well-scoped, pattern-following work"
+        }
+      ],
+      "issues": [
+        {
+          "number": 704,
+          "title": "Draw the plate",
+          "state": "OPEN",
+          "labels": [
+            "fable"
+          ],
+          "closedAt": null,
+          "url": "https://github.com/acme/widgets/issues/704",
+          "body": "",
+          "milestone": {
+            "title": "Phase 7"
+          }
+        }
+      ],
+      "cards": [
+        {
+          "file": "Task704-draw-the-plate.prompt.md",
+          "folder": "current",
+          "status": "In Progress",
+          "closed": null,
+          "title": "Draw the plate",
+          "id": "704",
+          "type": "Task",
+          "body": "# Task 704: Draw the plate\n\n\n---\n\n**Agent:** claude-sonnet-5-5\n**Created:** 2026-10-01\n",
+          "begun": "2026-10-01",
+          "commits": []
+        }
+      ],
+      "space": "widgets",
+      "spaceName": "Widgets",
+      "expected": {
+        "team": {
+          "size": 9
+        },
+        "workers": [
+          {
+            "label": "fable",
+            "name": "Fable",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "sonnet",
+            "name": "Sonnet",
+            "empty": false,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          }
+        ],
+        "round": [
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "cast": false
+          },
+          {
+            "label": "sonnet",
+            "name": "Sonnet",
+            "cast": false
+          },
+          {
+            "label": "fable",
+            "name": "Fable",
+            "cast": false
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "cast": false
+          },
+          {
+            "label": "new-hire",
+            "name": "NEW HIRE",
+            "cast": true
+          },
+          {
+            "label": "ultrawide",
+            "name": "ULTRAWIDE OVERLORD",
+            "cast": true
+          },
+          {
+            "label": "qa",
+            "name": "QA ALCHEMIST",
+            "cast": true
+          },
+          {
+            "label": "designer",
+            "name": "DESIGNER",
+            "cast": true
+          }
+        ],
+        "agents": {
+          "704": {
+            "id": "claude-sonnet-5-5",
+            "family": "sonnet",
+            "source": "line"
+          }
+        },
+        "windows": {
+          "widgets": "ops-dev",
+          "sonnet": "minimalist",
+          "fable": "dev-hero",
+          "opus": "vibemancer"
+        },
+        "text": "standup-team-label-differs.txt",
+        "work": "standup-team-label-differs.work.txt",
+        "brief": "standup-team-label-differs.brief.txt"
+      }
+    },
+    {
+      "name": "labelled-no-card",
+      "shape": "a labelled issue with no card is planned work: it stays with its label's worker (Opus), as it always did, beside a card the engineer reports",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "teamSize": 9,
+      "labels": [
+        {
+          "name": "fable",
+          "description": "Routed to Fable -- the deep or risky work"
+        },
+        {
+          "name": "opus",
+          "description": "Routed to Opus -- the crash-through volume"
+        },
+        {
+          "name": "sonnet",
+          "description": "Routed to Sonnet -- well-scoped, pattern-following work"
+        }
+      ],
+      "issues": [
+        {
+          "number": 705,
+          "title": "Route the walk",
+          "state": "OPEN",
+          "labels": [
+            "opus"
+          ],
+          "closedAt": null,
+          "url": "https://github.com/acme/widgets/issues/705",
+          "body": "",
+          "milestone": {
+            "title": "Phase 7"
+          }
+        }
+      ],
+      "cards": [
+        {
+          "file": "TaskK8N3-read-the-board.prompt.md",
+          "folder": "current",
+          "status": "In Progress",
+          "closed": null,
+          "title": "Read the board",
+          "id": "K8N3",
+          "type": "Task",
+          "body": "# Task K8N3: Read the board\n\n\n---\n\n**Created:** 2026-10-01\n",
+          "begun": "2026-10-01",
+          "commits": []
+        }
+      ],
+      "space": "widgets",
+      "spaceName": "Widgets",
+      "expected": {
+        "team": {
+          "size": 9
+        },
+        "workers": [
+          {
+            "label": "fable",
+            "name": "Fable",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "empty": false,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "sonnet",
+            "name": "Sonnet",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "empty": false,
+            "present": true,
+            "plate": ""
+          }
+        ],
+        "round": [
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "cast": false
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "cast": false
+          },
+          {
+            "label": "fable",
+            "name": "Fable",
+            "cast": false
+          },
+          {
+            "label": "sonnet",
+            "name": "Sonnet",
+            "cast": false
+          },
+          {
+            "label": "new-hire",
+            "name": "NEW HIRE",
+            "cast": true
+          },
+          {
+            "label": "ultrawide",
+            "name": "ULTRAWIDE OVERLORD",
+            "cast": true
+          },
+          {
+            "label": "qa",
+            "name": "QA ALCHEMIST",
+            "cast": true
+          },
+          {
+            "label": "designer",
+            "name": "DESIGNER",
+            "cast": true
+          }
+        ],
+        "agents": {
+          "K8N3": {
+            "id": null,
+            "family": null,
+            "source": "none"
+          }
+        },
+        "windows": {
+          "widgets": "ops-dev",
+          "opus": "vibemancer",
+          "fable": "dev-hero",
+          "sonnet": "minimalist"
+        },
+        "text": "standup-team-labelled-no-card.txt",
+        "work": "standup-team-labelled-no-card.work.txt",
+        "brief": "standup-team-labelled-no-card.brief.txt"
+      }
+    },
+    {
+      "name": "no-kept-window",
+      "shape": "a card worked by a model whose family keeps no window (grok): a member of its own, named Grok, dealt the next free window, its plate GROK",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "teamSize": 9,
+      "labels": [
+        {
+          "name": "fable",
+          "description": "Routed to Fable -- the deep or risky work"
+        },
+        {
+          "name": "opus",
+          "description": "Routed to Opus -- the crash-through volume"
+        },
+        {
+          "name": "sonnet",
+          "description": "Routed to Sonnet -- well-scoped, pattern-following work"
+        }
+      ],
+      "issues": [],
+      "cards": [
+        {
+          "file": "TaskG4R7-port-the-parser.prompt.md",
+          "folder": "current",
+          "status": "In Progress",
+          "closed": null,
+          "title": "Port the parser",
+          "id": "G4R7",
+          "type": "Task",
+          "body": "# Task G4R7: Port the parser\n\n\n---\n\n**Agent:** grok-4\n**Created:** 2026-10-01\n",
+          "begun": "2026-10-01",
+          "commits": []
+        }
+      ],
+      "space": "widgets",
+      "spaceName": "Widgets",
+      "expected": {
+        "team": {
+          "size": 9
+        },
+        "workers": [
+          {
+            "label": "fable",
+            "name": "Fable",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "grok",
+            "name": "Grok",
+            "empty": false,
+            "present": true,
+            "plate": "GROK"
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "sonnet",
+            "name": "Sonnet",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          }
+        ],
+        "round": [
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "cast": false
+          },
+          {
+            "label": "grok",
+            "name": "Grok",
+            "cast": false
+          },
+          {
+            "label": "fable",
+            "name": "Fable",
+            "cast": false
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "cast": false
+          },
+          {
+            "label": "sonnet",
+            "name": "Sonnet",
+            "cast": false
+          },
+          {
+            "label": "ultrawide",
+            "name": "ULTRAWIDE OVERLORD",
+            "cast": true
+          },
+          {
+            "label": "qa",
+            "name": "QA ALCHEMIST",
+            "cast": true
+          },
+          {
+            "label": "designer",
+            "name": "DESIGNER",
+            "cast": true
+          }
+        ],
+        "agents": {
+          "G4R7": {
+            "id": "grok-4",
+            "family": "grok",
+            "source": "line"
+          }
+        },
+        "windows": {
+          "widgets": "ops-dev",
+          "grok": "new-hire",
+          "fable": "dev-hero",
+          "opus": "vibemancer",
+          "sonnet": "minimalist"
+        },
+        "text": "standup-team-no-kept-window.txt",
+        "work": "standup-team-no-kept-window.work.txt",
+        "brief": "standup-team-no-kept-window.brief.txt"
+      }
+    },
+    {
+      "name": "unknown-id",
+      "shape": "an Agent line naming an id the map does not know: a member under the id as written, its plate the id in capitals",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "teamSize": 9,
+      "labels": [
+        {
+          "name": "fable",
+          "description": "Routed to Fable -- the deep or risky work"
+        },
+        {
+          "name": "opus",
+          "description": "Routed to Opus -- the crash-through volume"
+        },
+        {
+          "name": "sonnet",
+          "description": "Routed to Sonnet -- well-scoped, pattern-following work"
+        }
+      ],
+      "issues": [],
+      "cards": [
+        {
+          "file": "TaskU9X2-try-the-new-model.prompt.md",
+          "folder": "current",
+          "status": "In Progress",
+          "closed": null,
+          "title": "Try the new model",
+          "id": "U9X2",
+          "type": "Task",
+          "body": "# Task U9X2: Try the new model\n\n\n---\n\n**Agent:** acme-coder-1\n**Created:** 2026-10-01\n",
+          "begun": "2026-10-01",
+          "commits": []
+        }
+      ],
+      "space": "widgets",
+      "spaceName": "Widgets",
+      "expected": {
+        "team": {
+          "size": 9
+        },
+        "workers": [
+          {
+            "label": "acme-coder-1",
+            "name": "Acme-coder-1",
+            "empty": false,
+            "present": true,
+            "plate": "ACME-CODER-1"
+          },
+          {
+            "label": "fable",
+            "name": "Fable",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "sonnet",
+            "name": "Sonnet",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          }
+        ],
+        "round": [
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "cast": false
+          },
+          {
+            "label": "acme-coder-1",
+            "name": "Acme-coder-1",
+            "cast": false
+          },
+          {
+            "label": "fable",
+            "name": "Fable",
+            "cast": false
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "cast": false
+          },
+          {
+            "label": "sonnet",
+            "name": "Sonnet",
+            "cast": false
+          },
+          {
+            "label": "ultrawide",
+            "name": "ULTRAWIDE OVERLORD",
+            "cast": true
+          },
+          {
+            "label": "qa",
+            "name": "QA ALCHEMIST",
+            "cast": true
+          },
+          {
+            "label": "designer",
+            "name": "DESIGNER",
+            "cast": true
+          }
+        ],
+        "agents": {
+          "U9X2": {
+            "id": "acme-coder-1",
+            "family": "acme-coder-1",
+            "source": "line"
+          }
+        },
+        "windows": {
+          "widgets": "ops-dev",
+          "acme-coder-1": "new-hire",
+          "fable": "dev-hero",
+          "opus": "vibemancer",
+          "sonnet": "minimalist"
+        },
+        "text": "standup-team-unknown-id.txt",
+        "work": "standup-team-unknown-id.work.txt",
+        "brief": "standup-team-unknown-id.brief.txt"
+      }
+    },
+    {
+      "name": "one-family",
+      "shape": "two cards naming two Opus ids (claude-opus-5 and claude-opus-5-5) with no Opus label: ONE member, opus, in its kept window, reporting both",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "teamSize": 9,
+      "labels": [
+        {
+          "name": "fable",
+          "description": "Routed to Fable -- the deep or risky work"
+        },
+        {
+          "name": "sonnet",
+          "description": "Routed to Sonnet -- well-scoped, pattern-following work"
+        }
+      ],
+      "issues": [],
+      "cards": [
+        {
+          "file": "TaskP2Q3-trim-the-header.prompt.md",
+          "folder": "current",
+          "status": "In Progress",
+          "closed": null,
+          "title": "Trim the header",
+          "id": "P2Q3",
+          "type": "Task",
+          "body": "# Task P2Q3: Trim the header\n\n\n---\n\n**Agent:** claude-opus-5\n**Created:** 2026-10-01\n",
+          "begun": "2026-10-01",
+          "commits": []
+        },
+        {
+          "file": "TaskP2Q4-rename-the-column.prompt.md",
+          "folder": "current",
+          "status": "In Progress",
+          "closed": null,
+          "title": "Rename the column",
+          "id": "P2Q4",
+          "type": "Task",
+          "body": "# Task P2Q4: Rename the column\n\n\n---\n\n**Agent:** claude-opus-5-5\n**Created:** 2026-10-01\n",
+          "begun": "2026-10-01",
+          "commits": []
+        }
+      ],
+      "space": "widgets",
+      "spaceName": "Widgets",
+      "expected": {
+        "team": {
+          "size": 9
+        },
+        "workers": [
+          {
+            "label": "fable",
+            "name": "Fable",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "empty": false,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "sonnet",
+            "name": "Sonnet",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          }
+        ],
+        "round": [
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "cast": false
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "cast": false
+          },
+          {
+            "label": "fable",
+            "name": "Fable",
+            "cast": false
+          },
+          {
+            "label": "sonnet",
+            "name": "Sonnet",
+            "cast": false
+          },
+          {
+            "label": "new-hire",
+            "name": "NEW HIRE",
+            "cast": true
+          },
+          {
+            "label": "ultrawide",
+            "name": "ULTRAWIDE OVERLORD",
+            "cast": true
+          },
+          {
+            "label": "qa",
+            "name": "QA ALCHEMIST",
+            "cast": true
+          },
+          {
+            "label": "designer",
+            "name": "DESIGNER",
+            "cast": true
+          }
+        ],
+        "agents": {
+          "P2Q3": {
+            "id": "claude-opus-5",
+            "family": "opus",
+            "source": "line"
+          },
+          "P2Q4": {
+            "id": "claude-opus-5-5",
+            "family": "opus",
+            "source": "line"
+          }
+        },
+        "windows": {
+          "widgets": "ops-dev",
+          "opus": "vibemancer",
+          "fable": "dev-hero",
+          "sonnet": "minimalist"
+        },
+        "text": "standup-team-one-family.txt",
+        "work": "standup-team-one-family.work.txt",
+        "brief": "standup-team-one-family.brief.txt"
+      }
+    },
+    {
+      "name": "legacy-size",
+      "shape": "an older card with no Agent line and Assigned sonnet (Route -Assign wrote the size there before the Agent line): Sonnet reports it",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "teamSize": 9,
+      "labels": [
+        {
+          "name": "fable",
+          "description": "Routed to Fable -- the deep or risky work"
+        },
+        {
+          "name": "opus",
+          "description": "Routed to Opus -- the crash-through volume"
+        },
+        {
+          "name": "sonnet",
+          "description": "Routed to Sonnet -- well-scoped, pattern-following work"
+        }
+      ],
+      "issues": [],
+      "cards": [
+        {
+          "file": "TaskL5S6-mend-the-loader.prompt.md",
+          "folder": "current",
+          "status": "In Progress",
+          "closed": null,
+          "title": "Mend the loader",
+          "id": "L5S6",
+          "type": "Task",
+          "body": "# Task L5S6: Mend the loader\n\n\n---\n\n**Assigned:** sonnet\n**Created:** 2026-10-01\n",
+          "begun": "2026-10-01",
+          "commits": []
+        }
+      ],
+      "space": "widgets",
+      "spaceName": "Widgets",
+      "expected": {
+        "team": {
+          "size": 9
+        },
+        "workers": [
+          {
+            "label": "fable",
+            "name": "Fable",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "sonnet",
+            "name": "Sonnet",
+            "empty": false,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          }
+        ],
+        "round": [
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "cast": false
+          },
+          {
+            "label": "sonnet",
+            "name": "Sonnet",
+            "cast": false
+          },
+          {
+            "label": "fable",
+            "name": "Fable",
+            "cast": false
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "cast": false
+          },
+          {
+            "label": "new-hire",
+            "name": "NEW HIRE",
+            "cast": true
+          },
+          {
+            "label": "ultrawide",
+            "name": "ULTRAWIDE OVERLORD",
+            "cast": true
+          },
+          {
+            "label": "qa",
+            "name": "QA ALCHEMIST",
+            "cast": true
+          },
+          {
+            "label": "designer",
+            "name": "DESIGNER",
+            "cast": true
+          }
+        ],
+        "agents": {
+          "L5S6": {
+            "id": "claude-sonnet-5-5",
+            "family": "sonnet",
+            "source": "assigned"
+          }
+        },
+        "windows": {
+          "widgets": "ops-dev",
+          "sonnet": "minimalist",
+          "fable": "dev-hero",
+          "opus": "vibemancer"
+        },
+        "text": "standup-team-legacy-size.txt",
+        "work": "standup-team-legacy-size.work.txt",
+        "brief": "standup-team-legacy-size.brief.txt"
+      }
+    },
+    {
+      "name": "legacy-backend",
+      "shape": "an older card with no Agent line and Assigned backend, a team's own worker the map has no current model for: a member under the name as written, its plate BACKEND",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "teamSize": 9,
+      "labels": [
+        {
+          "name": "fable",
+          "description": "Routed to Fable -- the deep or risky work"
+        },
+        {
+          "name": "opus",
+          "description": "Routed to Opus -- the crash-through volume"
+        },
+        {
+          "name": "sonnet",
+          "description": "Routed to Sonnet -- well-scoped, pattern-following work"
+        }
+      ],
+      "issues": [],
+      "cards": [
+        {
+          "file": "TaskB3K8-tune-the-cache.prompt.md",
+          "folder": "current",
+          "status": "In Progress",
+          "closed": null,
+          "title": "Tune the cache",
+          "id": "B3K8",
+          "type": "Task",
+          "body": "# Task B3K8: Tune the cache\n\n\n---\n\n**Assigned:** backend\n**Created:** 2026-10-01\n",
+          "begun": "2026-10-01",
+          "commits": []
+        }
+      ],
+      "space": "widgets",
+      "spaceName": "Widgets",
+      "expected": {
+        "team": {
+          "size": 9
+        },
+        "workers": [
+          {
+            "label": "backend",
+            "name": "Backend",
+            "empty": false,
+            "present": true,
+            "plate": "BACKEND"
+          },
+          {
+            "label": "fable",
+            "name": "Fable",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "sonnet",
+            "name": "Sonnet",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          }
+        ],
+        "round": [
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "cast": false
+          },
+          {
+            "label": "backend",
+            "name": "Backend",
+            "cast": false
+          },
+          {
+            "label": "fable",
+            "name": "Fable",
+            "cast": false
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "cast": false
+          },
+          {
+            "label": "sonnet",
+            "name": "Sonnet",
+            "cast": false
+          },
+          {
+            "label": "ultrawide",
+            "name": "ULTRAWIDE OVERLORD",
+            "cast": true
+          },
+          {
+            "label": "qa",
+            "name": "QA ALCHEMIST",
+            "cast": true
+          },
+          {
+            "label": "designer",
+            "name": "DESIGNER",
+            "cast": true
+          }
+        ],
+        "agents": {
+          "B3K8": {
+            "id": null,
+            "family": "backend",
+            "source": "assigned"
+          }
+        },
+        "windows": {
+          "widgets": "ops-dev",
+          "backend": "new-hire",
+          "fable": "dev-hero",
+          "opus": "vibemancer",
+          "sonnet": "minimalist"
+        },
+        "text": "standup-team-legacy-backend.txt",
+        "work": "standup-team-legacy-backend.work.txt",
+        "brief": "standup-team-legacy-backend.brief.txt"
       }
     }
   ]

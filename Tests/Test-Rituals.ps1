@@ -971,7 +971,7 @@ $teamTable = $teamRaw | ConvertFrom-Json
 $teamCases = @($teamTable.cases)
 $teamAsOf = @([regex]::Matches($teamRaw, '"asOf"\s*:\s*"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
 $teamNames = (@($teamCases | ForEach-Object { [string]$_.name })) -join ','
-Assert-True 'the team table is read: its sizes, its seats, its room rows and eight cases, an asOf each' (@($teamTable.sizes).Count -ge 8 -and @($teamTable.seats).Count -ge 6 -and @($teamTable.room).Count -ge 16 -and $teamNames -ceq 'absent,idle-sits,unset,work-unsaid,walk-size-3,walk-size-6,walk-size-9,idle-room' -and $teamAsOf.Count -eq $teamCases.Count) "$(@($teamTable.sizes).Count) sizes, $(@($teamTable.seats).Count) seats, $(@($teamTable.room).Count) room rows, cases $teamNames"
+Assert-True 'the team table is read: its sizes, its seats, its room rows and eighteen cases, an asOf each' (@($teamTable.sizes).Count -ge 8 -and @($teamTable.seats).Count -ge 6 -and @($teamTable.room).Count -ge 16 -and $teamNames -ceq 'absent,idle-sits,unset,work-unsaid,walk-size-3,walk-size-6,walk-size-9,idle-room,agent-line,trailer-only,neither,label-differs,labelled-no-card,no-kept-window,unknown-id,one-family,legacy-size,legacy-backend' -and $teamAsOf.Count -eq $teamCases.Count) "$(@($teamTable.sizes).Count) sizes, $(@($teamTable.seats).Count) seats, $(@($teamTable.room).Count) room rows, cases $teamNames"
 
 foreach ($row in @($teamTable.sizes)) {
     $got = Get-P20TeamSize -Stored $row.stored
@@ -1018,11 +1018,18 @@ Assert-True 'the walk rows are the three rooms: no labels, the engineer with wor
 for ($n = 0; $n -lt $teamCases.Count; $n++) {
     $case = $teamCases[$n]
     $name = 'team-' + [string]$case.name
+    $caseMessages = $null
     $exp = $case.expected
     if ($case.PSObject.Properties['cards']) {
-        # A case that states its cards is the joined fill over its own labels, issues and cards.
+        # A case that states its cards is the joined fill over its own labels, issues and cards,
+        # with the trailer read's messages when it states them.
+        $caseMessages = $null
+        if ($case.PSObject.Properties['messages'] -and $null -ne $case.messages) {
+            $caseMessages = @{}
+            foreach ($p in @($case.messages.PSObject.Properties)) { $caseMessages[$p.Name] = [string]$p.Value }
+        }
         $s = Invoke-P20StandupJoinedFill -AsOf $teamAsOf[$n] -Labels @($case.labels) -Issues @($case.issues) -Tracker ([pscustomobject]@{ ok = $true; reason = '' }) `
-            -Cards @($case.cards) -Space ([string]$case.space) -SpaceName ([string]$case.spaceName) -PackageRoot $pkgRoot -TeamSize $case.teamSize
+            -Cards @($case.cards) -Space ([string]$case.space) -SpaceName ([string]$case.spaceName) -PackageRoot $pkgRoot -TeamSize $case.teamSize -Messages $caseMessages
     }
     else {
         $s = Invoke-P20StandupFill -AsOf $teamAsOf[$n] -Labels @($teamTable.workerLabels) -Issues @($case.issues) -Tracker ([pscustomobject]@{ ok = $true; reason = '' }) -Space 'widgets' -PackageRoot $pkgRoot -TeamSize $case.teamSize
@@ -1031,6 +1038,29 @@ for ($n = 0; $n -lt $teamCases.Count; $n++) {
     $want = (@($exp.workers | ForEach-Object { "$($_.label)/$($_.name)/$([bool]$_.empty)/$([bool]$_.present)" })) -join ','
     $got = (@($s.workers | ForEach-Object { "$($_.label)/$($_.name)/$([bool]$_.empty)/$([bool]$_.present)" })) -join ','
     Assert-True "${name}: every worker kept, in label order, each marked present or absent" ($got -ceq $want) "`n  got  $got`n  want $want"
+    # A row that states a plate holds it; one that does not wears none.
+    $wantPlates = (@($exp.workers | ForEach-Object { $pl = ''; if ($_.PSObject.Properties['plate']) { $pl = [string]$_.plate }; "$($_.label)=$pl" })) -join ','
+    $gotPlates = (@($s.workers | ForEach-Object { "$($_.label)=$([string]$_.plate)" })) -join ','
+    Assert-True "${name}: each worker's plate" ($gotPlates -ceq $wantPlates) "`n  got  $gotPlates`n  want $wantPlates"
+    # Who each card names, and where it came from: the one reader, shipped order.
+    if ($exp.PSObject.Properties['agents']) {
+        foreach ($ap in @($exp.agents.PSObject.Properties)) {
+            $acard = @($case.cards | Where-Object { [string]$_.id -ceq $ap.Name })[0]
+            $ans = Resolve-P20CardAgent -Content ([string]$acard.body) -Messages $caseMessages
+            $wantA = "$($ap.Value.id)|$($ap.Value.family)|$($ap.Value.source)"
+            $gotA = "$($ans.id)|$($ans.family)|$($ans.source)"
+            Assert-True "${name}: card $($ap.Name) is $($ap.Value.source)" ($gotA -ceq $wantA) "got $gotA want $wantA"
+        }
+    }
+    # Each member's window, by the room's own rule over the fill's record.
+    if ($exp.PSObject.Properties['windows']) {
+        $rec = @($s.workers)
+        $eng = $rec[$rec.Count - 1]
+        $roomNow = Get-P20StandupRoomSeats -Size ([int]$s.team.size) -Engineer @{ label = [string]$eng.label; empty = [bool]$eng.empty } -Labels @($rec[0..($rec.Count - 2)] | ForEach-Object { @{ label = [string]$_.label; empty = [bool]$_.empty } })
+        $gotW = (@($roomNow.round | Where-Object { -not $_.cast } | ForEach-Object { "$($_.label)=$($_.window)" } | Sort-Object)) -join ','
+        $wantW = (@($exp.windows.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" } | Sort-Object)) -join ','
+        Assert-True "${name}: each member's window" ($gotW -ceq $wantW) "got $gotW want $wantW"
+    }
     $wantRound = (@($exp.round | ForEach-Object { "$($_.label)/$($_.name)/$([bool]$_.cast)" })) -join ','
     $gotRound = (@($s.work.workers | ForEach-Object { "$($_.label)/$($_.name)/$([bool]$_.cast)" })) -join ','
     Assert-True "${name}: the round is the seated in seat order, then the invented cast members" ($gotRound -ceq $wantRound) "`n  got  $gotRound`n  want $wantRound"

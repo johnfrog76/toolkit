@@ -37,6 +37,7 @@ try:
     from agent.ado import accounting
     from agent.core import config, disk_cache
     from agent.core import consts as C
+    from agent.core.parsers import resolve_card_agent
     from agent.solitaire import standup
     from agent.solitaire import tracker as solitaire_tracker
 except Exception as e:  # pragma: no cover - environment without the deps
@@ -700,9 +701,10 @@ class TheJoinedTable(unittest.TestCase):
         filled = _fill_joined(JOINED_CASES["issue-labelled-in-window"])
         self.assertEqual([(i.number, i.motion) for i in filled.workers[1].today], [(171, "started")])
         before = _fill_joined(JOINED_CASES["issue-assigned-before-window"])
-        self.assertEqual(
-            [(i.number, i.motion) for i in before.workers[0].today], [(172, "inProgress"), (173, "inProgress")]
-        )
+        # The issue whose card names nobody is the engineer's to report; the one
+        # with no card stays with its label's worker.
+        self.assertEqual([(i.number, i.motion) for i in before.workers[0].today], [(172, "inProgress")])
+        self.assertEqual([(i.number, i.motion) for i in before.workers[-1].today], [(173, "inProgress")])
 
     def test_the_window_hashes_rule(self):
         at = datetime.fromisoformat(JOINED_TABLE["asOf"])
@@ -1415,6 +1417,7 @@ def _fill_team(case: dict) -> "standup.Standup":
             space=case["space"],
             space_name=case["spaceName"],
             size=case["teamSize"],
+            messages=case.get("messages"),
         )
     else:
         filled = standup.fill_standup(
@@ -1447,7 +1450,27 @@ class TheTeamTable(unittest.TestCase):
         self.assertGreaterEqual(len(TEAM_TABLE["room"]), 16)
         self.assertEqual(
             {c["name"] for c in TEAM_TABLE["cases"]},
-            {"absent", "idle-sits", "unset", "work-unsaid", "walk-size-3", "walk-size-6", "walk-size-9", "idle-room"},
+            {
+                "absent",
+                "idle-sits",
+                "unset",
+                "work-unsaid",
+                "walk-size-3",
+                "walk-size-6",
+                "walk-size-9",
+                "idle-room",
+                # Where the room's members come from: the card decides once it exists.
+                "agent-line",
+                "trailer-only",
+                "neither",
+                "label-differs",
+                "labelled-no-card",
+                "no-kept-window",
+                "unknown-id",
+                "one-family",
+                "legacy-size",
+                "legacy-backend",
+            },
         )
 
     def test_every_size_row(self):
@@ -1516,10 +1539,24 @@ class TheTeamTable(unittest.TestCase):
             with self.subTest(case=case["name"]):
                 filled = _fill_team(case)
                 self.assertEqual(filled.team.model_dump(), exp["team"])
+                # A row that states a plate holds it; one that does not wears none.
                 got = [
-                    {"label": w.label, "name": w.name, "empty": w.empty, "present": w.present} for w in filled.workers
+                    {"label": w.label, "name": w.name, "empty": w.empty, "present": w.present, "plate": w.plate}
+                    for w in filled.workers
                 ]
-                self.assertEqual(got, exp["workers"])
+                self.assertEqual(got, [{**w, "plate": w.get("plate", "")} for w in exp["workers"]])
+                # Who each card names, and where it came from: the one reader, shipped order.
+                for cid, want in exp.get("agents", {}).items():
+                    card = next(c for c in case["cards"] if c["id"] == cid)
+                    self.assertEqual(resolve_card_agent(card["body"], "", case.get("messages")), want, cid)
+                # Each member's window, by the room's own rule over the fill's record.
+                if "windows" in exp:
+                    room = standup.room_seats(
+                        filled.team.size,
+                        (filled.workers[-1].label, filled.workers[-1].empty),
+                        [(w.label, w.empty) for w in filled.workers[:-1]],
+                    )
+                    self.assertEqual({r["label"]: r["window"] for r in room["round"] if not r["cast"]}, exp["windows"])
                 # The round: the seated in seat order, then the invented cast members.
                 spoken = [{"label": w.label, "name": w.name, "cast": w.cast} for w in filled.work.workers]
                 self.assertEqual(spoken, exp["round"])
@@ -2253,7 +2290,7 @@ def _brief_less_corner(body: dict) -> str:
 
 WORK_FIELDS = {"queue", "workers", "queueProse", "chairProse", "text"}
 GROUP_FIELDS = {"name", "by", "count", "refs", "phrase"}
-WORKER_FIELDS = {"label", "name", "yesterday", "today", "blockers", "empty", "excuse", "status", "present"}
+WORKER_FIELDS = {"label", "name", "yesterday", "today", "blockers", "empty", "excuse", "status", "present", "plate"}
 WALK_FIELDS = {"number", "id", "title", "url", "path", "motion", "commits", "worker"}
 ITEM_FIELDS = {"number", "id", "title", "url", "path", "motion", "commits"}
 COUNT_FIELDS = {"label", "name", "closed", "started", "inProgress", "commits", "undated"}

@@ -238,6 +238,10 @@ class Worker(BaseModel):
     # speaks the present only; the ledger -- the detail, the counts, the brief --
     # keeps every worker. True for a reader that knows nothing of the room.
     present: bool = True
+    # The plate a member a card names wears when its family keeps no window
+    # (``card_member``): the family in capitals, ``GROK``. "" for a labelled
+    # worker, the engineer and a kept family, whose window's plate stands.
+    plate: str = ""
 
 
 class WorkGroup(BaseModel):
@@ -1155,6 +1159,92 @@ def _cards_tile(
     return worker, walk, key_of, hashes, undated
 
 
+class _CardMembers:
+    """Who reports a card, once a card exists (docs/modules/solitaire-agile.md,
+    "Where the room's members come from"): the family of the card's agent by the
+    one reader (``resolve_card_agent``, the shipped order, the label never passed;
+    ``messages`` the trailer read's, None for none) -- the labelled worker whose
+    label is that family (ignoring case), else a member of its own, one per
+    family, made the first time a card names it -- or None, the engineer, when
+    the card names nobody. The mirror of ``Get-P20StandupCardMember``."""
+
+    def __init__(self, labelled: list[Worker], messages: dict | None) -> None:
+        self.by_low = {w.label.lower(): w for w in labelled}
+        self.members: dict[str, Worker] = {}
+        self.messages = messages
+        self.rows, self.sizes = read_model_map(), read_model_current()
+
+    def dest(self, card: dict) -> Worker | None:
+        family = resolve_card_agent(
+            str(card.get("body") or ""), "", self.messages, self.rows, None, current=self.sizes
+        )["family"]
+        if not family:
+            return None
+        low = str(family).lower()
+        if low in self.by_low:
+            return self.by_low[low]
+        if low not in self.members:
+            self.members[low] = card_member(str(family))
+        return self.members[low]
+
+    def seated(self) -> list[Worker]:
+        """The members with something to say: one a card in scope names, and none
+        that ends with nothing."""
+        return [w for w in self.members.values() if w.yesterday or w.today or w.blockers]
+
+
+def card_member(family: str) -> Worker:
+    """A member a card names that no worker label routes to: labelled with the
+    family as written, named with its first letter in capitals, and wearing the
+    family in capitals on its plate unless the family keeps a window
+    (``rituals.room.kept``). The mirror of ``New-P20StandupCardMember``."""
+    plate = "" if family.lower() in rituals_room()["kept"] else family.upper()
+    return Worker(label=family, name=family[:1].upper() + family[1:], plate=plate)
+
+
+def _slot_order(w: Worker) -> None:
+    """A slot's issues first, by number, then its cards in the order they came."""
+    for slot in ceremonies()[CEREMONY]["slots"]:
+        getattr(w, slot).sort(key=lambda i: (i.number is None, i.number or 0))
+
+
+def _member_tiles(
+    as_of: datetime,
+    cards: list[dict],
+    route: _CardMembers,
+    engineer_label: str,
+    engineer_name: str,
+    marks: dict,
+    since: datetime,
+    commit_dates: dict | None,
+) -> tuple[Worker, list[WalkItem], dict, dict, dict]:
+    """Cards in file order -> the engineer's tile, with every card that names
+    nobody, and each other card's items added to the member it names, each by
+    ``_cards_tile``'s mapping; the walk in the cards' order, the work keys, the
+    hashes and the undated."""
+    groups: dict[int, tuple[Worker | None, list[dict]]] = {}
+    for card in cards:
+        target = route.dest(card)
+        groups.setdefault(id(target), (target, []))[1].append(card)
+    position = {str(c.get("path") or f"{c.get('folder', '')}/{c.get('file', '')}"): i for i, c in enumerate(cards)}
+    engineer_cards = groups.pop(id(None), (None, []))[1]
+    tile, walk, keys, hashes, undated = _cards_tile(
+        as_of, engineer_cards, engineer_label, engineer_name, marks, since, commit_dates
+    )
+    for target, group in groups.values():
+        part, part_walk, part_keys, part_hashes, part_undated = _cards_tile(
+            as_of, group, target.label, target.name, marks, since, commit_dates
+        )
+        for slot in ceremonies()[CEREMONY]["slots"]:
+            getattr(target, slot).extend(getattr(part, slot))
+        walk += part_walk
+        keys.update(part_keys)
+        hashes.update(part_hashes)
+        undated.update(part_undated)
+    walk.sort(key=lambda w: position.get(w.path, 0))
+    return tile, walk, keys, hashes, undated
+
+
 def fill_cards_standup(
     as_of: datetime, cards: list[dict], space: str = "", space_name: str = "", window: str = "", size=None
 ) -> Standup:
@@ -1179,11 +1269,19 @@ def fill_cards_standup(
         chair=Chair(open=phrasebook[d % len(phrasebook)], close=phrasebook[(d + 1) % len(phrasebook)]),
         team=Team(size=team_size(size)),
     )
-    worker, walk, key_of, hashes, _undated = _cards_tile(as_of, cards_in_play(cards), space, name, out._marks, since)
-    worker.empty = not (worker.yesterday or worker.today or worker.blockers)
+    # Each card is reported by the member its agent names (its Agent line, else
+    # an older card's Assigned worker: no messages here), else by the engineer.
+    route = _CardMembers([], None)
+    worker, walk, key_of, hashes, _undated = _member_tiles(
+        as_of, cards_in_play(cards), route, space, name, out._marks, since, None
+    )
+    members = sorted(route.seated(), key=lambda w: w.label)
+    for w in [*members, worker]:
+        _slot_order(w)
+        w.empty = not (w.yesterday or w.today or w.blockers)
     out.queue = Queue(walk=walk)
-    out.workers = [worker]
-    # The tile is the engineer: the first seat, and the record's one member.
+    out.workers = [*members, worker]
+    # The tile is the engineer: the first seat, and the record's last member.
     seat_room(out, worker, d, words)
     out.work = build_work(out, key_of)
     out.counts = standup_counts(out, hashes)
@@ -1241,9 +1339,12 @@ def fill_joined_standup(
     number -> its timeline's start) says started for an open issue with no card
     whose work began in the window. None for either is not read, and today's
     rule stands: every bullet counts, and an issue alone is in progress.
-    ``messages`` (short hash -> commit message, the trailer read's) is held for
-    the reader of a card's agent: accepted and not yet read."""
-    del messages
+    Once a card exists the card decides who reports it (``_CardMembers``: its
+    Agent line, else an older card's Assigned worker, else the trailers its
+    commits carry -- ``messages``, short hash -> commit message, the trailer
+    read's -- else the engineer): a joined issue's row moves to that member, and
+    every other card is that member's. An issue with no card stays with its
+    label's worker."""
     out = fill_standup(as_of, labels, issues, tracker_state, space=space, window=window, size=size)
     if not out.tracker.ok:
         return out
@@ -1266,6 +1367,7 @@ def fill_joined_standup(
         else:
             alone.append(card)
     unrouted: list[dict] = []
+    chosen: list[tuple[int, dict]] = []
     for number in sorted(joined):
         rounds = joined[number]
         current = [c for c in rounds if str(c.get("folder", "")) == folder_current()]
@@ -1279,6 +1381,7 @@ def fill_joined_standup(
             CardLink(number=number, id=str(card.get("id") or ""), lane=str(card.get("status") or ""), path=path)
         )
         hashes[f"#{number}|"], undated[f"#{number}|"] = window_hashes(card_hashes(card), commit_dates, since, as_of)
+        chosen.append((number, card))
         begun = card_begun_in(card, first, last)
         placed = False
         for it in issue_items:
@@ -1307,13 +1410,40 @@ def fill_joined_standup(
         if commit_in_window(starts.get(it.number), since, as_of):
             it.motion = started
 
+    # Once a card exists the card decides: a joined issue's row moves from its
+    # label's worker to the member the card names, or to the engineer.
+    labelled = list(out.workers)
+    route = _CardMembers(labelled, messages)
+    engineer_name = space_name or space
+    moved: dict[str, list[SlotItem]] = {slot: [] for slot in ceremonies()[CEREMONY]["slots"]}
+    for number, card in chosen:
+        target = route.dest(card)
+        for holder in labelled:
+            if holder is target:
+                continue
+            for slot in ceremonies()[CEREMONY]["slots"]:
+                items = getattr(holder, slot)
+                mine = [i for i in items if i.number == number]
+                if not mine:
+                    continue
+                setattr(holder, slot, [i for i in items if i.number != number])
+                (getattr(target, slot) if target is not None else moved[slot]).extend(mine)
+        for w in out.queue.walk:
+            if w.number == number:
+                w.worker = target.name if target is not None else engineer_name
+
     tile_cards = sorted(alone + unrouted, key=lambda c: str(c.get("file", "")))
-    tile, walk, card_keys, tile_hashes, tile_undated = _cards_tile(
-        as_of, tile_cards, space, space_name or space, out._marks, since, commit_dates
+    tile, walk, card_keys, tile_hashes, tile_undated = _member_tiles(
+        as_of, tile_cards, route, space, engineer_name, out._marks, since, commit_dates
     )
+    for slot, items in moved.items():
+        getattr(tile, slot).extend(items)
+    out.workers = sorted([*labelled, *route.seated()], key=lambda w: w.label)
     # The engineer is always in the room: the record's last member, the first seat.
-    tile.empty = not (tile.yesterday or tile.today or tile.blockers)
     out.workers.append(tile)
+    for w in out.workers:
+        _slot_order(w)
+        w.empty = not (w.yesterday or w.today or w.blockers)
     seat_room(out, tile, as_of.timetuple().tm_yday, vocabulary())
     out.queue.walk.extend(walk)
     out.work = build_work(out, {**issue_keys(issues), **card_keys}, dated=commit_dates is not None)
@@ -2455,10 +2585,12 @@ def _dated(
     commit_dates, issue_starts, messages, why = tracker_read.dates(
         repos, hashes, numbers_by_repo, workers, refresh, trailers=trailers
     )
-    # Trailers alone, with no date asked: the read is kept for the agent's
-    # reader, and the fill stands as it was -- every bullet counts.
-    if why or (not hashes and not numbers):
+    if why:
         return filled
+    if not hashes and not numbers:
+        # Trailers alone, with no date asked: the fill again with the messages
+        # only, so every bullet still counts.
+        commit_dates, issue_starts = None, None
     return fill_joined_standup(
         now,
         labels,

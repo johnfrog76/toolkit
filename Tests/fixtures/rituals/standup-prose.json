@@ -669,7 +669,7 @@
           "title": "Draw the stage",
           "id": "911",
           "type": "Task",
-          "body": "# Task 911: Draw the stage\n",
+          "body": "# Task 911: Draw the stage\n\n**Agent:** claude-fable-5-2\n",
           "begun": "2026-10-01",
           "commits": []
         },
@@ -681,7 +681,7 @@
           "title": "Date the commits",
           "id": "921",
           "type": "Task",
-          "body": "# Task 921: Date the commits\n",
+          "body": "# Task 921: Date the commits\n\n**Agent:** claude-opus-5-5\n",
           "begun": "2026-09-20",
           "commits": [
             "a1a1111"
@@ -695,7 +695,7 @@
           "title": "Count the window",
           "id": "922",
           "type": "Task",
-          "body": "# Task 922: Count the window\n",
+          "body": "# Task 922: Count the window\n\n**Agent:** claude-opus-5-5\n",
           "begun": "2026-09-20",
           "commits": [
             "b2b2222"
@@ -709,7 +709,7 @@
           "title": "Say the undated",
           "id": "923",
           "type": "Task",
-          "body": "# Task 923: Say the undated\n",
+          "body": "# Task 923: Say the undated\n\n**Agent:** claude-opus-5-5\n",
           "begun": "2026-09-20",
           "commits": [
             "c3c3333"

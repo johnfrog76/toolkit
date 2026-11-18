@@ -116,6 +116,7 @@ def filled_team_case(table: dict, case: dict) -> "standup.Standup":
                 space=case["space"],
                 space_name=case["spaceName"],
                 size=case["teamSize"],
+                messages=case.get("messages"),
             )
         )
     return _rendered(
