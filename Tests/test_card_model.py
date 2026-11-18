@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _skipguard import skip_module
+from _tracker_cli import unreachable
 
 try:
     from fastapi.testclient import TestClient
@@ -280,6 +281,7 @@ class TheRouteServesTheModel(unittest.TestCase):
         )
         self.assertTrue(path.is_file())
 
+    @unreachable("az")
     def test_env_serves_the_lanes_names_for_the_org(self):
         """Org-scoped display names, keyed by the CONTRACT's words; an org that
         says nothing is called by those words, so an ADO user sees no change.
@@ -316,6 +318,7 @@ class TheRouteServesTheModel(unittest.TestCase):
         body = self.client.get("/api/env").json()
         self.assertEqual(body["config"]["laneNames"]["Code Review"], "Code Review")
 
+    @unreachable("az")
     def test_env_says_whether_the_first_run_banner_is_on(self):
         """firstRun.welcome: off unless this machine said so -- tkStart does, and
         the banner's Start the tour or Dismiss turns it off (Local Example, item 5)."""
@@ -325,6 +328,7 @@ class TheRouteServesTheModel(unittest.TestCase):
         local.write_text(json.dumps({**patch, "firstRun": {"welcome": True}}), encoding="utf-8")
         self.assertIs(self.client.get("/api/env").json()["config"]["firstRunWelcome"], True)
 
+    @unreachable("az")
     def test_env_carries_the_decks_put_away_on_this_machine(self):
         """deck.archived: the decks this machine has put away, by id (docs/modules/deck.md,
         "A deck's page"). None unless this machine said so; a list of ids is served in
@@ -341,6 +345,7 @@ class TheRouteServesTheModel(unittest.TestCase):
             local.write_text(json.dumps({**patch, "deck": {"archived": written}}), encoding="utf-8")
             self.assertEqual(self.client.get("/api/env").json()["config"]["deckArchived"], served, written)
 
+    @unreachable("az")
     def test_env_carries_the_wip_limit_and_only_a_real_one(self):
         """limits.inPlay: unset is null (no line, the opt-in rule); a whole number of 1
         or more is served as is; zero, negative, text and a bool are no limit. A line
@@ -364,6 +369,7 @@ class TheRouteServesTheModel(unittest.TestCase):
             with self.subTest(stored=stored):
                 self.assertEqual(self.client.get("/api/env").json()["config"]["inPlayLimit"], served)
 
+    @unreachable("az")
     def test_env_tells_the_web_which_card_types_exist(self):
         """What the "New card" dialog offers: config's types, in config's order,
         a team's own included, the comment key not."""
