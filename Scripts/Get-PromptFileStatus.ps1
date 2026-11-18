@@ -116,6 +116,32 @@ function Get-P20CardAgent {
     return ''
 }
 
+function Get-P20CardWorker {
+    <#
+      Who works the card, as a FAMILY-shaped string the standup, the suggestion
+      and StartWork -Launch compare against sizes: when the card has an
+      `**Agent:**` line, the model map's family for its id if the id is known,
+      else the id as written; with no Agent line, exactly the `**Assigned:**`
+      line's value, as those readers took it before (a size, me, or '').
+
+      A BRIDGE: it stands in for the shared resolver of a card's agent
+      (Resolve-P20CardAgent, issue #500) until that lands, and that change
+      removes it. Its three callers are Standup-Rules.ps1's card rows and
+      Start-Work.ps1's -Launch size check; add none. agent/core/parsers.py's
+      card_worker is the same rule, and Tests/fixtures/parsers/card-worker.json
+      holds the two to one table.
+    #>
+    param(
+        [Parameter(Position = 0)][AllowEmptyString()][AllowNull()][string]$Text,
+        [string]$PackageRoot
+    )
+    $agentId = Get-P20CardAgent -Content $Text
+    if (-not $agentId) { return (Get-P20CardAssigned -Content $Text) }
+    $info = if ($PackageRoot) { Get-P20ModelInfo -Id $agentId -PackageRoot $PackageRoot } else { Get-P20ModelInfo -Id $agentId }
+    if ($info.known -and $info.family) { return [string]$info.family }
+    return $agentId
+}
+
 function Get-P20ModelInfo {
     <#
       What the model map (consts.json models.file, Config/models.json) says about

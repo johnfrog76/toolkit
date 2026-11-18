@@ -162,6 +162,15 @@ foreach ($mrow in @($modelsTable.rows)) {
     }
     Assert-True "Get-P20ModelInfo: $($mrow.name)" $same "got $($info | ConvertTo-Json -Compress)"
 }
+$workerTable = [System.IO.File]::ReadAllText((Join-Path $scriptDir 'fixtures/parsers/card-worker.json')) | ConvertFrom-Json
+Assert-True 'the card-worker table has its rows' (@($workerTable.rows).Count -ge 7)
+foreach ($wrow in @($workerTable.rows)) {
+    $eol = "`n"
+    if ($wrow.crlf) { $eol = "`r`n" }
+    $text = (@($wrow.lines) -join $eol) + $eol
+    $gotWorker = Get-P20CardWorker -Text $text
+    Assert-True "Get-P20CardWorker: $($wrow.name)" ($gotWorker -ceq [string]$wrow.expected) "got '$gotWorker'"
+}
 Assert-True 'the size table has its rows' (@($modelsTable.sizes).Count -ge 4)
 foreach ($srow in @($modelsTable.sizes)) {
     $gotId = Get-P20ModelForSize -Size ([string]$srow.size)

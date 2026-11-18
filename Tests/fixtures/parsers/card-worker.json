@@ -1,0 +1,47 @@
+{
+  "_": "ONE table, read by both halves' bridge reader of who works a card: Scripts/Get-PromptFileStatus.ps1 Get-P20CardWorker (tkTestToolkit -Triage) and agent/core/parsers.py card_worker() (Tests/test_parsers.py). It stands in for the shared resolver of a card's agent (issue #500) until that lands. Each row's lines are joined with LF, or CRLF when crlf is true, into a card's text. expected is a FAMILY-shaped string: with an **Agent:** line, the model map's family for a known id, else the id as written; with none, exactly the **Assigned:** line's value (a size, me, or ''). If the two halves ever disagree about a row, one of them is wrong.",
+  "rows": [
+    {
+      "name": "a known Agent line gives its family",
+      "crlf": false,
+      "lines": ["# Task K7M2: Bench notes", "", "**Agent:** claude-sonnet-5-5", "**Created:** 2026-10-17"],
+      "expected": "sonnet"
+    },
+    {
+      "name": "an unknown id gives the id as written",
+      "crlf": false,
+      "lines": ["# Task K7M2: Bench notes", "", "**Agent:** some-new-model-1", "**Created:** 2026-10-17"],
+      "expected": "some-new-model-1"
+    },
+    {
+      "name": "no Agent line: a size on the Assigned line, as before",
+      "crlf": false,
+      "lines": ["# Task K7M2: Bench notes", "", "**Assigned:** opus", "**Created:** 2026-10-17"],
+      "expected": "opus"
+    },
+    {
+      "name": "no Agent line: me on the Assigned line, as before",
+      "crlf": false,
+      "lines": ["# Task K7M2: Bench notes", "", "**Assigned:** me", "**Created:** 2026-10-17"],
+      "expected": "me"
+    },
+    {
+      "name": "no line at all: nobody",
+      "crlf": false,
+      "lines": ["# Task K7M2: Bench notes", "", "**Created:** 2026-10-17"],
+      "expected": ""
+    },
+    {
+      "name": "Assigned me with an Agent line gives the line's family",
+      "crlf": false,
+      "lines": ["# Task K7M2: Bench notes", "", "**Assigned:** me", "**Agent:** claude-opus-5-5", "**Created:** 2026-10-17"],
+      "expected": "opus"
+    },
+    {
+      "name": "the same in a CRLF card",
+      "crlf": true,
+      "lines": ["# Task K7M2: Bench notes", "", "**Assigned:** me", "**Agent:** claude-fable-5-2", "**Created:** 2026-10-17"],
+      "expected": "fable"
+    }
+  ]
+}

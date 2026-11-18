@@ -538,7 +538,7 @@ if ($Launch) {
     }
 
     # 3. The size: who the rituals say has it, read the rituals' way -- an
-    # issue's labels; a card's **Assigned:** line, else a size in its Tags, else
+    # issue's labels; a card's worker (its Agent line, else its **Assigned:** line), else a size in its Tags, else
     # (a card whose id is an issue number, which Route sizes on the tracker)
     # that issue's labels.
     $size = ''
@@ -551,8 +551,14 @@ if ($Launch) {
         }
     }
     else {
-        $assigned = Get-P20CardAssigned $content
-        if ($assigned) { $size = $assigned; $sizeFrom = 'its **Assigned:** line' }
+        # Who works it: its Agent line's family, else its Assigned line
+        # (Get-P20CardWorker, the bridge until the shared resolver, issue #500, lands).
+        $assigned = Get-P20CardWorker $content -PackageRoot $repoRoot
+        if ($assigned) {
+            $size = $assigned
+            $sizeFrom = 'its **Assigned:** line'
+            if (Get-P20CardAgent $content) { $sizeFrom = "its $([string](Get-P20Consts).stamps.agent) line" }
+        }
         if (-not $size) {
             foreach ($tag in @(Get-P20CardTags $content)) {
                 $hit = @($knownSizes | Where-Object { $_ -ieq [string]$tag }) | Select-Object -First 1

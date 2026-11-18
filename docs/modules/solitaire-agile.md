@@ -855,7 +855,7 @@ starts nothing:
 2. **`claude` is on the PATH** -- the optional surface `startWorkLaunch` below. The hint says the block
    works without it.
 3. **The item has a crew size**, read the way the rituals read who has it ([who](#who-takes-it)): an
-   issue's labels; a card's `**Assigned:**` line, else a size in its `Tags:`, else -- for a card whose id
+   issue's labels; a card's worker -- its `**Agent:**` line's family, else its `**Assigned:**` line -- else a size in its `Tags:`, else -- for a card whose id
    is an issue number, which `Route` sizes on the tracker -- that issue's labels. The size label IS the
    model on the command line: `sonnet` or `opus`. **Never a Fable builder**: `fable` is the owner's own
    seat (D-AR10, `rituals.suggestOwnerSeat`) and is refused, as are an item assigned to you (`me`), an item
@@ -1017,8 +1017,8 @@ size are its labels (the triage ceremony's `sev1`-`sev3`, the worker labels), wh
 ([who](#who-takes-it): its first assignee -- `me` when that is the signed-in `gh` user, `@<login>` otherwise
 -- else its size; the standup asks `gh api user` once per call, the read Triage makes, and only while the
 suggestion is on), its milestone and due date are the tracker's, its age is
-`createdAt`. A card's severity and size are on its `Tags:` line, who has it is its `**Assigned:**` line
-(else its size), its milestone is its `**Milestone:**` line read WHOLE -- or, on a card with none, its
+`createdAt`. A card's severity and size are on its `Tags:` line, who has it is its worker -- its `**Agent:**`
+line's family, else its `**Assigned:**` line -- (else its size), its milestone is its `**Milestone:**` line read WHOLE -- or, on a card with none, its
 `**Sprint:**` line, as every card read before the two were separate -- and its age is its `**Created:**` day
 ([cards](../hub/cards.md#what-the-suggestion-reads)). A milestone's open count is its billable items, once
 per id.
@@ -1276,7 +1276,7 @@ reads the reminder's state for the drawer. `docs/modules/organize.md` names the 
 ## The file shape, and how a standup is read
 
 Team Agile keeps no file of its own in the hub, so it has no file shape of its own -- its one hub write is
-a card's `**Assigned:**` footer line ([who](#who-takes-it); [cards](../hub/cards.md)); a standup reads the cards'
+a card's `**Assigned:**` or `**Agent:**` footer line ([who](#who-takes-it); [cards](../hub/cards.md)); a standup reads the cards'
 ([the two sources, joined](#the-two-sources-joined)). What regresses is the **slot rule**, and it is
 read the same in both halves (`Scripts/Standup-Rules.ps1`, `agent/solitaire/standup.py`), held by one table:
 
