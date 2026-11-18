@@ -112,12 +112,38 @@ export function StandupKeyframes() {
  * (room for a bun or a spike) and its torso runs 14 lower, so it is hung 10 up
  * and overflows the bottom, where a desk or the window's edge cuts it.
  */
-export function Bust({ id, width = 150 }: { id: FaceId; width?: number }) {
+export function Bust({
+  id,
+  width = 150,
+  cover,
+}: {
+  id: FaceId;
+  width?: number;
+  /**
+   * A patch of the shirt's own colour over part of the shirt, in the box's
+   * units. A mark on a shirt (a glyph, a badge, a bolt) that a window's edge or
+   * a desk would cut in half is covered whole instead: fully seen or not at all.
+   * It lies on the lit side of the torso, so it is flat colour on flat colour.
+   */
+  cover?: { x: number; y: number; width: number; height: number; fill: string };
+}) {
   return (
-    <div data-bust={id} style={{ width, height: (width * 100) / 120 }}>
+    <div data-bust={id} style={{ position: "relative", width, height: (width * 100) / 120 }}>
       <div style={{ display: "flex", position: "relative", top: -(width * 10) / 120 }}>
         <RefinedBust face={id} width={width} />
       </div>
+      {cover && (
+        <svg
+          viewBox="0 0 120 100"
+          width={width}
+          height={(width * 100) / 120}
+          aria-hidden
+          focusable="false"
+          style={{ position: "absolute", left: 0, top: 0, overflow: "visible" }}
+        >
+          <rect {...cover} />
+        </svg>
+      )}
     </div>
   );
 }
@@ -622,7 +648,8 @@ function DevHeroScene({ ride = "-58%", press = false }: { ride?: string; press?:
             transform: "translateX(-50%)",
           }}
         >
-          <Bust id="dev-hero" />
+          {/* the bolt on his shirt stops at the desk: none of it shows under the slab */}
+          <Bust id="dev-hero" cover={{ x: 51, y: 99, width: 19, height: 14.5, fill: "#2d5bd0" }} />
         </div>
         {press && (
           /* shoulder presses mid-status: upper arm out 90°, forearm up,
@@ -728,7 +755,8 @@ function OpsDevScene() {
   return (
     <div style={{ position: "absolute", inset: 0, background: wall("#10141f") }}>
       <div style={{ position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)" }}>
-        <Bust id="ops-dev" />
+        {/* the prompt on his shirt would be cut by the window's edge: not drawn here */}
+        <Bust id="ops-dev" cover={{ x: 46, y: 85, width: 27, height: 28.5, fill: "#26303f" }} />
       </div>
       {/* terminal window, phosphor-lit from below, up in the corner beside his head */}
       <div
@@ -1248,7 +1276,8 @@ function NewHireScene() {
           </Soft>
         </svg>
         <div style={{ position: "relative" }}>
-          <Bust id="new-hire" />
+          {/* the name sticker would be cut by the window's edge: not drawn here */}
+          <Bust id="new-hire" cover={{ x: 62, y: 88, width: 22, height: 25.5, fill: "#d9a12f" }} />
         </div>
       </div>
     </div>
