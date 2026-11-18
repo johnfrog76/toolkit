@@ -170,6 +170,11 @@ after it is what the agent resolves.
 The Agent line means **who is working it, or did**. A card says it on the same line whatever its tracker -- Azure DevOps, GitHub, or none -- so
 every reader gets one answer from one record, not from a commit trailer or a tracker label.
 
+`**Assigned:**` names the person who answers for the work; `**Agent:**` names the model that does or did
+it. **The Agent line is a record, not an instruction:** writing it starts nothing, and it does not change
+who reviews or merges. Some trackers start an agent's work when a card is assigned to it; ToolKit only
+records who did the work, and the standup and any later report read that record.
+
 **Route writes it at the hand-off; the lead rewrites it whenever the work changes hands, and confirms it
 at sign-off.** `Route <id> -Assign <size>` writes the size's current model id (the map's `current` block,
 below; a size is a family alias, not an id), and refuses a size that has no `current` entry. From then on
