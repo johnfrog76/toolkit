@@ -162,6 +162,11 @@ foreach ($mrow in @($modelsTable.rows)) {
     }
     Assert-True "Get-P20ModelInfo: $($mrow.name)" $same "got $($info | ConvertTo-Json -Compress)"
 }
+Assert-True 'the size table has its rows' (@($modelsTable.sizes).Count -ge 4)
+foreach ($srow in @($modelsTable.sizes)) {
+    $gotId = Get-P20ModelForSize -Size ([string]$srow.size)
+    Assert-True "Get-P20ModelForSize: $($srow.name)" ($gotId -ceq [string]$srow.expected) "got '$gotId'"
+}
 # A missing or invalid map is an EMPTY one: every id unknown, as written, nothing thrown.
 # A scratch package root stands in; the real file is never touched.
 $mapRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-models-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -178,6 +183,10 @@ try {
         try { $info = Get-P20ModelInfo -Id 'claude-sonnet-5-5' -PackageRoot $mapRoot -ErrorAction Stop } catch { $threw = $_.Exception.Message }
         $unknown = ($null -eq $threw) -and $info -and (-not $info.known) -and ($info.name -ceq 'claude-sonnet-5-5') -and ($null -eq $info.provider) -and ($null -eq $info.family)
         Assert-True "Get-P20ModelInfo: $case map reads as empty, the id unknown, nothing thrown" $unknown "threw '$threw', got $($info | ConvertTo-Json -Compress)"
+        $threw = $null
+        $sizeId = 'unset'
+        try { $sizeId = Get-P20ModelForSize -Size 'sonnet' -PackageRoot $mapRoot -ErrorAction Stop } catch { $threw = $_.Exception.Message }
+        Assert-True "Get-P20ModelForSize: $case map resolves no size, nothing thrown" (($null -eq $threw) -and $sizeId -ceq '') "threw '$threw', got '$sizeId'"
     }
 }
 finally { Remove-Item -LiteralPath $mapRoot -Recurse -Force -ErrorAction SilentlyContinue }

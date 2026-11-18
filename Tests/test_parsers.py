@@ -203,6 +203,20 @@ class StatusMetadataTests(unittest.TestCase):
             with self.subTest(row=row["name"]):
                 self.assertEqual(model_info(row["id"]), row["expected"])
 
+    def test_what_a_worker_size_resolves_to_by_the_shared_table(self):
+        """A worker size is a family alias: the map's current block names the id it
+        resolves to when a card is routed to it. The CLI's Get-P20ModelForSize
+        asserts the SAME rows, Tests/fixtures/parsers/models.json's sizes."""
+        import json
+
+        from agent.core.models import current_model
+
+        table = json.loads((FIXTURES / "models.json").read_text(encoding="utf-8"))
+        self.assertGreaterEqual(len(table["sizes"]), 4)
+        for row in table["sizes"]:
+            with self.subTest(row=row["name"]):
+                self.assertEqual(current_model(row["size"]), row["expected"] or None)
+
     def test_a_missing_or_broken_model_map_reads_as_empty(self):
         """A missing or invalid Config/models.json is an EMPTY map: every id reads
         unknown, as written, and nothing raises. A scratch package root stands in;
@@ -223,6 +237,7 @@ class StatusMetadataTests(unittest.TestCase):
                 try:
                     with mock.patch.object(models, "CONSTS_PATH", Path(root) / "consts.json"):
                         self.assertEqual(models.model_map(), {})
+                        self.assertIsNone(models.current_model("sonnet"))
                         self.assertEqual(
                             models.model_info("claude-sonnet-5-5"),
                             {
