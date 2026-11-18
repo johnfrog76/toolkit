@@ -250,17 +250,18 @@ Which model worked a card is worked out every time it is read, and **nothing is 
 reader a half does it -- `Resolve-P20CardAgent` in `Scripts/Get-PromptFileStatus.ps1` and `resolve_card_agent()`
 in `agent/core/parsers.py`, held to one table, `Tests/fixtures/parsers/agent-source.json` -- and it answers
 with the model's id (or none), its family, and the source the answer came from. The sources are tried in
-the order `consts.json` `models.agentSources` names, `line`, `trailer`, `label`, `none`, and the first
-that answers wins:
+the order `consts.json` `models.agentSources` names, and the first that answers wins. The shipped order
+is three sources, `line`, `trailer`, `none`: **a tracker's worker label does not decide who worked a card**,
+since it says who was meant to do the work, not who did.
 
 | Source | Reads | Answers |
 | --- | --- | --- |
 | `line` | the card's first `**Agent:**` line (`stamps.agent`) | the id as written; the family from the id's row in `Config/models.json`, else the id as written. An empty line does not answer |
 | `trailer` | the commits the card's own bullets name (`regex.commitBullet`, the `#<n> squash-merged` bullet among them, each commit once by its first seven characters), when the caller has read their messages | each commit votes once for every model its `Co-Authored-By` trailers name (`regex.coAuthorTrailer`, the key in any case); most votes wins, a tie to the first seen in bullet then trailer order. A trailer name is looked up in the map's `coAuthor`, trimmed and ignoring case, never parsed: a person's name, or a model the map does not know, names nothing |
-| `label` | the card's issue's worker label, as the caller passes it | no id; the family is the label as written |
+| `label` | **not in the shipped order.** The card's issue's worker label, as the caller passes it, read only by a caller that passes an order naming `label` | no id; the family is the label as written |
 | `none` | -- | no id and no family: a person worked the card alone |
 
-The caller supplies what is not in the card: the label, and the commit messages, as one
+The caller supplies what is not in the card: the commit messages (and the label, for an order that reads it), as one
 `git log --no-walk=unsorted --ignore-missing --format=%x00%H%x1f%B <hashes>` read parsed by
 `ConvertFrom-P20GitMessages` / `git_messages()`. With no messages the trailer source is skipped, not
 guessed. A missing or unreadable model map reads as empty, so the reader never throws for it.

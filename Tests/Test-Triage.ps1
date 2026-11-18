@@ -188,10 +188,13 @@ finally { Remove-Item -LiteralPath $mapRoot -Recurse -Force -ErrorAction Silentl
 $sourceTable = [System.IO.File]::ReadAllText((Join-Path $scriptDir 'fixtures/parsers/agent-source.json')) | ConvertFrom-Json
 $fixtureModels = $sourceTable.models
 Assert-True 'the agent-source table has its rows' (@($sourceTable.rows).Count -ge 20)
-Assert-True 'models.agentSources is the default order' ((@((Get-P20Consts).models.agentSources) -join ',') -ceq 'line,trailer,label,none')
+Assert-True 'models.agentSources is the shipped order, which never reads the label' ((@((Get-P20Consts).models.agentSources) -join ',') -ceq 'line,trailer,none')
 $orderNames = @($sourceTable.rows | Where-Object { $_.PSObject.Properties['order'] } | ForEach-Object { @($_.order) -join ',' })
-Assert-True 'the table runs rows under the default order' ($orderNames -contains 'line,trailer,label,none')
+Assert-True 'the table runs rows under the order with the label after the trailer' ($orderNames -contains 'line,trailer,label,none')
 Assert-True 'the table runs rows under the label-first order' ($orderNames -contains 'line,label,trailer,none')
+$shippedRows = @($sourceTable.rows | Where-Object { -not $_.PSObject.Properties['order'] })
+Assert-True 'the shipped order never answers label' (@($shippedRows | Where-Object { [string]$_.expected.source -ceq 'label' }).Count -eq 0)
+Assert-True 'the shipped order leaves a passed label unread' (@($shippedRows | Where-Object { [string]$_.label -and [string]$_.expected.source -ceq 'none' }).Count -gt 0)
 foreach ($srow in @($sourceTable.rows)) {
     $eol = "`n"
     if ($srow.crlf) { $eol = "`r`n" }

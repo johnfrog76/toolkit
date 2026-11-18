@@ -206,8 +206,9 @@ class StatusMetadataTests(unittest.TestCase):
     def test_who_worked_a_card_by_its_sources_by_the_shared_table(self):
         """The one reader of a card's agent (docs/hub/cards.md, "How a card's agent
         is worked out"): its Agent line, else its commits' Co-Authored-By trailers,
-        else its issue's worker label, else none -- in the order consts.json
-        models.agentSources names, and under any order a row states. The CLI's
+        else none -- the shipped order, consts.json models.agentSources, which never
+        reads the label -- and under any order a row states, the label among them
+        where the order names it. The CLI's
         Resolve-P20CardAgent and its pieces assert the SAME table,
         Tests/fixtures/parsers/agent-source.json, against the table's own model map."""
         import json
@@ -219,12 +220,18 @@ class StatusMetadataTests(unittest.TestCase):
         table = json.loads((FIXTURES / "agent-source.json").read_text(encoding="utf-8"))
         models = table["models"]
         self.assertGreaterEqual(len(table["rows"]), 20)
-        self.assertEqual(model_agent_sources(), ("line", "trailer", "label", "none"))
+        self.assertEqual(model_agent_sources(), ("line", "trailer", "none"))
         orders = {tuple(r["order"]) for r in table["rows"] if "order" in r}
         self.assertIn(("line", "trailer", "label", "none"), orders)
         self.assertIn(("line", "label", "trailer", "none"), orders)
         for source in ("line", "trailer", "label", "none"):
             self.assertTrue(any(r["expected"]["source"] == source for r in table["rows"]), source)
+        # The shipped order, on rows that state none: each of its sources, and a label passed and not read.
+        shipped = [r for r in table["rows"] if "order" not in r]
+        for source in ("line", "trailer", "none"):
+            self.assertTrue(any(r["expected"]["source"] == source for r in shipped), source)
+        self.assertTrue(any(r["label"] and r["expected"]["source"] == "none" for r in shipped))
+        self.assertFalse(any(r["expected"]["source"] == "label" for r in shipped))
         for row in table["rows"]:
             with self.subTest(row=row["name"]):
                 eol = "\r\n" if row["crlf"] else "\n"

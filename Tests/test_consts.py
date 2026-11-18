@@ -435,7 +435,7 @@ EXPECTED = {
     # The model map a card's Agent id is looked up in: the agent reads it through models_file().
     ("models", "file"): "Config/models.json",
     # The order a card's agent is worked out in: the agent reads it through model_agent_sources().
-    ("models", "agentSources"): ["line", "trailer", "label", "none"],
+    ("models", "agentSources"): ["line", "trailer", "none"],
     # Daily's window: the billing script, the CLI's Daily and GET /api/billing refuse
     # a window in these words (Scripts/Resolve-BillingWindow.ps1 is the rule).
     ("billing", "text"): {

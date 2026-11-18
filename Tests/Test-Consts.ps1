@@ -303,7 +303,7 @@ $expected = [ordered]@{
     # The model map a card's Agent id is looked up in: Get-P20ModelInfo reads (Get-P20Consts).models.file.
     'models.file'               = 'Config/models.json'
     # The order a card's agent is worked out in: Resolve-P20CardAgent reads (Get-P20Consts).models.agentSources.
-    'models.agentSources'       = 'line,trailer,label,none'
+    'models.agentSources'       = 'line,trailer,none'
     # Daily's window: the billing script, Daily and GET /api/billing refuse a
     # window in these words (Scripts/Resolve-BillingWindow.ps1 is the rule).
     'billing.text'              = 'halfWindow=-Since and -Until go together: pass both (YYYY-MM-DD), or neither for this week.,notADay={name} ''{value}'' is not a day: yyyy-MM-dd.,backwards=-Since {since} is after -Until {until}.'

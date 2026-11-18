@@ -312,8 +312,9 @@ def resolve_card_agent(
       trailers name, most votes wins, a tie to the first seen in bullet then
       trailer order; a name no row carries is ignored, a hash with no message
       skipped.
-    - ``label``: the card's issue's worker label, trimmed -- id None, family the
-      label as written.
+    - ``label``: not in the shipped order, read only where ``order`` names it --
+      the card's issue's worker label, trimmed: id None, family the label as
+      written.
     - ``none``: a person worked it alone -- id and family None.
 
     An order that leaves ``none`` out still ends in it. ``messages`` is short

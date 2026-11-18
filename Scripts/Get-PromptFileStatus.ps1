@@ -281,7 +281,8 @@ function Resolve-P20CardAgent {
                  votes wins, a tie to the first seen in bullet then trailer
                  order; a name no row carries is ignored, a hash with no message
                  skipped
-        label    -Label, the card's issue's worker label, trimmed: id $null,
+        label    not in the shipped order, read only where -Order names it:
+                 -Label, the card's issue's worker label, trimmed: id $null,
                  family the label as written
         none     a person worked it alone: id and family $null
 

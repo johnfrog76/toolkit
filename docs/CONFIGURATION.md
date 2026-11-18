@@ -743,7 +743,8 @@ rather than from the id -- see [the card](hub/cards.md#the-agent-line)). Like th
 not a setting: adding a model is one row in the package's file,
 and **the package's own repository** (`repository.url`: what the agent compares a Space's repository with when the package has no git origin to read, so ToolKit connected to itself still reads as itself on the Prompts card -- a checkout's origin wins when it is there),
 and **how a card's agent is worked out** (`models.file`, the model map `Config/models.json`; `models.agentSources`,
-`["line", "trailer", "label", "none"]`, the order the sources are tried in, so changing the order is one edit here;
+`["line", "trailer", "none"]`, the order the sources are tried in, so changing the order is one edit here -- the
+worker label is a source a caller may ask for by passing an order that names it, and the shipped order does not read it;
 and `regex.coAuthorTrailer`, a commit's `Co-Authored-By` trailer with the key in any case -- `Resolve-P20CardAgent`
 and `resolve_card_agent` read all three, see [the card](hub/cards.md), "How a card's agent is worked out"),
 and **the product's version** (`version`, the one top-level value that is not a group: `Env` prints it

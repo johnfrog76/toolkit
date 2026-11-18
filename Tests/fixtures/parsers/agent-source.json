@@ -1,5 +1,5 @@
 {
-  "_": "ONE table, read by both readers of a card's agent (docs/hub/cards.md, \"How a card's agent is worked out\"): Scripts/Get-PromptFileStatus.ps1 Resolve-P20CardAgent, Get-P20CommitCoAuthors, Get-P20ModelByCoAuthor and ConvertFrom-P20GitMessages (tkTestToolkit -Triage), and agent/core/parsers.py resolve_card_agent, commit_co_authors and git_messages, with agent/core/models.py model_by_co_author (Tests/test_parsers.py). models is the map every row is read against -- its own, so the table does not move when Config/models.json grows. rows: each row's lines are joined with LF, or CRLF when crlf is true, into a card's text; label is the card's issue's worker label ('' for none); messages is short hash -> commit message, or null for not read; order is the sources' order, and a row with none runs under the default, consts.json models.agentSources. expected is {id, family, source}. coAuthors: a commit message -> the names its Co-Authored-By trailers carry, in order. byCoAuthor: a trailer name -> the model id whose coAuthor it is, trimmed and ignoring case, or null. gitLog: git log's --format=%x00%H%x1f%B output -> short hash (seven characters, lower case) -> message, trailing line endings removed. If the two halves ever disagree about a row, one of them is wrong.",
+  "_": "ONE table, read by both readers of a card's agent (docs/hub/cards.md, \"How a card's agent is worked out\"): Scripts/Get-PromptFileStatus.ps1 Resolve-P20CardAgent, Get-P20CommitCoAuthors, Get-P20ModelByCoAuthor and ConvertFrom-P20GitMessages (tkTestToolkit -Triage), and agent/core/parsers.py resolve_card_agent, commit_co_authors and git_messages, with agent/core/models.py model_by_co_author (Tests/test_parsers.py). models is the map every row is read against -- its own, so the table does not move when Config/models.json grows. rows: each row's lines are joined with LF, or CRLF when crlf is true, into a card's text; label is the card's issue's worker label ('' for none); messages is short hash -> commit message, or null for not read; order is the sources' order, and a row with none runs under the shipped one, consts.json models.agentSources (line, trailer, none: it never reads the label, which a caller asks for by passing an order that names it). expected is {id, family, source}. coAuthors: a commit message -> the names its Co-Authored-By trailers carry, in order. byCoAuthor: a trailer name -> the model id whose coAuthor it is, trimmed and ignoring case, or null. gitLog: git log's --format=%x00%H%x1f%B output -> short hash (seven characters, lower case) -> message, trailing line endings removed. If the two halves ever disagree about a row, one of them is wrong.",
   "models": {
     "claude-opus-5-5": {
       "provider": "anthropic",
@@ -182,7 +182,13 @@
         "id": null,
         "family": "sonnet",
         "source": "label"
-      }
+      },
+      "order": [
+        "line",
+        "trailer",
+        "label",
+        "none"
+      ]
     },
     {
       "name": "an empty Agent line falls through to the trailer",
@@ -376,7 +382,13 @@
         "id": null,
         "family": "sonnet",
         "source": "label"
-      }
+      },
+      "order": [
+        "line",
+        "trailer",
+        "label",
+        "none"
+      ]
     },
     {
       "name": "an unmapped trailer name and no label",
@@ -439,7 +451,13 @@
         "id": null,
         "family": "opus",
         "source": "label"
-      }
+      },
+      "order": [
+        "line",
+        "trailer",
+        "label",
+        "none"
+      ]
     },
     {
       "name": "three commits, Sonnet then Opus twice: most votes wins",
@@ -607,7 +625,13 @@
         "id": null,
         "family": "opus",
         "source": "label"
-      }
+      },
+      "order": [
+        "line",
+        "trailer",
+        "label",
+        "none"
+      ]
     },
     {
       "name": "messages empty: nothing resolved, the label answers",
@@ -626,7 +650,13 @@
         "id": null,
         "family": "opus",
         "source": "label"
-      }
+      },
+      "order": [
+        "line",
+        "trailer",
+        "label",
+        "none"
+      ]
     },
     {
       "name": "a bullet hash absent from messages is skipped",
@@ -729,7 +759,13 @@
         "id": null,
         "family": "sonnet",
         "source": "label"
-      }
+      },
+      "order": [
+        "line",
+        "trailer",
+        "label",
+        "none"
+      ]
     },
     {
       "name": "a label with spaces around it is trimmed",
@@ -747,7 +783,13 @@
         "id": null,
         "family": "sonnet",
         "source": "label"
-      }
+      },
+      "order": [
+        "line",
+        "trailer",
+        "label",
+        "none"
+      ]
     },
     {
       "name": "nothing: a person worked it alone",
@@ -786,7 +828,7 @@
       }
     },
     {
-      "name": "trailer and label disagree: the default order takes the trailer",
+      "name": "trailer and label disagree: the order with the label after the trailer takes the trailer",
       "crlf": false,
       "lines": [
         "# Task K7M2: Bench notes",
@@ -891,7 +933,7 @@
       }
     },
     {
-      "name": "the default order stated: a row with no order runs under it",
+      "name": "a row with no order runs under the shipped order",
       "crlf": false,
       "lines": [
         "# Task K7M2: Bench notes",
@@ -955,6 +997,105 @@
         "id": null,
         "family": "sonnet",
         "source": "label"
+      }
+    },
+    {
+      "name": "the shipped order does not read the label: a label alone is none",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Created:** 2026-11-02",
+        "",
+        "## Commits"
+      ],
+      "label": "sonnet",
+      "messages": null,
+      "expected": {
+        "id": null,
+        "family": null,
+        "source": "none"
+      }
+    },
+    {
+      "name": "the shipped order does not read the label: a human-only trailer and a label is none",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Created:** 2026-11-02",
+        "",
+        "## Commits",
+        "- 1a2b3c4 the change"
+      ],
+      "label": "sonnet",
+      "messages": {
+        "1a2b3c4": "The change\n\nA body line.\n\nCo-Authored-By: A Person <person@example.com>"
+      },
+      "expected": {
+        "id": null,
+        "family": null,
+        "source": "none"
+      }
+    },
+    {
+      "name": "the shipped order does not read the label: messages null and a label is none",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Created:** 2026-11-02",
+        "",
+        "## Commits",
+        "- 1a2b3c4 the change"
+      ],
+      "label": "opus",
+      "messages": null,
+      "expected": {
+        "id": null,
+        "family": null,
+        "source": "none"
+      }
+    },
+    {
+      "name": "the shipped order: a trailer and a label that disagree, the trailer",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Created:** 2026-11-02",
+        "",
+        "## Commits",
+        "- 1a2b3c4 the change"
+      ],
+      "label": "sonnet",
+      "messages": {
+        "1a2b3c4": "The change\n\nA body line.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+      },
+      "expected": {
+        "id": "claude-opus-5-5",
+        "family": "opus",
+        "source": "trailer"
+      }
+    },
+    {
+      "name": "the shipped order: an empty Agent line and a label is none",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Created:** 2026-11-02",
+        "",
+        "## Commits",
+        "",
+        "**Agent:**"
+      ],
+      "label": "sonnet",
+      "messages": {},
+      "expected": {
+        "id": null,
+        "family": null,
+        "source": "none"
       }
     }
   ],
