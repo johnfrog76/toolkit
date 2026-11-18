@@ -527,21 +527,24 @@ function Get-P20StandupRoomSeats {
     $all = @($Labels | Where-Object { $null -ne $_ })
     $people = New-Object 'System.Collections.Generic.List[string]'
     $order = New-Object 'System.Collections.Generic.List[string]'
+    # A member is its kind and its label: the engineer ('e:') and a labelled worker
+    # ('w:') can share a label (a Space whose slug is one of its worker labels) and
+    # stay two.
     $engineerLabel = $null
     if ($null -ne $Engineer) {
-        $engineerLabel = [string]$Engineer.label
+        $engineerLabel = 'e:' + [string]$Engineer.label
         $people.Add($engineerLabel)
         $order.Add($engineerLabel)
     }
-    foreach ($w in $all) { $people.Add([string]$w.label) }
-    foreach ($w in $all) { if (-not $w.empty) { $order.Add([string]$w.label) } }
-    foreach ($w in $all) { if ($w.empty) { $order.Add([string]$w.label) } }
+    foreach ($w in $all) { $people.Add('w:' + [string]$w.label) }
+    foreach ($w in $all) { if (-not $w.empty) { $order.Add('w:' + [string]$w.label) } }
+    foreach ($w in $all) { if ($w.empty) { $order.Add('w:' + [string]$w.label) } }
     $seated = New-Object 'System.Collections.Generic.List[string]'
     for ($i = 0; $i -lt $order.Count -and $i -lt $seats; $i++) { $seated.Add($order[$i]) }
 
     $reserved = New-Object 'System.Collections.Generic.List[string]'
     foreach ($label in $people) {
-        $mine = & $own $label
+        $mine = & $own $label.Substring(2)
         if ($mine -and -not $reserved.Contains($mine)) { $reserved.Add($mine) }
     }
     # Labels are compared as written: two that differ only in case are two members.
@@ -550,7 +553,7 @@ function Get-P20StandupRoomSeats {
     $dealing = New-Object 'System.Collections.Generic.List[string]'
     foreach ($label in $people) { if ($seated.Contains($label)) { $dealing.Add($label) } }
     foreach ($label in $dealing) {
-        $mine = & $own $label
+        $mine = & $own $label.Substring(2)
         if ($mine -and -not $taken.Contains($mine) -and -not $window.ContainsKey($label)) {
             $window[$label] = $mine
             $taken.Add($mine)
@@ -576,11 +579,11 @@ function Get-P20StandupRoomSeats {
         if (-not $taken.Contains($m) -and -not $reserved.Contains($m)) { $invented.Add($m) }
     }
     $round = New-Object System.Collections.ArrayList
-    foreach ($label in $seated) { [void]$round.Add([ordered]@{ label = $label; cast = $false; window = $window[$label] }) }
+    foreach ($label in $seated) { [void]$round.Add([ordered]@{ label = $label.Substring(2); cast = $false; window = $window[$label] }) }
     foreach ($m in $invented) { [void]$round.Add([ordered]@{ label = $m; cast = $true; window = $m }) }
     $desks = New-Object 'System.Collections.Generic.List[string]'
     foreach ($m in $members) { if (-not $taken.Contains($m) -and -not $invented.Contains($m)) { $desks.Add($m) } }
-    return @{ present = [string[]]$seated.ToArray(); round = [object[]]$round.ToArray(); desks = [string[]]$desks.ToArray() }
+    return @{ present = [string[]]@($seated | ForEach-Object { $_.Substring(2) }); round = [object[]]$round.ToArray(); desks = [string[]]$desks.ToArray() }
 }
 
 function Set-P20StandupRoom {
@@ -612,11 +615,17 @@ function Set-P20StandupRoom {
     $room = Get-P20StandupRoomSeats -Size $Size -Engineer $engineerRow -Labels @($labels | ForEach-Object { @{ label = [string]$_.label; empty = [bool]$_.empty } })
 
     $byLabel = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([System.StringComparer]::Ordinal)
-    if ($null -ne $Engineer) { $byLabel[[string]$Engineer.label] = $Engineer }
     foreach ($w in $labels) { if (-not $byLabel.ContainsKey([string]$w.label)) { $byLabel[[string]$w.label] = $w } }
     foreach ($w in $record) { $w['present'] = $false }
     $round = New-Object System.Collections.ArrayList
-    foreach ($label in @($room.present)) {
+    # The engineer is the first seat when there is one; the rest are the labels.
+    $skip = 0
+    if ($null -ne $Engineer -and @($room.present).Count -gt 0) {
+        $Engineer['present'] = $true
+        [void]$round.Add($Engineer)
+        $skip = 1
+    }
+    foreach ($label in @($room.present | Select-Object -Skip $skip)) {
         $byLabel[[string]$label]['present'] = $true
         [void]$round.Add($byLabel[[string]$label])
     }
