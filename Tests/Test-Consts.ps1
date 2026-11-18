@@ -100,6 +100,8 @@ $expected = [ordered]@{
     # A card's two planning lines, each its own: Plan -Milestone and Plan -Sprint write them.
     'stamps.milestone'        = '**Milestone:**'
     'stamps.sprint'           = '**Sprint:**'
+    # Who did the work on a card an agent worked: its model id, beside the Assigned line.
+    'stamps.agent'            = '**Agent:**'
     'stamps.started'          = '**Started:**'
     'stamps.outcome'          = '**Outcome:**'
     'stamps.review'           = '**Review:**'
@@ -296,6 +298,8 @@ $expected = [ordered]@{
     'usage.unpricedPhrase'      = 'not counting'
     # The org chart's hub file: Read-OrgChart.ps1 reads (Get-P20Consts).org.file.
     'org.file'                  = 'org.json'
+    # The model map a card's Agent id is looked up in: Get-P20ModelInfo reads (Get-P20Consts).models.file.
+    'models.file'               = 'Config/models.json'
     # Daily's window: the billing script, Daily and GET /api/billing refuse a
     # window in these words (Scripts/Resolve-BillingWindow.ps1 is the rule).
     'billing.text'              = 'halfWindow=-Since and -Until go together: pass both (YYYY-MM-DD), or neither for this week.,notADay={name} ''{value}'' is not a day: yyyy-MM-dd.,backwards=-Since {since} is after -Until {until}.'
@@ -528,6 +532,10 @@ $guarded = [ordered]@{
     'stamps.from'            = '**From:**'
     # Plan-Card.ps1 and the reader build the line from (Get-P20Consts).stamps.milestone.
     'stamps.milestone'       = '**Milestone:**'
+    # Get-P20CardAgent builds the line's pattern from (Get-P20Consts).stamps.agent.
+    'stamps.agent'           = '**Agent:**'
+    # Get-P20ModelInfo reads the map's path from (Get-P20Consts).models.file.
+    'models.file'            = 'Config/models.json'
     # The standup's distinctive words: Scripts/Standup-Rules.ps1 reads them
     # from rituals.text and rituals.workerLabelPrefix, and nothing types them.
     'rituals.text.queueHeading'  = 'Waiting on you'

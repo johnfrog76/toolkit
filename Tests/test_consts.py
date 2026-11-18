@@ -47,6 +47,8 @@ EXPECTED = {
     # A card's two planning lines, each its own: Plan -Milestone and Plan -Sprint write them.
     ("stamps", "milestone"): "**Milestone:**",
     ("stamps", "sprint"): "**Sprint:**",
+    # Who did the work on a card an agent worked: its model id, beside the Assigned line.
+    ("stamps", "agent"): "**Agent:**",
     ("stamps", "started"): "**Started:**",
     ("stamps", "outcome"): "**Outcome:**",
     ("stamps", "review"): "**Review:**",
@@ -428,6 +430,8 @@ EXPECTED = {
     ("usage", "unpricedPhrase"): "not counting",
     # The org chart's hub file: the agent reads it through org_file().
     ("org", "file"): "org.json",
+    # The model map a card's Agent id is looked up in: the agent reads it through models_file().
+    ("models", "file"): "Config/models.json",
     # Daily's window: the billing script, the CLI's Daily and GET /api/billing refuse
     # a window in these words (Scripts/Resolve-BillingWindow.ps1 is the rule).
     ("billing", "text"): {
@@ -471,6 +475,7 @@ class TheFileParses(unittest.TestCase):
             "assets",
             "tests",
             "org",
+            "models",
             "agent",
         ):
             self.assertIn(group, raw)
@@ -630,6 +635,8 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.usage_burn_route(), EXPECTED[("usage", "burnRoute")])
         self.assertEqual(C.usage_readings_folder(), EXPECTED[("usage", "readingsFolder")])
         self.assertEqual(C.org_file(), EXPECTED[("org", "file")])
+        self.assertEqual(C.models_file(), EXPECTED[("models", "file")])
+        self.assertEqual(C.stamp_agent(), EXPECTED[("stamps", "agent")])
         self.assertEqual(C.billing_text(), EXPECTED[("billing", "text")])
         self.assertEqual(C.webhook_recipient_types(), tuple(EXPECTED[("communication", "webhookRecipientTypes")]))
         self.assertEqual(C.deferred_recipient_types(), tuple(EXPECTED[("communication", "deferredRecipientTypes")]))
@@ -700,6 +707,7 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("stamps.outcome", "**Outcome:**"),
         ("stamps.from", "**From:**"),
         ("stamps.milestone", "**Milestone:**"),
+        ("stamps.agent", "**Agent:**"),
         ("studio.threadLine", "GitHub:\\s*(https"),
         ("rituals.workerLabelPrefix", "Routed to"),
         ("rituals.text.queueHeading", "Waiting on you"),
@@ -731,6 +739,8 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("usage.envFlag", "claudeUsage"),
         # The org chart's file name: served through org_file(), never typed.
         ("org.file", "org.json"),
+        # The model map's path: served through models_file(), never typed.
+        ("models.file", "Config/models.json"),
         # The gh read limits: served through gh_read_limit_*(), never typed as a --limit.
         ("ghReads.labels", '"--limit", "200"'),
         ("ghReads.openIssues", '"--limit", "100"'),

@@ -223,6 +223,12 @@ def stamp_sprint() -> str:
     return consts()["stamps"]["sprint"]
 
 
+def stamp_agent() -> str:
+    """``**Agent:**`` -- who did the work on a card an agent worked: its model id, beside
+    the ``**Assigned:**`` line. A card a person worked alone has no such line."""
+    return consts()["stamps"]["agent"]
+
+
 def token_tags() -> str:
     """``Tags:`` -- the card's tags line under ``## Work Item Info``. Tag writes it."""
     return consts()["tokens"]["tags"]
@@ -748,6 +754,12 @@ def org_file() -> str:
     """``org.json`` -- the org chart's file at the hub root, beside ``hub.json``
     (docs/hub/org.md). The CLI and the agent read it."""
     return consts()["org"]["file"]
+
+
+def models_file() -> str:
+    """``Config/models.json`` -- the model map, relative to the package root: every
+    reader of a card's ``**Agent:**`` line takes provider, family and display name from it."""
+    return consts()["models"]["file"]
 
 
 def billing_text() -> dict[str, str]:

@@ -1910,6 +1910,23 @@ class TheCardReader(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertEqual(standup.read_cards(Path(tmp) / "missing", [], []), [])
 
+    def test_a_card_routed_to_a_size_is_taken_by_that_size(self):
+        """A card routed with Route -Assign sonnet carries the Agent line alone: the
+        standup's row and the suggestion see it as sonnet (the CLI: the same)."""
+        from agent.solitaire import suggest
+
+        with tempfile.TemporaryDirectory() as tmp:
+            space = Path(tmp)
+            (space / "current").mkdir()
+            (space / "current" / "TaskR2DW-routed-to-sonnet.prompt.md").write_bytes(
+                b"# Task R2DW: Routed to sonnet\n\n---\n\n**Agent:** claude-sonnet-5-5\n**Created:** 2026-09-20\n"
+            )
+            rows = standup.read_cards(space, ["Task"], ["Task"])
+        self.assertEqual([(r["id"], r["assigned"]) for r in rows], [("R2DW", "sonnet")])
+        labels = [{"name": "sonnet", "description": "Routed to sonnet -- the crew"}]
+        items = suggest.suggest_items(labels, [], rows, set())
+        self.assertEqual([(i["ref"], i["who"]) for i in items], [("R2DW", "sonnet")])
+
     def test_what_the_suggestion_reads(self):
         """The milestone a card's **Sprint:** line names (whole), its **Created:**
         day, its Tags and who takes it -- the suggestion's four card fields."""

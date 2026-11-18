@@ -31,7 +31,7 @@ try:
     from fastapi.testclient import TestClient
 
     from agent.core import config
-    from agent.core.consts import stamp_assigned, stamp_billable, stamp_milestone
+    from agent.core.consts import stamp_agent, stamp_assigned, stamp_billable, stamp_milestone
 except Exception as exc:  # pragma: no cover - a machine without the agent's deps
     skip_module(f"the agent's dependencies are not installed: {exc}")
 
@@ -92,7 +92,8 @@ class TheRouteServesTheModel(unittest.TestCase):
                     link="(not linked)",
                 ).replace(
                     "**Created:**",
-                    f"{stamp_billable()} no\n{stamp_assigned()} me\n{stamp_milestone()} v0.3 -- Share\n**Created:**",
+                    f"{stamp_billable()} no\n{stamp_assigned()} me\n{stamp_agent()} claude-sonnet-5-5\n"
+                    f"{stamp_milestone()} v0.3 -- Share\n**Created:**",
                 ),
                 "notes-from-tuesday.prompt.md": "# Notes from Tuesday\n\nNot a card.\n",
                 # A GitHub-born card in the same (local) Space: the mingling the tracker badge is for.
@@ -217,6 +218,16 @@ class TheRouteServesTheModel(unittest.TestCase):
         self.assertEqual(cards["Spike-K7M2-wallet-ticket.prompt.md"]["assigned"], "")
         detail = self.client.get("/api/status/TaskW3X7-bench-reading.prompt.md").json()
         self.assertEqual(detail["assigned"], "me")
+
+    def test_the_card_model_says_who_worked_it(self):
+        """The **Agent:** line beside Assigned, read as `agent` -- the model id as
+        written; a card with no line, worked by a person alone, is ""."""
+        cards = self._by_file()
+        self.assertEqual(cards["TaskW3X7-bench-reading.prompt.md"]["agent"], "claude-sonnet-5-5")
+        self.assertEqual(cards["Spike-K7M2-wallet-ticket.prompt.md"]["agent"], "")
+        self.assertEqual(cards["141-recipe-search.prompt.md"]["agent"], "")
+        detail = self.client.get("/api/status/TaskW3X7-bench-reading.prompt.md").json()
+        self.assertEqual((detail["assigned"], detail["agent"]), ("me", "claude-sonnet-5-5"))
 
     def test_the_card_model_serves_the_milestone_whole_and_the_tags(self):
         """The two planning lines and the tags (docs/hub/cards.md, "Milestone and sprint:

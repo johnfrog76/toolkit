@@ -139,6 +139,68 @@ foreach ($arow in @($assignedTable.rows)) {
     Assert-True "Get-P20CardAssigned: $($arow.name)" ($got -ceq [string]$arow.expected) "got '$got'"
 }
 
+# -- Who worked it: a card's **Agent:** line, and the model map ------------------
+$agentTable = [System.IO.File]::ReadAllText((Join-Path $scriptDir 'fixtures/parsers/agent-lines.json')) | ConvertFrom-Json
+Assert-True 'the **Agent:** table has its rows' (@($agentTable.rows).Count -ge 10)
+foreach ($grow in @($agentTable.rows)) {
+    $eol = "`n"
+    if ($grow.crlf) { $eol = "`r`n" }
+    $text = (@($grow.lines) -join $eol) + $eol
+    $got = Get-P20CardAgent -Content $text
+    $gotAssigned = Get-P20CardAssigned -Content $text
+    Assert-True "Get-P20CardAgent: $($grow.name)" ($got -ceq [string]$grow.expected -and $gotAssigned -ceq [string]$grow.assigned) "got '$got', assigned '$gotAssigned'"
+}
+$modelsTable = [System.IO.File]::ReadAllText((Join-Path $scriptDir 'fixtures/parsers/models.json')) | ConvertFrom-Json
+Assert-True 'the model map table has its rows' (@($modelsTable.rows).Count -ge 5)
+foreach ($mrow in @($modelsTable.rows)) {
+    $info = Get-P20ModelInfo -Id ([string]$mrow.id)
+    $want = $mrow.expected
+    $same = ($info.id -ceq [string]$want.id) -and ($info.known -eq [bool]$want.known) -and ($info.name -ceq [string]$want.name)
+    foreach ($field in 'provider', 'family') {
+        if ($null -eq $want.$field) { $same = $same -and ($null -eq $info.$field) }
+        else { $same = $same -and ($info.$field -ceq [string]$want.$field) }
+    }
+    Assert-True "Get-P20ModelInfo: $($mrow.name)" $same "got $($info | ConvertTo-Json -Compress)"
+}
+$workerTable = [System.IO.File]::ReadAllText((Join-Path $scriptDir 'fixtures/parsers/card-worker.json')) | ConvertFrom-Json
+Assert-True 'the card-worker table has its rows' (@($workerTable.rows).Count -ge 7)
+foreach ($wrow in @($workerTable.rows)) {
+    $eol = "`n"
+    if ($wrow.crlf) { $eol = "`r`n" }
+    $text = (@($wrow.lines) -join $eol) + $eol
+    $gotWorker = Get-P20CardWorker -Text $text
+    Assert-True "Get-P20CardWorker: $($wrow.name)" ($gotWorker -ceq [string]$wrow.expected) "got '$gotWorker'"
+}
+Assert-True 'the size table has its rows' (@($modelsTable.sizes).Count -ge 4)
+foreach ($srow in @($modelsTable.sizes)) {
+    $gotId = Get-P20ModelForSize -Size ([string]$srow.size)
+    Assert-True "Get-P20ModelForSize: $($srow.name)" ($gotId -ceq [string]$srow.expected) "got '$gotId'"
+}
+# A missing or invalid map is an EMPTY one: every id unknown, as written, nothing thrown.
+# A scratch package root stands in; the real file is never touched.
+$mapRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-models-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+try {
+    New-Item -ItemType Directory -Path $mapRoot -Force | Out-Null
+    foreach ($case in 'a missing', 'an invalid JSON') {
+        if ($case -eq 'an invalid JSON') {
+            $mapFile = Join-Path $mapRoot ([string](Get-P20Consts).models.file)
+            New-Item -ItemType Directory -Path (Split-Path $mapFile -Parent) -Force | Out-Null
+            [System.IO.File]::WriteAllText($mapFile, '{ not json', (New-Object System.Text.UTF8Encoding($false)))
+        }
+        $threw = $null
+        $info = $null
+        try { $info = Get-P20ModelInfo -Id 'claude-sonnet-5-5' -PackageRoot $mapRoot -ErrorAction Stop } catch { $threw = $_.Exception.Message }
+        $unknown = ($null -eq $threw) -and $info -and (-not $info.known) -and ($info.name -ceq 'claude-sonnet-5-5') -and ($null -eq $info.provider) -and ($null -eq $info.family)
+        Assert-True "Get-P20ModelInfo: $case map reads as empty, the id unknown, nothing thrown" $unknown "threw '$threw', got $($info | ConvertTo-Json -Compress)"
+        $threw = $null
+        $sizeId = 'unset'
+        try { $sizeId = Get-P20ModelForSize -Size 'sonnet' -PackageRoot $mapRoot -ErrorAction Stop } catch { $threw = $_.Exception.Message }
+        Assert-True "Get-P20ModelForSize: $case map resolves no size, nothing thrown" (($null -eq $threw) -and $sizeId -ceq '') "threw '$threw', got '$sizeId'"
+    }
+}
+catch { Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message }
+finally { Remove-Item -LiteralPath $mapRoot -Recurse -Force -ErrorAction SilentlyContinue }
+
 # -- The scratch package and hub -------------------------------------------------
 $scratch = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-triage-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
 $pkg = Join-Path $scratch 'pkg'
@@ -424,9 +486,40 @@ try {
     Assert-True 'and the reader reads what Route wrote' ((Get-P20CardAssigned -Content ([System.IO.File]::ReadAllText($cardLf))) -ceq 'me')
     $r = Invoke-Verb 'tkRoute K7M2 -Assign me'
     Assert-True 'again: nothing written, said once' ($r.Exit -eq '0' -and $r.Inner -match 'already says' -and [System.IO.File]::ReadAllText($cardLf) -ceq $want) $r.All
+    # A size is the model that works the card (#466): the **Agent:** line, with the
+    # size's current id from the model map; the **Assigned:** line is left as it is.
+    $r = Invoke-Verb 'tkRoute K7M2 -Assign SONNET -WhatIf'
+    Assert-True 'a size: -WhatIf names the Agent line with the size''s current id and writes nothing' ($r.Exit -eq '0' -and $r.Inner.Contains('[WhatIf] TaskK7M2-bench-notes.prompt.md: **Agent:** claude-sonnet-5-5') -and [System.IO.File]::ReadAllText($cardLf) -ceq $want) $r.All
     $r = Invoke-Verb 'tkRoute K7M2 -Assign SONNET'
-    Assert-True 'a size on a connected GitHub Space: the repo''s worker label, in its own spelling, replacing me' ($r.Exit -eq '0' -and [System.IO.File]::ReadAllText($cardLf) -ceq $cardText.Replace("**Created:**", "**Assigned:** sonnet`n**Created:**")) ($r.All + "`n" + [System.IO.File]::ReadAllText($cardLf))
+    $wantAgent = $cardText.Replace("**Created:**", "**Assigned:** me`n**Agent:** claude-sonnet-5-5`n**Created:**")
+    Assert-True 'a size writes **Agent:** <its current id> under Assigned, and Assigned is unchanged' ($r.Exit -eq '0' -and [System.IO.File]::ReadAllText($cardLf) -ceq $wantAgent) ($r.All + "`n" + [System.IO.File]::ReadAllText($cardLf))
     Assert-True 'and the sizes were read from the repo''s labels' (@($r.Calls | Where-Object { $_.StartsWith("label${sep}list${sep}--repo${sep}acme/widgets") }).Count -eq 1 -and (Get-Edits $r).Count -eq 0) ($r.Calls -join ' / ')
+    Assert-True 'and the readers read what Route wrote' ((Get-P20CardAgent -Content ([System.IO.File]::ReadAllText($cardLf))) -ceq 'claude-sonnet-5-5' -and (Get-P20CardAssigned -Content ([System.IO.File]::ReadAllText($cardLf))) -ceq 'me')
+    $r = Invoke-Verb 'tkRoute K7M2 -Assign opus'
+    $wantOpus = $cardText.Replace("**Created:**", "**Assigned:** me`n**Agent:** claude-opus-5-5`n**Created:**")
+    Assert-True 'a second size rewrites the Agent line: still one line, Assigned unchanged' ($r.Exit -eq '0' -and [System.IO.File]::ReadAllText($cardLf) -ceq $wantOpus -and ([regex]::Matches([System.IO.File]::ReadAllText($cardLf), '(?m)^\*\*Agent:\*\*')).Count -eq 1) ($r.All + "`n" + [System.IO.File]::ReadAllText($cardLf))
+    $stamp0 = (Get-Item -LiteralPath $cardLf).LastWriteTimeUtc
+    $r = Invoke-Verb 'tkRoute K7M2 -Assign opus'
+    Assert-True 'the same size again: nothing written, said once' ($r.Exit -eq '0' -and $r.Inner -match 'already says' -and [System.IO.File]::ReadAllText($cardLf) -ceq $wantOpus -and (Get-Item -LiteralPath $cardLf).LastWriteTimeUtc -eq $stamp0) $r.All
+    $r = Invoke-Verb 'tkRoute K7M2 -Assign me'
+    Assert-True '-Assign me still writes Assigned only: the card says me already, so nothing moves' ($r.Exit -eq '0' -and $r.Inner -match 'already says \*\*Assigned:\*\* me' -and [System.IO.File]::ReadAllText($cardLf) -ceq $wantOpus) $r.All
+    # A CRLF card on the connected Space keeps CRLF through the Agent write.
+    $cardCrlfGh = Join-Path $hub 'widgets/current/TaskM4P7-crlf-card.prompt.md'
+    $crlfText = "# Task M4P7: CRLF card`r`n`r`n---`r`n`r`n**Sprint:** (Not set)`r`n**Created:** 2026-10-17`r`n"
+    [System.IO.File]::WriteAllText($cardCrlfGh, $crlfText, $utf8)
+    $r = Invoke-Verb 'tkRoute M4P7 -Assign fable'
+    Assert-True 'a CRLF card: the Agent line lands above Created, CRLF kept on every line' ($r.Exit -eq '0' -and [System.IO.File]::ReadAllText($cardCrlfGh) -ceq $crlfText.Replace("**Created:**", "**Agent:** claude-fable-5-2`r`n**Created:**") -and -not ([regex]::IsMatch([System.IO.File]::ReadAllText($cardCrlfGh), "(?<!`r)`n"))) ($r.All + "`n" + [System.IO.File]::ReadAllText($cardCrlfGh))
+    # A worker size the map has no current id for is refused, and the card is not touched.
+    $scratchMap = Join-Path $pkg ([string](Get-P20Consts).models.file)
+    $mapBefore = [System.IO.File]::ReadAllText($scratchMap)
+    try {
+        $noFable = $mapBefore.Replace('"fable": "claude-fable-5-2", ', '')
+        [System.IO.File]::WriteAllText($scratchMap, $noFable, $utf8)
+        $cardBefore = [System.IO.File]::ReadAllText($cardLf)
+        $r = Invoke-Verb 'tkRoute K7M2 -Assign fable'
+        Assert-True 'a size with no current id in the model map is refused, exit 2, the card untouched' ((Test-OneRefusal $r) -and $r.All.Contains("'fable' has no current model in") -and [System.IO.File]::ReadAllText($cardLf) -ceq $cardBefore -and $noFable -ne $mapBefore) (($r.Calls -join ' / ') + "`n" + $r.All)
+    }
+    finally { [System.IO.File]::WriteAllText($scratchMap, $mapBefore, $utf8) }
 
     $r = Invoke-Verb 'tkRoute 141 -Assign me -Space sandbox'
     Assert-True 'a local Space: a numbered card takes -Assign me, no gh asked' ($r.Exit -eq '0' -and $r.Calls.Count -eq 0 -and [System.IO.File]::ReadAllText($cardCrlf).Contains("**Assigned:** me`r`n**Created:**")) ($r.All + "`n" + ($r.Calls -join ' / '))
