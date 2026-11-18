@@ -345,8 +345,8 @@ def resolve_card_agent(
                 family = row.get("family") if isinstance(row, dict) else None
                 return {"id": mid, "family": family or mid, "source": "line"}
         elif source == "assigned":
-            # A size's model may come from #466's models.current_model (the CLI's
-            # Get-P20ModelForSize) once merged; this step stays here either way.
+            # A size's model may later come from the map's own size lookup
+            # (models.current_model, the CLI's Get-P20ModelForSize); the step stays here.
             if card_agent(content or ""):
                 continue
             size = card_assigned(content or "")

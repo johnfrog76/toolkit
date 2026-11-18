@@ -355,7 +355,7 @@ function Resolve-P20CardAgent {
             return [pscustomobject][ordered]@{ id = $id; family = $family; source = 'line' }
         }
         if ($source -ceq 'assigned') {
-            # The size's model may come from #466's Get-P20ModelForSize (models.current_model) once merged; this step stays here.
+            # A size's model may later come from the map's own size lookup (Get-P20ModelForSize, models.current_model); the step stays here.
             if (Get-P20CardAgent -Content $Content) { continue }
             $size = Get-P20CardAssigned -Content $Content
             if (-not $size -or $size -ieq [string]$c.rituals.assignMe -or $size.StartsWith('@')) { continue }
