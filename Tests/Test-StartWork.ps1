@@ -238,6 +238,8 @@ try {
     Assert-True 'nothing before the block and nothing after it' ($r.Inner.StartsWith('# Start work: Task 23A3') -and $r.Inner.EndsWith($promptText))
     Assert-True 'the shipped rows carry agentic/build.prompt.md, whole' ($r.Inner.Contains("## The prompt (agentic/build.prompt.md)`n---`n") -and $r.Inner -notmatch '## The prompt \(agentic/pr-ship')
     Assert-True 'the card''s commit bullets, PR URL: and footer travel whole' ($r.Inner.Contains('- 80e2168 Route') -and $r.Inner.Contains('PR URL: https://github.com/acme/widgets/pull/57') -and $r.Inner.Contains('**Sprint:** Phase 6: the long milestone title that is longer than twenty characters'))
+    # The hand-off asks an agent to name itself on the card (docs/hub/cards.md, "The Agent line").
+    Assert-True 'the block tells the agent to write the card''s **Agent:** line' ($r.Inner.Contains('**Agent:**'))
     Assert-True 'gh is not asked for a card' ($r.Calls.Count -eq 0) ($r.Calls -join ' / ')
     Assert-True 'and the hub is untouched' ((Get-HubSnapshot) -ceq $before)
 

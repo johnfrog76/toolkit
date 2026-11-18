@@ -71,6 +71,10 @@ class PromptInfo(BaseModel):
     # Who takes it: the card's **Assigned:** line -- "me", or a size -- "" for
     # nobody (D-AR10; Route -Assign writes it). docs/hub/cards.md.
     assigned: str = ""
+    # Who did the work, when an agent did: the card's **Agent:** line -- a model
+    # id, as written, looked up in the model map by its reader -- "" for a card a
+    # person worked alone. docs/hub/cards.md, "The Agent line".
+    agent: str = ""
     # The meeting record an agenda line came from: the card's **From:** line --
     # the record's file stem -- else None (NewPrompt -From writes it). docs/hub/cards.md.
     from_record: str | None = None
@@ -129,6 +133,7 @@ class PromptDetailResponse(BaseModel):
     tracker: str = "none"
     billable: bool = True
     assigned: str = ""
+    agent: str = ""
     from_record: str | None = None
     title: str
     sprint: str

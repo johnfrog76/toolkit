@@ -736,6 +736,11 @@ names; `tests.historyBase`, `historyFallback` and `historyPath`, the per-platfor
 checkout; `env.testHistoryDir`, `P20_TEST_HISTORY_DIR`, the override the test runners set: `Scripts/Get-TestHistoryDir.ps1`
 and `agent/core/log.py` compute it by one rule, held to `Tests/fixtures/test-history/paths.json` --
 [Testing, "Where the record lives"](TESTING.md#where-the-record-lives)),
+and **the line a card names the agent that worked it with, and the map its id is read through**
+(`stamps.agent`, `**Agent:** <model id>`, beside `**Assigned:**`; `models.file`, `Config/models.json`: a row
+per known model id with its provider, family and display name, which every reader of the line takes from it
+rather than from the id -- see [the card](hub/cards.md#the-agent-line)). Like the price table, the map is
+not a setting: adding a model is one row in the package's file,
 and **the package's own repository** (`repository.url`: what the agent compares a Space's repository with when the package has no git origin to read, so ToolKit connected to itself still reads as itself on the Prompts card -- a checkout's origin wins when it is there),
 and **how a card's agent is worked out** (`models.file`, the model map `Config/models.json`; `models.agentSources`,
 `["line", "trailer", "label", "none"]`, the order the sources are tried in, so changing the order is one edit here;

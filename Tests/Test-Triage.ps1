@@ -162,6 +162,25 @@ foreach ($mrow in @($modelsTable.rows)) {
     }
     Assert-True "Get-P20ModelInfo: $($mrow.name)" $same "got $($info | ConvertTo-Json -Compress)"
 }
+# A missing or invalid map is an EMPTY one: every id unknown, as written, nothing thrown.
+# A scratch package root stands in; the real file is never touched.
+$mapRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-models-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+try {
+    New-Item -ItemType Directory -Path $mapRoot -Force | Out-Null
+    foreach ($case in 'a missing', 'an invalid JSON') {
+        if ($case -eq 'an invalid JSON') {
+            $mapFile = Join-Path $mapRoot ([string](Get-P20Consts).models.file)
+            New-Item -ItemType Directory -Path (Split-Path $mapFile -Parent) -Force | Out-Null
+            [System.IO.File]::WriteAllText($mapFile, '{ not json', (New-Object System.Text.UTF8Encoding($false)))
+        }
+        $threw = $null
+        $info = $null
+        try { $info = Get-P20ModelInfo -Id 'claude-sonnet-5-5' -PackageRoot $mapRoot -ErrorAction Stop } catch { $threw = $_.Exception.Message }
+        $unknown = ($null -eq $threw) -and $info -and (-not $info.known) -and ($info.name -ceq 'claude-sonnet-5-5') -and ($null -eq $info.provider) -and ($null -eq $info.family)
+        Assert-True "Get-P20ModelInfo: $case map reads as empty, the id unknown, nothing thrown" $unknown "threw '$threw', got $($info | ConvertTo-Json -Compress)"
+    }
+}
+finally { Remove-Item -LiteralPath $mapRoot -Recurse -Force -ErrorAction SilentlyContinue }
 
 # -- Who worked it, by its sources: line, trailer, label, none -------------------
 # Tests/fixtures/parsers/agent-source.json, the table Tests/test_parsers.py
