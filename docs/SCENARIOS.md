@@ -20,7 +20,7 @@ A machine is in exactly one cell of each axis at a time:
 | **Modules** | `growth`, `communication`, `deck`, `organize`, `solitaireAgile`, `lounge`, each on / off / not configured | top-level `features` in `config.local.json`; the engineer's, never an org's (`Tests/test_features.py`). The Studio is not on this axis: it is core (D-S13), and a `features.studio` left in a config is ignored |
 | **Sprint awareness** | on, off | `spaces[].features.sprintAwareness` -- a Space-scoped flag |
 | **Suggestions** | on (unset, or true), off | `spaces[].features.suggestions` -- a Space-scoped switch riding Team Agile: where Team Agile is on, unset is on; `false` takes the suggestion out of the standup -- the `switch` rows of `Tests/fixtures/suggestion/table.json`, read by `tkTestToolkit -Rituals` and `Tests/test_rituals.py` |
-| **Team size** | 3, 6, 9 (unset reads 9) | `spaces[].features.teamSize` -- a Space-scoped NUMBER, how many people are in the standup, the chair counted: every seat the size counts is filled -- the engineer, the labelled workers with work, the idle ones, then invented cast members -- and the empty desks are the windows past it; the fill keeps every worker of the record and marks each `present`; the round (the work grain) speaks the room, the detail and the brief keep the record and never an invented member; the stage still seats the record ([Known gaps](KNOWN-GAPS.md#the-played-standup-seats-the-record-not-the-room)) -- **the one shared table**, `Tests/fixtures/rituals/standup-team.json`, read by `tkTestToolkit -Rituals` and `Tests/test_rituals.py` |
+| **Team size** | 3, 6, 9 (unset reads 9) | `spaces[].features.teamSize` -- a Space-scoped NUMBER, how many people are in the standup, the chair counted: every seat the size counts is filled -- the engineer, the labelled workers with work, the idle ones, then invented cast members -- and the empty desks are the windows past it; the fill keeps every worker of the record and marks each `present`; the round (the work grain) speaks the room, the detail and the brief keep the record and never an invented member; the stage seats the same room, each speaker in the window the table names -- **the one shared table**, `Tests/fixtures/rituals/standup-team.json`, read by `tkTestToolkit -Rituals`, `Tests/test_rituals.py` and the stage's `seats.test.ts` |
 | **How you work here** | `agents`, `alone`, `team` | `spaces[].howIWork` -- the other Space-scoped switch: asked on a GitHub Space (`alone` until answered), derived elsewhere (`team` on Azure DevOps, `alone` with no tracker). Team Agile is on only where its switch is on AND the answer is `agents` -- **the one shared table**, `Tests/fixtures/how-i-work/table.json`, read by `tkTestToolkit -Environment` and `Tests/test_how_i_work.py` |
 
 **Off means absent** (AGENTS.md): a module that is off contributes no verb, no route (404, not 403),
@@ -463,21 +463,24 @@ Team Agile section (the reminder: a time and the days), saved through `POST /api
 item as the page does: an issue is `#<n>` (spoken `issue <n>`), linked; a card of its own is its id
 (spoken `card <id>`), with no link (`scenarios.test.tsx`, "the played standup names an issue").
 
-The stage is nine windows whatever the response: the chair, the members the response marks present in its
-order (everyone, capped at eight, from an agent that predates `present`), each plated `PERSONA (label)` --
-`fable`, `opus` and `sonnet` in their own personas' windows, any other label by position -- and an
-**empty desk** -- a chair, a desk and a steaming mug, in full colour, plated `EMPTY DESK`, a different mug each -- in
-every other window. A Space with no worker labels plays the chair and eight desks; its cards' own tile, where
-it reads cards, is a member. The chair opens the board, calls each member by name, the member answers, the
-chair gives its own status and closes; a desk never speaks (`scenarios.test.tsx`, "the played standup seats
-the present by position"; `stage/standupDeck.test.tsx`, "no silent face").
+The stage is nine windows whatever the response: the chair, then the round the response carries, in its
+order -- the engineer first, the labelled workers, then the invented cast members that fill the seats the
+size still counts. A member is plated `PERSONA (label)`, with `fable`, `opus` and `sonnet` in their own
+personas' windows and any other label by position; an invented cast member sits in its own window and
+wears its persona alone. An **empty desk** -- a chair, a desk and a steaming mug, in full colour, plated
+`EMPTY DESK`, a different mug each -- is in every window past the size: none at nine, three at six, six at
+three. A Space with no worker labels plays the chair, the engineer and the invented cast members up to its
+size. The chair opens the board, calls each speaker by name, the speaker answers, the chair gives its own
+status and closes; a desk never speaks (`scenarios.test.tsx`, "the played standup seats the round";
+`stage/seats.test.ts`, every row of the shared room table; `stage/standupDeck.test.tsx`, "no silent face").
+A response whose round does not account for its present workers (an agent that predates the room) is
+seated by its record: the workers marked present, in its order, capped at eight.
 
 The Space's size (`spaces.<slug>.features.teamSize`) is its team. Work shows the round -- the seated
 members, the engineer first, then the invented cast members that fill the seats left,
 `standup-team-<case>.work.txt` -- while Detail and Brief keep every worker of the record and never an
 invented one; the page draws what the response says and reads no setting of its own. The played view
-seats the record, so an invented member's window is an empty desk there
-([Known gaps](KNOWN-GAPS.md#the-played-standup-seats-the-record-not-the-room)).
+seats the same round, each speaker in the window the shared table names.
 
 The text is the shared fixture's golden (`Tests/fixtures/rituals/`), the same bytes the CLI's
 `Standup` and `Tests/test_rituals.py` assert.

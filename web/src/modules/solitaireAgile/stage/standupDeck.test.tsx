@@ -1198,12 +1198,49 @@ function expectNoSilentFace(data: StandupResponse, members: number) {
 // fill's rule; three empty desks. The members' labels and names are the fixtures'
 // own -- the team table's four and the joined table's card tile -- in label order.
 const teamTable = readJson<{
-  cases: { name: string; teamSize: number | null; expected: TeamExpected }[];
+  cases: { name: string; teamSize: number | null; space?: string; expected: TeamExpected }[];
 }>("standup-team.json");
 interface TeamExpected {
   team: { size: number };
   workers: { label: string; name: string; empty: boolean; present: boolean }[];
+  /** Every speaker in turn order: the seated, then the invented cast members. */
+  round: { label: string; name: string; cast: boolean }[];
   work: string;
+}
+
+/** A team case as the route's response: the record, and the round with each
+ *  speaker's turn as the case's work golden prints it. */
+function teamResponse(name: string): StandupResponse {
+  const c = teamTable.cases.find((x) => x.name === name)!;
+  const work = fs.readFileSync(path.join(FIXTURES, c.expected.work), "utf8").split("\n");
+  const turnOf = (who: string) => work.find((l) => l.startsWith(`${who}: `))!.slice(who.length + 2);
+  return {
+    ...friday,
+    space: c.space ?? "",
+    source: c.space ? "both" : "issues",
+    team: c.expected.team,
+    workers: c.expected.workers.map((w) => ({
+      label: w.label,
+      name: w.name,
+      yesterday: [],
+      today: [],
+      blockers: [],
+      empty: w.empty,
+      excuse: "",
+      status: [],
+      present: w.present,
+    })),
+    work: {
+      queue: { walk: [], decide: [], look: [] },
+      workers: c.expected.round.map((r) => ({
+        ...workRow(r.label, r.name, [turnOf(r.name)]),
+        cast: r.cast,
+      })),
+      queueProse: [],
+      chairProse: [work.find((l) => l.startsWith(T.turnOpen))!],
+      text: work.join("\n"),
+    },
+  };
 }
 const joined = readJson<{ cases: { name: string; expected: { workers: StandupWorker[] } }[] }>(
   "standup-joined.json",
@@ -1437,6 +1474,63 @@ describe("no silent face", () => {
         view.unmount();
       }
     }
+  });
+
+  describe("the team size is the team: a Space with no worker labels", () => {
+    const plateOf = new Map(RITUALS.room.windows.map((w) => [w.id, w.plate]));
+    const walks: [string, number][] = [
+      ["walk-size-3", 3],
+      ["walk-size-6", 6],
+      ["walk-size-9", 9],
+      ["idle-room", 9],
+    ];
+
+    for (const [name, size] of walks) {
+      it(`${name}: ${size} people and ${ROOM_WINDOWS - size} empty desks, every one of them speaking`, () => {
+        const data = teamResponse(name);
+        expect(data.team!.size).toBe(size);
+        const room = expectNoSilentFace(data, size - 1);
+        expect(room.desks.size).toBe(ROOM_WINDOWS - size);
+        const { members } = dealRoom(data);
+        // The engineer first, in the engineer's window; then the invented, each in its own.
+        expect(members[0].worker.label).toBe(data.space);
+        expect(members[0].castId).toBe(RITUALS.room.engineer);
+        expect(members[0].cast).toBe(false);
+        for (const m of members.slice(1)) {
+          expect(m.cast).toBe(true);
+          expect(m.castId).toBe(m.worker.label);
+        }
+        // The turns go in the round's order, the chair's status last before its close.
+        const ids = room.slides.map(idOf);
+        const turns = ids.filter((id) => members.some((m) => m.worker.label === id));
+        expect(turns).toEqual(members.map((m) => m.worker.label));
+        expect(ids.slice(-2)).toEqual(["chair-status", "chair-close"]);
+      });
+    }
+
+    it("a full room of nine has no empty desk, and an invented member wears its persona alone", () => {
+      const data = teamResponse("walk-size-9");
+      const s = buildStandupDeck(data).slides();
+      const view = render(<>{s[0].content}</>);
+      expect(view.container.textContent).not.toContain(EMPTY_DESK_PLATE);
+      for (const m of dealRoom(data).members) {
+        const tile = within(view.getByTestId(`tile-${m.castId}`));
+        const plate = plateOf.get(m.castId)!;
+        const words = m.cast ? plate : `${plate} (${m.worker.label})`;
+        expect(tile.getByText(words)).toBeTruthy();
+      }
+      view.unmount();
+    });
+
+    it("an invented member says the round's own turn, and is called by its plate", () => {
+      const data = teamResponse("walk-size-3");
+      const s = buildStandupDeck(data).slides();
+      const cast = data.work!.workers.find((w) => w.cast)!;
+      const call = s.find((x) => idOf(x) === `call-${cast.label}`)!;
+      expect(extractSayText(call.notes)).toBe(callLine(cast.name));
+      const turn = s.find((x) => idOf(x) === cast.label)!;
+      expect(extractSayText(turn.notes)).toBe(cast.prose.join(" "));
+    });
   });
 
   describe("nine labels or more: the room is full and the rest are out", () => {

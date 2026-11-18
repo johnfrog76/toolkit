@@ -101,6 +101,11 @@ export interface WorkWorker {
    *  with nothing at all its two made-up items, then `proseBlockersNone` when
    *  nothing blocks it, then `turnClose`. */
   prose: string[];
+  /** An invented cast member (the team size, docs/modules/solitaire-agile.md, "The
+   *  team size: who is in the room"): it fills a seat the size counts and no member
+   *  takes. Its label is its cast id, its name the plate, its turn made-up status;
+   *  it is in the round only, never in `workers`. Absent from an agent that predates it. */
+  cast?: boolean;
 }
 
 /** The standup at the grain of the work: the same items, grouped, and its text. */

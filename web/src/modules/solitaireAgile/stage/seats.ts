@@ -1,29 +1,32 @@
+import { RITUALS } from "../../../shell/consts";
 import type { StandupResponse, StandupWorker } from "../api.solitaireAgile";
-import { CAST } from "./cast";
 import { dealMugLooks } from "./EmptyDesk";
 import type { MugLook } from "./EmptyDesk";
 
 // ── The room (docs/modules/solitaire-agile.md, "The played view") ────────────
 //
 // The stage is always nine windows, the Zoom grid (D-TA17). The chair keeps
-// its own window; the other eight are the members' windows, in CAST order. A
-// label in KEPT_WINDOWS keeps its own persona's window; the rest of the team is
-// DEALT onto the free windows by position. A window with nobody in it is an
-// empty desk.
+// its own window; the other eight are the members' windows, in grid order. The
+// windows, their plates, the chair's, the windows three labels keep and the
+// engineer's are the shared room (consts.json `rituals.room`): the terminal's
+// Standup and the agent seat the same room from it, and one table
+// (Tests/fixtures/rituals/standup-team.json, `room`) holds all three.
 //
 // The web never reads the team-size setting. It draws what the response gives
-// it: the workers marked `present` (all of them, from an agent that predates
-// the room), in their order, capped at the room. So a Space sized three draws
-// two members and six desks because only two are present, not because the
-// stage knows the number.
+// it: the round (`work.workers`) -- the seated members in turn order, then the
+// invented cast members that fill the seats the size still counts -- each in
+// its window, capped at the room. So a Space sized three draws two members and
+// six desks because the round has two, not because the stage knows the number.
+
+const ROOM = RITUALS.room;
 
 /** The room's windows, the chair's included: the 3x3 grid. Read everywhere; never typed again. */
-export const ROOM_WINDOWS = 9;
+export const ROOM_WINDOWS = ROOM.windows.length;
 /** The windows a member can sit in: the room less the chair's. */
 export const MEMBER_SEATS = ROOM_WINDOWS - 1;
 
 /** The cast member whose window is the chair's. */
-export const CHAIR_CAST_ID = "pm";
+export const CHAIR_CAST_ID = ROOM.chair;
 /** The chair's plate. */
 export const CHAIR_PLATE = "CHAIR · PM";
 /** The plate on a window with nobody in it. */
@@ -35,10 +38,10 @@ export interface MemberWindow {
   persona: string;
 }
 
-/** The eight member windows, in CAST order: the faces, dealt by position. */
-export const MEMBER_WINDOWS: readonly MemberWindow[] = CAST.filter(
-  (c) => c.id !== CHAIR_CAST_ID,
-).map((c) => ({ castId: c.id, persona: c.label }));
+/** The eight member windows, in grid order: the room's, the chair's left out. */
+export const MEMBER_WINDOWS: readonly MemberWindow[] = ROOM.windows
+  .filter((w) => w.id !== CHAIR_CAST_ID)
+  .map((w) => ({ castId: w.id, persona: w.plate }));
 
 /** A member's plate: `PERSONA (label)`. */
 export function memberPlate(window: MemberWindow, label: string): string {
@@ -55,6 +58,8 @@ export function standupDayOfYear(asOf: string): number {
 
 export interface Seated extends MemberWindow {
   worker: StandupWorker;
+  /** An invented cast member: it sits in its own window and wears its persona alone. */
+  cast: boolean;
 }
 
 export interface EmptyWindow extends MemberWindow {
@@ -62,7 +67,7 @@ export interface EmptyWindow extends MemberWindow {
 }
 
 export interface Room {
-  /** The present members, in speaking order, each in its window. */
+  /** Everyone in the room but the chair, in speaking order, each in its window. */
   members: Seated[];
   /** Every member window nobody sits in, in window order, with its mug. */
   desks: EmptyWindow[];
@@ -74,52 +79,125 @@ export interface Room {
  * else is in the room. The sample team is a model crew; any other label is
  * dealt by position. One label to a window.
  */
-export const KEPT_WINDOWS: Readonly<Record<string, string>> = {
-  fable: "dev-hero",
-  opus: "vibemancer",
-  sonnet: "minimalist",
-};
+export const KEPT_WINDOWS: Readonly<Record<string, string>> = ROOM.kept;
+
+/** The plate a seated member wears: `PERSONA (label)`, or the persona alone for
+ *  an invented cast member, whose label is the persona's own id. */
+export function seatedPlate(m: Seated): string {
+  return m.cast ? m.persona : memberPlate(m, m.worker.label);
+}
+
+const MEMBER_IDS = MEMBER_WINDOWS.map((m) => m.castId);
+
+/** The window a label owns: the one it keeps, or its own when the label is
+ *  itself a member window's cast id (compared in lowercase); "" for neither. */
+function ownWindow(label: string): string {
+  const low = label.toLowerCase();
+  return KEPT_WINDOWS[low] ?? (MEMBER_IDS.includes(low) ? low : "");
+}
+
+type Dealt = Pick<StandupResponse, "asOf" | "workers"> &
+  Partial<Pick<StandupResponse, "work" | "space" | "source">>;
+
+/** An invented cast member as the stage's worker: idle, named by its plate. Its
+ *  turn is the round's own prose. */
+function castWorker(label: string, name: string): StandupWorker {
+  return {
+    label,
+    name,
+    yesterday: [],
+    today: [],
+    blockers: [],
+    empty: true,
+    excuse: "",
+    status: [],
+  };
+}
+
+/** Who speaks, in turn order. The round the response carries (`work.workers`:
+ *  the seated members in seat order, then the invented cast members) when it
+ *  accounts for exactly the present members of the record; else -- no work
+ *  grain, or an agent that predates the room -- the present members in the
+ *  record's order. */
+function roundOf(data: Dealt): { worker: StandupWorker; cast: boolean }[] {
+  const record = data.workers ?? [];
+  const present = record.filter((w) => w.present !== false);
+  const byLabel = new Map(record.map((w) => [w.label, w]));
+  const round = data.work?.workers;
+  const said = (round ?? []).filter((w) => !w.cast);
+  const whole =
+    said.length === present.length &&
+    said.every((w) => byLabel.has(w.label) && byLabel.get(w.label)!.present !== false);
+  if (!round || !whole) return present.map((worker) => ({ worker, cast: false }));
+  return round.map((w) =>
+    w.cast
+      ? { worker: castWorker(w.label, w.name), cast: true }
+      : { worker: byLabel.get(w.label)!, cast: false },
+  );
+}
 
 /**
- * Seat today's standup.
+ * Seat today's standup: the same rule the terminal and the agent seat by
+ * (`room_seats`, `Get-P20StandupRoomSeats`), read off the response.
  *
- * - The present members (every worker, from an agent that predates `present`),
- *   in the response's order, up to the room -- the order the round speaks them,
- *   whichever window each sits in.
- * - A present member whose label is in KEPT_WINDOWS sits in its own window.
- * - A kept window whose label is in the response but out today stays EMPTY, so
- *   no other face takes it and nobody moves when that member is back; a kept
- *   window whose label this Space does not have is an ordinary window.
- * - Every other present member takes the free windows in CAST order; only when
- *   those run out does it take a kept window left empty by an absent member, so
- *   no present member is ever dropped.
+ * - The round, in turn order, up to the room: the engineer first, the labelled
+ *   workers, then the invented cast members. The order is the turns', whichever
+ *   window each sits in.
+ * - An invented cast member sits in its own window: its label is its cast id.
+ * - A window is a member's own when its label is in KEPT_WINDOWS or is itself a
+ *   member window's cast id. A seated member sits in its own window; one in the
+ *   response but out today keeps it EMPTY, so no other face takes it and nobody
+ *   moves when that member is back.
+ * - The engineer -- the member the Space's own slug names, where cards fill the
+ *   standup -- otherwise takes the engineer's window when no member owns it.
+ * - Every other seated member takes the free windows in grid order, the
+ *   engineer first and then the labels in the record's order, so a label's
+ *   window does not move when its work does; only when the free ones run out
+ *   does it take a window an absent member keeps, so nobody seated is dropped.
  * - The windows left are empty desks, dealt their mugs by the day in window order.
  */
-export function dealRoom(data: Pick<StandupResponse, "asOf" | "workers">): Room {
-  const workers = data.workers ?? [];
-  const present = workers.filter((w) => w.present !== false).slice(0, MEMBER_SEATS);
-  const keptOf = (w: StandupWorker) => KEPT_WINDOWS[w.label.toLowerCase()];
-  const reserved = new Set(workers.map(keptOf).filter((id): id is string => !!id));
-  const byCast = new Map<string, StandupWorker>();
-  for (const w of present) {
-    const own = keptOf(w);
-    if (own && !byCast.has(own)) byCast.set(own, w);
+export function dealRoom(data: Dealt): Room {
+  const record = data.workers ?? [];
+  const round = roundOf(data).slice(0, MEMBER_SEATS);
+  const filled = data.source === "cards" || data.source === "both";
+  const engineer = filled && data.space ? record.find((w) => w.label === data.space) : undefined;
+  const people = [...(engineer ? [engineer] : []), ...record.filter((w) => w !== engineer)];
+  const reserved = new Set(people.map((w) => ownWindow(w.label)).filter(Boolean));
+  const seated = new Set(round.filter((r) => !r.cast).map((r) => r.worker));
+  const dealing = people.filter((w) => seated.has(w));
+
+  const windowOf = new Map<StandupWorker, string>();
+  const taken = new Set<string>();
+  const sit = (w: StandupWorker, castId: string) => {
+    windowOf.set(w, castId);
+    taken.add(castId);
+  };
+  for (const w of dealing) {
+    const own = ownWindow(w.label);
+    if (own && !taken.has(own)) sit(w, own);
   }
-  const seatedKept = new Set(byCast.values());
-  const free = MEMBER_WINDOWS.filter((m) => !reserved.has(m.castId));
-  const spare = MEMBER_WINDOWS.filter((m) => reserved.has(m.castId) && !byCast.has(m.castId));
-  const open = [...free, ...spare];
-  for (const w of present) {
-    if (seatedKept.has(w)) continue;
-    const at = open.shift()!;
-    byCast.set(at.castId, w);
+  if (engineer && seated.has(engineer) && !windowOf.has(engineer) && !reserved.has(ROOM.engineer))
+    sit(engineer, ROOM.engineer);
+  // The invented sit in their own windows before anyone is dealt: the rule
+  // never invents a member for a window a seated or absent member owns.
+  for (const r of round) {
+    const own = r.cast ? ownWindow(r.worker.label) : "";
+    if (own && !taken.has(own)) sit(r.worker, own);
   }
-  const windowOf = new Map([...byCast].map(([castId, w]) => [w, castId]));
-  const members = present.map((worker) => ({
+  const open = [
+    ...MEMBER_IDS.filter((id) => !reserved.has(id) && !taken.has(id)),
+    ...MEMBER_IDS.filter((id) => reserved.has(id) && !taken.has(id)),
+  ];
+  for (const w of [...dealing, ...round.filter((r) => r.cast).map((r) => r.worker)]) {
+    if (!windowOf.has(w)) sit(w, open.shift()!);
+  }
+
+  const members = round.map(({ worker, cast }) => ({
     ...MEMBER_WINDOWS.find((m) => m.castId === windowOf.get(worker))!,
     worker,
+    cast,
   }));
-  const empty = MEMBER_WINDOWS.filter((m) => !byCast.has(m.castId));
+  const empty = MEMBER_WINDOWS.filter((m) => !taken.has(m.castId));
   const looks = dealMugLooks(standupDayOfYear(data.asOf), empty.length);
   return { members, desks: empty.map((w, i) => ({ ...w, look: looks[i] })) };
 }
