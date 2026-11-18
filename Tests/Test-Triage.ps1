@@ -189,6 +189,7 @@ try {
         Assert-True "Get-P20ModelForSize: $case map resolves no size, nothing thrown" (($null -eq $threw) -and $sizeId -ceq '') "threw '$threw', got '$sizeId'"
     }
 }
+catch { Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message }
 finally { Remove-Item -LiteralPath $mapRoot -Recurse -Force -ErrorAction SilentlyContinue }
 
 # -- The scratch package and hub -------------------------------------------------
@@ -476,9 +477,40 @@ try {
     Assert-True 'and the reader reads what Route wrote' ((Get-P20CardAssigned -Content ([System.IO.File]::ReadAllText($cardLf))) -ceq 'me')
     $r = Invoke-Verb 'tkRoute K7M2 -Assign me'
     Assert-True 'again: nothing written, said once' ($r.Exit -eq '0' -and $r.Inner -match 'already says' -and [System.IO.File]::ReadAllText($cardLf) -ceq $want) $r.All
+    # A size is the model that works the card (#466): the **Agent:** line, with the
+    # size's current id from the model map; the **Assigned:** line is left as it is.
+    $r = Invoke-Verb 'tkRoute K7M2 -Assign SONNET -WhatIf'
+    Assert-True 'a size: -WhatIf names the Agent line with the size''s current id and writes nothing' ($r.Exit -eq '0' -and $r.Inner.Contains('[WhatIf] TaskK7M2-bench-notes.prompt.md: **Agent:** claude-sonnet-5-5') -and [System.IO.File]::ReadAllText($cardLf) -ceq $want) $r.All
     $r = Invoke-Verb 'tkRoute K7M2 -Assign SONNET'
-    Assert-True 'a size on a connected GitHub Space: the repo''s worker label, in its own spelling, replacing me' ($r.Exit -eq '0' -and [System.IO.File]::ReadAllText($cardLf) -ceq $cardText.Replace("**Created:**", "**Assigned:** sonnet`n**Created:**")) ($r.All + "`n" + [System.IO.File]::ReadAllText($cardLf))
+    $wantAgent = $cardText.Replace("**Created:**", "**Assigned:** me`n**Agent:** claude-sonnet-5-5`n**Created:**")
+    Assert-True 'a size writes **Agent:** <its current id> under Assigned, and Assigned is unchanged' ($r.Exit -eq '0' -and [System.IO.File]::ReadAllText($cardLf) -ceq $wantAgent) ($r.All + "`n" + [System.IO.File]::ReadAllText($cardLf))
     Assert-True 'and the sizes were read from the repo''s labels' (@($r.Calls | Where-Object { $_.StartsWith("label${sep}list${sep}--repo${sep}acme/widgets") }).Count -eq 1 -and (Get-Edits $r).Count -eq 0) ($r.Calls -join ' / ')
+    Assert-True 'and the readers read what Route wrote' ((Get-P20CardAgent -Content ([System.IO.File]::ReadAllText($cardLf))) -ceq 'claude-sonnet-5-5' -and (Get-P20CardAssigned -Content ([System.IO.File]::ReadAllText($cardLf))) -ceq 'me')
+    $r = Invoke-Verb 'tkRoute K7M2 -Assign opus'
+    $wantOpus = $cardText.Replace("**Created:**", "**Assigned:** me`n**Agent:** claude-opus-5-5`n**Created:**")
+    Assert-True 'a second size rewrites the Agent line: still one line, Assigned unchanged' ($r.Exit -eq '0' -and [System.IO.File]::ReadAllText($cardLf) -ceq $wantOpus -and ([regex]::Matches([System.IO.File]::ReadAllText($cardLf), '(?m)^\*\*Agent:\*\*')).Count -eq 1) ($r.All + "`n" + [System.IO.File]::ReadAllText($cardLf))
+    $stamp0 = (Get-Item -LiteralPath $cardLf).LastWriteTimeUtc
+    $r = Invoke-Verb 'tkRoute K7M2 -Assign opus'
+    Assert-True 'the same size again: nothing written, said once' ($r.Exit -eq '0' -and $r.Inner -match 'already says' -and [System.IO.File]::ReadAllText($cardLf) -ceq $wantOpus -and (Get-Item -LiteralPath $cardLf).LastWriteTimeUtc -eq $stamp0) $r.All
+    $r = Invoke-Verb 'tkRoute K7M2 -Assign me'
+    Assert-True '-Assign me still writes Assigned only: the card says me already, so nothing moves' ($r.Exit -eq '0' -and $r.Inner -match 'already says \*\*Assigned:\*\* me' -and [System.IO.File]::ReadAllText($cardLf) -ceq $wantOpus) $r.All
+    # A CRLF card on the connected Space keeps CRLF through the Agent write.
+    $cardCrlfGh = Join-Path $hub 'widgets/current/TaskM4P7-crlf-card.prompt.md'
+    $crlfText = "# Task M4P7: CRLF card`r`n`r`n---`r`n`r`n**Sprint:** (Not set)`r`n**Created:** 2026-10-17`r`n"
+    [System.IO.File]::WriteAllText($cardCrlfGh, $crlfText, $utf8)
+    $r = Invoke-Verb 'tkRoute M4P7 -Assign fable'
+    Assert-True 'a CRLF card: the Agent line lands above Created, CRLF kept on every line' ($r.Exit -eq '0' -and [System.IO.File]::ReadAllText($cardCrlfGh) -ceq $crlfText.Replace("**Created:**", "**Agent:** claude-fable-5-2`r`n**Created:**") -and -not ([regex]::IsMatch([System.IO.File]::ReadAllText($cardCrlfGh), "(?<!`r)`n"))) ($r.All + "`n" + [System.IO.File]::ReadAllText($cardCrlfGh))
+    # A worker size the map has no current id for is refused, and the card is not touched.
+    $scratchMap = Join-Path $pkg ([string](Get-P20Consts).models.file)
+    $mapBefore = [System.IO.File]::ReadAllText($scratchMap)
+    try {
+        $noFable = $mapBefore.Replace('"fable": "claude-fable-5-2", ', '')
+        [System.IO.File]::WriteAllText($scratchMap, $noFable, $utf8)
+        $cardBefore = [System.IO.File]::ReadAllText($cardLf)
+        $r = Invoke-Verb 'tkRoute K7M2 -Assign fable'
+        Assert-True 'a size with no current id in the model map is refused, exit 2, the card untouched' ((Test-OneRefusal $r) -and $r.All.Contains("'fable' has no current model in") -and [System.IO.File]::ReadAllText($cardLf) -ceq $cardBefore -and $noFable -ne $mapBefore) (($r.Calls -join ' / ') + "`n" + $r.All)
+    }
+    finally { [System.IO.File]::WriteAllText($scratchMap, $mapBefore, $utf8) }
 
     $r = Invoke-Verb 'tkRoute 141 -Assign me -Space sandbox'
     Assert-True 'a local Space: a numbered card takes -Assign me, no gh asked' ($r.Exit -eq '0' -and $r.Calls.Count -eq 0 -and [System.IO.File]::ReadAllText($cardCrlf).Contains("**Assigned:** me`r`n**Created:**")) ($r.All + "`n" + ($r.Calls -join ' / '))
