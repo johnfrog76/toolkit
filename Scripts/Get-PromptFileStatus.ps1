@@ -134,7 +134,17 @@ function Get-P20ModelInfo {
     if (-not $PackageRoot) { $PackageRoot = Split-Path (Get-P20ConstsPath) -Parent }
     $mid = "$Id"
     $path = Join-Path $PackageRoot ([string](Get-P20Consts).models.file)
-    $map = (Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json).models
+    # A map that is missing, unreadable or not JSON reads as EMPTY: every id is
+    # unknown and reads as written, and nothing throws.
+    $map = $null
+    if (Test-Path -LiteralPath $path -PathType Leaf) {
+        try {
+            $raw = Get-Content -LiteralPath $path -Raw -Encoding UTF8 -ErrorAction Stop
+            if ($raw) { $map = (ConvertFrom-Json -InputObject $raw -ErrorAction Stop).models }
+        }
+        catch { $map = $null }
+    }
+    if ($map -isnot [System.Management.Automation.PSCustomObject]) { $map = $null }
     $row = $null
     if ($mid -and $map) {
         $prop = $map.PSObject.Properties | Where-Object { $_.Name -ceq $mid } | Select-Object -First 1

@@ -182,6 +182,8 @@ Adding a model is one row. The lookup is `model_info` (`agent/core/models.py`) a
 - an id with **no row** reads as written -- `known` false, `name` the id, `provider` and `family` null --
   and is reported, never guessed at. Nothing parses an id for a family, and an unknown id is left out of
   any cost, since only the price table's rows can be priced.
+- a map that is **missing or not valid JSON** reads as empty, so every id is unknown and reads as
+  written; neither lookup throws over it.
 
 `Tests/fixtures/parsers/models.json` holds the two lookups to one table. The card keeps the id; a reader
 that shows it shows the map's name.

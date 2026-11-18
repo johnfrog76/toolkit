@@ -25,9 +25,16 @@ from .consts import CONSTS_PATH, models_file
 
 @functools.lru_cache(maxsize=1)
 def model_map() -> dict[str, dict]:
-    """The map's rows by id, read once per process from the package's model map."""
+    """The map's rows by id, read once per process from the package's model map.
+
+    A map that is missing, unreadable or not the expected JSON reads as EMPTY, so
+    every id is unknown and reads as written -- a card is never refused for it."""
     path = CONSTS_PATH.parent / models_file()
-    return json.loads(path.read_text(encoding="utf-8-sig")).get("models") or {}
+    try:
+        rows = json.loads(path.read_text(encoding="utf-8-sig")).get("models")
+    except (OSError, ValueError, AttributeError):
+        return {}
+    return rows if isinstance(rows, dict) else {}
 
 
 def model_info(model_id: str | None) -> dict:

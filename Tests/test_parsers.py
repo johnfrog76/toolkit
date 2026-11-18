@@ -203,6 +203,39 @@ class StatusMetadataTests(unittest.TestCase):
             with self.subTest(row=row["name"]):
                 self.assertEqual(model_info(row["id"]), row["expected"])
 
+    def test_a_missing_or_broken_model_map_reads_as_empty(self):
+        """A missing or invalid Config/models.json is an EMPTY map: every id reads
+        unknown, as written, and nothing raises. A scratch package root stands in;
+        the real file is never touched."""
+        import tempfile
+        from unittest import mock
+
+        from agent.core import consts as C
+        from agent.core import models
+
+        for case, body in (("missing", None), ("invalid JSON", "{ not json")):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as root:
+                if body is not None:
+                    target = Path(root) / C.models_file()
+                    target.parent.mkdir(parents=True)
+                    target.write_text(body, encoding="utf-8")
+                models.model_map.cache_clear()
+                try:
+                    with mock.patch.object(models, "CONSTS_PATH", Path(root) / "consts.json"):
+                        self.assertEqual(models.model_map(), {})
+                        self.assertEqual(
+                            models.model_info("claude-sonnet-5-5"),
+                            {
+                                "id": "claude-sonnet-5-5",
+                                "known": False,
+                                "provider": None,
+                                "family": None,
+                                "name": "claude-sonnet-5-5",
+                            },
+                        )
+                finally:
+                    models.model_map.cache_clear()
+
     def test_the_meeting_a_card_came_from_by_the_shared_table(self):
         """The `**From:**` footer line (docs/hub/cards.md, consts.json stamps.from):
         the meeting record an agenda line came from, by its file stem. NewPrompt -From
