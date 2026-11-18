@@ -182,6 +182,9 @@ class StatusMetadataTests(unittest.TestCase):
                 text = eol.join(row["lines"]) + eol
                 self.assertEqual(card_agent(text), row["expected"])
                 self.assertEqual(card_assigned(text), row["assigned"])
+                # The model carries it as the card's `agent`, beside `assigned`.
+                meta = _parse_status_metadata(text)
+                self.assertEqual((meta["agent"], meta["assigned"]), (row["expected"], row["assigned"]))
 
     def test_what_the_model_map_says_by_the_shared_table(self):
         """A card's Agent id looked up in the model map (consts.json models.file;
