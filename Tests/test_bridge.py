@@ -551,6 +551,8 @@ class StartWorkThroughTheBridge(unittest.TestCase):
         prompt = (PKG_ROOT / "agentic" / "build.prompt.md").read_text("utf-8").replace("\r\n", "\n").rstrip("\n")
         want = f"{golden}\n{prompt}"
         self.assertEqual(body["output"].replace("\r\n", "\n").strip("\n"), want)
+        # The hand-off asks an agent to name itself on the card (docs/hub/cards.md, "The Agent line").
+        self.assertIn("**Agent:**", body["output"])
 
     def test_a_refusal_is_an_error_with_the_verbs_sentence(self):
         self._config(True)
