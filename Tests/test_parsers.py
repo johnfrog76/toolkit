@@ -164,6 +164,110 @@ class StatusMetadataTests(unittest.TestCase):
                 # The model carries it as the card's `assigned`.
                 self.assertEqual(_parse_status_metadata(text)["assigned"], row["expected"])
 
+    def test_who_worked_a_card_by_the_shared_table(self):
+        """The `**Agent:**` footer line (docs/hub/cards.md, consts.json
+        stamps.agent): the model id of the agent that worked the card, beside the
+        Assigned line and read apart from it. The CLI reads it with
+        Get-P20CardAgent; tkTestToolkit -Triage asserts the SAME table,
+        Tests/fixtures/parsers/agent-lines.json, so the two readers cannot drift."""
+        import json
+
+        from agent.core.parsers import card_agent, card_assigned
+
+        table = json.loads((FIXTURES / "agent-lines.json").read_text(encoding="utf-8"))
+        self.assertGreaterEqual(len(table["rows"]), 10)
+        for row in table["rows"]:
+            with self.subTest(row=row["name"]):
+                eol = "\r\n" if row["crlf"] else "\n"
+                text = eol.join(row["lines"]) + eol
+                self.assertEqual(card_agent(text), row["expected"])
+                self.assertEqual(card_assigned(text), row["assigned"])
+                # The model carries it as the card's `agent`, beside `assigned`.
+                meta = _parse_status_metadata(text)
+                self.assertEqual((meta["agent"], meta["assigned"]), (row["expected"], row["assigned"]))
+
+    def test_what_the_model_map_says_by_the_shared_table(self):
+        """A card's Agent id looked up in the model map (consts.json models.file;
+        docs/hub/cards.md, "The Agent line"): provider, family and name from the
+        id's row, and an id with no row reported as written, never guessed at. The
+        CLI's Get-P20ModelInfo asserts the SAME table, Tests/fixtures/parsers/models.json."""
+        import json
+
+        from agent.core.models import model_info
+
+        table = json.loads((FIXTURES / "models.json").read_text(encoding="utf-8"))
+        self.assertGreaterEqual(len(table["rows"]), 5)
+        self.assertTrue(any(r["expected"]["known"] for r in table["rows"]))
+        self.assertTrue(any(not r["expected"]["known"] for r in table["rows"]))
+        for row in table["rows"]:
+            with self.subTest(row=row["name"]):
+                self.assertEqual(model_info(row["id"]), row["expected"])
+
+    def test_who_works_a_card_by_the_shared_table(self):
+        """The bridge reader of who works a card (standing in for the shared
+        resolver): a known Agent line's family, an unknown id as
+        written, else the Assigned value. The CLI's Get-P20CardWorker asserts the
+        SAME table, Tests/fixtures/parsers/card-worker.json."""
+        import json
+
+        from agent.core.parsers import card_worker
+
+        table = json.loads((FIXTURES / "card-worker.json").read_text(encoding="utf-8"))
+        self.assertGreaterEqual(len(table["rows"]), 7)
+        for row in table["rows"]:
+            with self.subTest(row=row["name"]):
+                eol = "\r\n" if row["crlf"] else "\n"
+                text = eol.join(row["lines"]) + eol
+                self.assertEqual(card_worker(text), row["expected"])
+
+    def test_what_a_worker_size_resolves_to_by_the_shared_table(self):
+        """A worker size is a family alias: the map's current block names the id it
+        resolves to when a card is routed to it. The CLI's Get-P20ModelForSize
+        asserts the SAME rows, Tests/fixtures/parsers/models.json's sizes."""
+        import json
+
+        from agent.core.models import current_model
+
+        table = json.loads((FIXTURES / "models.json").read_text(encoding="utf-8"))
+        self.assertGreaterEqual(len(table["sizes"]), 4)
+        for row in table["sizes"]:
+            with self.subTest(row=row["name"]):
+                self.assertEqual(current_model(row["size"]), row["expected"] or None)
+
+    def test_a_missing_or_broken_model_map_reads_as_empty(self):
+        """A missing or invalid Config/models.json is an EMPTY map: every id reads
+        unknown, as written, and nothing raises. A scratch package root stands in;
+        the real file is never touched."""
+        import tempfile
+        from unittest import mock
+
+        from agent.core import consts as C
+        from agent.core import models
+
+        for case, body in (("missing", None), ("invalid JSON", "{ not json")):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as root:
+                if body is not None:
+                    target = Path(root) / C.models_file()
+                    target.parent.mkdir(parents=True)
+                    target.write_text(body, encoding="utf-8")
+                models.model_map.cache_clear()
+                try:
+                    with mock.patch.object(models, "CONSTS_PATH", Path(root) / "consts.json"):
+                        self.assertEqual(models.model_map(), {})
+                        self.assertIsNone(models.current_model("sonnet"))
+                        self.assertEqual(
+                            models.model_info("claude-sonnet-5-5"),
+                            {
+                                "id": "claude-sonnet-5-5",
+                                "known": False,
+                                "provider": None,
+                                "family": None,
+                                "name": "claude-sonnet-5-5",
+                            },
+                        )
+                finally:
+                    models.model_map.cache_clear()
+
     def test_the_meeting_a_card_came_from_by_the_shared_table(self):
         """The `**From:**` footer line (docs/hub/cards.md, consts.json stamps.from):
         the meeting record an agenda line came from, by its file stem. NewPrompt -From

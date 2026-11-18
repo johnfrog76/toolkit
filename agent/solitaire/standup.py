@@ -104,7 +104,7 @@ from ..core.consts import (
     status_done,
     status_in_progress,
 )
-from ..core.parsers import _parse_status_metadata, card_assigned, card_billable, card_id, card_milestone, card_tags
+from ..core.parsers import _parse_status_metadata, card_billable, card_id, card_milestone, card_tags, card_worker
 from .tracker import read_tracker
 
 FEATURE = "solitaireAgile"
@@ -905,11 +905,13 @@ def read_cards(space_dir: Path, type_names: list[str], prefixes: list[str]) -> l
                     "commits": re_commit_bullet().findall(content),
                     # What the suggestion reads (suggest.py): the milestone its
                     # **Sprint:** line names, whole; its **Created:** day; its
-                    # Tags (a severity, a size); and who takes it.
+                    # Tags (a severity, a size); and who takes it -- its Agent
+                    # line's family, else its Assigned line (card_worker, the
+                    # bridge until the shared resolver lands).
                     "sprint": card_milestone(content),
                     "created": _stamp_day(content, stamp_created()),
                     "tags": card_tags(content),
-                    "assigned": card_assigned(content),
+                    "assigned": card_worker(content),
                 }
             )
     return rows
