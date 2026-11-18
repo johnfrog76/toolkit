@@ -546,13 +546,12 @@ file in the hub:
   which shell ran it.
 - **A file the tool CREATES is LF** -- `Write-CardText -New`, which normalises CRLF to LF once, in
   the writer. The switch is the contract: a create says so at the call site, and nothing else in the
-  package normalises. It has to be there because on a Windows clone the content arrives CRLF from
-  two directions at once -- `* text=auto` plus `core.autocrlf=true` checks `templates/*.template.md`
-  out CRLF, and checks the `.ps1` files whose here-strings build card bodies out CRLF too -- so a
-  writer that "wrote the string it was given" produced CRLF on the PC and LF on the Mac for the same
-  verb into the same hub.
-  Pinning `templates/*.md eol=lf` in `.gitattributes` would fix the template readers and leave the
-  here-string builders alone, so it is not the fix.
+  package normalises. The package's own `.gitattributes` checks every text file out LF
+  (`* text=auto eol=lf`), templates and the `.ps1` files whose here-strings build card bodies
+  included, so on a current clone the content already arrives LF. The writer still normalises,
+  because a clone that predates that line keeps its CRLF files until they are checked out again, and
+  a writer that "wrote the string it was given" would then produce CRLF on one machine and LF on
+  another for the same verb into the same hub.
 - **A file the tool EDITS keeps the line ending it already has** -- the same writer with no `-New`,
   which reads the bytes on disk and writes the new content in the terminator the file already uses
   (a file with any CRLF in it is CRLF; a mixed file comes out consistent). The writer decides, not

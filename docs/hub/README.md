@@ -8,6 +8,7 @@ own checkout -- and it need not be a git repository (`storeSync`, [Configuration
 <promptsRoot>/
   hub.json                  the hub's own orgs, folder names and storeSync   (optional)
   org.json                  the org chart: positions, seats, who sits where   (optional; read by OrgChart)
+  .gitattributes            LF line endings for every text file, on every machine  (Start writes it)
   <promptsFolder>/          ONE PER ORG -- its cards
     current/  backlog/  archive/   in play, planned, done
     assets/<card key>/      a card's pictures -- cover.png, before.png (Cover)

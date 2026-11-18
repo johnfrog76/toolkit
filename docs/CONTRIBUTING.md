@@ -238,7 +238,7 @@ is a finding like an error: the bar is zero of either.
 
 A Prettier failure names the files: fix them with `npx prettier --write <file>` (`npm run format` for all of `web/src`), then run `npm run lint` again.
 
-`.gitattributes` pins `web/src` to LF on disk, which is what Prettier's `endOfLine` expects, so a Windows checkout with `core.autocrlf` true passes `--check`. A clone that predates that line keeps its CRLF files until they are checked out again.
+`.gitattributes` checks out every text file LF on every platform (`* text=auto eol=lf`), which is what Prettier's `endOfLine` expects, so a Windows checkout with `core.autocrlf` true passes `--check`, and a test that reads the package's own source reads the same bytes everywhere. A clone that predates that line keeps its CRLF files until they are checked out again.
 
 ruff covers `agent/` and the suites in `Tests/*.py`, the repository's only Python, and comes with
 `agent/requirements-dev.txt`, pinned exactly. The line is 120 for the formatter and for `E501` alike. The rules
