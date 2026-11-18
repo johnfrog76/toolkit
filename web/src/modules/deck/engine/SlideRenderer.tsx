@@ -143,8 +143,16 @@ export function SlideRenderer({
       {hasContent && (
         <div
           // key per slide forces a remount so stateful visuals (e.g. the
-          // ShellEmbed run result) reset to a clean state on arrival.
-          key={`content-${slideIndex}`}
+          // ShellEmbed run result) reset to a clean state on arrival. That is
+          // the default, and every deck that says nothing gets it. A slide may
+          // opt out with `contentKey` (decks/types.ts): slides that share one
+          // share this panel, and their content is reconciled, not remounted --
+          // for a deck that is one scene changing a little a slide. The two
+          // kinds of key are spelled apart, so a contentKey can never equal an
+          // index's key.
+          key={
+            slide.contentKey !== undefined ? `scene-${slide.contentKey}` : `content-${slideIndex}`
+          }
           style={
             stacked
               ? {

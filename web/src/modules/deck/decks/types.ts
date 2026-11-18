@@ -24,6 +24,16 @@ export interface Slide {
    * derive it from the Say text. See "../deck-components/deckDuration".
    */
   approximateTime?: string;
+  /**
+   * Opt in to keeping this slide's `content` mounted across slides. By default
+   * the engine remounts the content panel on every slide, so a stateful visual
+   * arrives clean. Consecutive slides that carry the SAME `contentKey` share
+   * one mounted panel instead: React reconciles the new content into the old,
+   * so whatever is unchanged between them keeps its DOM nodes, its state and
+   * its running animations. For a deck whose slides are one scene that changes
+   * a little at a time. A slide with a different key, or with none, remounts.
+   */
+  contentKey?: string;
 }
 
 /**
