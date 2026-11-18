@@ -210,9 +210,10 @@ which is why the lead keeps one line by rewriting it rather than adding another.
 `Tests/fixtures/parsers/models.json` holds the two lookups to one table. The card keeps the id; a reader
 that shows it shows the map's name.
 
-The standup, the suggestion and `StartWork -Launch` read a card's worker from its Agent line -- the known
-id's family -- else from its Assigned line (`Get-P20CardWorker`, `card_worker`, held to
-`Tests/fixtures/parsers/card-worker.json`).
+The standup, the suggestion and `StartWork -Launch` read a card's worker through the one reader of a card's
+agent ([below](#how-a-cards-agent-is-worked-out)): its Agent line -- the known id's family, an unknown id as
+written -- else an older card's Assigned worker; `StartWork -Launch` reads those two sources alone. A card
+neither names keeps its Assigned line as written (`me`, an `@<login>`), as before.
 
 ### Milestone and sprint: two lines
 

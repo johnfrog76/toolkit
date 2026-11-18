@@ -105,14 +105,16 @@ from ..core.consts import (
     status_done,
     status_in_progress,
 )
+from ..core.models import read_model_current, read_model_map
 from ..core.parsers import (
     _parse_status_metadata,
     card_agent,
+    card_assigned,
     card_billable,
     card_id,
     card_milestone,
     card_tags,
-    card_worker,
+    resolve_card_agent,
 )
 from .tracker import read_tracker
 
@@ -1026,6 +1028,8 @@ def read_cards(space_dir: Path, type_names: list[str], prefixes: list[str]) -> l
     in ``archive/`` is Done and carries its Closed stamp's day."""
     rows: list[dict] = []
     closed_rx = re_closed_stamp_date()
+    # The model map and its current block, read once for every card.
+    model_rows, sizes = read_model_map(), read_model_current()
     for folder in (folder_current(), folder_archive()):
         d = space_dir / folder
         if not d.is_dir():
@@ -1062,13 +1066,16 @@ def read_cards(space_dir: Path, type_names: list[str], prefixes: list[str]) -> l
                     "commits": re_commit_bullet().findall(content),
                     # What the suggestion reads (suggest.py): the milestone its
                     # **Sprint:** line names, whole; its **Created:** day; its
-                    # Tags (a severity, a size); and who takes it -- its Agent
-                    # line's family, else its Assigned line (card_worker, the
-                    # bridge until the shared resolver, issue #500, lands).
+                    # Tags (a severity, a size); and who takes it -- the card's
+                    # agent's family by the one reader (resolve_card_agent, the
+                    # shipped order, no messages: its Agent line, else an older
+                    # card's Assigned worker), else its Assigned line as written
+                    # (``me``, an ``@<login>``, or "").
                     "sprint": card_milestone(content),
                     "created": _stamp_day(content, stamp_created()),
                     "tags": card_tags(content),
-                    "assigned": card_worker(content),
+                    "assigned": resolve_card_agent(content, "", None, model_rows, None, current=sizes)["family"]
+                    or card_assigned(content),
                 }
             )
     return rows

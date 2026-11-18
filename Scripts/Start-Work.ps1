@@ -551,13 +551,16 @@ if ($Launch) {
         }
     }
     else {
-        # Who works it: its Agent line's family, else its Assigned line
-        # (Get-P20CardWorker, the bridge until the shared resolver, issue #500, lands).
-        $assigned = Get-P20CardWorker $content -PackageRoot $repoRoot
+        # Who works it: the card's agent by the one reader (Resolve-P20CardAgent),
+        # its Agent line then an older card's Assigned worker -- no trailers, no
+        # tracker read -- else its Assigned line as written (me, an @<login>).
+        $who = Resolve-P20CardAgent -Content $content -Models (Get-P20ModelMap -PackageRoot $repoRoot) -Current (Get-P20ModelCurrent -PackageRoot $repoRoot) -Order @('line', 'assigned')
+        $assigned = [string]$who.family
+        if (-not $assigned) { $assigned = Get-P20CardAssigned -Content $content }
         if ($assigned) {
             $size = $assigned
             $sizeFrom = 'its **Assigned:** line'
-            if (Get-P20CardAgent $content) { $sizeFrom = "its $([string](Get-P20Consts).stamps.agent) line" }
+            if ([string]$who.source -ceq 'line') { $sizeFrom = "its $([string](Get-P20Consts).stamps.agent) line" }
         }
         if (-not $size) {
             foreach ($tag in @(Get-P20CardTags $content)) {

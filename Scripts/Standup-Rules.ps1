@@ -1001,6 +1001,9 @@ function Get-P20StandupCards {
     $startedRx = '(?m)^' + [regex]::Escape([string]$c.stamps.started) + '\s*(\d{4}-\d{2}-\d{2})'
     $createdRx = '(?m)^' + [regex]::Escape([string]$c.stamps.created) + '\s*(\d{4}-\d{2}-\d{2})'
     $hashRx = [string]$c.regex.commitBullet
+    # The model map and its current block, read once for every card.
+    $modelMap = Get-P20ModelMap
+    $modelCurrent = Get-P20ModelCurrent
     $rows = New-Object System.Collections.ArrayList
     foreach ($pair in @(@([string]$c.folders.current, $CurrentDir), @([string]$c.folders.archive, $ArchiveDir))) {
         $folder = $pair[0]
@@ -1010,6 +1013,8 @@ function Get-P20StandupCards {
             $id = Get-P20CardId -Name $f.Name -Pattern $Pattern
             if (-not $id) { continue }
             $content = [System.IO.File]::ReadAllText($f.FullName)
+            $who = [string](Resolve-P20CardAgent -Content $content -Models $modelMap -Current $modelCurrent).family
+            if (-not $who) { $who = Get-P20CardAssigned -Content $content }
             $closed = $null
             $begun = $null
             $bm = [regex]::Match($content, $startedRx)
@@ -1041,13 +1046,15 @@ function Get-P20StandupCards {
                     commits  = [object[]]$hashes
                     # What the suggestion reads (Suggest-Rules.ps1): the milestone its
                     # **Sprint:** line names, whole; its **Created:** day; its Tags
-                    # (a severity, a size); and who takes it -- its Agent line's
-                    # family, else its Assigned line (Get-P20CardWorker, the
-                    # bridge until the shared resolver, issue #500, lands).
+                    # (a severity, a size); and who takes it -- the card's agent's
+                    # family by the one reader (Resolve-P20CardAgent, the shipped
+                    # order, no messages: its Agent line, else an older card's
+                    # Assigned worker), else its Assigned line as written (me, an
+                    # @<login>, or '').
                     sprint   = (Get-P20CardMilestone $content)
                     created  = $created
                     tags     = [object[]]@(Get-P20CardTags $content)
-                    assigned = (Get-P20CardWorker $content)
+                    assigned = $who
                 })
         }
     }

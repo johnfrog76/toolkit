@@ -45,10 +45,7 @@ from .consts import (
     token_previous_round,
     token_tags,
 )
-
-# The model map: card_worker takes a known Agent id's family from it (it reads
-# consts only, so the import is not a cycle).
-from .models import model_by_co_author, model_info, read_model_current, read_model_map
+from .models import model_by_co_author, read_model_current, read_model_map
 
 # The state vocabulary and the two patterns that derive it come from
 # consts.json, the package's contract file -- NOT from literals here. This
@@ -376,26 +373,6 @@ def resolve_card_agent(
         elif source == "none":
             break
     return {"id": None, "family": None, "source": "none"}
-
-
-def card_worker(content: str) -> str:
-    """Who works the card, as a FAMILY-shaped string the standup, the suggestion
-    and StartWork -Launch compare against sizes: when the card has an
-    ``**Agent:**`` line, the model map's family for its id if the id is known,
-    else the id as written; with no Agent line, exactly ``card_assigned``'s value,
-    as those readers took it before (a size, ``me``, or "").
-
-    A BRIDGE: it stands in for the shared resolver of a card's agent
-    (``resolve_card_agent``, issue #500) until that lands, and that change
-    removes it. Its one caller in this half is the standup's card rows
-    (``agent/solitaire/standup.py``); add none. The CLI's mirror is
-    ``Get-P20CardWorker``, and ``Tests/fixtures/parsers/card-worker.json`` holds
-    the two to one table."""
-    agent_id = card_agent(content)
-    if not agent_id:
-        return card_assigned(content)
-    info = model_info(agent_id)
-    return str(info["family"]) if info["known"] and info["family"] else agent_id
 
 
 def card_from_record(content: str) -> str | None:

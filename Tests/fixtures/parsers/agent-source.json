@@ -1410,6 +1410,126 @@
         "family": "sonnet",
         "source": "line"
       }
+    },
+    {
+      "name": "a known Agent line with no Assigned line: its family",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Agent:** claude-sonnet-5-5",
+        "**Created:** 2026-10-17"
+      ],
+      "label": "",
+      "messages": null,
+      "expected": {
+        "id": "claude-sonnet-5-5",
+        "family": "sonnet",
+        "source": "line"
+      }
+    },
+    {
+      "name": "an unknown id on the Agent line and nothing else: as written",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Agent:** some-new-model-1",
+        "**Created:** 2026-10-17"
+      ],
+      "label": "",
+      "messages": null,
+      "expected": {
+        "id": "some-new-model-1",
+        "family": "some-new-model-1",
+        "source": "line"
+      }
+    },
+    {
+      "name": "Assigned opus and no Agent line: the size's current model",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Assigned:** opus",
+        "**Created:** 2026-10-17"
+      ],
+      "label": "",
+      "messages": null,
+      "expected": {
+        "id": "claude-opus-5-5",
+        "family": "opus",
+        "source": "assigned"
+      }
+    },
+    {
+      "name": "Assigned me and nothing else: none, the Assigned line is the caller's",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Assigned:** me",
+        "**Created:** 2026-10-17"
+      ],
+      "label": "",
+      "messages": null,
+      "expected": {
+        "id": null,
+        "family": null,
+        "source": "none"
+      }
+    },
+    {
+      "name": "no line at all: none",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Created:** 2026-10-17"
+      ],
+      "label": "",
+      "messages": null,
+      "expected": {
+        "id": null,
+        "family": null,
+        "source": "none"
+      }
+    },
+    {
+      "name": "Assigned me with an Agent line: the line's family",
+      "crlf": false,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Assigned:** me",
+        "**Agent:** claude-opus-5-5",
+        "**Created:** 2026-10-17"
+      ],
+      "label": "",
+      "messages": null,
+      "expected": {
+        "id": "claude-opus-5-5",
+        "family": "opus",
+        "source": "line"
+      }
+    },
+    {
+      "name": "Assigned me with an Agent line, CRLF: the line's family",
+      "crlf": true,
+      "lines": [
+        "# Task K7M2: Bench notes",
+        "",
+        "**Assigned:** me",
+        "**Agent:** claude-fable-5-2",
+        "**Created:** 2026-10-17"
+      ],
+      "label": "",
+      "messages": null,
+      "expected": {
+        "id": "claude-fable-5-2",
+        "family": "fable",
+        "source": "line"
+      }
     }
   ],
   "coAuthors": [
