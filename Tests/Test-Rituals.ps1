@@ -628,6 +628,9 @@ Assert-True 'no card in play: the engineer takes the round''s first turn' ([stri
 $together = @($joinedCases | Where-Object { $_.name -eq 'together' })[0]
 $downFill = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @($joinedTable.workerLabels) -Issues @($together.issues) -Tracker @{ ok = $false; reason = 'gh did not answer' } -Cards @($together.cards) -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
 Assert-True 'the tracker not answering: the Tracker line, no worker, no Check line, no link' ($downFill.source -ceq 'none' -and @($downFill.workers).Count -eq 0 -and @($downFill.checks).Count -eq 0 -and @($downFill.links).Count -eq 0)
+$slugged = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @([pscustomobject]@{ name = 'opus'; description = 'Routed to Opus' }) -Issues @() -Tracker @{ ok = $true; reason = '' } -Cards @() -Space 'opus' -SpaceName 'Opus' -PackageRoot $pkgRoot
+$sluggedBrief = Format-P20StandupBrief -Standup $slugged
+Assert-True 'a Space slugged as its only worker label still has a worker label: the in-flight line, not noWorkers' ($sluggedBrief.Contains([string]$consts.rituals.text.briefInFlightUnknown) -and -not $sluggedBrief.Contains([string]$consts.rituals.text.noWorkers))
 $rounds = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @($joinedTable.workerLabels) -Tracker @{ ok = $true; reason = '' } -Space 'widgets' -PackageRoot $pkgRoot `
     -Issues @([pscustomobject]@{ number = 141; title = 'Build'; state = 'OPEN'; labels = @('opus'); closedAt = $null }) `
     -Cards @([pscustomobject]@{ file = '141-build-r1.prompt.md'; folder = 'archive'; status = 'Done'; closed = '2026-09-01'; id = '141' },

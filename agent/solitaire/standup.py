@@ -2306,8 +2306,8 @@ def render_brief(filled: Standup) -> str:
             bits.append(t["blockersEmpty"])
         lines.append(f"{w.name}: {', '.join(bits)}.")
     # The line the members end on is about the tracker: with no worker label the Space routes nothing,
-    # the engineer (the Space itself, on a joined read) notwithstanding.
-    labelled = [w for w in filled.workers if not (filled.source == "both" and w.label == filled.space)]
+    # the engineer notwithstanding: on a joined read it is the record's last member, the card tile.
+    labelled = filled.workers[:-1] if filled.source == "both" else filled.workers
     if not filled.workers or (issues and not labelled):
         lines.append(t["noWorkers"])
     elif issues:
