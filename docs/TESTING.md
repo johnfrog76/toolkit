@@ -395,7 +395,11 @@ isolated run that was stopped.` for each one it removes. The sweep takes a folde
 - the process id in its name is not alive, so a run that is still going is never removed. An id the system has
   reused keeps a dead run's folder until that process ends, which errs on the side of leaving it.
 
-The age, the marker's name and the line are in `Get-P20IsolatedRunPrefix` (`Scripts/TestAll-Isolated.ps1`).
+A folder kept by an earlier version has no marker; touch `.p20-kept` inside it to keep it.
+
+The age, the marker's name and the line are in `Get-P20IsolatedRunPrefix` (`Scripts/TestAll-Isolated.ps1`). It also
+holds the sweep's folder, `/tmp` unless `P20_ISOLATED_SWEEP_BASE` names another: the suite's own seam, so a stubbed run
+never sweeps the real `/tmp`.
 
 **A known limit: the shell you type it in.** Only the child is isolated. The PowerShell that runs
 `tkTest -Isolated` itself started before the switch was read, so it read the real home's startup caches, and it
