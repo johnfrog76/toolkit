@@ -902,9 +902,10 @@ exit 0
         }
 
         # A stale run folder planted in the REAL /tmp must survive a stubbed run;
-        # one planted in the scratch sweep base is the one it removes.
-        $realStale = Join-Path (Get-P20IsolatedRunPrefix).Base 'p20-isolated-99999999-zzzz9999'
-        $scratchStale = Join-Path $sweepSeamBase 'p20-isolated-99999999-yyyy8888'
+        # one planted in the scratch sweep base is the one it removes. Each name
+        # carries a random part, so two runs of this suite never share a folder.
+        $realStale = Join-Path (Get-P20IsolatedRunPrefix).Base (Get-P20IsolatedRunName -ProcessId 99999999)
+        $scratchStale = Join-Path $sweepSeamBase (Get-P20IsolatedRunName -ProcessId 99999999)
         try {
             foreach ($d in @($realStale, $scratchStale)) {
                 New-Item -ItemType Directory -Path $d -Force | Out-Null
