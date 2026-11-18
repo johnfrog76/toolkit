@@ -20,7 +20,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
@@ -63,6 +63,43 @@ def _fill(case: dict, size=None) -> "standup.Standup":
     )
     filled.text = standup.render_standup(filled)
     return filled
+
+
+def _fill_route(case: dict, size=None) -> "standup.Standup":
+    """What the route fills for the toolkit Space with no card in its folders: the
+    joined fill over the case's read -- the labelled workers' rows, and the
+    engineer's, idle, named for the Space (its slug: the test Space has no name)."""
+    filled = standup.fill_joined_standup(
+        datetime.fromisoformat(case["asOf"]),
+        _labels(case),
+        case["issues"],
+        case["tracker"],
+        [],
+        space="toolkit",
+        size=size,
+    )
+    filled.text = standup.render_standup(filled)
+    return filled
+
+
+def _less_engineer(text: str, name: str) -> str:
+    """A rendering with the engineer's rows set aside: the detail's block under
+    ``name`` (the name line and its indented rows) and the brief's ``name: ...``
+    line. What is left is the labelled workers' own, which the issues fill's
+    goldens hold byte for byte."""
+    out: list[str] = []
+    skipping = False
+    for line in text.split("\n"):
+        if line == name:
+            skipping = True
+            continue
+        if skipping and line.startswith("  "):
+            continue
+        skipping = False
+        if line.startswith(name + ": "):
+            continue
+        out.append(line)
+    return "\n".join(out)
 
 
 REASONS = json.loads((FIXTURES / "tracker-reasons.json").read_text(encoding="utf-8"))
@@ -801,8 +838,10 @@ class TheJoinedTable(unittest.TestCase):
                     (filled.text, filled.work.text, filled.brief),
                 )
 
-    def test_with_no_card_in_play_it_reads_as_the_issues_alone(self):
-        """No card: the issues fill's own text, brief and work, only the source says both."""
+    def test_with_no_card_in_play_it_reads_as_the_issues_and_the_idle_engineer(self):
+        """No card: the issues fill's own rows, then the engineer's -- idle, with a
+        made-up Status row as an idle labelled worker has -- and the source says both.
+        The engineer takes the round's first turn."""
         friday = CASES["friday"]
         at = datetime.fromisoformat(friday["asOf"])
         alone = standup.fill_standup(at, _labels(friday), friday["issues"], friday["tracker"], space="toolkit")
@@ -810,10 +849,25 @@ class TheJoinedTable(unittest.TestCase):
             at, _labels(friday), friday["issues"], friday["tracker"], [], space="toolkit", space_name="Toolkit"
         )
         self.assertEqual(joined.source, "both")
+        self.assertEqual([w.model_dump() for w in joined.workers[:-1]], [w.model_dump() for w in alone.workers])
+        engineer = joined.workers[-1]
+        n, d = len(alone.workers), at.timetuple().tm_yday
+        self.assertEqual(
+            (engineer.label, engineer.name, engineer.empty, engineer.present), ("toolkit", "Toolkit", True, True)
+        )
+        self.assertEqual(
+            engineer.status,
+            [
+                VOCAB["nothing"][(d + n) % len(VOCAB["nothing"])],
+                VOCAB["nothingToday"][(d + n) % len(VOCAB["nothingToday"])],
+            ],
+        )
         for render in (standup.render_standup, standup.render_brief):
             with self.subTest(render=render.__name__):
-                self.assertEqual(render(joined), render(alone))
-        self.assertEqual(joined.work.model_dump(), alone.work.model_dump())
+                self.assertNotEqual(render(joined), render(alone))
+                self.assertEqual(_less_engineer(render(joined), "Toolkit"), render(alone))
+        self.assertEqual(joined.work.workers[0].label, "toolkit")
+        self.assertEqual(joined.work.queue.model_dump(), alone.work.queue.model_dump())
 
     def test_the_tracker_not_answering_is_the_tracker_line_and_no_card(self):
         filled = _fill_joined(JOINED_CASES["together"], {"ok": False, "reason": "gh did not answer"})
@@ -879,9 +933,14 @@ class TheWorkTable(unittest.TestCase):
         for name, case in WORK_CASES.items():
             filled = _fill_work(case)
             want = case["expected"]["workers"]
+            # The table's rows are the members'; the invented cast members that fill
+            # the room follow them, with no group: the golden text holds their lines.
+            members = [w for w in filled.work.workers if not w.cast]
+            invented = filled.work.workers[len(members) :]
             with self.subTest(case=name, what="order"):
-                self.assertEqual([w.label for w in filled.work.workers], [w["label"] for w in want])
-            for got, exp in zip(filled.work.workers, want):
+                self.assertEqual([w.label for w in members], [w["label"] for w in want])
+                self.assertTrue(all(w.cast and not (w.yesterday or w.today or w.blockers) for w in invented))
+            for got, exp in zip(members, want):
                 for slot in ("yesterday", "today", "blockers"):
                     with self.subTest(case=name, worker=exp["label"], slot=slot):
                         self.assertEqual([g.model_dump() for g in getattr(got, slot)], exp[slot])
@@ -1013,7 +1072,7 @@ class TheProseTable(unittest.TestCase):
         unsaid = {t["proseYesterdayNone"], t["proseTodayNone"]}
         for name, case in PROSE_CASES.items():
             filled = _fill_prose(case)
-            grained = {w.label: w for w in filled.work.workers}
+            grained = {w.label: w for w in filled.work.workers if not w.cast}
             for w in (w for w in filled.workers if w.present and not w.empty):
                 prose = grained[w.label].prose
                 with self.subTest(case=name, worker=w.label):
@@ -1085,9 +1144,19 @@ class TheProseTable(unittest.TestCase):
 
     def test_each_workers_sentences(self):
         for name, case in PROSE_CASES.items():
-            got = [{"label": w.label, "prose": w.prose} for w in _fill_prose(case).work.workers]
+            # The table's rows are the members'; an invented cast member says two
+            # made-up items in the same frame, and the golden text holds its line.
+            t = C.rituals_text()
+            spoken = _fill_prose(case).work.workers
+            got = [{"label": w.label, "prose": w.prose} for w in spoken if not w.cast]
             with self.subTest(case=name):
                 self.assertEqual(got, case["expected"]["workers"])
+                for w in (w for w in spoken if w.cast):
+                    self.assertEqual(
+                        (w.prose[0], w.prose[3:]), (t["turnOpen"], [t["proseBlockersNone"], t["turnClose"]])
+                    )
+                    self.assertIn(w.prose[1], VOCAB["nothing"])
+                    self.assertIn(w.prose[2], VOCAB["nothingToday"])
 
     def test_the_chairs_own_turn(self):
         """The chair gives its status last, in the workers' frame and its own first
@@ -1241,29 +1310,55 @@ TEAM_TABLE = json.loads((FIXTURES / "standup-team.json").read_text(encoding="utf
 
 
 def _fill_team(case: dict) -> "standup.Standup":
-    """A standup-team.json case: the issues fill over the table's labels with its stored teamSize."""
-    filled = standup.fill_standup(
-        datetime.fromisoformat(case["asOf"]),
-        TEAM_TABLE["workerLabels"],
-        case["issues"],
-        {"ok": True, "reason": ""},
-        space="widgets",
-        size=case["teamSize"],
-    )
+    """A standup-team.json case with its stored teamSize: the issues fill over the
+    table's labels, or -- for a case that states ``cards`` -- the joined fill over
+    its own labels, issues and cards."""
+    at = datetime.fromisoformat(case["asOf"])
+    ok = {"ok": True, "reason": ""}
+    if "cards" in case:
+        filled = standup.fill_joined_standup(
+            at,
+            case["labels"],
+            case["issues"],
+            ok,
+            case["cards"],
+            space=case["space"],
+            space_name=case["spaceName"],
+            size=case["teamSize"],
+        )
+    else:
+        filled = standup.fill_standup(
+            at, TEAM_TABLE["workerLabels"], case["issues"], ok, space="widgets", size=case["teamSize"]
+        )
     filled.text = standup.render_standup(filled)
     filled.work.text = standup.render_work(filled)
     filled.brief = standup.render_brief(filled)
     return filled
 
 
+def _room(row: dict) -> dict:
+    """A ``room`` or ``seats`` row through ``room_seats``."""
+    engineer = row.get("engineer")
+    return standup.room_seats(
+        row["size"],
+        (engineer["label"], engineer["empty"]) if engineer else None,
+        [(w["label"], w["empty"]) for w in row.get("labels", row.get("workers", []))],
+    )
+
+
 class TheTeamTable(unittest.TestCase):
     """Every row of standup-team.json -- the same rows tkTestToolkit -Rituals asserts
-    against Get-P20TeamSize, Set-P20StandupPresent and Invoke-P20StandupFill."""
+    against Get-P20TeamSize, Get-P20StandupRoomSeats, Invoke-P20StandupFill and
+    Invoke-P20StandupJoinedFill."""
 
     def test_the_table_has_its_sections(self):
         self.assertGreaterEqual(len(TEAM_TABLE["sizes"]), 8)
         self.assertGreaterEqual(len(TEAM_TABLE["seats"]), 6)
-        self.assertEqual({c["name"] for c in TEAM_TABLE["cases"]}, {"absent", "idle-sits", "unset", "work-unsaid"})
+        self.assertGreaterEqual(len(TEAM_TABLE["room"]), 16)
+        self.assertEqual(
+            {c["name"] for c in TEAM_TABLE["cases"]},
+            {"absent", "idle-sits", "unset", "work-unsaid", "walk-size-3", "walk-size-6", "walk-size-9", "idle-room"},
+        )
 
     def test_every_size_row(self):
         for row in TEAM_TABLE["sizes"]:
@@ -1277,12 +1372,53 @@ class TheTeamTable(unittest.TestCase):
             self.assertEqual(standup.team_size(n), n)
 
     def test_every_seat_row(self):
+        """Labels only: who sits, said in the workers' own order."""
         for row in TEAM_TABLE["seats"]:
             with self.subTest(row=row["name"]):
-                workers = [standup.Worker(label=w["label"], name=w["label"], empty=w["empty"]) for w in row["workers"]]
-                standup.set_present(workers, row["size"])
-                self.assertEqual([w.label for w in workers], [w["label"] for w in row["workers"]], "the order is kept")
-                self.assertEqual([w.label for w in workers if w.present], row["present"])
+                seated = _room(row)["present"]
+                self.assertEqual([w["label"] for w in row["workers"] if w["label"] in seated], row["present"])
+
+    def test_every_room_row(self):
+        """The size is the team: who sits, each speaker's window, and the desks left."""
+        for row in TEAM_TABLE["room"]:
+            with self.subTest(row=row["name"]):
+                got = _room(row)
+                self.assertEqual(got["present"], row["present"])
+                self.assertEqual(got["round"], row["round"])
+                self.assertEqual(got["desks"], row["desks"])
+
+    def test_every_room_row_fills_the_seats_it_can(self):
+        """Every seat the size counts is filled -- by a member, or by an invented cast
+        member -- so the desks are the windows past the size; nobody shares a window
+        or a label, and the chair's window is never a member's."""
+        room = C.rituals_room()
+        members = [w["id"] for w in room["windows"] if w["id"] != room["chair"]]
+        for row in TEAM_TABLE["room"]:
+            with self.subTest(row=row["name"]):
+                seats = row["size"] - 1
+                windows = [r["window"] for r in row["round"]]
+                self.assertEqual(len(row["round"]), seats)
+                self.assertEqual(len(row["desks"]), len(members) - seats)
+                self.assertEqual(sorted(windows + row["desks"]), sorted(members))
+                self.assertEqual(len({r["label"] for r in row["round"]}), seats)
+                everyone = len(row["labels"]) + (1 if row["engineer"] else 0)
+                self.assertEqual(sum(1 for r in row["round"] if r["cast"]), max(seats - everyone, 0))
+                self.assertTrue(all(r["window"] == r["label"] for r in row["round"] if r["cast"]))
+
+    def test_the_walk_rows_are_the_three_rooms(self):
+        """A Space with no worker labels whose engineer has work, at 3, 6 and 9: the
+        chair, the engineer, and 1, 4 and 7 invented cast members; 6, 3 and 0 desks."""
+        rows = {r["size"]: r for r in TEAM_TABLE["room"] if r["name"].startswith("walk-size-")}
+        self.assertEqual(sorted(rows), [3, 6, 9])
+        for size, row in rows.items():
+            with self.subTest(size=size):
+                self.assertEqual(row["engineer"], {"label": "widgets", "empty": False})
+                self.assertEqual(row["labels"], [])
+                self.assertEqual(
+                    row["round"][0], {"label": "widgets", "cast": False, "window": C.rituals_room()["engineer"]}
+                )
+                self.assertEqual(sum(1 for r in row["round"] if r["cast"]), size - 2)
+                self.assertEqual(len(row["desks"]), 9 - size)
 
     def test_every_case_end_to_end(self):
         for case in TEAM_TABLE["cases"]:
@@ -1294,18 +1430,59 @@ class TheTeamTable(unittest.TestCase):
                     {"label": w.label, "name": w.name, "empty": w.empty, "present": w.present} for w in filled.workers
                 ]
                 self.assertEqual(got, exp["workers"])
-                # The round is the present only, in the workers' order.
+                # The round: the seated in seat order, then the invented cast members.
+                spoken = [{"label": w.label, "name": w.name, "cast": w.cast} for w in filled.work.workers]
+                self.assertEqual(spoken, exp["round"])
                 self.assertEqual(
-                    [w.label for w in filled.work.workers], [w["label"] for w in exp["workers"] if w["present"]]
+                    {w["label"] for w in spoken if not w["cast"]}, {w["label"] for w in exp["workers"] if w["present"]}
                 )
-                # The counts keep every worker.
+                self.assertEqual(len(spoken), min(filled.team.size - 1, 8) if len(spoken) > len(got) else len(spoken))
+                # The counts keep every worker of the record, and never an invented one.
                 self.assertEqual([c.label for c in filled.counts.workers], [w["label"] for w in exp["workers"]])
                 self.assertEqual(filled.text, _golden(exp["text"]))
                 self.assertEqual(filled.work.text, _golden(exp["work"]))
                 self.assertEqual(filled.brief, _golden(exp["brief"]))
-                # The dress is offered the present only: an absent worker's facts are never asked for.
+                # An invented cast member is in the round only: not in the detail, not in the brief.
+                for w in (w for w in spoken if w["cast"]):
+                    self.assertIn(w["name"] + ": ", filled.work.text)
+                    self.assertNotIn(w["name"], filled.text)
+                    self.assertNotIn(w["name"], filled.brief)
+                # The dress is offered the seated members only: never an absent worker's
+                # facts, never an invented cast member's.
                 said = {f["id"].split("/")[0] for f in standup.dress_facts(filled)}
                 self.assertTrue(said <= {w["label"] for w in exp["workers"] if w["present"]}, said)
+
+    def test_the_walk_cases_seat_the_three_rooms(self):
+        """On a Space with no worker labels: at 9 the chair, the engineer and seven
+        invented members with no empty desk; at 6 three desks; at 3 six."""
+        for size, invented in ((3, 1), (6, 4), (9, 7)):
+            case = next(c for c in TEAM_TABLE["cases"] if c["name"] == f"walk-size-{size}")
+            filled = _fill_team(case)
+            with self.subTest(size=size):
+                self.assertEqual([w.label for w in filled.workers], ["widgets"])
+                self.assertEqual([w.cast for w in filled.work.workers], [False] + [True] * invented)
+                self.assertEqual(8 - len(filled.work.workers), 9 - size, "the empty desks")
+                self.assertIn("Today I'm on R4T7, Wire the export.", filled.work.workers[0].prose)
+
+    def test_a_full_idle_room_never_repeats_a_made_up_line(self):
+        """Eight idle members -- the engineer and seven invented -- say two different
+        made-up items each, none repeated on one day, and the chair's own made-up
+        yesterday is none of them: every day of a year, leap day included."""
+        case = next(c for c in TEAM_TABLE["cases"] if c["name"] == "idle-room")
+        self.assertEqual(len(_fill_team(case).work.workers), 8)
+        for day in range(367):
+            at = datetime.fromisoformat("2028-01-01T09:00:00-05:00") + timedelta(days=day)
+            filled = _fill_team({**case, "asOf": at.isoformat()})
+            members = filled.work.workers
+            lines = [line for w in members for line in w.prose[1:3]]
+            with self.subTest(day=at.date().isoformat()):
+                self.assertEqual(len(members), 8)
+                self.assertEqual(len(set(lines)), 16, lines)
+                self.assertTrue(
+                    all(w.prose[1] in VOCAB["nothing"] and w.prose[2] in VOCAB["nothingToday"] for w in members)
+                )
+                self.assertIn(filled.work.chairProse[1], VOCAB["nothing"])
+                self.assertNotIn(filled.work.chairProse[1], lines)
 
     def test_an_absent_worker_keeps_its_made_up_items_by_its_label_position(self):
         """The idle pick's i is the worker's place in the label order, whoever is absent:
@@ -1315,9 +1492,20 @@ class TheTeamTable(unittest.TestCase):
         whole = _fill_team({**case, "teamSize": None})
         self.assertEqual([w.status for w in small.workers], [w.status for w in whole.workers])
 
-    def test_the_cards_tile_and_the_joined_tile_are_seated_too(self):
+    def test_the_cards_fill_seats_the_engineer_and_fills_the_room(self):
         cards = standup.fill_cards_standup(datetime.fromisoformat("2026-10-02T09:00:00-04:00"), [], space="s", size=3)
         self.assertEqual((cards.team.size, [w.present for w in cards.workers]), (3, [True]))
+        self.assertEqual([(w.label, w.cast) for w in cards.work.workers], [("s", False), ("ops-dev", True)])
+
+    def test_a_standup_nobody_seated_speaks_its_present_workers(self):
+        """A reading that carries no round -- read back from JSON -- speaks the workers
+        marked present, in their order."""
+        case = next(c for c in TEAM_TABLE["cases"] if c["name"] == "absent")
+        filled = _fill_team(case)
+        back = standup.Standup.model_validate(json.loads(filled.model_dump_json(by_alias=True)))
+        self.assertEqual(standup.render_work(back), filled.work.text)
+        again = standup.build_work(back, {})
+        self.assertEqual([w.label for w in again.workers], [w.label for w in back.workers if w.present])
 
 
 class TheDressTable(unittest.TestCase):
@@ -2098,12 +2286,12 @@ class TheRoute(unittest.TestCase):
     def test_no_model_key_is_spoken_null_and_the_prose_stands(self):
         body = self._get("/api/ritual/standup?space=toolkit")[0].json()
         self.assertIsNone(body["spoken"])
-        filled = _fill(CASES["friday"], self.room)
+        filled = _fill_route(CASES["friday"], self.room)
         filled.work.text = standup.render_work(filled)
         self.assertEqual(body["work"]["text"], filled.work.text)
 
     def test_a_model_that_answers_is_spoken_beside_work_and_text_and_brief_are_untouched(self):
-        filled = _fill(CASES["friday"], self.room)
+        filled = _fill_route(CASES["friday"], self.room)
         facts = standup.dress_facts(filled)
         self.assertGreater(len(facts), 1)
         complete, calls = _answering(
@@ -2119,8 +2307,8 @@ class TheRoute(unittest.TestCase):
         self.assertEqual([w["label"] for w in body["spoken"]["workers"]], [w["label"] for w in body["work"]["workers"]])
         said = [s for w in body["spoken"]["workers"] for s in w["prose"]]
         self.assertNotIn("#999", " ".join(said))
-        self.assertEqual(body["text"], _golden("standup-friday.txt"))
-        self.assertEqual(_brief_less_corner(body), _golden("standup-friday.brief.txt"))
+        self.assertEqual(_less_engineer(body["text"], "toolkit"), _golden("standup-friday.txt"))
+        self.assertEqual(_less_engineer(_brief_less_corner(body), "toolkit"), _golden("standup-friday.brief.txt"))
         self.assertEqual(body["register"], "real", "dressed facts are still facts")
 
     def test_the_route_is_the_contracts(self):
@@ -2130,12 +2318,15 @@ class TheRoute(unittest.TestCase):
         res, calls = self._get("/api/ritual/standup?space=toolkit")
         self.assertEqual(res.status_code, 200)
         body = res.json()
-        self.assertEqual(body["text"], _golden("standup-friday.txt"))
-        self.assertEqual(_brief_less_corner(body), _golden("standup-friday.brief.txt"))
+        # An active GitHub Space reads both; with no card in its folders the text is
+        # the issues' rows and the engineer's, idle: the friday golden once its block is set aside.
+        self.assertEqual(body["text"], _fill_route(CASES["friday"], self.room).text)
+        self.assertEqual(_less_engineer(body["text"], "toolkit"), _golden("standup-friday.txt"))
+        self.assertEqual(_less_engineer(_brief_less_corner(body), "toolkit"), _golden("standup-friday.brief.txt"))
         self.assertEqual((body["ceremony"], body["register"], body["space"]), ("standup", "real", "toolkit"))
         self.assertEqual(body["tracker"], {"ok": True, "reason": ""})
-        # An active GitHub Space reads both; with no card in its folders the text is the issues' alone.
         self.assertEqual(body["source"], "both")
+        self.assertEqual((body["workers"][-1]["label"], body["workers"][-1]["empty"]), ("toolkit", True))
         self.assertEqual((body["checks"], body["links"]), ([], []))
         # The two reads, then who "me" is -- once, for the suggestion (triage's gh api user).
         # The two reads, the dates read for what they counted, then who "me" is.
@@ -2151,22 +2342,29 @@ class TheRoute(unittest.TestCase):
         self.assertIn("body", fields)
         # An open issue's age: the suggestion's order and the Agenda's "Open since" read it, as the CLI's read does.
         self.assertIn("createdAt", fields)
-        filled = _fill(CASES["friday"], self.room)
+        filled = _fill_route(CASES["friday"], self.room)
         filled.work.text = standup.render_work(filled)
         self.assertEqual(body["work"]["text"], filled.work.text)
 
     def test_the_room_is_the_spaces_team_size(self):
         """spaces[].features.teamSize, read per request: the response's team.size, every
-        worker kept and marked present -- the detail and the brief keep them all, the
-        round (work.workers, work.text) speaks the present only."""
+        worker kept and marked present -- the detail and the brief keep them all -- and
+        the round (work.workers, work.text) is the room: the seated members, the
+        engineer first, then the invented cast members that fill the seats left."""
         body = self._get("/api/ritual/standup?space=toolkit")[0].json()
-        self.assertEqual(body["team"], {"size": standup.team_size(self.room)})
-        filled = _fill(CASES["friday"], self.room)
+        size = standup.team_size(self.room)
+        self.assertEqual(body["team"], {"size": size})
+        filled = _fill_route(CASES["friday"], self.room)
         self.assertEqual([w["present"] for w in body["workers"]], [w.present for w in filled.workers])
+        spoken = body["work"]["workers"]
+        self.assertEqual([(w["label"], w["cast"]) for w in spoken], [(w.label, w.cast) for w in filled.work.workers])
+        self.assertEqual(len(spoken), size - 1, "every seat the size counts is filled")
+        self.assertEqual(spoken[0]["label"], "toolkit", "the engineer takes the first turn")
         self.assertEqual(
-            [w["label"] for w in body["work"]["workers"]], [w["label"] for w in body["workers"] if w["present"]]
+            {w["label"] for w in spoken if not w["cast"]}, {w["label"] for w in body["workers"] if w["present"]}
         )
-        self.assertEqual(body["text"], _golden("standup-friday.txt"))
+        self.assertEqual(sum(1 for w in spoken if w["cast"]), max(size - 1 - len(body["workers"]), 0))
+        self.assertEqual(_less_engineer(body["text"], "toolkit"), _golden("standup-friday.txt"))
 
     def test_the_response_field_names_are_section_4bs(self):
         body = self._get("/api/ritual/standup")[0].json()
@@ -2185,7 +2383,7 @@ class TheRoute(unittest.TestCase):
         self.assertEqual(set(body["work"]["queue"]), {"walk", "decide", "look"})
         self.assertEqual(set(body["work"]["queue"]["walk"][0]), GROUP_FIELDS)
         for w in body["work"]["workers"]:
-            self.assertEqual(set(w), {"label", "name", "yesterday", "today", "blockers", "prose"})
+            self.assertEqual(set(w), {"label", "name", "yesterday", "today", "blockers", "prose", "cast"})
         self.assertEqual(set(body["counts"]), {"workers", "total"})
         self.assertEqual(set(body["counts"]["total"]), COUNT_FIELDS)
         for c in body["counts"]["workers"]:
@@ -2368,7 +2566,7 @@ class TheRoute(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         body = res.json()
         self.assertEqual(body["tracker"], {"ok": True, "reason": ""})
-        self.assertEqual(body["text"], _golden("standup-friday.txt"))
+        self.assertEqual(_less_engineer(body["text"], "toolkit"), _golden("standup-friday.txt"))
         self.assertIn(
             "#101 Build the foyer counts \u2014 Chlo\u00e9\u2019s \u201c\u00cfle\u201d row\n",
             body["text"],
@@ -2463,22 +2661,28 @@ class TheRouteWithSuggestionsOff(TheRoute):
 
 
 class TheRouteInARoomOfThree(TheRoute):
-    """spaces.toolkit.features.teamSize=3: two seats. The friday case's two workers with work
-    sit and its idle third is absent -- the detail and the brief are friday's, the round is two."""
+    """spaces.toolkit.features.teamSize=3: two seats. The engineer always sits, so it
+    takes the first and the friday case's first worker with work the second; its
+    other worker with work and its idle third are absent -- the detail and the brief
+    keep everyone, the round is two."""
 
     space_features = {"teamSize": 3}
     room = 3
 
-    def test_sonnet_is_absent_from_the_round_and_kept_in_the_ledger(self):
+    def test_the_engineer_sits_first_and_the_ledger_keeps_everyone(self):
         body = self._get("/api/ritual/standup?space=toolkit")[0].json()
         self.assertEqual(body["team"], {"size": 3})
         self.assertEqual(
-            [(w["label"], w["present"]) for w in body["workers"]], [("fable", True), ("opus", True), ("sonnet", False)]
+            [(w["label"], w["present"]) for w in body["workers"]],
+            [("fable", True), ("opus", False), ("sonnet", False), ("toolkit", True)],
         )
-        self.assertEqual([w["label"] for w in body["work"]["workers"]], ["fable", "opus"])
-        self.assertNotIn("Sonnet:", body["work"]["text"])
-        self.assertIn("Sonnet", body["text"])
-        self.assertIn("Sonnet:", _brief_less_corner(body))
+        self.assertEqual(
+            [(w["label"], w["cast"]) for w in body["work"]["workers"]], [("toolkit", False), ("fable", False)]
+        )
+        for name in ("Opus", "Sonnet"):
+            self.assertNotIn(name + ":", body["work"]["text"])
+            self.assertIn(name, body["text"])
+            self.assertIn(name + ":", _brief_less_corner(body))
 
 
 class TheAppMountsIt(unittest.TestCase):
@@ -2576,7 +2780,7 @@ class TheOneTrackerRead(unittest.TestCase):
         self.assertEqual(self._reads(), (1, 1, 1))
         self.assertEqual(self._gh("api", "graphql"), 1, "the dates read is kept like the others")
         self.assertEqual(first, second, "the same facts, the same words")
-        self.assertEqual(first["text"], _golden("standup-friday.txt"))
+        self.assertEqual(_less_engineer(first["text"], "toolkit"), _golden("standup-friday.txt"))
 
     def test_two_triages_inside_the_ttl_read_the_tracker_once(self):
         first = self.client.get("/api/ritual/triage?space=toolkit").json()

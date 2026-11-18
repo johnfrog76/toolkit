@@ -6,6 +6,11 @@ Waiting on you to walk one in the Studio: #533, Verify the foyer counts.
 Fable: Good morning. Yesterday I closed one in Phase 6: #530, Verify the clock on Windows. Today I'll pick up the next item from the board. No blockers. That's it for me.
 Opus: Good morning. Yesterday I closed #535, Rename the column. Today I'm on Phase 6: #534, Trim the log. No blockers. That's it for me.
 Sonnet: Good morning. Yesterday I took a course module on the cloud platform. Today I'll set up the password manager on my phone. No blockers. That's it for me.
+OPS-DEV: Good morning. Yesterday I tidied my notes and my calendar for the week. Today I'll pair with a teammate to learn how the build runs. No blockers. That's it for me.
+NEW HIRE: Good morning. Yesterday I had a quiet day: some learning and some setup. Today I'll set up my editor's formatter to match the team's. No blockers. That's it for me.
+ULTRAWIDE OVERLORD: Good morning. Yesterday I started configuring my dev environment. Today I'll practise the keyboard shortcuts I keep forgetting. No blockers. That's it for me.
+QA ALCHEMIST: Good morning. Yesterday I fought my mechanical keyboard's Bluetooth until it paired. Today I'll sit in on the planning meeting and take notes. No blockers. That's it for me.
+DESIGNER: Good morning. Yesterday I fixed my standing desk; it goes up and down again. Today I'll swap the batteries in my mouse and keyboard. No blockers. That's it for me.
 
 Good morning. Yesterday I walked #530 and #531. Today I'll walk #533. No blockers. That's it for me.
 

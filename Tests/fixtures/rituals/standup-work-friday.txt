@@ -6,7 +6,12 @@ Waiting on you to walk #416, Verify the Studio tab draws on the PC. Also to walk
 Fable: Good morning. Yesterday I closed two in Design lifecycle (#411, #412). I also closed #413, Rename the slug. Today I'm on two in Team Agile (#414, #415). I'm also on two more: #999 and Design lifecycle L3. Blocked on #416, Verify the Studio tab draws on the PC. That's it for me.
 Opus: Good morning. Yesterday I closed three in Team Agile (#401, #402, #403). I also closed one in the Studio: #404, Count the foyer rows. Today I'm on two in Team Agile (#405, #406). No blockers. That's it for me.
 Sonnet: Good morning. Yesterday I took a course module on the cloud platform. Today I'll set up the password manager on my phone. No blockers. That's it for me.
+OPS-DEV: Good morning. Yesterday I tidied my notes and my calendar for the week. Today I'll pair with a teammate to learn how the build runs. No blockers. That's it for me.
+NEW HIRE: Good morning. Yesterday I had a quiet day: some learning and some setup. Today I'll set up my editor's formatter to match the team's. No blockers. That's it for me.
+ULTRAWIDE OVERLORD: Good morning. Yesterday I started configuring my dev environment. Today I'll practise the keyboard shortcuts I keep forgetting. No blockers. That's it for me.
+QA ALCHEMIST: Good morning. Yesterday I fought my mechanical keyboard's Bluetooth until it paired. Today I'll sit in on the planning meeting and take notes. No blockers. That's it for me.
+DESIGNER: Good morning. Yesterday I fixed my standing desk; it goes up and down again. Today I'll swap the batteries in my mouse and keyboard. No blockers. That's it for me.
 
-Good morning. Yesterday I tidied my notes and my calendar for the week. Today I'll walk #416, #417 and #421. No blockers. That's it for me.
+Good morning. Yesterday I watched a couple of React tutorials to get my head into the new stack. Today I'll walk #416, #417 and #421. No blockers. That's it for me.
 
 "Let's circle back."

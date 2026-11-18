@@ -46,12 +46,15 @@
                                titles' common stem, one phrase per group.
       Get-P20StandupProseSentence  the prose: one group as one standup
                                sentence -- a grammar over the groups, no model.
-      Set-P20StandupPresent    the team size: who is in the room today -- every
-                               worker kept and marked present or absent, the
-                               ones with work seated first.
+      Get-P20StandupRoomSeats  the team size is the team: who sits, in which
+                               window, and the invented cast members that fill
+                               the seats left. Pure over labels.
+      Set-P20StandupRoom       the same over a fill's workers: every worker kept
+                               and marked present or absent, and the round --
+                               the seated in seat order, then the invented.
       Format-P20StandupWork    the filled object -> the work grain's text, its
                                prose: one line for the queue, one turn per
-                               PRESENT worker, and the chair's own turn last.
+                               speaker of the round, and the chair's own turn last.
       Test-P20StandupDress     the dress guard: a model's sentence and its
                                group's facts -> '' or the guard it fails. The
                                CLI calls no model; the guard is the contract.
@@ -442,7 +445,9 @@ function Set-P20StandupIdle {
       The idle worker's turn: each worker of Workers (in order) whose slots are
       all empty says two made-up items, as status = @(yesterday, today) --
       nothing[(d + i) mod len] and nothingToday[(d + i) mod len2], d the day of
-      the year (1-based), i the worker's position among Workers (0-based). The
+      the year (1-based), i the worker's position among Workers (0-based) after
+      Start -- the places before it are someone else's (the record's, when
+      Workers are the invented cast members: Set-P20StandupRoom). The
       two lengths share no factor, so the pair does not repeat in step. excuse
       is the first of the two, for a reader that knows only that field. A
       worker with something to say gets excuse '' and status empty. With
@@ -451,11 +456,12 @@ function Set-P20StandupIdle {
     param(
         $Workers,
         [int]$Day,
-        $Vocabulary
+        $Vocabulary,
+        [int]$Start = 0
     )
     $yesterday = @($Vocabulary.nothing)
     $today = @($Vocabulary.nothingToday)
-    $i = 0
+    $i = $Start
     foreach ($w in @($Workers)) {
         if ($null -eq $w) { continue }
         $w['excuse'] = ''
@@ -469,28 +475,169 @@ function Set-P20StandupIdle {
     }
 }
 
-function Set-P20StandupPresent {
+function Get-P20StandupRoomSeats {
     <#
-      Who is in the room today. The room is Size windows, the chair's one of
-      them, so Size - 1 workers sit. Every worker stays on the response and gets
-      present = $true or $false: the workers with something to say (a yesterday,
-      today or blockers item -- not empty) take the seats first, then the idle,
-      each run in the order of Workers (the label order, the card tile last);
-      the rest are absent. With no more workers than seats, everyone is present.
-      The round -- the work grain -- speaks the present only; the ledger keeps
-      every worker. set_present in the agent; standup-team.json's `seats` rows.
+      The room, from who there is. Pure over plain data; room_seats in the
+      agent; standup-team.json's `room` rows.
+
+      Size is the room's windows, the chair's one of them, so Size - 1 members
+      sit. Engineer is @{ label; empty } or $null for a fill with no engineer;
+      Labels the labelled workers as @{ label; empty }, in label order.
+
+        - The seats go to the engineer, then the labelled workers with
+          something to say, then the idle ones, each run in label order.
+          Whoever is past the seats is absent.
+        - A seat nobody takes is filled by an invented cast member: the member
+          windows nobody sits in, in grid order (rituals.room.windows, the
+          chair's left out), each labelled with its cast id.
+        - A window is a member's own when its label is a key of
+          rituals.room.kept or is itself a member window's cast id (compared
+          in lowercase). A seated member sits in its own window; an absent one
+          keeps it empty. The engineer otherwise takes rituals.room.engineer
+          when no member of the record owns it. Everyone else is dealt the
+          free windows in grid order -- the engineer first, then the labels in
+          their order -- and takes a window an absent member keeps only when
+          the free ones run out.
+
+      Returns @{ present; round; desks }: the labels seated, in seat order;
+      each speaker in turn order as @{ label; cast; window }; and the member
+      windows left empty, in grid order.
+    #>
+    param(
+        [int]$Size,
+        $Engineer,
+        $Labels
+    )
+    $room = (Get-P20Consts).rituals.room
+    $chair = [string]$room.chair
+    $members = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($w in @($room.windows)) { if ([string]$w.id -cne $chair) { $members.Add([string]$w.id) } }
+    $kept = @{}
+    foreach ($p in $room.kept.PSObject.Properties) { $kept[[string]$p.Name] = [string]$p.Value }
+    $own = {
+        param([string]$Label)
+        $low = $Label.ToLowerInvariant()
+        if ($kept.ContainsKey($low)) { return $kept[$low] }
+        if ($members.Contains($low)) { return $low }
+        return ''
+    }
+
+    $seats = $Size - 1
+    if ($seats -lt 0) { $seats = 0 }
+    $all = @($Labels | Where-Object { $null -ne $_ })
+    $people = New-Object 'System.Collections.Generic.List[string]'
+    $order = New-Object 'System.Collections.Generic.List[string]'
+    $engineerLabel = $null
+    if ($null -ne $Engineer) {
+        $engineerLabel = [string]$Engineer.label
+        $people.Add($engineerLabel)
+        $order.Add($engineerLabel)
+    }
+    foreach ($w in $all) { $people.Add([string]$w.label) }
+    foreach ($w in $all) { if (-not $w.empty) { $order.Add([string]$w.label) } }
+    foreach ($w in $all) { if ($w.empty) { $order.Add([string]$w.label) } }
+    $seated = New-Object 'System.Collections.Generic.List[string]'
+    for ($i = 0; $i -lt $order.Count -and $i -lt $seats; $i++) { $seated.Add($order[$i]) }
+
+    $reserved = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($label in $people) {
+        $mine = & $own $label
+        if ($mine -and -not $reserved.Contains($mine)) { $reserved.Add($mine) }
+    }
+    # Labels are compared as written: two that differ only in case are two members.
+    $window = New-Object 'System.Collections.Generic.Dictionary[string,string]' ([System.StringComparer]::Ordinal)
+    $taken = New-Object 'System.Collections.Generic.List[string]'
+    $dealing = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($label in $people) { if ($seated.Contains($label)) { $dealing.Add($label) } }
+    foreach ($label in $dealing) {
+        $mine = & $own $label
+        if ($mine -and -not $taken.Contains($mine) -and -not $window.ContainsKey($label)) {
+            $window[$label] = $mine
+            $taken.Add($mine)
+        }
+    }
+    if ($null -ne $engineerLabel -and $seated.Contains($engineerLabel) -and -not $window.ContainsKey($engineerLabel) -and -not $reserved.Contains([string]$room.engineer)) {
+        $window[$engineerLabel] = [string]$room.engineer
+        $taken.Add([string]$room.engineer)
+    }
+    $open = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($m in $members) { if (-not $reserved.Contains($m) -and -not $taken.Contains($m)) { $open.Add($m) } }
+    foreach ($m in $members) { if ($reserved.Contains($m) -and -not $taken.Contains($m)) { $open.Add($m) } }
+    foreach ($label in $dealing) {
+        if ($window.ContainsKey($label)) { continue }
+        $window[$label] = $open[0]
+        $taken.Add($open[0])
+        $open.RemoveAt(0)
+    }
+    $need = $seats - $seated.Count
+    $invented = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($m in $members) {
+        if ($invented.Count -ge $need) { break }
+        if (-not $taken.Contains($m) -and -not $reserved.Contains($m)) { $invented.Add($m) }
+    }
+    $round = New-Object System.Collections.ArrayList
+    foreach ($label in $seated) { [void]$round.Add([ordered]@{ label = $label; cast = $false; window = $window[$label] }) }
+    foreach ($m in $invented) { [void]$round.Add([ordered]@{ label = $m; cast = $true; window = $m }) }
+    $desks = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($m in $members) { if (-not $taken.Contains($m) -and -not $invented.Contains($m)) { $desks.Add($m) } }
+    return @{ present = [string[]]$seated.ToArray(); round = [object[]]$round.ToArray(); desks = [string[]]$desks.ToArray() }
+}
+
+function Set-P20StandupRoom {
+    <#
+      Seat a fill: the team size is the team. Workers is the record -- the
+      labelled workers in label order, then Engineer (the card tile) when the
+      fill has one -- and it is kept whole: each member gets its made-up items
+      when idle (Set-P20StandupIdle, by its place in the record) and present =
+      $true or $false by Get-P20StandupRoomSeats. Returns @{ round; invented }:
+      the round is who speaks, in seat order -- the seated members, then the
+      invented cast members that fill the seats left, each an idle worker
+      named by its plate and marked cast, its made-up items picked at the
+      places after the record's last; invented is how many of them there are.
+      seat_room in the agent.
     #>
     param(
         $Workers,
-        [int]$Size
+        $Engineer,
+        [int]$Size,
+        [int]$Day,
+        $Vocabulary,
+        [string[]]$Slots
     )
-    $all = @($Workers | Where-Object { $null -ne $_ })
-    $seats = $Size - 1
-    if ($seats -lt 0) { $seats = 0 }
-    $order = New-Object System.Collections.ArrayList
-    foreach ($w in $all) { if (-not $w.empty) { [void]$order.Add($w) } }
-    foreach ($w in $all) { if ($w.empty) { [void]$order.Add($w) } }
-    for ($i = 0; $i -lt $order.Count; $i++) { $order[$i]['present'] = ($i -lt $seats) }
+    $record = @($Workers | Where-Object { $null -ne $_ })
+    Set-P20StandupIdle -Workers $record -Day $Day -Vocabulary $Vocabulary
+    $labels = @($record | Where-Object { -not [object]::ReferenceEquals($_, $Engineer) })
+    $engineerRow = $null
+    if ($null -ne $Engineer) { $engineerRow = @{ label = [string]$Engineer.label; empty = [bool]$Engineer.empty } }
+    $room = Get-P20StandupRoomSeats -Size $Size -Engineer $engineerRow -Labels @($labels | ForEach-Object { @{ label = [string]$_.label; empty = [bool]$_.empty } })
+
+    $byLabel = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([System.StringComparer]::Ordinal)
+    if ($null -ne $Engineer) { $byLabel[[string]$Engineer.label] = $Engineer }
+    foreach ($w in $labels) { if (-not $byLabel.ContainsKey([string]$w.label)) { $byLabel[[string]$w.label] = $w } }
+    foreach ($w in $record) { $w['present'] = $false }
+    $round = New-Object System.Collections.ArrayList
+    foreach ($label in @($room.present)) {
+        $byLabel[[string]$label]['present'] = $true
+        [void]$round.Add($byLabel[[string]$label])
+    }
+    $plates = @{}
+    foreach ($w in @((Get-P20Consts).rituals.room.windows)) { $plates[[string]$w.id] = [string]$w.plate }
+    $invented = New-Object System.Collections.ArrayList
+    foreach ($seat in @($room.round)) {
+        if (-not $seat.cast) { continue }
+        $w = [ordered]@{ label = [string]$seat.label; name = $plates[[string]$seat.label] }
+        foreach ($slot in $Slots) { $w[$slot] = [object[]]@() }
+        $w['empty'] = $true
+        $w['excuse'] = ''
+        $w['status'] = [object[]]@()
+        $w['present'] = $true
+        $w['cast'] = $true
+        [void]$invented.Add($w)
+    }
+    # Their made-up items follow the record's: the same picker, the places after it.
+    Set-P20StandupIdle -Workers $invented.ToArray() -Day $Day -Vocabulary $Vocabulary -Start $record.Count
+    foreach ($w in $invented) { [void]$round.Add($w) }
+    return @{ round = [object[]]$round.ToArray(); invented = $invented.Count }
 }
 
 function Invoke-P20StandupFill {
@@ -513,7 +660,7 @@ function Invoke-P20StandupFill {
       With tracker.ok false the queue and the workers are empty -- the ritual
       happens anyway. TeamSize is the Space's features.teamSize as stored
       (Get-P20TeamSize reads it; unset, or not a size, is the default): the
-      response's team.size, and who is present (Set-P20StandupPresent).
+      response's team.size, and who is in the room (Set-P20StandupRoom).
     #>
     param(
         [Parameter(Mandatory)]$AsOf,
@@ -618,15 +765,15 @@ function Invoke-P20StandupFill {
             $w['empty'] = $empty
             [void]$workers.Add($w)
         }
-        Set-P20StandupIdle -Workers $workers.ToArray() -Day $d -Vocabulary $data.Vocabulary
-        Set-P20StandupPresent -Workers $workers.ToArray() -Size $size
+        # This fill has no engineer: the seats its labels leave are the invented cast members'.
+        $room = Set-P20StandupRoom -Workers $workers.ToArray() -Engineer $null -Size $size -Day $d -Vocabulary $data.Vocabulary -Slots $slots
     }
 
     $queue = [ordered]@{}
     foreach ($kind in $queueLists.Keys) { $queue[$kind] = [object[]]@($queueLists[$kind] | Sort-Object { [int]$_.number }) }
     $walkedSorted = [object[]]@($walked | Sort-Object { [int]$_.number })
     $work = New-P20StandupWorkEmpty -QueueKinds $kinds
-    if ($ok) { $work = New-P20StandupWork -Standup @{ queue = $queue; workers = $workers.ToArray(); walked = $walkedSorted; day = $d; nothing = @($data.Vocabulary.nothing) } -KeyOf $keyOf -QueueKinds $kinds -Slots $slots }
+    if ($ok) { $work = New-P20StandupWork -Standup @{ queue = $queue; workers = $workers.ToArray(); round = $room.round; invented = $room.invented; walked = $walkedSorted; day = $d; nothing = @($data.Vocabulary.nothing) } -KeyOf $keyOf -QueueKinds $kinds -Slots $slots }
     $counts = Get-P20StandupCounts -Standup @{ workers = $workers.ToArray() } -Hashes @{} -Slots $slots
 
     $open = ''
@@ -978,14 +1125,13 @@ function Invoke-P20StandupCardsFill {
     $kinds = @($data.Ceremony.queue | ForEach-Object { [string]$_ })
     $tile = Get-P20StandupCardTile -AsOf $at -Cards @(Get-P20StandupCardsInPlay -Cards $Cards) -Label $Space -Name $name -Slots $slots -From $since
     $w = $tile.worker
-    # The tile is a worker like any other: its made-up items are picked by its position.
-    Set-P20StandupIdle -Workers @($w) -Day $d -Vocabulary $data.Vocabulary
-    Set-P20StandupPresent -Workers @($w) -Size $size
+    # The tile is the engineer: the first seat, and the record's one member.
+    $room = Set-P20StandupRoom -Workers @($w) -Engineer $w -Size $size -Day $d -Vocabulary $data.Vocabulary -Slots $slots
 
     $queue = [ordered]@{}
     foreach ($kind in @($data.Ceremony.queue)) { $queue[[string]$kind] = [object[]]@() }
     if ($queue.Contains('walk')) { $queue['walk'] = [object[]]$tile.walk }
-    $work = New-P20StandupWork -Standup @{ queue = $queue; workers = @($w); walked = @(); day = $d; nothing = @($data.Vocabulary.nothing) } -KeyOf $tile.keyOf -QueueKinds $kinds -Slots $slots
+    $work = New-P20StandupWork -Standup @{ queue = $queue; workers = @($w); round = $room.round; invented = $room.invented; walked = @(); day = $d; nothing = @($data.Vocabulary.nothing) } -KeyOf $tile.keyOf -QueueKinds $kinds -Slots $slots
     $counts = Get-P20StandupCounts -Standup @{ workers = @($w) } -Hashes $tile.hashes -Slots $slots
 
     $open = ''
@@ -1169,9 +1315,9 @@ function Invoke-P20StandupJoinedFill {
     foreach ($k in @($tile.undated.Keys)) { $undatedOf[$k] = $tile.undated[$k] }
     $workers = New-Object System.Collections.ArrayList
     foreach ($w in @($out.workers | Where-Object { $null -ne $_ })) { [void]$workers.Add($w) }
-    if (-not $tile.worker.empty) { [void]$workers.Add($tile.worker) }
-    # The card tile is a member like the labels: seated by the same rule, after them.
-    Set-P20StandupPresent -Workers $workers.ToArray() -Size ([int]$out.team.size)
+    # The engineer is always in the room: the record's last member, the first seat.
+    [void]$workers.Add($tile.worker)
+    $room = Set-P20StandupRoom -Workers $workers.ToArray() -Engineer $tile.worker -Size ([int]$out.team.size) -Day $at.DayOfYear -Vocabulary $data.Vocabulary -Slots $slots
     $out.workers = [object[]]$workers.ToArray()
     if ($out.queue.Contains('walk')) {
         $walk = New-Object System.Collections.ArrayList
@@ -1181,7 +1327,7 @@ function Invoke-P20StandupJoinedFill {
     }
     $keyOf = Get-P20StandupIssueKeys -Issues $Issues
     foreach ($k in @($tile.keyOf.Keys)) { $keyOf[$k] = $tile.keyOf[$k] }
-    $out.work = New-P20StandupWork -Standup @{ queue = $out.queue; workers = $out.workers; walked = @($out.chair.walked); day = $at.DayOfYear; nothing = @($data.Vocabulary.nothing); dated = ($null -ne $CommitDates) } -KeyOf $keyOf -QueueKinds $kinds -Slots $slots
+    $out.work = New-P20StandupWork -Standup @{ queue = $out.queue; workers = $out.workers; round = $room.round; invented = $room.invented; walked = @($out.chair.walked); day = $at.DayOfYear; nothing = @($data.Vocabulary.nothing); dated = ($null -ne $CommitDates) } -KeyOf $keyOf -QueueKinds $kinds -Slots $slots
     $out.checks = [object[]]$checks.ToArray()
     $out.links = [object[]]$links.ToArray()
     $out.counts = Get-P20StandupCounts -Standup @{ workers = $out.workers } -Hashes $hashesOf -Slots $slots -Undated $undatedOf
@@ -1423,10 +1569,13 @@ function New-P20StandupWork {
         foreach ($said in @(Get-P20StandupProse -Slot $kind -Groups $queue[$kind] -Rows $rows)) { [void]$queueProse.Add($said) }
     }
     $workers = New-Object System.Collections.ArrayList
-    foreach ($w in @($Standup.workers | Where-Object { $null -ne $_ })) {
-        # The round speaks the present only (Set-P20StandupPresent); a worker
-        # with no present key -- an older reading -- is in the room.
-        if ($false -eq $w.present) { continue }
+    # The round (Set-P20StandupRoom): the seated members in seat order, then the
+    # invented cast members. An absent worker has no row. A standup nobody
+    # seated speaks its present workers, in their order -- a worker with no
+    # present key, an older reading, is in the room.
+    $speakers = @($Standup.workers | Where-Object { $null -ne $_ -and $false -ne $_.present })
+    if ($Standup -is [System.Collections.IDictionary] -and $Standup.Contains('round')) { $speakers = @($Standup.round | Where-Object { $null -ne $_ }) }
+    foreach ($w in $speakers) {
         $row = [ordered]@{ label = $w.label; name = $w.name }
         $sentences = @{}
         foreach ($slot in $Slots) {
@@ -1466,6 +1615,8 @@ function New-P20StandupWork {
             }
         }
         $row['prose'] = Get-P20StandupTurn -Said $prose.ToArray()
+        # An invented cast member fills a seat nobody takes: in the round, never in the record.
+        $row['cast'] = ($true -eq $w.cast)
         [void]$workers.Add($row)
     }
     # The chair's own turn, last, in its own first person: what you walked, what waits.
@@ -1474,7 +1625,10 @@ function New-P20StandupWork {
         $refsOf[$kind] = [object[]]@($queue[$kind] | Where-Object { $null -ne $_ } | ForEach-Object { , ([object[]]@($_.refs | ForEach-Object { [string]$_ })) })
     }
     $walkedRefs = @($Standup.walked | Where-Object { $null -ne $_ } | ForEach-Object { Get-P20StandupItemRef $_ })
+    # Its made-up yesterday is picked at the place after the last member's: the
+    # record's, then the invented cast members'.
     $everyone = @($Standup.workers | Where-Object { $null -ne $_ }).Count
+    if ($Standup -is [System.Collections.IDictionary] -and $Standup.Contains('invented')) { $everyone += [int]$Standup.invented }
     $chair = Get-P20StandupChairTurn -Walked $walkedRefs -Day ([int]$Standup.day) -Workers $everyone -Nothing $Standup.nothing -Queue $refsOf -QueueKinds $QueueKinds
     return [ordered]@{ queue = $queue; workers = [object[]]$workers.ToArray(); queueProse = [object[]]$queueProse.ToArray(); chairProse = $chair; text = '' }
 }
@@ -1945,9 +2099,10 @@ function Format-P20StandupWork {
       The filled object -> the work grain's text, spoken as prose: the round of
       the room. The same frame as the long form -- the title, the chair's lines,
       the Tracker line when nothing answered -- with ONE line for the queue (its
-      sentences, or "Nothing is waiting on you."), one per PRESENT worker (its
-      name, then its turn; an absent worker says nothing, Set-P20StandupPresent),
-      and the chair's own turn last (work.chairProse):
+      sentences, or "Nothing is waiting on you."), one per speaker of the round,
+      in seat order (its name, then its turn; an absent worker says nothing and
+      an invented cast member says made-up items, Set-P20StandupRoom), and the
+      chair's own turn last (work.chairProse):
 
         Waiting on you to walk two in Phase 6.
         <worker>: Good morning. Yesterday I closed two in Team Agile. No blockers. That's it for me.
@@ -1979,16 +2134,13 @@ function Format-P20StandupWork {
         else { $lines.Add($said -join ' ') }
         $lines.Add('')
 
-        $workers = @($Standup.workers | Where-Object { $null -ne $_ })
-        if ($workers.Count -eq 0) { $lines.Add([string]$t.noWorkers) }
+        # The round, in seat order: an absent worker is not in it, so it has no
+        # line, not even its name; an invented cast member has one.
         $grained = @($Standup.work.workers | Where-Object { $null -ne $_ })
-        foreach ($w in $workers) {
-            # An absent worker is not in today's round: no line, not even its name.
-            if ($false -eq $w.present) { continue }
-            $ww = @($grained | Where-Object { [string]$_.label -ceq [string]$w.label }) | Select-Object -First 1
-            $said = @()
-            if ($ww) { $said = @($ww.prose | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_ }) }
-            $lines.Add([string]$w.name + ': ' + ($said -join ' '))
+        if ($grained.Count -eq 0) { $lines.Add([string]$t.noWorkers) }
+        foreach ($ww in $grained) {
+            $said = @($ww.prose | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_ })
+            $lines.Add([string]$ww.name + ': ' + ($said -join ' '))
         }
         $checks = @($Standup.checks | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_ })
         if ($checks.Count -gt 0) {

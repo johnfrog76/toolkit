@@ -69,13 +69,16 @@
     item with its number; work is the ritual's grain: each worker's items grouped
     by milestone, else the design card the issue names, else the titles' common
     stem, and spoken as standup prose -- one sentence a group, a grammar over
-    the groups and no model -- the round of the room, in which only the
-    workers present today speak: the Space's spaces.<slug>.features.teamSize
-    (3, 6 or 9, the chair included; unset is 9) seats the ones with work first,
-    then the idle, and the rest are absent. detail and brief keep every worker.
+    the groups and no model -- the round of the room. The Space's
+    spaces.<slug>.features.teamSize (3, 6 or 9, the chair included; unset is
+    9) is the team: the seats go to the engineer, then the workers with work,
+    then the idle; workers past the size are absent, and seats still open are
+    filled by invented cast members, who report made-up status. detail and
+    brief keep every worker, and never an invented one.
     brief is -Brief's reading, and like -Brief it is a read, not attending.
     Anything else is a stated refusal. -AsJson carries all three whatever this
-    says, with every worker's present and the room's team.size.
+    says, with every worker's present, each speaker's cast and the room's
+    team.size.
 .PARAMETER Remind
     HH:mm. Write the reminder to attend (D-TA15): ONE Organize reminder,
     source standup, through NewReminder -- or, when one is open, rewrite its due
@@ -159,7 +162,7 @@ if ($Help) {
     Write-Host "  The queue waiting on you, then one block per worker label. Writes nothing"
     Write-Host "  to the tracker. -Brief prints only the chair's reading, in a few lines. -Grain work speaks"
     Write-Host "  at the grain of the work: items grouped by milestone or feature, one sentence a group --"
-    Write-Host "  the round, where only the workers present today speak (spaces.<slug>.features.teamSize)."
+    Write-Host "  the round of the room, as many people as spaces.<slug>.features.teamSize says, the chair counted."
     Write-Host "  Each item says what moved -- closed, started or in progress, and its card's commits -- and the"
     Write-Host "  brief opens on the counts. -Since <yyyy-MM-dd> widens yesterday back to that day."
     Write-Host "  -Remind sets an Organize reminder to attend (features.organize);"
@@ -307,7 +310,9 @@ elseif ($choice.source -eq 'both') {
 # -- The room ---------------------------------------------------------------
 # spaces.<slug>.features.teamSize: how many are in the standup, the chair
 # included (Scripts/Resolve-TeamSize.ps1 reads it; unset is the default). The
-# fill keeps every worker and marks who is present; the round speaks those.
+# size is the team: the fill keeps every worker and marks who is present, and
+# the round speaks the room -- the present, then the invented cast members
+# that fill the seats left.
 $teamEntry = $null
 if ($cfg -and $cfg.Spaces) { $teamEntry = @($cfg.Spaces | Where-Object { $_ -and [string]$_.slug -eq $slug }) | Select-Object -First 1 }
 $teamStored = $null

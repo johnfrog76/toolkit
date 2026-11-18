@@ -129,7 +129,7 @@
             ]
           }
         ],
-        "chair": ["Good morning.", "Yesterday I tidied my notes and my calendar for the week.", "Today I'll walk #515, #517 and #513.", "No blockers.", "That's it for me."],
+        "chair": ["Good morning.", "Yesterday I watched a couple of React tutorials to get my head into the new stack.", "Today I'll walk #515, #517 and #513.", "No blockers.", "That's it for me."],
         "text": "standup-prose-friday.txt"
       }
     },
@@ -145,21 +145,21 @@
         "queue": [],
         "workers": [
           {
-            "label": "fable",
-            "prose": [
-              "Good morning.",
-              "Yesterday I read up on how the team works, so I'm ready for what's next.",
-              "Today I'll move my shell to the new terminal and pick a theme.",
-              "No blockers.",
-              "That's it for me."
-            ]
-          },
-          {
             "label": "opus",
             "prose": [
               "Good morning.",
               "Yesterday I closed one in Phase 6: #601, the clock drifts.",
               "Today I'll pick up the next item from the board.",
+              "No blockers.",
+              "That's it for me."
+            ]
+          },
+          {
+            "label": "fable",
+            "prose": [
+              "Good morning.",
+              "Yesterday I read up on how the team works, so I'm ready for what's next.",
+              "Today I'll move my shell to the new terminal and pick a theme.",
               "No blockers.",
               "That's it for me."
             ]
@@ -175,7 +175,7 @@
             ]
           }
         ],
-        "chair": ["Good morning.", "Yesterday I tidied my notes and my calendar for the week.", "Today I'll keep the board moving.", "No blockers.", "That's it for me."],
+        "chair": ["Good morning.", "Yesterday I watched a couple of React tutorials to get my head into the new stack.", "Today I'll keep the board moving.", "No blockers.", "That's it for me."],
         "text": "standup-prose-quiet.txt"
       }
     },
@@ -219,7 +219,7 @@
             ]
           }
         ],
-        "chair": ["Good morning.", "Yesterday I swapped my laptop dock; no more flicker.", "Today I'll walk 140.", "No blockers.", "That's it for me."],
+        "chair": ["Good morning.", "Yesterday I watched a couple of React tutorials to get my head into the new stack.", "Today I'll walk 140.", "No blockers.", "That's it for me."],
         "text": "standup-prose-cards.txt"
       }
     },
@@ -290,7 +290,7 @@
             ]
           }
         ],
-        "chair": ["Good morning.", "Yesterday I tidied my notes and my calendar for the week.", "Today I'll keep the board moving.", "No blockers.", "That's it for me."],
+        "chair": ["Good morning.", "Yesterday I watched a couple of React tutorials to get my head into the new stack.", "Today I'll keep the board moving.", "No blockers.", "That's it for me."],
         "text": "standup-prose-eight-groups.txt"
       }
     },
@@ -510,7 +510,7 @@
             ]
           }
         ],
-        "chair": ["Good morning.", "Yesterday I tidied my notes and my calendar for the week.", "Today I'll walk #901.", "No blockers.", "That's it for me."],
+        "chair": ["Good morning.", "Yesterday I watched a couple of React tutorials to get my head into the new stack.", "Today I'll walk #901.", "No blockers.", "That's it for me."],
         "text": "standup-prose-one-slot.txt"
       }
     },
@@ -733,6 +733,16 @@
         "queue": [],
         "workers": [
           {
+            "label": "widgets",
+            "prose": [
+              "Good morning.",
+              "Yesterday I tidied my notes and my calendar for the week.",
+              "Today I'll pair with a teammate to learn how the build runs.",
+              "No blockers.",
+              "That's it for me."
+            ]
+          },
+          {
             "label": "fable",
             "prose": [
               "Good morning.",
@@ -764,7 +774,7 @@
             ]
           }
         ],
-        "chair": ["Good morning.", "Yesterday I tidied my notes and my calendar for the week.", "Today I'll keep the board moving.", "No blockers.", "That's it for me."],
+        "chair": ["Good morning.", "Yesterday I watched a couple of React tutorials to get my head into the new stack.", "Today I'll keep the board moving.", "No blockers.", "That's it for me."],
         "text": "standup-prose-worked.txt"
       }
     },
@@ -817,7 +827,7 @@
             ]
           }
         ],
-        "chair": ["Good morning.", "Yesterday I swapped my laptop dock; no more flicker.", "Today I'll keep the board moving.", "No blockers.", "That's it for me."],
+        "chair": ["Good morning.", "Yesterday I watched a couple of React tutorials to get my head into the new stack.", "Today I'll keep the board moving.", "No blockers.", "That's it for me."],
         "text": "standup-prose-cards-worked.txt"
       }
     }

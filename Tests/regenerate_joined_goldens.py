@@ -1,5 +1,6 @@
 """Regenerate the rituals' goldens: the standup's -- standup-joined.json's, standup.json's,
-standup-cards.json's and standup-team.json's -- and triage's, triage.json's triage-<name>.txt.
+standup-cards.json's, standup-team.json's, standup-work.json's and standup-prose.json's --
+and triage's, triage.json's triage-<name>.txt.
 
 Goldens are generated, never typed: every case that names a ``text``, ``work``
 or ``brief`` file is filled by the agent's fill for its table (the joined fill,
@@ -7,15 +8,19 @@ the issues fill, the cards fill) and rendered, and the bytes are written LF-only
 The CLI's half (tkTestToolkit -Rituals) then holds its own rendering to the
 same files, so a disagreement between the halves is a red suite, not a quietly
 rewritten golden. The work grain of standup.json and standup-cards.json is
-held by standup-work.json and standup-prose.json, whose goldens this does not
-write: those two tables name only ``text``, and it is the work text. Triage's
+held by standup-work.json and standup-prose.json: those two tables name only
+``text``, and it is the work text -- the round, which the room fills (the team
+size is the team), so their goldens are written here too, each case by the fill
+its ``source`` names. Triage's
 goldens are filled by agent/solitaire/triage.py's fill over triage.json (each
 case's labels, issues, tracker and viewer) and rendered; tkTestToolkit -Triage
 holds the CLI's rendering to the same files.
 
 The team size's goldens (Tests/fixtures/rituals/standup-team.json, its ``cases``) are
-the issues fill over the table's ``workerLabels`` with the case's stored teamSize:
-the detail, the work grain (the round, the present only) and the brief.
+the issues fill over the table's ``workerLabels`` with the case's stored teamSize --
+or, for a case that states ``cards``, the joined fill over them with the case's
+``labels``, ``space`` and ``spaceName`` -- the detail, the work grain (the round:
+the seated in seat order, then the invented cast members) and the brief.
 
 The suggestion table's chair readings (Tests/fixtures/suggestion/table.json,
 its ``briefs`` cases) are written beside it the same way: the joined fill, the
@@ -49,6 +54,8 @@ TRIAGE_TABLE_FILE = "triage.json"
 SUGGEST_DIR = REPO_ROOT / "Tests" / "fixtures" / "suggestion"
 CORNER_TABLE_FILE = "corner.json"
 TEAM_TABLE_FILE = "standup-team.json"
+WORK_TABLE_FILE = "standup-work.json"
+PROSE_TABLE_FILE = "standup-prose.json"
 
 
 def filled_triage_case(table: dict, case: dict) -> "triage.Triage":
@@ -96,7 +103,21 @@ def filled_issues_case(table: dict, case: dict) -> "standup.Standup":
 
 
 def filled_team_case(table: dict, case: dict) -> "standup.Standup":
-    """A standup-team.json case (the issues fill, the case's stored teamSize), filled and rendered."""
+    """A standup-team.json case, filled and rendered: the issues fill with the
+    case's stored teamSize, or the joined fill for a case that states ``cards``."""
+    if "cards" in case:
+        return _rendered(
+            standup.fill_joined_standup(
+                datetime.fromisoformat(case["asOf"]),
+                case["labels"],
+                case["issues"],
+                {"ok": True, "reason": ""},
+                case["cards"],
+                space=case["space"],
+                space_name=case["spaceName"],
+                size=case["teamSize"],
+            )
+        )
     return _rendered(
         standup.fill_standup(
             datetime.fromisoformat(case["asOf"]),
@@ -107,6 +128,30 @@ def filled_team_case(table: dict, case: dict) -> "standup.Standup":
             size=case["teamSize"],
         )
     )
+
+
+def filled_grain_case(table: dict, case: dict) -> "standup.Standup":
+    """A standup-work.json or standup-prose.json case, filled by the fill its
+    ``source`` names and rendered -- as ``_fill_work`` and ``_fill_prose`` do in
+    Tests/test_rituals.py."""
+    at = datetime.fromisoformat(case["asOf"])
+    if case["source"] == "cards":
+        filled = standup.fill_cards_standup(at, case["cards"], space=case["space"], space_name=case["spaceName"])
+    elif case["source"] == "both":
+        filled = standup.fill_joined_standup(
+            at,
+            table["workerLabels"],
+            case["issues"],
+            case["tracker"],
+            case["cards"],
+            space=case["space"],
+            space_name=case["spaceName"],
+            commit_dates=case.get("commitDates"),
+            issue_starts=case.get("issueStarts"),
+        )
+    else:
+        filled = standup.fill_standup(at, table["workerLabels"], case["issues"], case["tracker"])
+    return _rendered(filled)
 
 
 def filled_cards_case(case: dict) -> "standup.Standup":
@@ -211,6 +256,10 @@ def goldens() -> dict[str, str]:
     team = json.loads((FIXTURES / TEAM_TABLE_FILE).read_text(encoding="utf-8"))
     for case in team["cases"]:
         take(case["expected"], filled_team_case(team, case), ("text", "work", "brief"))
+    for name in (WORK_TABLE_FILE, PROSE_TABLE_FILE):
+        grain = json.loads((FIXTURES / name).read_text(encoding="utf-8"))
+        for case in grain["cases"]:
+            out[case["expected"]["text"]] = filled_grain_case(grain, case).work.text
     tri = json.loads((FIXTURES / TRIAGE_TABLE_FILE).read_text(encoding="utf-8"))
     for case in tri["cases"]:
         out[case["expected"]["text"]] = filled_triage_case(tri, case).text
