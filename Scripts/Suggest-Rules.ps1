@@ -276,7 +276,8 @@ function Get-P20SuggestionItems {
       milestone and due date, its createdAt, its lane from the card in current/
       whose id is its number (Active without one). A card in current/ whose id is
       no issue in the read is its own item -- severity and size from its Tags,
-      who from its **Assigned:** line (else its size), its milestone from its
+      who from its worker -- its Agent line's family, else its **Assigned:** line
+      (Get-P20CardWorker, on the card row) -- else its size, its milestone from its
       **Sprint:** line, its **Created:** day, its lane. A not-billable card is an
       item with billable false and adds nothing to an issue. -Waiting is every ref
       on the queue. A milestone's open counts its billable items, once per id.

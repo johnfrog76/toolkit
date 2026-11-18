@@ -824,11 +824,13 @@ function Get-P20StandupCards {
                     commits  = [object[]]$hashes
                     # What the suggestion reads (Suggest-Rules.ps1): the milestone its
                     # **Sprint:** line names, whole; its **Created:** day; its Tags
-                    # (a severity, a size); and who takes it.
+                    # (a severity, a size); and who takes it -- its Agent line's
+                    # family, else its Assigned line (Get-P20CardWorker, the
+                    # bridge until the shared resolver, issue #500, lands).
                     sprint   = (Get-P20CardMilestone $content)
                     created  = $created
                     tags     = [object[]]@(Get-P20CardTags $content)
-                    assigned = (Get-P20CardAssigned $content)
+                    assigned = (Get-P20CardWorker $content)
                 })
         }
     }
