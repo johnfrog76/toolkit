@@ -267,6 +267,15 @@ chunk by whichever module draws it. `GeneratedDeckHost` opens such a deck in Aud
 choice while the room is open: the sheet's mode row turns it to Paging and back, through the player's
 `onAudiobookChange` ("The player's two bars", above).
 
+**A slide's content remounts on every slide, unless the slides say they are one scene.** The engine keys
+the content panel by the slide's index (`engine/SlideRenderer.tsx`), so a stateful visual arrives clean, and
+every deck that says nothing gets that. A slide may set **`contentKey`** (`decks/types.ts`): consecutive
+slides with the same key share one mounted panel and React reconciles the new content into the old, so
+what did not change keeps its DOM nodes, its state and its running animations. A different key, or none,
+remounts. The played standup sets one key on every slide, because every slide is the same room; the copy
+panel beside it is not the content's and has never been keyed. `engine/SlideRenderer.test.tsx` holds it
+both ways, by node identity.
+
 **The deck room is dark on purpose, whatever the app wears** (reversing a change that had it follow the app's theme, at the owner's word).
 `DeckRoom` provides the shell's dark theme and `DeckPlayer` (and the notes window) the engine's default
 `webDarkTheme`, so a played deck looks the way Connected Deck's default does under Seaglass, Aurora or any

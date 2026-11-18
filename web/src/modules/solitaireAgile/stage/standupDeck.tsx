@@ -224,15 +224,20 @@ function DeskTile({ id, label, look }: { id: string; label: string; look: MugLoo
  * clean place, or, when no side is clean, the one with the least overlap. The bubble is drawn unseen until it has a place. Without
  * layout (a test's DOM) nothing measures, and the bubble stays at its origin.
  */
-function useBubblePlace(speaking: boolean) {
+function useBubblePlace(speaking: boolean, slideKey: string) {
   const wrap = useRef<HTMLDivElement | null>(null);
   const bubble = useRef<HTMLDivElement | null>(null);
-  const [place, setPlace] = useState<{
+  // A window outlives its slide (the stage stays mounted across the round), so
+  // a place is kept with the slide it was measured for and is no place at all
+  // on any other: the next bubble is laid out unseen and measured afresh.
+  const [placed, setPlace] = useState<{
+    slideKey: string;
     left: number;
     top: number;
     side: BubbleSide;
     tail: number;
   } | null>(null);
+  const place = speaking && placed?.slideKey === slideKey ? placed : null;
   const [tick, setTick] = useState(0);
   const wrapRef = useCallback((el: HTMLDivElement | null) => {
     wrap.current = el;
@@ -282,12 +287,13 @@ function useBubblePlace(speaking: boolean) {
     if (!found) return;
     const tile = rel(w.getBoundingClientRect());
     setPlace({
+      slideKey,
       left: found.left - tile.x,
       top: found.top - tile.y,
       side: found.side,
       tail: found.tail,
     });
-  }, [speaking, tick]);
+  }, [speaking, tick, slideKey]);
 
   // A stage that changes size places its bubble again.
   useLayoutEffect(() => {
@@ -311,7 +317,18 @@ function useBubblePlace(speaking: boolean) {
 }
 
 /** A tile and what it says: the speech bubble while it speaks, the thought bubble where there is detail. */
-function Tile({ id, label, t }: { id: string; label: string; t: TileState }) {
+function Tile({
+  id,
+  label,
+  t,
+  slideKey,
+}: {
+  id: string;
+  label: string;
+  t: TileState;
+  /** The slide being drawn: what a bubble belongs to. The window itself stays mounted across slides. */
+  slideKey: string;
+}) {
   const tint = castById(id).tint;
   const detail = (t.detail ?? []).filter((s) => s.items.length > 0);
   // Speaking is "its bubble is open"; named is a face that is there without one.
@@ -323,7 +340,7 @@ function Tile({ id, label, t }: { id: string; label: string; t: TileState }) {
       : t.lit || t.present
         ? "named"
         : "ghost";
-  const { wrapRef, bubbleRef, place } = useBubblePlace(speaking);
+  const { wrapRef, bubbleRef, place } = useBubblePlace(speaking, slideKey);
   return (
     <div
       ref={wrapRef}
@@ -349,12 +366,15 @@ function Tile({ id, label, t }: { id: string; label: string; t: TileState }) {
         }}
       />
       {speaking && (
-        <SpeechBubble bubbleRef={bubbleRef} place={place}>
+        // A bubble is its slide's: keyed by it, so each one arrives with its own
+        // entrance even when the same window speaks on two slides running.
+        <SpeechBubble key={`speech-${slideKey}`} bubbleRef={bubbleRef} place={place}>
           {t.bubble!.join("\n")}
         </SpeechBubble>
       )}
       {t.lit && detail.length > 0 && (
-        <ThoughtBubble label={`What ${label} did not say`}>
+        // And so is a thought: one left open closes when the deck moves on.
+        <ThoughtBubble key={`thought-${slideKey}`} label={`What ${label} did not say`}>
           <div
             data-testid="stage-thought-items"
             style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.7rem" }}
@@ -462,10 +482,13 @@ function StageView({
         {CAST.map((c) => {
           const t = tiles.get(c.id) ?? {};
           const label = plates.get(c.id) ?? c.label;
+          // Keyed by the window alone: across the slides of a round a window is
+          // the same node, so it enters once, when the room loads, and only what
+          // changed on it (the frame, the bubble, the called mark) is redrawn.
           return t.desk ? (
-            <DeskTile key={`${slideKey}-${c.id}`} id={c.id} label={label} look={t.desk} />
+            <DeskTile key={c.id} id={c.id} label={label} look={t.desk} />
           ) : (
-            <Tile key={`${slideKey}-${c.id}`} id={c.id} label={label} t={t} />
+            <Tile key={c.id} id={c.id} label={label} t={t} slideKey={slideKey} />
           );
         })}
       </div>
@@ -565,6 +588,10 @@ export function buildStandupDeck(data: StandupResponse): Deck {
     for (const d of desks) m.set(d.castId, { desk: d.look });
     return m;
   };
+  // Every slide is the same room, so every slide shares one content key and the
+  // engine keeps the stage mounted for the whole round (decks/types.ts
+  // `contentKey`): the windows enter once and keep their motion.
+  const stageKey = `${stem}-stage`;
   const stage = (slideKey: string, tiles: Map<string, TileState>) => (
     <StageView
       slideKey={slideKey}
@@ -599,6 +626,7 @@ export function buildStandupDeck(data: StandupResponse): Deck {
     return {
       id,
       title: slideTitle,
+      contentKey: stageKey,
       content: stage(id, tiles),
       copy: <Copy castId={CHAIR_CAST_ID} />,
       notes: notesOf(script.say),
@@ -662,6 +690,7 @@ export function buildStandupDeck(data: StandupResponse): Deck {
     // No title either: the chair has just said the name, so the turn is not announced again.
     return {
       id,
+      contentKey: stageKey,
       content: stage(id, tiles),
       copy: <Copy castId={castId} label={worker.label} />,
       notes: notesOf(script.say),

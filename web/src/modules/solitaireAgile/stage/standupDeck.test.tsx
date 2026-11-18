@@ -32,6 +32,7 @@ import {
   standupDayOfYear,
 } from "./seats";
 import { buildStandupDeck, callLine } from "./standupDeck";
+import { SlideRenderer } from "../../deck/engine/SlideRenderer";
 import { slideSpokenText } from "../../deck/engine/sayText";
 
 // The engine's placement needs layout, which jsdom has none of, so the bubbles'
@@ -1491,5 +1492,125 @@ describe("no silent face", () => {
     expect(friday.work).toBeUndefined();
     expect(friday.team).toBeUndefined();
     expectNoSilentFace(friday, 3);
+  });
+});
+
+// The round, played through the engine's own renderer (deck/engine/SlideRenderer.tsx,
+// which owns the content panel's key). The stage's slides share one content key,
+// so the room stays mounted from slide to slide: a window is one DOM node for the
+// whole round, enters once, and only what changed on it is redrawn.
+describe("the room stays mounted across the round", () => {
+  const ENTRANCE = /rs-pop/;
+  function play(i: number) {
+    const view = render(<SlideRenderer slide={slides[i]} slideIndex={i} isFullscreen={false} />);
+    const go = (n: number) =>
+      view.rerender(<SlideRenderer slide={slides[n]} slideIndex={n} isFullscreen={false} />);
+    const tile = (id: string) => screen.getByTestId(`tile-${id}`);
+    /** The element that carries a window's entrance: the tile inside its wrapper. */
+    const entering = (id: string) =>
+      [...tile(id).querySelectorAll<HTMLElement>("*")].filter((el) =>
+        ENTRANCE.test(el.style.animation),
+      );
+    const nodes = () =>
+      new Map(CAST.map((c) => [c.id, { wrap: tile(c.id), pop: entering(c.id)[0] }] as const));
+    return { view, go, tile, entering, nodes };
+  }
+  const speakerOf = (view: ReturnType<typeof render>) =>
+    [...view.container.querySelectorAll('[data-speaking="true"]')].map((el) =>
+      el.getAttribute("data-testid")!.replace(/^tile-/, ""),
+    );
+
+  it("every slide of the round carries the one content key, so the engine keeps the stage", () => {
+    const keys = new Set(slides.map((s) => s.contentKey));
+    expect(keys.size).toBe(1);
+    expect([...keys][0]).toMatch(/^standup-\d{4}-\d{2}-\d{2}-stage$/);
+    // The same response builds the same key: a refetch keeps the room too.
+    expect(buildStandupDeck(friday).slides()[0].contentKey).toBe(slides[0].contentKey);
+  });
+
+  it("when the speaker changes, every window is the same node and none replays its entrance", () => {
+    const { view, go, nodes, entering } = play(0);
+    const grid = screen.getByTestId("stage-grid");
+    const first = nodes();
+    // Each window has its entrance once, on the node it was first drawn with.
+    for (const c of CAST) expect(entering(c.id)).toHaveLength(1);
+    for (let i = 1; i < slides.length; i++) {
+      go(i);
+      expect(screen.getByTestId("stage-grid")).toBe(grid);
+      const now = nodes();
+      for (const c of CAST) {
+        // The same DOM nodes, wrapper and tile: nothing was remounted, so no
+        // animation on it restarted -- the entrance, the steam, the bob.
+        expect(now.get(c.id)!.wrap).toBe(first.get(c.id)!.wrap);
+        expect(now.get(c.id)!.pop).toBe(first.get(c.id)!.pop);
+        // And no new node carries an entrance for that window.
+        expect(entering(c.id)).toEqual([first.get(c.id)!.pop]);
+      }
+    }
+    view.unmount();
+  });
+
+  it("the windows nobody is speaking in keep their drawings too: the same desk, the same bust", () => {
+    const { go, tile } = play(at("call-fable"));
+    const drawn = (id: string) =>
+      tile(id).querySelector("[data-refined], [data-testid='empty-desk']");
+    const before = new Map(CAST.map((c) => [c.id, drawn(c.id)] as const));
+    go(at("fable"));
+    for (const c of CAST) expect(drawn(c.id)).toBe(before.get(c.id));
+  });
+
+  it("the new speaker has the frame and a bubble, the old one has neither", () => {
+    const { view, go, tile } = play(at("call-fable"));
+    expect(speakerOf(view)).toEqual(["pm"]);
+    expect(within(tile("dev-hero")).queryByTestId("stage-called-mark")).not.toBeNull();
+    go(at("fable"));
+    expect(speakerOf(view)).toEqual(["dev-hero"]);
+    expect(within(tile("dev-hero")).queryByTestId("stage-frame")).not.toBeNull();
+    expect(within(tile("dev-hero")).queryByTestId("stage-speech")).not.toBeNull();
+    expect(within(tile("dev-hero")).queryByTestId("stage-called-mark")).toBeNull();
+    expect(tile("dev-hero").getAttribute("data-look")).toBe("speaking");
+    expect(within(tile("pm")).queryByTestId("stage-frame")).toBeNull();
+    expect(within(tile("pm")).queryByTestId("stage-speech")).toBeNull();
+    expect(tile("pm").getAttribute("data-look")).toBe("named");
+    // One frame, one bubble, on the whole stage.
+    expect(view.container.querySelectorAll('[data-testid="stage-frame"]')).toHaveLength(1);
+    expect(view.container.querySelectorAll('[data-testid="stage-speech"]')).toHaveLength(1);
+  });
+
+  it("a bubble is its slide's: the chair speaking on two slides running gets a new bubble, with its entrance and the new words", () => {
+    // The board, then the chair's opening line: the same window speaks twice.
+    const { view, go, tile } = play(0);
+    expect(speakerOf(view)).toEqual(["pm"]);
+    const bubble = () => within(tile("pm")).getByTestId("stage-speech");
+    const first = bubble();
+    const firstText = first.textContent;
+    go(1);
+    expect(speakerOf(view)).toEqual(["pm"]);
+    expect(bubble()).not.toBe(first);
+    expect(bubble().textContent).not.toBe(firstText);
+    expect(bubble().querySelector<HTMLElement>("div")!.style.animation).toMatch(/rs-bubble/);
+    // Laid out unseen until the stage places it: the last slide's place is not this one's.
+    expect(bubble().style.visibility).toBe("hidden");
+  });
+
+  it("a thought left open does not stay open on the next slide", () => {
+    const { go, tile } = play(0);
+    fireEvent.click(within(tile("pm")).getByTestId("stage-thought-trigger"));
+    expect(screen.queryByTestId("stage-thought")).not.toBeNull();
+    go(1);
+    expect(screen.queryByTestId("stage-thought")).toBeNull();
+    // Back on a slide where the chair has detail, the thought is there to open, shut.
+    go(0);
+    expect(within(tile("pm")).queryByTestId("stage-thought-trigger")).not.toBeNull();
+    expect(screen.queryByTestId("stage-thought")).toBeNull();
+  });
+
+  it("nothing on the stage runs a set number of times but the two entrances", () => {
+    const { view } = play(at("fable"));
+    const finite = [...view.container.querySelectorAll<HTMLElement>(`.${STAGE_CLASS} *`)]
+      .map((el) => el.style.animation)
+      .filter((a) => a && !/infinite/.test(a))
+      .map((a) => a.split(" ")[0]);
+    expect([...new Set(finite)].sort()).toEqual(["rs-bubble", "rs-pop"]);
   });
 });

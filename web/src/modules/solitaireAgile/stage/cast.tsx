@@ -1119,8 +1119,8 @@ function PmScene() {
             "repeating-linear-gradient(105deg, rgba(255,255,255,0.07) 0px, rgba(255,255,255,0.07) 3px, transparent 3px, transparent 26px), rgba(11,15,25,0.72)",
         }}
       />
-      {/* the roadmap's readout, above her head */}
-      <Readout top="20%" left="20%" color={pf.green}>
+      {/* the roadmap's readout, up in the corner at the desk motor's inset */}
+      <Readout top="5%" left="16%" color={pf.green}>
         ROADMAP ▲ STABLE
       </Readout>
     </div>
