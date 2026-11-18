@@ -2516,6 +2516,8 @@ function global:Invoke-P20TestAll {
         [ValidateSet('cli', 'agent', 'web')]
         [string]$Half,
         [switch]$Fast,
+        [switch]$Isolated,
+        [switch]$Keep,
         [switch]$Help
     )
     if ($Help) { Show-CommandHelp 'Test'; return }

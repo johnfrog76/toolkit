@@ -11,6 +11,7 @@ count disagrees with [the counts](TEST-COUNTS.md). [`VERIFY.md`](../VERIFY.md) i
 tkTest                   # the agent, the CLI, the web UI -- one summary, one verdict
 tkTest -Half agent       # one half: cli, agent or web
 tkTest -Fast             # the CLI runner's -Fast; the agent and the web run in full
+tkTest -Isolated         # macOS: a home, caches and test history of its own, so two can run at once
 ```
 
 `tkTest` runs `pytest` (through the Python that has it, below), the CLI runner and `npm test`, in that order, each in its own child with the environment its runner
@@ -323,6 +324,60 @@ read after upgrading is the last record, not "not run"; the old file is left whe
 It is copied, not merged: of a main checkout and its worktrees, whichever reads first brings its record, and later
 runs write over it. Another machine's `test-summary.<machine>.json` still shows on the card the way it always
 has: copy it into this folder beside yours. Nothing syncs it.
+
+## Two runs at once: -Isolated
+
+Two full `tkTest` runs started at the same moment on one Mac can crash each other: PowerShell children die
+at startup with `The given assembly name was invalid`, the name cut short. Both runs read and write the same
+startup caches under the home folder (`~/.cache/powershell`) and the same test-history file. A plain `tkTest`
+is still one at a time per machine. **`tkTest -Isolated`** runs the same halves, prints the same summary,
+expected-vs-actual lines and counts block, and gives the run state of its own:
+
+```powershell
+tkTest -Isolated         # a folder of its own, removed after the summary
+tkTest -Isolated -Keep   # the folder is left in place, and its path printed
+```
+
+The run's folder is `/tmp/p20-isolated-<process id>-<random>`, made fresh and readable by you alone; the
+process id and the random part keep two runs started in the same second apart. The verb starts the usual run
+(itself, without the switch) in a child whose environment points into that folder; the shell you typed it in
+keeps its own environment:
+
+| Folder | Variables | What lands there |
+| --- | --- | --- |
+| `home/` | `HOME` | everything a tool keeps under the home folder: PowerShell's user module folder, npm's cache and logs, .NET's per-user files |
+| `tmp/` | `TMPDIR`, `TMP`, `TEMP` | temp files, jest's cache, and .NET's diagnostics socket for every process |
+| `cache/` | `XDG_CACHE_HOME` | PowerShell's startup caches (`StartupProfileData-NonInteractive`, `ModuleAnalysisCache-*`) |
+| `data/`, `config/` | `XDG_DATA_HOME`, `XDG_CONFIG_HOME` | set so nothing reaches the real ones |
+| `history/` | `P20_TEST_HISTORY_DIR` | the run's own `test-summary.<machine>.json` and `test-results.<machine>.log` -- never the machine's ([Where the record lives](#where-the-record-lives)) |
+
+It sits in `/tmp` rather than the per-user temp folder because a socket path on macOS holds at most 104 bytes:
+the per-user temp folder plus a run folder is long enough to cut .NET's socket names short, and two processes
+would then aim at one socket.
+
+**What the run carries from your real home**, so that its counts are a plain run's: the test venv
+(`~/.venv-toolkit`, linked, so the agent half picks the same Python and its line still ends
+`[via ~/.venv-toolkit/bin/python]`), and git's global settings (`~/.gitconfig`, and `config`, `ignore` and
+`attributes` under `~/.config/git`), copied, so a suite that builds a fixture repository reads what it reads
+in a plain run. Nothing else: `gh`'s and `az`'s sign-ins stay where they are, because no suite may reach a real
+tracker. An isolated run's counts are a plain run's on the same commit; a difference is a bug.
+
+**Ports: none to move.** No half binds a fixed port -- the suites that serve HTTP ask the system for a free one --
+so two runs cannot collide on one. The browser smoke, which does use the dev server's port, is not part of `tkTest`.
+
+Without `-Keep` the folder is removed after the summary, whatever the verdict, and a link inside it is unlinked,
+never followed. With `-Keep` it stays, so a failure can be read afterwards: the run's history is in its
+`history/` folder. Remove it yourself when you are done.
+
+**A known limit: the shell you type it in.** Only the child is isolated. The PowerShell that runs
+`tkTest -Isolated` itself started before the switch was read, so it read the real home's startup caches, and it
+writes them again when it exits. Pairs of isolated runs started in the same second have passed with this
+in place, so it is left as it is; if two runs ever do crash at the launcher's own start, start them a moment apart.
+
+**macOS only, in this version.** On Linux and Windows `-Isolated` refuses and says so (exit 2), and so does
+`-Keep` without `-Isolated` everywhere. There, run one `tkTest` at a time. `tkTestToolkit -TestAll` holds the
+plan (what each variable is set to, what is carried, the socket-path budget), the two refusals on every host,
+and on macOS a stubbed isolated run end to end.
 
 ## In CI
 
