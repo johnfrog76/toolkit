@@ -231,8 +231,9 @@ def suggest_items(
     ``@<login>`` -- else its size), its milestone and due date, its
     createdAt, and its lane from the card in ``current/`` whose id is its number
     (Active without one). A card in ``current/`` whose id is no issue in the read
-    is its own item: severity and size from its Tags line, who from its
-    **Assigned:** line (else its size), its milestone from its **Sprint:** line,
+    is its own item: severity and size from its Tags line, who from its worker --
+    its Agent line's family, else its **Assigned:** line (``card_worker``, on the
+    card row) -- else its size, its milestone from its **Sprint:** line,
     its **Created:** day and its lane. A not-billable card is an item with
     ``billable`` false and adds nothing to an issue. ``waiting`` is every ref on
     the queue. A milestone's ``open`` counts its billable items, once per id."""

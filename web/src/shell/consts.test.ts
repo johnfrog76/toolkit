@@ -21,6 +21,7 @@ import {
   DOCS,
   FEATURES,
   FOLDERS,
+  MODELS,
   ORG,
   RE,
   REMINDERS,
@@ -61,6 +62,8 @@ describe("consts.json", () => {
     // A card's two planning lines, each its own (Plan -Milestone, Plan -Sprint).
     expect(STAMPS.milestone).toBe("**Milestone:**");
     expect(STAMPS.sprint).toBe("**Sprint:**");
+    // Who did the work on a card an agent worked: its model id, beside the Assigned line.
+    expect(STAMPS.agent).toBe("**Agent:**");
     expect(TOKENS.prUrl).toBe("PR URL:");
     expect(TOKENS.prReviewHeading).toBe("## PR Review Comments");
     expect(TOKENS.previousRound).toBe("> Previous round:");
@@ -504,6 +507,11 @@ describe("consts.json", () => {
     expect(orgDoc).toMatch(/docs\/hub\/org\.md/);
     expect(orgKeys).toEqual({ file: "org.json" });
 
+    // The model map a card's Agent id is looked up in (docs/hub/cards.md).
+    const { _: modelsDoc, ...modelsKeys } = MODELS as typeof MODELS & { _: string };
+    expect(modelsDoc).toMatch(/Config\/models\.json/);
+    expect(modelsKeys).toEqual({ file: "Config/models.json" });
+
     // The statuses a reply may set, per tracker.
     expect(REPLY_STATUSES_BY_TRACKER.ado).toEqual([
       "fixed",
@@ -544,6 +552,7 @@ describe("consts.json", () => {
         "features",
         "folders",
         "ghReads",
+        "models",
         "org",
         "regex",
         "reminders",
@@ -665,6 +674,7 @@ describe("no half retypes a contract literal", () => {
     ["stamps.assigned", STAMPS.assigned],
     ["stamps.from", STAMPS.from],
     ["stamps.milestone", STAMPS.milestone],
+    ["stamps.agent", STAMPS.agent],
     ["stamps.started", STAMPS.started],
     ["stamps.review", STAMPS.review],
     ["stamps.cover", STAMPS.cover],

@@ -497,6 +497,19 @@ try {
     $seenSug = (@($sugRows | Sort-Object { $_.id } | ForEach-Object { "$($_.id)|$($_.sprint)|$($_.created)|$((@($_.tags)) -join ',')|$($_.assigned)" })) -join "`n"
     $wantSug = "23A3|M2 -- 1.2.0, the standup sees the work|2026-09-20|spec,sev2,sonnet|me`nK7M2||||"
     Assert-True 'Get-P20StandupCards: the milestone a card names (whole), its Created day, its Tags, who takes it (agent: the same)' ($seenSug -ceq $wantSug) ("`n--- got ---`n$seenSug`n--- want ---`n$wantSug")
+
+    # A card routed with Route -Assign sonnet carries the Agent line alone: the
+    # standup's row and the suggestion see it as sonnet (agent: the same).
+    $routedDir = Join-Path $readerDir 'routed'
+    New-Item -ItemType Directory -Path (Join-Path $routedDir 'current') -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $routedDir 'current/TaskR2DW-routed-to-sonnet.prompt.md'),
+        "# Task R2DW: Routed to sonnet`n`n---`n`n**Agent:** claude-sonnet-5-5`n**Created:** 2026-09-20`n", $utf8r)
+    $routedRows = @(Get-P20StandupCards -CurrentDir (Join-Path $routedDir 'current') -ArchiveDir (Join-Path $routedDir 'archive') -Pattern $pattern)
+    Assert-True 'Get-P20StandupCards: a card routed to sonnet (its Agent line alone) is taken by sonnet' ($routedRows.Count -eq 1 -and [string]$routedRows[0].assigned -ceq 'sonnet') (($routedRows | ForEach-Object { "$($_.id)|$($_.assigned)" }) -join ' / ')
+    if (-not (Get-Command Get-P20SuggestionItems -ErrorAction SilentlyContinue)) { . (Join-Path $pkgRoot 'Scripts/Suggest-Rules.ps1') }
+    $routedLabels = @([pscustomobject]@{ name = 'sonnet'; description = 'Routed to sonnet -- the crew' })
+    $routedItems = @(Get-P20SuggestionItems -Labels $routedLabels -Issues @() -Cards $routedRows -PackageRoot $pkgRoot)
+    Assert-True 'and the suggestion sizes it as sonnet: who is sonnet' ($routedItems.Count -eq 1 -and [string]$routedItems[0].who -ceq 'sonnet') (($routedItems | ForEach-Object { "$($_.ref)|$($_.who)" }) -join ' / ')
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message

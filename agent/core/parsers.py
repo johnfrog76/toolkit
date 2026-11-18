@@ -26,6 +26,7 @@ from .consts import (
     re_review_line,
     re_started_line,
     re_tag_separator,
+    stamp_agent,
     stamp_assigned,
     stamp_billable,
     stamp_created,
@@ -41,6 +42,10 @@ from .consts import (
     token_previous_round,
     token_tags,
 )
+
+# The model map: card_worker takes a known Agent id's family from it (it reads
+# consts only, so the import is not a cycle).
+from .models import model_info
 
 # The state vocabulary and the two patterns that derive it come from
 # consts.json, the package's contract file -- NOT from literals here. This
@@ -199,6 +204,41 @@ def card_assigned(content: str) -> str:
     and ``Tests/fixtures/parsers/assigned-lines.json`` holds the two to one table."""
     m = re.search(r"(?m)^" + re.escape(stamp_assigned()) + r"[ \t]*([^\r\n]*?)[ \t]*\r?$", content or "")
     return m.group(1) if m else ""
+
+
+def card_agent(content: str) -> str:
+    """Who did the work, when an agent did: the value of the card's first
+    ``**Agent:**`` line, trimmed -- a model id, as written -- and "" when it has
+    none (a person worked it alone).
+
+    The line sits beside ``**Assigned:**``: the person owns the card, the agent
+    worked it. The value is never parsed here; ``agent/core/models.py``'s
+    ``model_info`` looks it up in the model map. The one reader of
+    ``stamps.agent`` in this half; the CLI's mirror is ``Get-P20CardAgent`` in
+    ``Scripts/Get-PromptFileStatus.ps1``, and ``Tests/fixtures/parsers/agent-lines.json``
+    holds the two to one table."""
+    m = re.search(r"(?m)^" + re.escape(stamp_agent()) + r"[ \t]*([^\r\n]*?)[ \t]*\r?$", content or "")
+    return m.group(1) if m else ""
+
+
+def card_worker(content: str) -> str:
+    """Who works the card, as a FAMILY-shaped string the standup, the suggestion
+    and StartWork -Launch compare against sizes: when the card has an
+    ``**Agent:**`` line, the model map's family for its id if the id is known,
+    else the id as written; with no Agent line, exactly ``card_assigned``'s value,
+    as those readers took it before (a size, ``me``, or "").
+
+    A BRIDGE: it stands in for the shared resolver of a card's agent
+    (``resolve_card_agent``) until that lands, and that change
+    removes it. Its one caller in this half is the standup's card rows
+    (``agent/solitaire/standup.py``); add none. The CLI's mirror is
+    ``Get-P20CardWorker``, and ``Tests/fixtures/parsers/card-worker.json`` holds
+    the two to one table."""
+    agent_id = card_agent(content)
+    if not agent_id:
+        return card_assigned(content)
+    info = model_info(agent_id)
+    return str(info["family"]) if info["known"] and info["family"] else agent_id
 
 
 def card_from_record(content: str) -> str | None:
@@ -490,7 +530,7 @@ def backlog_rows(
 def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES, folder: str = "") -> dict:
     """Extract the file-content-derived fields of PromptInfo.
 
-    Returns a dict with keys: title, type, name, linked, tracker, billable, assigned, from_record, sprint,
+    Returns a dict with keys: title, type, name, linked, tracker, billable, assigned, agent, from_record, sprint,
     milestone, tags, progress, checked, total, ado_url, pr_url, previous_round, design, commits, status --
     the content half of the Card model (docs/hub/cards.md, "The model, as the agent serves it").
     ``id`` comes from the FILENAME (``card_id``), so the caller adds it. Fields that need filesystem access (file
@@ -558,6 +598,8 @@ def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES, folder:
         "billable": card_billable(content),
         # Who takes it: the **Assigned:** line's value (me, or a size), "" for nobody.
         "assigned": card_assigned(content),
+        # Who did the work, when an agent did: the **Agent:** line's model id, "" for none.
+        "agent": card_agent(content),
         # The meeting record an agenda line came from: the **From:** line's
         # record stem, None when the card names none (NewPrompt -From writes it).
         "from_record": card_from_record(content),

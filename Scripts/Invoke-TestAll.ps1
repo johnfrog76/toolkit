@@ -97,6 +97,14 @@ if ($Isolated) {
         Write-CliError -Message '-Isolated starts the run in pwsh, and there is no pwsh on the PATH.' -Hint 'Install PowerShell 7 (docs/QUICKSTART.md, "Requirements").'
         exit 2
     }
+    # A run killed past its finally leaves its folder; this one removes those
+    # older than a day, and names each. It never stops the run.
+    try {
+        foreach ($swept in @(Remove-P20StaleIsolatedRunDirs)) {
+            Write-Host ('  ' + ((Get-P20IsolatedRunPrefix).SweptLine -f $swept)) -ForegroundColor DarkGray
+        }
+    }
+    catch { $null = $_ }
     $isoEnv = @{}
     foreach ($v in @(Get-ChildItem Env:)) { $isoEnv[$v.Name] = $v.Value }
     $runDir = Join-Path (Get-P20IsolatedRunPrefix).Base (Get-P20IsolatedRunName -ProcessId $PID)
@@ -127,6 +135,7 @@ if ($Isolated) {
     finally {
         if ($Keep) {
             if (Test-Path -LiteralPath $runDir) {
+                $null = Set-P20IsolatedRunKept -Path $runDir
                 Write-Host "  Kept $runDir -- this run's test history is in its history folder." -ForegroundColor DarkGray
                 Write-Host ""
             }
