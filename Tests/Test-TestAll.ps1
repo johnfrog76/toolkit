@@ -1341,6 +1341,49 @@ Assert-True 'two runs with one process id in one second get two names' ($n1 -ne 
 Assert-True 'a run folder is recognised by its name' ((Test-P20IsolatedRunDir (Join-Path '/tmp' $n1)) -and (Test-P20IsolatedRunDir ($n1 + '/')))
 Assert-True 'and nothing else is' (-not (Test-P20IsolatedRunDir '/tmp') -and -not (Test-P20IsolatedRunDir '') -and -not (Test-P20IsolatedRunDir (Join-Path $realHome '.venv-toolkit')) -and -not (Test-P20IsolatedRunDir '/tmp/p20-isolated-x-ab'))
 Assert-True 'Remove refuses a folder that is not a run folder' (-not (Remove-P20IsolatedRunDir -Path $scriptDir) -and (Test-Path -LiteralPath $scriptDir))
+
+# -- 3h. The sweep of folders a killed run left, in a scratch base ---------------
+Write-Host ""
+Write-Host "-- -Isolated's sweep: stale folders go, kept and live ones stay --" -ForegroundColor Cyan
+$isoCfg = Get-P20IsolatedRunPrefix
+Assert-True 'a day is the age, and the kept marker and swept line are named once' ($isoCfg.MaxAgeDays -eq 1 -and $isoCfg.KeptMarker -and $isoCfg.SweptLine -match '\{0\}')
+if (Test-Path -LiteralPath '/bin/rm') {
+    $sweepBase = Join-Path ([System.IO.Path]::GetTempPath()) ('p20-sweep-test-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+    New-Item -ItemType Directory -Path $sweepBase -Force | Out-Null
+    try {
+        $deadId = 99999999
+        $old = (Get-Date).AddDays(-3)
+        $mk = {
+            param([string]$Name, [datetime]$When)
+            $d = Join-Path $sweepBase $Name
+            New-Item -ItemType Directory -Path (Join-Path $d 'home') -Force | Out-Null
+            (Get-Item -LiteralPath $d).LastWriteTime = $When
+            return $d
+        }
+        $stale = & $mk "p20-isolated-$deadId-aaaa1111" $old
+        $fresh = & $mk "p20-isolated-$deadId-bbbb2222" (Get-Date).AddHours(-2)
+        $keptDir = & $mk "p20-isolated-$deadId-cccc3333" $old
+        $live = & $mk "p20-isolated-$PID-dddd4444" $old
+        $other = & $mk 'some-other-folder' $old
+        $nearName = & $mk 'p20-isolated-x-ab' $old
+        Assert-True 'Set-P20IsolatedRunKept marks a run folder, and refuses a name that is not one' ((Set-P20IsolatedRunKept -Path $keptDir) -and (Test-Path -LiteralPath (Join-Path $keptDir $isoCfg.KeptMarker)) -and -not (Set-P20IsolatedRunKept -Path $other))
+        (Get-Item -LiteralPath $keptDir).LastWriteTime = $old
+        $gone = @(Remove-P20StaleIsolatedRunDirs -Base $sweepBase)
+        Assert-True 'a stale folder is removed, and named in what is returned' ($gone.Count -eq 1 -and $gone[0] -eq $stale -and -not (Test-Path -LiteralPath $stale)) ($gone -join ',')
+        Assert-True 'a fresh folder is kept' (Test-Path -LiteralPath $fresh)
+        Assert-True 'a -Keep folder is kept, however old' (Test-Path -LiteralPath $keptDir)
+        Assert-True 'a folder of a live process is kept, however old' (Test-Path -LiteralPath $live)
+        Assert-True 'a folder that is not a run folder is untouched, and so is a near miss' ((Test-Path -LiteralPath $other) -and (Test-Path -LiteralPath $nearName))
+        Assert-True 'a second sweep removes nothing' (@(Remove-P20StaleIsolatedRunDirs -Base $sweepBase).Count -eq 0)
+        Assert-True 'a base that does not exist is no error and removes nothing' (@(Remove-P20StaleIsolatedRunDirs -Base (Join-Path $sweepBase 'absent')).Count -eq 0)
+        Assert-True 'the age is the caller''s to move: a later clock takes the fresh one' ((@(Remove-P20StaleIsolatedRunDirs -Base $sweepBase -Now (Get-Date).AddDays(5)) | ForEach-Object { Split-Path -Leaf $_ }) -contains (Split-Path -Leaf $fresh) -and (Test-Path -LiteralPath $keptDir) -and (Test-Path -LiteralPath $live))
+    }
+    finally {
+        Remove-Item -LiteralPath $sweepBase -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+$isoSource = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'Scripts/TestAll-Isolated.ps1'))
+Assert-True 'the child is waited on after a kill, so the folder is not removed under it' ($isoSource -match '(?s)finally \{.*\$p\.Kill\(\);\s*\$null = \$p\.WaitForExit')
 # .NET puts a socket per process in TMPDIR, and a socket path on macOS holds
 # 104 bytes with its terminator: the longest name, with the longest process id,
 # must fit, or two processes aim at one cut-short name.
@@ -1364,6 +1407,8 @@ $isoBlock = [regex]::Match($verbSource, '(?s)if \(\$Isolated\) \{.*?\r?\n    exi
 Assert-True '-Isolated is handled before any half runs, and ends in its own exit' ($isoBlock -and $verbSource.IndexOf($isoBlock) -lt $verbSource.IndexOf('$runners = @{'))
 Assert-True 'and changes no variable in the launcher: the child gets the plan''s' ($isoBlock -notmatch '(?m)^\s*\$env:\w+\s*=' -and $isoBlock -notmatch 'SetEnvironmentVariable' -and $isoBlock -match 'Invoke-P20IsolatedChild [^\r\n]*-Variables \$plan\.Variables')
 Assert-True 'and the folder is removed in a finally unless -Keep' ($isoBlock -match '(?s)finally \{.*if \(\$Keep\).*Remove-P20IsolatedRunDir')
+Assert-True 'the folder is marked kept under -Keep, before the finally ends' ($isoBlock -match '(?s)finally \{.*if \(\$Keep\).*Set-P20IsolatedRunKept')
+Assert-True 'a sweep of stale folders runs before the run''s own folder is made, and cannot stop the run' ($isoBlock -match '(?s)try \{\s*foreach \(\$swept in @\(Remove-P20StaleIsolatedRunDirs\)\).*?catch \{ \$null = \$_ \}.*Get-P20IsolatedRunName' -and $isoBlock -match '(?s)Remove-P20StaleIsolatedRunDirs.*Initialize-P20IsolatedRun')
 Assert-True 'the CLI runner names each suite before it starts it' ($runnerSource -match "(?s)--\s+started\s+\{1\}.{0,400}Invoke-P20TestHost\s+-File")
 $cfg = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'config.default.json')) | ConvertFrom-Json
 Assert-True 'config: Test outlasts the bridge''s default timeout' ([int]$cfg.commands.Test.bridgeTimeoutSeconds -ge 1800)
