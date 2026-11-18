@@ -1108,6 +1108,10 @@ Assert-True 'the cards fill seats the engineer and fills the room: its one tile 
 # present, both in the round.
 $sameSlug = Invoke-P20StandupJoinedFill -AsOf $absentAt -Labels @(@{ name = 'opus'; description = 'Routed to Opus -- the crash-through volume' }) -Issues @(@{ number = 801; title = 'Trim the export header'; state = 'OPEN'; labels = @('opus'); closedAt = $null; url = 'https://github.com/acme/widgets/issues/801'; body = ''; milestone = @{ title = 'Phase 6' } }) -Tracker @{ ok = $true; reason = '' } -Cards @($teamCases[4].cards) -Space 'opus' -SpaceName 'Opus' -PackageRoot $pkgRoot -TeamSize 3
 Assert-True 'a Space whose slug is a worker label seats the engineer and the worker: two members, both present, both in the round' (@($sameSlug.workers).Count -eq 2 -and @($sameSlug.workers | Where-Object { $_.present }).Count -eq 2 -and ((@($sameSlug.work.workers | ForEach-Object { "$($_.label)/$([bool]$_.cast)" })) -join ',') -ceq 'opus/False,opus/False') ((@($sameSlug.work.workers | ForEach-Object { "$($_.label)/$([bool]$_.cast)" })) -join ',')
+# Its brief: the worker gets the in-flight treatment, the engineer (the record's last) its own.
+$sameBrief = @((Format-P20StandupBrief -Standup $sameSlug -PackageRoot $pkgRoot) -split "`n" | Where-Object { $_.StartsWith('Opus: ') })
+$inFlightSaid = [string]$consts.rituals.text.briefInFlight
+Assert-True 'a Space whose slug is a worker label: the brief gives the worker the in-flight line and the engineer its own' ($sameBrief.Count -eq 2 -and $sameBrief[0].Contains($inFlightSaid) -and -not $sameBrief[1].Contains($inFlightSaid)) ($sameBrief -join ' | ')
 # A full idle room never repeats a made-up line: eight idle members -- the
 # engineer and seven invented -- say two different items each, none repeated on
 # one day, and the chair's own made-up yesterday is none of them. Every day of

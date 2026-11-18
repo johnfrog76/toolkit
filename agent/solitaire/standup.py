@@ -2285,7 +2285,7 @@ def render_brief(filled: Standup) -> str:
             best_noun, best_count = noun, count
     if not best_count:
         lines.append(t["queueEmpty"])
-    for w in filled.workers:
+    for at, w in enumerate(filled.workers):
         if w.empty:
             lines.append(f"{w.name}: {t['briefWorkerNone']}.")
             continue
@@ -2302,7 +2302,7 @@ def render_brief(filled: Standup) -> str:
             bits.append(t["countsStarted"].replace("{n}", str(mine.started)))
         if mine.commits:
             bits.append(commits_said(mine.commits))
-        if issues and not (filled.source == "both" and w.label == filled.space):
+        if issues and not (filled.source == "both" and at == len(filled.workers) - 1):
             bits.append(t["briefInFlight"])
         if blockers > 1:
             bits.append(t["briefBlockers"].replace("{n}", str(blockers)))

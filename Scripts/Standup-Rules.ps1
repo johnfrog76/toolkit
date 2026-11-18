@@ -2426,7 +2426,11 @@ function Format-P20StandupBrief {
     if ($bestCount -eq 0) { $lines.Add([string]$t.queueEmpty) }
 
     $workers = @($Standup.workers | Where-Object { $null -ne $_ })
+    # On a joined read the engineer is the record's last worker, the card tile.
+    $seat = 0
     foreach ($w in $workers) {
+        $isTile = ($seat -eq $workers.Count - 1)
+        $seat++
         if ($w.empty) { $lines.Add([string]$w.name + ': ' + [string]$t.briefWorkerNone + '.'); continue }
         $closed = @($w.yesterday | Where-Object { $null -ne $_ }).Count
         $blockers = @($w.blockers | Where-Object { $null -ne $_ }).Count
@@ -2441,7 +2445,7 @@ function Format-P20StandupBrief {
         $mine = $counted[[string]$w.label]
         if ($null -ne $mine -and [int]$mine.started -gt 0) { $bits += (& $fill $t.countsStarted ([int]$mine.started)) }
         if ($null -ne $mine -and [int]$mine.commits -gt 0) { $bits += (Get-P20StandupCommitsText ([int]$mine.commits)) }
-        if ($issues -and -not ($both -and [string]$w.label -ceq [string]$Standup.space)) { $bits += [string]$t.briefInFlight }
+        if ($issues -and -not ($both -and $isTile)) { $bits += [string]$t.briefInFlight }
         if ($blockers -gt 1) { $bits += (& $fill $t.briefBlockers $blockers) }
         elseif ($blockers -eq 1) { $bits += (& $fill $t.briefBlocker $blockers) }
         else { $bits += [string]$t.blockersEmpty }

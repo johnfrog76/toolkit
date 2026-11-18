@@ -1544,6 +1544,12 @@ class TheTeamTable(unittest.TestCase):
         self.assertEqual([w.present for w in filled.workers], [True, True])
         self.assertEqual([w.label for w in filled.work.workers], ["opus", "opus"])
         self.assertEqual(sum(1 for w in filled.work.workers if w.cast), 0)
+        # Its brief: the worker gets the in-flight line, the engineer (the record's last) its own.
+        said = C.rituals_text()["briefInFlight"]
+        mine = [ln for ln in standup.render_brief(filled).splitlines() if ln.startswith("Opus: ")]
+        self.assertEqual(len(mine), 2)
+        self.assertIn(said, mine[0])
+        self.assertNotIn(said, mine[1])
 
     def test_the_walk_rows_are_the_three_rooms(self):
         """A Space with no worker labels whose engineer has work, at 3, 6 and 9: the
