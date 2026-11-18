@@ -508,22 +508,26 @@
       "bridgeTimeoutSeconds": 3600,
       "category": "test",
       "description": "Run all three halves' suites and report them",
-      "usage": "{cliPrefix}Test [-Half cli|agent|web] [-Fast] [-Help]",
+      "usage": "{cliPrefix}Test [-Half cli|agent|web] [-Fast] [-Isolated] [-Keep] [-Help]",
       "examples": [
         "{cliPrefix}Test",
         "{cliPrefix}Test -Half agent",
-        "{cliPrefix}Test -Fast"
+        "{cliPrefix}Test -Fast",
+        "{cliPrefix}Test -Isolated"
       ],
       "notes": [
         "In order: the agent (pytest, the interpreter from Resolve-Python -- never python3 on Windows), the CLI ({cliPrefix}TestToolkit's runner), the web UI (npm test in web/). Each runner sets its own environment; npm test, which sets none, gets the webhooks removed and the run marker set.",
         "A half that cannot run is skipped and says why -- no Python, no pytest or httpx, no pwsh, no npm, no web/node_modules -- and the verdict names it SKIPPED, not passed.",
         "Exit 0 when every half that ran passed; exit 2, after the summary, when a half failed or none ran.",
         "Expected vs actual, per half, from docs/TESTING.md's own lines: information, not a failure -- the merger pastes those counts from the Mac's run.",
-        "test-summary.<machine>.json gains a half field per suite and a halves block, each record with the checkout and commit it ran from; the System page's Health card and {cliPrefix}Setup read the whole machine from it. It lives in the machine's test-history folder, one for every checkout and git worktree ({cliPrefix}TestToolkit's notes say where)."
+        "test-summary.<machine>.json gains a half field per suite and a halves block, each record with the checkout and commit it ran from; the System page's Health card and {cliPrefix}Setup read the whole machine from it. It lives in the machine's test-history folder, one for every checkout and git worktree ({cliPrefix}TestToolkit's notes say where).",
+        "-Isolated (macOS only) runs the same halves with a home, a temp folder, PowerShell's caches and a test history of their own, in a folder under /tmp, so two runs can start at once; it prints the same summary and removes the folder after. -Keep leaves the folder and names it. Elsewhere, and -Keep without -Isolated, it refuses and says why."
       ],
       "switches": {
         "-Half": "One half: cli, agent or web",
         "-Fast": "Passed to the CLI runner's -Fast (the suites that spawn no shell); the agent and web halves run in full",
+        "-Isolated": "macOS only: the run gets its own home, temp folder, PowerShell caches and test history, so two can run at once",
+        "-Keep": "With -Isolated: keep the run's folder afterwards and print where it is",
         "-Help": "This"
       }
     },

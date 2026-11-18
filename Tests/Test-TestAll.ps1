@@ -627,7 +627,7 @@ exit 0
                 $body = "#!/bin/sh`nd=`"`${0%/*}`"`nif [ `"`$1`" = `"-m`" ]; then`n  while IFS= read -r l || [ -n `"`$l`" ]; do printf '%s\n' `"`$l`"; done < `"`$d/python-out.txt`"`n  read code < `"`$d/python-exit.txt`"; exit `$code`nfi`ncase `"`$2`" in`n  *'import sys'*) echo 3.12.0; exit 0;;`n  *'import httpx'*) if [ -f `"`$d/nohttpx`" ]; then exit 1; fi; exit 0;;`nesac`nexit 0`n"
             }
             else {
-                $body = "#!/bin/sh`nd=`"`${0%/*}`"`necho `"NPM-ARGS: `$*`"`necho `"HOOK=[`$TEAMS_WEBHOOK_TESTALL43] MARKER=[`$P20_TEST_RUN]`"`necho `"OVERRIDES=[`$P20_ACTIVE_SPACE][`$PROMPTS_ROOT]`"`nwhile IFS= read -r l || [ -n `"`$l`" ]; do printf '%s\n' `"`$l`"; done < `"`$d/npm-out.txt`"`nread code < `"`$d/npm-exit.txt`"; exit `$code`n"
+                $body = "#!/bin/sh`nd=`"`${0%/*}`"`necho `"NPM-ARGS: `$*`"`necho `"HOOK=[`$TEAMS_WEBHOOK_TESTALL43] MARKER=[`$P20_TEST_RUN]`"`necho `"OVERRIDES=[`$P20_ACTIVE_SPACE][`$PROMPTS_ROOT]`"`necho `"ISO-HOME=[`$HOME] ISO-TMPDIR=[`$TMPDIR] ISO-CACHE=[`$XDG_CACHE_HOME] ISO-HISTORY=[`$P20_TEST_HISTORY_DIR]`"`nwhile IFS= read -r l || [ -n `"`$l`" ]; do printf '%s\n' `"`$l`"; done < `"`$d/npm-out.txt`"`nread code < `"`$d/npm-exit.txt`"; exit `$code`n"
             }
             $stubPath = Join-Path $bin $Name
             [System.IO.File]::WriteAllText($stubPath, $body, $enc)
@@ -841,7 +841,69 @@ exit 0
 
     # -Help.
     $r = Invoke-TestVerb @('-Help')
-    Assert-True '-Help renders the usage from config' ($r.Exit -eq 0 -and $r.Text -match [regex]::Escape('Test [-Half cli|agent|web] [-Fast] [-Help]')) $r.Text
+    Assert-True '-Help renders the usage from config' ($r.Exit -eq 0 -and $r.Text -match [regex]::Escape('Test [-Half cli|agent|web] [-Fast] [-Isolated] [-Keep] [-Help]')) $r.Text
+
+    # -- 3f. -Isolated: refusals on every host, a stubbed run on macOS --------
+    Write-Host ""
+    Write-Host "-- -Isolated: the refusals, and a stubbed run in a folder of its own --" -ForegroundColor Cyan
+    $r = Invoke-TestVerb @('-Keep')
+    Assert-True '-Keep without -Isolated: exit 2' ($r.Exit -eq 2) "exit $($r.Exit)"
+    Assert-True 'stated once, naming -Isolated, and no half ran' (@($r.Text -split "`n" | Where-Object { $_ -match '^Error: -Keep keeps an isolated run' }).Count -eq 1 -and $r.Text -match 'Test -Isolated -Keep' -and $r.Text -notmatch 'the agent half') $r.Text
+    . (Join-Path $pkgRoot 'Scripts/TestAll-Isolated.ps1')
+    $onMac = ((Get-P20TestHistoryPlatform) -eq 'macos')
+    if (-not $onMac) {
+        $r = Invoke-TestVerb @('-Isolated')
+        Assert-True '-Isolated off macOS: exit 2' ($r.Exit -eq 2) "exit $($r.Exit)"
+        Assert-True 'stated once, naming macOS, and no half ran' (@($r.Text -split "`n" | Where-Object { $_ -match '^Error: -Isolated runs on macOS only' }).Count -eq 1 -and $r.Text -notmatch 'the agent half') $r.Text
+        $r = Invoke-TestVerb @('-Isolated', '-Keep')
+        Assert-True '-Isolated -Keep off macOS: the same refusal, exit 2' ($r.Exit -eq 2 -and $r.Text -match 'runs on macOS only') "exit $($r.Exit)"
+    }
+    else {
+        # The real home's test venv and git settings are carried: the venv's
+        # stub prints its own count, so the agent line shows which ran.
+        $venvBin = Join-Path $fakeHome '.venv-toolkit/bin'
+        New-Item -ItemType Directory -Path $venvBin -Force | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $venvBin 'python'), "#!/bin/sh`nif [ `"`$1`" = `"-m`" ]; then echo '===== 7 passed in 1.0s ====='; exit 0; fi`nexit 0`n", $enc)
+        & chmod +x (Join-Path $venvBin 'python')
+        [System.IO.File]::WriteAllText((Join-Path $fakeHome '.venv-toolkit/keep-me'), 'x', $enc)
+        [System.IO.File]::WriteAllText((Join-Path $fakeHome '.gitconfig'), "[user]`n`tname = fixture`n", $enc)
+        $machineSummary = ''
+        if (Test-Path -LiteralPath $summaryFile) { $machineSummary = [System.IO.File]::ReadAllText($summaryFile) }
+
+        $r = Invoke-TestVerb @('-Isolated', '-Keep')
+        $km = [regex]::Match($r.Text, '(?m)^\s*Kept (\S+) -- ')
+        $kept = ''
+        if ($km.Success) { $kept = $km.Groups[1].Value }
+        Assert-True '-Isolated -Keep: exit 0, the folder named' ($r.Exit -eq 0 -and $kept -and (Test-Path -LiteralPath $kept)) "exit $($r.Exit)`n$($r.Text)"
+        Assert-True 'the folder is in /tmp, with the run folder''s name' ((Test-P20IsolatedRunDir $kept) -and $kept.StartsWith('/tmp/p20-isolated-')) $kept
+        Assert-True 'the same summary and verdict as a plain run' ((Get-Line $r.Text 'cli') -match 'PASS\s+10 passed, 0 failed, 1 skipped' -and (Get-Line $r.Text 'web') -match 'PASS\s+40 passed' -and $r.Text -match 'Verdict: PASSED -- agent, cli, web\.') $r.Text
+        Assert-True 'the agent half ran the carried test venv' ((Get-Line $r.Text 'agent') -match 'PASS\s+7 passed' -and (Get-Line $r.Text 'agent') -match [regex]::Escape('[via ~/.venv-toolkit/bin/python]')) (Get-Line $r.Text 'agent')
+        if ($kept -and (Test-Path -LiteralPath $kept)) {
+            $iso = [regex]::Escape($kept)
+            Assert-True 'the child''s HOME, TMPDIR, cache and history are the run''s' ($r.Text -match ('ISO-HOME=\[' + $iso + '/home\] ISO-TMPDIR=\[' + $iso + '/tmp\] ISO-CACHE=\[' + $iso + '/cache\] ISO-HISTORY=\[' + $iso + '/history\]')) (@($r.Text -split "`n" | Where-Object { $_ -match 'ISO-HOME' }) -join ' ')
+            $isoSummary = Read-P20TestSummary -Path (Join-Path (Join-Path $kept 'history') (Get-P20TestHistoryFileName -Kind summary))
+            Assert-True 'the run''s own summary file has the three halves' ($null -ne $isoSummary -and (@($isoSummary['halves'].Keys) -join ',') -eq 'agent,cli,web')
+            $afterSummary = ''
+            if (Test-Path -LiteralPath $summaryFile) { $afterSummary = [System.IO.File]::ReadAllText($summaryFile) }
+            Assert-True 'and the history the launcher was given is untouched' ($afterSummary -eq $machineSummary)
+            $linkPath = Join-Path $kept 'home/.venv-toolkit'
+            $linkType = ''
+            if (Test-Path -LiteralPath $linkPath) { $linkType = [string](Get-Item -LiteralPath $linkPath -Force).LinkType }
+            Assert-True 'the test venv is a link to the real one' ($linkType -eq 'SymbolicLink') $linkType
+            Assert-True 'git''s global settings are a copy' ((Test-Path -LiteralPath (Join-Path $kept 'home/.gitconfig')) -and -not (Get-Item -LiteralPath (Join-Path $kept 'home/.gitconfig') -Force).LinkType)
+            Assert-True 'Remove-P20IsolatedRunDir removes the kept folder' (Remove-P20IsolatedRunDir -Path $kept)
+            Assert-True 'and unlinks the venv without following the link' (Test-Path -LiteralPath (Join-Path $fakeHome '.venv-toolkit/keep-me'))
+        }
+
+        $r = Invoke-TestVerb @('-Isolated', '-Half', 'web')
+        $nm = [regex]::Match($r.Text, 'caches and test history are in (\S+)')
+        $named = ''
+        if ($nm.Success) { $named = $nm.Groups[1].Value }
+        Assert-True '-Isolated without -Keep: exit 0, -Half passed through' ($r.Exit -eq 0 -and $r.Text -match 'the web half' -and $r.Text -notmatch 'the agent half') "exit $($r.Exit)`n$($r.Text)"
+        Assert-True 'the folder it named is gone after the summary' ($named -and -not (Test-Path -LiteralPath $named) -and $r.Text -notmatch 'Kept ') $named
+        Assert-True 'and the real venv is still there' (Test-Path -LiteralPath (Join-Path $fakeHome '.venv-toolkit/keep-me'))
+        Remove-Item (Join-Path $fakeHome '.venv-toolkit'), (Join-Path $fakeHome '.gitconfig') -Recurse -Force
+    }
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
@@ -1243,6 +1305,49 @@ finally {
     Remove-Item $ovBase -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+# -- 3g. -Isolated's plan, on every host --------------------------------------
+Write-Host ""
+Write-Host "-- -Isolated's plan: the variables, the folders, what is carried --" -ForegroundColor Cyan
+. (Join-Path $pkgRoot 'Scripts/TestAll-Isolated.ps1')
+$planConsts = Get-P20Consts
+$runDir = Join-Path 'R' 'p20-isolated-1-abc'
+$realHome = Join-Path 'H' 'me'
+$plan = Get-P20IsolatedRunPlan -RunDir $runDir -Environment @{ HOME = $realHome; XDG_CACHE_HOME = 'should-not-matter' }
+$wantVars = [ordered]@{
+    HOME = (Join-Path $runDir 'home'); TMPDIR = (Join-Path $runDir 'tmp'); TMP = (Join-Path $runDir 'tmp'); TEMP = (Join-Path $runDir 'tmp')
+    XDG_CACHE_HOME = (Join-Path $runDir 'cache'); XDG_DATA_HOME = (Join-Path $runDir 'data'); XDG_CONFIG_HOME = (Join-Path $runDir 'config')
+}
+$wantVars[[string]$planConsts.env.testHistoryDir] = (Join-Path $runDir 'history')
+Assert-True 'the plan sets exactly these variables, in this order' ((@($plan.Variables.Keys) -join ',') -eq (@($wantVars.Keys) -join ',')) (@($plan.Variables.Keys) -join ',')
+foreach ($k in $wantVars.Keys) {
+    Assert-True "the plan sets $k into the run folder" ($plan.Variables[$k] -eq $wantVars[$k]) "$($plan.Variables[$k])"
+}
+Assert-True 'the history variable is the contract''s name' ($plan.Variables.Contains('P20_TEST_HISTORY_DIR'))
+Assert-True 'the folders: the run folder first, then each one a variable names' ($plan.Folders[0] -eq $runDir -and $plan.Folders.Count -eq 7 -and @($plan.Folders | Where-Object { -not $_.StartsWith($runDir) }).Count -eq 0) ($plan.Folders -join ' ')
+$link = @($plan.Carry | Where-Object { $_.Kind -eq 'link' })
+Assert-True 'one link: the real home''s test venv, into the run''s home' ($link.Count -eq 1 -and $link[0].From -eq (Join-Path $realHome (Get-P20TestVenvHomeName)) -and $link[0].To -eq (Join-Path (Join-Path $runDir 'home') '.venv-toolkit'))
+$copies = @($plan.Carry | Where-Object { $_.Kind -eq 'copy' })
+Assert-True 'copies: ~/.gitconfig and the git folder''s config, ignore and attributes' ($copies.Count -eq 4 -and $copies[0].From -eq (Join-Path $realHome '.gitconfig') -and $copies[0].To -eq (Join-Path (Join-Path $runDir 'home') '.gitconfig'))
+$gitDefault = Join-Path (Join-Path $realHome '.config') 'git'
+Assert-True 'with no XDG_CONFIG_HOME, the git folder is ~/.config/git' ($copies[1].From -eq (Join-Path $gitDefault 'config') -and $copies[2].From -eq (Join-Path $gitDefault 'ignore') -and $copies[3].From -eq (Join-Path $gitDefault 'attributes') -and $copies[1].To -eq (Join-Path (Join-Path (Join-Path $runDir 'config') 'git') 'config')) $copies[1].From
+$plan2 = Get-P20IsolatedRunPlan -RunDir $runDir -Environment @{ HOME = $realHome; XDG_CONFIG_HOME = 'X' }
+Assert-True 'with XDG_CONFIG_HOME set, the git folder is under it' (@($plan2.Carry | Where-Object { $_.Kind -eq 'copy' })[1].From -eq (Join-Path (Join-Path 'X' 'git') 'config'))
+$plan3 = Get-P20IsolatedRunPlan -RunDir $runDir -Environment @{ HOME = '  ' }
+Assert-True 'with no home to carry from, nothing is carried and the variables are the same' (@($plan3.Carry).Count -eq 0 -and (@($plan3.Variables.Keys) -join ',') -eq (@($wantVars.Keys) -join ','))
+$n1 = Get-P20IsolatedRunName -ProcessId 4242
+$n2 = Get-P20IsolatedRunName -ProcessId 4242
+Assert-True 'the name: prefix, process id, random part' ((Get-P20IsolatedRunName -ProcessId 7 -Random 'ab12cd34') -eq 'p20-isolated-7-ab12cd34' -and $n1 -match '^p20-isolated-4242-[a-z0-9]{8}$') $n1
+Assert-True 'two runs with one process id in one second get two names' ($n1 -ne $n2) "$n1 $n2"
+Assert-True 'a run folder is recognised by its name' ((Test-P20IsolatedRunDir (Join-Path '/tmp' $n1)) -and (Test-P20IsolatedRunDir ($n1 + '/')))
+Assert-True 'and nothing else is' (-not (Test-P20IsolatedRunDir '/tmp') -and -not (Test-P20IsolatedRunDir '') -and -not (Test-P20IsolatedRunDir (Join-Path $realHome '.venv-toolkit')) -and -not (Test-P20IsolatedRunDir '/tmp/p20-isolated-x-ab'))
+Assert-True 'Remove refuses a folder that is not a run folder' (-not (Remove-P20IsolatedRunDir -Path $scriptDir) -and (Test-Path -LiteralPath $scriptDir))
+# .NET puts a socket per process in TMPDIR, and a socket path on macOS holds
+# 104 bytes with its terminator: the longest name, with the longest process id,
+# must fit, or two processes aim at one cut-short name.
+$isoBase = (Get-P20IsolatedRunPrefix).Base
+$longest = $isoBase + '/' + (Get-P20IsolatedRunName -ProcessId 99999999) + '/tmp/' + 'dotnet-diagnostic-99999999-9999999999-socket'
+Assert-True 'the longest diagnostics socket path fits in 103 bytes' ($longest.Length -le 103) "$($longest.Length): $longest"
+
 # -- 4. The wiring -----------------------------------------------------------------
 Write-Host ""
 Write-Host "-- The wiring --" -ForegroundColor Cyan
@@ -1255,6 +1360,10 @@ Assert-True 'and hands its children a scratch one, put back in the finally' ($ru
 Assert-True 'its own records go to the folder it resolved, by name' (([regex]::Matches($runnerSource, 'Write-P20TestResult [^\r\n]*-Dir \$historyDir')).Count -eq 2)
 $verbSource = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'Scripts/Invoke-TestAll.ps1'))
 Assert-True 'Test resolves the folder once, before the web half sets the marker' ($verbSource -match '(?s)\$historyDir = Get-P20TestHistoryDir.*\$runWeb = ')
+$isoBlock = [regex]::Match($verbSource, '(?s)if \(\$Isolated\) \{.*?\r?\n    exit \$code\r?\n\}').Value
+Assert-True '-Isolated is handled before any half runs, and ends in its own exit' ($isoBlock -and $verbSource.IndexOf($isoBlock) -lt $verbSource.IndexOf('$runners = @{'))
+Assert-True 'and changes no variable in the launcher: the child gets the plan''s' ($isoBlock -notmatch '(?m)^\s*\$env:\w+\s*=' -and $isoBlock -notmatch 'SetEnvironmentVariable' -and $isoBlock -match 'Invoke-P20IsolatedChild [^\r\n]*-Variables \$plan\.Variables')
+Assert-True 'and the folder is removed in a finally unless -Keep' ($isoBlock -match '(?s)finally \{.*if \(\$Keep\).*Remove-P20IsolatedRunDir')
 Assert-True 'the CLI runner names each suite before it starts it' ($runnerSource -match "(?s)--\s+started\s+\{1\}.{0,400}Invoke-P20TestHost\s+-File")
 $cfg = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'config.default.json')) | ConvertFrom-Json
 Assert-True 'config: Test outlasts the bridge''s default timeout' ([int]$cfg.commands.Test.bridgeTimeoutSeconds -ge 1800)

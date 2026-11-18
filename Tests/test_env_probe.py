@@ -32,6 +32,7 @@ sys.path.insert(0, str(PKG_ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # Tests/, for _skipguard
 
 from _skipguard import skip_module  # noqa: E402
+from _tracker_cli import unreachable  # noqa: E402
 
 try:
     import httpx
@@ -95,6 +96,7 @@ class EnvDoesNotHoldTheEventLoop(unittest.TestCase):
     def tearDown(self):
         tier.probe_cache_clear()
 
+    @unreachable("az")
     def test_health_answers_while_env_is_probing(self):
         # The assertion is an ORDERING, not a stopwatch reading. Wall-clock
         # timing around the /health call proves nothing here: if the loop is
@@ -146,6 +148,7 @@ class TheProbeIsCachedForAShortWhile(unittest.TestCase):
     def tearDown(self):
         tier.probe_cache_clear()
 
+    @unreachable("az")
     def test_a_second_call_inside_the_ttl_does_not_re_probe(self):
         with _ProbedOrg(), mock.patch.object(tier, "_probe_ado", return_value=True) as probe:
             first = client.get("/api/env")
@@ -157,6 +160,7 @@ class TheProbeIsCachedForAShortWhile(unittest.TestCase):
         self.assertEqual(first.json()["tier"], 1, "the fixture org did not reach the probe")
         self.assertEqual(calls, 1, f"two /env calls made {calls} probes inside the TTL")
 
+    @unreachable("az")
     def test_refresh_goes_past_the_cache(self):
         with _ProbedOrg(), mock.patch.object(tier, "_probe_ado", return_value=True) as probe:
             client.get("/api/env")
@@ -167,6 +171,7 @@ class TheProbeIsCachedForAShortWhile(unittest.TestCase):
         self.assertEqual(before, 1)
         self.assertEqual(after, 2, "/env?refresh=1 read a cached answer")
 
+    @unreachable("az")
     def test_an_expired_entry_is_probed_again(self):
         """The TTL is a window, not a one-shot memo."""
         with _ProbedOrg(), mock.patch.object(tier, "_probe_ado", return_value=True) as probe:
@@ -176,6 +181,7 @@ class TheProbeIsCachedForAShortWhile(unittest.TestCase):
                 client.get("/api/env")
             self.assertGreater(probe.call_count, before, "an expired entry was reused")
 
+    @unreachable("az")
     def test_switching_org_forgets_the_previous_answer(self):
         """A different org is a different question; /switch-mode busts the cache."""
         tier._probe_tracker_cached(PROBED_ORG)
@@ -206,6 +212,7 @@ class EnvSaysWhichBuild(unittest.TestCase):
     def tearDown(self):
         tier.probe_cache_clear()
 
+    @unreachable("az")
     def test_the_version_is_the_contracts(self):
         from agent.core import consts
 
@@ -243,11 +250,13 @@ class EnvSaysWhetherALaunchCanStart(unittest.TestCase):
             body = client.get("/api/env").json()
         return body, asked
 
+    @unreachable("az")
     def test_on_where_claude_is_found(self):
         body, asked = self._env_with_claude_at("/usr/local/bin/claude")
         self.assertIs(body["startWorkLaunch"], True)
         self.assertIn("claude", asked)
 
+    @unreachable("az")
     def test_off_where_it_is_not(self):
         body, _ = self._env_with_claude_at(None)
         self.assertIs(body["startWorkLaunch"], False)
