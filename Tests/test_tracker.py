@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _skipguard import skip_module
+from _tracker_cli import unreachable
 
 try:
     from fastapi.testclient import TestClient
@@ -128,8 +129,10 @@ class EnvServesIt(unittest.TestCase):
 
         return TestClient(app).get("/api/env").json()
 
+    @unreachable("az", "gh")
     def test_a_github_address_serves_github(self):
         self.assertEqual(self._env({})["tracker"], "github")
 
+    @unreachable("az")
     def test_a_local_board_serves_none(self):
         self.assertEqual(self._env({"activeSpace": "demo"})["tracker"], "none")

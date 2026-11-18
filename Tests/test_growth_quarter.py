@@ -25,6 +25,7 @@ sys.path.insert(0, str(PKG_ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # Tests/, for _skipguard and test_growth
 
 from _skipguard import skip_module  # noqa: E402
+from _tracker_cli import unreachable  # noqa: E402
 
 try:
     from test_growth import _client
@@ -178,6 +179,7 @@ class TrainingQuarterRoute(unittest.TestCase):
                 body = self._client(hub, {"trainingHoursPerQuarter": bad}).get("/api/growth").json()
                 self.assertIsNone(body["trainingQuarter"])
 
+    @unreachable("az")
     def test_the_number_does_not_leak_into_the_features_flags(self):
         # A Space states the number; the merged features map /env serves is flags only.
         hub = self._hub([])

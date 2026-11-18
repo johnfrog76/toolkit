@@ -16,6 +16,7 @@ PKG_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PKG_ROOT))
 
 from _skipguard import skip_module  # noqa: E402
+from _tracker_cli import unreachable  # noqa: E402
 
 try:
     from fastapi.testclient import TestClient
@@ -72,6 +73,7 @@ class SwitchSpace(unittest.TestCase):
     def _active(self) -> str:
         return self.client.get("/api/env").json()["config"]["activeSpace"]
 
+    @unreachable("az")
     def test_switching_back_and_forth_is_read_at_once_and_writes_one_spelling(self):
         self.assertEqual(self._active(), "a")
         self.assertEqual([s["slug"] for s in self.client.get("/api/env").json()["config"]["spaces"]], ["a", "b"])

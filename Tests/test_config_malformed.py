@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _skipguard import skip_module
+from _tracker_cli import unreachable
 
 try:
     from fastapi.testclient import TestClient
@@ -84,6 +85,7 @@ class MalformedConfig(unittest.TestCase):
         cfg = config.load_config()
         self.assertEqual((cfg["activeSpace"], cfg["configProblems"]), ("beta", []))
 
+    @unreachable("az")
     def test_a_file_broken_while_running_keeps_the_routes_answering_and_env_says_so(self):
         client = self._client()
         self.local.write_text(json.dumps({"activeSpace": "beta"}), encoding="utf-8")
