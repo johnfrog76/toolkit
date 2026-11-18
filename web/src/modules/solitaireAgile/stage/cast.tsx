@@ -93,7 +93,6 @@ export function StandupKeyframes() {
       @keyframes rs-zz        { 0% { transform: translateY(0); opacity: 0; } 25% { opacity: 0.8; } 100% { transform: translateY(-30px); opacity: 0; } }
       @keyframes rs-glowsip   { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
       @keyframes rs-deskride  { 0%, 14% { transform: translateY(0); } 42%, 60% { transform: translateY(var(--ride, -36%)); } 86%, 100% { transform: translateY(0); } }
-      @keyframes rs-press     { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-18px); } }
       @keyframes rs-breathe   { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.045); } }
       ${REDUCED_MOTION_RULE}
     `}</style>
@@ -621,14 +620,9 @@ function Readout({
 
 // The Super Dev rig: motorized desk that takes him out of frame — exactly
 // three rides per standup, then it rests — plus a ten-mug fleet riding along.
-// In his status callout (`press`) the desk is PARKED and the 60-lb dumbbell
-// comes out: arm out at 90°, forearm up, wrist turned 45°, pressing reps
-// while reporting. One gag per register — the desk rides OR he lifts.
+// Parked (`press`), the desk holds still and he sits at rest: no ride, no
+// console, nothing in his window moves but the steam on his mugs.
 function DevHeroScene({ ride = "-58%", press = false }: { ride?: string; press?: boolean }) {
-  const id = useDrawingId("dh");
-  const shirt = "#2d5bd0";
-  const skin = "#e8b88a";
-  const iron = "#333a4b";
   return (
     <div style={{ position: "absolute", inset: 0 }}>
       {/* everything on the rig rides the motor together — 3 rides, not infinite */}
@@ -651,51 +645,6 @@ function DevHeroScene({ ride = "-58%", press = false }: { ride?: string; press?:
           {/* the bolt on his shirt stops at the desk: none of it shows under the slab */}
           <Bust id="dev-hero" cover={{ x: 51, y: 99, width: 19, height: 14.5, fill: "#2d5bd0" }} />
         </div>
-        {press && (
-          /* shoulder presses mid-status: upper arm out 90°, forearm up,
-             wrist at 45°, sixty pounds of commitment */
-          <div
-            style={{
-              position: "absolute",
-              bottom: "21%",
-              left: "56%",
-              animation: "rs-press 1.4s ease-in-out infinite",
-            }}
-          >
-            <svg
-              width="124"
-              height="112"
-              viewBox="0 0 124 112"
-              style={{ display: "block", overflow: "visible", filter: DRAWING_SHADOW }}
-            >
-              <Soft id={`${id}-sleeve`} fill={shirt} shade={dark(shirt, 0.24)} dx={-1} dy={-3}>
-                <rect x="12" y="90" width="49" height="16" rx="8" transform="rotate(-17 20 98)" />
-              </Soft>
-              <Soft id={`${id}-arm`} fill={skin} shade={dark(skin, 0.16)} dx={-2.6} dy={0}>
-                <rect
-                  x="46.5"
-                  y="34"
-                  width="13"
-                  height="58"
-                  rx="6.5"
-                  transform="rotate(2.5 53 63)"
-                />
-                <circle cx="55" cy="35" r="8.5" />
-              </Soft>
-              <path
-                d="M 38 52 L 72 18"
-                fill="none"
-                stroke={iron}
-                strokeWidth="6"
-                strokeLinecap="round"
-              />
-              <Soft id={`${id}-iron`} fill={iron} shade={dark(iron, 0.4)} dx={-2.4} dy={-1.6}>
-                <rect x="30" y="35" width="17" height="36" rx="6" transform="rotate(-45 38.5 53)" />
-                <rect x="63" y="1" width="17" height="36" rx="6" transform="rotate(-45 71.5 19)" />
-              </Soft>
-            </svg>
-          </div>
-        )}
         {/* desk surface; legs long enough to stay grounded mid-ascent */}
         <div
           style={{
@@ -744,9 +693,11 @@ function DevHeroScene({ ride = "-58%", press = false }: { ride?: string; press?:
         <Mug left="92%" bottom="17.4%" size={18} color={pf.yellow} />
       </div>
       {/* the motor console does not ride — it just reports, above his head */}
-      <Readout top="5%" left="16%" color={pf.yellow}>
-        {press ? "DESK MOTOR · PARKED" : "DESK MOTOR ▲ ENGAGED"}
-      </Readout>
+      {!press && (
+        <Readout top="5%" left="16%" color={pf.yellow}>
+          DESK MOTOR ▲ ENGAGED
+        </Readout>
+      )}
     </div>
   );
 }
@@ -1314,8 +1265,7 @@ export function CastScene({
   id: string;
   /** Park Super Dev's motorized desk. Without this his rig rides him out of
       frame on a timer, so any slide that needs all nine faces present at once
-      has to ask for it. On his rig, parking is also what brings the dumbbell
-      out — the desk rides or he lifts, never both. */
+      has to ask for it. Parked, he sits at rest. */
   parked?: boolean;
 }) {
   switch (id) {
