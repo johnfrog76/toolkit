@@ -25,6 +25,11 @@
                                   console, and waits for it to exit.
       Remove-P20IsolatedRunDir    removes the folder, links and all, without
                                   following a link.
+      Set-P20IsolatedRunKept      marks a folder -Keep left, so no sweep takes it.
+      Remove-P20StaleIsolatedRunDirs
+                                  removes the folders a killed run left: run
+                                  folders older than a day, not kept, and not
+                                  of a live process. Returns the paths removed.
 
     What a run carries from the real home, and why:
       the test venv (Get-P20TestVenvHomeName), as a LINK: the agent half picks
@@ -59,7 +64,23 @@ if (-not (Get-Command Get-P20TestVenvHomeName -ErrorAction SilentlyContinue)) {
 
 function Get-P20IsolatedRunPrefix {
     <# The front of every run folder's name, and the base it sits in. #>
-    return @{ Prefix = 'p20-isolated'; Base = '/tmp' }
+    # MaxAgeDays: how old a folder is before the next run may sweep it.
+    # KeptMarker: the file -Keep leaves inside a folder; a sweep never takes
+    # a folder that holds it. SweptLine: what a run says of each folder it swept.
+    # SweepBase: where the sweep looks. It is Base, unless P20_ISOLATED_SWEEP_BASE
+    # names another folder -- the test suite's seam, so a stubbed run never
+    # sweeps the real /tmp. Nothing else reads the variable.
+    $sweepBase = '/tmp'
+    $seam = [Environment]::GetEnvironmentVariable('P20_ISOLATED_SWEEP_BASE')
+    if ($seam -and $seam.Trim()) { $sweepBase = $seam.Trim() }
+    return @{
+        Prefix     = 'p20-isolated'
+        Base       = '/tmp'
+        SweepBase  = $sweepBase
+        MaxAgeDays = 1
+        KeptMarker = '.p20-kept'
+        SweptLine  = 'Removed {0}, left by an earlier isolated run that was stopped.'
+    }
 }
 
 function Get-P20IsolatedRunName {
@@ -194,7 +215,9 @@ function Invoke-P20IsolatedChild {
         return [int]$p.ExitCode
     }
     finally {
-        if (-not $p.HasExited) { try { $p.Kill() } catch { $null = $_ } }
+        # Wait for the exit after the kill, so the folder is not removed under a
+        # child that is still writing into it.
+        if (-not $p.HasExited) { try { $p.Kill(); $null = $p.WaitForExit(5000) } catch { $null = $_ } }
         $p.Dispose()
     }
 }
@@ -210,4 +233,54 @@ function Remove-P20IsolatedRunDir {
     if (-not (Test-Path -LiteralPath $Path)) { return $true }
     $null = & /bin/rm -rf -- $Path
     return (-not (Test-Path -LiteralPath $Path))
+}
+
+function Set-P20IsolatedRunKept {
+    <# Marks a run folder as kept by -Keep, so a later run's sweep leaves it. #>
+    param([Parameter(Mandatory)][string]$Path)
+    if (-not (Test-P20IsolatedRunDir $Path)) { return $false }
+    if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return $false }
+    try {
+        [System.IO.File]::WriteAllText((Join-Path $Path (Get-P20IsolatedRunPrefix).KeptMarker), '')
+        return $true
+    }
+    catch { return $false }
+}
+
+function Remove-P20StaleIsolatedRunDirs {
+    <#
+      Removes the run folders a killed run left behind, which no finally
+      survives. Only a direct child of -Base whose name is a run folder's
+      (Test-P20IsolatedRunDir) is ever looked at; nothing else in -Base is
+      touched. A folder stays when
+        - it is not older than -MaxAgeDays (default: a day) by its last write,
+        - it holds the -Keep marker (Set-P20IsolatedRunKept), or
+        - the process id in its name is alive: a run that is still going is
+          never removed, whatever its age. A reused id keeps a dead run's
+          folder a while longer, and that is the safe way to be wrong.
+      -Now and -Base are the caller's to give (a suite gives a scratch base).
+      Returns the paths it removed, in name order.
+    #>
+    param(
+        [string]$Base = (Get-P20IsolatedRunPrefix).SweepBase,
+        [double]$MaxAgeDays = (Get-P20IsolatedRunPrefix).MaxAgeDays,
+        [datetime]$Now = (Get-Date)
+    )
+    $removed = @()
+    if (-not (Test-Path -LiteralPath $Base -PathType Container)) { return $removed }
+    $marker = (Get-P20IsolatedRunPrefix).KeptMarker
+    $cutoff = $Now.AddDays(-$MaxAgeDays)
+    foreach ($d in @(Get-ChildItem -LiteralPath $Base -Directory -Force -ErrorAction SilentlyContinue | Sort-Object Name)) {
+        if (-not (Test-P20IsolatedRunDir $d.Name)) { continue }
+        if ($d.LinkType) { continue }
+        if ($d.LastWriteTime -ge $cutoff) { continue }
+        if (Test-Path -LiteralPath (Join-Path $d.FullName $marker)) { continue }
+        $m = [regex]::Match($d.Name, '^' + [regex]::Escape((Get-P20IsolatedRunPrefix).Prefix) + '-(\d+)-')
+        $procId = 0
+        if ($m.Success -and [int]::TryParse($m.Groups[1].Value, [ref]$procId) -and $procId -gt 0) {
+            if (Get-Process -Id $procId -ErrorAction SilentlyContinue) { continue }
+        }
+        if (Remove-P20IsolatedRunDir -Path $d.FullName) { $removed += $d.FullName }
+    }
+    return $removed
 }
