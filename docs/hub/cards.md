@@ -185,6 +185,10 @@ Adding a model is one row. The lookup is `model_info` (`agent/core/models.py`) a
 - a map that is **missing or not valid JSON** reads as empty, so every id is unknown and reads as
   written; neither lookup throws over it.
 
+The reader takes the FIRST line that starts with `**Agent:**`, as the Assigned reader does, wherever it
+sits in the file -- so a card's body that quotes the line at the start of a line, above the footer, would be
+read as the line; quote it indented or in backticks.
+
 `Tests/fixtures/parsers/models.json` holds the two lookups to one table. The card keeps the id; a reader
 that shows it shows the map's name.
 
