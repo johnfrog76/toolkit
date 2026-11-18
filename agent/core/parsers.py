@@ -229,7 +229,7 @@ def card_worker(content: str) -> str:
     as those readers took it before (a size, ``me``, or "").
 
     A BRIDGE: it stands in for the shared resolver of a card's agent
-    (``resolve_card_agent``, issue #500) until that lands, and that change
+    (``resolve_card_agent``) until that lands, and that change
     removes it. Its one caller in this half is the standup's card rows
     (``agent/solitaire/standup.py``); add none. The CLI's mirror is
     ``Get-P20CardWorker``, and ``Tests/fixtures/parsers/card-worker.json`` holds

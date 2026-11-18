@@ -552,7 +552,7 @@ if ($Launch) {
     }
     else {
         # Who works it: its Agent line's family, else its Assigned line
-        # (Get-P20CardWorker, the bridge until the shared resolver, issue #500, lands).
+        # (Get-P20CardWorker, the bridge until the shared resolver lands).
         $assigned = Get-P20CardWorker $content -PackageRoot $repoRoot
         if ($assigned) {
             $size = $assigned

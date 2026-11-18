@@ -205,7 +205,7 @@ class StatusMetadataTests(unittest.TestCase):
 
     def test_who_works_a_card_by_the_shared_table(self):
         """The bridge reader of who works a card (standing in for the shared
-        resolver, issue #500): a known Agent line's family, an unknown id as
+        resolver): a known Agent line's family, an unknown id as
         written, else the Assigned value. The CLI's Get-P20CardWorker asserts the
         SAME table, Tests/fixtures/parsers/card-worker.json."""
         import json

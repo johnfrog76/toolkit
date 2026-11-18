@@ -826,7 +826,7 @@ function Get-P20StandupCards {
                     # **Sprint:** line names, whole; its **Created:** day; its Tags
                     # (a severity, a size); and who takes it -- its Agent line's
                     # family, else its Assigned line (Get-P20CardWorker, the
-                    # bridge until the shared resolver, issue #500, lands).
+                    # bridge until the shared resolver lands).
                     sprint   = (Get-P20CardMilestone $content)
                     created  = $created
                     tags     = [object[]]@(Get-P20CardTags $content)

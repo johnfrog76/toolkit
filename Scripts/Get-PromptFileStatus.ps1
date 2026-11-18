@@ -125,7 +125,7 @@ function Get-P20CardWorker {
       line's value, as those readers took it before (a size, me, or '').
 
       A BRIDGE: it stands in for the shared resolver of a card's agent
-      (Resolve-P20CardAgent, issue #500) until that lands, and that change
+      (Resolve-P20CardAgent) until that lands, and that change
       removes it. Its three callers are Standup-Rules.ps1's card rows and
       Start-Work.ps1's -Launch size check; add none. agent/core/parsers.py's
       card_worker is the same rule, and Tests/fixtures/parsers/card-worker.json

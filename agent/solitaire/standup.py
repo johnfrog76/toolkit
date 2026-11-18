@@ -907,7 +907,7 @@ def read_cards(space_dir: Path, type_names: list[str], prefixes: list[str]) -> l
                     # **Sprint:** line names, whole; its **Created:** day; its
                     # Tags (a severity, a size); and who takes it -- its Agent
                     # line's family, else its Assigned line (card_worker, the
-                    # bridge until the shared resolver, issue #500, lands).
+                    # bridge until the shared resolver lands).
                     "sprint": card_milestone(content),
                     "created": _stamp_day(content, stamp_created()),
                     "tags": card_tags(content),

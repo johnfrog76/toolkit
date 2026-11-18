@@ -1,5 +1,5 @@
 {
-  "_": "ONE table, read by both halves' bridge reader of who works a card: Scripts/Get-PromptFileStatus.ps1 Get-P20CardWorker (tkTestToolkit -Triage) and agent/core/parsers.py card_worker() (Tests/test_parsers.py). It stands in for the shared resolver of a card's agent (issue #500) until that lands. Each row's lines are joined with LF, or CRLF when crlf is true, into a card's text. expected is a FAMILY-shaped string: with an **Agent:** line, the model map's family for a known id, else the id as written; with none, exactly the **Assigned:** line's value (a size, me, or ''). If the two halves ever disagree about a row, one of them is wrong.",
+  "_": "ONE table, read by both halves' bridge reader of who works a card: Scripts/Get-PromptFileStatus.ps1 Get-P20CardWorker (tkTestToolkit -Triage) and agent/core/parsers.py card_worker() (Tests/test_parsers.py). It stands in for the shared resolver of a card's agent until that lands. Each row's lines are joined with LF, or CRLF when crlf is true, into a card's text. expected is a FAMILY-shaped string: with an **Agent:** line, the model map's family for a known id, else the id as written; with none, exactly the **Assigned:** line's value (a size, me, or ''). If the two halves ever disagree about a row, one of them is wrong.",
   "rows": [
     {
       "name": "a known Agent line gives its family",
