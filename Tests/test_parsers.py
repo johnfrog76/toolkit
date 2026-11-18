@@ -203,6 +203,23 @@ class StatusMetadataTests(unittest.TestCase):
             with self.subTest(row=row["name"]):
                 self.assertEqual(model_info(row["id"]), row["expected"])
 
+    def test_who_works_a_card_by_the_shared_table(self):
+        """The bridge reader of who works a card (standing in for the shared
+        resolver, issue #500): a known Agent line's family, an unknown id as
+        written, else the Assigned value. The CLI's Get-P20CardWorker asserts the
+        SAME table, Tests/fixtures/parsers/card-worker.json."""
+        import json
+
+        from agent.core.parsers import card_worker
+
+        table = json.loads((FIXTURES / "card-worker.json").read_text(encoding="utf-8"))
+        self.assertGreaterEqual(len(table["rows"]), 7)
+        for row in table["rows"]:
+            with self.subTest(row=row["name"]):
+                eol = "\r\n" if row["crlf"] else "\n"
+                text = eol.join(row["lines"]) + eol
+                self.assertEqual(card_worker(text), row["expected"])
+
     def test_what_a_worker_size_resolves_to_by_the_shared_table(self):
         """A worker size is a family alias: the map's current block names the id it
         resolves to when a card is routed to it. The CLI's Get-P20ModelForSize
