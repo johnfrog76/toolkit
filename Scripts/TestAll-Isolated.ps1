@@ -67,9 +67,16 @@ function Get-P20IsolatedRunPrefix {
     # MaxAgeDays: how old a folder is before the next run may sweep it.
     # KeptMarker: the file -Keep leaves inside a folder; a sweep never takes
     # a folder that holds it. SweptLine: what a run says of each folder it swept.
+    # SweepBase: where the sweep looks. It is Base, unless P20_ISOLATED_SWEEP_BASE
+    # names another folder -- the test suite's seam, so a stubbed run never
+    # sweeps the real /tmp. Nothing else reads the variable.
+    $sweepBase = '/tmp'
+    $seam = [Environment]::GetEnvironmentVariable('P20_ISOLATED_SWEEP_BASE')
+    if ($seam -and $seam.Trim()) { $sweepBase = $seam.Trim() }
     return @{
         Prefix     = 'p20-isolated'
         Base       = '/tmp'
+        SweepBase  = $sweepBase
         MaxAgeDays = 1
         KeptMarker = '.p20-kept'
         SweptLine  = 'Removed {0}, left by an earlier isolated run that was stopped.'
@@ -255,7 +262,7 @@ function Remove-P20StaleIsolatedRunDirs {
       Returns the paths it removed, in name order.
     #>
     param(
-        [string]$Base = (Get-P20IsolatedRunPrefix).Base,
+        [string]$Base = (Get-P20IsolatedRunPrefix).SweepBase,
         [double]$MaxAgeDays = (Get-P20IsolatedRunPrefix).MaxAgeDays,
         [datetime]$Now = (Get-Date)
     )

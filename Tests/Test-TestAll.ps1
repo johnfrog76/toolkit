@@ -664,6 +664,8 @@ exit 0
     $summaryFile = Join-Path $stubHistory (Get-P20TestHistoryFileName -Kind summary)
     [System.Environment]::SetEnvironmentVariable('TEAMS_WEBHOOK_TESTALL43', 'not-a-url')
 
+    $sweepSeamBase = Join-Path $base 'sweep-base'
+    New-Item -ItemType Directory -Path $sweepSeamBase -Force | Out-Null
     function Invoke-TestVerb {
         param([string[]]$Arguments = @(), [string]$PathValue = $stubPath, [string]$HostExe = $hostExe)
         $env:PATH = $PathValue
@@ -671,6 +673,9 @@ exit 0
         # running this suite must not answer for the stub PATH.
         $savedHome = $env:HOME; $savedProfile = $env:USERPROFILE
         $env:HOME = $fakeHome; $env:USERPROFILE = $fakeHome
+        # The sweep of stale run folders looks in a scratch base, never the real /tmp.
+        $savedSweep = $env:P20_ISOLATED_SWEEP_BASE
+        $env:P20_ISOLATED_SWEEP_BASE = $sweepSeamBase
         try {
             $global:LASTEXITCODE = 0
             $out = & $HostExe -NoProfile -ExecutionPolicy Bypass -File $verb @Arguments 2>&1
@@ -679,6 +684,7 @@ exit 0
         finally {
             $env:PATH = $savedPath
             $env:HOME = $savedHome; $env:USERPROFILE = $savedProfile
+            $env:P20_ISOLATED_SWEEP_BASE = $savedSweep
         }
         return @{ Text = (@($out | ForEach-Object { [string]$_ }) -join "`n"); Exit = $code }
     }
@@ -895,7 +901,22 @@ exit 0
             Assert-True 'and unlinks the venv without following the link' (Test-Path -LiteralPath (Join-Path $fakeHome '.venv-toolkit/keep-me'))
         }
 
-        $r = Invoke-TestVerb @('-Isolated', '-Half', 'web')
+        # A stale run folder planted in the REAL /tmp must survive a stubbed run;
+        # one planted in the scratch sweep base is the one it removes.
+        $realStale = Join-Path (Get-P20IsolatedRunPrefix).Base 'p20-isolated-99999999-zzzz9999'
+        $scratchStale = Join-Path $sweepSeamBase 'p20-isolated-99999999-yyyy8888'
+        try {
+            foreach ($d in @($realStale, $scratchStale)) {
+                New-Item -ItemType Directory -Path $d -Force | Out-Null
+                (Get-Item -LiteralPath $d).LastWriteTime = (Get-Date).AddDays(-3)
+            }
+            $r = Invoke-TestVerb @('-Isolated', '-Half', 'web')
+            Assert-True 'the stubbed run sweeps the scratch base, and says which folder it removed' ($r.Text -match [regex]::Escape($scratchStale) -and -not (Test-Path -LiteralPath $scratchStale)) $r.Text
+            Assert-True 'and leaves a stale run folder in the real /tmp untouched' (Test-Path -LiteralPath $realStale)
+        }
+        finally {
+            Remove-P20IsolatedRunDir -Path $realStale | Out-Null
+        }
         $nm = [regex]::Match($r.Text, 'caches and test history are in (\S+)')
         $named = ''
         if ($nm.Success) { $named = $nm.Groups[1].Value }
