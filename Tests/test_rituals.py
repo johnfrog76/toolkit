@@ -1593,6 +1593,8 @@ class TheTeamTable(unittest.TestCase):
                 # The brief reads each member's counts by its place: two members of one name keep their own.
                 "slug-is-label-counts",
                 "agent-family-is-slug-counts",
+                # The brief says no worker labels from the tracker's own count, not from who is seated.
+                "no-worker-labels-card-seats-member",
             },
         )
 
@@ -2630,7 +2632,7 @@ class TheRoute(unittest.TestCase):
         self.assertEqual(_less_engineer(body["text"], "toolkit"), _golden("standup-friday.txt"))
         self.assertEqual(_less_engineer(_brief_less_corner(body), "toolkit"), _golden("standup-friday.brief.txt"))
         self.assertEqual((body["ceremony"], body["register"], body["space"]), ("standup", "real", "toolkit"))
-        self.assertEqual(body["tracker"], {"ok": True, "reason": ""})
+        self.assertEqual(body["tracker"], {"ok": True, "reason": "", "workerLabels": 3})
         self.assertEqual(body["source"], "both")
         self.assertEqual((body["workers"][-1]["label"], body["workers"][-1]["empty"]), ("toolkit", True))
         self.assertEqual((body["checks"], body["links"]), ([], []))
@@ -2680,7 +2682,7 @@ class TheRoute(unittest.TestCase):
         self.assertTrue(tiles, "friday has closes and routed issues")
         for tile in tiles:
             self.assertEqual(set(tile), AGENDA_FIELDS)
-        self.assertEqual(set(body["tracker"]), {"ok", "reason"})
+        self.assertEqual(set(body["tracker"]), {"ok", "reason", "workerLabels"})
         self.assertEqual(set(body["chair"]), {"open", "close", "walked"})
         self.assertEqual(set(body["team"]), {"size"})
         self.assertEqual(set(body["queue"]), {"walk", "decide", "look"})
@@ -2780,7 +2782,7 @@ class TheRoute(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         body = res.json()
         self.assertEqual(calls, [])
-        self.assertEqual((body["source"], body["tracker"]), ("cards", {"ok": True, "reason": ""}))
+        self.assertEqual((body["source"], body["tracker"]), ("cards", {"ok": True, "reason": "", "workerLabels": 0}))
         self.assertEqual([(w["label"], w["name"]) for w in body["workers"]], [("solo", "Solo Work")])
         self.assertEqual([i["id"] for i in body["queue"]["walk"]], ["K7M2"])
         self.assertEqual(set(body["queue"]["walk"][0]), WALK_FIELDS)
@@ -2836,7 +2838,8 @@ class TheRoute(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         body = res.json()
         self.assertEqual(
-            body["tracker"], {"ok": False, "reason": "gh did not answer for johnfrog76/toolkit: TimeoutExpired"}
+            body["tracker"],
+            {"ok": False, "reason": "gh did not answer for johnfrog76/toolkit: TimeoutExpired", "workerLabels": 0},
         )
         self.assertEqual(body["text"], _golden("standup-no-tracker.txt"))
 
@@ -2871,7 +2874,7 @@ class TheRoute(unittest.TestCase):
         res = self._get_windows("/api/ritual/standup?space=toolkit", _cp1252_console(gh))
         self.assertEqual(res.status_code, 200)
         body = res.json()
-        self.assertEqual(body["tracker"], {"ok": True, "reason": ""})
+        self.assertEqual(body["tracker"], {"ok": True, "reason": "", "workerLabels": 3})
         self.assertEqual(_less_engineer(body["text"], "toolkit"), _golden("standup-friday.txt"))
         self.assertIn(
             "#101 Build the foyer counts \u2014 Chlo\u00e9\u2019s \u201c\u00cfle\u201d row\n",
@@ -3401,5 +3404,3 @@ class TheAgenda(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
-                # The brief says no worker labels from the tracker's own count, not from who is seated.
-                "no-worker-labels-card-seats-member",
