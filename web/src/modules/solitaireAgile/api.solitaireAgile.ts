@@ -149,8 +149,9 @@ export interface StandupResponse {
    * on the id ("both"), a local Space's cards, or none when nothing answered
    * (an ADO Space, gh down). "issues" is what an agent that predates the join says. */
   source?: "issues" | "cards" | "both" | "none";
-  /** false: no tracker answered. The ritual still happens (principle 3). */
-  tracker: { ok: boolean; reason: string };
+  /** ok false: no tracker answered. The ritual still happens (principle 3).
+   * workerLabels: how many worker labels the tracker answered (0 where none was read). */
+  tracker: { ok: boolean; reason: string; workerLabels?: number };
   /** The chair's two phrasebook lines, and `walked`: the walk items closed inside
    *  the window, by number -- what the chair's turn says it walked. `walked` is
    *  absent from an agent that predates it. */

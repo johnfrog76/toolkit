@@ -978,7 +978,7 @@ $teamTable = $teamRaw | ConvertFrom-Json
 $teamCases = @($teamTable.cases)
 $teamAsOf = @([regex]::Matches($teamRaw, '"asOf"\s*:\s*"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
 $teamNames = (@($teamCases | ForEach-Object { [string]$_.name })) -join ','
-Assert-True 'the team table is read: its sizes, its seats, its room rows and twenty-two cases, an asOf each' (@($teamTable.sizes).Count -ge 8 -and @($teamTable.seats).Count -ge 6 -and @($teamTable.room).Count -ge 16 -and $teamNames -ceq 'absent,idle-sits,unset,work-unsaid,walk-size-3,walk-size-6,walk-size-9,idle-room,idle-room-3,idle-room-6,agent-line,trailer-only,neither,label-differs,labelled-no-card,no-kept-window,unknown-id,one-family,legacy-size,legacy-backend,slug-is-label-counts,agent-family-is-slug-counts' -and $teamAsOf.Count -eq $teamCases.Count) "$(@($teamTable.sizes).Count) sizes, $(@($teamTable.seats).Count) seats, $(@($teamTable.room).Count) room rows, cases $teamNames"
+Assert-True 'the team table is read: its sizes, its seats, its room rows and twenty-three cases, an asOf each' (@($teamTable.sizes).Count -ge 8 -and @($teamTable.seats).Count -ge 6 -and @($teamTable.room).Count -ge 16 -and $teamNames -ceq 'absent,idle-sits,unset,work-unsaid,walk-size-3,walk-size-6,walk-size-9,idle-room,idle-room-3,idle-room-6,agent-line,trailer-only,neither,label-differs,labelled-no-card,no-kept-window,unknown-id,one-family,legacy-size,legacy-backend,slug-is-label-counts,agent-family-is-slug-counts,no-worker-labels-card-seats-member' -and $teamAsOf.Count -eq $teamCases.Count) "$(@($teamTable.sizes).Count) sizes, $(@($teamTable.seats).Count) seats, $(@($teamTable.room).Count) room rows, cases $teamNames"
 
 foreach ($row in @($teamTable.sizes)) {
     $got = Get-P20TeamSize -Stored $row.stored

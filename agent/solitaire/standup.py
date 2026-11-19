@@ -172,6 +172,8 @@ def vocabulary() -> dict:
 class TrackerState(BaseModel):
     ok: bool = True
     reason: str = ""
+    # How many worker labels the tracker answered; 0 where no tracker was read.
+    workerLabels: int = 0
 
 
 class Team(BaseModel):
@@ -946,6 +948,7 @@ def fill_standup(
         key=lambda t: t[0],
     )
     names = dict(routes)
+    state.workerLabels = len(routes)
     workers = {label: Worker(label=label, name=name) for label, name in routes}
     key_of = issue_keys(issues)
 
@@ -2522,9 +2525,8 @@ def render_brief(filled: Standup) -> str:
             bits.append(t["blockersEmpty"])
         lines.append(f"{w.name}: {', '.join(bits)}.")
     # The line the members end on is about the tracker: with no worker label the Space routes nothing,
-    # the engineer notwithstanding: on a joined read it is the record's last member, the card tile.
-    labelled = filled.workers[:-1] if filled.source == "both" else filled.workers
-    if not filled.workers or (issues and not labelled):
+    # whoever a card seats; the tracker's own count says so.
+    if not filled.workers or (issues and not filled.tracker.workerLabels):
         lines.append(t["noWorkers"])
     elif issues:
         lines.append(t["briefInFlightUnknown"])
