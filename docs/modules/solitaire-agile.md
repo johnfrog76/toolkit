@@ -934,7 +934,8 @@ whose slug is also one of its tracker's worker labels (a Space called `opus` on 
 `opus` label) has two members that share a name: the engineer, and the worker that label routes to.
 Both sit and both report, at every size with a seat for each, under the same name they wear today. The
 fill keys a member by its kind and its label together, in both halves, so the second of the pair never
-reads as absent.
+reads as absent. The stage does the same: the engineer is the record's last member of that name, the
+card tile, and each keeps its own window.
 
 Whoever is past the size is **absent** today, and nobody reports for them. So four workers with work
 and a size of 3 seat the chair and two of them, and an idle engineer still sits ahead of three working
