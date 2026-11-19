@@ -769,6 +769,7 @@ function Invoke-P20StandupFill {
     $phrases = @($data.Vocabulary.phrasebook)
 
     $ok = $true
+    $workerLabels = 0
     $reason = ''
     if ($null -ne $Tracker) {
         $ok = [bool]$Tracker.ok
@@ -788,6 +789,7 @@ function Invoke-P20StandupFill {
 
     if ($ok) {
         $defs = @(Get-P20StandupWorkers -Labels $Labels -Prefix ([string]$rituals.workerLabelPrefix))
+        $workerLabels = $defs.Count
         $byLabel = @{}
         $fills = [ordered]@{}
         foreach ($def in $defs) {
@@ -875,7 +877,7 @@ function Invoke-P20StandupFill {
         since    = (Format-P20RitualTime $since)
         space    = $Space
         source   = $(if ($ok) { 'issues' } else { 'none' })
-        tracker  = [ordered]@{ ok = $ok; reason = $reason }
+        tracker  = [ordered]@{ ok = $ok; reason = $reason; workerLabels = $workerLabels }
         chair    = [ordered]@{ open = $open; close = $close; walked = $walkedSorted }
         team     = [ordered]@{ size = $size }
         queue    = $queue
@@ -1387,7 +1389,7 @@ function Invoke-P20StandupCardsFill {
         since    = (Format-P20RitualTime $since)
         space    = $Space
         source   = 'cards'
-        tracker  = [ordered]@{ ok = $true; reason = '' }
+        tracker  = [ordered]@{ ok = $true; reason = ''; workerLabels = 0 }
         chair    = [ordered]@{ open = $open; close = $close; walked = [object[]]@() }
         team     = [ordered]@{ size = $size }
         queue    = $queue
@@ -2722,10 +2724,8 @@ function Format-P20StandupBrief {
         $lines.Add([string]$w.name + ': ' + ($bits -join ', ') + '.')
     }
     # The line the members end on is about the tracker: with no worker label the Space routes nothing,
-    # the engineer notwithstanding: on a joined read it is the record's last member, the card tile.
-    $labelled = $workers
-    if ($both) { $labelled = @($workers | Select-Object -First ($workers.Count - 1)) }
-    if ($workers.Count -eq 0 -or ($issues -and $labelled.Count -eq 0)) { $lines.Add([string]$t.noWorkers) }
+    # whoever a card seats; the tracker's own count says so.
+    if ($workers.Count -eq 0 -or ($issues -and [int]$Standup.tracker.workerLabels -eq 0)) { $lines.Add([string]$t.noWorkers) }
     elseif ($issues) { $lines.Add([string]$t.briefInFlightUnknown) }
     foreach ($check in @($Standup.checks | Where-Object { $null -ne $_ })) { $lines.Add([string]$t.check + ': ' + [string]$check) }
 
