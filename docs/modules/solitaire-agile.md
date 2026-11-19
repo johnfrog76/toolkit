@@ -1432,9 +1432,10 @@ date and its trailers is asked once, as a `t` alias, which dates it too; the 50-
 all; with no such hash the query is the one above, unchanged. The parse returns `messages`, a resolved
 hash's first seven characters, lower case, to its message -- the shape the reader takes -- and skips a
 hash GitHub could not resolve. A standup with trailers to read and no date to ask still makes the call,
-but keeps its fill: with no date asked, every bullet counts. A failed read keeps today's standup. The
-messages are held beside the commit dates and passed to the joined fill, which does not read them yet:
-nobody's seat moves on them.
+and fills again with the messages alone: with no date asked, every bullet counts. A failed read keeps today's standup. The
+messages are held beside the commit dates and passed to the joined fill, where a card with no Agent line
+and no Assigned worker is reported by the model its commits credit
+([where the room's members come from](#where-the-rooms-members-come-from)).
 
 **Commits** are the card's `- <hash>` bullets -- the same lines that put it In Progress
 (`regex.commitBullet`, the lane rule's own pattern, which captures the hash), so counting them is no
