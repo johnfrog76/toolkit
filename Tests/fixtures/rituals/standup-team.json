@@ -3635,6 +3635,257 @@
         "work": "standup-team-legacy-backend.work.txt",
         "brief": "standup-team-legacy-backend.brief.txt"
       }
+    },
+    {
+      "name": "slug-is-label-counts",
+      "shape": "a Space whose slug is a worker label (opus), the engineer and the Opus worker each with work of their own: the engineer started one card and made no commit, the worker's card names an Opus id, began before the window and threads two commits -- each member's line reports its own counts, not the other's",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "teamSize": 9,
+      "space": "opus",
+      "spaceName": "Opus",
+      "labels": [
+        {
+          "name": "opus",
+          "description": "Routed to Opus -- the crash-through volume"
+        }
+      ],
+      "issues": [],
+      "cards": [
+        {
+          "file": "TaskK9L2-wire-the-column.prompt.md",
+          "folder": "current",
+          "status": "In Progress",
+          "closed": null,
+          "title": "Wire the column",
+          "id": "K9L2",
+          "type": "Task",
+          "body": "# Task K9L2: Wire the column\n\n\n---\n\n**Agent:** claude-opus-5-5\n**Created:** 2026-10-01\n",
+          "begun": "2026-09-25",
+          "commits": [
+            "c3c3333",
+            "d4d4444"
+          ]
+        },
+        {
+          "file": "TaskR4T6-read-the-board.prompt.md",
+          "folder": "current",
+          "status": "In Progress",
+          "closed": null,
+          "title": "Read the board",
+          "id": "R4T6",
+          "type": "Task",
+          "body": "# Task R4T6: Read the board\n\n\n---\n\n**Created:** 2026-10-01\n",
+          "begun": "2026-10-01",
+          "commits": []
+        }
+      ],
+      "expected": {
+        "team": {
+          "size": 9
+        },
+        "workers": [
+          {
+            "label": "opus",
+            "name": "Opus",
+            "empty": false,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "empty": false,
+            "present": true,
+            "plate": ""
+          }
+        ],
+        "round": [
+          {
+            "label": "opus",
+            "name": "Opus",
+            "cast": false
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "cast": false
+          },
+          {
+            "label": "ops-dev",
+            "name": "OPS-DEV",
+            "cast": true
+          },
+          {
+            "label": "minimalist",
+            "name": "MINIMALIST",
+            "cast": true
+          },
+          {
+            "label": "new-hire",
+            "name": "NEW HIRE",
+            "cast": true
+          },
+          {
+            "label": "ultrawide",
+            "name": "ULTRAWIDE OVERLORD",
+            "cast": true
+          },
+          {
+            "label": "qa",
+            "name": "QA ALCHEMIST",
+            "cast": true
+          },
+          {
+            "label": "designer",
+            "name": "DESIGNER",
+            "cast": true
+          }
+        ],
+        "agents": {
+          "K9L2": {
+            "id": "claude-opus-5-5",
+            "family": "opus",
+            "source": "line"
+          },
+          "R4T6": {
+            "id": null,
+            "family": null,
+            "source": "none"
+          }
+        },
+        "text": "standup-team-slug-is-label-counts.txt",
+        "work": "standup-team-slug-is-label-counts.work.txt",
+        "brief": "standup-team-slug-is-label-counts.brief.txt"
+      }
+    },
+    {
+      "name": "agent-family-is-slug-counts",
+      "shape": "a card whose Agent line names an Opus id in a Space whose slug is opus: the card's agent and the engineer are two members of one name, the engineer started one card with no commit and the agent's card began before the window and threads two commits -- each reports its own counts",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "teamSize": 9,
+      "space": "opus",
+      "spaceName": "Opus",
+      "labels": [
+        {
+          "name": "fable",
+          "description": "Routed to Fable -- the deep or risky work"
+        }
+      ],
+      "issues": [],
+      "cards": [
+        {
+          "file": "TaskK9L2-wire-the-column.prompt.md",
+          "folder": "current",
+          "status": "In Progress",
+          "closed": null,
+          "title": "Wire the column",
+          "id": "K9L2",
+          "type": "Task",
+          "body": "# Task K9L2: Wire the column\n\n\n---\n\n**Agent:** claude-opus-5-5\n**Created:** 2026-10-01\n",
+          "begun": "2026-09-25",
+          "commits": [
+            "c3c3333",
+            "d4d4444"
+          ]
+        },
+        {
+          "file": "TaskR4T6-read-the-board.prompt.md",
+          "folder": "current",
+          "status": "In Progress",
+          "closed": null,
+          "title": "Read the board",
+          "id": "R4T6",
+          "type": "Task",
+          "body": "# Task R4T6: Read the board\n\n\n---\n\n**Created:** 2026-10-01\n",
+          "begun": "2026-10-01",
+          "commits": []
+        }
+      ],
+      "expected": {
+        "team": {
+          "size": 9
+        },
+        "workers": [
+          {
+            "label": "fable",
+            "name": "Fable",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "empty": false,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "empty": false,
+            "present": true,
+            "plate": ""
+          }
+        ],
+        "round": [
+          {
+            "label": "opus",
+            "name": "Opus",
+            "cast": false
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "cast": false
+          },
+          {
+            "label": "fable",
+            "name": "Fable",
+            "cast": false
+          },
+          {
+            "label": "minimalist",
+            "name": "MINIMALIST",
+            "cast": true
+          },
+          {
+            "label": "new-hire",
+            "name": "NEW HIRE",
+            "cast": true
+          },
+          {
+            "label": "ultrawide",
+            "name": "ULTRAWIDE OVERLORD",
+            "cast": true
+          },
+          {
+            "label": "qa",
+            "name": "QA ALCHEMIST",
+            "cast": true
+          },
+          {
+            "label": "designer",
+            "name": "DESIGNER",
+            "cast": true
+          }
+        ],
+        "agents": {
+          "K9L2": {
+            "id": "claude-opus-5-5",
+            "family": "opus",
+            "source": "line"
+          },
+          "R4T6": {
+            "id": null,
+            "family": null,
+            "source": "none"
+          }
+        },
+        "text": "standup-team-agent-family-is-slug-counts.txt",
+        "work": "standup-team-agent-family-is-slug-counts.work.txt",
+        "brief": "standup-team-agent-family-is-slug-counts.brief.txt"
+      }
     }
   ]
 }

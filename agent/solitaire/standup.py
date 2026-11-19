@@ -2477,7 +2477,7 @@ def render_brief(filled: Standup) -> str:
     # A window wider than yesterday (?since=) says a worker's closes without "yesterday".
     as_of = datetime.fromisoformat(filled.asOf)
     widened = filled.since != previous_working_day_start(as_of).isoformat()
-    counted = {c.label: c for c in filled.counts.workers}
+    counted = filled.counts.workers  # one per member, in the members' order
     # The counts line opens the reading: what moved in the window, in total.
     lines: list[str] = [render_counts(filled)]
     best_noun, best_count = "", 0
@@ -2507,7 +2507,7 @@ def render_brief(filled: Standup) -> str:
             t["briefOpen"].replace("{n}", str(opened)) if opened else t["briefOpenNone"],
         ]
         # What moved, the worker's own: how many of the open began in the window, and the commits.
-        mine = counted.get(w.label) or MotionCount()
+        mine = counted[at] if at < len(counted) else MotionCount()
         if mine.started:
             bits.append(t["countsStarted"].replace("{n}", str(mine.started)))
         if mine.commits:

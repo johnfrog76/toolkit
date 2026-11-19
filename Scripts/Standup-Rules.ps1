@@ -2670,10 +2670,9 @@ function Format-P20StandupBrief {
     # A window wider than yesterday (-Since) says a worker's closes without "yesterday".
     $at = ConvertTo-P20RitualTime $Standup.asOf
     $widened = ((ConvertTo-P20RitualTime $Standup.since) -ne (Get-P20StandupSince -AsOf $at))
-    $counted = @{}
-    if ($null -ne $Standup.counts) {
-        foreach ($cw in @($Standup.counts.workers | Where-Object { $null -ne $_ })) { $counted[[string]$cw.label] = $cw }
-    }
+    # One count per member, in the members' order: read by place, so two members of one name keep their own.
+    $counted = @()
+    if ($null -ne $Standup.counts) { $counted = @($Standup.counts.workers | Where-Object { $null -ne $_ }) }
     # The counts line opens the reading: what moved in the window, in total.
     $lines.Add((Format-P20StandupCounts -Standup $Standup))
 
@@ -2700,6 +2699,8 @@ function Format-P20StandupBrief {
     $seat = 0
     foreach ($w in $workers) {
         $isTile = ($seat -eq $workers.Count - 1)
+        $mine = $null
+        if ($seat -lt $counted.Count) { $mine = $counted[$seat] }
         $seat++
         if ($w.empty) { $lines.Add([string]$w.name + ': ' + [string]$t.briefWorkerNone + '.'); continue }
         $closed = @($w.yesterday | Where-Object { $null -ne $_ }).Count
@@ -2712,7 +2713,6 @@ function Format-P20StandupBrief {
         if ($closed -gt 0) { $bits += (& $fill $t.$closedKey $closed) } else { $bits += [string]$t.$noneKey }
         if ($open -gt 0) { $bits += (& $fill $t.briefOpen $open) } else { $bits += [string]$t.briefOpenNone }
         # What moved, the worker's own: how many of the open began in the window, and the commits.
-        $mine = $counted[[string]$w.label]
         if ($null -ne $mine -and [int]$mine.started -gt 0) { $bits += (& $fill $t.countsStarted ([int]$mine.started)) }
         if ($null -ne $mine -and [int]$mine.commits -gt 0) { $bits += (Get-P20StandupCommitsText ([int]$mine.commits)) }
         if ($issues -and -not ($both -and $isTile)) { $bits += [string]$t.briefInFlight }

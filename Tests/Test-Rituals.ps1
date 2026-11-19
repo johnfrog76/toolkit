@@ -978,7 +978,7 @@ $teamTable = $teamRaw | ConvertFrom-Json
 $teamCases = @($teamTable.cases)
 $teamAsOf = @([regex]::Matches($teamRaw, '"asOf"\s*:\s*"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
 $teamNames = (@($teamCases | ForEach-Object { [string]$_.name })) -join ','
-Assert-True 'the team table is read: its sizes, its seats, its room rows and twenty cases, an asOf each' (@($teamTable.sizes).Count -ge 8 -and @($teamTable.seats).Count -ge 6 -and @($teamTable.room).Count -ge 16 -and $teamNames -ceq 'absent,idle-sits,unset,work-unsaid,walk-size-3,walk-size-6,walk-size-9,idle-room,idle-room-3,idle-room-6,agent-line,trailer-only,neither,label-differs,labelled-no-card,no-kept-window,unknown-id,one-family,legacy-size,legacy-backend' -and $teamAsOf.Count -eq $teamCases.Count) "$(@($teamTable.sizes).Count) sizes, $(@($teamTable.seats).Count) seats, $(@($teamTable.room).Count) room rows, cases $teamNames"
+Assert-True 'the team table is read: its sizes, its seats, its room rows and twenty-two cases, an asOf each' (@($teamTable.sizes).Count -ge 8 -and @($teamTable.seats).Count -ge 6 -and @($teamTable.room).Count -ge 16 -and $teamNames -ceq 'absent,idle-sits,unset,work-unsaid,walk-size-3,walk-size-6,walk-size-9,idle-room,idle-room-3,idle-room-6,agent-line,trailer-only,neither,label-differs,labelled-no-card,no-kept-window,unknown-id,one-family,legacy-size,legacy-backend,slug-is-label-counts,agent-family-is-slug-counts' -and $teamAsOf.Count -eq $teamCases.Count) "$(@($teamTable.sizes).Count) sizes, $(@($teamTable.seats).Count) seats, $(@($teamTable.room).Count) room rows, cases $teamNames"
 
 foreach ($row in @($teamTable.sizes)) {
     $got = Get-P20TeamSize -Stored $row.stored
@@ -1026,11 +1026,17 @@ $ruleEveryoneSpeaks = {
     $lines = @($WorkText -split "`n")
     $at = -1
     $bad = @()
-    foreach ($sp in @($Speakers)) {
+    $place = 0
+    $everyone = @($Speakers)
+    foreach ($sp in $everyone) {
         $head = [string]$sp.name + ': '
         $found = @(for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i].StartsWith($head, [System.StringComparison]::Ordinal)) { $i } })
-        if ($found.Count -ne 1 -or $found[0] -le $at) { $bad += "$($sp.name): no one turn of its own, in round order"; continue }
-        $at = $found[0]
+        # Members of one name each have a turn: this one is the nth of them, in round order.
+        $same = @($everyone | Where-Object { [string]$_.name -ceq [string]$sp.name }).Count
+        $nth = @($everyone | Select-Object -First $place | Where-Object { [string]$_.name -ceq [string]$sp.name }).Count
+        $place++
+        if ($found.Count -ne $same -or $found[$nth] -le $at) { $bad += "$($sp.name): no turn of its own, in round order"; continue }
+        $at = $found[$nth]
         $line = $lines[$at].Substring($head.Length)
         if (-not $line.StartsWith("$open ", [System.StringComparison]::Ordinal) -or -not $line.EndsWith(" $close", [System.StringComparison]::Ordinal)) { $bad += "$($sp.name): the turn is not framed"; continue }
         $body = $line.Substring($open.Length + 1, $line.Length - $open.Length - $close.Length - 2)
