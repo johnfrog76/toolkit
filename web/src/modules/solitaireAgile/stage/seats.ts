@@ -81,10 +81,13 @@ export interface Room {
  */
 export const KEPT_WINDOWS: Readonly<Record<string, string>> = ROOM.kept;
 
-/** The plate a seated member wears: `PERSONA (label)`, or the persona alone for
- *  an invented cast member, whose label is the persona's own id. */
+/** The plate a seated member wears: the worker's own `plate` when the response
+ *  gives one (a member a card names whose family keeps no window: `GROK`), else
+ *  `PERSONA (label)`; the persona alone for an invented cast member, whose label
+ *  is the persona's own id. */
 export function seatedPlate(m: Seated): string {
-  return m.cast ? m.persona : memberPlate(m, m.worker.label);
+  if (m.cast) return m.persona;
+  return m.worker.plate || memberPlate(m, m.worker.label);
 }
 
 const MEMBER_IDS = MEMBER_WINDOWS.map((m) => m.castId);

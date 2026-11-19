@@ -25,9 +25,9 @@
     {
       "name": "Assigned and Agent together: the person owns it, the agent worked it",
       "crlf": false,
-      "lines": ["# Task K7M2: Bench notes", "", "**Assigned:** John", "**Agent:** claude-sonnet-5-5", "**Created:** 2026-10-17"],
+      "lines": ["# Task K7M2: Bench notes", "", "**Assigned:** Sam", "**Agent:** claude-sonnet-5-5", "**Created:** 2026-10-17"],
       "expected": "claude-sonnet-5-5",
-      "assigned": "John"
+      "assigned": "Sam"
     },
     {
       "name": "the same lines in a CRLF card",

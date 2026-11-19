@@ -210,9 +210,10 @@ which is why the lead keeps one line by rewriting it rather than adding another.
 `Tests/fixtures/parsers/models.json` holds the two lookups to one table. The card keeps the id; a reader
 that shows it shows the map's name.
 
-The standup, the suggestion and `StartWork -Launch` read a card's worker from its Agent line -- the known
-id's family -- else from its Assigned line (`Get-P20CardWorker`, `card_worker`, held to
-`Tests/fixtures/parsers/card-worker.json`).
+The standup, the suggestion and `StartWork -Launch` read a card's worker through the one reader of a card's
+agent ([below](#how-a-cards-agent-is-worked-out)): its Agent line -- the known id's family, an unknown id as
+written -- else an older card's Assigned worker; `StartWork -Launch` reads those two sources alone. A card
+neither names keeps its Assigned line as written (`me`, an `@<login>`), as before.
 
 ### Milestone and sprint: two lines
 
@@ -265,6 +266,29 @@ board's Tag filter and the model's `tags`. `tokens.tags`, and the separator is `
 written with semicolons (`Tags: enhancement; sev3`) -- as an Azure DevOps work item's tags arrive, and
 as `NewPrompt` and `StartWork` join a GitHub issue's labels -- reads as two tags, and a line
 with both separators reads every tag; `Tag` rewrites the line it changes with commas.
+
+### How a card's agent is worked out
+
+Which model worked a card is worked out every time it is read, and **nothing is written into the card**. One
+reader a half does it -- `Resolve-P20CardAgent` in `Scripts/Get-PromptFileStatus.ps1` and `resolve_card_agent()`
+in `agent/core/parsers.py`, held to one table, `Tests/fixtures/parsers/agent-source.json` -- and it answers
+with the model's id (or none), its family, and the source the answer came from. The sources are tried in
+the order `consts.json` `models.agentSources` names, and the first that answers wins. The shipped order
+is four sources, `line`, `assigned`, `trailer`, `none`: **a tracker's worker label does not decide who worked a card**,
+since it says who was meant to do the work, not who did.
+
+| Source | Reads | Answers |
+| --- | --- | --- |
+| `line` | the card's first `**Agent:**` line (`stamps.agent`) | the id as written; the family from the id's row in `Config/models.json`, else the id as written. An empty line does not answer |
+| `assigned` | on a card with no Agent line, the first `**Assigned:**` value (`stamps.assigned`) when it names a worker. `Route <id> -Assign <size>` writes it on a card with no issue, so on an older card it is the worker, and it is read tolerantly: a known family -- a key of the model map's `current` block, matched ignoring case, which says which model id a size (`sonnet`, `opus`) means today -- as its current model, and any other worker's name as written. An empty value, `me` (`rituals.assignMe`, in any case) and an `@<login>` do not answer | a known family: the id `current` gives, and the family from that id's row (else the id as written). Any other name: no id, the family the name as written. An Agent line still wins; this beats a trailer |
+| `trailer` | the commits the card's own bullets name (`regex.commitBullet`, the `#<n> squash-merged` bullet among them, each commit once by its first seven characters), when the caller has read their messages | each commit votes once for every model its `Co-Authored-By` trailers name (`regex.coAuthorTrailer`, the key in any case); most votes wins, a tie to the first seen in bullet then trailer order. A trailer name is looked up in the map's `coAuthor`, trimmed and ignoring case, never parsed: a person's name, or a model the map does not know, names nothing |
+| `label` | **not in the shipped order.** The card's issue's worker label, as the caller passes it, read only by a caller that passes an order naming `label` | no id; the family is the label as written |
+| `none` | -- | no id and no family: a person worked the card alone |
+
+The caller supplies what is not in the card: the commit messages (and the label, for an order that reads it), as one
+`git log --no-walk=unsorted --ignore-missing --format=%x00%H%x1f%B <hashes>` read parsed by
+`ConvertFrom-P20GitMessages` / `git_messages()`. With no messages the trailer source is skipped, not
+guessed. A missing or unreadable model map reads as empty, so the reader never throws for it.
 
 ### A card's pictures -- `<space>/assets/`
 
@@ -429,7 +453,15 @@ too, joined to its issues on the id: a card whose id is an issue's number adds i
 row (and a `Check` line where the two disagree), and any other card goes in the tile below. A card that
 says `**Billable:** no` is in neither. For a card of its own:
 the derived state above, plus the `**Closed:**` day of an archived card, puts each card in at most one
-slot of the engineer's one tile, read fresh every time and never written back. The days are the
+slot, read fresh every time and never written back.
+
+**Who reports a card is the card's.** The standup asks the one reader of a card's agent
+([above](#how-a-cards-agent-is-worked-out)), in the shipped order and never with the issue's worker label:
+the card is reported by the member its Agent line, an older card's Assigned worker or, on a connected
+GitHub Space, its commits' trailers name -- a labelled worker of that family, else a member of its own --
+and by the engineer's tile when it names nobody. A card joined to an issue moves that issue's row to the
+same member; an issue with no card stays with its label's worker
+([Team Agile](../modules/solitaire-agile.md#where-the-rooms-members-come-from)). The days are the
 standup's window: `since` is the start of the previous working day (or the day `Standup -Since`
 names), `asOf` is now.
 

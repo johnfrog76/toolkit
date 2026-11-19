@@ -1,0 +1,21 @@
+Standup -- Friday 2 October 2026
+"Can we not adjust scope."
+
+Waiting on you
+  Nothing is waiting on you.
+
+Fable
+  Status     "Yesterday I read up on how the team works, so I'm ready for what's next."
+  Status     "Today I'll move my shell to the new terminal and pick a theme."
+Opus
+  Yesterday  nothing closed
+  Today      #702 (started, 1 commit) Count the window
+  Blockers   no blockers
+Sonnet
+  Status     "Yesterday I took a course module on the cloud platform."
+  Status     "Today I'll set up the password manager on my phone."
+Widgets
+  Status     "Yesterday I tidied my notes and my calendar for the week."
+  Status     "Today I'll pair with a teammate to learn how the build runs."
+
+"Let's circle back."

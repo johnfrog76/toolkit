@@ -67,6 +67,17 @@ page, so the two counts lines can differ.
 
 **Issue:** [#316](https://github.com/johnfrog76/toolkit/issues/316)
 
+### A card's commit trailers are read from GitHub only
+
+**What you see:** The standup reports a card with no Agent line and no Assigned worker by the model its
+commits' `Co-Authored-By` trailers credit only on a GitHub Space that is connected: the trailers ride the
+standup's dates read. On a Space with no tracker, an Azure DevOps Space, or when the dates read fails, such
+a card is the engineer's, even when the commits in a local checkout name a model.
+
+**Where you meet it:** [Team Agile](modules/solitaire-agile.md#where-the-rooms-members-come-from), "Where the room's members come from"
+
+**Issue:** [#503](https://github.com/johnfrog76/toolkit/issues/503)
+
 ### The foyer's design counts can differ from the Design tab's
 
 **What you see:** A GitHub row in the Studio's foyer counts a product's designs and specs from GitHub's

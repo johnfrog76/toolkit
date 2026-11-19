@@ -37,6 +37,7 @@ try:
     from agent.ado import accounting
     from agent.core import config, disk_cache
     from agent.core import consts as C
+    from agent.core.parsers import resolve_card_agent
     from agent.solitaire import standup
     from agent.solitaire import tracker as solitaire_tracker
 except Exception as e:  # pragma: no cover - environment without the deps
@@ -551,14 +552,25 @@ class TheDatesTable(unittest.TestCase):
         q = DATES_TABLE["query"]
         self.assertEqual(standup.dates_query(q["hashes"], q["numbers"]), "\n".join(q["lines"]) + "\n")
 
-    def test_each_answer_parses_to_its_two_maps(self):
+    def test_the_trailer_aliases_ride_after_the_others(self):
+        """t<i> asks a trailer hash's commit with its message, after the c and i
+        aliases; with no trailer hashes the text is the query's, unchanged."""
+        q = DATES_TABLE["trailerQuery"]
+        got = standup.dates_query(q["hashes"], q["numbers"], q["trailers"])
+        self.assertEqual(got, "\n".join(q["lines"]) + "\n")
+        plain = DATES_TABLE["query"]
+        self.assertEqual(standup.dates_query(plain["hashes"], plain["numbers"], []), "\n".join(plain["lines"]) + "\n")
+        self.assertNotIn("evil", standup.dates_query([], [], ['a0a1111") { x } evil: object(expression: "']))
+
+    def test_each_answer_parses_to_its_maps(self):
         for case in DATES_TABLE["cases"]:
             with self.subTest(case=case["name"]):
-                commits, starts = standup.dates_from_answer(
-                    case["answer"], case["hashes"], case["numbers"], DATES_TABLE["workerLabels"]
+                commits, starts, messages = standup.dates_from_answer(
+                    case["answer"], case["hashes"], case["numbers"], DATES_TABLE["workerLabels"], case.get("trailers")
                 )
                 self.assertEqual(commits, case["expected"]["commitDates"])
                 self.assertEqual({str(k): v for k, v in starts.items()}, case["expected"]["issueStarts"])
+                self.assertEqual(messages, case["expected"].get("messages", {}))
 
     def test_a_hash_that_is_not_hex_is_never_written_into_the_query(self):
         self.assertNotIn("evil", standup.dates_query(['a0a1111") { x } evil: object(expression: "'], []))
@@ -689,9 +701,10 @@ class TheJoinedTable(unittest.TestCase):
         filled = _fill_joined(JOINED_CASES["issue-labelled-in-window"])
         self.assertEqual([(i.number, i.motion) for i in filled.workers[1].today], [(171, "started")])
         before = _fill_joined(JOINED_CASES["issue-assigned-before-window"])
-        self.assertEqual(
-            [(i.number, i.motion) for i in before.workers[0].today], [(172, "inProgress"), (173, "inProgress")]
-        )
+        # The issue whose card names nobody is the engineer's to report; the one
+        # with no card stays with its label's worker.
+        self.assertEqual([(i.number, i.motion) for i in before.workers[0].today], [(172, "inProgress")])
+        self.assertEqual([(i.number, i.motion) for i in before.workers[-1].today], [(173, "inProgress")])
 
     def test_the_window_hashes_rule(self):
         at = datetime.fromisoformat(JOINED_TABLE["asOf"])
@@ -725,8 +738,10 @@ class TheJoinedTable(unittest.TestCase):
             calls.append(cmd)
             query = Path(cmd[cmd.index("-F") + 1].split("@", 1)[1]).read_text(encoding="utf-8")
             repo = {}
-            for i, h in enumerate(re.findall(r'object\(expression: "([0-9a-f]+)"\)', query)):
-                repo[f"c{i}"] = {"oid": h + "0" * (40 - len(h)), "authoredDate": "2026-10-01T10:00:00Z"}
+            for alias, h in re.findall(r'\b([ct]\d+): object\(expression: "([0-9a-f]+)"\)', query):
+                repo[alias] = {"oid": h + "0" * (40 - len(h)), "authoredDate": "2026-10-01T10:00:00Z"}
+                if alias.startswith("t"):
+                    repo[alias]["message"] = f"Commit {h}"
             return subprocess.CompletedProcess(cmd, 0, json.dumps({"data": {"repository": repo}}), "")
 
         tracker.forget()
@@ -737,7 +752,8 @@ class TheJoinedTable(unittest.TestCase):
                 self.assertEqual(len(calls), 2)
                 self.assertTrue(all(c[:3] == ["gh", "api", "graphql"] for c in calls))
                 self.assertEqual(got[0], {h: "2026-10-01T10:00:00Z" for h in hashes})
-                self.assertIsNone(got[2])
+                self.assertEqual(got[2], {})
+                self.assertIsNone(got[3])
                 tracker.dates(["acme/widgets", "acme/gears"], hashes, {"acme/widgets": [171]}, ["opus"])
                 self.assertEqual(len(calls), 2, "the second standup is served from the kept read")
                 many = [f"{i:07x}" for i in range(standup.DATES_CHUNK + 1)]
@@ -748,9 +764,85 @@ class TheJoinedTable(unittest.TestCase):
                 return_value=subprocess.CompletedProcess([], 1, "", "HTTP 502: down"),
             ):
                 tracker.forget()
-                self.assertEqual(tracker.dates(["acme/widgets"], ["a0a1111"], {}, []), (None, None, "HTTP 502: down"))
+                self.assertEqual(
+                    tracker.dates(["acme/widgets"], ["a0a1111"], {}, []), (None, None, None, "HTTP 502: down")
+                )
         finally:
             tracker.forget()
+
+    def test_the_trailer_read_rides_the_dates_read(self):
+        """Trailer hashes ride the same call as t aliases: a hash asked for its
+        date and its trailers is asked once, every alias counts toward a chunk,
+        the messages come back keyed by seven characters, and the kept read is
+        keyed by the trailer hashes too."""
+        from agent.solitaire import tracker
+
+        calls: list[str] = []
+
+        def fake_run(cmd, timeout, **_kw):
+            query = Path(cmd[cmd.index("-F") + 1].split("@", 1)[1]).read_text(encoding="utf-8")
+            calls.append(query)
+            repo = {}
+            for alias, h in re.findall(r'\b([ct]\d+): object\(expression: "([0-9a-f]+)"\)', query):
+                repo[alias] = {"oid": h + "0" * (40 - len(h)), "authoredDate": "2026-10-01T10:00:00Z"}
+                if alias.startswith("t"):
+                    repo[alias]["message"] = f"Commit {h}"
+            return subprocess.CompletedProcess(cmd, 0, json.dumps({"data": {"repository": repo}}), "")
+
+        tracker.forget()
+        try:
+            with mock.patch("agent.ado.repo_read.run_read", side_effect=fake_run):
+                commits, _starts, messages, why = tracker.dates(
+                    ["acme/widgets"], ["a0a1111", "b0b2222"], {}, [], trailers=["b0b2222", "c0c3333"]
+                )
+                self.assertIsNone(why)
+                self.assertEqual(len(calls), 1, "the trailers ride the dates read: no second call")
+                self.assertEqual(calls[0].count('object(expression: "b0b2222")'), 1, "asked once, as a t alias")
+                self.assertIn(
+                    't0: object(expression: "b0b2222") { ... on Commit { oid authoredDate message } }', calls[0]
+                )
+                self.assertEqual(set(commits), {"a0a1111", "b0b2222", "c0c3333"})
+                self.assertTrue(all(commits.values()))
+                self.assertEqual(messages, {"b0b2222": "Commit b0b2222", "c0c3333": "Commit c0c3333"})
+                tracker.dates(["acme/widgets"], ["a0a1111", "b0b2222"], {}, [], trailers=["b0b2222", "c0c3333"])
+                self.assertEqual(len(calls), 1, "kept for the TTL")
+                tracker.dates(["acme/widgets"], ["a0a1111", "b0b2222"], {}, [])
+                self.assertEqual(len(calls), 2, "the kept read is keyed by the trailer hashes")
+                half = [f"{i:07x}" for i in range(standup.DATES_CHUNK - 1)]
+                tracker.dates(["acme/widgets"], half, {}, [], trailers=["e0e5555", "f0f6666"])
+                self.assertEqual(len(calls), 4, "a t alias counts toward a chunk")
+        finally:
+            tracker.forget()
+
+    def test_the_trailer_asks_are_the_placed_cards_with_no_agent_line(self):
+        """trailer_asks: the commits of every card the fill places that has no
+        Agent line -- never a card whose line answers, never the whole archive."""
+        case = JOINED_CASES["dates-not-read"]
+        filled = _fill_joined(case)
+        self.assertEqual(
+            standup.trailer_asks(filled, case["cards"]),
+            # The slots' own cards first, then the cards joined to an issue.
+            ["e0e5555", "f0f6666", "a0a1111", "b0b2222", "c0c3333", "d0d4444", "a0a9999"],
+        )
+        lined = [dict(c) for c in case["cards"]]
+        lined[0]["body"] = "# Task 170: Date the commits\n\n**Agent:** claude-opus-5-5\n"
+        self.assertEqual(standup.trailer_asks(filled, lined), ["e0e5555", "f0f6666"])
+        old = {
+            "file": "Task120-long-ago.prompt.md",
+            "folder": "archive",
+            "status": "Done",
+            "closed": "2026-01-05",
+            "title": "Long ago",
+            "id": "120",
+            "path": "archive/Task120-long-ago.prompt.md",
+            "commits": ["9a9a9a9"],
+        }
+        self.assertNotIn(
+            "9a9a9a9",
+            standup.trailer_asks(_fill_joined({**case, "cards": [*case["cards"], old]}), [*case["cards"], old]),
+        )
+        lone = JOINED_CASES["issue-assigned-before-window"]
+        self.assertEqual(standup.trailer_asks(_fill_joined(lone), lone["cards"]), [])
 
     def test_a_window_is_a_day_on_or_before_today(self):
         at = datetime.fromisoformat(JOINED_TABLE["asOf"])
@@ -1325,6 +1417,7 @@ def _fill_team(case: dict) -> "standup.Standup":
             space=case["space"],
             space_name=case["spaceName"],
             size=case["teamSize"],
+            messages=case.get("messages"),
         )
     else:
         filled = standup.fill_standup(
@@ -1468,6 +1561,17 @@ class TheTeamTable(unittest.TestCase):
                 "idle-room",
                 "idle-room-3",
                 "idle-room-6",
+                # Where the room's members come from: the card decides once it exists.
+                "agent-line",
+                "trailer-only",
+                "neither",
+                "label-differs",
+                "labelled-no-card",
+                "no-kept-window",
+                "unknown-id",
+                "one-family",
+                "legacy-size",
+                "legacy-backend",
             },
         )
 
@@ -1537,10 +1641,24 @@ class TheTeamTable(unittest.TestCase):
             with self.subTest(case=case["name"]):
                 filled = _fill_team(case)
                 self.assertEqual(filled.team.model_dump(), exp["team"])
+                # A row that states a plate holds it; one that does not wears none.
                 got = [
-                    {"label": w.label, "name": w.name, "empty": w.empty, "present": w.present} for w in filled.workers
+                    {"label": w.label, "name": w.name, "empty": w.empty, "present": w.present, "plate": w.plate}
+                    for w in filled.workers
                 ]
-                self.assertEqual(got, exp["workers"])
+                self.assertEqual(got, [{**w, "plate": w.get("plate", "")} for w in exp["workers"]])
+                # Who each card names, and where it came from: the one reader, shipped order.
+                for cid, want in exp.get("agents", {}).items():
+                    card = next(c for c in case["cards"] if c["id"] == cid)
+                    self.assertEqual(resolve_card_agent(card["body"], "", case.get("messages")), want, cid)
+                # Each member's window, by the room's own rule over the fill's record.
+                if "windows" in exp:
+                    room = standup.room_seats(
+                        filled.team.size,
+                        (filled.workers[-1].label, filled.workers[-1].empty),
+                        [(w.label, w.empty) for w in filled.workers[:-1]],
+                    )
+                    self.assertEqual({r["label"]: r["window"] for r in room["round"] if not r["cast"]}, exp["windows"])
                 # The round: the seated in seat order, then the invented cast members.
                 spoken = [{"label": w.label, "name": w.name, "cast": w.cast} for w in filled.work.workers]
                 self.assertEqual(spoken, exp["round"])
@@ -2274,7 +2392,7 @@ def _brief_less_corner(body: dict) -> str:
 
 WORK_FIELDS = {"queue", "workers", "queueProse", "chairProse", "text"}
 GROUP_FIELDS = {"name", "by", "count", "refs", "phrase"}
-WORKER_FIELDS = {"label", "name", "yesterday", "today", "blockers", "empty", "excuse", "status", "present"}
+WORKER_FIELDS = {"label", "name", "yesterday", "today", "blockers", "empty", "excuse", "status", "present", "plate"}
 WALK_FIELDS = {"number", "id", "title", "url", "path", "motion", "commits", "worker"}
 ITEM_FIELDS = {"number", "id", "title", "url", "path", "motion", "commits"}
 COUNT_FIELDS = {"label", "name", "closed", "started", "inProgress", "commits", "undated"}
@@ -2282,11 +2400,15 @@ COUNT_FIELDS = {"label", "name", "closed", "started", "inProgress", "commits", "
 
 def _graphql_answer(argv: list[str], when: str) -> "subprocess.CompletedProcess":
     """A stub's answer to the standup's dates read: every hash the query asks
-    for a commit authored at ``when``, every issue a timeline with no event."""
+    for a commit authored at ``when``, by its own alias -- a ``t`` alias's
+    commit with a message and no trailer -- and every issue a timeline with no
+    event."""
     query = Path(argv[argv.index("-F") + 1].split("@", 1)[1]).read_text(encoding="utf-8")
     repo: dict = {}
-    for i, h in enumerate(re.findall(r'object\(expression: "([0-9a-f]+)"\)', query)):
-        repo[f"c{i}"] = {"oid": h + "0" * (40 - len(h)), "authoredDate": when}
+    for alias, h in re.findall(r'\b([ct]\d+): object\(expression: "([0-9a-f]+)"\)', query):
+        repo[alias] = {"oid": h + "0" * (40 - len(h)), "authoredDate": when}
+        if alias.startswith("t"):
+            repo[alias]["message"] = "A commit"
     for n in re.findall(r"\bi(\d+): issue\(", query):
         repo[f"i{n}"] = {"timelineItems": {"nodes": []}}
     return subprocess.CompletedProcess(argv, 0, stdout=json.dumps({"data": {"repository": repo}}), stderr="")

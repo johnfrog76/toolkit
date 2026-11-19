@@ -129,6 +129,8 @@ EXPECTED = {
     ): r"^(?:ssh://(?:[^/@\s]+@)?(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com)(?::\d+)?/|(?:ssh://)?[^/@\s]+@(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com):)v3/([^/\s]+)/([^/\s]+)/([^/\s]+?)(?:\.git)?/?$",
     ("regex", "adoOrgDev"): r"^https?://(?:[^/@\s]+@)?dev\.azure\.com/([^/\s]+)",
     ("regex", "adoOrgVisualStudio"): r"^https?://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com(?:[/:]|$)",
+    # A commit's Co-Authored-By trailer, the key in any case: group 1 the name (commit_co_authors).
+    ("regex", "coAuthorTrailer"): r"(?mi)^[ \t]*Co-Authored-By:[ \t]*([^<\r\n]*?)[ \t]*<[^>\r\n]*>",
     ("reminders", "buckets"): ["overdue", "today", "upcoming"],
     ("reminders", "snooze"): ["1h", "tomorrow", "nextweek"],
     # A Teams recipient's type: the engine posts the first list and skips the second.
@@ -432,6 +434,8 @@ EXPECTED = {
     ("org", "file"): "org.json",
     # The model map a card's Agent id is looked up in: the agent reads it through models_file().
     ("models", "file"): "Config/models.json",
+    # The order a card's agent is worked out in: the agent reads it through model_agent_sources().
+    ("models", "agentSources"): ["line", "assigned", "trailer", "none"],
     # Daily's window: the billing script, the CLI's Daily and GET /api/billing refuse
     # a window in these words (Scripts/Resolve-BillingWindow.ps1 is the rule).
     ("billing", "text"): {
@@ -636,6 +640,12 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.usage_readings_folder(), EXPECTED[("usage", "readingsFolder")])
         self.assertEqual(C.org_file(), EXPECTED[("org", "file")])
         self.assertEqual(C.models_file(), EXPECTED[("models", "file")])
+        self.assertEqual(C.model_agent_sources(), tuple(EXPECTED[("models", "agentSources")]))
+        self.assertEqual(C.re_co_author_trailer().pattern, EXPECTED[("regex", "coAuthorTrailer")])
+        trailer = "Fix\n\nCo-Authored-By: Claude Opus 5.5 <a@b>\r\nco-authored-by:  A Person  <p@q>\n"
+        trailer += "Co-Authored-By: no email"
+        names = [n.strip() for n in C.re_co_author_trailer().findall(trailer)]
+        self.assertEqual(names, ["Claude Opus 5.5", "A Person"])
         self.assertEqual(C.stamp_agent(), EXPECTED[("stamps", "agent")])
         self.assertEqual(C.billing_text(), EXPECTED[("billing", "text")])
         self.assertEqual(C.webhook_recipient_types(), tuple(EXPECTED[("communication", "webhookRecipientTypes")]))
@@ -741,6 +751,8 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("org.file", "org.json"),
         # The model map's path: served through models_file(), never typed.
         ("models.file", "Config/models.json"),
+        # The trailer's key: read through re_co_author_trailer(), never typed into a pattern.
+        ("regex.coAuthorTrailer", "Authored-By:"),
         # The gh read limits: served through gh_read_limit_*(), never typed as a --limit.
         ("ghReads.labels", '"--limit", "200"'),
         ("ghReads.openIssues", '"--limit", "100"'),

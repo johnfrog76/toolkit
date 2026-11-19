@@ -321,6 +321,12 @@ def re_tag_separator() -> re.Pattern:
     return pattern("regex", "tagSeparator")
 
 
+def re_co_author_trailer() -> re.Pattern:
+    """One ``Co-Authored-By`` trailer line of a commit message, the key in any case
+    (the pattern carries ``(?mi)``): group 1 the name before the ``<email>``."""
+    return pattern("regex", "coAuthorTrailer")
+
+
 def re_due_line() -> re.Pattern:
     """``**Due:** YYYY-MM-DD`` or ``YYYY-MM-DDTHH:MM``: group 1 the date, group 2 the time."""
     return pattern("regex", "dueLine")
@@ -760,6 +766,13 @@ def models_file() -> str:
     """``Config/models.json`` -- the model map, relative to the package root: every
     reader of a card's ``**Agent:**`` line takes provider, family and display name from it."""
     return consts()["models"]["file"]
+
+
+def model_agent_sources() -> tuple[str, ...]:
+    """``line``, ``assigned``, ``trailer``, ``none`` -- the shipped order a card's agent is worked
+    out in (``parsers.resolve_card_agent``): the first source that answers wins. It
+    never reads ``label``, which a caller asks for by passing an order naming it."""
+    return tuple(consts()["models"]["agentSources"])
 
 
 def billing_text() -> dict[str, str]:
