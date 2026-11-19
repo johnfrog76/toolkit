@@ -30,7 +30,7 @@ import {
 import type { TileLook } from "./cast";
 import type { MugLook } from "./EmptyDesk";
 import { RefinedDesk } from "./RefinedDesk";
-import { CHAIR_CAST_ID, CHAIR_PLATE, EMPTY_DESK_PLATE, dealRoom, memberPlate } from "./seats";
+import { CHAIR_CAST_ID, CHAIR_PLATE, EMPTY_DESK_PLATE, dealRoom, seatedPlate } from "./seats";
 import type { Seated } from "./seats";
 import { HEADS, HEAD_FALLBACK, faceBox, leastOverlap, placeBubble } from "./geometry";
 import type { BubbleSide, Rect } from "./geometry";
@@ -576,9 +576,9 @@ export function buildStandupDeck(data: StandupResponse): Deck {
   const { members, desks } = dealRoom(data);
 
   // Every window's plate for this standup: the chair's, each member's persona
-  // with its label, and the desks'.
+  // with its label, an invented cast member's persona alone, and the desks'.
   const plates = new Map<string, string>([[CHAIR_CAST_ID, CHAIR_PLATE]]);
-  for (const m of members) plates.set(m.castId, memberPlate(m, m.worker.label));
+  for (const m of members) plates.set(m.castId, seatedPlate(m));
   for (const d of desks) plates.set(d.castId, EMPTY_DESK_PLATE);
 
   /** The tile states every slide starts from: the faces that are there, and the desks. */
@@ -671,7 +671,7 @@ export function buildStandupDeck(data: StandupResponse): Deck {
     );
   };
 
-  const turnSlide = ({ castId, worker }: Seated): Slide => {
+  const turnSlide = ({ castId, worker, cast }: Seated): Slide => {
     const script = workerScript(worker, grained.get(worker.label), dressed.get(worker.label));
     const tiles = base();
     tiles.set(castId, {
@@ -692,7 +692,7 @@ export function buildStandupDeck(data: StandupResponse): Deck {
       id,
       contentKey: stageKey,
       content: stage(id, tiles),
-      copy: <Copy castId={castId} label={worker.label} />,
+      copy: <Copy castId={castId} label={cast ? undefined : worker.label} />,
       notes: notesOf(script.say),
     };
   };

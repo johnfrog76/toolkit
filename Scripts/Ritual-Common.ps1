@@ -147,26 +147,43 @@ function Get-P20StandupDates {
     # The standup's dates read for ONE repo: one `gh api graphql` per chunk of
     # aliases (Get-P20StandupDatesLimits), the query in a temporary file and the
     # owner and name as fields, so no quote in it crosses a native argument.
-    # -> @{ ok; commitDates; issueStarts } or @{ ok = $false; reason }. An alias
+    # -> @{ ok; commitDates; issueStarts; messages } or @{ ok = $false; reason }.
+    # Trailers are the hashes whose co-author trailers the standup reads
+    # (Get-P20StandupTrailerAsks): each rides the same call as a t alias, which
+    # also dates it, so a hash asked for its date AND its trailers is asked once,
+    # as a t alias; every alias counts toward a chunk. An alias
     # GitHub could not resolve is null in an answer that still has data (gh
     # exits 1 for it), so the answer is read from stdout whatever the exit code,
     # and only an answer with no data is a failed read. The query and the parse
     # are Standup-Rules.ps1's (Get-P20StandupDatesQuery, ConvertFrom-P20StandupDates).
-    param([string]$Repo, [string[]]$Hashes, [int[]]$Numbers, [string[]]$WorkerLabels)
+    param([string]$Repo, [string[]]$Hashes, [int[]]$Numbers, [string[]]$WorkerLabels, [string[]]$Trailers)
     $commits = @{}
     $starts = @{}
+    $messages = @{}
+    $trailerSet = @{}
+    foreach ($h in @($Trailers | Where-Object { $_ })) { $trailerSet[[string]$h] = $true }
     $asks = New-Object System.Collections.ArrayList
-    foreach ($h in @($Hashes | Where-Object { $_ })) { [void]$asks.Add(@('c', [string]$h)) }
+    foreach ($h in @($Hashes | Where-Object { $_ })) {
+        if ($trailerSet.ContainsKey([string]$h)) { $commits[[string]$h] = $null; continue }
+        [void]$asks.Add(@('c', [string]$h))
+    }
     foreach ($n in @($Numbers | Where-Object { $null -ne $_ })) { [void]$asks.Add(@('i', [int]$n)) }
+    $seenT = @{}
+    foreach ($h in @($Trailers | Where-Object { $_ })) {
+        if ($seenT.ContainsKey([string]$h)) { continue }
+        $seenT[[string]$h] = $true
+        [void]$asks.Add(@('t', [string]$h))
+    }
     $owner, $name = ([string]$Repo).Split('/', 2)
     $size = (Get-P20StandupDatesLimits).chunk
     for ($at = 0; $at -lt $asks.Count; $at += $size) {
         $chunk = @($asks.ToArray()[$at..([Math]::Min($at + $size, $asks.Count) - 1)])
         $ch = [string[]]@($chunk | Where-Object { $_[0] -ceq 'c' } | ForEach-Object { [string]$_[1] })
         $cn = [int[]]@($chunk | Where-Object { $_[0] -ceq 'i' } | ForEach-Object { [int]$_[1] })
+        $ct = [string[]]@($chunk | Where-Object { $_[0] -ceq 't' } | ForEach-Object { [string]$_[1] })
         $file = Join-Path ([System.IO.Path]::GetTempPath()) ('p20-gql-' + [guid]::NewGuid().ToString('N') + '.graphql')
         try {
-            [System.IO.File]::WriteAllText($file, (Get-P20StandupDatesQuery -Hashes $ch -Numbers $cn), (New-Object System.Text.UTF8Encoding($false)))
+            [System.IO.File]::WriteAllText($file, (Get-P20StandupDatesQuery -Hashes $ch -Numbers $cn -Trailers $ct), (New-Object System.Text.UTF8Encoding($false)))
             $read = Invoke-P20TrackerRead 'gh' @('api', 'graphql', '-F', "query=@$file", '-f', "owner=$owner", '-f', "name=$name")
         }
         catch { return @{ ok = $false; reason = (Format-P20TrackerReason -Key 'trackerGhNoAnswer' -Values @{ repo = $Repo; error = $_.Exception.Message }) } }
@@ -176,9 +193,10 @@ function Get-P20StandupDates {
         if ($null -eq $parsed -or $null -eq $parsed.PSObject.Properties['data'] -or $null -eq $parsed.data) {
             return @{ ok = $false; reason = (Get-P20GhRefusalReason -Repo $Repo -Err $read.Err) }
         }
-        $got = ConvertFrom-P20StandupDates -Repository $parsed.data.repository -Hashes $ch -Numbers $cn -WorkerLabels $WorkerLabels
+        $got = ConvertFrom-P20StandupDates -Repository $parsed.data.repository -Hashes $ch -Numbers $cn -WorkerLabels $WorkerLabels -Trailers $ct
         foreach ($k in @($got.commitDates.Keys)) { $commits[$k] = $got.commitDates[$k] }
         foreach ($k in @($got.issueStarts.Keys)) { $starts[$k] = $got.issueStarts[$k] }
+        foreach ($k in @($got.messages.Keys)) { if (-not $messages.ContainsKey($k)) { $messages[$k] = $got.messages[$k] } }
     }
-    return @{ ok = $true; commitDates = $commits; issueStarts = $starts }
+    return @{ ok = $true; commitDates = $commits; issueStarts = $starts; messages = $messages }
 }

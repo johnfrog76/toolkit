@@ -247,7 +247,8 @@ export const RITUALS = consts.rituals as {
    *  in the room"): the nine windows in grid order, each a cast id and the plate
    *  its persona wears; the cast id whose window is the chair's; the window a
    *  worker label keeps; and the window the engineer takes when no member owns
-   *  it. The CLI and the agent seat the room from it. */
+   *  it. The CLI and the agent seat the room from it, and the stage draws it
+   *  (modules/solitaireAgile/stage/seats.ts). */
   room: {
     windows: { id: string; plate: string }[];
     chair: string;
@@ -505,6 +506,10 @@ export const ORG = consts.org as {
  */
 export const MODELS = consts.models as {
   file: string;
+  /** The shipped order a card's agent is worked out in: `line`, `assigned`, `trailer`, `none` -- never the label
+   *  (docs/hub/cards.md, "How a card's agent is worked out"). The agent works it
+   *  out and serves the answer; this half states it. */
+  agentSources: string[];
 };
 
 /**
@@ -543,4 +548,7 @@ export const RE = {
   /** A WHOLE string that is a card id: a work item number, or the four-character
    *  id of a card with no work item. Anchored here; the contract's shape is not. */
   cardId: toRegExp(`^(?:${consts.regex.cardId})$`),
+  /** One Co-Authored-By trailer line of a commit message, the key in any case:
+   *  group 1 the name before the `<email>`, untrimmed. */
+  coAuthorTrailer: toRegExp(consts.regex.coAuthorTrailer),
 };

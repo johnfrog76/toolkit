@@ -628,6 +628,9 @@ Assert-True 'no card in play: the engineer takes the round''s first turn' ([stri
 $together = @($joinedCases | Where-Object { $_.name -eq 'together' })[0]
 $downFill = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @($joinedTable.workerLabels) -Issues @($together.issues) -Tracker @{ ok = $false; reason = 'gh did not answer' } -Cards @($together.cards) -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
 Assert-True 'the tracker not answering: the Tracker line, no worker, no Check line, no link' ($downFill.source -ceq 'none' -and @($downFill.workers).Count -eq 0 -and @($downFill.checks).Count -eq 0 -and @($downFill.links).Count -eq 0)
+$slugged = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @([pscustomobject]@{ name = 'opus'; description = 'Routed to Opus' }) -Issues @() -Tracker @{ ok = $true; reason = '' } -Cards @() -Space 'opus' -SpaceName 'Opus' -PackageRoot $pkgRoot
+$sluggedBrief = Format-P20StandupBrief -Standup $slugged
+Assert-True 'a Space slugged as its only worker label still has a worker label: the in-flight line, not noWorkers' ($sluggedBrief.Contains([string]$consts.rituals.text.briefInFlightUnknown) -and -not $sluggedBrief.Contains([string]$consts.rituals.text.noWorkers))
 $rounds = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @($joinedTable.workerLabels) -Tracker @{ ok = $true; reason = '' } -Space 'widgets' -PackageRoot $pkgRoot `
     -Issues @([pscustomobject]@{ number = 141; title = 'Build'; state = 'OPEN'; labels = @('opus'); closedAt = $null }) `
     -Cards @([pscustomobject]@{ file = '141-build-r1.prompt.md'; folder = 'archive'; status = 'Done'; closed = '2026-09-01'; id = '141' },
@@ -661,6 +664,22 @@ $loneCase = @($joinedCases | Where-Object { $_.name -eq 'issue-assigned-before-w
 $loneFill = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @($joinedTable.workerLabels) -Issues @($loneCase.issues) -Tracker @{ ok = $true; reason = '' } -Cards @($loneCase.cards) -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
 $loneAsks = Get-P20StandupDateAsks -Standup $loneFill -Cards @($loneCase.cards) -Slots @('yesterday', 'today', 'blockers')
 Assert-True 'and the open issues with no card, by number (agent: the same)' (@($loneAsks.hashes).Count -eq 0 -and (($loneAsks.numbers) -join ',') -ceq '172') "$($loneAsks.numbers -join ',')"
+# The trailer asks: the commits of every card the fill places with no Agent line.
+$slotsT = @('yesterday', 'today', 'blockers')
+$plainTrailers = Get-P20StandupTrailerAsks -Standup $plainFill -Cards @($plainCase.cards) -Slots $slotsT
+Assert-True 'the trailer asks: the slots'' own cards, then the joined ones (agent: the same)' (($plainTrailers -join ',') -ceq 'e0e5555,f0f6666,a0a1111,b0b2222,c0c3333,d0d4444,a0a9999') ($plainTrailers -join ',')
+$linedCards = @($plainCase.cards | ForEach-Object { $_ | Select-Object * })
+$linedCards[0] | Add-Member -NotePropertyName body -NotePropertyValue "# Task 170: Date the commits`n`n**Agent:** claude-opus-5-5`n" -Force
+$linedTrailers = Get-P20StandupTrailerAsks -Standup $plainFill -Cards $linedCards -Slots $slotsT
+Assert-True 'the trailer asks: never a card whose Agent line answers (agent: the same)' (($linedTrailers -join ',') -ceq 'e0e5555,f0f6666') ($linedTrailers -join ',')
+$oldCard = [pscustomobject]@{ file = 'Task120-long-ago.prompt.md'; folder = 'archive'; status = 'Done'; closed = '2026-01-05'; title = 'Long ago'; id = '120'; path = 'archive/Task120-long-ago.prompt.md'; commits = @('9a9a9a9') }
+$withOld = @(@($plainCase.cards) + $oldCard)
+$oldFill = Invoke-P20StandupJoinedFill -AsOf $joinedAsOf -Labels @($joinedTable.workerLabels) -Issues @($plainCase.issues) -Tracker @{ ok = $true; reason = '' } -Cards $withOld -Space 'widgets' -SpaceName 'Widgets' -PackageRoot $pkgRoot
+# One array back, as Get-P20StandupCardHashes gives one: not wrapped again in @().
+$oldTrailers = Get-P20StandupTrailerAsks -Standup $oldFill -Cards $withOld -Slots $slotsT
+Assert-True 'the trailer asks: never the whole archive (agent: the same)' ($oldTrailers.Count -gt 0 -and -not ($oldTrailers -contains '9a9a9a9')) ($oldTrailers -join ',')
+$loneTrailers = Get-P20StandupTrailerAsks -Standup $loneFill -Cards @($loneCase.cards) -Slots $slotsT
+Assert-True 'the trailer asks: an issue alone asks none (agent: the same)' ($loneTrailers.Count -eq 0) ($loneTrailers -join ',')
 
 # -- The dates read: its query and its parse ----------------------------------
 # Tests/fixtures/rituals/standup-dates.json, the SAME rows Tests/test_rituals.py
@@ -673,8 +692,20 @@ $wantQuery = ((@($dq.lines | ForEach-Object { [string]$_ })) -join "`n") + "`n"
 $gotQuery = Get-P20StandupDatesQuery -Hashes ([string[]]@($dq.hashes)) -Numbers ([int[]]@($dq.numbers))
 Assert-True 'dates: the query, line for line' ($gotQuery -ceq $wantQuery) ("`n--- got ---`n$gotQuery--- want ---`n$wantQuery")
 Assert-True 'dates: a hash that is not hex is never written into the query' (-not (Get-P20StandupDatesQuery -Hashes @('a0a1111") { x } evil: object(expression: "') -Numbers @()).Contains('evil'))
+$tq = $datesTable.trailerQuery
+$wantTQuery = ((@($tq.lines | ForEach-Object { [string]$_ })) -join "`n") + "`n"
+$gotTQuery = Get-P20StandupDatesQuery -Hashes ([string[]]@($tq.hashes)) -Numbers ([int[]]@($tq.numbers)) -Trailers ([string[]]@($tq.trailers))
+Assert-True 'dates: the trailer aliases ride after the others, line for line' ($gotTQuery -ceq $wantTQuery) ("`n--- got ---`n$gotTQuery--- want ---`n$wantTQuery")
+Assert-True 'dates: no trailer hashes is the query unchanged' ((Get-P20StandupDatesQuery -Hashes ([string[]]@($dq.hashes)) -Numbers ([int[]]@($dq.numbers)) -Trailers @()) -ceq $wantQuery)
+Assert-True 'dates: a trailer hash that is not hex is never written into the query' (-not (Get-P20StandupDatesQuery -Hashes @() -Numbers @() -Trailers @('a0a1111") { x } evil: object(expression: "')).Contains('evil'))
 foreach ($dc in @($datesTable.cases)) {
-    $got = ConvertFrom-P20StandupDates -Repository $dc.answer -Hashes ([string[]]@($dc.hashes)) -Numbers ([int[]]@($dc.numbers)) -WorkerLabels ([string[]]@($datesTable.workerLabels))
+    $trailersOf = [string[]]@()
+    if ($dc.PSObject.Properties['trailers']) { $trailersOf = [string[]]@($dc.trailers) }
+    $got = ConvertFrom-P20StandupDates -Repository $dc.answer -Hashes ([string[]]@($dc.hashes)) -Numbers ([int[]]@($dc.numbers)) -WorkerLabels ([string[]]@($datesTable.workerLabels)) -Trailers $trailersOf
+    $wantM = ''
+    if ($dc.expected.PSObject.Properties['messages']) { $wantM = (@($dc.expected.messages.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" }) | Sort-Object) -join '|' }
+    $gotM = (@($got.messages.Keys | ForEach-Object { "$_=$($got.messages[$_])" }) | Sort-Object) -join '|'
+    Assert-True "dates $($dc.name): the messages" ($gotM -ceq $wantM) "got [$gotM] want [$wantM]"
     $instant = { param($v) $t = ConvertTo-P20RitualTime $v; if ($null -eq $t) { 'null' } else { $t.UtcTicks } }
     $wantC = (@($dc.expected.commitDates.PSObject.Properties | ForEach-Object { "$($_.Name)=$(& $instant $_.Value)" }) | Sort-Object) -join ','
     $gotC = (@($got.commitDates.Keys | ForEach-Object { "$_=$(& $instant $got.commitDates[$_])" }) | Sort-Object) -join ','
@@ -947,7 +978,7 @@ $teamTable = $teamRaw | ConvertFrom-Json
 $teamCases = @($teamTable.cases)
 $teamAsOf = @([regex]::Matches($teamRaw, '"asOf"\s*:\s*"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
 $teamNames = (@($teamCases | ForEach-Object { [string]$_.name })) -join ','
-Assert-True 'the team table is read: its sizes, its seats, its room rows and ten cases, an asOf each' (@($teamTable.sizes).Count -ge 8 -and @($teamTable.seats).Count -ge 6 -and @($teamTable.room).Count -ge 16 -and $teamNames -ceq 'absent,idle-sits,unset,work-unsaid,walk-size-3,walk-size-6,walk-size-9,idle-room,idle-room-3,idle-room-6' -and $teamAsOf.Count -eq $teamCases.Count) "$(@($teamTable.sizes).Count) sizes, $(@($teamTable.seats).Count) seats, $(@($teamTable.room).Count) room rows, cases $teamNames"
+Assert-True 'the team table is read: its sizes, its seats, its room rows and twenty cases, an asOf each' (@($teamTable.sizes).Count -ge 8 -and @($teamTable.seats).Count -ge 6 -and @($teamTable.room).Count -ge 16 -and $teamNames -ceq 'absent,idle-sits,unset,work-unsaid,walk-size-3,walk-size-6,walk-size-9,idle-room,idle-room-3,idle-room-6,agent-line,trailer-only,neither,label-differs,labelled-no-card,no-kept-window,unknown-id,one-family,legacy-size,legacy-backend' -and $teamAsOf.Count -eq $teamCases.Count) "$(@($teamTable.sizes).Count) sizes, $(@($teamTable.seats).Count) seats, $(@($teamTable.room).Count) room rows, cases $teamNames"
 
 foreach ($row in @($teamTable.sizes)) {
     $got = Get-P20TeamSize -Stored $row.stored
@@ -1041,11 +1072,18 @@ Assert-True 'the walk rows are the three rooms: no labels, the engineer with wor
 for ($n = 0; $n -lt $teamCases.Count; $n++) {
     $case = $teamCases[$n]
     $name = 'team-' + [string]$case.name
+    $caseMessages = $null
     $exp = $case.expected
     if ($case.PSObject.Properties['cards']) {
-        # A case that states its cards is the joined fill over its own labels, issues and cards.
+        # A case that states its cards is the joined fill over its own labels, issues and cards,
+        # with the trailer read's messages when it states them.
+        $caseMessages = $null
+        if ($case.PSObject.Properties['messages'] -and $null -ne $case.messages) {
+            $caseMessages = @{}
+            foreach ($p in @($case.messages.PSObject.Properties)) { $caseMessages[$p.Name] = [string]$p.Value }
+        }
         $s = Invoke-P20StandupJoinedFill -AsOf $teamAsOf[$n] -Labels @($case.labels) -Issues @($case.issues) -Tracker ([pscustomobject]@{ ok = $true; reason = '' }) `
-            -Cards @($case.cards) -Space ([string]$case.space) -SpaceName ([string]$case.spaceName) -PackageRoot $pkgRoot -TeamSize $case.teamSize
+            -Cards @($case.cards) -Space ([string]$case.space) -SpaceName ([string]$case.spaceName) -PackageRoot $pkgRoot -TeamSize $case.teamSize -Messages $caseMessages
     }
     else {
         $s = Invoke-P20StandupFill -AsOf $teamAsOf[$n] -Labels @($teamTable.workerLabels) -Issues @($case.issues) -Tracker ([pscustomobject]@{ ok = $true; reason = '' }) -Space 'widgets' -PackageRoot $pkgRoot -TeamSize $case.teamSize
@@ -1054,6 +1092,29 @@ for ($n = 0; $n -lt $teamCases.Count; $n++) {
     $want = (@($exp.workers | ForEach-Object { "$($_.label)/$($_.name)/$([bool]$_.empty)/$([bool]$_.present)" })) -join ','
     $got = (@($s.workers | ForEach-Object { "$($_.label)/$($_.name)/$([bool]$_.empty)/$([bool]$_.present)" })) -join ','
     Assert-True "${name}: every worker kept, in label order, each marked present or absent" ($got -ceq $want) "`n  got  $got`n  want $want"
+    # A row that states a plate holds it; one that does not wears none.
+    $wantPlates = (@($exp.workers | ForEach-Object { $pl = ''; if ($_.PSObject.Properties['plate']) { $pl = [string]$_.plate }; "$($_.label)=$pl" })) -join ','
+    $gotPlates = (@($s.workers | ForEach-Object { "$($_.label)=$([string]$_.plate)" })) -join ','
+    Assert-True "${name}: each worker's plate" ($gotPlates -ceq $wantPlates) "`n  got  $gotPlates`n  want $wantPlates"
+    # Who each card names, and where it came from: the one reader, shipped order.
+    if ($exp.PSObject.Properties['agents']) {
+        foreach ($ap in @($exp.agents.PSObject.Properties)) {
+            $acard = @($case.cards | Where-Object { [string]$_.id -ceq $ap.Name })[0]
+            $ans = Resolve-P20CardAgent -Content ([string]$acard.body) -Messages $caseMessages
+            $wantA = "$($ap.Value.id)|$($ap.Value.family)|$($ap.Value.source)"
+            $gotA = "$($ans.id)|$($ans.family)|$($ans.source)"
+            Assert-True "${name}: card $($ap.Name) is $($ap.Value.source)" ($gotA -ceq $wantA) "got $gotA want $wantA"
+        }
+    }
+    # Each member's window, by the room's own rule over the fill's record.
+    if ($exp.PSObject.Properties['windows']) {
+        $rec = @($s.workers)
+        $eng = $rec[$rec.Count - 1]
+        $roomNow = Get-P20StandupRoomSeats -Size ([int]$s.team.size) -Engineer @{ label = [string]$eng.label; empty = [bool]$eng.empty } -Labels @($rec[0..($rec.Count - 2)] | ForEach-Object { @{ label = [string]$_.label; empty = [bool]$_.empty } })
+        $gotW = (@($roomNow.round | Where-Object { -not $_.cast } | ForEach-Object { "$($_.label)=$($_.window)" } | Sort-Object)) -join ','
+        $wantW = (@($exp.windows.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" } | Sort-Object)) -join ','
+        Assert-True "${name}: each member's window" ($gotW -ceq $wantW) "got $gotW want $wantW"
+    }
     $wantRound = (@($exp.round | ForEach-Object { "$($_.label)/$($_.name)/$([bool]$_.cast)" })) -join ','
     $gotRound = (@($s.work.workers | ForEach-Object { "$($_.label)/$($_.name)/$([bool]$_.cast)" })) -join ','
     Assert-True "${name}: the round is the seated in seat order, then the invented cast members" ($gotRound -ceq $wantRound) "`n  got  $gotRound`n  want $wantRound"
@@ -1415,10 +1476,12 @@ function global:gh {
         `$when = '$stubWhen'
         `$old = '$stubOld'
         `$repo = [ordered]@{}
-        foreach (`$m in [regex]::Matches(`$query, '(c\d+): object\(expression: "([0-9a-f]+)"\)')) {
+        foreach (`$m in [regex]::Matches(`$query, '\b([ct]\d+): object\(expression: "([0-9a-f]+)"\)')) {
             `$at = `$when
             if (`$m.Groups[2].Value.StartsWith('d7')) { `$at = `$old }
             `$repo[`$m.Groups[1].Value] = [ordered]@{ oid = `$m.Groups[2].Value.PadRight(40, '0'); authoredDate = `$at }
+            # A t alias is a trailer read: its commit's message, with no trailer.
+            if (`$m.Groups[1].Value.StartsWith('t')) { `$repo[`$m.Groups[1].Value]['message'] = 'A commit' }
         }
         foreach (`$m in [regex]::Matches(`$query, '\b(i\d+): issue\(')) { `$repo[`$m.Groups[1].Value] = [ordered]@{ timelineItems = [ordered]@{ nodes = @() } } }
         return (ConvertTo-Json -InputObject ([ordered]@{ data = [ordered]@{ repository = `$repo } }) -Depth 6 -Compress)

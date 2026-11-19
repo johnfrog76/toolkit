@@ -67,7 +67,7 @@ import {
   spaceLifecycleActions,
 } from "../modules/studio/foyer";
 import { visibilityLabel } from "../shared/visibility";
-import { STATUS, USAGE, VISIBILITY } from "./consts";
+import { RITUALS, STATUS, USAGE, VISIBILITY } from "./consts";
 import {
   WORKFLOW_ENTRIES,
   answerLive,
@@ -582,11 +582,12 @@ describe("the scenario grid: what each configuration shows", () => {
   });
 
   // The played standup's room (docs/SCENARIOS.md, "Team Agile's standup"): nine windows
-  // whatever the Space's size -- the chair, the members the response marks present in
-  // its order, and an empty desk in every other window, each with its own mug -- and
+  // whatever the Space's size -- the chair, the round the response carries in its
+  // order (the members, then the invented cast members that fill the seats the size
+  // counts), and an empty desk in every other window, each with its own mug -- and
   // the page's door to the size is the settings entry's own anchor. Held in full by
   // stage/standupDeck.test.tsx ("no silent face").
-  it("the played standup seats the present by position and an empty desk in the rest", () => {
+  it("the played standup seats the round and an empty desk in the rest", () => {
     const worker = (label: string, present?: boolean) => ({
       label,
       name: label,
@@ -598,16 +599,53 @@ describe("the scenario grid: what each configuration shows", () => {
       status: [],
       ...(present === undefined ? {} : { present }),
     });
-    const room = (workers: StandupResponse["workers"]) => {
-      const r = dealRoom({ asOf: "2026-10-02T09:00:00-04:00", workers });
+    const spoken = (label: string, cast: boolean) => ({
+      label,
+      name: label,
+      yesterday: [],
+      today: [],
+      blockers: [],
+      prose: [],
+      cast,
+    });
+    const room = (workers: StandupResponse["workers"], invented: string[] = []) => {
+      const r = dealRoom({
+        asOf: "2026-10-02T09:00:00-04:00",
+        workers,
+        work: {
+          queue: { walk: [], decide: [], look: [] },
+          workers: [
+            ...workers.filter((w) => w.present !== false).map((w) => spoken(w.label, false)),
+            ...invented.map((id) => spoken(id, true)),
+          ],
+          queueProse: [],
+          text: "",
+        },
+      });
       return [r.members.length, r.desks.length, new Set(r.desks.map((d) => d.look)).size];
     };
     // A room of three: two present, six desks, six mugs.
     expect(room([worker("a", true), worker("b", false), worker("c", true)])).toEqual([2, 6, 6]);
-    // No worker at all: the chair alone, eight desks.
-    expect(room([])).toEqual([0, MEMBER_SEATS, MEMBER_SEATS]);
-    // An older agent (no present): everyone, capped at the room.
-    expect(room(Array.from({ length: 10 }, (_, i) => worker(`w${i}`)))).toEqual([8, 0, 0]);
+    // The size fills the room: one member and the invented cast members after it --
+    // six desks at three, three at six, none at nine.
+    const cast = RITUALS.room.windows.map((w) => w.id).filter((id) => id !== RITUALS.room.chair);
+    for (const size of RITUALS.teamSizes)
+      expect(room([worker("a", true)], cast.slice(1, size - 1))).toEqual([
+        size - 1,
+        ROOM_WINDOWS - size,
+        ROOM_WINDOWS - size,
+      ]);
+    // No worker at all and no round: the chair alone, eight desks.
+    expect(dealRoom({ asOf: "2026-10-02T09:00:00-04:00", workers: [] }).desks).toHaveLength(
+      MEMBER_SEATS,
+    );
+    // An older agent (no present, no round): everyone, capped at the room.
+    expect(
+      dealRoom({
+        asOf: "2026-10-02T09:00:00-04:00",
+        workers: Array.from({ length: 10 }, (_, i) => worker(`w${i}`)),
+      }).members,
+    ).toHaveLength(MEMBER_SEATS);
     expect(ROOM_WINDOWS).toBe(MEMBER_SEATS + 1);
     const entry = WORKFLOW_ENTRIES.find((e) => e.id === "team-size")!;
     expect(entryAnchor(entry, "x")).toBe("spaces.x.features.teamSize");

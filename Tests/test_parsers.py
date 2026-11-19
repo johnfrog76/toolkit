@@ -203,22 +203,87 @@ class StatusMetadataTests(unittest.TestCase):
             with self.subTest(row=row["name"]):
                 self.assertEqual(model_info(row["id"]), row["expected"])
 
-    def test_who_works_a_card_by_the_shared_table(self):
-        """The bridge reader of who works a card (standing in for the shared
-        resolver): a known Agent line's family, an unknown id as
-        written, else the Assigned value. The CLI's Get-P20CardWorker asserts the
-        SAME table, Tests/fixtures/parsers/card-worker.json."""
+    def test_who_worked_a_card_by_its_sources_by_the_shared_table(self):
+        """The one reader of a card's agent (docs/hub/cards.md, "How a card's agent
+        is worked out"): its Agent line, else its Assigned line when that names a
+        worker, else its commits' Co-Authored-By trailers, else none -- the shipped
+        order, consts.json models.agentSources, which never reads the label -- and
+        under any order a row states, the label among them where the order names
+        it. The CLI's
+        Resolve-P20CardAgent and its pieces assert the SAME table,
+        Tests/fixtures/parsers/agent-source.json, against the table's own model map."""
         import json
 
-        from agent.core.parsers import card_worker
+        from agent.core.consts import model_agent_sources
+        from agent.core.models import model_by_co_author
+        from agent.core.parsers import commit_co_authors, git_messages, resolve_card_agent
 
-        table = json.loads((FIXTURES / "card-worker.json").read_text(encoding="utf-8"))
-        self.assertGreaterEqual(len(table["rows"]), 7)
+        table = json.loads((FIXTURES / "agent-source.json").read_text(encoding="utf-8"))
+        models = table["models"]
+        self.assertGreaterEqual(len(table["rows"]), 20)
+        self.assertEqual(model_agent_sources(), ("line", "assigned", "trailer", "none"))
+        orders = {tuple(r["order"]) for r in table["rows"] if "order" in r}
+        self.assertIn(("line", "trailer", "label", "none"), orders)
+        self.assertIn(("line", "label", "trailer", "none"), orders)
+        for source in ("line", "trailer", "label", "none"):
+            self.assertTrue(any(r["expected"]["source"] == source for r in table["rows"]), source)
+        # The shipped order, on rows that state none: each of its sources, and a label passed and not read.
+        shipped = [r for r in table["rows"] if "order" not in r]
+        for source in ("line", "assigned", "trailer", "none"):
+            self.assertTrue(any(r["expected"]["source"] == source for r in shipped), source)
+        self.assertTrue(any(r["label"] and r["expected"]["source"] == "none" for r in shipped))
+        self.assertFalse(any(r["expected"]["source"] == "label" for r in shipped))
         for row in table["rows"]:
             with self.subTest(row=row["name"]):
                 eol = "\r\n" if row["crlf"] else "\n"
                 text = eol.join(row["lines"]) + eol
-                self.assertEqual(card_worker(text), row["expected"])
+                current = row["current"] if "current" in row else table["current"]
+                got = resolve_card_agent(
+                    text, row["label"], row["messages"], models, row.get("order"), current=current or {}
+                )
+                self.assertEqual(got, row["expected"])
+        for row in table["coAuthors"]:
+            with self.subTest(coAuthors=row["name"]):
+                self.assertEqual(commit_co_authors(row["message"]), row["expected"])
+        for row in table["byCoAuthor"]:
+            with self.subTest(byCoAuthor=row["name"]):
+                self.assertEqual(model_by_co_author(row["name"], models), row["expected"])
+        for row in table["gitLog"]:
+            with self.subTest(gitLog=row["name"]):
+                self.assertEqual(git_messages(row["raw"]), row["expected"])
+
+    def test_a_missing_or_unreadable_model_map_reads_as_empty(self):
+        """The trailer source must never throw on a machine whose map is gone or
+        broken: the map reads as empty, and no trailer names a model."""
+        from agent.core.models import model_by_co_author, read_model_map
+        from agent.core.parsers import resolve_card_agent
+
+        with tempfile.TemporaryDirectory() as tmp:
+            missing = Path(tmp) / "models.json"
+            self.assertEqual(read_model_map(missing), {})
+            broken = Path(tmp) / "broken.json"
+            broken.write_text("{ not json", encoding="utf-8")
+            self.assertEqual(read_model_map(broken), {})
+            listed = Path(tmp) / "list.json"
+            listed.write_text("[1, 2]", encoding="utf-8")
+            self.assertEqual(read_model_map(listed), {})
+            # The current block (worker size -> model id): the same, absent is empty.
+            from agent.core.models import read_model_current
+
+            self.assertEqual(read_model_current(missing), {})
+            self.assertEqual(read_model_current(broken), {})
+            plain = Path(tmp) / "plain.json"
+            plain.write_text('{"models": {}}', encoding="utf-8")
+            self.assertEqual(read_model_current(plain), {})
+            sized = Path(tmp) / "sized.json"
+            sized.write_text('{"models": {}, "current": {"opus": "claude-opus-5-5"}}', encoding="utf-8")
+            self.assertEqual(read_model_current(sized), {"opus": "claude-opus-5-5"})
+        self.assertIsNone(model_by_co_author("Claude Opus 5.5", {}))
+        card = "# Task K7M2: x\n\n- 1a2b3c4 one\n"
+        msgs = {"1a2b3c4": "One\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"}
+        self.assertEqual(resolve_card_agent(card, "", msgs, {}), {"id": None, "family": None, "source": "none"})
+        # The shipped map knows the shipped trailer: the default reads it.
+        self.assertEqual(resolve_card_agent(card, "", msgs)["source"], "trailer")
 
     def test_what_a_worker_size_resolves_to_by_the_shared_table(self):
         """A worker size is a family alias: the map's current block names the id it

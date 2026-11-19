@@ -8,11 +8,11 @@ Fable
   Status     "Yesterday I read up on how the team works, so I'm ready for what's next."
   Status     "Today I'll move my shell to the new terminal and pick a theme."
 Opus
-  Yesterday  nothing closed
-  Today      #170 (2 commits) Date the commits
-  Blockers   no blockers
+  Status     "Yesterday I swapped my laptop dock; no more flicker."
+  Status     "Today I'll update my operating system and restart everything once."
 Widgets
   Yesterday  nothing closed
+  Today      #170 (2 commits) Date the commits
   Today      P4Q8 (started, 1 commit) Say the undated
   Blockers   no blockers
 

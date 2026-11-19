@@ -250,9 +250,9 @@ export function issueUrls(data: StandupResponse): Map<number, string> {
 export function workerChip(data: StandupResponse, who: string): string | undefined {
   const at = who.toLowerCase();
   const m = dealRoom(data).members.find(
-    (x) => x.worker.label.toLowerCase() === at || x.worker.name.toLowerCase() === at,
+    (x) => !x.cast && (x.worker.label.toLowerCase() === at || x.worker.name.toLowerCase() === at),
   );
-  return m ? memberPlate(m, m.worker.label) : undefined;
+  return m ? m.worker.plate || memberPlate(m, m.worker.label) : undefined;
 }
 
 /** The settings entry the door beside Play opens the drawer at: how many are in the standup. */
