@@ -79,11 +79,12 @@ export const tabRowGap = tokens.spacingVerticalS;
 /** `tabRowGap`, in px. */
 export const tabRowGapPx = 8;
 
-/** The plot height of a list panel's lead chart by default, in px. */
-export const leadChartPlotHeightPx = 102;
+/** The height of a list panel's lead chart area by default, in px: the floor
+ *  the chart's area keeps, whatever its plot asks for. */
+export const leadChartPlotHeightPx = 120;
 
 /** The plot height of the Log card's lead chart, in px. The card's page is six
  *  entries (a controls row above the chart, a shorter list), so the chart takes
  *  the room the shorter list leaves and the card keeps its height. A multiple
  *  of 4 px. */
-export const logChartPlotHeightPx = 208;
+export const logChartPlotHeightPx = 232;
