@@ -1483,6 +1483,8 @@ describe("no silent face", () => {
       ["walk-size-6", 6],
       ["walk-size-9", 9],
       ["idle-room", 9],
+      ["idle-room-6", 6],
+      ["idle-room-3", 3],
     ];
 
     for (const [name, size] of walks) {

@@ -1439,6 +1439,106 @@ def _room(row: dict) -> dict:
     )
 
 
+# The room's rules (docs/modules/solitaire-agile.md, "The room's rules"), each stated
+# once, so a failure names the rule it broke. tkTestToolkit -Rituals states the same
+# four over the same rows.
+
+
+def assert_the_size_seen_is_the_size_picked(tc: unittest.TestCase, size: int, speakers: int) -> None:
+    """The round's members plus the chair are exactly the size."""
+    tc.assertEqual(speakers + 1, size, "the size seen is the size picked: the round plus the chair")
+
+
+def assert_the_desks_are_past_the_size(tc: unittest.TestCase, size: int, desks: int) -> None:
+    """The empty desks are the windows past the size: the windows taken are the size."""
+    windows = len(C.rituals_room()["windows"])
+    tc.assertEqual(desks, windows - size, "the empty desks are only the windows past the size")
+
+
+def assert_the_engineer_sits(tc: unittest.TestCase, speakers: list[dict], engineer: dict | None) -> None:
+    """Whenever the fill has an engineer, it is in the round -- first, never invented --
+    under the Space's name when the row names one."""
+    if engineer is None:
+        return
+    tc.assertTrue(speakers, "the engineer's seat is the owner's: the round is empty")
+    first = speakers[0]
+    tc.assertEqual(first["label"], engineer["label"], "the engineer's seat is the owner's: first in the round")
+    tc.assertFalse(first["cast"], "the engineer's seat is the owner's: never an invented member")
+    if "name" in engineer:
+        tc.assertEqual(first["name"], engineer["name"], "the engineer's seat is the owner's: the Space's name")
+
+
+def assert_everyone_speaks(tc: unittest.TestCase, speakers: list[dict], work_text: str) -> None:
+    """Every member of the round has a turn in the rendered work grain, in round order;
+    an idle member's turn is its two made-up items, never empty and never omitted."""
+    text = C.rituals_text()
+    lines = work_text.split("\n")
+    at = -1
+    for s in speakers:
+        head = s["name"] + ": "
+        found = [i for i, line in enumerate(lines) if line.startswith(head)]
+        tc.assertEqual(len(found), 1, f"everyone speaks: {s['name']} has one turn in the work grain")
+        tc.assertGreater(found[0], at, f"everyone speaks: {s['name']}'s turn is in round order")
+        at = found[0]
+        line = lines[at][len(head) :]
+        tc.assertTrue(line.startswith(text["turnOpen"] + " "), f"everyone speaks: {s['name']}'s turn opens")
+        tc.assertTrue(line.endswith(" " + text["turnClose"]), f"everyone speaks: {s['name']}'s turn closes")
+        body = line[len(text["turnOpen"]) + 1 : -len(text["turnClose"]) - 1]
+        tc.assertTrue(body.strip(), f"everyone speaks: {s['name']}'s turn says something")
+        if s["idle"]:
+            pairs = {f"{y} {t} {text['proseBlockersNone']}" for y in VOCAB["nothing"] for t in VOCAB["nothingToday"]}
+            tc.assertIn(body, pairs, f"everyone speaks: idle {s['name']}'s turn is a made-up pair")
+
+
+def _speakers(filled: "standup.Standup") -> list[dict]:
+    """The round as the rules read it: each speaker's label, name, cast, and whether it
+    is idle -- an invented member always, a member of the record by its own ``empty``."""
+    empty = {w.label: w.empty for w in filled.workers}
+    return [
+        {"label": w.label, "name": w.name, "cast": w.cast, "idle": w.cast or empty.get(w.label, True)}
+        for w in filled.work.workers
+    ]
+
+
+class TheRoomsRules(unittest.TestCase):
+    """The room's rules over every ``room`` row and every case of standup-team.json:
+    the size seen is the size picked, everyone speaks, the desks are past the size,
+    and the engineer sits."""
+
+    def test_every_room_row_keeps_the_rules(self):
+        for row in TEAM_TABLE["room"]:
+            with self.subTest(row=row["name"]):
+                got = _room(row)
+                assert_the_size_seen_is_the_size_picked(self, row["size"], len(got["round"]))
+                assert_the_desks_are_past_the_size(self, row["size"], len(got["desks"]))
+                assert_the_engineer_sits(self, got["round"], row["engineer"])
+
+    def test_every_case_keeps_the_rules(self):
+        windows = len(C.rituals_room()["windows"])
+        for case in TEAM_TABLE["cases"]:
+            with self.subTest(case=case["name"]):
+                filled = _fill_team(case)
+                speakers = _speakers(filled)
+                assert_the_size_seen_is_the_size_picked(self, filled.team.size, len(speakers))
+                assert_the_desks_are_past_the_size(self, filled.team.size, windows - 1 - len(speakers))
+                assert_everyone_speaks(self, speakers, filled.work.text)
+                engineer = {"label": case["space"], "name": case["spaceName"]} if "cards" in case else None
+                assert_the_engineer_sits(self, speakers, engineer)
+
+    def test_the_standup_runs_on_a_day_with_no_work_at_every_size(self):
+        """No labels, no issues, no card: a room at each size all the same."""
+        idle = {c["teamSize"]: c for c in TEAM_TABLE["cases"] if c["name"].startswith("idle-room")}
+        self.assertEqual(sorted(idle), sorted(C.rituals_team_sizes()))
+        for size, case in idle.items():
+            with self.subTest(size=size):
+                self.assertEqual(case["labels"] + case["issues"] + case["cards"], [])
+                filled = _fill_team(case)
+                self.assertTrue(all(s["idle"] for s in _speakers(filled)))
+                self.assertEqual(filled.team.size, size)
+                # The chair speaks last, as on any other day.
+                self.assertIn("\n" + " ".join(filled.work.chairProse) + "\n", filled.work.text)
+
+
 class TheTeamTable(unittest.TestCase):
     """Every row of standup-team.json -- the same rows tkTestToolkit -Rituals asserts
     against Get-P20TeamSize, Get-P20StandupRoomSeats, Invoke-P20StandupFill and
@@ -1459,6 +1559,8 @@ class TheTeamTable(unittest.TestCase):
                 "walk-size-6",
                 "walk-size-9",
                 "idle-room",
+                "idle-room-3",
+                "idle-room-6",
                 # Where the room's members come from: the card decides once it exists.
                 "agent-line",
                 "trailer-only",
