@@ -3401,3 +3401,5 @@ class TheAgenda(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+                # The brief says no worker labels from the tracker's own count, not from who is seated.
+                "no-worker-labels-card-seats-member",

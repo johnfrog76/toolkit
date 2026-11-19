@@ -3886,6 +3886,116 @@
         "work": "standup-team-agent-family-is-slug-counts.work.txt",
         "brief": "standup-team-agent-family-is-slug-counts.brief.txt"
       }
+    },
+    {
+      "name": "no-worker-labels-card-seats-member",
+      "shape": "a Space with no worker labels, one open issue and one card whose Agent line names an Opus id: the card seats a member, and the brief still says the Space has no worker labels, because it takes that from the tracker's own count",
+      "asOf": "2026-10-02T09:00:00-04:00",
+      "teamSize": 9,
+      "space": "widgets",
+      "spaceName": "Widgets",
+      "labels": [],
+      "issues": [
+        {
+          "number": 706,
+          "title": "Seed the import",
+          "state": "OPEN",
+          "labels": [],
+          "closedAt": null,
+          "url": "https://github.com/acme/widgets/issues/706",
+          "body": "",
+          "milestone": {
+            "title": "Phase 7"
+          }
+        }
+      ],
+      "cards": [
+        {
+          "file": "TaskK9L2-wire-the-column.prompt.md",
+          "folder": "current",
+          "status": "In Progress",
+          "closed": null,
+          "title": "Wire the column",
+          "id": "K9L2",
+          "type": "Task",
+          "body": "# Task K9L2: Wire the column\n\n\n---\n\n**Agent:** claude-opus-5-5\n**Created:** 2026-10-01\n",
+          "begun": "2026-10-01",
+          "commits": []
+        }
+      ],
+      "expected": {
+        "team": {
+          "size": 9
+        },
+        "workers": [
+          {
+            "label": "opus",
+            "name": "Opus",
+            "empty": false,
+            "present": true,
+            "plate": ""
+          },
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "empty": true,
+            "present": true,
+            "plate": ""
+          }
+        ],
+        "round": [
+          {
+            "label": "widgets",
+            "name": "Widgets",
+            "cast": false
+          },
+          {
+            "label": "opus",
+            "name": "Opus",
+            "cast": false
+          },
+          {
+            "label": "ops-dev",
+            "name": "OPS-DEV",
+            "cast": true
+          },
+          {
+            "label": "minimalist",
+            "name": "MINIMALIST",
+            "cast": true
+          },
+          {
+            "label": "new-hire",
+            "name": "NEW HIRE",
+            "cast": true
+          },
+          {
+            "label": "ultrawide",
+            "name": "ULTRAWIDE OVERLORD",
+            "cast": true
+          },
+          {
+            "label": "qa",
+            "name": "QA ALCHEMIST",
+            "cast": true
+          },
+          {
+            "label": "designer",
+            "name": "DESIGNER",
+            "cast": true
+          }
+        ],
+        "agents": {
+          "K9L2": {
+            "id": "claude-opus-5-5",
+            "family": "opus",
+            "source": "line"
+          }
+        },
+        "text": "standup-team-no-worker-labels-card-seats-member.txt",
+        "work": "standup-team-no-worker-labels-card-seats-member.work.txt",
+        "brief": "standup-team-no-worker-labels-card-seats-member.brief.txt"
+      }
     }
   ]
 }
