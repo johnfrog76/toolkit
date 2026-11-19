@@ -11,6 +11,7 @@ import {
 import { useChartColors } from "../../hooks/chartPalette";
 import { useWornTheme } from "../../hooks/useWornTheme";
 import { ChartWrapper } from "../../shared/ChartWrapper";
+import { logChartPlotHeightPx } from "../../shell/layoutTokens";
 import type { LogEntry } from "./api.ado";
 import { buildChartData } from "./logChart";
 
@@ -70,7 +71,7 @@ export function LogTypeChart({ entries }: { entries: LogEntry[] }) {
   return (
     <ChartWrapper>
       <div className={styles.chartArea}>
-        <ResponsiveContainer width="100%" height={102}>
+        <ResponsiveContainer width="100%" height={logChartPlotHeightPx}>
           <AreaChart data={chartData}>
             <defs>
               <linearGradient id="lgCMD" x1="0" y1="0" x2="0" y2="1">
