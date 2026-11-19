@@ -1489,12 +1489,15 @@ def assert_everyone_speaks(tc: unittest.TestCase, speakers: list[dict], work_tex
     text = C.rituals_text()
     lines = work_text.split("\n")
     at = -1
-    for s in speakers:
+    for place, s in enumerate(speakers):
         head = s["name"] + ": "
         found = [i for i, line in enumerate(lines) if line.startswith(head)]
-        tc.assertEqual(len(found), 1, f"everyone speaks: {s['name']} has one turn in the work grain")
-        tc.assertGreater(found[0], at, f"everyone speaks: {s['name']}'s turn is in round order")
-        at = found[0]
+        # Members of one name each have a turn: this one is the nth of them, in round order.
+        same = [x for x in speakers if x["name"] == s["name"]]
+        nth = len([x for x in speakers[:place] if x["name"] == s["name"]])
+        tc.assertEqual(len(found), len(same), f"everyone speaks: {s['name']} has a turn each in the work grain")
+        tc.assertGreater(found[nth], at, f"everyone speaks: {s['name']}'s turn is in round order")
+        at = found[nth]
         line = lines[at][len(head) :]
         tc.assertTrue(line.startswith(text["turnOpen"] + " "), f"everyone speaks: {s['name']}'s turn opens")
         tc.assertTrue(line.endswith(" " + text["turnClose"]), f"everyone speaks: {s['name']}'s turn closes")
@@ -1587,6 +1590,9 @@ class TheTeamTable(unittest.TestCase):
                 "one-family",
                 "legacy-size",
                 "legacy-backend",
+                # The brief reads each member's counts by its place: two members of one name keep their own.
+                "slug-is-label-counts",
+                "agent-family-is-slug-counts",
             },
         )
 
