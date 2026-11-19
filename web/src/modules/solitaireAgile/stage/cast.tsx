@@ -82,7 +82,7 @@ export function StandupKeyframes() {
       @keyframes rs-bubble    { 0% { transform: translateY(8px) scale(0.85); opacity: 0; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
       @keyframes rs-float     { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
       @keyframes rs-pulse     { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
-      @keyframes rs-flicker   { 0%, 100% { opacity: 1; } 42% { opacity: 0.55; } 46% { opacity: 0.95; } 74% { opacity: 0.7; } }
+      @keyframes rs-termbeat  { 0%, 100% { color: #79d68a; } 50% { color: #eef7ef; } }
       @keyframes rs-hue       { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
       @keyframes rs-smoke     { 0% { transform: translateY(0) translateX(0); opacity: 0.5; } 100% { transform: translateY(-46px) translateX(10px); opacity: 0; } }
       @keyframes rs-bob       { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
@@ -702,15 +702,19 @@ function DevHeroScene({ ride = "-58%", press = false }: { ride?: string; press?:
   );
 }
 
+/** The ops terminal's text colour at rest, and its beat: a colour shift only, slow
+ *  and gentle. Reduced motion stops it with every other animation (REDUCED_MOTION_RULE). */
+export const OPS_TERMINAL_GREEN = "#79d68a";
+export const OPS_TERMINAL_BEAT = "rs-termbeat 2.6s ease-in-out infinite";
+
 function OpsDevScene() {
   return (
     <div style={{ position: "absolute", inset: 0, background: wall("#10141f") }}>
-      <div style={{ position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)" }}>
-        {/* the prompt on his shirt would be cut by the window's edge: not drawn here */}
-        <Bust id="ops-dev" cover={{ x: 46, y: 85, width: 27, height: 28.5, fill: "#26303f" }} />
-      </div>
-      {/* terminal window, phosphor-lit from below, up in the corner beside his head */}
+      {/* The terminal is on the wall BEHIND him, like a call's background: drawn first, so
+          his head is always in front of it. On the beat only its text shifts between
+          phosphor green and white -- the panel itself never fades or blinks. */}
       <div
+        data-testid="ops-dev-terminal"
         style={{
           position: "absolute",
           top: "6%",
@@ -722,15 +726,23 @@ function OpsDevScene() {
           padding: "6px 10px",
           fontFamily: mono,
           fontSize: "0.58rem",
-          color: "#79d68a",
+          color: OPS_TERMINAL_GREEN,
           lineHeight: 1.5,
-          animation: "rs-flicker 2.6s ease-in-out infinite",
         }}
       >
-        <div>$ tail -f prod.log</div>
-        <div style={{ opacity: 0.65 }}>[ok] heartbeat 200</div>
-        <div style={{ opacity: 0.65 }}>[ok] heartbeat 200</div>
-        <div style={{ opacity: 0.4 }}>▮</div>
+        <div data-testid="ops-dev-terminal-text" style={{ animation: OPS_TERMINAL_BEAT }}>
+          <div>$ tail -f prod.log</div>
+          <div style={{ opacity: 0.65 }}>[ok] heartbeat 200</div>
+          <div style={{ opacity: 0.65 }}>[ok] heartbeat 200</div>
+          <div style={{ opacity: 0.4 }}>▮</div>
+        </div>
+      </div>
+      <div
+        data-testid="ops-dev-figure"
+        style={{ position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)" }}
+      >
+        {/* the prompt on his shirt would be cut by the window's edge: not drawn here */}
+        <Bust id="ops-dev" cover={{ x: 46, y: 85, width: 27, height: 28.5, fill: "#26303f" }} />
       </div>
       <div
         style={{

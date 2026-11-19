@@ -3,7 +3,8 @@
     Standup -- today's standup, filled from the tracker (the Solitaire Agile add-on).
 
 .DESCRIPTION
-    The Ritual Engine's first ceremony, as text (docs/modules/solitaire-agile.md, "The file shape, and how a standup is read"). The human's queue first, then one block per worker label --
+    The Ritual Engine's first ceremony, as text (docs/modules/solitaire-agile.md, "The file shape, and how a standup is read"). The human's queue first, then one block per member --
+    each worker label, each model a card in play names that no label routes to, and you --
     yesterday, today and blockers, each line a real issue with its number, or the
     mug and one status sentence (the vocabulary's nothing family: the day around the
     work, never tracker work) when a worker has nothing.
@@ -21,7 +22,9 @@
     standup counts was authored, so a card counts only the commits inside the
     window and says the ones it cannot date; and when each open issue with no
     card was first given a worker label or assigned, so it can read started.
-    One call per 50 aliases; none when there is nothing to ask.
+    The same call reads the message of each commit a placed card with no
+    **Agent:** line names, for its co-author trailers. One call per 50
+    aliases; none when there is nothing to ask.
 
     milestone and body are the work grain's: an item groups by its
     milestone, else by the design card its body names. createdAt and
@@ -37,8 +40,11 @@
 
     The same Space's CARDS are read too (Get-P20StandupCards) and joined to the
     issues on the id by Invoke-P20StandupJoinedFill: a card whose id is an
-    issue's number adds its lane, and a Check line where the two disagree; a card
-    of its own is a row under you; a not-billable card is not a row.
+    issue's number adds its lane, and a Check line where the two disagree; a
+    not-billable card is not a row. Once a card exists the card decides who
+    reports it, never the issue's label: the member its Agent line, an older
+    card's Assigned worker or its commits' co-author trailers name, else you
+    (Resolve-P20CardAgent). An issue with no card stays with its label's worker.
 
     A Space with no tracker address, or a local or archive one, fills from its
     CARDS alone: the hub's current/ and archive/ for that Space, read by
@@ -343,17 +349,32 @@ elseif ($choice.source -eq 'both') {
     # -- The dates read: when the counted commits were authored, and when the
     # open issues with no card began (Scripts/Ritual-Common.ps1). Asked for what
     # the fill counted, then the fill again with the answer; nothing to ask, or
-    # a read that failed, keeps the fill as it is -- every bullet counts.
+    # a read that failed, keeps the fill as it is -- every bullet counts. The
+    # same call reads the co-author trailers of the commits of every card the
+    # fill places with no **Agent:** line (Get-P20StandupTrailerAsks), as t
+    # aliases; their messages go to the fill again, where a card with no Agent
+    # line and no Assigned worker is reported by the model its commits credit.
+    # Trailers alone, with no date to ask, still make the call, and the fill
+    # runs again with the messages only: with no date asked, every bullet counts.
+    $trailerMessages = $null
     if ($tracker.ok) {
         $slotNames = @((Get-P20RitualData -PackageRoot $repoRoot).Ceremony.slots | ForEach-Object { [string]$_ })
         $asks = Get-P20StandupDateAsks -Standup $standup -Cards $cards -Slots $slotNames
-        if (@($asks.hashes).Count -gt 0 -or @($asks.numbers).Count -gt 0) {
+        $trailerAsks = Get-P20StandupTrailerAsks -Standup $standup -Cards $cards -Slots $slotNames
+        $datesAsked = (@($asks.hashes).Count -gt 0 -or @($asks.numbers).Count -gt 0)
+        if ($datesAsked -or @($trailerAsks).Count -gt 0) {
             $workerNames = [string[]]@(Get-P20StandupWorkers -Labels $labels -Prefix ([string](Get-P20Consts).rituals.workerLabelPrefix) | ForEach-Object { [string]$_.label })
-            $dates = Get-P20StandupDates -Repo $repo -Hashes $asks.hashes -Numbers $asks.numbers -WorkerLabels $workerNames
+            $dates = Get-P20StandupDates -Repo $repo -Hashes $asks.hashes -Numbers $asks.numbers -WorkerLabels $workerNames -Trailers $trailerAsks
             if ($dates.ok) {
+                $trailerMessages = $dates.messages
+                # Trailers alone, with no date asked: the fill again with the
+                # messages only, so every bullet still counts.
+                $commitDates = $null
+                $issueStarts = $null
+                if ($datesAsked) { $commitDates = $dates.commitDates; $issueStarts = $dates.issueStarts }
                 $standup = Invoke-P20StandupJoinedFill -AsOf $asOf -Labels $labels -Issues $issues -Tracker $tracker `
                     -Cards $cards -Space $slug -SpaceName $spaceName -Window $window -PackageRoot $repoRoot `
-                    -CommitDates $dates.commitDates -IssueStarts $dates.issueStarts -TeamSize $teamStored
+                    -CommitDates $commitDates -IssueStarts $issueStarts -TeamSize $teamStored -Messages $trailerMessages
             }
         }
     }

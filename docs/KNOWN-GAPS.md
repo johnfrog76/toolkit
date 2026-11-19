@@ -67,6 +67,17 @@ page, so the two counts lines can differ.
 
 **Issue:** [#316](https://github.com/johnfrog76/toolkit/issues/316)
 
+### A card's commit trailers are read from GitHub only
+
+**What you see:** The standup reports a card with no Agent line and no Assigned worker by the model its
+commits' `Co-Authored-By` trailers credit only on a GitHub Space that is connected: the trailers ride the
+standup's dates read. On a Space with no tracker, an Azure DevOps Space, or when the dates read fails, such
+a card is the engineer's, even when the commits in a local checkout name a model.
+
+**Where you meet it:** [Team Agile](modules/solitaire-agile.md#where-the-rooms-members-come-from), "Where the room's members come from"
+
+**Issue:** [#503](https://github.com/johnfrog76/toolkit/issues/503)
+
 ### The foyer's design counts can differ from the Design tab's
 
 **What you see:** A GitHub row in the Studio's foyer counts a product's designs and specs from GitHub's
@@ -344,18 +355,6 @@ the chair does not yet say who is out.
 **Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
 
 **Issue:** [#389](https://github.com/johnfrog76/toolkit/issues/389)
-
-### The played standup seats the record, not the room
-
-**What you see:** A Space's team size is how many people are in its standup, and the terminal's round fills every seat:
-the engineer, the labelled workers, then invented cast members. The played view on the Team Agile page seats only the
-labelled workers and the engineer. A window an invented member sits in is drawn as an empty desk, that member has no
-turn, and the engineer speaks after the labelled workers and not first. A Space with no worker labels shows the chair,
-the engineer and seven empty desks at every size.
-
-**Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
-
-**Issue:** [#465](https://github.com/johnfrog76/toolkit/issues/465)
 
 ### The standup's prose reads no age, pull request or assignee
 

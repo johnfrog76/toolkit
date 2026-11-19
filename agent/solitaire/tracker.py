@@ -132,7 +132,9 @@ def issues(repo: str, state: str, body: bool = False, refresh: bool = False) -> 
     return copy.deepcopy(rows), why
 
 
-def _dates_chunk(repo: str, hashes: list[str], numbers: list[int]) -> tuple[object, str | None]:
+def _dates_chunk(
+    repo: str, hashes: list[str], numbers: list[int], trailers: list[str] | None = None
+) -> tuple[object, str | None]:
     """One GraphQL call for one chunk: (the ``repository`` object, None), or
     (None, why). An alias GitHub could not resolve is null in the answer, not a
     failure of the call."""
@@ -141,7 +143,7 @@ def _dates_chunk(repo: str, hashes: list[str], numbers: list[int]) -> tuple[obje
 
     owner, _, name = repo.partition("/")
     data, _errors, why = repo_read.graphql_aliases(
-        dates_query(hashes, numbers), ["-f", f"owner={owner}", "-f", f"name={name}"]
+        dates_query(hashes, numbers, trailers), ["-f", f"owner={owner}", "-f", f"name={name}"]
     )
     if why:
         return None, why
@@ -154,39 +156,52 @@ def dates(
     numbers_by_repo: dict[str, list[int]],
     worker_labels: list[str],
     refresh: bool = False,
-) -> tuple[dict | None, dict | None, str | None]:
+    trailers: list[str] | None = None,
+) -> tuple[dict | None, dict | None, dict | None, str | None]:
     """The standup's dates read: (hash -> authored instant or None, issue number
-    -> its start, None), or (None, None, why) when any call failed -- the
-    standup then counts as it did before the read existed. Every hash is asked
-    of every repo (a card does not say which one it was committed to) and dated
-    by the first that knows it; an issue is asked of its own repo. One
-    ``gh api graphql`` per repo per ``standup.DATES_CHUNK`` aliases, each kept
-    for the TTL like every other read here. Never raises."""
+    -> its start, short hash -> commit message, None), or (None, None, None, why)
+    when any call failed -- the standup then counts as it did before the read
+    existed. Every hash is asked of every repo (a card does not say which one it
+    was committed to) and dated by the first that knows it; an issue is asked of
+    its own repo. ``trailers`` are the hashes whose co-author trailers the
+    standup reads (``standup.trailer_asks``): each rides the same call as a
+    ``t`` alias, which dates it too, so a hash asked for both is asked once. One
+    ``gh api graphql`` per repo per ``standup.DATES_CHUNK`` aliases, the ``t``
+    aliases counted, each kept for the TTL like every other read here. Never
+    raises."""
     from .standup import DATES_CHUNK, dates_from_answer
 
+    wanted = list(dict.fromkeys(trailers or []))
     commits: dict[str, str | None] = {h: None for h in hashes}
     starts: dict[int, str] = {}
+    messages: dict[str, str] = {}
     try:
         for repo in repos:
             numbers = sorted(set(numbers_by_repo.get(repo, [])))
-            asks = [("c", h) for h in hashes] + [("i", n) for n in numbers]
+            asks = [("c", h) for h in hashes if h not in wanted] + [("i", n) for n in numbers]
+            asks += [("t", h) for h in wanted]
             for at in range(0, len(asks), DATES_CHUNK):
                 chunk = asks[at : at + DATES_CHUNK]
                 ch = [v for k, v in chunk if k == "c"]
                 cn = [v for k, v in chunk if k == "i"]
+                ct = [v for k, v in chunk if k == "t"]
                 answer, why = remember(
-                    ("dates", repo, tuple(ch), tuple(cn)), refresh, lambda r=repo, a=ch, b=cn: _dates_chunk(r, a, b)
+                    ("dates", repo, tuple(ch), tuple(cn), tuple(ct)),
+                    refresh,
+                    lambda r=repo, a=ch, b=cn, t=ct: _dates_chunk(r, a, b, t),
                 )
                 if why:
-                    return None, None, why
-                got_commits, got_starts = dates_from_answer(answer, ch, cn, worker_labels)
+                    return None, None, None, why
+                got_commits, got_starts, got_messages = dates_from_answer(answer, ch, cn, worker_labels, ct)
                 for h, when in got_commits.items():
                     if when and not commits.get(h):
                         commits[h] = when
                 starts.update(got_starts)
+                for k, v in got_messages.items():
+                    messages.setdefault(k, v)
     except Exception as exc:  # noqa: BLE001 -- a reader that raised is a tracker that did not answer
-        return None, None, f"The dates read failed: {exc.__class__.__name__}: {exc}"
-    return commits, starts, None
+        return None, None, None, f"The dates read failed: {exc.__class__.__name__}: {exc}"
+    return commits, starts, messages, None
 
 
 def github_repos(

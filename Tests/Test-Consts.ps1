@@ -170,6 +170,8 @@ $expected = [ordered]@{
     'regex.adoOriginSsh'           = '^(?:ssh://(?:[^/@\s]+@)?(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com)(?::\d+)?/|(?:ssh://)?[^/@\s]+@(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com):)v3/([^/\s]+)/([^/\s]+)/([^/\s]+?)(?:\.git)?/?$'
     'regex.adoOrgDev'              = '^https?://(?:[^/@\s]+@)?dev\.azure\.com/([^/\s]+)'
     'regex.adoOrgVisualStudio'     = '^https?://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com(?:[/:]|$)'
+    # A commit's Co-Authored-By trailer, the key in any case: group 1 the name (Get-P20CommitCoAuthors).
+    'regex.coAuthorTrailer'        = '(?mi)^[ \t]*Co-Authored-By:[ \t]*([^<\r\n]*?)[ \t]*<[^>\r\n]*>'
     'reminders.buckets'       = 'overdue,today,upcoming'
     'reminders.snooze'        = '1h,tomorrow,nextweek'
     # A Teams recipient's type: gate 2 checks the first list; the schema offers both.
@@ -300,6 +302,8 @@ $expected = [ordered]@{
     'org.file'                  = 'org.json'
     # The model map a card's Agent id is looked up in: Get-P20ModelInfo reads (Get-P20Consts).models.file.
     'models.file'               = 'Config/models.json'
+    # The order a card's agent is worked out in: Resolve-P20CardAgent reads (Get-P20Consts).models.agentSources.
+    'models.agentSources'       = 'line,assigned,trailer,none'
     # Daily's window: the billing script, Daily and GET /api/billing refuse a
     # window in these words (Scripts/Resolve-BillingWindow.ps1 is the rule).
     'billing.text'              = 'halfWindow=-Since and -Until go together: pass both (YYYY-MM-DD), or neither for this week.,notADay={name} ''{value}'' is not a day: yyyy-MM-dd.,backwards=-Since {since} is after -Until {until}.'
@@ -421,6 +425,8 @@ Assert-True "commitBullet matches a real bullet" ("Commits:`n- 80e2168 add grid"
 Assert-True "commitBullet does not match the placeholder" (-not ("Commits:`n- (pending)" -match $c.regex.commitBullet))
 $bulletHashes = @([regex]::Matches("- 80e2168 a`n- ``abcdef1234`` b`n- (pending)", $c.regex.commitBullet) | ForEach-Object { $_.Groups[1].Value })
 Assert-Equal "commitBullet captures the hash in group 1" '80e2168,abcdef1234' ($bulletHashes -join ',')
+$trailerNames = @([regex]::Matches("Fix`n`nCo-Authored-By: Claude Opus 5.5 <a@b>`r`nco-authored-by:  A Person  <p@q>`nCo-Authored-By: no email", $c.regex.coAuthorTrailer) | ForEach-Object { $_.Groups[1].Value.Trim() })
+Assert-Equal "coAuthorTrailer reads the name in any case of the key, and needs the email" 'Claude Opus 5.5|A Person' ($trailerNames -join '|')
 $idWhole = '^(?:' + $c.regex.cardId + ')$'
 Assert-True "cardId matches a work item number" ('141' -cmatch $idWhole)
 Assert-True "cardId matches the id of a card with no work item" ('K7M2' -cmatch $idWhole)
@@ -536,6 +542,8 @@ $guarded = [ordered]@{
     'stamps.agent'           = '**Agent:**'
     # Get-P20ModelInfo reads the map's path from (Get-P20Consts).models.file.
     'models.file'            = 'Config/models.json'
+    # Get-P20CommitCoAuthors reads the trailer's pattern from (Get-P20Consts).regex.coAuthorTrailer.
+    'regex.coAuthorTrailer'  = 'Authored-By:'
     # The standup's distinctive words: Scripts/Standup-Rules.ps1 reads them
     # from rituals.text and rituals.workerLabelPrefix, and nothing types them.
     'rituals.text.queueHeading'  = 'Waiting on you'

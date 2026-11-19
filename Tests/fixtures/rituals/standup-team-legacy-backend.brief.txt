@@ -1,0 +1,9 @@
+Since Thursday 1 October 2026: 1 started.
+Nothing is waiting on you.
+Backend: nothing yesterday, 1 open, 1 started, none in flight, no blockers.
+Fable: nothing today.
+Opus: nothing today.
+Sonnet: nothing today.
+Widgets: nothing today.
+In flight is not yet known: every routed issue reads as open.
+Next: nothing is waiting on you.

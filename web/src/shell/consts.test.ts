@@ -144,6 +144,10 @@ describe("consts.json", () => {
     expect(consts.regex.adoOrgVisualStudio).toBe(
       String.raw`^https?://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com(?:[/:]|$)`,
     );
+    // A commit's Co-Authored-By trailer, the key in any case: group 1 the name.
+    expect(consts.regex.coAuthorTrailer).toBe(
+      String.raw`(?mi)^[ \t]*Co-Authored-By:[ \t]*([^<\r\n]*?)[ \t]*<[^>\r\n]*>`,
+    );
     expect(REMINDERS.buckets).toEqual(["overdue", "today", "upcoming"]);
     expect(REMINDERS.snooze).toEqual(["1h", "tomorrow", "nextweek"]);
     // A Teams recipient's type: channel and chat post through their webhook, person never posts.
@@ -510,7 +514,11 @@ describe("consts.json", () => {
     // The model map a card's Agent id is looked up in (docs/hub/cards.md).
     const { _: modelsDoc, ...modelsKeys } = MODELS as typeof MODELS & { _: string };
     expect(modelsDoc).toMatch(/Config\/models\.json/);
-    expect(modelsKeys).toEqual({ file: "Config/models.json" });
+    expect(modelsKeys).toEqual({
+      file: "Config/models.json",
+      // The order a card's agent is worked out in: the first source that answers wins.
+      agentSources: ["line", "assigned", "trailer", "none"],
+    });
 
     // The statuses a reply may set, per tracker.
     expect(REPLY_STATUSES_BY_TRACKER.ado).toEqual([
@@ -639,6 +647,16 @@ describe("toRegExp", () => {
     // The hash is group 1: the standup's commit count reads the lane rule's own bullet.
     const bullet = new RegExp(RE.commitBullet.source, RE.commitBullet.flags.replace("g", ""));
     expect(bullet.exec("Commits:\n- `80e2168` add grid")?.[1]).toBe("80e2168");
+    // The trailer pattern lifts (?mi) into real flags, and reads the key in any case.
+    expect(RE.coAuthorTrailer.flags).toContain("i");
+    expect(RE.coAuthorTrailer.flags).toContain("m");
+    const trailers = new RegExp(RE.coAuthorTrailer.source, RE.coAuthorTrailer.flags + "g");
+    const names = [
+      ..."Fix\n\nCo-Authored-By: Claude Opus 5.5 <a@b>\r\nco-authored-by:  A Person  <p@q>\nCo-Authored-By: no email".matchAll(
+        trailers,
+      ),
+    ].map((m) => m[1].trim());
+    expect(names).toEqual(["Claude Opus 5.5", "A Person"]);
   });
 
   // The shape of a card's id crosses all three halves: a work item number, or the
