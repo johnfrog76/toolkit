@@ -832,32 +832,36 @@ def room_seats(size: int, engineer: tuple[str, bool] | None, labels: list[tuple[
         return kept.get(low) or (low if low in members else "")
 
     seats = max(size - 1, 0)
-    people = ([engineer] if engineer else []) + list(labels)
+    # A member is its kind and its label: the engineer and a labelled worker can
+    # share a label (a Space whose slug is one of its worker labels) and stay two.
+    people = ([(True, engineer[0])] if engineer else []) + [(False, label) for label, _ in labels]
     order = (
-        ([engineer[0]] if engineer else [])
-        + [label for label, empty in labels if not empty]
-        + [label for label, empty in labels if empty]
+        ([(True, engineer[0])] if engineer else [])
+        + [(False, label) for label, empty in labels if not empty]
+        + [(False, label) for label, empty in labels if empty]
     )
     seated = order[:seats]
-    reserved = {own(label) for label, _ in people if own(label)}
-    window: dict[str, str] = {}
-    dealing = [label for label, _ in people if label in seated]
-    for label in dealing:
-        if own(label) and own(label) not in window.values():
-            window[label] = own(label)
-    if engineer and engineer[0] in seated and engineer[0] not in window and room["engineer"] not in reserved:
-        window[engineer[0]] = room["engineer"]
+    reserved = {own(label) for _, label in people if own(label)}
+    window: dict[tuple[bool, str], str] = {}
+    dealing = [m for m in people if m in seated]
+    for m in dealing:
+        if own(m[1]) and own(m[1]) not in window.values():
+            window[m] = own(m[1])
+    me = (True, engineer[0]) if engineer else None
+    if me and me in seated and me not in window and room["engineer"] not in reserved:
+        window[me] = room["engineer"]
     taken = set(window.values())
     opened = [m for m in members if m not in reserved and m not in taken]
     opened += [m for m in members if m in reserved and m not in taken]
-    for label in dealing:
-        if label not in window:
-            window[label] = opened.pop(0)
+    for m in dealing:
+        if m not in window:
+            window[m] = opened.pop(0)
     taken = set(window.values())
     invented = [m for m in members if m not in taken and m not in reserved][: max(seats - len(seated), 0)]
-    spoken = [{"label": label, "cast": False, "window": window[label]} for label in seated]
+    spoken = [{"label": m[1], "cast": False, "window": window[m]} for m in seated]
     spoken += [{"label": m, "cast": True, "window": m} for m in invented]
     filled = taken | set(invented)
+    seated = [label for _, label in seated]
     return {"present": seated, "round": spoken, "desks": [m for m in members if m not in filled]}
 
 
@@ -877,10 +881,14 @@ def seat_room(out: Standup, engineer: Worker | None, d: int, words: dict) -> Non
         (engineer.label, engineer.empty) if engineer is not None else None,
         [(w.label, w.empty) for w in labels],
     )
+    # The engineer is the first seat when there is one; the rest are the labels.
     by_label: dict[str, Worker] = {}
-    for w in ([engineer] if engineer is not None else []) + labels:
+    for w in labels:
         by_label.setdefault(w.label, w)
-    seated = [by_label[label] for label in room["present"]]
+    skip = 1 if engineer is not None else 0
+    seated = [by_label[label] for label in room["present"][skip:]]
+    if engineer is not None and room["present"]:
+        seated.insert(0, engineer)
     for w in out.workers:
         w.present = any(w is s for s in seated)
     plates = {w["id"]: w["plate"] for w in rituals_room()["windows"]}
@@ -2487,7 +2495,7 @@ def render_brief(filled: Standup) -> str:
             best_noun, best_count = noun, count
     if not best_count:
         lines.append(t["queueEmpty"])
-    for w in filled.workers:
+    for at, w in enumerate(filled.workers):
         if w.empty:
             lines.append(f"{w.name}: {t['briefWorkerNone']}.")
             continue
@@ -2504,7 +2512,7 @@ def render_brief(filled: Standup) -> str:
             bits.append(t["countsStarted"].replace("{n}", str(mine.started)))
         if mine.commits:
             bits.append(commits_said(mine.commits))
-        if issues and not (filled.source == "both" and w.label == filled.space):
+        if issues and not (filled.source == "both" and at == len(filled.workers) - 1):
             bits.append(t["briefInFlight"])
         if blockers > 1:
             bits.append(t["briefBlockers"].replace("{n}", str(blockers)))

@@ -125,18 +125,39 @@ function castWorker(label: string, name: string): StandupWorker {
 function roundOf(data: Dealt): { worker: StandupWorker; cast: boolean }[] {
   const record = data.workers ?? [];
   const present = record.filter((w) => w.present !== false);
-  const byLabel = new Map(record.map((w) => [w.label, w]));
+  const engineer = engineerOf(data);
+  const byLabel = new Map(record.filter((w) => w !== engineer).map((w) => [w.label, w]));
   const round = data.work?.workers;
   const said = (round ?? []).filter((w) => !w.cast);
+  // The engineer, when seated, is the round's first turn; the rest are the
+  // labels. A labelled worker can share the engineer's label and stays a
+  // member of its own.
+  const memberOf = (label: string, at: number) =>
+    (at === 0 && engineer && label === engineer.label ? engineer : byLabel.get(label)) ??
+    (engineer && label === engineer.label ? engineer : undefined);
+  const members = said.map((w, at) => memberOf(w.label, at));
   const whole =
     said.length === present.length &&
-    said.every((w) => byLabel.has(w.label) && byLabel.get(w.label)!.present !== false);
+    members.every((m) => m !== undefined && m.present !== false) &&
+    new Set(members).size === members.length;
   if (!round || !whole) return present.map((worker) => ({ worker, cast: false }));
+  let at = 0;
   return round.map((w) =>
     w.cast
       ? { worker: castWorker(w.label, w.name), cast: true }
-      : { worker: byLabel.get(w.label)!, cast: false },
+      : { worker: members[at++]!, cast: false },
   );
+}
+
+/** The engineer -- the member the Space's own slug names, where cards fill the
+ *  standup. A labelled worker can carry the same word; the engineer is the
+ *  record's last member of that label, the card tile. */
+function engineerOf(data: Dealt): StandupWorker | undefined {
+  const record = data.workers ?? [];
+  const filled = data.source === "cards" || data.source === "both";
+  if (!filled || !data.space) return undefined;
+  for (let i = record.length - 1; i >= 0; i--) if (record[i].label === data.space) return record[i];
+  return undefined;
 }
 
 /**
@@ -162,8 +183,7 @@ function roundOf(data: Dealt): { worker: StandupWorker; cast: boolean }[] {
 export function dealRoom(data: Dealt): Room {
   const record = data.workers ?? [];
   const round = roundOf(data).slice(0, MEMBER_SEATS);
-  const filled = data.source === "cards" || data.source === "both";
-  const engineer = filled && data.space ? record.find((w) => w.label === data.space) : undefined;
+  const engineer = engineerOf(data);
   const people = [...(engineer ? [engineer] : []), ...record.filter((w) => w !== engineer)];
   const reserved = new Set(people.map((w) => ownWindow(w.label)).filter(Boolean));
   const seated = new Set(round.filter((r) => !r.cast).map((r) => r.worker));

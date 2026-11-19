@@ -1286,6 +1286,155 @@
         }
       ],
       "desks": []
+    },
+    {
+      "name": "a Space whose slug is a worker label, both with work, a room of three: the engineer and the worker are two members, both sit and both report",
+      "size": 3,
+      "engineer": {
+        "label": "opus",
+        "empty": false
+      },
+      "labels": [
+        {
+          "label": "opus",
+          "empty": false
+        }
+      ],
+      "present": [
+        "opus",
+        "opus"
+      ],
+      "round": [
+        {
+          "label": "opus",
+          "cast": false,
+          "window": "vibemancer"
+        },
+        {
+          "label": "opus",
+          "cast": false,
+          "window": "dev-hero"
+        }
+      ],
+      "desks": [
+        "ops-dev",
+        "minimalist",
+        "new-hire",
+        "ultrawide",
+        "qa",
+        "designer"
+      ]
+    },
+    {
+      "name": "a Space whose slug is a worker label, both with work, a room of six: the engineer and the worker are two members, both sit and both report",
+      "size": 6,
+      "engineer": {
+        "label": "opus",
+        "empty": false
+      },
+      "labels": [
+        {
+          "label": "opus",
+          "empty": false
+        }
+      ],
+      "present": [
+        "opus",
+        "opus"
+      ],
+      "round": [
+        {
+          "label": "opus",
+          "cast": false,
+          "window": "vibemancer"
+        },
+        {
+          "label": "opus",
+          "cast": false,
+          "window": "dev-hero"
+        },
+        {
+          "label": "ops-dev",
+          "cast": true,
+          "window": "ops-dev"
+        },
+        {
+          "label": "minimalist",
+          "cast": true,
+          "window": "minimalist"
+        },
+        {
+          "label": "new-hire",
+          "cast": true,
+          "window": "new-hire"
+        }
+      ],
+      "desks": [
+        "ultrawide",
+        "qa",
+        "designer"
+      ]
+    },
+    {
+      "name": "a Space whose slug is a worker label, both with work, a room of nine: the engineer and the worker are two members, both sit and both report",
+      "size": 9,
+      "engineer": {
+        "label": "opus",
+        "empty": false
+      },
+      "labels": [
+        {
+          "label": "opus",
+          "empty": false
+        }
+      ],
+      "present": [
+        "opus",
+        "opus"
+      ],
+      "round": [
+        {
+          "label": "opus",
+          "cast": false,
+          "window": "vibemancer"
+        },
+        {
+          "label": "opus",
+          "cast": false,
+          "window": "dev-hero"
+        },
+        {
+          "label": "ops-dev",
+          "cast": true,
+          "window": "ops-dev"
+        },
+        {
+          "label": "minimalist",
+          "cast": true,
+          "window": "minimalist"
+        },
+        {
+          "label": "new-hire",
+          "cast": true,
+          "window": "new-hire"
+        },
+        {
+          "label": "ultrawide",
+          "cast": true,
+          "window": "ultrawide"
+        },
+        {
+          "label": "qa",
+          "cast": true,
+          "window": "qa"
+        },
+        {
+          "label": "designer",
+          "cast": true,
+          "window": "designer"
+        }
+      ],
+      "desks": []
     }
   ],
   "workerLabels": [

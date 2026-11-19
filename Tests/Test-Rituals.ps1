@@ -1054,7 +1054,7 @@ foreach ($row in @($teamTable.room)) {
     $gotRest = ((@($got.present | ForEach-Object { [string]$_ })) -join ',') + ' | ' + ((@($got.desks | ForEach-Object { [string]$_ })) -join ',')
     Assert-True "room: $($row.name)" ($gotRound -ceq $wantRound -and $gotRest -ceq $wantRest) "`n  got  $gotRound -- $gotRest`n  want $wantRound -- $wantRest"
     # Every seat the size counts is filled, so the desks are the windows past it;
-    # nobody shares a window or a label.
+    # nobody shares a window (a Space's slug may be a worker label: two members, one label).
     $seats = [int]$row.size - 1
     $everyone = $labels.Count
     if ($null -ne $engineer) { $everyone++ }
@@ -1064,7 +1064,7 @@ foreach ($row in @($teamTable.room)) {
     & $ruleSizeSeen "room: $($row.name)" ([int]$row.size) @($got.round).Count
     & $ruleDesks "room: $($row.name)" ([int]$row.size) @($got.desks).Count
     & $ruleEngineer "room: $($row.name)" @($got.round) $engineer
-    Assert-True "room: $($row.name) -- $seats seats filled, $($roomMembers.Count - $seats) desks, $wantCast invented" (@($got.round).Count -eq $seats -and @($got.desks).Count -eq ($roomMembers.Count - $seats) -and ((@($windows | Sort-Object)) -join ',') -ceq ((@($roomMembers | Sort-Object)) -join ',') -and @(@($got.round) | ForEach-Object { [string]$_.label } | Sort-Object -Unique).Count -eq $seats -and @(@($got.round) | Where-Object { $_.cast }).Count -eq $wantCast -and @(@($got.round) | Where-Object { $_.cast -and [string]$_.window -cne [string]$_.label }).Count -eq 0) $gotRound
+    Assert-True "room: $($row.name) -- $seats seats filled, $($roomMembers.Count - $seats) desks, $wantCast invented" (@($got.round).Count -eq $seats -and @($got.desks).Count -eq ($roomMembers.Count - $seats) -and ((@($windows | Sort-Object)) -join ',') -ceq ((@($roomMembers | Sort-Object)) -join ',') -and @(@($got.round) | ForEach-Object { [string]$_.window } | Sort-Object -Unique).Count -eq $seats -and @(@($got.round) | Where-Object { $_.cast }).Count -eq $wantCast -and @(@($got.round) | Where-Object { $_.cast -and [string]$_.window -cne [string]$_.label }).Count -eq 0) $gotRound
 }
 $walkRooms = @($teamTable.room | Where-Object { ([string]$_.name).StartsWith('walk-size-') })
 Assert-True 'the walk rows are the three rooms: no labels, the engineer with work in its own window, and 1, 4 and 7 invented with 6, 3 and 0 desks' ($walkRooms.Count -eq 3 -and ((@($walkRooms | ForEach-Object { "$($_.size):$(@($_.round | Where-Object { $_.cast }).Count):$(@($_.desks).Count)" })) -join ',') -ceq '3:1:6,6:4:3,9:7:0' -and @($walkRooms | Where-Object { @($_.labels).Count -ne 0 -or [string]$_.round[0].label -cne 'widgets' -or [string]$_.round[0].window -cne [string]$consts.rituals.room.engineer }).Count -eq 0)
@@ -1165,6 +1165,14 @@ $wholeSaid = (@($whole.workers | ForEach-Object { (@($_.status) -join '/') })) -
 Assert-True 'an absent worker keeps its made-up items by its label position' ($smallSaid -ceq $wholeSaid) "`n  small $smallSaid`n  whole $wholeSaid"
 $cardsRoom = Invoke-P20StandupCardsFill -AsOf $absentAt -Cards @() -Space 's' -PackageRoot $pkgRoot -TeamSize 3
 Assert-True 'the cards fill seats the engineer and fills the room: its one tile present, and one invented cast member beside it' ([int]$cardsRoom.team.size -eq 3 -and @($cardsRoom.workers | Where-Object { $_.present }).Count -eq 1 -and ((@($cardsRoom.work.workers | ForEach-Object { "$($_.label)/$([bool]$_.cast)" })) -join ',') -ceq 's/False,ops-dev/True')
+# A Space named for one of its worker labels, both with work: two members, both
+# present, both in the round.
+$sameSlug = Invoke-P20StandupJoinedFill -AsOf $absentAt -Labels @(@{ name = 'opus'; description = 'Routed to Opus -- the crash-through volume' }) -Issues @(@{ number = 801; title = 'Trim the export header'; state = 'OPEN'; labels = @('opus'); closedAt = $null; url = 'https://github.com/acme/widgets/issues/801'; body = ''; milestone = @{ title = 'Phase 6' } }) -Tracker @{ ok = $true; reason = '' } -Cards @($teamCases[4].cards) -Space 'opus' -SpaceName 'Opus' -PackageRoot $pkgRoot -TeamSize 3
+Assert-True 'a Space whose slug is a worker label seats the engineer and the worker: two members, both present, both in the round' (@($sameSlug.workers).Count -eq 2 -and @($sameSlug.workers | Where-Object { $_.present }).Count -eq 2 -and ((@($sameSlug.work.workers | ForEach-Object { "$($_.label)/$([bool]$_.cast)" })) -join ',') -ceq 'opus/False,opus/False') ((@($sameSlug.work.workers | ForEach-Object { "$($_.label)/$([bool]$_.cast)" })) -join ',')
+# Its brief: the worker gets the in-flight treatment, the engineer (the record's last) its own.
+$sameBrief = @((Format-P20StandupBrief -Standup $sameSlug -PackageRoot $pkgRoot) -split "`n" | Where-Object { $_.StartsWith('Opus: ') })
+$inFlightSaid = [string]$consts.rituals.text.briefInFlight
+Assert-True 'a Space whose slug is a worker label: the brief gives the worker the in-flight line and the engineer its own' ($sameBrief.Count -eq 2 -and $sameBrief[0].Contains($inFlightSaid) -and -not $sameBrief[1].Contains($inFlightSaid)) ($sameBrief -join ' | ')
 # A full idle room never repeats a made-up line: eight idle members -- the
 # engineer and seven invented -- say two different items each, none repeated on
 # one day, and the chair's own made-up yesterday is none of them. Every day of

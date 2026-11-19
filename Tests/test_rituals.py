@@ -1619,8 +1619,8 @@ class TheTeamTable(unittest.TestCase):
 
     def test_every_room_row_fills_the_seats_it_can(self):
         """Every seat the size counts is filled -- by a member, or by an invented cast
-        member -- so the desks are the windows past the size; nobody shares a window
-        or a label, and the chair's window is never a member's."""
+        member -- so the desks are the windows past the size; nobody shares a window,
+        and the chair's window is never a member's."""
         room = C.rituals_room()
         members = [w["id"] for w in room["windows"] if w["id"] != room["chair"]]
         for row in TEAM_TABLE["room"]:
@@ -1630,10 +1630,45 @@ class TheTeamTable(unittest.TestCase):
                 self.assertEqual(len(row["round"]), seats)
                 self.assertEqual(len(row["desks"]), len(members) - seats)
                 self.assertEqual(sorted(windows + row["desks"]), sorted(members))
-                self.assertEqual(len({r["label"] for r in row["round"]}), seats)
+                # A Space's slug may be one of its worker labels: two members, one label.
+                self.assertEqual(len(set(windows)), seats)
                 everyone = len(row["labels"]) + (1 if row["engineer"] else 0)
                 self.assertEqual(sum(1 for r in row["round"] if r["cast"]), max(seats - everyone, 0))
                 self.assertTrue(all(r["window"] == r["label"] for r in row["round"] if r["cast"]))
+
+    def test_a_slug_that_is_a_worker_label_seats_the_engineer_and_the_worker(self):
+        """The joined fill of a Space named for one of its worker labels, both with work:
+        two members, both present, both in the round."""
+        case = {
+            "asOf": "2026-10-02T09:00:00-04:00",
+            "teamSize": 3,
+            "labels": [{"name": "opus", "description": "Routed to Opus -- the crash-through volume"}],
+            "issues": [
+                {
+                    "number": 801,
+                    "title": "Trim the export header",
+                    "state": "OPEN",
+                    "labels": ["opus"],
+                    "closedAt": None,
+                    "url": "https://github.com/acme/widgets/issues/801",
+                    "body": "",
+                    "milestone": {"title": "Phase 6"},
+                }
+            ],
+            "cards": TEAM_TABLE["cases"][4]["cards"],
+            "space": "opus",
+            "spaceName": "Opus",
+        }
+        filled = _fill_team(case)
+        self.assertEqual([w.present for w in filled.workers], [True, True])
+        self.assertEqual([w.label for w in filled.work.workers], ["opus", "opus"])
+        self.assertEqual(sum(1 for w in filled.work.workers if w.cast), 0)
+        # Its brief: the worker gets the in-flight line, the engineer (the record's last) its own.
+        said = C.rituals_text()["briefInFlight"]
+        mine = [ln for ln in standup.render_brief(filled).splitlines() if ln.startswith("Opus: ")]
+        self.assertEqual(len(mine), 2)
+        self.assertIn(said, mine[0])
+        self.assertNotIn(said, mine[1])
 
     def test_the_walk_rows_are_the_three_rooms(self):
         """A Space with no worker labels whose engineer has work, at 3, 6 and 9: the
