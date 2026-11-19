@@ -349,7 +349,7 @@ the standup's second GET 2.4 s and three `gh` calls before, under 0.01 s and non
 standup 1.8 s and three calls before, none after.
 
 The response is the spec's ("The M0 build contract"): `ceremony`, `register` (`real`), `asOf`, `since`, `space`,
-`source` (`issues`, `cards`, or `none` when `tracker.ok` is false), `tracker` (`ok`, `reason`), `chair`
+`source` (`issues`, `cards`, or `none` when `tracker.ok` is false), `tracker` (`ok`, `reason`, and `workerLabels`: how many worker labels the tracker answered, 0 where none was read), `chair`
 (`open`, `close`, and `walked` -- the walk items closed inside the window, by number, what the chair's
 turn says it walked), `team` (`size`: the room's windows, the chair included -- the Space's `features.teamSize`
 as [the team size](#the-team-size-who-is-in-the-room) reads it, 9 when unset), `queue` (`walk`, `decide`, `look`), `workers` (the record: EVERY labelled worker in label order, then on a GitHub or a local Space the engineer -- the card tile, always there --, each `label`, `name`, `yesterday`,
@@ -717,7 +717,7 @@ that has items ("Nothing is waiting on you." when none); one line per worker
 (open is today plus blockers; an empty worker is "nothing today"; a worker whose open items began in the
 window adds `<n> started`, and one whose cards thread commits adds `<n> commits` -- the per-worker
 counts; under a wider window a worker's closes are `<n> closed`, not "closed yesterday"); then one line about
-what the brief could not read, chosen by the tracker, never by who is in the room: on a GitHub Space with worker
+what the brief could not read, chosen by the tracker, never by who is in the room (it takes "no worker labels" from the tracker's own count, `tracker.workerLabels`, not from who is seated, so a member a card seats does not hide it): on a GitHub Space with worker
 labels, the in-flight sentence while the running state is unbuilt, because every routed issue reads as open; on one
 with none, `No worker labels in this Space.`, after the engineer's line, since nothing is routed for the sentence to
 describe (the engineer is always a member, so the list is never empty); and "Next", the rule -- the kind
