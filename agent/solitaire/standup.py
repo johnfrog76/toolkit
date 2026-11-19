@@ -847,8 +847,9 @@ def room_seats(size: int, engineer: tuple[str, bool] | None, labels: list[tuple[
     for m in dealing:
         if own(m[1]) and own(m[1]) not in window.values():
             window[m] = own(m[1])
-    if engineer and (True, engineer[0]) in seated and (True, engineer[0]) not in window and room["engineer"] not in reserved:
-        window[(True, engineer[0])] = room["engineer"]
+    me = (True, engineer[0]) if engineer else None
+    if me and me in seated and me not in window and room["engineer"] not in reserved:
+        window[me] = room["engineer"]
     taken = set(window.values())
     opened = [m for m in members if m not in reserved and m not in taken]
     opened += [m for m in members if m in reserved and m not in taken]
@@ -884,7 +885,8 @@ def seat_room(out: Standup, engineer: Worker | None, d: int, words: dict) -> Non
     by_label: dict[str, Worker] = {}
     for w in labels:
         by_label.setdefault(w.label, w)
-    seated = [by_label[label] for label in room["present"][(1 if engineer is not None else 0):]]
+    skip = 1 if engineer is not None else 0
+    seated = [by_label[label] for label in room["present"][skip:]]
     if engineer is not None and room["present"]:
         seated.insert(0, engineer)
     for w in out.workers:
