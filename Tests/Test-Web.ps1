@@ -423,7 +423,7 @@ function global:Invoke-WebComposeDown { Write-Host "  [test] compose down" }
 # the harness does it by default, ahead of any case's own preamble, and a case
 # that swaps in the real helpers still stubs the kill.
 $harnessText = Get-Content -LiteralPath $MyInvocation.MyCommand.Path -Raw
-$casePreambleAt = $harnessText.IndexOf('$Preamble' + [Environment]::NewLine + '& ')
+$casePreambleAt = $harnessText.IndexOf('$Preamble' + "`n" + '& ')
 foreach ($helper in @('Get-WebPortListenerIds', 'Get-WebProcessName', 'Test-WebListenerIsOurs', 'Stop-WebProcessTree')) {
     $at = $harnessText.IndexOf("function global:$helper")
     Assert-True "the harness stubs $helper before any case's preamble" ($at -ge 0 -and $casePreambleAt -gt $at) "$helper at $at, preamble at $casePreambleAt"
