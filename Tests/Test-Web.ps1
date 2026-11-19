@@ -50,6 +50,17 @@ $script:passed = 0
 $script:failed = 0
 $script:errors = @()
 
+function Test-NetPortOpen {
+    param([int]$Port)
+    $client = [System.Net.Sockets.TcpClient]::new()
+    try {
+        $client.Connect([System.Net.IPAddress]::Loopback, $Port)
+        return $true
+    }
+    catch { return $false }
+    finally { $client.Dispose() }
+}
+
 function Assert-True {
     param([string]$TestName, [bool]$Condition, [string]$Detail)
     if ($Condition) {
@@ -215,9 +226,18 @@ function Start-DetachedProcess {
 # the port. A quiet agent port by default, and never a real kill: otherwise an
 # agent the engineer has running on 4100 turns "-Stop (down)" red. A case about
 # a listener defines its own stubs in -Preamble, which comes after these.
+# (Web half: Get-WebPortListenerIds, Get-WebProcessName, Test-WebListenerIsOurs
+# and Stop-WebProcessTree are stubbed below the same way.)
 function global:Get-AgentPortListenerIds { param([int]`$Port) return @() }
 function global:Get-AgentHealthReport { param([int]`$Port) return @{ Answered = `$false; PromptsRoot = ''; Status = ''; PackageRoot = '' } }
 function global:Stop-AgentProcess { param([int]`$ProcessId) Write-Host "  [test] would stop agent `$ProcessId" }
+# The web half the same way: no listener is ever found, and nothing is ever
+# stopped. The launcher's sweep acts on whatever listens on the dev port, and a
+# real dev server of another checkout on 5174 is not the suite's to touch.
+function global:Get-WebPortListenerIds { param([int]`$Port) return @() }
+function global:Get-WebProcessName { param([int]`$ProcessId) return '' }
+function global:Test-WebListenerIsOurs { param([int]`$ProcessId) return `$false }
+function global:Stop-WebProcessTree { param([int]`$ProcessId) Write-Host "  [test] would stop `$ProcessId" }
 function global:Get-CliPrefix { return '$script:Prefix' }
 function global:Write-ToolkitLog {
     param([string]`$Type, [string]`$Source, [string]`$Detail)
@@ -275,7 +295,8 @@ Write-Host ""
 Write-Host "-- -Stop (nothing running) ----------------------------" -ForegroundColor Cyan
 
 $r = Invoke-Web -ScriptArgs @('-Stop')
-Assert-True '-Stop (down) reports nothing to stop' ($r.Output -match 'nothing to stop') $r.Output
+Assert-True '-Stop (down) reports the dev half has nothing to stop' ($r.Output -match 'Dev server is not running -- nothing to stop') $r.Output
+Assert-True '-Stop (down) stops nothing on the port either' ($r.Output -notmatch 'Also stopped PID') $r.Output
 Assert-True '-Stop (down) stops the agent half too' ($r.Output -match 'Agent is not running') $r.Output
 Assert-True '-Stop (down) exits 0 (idempotent)' ($r.ExitCode -eq 0) "exit $($r.ExitCode)"
 Assert-True '-Stop (down) logs CMD' ($r.LogText -match "^CMD`t") $r.LogText
@@ -296,6 +317,7 @@ $listenerShim = @'
 function global:Get-WebPortListenerIds { param([int]$Port) if ($Port -eq 5174) { return @(424242) } return @() }
 function global:Get-WebChildProcessIds { param([int]$ProcessId) return @() }
 function global:Get-WebProcessName { param([int]$ProcessId) return 'node' }
+function global:Test-WebListenerIsOurs { param([int]$ProcessId) return $true }
 function global:Stop-WebProcessTree { param([int]$ProcessId) Write-Host "  [test] would stop $ProcessId" }
 '@
 
@@ -319,6 +341,7 @@ $portShim = @'
 function global:Get-WebPortListenerIds { param([int]$Port) return @($Port) }
 function global:Get-WebChildProcessIds { param([int]$ProcessId) return @() }
 function global:Get-WebProcessName { param([int]$ProcessId) return 'node' }
+function global:Test-WebListenerIsOurs { param([int]$ProcessId) return $true }
 function global:Stop-WebProcessTree { param([int]$ProcessId) Write-Host "  [test] would stop $ProcessId" }
 '@
 $r = Invoke-Web -ScriptArgs @('-Status') -Preamble $portShim -VitePort 5199
@@ -340,6 +363,73 @@ Assert-True '-Stop with an orphan exits 0' ($r.ExitCode -eq 0) "exit $($r.ExitCo
 
 $r = Invoke-Web -ScriptArgs @('-Stop') -Preamble $quietShim
 Assert-True '-Stop with nothing listening still reports nothing to stop' ($r.Output -match 'Dev server is not running -- nothing to stop') $r.Output
+
+Write-Host ""
+
+# -- A node listener of another checkout ---------------------------------------
+# The sweep stops a node on the dev port only when it belongs to this checkout.
+# A real throwaway listener, started outside the sandbox, stands in for another
+# checkout's dev server: the real helpers answer for it, and only the final
+# kill is stubbed, so a regression here is a failed assertion, not a dead server.
+
+Write-Host "-- Another checkout's node listener is reported, kept -" -ForegroundColor Cyan
+
+$nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+if (-not $nodeCmd) {
+    Write-Host "  SKIP: node is not on PATH" -ForegroundColor Yellow
+}
+else {
+    $probe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+    $probe.Start()
+    $foreignPort = ([System.Net.IPEndPoint]$probe.LocalEndpoint).Port
+    $probe.Stop()
+    $foreign = $null
+    try {
+        $foreign = Start-Process -FilePath $nodeCmd.Source -PassThru -NoNewWindow `
+            -ArgumentList @('-e', "require('net').createServer().listen($foreignPort)")
+        $deadline = (Get-Date).AddSeconds(10)
+        while ((Get-Date) -lt $deadline -and -not (Test-NetPortOpen -Port $foreignPort)) { Start-Sleep -Milliseconds 100 }
+
+        $realHelpers = @'
+Remove-Item Function:\Get-WebPortListenerIds, Function:\Get-WebProcessName, Function:\Test-WebListenerIsOurs -ErrorAction SilentlyContinue
+function global:Stop-WebProcessTree { param([int]$ProcessId) Write-Host "  [test] would stop $ProcessId" }
+function global:Test-DockerAvailable { return $true }
+function global:Invoke-WebComposeDown { Write-Host "  [test] compose down" }
+'@
+        Assert-True 'the throwaway listener is up before the run' (Test-NetPortOpen -Port $foreignPort) "port $foreignPort"
+
+        $r = Invoke-Web -ScriptArgs @('-Stop') -Preamble $realHelpers -VitePort $foreignPort
+        Assert-True '-Stop does not stop another checkout''s node' ($r.Output -notmatch "would stop $($foreign.Id)") $r.Output
+        Assert-True '-Stop says it did not stop it' ($r.Output -notmatch 'Also stopped PID') $r.Output
+        Assert-True '-Stop names it as another checkout''s' ($r.Output -match "PID $($foreign.Id)\) that belongs to another checkout; not stopping it") $r.Output
+        Assert-True '-Stop leaves the listener running' (-not $foreign.HasExited -and (Test-NetPortOpen -Port $foreignPort)) "port $foreignPort"
+        Assert-True '-Stop beside another checkout''s node exits 0' ($r.ExitCode -eq 0) "exit $($r.ExitCode)"
+
+        $r = Invoke-Web -ScriptArgs @('-Restart', '-Dev', '-NoBrowser') -WithModules -StubAgent -StubLaunch -Preamble $realHelpers -VitePort $foreignPort
+        Assert-True '-Restart does not stop another checkout''s node' ($r.Output -notmatch "would stop $($foreign.Id)") $r.Output
+        Assert-True '-Restart names it as another checkout''s' ($r.Output -match "PID $($foreign.Id)\) that belongs to another checkout; not stopping it") $r.Output
+        Assert-True '-Restart leaves the listener running' (-not $foreign.HasExited -and (Test-NetPortOpen -Port $foreignPort)) "port $foreignPort"
+
+        $r = Invoke-Web -ScriptArgs @('-Status') -Preamble $realHelpers -VitePort $foreignPort
+        Assert-True '-Status names it as another checkout''s' ($r.Output -match 'belongs to another checkout') $r.Output
+        Assert-True '-Status does not promise -Stop will end it' ($r.Output -notmatch 'Web -Stop will end it') $r.Output
+    }
+    finally {
+        if ($foreign -and -not $foreign.HasExited) { Stop-Process -Id $foreign.Id -Force -ErrorAction SilentlyContinue }
+    }
+}
+
+# Every run that can reach -Stop, -Restart or -Dev has the web helpers stubbed:
+# the harness does it by default, ahead of any case's own preamble, and a case
+# that swaps in the real helpers still stubs the kill.
+$harnessText = Get-Content -LiteralPath $MyInvocation.MyCommand.Path -Raw
+$casePreambleAt = $harnessText.IndexOf('$Preamble' + [Environment]::NewLine + '& ')
+foreach ($helper in @('Get-WebPortListenerIds', 'Get-WebProcessName', 'Test-WebListenerIsOurs', 'Stop-WebProcessTree')) {
+    $at = $harnessText.IndexOf("function global:$helper")
+    Assert-True "the harness stubs $helper before any case's preamble" ($at -ge 0 -and $casePreambleAt -gt $at) "$helper at $at, preamble at $casePreambleAt"
+}
+Assert-True 'the default stub for the sweep finds no listener' ($harnessText -match 'function global:Get-WebPortListenerIds \{ param\(\[int\]\$Port\) return @\(\) \}') ''
+Assert-True 'the case that runs the real helpers still stubs Stop-WebProcessTree' ($harnessText -match "(?s)Remove-Item Function:.{0,300}function global:Stop-WebProcessTree") ''
 
 Write-Host ""
 
@@ -393,6 +483,7 @@ function global:Get-WebProcessName {
     if ($ProcessId -eq 424242) { return 'node' }
     return 'com.docker.backend.exe'
 }
+function global:Test-WebListenerIsOurs { param([int]$ProcessId) return $true }
 function global:Stop-WebProcessTree { param([int]$ProcessId) Write-Host "  [test] would stop $ProcessId" }
 function global:Test-DockerAvailable { return $true }
 function global:Invoke-WebComposeDown { Write-Host "  [test] compose down" }
