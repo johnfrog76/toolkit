@@ -8,6 +8,7 @@ import { LOG_LATEST, useGetLogEntriesQuery, useRunCommandMutation } from "./api.
 import type { LogEntry } from "./api.ado";
 import { logBadge } from "./logChart";
 import { LogTypeChart } from "./LogTypeChart";
+import { leadChartPlotHeightPx, logChartPlotHeightPx } from "../../shell/layoutTokens";
 import { localToday, localDaysAgo } from "../../utility/dates";
 
 function typeBadgeColor(type: string): BadgeSpec["color"] {
@@ -114,6 +115,7 @@ export function ToolkitLog() {
       lead={
         !error && filtered.length > 0
           ? {
+              chartExtraPx: logChartPlotHeightPx - leadChartPlotHeightPx,
               chart: {
                 label: "Log entries by day and type",
                 chart: <LogTypeChart entries={filtered} />,
@@ -121,6 +123,7 @@ export function ToolkitLog() {
             }
           : undefined
       }
+      controlsInBody
       pickers={[
         {
           label: "Entry type",

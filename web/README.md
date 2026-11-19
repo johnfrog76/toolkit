@@ -737,7 +737,8 @@ is still Active Cards.
   no margin, so the space between two rows is there only while both are drawn, and every row looks
   alike -- a chosen chip in a second row is drawn as one in the first. An inline subhead
   used as a split ("Design (5)") is not allowed. A choice from a longer list (a period, a tag, a
-  state) is a `pickers` entry in the header.
+  state) is a `pickers` entry in the header, or in a row at the top of the body
+  when the panel sets `controlsInBody` (the Log card).
 - **One way to explain: `info`.** A sentence about what a panel holds goes behind the info icon
   beside its title. No helper sentence sits in the body.
 - **The header and the foot have one order.** Header: icon, title, info; then pickers, search, the
