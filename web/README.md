@@ -160,7 +160,7 @@ web/
     │   └── stage/          the played view: one lazy chunk with the deck engine
     │       ├── cast.tsx        the Remote Standup's tiles, bubbles and nine scenes, by copy from the Wasteland (no bios), drawn in the refined cast; reduced motion stills them
     │       ├── refined.tsx     the refined style for the stage's own drawings: the shade, the wall's light, the one shadow
-    │       ├── seats.ts        the room: nine windows (ROOM_WINDOWS), kept labels in their own window, the rest dealt by position, PERSONA (label) plates, empty desks and their mugs
+    │       ├── seats.ts        the room, from consts.json rituals.room: nine windows, the response's round seated in turn order -- a member in its kept or dealt window plated PERSONA (label), an invented cast member in its own -- empty desks and their mugs
     │       ├── EmptyDesk.tsx   the eight mug looks and the day's deal of them, and the desk the Org page draws in a vacant seat
     │       ├── RefinedDesk.tsx a window with nobody in it, in the refined cast and full colour: a flat-backed chair, a shut laptop and a steaming drink
     │       ├── standupDeck.tsx the standup response -> an audiobook Deck: the board, the open, a call and a turn a member, the chair's status, the close

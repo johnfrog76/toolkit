@@ -247,7 +247,8 @@ export const RITUALS = consts.rituals as {
    *  in the room"): the nine windows in grid order, each a cast id and the plate
    *  its persona wears; the cast id whose window is the chair's; the window a
    *  worker label keeps; and the window the engineer takes when no member owns
-   *  it. The CLI and the agent seat the room from it. */
+   *  it. The CLI and the agent seat the room from it, and the stage draws it
+   *  (modules/solitaireAgile/stage/seats.ts). */
   room: {
     windows: { id: string; plate: string }[];
     chair: string;

@@ -610,20 +610,29 @@ engine are one lazy chunk fetched when Play is pressed.
   dot, never lit (`data-look="ghost"`, the look's name from when it was dimmed): the drink on the desk is
   what says nobody is there. The frame's colour is the stage's own green, `pf.green` -- the colour of the register badge at the top right and of the speaker's name-dot -- handed to the tiles as the CSS variable `--sa-speaker`. It is never a theme's brand token: the room is the engine's default dark whatever the app wears, and the frame is the same on every theme. There is no pulse, so reduced motion has none to
   still.
-- **The room** (`stage/seats.ts`). Nine windows, always (`ROOM_WINDOWS`, the one constant the stage
-  reads; `MEMBER_SEATS` is the room less the chair's window). The chair keeps its own, `CHAIR · PM`. The
-  other eight are the member windows, the cast in its grid order -- `DEV-HERO`, `OPS-DEV`, `MINIMALIST`,
-  `NEW HIRE`, `AI VIBEMANCER`, `ULTRAWIDE OVERLORD`, `QA ALCHEMIST`, `DESIGNER` -- each plated
-  `PERSONA (label)`. The members are the workers the response marks `present` (every worker, capped at the
-  room, from an agent that predates `present`), and they speak in the response's order whichever window each
-  sits in. Three labels keep a face of their own, as they always have (`KEPT_WINDOWS`): `fable` sits in
-  `DEV-HERO`'s window, `opus` in `AI VIBEMANCER`'s, `sonnet` in `MINIMALIST`'s, so a persona and its
-  tagline never change with who else is in the room. Every other present member takes the free windows by
-  position, in cast order. A kept window whose label is in the response but out today stays empty, so no
-  other face takes it and nobody moves when that member is back; only when the free windows run out does
-  the next member take such a window, in cast order, so no present member is ever dropped. A kept window
-  whose label the Space does not have is an ordinary window. No window is a role, and a face does not
-  change window because its work changed. **Every other window is an empty desk** (`stage/RefinedDesk.tsx`): a
+- **The room** (`stage/seats.ts`). Nine windows, always (`ROOM_WINDOWS`; `MEMBER_SEATS` is the room less
+  the chair's window). The windows, their plates, the chair's window, the windows three labels keep and
+  the engineer's are the shared room, `consts.json` `rituals.room`, which the stage reads and never
+  types: the terminal's `Standup` and the agent seat the same room from it
+  ([the team size](#the-team-size-who-is-in-the-room)). The chair keeps its own window, `CHAIR · PM`. The
+  other eight are the member windows, in grid order -- `DEV-HERO`, `OPS-DEV`, `MINIMALIST`, `NEW HIRE`,
+  `AI VIBEMANCER`, `ULTRAWIDE OVERLORD`, `QA ALCHEMIST`, `DESIGNER`. The stage seats **the round** the
+  response carries (`work.workers`): the engineer first, the labelled workers with work, the labelled
+  workers with nothing routed, then the invented cast members that fill the seats the size still counts,
+  and they speak in that order whichever window each sits in. A member is plated `PERSONA (label)`; an
+  invented cast member sits in the window its cast id names and wears its persona alone, `OPS-DEV`. A
+  window is a member's own when its label keeps it (`KEPT_WINDOWS`: `fable` sits in `DEV-HERO`'s window,
+  `opus` in `AI VIBEMANCER`'s, `sonnet` in `MINIMALIST`'s) or is itself a cast id, so a persona and its
+  tagline never change with who else is in the room. The engineer -- the member the Space's own slug
+  names, where cards fill the standup -- takes the engineer's window when no member owns it. Every other
+  seated member takes the free windows in grid order, the engineer first and then the labels in the
+  response's order. A window whose owner is in the response but out today stays empty, so no other face
+  takes it and nobody moves when that member is back; only when the free windows run out does a member
+  take such a window, so nobody seated is ever dropped. A kept window whose label the Space does not have
+  is an ordinary window. No window is a role, and a face does not change window because its work changed.
+  A response with no work grain, or whose round does not account for exactly its present workers (an
+  agent that predates the room), is seated by its record: the workers it marks `present` -- every worker
+  from an agent that predates `present` -- in its order, capped at the room. **Every other window is an empty desk** (`stage/RefinedDesk.tsx`): a
   flat-backed chair pushed back, a shut laptop and a steaming drink on that window's tint, in full colour --
   the room's light is off, which is a wash in the drawing and no filter -- plated `EMPTY DESK`, never lit,
   never a bubble, never a slide. The drinks are the eight the stage has always had (`stage/EmptyDesk.tsx`
@@ -632,7 +641,7 @@ engine are one lazy chunk fetched when Play is pressed.
   `dealMugLooks(day, desks)` in window order, `day` the standup's day of the year (1-based, from `asOf`'s
   own date, as the fill counts it), so the same day always deals the same mugs. An absent worker is silent
   and unseen: no window, no line, no name. The web never reads the team-size setting: a Space sized three
-  draws two members and six desks because the response marks two present. Grid order, top row first:
+  draws two speakers and six desks because the response's round has two. Grid order, top row first:
   `DEV-HERO`, `OPS-DEV`, `MINIMALIST`; `NEW HIRE`, `AI VIBEMANCER`, `ULTRAWIDE OVERLORD`; `QA ALCHEMIST`,
   the chair, `DESIGNER`.
 - **The script** (`stage/standupDeck.tsx`). The round of the room, in this order: the **board** (the
@@ -992,13 +1001,14 @@ different lines on any day of the year, and the chair's is none of them. One rul
 `agent/solitaire/standup.py`; **one table**, `Tests/fixtures/rituals/standup-team.json` -- its `sizes`
 (a stored value in, the room out), its `seats` (labels only: who sits), its `room` rows (who sits, the
 window each speaker sits in, and the desks left) and ten cases end to end with their detail, work and
-brief goldens, `standup-team-<case>*.txt`. The `room` rows carry every seat, so the stage can be held
-to the same table.
+brief goldens, `standup-team-<case>*.txt`. The `room` rows carry every seat, and the stage is the
+table's third reader: `stage/seats.test.ts` gives each row to the stage as the response would carry it
+and holds every speaker to the window the row names.
 
-**The stage does not draw an invented member yet.** The played view seats the record: the labelled
-workers and the engineer, in the response's order. A window an invented member sits in is drawn as an
-empty desk there, and the invented member has no turn on the stage, until the stage reads this table
-([Known gaps](#known-gaps)).
+**The stage seats the same room.** The played view draws the round: the engineer and the labelled
+workers in their windows, each invented cast member in its own, and an empty desk only in the windows
+past the size -- none at nine, three at six, six at three
+([the played view](#the-played-view)).
 
 The setting is written by `Config -Set spaces.<slug>.features.teamSize=<3|6|9> -Hub`, which refuses any
 other number by name (exit 2), and asked in the settings drawer as **How many are in my standup in
@@ -1869,6 +1879,7 @@ standup is complete and correct; nothing on screen says a dress was skipped.
 | `tkTestToolkit -Consts`, `Tests/test_consts.py`, `web/src/shell/consts.test.ts` | the `startWork.text` headings; the `rituals` values (`triageRoute`, `milestonesRoute`, `grains`, `numberWords`, the four `work*Regex` patterns, the `work*` phrases and the `prose*` words among them, the dress's `dressGuards` and four `dress*Regex` patterns, and what moved's `motions`, the `itemMotion`, `motion*`, `commit*` and `counts*` words, and the room's `teamSizes` and `teamSizeDefault`), stated from all three halves; the turn's `turnOpen` and `turnClose`; `{n} to walk`, `No blockers.`, `Good morning.`, `That's it for me.` and `Yesterday I closed` never retyped in the CLI's scripts or the agent; `Waiting on you`, `nothing in flight` and `Routed to` never retyped in the CLI's scripts |
 | `web/src/modules/solitaireAgile/StandupPage.test.tsx` | the page over the shared fixture and goldens (above); the Agenda -- a fresh page on it with its one sentence and no text, the two lanes and their headings (`Since Thursday 1 October`, `Waiting on you`), no action on what moved, one button a waiting tile with the suggestion's pick first, the suggestion row the first line after the sentence and above the lanes with no brief (a dismiss bringing an unrouted pick and its Open Triage), no Yesterday or Today word and no lane badge, each tile's fact and long date, a card's cover and progress and an issue's neither, **Work it now** one `StartWork` call with the number (a card by its id) and none before it is pressed, **Review it** a card's page or the walked issue, the cards / list toggle remembered with the list the same groups and buttons, **Copy and Play carrying exactly the text they carried before**, **Team size** beside them opening the drawer at the team-size entry's anchor, the worker chip reading the stage's deal (`PERSONA (label)`, none for a worker out today) (`standup-friday.txt` read from disk, and a stored Work or Brief grain), the tab remembered, an agent with no `agenda` both lanes empty; the counts line the first line at the top of the page, and an item's motion in the text; the grain: three tabs from `rituals.grains` after the Agenda, Detail the grain by default, Work showing `work.text` (`standup-prose-friday.txt`, the prose) verbatim and Copy copying it, Brief the brief as the body once, the choice remembered by the browser, a stored word that is not a grain read as Detail; the chair's suggestion over `suggestion-suggested.brief.txt` -- the Next line as its own row, its **Work it now** (the tiles' label) making one `StartWork` call with the number, a dismiss yielding the next (a route's action Open Triage) and holding for the session, none left the line today's, another session nothing dismissed, a browser that refuses storage still drawing it, the Brief grain showing it once, no row while something waits or with the switch off; the PM Corner over `corner-many-left.brief.txt` and `corner-reached.brief.txt` -- at the head of the page, the brief below stopping above its line while the suggestion still stands, the chevron one `StartWork` call, the Brief grain without the Corner's line and Copy the brief as it came, reached one burst and a fresh draw none, no Corner when the response has none |
 | `web/src/modules/solitaireAgile/stage/geometry.test.ts` | where a speech bubble goes: over the nine windows at the stage's usual size, every face, plate and the speaker's button modelled from `HEADS`, a short and a long turn for each window placed clean -- no face, no plate, no button, inside the grid with its margin --, the side and size each one takes as a table, a short turn above the speaker wherever the window over it leaves room, the sides tried in order and a bubble slid along a side to clear a keep-out, nothing found when every side is blocked and the least overlap the last resort, the tail at the face |
+| `web/src/modules/solitaireAgile/stage/seats.test.ts` | the stage as the third reader of `Tests/fixtures/rituals/standup-team.json`: the stage's windows, chair and kept windows are `consts.json` `rituals.room`'s, and the cast's drawings are the room's windows in the same order under the same plates; every `room` row given to the stage as the response carries it -- the record with who is present, the round in turn order -- seats each speaker in the window the row names, leaves the row's desks, and plates a member `PERSONA (label)` and an invented cast member its persona alone; every end-to-end case's round in turn order with each invented member in its own window and no window shared; a response with no work grain, or whose round names a stranger or leaves a present member out, seated by its record |
 | `web/src/modules/solitaireAgile/stage/standupDeck.test.tsx` | the room: nine windows (`ROOM_WINDOWS`, the cast's count and the largest `rituals.teamSizes`), the eight member windows in cast order, the day of the year as the fill counts it (every `standup.json` case's `dayOfYear`), a kept label (`KEPT_WINDOWS`) in its own persona's window whatever its case or order and every other label by position in the free windows, a kept label out today leaving its window empty so no face moves, a kept window the Space has no label for dealt like any other, eight present never dropped (the windows absent kept labels left taken last), the desks' mugs `dealMugLooks` in window order, a face not moving when its work changes, only the present seated and an older agent's everyone capped at the room; the deck from the shared fixture's `friday` and `no-tracker` cases: the round in order with its ids (the board, the open, a call and a turn per member, the chair's status, the close), the call the member's name with its window called -- in colour, unframed -- and heard once (no title read before it, none before the turn), the board lighting the chair alone, the plates (`CHAIR · PM`, `PERSONA (label)`, `EMPTY DESK`) and no role word on any slide, an idle member keeping its face and saying its pair, never async, nine windows and the register on every slide, reduced motion; the copy panel the speaker's character -- title, persona with the label, motto; the four looks -- every window in full colour on every slide (no picture and no plate filtered, nothing greyed or dimmed), one framed speaker a slide, the called member marked, every other face named, every desk an empty desk with the drink the day dealt it and the grey dot, never lit, with no face anchor, bubble or thought; every face the refined cast's bust for its window's cast id; the round through the engine's own `SlideRenderer` -- one content key on every slide, every window the same DOM node from slide to slide with no entrance replayed, the new speaker framed with a bubble and the old one neither, a new bubble with its entrance when one window speaks twice running, a thought not left open, and nothing finite on the stage but the two entrances; the called mark on the called window and on no other; the bubble laid out unseen until placed, at main's size (up to 260px, never wider than its window, four lines), and the faces and plates it keeps off marked on the stage; the thought bubble's button and placement as they were;  at the work grain over `standup-prose.json`: the queue's sentences, each turn as the agent wrote it, the chair's own status last and never the board again, the tracker down leaving the chair no status; dressed, from `standup-dress.json`'s reply: a dressed worker's sentences, an undressed one's prose, `spoken: null` the prose, the board, calls, chair's status and an idle member never dressed; **no silent face** -- every face has a slide where it speaks and every desk none, with a mug of its own, over the owner's demo room (the chair, two members with tracker work, three idle each with its own pair, three desks), a Space with no worker labels on the issues (the chair alone, eight desks) and on its cards (the engineer's tile a member), `standup-team.json`'s `absent` case (two members, six desks, the absent never named), ten labels marked present by the fill and from an older agent (eight sit), and a response with no `work` |
 | `web/src/modules/solitaireAgile/stage/RefinedDesk.test.tsx` | the room's empty desk in the refined cast: every drink the deal can hand it drawn, each differently and with no outline on its body; the flat-backed chair; full colour on the window's tint with no filter that greys or dims; two desks sharing no ids; one picture to a screen reader; the steam on the clocks and under the rule it has always had, still drawn when stilled (`stage/EmptyDesk.test.tsx` holds the deal and the Org page's desk) |
 | `web/src/modules/solitaireAgile/stage/StandupPlay.test.tsx`, `web/src/modules/deck/engine/DeckPlayer.audiobook.test.tsx`, `web/src/modules/deck/GeneratedDeckHost.mute.test.tsx` | the mute, the played route's loading, error and Audiobook states; the audiobook hint at desktop width with prev and next either side of the ring, the browser voice, and a deck without the hint untouched |
@@ -1901,11 +1912,6 @@ Each of these is a block on [Known gaps](../KNOWN-GAPS.md), with its issue:
 - **The bell and Home's tips do not suggest yet.** They are the suggestion's later surfaces, behind the
   same switch; the chair's line and [the PM Corner](#the-pm-corner-the-line-the-chevron-the-confetti) are the two built
   ([The bell and Home's tips carry no suggestion](../KNOWN-GAPS.md#the-bell-and-homes-tips-carry-no-suggestion)).
-- **The stage draws no invented cast member.** The terminal's round and the agent's `work.workers` fill
-  the room to the Space's size; the played view still seats the record -- the labelled workers and the
-  engineer, in the response's order -- so a window an invented member sits in is an empty desk there, and
-  the engineer speaks in the response's place and not first
-  ([The played standup seats the record, not the room](../KNOWN-GAPS.md#the-played-standup-seats-the-record-not-the-room)).
 - **The celebration's mark is per browser.** Another browser, or one whose site data was cleared, celebrates a
   reached milestone once more on first sight
   ([A reached milestone celebrates once per browser](../KNOWN-GAPS.md#a-reached-milestone-celebrates-once-per-browser)).
