@@ -608,6 +608,21 @@ class TheJoinedTable(unittest.TestCase):
     """Every case of standup-joined.json -- the same rows tkTestToolkit -Rituals
     asserts against Invoke-P20StandupJoinedFill."""
 
+    def test_a_space_slugged_as_its_only_worker_label_still_has_a_worker_label(self):
+        t = standup.rituals_text()
+        filled = standup.fill_joined_standup(
+            datetime.fromisoformat(JOINED_TABLE["asOf"]),
+            [{"name": "opus", "description": "Routed to Opus"}],
+            [],
+            {"ok": True, "reason": ""},
+            [],
+            space="opus",
+            space_name="Opus",
+        )
+        brief = standup.render_brief(filled)
+        self.assertIn(t["briefInFlightUnknown"], brief)
+        self.assertNotIn(t["noWorkers"], brief)
+
     def test_the_table_has_its_shapes(self):
         self.assertEqual(
             list(JOINED_CASES),

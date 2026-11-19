@@ -2708,7 +2708,11 @@ function Format-P20StandupBrief {
         else { $bits += [string]$t.blockersEmpty }
         $lines.Add([string]$w.name + ': ' + ($bits -join ', ') + '.')
     }
-    if ($workers.Count -eq 0) { $lines.Add([string]$t.noWorkers) }
+    # The line the members end on is about the tracker: with no worker label the Space routes nothing,
+    # the engineer notwithstanding: on a joined read it is the record's last member, the card tile.
+    $labelled = $workers
+    if ($both) { $labelled = @($workers | Select-Object -First ($workers.Count - 1)) }
+    if ($workers.Count -eq 0 -or ($issues -and $labelled.Count -eq 0)) { $lines.Add([string]$t.noWorkers) }
     elseif ($issues) { $lines.Add([string]$t.briefInFlightUnknown) }
     foreach ($check in @($Standup.checks | Where-Object { $null -ne $_ })) { $lines.Add([string]$t.check + ': ' + [string]$check) }
 

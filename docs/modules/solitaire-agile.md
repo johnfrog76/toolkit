@@ -716,8 +716,11 @@ commits.`, a part said only when it is not zero, `nothing moved` when all are. T
 that has items ("Nothing is waiting on you." when none); one line per worker
 (open is today plus blockers; an empty worker is "nothing today"; a worker whose open items began in the
 window adds `<n> started`, and one whose cards thread commits adds `<n> commits` -- the per-worker
-counts; under a wider window a worker's closes are `<n> closed`, not "closed yesterday"); the in-flight sentence while the
-running state is unbuilt, because every routed issue reads as open; and "Next", the rule -- the kind
+counts; under a wider window a worker's closes are `<n> closed`, not "closed yesterday"); then one line about
+what the brief could not read, chosen by the tracker, never by who is in the room: on a GitHub Space with worker
+labels, the in-flight sentence while the running state is unbuilt, because every routed issue reads as open; on one
+with none, `No worker labels in this Space.`, after the engineer's line, since nothing is routed for the sentence to
+describe (the engineer is always a member, so the list is never empty); and "Next", the rule -- the kind
 with the most items (ties go to the ceremony's queue order) and who they wait on. With nothing waiting,
 "Next" is [the suggestion](#the-suggestion-one-next-move-derived) where there is one, else
 `Next: nothing is waiting on you.` A GitHub Space's
