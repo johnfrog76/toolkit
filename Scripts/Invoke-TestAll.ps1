@@ -30,6 +30,12 @@
     (Get-TestHistoryDir.ps1), the same for every checkout, and each half's record
     says which checkout and commit it ran from.
 
+    -Isolated (macOS only) runs the same halves in a child with a home, a temp
+    folder, PowerShell's caches and a test history of its own, so two runs can
+    start at once (Scripts/TestAll-Isolated.ps1); the folder is removed after,
+    or kept and named with -Keep. Elsewhere, and -Keep without -Isolated, it is
+    a stated refusal.
+
 .NOTES
     PowerShell 5.1 compatible: ASCII only, no ternary, no null-coalescing.
 #>
@@ -39,6 +45,8 @@ param(
     [ValidateSet('cli', 'agent', 'web')]
     [string]$Half,
     [switch]$Fast,
+    [switch]$Isolated,
+    [switch]$Keep,
     [switch]$Help
 )
 
@@ -59,6 +67,84 @@ if ($Help) {
     Show-P20ConfigHelp -CommandName 'Test' -RepoRoot $packageRoot -Prefix $prefix `
         -Fallback 'config.default.json is missing its commands.Test entry.'
     exit 0
+}
+
+# -- -Isolated: the same run, in a child with per-run state ---------------------
+# Two runs started together share PowerShell's startup caches under the home
+# folder and the machine's test history. This starts the run below -- this
+# script, without the switch -- in a child whose home, temp folder, caches and
+# history are a folder of its own, and removes the folder after.
+if ($Keep -and -not $Isolated) {
+    Write-CliError -Message '-Keep keeps an isolated run''s folder, and this run has none.' `
+        -Hint "Use '$($prefix)Test -Isolated -Keep', or drop -Keep."
+    exit 2
+}
+if ($Isolated) {
+    if ((Get-P20TestHistoryPlatform) -ne 'macos') {
+        Write-CliError -Message '-Isolated runs on macOS only in this version.' `
+            -Hint "Run '$($prefix)Test' without it, one run at a time (docs/TESTING.md, ""Two runs at once: -Isolated"")."
+        exit 2
+    }
+    . (Join-Path $scriptsDir 'TestAll-Isolated.ps1')
+    $isoExe = ''
+    try { $isoExe = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName } catch { $isoExe = '' }
+    if (-not $isoExe -or ([System.IO.Path]::GetFileNameWithoutExtension($isoExe) -ne 'pwsh')) {
+        $found = Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+        $isoExe = ''
+        if ($found) { $isoExe = $found.Source }
+    }
+    if (-not $isoExe) {
+        Write-CliError -Message '-Isolated starts the run in pwsh, and there is no pwsh on the PATH.' -Hint 'Install PowerShell 7 (docs/QUICKSTART.md, "Requirements").'
+        exit 2
+    }
+    # A run killed past its finally leaves its folder; this one removes those
+    # older than a day, and names each. It never stops the run.
+    try {
+        foreach ($swept in @(Remove-P20StaleIsolatedRunDirs)) {
+            Write-Host ('  ' + ((Get-P20IsolatedRunPrefix).SweptLine -f $swept)) -ForegroundColor DarkGray
+        }
+    }
+    catch { $null = $_ }
+    $isoEnv = @{}
+    foreach ($v in @(Get-ChildItem Env:)) { $isoEnv[$v.Name] = $v.Value }
+    $runDir = Join-Path (Get-P20IsolatedRunPrefix).Base (Get-P20IsolatedRunName -ProcessId $PID)
+    $plan = Get-P20IsolatedRunPlan -RunDir $runDir -Environment $isoEnv
+    # The child is this script without -Isolated or -Keep. With the module loaded
+    # here, the child loads this package's module too, so it writes the same
+    # records a plain run does.
+    $q = { param([string]$Text) "'" + ($Text -replace "'", "''") + "'" }
+    $childLine = '& ' + (& $q $PSCommandPath)
+    if ($Half) { $childLine += ' -Half ' + (& $q $Half) }
+    if ($Fast) { $childLine += ' -Fast' }
+    $childLine += '; exit $LASTEXITCODE'
+    $manifest = Join-Path (Join-Path $packageRoot 'Prompt20Toolkit') 'Prompt20Toolkit.psd1'
+    if ((Get-Command Write-P20TestResult -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath $manifest)) {
+        $childLine = '$env:PSModulePath = ' + (& $q $packageRoot) + '; Import-Module ' + (& $q $manifest) + ' -Force; ' + $childLine
+    }
+    $code = 2
+    try {
+        $null = Initialize-P20IsolatedRun -Plan $plan
+        Write-Host ""
+        Write-Host "  ${prefix}Test -Isolated: this run's home, temp folder, caches and test history are in $runDir" -ForegroundColor DarkGray
+        $code = Invoke-P20IsolatedChild -Exe $isoExe -Arguments @('-NoProfile', '-Command', $childLine) -WorkDir $packageRoot -Variables $plan.Variables
+    }
+    catch {
+        Write-CliError -Message "-Isolated could not start its run: $($_.Exception.Message)" -Hint "Run '$($prefix)Test -Isolated -Keep' to keep the folder and read it."
+        $code = 2
+    }
+    finally {
+        if ($Keep) {
+            if (Test-Path -LiteralPath $runDir) {
+                $null = Set-P20IsolatedRunKept -Path $runDir
+                Write-Host "  Kept $runDir -- this run's test history is in its history folder." -ForegroundColor DarkGray
+                Write-Host ""
+            }
+        }
+        elseif (-not (Remove-P20IsolatedRunDir -Path $runDir)) {
+            Write-Warning "Could not remove $runDir; remove it by hand."
+        }
+    }
+    exit $code
 }
 
 $onWindows = ($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows
@@ -156,8 +242,10 @@ $runCli = {
         $rec.reason = 'Tests/Test-Toolkit.ps1 is not in this package'
         return $rec
     }
-    # The runner starts every suite in pwsh, so the CLI half needs it. The host
-    # this verb runs in is the answer when it is pwsh already.
+    # This verb starts the CLI runner in pwsh on every host, so the CLI half
+    # needs it; the runner then starts each suite in the host it is itself
+    # running in. The host this verb runs in is the answer when it is pwsh
+    # already.
     $pwshExe = ''
     if ($PSVersionTable.PSEdition -eq 'Core') {
         try { $pwshExe = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName } catch { $pwshExe = '' }
@@ -188,10 +276,10 @@ $runCli = {
     }
     $rec.seconds = [math]::Round(((Get-Date) - $start).TotalSeconds, 1)
     $c = ConvertFrom-P20ToolkitOutput -Text $run.Text
-    # The CLI runner's own paste lines (a full, green run prints them): kept for
-    # the paste block at the foot of this run's summary.
+    # The CLI runner's own two count lines (a full, green run prints them): kept
+    # for the counts block at the foot of this run's summary.
     $script:cliPasteLines = @()
-    $pm = [regex]::Match($run.Text, '(?m)^\s*Counts for docs/TESTING\.md''s combined row, from this run:\s*\r?\n\s*(\S[^\r\n]*?)\s*\r?\n\s*(\d+ suites, \d+ assertions)\s*$')
+    $pm = [regex]::Match($run.Text, '(?m)^\s*' + [regex]::Escape((Get-P20TestCountsFile).CliHeading) + '\s*\r?\n\s*(\S[^\r\n]*?)\s*\r?\n\s*(\d+ suites, \d+ assertions)\s*$')
     if ($pm.Success) { $script:cliPasteLines = @($pm.Groups[1].Value, $pm.Groups[2].Value) }
     $v = Get-P20HalfVerdict -Counts $c -ExitCode $run.ExitCode
     $rec.result = $v.Result; $rec.detail = $v.Detail
@@ -337,7 +425,8 @@ if (Get-Command Write-P20TestResult -ErrorAction SilentlyContinue) {
 }
 
 # -- One summary -----------------------------------------------------------------
-$expected = Read-P20ExpectedCounts -Path (Join-Path (Join-Path $packageRoot 'docs') 'TESTING.md')
+$countsFile = Get-P20TestCountsFile
+$expected = Read-P20ExpectedCounts -Path (Join-Path $packageRoot ($countsFile.Path -replace '/', [System.IO.Path]::DirectorySeparatorChar))
 $rule = '  ' + ('-' * 66)
 Write-Host ""
 Write-Host "  ${prefix}Test -- the three halves" -ForegroundColor Cyan
@@ -367,11 +456,11 @@ foreach ($h in @($records.Keys)) {
 Write-Host $rule -ForegroundColor Cyan
 Write-Host ('  {0,-12} {1}' -f 'Elapsed', ('{0:N1}s' -f $overallSeconds)) -ForegroundColor DarkGray
 
-# Expected vs actual: information, never the verdict. The counts in
-# docs/TESTING.md are pasted from a macOS run after a merge, so
-# a branch, a partial run or another platform reads differently on purpose.
+# Expected vs actual: information, never the verdict. docs/TEST-COUNTS.md is
+# written at a release, from a run on the host that built it, so main between
+# releases, a branch, a partial run or another platform reads differently on purpose.
 Write-Host ""
-Write-Host "  Expected (docs/TESTING.md) vs actual:" -ForegroundColor Cyan
+Write-Host "  Expected ($($countsFile.Path)) vs actual:" -ForegroundColor Cyan
 $differs = @()
 foreach ($h in @($records.Keys)) {
     $r = $records[$h]
@@ -404,20 +493,21 @@ foreach ($h in @($records.Keys)) {
     Write-Host ('    {0,-6} expected {1}; actual {2}{3}' -f $h, $expText, $actText, $mark) -ForegroundColor Gray
 }
 if ($differs.Count -gt 0) {
-    Write-Host "  Note: $($differs -join ', ') differs from docs/TESTING.md. Information, not a failure: the merger pastes those counts from the Mac's run after a merge, and a branch or another platform reads differently." -ForegroundColor DarkGray
+    Write-Host "  Note: $($differs -join ', ') differs from $($countsFile.Path). Information, not a failure: that page is written at a release, and main since then, a branch or another platform reads differently." -ForegroundColor DarkGray
 }
 
-# -- The paste block ----------------------------------------------------------
-# docs/TESTING.md's "The counts, after a merge" holds three figures: the CLI's
-# per-suite line and total, the pytest totals and the web totals. This is the
-# runner that has all three. A half that did not run says so in its line's place.
+# -- The counts block -----------------------------------------------------------
+# docs/TEST-COUNTS.md holds four lines: the CLI's per-suite line and total, the
+# pytest totals and the web totals. This is the runner that has all of them, and
+# Scripts/Write-TestCounts.ps1 takes them, heading and all, at a release. A half
+# that did not run says so in its line's place, which the writer refuses.
 Write-Host ""
 if ($halves.Count -eq 3 -and -not $Fast) {
-    Write-Host "  Counts for docs/TESTING.md's paste block, from this run:" -ForegroundColor Cyan
+    Write-Host "  $($countsFile.Heading)" -ForegroundColor Cyan
     foreach ($pl in @(Get-P20PasteLines -Records $records -CliLines $script:cliPasteLines)) { Write-Host "  $pl" }
 }
 else {
-    Write-Host "  No paste block: it needs all three halves and no -Fast." -ForegroundColor DarkGray
+    Write-Host "  No counts block: it needs all three halves and no -Fast." -ForegroundColor DarkGray
 }
 
 # -- One verdict -----------------------------------------------------------------

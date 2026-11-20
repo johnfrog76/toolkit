@@ -26,6 +26,7 @@ sys.path.insert(0, str(PKG_ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _skipguard import skip_module  # noqa: E402
+from _tracker_cli import unreachable  # noqa: E402
 
 try:
     from fastapi import HTTPException
@@ -228,10 +229,12 @@ class ThreeSpaceHub(unittest.TestCase):
 class TheEnv(ThreeSpaceHub):
     """/env says which tracker each offered Space's address names."""
 
+    @unreachable("az")
     def test_each_space_carries_its_tracker(self):
         spaces = self.client.get("/api/env").json()["config"]["spaces"]
         self.assertEqual({s["slug"]: s["tracker"] for s in spaces}, {"a": "none", "gh": "github", "ado": "ado"})
 
+    @unreachable("az")
     def test_each_space_carries_its_own_lane_names_by_contract_word(self):
         # The foyer counts another Space's cards under THAT Space's names.
         spaces = {s["slug"]: s for s in self.client.get("/api/env").json()["config"]["spaces"]}
@@ -628,6 +631,7 @@ class TheVerbTyped(unittest.TestCase):
         )
         return out.stdout + out.stderr
 
+    @unreachable("az")
     def test_the_verbs_are_core_whatever_a_leftover_flag_says(self):
         """D-S13: no flag to find. With no features block, and with a leftover
         features.studio of either value, both verbs resolve, Menu -All lists

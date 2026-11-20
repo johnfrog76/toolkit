@@ -1,0 +1,781 @@
+{
+  "_": "One table, two readers: Scripts/Read-OrgChart.ps1 (tkTestToolkit -OrgChart, Tests/Test-OrgChart.ps1) and the agent's reader. A case builds a scratch hub: hub.json when hubJson is given, org.json from `org` (an object), `orgText` (the raw file text) or `orgFile` (a file under this folder; no org.json when none is given), and an empty prompt file for each name in `prompts` (the table's `prompts` unless the case has its own) in the agentic folder -- agentic/, or `promptsFolder` -- plus an empty folder for each name in promptFolders. `tree` is the one asked for besides the file's own. `expect.status` is ok, missing or invalid. For ok: `activeTree`, `seatCount` (the seats of the tree shown), `warnings` (exact sentences, in order) and `chart` -- the response, compared as JSON, key order aside (docs/hub/org.md, \"The response\"); `text` is the CLI's lines for it and only the CLI asserts it. Otherwise `kind` is the contract both halves agree on, and `message` is the sentence the CLI says; a reader in another half may say the same sentence or only the kind (`messageStartsWith` stands in for a message that carries the parser's own words). Ids are compared exactly, character for character.",
+  "prompts": [
+    "vp-of-product.prompt.md",
+    "vp-of-engineering.prompt.md",
+    "pm.prompt.md",
+    "team-lead.prompt.md"
+  ],
+  "cases": [
+    {
+      "name": "valid",
+      "why": "A tree shaped like ours: the owner as a person, two VPs, a PM, one lead position with three seats on three Spaces (one vacant), and a builder pool with seats [] and its default-model line; a second tree beside it; activeTree chooses the first.",
+      "orgFile": "docs/valid.json",
+      "expect": {
+        "status": "ok",
+        "activeTree": "main",
+        "chart": "charts/valid.json",
+        "text": "text/valid.txt",
+        "seatCount": 7,
+        "warnings": []
+      }
+    },
+    {
+      "name": "valid-second-tree-active",
+      "why": "The same document with activeTree naming the second tree: the chart is that tree.",
+      "orgFile": "docs/valid-branch-active.json",
+      "expect": {
+        "status": "ok",
+        "activeTree": "branch",
+        "chart": "charts/valid-branch-active.json",
+        "text": "text/valid-branch-active.txt",
+        "seatCount": 2,
+        "warnings": []
+      }
+    },
+    {
+      "name": "valid-tree-by-id",
+      "why": "The first document read with tree=branch: the other tree's chart, and activeTree still says which one the file uses.",
+      "orgFile": "docs/valid.json",
+      "tree": "branch",
+      "expect": {
+        "status": "ok",
+        "activeTree": "main",
+        "chart": "charts/valid-tree-by-id.json",
+        "text": "text/valid-tree-by-id.txt",
+        "seatCount": 2,
+        "warnings": []
+      }
+    },
+    {
+      "name": "one-tree-no-active-tree",
+      "why": "One tree and no activeTree: that tree is the one in use.",
+      "org": {
+        "trees": [
+          {
+            "id": "solo",
+            "positions": [
+              {
+                "id": "boss",
+                "seats": [
+                  {
+                    "id": "boss",
+                    "person": "Sam"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": "ok",
+        "activeTree": "solo",
+        "chart": "charts/one-tree-no-active-tree.json",
+        "text": "text/one-tree-no-active-tree.txt",
+        "seatCount": 1,
+        "warnings": []
+      }
+    },
+    {
+      "name": "unknown-keys-and-notes",
+      "why": "A key the tool does not read is ignored with a warning at every level; an underscore key is a note and is not said. A position with no title shows its id, a tree with no name its id; a seat with active true or false is carried and never drawn.",
+      "org": {
+        "_note": "a comment",
+        "colour": "red",
+        "activeTree": "t",
+        "trees": [
+          {
+            "id": "t",
+            "_note": "x",
+            "region": "eu",
+            "positions": [
+              {
+                "id": "root",
+                "budget": 3,
+                "seats": [
+                  {
+                    "id": "a",
+                    "model": "opus",
+                    "badge": 1,
+                    "active": true
+                  },
+                  {
+                    "id": "b",
+                    "active": false
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": "ok",
+        "activeTree": "t",
+        "chart": "charts/unknown-keys-and-notes.json",
+        "text": "text/unknown-keys-and-notes.txt",
+        "seatCount": 2,
+        "warnings": [
+          "org.json: 'colour' is not a key this tool reads -- ignored.",
+          "org.json: 'region' is not a key this tool reads in tree 't' -- ignored.",
+          "org.json: 'budget' is not a key this tool reads in position 'root' of tree 't' -- ignored.",
+          "org.json: 'badge' is not a key this tool reads in seat 'a' of position 'root' in tree 't' -- ignored."
+        ]
+      }
+    },
+    {
+      "name": "agentic-folder-renamed",
+      "why": "hub.json renames the agentic folder; a prompt is looked for there.",
+      "org": {
+        "trees": [
+          {
+            "id": "t",
+            "positions": [
+              {
+                "id": "root",
+                "title": "Root",
+                "prompt": "root.prompt.md",
+                "seats": [
+                  {
+                    "id": "r",
+                    "model": "opus"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "hubJson": {
+        "folders": {
+          "agentic": "roles"
+        }
+      },
+      "promptsFolder": "roles",
+      "prompts": [
+        "root.prompt.md"
+      ],
+      "expect": {
+        "status": "ok",
+        "activeTree": "t",
+        "chart": "charts/agentic-folder-renamed.json",
+        "text": "text/agentic-folder-renamed.txt",
+        "seatCount": 1,
+        "warnings": []
+      }
+    },
+    {
+      "name": "same-position-id-in-two-trees",
+      "why": "The same position id in two different trees is allowed.",
+      "org": {
+        "activeTree": "a",
+        "trees": [
+          {
+            "id": "a",
+            "positions": [
+              {
+                "id": "x"
+              }
+            ]
+          },
+          {
+            "id": "b",
+            "positions": [
+              {
+                "id": "x"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": "ok",
+        "activeTree": "a",
+        "chart": "charts/same-position-id-in-two-trees.json",
+        "text": "text/same-position-id-in-two-trees.txt",
+        "seatCount": 0,
+        "warnings": []
+      }
+    },
+    {
+      "name": "no-file",
+      "why": "No org file in the hub root.",
+      "expect": {
+        "status": "missing",
+        "kind": "missing",
+        "message": "There is no org.json in the hub."
+      }
+    },
+    {
+      "name": "unreadable-json",
+      "why": "The file is not JSON.",
+      "orgText": "{ not json",
+      "expect": {
+        "status": "invalid",
+        "kind": "unreadable",
+        "messageStartsWith": "org.json is not valid JSON ("
+      }
+    },
+    {
+      "name": "unreadable-not-an-object",
+      "why": "The file is JSON but not an object.",
+      "orgText": "[]",
+      "expect": {
+        "status": "invalid",
+        "kind": "unreadable",
+        "message": "org.json must be a JSON object at the top level."
+      }
+    },
+    {
+      "name": "no-trees-absent",
+      "why": "No trees key.",
+      "org": {
+        "activeTree": "a"
+      },
+      "expect": {
+        "status": "invalid",
+        "kind": "no-trees",
+        "message": "org.json has no trees: 'trees' must be an array with at least one tree."
+      }
+    },
+    {
+      "name": "no-trees-empty",
+      "why": "An empty trees array.",
+      "org": {
+        "trees": []
+      },
+      "expect": {
+        "status": "invalid",
+        "kind": "no-trees",
+        "message": "org.json has no trees: 'trees' must be an array with at least one tree."
+      }
+    },
+    {
+      "name": "no-trees-not-an-array",
+      "why": "trees is an object.",
+      "org": {
+        "trees": {
+          "id": "a"
+        }
+      },
+      "expect": {
+        "status": "invalid",
+        "kind": "no-trees",
+        "message": "org.json has no trees: 'trees' must be an array with at least one tree."
+      }
+    },
+    {
+      "name": "missing-tree-id",
+      "why": "The second tree has no id.",
+      "org": {
+        "trees": [
+          {
+            "id": "a",
+            "positions": []
+          },
+          {
+            "name": "b"
+          }
+        ]
+      },
+      "expect": {
+        "status": "invalid",
+        "kind": "missing-id",
+        "message": "Tree 2 has no id."
+      }
+    },
+    {
+      "name": "missing-position-id",
+      "why": "The third position has no id.",
+      "org": {
+        "trees": [
+          {
+            "id": "a",
+            "positions": [
+              {
+                "id": "x"
+              },
+              {
+                "id": "y",
+                "reportsTo": "x"
+              },
+              {
+                "title": "No id"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": "invalid",
+        "kind": "missing-id",
+        "message": "Position 3 of tree 'a' has no id."
+      }
+    },
+    {
+      "name": "missing-seat-id",
+      "why": "The second seat has no id.",
+      "org": {
+        "trees": [
+          {
+            "id": "a",
+            "positions": [
+              {
+                "id": "x",
+                "seats": [
+                  {
+                    "id": "s1"
+                  },
+                  {
+                    "model": "opus"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": "invalid",
+        "kind": "missing-id",
+        "message": "Seat 2 of position 'x' in tree 'a' has no id."
+      }
+    },
+    {
+      "name": "no-active-tree",
+      "why": "Two trees and no activeTree.",
+      "org": {
+        "trees": [
+          {
+            "id": "a",
+            "positions": []
+          },
+          {
+            "id": "b",
+            "positions": []
+          }
+        ]
+      },
+      "expect": {
+        "status": "invalid",
+        "kind": "no-active-tree",
+        "message": "'activeTree' is not set and org.json has 2 trees (a, b): name the one in use."
+      }
+    },
+    {
+      "name": "unknown-active-tree",
+      "why": "activeTree names no tree.",
+      "org": {
+        "activeTree": "zzz",
+        "trees": [
+          {
+            "id": "a",
+            "positions": []
+          },
+          {
+            "id": "b",
+            "positions": []
+          }
+        ]
+      },
+      "expect": {
+        "status": "invalid",
+        "kind": "unknown-active-tree",
+        "message": "'activeTree' names 'zzz', which is not a tree. Trees: a, b."
+      }
+    },
+    {
+      "name": "active-tree-case-differs",
+      "why": "Ids are compared exactly: 'A' is not 'a'.",
+      "org": {
+        "activeTree": "A",
+        "trees": [
+          {
+            "id": "a",
+            "positions": []
+          }
+        ]
+      },
+      "expect": {
+        "status": "invalid",
+        "kind": "unknown-active-tree",
+        "message": "'activeTree' names 'A', which is not a tree. Trees: a."
+      }
+    },
+    {
+      "name": "duplicate-tree",
+      "why": "Two trees share an id.",
+      "org": {
+        "activeTree": "a",
+        "trees": [
+          {
+            "id": "a",
+            "positions": []
+          },
+          {
+            "id": "a",
+            "positions": []
+          }
+        ]
+      },
+      "expect": {
+        "status": "invalid",
+        "kind": "duplicate-tree",
+        "message": "Two trees share the id 'a'."
+      }
+    },
+    {
+      "name": "duplicate-position",
+      "why": "Two positions in one tree share an id.",
+      "org": {
+        "trees": [
+          {
+            "id": "a",
+            "positions": [
+              {
+                "id": "x"
+              },
+              {
+                "id": "x",
+                "reportsTo": "x"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": "invalid",
+        "kind": "duplicate-position",
+        "message": "Two positions in tree 'a' share the id 'x'."
+      }
+    },
+    {
+      "name": "duplicate-seat",
+      "why": "Two seats in one position share an id.",
+      "org": {
+        "trees": [
+          {
+            "id": "a",
+            "positions": [
+              {
+                "id": "x",
+                "seats": [
+                  {
+                    "id": "s",
+                    "model": "opus"
+                  },
+                  {
+                    "id": "s",
+                    "model": "fable"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": "invalid",
+        "kind": "duplicate-seat",
+        "message": "Two seats in position 'x' of tree 'a' share the id 's'."
+      }
+    },
+    {
+      "name": "unknown-reports-to",
+      "why": "A reportsTo names no position in the tree (one that is only in another tree does not count).",
+      "org": {
+        "activeTree": "a",
+        "trees": [
+          {
+            "id": "a",
+            "positions": [
+              {
+                "id": "x"
+              },
+              {
+                "id": "y",
+                "reportsTo": "elsewhere"
+              }
+            ]
+          },
+          {
+            "id": "b",
+            "positions": [
+              {
+                "id": "elsewhere"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": "invalid",
+        "kind": "unknown-reports-to",
+        "message": "Position 'y' in tree 'a' reports to 'elsewhere', which is not a position in that tree."
+      }
+    },
+    {
+      "name": "cycle",
+      "why": "Positions report to each other in a loop, with a root beside them; a tail that leads into the loop is not part of it, and the loop is named from the position where the walk up from the first affected position closes it.",
+      "org": {
+        "trees": [
+          {
+            "id": "a",
+            "positions": [
+              {
+                "id": "root"
+              },
+              {
+                "id": "tail",
+                "reportsTo": "p"
+              },
+              {
+                "id": "p",
+                "reportsTo": "r"
+              },
+              {
+                "id": "q",
+                "reportsTo": "p"
+              },
+              {
+                "id": "r",
+                "reportsTo": "q"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": "invalid",
+        "kind": "cycle",
+        "message": "Positions in tree 'a' report to each other in a loop: p -> r -> q -> p."
+      }
+    },
+    {
+      "name": "cycle-of-one",
+      "why": "A position reports to itself.",
+      "org": {
+        "trees": [
+          {
+            "id": "a",
+            "positions": [
+              {
+                "id": "root"
+              },
+              {
+                "id": "x",
+                "reportsTo": "x"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": "invalid",
+        "kind": "cycle",
+        "message": "Positions in tree 'a' report to each other in a loop: x -> x."
+      }
+    },
+    {
+      "name": "cycle-and-no-root",
+      "why": "Every position reports to another: the loop is said first, not the missing root.",
+      "org": {
+        "trees": [
+          {
+            "id": "a",
+            "positions": [
+              {
+                "id": "x",
+                "reportsTo": "y"
+              },
+              {
+                "id": "y",
+                "reportsTo": "x"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": "invalid",
+        "kind": "cycle",
+        "message": "Positions in tree 'a' report to each other in a loop: x -> y -> x."
+      }
+    },
+    {
+      "name": "several-roots",
+      "why": "Two positions report to nobody.",
+      "org": {
+        "trees": [
+          {
+            "id": "a",
+            "positions": [
+              {
+                "id": "x"
+              },
+              {
+                "id": "y"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": "invalid",
+        "kind": "several-roots",
+        "message": "Tree 'a' has 2 roots (x, y): exactly one position reports to nobody."
+      }
+    },
+    {
+      "name": "no-root",
+      "why": "A tree with no positions has no root.",
+      "org": {
+        "trees": [
+          {
+            "id": "a",
+            "positions": []
+          }
+        ]
+      },
+      "expect": {
+        "status": "invalid",
+        "kind": "no-root",
+        "message": "Tree 'a' has no root: exactly one position reports to nobody."
+      }
+    },
+    {
+      "name": "unknown-prompt",
+      "why": "A position names a prompt that is not a file in the agentic folder.",
+      "org": {
+        "trees": [
+          {
+            "id": "a",
+            "positions": [
+              {
+                "id": "x",
+                "prompt": "here.prompt.md"
+              },
+              {
+                "id": "y",
+                "reportsTo": "x",
+                "prompt": "missing.prompt.md"
+              }
+            ]
+          }
+        ]
+      },
+      "prompts": [
+        "here.prompt.md"
+      ],
+      "expect": {
+        "status": "invalid",
+        "kind": "unknown-prompt",
+        "message": "Position 'y' in tree 'a' names the prompt 'missing.prompt.md', which is not a file in the hub's agentic/ folder."
+      }
+    },
+    {
+      "name": "prompt-with-a-path",
+      "why": "A prompt is a file NAME in the agentic folder, never a path out of it.",
+      "org": {
+        "trees": [
+          {
+            "id": "a",
+            "positions": [
+              {
+                "id": "x",
+                "prompt": "../hub.json"
+              }
+            ]
+          }
+        ]
+      },
+      "hubJson": {},
+      "expect": {
+        "status": "invalid",
+        "kind": "unknown-prompt",
+        "message": "Position 'x' in tree 'a' names the prompt '../hub.json', which is not a file in the hub's agentic/ folder."
+      }
+    },
+    {
+      "name": "prompt-is-a-folder",
+      "why": "A folder of that name is not a prompt file.",
+      "org": {
+        "trees": [
+          {
+            "id": "a",
+            "positions": [
+              {
+                "id": "x",
+                "prompt": "a-folder"
+              }
+            ]
+          }
+        ]
+      },
+      "promptFolders": [
+        "a-folder"
+      ],
+      "expect": {
+        "status": "invalid",
+        "kind": "unknown-prompt",
+        "message": "Position 'x' in tree 'a' names the prompt 'a-folder', which is not a file in the hub's agentic/ folder."
+      }
+    },
+    {
+      "name": "a-broken-second-tree",
+      "why": "Every tree is checked, not only the one in use: a second tree with two roots refuses the file.",
+      "org": {
+        "activeTree": "a",
+        "trees": [
+          {
+            "id": "a",
+            "positions": [
+              {
+                "id": "x"
+              }
+            ]
+          },
+          {
+            "id": "b",
+            "positions": [
+              {
+                "id": "x"
+              },
+              {
+                "id": "y"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": "invalid",
+        "kind": "several-roots",
+        "message": "Tree 'b' has 2 roots (x, y): exactly one position reports to nobody."
+      }
+    },
+    {
+      "name": "unknown-tree",
+      "why": "Asking for a tree the file does not have.",
+      "org": {
+        "trees": [
+          {
+            "id": "a",
+            "positions": [
+              {
+                "id": "x"
+              }
+            ]
+          }
+        ]
+      },
+      "tree": "nope",
+      "expect": {
+        "status": "invalid",
+        "kind": "unknown-tree",
+        "message": "-Tree names 'nope', which is not a tree in org.json. Trees: a."
+      }
+    }
+  ]
+}

@@ -80,87 +80,9 @@ if ($Help) {
 }
 
 # -- Config ---------------------------------------------------------------------
-# Read straight from the two JSON files rather than through the module: this
-# script must work when it is invoked directly, and the recipients registry is
-# not part of the config object the module exports.
-function Read-CommunicationConfig {
-    param([string]$Root)
-
-    $defaults = $null
-    $local = $null
-    $defaultPath = Join-Path $Root 'config.default.json'
-    $localPath = Join-Path $Root 'config.local.json'
-    # The container's keys in both spellings (ConvertTo-P20SpaceKeys, stage 2).
-    . (Join-Path $PSScriptRoot 'Resolve-HubConfig.ps1')
-    if (Test-Path -LiteralPath $defaultPath) { $defaults = ConvertTo-P20SpaceKeys (Get-Content -LiteralPath $defaultPath -Raw -Encoding UTF8 | ConvertFrom-Json) }
-    if (-not (Get-Command Read-P20LocalConfigJson -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Write-ConfigParseWarning.ps1') }
-    $local = ConvertTo-P20SpaceKeys (Read-P20LocalConfigJson -Path $localPath)
-
-    # The manager recipient is NOT an org concern -- it does not change when the
-    # active org changes -- so it lives in a top-level managerWorkflow block.
-    # Every other recipient is the org's. Both are merged here, org last.
-    $recipients = @{}
-    foreach ($source in @($defaults, $local)) {
-        if (-not $source) { continue }
-        $mw = $source.managerWorkflow
-        if ($mw -and $mw.communication -and $mw.communication.recipients) {
-            foreach ($prop in $mw.communication.recipients.PSObject.Properties) {
-                $recipients[$prop.Name] = $prop.Value
-            }
-        }
-    }
-
-    $activeSlug = ''
-    if ($defaults -and $defaults.activeSpace) { $activeSlug = $defaults.activeSpace }
-    if ($local -and $local.activeSpace) { $activeSlug = $local.activeSpace }
-
-    # The active org's recipients, in the documented order: the shipped orgs,
-    # then the hub's own (hub.json), then this machine's spaces.<slug> patch. This
-    # read the shipped array alone, and a real org is always
-    # hub-declared, so gate 2 found nothing to check and the engine's `skipped`
-    # came back as a throw.
-    # Resolve-HubConfig.ps1 is the one reader of
-    # hub.json; nothing here parses it.
-    $orgRecipients = @{}
-    $takeRecipients = {
-        param($Org)
-        if ($Org -and $Org.communication -and $Org.communication.recipients) {
-            foreach ($prop in $Org.communication.recipients.PSObject.Properties) {
-                $orgRecipients[$prop.Name] = $prop.Value
-            }
-        }
-    }
-    if ($defaults -and $defaults.spaces) {
-        foreach ($o in @($defaults.spaces)) { if ($o.slug -eq $activeSlug) { & $takeRecipients $o } }
-    }
-    $hubResolver = Join-Path (Join-Path $Root 'Scripts') 'Resolve-HubConfig.ps1'
-    if (Test-Path -LiteralPath $hubResolver) {
-        . $hubResolver
-        $hubRoot = Get-P20PromptsRoot -PackageRoot $Root
-        $manifest = Read-P20HubManifest -Root $hubRoot -WarningAction SilentlyContinue
-        # A renamed Space's old slug -- a nameless hub.json patch, an activeSpace --
-        # is the new one.
-        $manifest.Spaces = @(Rename-P20LegacyHubSpaces -Spaces @($manifest.Spaces) -ShippedSlugs @(@($defaults.spaces) | Where-Object { $_ } | ForEach-Object { [string]$_.slug }))
-        $renamedTo = Resolve-P20RenamedSlug -Slug ([string]$activeSlug) -Slugs @(@($defaults.spaces) + @($manifest.Spaces) | Where-Object { $_ } | ForEach-Object { [string]$_.slug })
-        if ($renamedTo -ne $activeSlug) {
-            $activeSlug = $renamedTo
-            if ($defaults -and $defaults.spaces) { foreach ($o in @($defaults.spaces)) { if ($o.slug -eq $activeSlug) { & $takeRecipients $o } } }
-        }
-        foreach ($o in @($manifest.Spaces)) { if ($o.slug -eq $activeSlug) { & $takeRecipients $o } }
-    }
-    if ($local -and $local.spaces -and ($local.spaces -isnot [array]) -and $activeSlug) {
-        $patch = $local.spaces.PSObject.Properties[$activeSlug]
-        if ($patch) { & $takeRecipients $patch.Value }
-    }
-    foreach ($k in $orgRecipients.Keys) { $recipients[$k] = $orgRecipients[$k] }
-
-    $port = 4100
-    foreach ($source in @($defaults, $local)) {
-        if ($source -and $source.web -and $source.web.agentPort) { $port = [int]$source.web.agentPort }
-    }
-
-    return @{ Recipients = $recipients; AgentPort = $port }
-}
+# The recipients registry and the agent port: one reader, shared with the Teams
+# delivery row Env prints (Scripts/Read-CommunicationConfig.ps1).
+. (Join-Path $PSScriptRoot 'Read-CommunicationConfig.ps1')
 
 # recipient key -> TEAMS_WEBHOOK_{KEY}, the convention the engine uses when a
 # recipient entry does not name its variable explicitly.
@@ -180,14 +102,15 @@ if ([string]::IsNullOrWhiteSpace($Recipient) -or [string]::IsNullOrWhiteSpace($M
     throw "Recipient and Message are both required (usage: $(Get-CliPrefix)SendTeams <recipient> <message>)."
 }
 
-$commsConfig = Read-CommunicationConfig -Root $repoRoot
+$commsConfig = Read-P20CommunicationConfig -Root $repoRoot
 
 # -- Gate 2: the recipient's webhook environment variable ------------------------
-# Checked before the POST so the answer is immediate and names the fix. A
+# Checked before the POST so the answer is immediate and names the fix -- for
+# every type that posts through a webhook, a channel and a chat alike. A
 # recipient this config does not know is left to the engine, which has the whole
 # registry and a better message for it.
 $entry = $commsConfig.Recipients[$Recipient]
-if ($entry -and $entry.type -eq 'channel') {
+if ($entry -and (@($script:SendConsts.communication.webhookRecipientTypes) -ccontains [string]$entry.type)) {
     $envName = $entry.webhookEnv
     if (-not $envName) { $envName = Get-WebhookEnvName -Key $Recipient }
     $url = [Environment]::GetEnvironmentVariable($envName)

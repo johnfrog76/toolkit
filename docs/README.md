@@ -9,7 +9,7 @@ the same commit (`AGENTS.md`, "Documentation is part of the change").
 | [`QUICKSTART.md`](QUICKSTART.md) | Requirements, install, the first run (`tkStart`: the sample hub, the five tutorial cards, the tour banner), a first card, the web UI up |
 | [`CONFIGURATION.md`](CONFIGURATION.md) | `tkConfig`, the three config files, `consts.json`, the hub's `hub.json` |
 | [`CLI.md`](CLI.md) | The prefix, the workflow and its state, the command reference, tiers, errors, the log, AI review, the agentic workflows |
-| [`TESTING.md`](TESTING.md) | The four runners, the suites and their counts, and the counts line a full run prints |
+| [`TESTING.md`](TESTING.md) | The four runners, the suites, and the counts line a full run prints; the counts themselves, as of the last release, are [`TEST-COUNTS.md`](TEST-COUNTS.md) |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | How the three halves fit, the agent and the web UI in overview, and the repo layout; the detail is `agent/README.md` and `web/README.md` |
 | [`KNOWN-GAPS.md`](KNOWN-GAPS.md) | The known gaps: what the product does not do, what you see if you try, where you meet it, and the issue that carries each |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | **The contributor's first page**: set up the three halves, run the suites, the refusal contract, the documentation rule, how a pull request is reviewed, and the rules a change meets |

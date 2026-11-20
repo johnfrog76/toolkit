@@ -108,7 +108,8 @@ component import creeps back in. The smoke test's off mode asserts that no modul
 happened when you switch org, and a 1:1 history spans engagements, so a module that flickered as
 you moved between an active engagement and an archived one would be wrong. The exceptions are the
 Space-scoped switches, which describe one Space: `sprintAwareness`, the ADO core's own flag for
-one org's board, and `suggestions`, both read from `spaces[].features`. The
+one org's board, and `suggestions`, both read from `spaces[].features`; and `spaces[].howIWork`, the
+Space's answer to how you work there, which turns Team Agile on or off in that Space. The
 rule, and where each half reads it, is
 [Flags have a scope](../ARCHITECTURE.md#the-shell-owns-the-chrome-a-module-owns-the-rest) in [the web UI overview](../ARCHITECTURE.md#the-web-ui);
 `Tests/test_features.py` pins it.
@@ -144,7 +145,7 @@ generated work reviews, and the resume.
 Its three folders are **hub-root siblings** of the per-org folders, not children of one, for the
 same reason the flag is the engineer's -- resolved through the same `PROMPTS_ROOT`-first rule every
 module follows (`Get-P20PromptsRoot` / `hub_root()`). The one thing it writes that **is**
-org-scoped is `LogPeerReview`'s output, in the active Space's `pr-comments/`. Its nine routes are all
+org-scoped is `LogPeerReview`'s output, in the active Space's `pr-comments/`. Its routes are all
 Tier 2 or lower and all 404 with the flag off; two of them (`GET /api/reviews/{folder}`,
 `GET /api/review-preview`) are read by `ReviewPage`, which **stays an ADO card** (decision D-RP
 (a)) rather than moving here. [`docs/modules/growth.md`](growth.md) has the routes table, the pages,
@@ -160,7 +161,7 @@ tests. The module decides where it surfaces and what gates it.
 | --- | --- |
 | Flag | `features.communication` -- top-level, engineer-scoped |
 | Verbs | `SendTeams`, `NewMeeting`, `MeetingAgenda`. Each answers `-Help`; flags are in [the command reference](../CLI.md#the-opt-in-modules-verbs) |
-| Agent | `agent/communication/` -- `manager.py` (the routes) and `comms.py` (the engine, carried whole with its 21 tests) |
+| Agent | `agent/communication/` -- `manager.py` (the routes) and `comms.py` (the engine, carried whole with its tests) |
 | Web UI | `web/src/modules/communication/index.tsx`, export `communicationModule` |
 | Hub folder | `manager/current/` and `manager/archive/`, a hub-root sibling -- [`docs/hub/manager.md`](../hub/manager.md) is the session-file contract |
 | Everything else | [`docs/modules/communication.md`](communication.md) |
@@ -189,8 +190,8 @@ Where the things a person keeps in order live; reminders is its first surface. B
 | --- | --- |
 | Flag | `features.organize` -- top-level, engineer-scoped |
 | Verbs | `NewReminder`, `Reminders` (`-Snooze`, `-Due`, `-NoDue`, `-Title`, `-Source`, `-Ref`, `-Archive`, `-All`). Each answers `-Help`; flags are in [the command reference](../CLI.md#the-opt-in-modules-verbs) |
-| Agent | `agent/organize/` -- `reminders.py`, one gated router, `GET /api/reminders`, **reads only** |
-| Web UI | `web/src/modules/organize/index.tsx`, export `organizeModule` -- the `Organize` tab at `/organize`: the Meetings card through the `organize` slot when communication is on, then the Reminders card |
+| Agent | `agent/organize/` -- `reminders.py` and `reference.py`, one gated router, `GET /api/reminders`, `GET /api/reference` and `GET /api/reference/{name}`, **reads only** |
+| Web UI | `web/src/modules/organize/index.tsx`, export `organizeModule` -- the `Organize` tab at `/organize`, under in-page tabs **Reminders** (the Meetings card through the `organize` slot when communication is on, then the Reminders card) and **Reference** (`/organize/reference`, the hub's reference documents) |
 | Hub folder | `reminders/current/` and `reminders/archive/`, a hub-root sibling -- [`docs/hub/reminders.md`](../hub/reminders.md) is the file contract |
 | Everything else | [`docs/modules/organize.md`](organize.md) |
 
@@ -227,10 +228,10 @@ no file of its own in the hub.
 | | |
 | --- | --- |
 | Flag | `features.solitaireAgile` -- top-level, engineer-scoped; on only where the Space you are in answers `agents` to "How do you want to work in \<Space>?" (`spaces[].howIWork` -- asked on a GitHub Space, derived elsewhere) |
-| Verbs | `Standup` (`-Space`, `-AsJson`); `Triage` (`-Space`, `-AsJson`), the open issues by milestone; `Route` (`-Size`, `-Assign`, `-Milestone`, `-Severity`, `-DeepWater`, `-Space`, `-WhatIf`), the module's one write -- labels, an assignee and a milestone on the tracker, or a card's `**Assigned:**` line; `StartWork <id>` (`-Clip`, `-Prompt`, `-Space`, `-Launch`, `-WhatIf`), the hand-off block a cold agent starts from, writing nothing -- or, with `-Launch`, handed to a session in a new worktree of the Space's repository. Each answers `-Help`; flags are in [the command reference](../CLI.md#the-opt-in-modules-verbs) |
+| Verbs | `Standup` (`-Space`, `-AsJson`); `Triage` (`-Space`, `-AsJson`), the open issues by milestone; `Route` (`-Size`, `-Assign`, `-Milestone`, `-Severity`, `-DeepWater`, `-Space`, `-WhatIf`), the module's one write -- labels, an assignee and a milestone on the tracker, or a card's `**Assigned:**` line; `StartWork <id>` (`-Clip`, `-Prompt`, `-Space`, `-Launch`, `-WhatIf`), the hand-off block a cold agent starts from, writing nothing -- or, with `-Launch`, handed to a session in a new worktree of the Space's repository. Each answers `-Help`; flags are in [the command reference](../CLI.md#the-opt-in-modules-verbs); `OrgChart` (`-Tree`, `-AsJson`), the org's tree from the hub's `org.json` ([the file](../hub/org.md)), a read that writes nothing and is absent wherever Team Agile is off |
 | Agent | `agent/solitaire/` -- `standup.py`, `triage.py` and `milestones.py`, one gated router, `GET /api/ritual/standup`, `GET /api/ritual/triage` and `GET /api/ritual/milestones`, **reads only**; `Route` runs through the bridge |
 | Web UI | `web/src/modules/solitaireAgile/` -- the Team Agile tab, after the Studio's and before the Lounge's: the standup's text, its issue numbers linked; each list row's **Start work** opens the hand-off block in a copy box, through `POST /api/cmd/StartWork` |
-| Data | `Config/ceremonies.json` and `Config/standup-vocabulary.json`, read by both halves; `consts.json` `rituals` |
+| Data | `Config/ceremonies.json` and `Config/standup-vocabulary.json`, read by both halves; `consts.json` `rituals`; the hub's `org.json` (name: `consts.json` `org.file`) |
 | Everything else | [`docs/modules/solitaire-agile.md`](solitaire-agile.md) |
 
 The worker is the tracker's own label -- its description says `Routed to <Name> -- ...` -- never a list in

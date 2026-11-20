@@ -25,12 +25,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _skipguard import skip_module
+from _tracker_cli import unreachable
 
 try:
     from fastapi.testclient import TestClient
 
     from agent.core import config
-    from agent.core.consts import stamp_assigned, stamp_billable, stamp_milestone
+    from agent.core.consts import stamp_agent, stamp_assigned, stamp_billable, stamp_milestone
 except Exception as exc:  # pragma: no cover - a machine without the agent's deps
     skip_module(f"the agent's dependencies are not installed: {exc}")
 
@@ -91,7 +92,8 @@ class TheRouteServesTheModel(unittest.TestCase):
                     link="(not linked)",
                 ).replace(
                     "**Created:**",
-                    f"{stamp_billable()} no\n{stamp_assigned()} me\n{stamp_milestone()} v0.3 -- Share\n**Created:**",
+                    f"{stamp_billable()} no\n{stamp_assigned()} me\n{stamp_agent()} claude-sonnet-5-5\n"
+                    f"{stamp_milestone()} v0.3 -- Share\n**Created:**",
                 ),
                 "notes-from-tuesday.prompt.md": "# Notes from Tuesday\n\nNot a card.\n",
                 # A GitHub-born card in the same (local) Space: the mingling the tracker badge is for.
@@ -217,6 +219,16 @@ class TheRouteServesTheModel(unittest.TestCase):
         detail = self.client.get("/api/status/TaskW3X7-bench-reading.prompt.md").json()
         self.assertEqual(detail["assigned"], "me")
 
+    def test_the_card_model_says_who_worked_it(self):
+        """The **Agent:** line beside Assigned, read as `agent` -- the model id as
+        written; a card with no line, worked by a person alone, is ""."""
+        cards = self._by_file()
+        self.assertEqual(cards["TaskW3X7-bench-reading.prompt.md"]["agent"], "claude-sonnet-5-5")
+        self.assertEqual(cards["Spike-K7M2-wallet-ticket.prompt.md"]["agent"], "")
+        self.assertEqual(cards["141-recipe-search.prompt.md"]["agent"], "")
+        detail = self.client.get("/api/status/TaskW3X7-bench-reading.prompt.md").json()
+        self.assertEqual((detail["assigned"], detail["agent"]), ("me", "claude-sonnet-5-5"))
+
     def test_the_card_model_serves_the_milestone_whole_and_the_tags(self):
         """The two planning lines and the tags (docs/hub/cards.md, "Milestone and sprint:
         two lines"): a card's own **Milestone:** line is its milestone, and a card with
@@ -280,6 +292,7 @@ class TheRouteServesTheModel(unittest.TestCase):
         )
         self.assertTrue(path.is_file())
 
+    @unreachable("az")
     def test_env_serves_the_lanes_names_for_the_org(self):
         """Org-scoped display names, keyed by the CONTRACT's words; an org that
         says nothing is called by those words, so an ADO user sees no change.
@@ -316,6 +329,7 @@ class TheRouteServesTheModel(unittest.TestCase):
         body = self.client.get("/api/env").json()
         self.assertEqual(body["config"]["laneNames"]["Code Review"], "Code Review")
 
+    @unreachable("az")
     def test_env_says_whether_the_first_run_banner_is_on(self):
         """firstRun.welcome: off unless this machine said so -- tkStart does, and
         the banner's Start the tour or Dismiss turns it off (Local Example, item 5)."""
@@ -325,6 +339,7 @@ class TheRouteServesTheModel(unittest.TestCase):
         local.write_text(json.dumps({**patch, "firstRun": {"welcome": True}}), encoding="utf-8")
         self.assertIs(self.client.get("/api/env").json()["config"]["firstRunWelcome"], True)
 
+    @unreachable("az")
     def test_env_carries_the_decks_put_away_on_this_machine(self):
         """deck.archived: the decks this machine has put away, by id (docs/modules/deck.md,
         "A deck's page"). None unless this machine said so; a list of ids is served in
@@ -341,6 +356,7 @@ class TheRouteServesTheModel(unittest.TestCase):
             local.write_text(json.dumps({**patch, "deck": {"archived": written}}), encoding="utf-8")
             self.assertEqual(self.client.get("/api/env").json()["config"]["deckArchived"], served, written)
 
+    @unreachable("az")
     def test_env_carries_the_wip_limit_and_only_a_real_one(self):
         """limits.inPlay: unset is null (no line, the opt-in rule); a whole number of 1
         or more is served as is; zero, negative, text and a bool are no limit. A line
@@ -364,6 +380,7 @@ class TheRouteServesTheModel(unittest.TestCase):
             with self.subTest(stored=stored):
                 self.assertEqual(self.client.get("/api/env").json()["config"]["inPlayLimit"], served)
 
+    @unreachable("az")
     def test_env_tells_the_web_which_card_types_exist(self):
         """What the "New card" dialog offers: config's types, in config's order,
         a team's own included, the comment key not."""
@@ -516,3 +533,82 @@ class TheAgentNamesTheBillingFolder(unittest.TestCase):
             {},
         )
         self.assertEqual((resolved, passed), ("", "."))
+
+
+class TheBillingRouteTakesAWindow(unittest.TestCase):
+    """``GET /billing`` takes ``since`` and ``until`` as well as ``week``, and passes
+    them to the script as ``-Since`` and ``-Until``. Half a window, or a value that
+    is not a yyyy-MM-dd day, is refused before any PowerShell starts, in the
+    script's own words (consts.json billing.text)."""
+
+    def _ask(self, **query) -> tuple[list[list[str]], object]:
+        from agent.ado import reporting
+
+        with tempfile.TemporaryDirectory() as cfg_dir, tempfile.TemporaryDirectory() as hub:
+            base = Path(cfg_dir)
+            (base / "config.default.json").write_text(
+                json.dumps({"activeSpace": "t", "spaces": [{"slug": "t", "status": "local", "promptsFolder": "t"}]}),
+                encoding="utf-8",
+            )
+            (base / "config.local.json").write_text("{}", encoding="utf-8")
+            seen: list[list[str]] = []
+
+            def fake_run(args, **_kwargs):
+                seen.append(list(args))
+                return subprocess.CompletedProcess(
+                    args, 0, stdout='{"days": [], "raw": "No activity found."}', stderr=""
+                )
+
+            with (
+                mock.patch.object(config, "DEFAULT_CONFIG_PATH", base / "config.default.json"),
+                mock.patch.object(config, "LOCAL_CONFIG_PATH", base / "config.local.json"),
+                mock.patch.dict(os.environ, {"PROMPTS_ROOT": hub}, clear=False),
+                mock.patch.object(reporting, "host_argv", lambda script, *a: ["pwsh", "-File", script, *a]),
+                mock.patch.object(reporting.subprocess, "run", fake_run),
+            ):
+                answer = asyncio.run(reporting.get_billing(**query))
+        return seen, answer
+
+    def test_a_window_reaches_the_argv_as_since_and_until(self):
+        seen, answer = self._ask(since="2026-01-05", until="2026-01-09")
+        self.assertEqual(answer.error, "")
+        argv = seen[0]
+        self.assertEqual(argv[argv.index("-Since") + 1], "2026-01-05")
+        self.assertEqual(argv[argv.index("-Until") + 1], "2026-01-09")
+        self.assertNotIn("-LastWeek", argv)
+
+    def test_a_window_wins_over_week(self):
+        seen, _ = self._ask(week="last", since="2026-01-05", until="2026-01-09")
+        self.assertIn("-Since", seen[0])
+        self.assertNotIn("-LastWeek", seen[0])
+
+    def test_week_last_is_unchanged(self):
+        seen, answer = self._ask(week="last")
+        self.assertEqual(answer.error, "")
+        self.assertIn("-LastWeek", seen[0])
+        self.assertNotIn("-Since", seen[0])
+        seen, _ = self._ask()
+        self.assertFalse({"-LastWeek", "-Since", "-Until"} & set(seen[0]))
+
+    def test_half_a_window_is_refused_in_the_scripts_words_and_starts_nothing(self):
+        from agent.core.consts import billing_text
+
+        for query in ({"since": "2026-01-05"}, {"until": "2026-01-09"}):
+            with self.subTest(query=query):
+                seen, answer = self._ask(**query)
+                self.assertEqual(seen, [], "no PowerShell is started for a window the script would refuse")
+                self.assertEqual(answer.error, billing_text()["halfWindow"])
+                self.assertEqual(answer.days, [])
+
+    def test_a_value_that_is_not_a_day_is_refused_and_starts_nothing(self):
+        from agent.core.consts import billing_text
+
+        for since in ("2026-13-01", "-LastWeek", "1/5/2026", "2026-1-5", "2026-02-30"):
+            with self.subTest(since=since):
+                seen, answer = self._ask(since=since, until="2026-01-09")
+                self.assertEqual(seen, [])
+                expected = billing_text()["notADay"].replace("{name}", "-Since").replace("{value}", since)
+                self.assertEqual(answer.error, expected)
+        seen, answer = self._ask(since="2026-01-05", until="soon")
+        self.assertEqual(seen, [])
+        self.assertIn("-Until 'soon'", answer.error)

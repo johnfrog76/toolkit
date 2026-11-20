@@ -5,7 +5,8 @@ fails fails the whole read, and a reader that raised is a tracker that did not
 answer. The ceremonies differ only in which issues they ask for.
 
 One read per repo per ``READ_TTL_SECONDS`` (toolkit card QP33). Each gh answer --
-a repo's labels, a repo's issues in a state, the signed-in login -- is kept in
+a repo's labels, a repo's issues in a state, the signed-in login, the standup's
+dates read (``dates``) -- is kept in
 memory for the design list's TTL, so the Triage page opened after the standup,
 or the standup re-mounted after attending, pays no subprocess. Triage's open
 issues are served from the standup's all-states read while it is fresh and
@@ -26,17 +27,50 @@ from collections.abc import Callable
 
 from ..ado import accounting
 from ..ado.design import LIST_TTL_SECONDS
+from ..core.child import ChildReadError
 from ..core.config import ISSUE_LIMIT_ALL, ISSUE_LIMIT_OPEN, tracker, tracker_repos
+from ..core.consts import rituals_text
 from ..core.tier import _resolve_tier
 
-NO_REPO_REASON = "This GitHub space names no repository."
+
+def tracker_reason(key: str, **values: object) -> str:
+    """Why the tracker was not read, as the one sentence the Tracker line
+    carries: consts.json rituals.text.<key>, each {name} filled from ``values``.
+    The CLI words the same reasons from the same keys (Scripts/Ritual-Common.ps1,
+    Format-P20TrackerReason); Tests/fixtures/rituals/tracker-reasons.json holds
+    both halves to one table."""
+    text = rituals_text()[key]
+    for name, value in values.items():
+        text = text.replace("{" + name + "}", str(value))
+    return text
+
+
+def gh_reason(failure: accounting.GhFailure) -> str:
+    """A failed gh list read, as the Tracker line's sentence."""
+    repo = failure.repo
+    if failure.kind == "missing":
+        return tracker_reason("trackerGhMissing")
+    if failure.kind == "raised":
+        exc = failure.exc
+        error = str(exc) if isinstance(exc, ChildReadError) else exc.__class__.__name__
+        return tracker_reason("trackerGhNoAnswer", repo=repo, error=error)
+    if failure.kind == "exit":
+        if not failure.line:
+            return tracker_reason("trackerGhSilent", repo=repo)
+        if accounting.repo_missing(failure.line):
+            return tracker_reason("trackerRepoUnreadable", repo=repo)
+        return tracker_reason("trackerGhNoAnswer", repo=repo, error=failure.line)
+    return tracker_reason("trackerNotJson", repo=repo)
+
 
 # How long one gh answer is served again: the design list's TTL.
 READ_TTL_SECONDS = LIST_TTL_SECONDS
 _OPEN = "OPEN"
 
 # key -> (when, the answer). A key is ("labels", repo), ("issues", repo, state,
-# body), ("milestones", repo) -- the Milestones tab's read (milestones.py) -- or ("viewer",).
+# body), ("milestones", repo) -- the Releases tab's read (milestones.py) --
+# ("dates", repo, hashes, numbers) -- the standup's commit dates and issue
+# timelines (``dates``) -- or ("viewer",).
 _reads: dict[tuple, tuple[float, object]] = {}
 
 
@@ -66,7 +100,7 @@ def remember(key: tuple, refresh: bool, read: Callable[[], tuple[object, str | N
 
 
 def labels(repo: str, refresh: bool = False) -> tuple[list[dict], str | None]:
-    rows, why = remember(("labels", repo), refresh, lambda: accounting._gh_labels(repo))
+    rows, why = remember(("labels", repo), refresh, lambda: accounting._gh_labels(repo, say=gh_reason))
     return copy.deepcopy(rows), why  # a copy: a caller never edits what is kept
 
 
@@ -91,9 +125,83 @@ def issues(repo: str, state: str, body: bool = False, refresh: bool = False) -> 
         if derived is not None and _fresh(("issues", repo, state, body)) is None:
             return copy.deepcopy(derived), None
     rows, why = remember(
-        ("issues", repo, state, body), refresh, lambda: accounting._gh_issues(repo, True, state, body=body)
+        ("issues", repo, state, body),
+        refresh,
+        lambda: accounting._gh_issues(repo, True, state, body=body, say=gh_reason),
     )
     return copy.deepcopy(rows), why
+
+
+def _dates_chunk(
+    repo: str, hashes: list[str], numbers: list[int], trailers: list[str] | None = None
+) -> tuple[object, str | None]:
+    """One GraphQL call for one chunk: (the ``repository`` object, None), or
+    (None, why). An alias GitHub could not resolve is null in the answer, not a
+    failure of the call."""
+    from ..ado import repo_read
+    from .standup import dates_query
+
+    owner, _, name = repo.partition("/")
+    data, _errors, why = repo_read.graphql_aliases(
+        dates_query(hashes, numbers, trailers), ["-f", f"owner={owner}", "-f", f"name={name}"]
+    )
+    if why:
+        return None, why
+    return (data or {}).get("repository") or {}, None
+
+
+def dates(
+    repos: list[str],
+    hashes: list[str],
+    numbers_by_repo: dict[str, list[int]],
+    worker_labels: list[str],
+    refresh: bool = False,
+    trailers: list[str] | None = None,
+) -> tuple[dict | None, dict | None, dict | None, str | None]:
+    """The standup's dates read: (hash -> authored instant or None, issue number
+    -> its start, short hash -> commit message, None), or (None, None, None, why)
+    when any call failed -- the standup then counts as it did before the read
+    existed. Every hash is asked of every repo (a card does not say which one it
+    was committed to) and dated by the first that knows it; an issue is asked of
+    its own repo. ``trailers`` are the hashes whose co-author trailers the
+    standup reads (``standup.trailer_asks``): each rides the same call as a
+    ``t`` alias, which dates it too, so a hash asked for both is asked once. One
+    ``gh api graphql`` per repo per ``standup.DATES_CHUNK`` aliases, the ``t``
+    aliases counted, each kept for the TTL like every other read here. Never
+    raises."""
+    from .standup import DATES_CHUNK, dates_from_answer
+
+    wanted = list(dict.fromkeys(trailers or []))
+    commits: dict[str, str | None] = {h: None for h in hashes}
+    starts: dict[int, str] = {}
+    messages: dict[str, str] = {}
+    try:
+        for repo in repos:
+            numbers = sorted(set(numbers_by_repo.get(repo, [])))
+            asks = [("c", h) for h in hashes if h not in wanted] + [("i", n) for n in numbers]
+            asks += [("t", h) for h in wanted]
+            for at in range(0, len(asks), DATES_CHUNK):
+                chunk = asks[at : at + DATES_CHUNK]
+                ch = [v for k, v in chunk if k == "c"]
+                cn = [v for k, v in chunk if k == "i"]
+                ct = [v for k, v in chunk if k == "t"]
+                answer, why = remember(
+                    ("dates", repo, tuple(ch), tuple(cn), tuple(ct)),
+                    refresh,
+                    lambda r=repo, a=ch, b=cn, t=ct: _dates_chunk(r, a, b, t),
+                )
+                if why:
+                    return None, None, None, why
+                got_commits, got_starts, got_messages = dates_from_answer(answer, ch, cn, worker_labels, ct)
+                for h, when in got_commits.items():
+                    if when and not commits.get(h):
+                        commits[h] = when
+                starts.update(got_starts)
+                for k, v in got_messages.items():
+                    messages.setdefault(k, v)
+    except Exception as exc:  # noqa: BLE001 -- a reader that raised is a tracker that did not answer
+        return None, None, None, f"The dates read failed: {exc.__class__.__name__}: {exc}"
+    return commits, starts, messages, None
 
 
 def github_repos(
@@ -102,14 +210,13 @@ def github_repos(
     """(the Space's repos, tracker state) -- the checks every ceremony makes before
     asking gh anything: a GitHub Space, tier 1, and at least one repo. Never raises."""
     if tracker(org) != "github":
-        reason = f"This Space's tracker is not GitHub -- {ritual} reads a GitHub Space's issues."
-        return [], {"ok": False, "reason": reason}
+        return [], {"ok": False, "reason": tracker_reason("trackerNotGitHub", ritual=ritual)}
     tier, _ = _resolve_tier(org, status, refresh)
     if tier != 1:
-        return [], {"ok": False, "reason": f"The tracker is not reachable from here (tier {tier})."}
+        return [], {"ok": False, "reason": tracker_reason("trackerTier", tier=tier)}
     repos = tracker_repos(org, projects)
     if not repos:
-        return [], {"ok": False, "reason": NO_REPO_REASON}
+        return [], {"ok": False, "reason": tracker_reason("trackerNoRepo")}
     return repos, {"ok": True, "reason": ""}
 
 
@@ -147,5 +254,6 @@ def read_tracker(
                 return [], [], {"ok": False, "reason": why}
             rows_in += rows
     except Exception as exc:  # noqa: BLE001 -- a reader that raised is a tracker that did not answer
-        return [], [], {"ok": False, "reason": f"The tracker read failed: {exc.__class__.__name__}: {exc}"}
+        error = f"{exc.__class__.__name__}: {exc}"
+        return [], [], {"ok": False, "reason": tracker_reason("trackerReadFailed", error=error)}
     return list(found.values()), rows_in, {"ok": True, "reason": ""}

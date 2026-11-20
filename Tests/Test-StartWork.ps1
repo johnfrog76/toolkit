@@ -238,6 +238,8 @@ try {
     Assert-True 'nothing before the block and nothing after it' ($r.Inner.StartsWith('# Start work: Task 23A3') -and $r.Inner.EndsWith($promptText))
     Assert-True 'the shipped rows carry agentic/build.prompt.md, whole' ($r.Inner.Contains("## The prompt (agentic/build.prompt.md)`n---`n") -and $r.Inner -notmatch '## The prompt \(agentic/pr-ship')
     Assert-True 'the card''s commit bullets, PR URL: and footer travel whole' ($r.Inner.Contains('- 80e2168 Route') -and $r.Inner.Contains('PR URL: https://github.com/acme/widgets/pull/57') -and $r.Inner.Contains('**Sprint:** Phase 6: the long milestone title that is longer than twenty characters'))
+    # The hand-off asks an agent to name itself on the card (docs/hub/cards.md, "The Agent line").
+    Assert-True 'the block tells the agent to write the card''s **Agent:** line' ($r.Inner.Contains('**Agent:**'))
     Assert-True 'gh is not asked for a card' ($r.Calls.Count -eq 0) ($r.Calls -join ' / ')
     Assert-True 'and the hub is untouched' ((Get-HubSnapshot) -ceq $before)
 
@@ -401,6 +403,8 @@ exec sleep 30
         'Task-M6YD-mine.prompt.md'                  = "# Task M6YD: Mine`n`n**Assigned:** me`n"
         'Task-H4KU-a-size-with-no-model.prompt.md'  = "# Task H4KU: A size with no model`n`n**Assigned:** haiku`n"
         'Task45-sized-on-the-tracker.prompt.md'     = "# Task 45: Sized on the tracker`n"
+        # What Route <id> -Assign sonnet writes on a card: the Agent line alone.
+        'Task-R2DW-routed-to-sonnet.prompt.md'      = "# Task R2DW: Routed to sonnet`n`n**Agent:** claude-sonnet-5-5`n"
     }
     foreach ($k in $launchCards.Keys) { [System.IO.File]::WriteAllText((Join-Path $current ($k -replace '^Task-', 'Task')), $launchCards[$k], $utf8) }
     [System.IO.File]::WriteAllText((Join-Path $scratch 'issue-44.json'), '{ "number": 44, "title": "Sized opus", "state": "OPEN", "labels": [{ "name": "opus" }], "milestone": null, "body": "", "url": "https://github.com/acme/widgets/issues/44" }', $utf8)
@@ -454,6 +458,8 @@ exec sleep 30
 
     $tags = Invoke-Verb ($inClone + 'tkStartWork P9TC -Launch -WhatIf') -PathPrefix $bin
     Assert-True 'a size in the card''s Tags picks the model' ($tags.Exit -eq '0' -and $tags.Inner.Contains('Task P9TC is sized opus (its Tags): model opus.') -and $tags.Inner.Contains('--model opus')) $tags.All
+    $routed = Invoke-Verb ($inClone + 'tkStartWork R2DW -Launch -WhatIf') -PathPrefix $bin
+    Assert-True 'a card routed to sonnet (its Agent line alone) is sized sonnet and picks the model' ($routed.Exit -eq '0' -and $routed.Inner.Contains('Task R2DW is sized sonnet (its **Agent:** line): model sonnet.') -and $routed.Inner.Contains('--model sonnet')) $routed.All
     $iss = Invoke-Verb ($inClone + 'tkStartWork 44 -Launch -WhatIf') -PathPrefix $bin
     Assert-True 'an issue''s label picks the model' ($iss.Exit -eq '0' -and $iss.Inner.Contains('Issue #44 is sized opus (a label on issue #44): model opus.')) $iss.All
     $tracked = Invoke-Verb ($inClone + 'tkStartWork 45 -Launch -WhatIf') -PathPrefix $bin

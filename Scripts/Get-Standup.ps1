@@ -3,17 +3,28 @@
     Standup -- today's standup, filled from the tracker (the Solitaire Agile add-on).
 
 .DESCRIPTION
-    The Ritual Engine's first ceremony, as text (docs/modules/solitaire-agile.md, "The file shape, and how a standup is read"). The human's queue first, then one block per worker label --
+    The Ritual Engine's first ceremony, as text (docs/modules/solitaire-agile.md, "The file shape, and how a standup is read"). The human's queue first, then one block per member --
+    each worker label, each model a card in play names that no label routes to, and you --
     yesterday, today and blockers, each line a real issue with its number, or the
-    mug and one status sentence ("Nothing on the board for me...") when a worker has nothing.
+    mug and one status sentence (the vocabulary's nothing family: the day around the
+    work, never tracker work) when a worker has nothing.
 
     The rule is Scripts/Standup-Rules.ps1's, shared with the suite; this script is
     the thin layer around it: which Space, which repo, the two gh reads, and the
-    printing. Two reads, both on the Space's ONE repo (Resolve-P20TrackerRepo, the
+    printing. Three reads, all on the Space's ONE repo (Resolve-P20TrackerRepo, the
     rule every GitHub verb uses):
 
-        gh label list --repo <repo> --limit 500 --json name,description
-        gh issue list --repo <repo> --state all --limit 500 --json number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees
+        gh label list --repo <repo> --limit <n> --json name,description
+        gh issue list --repo <repo> --state all --limit <n> --json number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees
+        gh api graphql -F query=@<file> -f owner=<owner> -f name=<name>
+
+    The third is the dates read (Get-P20StandupDates): when each commit the
+    standup counts was authored, so a card counts only the commits inside the
+    window and says the ones it cannot date; and when each open issue with no
+    card was first given a worker label or assigned, so it can read started.
+    The same call reads the message of each commit a placed card with no
+    **Agent:** line names, for its co-author trailers. One call per 50
+    aliases; none when there is nothing to ask.
 
     milestone and body are the work grain's: an item groups by its
     milestone, else by the design card its body names. createdAt and
@@ -29,8 +40,11 @@
 
     The same Space's CARDS are read too (Get-P20StandupCards) and joined to the
     issues on the id by Invoke-P20StandupJoinedFill: a card whose id is an
-    issue's number adds its lane, and a Check line where the two disagree; a card
-    of its own is a row under you; a not-billable card is not a row.
+    issue's number adds its lane, and a Check line where the two disagree; a
+    not-billable card is not a row. Once a card exists the card decides who
+    reports it, never the issue's label: the member its Agent line, an older
+    card's Assigned worker or its commits' co-author trailers name, else you
+    (Resolve-P20CardAgent). An issue with no card stays with its label's worker.
 
     A Space with no tracker address, or a local or archive one, fills from its
     CARDS alone: the hub's current/ and archive/ for that Space, read by
@@ -61,9 +75,16 @@
     item with its number; work is the ritual's grain: each worker's items grouped
     by milestone, else the design card the issue names, else the titles' common
     stem, and spoken as standup prose -- one sentence a group, a grammar over
-    the groups and no model; brief is -Brief's reading, and like -Brief it is
-    a read, not attending. Anything else is a stated refusal. -AsJson carries all
-    three whatever this says.
+    the groups and no model -- the round of the room. The Space's
+    spaces.<slug>.features.teamSize (3, 6 or 9, the chair included; unset is
+    9) is the team: the seats go to the engineer, then the workers with work,
+    then the idle; workers past the size are absent, and seats still open are
+    filled by invented cast members, who report made-up status. detail and
+    brief keep every worker, and never an invented one.
+    brief is -Brief's reading, and like -Brief it is a read, not attending.
+    Anything else is a stated refusal. -AsJson carries all three whatever this
+    says, with every worker's present, each speaker's cast and the room's
+    team.size.
 .PARAMETER Remind
     HH:mm. Write the reminder to attend (D-TA15): ONE Organize reminder,
     source standup, through NewReminder -- or, when one is open, rewrite its due
@@ -146,7 +167,8 @@ if ($Help) {
     Write-Host ""
     Write-Host "  The queue waiting on you, then one block per worker label. Writes nothing"
     Write-Host "  to the tracker. -Brief prints only the chair's reading, in a few lines. -Grain work speaks"
-    Write-Host "  at the grain of the work: items grouped by milestone or feature, one sentence a group."
+    Write-Host "  at the grain of the work: items grouped by milestone or feature, one sentence a group --"
+    Write-Host "  the round of the room, as many people as spaces.<slug>.features.teamSize says, the chair counted."
     Write-Host "  Each item says what moved -- closed, started or in progress, and its card's commits -- and the"
     Write-Host "  brief opens on the counts. -Since <yyyy-MM-dd> widens yesterday back to that day."
     Write-Host "  -Remind sets an Organize reminder to attend (features.organize);"
@@ -212,6 +234,15 @@ if ($PSBoundParameters.ContainsKey('Remind')) {
 # open now. One clock for the check and the fill. Test-P20StandupSince holds the
 # rule, the agent's since_refusal the same one.
 $asOf = [DateTimeOffset]::Now
+# A suite pins that clock: while the test-run marker is set (consts.json
+# env.testRunMarker), env.standupAsOf names the instant the standup is read at,
+# so a suite builds its expectation from the same instant and not from a second
+# reading of now. Outside a test run it is not read at all.
+$clockNames = (Get-P20Consts).env
+if ([System.Environment]::GetEnvironmentVariable([string]$clockNames.testRunMarker)) {
+    $pinned = ConvertTo-P20RitualTime ([System.Environment]::GetEnvironmentVariable([string]$clockNames.standupAsOf))
+    if ($null -ne $pinned) { $asOf = $pinned }
+}
 $window = ''
 if ($PSBoundParameters.ContainsKey('Since')) {
     $why = Test-P20StandupSince -AsOf $asOf -Since $Since
@@ -257,18 +288,18 @@ if ($choice.source -eq 'none') {
 elseif ($choice.source -eq 'both') {
     $target = Resolve-P20TrackerRepo -OrgUrl $org -Projects $projects -CliPrefix (Get-CliPrefix)
     if ($target.Reason) {
-        $tracker.reason = $target.Reason
+        $tracker.reason = Get-P20TrackerRepoReason -Target $target
     }
     elseif (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-        $tracker.reason = 'gh is not installed, so the tracker was not asked.'
+        $tracker.reason = Format-P20TrackerReason -Key 'trackerGhMissing'
     }
     else {
         # -- The thin layer: two gh reads (Scripts/Ritual-Common.ps1) --------
         $repo = $target.Repo
-        $got = Invoke-P20RitualGh -Repo $repo -Arguments @('label', 'list', '--repo', $repo, '--limit', '500', '--json', 'name,description')
+        $got = Invoke-P20RitualGh -Repo $repo -Arguments @('label', 'list', '--repo', $repo, '--limit', [string](Get-P20Consts).ghReads.labels, '--json', 'name,description')
         if ($got.ok) {
             $labels = $got.value
-            $got = Invoke-P20RitualGh -Repo $repo -Arguments @('issue', 'list', '--repo', $repo, '--state', 'all', '--limit', '500',
+            $got = Invoke-P20RitualGh -Repo $repo -Arguments @('issue', 'list', '--repo', $repo, '--state', 'all', '--limit', [string](Get-P20Consts).ghReads.allIssues,
                 '--json', 'number,title,state,labels,closedAt,url,milestone,body,createdAt,assignees')
         }
         if ($got.ok) {
@@ -281,6 +312,17 @@ elseif ($choice.source -eq 'both') {
         }
     }
 }
+
+# -- The room ---------------------------------------------------------------
+# spaces.<slug>.features.teamSize: how many are in the standup, the chair
+# included (Scripts/Resolve-TeamSize.ps1 reads it; unset is the default). The
+# size is the team: the fill keeps every worker and marks who is present, and
+# the round speaks the room -- the present, then the invented cast members
+# that fill the seats left.
+$teamEntry = $null
+if ($cfg -and $cfg.Spaces) { $teamEntry = @($cfg.Spaces | Where-Object { $_ -and [string]$_.slug -eq $slug }) | Select-Object -First 1 }
+$teamStored = $null
+if ($teamEntry -and $teamEntry.features -and $teamEntry.features.PSObject.Properties['teamSize']) { $teamStored = $teamEntry.features.teamSize }
 
 # -- The fill, the rendering, the printing --------------------------------------
 $cards = @()
@@ -299,15 +341,47 @@ if ($choice.source -eq 'cards' -or $choice.source -eq 'both') {
 }
 if ($choice.source -eq 'cards') {
     $standup = Invoke-P20StandupCardsFill -AsOf $asOf -Cards $cards -Space $slug -SpaceName $spaceName `
-        -Window $window -PackageRoot $repoRoot
+        -Window $window -PackageRoot $repoRoot -TeamSize $teamStored
 }
 elseif ($choice.source -eq 'both') {
     $standup = Invoke-P20StandupJoinedFill -AsOf $asOf -Labels $labels -Issues $issues -Tracker $tracker `
-        -Cards $cards -Space $slug -SpaceName $spaceName -Window $window -PackageRoot $repoRoot
+        -Cards $cards -Space $slug -SpaceName $spaceName -Window $window -PackageRoot $repoRoot -TeamSize $teamStored
+    # -- The dates read: when the counted commits were authored, and when the
+    # open issues with no card began (Scripts/Ritual-Common.ps1). Asked for what
+    # the fill counted, then the fill again with the answer; nothing to ask, or
+    # a read that failed, keeps the fill as it is -- every bullet counts. The
+    # same call reads the co-author trailers of the commits of every card the
+    # fill places with no **Agent:** line (Get-P20StandupTrailerAsks), as t
+    # aliases; their messages go to the fill again, where a card with no Agent
+    # line and no Assigned worker is reported by the model its commits credit.
+    # Trailers alone, with no date to ask, still make the call, and the fill
+    # runs again with the messages only: with no date asked, every bullet counts.
+    $trailerMessages = $null
+    if ($tracker.ok) {
+        $slotNames = @((Get-P20RitualData -PackageRoot $repoRoot).Ceremony.slots | ForEach-Object { [string]$_ })
+        $asks = Get-P20StandupDateAsks -Standup $standup -Cards $cards -Slots $slotNames
+        $trailerAsks = Get-P20StandupTrailerAsks -Standup $standup -Cards $cards -Slots $slotNames
+        $datesAsked = (@($asks.hashes).Count -gt 0 -or @($asks.numbers).Count -gt 0)
+        if ($datesAsked -or @($trailerAsks).Count -gt 0) {
+            $workerNames = [string[]]@(Get-P20StandupWorkers -Labels $labels -Prefix ([string](Get-P20Consts).rituals.workerLabelPrefix) | ForEach-Object { [string]$_.label })
+            $dates = Get-P20StandupDates -Repo $repo -Hashes $asks.hashes -Numbers $asks.numbers -WorkerLabels $workerNames -Trailers $trailerAsks
+            if ($dates.ok) {
+                $trailerMessages = $dates.messages
+                # Trailers alone, with no date asked: the fill again with the
+                # messages only, so every bullet still counts.
+                $commitDates = $null
+                $issueStarts = $null
+                if ($datesAsked) { $commitDates = $dates.commitDates; $issueStarts = $dates.issueStarts }
+                $standup = Invoke-P20StandupJoinedFill -AsOf $asOf -Labels $labels -Issues $issues -Tracker $tracker `
+                    -Cards $cards -Space $slug -SpaceName $spaceName -Window $window -PackageRoot $repoRoot `
+                    -CommitDates $commitDates -IssueStarts $issueStarts -TeamSize $teamStored -Messages $trailerMessages
+            }
+        }
+    }
 }
 else {
     $standup = Invoke-P20StandupFill -AsOf $asOf -Labels $labels -Issues $issues -Tracker $tracker `
-        -Space $slug -Window $window -PackageRoot $repoRoot
+        -Space $slug -Window $window -PackageRoot $repoRoot -TeamSize $teamStored
 }
 # -- The suggestion ---------------------------------------------------------
 # One derived next move over the same read (Scripts/Suggest-Rules.ps1), before
@@ -330,13 +404,14 @@ if ($choice.source -eq 'cards' -or $choice.source -eq 'both') {
     # where an issue read happened -- a cards Space has no assignee to compare.
     $viewer = ''
     if ($suggestOn -and $choice.source -eq 'both' -and $tracker.ok) { $viewer = Get-P20RitualViewer }
+    if (-not (Get-Command Test-P20StartWorkLaunch -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Test-StartWorkLaunch.ps1') }
     $null = Add-P20StandupSuggestion -Standup $standup -Labels $labels -Issues $issues -Cards $cards -HowIWork ([string]$how.answer) `
-        -On $suggestOn -Prefix (Get-CliPrefix) -Viewer $viewer -PackageRoot $repoRoot
+        -On $suggestOn -Prefix (Get-CliPrefix) -Viewer $viewer -PackageRoot $repoRoot -Launch (Test-P20StartWorkLaunch)
     # The PM Corner (Scripts/Corner-Rules.ps1): the suggestion's second surface --
     # the same switch, the same read, the same pick -- and the brief's last line.
     . (Join-Path $PSScriptRoot 'Corner-Rules.ps1')
     $null = Add-P20StandupCorner -Standup $standup -Labels $labels -Issues $issues -Cards $cards `
-        -On $suggestOn -Prefix (Get-CliPrefix) -Viewer $viewer -PackageRoot $repoRoot
+        -On $suggestOn -Prefix (Get-CliPrefix) -Viewer $viewer -PackageRoot $repoRoot -HowIWork ([string]$how.answer) -Launch (Test-P20StartWorkLaunch)
 }
 $standup.text = Format-P20StandupText -Standup $standup -PackageRoot $repoRoot
 $standup.work.text = Format-P20StandupWork -Standup $standup -PackageRoot $repoRoot

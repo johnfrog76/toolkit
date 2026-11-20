@@ -28,6 +28,7 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # Tests/, for _skipguard
 
 from _skipguard import skip_module
+from _tracker_cli import unreachable
 
 try:
     from fastapi.testclient import TestClient
@@ -95,6 +96,7 @@ class TheGateIsOneTable(unittest.TestCase):
 
 
 class EnvCarriesTheFlag(unittest.TestCase):
+    @unreachable("az", "gh")
     def test_true_and_false_by_the_contract_name(self):
         self.assertEqual(usage_env_flag(), "claudeUsage")
         client = TestClient(app)
@@ -141,6 +143,13 @@ class TheRoute(unittest.TestCase):
         self.assertEqual(body["week"]["totals"]["messages"], 9)
         self.assertIs(body["fromCache"], False)
         self.assertTrue(body["fetchedAt"].endswith("Z"))
+
+    def test_each_window_carries_its_unpriced_models_for_the_cost_line(self):
+        self.reply["today"]["unpriced"] = []
+        self.reply["week"]["unpriced"] = ["claude-new-1"]
+        body = self.client.get(self.path).json()
+        self.assertEqual(body["today"]["unpriced"], [])
+        self.assertEqual(body["week"]["unpriced"], ["claude-new-1"])
 
     def test_kept_for_the_hour_then_refresh_goes_past_it(self):
         first = self.client.get(self.path).json()

@@ -101,9 +101,11 @@ tkTest -Half agent       # one half: cli, agent or web
 Or run the half you touched with its own runner -- `tkTestToolkit` for the CLI, `python3 -m pytest Tests/`
 for the agent (on Windows: `python` or `py -3`), and `npm test` from `web/` for the web UI --
 and `npm run smoke` from `web/` when a change shows in the browser. Run the ones your change touches,
-and read the summary line rather than the total: a skip is not a pass. What each suite guards, the
-counts a green run prints, and the one rule for a shell with two checkouts in it (one toolkit per
-shell) are in [Testing](TESTING.md). The runners remove any `TEAMS_WEBHOOK_*` variable from their own
+and read the summary line rather than the total: a skip is not a pass. A pull request states no test
+count, and a count typed into a document fails `tkTestToolkit -DocCounts`: the counts live in
+[`docs/TEST-COUNTS.md`](TEST-COUNTS.md), written at a release. What each suite guards, how those counts are
+written, and the one rule for a shell with two checkouts in it (one toolkit per shell) are in
+[Testing](TESTING.md). The runners remove any `TEAMS_WEBHOOK_*` variable from their own
 processes, so a suite never posts to a real channel.
 
 ## The refusal contract
@@ -232,11 +234,11 @@ is a finding like an error: the bar is zero of either.
 | agent | the repository root | `ruff check` | `ruff.toml` |
 | agent | the repository root | `ruff format --check`; without `--check` to apply | `ruff.toml` |
 | CLI | the repository root, in `pwsh` | the PSScriptAnalyzer command below | `PSScriptAnalyzerSettings.psd1` |
-| documentation | `web/` | `npm run lint:md` (markdownlint-cli2 over every document in the repository: the root `README.md` and other root documents, `docs/`, the `design/` and `spec/` READMEs, `web/README.md`, `agent/README.md`) | `.markdownlint-cli2.jsonc` |
+| documentation | `web/` | `npm run lint:md` (markdownlint-cli2 over every document in the repository: the root `README.md` and other root documents, `docs/`, the `design/` and `spec/` READMEs, every entry waiting in `changelog.d/`, `web/README.md`, `agent/README.md`) | `.markdownlint-cli2.jsonc`, and `changelog.d/.markdownlint-cli2.jsonc`, which turns off the first-line-heading rule there because an entry opens with a dash |
 
 A Prettier failure names the files: fix them with `npx prettier --write <file>` (`npm run format` for all of `web/src`), then run `npm run lint` again.
 
-`.gitattributes` pins `web/src` to LF on disk, which is what Prettier's `endOfLine` expects, so a Windows checkout with `core.autocrlf` true passes `--check`. A clone that predates that line keeps its CRLF files until they are checked out again.
+`.gitattributes` checks out every text file LF on every platform (`* text=auto eol=lf`), which is what Prettier's `endOfLine` expects, so a Windows checkout with `core.autocrlf` true passes `--check`, and a test that reads the package's own source reads the same bytes everywhere. A clone that predates that line keeps its CRLF files until they are checked out again.
 
 ruff covers `agent/` and the suites in `Tests/*.py`, the repository's only Python, and comes with
 `agent/requirements-dev.txt`, pinned exactly. The line is 120 for the formatter and for `E501` alike. The rules

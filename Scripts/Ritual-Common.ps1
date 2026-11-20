@@ -19,6 +19,8 @@
 # PowerShell 5.1 compatible (ASCII dashes only); reads no module state.
 #
 
+if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Get-Consts.ps1') }
+
 function Get-P20RitualViewer {
     # Who you are on GitHub: the signed-in gh user's login, so an item assigned
     # to you reads "me" (D-AR10). ONE read, `gh api user -q .login`, made once per
@@ -79,27 +81,122 @@ function Resolve-P20RitualSpace {
     return [pscustomobject]$result
 }
 
+function Format-P20TrackerReason {
+    # Why the tracker was not read, as the one sentence the Tracker line
+    # carries: consts.json rituals.text.<Key>, each {name} filled from -Values.
+    # The agent words the same reasons from the same keys
+    # (agent/solitaire/tracker.py); Tests/fixtures/rituals/tracker-reasons.json
+    # holds both halves to one table.
+    param([string]$Key, [hashtable]$Values = @{})
+    $text = [string](Get-P20Consts).rituals.text.$Key
+    foreach ($name in @($Values.Keys)) { $text = $text.Replace('{' + $name + '}', [string]$Values[$name]) }
+    return $text
+}
+
+function Get-P20TrackerRepoReason {
+    # Resolve-P20TrackerRepo's refusal (Scripts/Resolve-Tracker.ps1), as the
+    # Tracker line's sentence: no repository, or more than the one a ritual
+    # reads. '' when the target names its repository.
+    param($Target)
+    if (-not $Target -or -not $Target.Reason) { return '' }
+    if ($Target.Kind -eq 'manyRepos') {
+        return (Format-P20TrackerReason -Key 'trackerManyRepos' -Values @{ n = @($Target.Repos).Count; repos = (@($Target.Repos) -join ', ') })
+    }
+    return (Format-P20TrackerReason -Key 'trackerNoRepo')
+}
+
+function Get-P20GhRefusalReason {
+    # A gh read of $Repo that exited non-zero (or answered no data), from its
+    # stderr: a repository gh cannot read (a ghReads.repoMissing word in the
+    # first line), gh's first line, or gh saying nothing.
+    param([string]$Repo, $Err)
+    $lines = @($Err | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
+    if ($lines.Count -eq 0) { return (Format-P20TrackerReason -Key 'trackerGhSilent' -Values @{ repo = $Repo }) }
+    $first = [string]$lines[0]
+    $lower = $first.ToLowerInvariant()
+    foreach ($word in @((Get-P20Consts).ghReads.repoMissing)) {
+        if ($lower.Contains([string]$word)) { return (Format-P20TrackerReason -Key 'trackerRepoUnreadable' -Values @{ repo = $Repo }) }
+    }
+    return (Format-P20TrackerReason -Key 'trackerGhNoAnswer' -Values @{ repo = $Repo; error = $first })
+}
+
 function Invoke-P20RitualGh {
-    # One gh call -> @{ ok; value } or @{ ok = $false; reason }. stderr's first
-    # line is the reason; the value is the parsed JSON array, enumerated so
+    # One gh call -> @{ ok; value } or @{ ok = $false; reason }. The reason is
+    # one of the Tracker line's sentences (Format-P20TrackerReason); the value
+    # is the parsed JSON array, enumerated so
     # 5.1's unrolled-array quirk cannot hand back an array of one array. The
     # call itself is Invoke-P20TrackerRead's (Scripts/Invoke-TrackerRead.ps1,
     # dot-sourced by the caller before this file) -- this only shapes its
     # answer, the way Set-Route.ps1's own Invoke-P20RouteGh does.
     param([string[]]$Arguments, [string]$Repo)
     try { $read = Invoke-P20TrackerRead 'gh' $Arguments }
-    catch { return @{ ok = $false; reason = "gh did not answer ($($_.Exception.Message))" } }
+    catch { return @{ ok = $false; reason = (Format-P20TrackerReason -Key 'trackerGhNoAnswer' -Values @{ repo = $Repo; error = $_.Exception.Message }) } }
     $code = $read.Code
     $stdout = @($read.Out) -join "`n"
-    $stderr = @($read.Err | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
     if ($code -ne 0) {
-        $why = "gh did not answer for $Repo"
-        if ($stderr.Count -gt 0) { $why += ": $($stderr[0])" }
-        return @{ ok = $false; reason = $why }
+        return @{ ok = $false; reason = (Get-P20GhRefusalReason -Repo $Repo -Err $read.Err) }
     }
     try { $parsed = ConvertFrom-Json -InputObject $stdout }
-    catch { return @{ ok = $false; reason = "gh answered for $Repo with something that is not JSON" } }
+    catch { return @{ ok = $false; reason = (Format-P20TrackerReason -Key 'trackerNotJson' -Values @{ repo = $Repo }) } }
     $list = New-Object System.Collections.ArrayList
     foreach ($x in $parsed) { if ($null -ne $x) { [void]$list.Add($x) } }
     return @{ ok = $true; value = $list.ToArray() }
+}
+
+function Get-P20StandupDates {
+    # The standup's dates read for ONE repo: one `gh api graphql` per chunk of
+    # aliases (Get-P20StandupDatesLimits), the query in a temporary file and the
+    # owner and name as fields, so no quote in it crosses a native argument.
+    # -> @{ ok; commitDates; issueStarts; messages } or @{ ok = $false; reason }.
+    # Trailers are the hashes whose co-author trailers the standup reads
+    # (Get-P20StandupTrailerAsks): each rides the same call as a t alias, which
+    # also dates it, so a hash asked for its date AND its trailers is asked once,
+    # as a t alias; every alias counts toward a chunk. An alias
+    # GitHub could not resolve is null in an answer that still has data (gh
+    # exits 1 for it), so the answer is read from stdout whatever the exit code,
+    # and only an answer with no data is a failed read. The query and the parse
+    # are Standup-Rules.ps1's (Get-P20StandupDatesQuery, ConvertFrom-P20StandupDates).
+    param([string]$Repo, [string[]]$Hashes, [int[]]$Numbers, [string[]]$WorkerLabels, [string[]]$Trailers)
+    $commits = @{}
+    $starts = @{}
+    $messages = @{}
+    $trailerSet = @{}
+    foreach ($h in @($Trailers | Where-Object { $_ })) { $trailerSet[[string]$h] = $true }
+    $asks = New-Object System.Collections.ArrayList
+    foreach ($h in @($Hashes | Where-Object { $_ })) {
+        if ($trailerSet.ContainsKey([string]$h)) { $commits[[string]$h] = $null; continue }
+        [void]$asks.Add(@('c', [string]$h))
+    }
+    foreach ($n in @($Numbers | Where-Object { $null -ne $_ })) { [void]$asks.Add(@('i', [int]$n)) }
+    $seenT = @{}
+    foreach ($h in @($Trailers | Where-Object { $_ })) {
+        if ($seenT.ContainsKey([string]$h)) { continue }
+        $seenT[[string]$h] = $true
+        [void]$asks.Add(@('t', [string]$h))
+    }
+    $owner, $name = ([string]$Repo).Split('/', 2)
+    $size = (Get-P20StandupDatesLimits).chunk
+    for ($at = 0; $at -lt $asks.Count; $at += $size) {
+        $chunk = @($asks.ToArray()[$at..([Math]::Min($at + $size, $asks.Count) - 1)])
+        $ch = [string[]]@($chunk | Where-Object { $_[0] -ceq 'c' } | ForEach-Object { [string]$_[1] })
+        $cn = [int[]]@($chunk | Where-Object { $_[0] -ceq 'i' } | ForEach-Object { [int]$_[1] })
+        $ct = [string[]]@($chunk | Where-Object { $_[0] -ceq 't' } | ForEach-Object { [string]$_[1] })
+        $file = Join-Path ([System.IO.Path]::GetTempPath()) ('p20-gql-' + [guid]::NewGuid().ToString('N') + '.graphql')
+        try {
+            [System.IO.File]::WriteAllText($file, (Get-P20StandupDatesQuery -Hashes $ch -Numbers $cn -Trailers $ct), (New-Object System.Text.UTF8Encoding($false)))
+            $read = Invoke-P20TrackerRead 'gh' @('api', 'graphql', '-F', "query=@$file", '-f', "owner=$owner", '-f', "name=$name")
+        }
+        catch { return @{ ok = $false; reason = (Format-P20TrackerReason -Key 'trackerGhNoAnswer' -Values @{ repo = $Repo; error = $_.Exception.Message }) } }
+        finally { Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue }
+        $parsed = $null
+        try { $parsed = ConvertFrom-Json -InputObject (@($read.Out) -join "`n") } catch { $parsed = $null }
+        if ($null -eq $parsed -or $null -eq $parsed.PSObject.Properties['data'] -or $null -eq $parsed.data) {
+            return @{ ok = $false; reason = (Get-P20GhRefusalReason -Repo $Repo -Err $read.Err) }
+        }
+        $got = ConvertFrom-P20StandupDates -Repository $parsed.data.repository -Hashes $ch -Numbers $cn -WorkerLabels $WorkerLabels -Trailers $ct
+        foreach ($k in @($got.commitDates.Keys)) { $commits[$k] = $got.commitDates[$k] }
+        foreach ($k in @($got.issueStarts.Keys)) { $starts[$k] = $got.issueStarts[$k] }
+        foreach ($k in @($got.messages.Keys)) { if (-not $messages.ContainsKey($k)) { $messages[$k] = $got.messages[$k] } }
+    }
+    return @{ ok = $true; commitDates = $commits; issueStarts = $starts; messages = $messages }
 }

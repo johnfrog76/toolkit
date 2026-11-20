@@ -1,5 +1,5 @@
 # The Solitaire Agile add-on's wrappers: Standup (M0), Triage and Route (V1),
-# StartWork (AR-1).
+# StartWork (AR-1), OrgChart.
 #
 # Dot-sourced by the module-command loader, and only when the top-level
 # features.solitaireAgile is true -- so a switched-off module defines no
@@ -90,4 +90,20 @@ function global:Get-P20StartWork {
     if ($Help) { Show-CommandHelp 'StartWork'; return }
     Invoke-ToolkitScript -Path (Join-Path $global:P20SolitaireAgileRoot 'Scripts/Start-Work.ps1') `
         -Parameters $PSBoundParameters -Name "$(Get-CliPrefix)StartWork" -Prefix (Get-CliPrefix)
+}
+
+# OrgChart: the org's tree, from the hub's org file. A read like StartWork --
+# one file in, text or JSON out, nothing written anywhere.
+
+function global:Get-P20OrgChart {
+    <# OrgChart -- the org's tree, one line per seat, from the hub's org file. Writes nothing. #>
+    [CmdletBinding()]
+    param(
+        [string]$Tree,
+        [switch]$AsJson,
+        [switch]$Help
+    )
+    if ($Help) { Show-CommandHelp 'OrgChart'; return }
+    Invoke-ToolkitScript -Path (Join-Path $global:P20SolitaireAgileRoot 'Scripts/Get-OrgChart.ps1') `
+        -Parameters $PSBoundParameters -Name "$(Get-CliPrefix)OrgChart" -Prefix (Get-CliPrefix)
 }

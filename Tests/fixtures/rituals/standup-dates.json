@@ -1,0 +1,329 @@
+{
+  "_": "The standup's dates read (docs/modules/solitaire-agile.md, \"What moved, and the window\"): ONE gh api graphql call per repo (per 50 aliases), the owner and name as variables. `query` is the text both halves send for its hashes and numbers, line for line (dates_query / Get-P20StandupDatesQuery): c<i> is the i-th hash's commit by object(expression:), i<n> issue n's labelled and assigned events. Each case is the parse of one answer's `repository` object (dates_from_answer / ConvertFrom-P20StandupDates): a commit is dated by its authoredDate only when GitHub resolved the hash to a commit whose oid begins with it -- an abbreviated hash resolves, a missing or ambiguous one answers null and is null here, never a guess; an issue's start is the earliest of a worker label being added and the issue being assigned, a label that routes to no worker is not a start, and an issue with no start is not a key of issueStarts. The same call reads co-author trailers (docs/hub/cards.md, \"How a card's agent is worked out\"): `trailerQuery` adds t<i>, the i-th trailer hash's commit with its oid, authoredDate and message, after the c and i aliases -- and with no trailer hashes the text is `query`'s, unchanged. A case's `trailers` are parsed into `messages` (a resolved trailer hash's first seven characters, lower case -> its message: an unknown hash's null object, or an oid that is not the hash, is skipped) and date their commit when it has no date yet; a case with no `messages` expects none. Asserted from tkTestToolkit -Rituals and Tests/test_rituals.py.",
+  "workerLabels": [
+    "fable",
+    "opus"
+  ],
+  "query": {
+    "hashes": [
+      "a0a1111",
+      "b0b2222"
+    ],
+    "numbers": [
+      171
+    ],
+    "lines": [
+      "query($owner: String!, $name: String!) {",
+      "  repository(owner: $owner, name: $name) {",
+      "    c0: object(expression: \"a0a1111\") { ... on Commit { oid authoredDate } }",
+      "    c1: object(expression: \"b0b2222\") { ... on Commit { oid authoredDate } }",
+      "    i171: issue(number: 171) { timelineItems(itemTypes: [LABELED_EVENT, ASSIGNED_EVENT], first: 50) { nodes { __typename ... on LabeledEvent { createdAt label { name } } ... on AssignedEvent { createdAt } } } }",
+      "  }",
+      "}"
+    ]
+  },
+  "trailerQuery": {
+    "hashes": [
+      "a0a1111"
+    ],
+    "numbers": [
+      171
+    ],
+    "trailers": [
+      "c0c3333",
+      "d0d4444"
+    ],
+    "lines": [
+      "query($owner: String!, $name: String!) {",
+      "  repository(owner: $owner, name: $name) {",
+      "    c0: object(expression: \"a0a1111\") { ... on Commit { oid authoredDate } }",
+      "    i171: issue(number: 171) { timelineItems(itemTypes: [LABELED_EVENT, ASSIGNED_EVENT], first: 50) { nodes { __typename ... on LabeledEvent { createdAt label { name } } ... on AssignedEvent { createdAt } } } }",
+      "    t0: object(expression: \"c0c3333\") { ... on Commit { oid authoredDate message } }",
+      "    t1: object(expression: \"d0d4444\") { ... on Commit { oid authoredDate message } }",
+      "  }",
+      "}"
+    ]
+  },
+  "cases": [
+    {
+      "name": "abbreviated-hash",
+      "hashes": [
+        "558e35a"
+      ],
+      "numbers": [],
+      "answer": {
+        "c0": {
+          "oid": "558e35a7de37c4680589419c3be2b848d075b86b",
+          "authoredDate": "2026-11-10T14:11:18Z"
+        }
+      },
+      "expected": {
+        "commitDates": {
+          "558e35a": "2026-11-10T14:11:18Z"
+        },
+        "issueStarts": {}
+      }
+    },
+    {
+      "name": "missing-object",
+      "hashes": [
+        "0000000",
+        "a0a1111"
+      ],
+      "numbers": [],
+      "answer": {
+        "c0": null
+      },
+      "expected": {
+        "commitDates": {
+          "0000000": null,
+          "a0a1111": null
+        },
+        "issueStarts": {}
+      }
+    },
+    {
+      "name": "oid-not-the-hash",
+      "hashes": [
+        "b0b2222"
+      ],
+      "numbers": [],
+      "answer": {
+        "c0": {
+          "oid": "ffff2222aaaabbbbccccddddeeeeffff00001111",
+          "authoredDate": "2026-10-01T10:00:00Z"
+        }
+      },
+      "expected": {
+        "commitDates": {
+          "b0b2222": null
+        },
+        "issueStarts": {}
+      }
+    },
+    {
+      "name": "non-worker-label-ignored",
+      "hashes": [],
+      "numbers": [
+        171
+      ],
+      "answer": {
+        "i171": {
+          "timelineItems": {
+            "nodes": [
+              {
+                "__typename": "LabeledEvent",
+                "createdAt": "2026-09-01T09:00:00Z",
+                "label": {
+                  "name": "enhancement"
+                }
+              },
+              {
+                "__typename": "LabeledEvent",
+                "createdAt": "2026-10-01T14:00:00Z",
+                "label": {
+                  "name": "opus"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "commitDates": {},
+        "issueStarts": {
+          "171": "2026-10-01T14:00:00Z"
+        }
+      }
+    },
+    {
+      "name": "earliest-of-label-and-assign",
+      "hashes": [],
+      "numbers": [
+        172
+      ],
+      "answer": {
+        "i172": {
+          "timelineItems": {
+            "nodes": [
+              {
+                "__typename": "LabeledEvent",
+                "createdAt": "2026-10-01T14:00:00Z",
+                "label": {
+                  "name": "fable"
+                }
+              },
+              {
+                "__typename": "AssignedEvent",
+                "createdAt": "2026-09-28T08:00:00Z"
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "commitDates": {},
+        "issueStarts": {
+          "172": "2026-09-28T08:00:00Z"
+        }
+      }
+    },
+    {
+      "name": "unassign-only",
+      "hashes": [],
+      "numbers": [
+        173,
+        174
+      ],
+      "answer": {
+        "i173": {
+          "timelineItems": {
+            "nodes": [
+              {
+                "__typename": "UnassignedEvent",
+                "createdAt": "2026-10-01T14:00:00Z"
+              }
+            ]
+          }
+        },
+        "i174": null
+      },
+      "expected": {
+        "commitDates": {},
+        "issueStarts": {}
+      }
+    },
+    {
+      "name": "trailer-message",
+      "hashes": [],
+      "numbers": [],
+      "trailers": [
+        "c0c3333"
+      ],
+      "answer": {
+        "t0": {
+          "oid": "c0c3333aaaabbbbccccddddeeeeffff0000111122",
+          "authoredDate": "2026-11-10T14:11:18Z",
+          "message": "Fix the thing\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+        }
+      },
+      "expected": {
+        "commitDates": {
+          "c0c3333": "2026-11-10T14:11:18Z"
+        },
+        "issueStarts": {},
+        "messages": {
+          "c0c3333": "Fix the thing\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+        }
+      }
+    },
+    {
+      "name": "trailer-unknown-hash-skipped",
+      "hashes": [],
+      "numbers": [],
+      "trailers": [
+        "0000000",
+        "c0c3333"
+      ],
+      "answer": {
+        "t0": null,
+        "t1": {
+          "oid": "c0c3333aaaabbbbccccddddeeeeffff0000111122",
+          "authoredDate": "2026-11-10T14:11:18Z",
+          "message": "Plain"
+        }
+      },
+      "expected": {
+        "commitDates": {
+          "c0c3333": "2026-11-10T14:11:18Z"
+        },
+        "issueStarts": {},
+        "messages": {
+          "c0c3333": "Plain"
+        }
+      }
+    },
+    {
+      "name": "trailer-oid-not-the-hash",
+      "hashes": [],
+      "numbers": [],
+      "trailers": [
+        "c0c3333"
+      ],
+      "answer": {
+        "t0": {
+          "oid": "ffff3333aaaabbbbccccddddeeeeffff00001111",
+          "authoredDate": "2026-11-10T14:11:18Z",
+          "message": "Fix the thing\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+        }
+      },
+      "expected": {
+        "commitDates": {},
+        "issueStarts": {},
+        "messages": {}
+      }
+    },
+    {
+      "name": "trailer-dates-a-hash-with-no-date-yet",
+      "hashes": [
+        "a0a1111"
+      ],
+      "numbers": [],
+      "trailers": [
+        "a0a1111",
+        "b0b2222"
+      ],
+      "answer": {
+        "c0": {
+          "oid": "a0a1111aaaabbbbccccddddeeeeffff0000111122",
+          "authoredDate": "2026-11-09T09:00:00Z"
+        },
+        "t0": {
+          "oid": "a0a1111aaaabbbbccccddddeeeeffff0000111122",
+          "authoredDate": "2026-11-01T09:00:00Z",
+          "message": "One"
+        },
+        "t1": {
+          "oid": "b0b2222aaaabbbbccccddddeeeeffff0000111122",
+          "authoredDate": "2026-11-02T09:00:00Z",
+          "message": "Two"
+        }
+      },
+      "expected": {
+        "commitDates": {
+          "a0a1111": "2026-11-09T09:00:00Z",
+          "b0b2222": "2026-11-02T09:00:00Z"
+        },
+        "issueStarts": {},
+        "messages": {
+          "a0a1111": "One",
+          "b0b2222": "Two"
+        }
+      }
+    },
+    {
+      "name": "trailer-full-hash-keyed-short",
+      "hashes": [],
+      "numbers": [],
+      "trailers": [
+        "c0c3333aaaabbbbccccddddeeeeffff0000111122"
+      ],
+      "answer": {
+        "t0": {
+          "oid": "c0c3333aaaabbbbccccddddeeeeffff0000111122",
+          "authoredDate": "2026-11-10T14:11:18Z",
+          "message": "Full"
+        }
+      },
+      "expected": {
+        "commitDates": {
+          "c0c3333aaaabbbbccccddddeeeeffff0000111122": "2026-11-10T14:11:18Z"
+        },
+        "issueStarts": {},
+        "messages": {
+          "c0c3333": "Full"
+        }
+      }
+    }
+  ]
+}

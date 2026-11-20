@@ -1,6 +1,19 @@
 import { useState } from "react";
 import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { Popover, PopoverSurface, PopoverTrigger } from "@fluentui/react-components";
+import { RefinedBust } from "../../../shared/refinedFaces";
+import type { FaceId } from "../../../shared/refinedFaces";
+import type { BubbleSide } from "./geometry";
+import {
+  DRAWING_SHADOW,
+  SOFT_SHADOW,
+  Soft,
+  dark,
+  lite,
+  sideShade,
+  useDrawingId,
+  wall,
+} from "./refined";
 
 // ── The stage's cast, by copy ────────────────────────────────────────────────
 //
@@ -11,13 +24,19 @@ import { Popover, PopoverSurface, PopoverTrigger } from "@fluentui/react-compone
 // script on it (docs/modules/solitaire-agile.md, "The played view"; D-TA17): the nine tiles,
 // the tints, the webcam scenes, the bubble.
 //
-// What came over: the palette, the keyframes, Person, ZoomTile, the bubbles, Mug,
-// the nine scenes, CastScene and SceneZoom -- verbatim but for the export on
-// Mug and the reduced-motion rule in StandupKeyframes. What did NOT: the
-// cast's bios, dossiers, code styles and status lines, and Cat Dev. The
-// Wasteland's lines are the satire; here every word a tile says comes from
-// the Ritual Engine (the agent's standup route), and the plate under a tile is
-// the seat's (./seats.ts), not the persona's alone.
+// What came over: the palette, the keyframes, ZoomTile, the bubbles, the nine
+// scenes, CastScene and SceneZoom. What did NOT: the cast's bios, dossiers,
+// code styles and status lines, and Cat Dev. The Wasteland's lines are the
+// satire; here every word a tile says comes from the Ritual Engine (the
+// agent's standup route), and the plate under a tile is the seat's
+// (./seats.ts), not the persona's alone.
+//
+// The drawings are no longer the Wasteland's. The people are the refined cast
+// (shared/refinedFaces.tsx, the faces the Org page and the landing page draw),
+// matched by cast id, and every prop -- the desk and its mugs, the terminal,
+// the monitors, the flask, the treadmill, the raised hand -- is drawn in that
+// style (./refined.tsx). What a window holds, where its head is and what moves
+// are as they were: the head of each bust is where ./geometry.ts says it is.
 
 export const pf = {
   bg: "#131a2b", // studio navy — bright tiles pop against it
@@ -51,6 +70,8 @@ export const mono = "'Cascadia Code', 'Fira Code', 'Consolas', monospace";
 // reduced-animation switch is not the deck engine's to read today (the engine
 // exposes none), so the media query is the one rule.
 export const STAGE_CLASS = "sa-stage";
+/** The stage's grid of nine windows, below its title row: the room a speech bubble is kept inside. */
+export const STAGE_GRID_CLASS = "sa-stage-grid";
 
 export const REDUCED_MOTION_RULE = `@media (prefers-reduced-motion: reduce) { .${STAGE_CLASS}, .${STAGE_CLASS} * { animation: none !important; transition: none !important; } }`;
 
@@ -61,7 +82,7 @@ export function StandupKeyframes() {
       @keyframes rs-bubble    { 0% { transform: translateY(8px) scale(0.85); opacity: 0; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
       @keyframes rs-float     { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
       @keyframes rs-pulse     { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
-      @keyframes rs-flicker   { 0%, 100% { opacity: 1; } 42% { opacity: 0.55; } 46% { opacity: 0.95; } 74% { opacity: 0.7; } }
+      @keyframes rs-termbeat  { 0%, 100% { color: #79d68a; } 50% { color: #eef7ef; } }
       @keyframes rs-hue       { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
       @keyframes rs-smoke     { 0% { transform: translateY(0) translateX(0); opacity: 0.5; } 100% { transform: translateY(-46px) translateX(10px); opacity: 0; } }
       @keyframes rs-bob       { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
@@ -72,7 +93,6 @@ export function StandupKeyframes() {
       @keyframes rs-zz        { 0% { transform: translateY(0); opacity: 0; } 25% { opacity: 0.8; } 100% { transform: translateY(-30px); opacity: 0; } }
       @keyframes rs-glowsip   { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
       @keyframes rs-deskride  { 0%, 14% { transform: translateY(0); } 42%, 60% { transform: translateY(var(--ride, -36%)); } 86%, 100% { transform: translateY(0); } }
-      @keyframes rs-press     { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-18px); } }
       @keyframes rs-breathe   { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.045); } }
       ${REDUCED_MOTION_RULE}
     `}</style>
@@ -81,177 +101,82 @@ export function StandupKeyframes() {
 
 // ── Shared atoms ─────────────────────────────────────────────────────────────
 
-// A webcam bust — head + shoulders, bottom-anchored like a real Zoom framing.
-// Hair variant + shirt/skin color are each character's identity, so the same
-// person is recognizable later on the beach.
-type Hair = "crop" | "bun" | "headphones" | "cap" | "curls" | "long" | "buzz" | "coif" | "spikes";
-
-export function Person({
-  shirt,
-  skin = "#e8b88a",
-  hairColor = "#3a2a22",
-  hair = "crop",
+/**
+ * A webcam bust: the refined face for a cast id, bottom-anchored like a real
+ * Zoom framing.
+ *
+ * The box it stands in is the one the stage has always given a bust -- 120 by
+ * 100 units, the head an ellipse centred on (60, 38) -- so a head is where
+ * ./geometry.ts expects it. The refined bust's own box starts 10 units higher
+ * (room for a bun or a spike) and its torso runs 14 lower, so it is hung 10 up
+ * and overflows the bottom, where a desk or the window's edge cuts it.
+ */
+export function Bust({
+  id,
   width = 150,
-  mood = "calm",
-  headwear,
+  cover,
 }: {
-  shirt: string;
-  skin?: string;
-  hairColor?: string;
-  hair?: Hair;
-  /** px, or a CSS length like "100%" so a host can size the bust relatively */
-  width?: number | string;
-  mood?: "calm" | "grin" | "awe" | "zen";
+  id: FaceId;
+  width?: number;
   /**
-   * Anything worn on the head, drawn in this SVG's own "0 0 120 100" space so
-   * it scales with the bust instead of being chased around in CSS. The head is
-   * a circle at cx=60 cy=38 r=24, so a band sits near y=30 and a crown tops
-   * out around y=14. Added for the Remote Control Hat deck (the Gadget Hat
-   * mounts here); omit it and the bust renders exactly as it always has.
+   * A patch of the shirt's own colour over part of the shirt, in the box's
+   * units. A mark on a shirt (a glyph, a badge, a bolt) that a window's edge or
+   * a desk would cut in half is covered whole instead: fully seen or not at all.
+   * It lies on the lit side of the torso, so it is flat colour on flat colour.
    */
-  headwear?: ReactNode;
+  cover?: { x: number; y: number; width: number; height: number; fill: string };
 }) {
-  // overflow must stay visible: headwear is drawn in this same coordinate space
-  // and can legitimately extend above y=0 (a propeller on top of a cap), which
-  // the default clip would silently cut off. Nothing changes for the scenes that
-  // pass no headwear.
   return (
-    <svg width={width} viewBox="0 0 120 100" style={{ display: "block", overflow: "visible" }}>
-      {/* shoulders */}
-      <rect x="22" y="64" width="76" height="40" rx="17" fill={shirt} />
-      {/* head */}
-      <circle cx="60" cy="38" r="24" fill={skin} />
-      {/* hair variants */}
-      {hair === "crop" && (
-        <path d="M 36 34 A 24 24 0 0 1 84 34 L 84 28 A 24 26 0 0 0 36 28 Z" fill={hairColor} />
+    <div data-bust={id} style={{ position: "relative", width, height: (width * 100) / 120 }}>
+      <div style={{ display: "flex", position: "relative", top: -(width * 10) / 120 }}>
+        <RefinedBust face={id} width={width} />
+      </div>
+      {cover && (
+        <svg
+          viewBox="0 0 120 100"
+          width={width}
+          height={(width * 100) / 120}
+          aria-hidden
+          focusable="false"
+          style={{ position: "absolute", left: 0, top: 0, overflow: "visible" }}
+        >
+          <rect {...cover} />
+        </svg>
       )}
-      {hair === "buzz" && (
-        <path
-          d="M 37 30 A 24 22 0 0 1 83 30 L 83 26 A 24 24 0 0 0 37 26 Z"
-          fill={hairColor}
-          opacity="0.7"
-        />
-      )}
-      {hair === "bun" && (
-        <g fill={hairColor}>
-          <path d="M 36 34 A 24 24 0 0 1 84 34 L 84 26 A 24 26 0 0 0 36 26 Z" />
-          <circle cx="60" cy="12" r="8" />
-        </g>
-      )}
-      {hair === "long" && (
-        <g fill={hairColor}>
-          <path d="M 36 34 A 24 24 0 0 1 84 34 L 84 26 A 24 26 0 0 0 36 26 Z" />
-          <rect x="32" y="30" width="9" height="34" rx="4.5" />
-          <rect x="79" y="30" width="9" height="34" rx="4.5" />
-        </g>
-      )}
-      {hair === "curls" && (
-        <g fill={hairColor}>
-          <circle cx="44" cy="20" r="9" />
-          <circle cx="60" cy="15" r="10" />
-          <circle cx="76" cy="20" r="9" />
-        </g>
-      )}
-      {hair === "coif" && (
-        <path
-          d="M 34 30 Q 44 6 66 12 Q 88 18 86 32 Q 74 18 56 20 Q 40 22 34 30 Z"
-          fill={hairColor}
-        />
-      )}
-      {hair === "spikes" && (
-        <g fill={hairColor}>
-          <path d="M 40 26 L 44 12 L 50 24 Z" />
-          <path d="M 52 22 L 58 8 L 64 22 Z" />
-          <path d="M 66 24 L 74 12 L 78 26 Z" />
-        </g>
-      )}
-      {hair === "cap" && (
-        <g fill={hairColor}>
-          <path d="M 36 30 A 24 22 0 0 1 84 30 L 84 26 A 24 24 0 0 0 36 26 Z" />
-          <rect x="30" y="27" width="34" height="7" rx="3.5" />
-        </g>
-      )}
-      {hair === "headphones" && (
-        <g fill={hairColor}>
-          <path d="M 34 34 A 26 26 0 0 1 86 34 L 80 34 A 20 20 0 0 0 40 34 Z" />
-          <rect x="30" y="32" width="10" height="16" rx="5" />
-          <rect x="80" y="32" width="10" height="16" rx="5" />
-        </g>
-      )}
-      {/* face */}
-      {mood === "zen" ? (
-        <g stroke="#2b2018" strokeWidth="2.4" strokeLinecap="round">
-          <line x1="49" y1="38" x2="57" y2="38" />
-          <line x1="63" y1="38" x2="71" y2="38" />
-        </g>
-      ) : (
-        <g fill="#2b2018">
-          <circle cx="52" cy="37" r={mood === "awe" ? 3.6 : 2.6} />
-          <circle cx="68" cy="37" r={mood === "awe" ? 3.6 : 2.6} />
-        </g>
-      )}
-      {mood === "grin" && (
-        <path
-          d="M 52 47 Q 60 54 68 47"
-          fill="none"
-          stroke="#2b2018"
-          strokeWidth="2.4"
-          strokeLinecap="round"
-        />
-      )}
-      {mood === "calm" && (
-        <path
-          d="M 54 48 Q 60 51 66 48"
-          fill="none"
-          stroke="#2b2018"
-          strokeWidth="2.4"
-          strokeLinecap="round"
-        />
-      )}
-      {mood === "awe" && <ellipse cx="60" cy="49" rx="4" ry="5" fill="#2b2018" />}
-      {mood === "zen" && (
-        <path
-          d="M 54 48 Q 60 50 66 48"
-          fill="none"
-          stroke="#2b2018"
-          strokeWidth="2.4"
-          strokeLinecap="round"
-        />
-      )}
-      {headwear}
-    </svg>
+    </div>
   );
 }
 
 /**
- * The three looks of a tile on the played standup, and the contract the
- * three of them keep: one tile in colour, ever.
+ * The four looks of a tile on the played standup, and the contract they keep:
+ * every window is in full colour, one tile is framed, ever, and one more is
+ * marked on the slide the chair calls a name. Nothing is black and white and
+ * nothing is dimmed: a look is a frame, a mark or a dot, never a filter.
  *
- *  - `speaking` -- its bubble is open: colour, the speaker's frame, a green dot.
- *  - `named`    -- lit, no bubble (the queue's Walk / Decide / Look seats, the
- *                  tracker's alarm): black and white at full brightness, a green
- *                  dot. The dot is the signal light; colour is the speaker's alone.
- *  - `ghost`    -- everyone else: grayscale, dimmed, a grey dot. The outage register.
+ *  - `speaking` -- its bubble is open: the speaker's frame, a green dot.
+ *  - `called`   -- the member the chair has just named, about to answer: a
+ *                  green dot and the called mark (a dashed ring in the speaker's
+ *                  colour, inset from the edge), but no frame and no bubble.
+ *  - `named`    -- a face that is there and not speaking: a green dot, the
+ *                  signal light, and neither frame nor mark.
+ *  - `ghost`    -- a window with nobody in it, the empty desk: a grey dot. The
+ *                  drink on the desk is what says the seat is empty.
  */
-export type TileLook = "speaking" | "named" | "ghost";
+export type TileLook = "speaking" | "called" | "named" | "ghost";
 
 /** The speaker's frame: 3px, inside the tile's box so the grid does not move. */
 export const SPEAKER_OUTLINE_WIDTH = "3px";
+/** The called mark: a dashed ring, inset from the window's edge so it never reads as the frame. */
+export const CALLED_MARK_OUTLINE = "3px dashed";
+export const CALLED_MARK_INSET = "7px";
 /**
  * The CSS variable the stage sets to its own green, `pf.green` -- the register badge's: a colour
  * of the room's palette, never a theme's brand token, so nothing of the app bleeds in.
  */
 export const SPEAKER_COLOR_VAR = "--sa-speaker";
 
-export const LOOK_FILTER: Record<TileLook, string | undefined> = {
-  speaking: undefined,
-  named: "grayscale(1)",
-  ghost: "grayscale(1) brightness(0.6)",
-};
-
-// One Zoom window. Ghost mode is the outage register: grayscale, dimmed,
-// signal gone. Named is the same in black and white at full brightness, with
-// the signal on; speaking is colour in the speaker's frame.
+// One Zoom window, in full colour whatever its look. The wall is the window's
+// tint under the refined light: lit at the top left, shaded at the bottom right.
 export function ZoomTile({
   tint,
   label,
@@ -280,25 +205,22 @@ export function ZoomTile({
         animation: `rs-pop 0.5s ease-out ${delay}s both`,
       }}
     >
-      {/* The look's filter is the picture's, not the whole tile's: a named tile is
-          black and white and its dot must still be green, the signal light. */}
       <div
         data-testid="stage-layer"
         style={{
           position: "absolute",
           inset: 0,
-          background: `linear-gradient(180deg, ${tint} 0%, ${tint}bb 100%)`,
-          filter: LOOK_FILTER[look],
+          background: wall(tint),
         }}
       >
         {children}
       </div>
       <div
+        data-testid="stage-plate-label"
         style={{
           position: "absolute",
           left: "10px",
           bottom: "10px",
-          filter: ghost ? LOOK_FILTER.ghost : undefined,
           display: "flex",
           alignItems: "center",
           gap: "7px",
@@ -340,13 +262,25 @@ export function ZoomTile({
           }}
         />
       )}
+      {look === "called" && (
+        <div
+          data-testid="stage-called-mark"
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: CALLED_MARK_INSET,
+            borderRadius: "10px",
+            pointerEvents: "none",
+            outline: `${CALLED_MARK_OUTLINE} var(${SPEAKER_COLOR_VAR}, ${pf.brand})`,
+          }}
+        />
+      )}
       {pillState && (
         <div
           style={{
             position: "absolute",
             right: "10px",
             top: "10px",
-            filter: ghost ? LOOK_FILTER.ghost : undefined,
             background: pillState === "green" ? pf.green : "#3a4152",
             color: pillState === "green" ? "#0c2417" : "#9aa3b5",
             borderRadius: "999px",
@@ -366,11 +300,11 @@ export function ZoomTile({
 }
 
 // ── The bubbles ───────────────────────────────────────────────────────
-// Two surfaces of one Fluent Popover, placed by the engine (`positioning`,
-// `withArrow`: it flips and shifts and follows its anchor -- no fixed offset,
-// the way IssuePopover.tsx does it). Both are `inline`, so they stay inside the
-// tile that owns them. Neither is a Say line: the voice reads the slide's notes,
-// and these live in the slide's content.
+// Two surfaces on one white ground. The speech bubble is placed by the stage's
+// own rule (./geometry.ts), which knows the faces and plates it must keep off; the
+// thought cloud is a Fluent Popover opened from its window's button. Both live in
+// the tile that owns them. Neither is a Say line: the voice reads the slide's
+// notes, and these live in the slide's content.
 
 /**
  * Above everything a tile draws. Nothing in ZoomTile or CastScene sets a
@@ -382,10 +316,10 @@ export const BUBBLE_Z_INDEX = 30;
 
 /**
  * The speech bubble shows at most this many lines and ends the last in an
- * ellipsis: a fixed count, "because it is real" -- a listener takes in
- * about that much. The voice and the copy panel still carry every line, and
- * four lines always fit below the face, so the bubble never covers the speaker.
- * No scrollbar: a speech bubble that scrolls is not a shape anyone knows.
+ * ellipsis: a fixed count, "because it is real" -- a listener takes in about
+ * that much. A turn's first lines show; the voice (the slide's Say lines)
+ * carries every line of it. No scrollbar: a speech bubble that scrolls is not a
+ * shape anyone knows.
  */
 export const SPEECH_MAX_LINES = 4;
 
@@ -424,51 +358,77 @@ const bubbleSurface = {
 } as const;
 
 /**
- * Where the speech bubble's tail points: the speaker's face, not the
- * tile's box. `target` is a small anchor element over the head of the scene
- * (centre-top; at the mug on a mug tile), so the bubble sits `above` it with the
- * tail at the person. A top-row tile has no room above, so the engine flips to
- * `below` -- the tail still at the face -- and `overflowBoundary` is the stage, so
- * the bubble is kept inside the grid rather than shifted sideways into a neighbour.
+ * The speech bubble's width: as wide as its lines need, up to 260px and never
+ * wider than its own window -- the size it has always had (an inline popover
+ * shrank to its window). Drawn at `max-content` within this cap, so where the
+ * stage places it does not change how wide it is.
  */
-export function speechPositioning(target: HTMLElement, boundary: HTMLElement | null) {
-  return {
-    target,
-    position: "above" as const,
-    align: "center" as const,
-    fallbackPositions: ["below" as const],
-    overflowBoundary: boundary,
-  };
-}
+export const SPEECH_MAX_WIDTH = "min(260px, 100%)";
 
-/** The speech bubble: open for as long as its tile speaks, its tail at the speaker's face. */
+/** The tail's size: a small square turned 45 degrees on the edge that faces the speaker. */
+const TAIL = 12;
+
+/**
+ * The speech bubble: open for as long as its tile speaks, placed by the stage
+ * (./geometry.ts placeBubble) and drawn here at that place, its tail on the edge
+ * that faces the speaker, at the face. Until it is placed it is laid out
+ * unseen, so the stage can measure it.
+ */
 export function SpeechBubble({
-  anchor,
-  boundary = null,
+  bubbleRef,
+  place,
   children,
 }: {
-  anchor: HTMLElement | null;
-  boundary?: HTMLElement | null;
+  bubbleRef: (el: HTMLDivElement | null) => void;
+  /** Where to draw it, relative to the speaking window; null while it is measured. */
+  place: { left: number; top: number; side: BubbleSide; tail: number } | null;
   children: ReactNode;
 }) {
-  if (!anchor) return null;
+  const tailEdge: Record<BubbleSide, CSSProperties> = {
+    above: { bottom: -TAIL / 2, left: (place?.tail ?? 0) - TAIL / 2 },
+    below: { top: -TAIL / 2, left: (place?.tail ?? 0) - TAIL / 2 },
+    after: { left: -TAIL / 2, top: (place?.tail ?? 0) - TAIL / 2 },
+    before: { right: -TAIL / 2, top: (place?.tail ?? 0) - TAIL / 2 },
+  };
   return (
-    <Popover open inline withArrow positioning={speechPositioning(anchor, boundary)}>
-      {/* The surface does not clip: the tail is drawn outside its box. The
-          four-line clamp is the text element's. */}
-      <PopoverSurface
-        aria-label="Says"
-        role="status"
-        data-testid="stage-speech"
-        style={{ ...bubbleSurface, overflowY: "visible", borderRadius: "14px" }}
-      >
-        <div style={{ animation: "rs-bubble 0.45s ease-out 0.3s both" }}>
-          <span data-testid="stage-speech-text" style={speechTextClamp}>
-            {children}
-          </span>
-        </div>
-      </PopoverSurface>
-    </Popover>
+    <div
+      ref={bubbleRef}
+      aria-label="Says"
+      role="status"
+      data-testid="stage-speech"
+      data-side={place?.side}
+      style={{
+        ...bubbleSurface,
+        position: "absolute",
+        left: place?.left ?? 0,
+        top: place?.top ?? 0,
+        visibility: place ? "visible" : "hidden",
+        width: "max-content",
+        maxWidth: SPEECH_MAX_WIDTH,
+        overflowY: "visible",
+        borderRadius: "14px",
+      }}
+    >
+      {place && (
+        <span
+          aria-hidden
+          data-testid="stage-speech-tail"
+          style={{
+            position: "absolute",
+            width: TAIL,
+            height: TAIL,
+            background: "#ffffff",
+            transform: "rotate(45deg)",
+            ...tailEdge[place.side],
+          }}
+        />
+      )}
+      <div style={{ position: "relative", animation: "rs-bubble 0.45s ease-out 0.3s both" }}>
+        <span data-testid="stage-speech-text" style={speechTextClamp}>
+          {children}
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -562,7 +522,11 @@ export function ThoughtBubble({ label, children }: { label: string; children: Re
 }
 
 // ── Character scenes (webcam register) ───────────────────────────────────────
+// Each scene is its window's picture: the bust, where it has always sat, and
+// the props around it. A readout that is text (the desk motor's, the
+// terminal's, the roadmap's) sits clear of the face, so the face is seen.
 
+/** A small mug on a desk: a fill, a darker handle, one shade down the right and a highlight on the left. */
 export function Mug({
   left,
   bottom,
@@ -576,6 +540,7 @@ export function Mug({
   color: string;
   steam?: boolean;
 }) {
+  const id = useDrawingId("mg");
   return (
     <div style={{ position: "absolute", left, bottom }}>
       {steam &&
@@ -597,28 +562,67 @@ export function Mug({
             }}
           />
         ))}
-      <svg width={size} height={size * 0.95} viewBox="0 0 20 19">
+      <svg width={size} height={size * 0.95} viewBox="0 0 20 19" style={{ display: "block" }}>
+        <path
+          d="M 14 6 A 4.5 4.5 0 0 1 14 14"
+          fill="none"
+          stroke={dark(color, 0.2)}
+          strokeWidth="2.6"
+          strokeLinecap="round"
+        />
+        <clipPath id={id}>
+          <rect x="2" y="3" width="12" height="14" rx="2.5" />
+        </clipPath>
         <rect x="2" y="3" width="12" height="14" rx="2.5" fill={color} />
-        <path d="M 14 6 A 4.5 4.5 0 0 1 14 14" fill="none" stroke={color} strokeWidth="2.6" />
+        <path
+          d="M 11.6 0 Q 10 10 11.6 20 H 18 V 0 Z"
+          fill="#000"
+          opacity="0.16"
+          clipPath={`url(#${id})`}
+        />
+        <rect x="3.7" y="5.6" width="1.5" height="8" rx="0.75" fill="#fff" opacity="0.36" />
       </svg>
+    </div>
+  );
+}
+
+/** A status readout pinned in a window: the dark pill the plates use, in the stage's mono. */
+function Readout({
+  top,
+  left,
+  color,
+  children,
+}: {
+  top: string;
+  left: string;
+  color: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top,
+        left,
+        background: "rgba(10,14,24,0.72)",
+        borderRadius: "7px",
+        padding: "5px 10px",
+        fontFamily: mono,
+        fontSize: "0.6rem",
+        color,
+        letterSpacing: "0.08em",
+      }}
+    >
+      {children}
     </div>
   );
 }
 
 // The Super Dev rig: motorized desk that takes him out of frame — exactly
 // three rides per standup, then it rests — plus a ten-mug fleet riding along.
-// In his status callout (`press`) the desk is PARKED and the 60-lb dumbbell
-// comes out: arm out at 90°, forearm up, wrist turned 45°, pressing reps
-// while reporting. One gag per register — the desk rides OR he lifts.
-function DevHeroScene({
-  ride = "-58%",
-  press = false,
-  headwear,
-}: {
-  ride?: string;
-  press?: boolean;
-  headwear?: ReactNode;
-}) {
+// Parked (`press`), the desk holds still and he sits at rest: no ride, no
+// console, nothing in his window moves but the steam on his mugs.
+function DevHeroScene({ ride = "-58%", press = false }: { ride?: string; press?: boolean }) {
   return (
     <div style={{ position: "absolute", inset: 0 }}>
       {/* everything on the rig rides the motor together — 3 rides, not infinite */}
@@ -638,69 +642,9 @@ function DevHeroScene({
             transform: "translateX(-50%)",
           }}
         >
-          <Person shirt="#2d5bd0" hair="coif" mood="grin" headwear={headwear} />
+          {/* the bolt on his shirt stops at the desk: none of it shows under the slab */}
+          <Bust id="dev-hero" cover={{ x: 51, y: 99, width: 19, height: 14.5, fill: "#2d5bd0" }} />
         </div>
-        {press && (
-          /* shoulder presses mid-status: upper arm out 90°, forearm up,
-             wrist at 45°, sixty pounds of commitment */
-          <div
-            style={{
-              position: "absolute",
-              bottom: "21%",
-              left: "56%",
-              animation: "rs-press 1.4s ease-in-out infinite",
-            }}
-          >
-            <svg width="124" height="112" viewBox="0 0 124 112">
-              <line
-                x1="4"
-                y1="88"
-                x2="52"
-                y2="86"
-                stroke="#2d5bd0"
-                strokeWidth="13"
-                strokeLinecap="round"
-              />
-              <line
-                x1="52"
-                y1="86"
-                x2="54"
-                y2="40"
-                stroke="#e8b88a"
-                strokeWidth="11"
-                strokeLinecap="round"
-              />
-              <circle cx="55" cy="35" r="8" fill="#e8b88a" />
-              <line
-                x1="38"
-                y1="52"
-                x2="72"
-                y2="18"
-                stroke="#3a3f4b"
-                strokeWidth="6"
-                strokeLinecap="round"
-              />
-              <rect
-                x="30"
-                y="35"
-                width="17"
-                height="36"
-                rx="6"
-                transform="rotate(-45 38.5 53)"
-                fill="#242833"
-              />
-              <rect
-                x="63"
-                y="1"
-                width="17"
-                height="36"
-                rx="6"
-                transform="rotate(-45 71.5 19)"
-                fill="#242833"
-              />
-            </svg>
-          </div>
-        )}
         {/* desk surface; legs long enough to stay grounded mid-ascent */}
         <div
           style={{
@@ -709,9 +653,9 @@ function DevHeroScene({
             left: "8%",
             right: "8%",
             height: "9px",
-            background: "#7d5a3a",
+            background: sideShade("#8a6644"),
             borderRadius: "4px",
-            boxShadow: "0 6px 12px rgba(0,0,0,0.3)",
+            boxShadow: SOFT_SHADOW,
           }}
         />
         <div
@@ -721,7 +665,7 @@ function DevHeroScene({
             left: "27%",
             width: "7px",
             height: "68%",
-            background: "#5a4530",
+            background: sideShade("#5f4932", 0.3),
             borderRadius: "3px",
           }}
         />
@@ -732,7 +676,7 @@ function DevHeroScene({
             right: "27%",
             width: "7px",
             height: "68%",
-            background: "#5a4530",
+            background: sideShade("#5f4932", 0.3),
             borderRadius: "3px",
           }}
         />
@@ -748,69 +692,63 @@ function DevHeroScene({
         <Mug left="85%" bottom="17.4%" size={28} color={pf.pink} />
         <Mug left="92%" bottom="17.4%" size={18} color={pf.yellow} />
       </div>
-      {/* the motor console does not ride — it just reports */}
-      <div
-        style={{
-          position: "absolute",
-          top: "30%",
-          left: "16%",
-          background: "rgba(10,14,24,0.72)",
-          borderRadius: "7px",
-          padding: "5px 10px",
-          fontFamily: mono,
-          fontSize: "0.6rem",
-          color: pf.yellow,
-          letterSpacing: "0.08em",
-        }}
-      >
-        {press ? "DESK MOTOR · PARKED" : "DESK MOTOR ▲ ENGAGED"}
-      </div>
+      {/* the motor console does not ride — it just reports, above his head */}
+      {!press && (
+        <Readout top="5%" left="16%" color={pf.yellow}>
+          DESK MOTOR ▲ ENGAGED
+        </Readout>
+      )}
     </div>
   );
 }
 
-function OpsDevScene({ headwear }: { headwear?: ReactNode } = {}) {
+/** The ops terminal's text colour at rest, and its beat: a colour shift only, slow
+ *  and gentle. Reduced motion stops it with every other animation (REDUCED_MOTION_RULE). */
+export const OPS_TERMINAL_GREEN = "#79d68a";
+export const OPS_TERMINAL_BEAT = "rs-termbeat 2.6s ease-in-out infinite";
+
+function OpsDevScene() {
   return (
-    <div style={{ position: "absolute", inset: 0, background: "#10141f" }}>
-      <div style={{ position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)" }}>
-        <Person
-          shirt="#26303f"
-          skin="#c68863"
-          hair="buzz"
-          hairColor="#1c1611"
-          mood="calm"
-          headwear={headwear}
-        />
-      </div>
-      {/* terminal window, phosphor-lit from below. Props live inside the
-          zoom-safe box (≥ 0.5 − 0.5/zoom from center, both axes) so the
-          solo close-up never crops them. */}
+    <div style={{ position: "absolute", inset: 0, background: wall("#10141f") }}>
+      {/* The terminal is on the wall BEHIND him, like a call's background: drawn first, so
+          his head is always in front of it. On the beat only its text shifts between
+          phosphor green and white -- the panel itself never fades or blinks. */}
       <div
+        data-testid="ops-dev-terminal"
         style={{
           position: "absolute",
-          top: "36%",
-          left: "20%",
+          top: "6%",
+          left: "6%",
           width: "44%",
           borderRadius: "8px",
           background: "#0a0f0a",
-          border: "1px solid #1d3020",
-          padding: "8px 10px",
+          boxShadow: SOFT_SHADOW,
+          padding: "6px 10px",
           fontFamily: mono,
           fontSize: "0.58rem",
-          color: "#79d68a",
-          lineHeight: 1.7,
-          animation: "rs-flicker 2.6s ease-in-out infinite",
+          color: OPS_TERMINAL_GREEN,
+          lineHeight: 1.5,
         }}
       >
-        <div>$ tail -f prod.log</div>
-        <div style={{ opacity: 0.65 }}>[ok] heartbeat 200</div>
-        <div style={{ opacity: 0.65 }}>[ok] heartbeat 200</div>
-        <div style={{ opacity: 0.4 }}>▮</div>
+        <div data-testid="ops-dev-terminal-text" style={{ animation: OPS_TERMINAL_BEAT }}>
+          <div>$ tail -f prod.log</div>
+          <div style={{ opacity: 0.65 }}>[ok] heartbeat 200</div>
+          <div style={{ opacity: 0.65 }}>[ok] heartbeat 200</div>
+          <div style={{ opacity: 0.4 }}>▮</div>
+        </div>
+      </div>
+      <div
+        data-testid="ops-dev-figure"
+        style={{ position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)" }}
+      >
+        {/* the prompt on his shirt would be cut by the window's edge: not drawn here */}
+        <Bust id="ops-dev" cover={{ x: 46, y: 85, width: 27, height: 28.5, fill: "#26303f" }} />
       </div>
       <div
         style={{
           position: "absolute",
           inset: 0,
+          pointerEvents: "none",
           background:
             "radial-gradient(ellipse 70% 45% at 50% 100%, rgba(121,214,138,0.16) 0%, transparent 70%)",
         }}
@@ -819,7 +757,7 @@ function OpsDevScene({ headwear }: { headwear?: ReactNode } = {}) {
   );
 }
 
-function VibemancerScene({ headwear }: { headwear?: ReactNode } = {}) {
+function VibemancerScene() {
   return (
     <div style={{ position: "absolute", inset: 0, background: "#171226" }}>
       {/* RGB ambiance — the whole aura slowly cycles hue */}
@@ -897,14 +835,7 @@ function VibemancerScene({ headwear }: { headwear?: ReactNode } = {}) {
         />
       </div>
       <div style={{ position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)" }}>
-        <Person
-          shirt="#31264d"
-          skin="#f2c9a0"
-          hair="headphones"
-          hairColor="#231a38"
-          mood="zen"
-          headwear={headwear}
-        />
+        <Bust id="vibemancer" />
       </div>
       {[
         { top: "38%", left: "24%" },
@@ -930,22 +861,15 @@ function VibemancerScene({ headwear }: { headwear?: ReactNode } = {}) {
   );
 }
 
-function UltraWideScene({ headwear }: { headwear?: ReactNode } = {}) {
+function UltraWideScene() {
+  const bezel = "#27344e";
   return (
-    <div style={{ position: "absolute", inset: 0, background: "#1a2233" }}>
-      {/* only the forehead survives behind three 50-inch displays — high
-          enough that eyes peek over the monitor line even in the solo zoom */}
+    <div style={{ position: "absolute", inset: 0 }}>
+      {/* three 50-inch displays, and a head above the monitor line */}
       <div
         style={{ position: "absolute", bottom: "38%", left: "50%", transform: "translateX(-50%)" }}
       >
-        <Person
-          shirt="#223047"
-          skin="#8d5a3b"
-          hair="crop"
-          hairColor="#14100c"
-          mood="awe"
-          headwear={headwear}
-        />
+        <Bust id="ultrawide" />
       </div>
       {[
         { left: "2%", rot: -8 },
@@ -960,18 +884,25 @@ function UltraWideScene({ headwear }: { headwear?: ReactNode } = {}) {
             left,
             width: "38%",
             height: "46%",
-            background: "linear-gradient(200deg, #2c3c58 0%, #1b2536 100%)",
-            border: "3px solid #0d1420",
-            borderRadius: "6px",
+            background: sideShade(bezel, 0.36),
+            borderRadius: "8px",
             transform: `rotate(${rot}deg)`,
-            boxShadow: "0 10px 22px rgba(0,0,0,0.5)",
+            boxShadow: SOFT_SHADOW,
           }}
         >
           <div
             style={{
               position: "absolute",
-              inset: "10%",
-              background: `repeating-linear-gradient(0deg, rgba(111,207,151,0.28) 0px, rgba(111,207,151,0.28) 2px, transparent 2px, transparent 7px)`,
+              inset: "8%",
+              borderRadius: "4px",
+              background: "#141c2c",
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              inset: "14%",
+              background: `repeating-linear-gradient(0deg, rgba(111,207,151,0.34) 0px, rgba(111,207,151,0.34) 2px, transparent 2px, transparent 7px)`,
             }}
           />
         </div>
@@ -980,33 +911,33 @@ function UltraWideScene({ headwear }: { headwear?: ReactNode } = {}) {
   );
 }
 
-function QaScene({ headwear }: { headwear?: ReactNode } = {}) {
+function QaScene() {
+  const id = useDrawingId("qa");
+  const glass = "#e6eef3";
   return (
     <div style={{ position: "absolute", inset: 0 }}>
       <div style={{ position: "absolute", bottom: 0, left: "44%", transform: "translateX(-50%)" }}>
         {/* labcoat */}
-        <Person
-          shirt="#f2f4f6"
-          skin="#e8b88a"
-          hair="bun"
-          hairColor="#5a3a20"
-          mood="calm"
-          headwear={headwear}
-        />
+        <Bust id="qa" />
       </div>
       {/* flask of suspiciously stable green */}
       <div style={{ position: "absolute", bottom: "6%", right: "21%" }}>
-        <svg width="52" height="64" viewBox="0 0 52 64">
-          <path
-            d="M 21 4 L 21 24 L 8 52 A 8 8 0 0 0 15 62 L 37 62 A 8 8 0 0 0 44 52 L 31 24 L 31 4 Z"
-            fill="#dfe8ee"
-            opacity="0.9"
-          />
-          <path
-            d="M 13 42 L 39 42 L 44 52 A 8 8 0 0 1 37 62 L 15 62 A 8 8 0 0 1 8 52 Z"
-            fill={pf.green}
-          />
-          <rect x="18" y="2" width="16" height="5" rx="2.5" fill="#b9c6d1" />
+        <svg
+          width="52"
+          height="64"
+          viewBox="0 0 52 64"
+          style={{ display: "block", overflow: "visible", filter: DRAWING_SHADOW }}
+        >
+          <Soft id={`${id}-glass`} fill={glass} shade={dark(glass, 0.22)} dx={-3.4} dy={0}>
+            <path d="M 21 4 L 21 24 L 8 52 A 8 8 0 0 0 15 62 L 37 62 A 8 8 0 0 0 44 52 L 31 24 L 31 4 Z" />
+          </Soft>
+          <Soft id={`${id}-brew`} fill={pf.green} shade={dark(pf.green, 0.24)} dx={-3.4} dy={0}>
+            <path d="M 13 42 L 39 42 L 44 52 A 8 8 0 0 1 37 62 L 15 62 A 8 8 0 0 1 8 52 Z" />
+          </Soft>
+          <Soft id={`${id}-lip`} fill="#c9d4dd" shade="#a3b0bc" dx={-3} dy={0}>
+            <rect x="18" y="2" width="16" height="5" rx="2.5" />
+          </Soft>
+          <rect x="22.6" y="9" width="1.8" height="13" rx="0.9" fill="#fff" opacity="0.5" />
         </svg>
       </div>
       {/* smoke, rising from the flask: normal, apparently. The copy promises
@@ -1033,59 +964,133 @@ function QaScene({ headwear }: { headwear?: ReactNode } = {}) {
   );
 }
 
-function PmScene({ headwear }: { headwear?: ReactNode } = {}) {
+/** The PM's bust, in px: smaller than the others, as it has always been. */
+const PM_BUST = 130;
+
+function PmScene() {
+  const id = useDrawingId("pm");
+  const shirt = "#2a3142";
+  const skin = "#f2c9a0";
+  const rail = "#c9d0de";
+  const grip = "#1c2434";
   return (
     <div style={{ position: "absolute", inset: 0 }}>
-      {/* controlled forward motion — inner wrapper owns the bob animation */}
       <div
         style={{ position: "absolute", bottom: "14%", left: "50%", transform: "translateX(-50%)" }}
       >
+        {/* controlled forward motion — inner wrapper owns the bob animation */}
         <div style={{ animation: "rs-bob 1.1s ease-in-out infinite" }}>
           {/* charcoal athletic wear — a red shirt vanishes into the red tile */}
-          <Person
-            shirt="#2a3142"
-            skin="#f2c9a0"
-            hair="long"
-            hairColor="#7a4a20"
-            mood="grin"
-            width={130}
-            headwear={headwear}
-          />
+          <Bust id="pm" width={PM_BUST} />
         </div>
+        {/* the treadmill, in the bust's own units and standing still while she
+            walks: two rails with grips and her hands on them, the crossbar, and
+            the console reading its speed */}
+        <svg
+          data-testid="stage-treadmill"
+          viewBox="0 0 120 100"
+          width={PM_BUST}
+          height={(PM_BUST * 100) / 120}
+          aria-hidden
+          focusable="false"
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            overflow: "visible",
+            filter: DRAWING_SHADOW,
+          }}
+        >
+          <Soft id={`${id}-bar`} fill={dark(rail, 0.3)} shade={dark(rail, 0.5)} dx={0} dy={-1.8}>
+            <rect x="-24" y="78" width="168" height="7" rx="3.5" />
+          </Soft>
+          <Soft id={`${id}-posts`} fill={rail} shade={dark(rail, 0.3)} dx={-3} dy={0}>
+            <rect
+              x="-33.5"
+              y="72.5"
+              width="10.4"
+              height="92"
+              rx="5.2"
+              transform="rotate(5 -28.8 159)"
+            />
+            <rect
+              x="143.1"
+              y="72.5"
+              width="10.4"
+              height="92"
+              rx="5.2"
+              transform="rotate(-5 148.8 159)"
+            />
+          </Soft>
+          <Soft id={`${id}-grips`} fill={lite(grip, 0.08)} shade={grip} dx={-2.3} dy={-1.8}>
+            <rect x="-26.5" y="70.2" width="39.2" height="9.7" rx="4.85" />
+            <rect x="107.3" y="70.2" width="39.2" height="9.7" rx="4.85" />
+          </Soft>
+          <Soft id={`${id}-sleeves`} fill={shirt} shade={dark(shirt, 0.24)} dx={-2.8} dy={-1.2}>
+            <rect
+              x="3.5"
+              y="67.8"
+              width="14.4"
+              height="34.6"
+              rx="7.2"
+              transform="rotate(-52 10.4 74.8)"
+            />
+            <rect
+              x="102.1"
+              y="67.8"
+              width="14.4"
+              height="34.6"
+              rx="7.2"
+              transform="rotate(52 109.6 74.8)"
+            />
+          </Soft>
+          <Soft id={`${id}-fists`} fill={skin} shade={dark(skin, 0.16)} dx={-2.1} dy={-1.4}>
+            <rect x="-3.5" y="65" width="17.3" height="16.7" rx="7.15" />
+            <rect x="106.2" y="65" width="17.3" height="16.7" rx="7.15" />
+          </Soft>
+          <Soft id={`${id}-console`} fill="#2b3550" shade="#1a2236" dx={-5} dy={0}>
+            <rect x="31" y="71.5" width="58" height="17" rx="5" />
+          </Soft>
+          <rect x="35.5" y="74.5" width="28" height="11" rx="2.6" fill="#0b1020" />
+          <text
+            x="49.5"
+            y="83.4"
+            textAnchor="middle"
+            fontFamily={mono}
+            fontSize="8.6"
+            fontWeight="700"
+            fill={pf.green}
+          >
+            3.5
+          </text>
+          <circle cx="71.5" cy="78.3" r="2.1" fill={pf.green} />
+          <circle cx="78" cy="78.3" r="2.1" fill={pf.yellow} />
+          <rect x="68.6" y="82.6" width="12.2" height="2.6" rx="1.3" fill="#fff" opacity="0.3" />
+        </svg>
       </div>
+      {/* the belt, running under her */}
       <div
         style={{
           position: "absolute",
-          bottom: "6%",
-          left: "18%",
-          right: "18%",
-          height: "12px",
-          background: "#2a3142",
-          borderRadius: "6px",
-          boxShadow: "0 8px 14px rgba(0,0,0,0.35)",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: "calc(14% - 6px)",
+          boxSizing: "border-box",
+          borderTop: "1px solid rgba(255,255,255,0.22)",
+          background:
+            "repeating-linear-gradient(105deg, rgba(255,255,255,0.07) 0px, rgba(255,255,255,0.07) 3px, transparent 3px, transparent 26px), rgba(11,15,25,0.72)",
         }}
       />
-      <div
-        style={{
-          position: "absolute",
-          top: "34%",
-          left: "20%",
-          background: "rgba(10,14,24,0.7)",
-          borderRadius: "7px",
-          padding: "5px 10px",
-          fontFamily: mono,
-          fontSize: "0.6rem",
-          color: pf.green,
-          letterSpacing: "0.08em",
-        }}
-      >
+      {/* the roadmap's readout, up in the corner at the desk motor's inset */}
+      <Readout top="5%" left="16%" color={pf.green}>
         ROADMAP ▲ STABLE
-      </div>
+      </Readout>
     </div>
   );
 }
 
-function DesignerScene({ headwear }: { headwear?: ReactNode } = {}) {
+function DesignerScene() {
   return (
     <div style={{ position: "absolute", inset: 0 }}>
       {/* beanbag blob, low in frame */}
@@ -1097,33 +1102,46 @@ function DesignerScene({ headwear }: { headwear?: ReactNode } = {}) {
           width: "68%",
           height: "38%",
           borderRadius: "48% 52% 40% 60% / 62% 58% 42% 38%",
-          background: "#b0563a",
-          boxShadow: "inset 0 -12px 24px rgba(0,0,0,0.3)",
+          background: "linear-gradient(100deg, #b85c3f 0%, #b0563a 58%, #8c452f 100%)",
+          boxShadow: SOFT_SHADOW,
         }}
       />
       <div
         style={{ position: "absolute", bottom: "16%", left: "50%", transform: "translateX(-50%)" }}
       >
         {/* cream shirt + terracotta beanbag — green-on-green disappeared into the tile */}
-        <Person
-          shirt="#efe6d6"
-          skin="#c68863"
-          hair="curls"
-          hairColor="#241a12"
-          mood="zen"
-          width={130}
-          headwear={headwear}
-        />
+        <Bust id="designer" width={130} />
       </div>
-      {/* floating design frames + cursor */}
-      <div style={{ position: "absolute", top: "32%", right: "19%", width: "34%", height: "26%" }}>
+      {/* the beanbag's near side, which she has sunk into */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: "-6%",
+          left: "21%",
+          width: "58%",
+          height: "17%",
+          borderRadius: "50% 50% 0 0 / 100% 100% 0 0",
+          background: "linear-gradient(100deg, #b85c3f 0%, #b0563a 58%, #8c452f 100%)",
+        }}
+      />
+      {/* floating design frames + cursor, beside the head */}
+      <div
+        style={{
+          position: "absolute",
+          top: "6%",
+          right: "5%",
+          width: "29%",
+          height: "22%",
+          filter: DRAWING_SHADOW,
+        }}
+      >
         <div
           style={{
             position: "absolute",
             inset: 0,
             border: `2px solid ${pf.pink}`,
             borderRadius: "6px",
-            opacity: 0.85,
+            opacity: 0.9,
           }}
         />
         <div
@@ -1132,7 +1150,7 @@ function DesignerScene({ headwear }: { headwear?: ReactNode } = {}) {
             inset: "22% 40% 20% 12%",
             border: `2px solid ${pf.teal}`,
             borderRadius: "4px",
-            opacity: 0.85,
+            opacity: 0.9,
           }}
         />
         <svg
@@ -1148,7 +1166,16 @@ function DesignerScene({ headwear }: { headwear?: ReactNode } = {}) {
   );
 }
 
-function NewHireScene({ headwear }: { headwear?: ReactNode } = {}) {
+/** The raised arm's shapes are drawn for the left of a bust; this puts them on the right. */
+const MIRROR = "translate(120 0) scale(-1 1)";
+
+function NewHireScene() {
+  const id = useDrawingId("nh");
+  const shirt = "#d9a12f";
+  const skin = "#f2c9a0";
+  const cuff = lite(shirt, 0.5);
+  const sleeve = `${MIRROR} rotate(-12 19.5 112)`;
+  const palm = `${MIRROR} translate(-5.6 -3.4) rotate(-12 11.5 49)`;
   return (
     <div style={{ position: "absolute", inset: 0 }}>
       {/* framing is... a work in progress — half out of shot, waving */}
@@ -1160,61 +1187,72 @@ function NewHireScene({ headwear }: { headwear?: ReactNode } = {}) {
           transform: "translateX(-50%) rotate(-4deg)",
         }}
       >
-        <Person
-          shirt="#d9a12f"
-          skin="#f2c9a0"
-          hair="spikes"
-          hairColor="#6a4a1a"
-          mood="awe"
-          headwear={headwear}
-        />
-      </div>
-      {/* the eager raised hand — 2x, shadowed, with a shirt-yellow cuff so
-          it unmistakably belongs to him */}
-      <svg
-        width="80"
-        height="88"
-        viewBox="0 0 30 38"
-        style={{
-          position: "absolute",
-          bottom: "34%",
-          left: "45%",
-          filter: "drop-shadow(0 6px 12px rgba(0,0,0,0.4))",
-        }}
-      >
-        <g fill="#f2c9a0">
-          <rect x="10" y="12" width="12" height="18" rx="6" />
-          {[0, 1, 2, 3].map((i) => (
+        {/* the eager raised hand, behind the shoulder it belongs to: a sleeve,
+            a cuff and an open palm, in the bust's own units */}
+        <svg
+          data-testid="stage-raised-hand"
+          viewBox="0 0 120 100"
+          width={150}
+          height={125}
+          aria-hidden
+          focusable="false"
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            overflow: "visible",
+            filter: DRAWING_SHADOW,
+          }}
+        >
+          <Soft id={`${id}-arm`} fill={shirt} shade={dark(shirt, 0.24)} dx={-3.4} dy={0}>
+            <rect x="12" y="48" width="15" height="68" rx="7.5" transform={sleeve} />
+          </Soft>
+          <Soft id={`${id}-hand`} fill={skin} shade={dark(skin, 0.16)} dx={-1.8} dy={-1.2}>
+            <rect x="1.8" y="30" width="19.4" height="19" rx="7" transform={palm} />
+            {[
+              [-15, 20.5],
+              [-5, 17.5],
+              [5, 18],
+              [15, 21.5],
+            ].map(([a, y], i) => (
+              <rect
+                key={a}
+                x={1.6 + i * 5.1}
+                y={y}
+                width="4.3"
+                height="17"
+                rx="2.15"
+                transform={`${palm} rotate(${a} 11.4 44)`}
+              />
+            ))}
             <rect
-              key={i}
-              x={8 + i * 4.4}
-              y={2 + (i === 0 ? 6 : i === 3 ? 4 : 0)}
-              width="4"
-              height="14"
-              rx="2"
+              x="19.2"
+              y="31.5"
+              width="4.6"
+              height="13"
+              rx="2.3"
+              transform={`${palm} rotate(38 21.5 44)`}
             />
-          ))}
-        </g>
-        <rect x="9" y="28" width="14" height="9" rx="3.5" fill="#d9a12f" />
-      </svg>
+          </Soft>
+          <Soft id={`${id}-cuff`} fill={cuff} shade={dark(cuff, 0.2)} dx={-3} dy={0}>
+            <rect x="10.6" y="46" width="17.8" height="7.6" rx="3.8" transform={sleeve} />
+          </Soft>
+        </svg>
+        <div style={{ position: "relative" }}>
+          {/* the name sticker would be cut by the window's edge: not drawn here */}
+          <Bust id="new-hire" cover={{ x: 62, y: 88, width: 22, height: 25.5, fill: "#d9a12f" }} />
+        </div>
+      </div>
     </div>
   );
 }
 
-function MinimalistScene({ headwear }: { headwear?: ReactNode } = {}) {
+function MinimalistScene() {
   return (
-    <div style={{ position: "absolute", inset: 0, background: "#e8ecef" }}>
+    <div style={{ position: "absolute", inset: 0, background: wall("#e8ecef") }}>
       {/* a perfectly empty room, one small person, zero clutter */}
       <div style={{ position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)" }}>
-        <Person
-          shirt="#454b54"
-          skin="#e8b88a"
-          hair="buzz"
-          hairColor="#2c2c2c"
-          mood="calm"
-          width={96}
-          headwear={headwear}
-        />
+        <Bust id="minimalist" width={96} />
       </div>
       <div
         style={{
@@ -1231,44 +1269,36 @@ function MinimalistScene({ headwear }: { headwear?: ReactNode } = {}) {
   );
 }
 
-// Renders a character's webcam scene on demand, optionally with something on
-// their head. CAST's own `scene` field stays a pre-built element because the
-// first two decks never needed to vary one; the Remote Control Hat deck goes
-// through here instead, so the hat mounts inside Person's SVG rather than being
-// positioned over the tile in CSS (a hat that floats near a head fails the
-// rigid-relations check, and nine hand-tuned offsets would drift anyway).
+// Renders a character's webcam scene on demand.
 export function CastScene({
   id,
-  headwear,
   parked = false,
 }: {
   id: string;
-  headwear?: ReactNode;
   /** Park Super Dev's motorized desk. Without this his rig rides him out of
       frame on a timer, so any slide that needs all nine faces present at once
-      has to ask for it. On his rig, parking is also what brings the dumbbell
-      out — the desk rides or he lifts, never both. */
+      has to ask for it. Parked, he sits at rest. */
   parked?: boolean;
 }) {
   switch (id) {
     case "dev-hero":
-      return <DevHeroScene press={parked} headwear={headwear} />;
+      return <DevHeroScene press={parked} />;
     case "ops-dev":
-      return <OpsDevScene headwear={headwear} />;
+      return <OpsDevScene />;
     case "minimalist":
-      return <MinimalistScene headwear={headwear} />;
+      return <MinimalistScene />;
     case "new-hire":
-      return <NewHireScene headwear={headwear} />;
+      return <NewHireScene />;
     case "vibemancer":
-      return <VibemancerScene headwear={headwear} />;
+      return <VibemancerScene />;
     case "ultrawide":
-      return <UltraWideScene headwear={headwear} />;
+      return <UltraWideScene />;
     case "qa":
-      return <QaScene headwear={headwear} />;
+      return <QaScene />;
     case "pm":
-      return <PmScene headwear={headwear} />;
+      return <PmScene />;
     case "designer":
-      return <DesignerScene headwear={headwear} />;
+      return <DesignerScene />;
     default:
       throw new Error(`Unknown cast member: ${id}`);
   }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import type { Deck, Slide } from "../../deck/decks/types";
 import { Say } from "../../deck/engine/PresenterNoteKit";
@@ -17,8 +17,8 @@ import {
   CAST,
   CastScene,
   castById,
-  Mug,
   SPEAKER_COLOR_VAR,
+  STAGE_GRID_CLASS,
   SpeechBubble,
   STAGE_CLASS,
   StandupKeyframes,
@@ -28,29 +28,39 @@ import {
   pf,
 } from "./cast";
 import type { TileLook } from "./cast";
-import { SEATS, dealSeats, plateFor, seatOf } from "./seats";
-import type { Seat } from "./seats";
+import type { MugLook } from "./EmptyDesk";
+import { RefinedDesk } from "./RefinedDesk";
+import { CHAIR_CAST_ID, CHAIR_PLATE, EMPTY_DESK_PLATE, dealRoom, seatedPlate } from "./seats";
+import type { Seated } from "./seats";
+import { HEADS, HEAD_FALLBACK, faceBox, leastOverlap, placeBubble } from "./geometry";
+import type { BubbleSide, Rect } from "./geometry";
 
 // ── The standup, played (docs/modules/solitaire-agile.md, "The played view") ─────────
 //
 // The agent's standup response turned into a Deck the deck engine plays
 // unchanged: the Remote Standup's stage (./cast.tsx), the engine's script.
-// Three slide kinds and nothing else (docs/modules/solitaire-agile.md, "The played view"):
+// The room is nine windows (./seats.ts): the chair, the present members by
+// position, and an empty desk in every other window. The round goes:
 //
-//   the QUEUE   -- what only the human can do; the chair reads it out
-//   the CHAIR   -- the PM's seat, the phrasebook's noun-less line
-//   a WORKER    -- one lit tile, its three slots, or the mug and its status
+//   the BOARD   -- the chair reads what is waiting on you, or the tracker's reason
+//   the CHAIR   -- the phrasebook's noun-less opening line
+//   for each present member, in seat order:
+//     the CALL  -- the chair says the member's name
+//     the TURN  -- the member's tile speaks its turn, in the frame
+//   the CHAIR'S STATUS -- its own turn, last, in the same frame
+//   the CLOSE   -- the phrasebook's closing line
 //
-// in the order queue, chair, each seated worker, chair, queue (D-TA6: the
-// queue is first and last). Every slide is the same nine tiles (D-TA17), the
-// ritual's plate across the top and the register on it (D-TA13), and its
-// Say lines are generated from the slot text so the engine's narration and
-// its duration estimate work as they do for any deck. The deck is an
-// AUDIOBOOK (decks/types.ts): played in Audiobook mode, the browser's voice.
+// An empty desk has no slide: the round passes it in silence. Every face
+// drawn speaks at least once. Every slide is the same nine windows (D-TA17),
+// the ritual's plate across the top and the register on it (D-TA13), and its
+// Say lines are the response's sentences, so the engine's narration and its
+// duration estimate work as they do for any deck. The deck is an AUDIOBOOK
+// (decks/types.ts): played in Audiobook mode, the browser's voice.
 //
 // Every fixed word of the standup is the contract's (consts.json
 // rituals.text, through RITUALS); the words below are this view's own --
-// the plates (./seats.ts) and two queue-kind labels the text has none for yet.
+// the plates (./seats.ts), the call, and two queue-kind labels the text has
+// none for yet.
 //
 // The deck plays at the WORK grain (D-TA20): a person speaks at the grain
 // of the work, not the ticket, so a tile says one SENTENCE a group -- the
@@ -67,11 +77,9 @@ const T = RITUALS.text;
 const DECIDE = "Decide";
 const LOOK = "Look";
 const CHAIR_TITLE = "The chair";
-/** What a tile with no person in it opens with: the mug is a seat reporting
- *  async. The stage's own reading of its tile -- the CLI's text has no tile -- so it
- *  lives here, not in consts.json. */
-const ASYNC_OPENER = "My async status:";
-const STANDING = "Also standing";
+/** The chair calling a member: the member's name and a full stop. The stage's
+ *  own line -- the CLI's round names each member at the head of its line instead. */
+export const callLine = (name: string) => `${name}.`;
 
 /** One slot's items, as the thought bubble lists them: the detail behind the sentence. */
 interface DetailSlot {
@@ -135,26 +143,27 @@ function queueWorkScript(data: StandupResponse): Script | null {
   return { lines: [...said], say: [...said] };
 }
 
-/** The mug and its status sentence (the agent's), opened as async. */
-function asyncScript(w: StandupWorker): Script {
-  return {
-    lines: [ASYNC_OPENER, `"${w.excuse}"`],
-    say: [`${ASYNC_OPENER} ${w.excuse}`],
-  };
+/** An idle member from an agent whose prose carries no turn for it: its made-up
+ *  items as they are (the pair, else the one sentence an older agent sent),
+ *  or, with none of those either, its three empty slots. Never a silent face. */
+function idleScript(w: StandupWorker): Script | null {
+  const said = (w.status?.length ? w.status : [w.excuse]).filter(Boolean);
+  return said.length ? { lines: [...said], say: [...said] } : null;
 }
 
-/** A worker at the work grain, spoken as prose: its sentences, one bubble
- *  line and one Say line each -- the dressed ones (`spoken`) when a model
- *  answered, the prose otherwise. An empty worker is async (above). */
-function workerWorkScript(w: StandupWorker, ww: WorkWorker, dressed?: string[]): Script {
-  if (w.empty) return asyncScript(w);
+/** A worker at the work grain, spoken as prose: its turn, one bubble
+ *  line and one Say line a sentence -- the dressed ones (`spoken`) when a model
+ *  answered, the prose otherwise. An idle worker's turn is its two made-up
+ *  items in the same frame. */
+function workerWorkScript(w: StandupWorker, ww: WorkWorker, dressed?: string[]): Script | null {
   const said = dressed ?? ww.prose ?? [];
+  if (said.length === 0) return w.empty ? idleScript(w) : null;
   return { lines: [...said], say: [...said] };
 }
 
 function workerScript(w: StandupWorker, ww?: WorkWorker, dressed?: string[]): Script {
-  if (ww) return workerWorkScript(w, ww, dressed);
-  if (w.empty) return asyncScript(w);
+  const prose = ww ? workerWorkScript(w, ww, dressed) : w.empty ? idleScript(w) : null;
+  if (prose) return prose;
   const slot = (
     label: string,
     items: RitualItem[],
@@ -177,86 +186,195 @@ function workerScript(w: StandupWorker, ww?: WorkWorker, dressed?: string[]): Sc
 // ── The stage ────────────────────────────────────────────────────────────────
 
 interface TileState {
-  /** Lit: the seat speaks or has something on this slide. Else ghosted. */
+  /** Lit: the window speaks on this slide (with a bubble) or is called (without). */
   lit?: boolean;
-  /** The mug where the face would be (D-TA11). */
-  mug?: boolean;
+  /** Someone is in this window today: a face, its signal light on. */
+  present?: boolean;
+  /** The member the chair has just called: in colour, unframed, about to answer. */
+  called?: boolean;
+  /** Nobody is in this window: the empty desk, with this mug. Never lit, never a bubble. */
+  desk?: MugLook;
   /** The bubble's lines, on a lit tile. */
   bubble?: string[];
   /** The detail behind the sentence, for the thought bubble; absent when there is none. */
   detail?: DetailSlot[];
 }
 
-/** The steaming mug, large, in place of the scene (D-TA11). */
-function MugGlyph() {
+/** A window with nobody in it: the empty desk in full colour, the signal light off, and nothing to say. */
+function DeskTile({ id, label, look }: { id: string; label: string; look: MugLook }) {
+  const tint = castById(id).tint;
   return (
-    <div data-testid="stage-mug" style={{ position: "absolute", inset: 0, background: "#1d2436" }}>
-      <Mug left="40%" bottom="34%" size={56} color={pf.sand} steam />
+    <div
+      data-testid={`tile-${id}`}
+      data-lit="false"
+      data-look="ghost"
+      data-desk={look}
+      style={{ position: "relative", minHeight: 0 }}
+    >
+      <ZoomTile tint={tint} label={label} look="ghost">
+        <RefinedDesk look={look} tint={tint} />
+      </ZoomTile>
     </div>
   );
 }
 
 /**
- * Where each scene's head is, as the top of the head in the tile: the
- * nine scenes are drawn differently (the minimalist sits low, the ultrawide's
- * head is near the top), so one fixed spot would hang the bubble over a
- * different part of each. The bubble's tail points here; the mug's rim on a mug
- * tile (D-TA11).
+ * The speaking window's bubble, placed: measure the grid, every face and every
+ * plate (and this window's own thought button), then ask ./geometry.ts for a
+ * clean place, or, when no side is clean, the one with the least overlap. The bubble is drawn unseen until it has a place. Without
+ * layout (a test's DOM) nothing measures, and the bubble stays at its origin.
  */
-const HEADS: Record<string, { left: string; top: string }> = {
-  "dev-hero": { left: "50%", top: "38%" },
-  "ops-dev": { left: "50%", top: "58%" },
-  minimalist: { left: "50%", top: "66%" },
-  "new-hire": { left: "23%", top: "60%" },
-  vibemancer: { left: "50%", top: "53%" },
-  ultrawide: { left: "50%", top: "16%" },
-  qa: { left: "44%", top: "45%" },
-  pm: { left: "50%", top: "45%" },
-  designer: { left: "50%", top: "42%" },
-};
-const MUG_FACE = { left: "calc(40% + 28px)", bottom: "calc(34% + 56px)" } as const;
+function useBubblePlace(speaking: boolean, slideKey: string) {
+  const wrap = useRef<HTMLDivElement | null>(null);
+  const bubble = useRef<HTMLDivElement | null>(null);
+  // A window outlives its slide (the stage stays mounted across the round), so
+  // a place is kept with the slide it was measured for and is no place at all
+  // on any other: the next bubble is laid out unseen and measured afresh.
+  const [placed, setPlace] = useState<{
+    slideKey: string;
+    left: number;
+    top: number;
+    side: BubbleSide;
+    tail: number;
+  } | null>(null);
+  const place = speaking && placed?.slideKey === slideKey ? placed : null;
+  const [tick, setTick] = useState(0);
+  const wrapRef = useCallback((el: HTMLDivElement | null) => {
+    wrap.current = el;
+  }, []);
+  const bubbleRef = useCallback((el: HTMLDivElement | null) => {
+    bubble.current = el;
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!speaking) return;
+    const w = wrap.current;
+    const b = bubble.current;
+    const grid = w?.closest<HTMLElement>(`.${STAGE_GRID_CLASS}`);
+    if (!w || !b || !grid) return;
+    const g = grid.getBoundingClientRect();
+    if (g.width === 0 || g.height === 0) return;
+    const rel = (r: DOMRect): Rect => ({
+      x: r.left - g.left,
+      y: r.top - g.top,
+      w: r.width,
+      h: r.height,
+    });
+    const faces = [...grid.querySelectorAll<HTMLElement>("[data-face]")].map((f) => {
+      const p = f.getBoundingClientRect();
+      return faceBox(
+        { x: p.left - g.left, y: p.top - g.top },
+        rel(f.parentElement!.getBoundingClientRect()),
+      );
+    });
+    const plates = [...grid.querySelectorAll<HTMLElement>('[data-testid="stage-plate-label"]')].map(
+      (el) => rel(el.getBoundingClientRect()),
+    );
+    const own = w.querySelector<HTMLElement>('[data-testid="stage-thought-trigger"]');
+    const ownFace = w.querySelector<HTMLElement>("[data-face]")!.getBoundingClientRect();
+    const face = faceBox(
+      { x: ownFace.left - g.left, y: ownFace.top - g.top },
+      rel(w.getBoundingClientRect()),
+    );
+    const keepOut = [...faces, ...plates, ...(own ? [rel(own.getBoundingClientRect())] : [])];
+    const args = {
+      grid: { w: g.width, h: g.height },
+      face,
+      size: { w: b.offsetWidth, h: b.offsetHeight },
+      keepOut,
+    };
+    const found = placeBubble(args) ?? leastOverlap(args);
+    if (!found) return;
+    const tile = rel(w.getBoundingClientRect());
+    setPlace({
+      slideKey,
+      left: found.left - tile.x,
+      top: found.top - tile.y,
+      side: found.side,
+      tail: found.tail,
+    });
+  }, [speaking, tick, slideKey]);
+
+  // A stage that changes size places its bubble again.
+  useLayoutEffect(() => {
+    if (!speaking || typeof ResizeObserver === "undefined") return;
+    const grid = wrap.current?.closest<HTMLElement>(`.${STAGE_GRID_CLASS}`);
+    if (!grid) return;
+    let first = true;
+    const ro = new ResizeObserver(() => {
+      if (first) {
+        first = false;
+        return;
+      }
+      setPlace(null);
+      setTick((n) => n + 1);
+    });
+    ro.observe(grid);
+    return () => ro.disconnect();
+  }, [speaking]);
+
+  return { wrapRef, bubbleRef, place };
+}
 
 /** A tile and what it says: the speech bubble while it speaks, the thought bubble where there is detail. */
-function Tile({ id, label, t }: { id: string; label: string; t: TileState }) {
-  // The anchor the engine points the speech bubble at: a small element
-  // over the speaker's face, not the tile's box. The stage is the boundary the
-  // bubble is kept inside.
-  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const boundary = anchor?.closest<HTMLElement>(`.${STAGE_CLASS}`) ?? null;
+function Tile({
+  id,
+  label,
+  t,
+  slideKey,
+}: {
+  id: string;
+  label: string;
+  t: TileState;
+  /** The slide being drawn: what a bubble belongs to. The window itself stays mounted across slides. */
+  slideKey: string;
+}) {
+  const tint = castById(id).tint;
   const detail = (t.detail ?? []).filter((s) => s.items.length > 0);
-  // Speaking is "its bubble is open"; named is lit without one.
+  // Speaking is "its bubble is open"; named is a face that is there without one.
   const speaking = !!t.lit && !!t.bubble && t.bubble.length > 0;
-  const look: TileLook = speaking ? "speaking" : t.lit ? "named" : "ghost";
+  const look: TileLook = speaking
+    ? "speaking"
+    : t.called
+      ? "called"
+      : t.lit || t.present
+        ? "named"
+        : "ghost";
+  const { wrapRef, bubbleRef, place } = useBubblePlace(speaking, slideKey);
   return (
     <div
+      ref={wrapRef}
       data-testid={`tile-${id}`}
       data-lit={t.lit ? "true" : "false"}
       data-look={look}
       data-speaking={speaking ? "true" : undefined}
       style={{ position: "relative", minHeight: 0 }}
     >
-      <ZoomTile tint={CAST.find((c) => c.id === id)!.tint} label={label} look={look}>
-        {t.mug ? <MugGlyph /> : <CastScene id={id} parked />}
+      <ZoomTile tint={tint} label={label} look={look}>
+        <CastScene id={id} parked />
       </ZoomTile>
       <div
-        ref={setAnchor}
         data-testid={`tile-${id}-face`}
+        data-face
         aria-hidden
         style={{
           position: "absolute",
           width: "1px",
           height: "1px",
           pointerEvents: "none",
-          ...(t.mug ? MUG_FACE : (HEADS[id] ?? { left: "50%", top: "40%" })),
+          ...(HEADS[id] ?? HEAD_FALLBACK),
         }}
       />
-      {t.lit && t.bubble && t.bubble.length > 0 && (
-        <SpeechBubble anchor={anchor} boundary={boundary}>
-          {t.bubble.join("\n")}
+      {speaking && (
+        // A bubble is its slide's: keyed by it, so each one arrives with its own
+        // entrance even when the same window speaks on two slides running.
+        <SpeechBubble key={`speech-${slideKey}`} bubbleRef={bubbleRef} place={place}>
+          {t.bubble!.join("\n")}
         </SpeechBubble>
       )}
       {t.lit && detail.length > 0 && (
-        <ThoughtBubble label={`What ${label} did not say`}>
+        // And so is a thought: one left open closes when the deck moves on.
+        <ThoughtBubble key={`thought-${slideKey}`} label={`What ${label} did not say`}>
           <div
             data-testid="stage-thought-items"
             style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "0.7rem" }}
@@ -350,6 +468,7 @@ function StageView({
       </div>
       <div
         data-testid="stage-grid"
+        className={STAGE_GRID_CLASS}
         style={{
           flex: 1,
           minHeight: 0,
@@ -361,13 +480,15 @@ function StageView({
         }}
       >
         {CAST.map((c) => {
-          return (
-            <Tile
-              key={`${slideKey}-${c.id}`}
-              id={c.id}
-              label={plates.get(c.id) ?? c.label}
-              t={tiles.get(c.id) ?? {}}
-            />
+          const t = tiles.get(c.id) ?? {};
+          const label = plates.get(c.id) ?? c.label;
+          // Keyed by the window alone: across the slides of a round a window is
+          // the same node, so it enters once, when the room loads, and only what
+          // changed on it (the frame, the bubble, the called mark) is redrawn.
+          return t.desk ? (
+            <DeskTile key={c.id} id={c.id} label={label} look={t.desk} />
+          ) : (
+            <Tile key={c.id} id={c.id} label={label} t={t} slideKey={slideKey} />
           );
         })}
       </div>
@@ -446,27 +567,31 @@ function notesOf(say: string[]): ReactNode {
 
 /**
  * The Deck for one standup response. Pure: the same response builds the same
- * slides with the same ids (`standup-<date>-<seat>`), so a rebuild after a
+ * slides with the same ids (`standup-<date>-<part>`), so a rebuild after a
  * refetch keeps the player where it was.
  */
 export function buildStandupDeck(data: StandupResponse): Deck {
   const title = standupTitle(data);
   const stem = `standup-${standupDate(data.asOf)}`;
-  const { seated, standing } = dealSeats(data.workers ?? []);
+  const { members, desks } = dealRoom(data);
 
-  // Every tile's plate for this standup: the dealt workers wear their own
-  // label; a worker seat nobody sits in today keeps its role and persona.
-  const plates = new Map<string, string>();
-  for (const seat of SEATS) plates.set(seat.castId, plateFor(seat));
-  for (const { seat, worker } of seated) plates.set(seat.castId, plateFor(seat, worker.label));
-  const mugs = new Set(seated.filter((s) => s.worker.empty).map((s) => s.seat.castId));
+  // Every window's plate for this standup: the chair's, each member's persona
+  // with its label, an invented cast member's persona alone, and the desks'.
+  const plates = new Map<string, string>([[CHAIR_CAST_ID, CHAIR_PLATE]]);
+  for (const m of members) plates.set(m.castId, seatedPlate(m));
+  for (const d of desks) plates.set(d.castId, EMPTY_DESK_PLATE);
 
-  /** The base tile states every slide starts from: the mugs, the tracker's alarm. */
+  /** The tile states every slide starts from: the faces that are there, and the desks. */
   const base = (): Map<string, TileState> => {
-    const m = new Map<string, TileState>();
-    for (const id of mugs) m.set(id, { mug: true });
+    const m = new Map<string, TileState>([[CHAIR_CAST_ID, { present: true }]]);
+    for (const s of members) m.set(s.castId, { present: true });
+    for (const d of desks) m.set(d.castId, { desk: d.look });
     return m;
   };
+  // Every slide is the same room, so every slide shares one content key and the
+  // engine keeps the stage mounted for the whole round (decks/types.ts
+  // `contentKey`): the windows enter once and keep their motion.
+  const stageKey = `${stem}-stage`;
   const stage = (slideKey: string, tiles: Map<string, TileState>) => (
     <StageView
       slideKey={slideKey}
@@ -477,56 +602,81 @@ export function buildStandupDeck(data: StandupResponse): Deck {
     />
   );
 
-  const chair = seatOf("chair");
-  const queueSlide = (id: string): Slide => {
-    const script = queueWorkScript(data) ?? queueScript(data);
+  /** The queue's items behind the chair's sentences, for its thought bubble. */
+  const queueDetail = (): DetailSlot[] =>
+    data.tracker.ok
+      ? [
+          { label: T.walk, items: data.queue.walk ?? [] },
+          { label: DECIDE, items: data.queue.decide ?? [] },
+          { label: LOOK, items: data.queue.look ?? [] },
+        ]
+      : [];
+
+  /** One slide where the chair speaks; `called` is the member it names, in colour, listening. */
+  const chairSays = (
+    id: string,
+    slideTitle: string | undefined,
+    script: Script,
+    detail: DetailSlot[] = [],
+    called?: string,
+  ): Slide => {
     const tiles = base();
-    tiles.set(chair.castId, {
-      lit: true,
-      bubble: script.lines,
-      detail: data.tracker.ok
-        ? [
-            { label: T.walk, items: data.queue.walk ?? [] },
-            { label: DECIDE, items: data.queue.decide ?? [] },
-            { label: LOOK, items: data.queue.look ?? [] },
-          ]
-        : [],
-    });
-    if (!data.tracker.ok) tiles.set(seatOf("tracker").castId, { lit: true });
-    if (data.queue.walk?.length) tiles.set(seatOf("walk").castId, { lit: true });
-    if (data.queue.decide?.length) tiles.set(seatOf("decide").castId, { lit: true });
-    if (data.queue.look?.length) tiles.set(seatOf("look").castId, { lit: true });
+    tiles.set(CHAIR_CAST_ID, { present: true, lit: true, bubble: script.lines, detail });
+    if (called) tiles.set(called, { present: true, lit: true, called: true });
     return {
       id,
-      title,
+      title: slideTitle,
+      contentKey: stageKey,
       content: stage(id, tiles),
-      copy: <Copy castId={chair.castId} />,
+      copy: <Copy castId={CHAIR_CAST_ID} />,
       notes: notesOf(script.say),
     };
   };
 
-  const chairSlide = (id: string, line: string, extra: string[] = []): Slide => {
-    const lines = [`"${line}"`, ...extra];
-    const tiles = base();
-    tiles.set(chair.castId, { lit: true, bubble: lines });
-    return {
-      id,
-      title: CHAIR_TITLE,
-      content: stage(id, tiles),
-      copy: <Copy castId={chair.castId} />,
-      notes: notesOf([line, ...extra]),
-    };
+  // The board: what is waiting on you, or -- the tracker's alarm -- why it could not be read.
+  const boardSlide = () =>
+    chairSays(`${stem}-queue`, title, queueWorkScript(data) ?? queueScript(data), queueDetail());
+
+  // A phrasebook line, quoted on the bubble as the text quotes it.
+  const phraseSlide = (id: string, line: string, extra: string[] = []) =>
+    chairSays(id, CHAIR_TITLE, { lines: [`"${line}"`, ...extra], say: [line, ...extra] });
+
+  // The chair's own status, last: its turn in the frame. From an agent that
+  // predates it, the board again, as the stage closed before; with no tracker
+  // the turn is empty and the chair has none to give (the text prints none).
+  const chairStatusSlide = (): Slide | null => {
+    const own = data.work?.chairProse;
+    if (own && own.length === 0) return null;
+    const script = own
+      ? { lines: [...own], say: [...own] }
+      : (queueWorkScript(data) ?? queueScript(data));
+    return chairSays(`${stem}-chair-status`, CHAIR_TITLE, script, queueDetail());
   };
 
   const grained = new Map((data.work?.workers ?? []).map((w) => [w.label, w]));
   // The dress: read when present, the prose (`work`) otherwise.
   const dressed = new Map((data.spoken?.workers ?? []).map((w) => [w.label, w.prose]));
-  const workerSlide = (seat: Seat, worker: StandupWorker): Slide => {
+
+  // The chair calls the member by name; the member's window is in colour, listening.
+  // No title: the narrator reads a slide's title before its lines, and the call is
+  // heard as the chair saying the name and nothing else.
+  const callSlide = ({ castId, worker }: Seated): Slide => {
+    const line = callLine(worker.name || worker.label);
+    return chairSays(
+      `${stem}-call-${worker.label}`,
+      undefined,
+      { lines: [line], say: [line] },
+      [],
+      castId,
+    );
+  };
+
+  const turnSlide = ({ castId, worker, cast }: Seated): Slide => {
     const script = workerScript(worker, grained.get(worker.label), dressed.get(worker.label));
     const tiles = base();
-    tiles.set(seat.castId, {
+    tiles.set(castId, {
+      present: true,
       lit: true,
-      mug: worker.empty,
       bubble: script.lines,
       detail: worker.empty
         ? []
@@ -537,36 +687,35 @@ export function buildStandupDeck(data: StandupResponse): Deck {
           ],
     });
     const id = `${stem}-${worker.label}`;
+    // No title either: the chair has just said the name, so the turn is not announced again.
     return {
       id,
-      title: worker.name,
+      contentKey: stageKey,
       content: stage(id, tiles),
-      copy: <Copy castId={seat.castId} label={worker.label} />,
+      copy: <Copy castId={castId} label={cast ? undefined : worker.label} />,
       notes: notesOf(script.say),
     };
   };
 
-  // The chair's opening line, and what the room has to know before the tiles:
+  // The chair's opening line, and what the room has to know before the round:
   // no worker routes in this Space (only when the tracker answered -- a
-  // tracker that did not has already said so on the queue).
+  // tracker that did not has already said so on the board).
   const openExtra = data.tracker.ok && (data.workers ?? []).length === 0 ? [T.noWorkers] : [];
-  const closeExtra = standing.length
-    ? [`${STANDING}: ${standing.map((w) => w.name).join(", ")}.`]
-    : [];
+  const status = chairStatusSlide();
 
   const slides: Slide[] = [
-    queueSlide(`${stem}-queue`),
-    chairSlide(`${stem}-chair-open`, data.chair.open, openExtra),
-    ...seated.map(({ seat, worker }) => workerSlide(seat, worker)),
-    chairSlide(`${stem}-chair-close`, data.chair.close, closeExtra),
-    queueSlide(`${stem}-queue-end`),
+    boardSlide(),
+    phraseSlide(`${stem}-chair-open`, data.chair.open, openExtra),
+    ...members.flatMap((m) => [callSlide(m), turnSlide(m)]),
+    ...(status ? [status] : []),
+    phraseSlide(`${stem}-chair-close`, data.chair.close),
   ];
 
   return {
     id: STANDUP_DECK_ID,
     title,
     summary:
-      "Today's standup, played on the Remote Standup's stage: the queue, the chair, one tile a worker.",
+      "Today's standup, played on the Remote Standup's stage: the board, the chair calling each member and their turns, the chair's own status, nine windows with an empty desk wherever nobody sits.",
     audiobook: true,
     slides: () => slides,
   };

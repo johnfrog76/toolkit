@@ -413,7 +413,7 @@ Released under the same MIT License as the code.
 | `docs/images/social-preview.png` | The repository's social preview, 1280x640 | Rendered from the project's own landing page by `web/tests/render-cast.mjs --preview` (`docs/images/README.md`) |
 | `docs/logo.txt`, `docs/logo-faces-preview.html` | The ToolKit mark, as ASCII, and a page that draws its faces | Drawn for the project |
 | `web/index.html` | The browser-tab icon, three bars inline as an SVG | Drawn for the project |
-| `web/src/modules/solitaireAgile/stage/cast.tsx` | The Team Agile stage's cast: the nine tiles, tints and webcam scenes | Quoted by copy from the Remote Standup in the project owner's CSS Wasteland studio, which the file's header states; the studio's bios and lines are not carried over |
+| `web/src/modules/solitaireAgile/stage/cast.tsx` | The Team Agile stage's cast: the nine tiles, tints and webcam scenes | Quoted by copy from the Remote Standup in the project owner's CSS Wasteland studio, which the file's header states, with the people and props redrawn for the project in its refined cast; the studio's bios and lines are not carried over |
 | `web/public/lounge/temple.html` | The Lounge's zen temple scene | Ported from the zen-development deck in the same studio |
 | `web/public/lounge/aquarium/` | The Lounge's seven aquarium scenes | Ported by `web/tools/port-aquarium.mjs` from aquarium-saver (MIT, the same licence as this repository's `LICENSE`, by the same owner), as each file's header says |
 | `web/src/modules/deck/decks/cat-dev.tsx`, `web/src/modules/deck/decks/connected-deck-trailer.tsx` | The trailer and its Cat Dev figure | Copied from Connected Deck (MIT, github.com/johnfrog76/connected-deck), by the same owner |

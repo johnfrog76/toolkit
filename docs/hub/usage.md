@@ -47,7 +47,7 @@ byte. Shortened:
       "firstAt": "2026-07-15T16:00:00.000Z", "lastAt": "2026-07-15T16:05:00.000Z" }
   ],
   "unpriced": ["claude-mystery-9"],
-  "cost": { "derived": true, "currency": "USD", "priceTableAsOf": "2026-10-06",
+  "cost": { "derived": true, "currency": "USD", "priceTableAsOf": "2026-11-16",
             "note": "list prices; not the plan's allocation",
             "priceNotes": [ { "model": "claude-haiku-5-5", "note": "priced at its lower rate card, ..." } ] }
 }
@@ -117,6 +117,15 @@ A model id the table has no row for is matched to the longest id it starts with 
 dated snapshot of a priced model takes that model's price. One with no match is counted, listed under
 `unpriced`, and its cost is `null`; a session's and the day's cost are the priced models' sum, and `null`
 only when none of their models is priced.
+
+A figure that leaves a model out says so **in the cost line itself**, not only in a footnote:
+`$1.23 derived, not counting claude-new-1` in `Burn` and `Burn -Log`, and the same words under the Cost
+tile of each window on the System page's burn tile, in its ordinary text colour -- the gap is a fact
+about the price table, not a fault. The words before the model ids are `usage.unpricedPhrase` in
+[`consts.json`](../../consts.json), read by the CLI and the web; each window names its own `unpriced`
+models, and when none is priced the line reads `no priced model, not counting ...`. A model the table
+does not yet price is fixed by adding its row to `Config/claude-prices.json`, from the published
+pricing page and nowhere else.
 
 It is **list price, not what anyone paid**, and never a share of a plan's allocation: a subscription is
 not billed per token, and nothing here knows what a plan allows.
@@ -297,8 +306,9 @@ back, edit the file. A file there that is not a readings record is refused rathe
 [`Tests/fixtures/usage/burndown.json`](../../Tests/fixtures/usage/burndown.json) is the table, one row per
 case: no reading, one bucket typed, behind, ahead, on pace, the rounding, two readings across machines,
 stale, the renewal's exact moment, a reading from before the reset, one after now, one at the week's first
-instant. `Get-P20Burndown` (`Scripts/Read-BurnReadings.ps1`) is the CLI's, and the web asserts the same
-table where it draws the burndown.
+instant. `Get-P20Burndown` (`Scripts/Read-BurnReadings.ps1`) is the CLI's, and `tkTestToolkit -Burn` is the one
+suite that reads the table. The agent passes the verb's answer through and implements no rule of its own, and
+the web does not draw the burndown yet.
 
 - **The week** is `burn.weekStarts`'s -- Friday 05:00 local by default, the reset -- to the next week start.
   A reading counts toward the week holding its time: at or after the week's start, before the reset, and
@@ -341,7 +351,7 @@ No record is written unless someone runs `Burn -Log`: nothing schedules it, so a
 today is as old as its last log. The ratio of the burn to the work it bought, and a weekly chart, are later
 work on the records this logs.
 
-The weekly burndown is in the terminal and in `GET /api/usage/burn`'s answer; the System page does not
-draw it yet.
+The weekly burndown is in the terminal and in `GET /api/usage/burn`'s answer; the System page's burn tile does not
+draw it yet, so nothing in the web half reads the table above.
 
 Known gap: [The plan's weekly usage is typed, not read](../KNOWN-GAPS.md#the-plans-weekly-usage-is-typed-not-read).

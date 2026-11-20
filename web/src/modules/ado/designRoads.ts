@@ -84,4 +84,6 @@ export interface ProductCheckout {
   repo: string;
   /** The clone's top level. */
   root: string;
+  /** The tab read this clone, so a staged move shows on the re-read. */
+  readsClone?: boolean;
 }

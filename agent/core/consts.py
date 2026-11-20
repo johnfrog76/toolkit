@@ -223,6 +223,12 @@ def stamp_sprint() -> str:
     return consts()["stamps"]["sprint"]
 
 
+def stamp_agent() -> str:
+    """``**Agent:**`` -- who did the work on a card an agent worked: its model id, beside
+    the ``**Assigned:**`` line. A card a person worked alone has no such line."""
+    return consts()["stamps"]["agent"]
+
+
 def token_tags() -> str:
     """``Tags:`` -- the card's tags line under ``## Work Item Info``. Tag writes it."""
     return consts()["tokens"]["tags"]
@@ -248,6 +254,18 @@ def re_closed_stamp_date() -> re.Pattern:
 def env_teams_webhook_prefix() -> str:
     """The front of every ``TEAMS_WEBHOOK_<RECIPIENT>`` variable."""
     return consts()["env"]["teamsWebhookPrefix"]
+
+
+def webhook_recipient_types() -> tuple[str, ...]:
+    """The recipient types that post through their webhook: a Teams channel and a
+    Teams chat, sent the same way. The CLI's gate 2 checks the same list."""
+    return tuple(consts()["communication"]["webhookRecipientTypes"])
+
+
+def deferred_recipient_types() -> tuple[str, ...]:
+    """The recipient types config may name that never post (``person``: a direct
+    message, not built)."""
+    return tuple(consts()["communication"]["deferredRecipientTypes"])
 
 
 def env_test_run_marker() -> str:
@@ -301,6 +319,12 @@ def stamp_ref() -> str:
 def re_tag_separator() -> re.Pattern:
     """What splits a card's ``Tags:`` line: a comma, or an Azure DevOps semicolon."""
     return pattern("regex", "tagSeparator")
+
+
+def re_co_author_trailer() -> re.Pattern:
+    """One ``Co-Authored-By`` trailer line of a commit message, the key in any case
+    (the pattern carries ``(?mi)``): group 1 the name before the ``<email>``."""
+    return pattern("regex", "coAuthorTrailer")
 
 
 def re_due_line() -> re.Pattern:
@@ -487,8 +511,13 @@ def rituals_triage_route() -> str:
 
 
 def rituals_milestones_route() -> str:
-    """The Milestones tab's route, with the /api prefix: ``/api/ritual/milestones``."""
+    """The Releases tab's route, with the /api prefix: ``/api/ritual/milestones``."""
     return consts()["rituals"]["milestonesRoute"]
+
+
+def rituals_org_route() -> str:
+    """The org chart's route, with the /api prefix: ``/api/ritual/org``."""
+    return consts()["rituals"]["orgRoute"]
 
 
 def rituals_assign_me() -> str:
@@ -504,7 +533,7 @@ def rituals_ceremonies_file() -> str:
 
 
 def rituals_vocabulary_file() -> str:
-    """phrasebook, nothing, excuses, fakeWork -- relative to the package root."""
+    """phrasebook, nothing, nothingToday, excuses, fakeWork, verbs -- relative to the package root."""
     return consts()["rituals"]["vocabularyFile"]
 
 
@@ -632,6 +661,27 @@ def rituals_corner_shapes() -> tuple[str, ...]:
     return tuple(consts()["rituals"]["cornerShapes"])
 
 
+def rituals_team_sizes() -> tuple[int, ...]:
+    """The room sizes a Space may state as ``spaces[].features.teamSize``: 3, 6, 9 --
+    the standup's windows, the chair included (docs/modules/solitaire-agile.md,
+    "The team size: who is in the room")."""
+    return tuple(int(n) for n in consts()["rituals"]["teamSizes"])
+
+
+def rituals_team_size_default() -> int:
+    """The room size an unset ``teamSize``, or one not in ``rituals_team_sizes``, reads as: 9."""
+    return int(consts()["rituals"]["teamSizeDefault"])
+
+
+def rituals_room() -> dict:
+    """The standup's room (docs/modules/solitaire-agile.md, "The team size: who is
+    in the room"): ``windows``, the nine windows in grid order, each a cast ``id``
+    and the ``plate`` its persona wears; ``chair``, the cast id whose window is the
+    chair's; ``kept``, a worker label -> the window it keeps; ``engineer``, the
+    window the engineer takes when no member owns it."""
+    return consts()["rituals"]["room"]
+
+
 # -- The dress (D-SA11) ---------------------------------------------------
 
 
@@ -666,17 +716,32 @@ def startwork_launch_env_flag() -> str:
     return consts()["startWork"]["launchEnvFlag"]
 
 
+def gh_read_limit_open_issues() -> int:
+    """How many open issues one ``gh issue list --state open`` reads."""
+    return int(consts()["ghReads"]["openIssues"])
+
+
+def gh_read_limit_all_issues() -> int:
+    """How many issues, in every state, one ``gh issue list --state all`` reads."""
+    return int(consts()["ghReads"]["allIssues"])
+
+
+def gh_read_limit_labels() -> int:
+    """How many labels one ``gh label list`` reads."""
+    return int(consts()["ghReads"]["labels"])
+
+
+def gh_repo_missing_markers() -> tuple[str, ...]:
+    """The lowercased words that mark gh's first stderr line as a repository it
+    cannot read -- it does not exist, or this login cannot see it."""
+    return tuple(str(m) for m in consts()["ghReads"]["repoMissing"])
+
+
 def usage_env_flag() -> str:
     """``claudeUsage`` -- the name of the top-level boolean ``GET /api/env`` carries for
     Claude Code usage on this machine, and the inventory row's key; the System page's
     burn tile reads it by the same name."""
     return consts()["usage"]["envFlag"]
-
-
-def reply_statuses(tracker: str) -> tuple:
-    """The thread statuses a reply may set on ``tracker`` (``ado`` or ``github``): what
-    ReplyPR accepts there and the PR Comments page's status box offers."""
-    return tuple(consts()["replyStatuses"][tracker])
 
 
 def usage_burn_route() -> str:
@@ -689,6 +754,32 @@ def usage_readings_folder() -> str:
     readings ``Burn -Reading`` appends to, one file per week per machine. The burn
     route fingerprints it, so a new reading is a miss in its cache."""
     return consts()["usage"]["readingsFolder"]
+
+
+def org_file() -> str:
+    """``org.json`` -- the org chart's file at the hub root, beside ``hub.json``
+    (docs/hub/org.md). The CLI and the agent read it."""
+    return consts()["org"]["file"]
+
+
+def models_file() -> str:
+    """``Config/models.json`` -- the model map, relative to the package root: every
+    reader of a card's ``**Agent:**`` line takes provider, family and display name from it."""
+    return consts()["models"]["file"]
+
+
+def model_agent_sources() -> tuple[str, ...]:
+    """``line``, ``assigned``, ``trailer``, ``none`` -- the shipped order a card's agent is worked
+    out in (``parsers.resolve_card_agent``): the first source that answers wins. It
+    never reads ``label``, which a caller asks for by passing an order naming it."""
+    return tuple(consts()["models"]["agentSources"])
+
+
+def billing_text() -> dict[str, str]:
+    """Daily's window sentences -- ``halfWindow``, ``notADay`` ({name}, {value}) and
+    ``backwards`` ({since}, {until}): the billing script, the CLI's Daily and
+    ``GET /api/billing`` refuse a window in the same words."""
+    return dict(consts()["billing"]["text"])
 
 
 def startwork_how_we_work_note() -> str:

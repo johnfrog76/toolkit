@@ -107,6 +107,17 @@ const useStyles = makeStyles({
   // Directly under the filters, the list adds no space of its own over its
   // first item: the filters' wrapper has given it.
   listUnderFilters: { paddingTop: 0 },
+  // The controls row: pickers and search, at the top of the body, spaced and
+  // sized like the filters above the list (filtersSpaceBelow under it).
+  controls: {
+    display: "flex",
+    alignItems: "center",
+    columnGap: tokens.spacingHorizontalS,
+    paddingBottom: filtersSpaceBelow,
+    minWidth: 0,
+    flexShrink: 0,
+  },
+  controlsSearch: { minWidth: 0, flexGrow: 1 },
   search: { minWidth: 0 },
   picker: { minWidth: 0 },
   foot: { color: tokens.colorNeutralForeground3 },
@@ -116,7 +127,7 @@ const useStyles = makeStyles({
 export interface FilterChip {
   id: string;
   label: string;
-  /** Left out, the chip draws no number. */
+  /** Left out, the chip draws no number (a zero is left out on purpose by the cards that do). */
   count?: number;
   active: boolean;
   onSelect: () => void;
@@ -207,6 +218,8 @@ export interface StatRow {
 export interface ListLead {
   stats?: StatRow[];
   chart?: ChartSpec;
+  /** Px the chart's plot is taller than the default (`leadChartPlotHeightPx` in layoutTokens). */
+  chartExtraPx?: number;
 }
 
 const TONE_COLOR: Record<NonNullable<StatSpec["tone"]>, string> = {
@@ -244,6 +257,8 @@ interface ListPanelBase<T> {
   filters?: FilterRow[];
   pickers?: SelectSlot[];
   search?: SearchSlot;
+  /** Set, pickers and search sit in a row at the top of the body, above the lead, not in the header. */
+  controlsInBody?: boolean;
   action?: ActionSlot;
   refresh?: RefreshSlot;
   /** The header's count chip. A string is a count that needs a word: "latest 500". */
@@ -306,6 +321,7 @@ export function ListPanel<T>(props: ListPanelProps<T>) {
     filters,
     pickers,
     search,
+    controlsInBody,
     action,
     refresh,
     count,
@@ -321,6 +337,8 @@ export function ListPanel<T>(props: ListPanelProps<T>) {
     density,
     filterRows: loading ? 0 : (filters?.length ?? 0),
     lead: lead != null && !loading,
+    leadExtraPx: lead?.chartExtraPx,
+    controlsRow: controlsInBody && (pickers != null || search != null),
     footNote: footNote != null,
     status: status != null,
   };
@@ -391,6 +409,40 @@ export function ListPanel<T>(props: ListPanelProps<T>) {
   const underFilters = !loading && (filters?.length ?? 0) > 0 && !lead;
   const none = items.length === 0 ? (props.filteredEmpty ?? props.empty) : null;
 
+  // The pickers and the search: in the header, or in the body's first row.
+  const controls = (
+    <>
+      {pickers?.map((p) => (
+        <Select
+          key={p.label}
+          size="small"
+          className={styles.picker}
+          aria-label={p.label}
+          value={p.value}
+          disabled={p.disabled}
+          onChange={(_e, d) => p.onChange(d.value)}
+        >
+          {p.options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </Select>
+      ))}
+      {search ? (
+        <Input
+          size="small"
+          type="search"
+          className={controlsInBody ? styles.controlsSearch : styles.search}
+          aria-label={search.label}
+          placeholder={search.placeholder}
+          value={search.value}
+          onChange={(_e, d) => search.onChange(d.value)}
+        />
+      ) : null}
+    </>
+  );
+
   return (
     <div
       ref={rootRef}
@@ -412,34 +464,7 @@ export function ListPanel<T>(props: ListPanelProps<T>) {
         }
         headerRight={
           <>
-            {pickers?.map((p) => (
-              <Select
-                key={p.label}
-                size="small"
-                className={styles.picker}
-                aria-label={p.label}
-                value={p.value}
-                disabled={p.disabled}
-                onChange={(_e, d) => p.onChange(d.value)}
-              >
-                {p.options.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </Select>
-            ))}
-            {search ? (
-              <Input
-                size="small"
-                type="search"
-                className={styles.search}
-                aria-label={search.label}
-                placeholder={search.placeholder}
-                value={search.value}
-                onChange={(_e, d) => search.onChange(d.value)}
-              />
-            ) : null}
+            {controlsInBody ? null : controls}
             {action ? (
               <Button
                 size="small"
@@ -499,6 +524,11 @@ export function ListPanel<T>(props: ListPanelProps<T>) {
                 )}
               </div>
             ) : null}
+            {controlsInBody && (pickers != null || search != null) ? (
+              <div className={styles.controls} data-panel-controls>
+                {controls}
+              </div>
+            ) : null}
             {loading ? (
               <CardSpinner label={loading.label} />
             ) : (
@@ -516,7 +546,7 @@ export function ListPanel<T>(props: ListPanelProps<T>) {
                           <FilterBadge
                             key={chip.id}
                             label={chip.label}
-                            count={chip.count}
+                            count={chip.count ?? null}
                             active={chip.active}
                             onClick={chip.onSelect}
                           />

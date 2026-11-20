@@ -30,6 +30,7 @@ import {
   activeModules,
   isChromeless,
   moduleCards,
+  moduleSystemTabs,
   moduleHomeTabs,
   moduleNavSplit,
   moduleRoutes,
@@ -66,8 +67,14 @@ import {
   spaceLifecycleActions,
 } from "../modules/studio/foyer";
 import { visibilityLabel } from "../shared/visibility";
-import { STATUS, USAGE, VISIBILITY } from "./consts";
-import { WORKFLOW_ENTRIES, answerLive, answerTarget } from "./settingsWorkflows";
+import { RITUALS, STATUS, USAGE, VISIBILITY } from "./consts";
+import {
+  WORKFLOW_ENTRIES,
+  answerLive,
+  answerStored,
+  answerTarget,
+  entryAnchor,
+} from "./settingsWorkflows";
 import type { SpaceBucket, SpaceLifecycleAction } from "../modules/studio/foyer";
 import { promptSets, spaceWorkflow } from "../modules/studio/prompts";
 import type { PromptRow, PromptWorkflow } from "../modules/studio/api.studio";
@@ -79,6 +86,7 @@ import { resetCelebrateMemory } from "../modules/solitaireAgile/celebrate";
 import type { Milestone } from "../modules/ado/api.ado";
 import type { AgendaItem, StandupResponse } from "../modules/solitaireAgile/api.solitaireAgile";
 import { agendaArg, agendaFact, sinceHeading } from "../modules/solitaireAgile/agenda";
+import { MEMBER_SEATS, ROOM_WINDOWS, dealRoom } from "../modules/solitaireAgile/stage/seats";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -113,8 +121,8 @@ function env(o: {
   };
 }
 
-function see(e: EnvStatus | undefined) {
-  const ctx: CardContext = {
+function ctxFor(e: EnvStatus | undefined): CardContext {
+  return {
     env: e,
     filterValue: "",
     stateFilter: "All",
@@ -125,6 +133,17 @@ function see(e: EnvStatus | undefined) {
     activeSkillTag: null,
     setActiveSkillTag: () => {},
   };
+}
+
+/** System's tab strip as `Label:card+card`, one string per tab. */
+function seeSystemTabs(e: EnvStatus | undefined) {
+  return moduleSystemTabs(activeModules(modules, e), ctxFor(e)).map(
+    (t) => `${t.label}:${t.cards.map((c) => String(c.key)).join("+")}`,
+  );
+}
+
+function see(e: EnvStatus | undefined) {
+  const ctx = ctxFor(e);
   const active = activeModules(modules, e);
   const { anchor, tabs } = moduleNavSplit(active, ctx);
   return {
@@ -446,6 +465,33 @@ describe("the scenario grid: what each configuration shows", () => {
   // The Claude Code burn tile follows /env's claudeUsage (consts.json usage.envFlag,
   // the CLI's Claude Code usage inventory row): on, it is System's last card on any
   // Space and tier; off or absent, there is no tile and nothing asks /usage/burn.
+  // The Organize tab's second page, Reference (#441): one flag gives the page and
+  // the document's reading room as routes; off, neither exists.
+  it("Organize's Reference page and reading room are routes only where organize is on", () => {
+    const routes = (features: Record<string, boolean>) =>
+      moduleRoutes(
+        activeModules(modules, env({ status: "active", tier: 1, tracker: "ado", features })),
+      )
+        .map((r) => r.path)
+        .filter((p) => (p ?? "").startsWith("/organize"));
+    expect(routes({ organize: true })).toEqual([
+      "/organize",
+      "/organize/reference",
+      "/organize/reference/:name",
+    ]);
+    expect(routes({ organize: false })).toEqual([]);
+  });
+
+  it("System's tabs: Overview holds the at-a-glance cards, Agents the burn, and an empty tab is absent", () => {
+    const withUsage = (e: EnvStatus, on: boolean) => ({ ...e, [USAGE.envFlag]: on }) as EnvStatus;
+    const ado1 = env({ status: "active", tier: 1, tracker: "ado" });
+    expect(seeSystemTabs(withUsage(ado1, true))).toEqual([
+      "Overview:env+modules+log+test-health",
+      "Agents:burn",
+    ]);
+    expect(seeSystemTabs(withUsage(ado1, false))).toEqual(["Overview:env+modules+log+test-health"]);
+  });
+
   it("System's Claude Code burn tile is there where the usage flag is on, and absent where not", () => {
     const withUsage = (e: EnvStatus, on: boolean | undefined) =>
       ({ ...e, [USAGE.envFlag]: on }) as EnvStatus;
@@ -533,6 +579,76 @@ describe("the scenario grid: what each configuration shows", () => {
     expect([itemSpoken(issue), itemSpoken(card)]).toEqual(["issue 143, A", "card 2HNU, B"]);
     expect(itemFacts(issue).url).toBe("https://example.test/143");
     expect(itemFacts(card)).toEqual({ title: "B", label: "2HNU", path: "current/x.md" });
+  });
+
+  // The played standup's room (docs/SCENARIOS.md, "Team Agile's standup"): nine windows
+  // whatever the Space's size -- the chair, the round the response carries in its
+  // order (the members, then the invented cast members that fill the seats the size
+  // counts), and an empty desk in every other window, each with its own mug -- and
+  // the page's door to the size is the settings entry's own anchor. Held in full by
+  // stage/standupDeck.test.tsx ("no silent face").
+  it("the played standup seats the round and an empty desk in the rest", () => {
+    const worker = (label: string, present?: boolean) => ({
+      label,
+      name: label,
+      yesterday: [],
+      today: [],
+      blockers: [],
+      empty: true,
+      excuse: "",
+      status: [],
+      ...(present === undefined ? {} : { present }),
+    });
+    const spoken = (label: string, cast: boolean) => ({
+      label,
+      name: label,
+      yesterday: [],
+      today: [],
+      blockers: [],
+      prose: [],
+      cast,
+    });
+    const room = (workers: StandupResponse["workers"], invented: string[] = []) => {
+      const r = dealRoom({
+        asOf: "2026-10-02T09:00:00-04:00",
+        workers,
+        work: {
+          queue: { walk: [], decide: [], look: [] },
+          workers: [
+            ...workers.filter((w) => w.present !== false).map((w) => spoken(w.label, false)),
+            ...invented.map((id) => spoken(id, true)),
+          ],
+          queueProse: [],
+          text: "",
+        },
+      });
+      return [r.members.length, r.desks.length, new Set(r.desks.map((d) => d.look)).size];
+    };
+    // A room of three: two present, six desks, six mugs.
+    expect(room([worker("a", true), worker("b", false), worker("c", true)])).toEqual([2, 6, 6]);
+    // The size fills the room: one member and the invented cast members after it --
+    // six desks at three, three at six, none at nine.
+    const cast = RITUALS.room.windows.map((w) => w.id).filter((id) => id !== RITUALS.room.chair);
+    for (const size of RITUALS.teamSizes)
+      expect(room([worker("a", true)], cast.slice(1, size - 1))).toEqual([
+        size - 1,
+        ROOM_WINDOWS - size,
+        ROOM_WINDOWS - size,
+      ]);
+    // No worker at all and no round: the chair alone, eight desks.
+    expect(dealRoom({ asOf: "2026-10-02T09:00:00-04:00", workers: [] }).desks).toHaveLength(
+      MEMBER_SEATS,
+    );
+    // An older agent (no present, no round): everyone, capped at the room.
+    expect(
+      dealRoom({
+        asOf: "2026-10-02T09:00:00-04:00",
+        workers: Array.from({ length: 10 }, (_, i) => worker(`w${i}`)),
+      }).members,
+    ).toHaveLength(MEMBER_SEATS);
+    expect(ROOM_WINDOWS).toBe(MEMBER_SEATS + 1);
+    const entry = WORKFLOW_ENTRIES.find((e) => e.id === "team-size")!;
+    expect(entryAnchor(entry, "x")).toBe("spaces.x.features.teamSize");
   });
 
   // Team Agile's Triage is a second page under the ONE Team Agile
@@ -729,6 +845,30 @@ describe("the scenario grid: what each configuration shows", () => {
     resetCelebrateMemory();
   });
 
+  // Team Agile's Org (docs/SCENARIOS.md, "Team Agile's org chart"): a fourth page
+  // under the ONE Team Agile entry, with the chrome, and absent with the flag off --
+  // the chart rides the module's gate, whatever org.json says.
+  it("Org: a page under Team Agile's one entry, there only with the flag", () => {
+    const at = (features: Record<string, boolean>) => {
+      const e = env({ status: "active", tier: 1, tracker: "github", features });
+      const active = activeModules(modules, e);
+      const ctx = { env: e } as CardContext;
+      return {
+        route: moduleRoutes(active).some((r) => r.path === "/solitaire-agile/org"),
+        chromeless: isChromeless(active, "/solitaire-agile/org"),
+        nav: moduleNavSplit(active, ctx)
+          .tabs.filter((n) => n.match("/solitaire-agile/org"))
+          .map((n) => n.label),
+      };
+    };
+    expect(at({ solitaireAgile: true })).toEqual({
+      route: true,
+      chromeless: false,
+      nav: ["Team Agile"],
+    });
+    expect(at({ solitaireAgile: false })).toEqual({ route: false, chromeless: false, nav: [] });
+  });
+
   // "How do you want to work in <Space>?" (docs/SCENARIOS.md, the "How do
   // I…" section): one row per kind of Space, Team Agile's own switch on. The
   // agent resolves the answer and serves features.solitaireAgile with the gate
@@ -796,6 +936,52 @@ describe("the scenario grid: what each configuration shows", () => {
         "Connect a tracker to unlock working with agents.",
         "nothing",
         false,
+      ],
+    ]);
+  });
+
+  // "How many are in my standup in <Space>?" (docs/SCENARIOS.md, the "How do I…"
+  // section): the Space's own spaces[].features.teamSize checks its radio -- none
+  // while unset, when the room is nine -- and the sizes are live where Team Agile's
+  // standup runs, a GitHub Space. The web never re-reads the size for the standup:
+  // the response says team.size and who is present.
+  it("How many are in my standup in <Space>?: the Space's size is checked, live on GitHub", () => {
+    const entry = WORKFLOW_ENTRIES.find((e) => e.id === "team-size")!;
+    const cases: [string, Tracker, number | undefined][] = [
+      ["GitHub, nothing set", "github", undefined],
+      ["GitHub, 6", "github", 6],
+      ["Azure DevOps", "ado", undefined],
+      ["no tracker", "none", undefined],
+    ];
+    const grid = cases.map(([name, tracker, size]) => {
+      const space = { slug: "x", features: size === undefined ? {} : { teamSize: size } };
+      const checked = entry.answers!.find((a) => a.value === answerStored(entry, space))?.label;
+      const live = entry.answers!.filter((a) => answerLive(a, tracker, false)).map((a) => a.label);
+      const writes = live.length ? `${answerTarget(entry, "x")}=<size> -Hub` : "nothing";
+      return [name, checked ?? "none", live, entry.why?.[tracker] ?? "", writes];
+    });
+    expect(grid).toEqual([
+      [
+        "GitHub, nothing set",
+        "none",
+        ["3", "6", "9"],
+        "",
+        "spaces.x.features.teamSize=<size> -Hub",
+      ],
+      ["GitHub, 6", "6", ["3", "6", "9"], "", "spaces.x.features.teamSize=<size> -Hub"],
+      [
+        "Azure DevOps",
+        "none",
+        [],
+        "Team Agile's standup is a GitHub Space's; this Space's tracker is Azure DevOps.",
+        "nothing",
+      ],
+      [
+        "no tracker",
+        "none",
+        [],
+        "Team Agile's standup is a GitHub Space's; connect a tracker to hold one.",
+        "nothing",
       ],
     ]);
   });

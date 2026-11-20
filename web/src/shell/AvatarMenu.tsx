@@ -67,6 +67,18 @@ export interface SpaceChoice {
   name: string;
 }
 
+/** The switcher's list: the Spaces /env names in `switcherSpaces`, in `spaces`'
+ *  order. An older agent sends no such list, which reads as every Space. */
+export function switcherChoices(
+  config:
+    { spaces?: Array<{ slug: string; name?: string }>; switcherSpaces?: string[] } | undefined,
+): SpaceChoice[] {
+  const listed = config?.switcherSpaces;
+  return (config?.spaces ?? [])
+    .filter((o) => !listed || listed.includes(o.slug))
+    .map((o) => ({ slug: o.slug, name: o.name ?? o.slug }));
+}
+
 interface Props {
   displayName?: string;
   detail?: string;

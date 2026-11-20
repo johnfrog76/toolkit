@@ -41,6 +41,10 @@ Three files, and the split is the whole of it:
 | `config.local.json` | **no** (gitignored) | Your machine: paths, active org, prefix, `email`, your feature flags. | `tkConfig -Set <key>=<value>` |
 | `<promptsRoot>/hub.json` | it is your hub's | **Your orgs**, the hub-root folder names, `storeSync`. | `tkConfig -Set spaces.<slug>.<field>=<value>` |
 
+A fourth file sits beside `hub.json` and is **not configuration**: `<promptsRoot>/org.json`, the hub's
+org chart -- positions, who reports to whom, which model or person sits in each seat. It is data the
+tool reads, hand-edited, and `Config` does not write it; see [The org chart in the hub](#the-org-chart-in-the-hub).
+
 `config.default.json` ships a **template** org, not a real one -- no ADO URL, no tenant, no
 email. Nothing that identifies a person or an organisation is committed. Your real values go in
 `config.local.json`, which patches the shipped org by slug:
@@ -92,12 +96,21 @@ table; this is the shape of it:
 
 | Scope | Keys | Goes to |
 | --- | --- | --- |
-| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `web.agentPort`, `web.corsOrigins`, `limits.inPlay`, `burn.weekStarts`, `burn.cacheHours`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display`, `spaceCheckouts.<slug>.path` | `config.local.json`, created as a sparse patch if it is not there |
-| **org** | `spaces.<slug>.name` / `.status` / `.orgType` / `.org` / `.tenant` / `.promptsFolder` / `.projects` / `.howIWork` / `.features.sprintAwareness` / `.features.suggestions` / `.features.trainingHoursPerQuarter` | the hub's `hub.json` -- or `config.local.json`'s `spaces.<slug>` patch with **`-Local`** |
+| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `isDemoDismissed`, `firstRun.welcome`, `deck.archived`, `web.agentPort`, `web.corsOrigins`, `limits.inPlay`, `burn.weekStarts`, `burn.cacheHours`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display`, `spaceCheckouts.<slug>.path`, `managerWorkflow.communication.recipients.<key>.type` / `.display` / `.webhookEnv`, `startWork.prompts.<kind>` (one per kind the shipped config's `startWork.prompts` names) | `config.local.json`, created as a sparse patch if it is not there |
+| **org** | `spaces.<slug>.name` / `.status` / `.orgType` / `.org` / `.tenant` / `.promptsFolder` / `.projects` / `.laneNames.<lane>` (`backlog`, `active`, `inProgress`, `codeReview`, `done`) / `.howIWork` / `.features.sprintAwareness` / `.features.suggestions` / `.features.trainingHoursPerQuarter` / `.features.teamSize` / `.communication.recipients.<key>.type` / `.display` / `.webhookEnv` | the hub's `hub.json` -- or `config.local.json`'s `spaces.<slug>` patch with **`-Local`** |
 | **hub** | `storeSync`, `folders.<name>` | the hub's `hub.json`, and only with **`-Hub`** |
-| **default** | `commands`, `workItemTypes`, `cliVersion`, `managerWorkflow` | nowhere. These are the team's, and a `-Set` on one is refused by name |
+| **default** | `commands`, `workItemTypes`, `cliVersion`, `managerWorkflow` (all of it but its recipients) | nowhere. These are the team's, and a `-Set` on one is refused by name |
 
 Things worth knowing before you use it:
+
+- **A Teams recipient is declared here, a field at a time** -- `type` (`channel`, `chat` or `person`,
+  from `consts.json`'s `communication` block; any other word is refused naming the three), `display`, and
+  `webhookEnv`, the NAME of the variable that holds the webhook (`TEAMS_WEBHOOK_<NAME>`, never a URL,
+  which is refused and not echoed). `managerWorkflow.communication.recipients.<key>.*` is the engineer's,
+  the same in every Space; `spaces.<slug>.communication.recipients.<key>.*` is one Space's. Every other
+  `managerWorkflow` key stays the team's and is refused as such, not as unknown. `-Unset` of a
+  recipient's last field removes the recipient. [Communication](modules/communication.md#getting-a-webhook-url)
+  has the walk.
 
 - **A slug nobody has declared is how you add an org** -- and `tkNewSpace` is the easy way to do it
   ([Adding a Space](#adding-a-space), below), writing these same keys. `tkConfig -Set spaces.acme.name=Acme` appends
@@ -245,9 +258,13 @@ config file, and a build that asked for the port would refuse.
   "whatever ships ... follow the same pattern"; the demo Spaces are
   [the add-on's](modules/ado.md#the-demo-spaces-one-per-grain)). Set this `true` (Settings: **Hide Demo**) and those orgs are left out of every list a
   person picks an org from: the web's switcher, Settings, the Reviews page's org chips (all read `/env`'s
-  `config.spaces`, which the agent filters), and `tkSwitchSpace Status`. It is **never removed from
-  config**, `tkSwitchSpace azure-demo` still works, and the org you are IN is always shown. One rule in each
-  half -- `Scripts/Select-OfferedSpaces.ps1` and `offered_spaces` in `agent/core/config.py` -- held to one
+  `config.spaces`, which the agent filters). The switcher leaves off one more: a **retired** Space (`status: archive`,
+  `tkRetireSpace`), whatever this is set to. That list is `/env`'s `config.switcherSpaces` (slugs) and
+  `tkSwitchSpace Status`; `config.spaces` keeps the retired Space, so its cards, reviews and row under
+  Archive stay. Nothing is **removed from config**, `tkSwitchSpace azure-demo` (or a retired Space) still
+  works, and the org you are IN is always shown. The switcher rule is `Select-P20SwitcherSpaces`
+  (`Scripts/Select-OfferedSpaces.ps1`) and `switcher_spaces` in `agent/core/config.py`, on top of the offered
+  rule (`Select-P20OfferedSpaces`, `offered_spaces`); the switcher rule is held to one
   table, `Tests/fixtures/offered-orgs/table.json`. `tkStart` does not set it. Not an opt-in surface, so
   it has no row in the inventory.
 - **`commandPrefix`, and the name in `aliases.<name>`** -- become part of a command. A prefix is a
@@ -322,7 +339,8 @@ is no "not configured": the shipped config answers `none`.
   count that was true a minute ago.
 
 Every git call this makes is the CLI half's -- `Scripts/Get-HubSyncState.ps1`, through
-`Invoke-P20TrackerRead` -- so it reads the same on Windows PowerShell 5.1 as on 7. The hub must be the
+`Invoke-P20TrackerRead` -- so it reads the same on Windows PowerShell 5.1 as on 7, a hub whose path holds a
+space and ends in a separator included. The hub must be the
 root of its repository, the same question `Sync` asks before it writes; a hub with no upstream branch
 says so in git's words.
 
@@ -400,21 +418,28 @@ shipped file carries an empty `limits` block and nothing in it.
 
 Where a Space's own repository is cloned **on this machine**: `tkConfig -Set spaceCheckouts.toolkit.path=~/Repos/toolkit`,
 or the **This Space's checkout** row in Settings (the drawer lists the Space you are in; another Space's is set by
-its key). A folder anywhere inside the clone will do; the path is absolute or starts with `~`. Keyed by the
-Space's slug, and the slug must be a declared Space.
+its key). A folder anywhere inside the clone will do; the path is absolute or starts with `~`, and a separator
+at its end is ignored (`C:\My Repos\product\` reads as `C:\My Repos\product`; a drive root stays as written).
+Keyed by the Space's slug, and the slug must be a declared Space.
 
 **It is this machine's, and only ever this machine's.** It is written to `config.local.json` and nowhere else:
 `-Hub` with it is refused, and a `spaceCheckouts` block in `config.default.json` or `hub.json` is read by
 nobody. The hub syncs between machines whose clones of the same repository sit in different folders, so a path
 in `hub.json` would be wrong everywhere but where it was typed.
 
-**What it turns on.** The Design tab reads a product's `design/` and `spec/` from GitHub, so its rows could only
-open a design, never move one -- a move is a `git mv` in a clone. With a checkout named, and its `origin` the
-Space's repository, a product design's menu offers the same moves a hub design's does (**Graduate to a spec**,
+**What it turns on.** A move is a `git mv` in a clone, so without one the Design tab's rows only open a design,
+read from GitHub. With a checkout named, and its `origin` the Space's repository, the tab reads that clone
+instead, and a product design's menu offers the same moves a hub design's does (**Graduate to a spec**,
 **Archive as shipped**, **Archive as dropped**, **Complete**), each running `MoveDesign -Space <slug>` through
 the bridge. The verb **stages the move in that clone and never commits**: a product's history is the engineer's.
-The dialog shows what was staged and the commit line the verb suggests, and the tab re-reads -- though a row
-moves only once the commit is pushed, because the tab reads GitHub ([A repository's designs move only through a named checkout](KNOWN-GAPS.md#a-repositorys-designs-move-only-through-a-named-checkout)).
+The dialog shows what was staged and the commit line the verb suggests, and the tab re-reads.
+
+**What the tab reads, with it.** The listing, **Search inside** and the reading room read the clone's
+**working tree** -- the four folders on disk, on whatever branch it has checked out -- so a staged move shows
+on the re-read, before anything is committed, and a design only that branch carries is listed and found. The
+card's foot says which source was read: the clone and its branch, or the repository on GitHub. Without the
+setting, or with one that is not a clone of the Space's repository, the tab reads GitHub's default branch as it
+always has, and its search is GitHub's code search.
 
 **One resolver.** `Resolve-P20SpaceCheckout` (`Scripts/Resolve-SpaceCheckout.ps1`) is the one thing that finds a
 Space's clone, and this setting is its first candidate, before the folder you stand in and the nav shortcuts'
@@ -425,11 +450,14 @@ repo. On an **Azure DevOps** Space it is the organisation the address names (`ht
 `https://<org>.visualstudio.com`), the one `projects[]` entry's name, and that entry's `repo` (the project's own
 name where it has none) -- and a clone's `origin` is that repository in any form Azure DevOps gives it:
 `https://dev.azure.com/<org>/<project>/_git/<repo>`, `https://<org>.visualstudio.com/[DefaultCollection/]<project>/_git/<repo>`,
-or `git@ssh.dev.azure.com:v3/<org>/<project>/<repo>` and `<org>@vs-ssh.visualstudio.com:v3/<org>/<project>/<repo>`,
+or `git@ssh.dev.azure.com:v3/<org>/<project>/<repo>` and `<org>@vs-ssh.visualstudio.com:v3/<org>/<project>/<repo>`
+(either ssh remote also as a URL, `ssh://git@ssh.dev.azure.com/v3/<org>/<project>/<repo>`, with or without the user and a port),
 the host in any case and a trailing `.git` optional. A Space with several projects names no single repository, so
 it has no clone to find. The patterns are `consts.json` `regex.adoOrigin*` and `regex.adoOrg*`. The agent asks the same question of the configured path alone for the Design tab
 (`agent/core/checkout.py`, on every `GET /api/design`, as `checkout`), and never searches; the path and
 origin rules (GitHub's and Azure DevOps's) are one table both halves assert, `Tests/fixtures/space-checkout/table.json`.
+What counts as absolute is the platform's, so the table's absolute-path rows carry `os` (`posix` for `/srv/clones/r`,
+`windows` for `C:\clones\r`) and each suite runs the rows for the platform it is on; the `~` and relative rows run everywhere.
 
 Unset, a product row keeps its one link out, **Open on GitHub**, and the Design tab's foot names this setting;
 set to a folder that is not a clone of the Space's repository, the foot says why. `tkEnv` lists it under
@@ -606,6 +634,45 @@ row, `Suggestions`, reads `not configured` where Team Agile is on and nothing is
 `on` where it is set true, and `off` where it is set false or Team Agile is off in that Space -- each
 with the line that changes it, under the question "Can it tell me what to do next?".
 
+## `spaces[].features.teamSize` -- how many are in the standup
+
+A number, Space-scoped (like `trainingHoursPerQuarter`): how many people are in Team Agile's standup in
+this Space, **the chair included** -- one of **3, 6 or 9** (`consts.json` `rituals.teamSizes`), so 2, 5
+or 8 members sit. **Unset is 9** (`rituals.teamSizeDefault`), the whole 3x3 grid, and so is any stored
+value that is not one of the three -- a hand-edited 4, a string, a fraction -- so a typo never empties a
+room. **The size is the team**: every seat it counts is filled, and the empty desks are only the windows
+past it. The seats go to the engineer, then the Space's labelled workers with work, then the idle ones,
+each in label order; workers past the size are absent, and seats still open are filled by invented cast
+members, who report made-up status. The round -- `Standup -Grain work` -- speaks the room; the detail,
+the counts and the brief keep every worker and never an invented one
+([the team size](modules/solitaire-agile.md#the-team-size-who-is-in-the-room)).
+
+| `teamSize` | In the room, on a Space with no worker labels | Empty desks |
+| --- | --- | --- |
+| 3 | the chair, the engineer, one invented cast member | 6 |
+| 6 | the chair, the engineer, four invented cast members | 3 |
+| 9, or unset | the chair, the engineer, seven invented cast members | 0 |
+
+```powershell
+tkConfig -Set spaces.<slug>.features.teamSize=3 -Hub   # three in the room: the chair and two members
+tkConfig -Set spaces.<slug>.features.teamSize=4 -Hub   # refused (exit 2): "... is one of: 3, 6, 9 -- got '4'."
+tkConfig -Unset spaces.<slug>.features.teamSize -Hub   # back to nine
+```
+
+`Config -Set` is the one writer: the schema row is an `int` with allowed values (`int(3|6|9)` in
+`Config -Schema`), so any other number is a stated refusal whose hint names the three, and nothing is
+written. It is declared in `consts.json` `features.spaceScoped`, so the hub keeps it on the Space's entry
+and a top-level `features.teamSize` is ignored; being a number, it is not folded into the merged flag map
+`/env` serves -- the standup reads it off the Space and says it back as `team.size`. One rule per half --
+`Get-P20TeamSize` (`Scripts/Resolve-TeamSize.ps1`) and `team_size()` (`agent/solitaire/standup.py`), the
+`sizes` rows of `Tests/fixtures/rituals/standup-team.json`; who sits where is its `room` rows, over the
+cast in `consts.json` `rituals.room`. The inventory row, `Team size`, rides Team Agile
+as the `Suggestions` row does: `off`, with `rides Team Agile, which is off in <slug>`, where Team Agile is
+off in that Space (the switch off, or the Space's `howIWork` not `agents`); where it is on, `on` with the
+number once one of the three is set and `not configured` while nothing is (the room is nine), under
+the question "How many are in my standup in \<Space>?"; the settings drawer draws that question as three
+radios, live on a GitHub Space, each writing the size through `PUT /api/config` with `-Hub`.
+
 ## `features.ado` is not like the other flags
 
 Every other flag under `features` is a module's on / off switch, off until someone sets it. **`features.ado`
@@ -639,7 +706,7 @@ read by `Get-P20MilestoneOrder` and `milestone_order()` -- [milestones](hub/mile
 card's state, **the shape of a card's id** (`regex.cardId`: a work item number, or the
 four-character id of a card with no work item -- at least one letter and one digit, no look-alike
 characters, uppercase; see [The workflow](CLI.md#the-workflow) and [the card](hub/cards.md), "The filename"),
-and **which feature flags are the org's** (`features.spaceScoped`, today `["sprintAwareness", "trainingHoursPerQuarter", "suggestions"]`: the
+and **which feature flags are the org's** (`features.spaceScoped`, today `["sprintAwareness", "trainingHoursPerQuarter", "suggestions", "teamSize"]`: the
 flags read from `spaces[].features` rather than the top-level block -- `SpaceScopedFeatures` in
 `utilities.psm1`, `SPACE_FEATURES` in `agent/core/config.py` and `FEATURES.spaceScoped` in
 `web/src/shell/consts.ts` all read this list, so a new org-scoped flag is added in one place
@@ -657,6 +724,9 @@ which `NewPrompt -Design` writes, and the corpus's hand-written `> Spec:` form, 
 and **the Studio's Prompts card's read** (`studio.promptsRoute`, which the agent mounts and the web asks,
 see [the Studio](modules/studio.md#the-web-ui)), and **the Spaces card's one read of every GitHub Space's
 ledger** (`studio.ledgerRoute`, the same, see [the Studio](modules/studio.md#the-routes)),
+and **the sentences Daily refuses a window with** (`billing.text`: `halfWindow`, `notADay` and
+`backwards` -- the billing script, the CLI's `Daily` and `GET /api/billing` say the same one, see
+[the CLI](CLI.md#the-third-line-billable)),
 and **the halves a test run
 covers** (`tests.halves`, `agent`, `cli`, `web` in the order `tkTest` runs them, and `tests.legacyHalf`,
 what a `test-summary.<machine>.json` entry with no `half` is read as: the CLI runner and `tkTest` write
@@ -666,7 +736,17 @@ names; `tests.historyBase`, `historyFallback` and `historyPath`, the per-platfor
 checkout; `env.testHistoryDir`, `P20_TEST_HISTORY_DIR`, the override the test runners set: `Scripts/Get-TestHistoryDir.ps1`
 and `agent/core/log.py` compute it by one rule, held to `Tests/fixtures/test-history/paths.json` --
 [Testing, "Where the record lives"](TESTING.md#where-the-record-lives)),
+and **the line a card names the agent that worked it with, and the map its id is read through**
+(`stamps.agent`, `**Agent:** <model id>`, beside `**Assigned:**`; `models.file`, `Config/models.json`: a row
+per known model id with its provider, family and display name, which every reader of the line takes from it
+rather than from the id -- see [the card](hub/cards.md#the-agent-line)). Like the price table, the map is
+not a setting: adding a model is one row in the package's file,
 and **the package's own repository** (`repository.url`: what the agent compares a Space's repository with when the package has no git origin to read, so ToolKit connected to itself still reads as itself on the Prompts card -- a checkout's origin wins when it is there),
+and **how a card's agent is worked out** (`models.file`, the model map `Config/models.json`; `models.agentSources`,
+`["line", "assigned", "trailer", "none"]`, the order the sources are tried in, so changing the order is one edit here -- the
+worker label is a source a caller may ask for by passing an order that names it, and the shipped order does not read it;
+and `regex.coAuthorTrailer`, a commit's `Co-Authored-By` trailer with the key in any case -- `Resolve-P20CardAgent`
+and `resolve_card_agent` read all three, see [the card](hub/cards.md), "How a card's agent is worked out"),
 and **the product's version** (`version`, the one top-level value that is not a group: `Env` prints it
 in its first block, `GET /api/env` serves it and the System page's Environment card shows it).
 Two files carry a copy because they must hold their own literal -- `ModuleVersion` in
@@ -849,6 +929,18 @@ tkSetup      # validates prerequisites and reports what is missing
 tkEnv        # machine, OS, tier, hub, active org, az identity, and what the tier allows
 ```
 
+### The org chart in the hub
+
+`org.json` is a second file at the hub root, beside `hub.json` -- `consts.json` `org.file`, the one name
+the CLI, the agent and the web all read it from. `hub.json` stays as it is (orgs, folder names and
+`storeSync`, "and nothing else"): positions and seats are not a Space's declaration, so they have a file of
+their own rather than a key a manifest would have to learn. It is found where the hub is (`PROMPTS_ROOT`,
+else `promptsRoot`), is read as UTF-8, and is validated whole before anything is drawn. Its shape, each
+field, the states and the checks are [`docs/hub/org.md`](hub/org.md); `OrgChart` prints it, and it is read
+only where Team Agile is on ([the scope](hub/org.md#the-scope----where-it-is-and-is-not-there)). No key in
+any config file turns it on: a file at the hub root is all it takes, and the inventory names it either way
+(`tkEnv`, the **Org chart** row).
+
 ## The container's keys: `spaces` and `activeSpace`
 
 The container is a **Space** (the GitHub spec's D-G13). Its keys are `spaces` -- an array in
@@ -909,6 +1001,12 @@ effect in that process -- the override wins, which is what it is for. Without it
 contract (`env.promptsRoot`, `env.activeSpace`, `env.features`): the two newer ones because both halves
 type them, and `PROMPTS_ROOT` because every test runner removes it for the run by that name.
 
+One more name is in that block and is not a setting: `P20_STANDUP_AS_OF` (`env.standupAsOf`) is the
+instant `Standup` reads the clock as, and it is read only while the test-run marker
+(`env.testRunMarker`) is set, so it does nothing in a shell you work in. `Tests/Test-Rituals.ps1`
+sets it for the children it starts, and every test runner removes it for the run with the two
+overrides above ([Testing](TESTING.md)).
+
 ## The agent's cache
 
 The agent keeps one thing on disk that is not a setting and not the hub's: what it has already read
@@ -938,14 +1036,14 @@ past its burndown's `renewsAt` ([usage](hub/usage.md#today-and-this-week)).
 Never the hub -- it is your record, and it may be synced between machines -- and never the package, whose
 tree `Update` refuses to move while it is dirty. Under it, `rows/<reader>.json` holds the parsed rows (the
 reader's name carries a version, bumped when what it parses changes), `bodies/<sha>` the opened bodies, and
-`ledger-1/<slug>.json` each GitHub Space's ledger with the time it was read (the folder's version is bumped
+`ledger-2/<slug>.json` each GitHub Space's ledger with the time it was read (the folder's version is bumped
 when the ledger's shape changes), and `standup-dress-1/<hash>.json` the dressed replies.
 `rows/`, `bodies/` and `standup-dress-1/` are **capped by one rule**, applied when something is written: a record or file unseen for
 30 days goes, and past 3000 records the oldest-unseen go first (`AGENT_CACHE_MAX_AGE_DAYS` and
 `AGENT_CACHE_MAX_RECORDS` in `agent/core/config.py`; not settings -- nothing to configure). "Seen" is when it
 was last written or served. In `rows/` a row carries a stamp in its file's `seen` map, refreshed by a warm
 read at most once a day; in `bodies/` and `standup-dress-1/` it is the file's modification time, set by the
-write and touched on a disk hit. `ledger-1/` is held to the Spaces instead: on a write, the file of any
+write and touched on a disk hit. `ledger-2/` is held to the Spaces instead: on a write, the file of any
 Space no longer in the config is dropped. `burn-1/` is one file, replaced on every read, so it needs no cap.
 A prune that cannot run leaves the cache as it was.
 Delete the folder whenever you like: the next read fetches what it needs again. `Config` does not know the
@@ -977,16 +1075,20 @@ is the active Space); `walk` is a journey -- the connect wizard, below -- offere
 the entry names an anchor or a route, and otherwise shown as its sentence; `sentence` is the whole
 answer, for the environment variables this tool never writes.
 
-**An entry that asks** carries `answers`, `answerKey` and `why` too -- one does today, **How do you want to
-work in {space}?** ([`spaces[].howIWork`](#spaceshowiwork----how-you-work-in-this-space)). `{space}`
+**An entry that asks** carries `answers`, `answerKey` and `why` too -- two do today, **How do you want to
+work in {space}?** ([`spaces[].howIWork`](#spaceshowiwork----how-you-work-in-this-space)) and **How many
+are in my standup in {space}?** ([`spaces[].features.teamSize`](#spacesfeaturesteamsize----how-many-are-in-the-standup)). `{space}`
 in a question is the Space you are in, by name ("this Space" when none is known), in the CLI's inventory
 and in the drawer alike. Each answer is a `label`, the `value` it writes to `answerKey` (`{slug}` the
 active Space) with `-Hub`, its `sentence`, and the trackers it is `live` on; `why` is one sentence per
 tracker saying why the others are disabled. The drawer draws every answer -- one the Space cannot make is
-disabled, never hidden -- checks the one `/env`'s `howIWork` names, and on a pick shows it at once with a
+disabled, never hidden -- checks, for How do you want to work?, the one `/env`'s `howIWork` names, and for
+any other the value the active Space's own entry holds at `answerKey` (none while it is unset; that
+entry's answers are live by `/env`'s `tracker`), and on a pick shows it at once with a
 tiny **Saving…** spinner beside the group, the other answers locked and the group `aria-busy` while
 `Config -Set` runs; a refusal puts the pick back and shows the CLI's sentence. The entry's door
-still goes to its `anchor`, Team Agile's own switch.
+still goes to its `anchor` -- for How do you want to work?, Team Agile's own switch. Only that entry's
+pick of *With agents* also runs `HowWeWork`, and only it says when the answer waits on the switch.
 
 **An entry that names a `space`** is about that one Space -- the demo Spaces, one per grain
 ([the add-on's demo Spaces](modules/ado.md#the-demo-spaces-one-per-grain)) -- and its tip is not

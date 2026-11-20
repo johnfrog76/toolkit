@@ -25,8 +25,9 @@ import {
   useOpenSettings,
   useShellFilters,
   useShellSlot,
+  useSystemTabs,
 } from "../../shell/cards";
-import { homeTabFor } from "../../shell/registry";
+import { homeTabFor, systemTabFor } from "../../shell/registry";
 import { HOME_BANNER_SLOT } from "../../shell/slots";
 import type { HomeTabId } from "../../shell/registry";
 import { ActionDialog } from "./ActionDialog";
@@ -388,7 +389,39 @@ const EXPLAIN: Partial<Record<HomeTabId, string>> = {
   actions: "ADO actions: commands that belong to no one card.",
 };
 
-/** `/system` -- the shell's page of system cards, nothing else. */
+/** `/system` and `/system/agents` -- the shell's system cards under in-page
+ *  tabs, the same TabRows / TabList Home's strip uses. One tab, no strip. */
 export function AdoSystem() {
-  return <ModuleCardGrid kind="system" />;
+  const tabs = useSystemTabs();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const tab = systemTabFor(location.pathname, tabs);
+  // An address for a tab this System page does not have goes to the first.
+  if (!tab && tabs.length > 0 && location.pathname !== "/system") {
+    return <Navigate to="/system" replace />;
+  }
+  return (
+    <>
+      {tabs.length > 1 ? (
+        <TabRows>
+          <TabList
+            size="small"
+            aria-label="System"
+            selectedValue={tab?.id ?? tabs[0].id}
+            onTabSelect={(_e, d) => {
+              const next = tabs.find((t) => t.id === d.value);
+              if (next) navigate(next.path);
+            }}
+          >
+            {tabs.map((t) => (
+              <Tab key={t.id} value={t.id}>
+                {t.label}
+              </Tab>
+            ))}
+          </TabList>
+        </TabRows>
+      ) : null}
+      <ModuleCardGrid kind="system" />
+    </>
+  );
 }

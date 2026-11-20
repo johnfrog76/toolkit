@@ -20,6 +20,11 @@
     card or issue, the kind's agentic prompt -- printed for a cold agent.
     It writes nothing; the web's copy box runs it through the bridge.
 
+    OrgChart prints the org's tree -- positions, who reports to whom, which
+    model or person sits in each seat -- from the hub's org file
+    (docs/hub/org.md). It rides Team Agile, so it is absent wherever Team
+    Agile is off, and it writes nothing.
+
     Commands is a PLAIN hashtable: Import-PowerShellDataFile, the only reader
     the loader uses, refuses a type cast such as [ordered].
 #>
@@ -31,8 +36,9 @@
         'Triage'  = 'Get-P20Triage'
         'Route'   = 'Set-P20Route'
         'StartWork' = 'Get-P20StartWork'
+        'OrgChart' = 'Get-P20OrgChart'
     }
-    Order = @('Standup', 'Triage', 'Route', 'StartWork')
+    Order = @('Standup', 'Triage', 'Route', 'StartWork', 'OrgChart')
 
     Help     = @{
         'Standup' = @{
@@ -40,13 +46,13 @@
             description = 'Today''s standup, filled from the tracker'
             notes       = @(
                 'The queue first -- every open issue labelled verify-close is yours to walk -- then one block per worker: a label whose description starts "Routed to <Name> -- ...". Yesterday is what closed since the previous working day began, Today what is open, Blockers what is open and waiting on you.',
-                'A worker with nothing in flight shows the mug and reports it (the vocabulary''s `nothing` family); the chair''s lines come from the phrasebook. Neither claims any work (Config/standup-vocabulary.json).',
+                'A worker with nothing at all on the tracker reports two made-up items about its day, one Status row each (the vocabulary''s `nothing` and `nothingToday` families); the chair''s lines come from the phrasebook. Neither claims any work (Config/standup-vocabulary.json).',
                 'GitHub Spaces only. With no tracker -- an Azure DevOps or local Space, gh missing or not answering -- the standup still happens, and its Tracker line says why the slots are empty.',
                 '-Space reads a declared Space other than the one you are in. -AsJson prints the response the agent''s GET /api/ritual/standup serves, text included. Nothing is written to the tracker.',
                 '-Brief prints only the chair''s reading, a few lines and no model: what waits on you by kind, each worker as closed / open / in flight / blockers, and the one thing next. -AsJson carries it as brief. Reading is not attending, so -Brief does not re-arm the reminder.',
                 '-Remind <HH:mm> [-Days ...] sets the reminder to attend: ONE Organize reminder, source standup, its cadence (time and days, Monday to Friday unless -Days says otherwise) on its own Ref line, due the next time in the cadence. A second -Remind rewrites it rather than adding one. Needs features.organize.',
                 '-Walk prints only the walk list, by issue number: each verify-close issue and, under it, the VERIFY.md Gate 12 row that names it (or "no VERIFY row -- close on the issue''s own words"). The PC''s morning as one printout; -AsJson carries walk[] of number, title, url, verifyRow. It is a read, not attending (it does not re-arm the reminder), and it does not go with -Remind.',
-                '-Grain detail|work|brief picks the register of detail: detail is the text above, every item and its number; work is the ritual''s grain, each worker''s items grouped by milestone, else the design card the issue names, else the titles'' common stem, spoken as standup prose, one sentence a group, no model ("Opus: Yesterday I closed two in Team Agile (#<n>, #<n>). Nothing blocked."); brief is -Brief''s reading. The played view speaks the work grain. -AsJson carries all three (text, work, brief).',
+                '-Grain detail|work|brief picks the register of detail: detail is the text above, every item and its number; work is the ritual''s grain, each worker''s items grouped by milestone, else the design card the issue names, else the titles'' common stem, spoken as standup prose, one sentence a group, no model, each worker''s turn in one frame ("Opus: Good morning. Yesterday I closed two in Team Agile (#<n>, #<n>). Today I''ll pick up the next item from the board. No blockers. That''s it for me.") -- always a yesterday and a today: real facts where there are any, else a fixed line for that slot ("Yesterday I worked on #<n>." for an open item begun or committed in the window, else "Yesterday I picked up where I left off."; "Today I''ll pick up the next item from the board."), the made-up items only for a worker with nothing at all -- the chair''s own status last, in its own words: what it walked and what it will walk; brief is -Brief''s reading. The played view speaks the work grain. -AsJson carries all three (text, work, brief).',
                 'Each item says what moved, after its number: closed (yesterday''s), started or in progress (today''s and the blockers'') -- started is a card whose **Started:** day, else its **Created:** day, is in the window; an issue with no card says closed or in progress -- and its card''s commits ("#143 (closed, 2 commits) Rename the slug"). The brief opens on the counts line: what moved since the window began, closed, started, in progress and commits, a hash counted once however many cards thread it; each worker''s brief line adds its own.',
                 '-Since <yyyy-MM-dd> widens yesterday back to that day: every issue closed and every card archived since then is said, and the counts sum the window. Today and the blockers are what is open now. The default is the previous working day. Not -Days, which is the reminder''s cadence; a day that is not one, or is after today, is a stated refusal, and it does not go with -Remind.',
                 'Attending re-arms it: Standup (or the Team Agile page) archives the open standup reminder and writes the next day''s in the cadence, once a day, through Organize''s own verbs. To stop it, archive it in Organize.'
@@ -84,8 +90,8 @@
             notes       = @(
                 'One gh write per switch on the Space''s repo: -Size adds that worker label and removes the other sizes; -Assign me makes you the assignee (gh issue edit --add-assignee @me), and -Assign <size> is the -Size write; -Milestone sets an OPEN milestone by title; -Severity adds that label and removes the other two; -DeepWater adds deep-water.',
                 'A size is a worker label on the repo (sonnet, opus, fable here; fable is the owner''s own seat). Deep water gets two moves -- assign Fable or split -- and Route prints them; it makes neither.',
-                'On a card -- an id of its own (K7M2), or any card in a Space with no tracker or a local one -- -Assign me or -Assign <size> writes one **Assigned:** line in the card''s footer and nothing else. A card''s sizes are the repo''s worker labels on a connected GitHub Space; with no connected repository there are no labels to read, so a card there takes -Assign me alone.',
-                'Refused, with nothing written: no number, no switch, an unknown severity, size or milestone (the hint lists the known ones), -Assign and -Size that disagree, an undeclared -Space, a Space that is not GitHub (an Azure DevOps Space refuses -Assign too), a card given any switch but -Assign. -WhatIf prints every write and makes none. Nothing is written to the hub but a card''s **Assigned:** line.'
+                'On a card -- an id of its own (K7M2), or any card in a Space with no tracker or a local one -- -Assign me writes one **Assigned:** me line in the card''s footer, and -Assign <size> writes (or rewrites) its one **Agent:** line -- who is working it, or did -- with the size''s current model id from Config/models.json, and nothing else. A card''s sizes are the repo''s worker labels on a connected GitHub Space; with no connected repository there are no labels to read, so a card there takes -Assign me alone.',
+                'Refused, with nothing written: no number, no switch, an unknown severity, size or milestone (the hint lists the known ones), -Assign and -Size that disagree, an undeclared -Space, a Space that is not GitHub (an Azure DevOps Space refuses -Assign too), a card given any switch but -Assign, a size with no current entry in the model map. -WhatIf prints every write and makes none. Nothing is written to the hub but a card''s **Assigned:** or **Agent:** line.'
             )
             usage       = '{cliPrefix}Route <n|id> [-Size <label>] [-Assign <me|size>] [-Milestone <title>] [-Severity <sev>] [-DeepWater] [-Space <slug>] [-WhatIf] [-Help]'
             examples    = @(
@@ -112,6 +118,21 @@
                 '{cliPrefix}StartWork 23A3 -Clip',
                 '{cliPrefix}StartWork 4 -Prompt agentic/new-issue.prompt.md',
                 '{cliPrefix}StartWork 23A3 -Launch -WhatIf'
+            )
+        }
+        'OrgChart' = @{
+            category    = 'rituals'
+            description = 'The org''s tree: who sits in each seat'
+            notes       = @(
+                'One line per seat -- the position, a middle dot, the model, then [space] and (machine) -- indented by level. A vacant seat says vacant; the owner''s line shows the person and no model; a position with no seats is a pool, one line with its default-model text. The positions are the hub''s org file (org.json at the hub root, beside hub.json; docs/hub/org.md), one tree of it in use.',
+                '-Tree <id> prints another tree of the file by id. -AsJson prints the tree as the agent serves it: the active tree''s id, and the tree with its machines and its positions in tree order, each with its level, prompt, reports-to, default model and seats, a seat''s state derived (staffed when a model or a person is named, vacant when neither is).',
+                'Reads one file and writes nothing. The file is checked first -- a duplicate id, a reportsTo that names no position, a loop, not exactly one root, a prompt that is not a file in the hub''s agentic folder -- and a file that fails is a stated refusal naming what is wrong. No hub configured, or no org file in it, is refused too. A key the tool does not read is ignored with a warning.'
+            )
+            usage       = '{cliPrefix}OrgChart [-Tree <id>] [-AsJson] [-Help]'
+            examples    = @(
+                '{cliPrefix}OrgChart',
+                '{cliPrefix}OrgChart -AsJson',
+                '{cliPrefix}OrgChart -Tree branch'
             )
         }
     }

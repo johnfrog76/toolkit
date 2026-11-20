@@ -32,6 +32,7 @@ sys.path.insert(0, str(PKG_ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _skipguard import skip_module  # noqa: E402
+from _tracker_cli import unreachable  # noqa: E402
 
 try:
     from fastapi.testclient import TestClient
@@ -544,6 +545,7 @@ class OneRecordForEveryPrompt(PromptsCase):
             with self.subTest(ref=row["ref"]):
                 self.assertEqual(row["purpose"], row["description"])
 
+    @unreachable("gh")
     def test_every_shipped_row_carries_its_index_category(self):
         for name, row in self.rows().items():
             if row["group"] == "toolkit":

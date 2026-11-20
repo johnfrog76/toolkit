@@ -1,5 +1,5 @@
 {
-  "_comment": "Settings BY WORKFLOW (D-W1, D-W8; docs/CONFIGURATION.md, \"Settings by workflow: the questions, and the one list behind them\"): the questions a person asks, in their words, each tied to the surfaces of Scripts/Get-OptionalSurfaces.ps1 by key. ONE file, read by the CLI (Scripts/Get-SettingsWorkflows.ps1 -- the question on every inventory row, printed by Env and Menu -All), by the agent (GET /api/surfaces, through the CLI's resolver) and by the web (the drawer's 'How do I' section and the tips at the foot of Home, through the @workflows alias). Held to the inventory both ways by tkTestToolkit -Environment and web/src/shell/settingsWorkflows.test.ts: every inventory key has an entry, every entry names a real key. An entry may carry `answers` (How do you want to work in {space}? -- {space} is the Space you are in): radios in the drawer, each a `label`, the `value` it writes to `answerKey` ({slug} is the active Space) through Config -Set -Hub over the bridge, its `sentence`, and the trackers it is `live` on; the answer checked is the one the agent resolved (/env howIWork), a radio whose `live` list lacks the Space's tracker is shown disabled -- never hidden -- and `why` is the one sentence, per tracker, saying why. Its door still goes to `anchor`. A door is one of three: 'change' opens the drawer at `anchor` ({slug} is the active Space); 'walk' is a journey: with a `route` it opens the wizard there (`/connect/{slug}`, W2); with only an anchor it opens the drawer like change; 'sentence' is the whole answer (an environment variable this tool never writes). An entry with a `tip` is offered at the foot of Home while EVERY one of its surfaces reads 'not configured' -- never 'off', an answered no is respected (D-W3). An entry that names a `space` (the three demo Spaces, one per grain, D-W17) is about THAT Space and tips by where it stands instead: a journey (an entry with a `route`) tips while the Space is declared and still 'local' -- connecting it retires the tip -- and walks THAT Space when it is declared, the one you are in when it is not; any other entry tips while you are in that Space. A Space hidden by Hide Demo is not declared, so its tip goes with it.",
+  "_comment": "Settings BY WORKFLOW (D-W1, D-W8; docs/CONFIGURATION.md, \"Settings by workflow: the questions, and the one list behind them\"): the questions a person asks, in their words, each tied to the surfaces of Scripts/Get-OptionalSurfaces.ps1 by key. ONE file, read by the CLI (Scripts/Get-SettingsWorkflows.ps1 -- the question on every inventory row, printed by Env and Menu -All), by the agent (GET /api/surfaces, through the CLI's resolver) and by the web (the drawer's 'How do I' section and the tips at the foot of Home, through the @workflows alias). Held to the inventory both ways by tkTestToolkit -Environment and web/src/shell/settingsWorkflows.test.ts: every inventory key has an entry, every entry names a real key. An entry may carry `answers` (How do you want to work in {space}?, and How many are in my standup in {space}? -- {space} is the Space you are in): radios in the drawer, each a `label`, the `value` it writes to `answerKey` ({slug} is the active Space) through Config -Set -Hub over the bridge, its `sentence`, and the trackers it is `live` on; the answer checked is, for howIWork, the one the agent resolved (/env howIWork), and for any other key the value the active Space's entry holds at it (none checked while it is unset), a radio whose `live` list lacks the Space's tracker is shown disabled -- never hidden -- and `why` is the one sentence, per tracker, saying why. Its door still goes to `anchor`. A door is one of three: 'change' opens the drawer at `anchor` ({slug} is the active Space); 'walk' is a journey: with a `route` it opens the wizard there (`/connect/{slug}`, W2); with only an anchor it opens the drawer like change; 'sentence' is the whole answer (an environment variable this tool never writes). An entry with a `tip` is offered at the foot of Home while EVERY one of its surfaces reads 'not configured' -- never 'off', an answered no is respected (D-W3). An entry that names a `space` (the three demo Spaces, one per grain, D-W17) is about THAT Space and tips by where it stands instead: a journey (an entry with a `route`) tips while the Space is declared and still 'local' -- connecting it retires the tip -- and walks THAT Space when it is declared, the one you are in when it is not; any other entry tips while you are in that Space. A Space hidden by Hide Demo is not declared, so its tip goes with it.",
   "entries": [
     {
       "id": "cards-live",
@@ -86,6 +86,56 @@
       ],
       "door": "change",
       "anchor": "spaces.{slug}.features.suggestions"
+    },
+    {
+      "id": "org-chart",
+      "question": "Who sits in which seat in my org?",
+      "sentence": "Where Team Agile is on, OrgChart prints your org as a tree: the positions, who each reports to, and the model or person sitting in each seat. It reads one file, org.json, at the top of your hub beside hub.json, and writes nothing; no file, nothing is shown.",
+      "surfaces": [
+        "orgChart"
+      ],
+      "door": "sentence"
+    },
+    {
+      "id": "team-size",
+      "question": "How many are in my standup in {space}?",
+      "sentence": "The room counts the chair; members with work sit first, and unset is nine.",
+      "surfaces": [
+        "teamSize"
+      ],
+      "door": "change",
+      "anchor": "spaces.{slug}.features.teamSize",
+      "answerKey": "spaces.{slug}.features.teamSize",
+      "answers": [
+        {
+          "label": "3",
+          "value": "3",
+          "sentence": "The chair and two members; the rest are out today.",
+          "live": [
+            "github"
+          ]
+        },
+        {
+          "label": "6",
+          "value": "6",
+          "sentence": "The chair and five members.",
+          "live": [
+            "github"
+          ]
+        },
+        {
+          "label": "9",
+          "value": "9",
+          "sentence": "The chair and eight members: the whole grid.",
+          "live": [
+            "github"
+          ]
+        }
+      ],
+      "why": {
+        "ado": "Team Agile's standup is a GitHub Space's; this Space's tracker is Azure DevOps.",
+        "none": "Team Agile's standup is a GitHub Space's; connect a tracker to hold one."
+      }
     },
     {
       "id": "training-hours",

@@ -4,7 +4,7 @@ import { COPY, fileUrl } from "./copy";
 import type { LandingCopy } from "./copy";
 import { PEOPLE } from "./people";
 import { Wordmark } from "../shared/Wordmark";
-import { Window, WindowStyles } from "./Window";
+import { Window } from "./Window";
 import { Code } from "./Code";
 import { Butler } from "./Butler";
 import { Faces } from "./Faces";
@@ -15,7 +15,7 @@ import type { Ramp } from "../shared/accent";
 // Connected Deck). A banner first: the wordmark, the offering, three bullets,
 // the call to action, and the many faces at right with one line under them.
 // Then the three ways of working under an eyebrow, each with one of the cast
-// in their window, sides alternating. Then quick start with Nimbus beside the
+// on their card, sides alternating. Then quick start with Nimbus beside the
 // shell, then the footer. The words are the page's own (copy.ts).
 
 /** The product's name: the wordmark's accessible name and the page's heading. */
@@ -68,7 +68,6 @@ export function Landing({
   }, [focusCta]);
   return (
     <div className="lp" style={LANDING_ACCENT}>
-      <WindowStyles />
       {/* The banner. */}
       <header className="lp-banner">
         <div className="lp-banner-words">

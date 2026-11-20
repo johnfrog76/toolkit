@@ -1,112 +1,25 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import {
-  Card,
-  Subtitle2,
-  Body1Strong,
-  Caption1,
-  Badge,
-  Button,
-  Dropdown,
-  Option,
-  Input,
-  Textarea,
-  Dialog,
-  DialogSurface,
-  DialogBody,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  DialogTrigger,
-  Field,
-  makeStyles,
-  tokens,
-} from "@fluentui/react-components";
-import { GoalActions } from "./GoalActions";
-import { DialogDismiss } from "../../shared/DialogDismiss";
-import { ROW } from "../../shared/CardActions";
-import { RefreshButton } from "../../shared/RefreshButton";
-import { PanelFrame } from "../../shared/PanelFrame";
-import { CreateButton } from "../../shared/CreateButton";
-import { Pagination } from "../../shared/Pagination";
-import { usePagination } from "../../hooks/usePagination";
-import { useGetGrowthQuery, useRunNewGrowthMutation } from "./api.growth";
-import {
-  buildNewGrowthParams,
-  commandResultMessage,
-  fileFromCommandOutput,
-} from "../ado/cliBridge";
-import type { GrowthItem, GrowthType } from "./api.growth";
 import { TargetArrowRegular } from "@fluentui/react-icons";
-import { EmptyState } from "../../shared/EmptyState";
-import { localToday } from "../../utility/dates";
+import { ROW } from "../../shared/CardActions";
+import { ListPanel } from "../../shell/kinds/ListPanel";
+import type { FilterChip } from "../../shell/kinds/ListPanel";
+import type { CardItemData, MetaItem } from "../../shell/CardItem";
+import { useGetGrowthQuery } from "./api.growth";
+import type { GrowthItem, GrowthStatus } from "./api.growth";
+import { canComplete } from "./GoalActions";
+import { CompleteGoalDialog } from "./CompleteGoal";
+import { RetireGoalDialog } from "./RetireGoal";
+import { NewGrowthDialog } from "./NewGrowthDialog";
+import { TYPE_COLOUR, TYPE_LABEL, goalPath } from "./growthLabels";
 
-const PAGE_SIZE = 3;
+type StatusFilter = "all" | GrowthStatus;
 
-type StatusFilter = "all" | "new" | "active" | "complete";
-
-const useStyles = makeStyles({
-  itemCard: {
-    marginTop: tokens.spacingVerticalS,
-    padding: tokens.spacingVerticalS,
-    backgroundColor: tokens.colorNeutralBackgroundAlpha,
-  },
-  itemHeader: {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: tokens.spacingHorizontalS,
-  },
-  itemBody: {
-    flex: 1,
-    minWidth: 0,
-  },
-  typeBadgeRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: tokens.spacingHorizontalS,
-  },
-  metaRow: {
-    display: "flex",
-    gap: tokens.spacingHorizontalM,
-    flexWrap: "wrap" as const,
-    marginTop: tokens.spacingVerticalXS,
-    alignItems: "center",
-  },
-  dialogFields: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: tokens.spacingVerticalM,
-    paddingTop: tokens.spacingVerticalS,
-  },
-});
-
-function statusBadge(status: GrowthItem["status"]) {
-  if (status === "new")
-    return (
-      <Badge color="important" appearance="tint" size="small">
-        New
-      </Badge>
-    );
-  return (
-    <Badge color="subtle" appearance="tint" size="small">
-      {status === "complete" ? "Complete" : "Active"}
-    </Badge>
-  );
-}
-
-// Three types, and the badge reads the item rather than asking whether it is a
-// presentation. It used to be a boolean, which was true of the two types that
-// existed then and silently labelled the third one "Training".
-const TYPE_LABEL: Record<GrowthType, string> = {
-  training: "Training",
-  presentation: "Presentation",
-  goal: "Goal",
-};
-const TYPE_COLOUR: Record<GrowthType, "success" | "brand" | "informative"> = {
-  training: "success",
-  presentation: "brand",
-  goal: "informative",
+const STATUSES: GrowthStatus[] = ["new", "active", "complete"];
+const STATUS_LABEL: Record<GrowthStatus, string> = {
+  new: "New",
+  active: "Active",
+  complete: "Complete",
 };
 
 // The agent falls back to the file's own stem when no heading parses (a file
@@ -119,350 +32,152 @@ export function isUntitledGrowthItem(title: string, filename: string): boolean {
   return title === filename.replace(/\.md$/, "");
 }
 
-function GoalCard({ item }: { item: GrowthItem }) {
-  const styles = useStyles();
-  const navigate = useNavigate();
-  const isTraining = item.type === "training";
-  const dueLabel = item.due_date ? `Due: ${item.due_date}` : item.date || null;
-  const noRealTitle = isUntitledGrowthItem(item.title, item.filename);
-
-  return (
-    <Card className={styles.itemCard} size="small" appearance="outline">
-      <div className={styles.itemHeader}>
-        <div className={styles.itemBody}>
-          <div className={styles.typeBadgeRow}>
-            <Badge color={TYPE_COLOUR[item.type]} appearance="outline" size="small">
-              {TYPE_LABEL[item.type]}
-            </Badge>
-            {statusBadge(item.status)}
-          </div>
-          <Body1Strong style={{ display: "block", marginTop: tokens.spacingVerticalXS }}>
-            {noRealTitle ? `Untitled ${TYPE_LABEL[item.type]}` : item.title}
-          </Body1Strong>
-          {noRealTitle && (
-            <Caption1
-              title={item.filename}
-              style={{ display: "block", color: tokens.colorNeutralForeground3 }}
-            >
-              {item.filename}
-            </Caption1>
-          )}
-          <div className={styles.metaRow}>
-            {isTraining && item.provider && <Caption1>{item.provider}</Caption1>}
-            {isTraining && item.hours && item.hours !== "TBD" && <Caption1>{item.hours}h</Caption1>}
-            {dueLabel && <Caption1>{dueLabel}</Caption1>}
-          </div>
-        </div>
-        <GoalActions
-          item={item}
-          primaryAction={ROW.open.action({
-            detail: "the goal",
-            onClick: () => navigate(`/growth/goals/${encodeURIComponent(item.filename)}`),
-          })}
-        />
-      </div>
-    </Card>
-  );
-}
-
-function todayIso(): string {
-  return localToday();
-}
-
+// The Goals panel: every growth item in growth/current/ -- a goal, a training,
+// a talk -- each a card item whose one exposed action is its page and whose
+// menu holds its moves (Complete for a goal that is not complete yet, Archive
+// either way). The status chips split the one list.
 export function Goals() {
-  const styles = useStyles();
   const navigate = useNavigate();
   const { data, isLoading, isFetching, isError, refetch } = useGetGrowthQuery();
-  const [runNewGrowth, { isLoading: creating }] = useRunNewGrowthMutation();
-  // What the verb said when it did not make a new item: a refusal in its own
-  // words, or "Already there" for an item growth/current/ already holds.
-  const [createMessage, setCreateMessage] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [newType, setNewType] = useState<GrowthType>("training");
-  const [newTitle, setNewTitle] = useState("");
-  const [newDate, setNewDate] = useState(todayIso);
-  const [newDueDate, setNewDueDate] = useState("");
-  const [newProvider, setNewProvider] = useState("");
-  const [newHours, setNewHours] = useState("");
-  const [newNotes, setNewNotes] = useState("");
+  const [creating, setCreating] = useState(false);
+  // The item a move's dialog is open on.
+  const [completing, setCompleting] = useState<GrowthItem | null>(null);
+  const [archiving, setArchiving] = useState<GrowthItem | null>(null);
 
   const allItems = data?.items ?? [];
-  const filtered =
+  const shown =
     statusFilter === "all" ? allItems : allItems.filter((i) => i.status === statusFilter);
-  const { page, totalPages, pageItems, setPage } = usePagination(filtered, PAGE_SIZE);
 
-  const newCount = allItems.filter((i) => i.status === "new").length;
-  const activeCount = allItems.filter((i) => i.status === "active").length;
-  const completeCount = allItems.filter((i) => i.status === "complete").length;
+  const chips: FilterChip[] = [
+    {
+      id: "all",
+      label: "All",
+      count: allItems.length,
+      active: statusFilter === "all",
+      onSelect: () => setStatusFilter("all"),
+    },
+    ...STATUSES.map((s) => ({
+      id: s,
+      label: STATUS_LABEL[s],
+      count: allItems.filter((i) => i.status === s).length,
+      active: statusFilter === s,
+      onSelect: () => setStatusFilter(s),
+    })),
+  ];
 
-  const handleFilter = (f: StatusFilter) => {
-    setStatusFilter(f);
-    setPage(0);
+  const toItem = (item: GrowthItem): CardItemData => {
+    const untitled = isUntitledGrowthItem(item.title, item.filename);
+    const title = untitled ? `Untitled ${TYPE_LABEL[item.type]}` : item.title;
+    const training = item.type === "training";
+    // The description is the item's facts as the file has them: who gives a
+    // training and how long it is, then its dates.
+    const facts = [
+      training && item.provider ? item.provider : null,
+      training && item.hours && item.hours !== "TBD" ? `${item.hours}h` : null,
+      item.date || null,
+    ].filter((fact): fact is string => fact !== null);
+    const meta: MetaItem[] = [
+      {
+        badge: {
+          label: TYPE_LABEL[item.type],
+          color: TYPE_COLOUR[item.type],
+          appearance: "outline",
+        },
+      },
+    ];
+    if (item.due_date) meta.push({ text: `Due: ${item.due_date}` });
+    // A file with no title of its own is named by its file.
+    if (untitled) meta.push({ text: item.filename, title: item.filename, shrink: true });
+    return {
+      id: item.filename,
+      title,
+      name: item.title,
+      description: facts.length > 0 ? facts.join(" · ") : undefined,
+      badges: [
+        {
+          label: STATUS_LABEL[item.status],
+          color: item.status === "new" ? "important" : "subtle",
+        },
+      ],
+      meta,
+      primary: ROW.open.action({
+        detail: "the goal",
+        onClick: () => navigate(goalPath(item.filename)),
+      }),
+      menu: [
+        ...(canComplete(item) ? [ROW.complete.action({ onClick: () => setCompleting(item) })] : []),
+        ROW.archive.action({ onClick: () => setArchiving(item) }),
+      ],
+    };
   };
 
-  const resetDialog = () => {
-    setNewType("training");
-    setNewTitle("");
-    setNewDate(todayIso());
-    setNewDueDate("");
-    setNewProvider("");
-    setNewHours("");
-    setNewNotes("");
-    setCreateMessage(null);
-  };
-
-  // `NewGrowth` through the bridge: the verb the terminal types writes the
-  // file, and its answer is a CommandResponse, not the item -- so the new
-  // item's name comes off the verb's `FILE:` line. An item that was already in
-  // the list before the call is the verb's "Already there": nothing was
-  // written, so the dialog stays open and says so rather than opening it.
-  const handleSubmit = async () => {
-    setCreateMessage(null);
-    const before = new Set(allItems.map((i) => i.filename));
-    try {
-      const result = await runNewGrowth({
-        params: buildNewGrowthParams({
-          type: newType,
-          title: newTitle,
-          date: newDate,
-          dueDate: newDueDate,
-          provider: newProvider,
-          hours: newHours,
-          notes: newNotes,
-        }),
-      }).unwrap();
-      const filename = result.status === "success" ? fileFromCommandOutput(result.output) : null;
-      if (!filename || before.has(filename)) {
-        setCreateMessage(commandResultMessage(result, "Nothing was written."));
-        return;
-      }
-      setDialogOpen(false);
-      resetDialog();
-      navigate(`/growth/goals/${encodeURIComponent(filename)}`);
-    } catch {
-      setCreateMessage("Could not reach the agent. Nothing was written.");
-    }
-  };
-
-  const filterLabel: Record<StatusFilter, string> = {
-    all: "All",
-    new: `New (${newCount})`,
-    active: `Active (${activeCount})`,
-    complete: `Complete (${completeCount})`,
-  };
-
+  const icon = <TargetArrowRegular />;
   return (
     <>
-      <PanelFrame
-        scrollable
-        loading={isLoading}
-        loadingLabel="Loading goals..."
-        headerLeft={<Subtitle2>Goals</Subtitle2>}
-        headerRight={
-          <>
-            <Dropdown
-              size="small"
-              aria-label="Status"
-              value={statusFilter === "all" ? "All" : filterLabel[statusFilter]}
-              selectedOptions={[statusFilter]}
-              onOptionSelect={(_e, d) => handleFilter(d.optionValue as StatusFilter)}
-              style={{ minWidth: "130px" }}
-            >
-              <Option value="all">All</Option>
-              <Option value="new">{filterLabel.new}</Option>
-              <Option value="active">{filterLabel.active}</Option>
-              <Option value="complete">{filterLabel.complete}</Option>
-            </Dropdown>
-            <RefreshButton onClick={refetch} isFetching={isFetching} />
-            <Badge color="informative" appearance="filled" size="large">
-              {statusFilter === "all" ? allItems.length : `${filtered.length} / ${allItems.length}`}
-            </Badge>
-          </>
+      <ListPanel
+        title="Goals"
+        info="What you are growing into: a goal, a course, a talk you are preparing. Each is one file in your hub."
+        items={shown}
+        item={toItem}
+        loading={isLoading ? { label: "Loading goals..." } : undefined}
+        empty={
+          isError
+            ? {
+                icon,
+                tone: "error",
+                title: "Could not load your goals",
+                detail: "The agent did not answer. Nothing was read.",
+              }
+            : {
+                icon,
+                title: "No goals yet",
+                detail: "A goal, a course or a talk you are preparing. The + below starts one.",
+              }
         }
-        footerCenter={
-          totalPages > 1 ? (
-            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-          ) : undefined
+        filteredEmpty={
+          statusFilter !== "all" && !isError
+            ? {
+                icon,
+                tone: "filtered",
+                title: `No ${statusFilter} goals`,
+                detail: "Others are hidden by the filter.",
+              }
+            : undefined
         }
-        footerRight={<CreateButton label="New Growth Item" onClick={() => setDialogOpen(true)} />}
-      >
-        {filtered.length === 0 ? (
-          isError ? (
-            <EmptyState
-              icon={<TargetArrowRegular />}
-              tone="error"
-              title="Could not load your goals"
-              detail="The agent did not answer. Nothing was read."
-            />
-          ) : statusFilter === "all" ? (
-            <EmptyState
-              icon={<TargetArrowRegular />}
-              title="No goals yet"
-              detail="A goal, a course or a talk you are preparing. The + below starts one."
-            />
-          ) : (
-            <EmptyState
-              icon={<TargetArrowRegular />}
-              tone="filtered"
-              title={`No ${statusFilter} goals`}
-              detail="Others are hidden by the filter."
-            />
-          )
-        ) : (
-          pageItems.map((item) => <GoalCard key={item.filename} item={item} />)
-        )}
-      </PanelFrame>
+        filters={[{ label: "Filter goals", chips }]}
+        refresh={{ onClick: refetch, isFetching }}
+        count={allItems.length}
+        countLabel={`${allItems.length} growth items`}
+        create={{ label: "New Growth Item", onClick: () => setCreating(true) }}
+      />
 
-      <Dialog
-        open={dialogOpen}
-        onOpenChange={(_e, d) => {
-          setDialogOpen(d.open);
-          if (!d.open) resetDialog();
-        }}
-      >
-        <DialogSurface>
-          <DialogBody>
-            <DialogTitle action={<DialogDismiss />}>New Growth Item</DialogTitle>
-            <DialogContent>
-              <div className={styles.dialogFields}>
-                <Field label="Type">
-                  <Dropdown
-                    size="small"
-                    value={TYPE_LABEL[newType]}
-                    selectedOptions={[newType]}
-                    onOptionSelect={(_e, d) => setNewType(d.optionValue as GrowthType)}
-                    style={{ minWidth: "150px" }}
-                  >
-                    <Option value="training">Training</Option>
-                    <Option value="presentation">Presentation</Option>
-                    <Option value="goal">Goal</Option>
-                  </Dropdown>
-                </Field>
-                <Field label="Title">
-                  <Input
-                    size="small"
-                    value={newTitle}
-                    onChange={(_, d) => setNewTitle(d.value)}
-                    placeholder="Course or talk title"
-                    style={{ width: "100%" }}
-                  />
-                </Field>
-                {newType === "training" ? (
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: tokens.spacingHorizontalM,
-                      alignItems: "flex-end",
-                    }}
-                  >
-                    <Field label="Start date">
-                      <Input
-                        type="date"
-                        size="small"
-                        value={newDate}
-                        onChange={(_, d) => setNewDate(d.value)}
-                        style={{ width: "145px" }}
-                      />
-                    </Field>
-                    {/* Required, and the field says so -- the Create button is
-                        already disabled without it, which told the user nothing
-                        about WHY. The CLI refuses the same case by name. */}
-                    <Field label="Due date (required)" required>
-                      <Input
-                        type="date"
-                        size="small"
-                        value={newDueDate}
-                        onChange={(_, d) => setNewDueDate(d.value)}
-                        style={{ width: "145px" }}
-                      />
-                    </Field>
-                  </div>
-                ) : (
-                  <Field label="Date">
-                    <Input
-                      type="date"
-                      size="small"
-                      value={newDate}
-                      onChange={(_, d) => setNewDate(d.value)}
-                      style={{ width: "150px" }}
-                    />
-                  </Field>
-                )}
-                {newType === "training" && (
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: tokens.spacingHorizontalM,
-                      alignItems: "flex-end",
-                    }}
-                  >
-                    <Field label="Provider">
-                      <Input
-                        size="small"
-                        value={newProvider}
-                        onChange={(_, d) => setNewProvider(d.value)}
-                        placeholder="Udemy, Pluralsight, internal…"
-                        style={{ width: "220px" }}
-                      />
-                    </Field>
-                    <Field label="Hours">
-                      <Input
-                        size="small"
-                        value={newHours}
-                        onChange={(_, d) => setNewHours(d.value)}
-                        placeholder="TBD"
-                        style={{ width: "70px" }}
-                      />
-                    </Field>
-                  </div>
-                )}
-                <Field label="Notes">
-                  <Textarea
-                    size="small"
-                    rows={3}
-                    resize="vertical"
-                    value={newNotes}
-                    onChange={(_, d) => setNewNotes(d.value)}
-                    placeholder={
-                      newType === "training"
-                        ? "What it covers, why you enrolled…"
-                        : newType === "goal"
-                          ? "Why this matters, and what it would change…"
-                          : "Context, audience, key message…"
-                    }
-                  />
-                </Field>
-                {createMessage && (
-                  <Caption1
-                    role="alert"
-                    style={{ color: tokens.colorPaletteRedForeground1, whiteSpace: "pre-wrap" }}
-                  >
-                    {createMessage}
-                  </Caption1>
-                )}
-              </div>
-            </DialogContent>
-            <DialogActions>
-              <DialogTrigger disableButtonEnhancement>
-                <Button appearance="secondary">Cancel</Button>
-              </DialogTrigger>
-              <Button
-                appearance="primary"
-                onClick={handleSubmit}
-                disabled={
-                  creating ||
-                  !newTitle.trim() ||
-                  !newDate ||
-                  (newType === "training" && !newDueDate)
-                }
-              >
-                {creating ? "Creating…" : "Submit"}
-              </Button>
-            </DialogActions>
-          </DialogBody>
-        </DialogSurface>
-      </Dialog>
+      {creating && (
+        <NewGrowthDialog
+          existing={allItems.map((i) => i.filename)}
+          onClose={() => setCreating(false)}
+        />
+      )}
+      {completing && (
+        <CompleteGoalDialog
+          filename={completing.filename}
+          title={completing.title}
+          open
+          onOpenChange={(open) => {
+            if (!open) setCompleting(null);
+          }}
+        />
+      )}
+      {archiving && (
+        <RetireGoalDialog
+          filename={archiving.filename}
+          title={archiving.title}
+          open
+          onOpenChange={(open) => {
+            if (!open) setArchiving(null);
+          }}
+        />
+      )}
     </>
   );
 }

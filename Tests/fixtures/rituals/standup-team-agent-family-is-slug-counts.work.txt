@@ -1,0 +1,17 @@
+Standup -- Friday 2 October 2026
+"Can we not adjust scope."
+
+Nothing is waiting on you.
+
+Opus: Good morning. Yesterday I worked on R4T6. Today I'm on Task: R4T6, Read the board. No blockers. That's it for me.
+Opus: Good morning. Yesterday I picked up where I left off. Today I'm on Task: K9L2, Wire the column. No blockers. That's it for me.
+Fable: Good morning. Yesterday I read up on how the team works, so I'm ready for what's next. Today I'll move my shell to the new terminal and pick a theme. No blockers. That's it for me.
+MINIMALIST: Good morning. Yesterday I tidied my notes and my calendar for the week. Today I'll pair with a teammate to learn how the build runs. No blockers. That's it for me.
+NEW HIRE: Good morning. Yesterday I had a quiet day: some learning and some setup. Today I'll set up my editor's formatter to match the team's. No blockers. That's it for me.
+ULTRAWIDE OVERLORD: Good morning. Yesterday I started configuring my dev environment. Today I'll practise the keyboard shortcuts I keep forgetting. No blockers. That's it for me.
+QA ALCHEMIST: Good morning. Yesterday I fought my mechanical keyboard's Bluetooth until it paired. Today I'll sit in on the planning meeting and take notes. No blockers. That's it for me.
+DESIGNER: Good morning. Yesterday I fixed my standing desk; it goes up and down again. Today I'll swap the batteries in my mouse and keyboard. No blockers. That's it for me.
+
+Good morning. Yesterday I watched a couple of React tutorials to get my head into the new stack. Today I'll keep the board moving. No blockers. That's it for me.
+
+"Let's circle back."

@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _skipguard import skip_module
+from _tracker_cli import unreachable
 
 try:
     from fastapi.testclient import TestClient
@@ -95,12 +96,15 @@ class EnvServesIt(unittest.TestCase):
 
         return TestClient(app).get("/api/env").json()
 
+    @unreachable("az")
     def test_it_follows_the_org_you_are_in(self):
         self.assertEqual(self._env({"activeSpace": "demo"})["ado"], {"enabled": False, "explicit": False})
 
+    @unreachable("az")
     def test_an_active_space_is_on_without_anyone_saying_so(self):
         self.assertEqual(self._env({})["ado"], {"enabled": True, "explicit": False})
 
+    @unreachable("az", "gh")
     def test_a_connected_github_space_is_off_and_the_tracker_says_why(self):
         """Active, nobody has said, and the address is GitHub: the same answer the CLI's inventory prints."""
         env = self._env({"activeSpace": "gh"})
@@ -111,6 +115,7 @@ class EnvServesIt(unittest.TestCase):
             self._env({"activeSpace": "gh", "features": {"ado": True}})["ado"], {"enabled": True, "explicit": True}
         )
 
+    @unreachable("az")
     def test_the_explicit_answer_wins_and_says_it_is_explicit(self):
         self.assertEqual(self._env({"features": {"ado": False}})["ado"], {"enabled": False, "explicit": True})
         self.assertEqual(
