@@ -928,9 +928,14 @@ test run. So `-Stop` walks the descendants (`pgrep -P` on macOS and Linux,
 `Win32_Process` children on Windows), and both verbs probe the dev port -- the one
 `web/vite.config.ts` asks for **and** the one Vite actually took.
 
-**The sweep stops a dev server and nothing else.** A listener the toolkit did not start is named
-with its PID either way, but it is only *stopped* if its image is `node`, which is what Vite runs
-in. Anything else gets `Port 5174 is held by <name> (PID <n>) -- not a dev server; not stopping it`
+**The sweep stops this checkout's dev server and nothing else.** A listener the toolkit did not
+start is named with its PID either way, but it is only *stopped* if its image is `node`, which is
+what Vite runs in, **and** it belongs to this checkout: its command line or working directory is
+under this package's `web/` (on Windows the command line alone, since the working directory is not
+readable there; a listener whose owner cannot be read counts as not this checkout's). A `node`
+serving that port from another checkout is named -- `Port 5174 is held by a node (PID <n>) that
+belongs to another checkout; not stopping it` -- and left running, from `-Status`, `-Stop` and
+`-Restart` alike. Anything that is not `node` gets `Port 5174 is held by <name> (PID <n>) -- not a dev server; not stopping it`
 from both `-Status` and `-Stop`. In production mode the only listeners on that port are Docker
 Desktop's own forwards, and force-killing them takes the Docker backend down, which makes the
 `docker compose down` about to run impossible: the container is left defined and every other
