@@ -44,6 +44,8 @@ export const LIST_CHROME_PX = {
   filterRow: 26,
   /** A lead chart (152), with the hairline under it. */
   lead: 153,
+  /** The controls row of a panel that sets them in its body (pickers and search, small): the row's height. */
+  controlsRow: 24,
   /** One line under the foot row (20), and the gap above it. */
   footNote: 32,
   /** A status line above the items, while one is shown. */
@@ -55,6 +57,10 @@ export interface ListChrome {
   density: ListDensity;
   filterRows?: number;
   lead?: boolean;
+  /** Px a lead chart is taller than the default plot, when the panel asks for it. */
+  leadExtraPx?: number;
+  /** The pickers and search sit in the body, in a row above the lead. */
+  controlsRow?: boolean;
   footNote?: boolean;
   status?: boolean;
 }
@@ -71,7 +77,8 @@ export function listChromePx(chrome: ListChrome): number {
     (rows > 0
       ? filtersSpaceBelowPx - (chrome.lead ? 0 : cardListPaddingTopPx[chrome.density])
       : 0) +
-    (chrome.lead ? LIST_CHROME_PX.lead : 0) +
+    (chrome.controlsRow ? LIST_CHROME_PX.controlsRow + filtersSpaceBelowPx : 0) +
+    (chrome.lead ? LIST_CHROME_PX.lead + (chrome.leadExtraPx ?? 0) : 0) +
     (chrome.footNote ? LIST_CHROME_PX.footNote : 0) +
     (chrome.status ? LIST_CHROME_PX.status : 0)
   );

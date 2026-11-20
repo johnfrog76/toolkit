@@ -6,6 +6,10 @@ import type { WorkItemInfo } from "./api.ado";
 import { workItemsPath } from "./issueAxes";
 import { expectListPanelShape } from "../../shell/kinds/panelShapeAssert";
 
+/** A chip's accessible name is its label then its count, where it has one. */
+const chipName = (label: string) =>
+  new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\d*$`);
+
 // The Issues row wears the house row: the title is text, the one exposed
 // action goes somewhere, the menu holds the rest. On a gh space the exposed
 // action is the reading room and github.com is a menu item; on ADO
@@ -309,7 +313,7 @@ describe("the Issues tab's states say where and what", () => {
     mount();
     fireEvent.click(
       within(screen.getByRole("radiogroup", { name: "Assigned to" })).getByRole("radio", {
-        name: "me",
+        name: chipName("me"),
       }),
     );
     expect(screen.getByText("GitHub issues assigned to me")).toBeTruthy();
@@ -332,7 +336,8 @@ describe("the Issues tab's states say where and what", () => {
 // state and assignee are asked of the agent, worked-by filters the list.
 describe("the Issues tab's chip groups", () => {
   const group = (name: string) => screen.getByRole("radiogroup", { name });
-  const chip = (g: string, name: string) => within(group(g)).getByRole("radio", { name });
+  const chip = (g: string, name: string) =>
+    within(group(g)).getByRole("radio", { name: chipName(name) });
 
   it("opens on today's view -- open issues, assigned to all -- and asks for nothing closed", () => {
     tracker = "github";
@@ -412,7 +417,7 @@ describe("the Issues tab's chip groups", () => {
       const labels = within(group("Worked by"))
         .getAllByRole("radio")
         .map((r) => r.textContent);
-      expect(labels).toEqual(["all", "opus", "fable", "sonnet", "haiku"]);
+      expect(labels).toEqual(["all5", "opus1", "fable1", "sonnet1", "haiku1"]);
     });
 
     it("every row wears its worker, so the list shows who gets what", () => {
@@ -479,7 +484,9 @@ describe("the Issues filters, in the drawer", () => {
   ];
   const shown = () => Array.from(document.querySelectorAll("strong")).map((s) => s.textContent);
   const chip = (g: string, name: string) =>
-    within(screen.getByRole("radiogroup", { name: g })).getByRole("radio", { name });
+    within(screen.getByRole("radiogroup", { name: g })).getByRole("radio", {
+      name: chipName(name),
+    });
 
   it("the list itself holds no chip: one summary line says what the drawer shows", () => {
     tracker = "github";

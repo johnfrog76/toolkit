@@ -14,6 +14,7 @@ Opus
   Today      #101 Build the foyer counts — Chloé’s “Ïle” row
   Blockers   no blockers
 Sonnet
-  Mug        "Nothing on the board for me. All green, no blockers."
+  Status     "Yesterday I took a course module on the cloud platform."
+  Status     "Today I'll set up the password manager on my phone."
 
 "Let's circle back."

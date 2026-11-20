@@ -141,12 +141,21 @@ jest.mock("./registry", () => ({
   ],
 }));
 
-let declaredSpaces: { slug: string; name: string; status: string }[] = [];
+let declaredSpaces: {
+  slug: string;
+  name: string;
+  status: string;
+  features?: Record<string, unknown>;
+}[] = [];
 // /env's howIWork for the Space you are in -- the agent's answer, per case.
 let howIWork: Record<string, unknown> | undefined;
+// /env's tracker: the one the active Space's address names.
+let envTracker: string | undefined;
 jest.mock("./api", () => ({
   useGetSurfacesQuery: () => ({ data: inventory, isError: false }),
-  useGetEnvQuery: () => ({ data: { config: { spaces: declaredSpaces }, howIWork } }),
+  useGetEnvQuery: () => ({
+    data: { config: { spaces: declaredSpaces }, howIWork, tracker: envTracker },
+  }),
 }));
 const openSpy = jest.fn();
 const navigateSpy = jest.fn();
@@ -473,6 +482,77 @@ describe("HowDoI", () => {
       renderWith();
       for (const l of ["With agents", "Alone", "On a team in Azure"])
         expect(radio(l).disabled).toBe(true);
+    });
+  });
+
+  // The second entry that asks: its value is the Space's own (spaces[].features.teamSize,
+  // read off the declared entry /env serves), never the agent's howIWork.
+  describe("How many are in my standup in {space}?", () => {
+    const row = () =>
+      screen
+        .getByText("How many are in my standup in Toolkit?")
+        .closest("[data-workflow-entry]") as HTMLElement;
+    const radio = (label: string) => within(row()).getByLabelText(label) as HTMLInputElement;
+    const labels = () => Array.from(row().querySelectorAll("label")).map((l) => l.textContent);
+
+    beforeEach(() => {
+      declaredSpaces = [{ slug: "toolkit", name: "Toolkit", status: "active" }];
+      envTracker = "github";
+      // How do you want to work?'s answer is With agents and its switch is OFF: none
+      // of that question's own lines may follow this one.
+      howIWork = {
+        answer: "agents",
+        source: "chosen",
+        tracker: "github",
+        locked: false,
+        switch: false,
+      };
+    });
+    afterEach(() => {
+      declaredSpaces = [];
+      envTracker = undefined;
+      howIWork = undefined;
+      writeSpy.mockClear();
+      writeReply = () => Promise.resolve(SUCCESS);
+      howWeWorkSpy.mockClear();
+    });
+
+    it("three radios, 3, 6 and 9; unset checks none, a stored size checks its own", () => {
+      renderWith();
+      expect(labels()).toEqual(["3", "6", "9"]);
+      for (const l of ["3", "6", "9"]) {
+        expect(radio(l).checked).toBe(false);
+        expect(radio(l).disabled).toBe(false);
+      }
+      expect(row().textContent).not.toContain("Team Agile's own switch is off");
+      cleanup();
+      declaredSpaces = [
+        { slug: "toolkit", name: "Toolkit", status: "active", features: { teamSize: 6 } },
+      ];
+      renderWith();
+      expect(radio("6").checked).toBe(true);
+      expect(radio("9").checked).toBe(false);
+    });
+
+    it("a pick writes the Space's size to the hub through the one writer, and asks for no note", async () => {
+      renderWith();
+      await act(async () => {
+        fireEvent.click(radio("3"));
+      });
+      expect(writeSpy).toHaveBeenLastCalledWith({
+        set: { "spaces.toolkit.features.teamSize": "3" },
+        unset: [],
+        hub: true,
+      });
+      expect(radio("3").checked).toBe(true);
+      expect(howWeWorkSpy).not.toHaveBeenCalled();
+    });
+
+    it("on Azure DevOps every size is disabled, with the reason", () => {
+      envTracker = "ado";
+      renderWith();
+      for (const l of ["3", "6", "9"]) expect(radio(l).disabled).toBe(true);
+      expect(row().textContent).toContain("this Space's tracker is Azure DevOps");
     });
   });
 

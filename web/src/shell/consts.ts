@@ -47,6 +47,8 @@ export const STAMPS = consts.stamps as {
   /** A card's two planning lines, each its own: `**Milestone:**` (Plan -Milestone) and `**Sprint:**` (Plan -Sprint). */
   milestone: string;
   sprint: string;
+  /** Who did the work on a card an agent worked: `**Agent:** <model id>`, beside the Assigned line. */
+  agent: string;
   /** A person's In Progress and Code Review -- for a card with nothing checked in, or no pull request. */
   started: string;
   review: string;
@@ -71,6 +73,17 @@ export const STAMPS = consts.stamps as {
 export const REMINDERS = consts.reminders as {
   buckets: Array<"overdue" | "today" | "upcoming">;
   snooze: Array<"1h" | "tomorrow" | "nextweek">;
+};
+
+/**
+ * The words a Teams recipient's type may be: channel and chat post through
+ * their webhook alike; person is accepted and never posts. The web shows the
+ * type /env carries and branches on none of them, so this is the contract
+ * stated, not a rule this half applies.
+ */
+export const COMMUNICATION = consts.communication as {
+  webhookRecipientTypes: string[];
+  deferredRecipientTypes: string[];
 };
 
 /**
@@ -192,8 +205,10 @@ export const RITUALS = consts.rituals as {
   route: string;
   /** Triage's read: the open issues by milestone. */
   triageRoute: string;
-  /** The Milestones tab's read: the tracker's milestones with its own counts. */
+  /** The Releases tab's read: the tracker's milestones with its own counts. */
   milestonesRoute: string;
+  /** The org chart's read: the tree in use, with each position's prompt title and reading-room ref. */
+  orgRoute: string;
   /** "me": the one answer to who takes an item that is not a size (D-AR10) --
    *  what the Triage page sends as `Route -Assign`, and an item's `who` when it is yours. */
   assignMe: string;
@@ -223,6 +238,23 @@ export const RITUALS = consts.rituals as {
   workSmallWordRegex: string;
   /** The also-ons fold (D-SA9): the most groups a folded sentence names. */
   proseFoldNames: number;
+  /** The standup room's sizes, the chair included (spaces[].features.teamSize):
+   *  the CLI and the agent read them; the web states them only, as the drawer's
+   *  answers (Config/settings-workflows.json) must be these. */
+  teamSizes: number[];
+  teamSizeDefault: number;
+  /** The standup's room (docs/modules/solitaire-agile.md, "The team size: who is
+   *  in the room"): the nine windows in grid order, each a cast id and the plate
+   *  its persona wears; the cast id whose window is the chair's; the window a
+   *  worker label keeps; and the window the engineer takes when no member owns
+   *  it. The CLI and the agent seat the room from it, and the stage draws it
+   *  (modules/solitaireAgile/stage/seats.ts). */
+  room: {
+    windows: { id: string; plate: string }[];
+    chair: string;
+    kept: Record<string, string>;
+    engineer: string;
+  };
   /** The dress guard: its checks in order, and the patterns it reads a
    *  model's sentence with. The agent and the CLI run it; the web reads `spoken`. */
   dressGuards: string[];
@@ -295,6 +327,7 @@ export const RITUALS = consts.rituals as {
     suggestNounCard: string;
     suggestNounIssue: string;
     suggestCommandStart: string;
+    suggestCommandLaunch: string;
     suggestCommandRoute: string;
     /** The PM Corner's lines; the page shows the served `line` verbatim, and the
      *  chevron is cornerChevron. cornerBrief / cornerBriefCommand are the brief's
@@ -326,6 +359,27 @@ export const RITUALS = consts.rituals as {
     proseBlockers: string;
     proseBlockersAlso: string;
     proseBlockersNone: string;
+    /** A slot with nothing in it, beside a slot with something: the fixed honest line
+     *  (prose<Slot>None), or for yesterday the open items worked inside the window
+     *  (proseYesterdayWorked, proseYesterdayWorkedMany past proseFoldNames). */
+    proseYesterdayNone: string;
+    proseYesterdayWorked: string;
+    proseYesterdayWorkedMany: string;
+    proseTodayNone: string;
+    turnOpen: string;
+    turnClose: string;
+    chairYesterday: string;
+    chairYesterdayMany: string;
+    chairToday: string;
+    chairTodayNone: string;
+    chairWalk: string;
+    chairWalkMany: string;
+    chairDecide: string;
+    chairDecideMany: string;
+    chairLook: string;
+    chairLookMany: string;
+    chairClauseSeparator: string;
+    chairClauseLast: string;
     proseWalk: string;
     proseWalkAlso: string;
     proseDecide: string;
@@ -355,6 +409,8 @@ export const RITUALS = consts.rituals as {
     countsClosed: string;
     countsStarted: string;
     countsInProgress: string;
+    /** Commits the dates read could not date, said after the commits. */
+    countsUndated: string;
   };
 };
 
@@ -431,6 +487,29 @@ export const USAGE = consts.usage as {
   envFlag: string;
   burnRoute: string;
   readingsFolder: string;
+  unpricedPhrase: string;
+};
+
+/**
+ * The org chart's hub file (docs/hub/org.md): the name of the file at the hub
+ * root, beside hub.json, that holds the org's trees, positions and seats. The CLI
+ * reads it; the agent serves it and the web will draw what the agent serves.
+ */
+export const ORG = consts.org as {
+  file: string;
+};
+
+/**
+ * The model map's file (Config/models.json, relative to the package root): every
+ * reader of a card's `**Agent:**` line takes provider, family and display name
+ * from it, never from the id itself (docs/hub/cards.md, "The Agent line").
+ */
+export const MODELS = consts.models as {
+  file: string;
+  /** The shipped order a card's agent is worked out in: `line`, `assigned`, `trailer`, `none` -- never the label
+   *  (docs/hub/cards.md, "How a card's agent is worked out"). The agent works it
+   *  out and serves the answer; this half states it. */
+  agentSources: string[];
 };
 
 /**
@@ -441,6 +520,20 @@ export const USAGE = consts.usage as {
 export const REPLY_STATUSES_BY_TRACKER = consts.replyStatuses as {
   ado: string[];
   github: string[];
+};
+
+/**
+ * Daily's window (docs/CLI.md, "The third line: Billable"): the sentences the
+ * billing script, the CLI's Daily and GET /api/billing refuse a window with. The
+ * page sends only whole windows it built itself and shows the agent's `error`
+ * verbatim, so it types none of them.
+ */
+export const BILLING = consts.billing as {
+  text: {
+    halfWindow: string;
+    notADay: string;
+    backwards: string;
+  };
 };
 
 /** The contract's patterns, compiled once for this bundle. */
@@ -455,4 +548,7 @@ export const RE = {
   /** A WHOLE string that is a card id: a work item number, or the four-character
    *  id of a card with no work item. Anchored here; the contract's shape is not. */
   cardId: toRegExp(`^(?:${consts.regex.cardId})$`),
+  /** One Co-Authored-By trailer line of a commit message, the key in any case:
+   *  group 1 the name before the `<email>`, untrimmed. */
+  coAuthorTrailer: toRegExp(consts.regex.coAuthorTrailer),
 };

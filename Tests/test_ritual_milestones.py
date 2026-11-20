@@ -1,6 +1,6 @@
 """Team Agile's GET /api/ritual/milestones -- the table, the kept read, the gate.
 
-The Milestones tab's read (docs/modules/solitaire-agile.md, "Milestones: the tab
+The Releases tab's read (docs/modules/solitaire-agile.md, "Milestones: the tab
 and the award"). Its rows are the ado core's own (accounting.github_milestone_rows,
 the reader behind GET /api/milestones, whose reached rule Tests/test_milestones.py
 pins), so this suite holds the table and Team Agile's shape around it. One table,
@@ -214,6 +214,7 @@ class TheRoute(unittest.TestCase):
         body = res.json()
         self.assertFalse(body["tracker"]["ok"])
         self.assertIn("not GitHub", body["tracker"]["reason"])
+        self.assertIn("the Releases tab", body["tracker"]["reason"])
         self.assertEqual(body["milestones"], [])
         self.assertEqual(calls, [])
 

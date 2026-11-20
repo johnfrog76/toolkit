@@ -1,0 +1,16 @@
+Standup -- Friday 2 October 2026
+"Can we not adjust scope."
+
+Waiting on you
+  Nothing is waiting on you.
+
+Opus
+  Yesterday  nothing closed
+  Today      K9L2 (2 commits) Wire the column
+  Blockers   no blockers
+Opus
+  Yesterday  nothing closed
+  Today      R4T6 (started) Read the board
+  Blockers   no blockers
+
+"Let's circle back."

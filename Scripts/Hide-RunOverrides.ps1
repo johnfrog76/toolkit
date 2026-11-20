@@ -7,6 +7,10 @@
 # own process tree for the run and puts them back after, the way it takes out
 # every TEAMS_WEBHOOK_*; a suite that means to test an override sets it itself.
 #
+# P20_STANDUP_AS_OF (env.standupAsOf) goes with them: Standup reads it as the
+# clock while the run marker is set, so a shell that holds it would pin every
+# suite that types the verb. Test-Rituals sets it for its own children.
+#
 # Dot-source Scripts/Get-Consts.ps1 first: the names are read from it.
 
 function Hide-P20RunOverrides {
@@ -14,7 +18,7 @@ function Hide-P20RunOverrides {
     .SYNOPSIS
         Remove the overrides from this process and return what they held.
     #>
-    $names = @((Get-P20Consts).env.activeSpace, (Get-P20Consts).env.promptsRoot)
+    $names = @((Get-P20Consts).env.activeSpace, (Get-P20Consts).env.promptsRoot, (Get-P20Consts).env.standupAsOf)
     $saved = [ordered]@{}
     foreach ($name in $names) {
         $saved[$name] = [System.Environment]::GetEnvironmentVariable($name)

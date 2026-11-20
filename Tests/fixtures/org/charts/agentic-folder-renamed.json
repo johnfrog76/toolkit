@@ -1,0 +1,29 @@
+{
+  "activeTree": "t",
+  "tree": {
+    "id": "t",
+    "name": "t",
+    "machines": [],
+    "positions": [
+      {
+        "id": "root",
+        "title": "Root",
+        "prompt": "root.prompt.md",
+        "reportsTo": null,
+        "defaultModel": null,
+        "level": 0,
+        "seats": [
+          {
+            "id": "r",
+            "model": "opus",
+            "person": null,
+            "machine": null,
+            "space": null,
+            "active": null,
+            "state": "staffed"
+          }
+        ]
+      }
+    ]
+  }
+}

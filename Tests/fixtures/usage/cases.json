@@ -80,6 +80,19 @@
       }
     },
     {
+      "name": "Fable 5.2 and the dated Haiku 4.5 snapshot are priced from the table's own rows",
+      "files": {
+        "-Users-alex-Repos-demo/aaaaaaaa-0000-4000-8000-000000000090.jsonl": [
+          { "t": "+13:00", "id": "msg_p1", "sid": "aaaaaaaa-0000-4000-8000-000000000090", "cwd": "/Users/alex/Repos/demo", "model": "claude-fable-5-2", "in": 1000, "out": 1000 },
+          { "t": "+13:01", "id": "msg_p2", "sid": "aaaaaaaa-0000-4000-8000-000000000090", "cwd": "/Users/alex/Repos/demo", "model": "claude-haiku-4-5-20251001", "in": 1000, "out": 1000 }
+        ]
+      },
+      "expect": {
+        "totals": { "input": 2000, "output": 2000, "messages": 2, "costUsdDerived": "0.054" },
+        "models": [ "claude-fable-5-2=0.048", "claude-haiku-4-5-20251001=0.006" ], "sessions": 1, "unpriced": []
+      }
+    },
+    {
       "name": "a model with no price is counted, named as unpriced, and has no cost",
       "files": {
         "-Users-alex-Repos-demo/aaaaaaaa-0000-4000-8000-000000000006.jsonl": [

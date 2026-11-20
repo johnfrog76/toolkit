@@ -80,7 +80,7 @@ is refused), its verbs `NewDesign`, `StampDesign`, `MoveDesign`, `NewSpace`, `Re
 autoload manifest, its agent routes ungated, its web descriptor with no `feature` (its pages still lazy);
 `docs/modules/studio.md`. **solitaireAgile** (Team Agile in the web UI) is a
 team's rituals with the tracker as the board -- the standup, `Standup` and its route, both halves,
-writing nothing; triage -- `Triage`, `GET /api/ritual/triage` and a Triage page; and `Route`, its one write, a real label, assignee or milestone on the tracker through `gh`, and on a card one `**Assigned:**` line; and `StartWork`, the hand-off block a cold agent starts from, which the Team Agile page copies through the bridge; `docs/modules/solitaire-agile.md`.
+writing nothing; triage -- `Triage`, `GET /api/ritual/triage` and a Triage page; and `Route`, its one write, a real label, assignee or milestone on the tracker through `gh`, and on a card one `**Assigned:**` line; and `StartWork`, the hand-off block a cold agent starts from, which the Team Agile page copies through the bridge; and `OrgChart`, the org's tree -- positions, who reports to whom, which model or person sits in each seat -- read from `org.json` at the hub root (`consts.json` `org.file`, `docs/hub/org.md`), a CLI read for now that writes nothing and is absent wherever Team Agile is off; `docs/modules/solitaire-agile.md`.
 
 One flag switches a whole module, in all three halves at once:
 
@@ -99,7 +99,11 @@ module: Team Agile is on only where `features.solitaireAgile` is on AND the answ
 where the flags are resolved (`Scripts/Resolve-HowIWork.ps1`, `how_i_work()`, one shared table). And
 `spaces[].features.suggestions` turns off Team Agile's suggestion -- the chair's one derived next move --
 in that Space; unset is on wherever Team Agile is on (`docs/modules/solitaire-agile.md`, "The suggestion:
-one next move, derived").
+one next move, derived"). Beside the three switches a Space states two numbers, which switch nothing:
+`spaces[].features.trainingHoursPerQuarter`, and `spaces[].features.teamSize`, the room of Team Agile's
+standup -- 3, 6 or 9 people with the chair counted, unset 9 -- which is the team: it decides who of the
+Space's members are present today, and how many invented cast members fill the seats they leave, and so who
+speaks in the round (`docs/modules/solitaire-agile.md`, "The team size: who is in the room").
 
 **Off means absent.** No verb, no line in `Menu`, no `-Help`, nothing for the bridge to call, no
 agent route (**404, not 403**), no nav entry, no page, no card, and nothing fetches the module's
@@ -113,9 +117,9 @@ exception and is not: the gate is checked **per request**, so flipping a flag in
 needs no restart **of the agent or the web UI**; a shell that is already open keeps the verbs it
 registered at import (`docs/CONFIGURATION.md`, "A module flag and an open shell").
 
-The fifteen verbs the modules contribute: `NewGrowth`, `NewWorkReview`, `PublishWorkReview`,
+The sixteen verbs the modules contribute: `NewGrowth`, `NewWorkReview`, `PublishWorkReview`,
 `WorkReview`, `LogPeerReview`, `UpdateResume` (growth); `SendTeams`, `NewMeeting`, `MeetingAgenda`
-(communication); `NewReminder`, `Reminders` (organize); `Standup`, `Triage`, `Route`, `StartWork` (solitaireAgile).
+(communication); `NewReminder`, `Reminders` (organize); `Standup`, `Triage`, `Route`, `StartWork`, `OrgChart` (solitaireAgile).
 (`NewDesign`, `StampDesign`, `MoveDesign`, `NewSpace`, `RetireSpace`, `RemoveSpace` and `HowWeWork` are the Studio's, and core.) **A module closes its own data.** `Archive` is org-scoped and cannot see a hub-root
 sibling like `manager/` or `growth/`, and the answer is not to teach it: it is
 `MeetingAgenda -Close`, which moves the session to `manager/archive/` and stamps `**Closed:**` from
@@ -165,11 +169,12 @@ module and you add a mock line to every one of these files.
 > The same goes for the per-shell overrides `P20_ACTIVE_SPACE` and `PROMPTS_ROOT` (`consts.json`
 > `env.activeSpace`, `env.promptsRoot`): the runners remove them for the run and put them back, so a
 > shell that holds them reads the same as one that does not; a suite that tests an override sets it itself.
+> `P20_STANDUP_AS_OF` (`env.standupAsOf`), the clock `Standup` reads under the run marker, goes with them.
 
 **Four test runners**, one per half plus one for the two together. Run the ones your change touches:
 
 ```powershell
-tkTestToolkit                 # the CLI -- 52 suites, 10127 assertions on this commit
+tkTestToolkit                 # the CLI -- every suite in the registry
 ```
 
 ```bash
@@ -182,9 +187,10 @@ cd web && npm run smoke       # both, in a browser -- needs the agent and the de
 
 A skip is not a pass. Read the summary line, not the total.
 
-The counts in `docs/TESTING.md` come from one paste block of three lines (the CLI's, `pytest:` and `web:`),
-which `tkTest` prints; `tkTestToolkit -DocCounts` holds the table row and the command block's totals to it.
-Paste all three, never type one.
+**A pull request never states a test count.** The counts live in `docs/TEST-COUNTS.md` alone, as of the
+version it names, written at a release by `Scripts/Write-TestCounts.ps1` from a full `tkTest` run's block;
+link to it, never type a figure. `tkTestToolkit -DocCounts` fails on a count line in any other document, and
+CI refuses a change to the page that does not change `consts.json`'s version (`docs/TESTING.md`, "The counts").
 
 ## Opt in by configuration
 
@@ -216,10 +222,12 @@ anywhere).
 | deck module | `features.deck` | `config.local.json`, top-level -- web UI only, it adds no verbs |
 | lounge module | `features.lounge` | `config.local.json`, top-level -- web UI only, the ambient room; while NOT CONFIGURED, Home's foot carries its discovery tip |
 | organize module | `features.organize` | `config.local.json`, top-level -- both halves: `NewReminder`, `Reminders` and the Organize tab |
-| Team Agile module | `features.solitaireAgile`, and the Space's `howIWork` | the switch in `config.local.json`, top-level; the answer in `hub.json` -- on only where both say so: `on`, `off` (derived or chosen) or `not configured` (a GitHub Space nobody has answered). Both halves: `Standup`, `Triage`, `Route` and `StartWork`, `GET /api/ritual/standup` and `/triage`, and its tab; writes only what `Route` writes -- a label, an assignee or a milestone on the tracker, and on a card one `**Assigned:**` line |
+| Team Agile module | `features.solitaireAgile`, and the Space's `howIWork` | the switch in `config.local.json`, top-level; the answer in `hub.json` -- on only where both say so: `on`, `off` (derived or chosen) or `not configured` (a GitHub Space nobody has answered). Both halves: `Standup`, `Triage`, `Route` and `StartWork`, `GET /api/ritual/standup` and `/triage`, and its tab; and `OrgChart`, a CLI read of the hub's `org.json` so far; writes only what `Route` writes -- a label, an assignee or a milestone on the tracker, and on a card one `**Assigned:**` line |
 | Design lifecycle | `design` | DERIVED (`Scripts/Read-DesignTree.ps1`, through `Get-OptionalSurfaces.ps1`): `on` when the repository you stand in has `design/` and every file in the four folders carries an `id:`, `off` with the count when some do not, `not configured` with no `design/` to read, or none with a note in it; the hub's own count in the note. `docs/hub/design.md`, "The CLI names it" |
 | Sprint awareness | `spaces[].features.sprintAwareness` | `hub.json` -- a Space-scoped flag (the other Space-scoped switches are `howIWork`, above, and `suggestions`, below) |
 | Suggestions | `spaces[].features.suggestions` | `hub.json` -- a Space-scoped switch riding Team Agile: `not configured` (on, by default, where Team Agile is on), `on`, or `off` (set false, or Team Agile off in that Space); `false` turns the chair's Next line back to `Next: nothing is waiting on you.` |
+| Org chart | `org.json` at the hub root | DERIVED, riding Team Agile like the Suggestions row: `off` where Team Agile is off in the Space (or where the file is there and fails its checks, the note carrying the sentence), `not configured` with no file, `on` with the active tree's name and its seat count. The file is the hub's, hand-edited and read-only to the tool -- its name is `consts.json` `org.file`, its shape `docs/hub/org.md`; `OrgChart` prints it |
+| Team size | `spaces[].features.teamSize` | `hub.json` -- `Config -Set spaces.<slug>.features.teamSize=<3\|6\|9> -Hub`, any other number refused by name. A Space-scoped NUMBER, not a switch: how many people are in the standup, the chair counted. Its row rides Team Agile as `Suggestions` does: `off` where Team Agile is off in that Space; where it is on, `on` with the number, `not configured` while unset, when the room is nine. The size is the team: the seats go to the engineer, the workers with work, then the idle, each marked `present`, and seats still open are filled by invented cast members from `consts.json` `rituals.room`, so the empty desks are only the windows past the size. The round -- `Standup -Grain work` -- speaks the room; the detail and the brief keep every worker and never an invented one. Asked in the drawer as "How many are in my standup in `<Space>`?", three radios. `docs/modules/solitaire-agile.md`, "The team size: who is in the room" |
 | Prompt store git sync | `storeSync` | `hub.json`, overridable per machine |
 | ADO identity | `email` | `config.local.json`, else `az login` |
 | Web UI and agent | `web.agentPort` | `config.local.json`; started with `{prefix}Web -Dev` |
@@ -423,6 +431,11 @@ Each step already done is skipped, so it is safe to re-run.
   `core.autocrlf false` stays, because it decides the bytes a card gets on Windows, but it is not what
   keeps stderr quiet. `Test-Portability`'s Clause 23 fails on a raw redirected git call anywhere under
   `Tests/`, the runner included, and allows nothing but the helper's own.
+  **An argument PowerShell would split is quoted.** The helper has no `param` block, so a bare `--` is dropped
+  before it runs, and `-c:x`, `-a.b`, a comma and `stash@{0}` each arrive as two arguments: write `'--'`, `'-c:x'`.
+  Clause 23 fails on one written bare, and holds a table of what git is handed, on 5.1's argument passing as well.
+  The escaping for that passing is not the helper's own: it calls `ConvertTo-P20NativeArgument`, the shipped rule
+  (the 5.1 stderr bullet below), and the same table is run through `Invoke-P20TrackerRead`.
 - **A suite that runs a script directly does not test the verb.** A suite that drives
   `Move-PromptToArchive.ps1` with a stubbed `Get-PromptFolders` stays green while `Archive` typed as a
   verb can look in `<hub>/<org>/` and see no cards at all -- as it does when the module's own
@@ -438,7 +451,15 @@ Each step already done is skipped, so it is safe to re-run.
   read, so the verb prints gh's sentence through the generic block instead of its own answer; pwsh 7 reads it as text, so
   a run under pwsh 7 alone is green either way. `Invoke-P20TrackerRead` (`Scripts/Invoke-TrackerRead.ps1`, dot-sourced; it refuses a `.cmd` tool an argument cmd.exe would read, `Test-P20CmdArgument`) is the one way a
   script calls `gh`, `az` or `git`: it returns `Code`, `Lines`, `Out` and `Err`, and a raw `gh ... 2>&1` in a script is the bug --
-  `Test-Portability`'s Clause 15 fails naming the line. Its allow-list only shrinks: three ritual and helper files by reason, and `Sync-Prompts.ps1` at entry level -- only its two deliberate output-passthrough lines (the pull and the push) are allowed, so any other raw `git` call in that file is a hit.
+  `Test-Portability`'s Clause 15 fails naming the line. **It is also where an argument is made safe for a host that builds
+  the command line itself.** Windows PowerShell 5.1 (and PowerShell 7 set to `Legacy`) joins a native command's arguments into one
+  line: an empty one vanishes, a double quote is lost, and 5.1 wraps `C:\My Repos\r\` in quotes without doubling the last
+  backslash, so git reads the closing quote into the path and swallows the arguments after it. On such a host the reader passes
+  every argument through `ConvertTo-P20NativeArgument` (`Scripts/ConvertTo-NativeArgument.ps1`, behind
+  `Test-P20LegacyNativeArguments`) -- ONE rule, which `Invoke-P20TestGit` calls too, and Clause 23 fails on a second definition.
+  The `.cmd` rule reads each argument as written, first; only what passes is converted. So a path goes to `git -C` as it is:
+  do not trim or quote one at the call. A folder path read from configuration has its trailing separator taken off where it is
+  read (`Remove-P20TrailingSeparator`, same file; a drive root keeps its own), which is tidiness, not the fix. Clause 15's allow-list only shrinks: three ritual and helper files by reason, and `Sync-Prompts.ps1` at entry level -- only its two deliberate output-passthrough lines (the pull and the push) are allowed, so any other raw `git` call in that file is a hit.
 - **On Windows a child inherits every inheritable handle its launcher holds, not only the std ones.** Windows
   PowerShell 5.1 keeps a second inheritable copy of its stdout (the .NET Framework's, at startup), so clearing
   `GetStdHandle`'s is not enough and `powershell -c tkAgent | ...` waits for the agent. A long-lived
@@ -729,7 +750,9 @@ What a release does, in one small pull request on main: fold the entries in, wit
 in `## [Unreleased]`, after any written there by hand, and its file is deleted; then rename
 `## [Unreleased]` to `## [x.y.z] - YYYY-MM-DD` and open a fresh empty `## [Unreleased]` above it; set the same version in the three places that state
 it, `Prompt20Toolkit/Prompt20Toolkit.psd1` (`ModuleVersion`), `consts.json` (`version`) and
-`web/package.json` (`version`); merge; then push the tag, `git tag vx.y.z && git push origin vx.y.z`.
+`web/package.json` (`version`); write the counts from a full `tkTest` run on that tree,
+`pwsh -NoProfile -File Scripts/Write-TestCounts.ps1 -Path <the run's saved output>` (`-WhatIf` first), the
+only change `docs/TEST-COUNTS.md` gets; merge; then push the tag, `git tag vx.y.z && git push origin vx.y.z`.
 `.github/workflows/release.yml` makes the GitHub Release from the changelog section with that
 version and refuses a tag that has none, or one cut while `changelog.d/` still holds an entry, so a
 release never ships with empty or missing notes. Only the owner

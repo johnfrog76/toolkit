@@ -106,8 +106,9 @@ def _command(template_key: str, ref: str) -> str:
     return _fill(rituals_text()[template_key], {"arg": ref.lstrip("#")})
 
 
-def _sentence(item: dict, how: str) -> tuple[str, str, str]:
-    """(shape, sentence, command) for one candidate. Pure."""
+def _sentence(item: dict, how: str, launch: bool = False) -> tuple[str, str, str]:
+    """(shape, sentence, command) for one candidate. Pure: ``launch`` is whether
+    ``StartWork -Launch`` has a session to start, and only a delegation names it."""
     t = rituals_text()
     start, delegate, route, place = rituals_suggest_shapes()
     ref = str(item.get("ref") or "")
@@ -131,7 +132,7 @@ def _sentence(item: dict, how: str) -> tuple[str, str, str]:
             return (
                 delegate,
                 _fill(t["suggestDelegate"], {"ref": ref, "size": size}),
-                _command("suggestCommandStart", ref),
+                _command("suggestCommandLaunch" if launch else "suggestCommandStart", ref),
             )
         # Sized, but no destination: route it to a milestone -- Route's write on an
         # issue, Plan's **Sprint:** line on a card (Route takes only -Assign there).
@@ -160,7 +161,9 @@ def excluded_by(item: dict, dismissed: set[str]) -> str:
     return ""
 
 
-def suggest(items: list[dict], how: str, dismissed: list[str] | None = None) -> tuple[list[dict], dict[str, str]]:
+def suggest(
+    items: list[dict], how: str, dismissed: list[str] | None = None, launch: bool = False
+) -> tuple[list[dict], dict[str, str]]:
     """The candidates in order and the excluded refs. Pure; the mirror of ``Select-P20Suggestion``.
 
     Each candidate is the item with ``shape``, ``sentence`` and ``command`` added; the
@@ -191,7 +194,7 @@ def suggest(items: list[dict], how: str, dismissed: list[str] | None = None) -> 
 
     out = []
     for item in sorted(kept, key=order):
-        shape, sentence, command = _sentence(item, how)
+        shape, sentence, command = _sentence(item, how, launch)
         out.append({**item, "shape": shape, "sentence": sentence, "command": command})
     return out, excluded
 
@@ -228,8 +231,9 @@ def suggest_items(
     ``@<login>`` -- else its size), its milestone and due date, its
     createdAt, and its lane from the card in ``current/`` whose id is its number
     (Active without one). A card in ``current/`` whose id is no issue in the read
-    is its own item: severity and size from its Tags line, who from its
-    **Assigned:** line (else its size), its milestone from its **Sprint:** line,
+    is its own item: severity and size from its Tags line, who from its worker --
+    its Agent line's family, else its **Assigned:** line (``resolve_card_agent`` on
+    the card row, else the Assigned line as written) -- else its size, its milestone from its **Sprint:** line,
     its **Created:** day and its lane. A not-billable card is an item with
     ``billable`` false and adds nothing to an issue. ``waiting`` is every ref on
     the queue. A milestone's ``open`` counts its billable items, once per id."""
@@ -327,13 +331,16 @@ def attach_suggestions(
     on: bool,
     prefix: str,
     viewer: str = "",
+    launch: bool = False,
 ) -> Standup:
     """The suggestion attached to a filled standup, in place: every candidate in
     order and the first. Nothing with the switch off, or with the tracker not
     answering (a ritual with no read has no list to choose from). ``prefix`` is the
     CLI's, for the command the chair's line names; ``viewer`` the signed-in gh user's
     login (triage's one read), "" when gh cannot say -- then every assignee is
-    someone else's, and a suggestion is never someone else's work."""
+    someone else's, and a suggestion is never someone else's work. ``launch`` is
+    ``start_work_launch()``'s answer: a delegation's command ends in ``-Launch``
+    where it is true."""
     filled.suggestions = []
     filled.suggestion = None
     if not on or not filled.tracker.ok:
@@ -341,7 +348,7 @@ def attach_suggestions(
     items = suggest_items(
         labels, issues if filled.source in ("issues", "both") else [], cards, queue_refs(filled), viewer
     )
-    picked, _excluded = suggest(items, how)
+    picked, _excluded = suggest(items, how, launch=launch)
     t = rituals_text()
     filled.suggestions = [
         Suggestion(

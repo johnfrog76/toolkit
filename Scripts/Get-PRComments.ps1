@@ -293,6 +293,10 @@ function Get-P20ThreadDelta {
           known      nothing to add
         A comment's id is ADO's, which counts WITHIN the thread (1, 2, 3...); a
         payload without ids falls back to position.
+
+        A GitHub reply read back into the thread it answers (foldedReply) is not
+        written again when the card already holds it as a thread of its own --
+        what every run before the fold wrote -- so a re-run adds nothing.
     #>
     param($Thread, [hashtable]$Recorded)
     $comments = @(Get-P20ThreadTextComments $Thread)
@@ -303,7 +307,9 @@ function Get-P20ThreadDelta {
         if ($comments[$i].PSObject.Properties['id'] -and $comments[$i].id) { $commentId = [long]$comments[$i].id }
         $numbered += [PSCustomObject]@{ Id = $commentId; Comment = $comments[$i] }
     }
-    $later = @($numbered | Select-Object -Skip 1)
+    $later = @($numbered | Select-Object -Skip 1 | Where-Object {
+            -not ($_.Comment.PSObject.Properties['foldedReply'] -and $_.Comment.foldedReply -and $Recorded.ContainsKey([long]$_.Id))
+        })
     if (-not $Recorded.ContainsKey($threadId)) {
         $opener = $null
         if ($numbered.Count -gt 0) { $opener = $numbered[0] }

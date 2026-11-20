@@ -547,22 +547,22 @@ describe("the outcome filter", () => {
     fireEvent.click(screen.getByRole("button", { name: "Show Archived" }));
     const chips = within(screen.getByRole("radiogroup", { name: "Archived outcome" }));
     expect(chips.getAllByRole("radio").map((r) => r.textContent)).toEqual([
-      "any outcome",
-      "shipped",
-      "dropped",
-      "nothing said",
+      "any outcome3",
+      "shipped1",
+      "dropped1",
+      "nothing said1",
     ]);
     const archived = () => within(screen.getByRole("region", { name: "Archived designs" }));
     expect(archived().getAllByRole("button", { name: "Open the document" })).toHaveLength(3);
-    fireEvent.click(chips.getByRole("radio", { name: "dropped" }));
+    fireEvent.click(chips.getByRole("radio", { name: /^dropped\s*\d*$/ }));
     expect(archived().getAllByRole("button", { name: "Open the document" })).toHaveLength(1);
     expect(archived().getByText("A second room")).toBeTruthy();
     expect(archived().getByText("1 of 3")).toBeTruthy();
-    fireEvent.click(chips.getByRole("radio", { name: "nothing said" }));
+    fireEvent.click(chips.getByRole("radio", { name: /^nothing said\s*\d*$/ }));
     expect(archived().getByText("An old note")).toBeTruthy();
     expect(archived().queryByText("A shipped deck")).toBeNull();
     // The same chip again is off.
-    fireEvent.click(chips.getByRole("radio", { name: "nothing said" }));
+    fireEvent.click(chips.getByRole("radio", { name: /^nothing said\s*\d*$/ }));
     expect(archived().getAllByRole("button", { name: "Open the document" })).toHaveLength(3);
   });
 
@@ -571,7 +571,7 @@ describe("the outcome filter", () => {
     fireEvent.click(screen.getByRole("button", { name: "Show Archived" }));
     fireEvent.click(
       within(screen.getByRole("radiogroup", { name: "Archived outcome" })).getByRole("radio", {
-        name: "shipped",
+        name: /^shipped\s*\d*$/,
       }),
     );
     expect(
@@ -811,6 +811,44 @@ describe("a product design's moves", () => {
     expect(await menuOf("A note about the board")).toEqual(["Open on GitHub"]);
     expect(screen.getByRole("note").textContent).toBe(
       `${reason} Point it at a clone of johnfrog76/toolkit to move these designs from here.`,
+    );
+  });
+
+  it("read from the clone, the foot says so and a staged move has moved already", async () => {
+    const note =
+      "Read on disk, in the clone at /src/toolkit on main, as its working tree is right now.";
+    listAnswer = {
+      data: { ...FULL, checkout: READY, source: "checkout", note },
+      refetch,
+    } as typeof listAnswer;
+    mountList();
+    expect(screen.getByRole("note").textContent).toBe(note);
+    await menuOf("A note about the board");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Archive as shipped" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Archive as shipped" }));
+    const status = await within(dialog).findByRole("status");
+    expect(
+      within(status).getByText(/reads the clone's working tree, so the row has moved already/),
+    ).toBeTruthy();
+    expect(within(status).queryByText(/once the commit is pushed/)).toBeNull();
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("read from GitHub, the foot says so, then names the setting", async () => {
+    const note =
+      "Read from johnfrog76/toolkit on GitHub, its default branch: a move staged in a clone shows once it is pushed.";
+    listAnswer = {
+      data: {
+        ...FULL,
+        checkout: { ...READY, path: "", root: "", ready: false },
+        source: "github",
+        note,
+      },
+    };
+    mountList();
+    expect(screen.getByRole("note").textContent).toBe(
+      `${note} To move these designs from here, name this machine's clone of johnfrog76/toolkit: spaceCheckouts.toolkit.path in Settings.`,
     );
   });
 

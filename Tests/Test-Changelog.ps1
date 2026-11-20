@@ -296,6 +296,13 @@ try {
     Write-Host ""
     Write-Host "-- The committed tree ---------------------------------" -ForegroundColor Cyan
     Assert-True 'changelog.d/README.md ships' (Test-Path -LiteralPath (Join-Path $pkgRoot 'changelog.d/README.md'))
+    # A fragment reaches the contract job alone, and that job's markdown lint is
+    # what CI's path rule says reads it: the lint's globs have to name the folder.
+    $lintMd = [string](([System.IO.File]::ReadAllText((Join-Path $pkgRoot 'web/package.json')) | ConvertFrom-Json).scripts.'lint:md')
+    Assert-True 'the markdown lint reads the waiting entries: lint:md names changelog.d/*.md' ($lintMd -match '"changelog\.d/\*\.md"') $lintMd
+    $lintCfg = Join-Path $pkgRoot 'changelog.d/.markdownlint-cli2.jsonc'
+    Assert-True '...and the folder turns off only the first-line-heading rule, which an entry cannot meet' `
+        ((Test-Path -LiteralPath $lintCfg) -and (@([regex]::Matches([System.IO.File]::ReadAllText($lintCfg), '"MD\d+"')).Count -eq 1) -and ([System.IO.File]::ReadAllText($lintCfg) -match '"MD041":\s*false'))
     $run = Invoke-Fold -Root $pkgRoot -With @{ Check = $true }
     Assert-Equal 'every committed fragment is in the shape a fold takes (-Check over the package)' 0 $run.Exit
     if ($run.Exit -ne 0) { Write-Host $run.Output }

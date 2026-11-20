@@ -5,16 +5,17 @@ Waiting on you
   Nothing is waiting on you.
 
 Fable
-  Yesterday  #153 (2 commits) Close the books
+  Yesterday  nothing closed
   Today      #154 Read the label
   Blockers   no blockers
 Opus
-  Yesterday  nothing closed
+  Status     "Yesterday I swapped my laptop dock; no more flicker."
+  Status     "Today I'll update my operating system and restart everything once."
+Widgets
+  Yesterday  #153 (2 commits) Close the books
+  Yesterday  199 Write the counts docs
   Today      #151 (started, 2 commits) Count the commits
   Today      #152 (1 commit) Fold the window
-  Blockers   no blockers
-Widgets
-  Yesterday  199 Write the counts docs
   Today      M7K3 (started, 1 commit) Draw the counts line
   Blockers   no blockers
 

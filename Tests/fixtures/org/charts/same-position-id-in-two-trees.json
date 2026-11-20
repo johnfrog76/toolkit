@@ -1,0 +1,19 @@
+{
+  "activeTree": "a",
+  "tree": {
+    "id": "a",
+    "name": "a",
+    "machines": [],
+    "positions": [
+      {
+        "id": "x",
+        "title": "x",
+        "prompt": null,
+        "reportsTo": null,
+        "defaultModel": null,
+        "level": 0,
+        "seats": []
+      }
+    ]
+  }
+}

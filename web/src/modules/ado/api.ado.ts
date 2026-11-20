@@ -86,9 +86,12 @@ export interface PromptInfo {
   tracker?: "github" | "ado" | "none";
   /** False only when the card says `**Billable:** no`. No line means billable. */
   billable: boolean;
-  /** Who takes it: the card's `**Assigned:**` line -- "me", or a size -- "" for
-   *  nobody (D-AR10; `Route -Assign` writes it). Absent from an older agent. */
+  /** Who takes it: the card's `**Assigned:**` line -- the person, "me" (`Route -Assign me`
+   *  writes it; a size there is legacy) -- "" for nobody (D-AR10). Absent from an older agent. */
   assigned?: string;
+  /** Who did the work, when an agent did: the card's `**Agent:**` line -- a model id,
+   *  as written -- "" for a card a person worked alone. Absent from an older agent. */
+  agent?: string;
   title: string;
   sprint: string;
   /** The card's milestone, WHOLE: its `**Milestone:**` line, else -- a card with none,
@@ -415,7 +418,16 @@ export interface DesignListResponse {
   notShown?: DesignNotShown[];
   structure?: DesignStructure;
   reason?: string | null;
+  /** Which source was read: the Space's checkout on this machine (its working
+   *  tree) or GitHub. Absent from an older agent. */
+  source?: DesignSource;
+  /** The sentence that says which source, drawn at the list's foot. */
+  note?: string;
 }
+
+/** Where a product's designs were read from: the clone the checkout
+ *  names, on disk, or the repo on GitHub. */
+export type DesignSource = "checkout" | "github";
 
 export interface DesignDocDetail extends DesignDoc {
   supported: boolean;
@@ -450,6 +462,8 @@ export interface DesignSearchResponse {
   available: boolean;
   reason: string;
   note: string;
+  /** A repo's search: on disk in the checkout, or GitHub's code search. Absent in the hub. */
+  source?: DesignSource;
   hits: DesignSearchHit[];
 }
 
@@ -662,6 +676,18 @@ export interface BillingDay {
   items: BillingItem[];
   raw: string;
   compact_raw: string;
+}
+
+/** Which week Daily asks for: this one, the one before, or a window (yyyy-MM-dd, both ends). */
+export type BillingWeek = { week: "current" | "last" } | { since: string; until: string };
+
+/** The billing route's path for a week. */
+export function billingPath(arg: BillingWeek): string {
+  if ("since" in arg) {
+    const q = new URLSearchParams({ since: arg.since, until: arg.until });
+    return `billing?${q.toString()}`;
+  }
+  return `billing?week=${arg.week}`;
 }
 
 export interface BillingResponse {
@@ -971,9 +997,9 @@ export const adoEndpoints = adoApi.injectEndpoints({
       keepUnusedDataFor: CACHE_TTL,
     }),
 
-    // GET /api/billing?week=current|last
-    getBilling: builder.query<BillingResponse, string>({
-      query: (week) => `billing?week=${week}`,
+    // GET /api/billing?week=current|last, or ?since=&until= for any window
+    getBilling: builder.query<BillingResponse, BillingWeek>({
+      query: billingPath,
       keepUnusedDataFor: CACHE_TTL,
       // Daily is built from the cards, so what changes a card's place on it
       // -- marking it not billable, archiving it -- has to drop this cache.
@@ -1306,7 +1332,8 @@ export const adoEndpoints = adoApi.injectEndpoints({
         }
       },
       // A write changes what the inventory says (D-W2): the "How do I" rows and the tips re-read it.
-      invalidatesTags: ["Env", "Surfaces"],
+      // The standup is sized by a setting (teamSize), so it re-reads too.
+      invalidatesTags: ["Env", "Surfaces", "Standup"],
     }),
 
     // GET /api/engagement/:slug/summary

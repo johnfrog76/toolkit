@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
+import { panelKindFacts } from "../../shell/kinds/panelKindFacts";
 
 /**
  * Every System panel's kind, read from the source.
@@ -11,6 +12,9 @@ import ts from "typescript";
  * beside its neighbour. A panel that is not a ListPanel and draws a list fails
  * here, unless it is named below with its reason: a short, fixed set of rows --
  * status rows or a table of figures -- that the status or stat kind will draw.
+ *
+ * shell/kinds/modulePanels.test.ts holds the same rule over every module's
+ * files, with the same reader.
  */
 
 const HERE = __dirname;
@@ -55,42 +59,12 @@ function systemPanels(): Map<string, string> {
   return out;
 }
 
-/** Whether a file fills ListPanel, and whether it maps records to elements. */
-function facts(file: string): { listPanel: boolean; mapsToJsx: boolean } {
-  const sf = source(file);
-  let listPanel = false;
-  let mapsToJsx = false;
-  const returnsJsx = (fn: ts.Node): boolean => {
-    let found = false;
-    const look = (n: ts.Node) => {
-      if (ts.isJsxElement(n) || ts.isJsxSelfClosingElement(n) || ts.isJsxFragment(n)) found = true;
-      else ts.forEachChild(n, look);
-    };
-    look(fn);
-    return found;
-  };
-  const visit = (node: ts.Node) => {
-    if (
-      (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) &&
-      node.tagName.getText(sf) === "ListPanel"
-    ) {
-      listPanel = true;
-    }
-    if (
-      ts.isCallExpression(node) &&
-      ts.isPropertyAccessExpression(node.expression) &&
-      node.expression.name.text === "map" &&
-      node.arguments.length > 0 &&
-      (ts.isArrowFunction(node.arguments[0]) || ts.isFunctionExpression(node.arguments[0])) &&
-      returnsJsx(node.arguments[0])
-    ) {
-      mapsToJsx = true;
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(sf);
+/** Whether a file fills ListPanel, and whether it maps records to elements:
+ *  the one reader modulePanels.test.ts holds every module's files with. */
+const facts = (file: string) => {
+  const { listPanel, mapsToJsx } = panelKindFacts(file);
   return { listPanel, mapsToJsx };
-}
+};
 
 describe("the System page's panels", () => {
   const panels = systemPanels();

@@ -144,6 +144,45 @@ export interface HomeTab {
 }
 
 /**
+ * The System page's tabs, the shape Home's strip has: each an address, so a
+ * tab can be linked and Back walks between them, and `/system` is the first.
+ * A system card belongs to ONE tab, by the key it is drawn with: Overview is
+ * the at-a-glance cards (and the default for a key not named below); Agents is
+ * the agent and the work agents do. An empty tab is absent, and a System page
+ * with fewer than two tabs shows no strip -- the same rules as Home's.
+ */
+export const SYSTEM_TABS = [
+  { id: "overview", label: "Overview", path: "/system" },
+  { id: "agents", label: "Agents", path: "/system/agents" },
+] as const;
+export type SystemTabId = (typeof SYSTEM_TABS)[number]["id"];
+
+/** Card key -> the System tab it sits on. A key not here lands on Overview. */
+const SYSTEM_CARD_TAB: Record<string, SystemTabId> = { burn: "agents" };
+
+export interface SystemTab {
+  id: SystemTabId;
+  label: string;
+  path: string;
+  cards: ReactElement[];
+}
+
+/** The System tabs that have cards, in strip order. */
+export function moduleSystemTabs(active: ToolkitModule[], ctx: CardContext): SystemTab[] {
+  const all = moduleCards(active, ctx, "system");
+  return SYSTEM_TABS.map((t) => ({
+    ...t,
+    cards: all.filter((c) => (SYSTEM_CARD_TAB[String(c.key)] ?? "overview") === t.id),
+  })).filter((t) => t.cards.length > 0);
+}
+
+/** The System tab an address shows: `/system` is the strip's first tab. */
+export function systemTabFor(pathname: string, tabs: SystemTab[]): SystemTab | undefined {
+  if (pathname === "/system") return tabs[0];
+  return tabs.find((t) => t.path === pathname);
+}
+
+/**
  * One export per module. Off means absent: a module whose feature flag is
  * false contributes no route, no nav entry and no card -- and no bytes. The
  * registry imports every module's DESCRIPTOR statically, because it has to

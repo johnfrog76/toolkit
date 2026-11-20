@@ -45,7 +45,11 @@
     none); a clone is its when the origin, in any of the https or ssh forms
     Azure DevOps gives, names the same three, ignoring case.
     Every git call goes through Invoke-P20TrackerRead (AGENTS.md, "Traps worth
-    knowing"), which the caller dot-sources, with Resolve-Tracker.ps1.
+    knowing"), which the caller dot-sources, with Resolve-Tracker.ps1. That is
+    also what makes a candidate with a space in it and a separator at its end
+    (`C:\My Repos\r\`) reach `git -C` whole under Windows PowerShell 5.1: the
+    reader escapes it for that host. The configured path has the separator
+    taken off as it is read as well (ConvertTo-P20CheckoutPath).
 
     The agent asks the same question of the configured path alone, for the
     Design tab's rows (agent/core/checkout.py): one candidate and the same
@@ -58,6 +62,9 @@
 
 if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
+}
+if (-not (Get-Command Remove-P20TrailingSeparator -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'ConvertTo-NativeArgument.ps1')
 }
 
 function Get-P20AdoOriginRepo {
@@ -129,16 +136,18 @@ function Get-P20SpaceCheckoutKey {
 function ConvertTo-P20CheckoutPath {
     # A configured path as written: absolute, or ~ for the home folder. A
     # relative path has nothing on this machine to be relative to, so it is ''.
+    # A separator at its end is taken off (Remove-P20TrailingSeparator; a root
+    # keeps its own), so `C:\My Repos\r\` is `C:\My Repos\r` before any call.
     param([AllowEmptyString()][AllowNull()][string]$Path)
     $p = "$Path".Trim()
     if (-not $p) { return '' }
     if ($p -eq '~' -or $p.StartsWith('~/') -or $p.StartsWith('~\')) {
         $rest = $p.Substring(1).TrimStart('/', '\')
-        if ($rest) { return (Join-Path $HOME $rest) }
+        if ($rest) { return (Remove-P20TrailingSeparator (Join-Path $HOME $rest)) }
         return $HOME
     }
     if (-not [System.IO.Path]::IsPathRooted($p)) { return '' }
-    return $p
+    return (Remove-P20TrailingSeparator $p)
 }
 
 function Get-P20ConfiguredCheckout {

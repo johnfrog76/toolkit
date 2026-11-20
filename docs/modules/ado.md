@@ -327,6 +327,9 @@ must not be able to pass a failing assertion.
 - **Hidden, not gone.** With ADO not in use its verbs leave `Menu` but stay registered; the bridge will
   still run them and the routes still exist. Unregistering belongs to M5 -- the rename, in
   [the roadmap](../ROADMAP.md). Known gap: [Azure DevOps verbs are hidden, not gone](../KNOWN-GAPS.md#azure-devops-verbs-are-hidden-not-gone).
+- **Create PR needs the branch pushed.** On an Azure DevOps board, *Create PR* in the browser runs in the
+  Toolkit's own folder rather than in a clone of the card's repository, so the card's branch must already
+  be pushed ([The web UI](#the-web-ui)). Known gap: [Create PR on Azure DevOps needs the branch pushed](../KNOWN-GAPS.md#create-pr-on-azure-devops-needs-the-branch-pushed).
 
 [Known gaps](../KNOWN-GAPS.md) is the list for the whole
 product; these are the ones that belong to this add-on.

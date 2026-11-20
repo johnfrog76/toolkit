@@ -19,13 +19,17 @@ from .consts import (
     card_id_shape,
     folder_archive,
     folder_backlog,
+    model_agent_sources,
     re_card_design_line,
+    re_co_author_trailer,
     re_commit_bullet,
     re_design_id,
     re_pr_url_line,
     re_review_line,
     re_started_line,
     re_tag_separator,
+    rituals_assign_me,
+    stamp_agent,
     stamp_assigned,
     stamp_billable,
     stamp_created,
@@ -41,6 +45,7 @@ from .consts import (
     token_previous_round,
     token_tags,
 )
+from .models import model_by_co_author, read_model_current, read_model_map
 
 # The state vocabulary and the two patterns that derive it come from
 # consts.json, the package's contract file -- NOT from literals here. This
@@ -199,6 +204,176 @@ def card_assigned(content: str) -> str:
     and ``Tests/fixtures/parsers/assigned-lines.json`` holds the two to one table."""
     m = re.search(r"(?m)^" + re.escape(stamp_assigned()) + r"[ \t]*([^\r\n]*?)[ \t]*\r?$", content or "")
     return m.group(1) if m else ""
+
+
+def card_agent(content: str) -> str:
+    """Who did the work, when an agent did: the value of the card's first
+    ``**Agent:**`` line, trimmed -- a model id, as written -- and "" when it has
+    none (a person worked it alone).
+
+    The line sits beside ``**Assigned:**``: the person owns the card, the agent
+    worked it. The value is never parsed here; ``agent/core/models.py``'s
+    ``model_info`` looks it up in the model map. The one reader of
+    ``stamps.agent`` in this half; the CLI's mirror is ``Get-P20CardAgent`` in
+    ``Scripts/Get-PromptFileStatus.ps1``, and ``Tests/fixtures/parsers/agent-lines.json``
+    holds the two to one table."""
+    m = re.search(r"(?m)^" + re.escape(stamp_agent()) + r"[ \t]*([^\r\n]*?)[ \t]*\r?$", content or "")
+    return m.group(1) if m else ""
+
+
+_GIT_HASH = re.compile(r"^[0-9a-f]{7,40}$")
+
+
+def commit_co_authors(message: str | None) -> list[str]:
+    """The names a commit message's ``Co-Authored-By`` trailers carry, trimmed, in
+    the order they are written: one per line that matches consts.json
+    ``regex.coAuthorTrailer`` (the key in any case, the name before an
+    ``<email>``). A person's name is a name too; whether it names a model is
+    ``models.model_by_co_author``'s question. The mirror of
+    ``Get-P20CommitCoAuthors``; ``Tests/fixtures/parsers/agent-source.json``
+    holds the two to one table."""
+    names = (m.group(1).strip() for m in re_co_author_trailer().finditer(message or ""))
+    return [n for n in names if n]
+
+
+def git_messages(raw: str | None) -> dict[str, str]:
+    """The output of ``git log --no-walk=unsorted --ignore-missing
+    --format=%x00%H%x1f%B <hashes>`` -> short hash (its first seven characters,
+    lower case) -> the commit's message, its trailing line endings removed.
+
+    A record with no unit separator, or whose hash is not 7 to 40 hex
+    characters, is skipped; a commit given twice keeps the first. Pure: the
+    caller runs git. The mirror of ``ConvertFrom-P20GitMessages``."""
+    out: dict[str, str] = {}
+    for rec in (raw or "").split("\x00"):
+        cut = rec.find("\x1f")
+        if cut < 0:
+            continue
+        full = rec[:cut].strip().lower()
+        if not _GIT_HASH.match(full):
+            continue
+        key = full[:7]
+        if key not in out:
+            out[key] = rec[cut + 1 :].rstrip("\r\n")
+    return out
+
+
+def _short_hash(value: str) -> str:
+    return str(value).strip().lower()[:7]
+
+
+def _trailer_model(content: str, messages: dict, models: dict) -> str | None:
+    """The trailer source: each of the card's commits votes once for every model
+    its trailers name; most votes wins, a tie to the first seen."""
+    msgs: dict[str, str] = {}
+    for k, v in messages.items():
+        key = _short_hash(k)
+        if key and key not in msgs:
+            msgs[key] = "" if v is None else str(v)
+    hashes: list[str] = []
+    for h in re_commit_bullet().findall(content or ""):
+        key = h.lower()[:7]
+        if key not in hashes:
+            hashes.append(key)
+    votes: dict[str, int] = {}
+    for h in hashes:
+        if h not in msgs:
+            continue
+        named: list[str] = []
+        for name in commit_co_authors(msgs[h]):
+            mid = model_by_co_author(name, models)
+            if mid and mid not in named:
+                named.append(mid)
+        for mid in named:
+            votes[mid] = votes.get(mid, 0) + 1
+    if not votes:
+        return None
+    best = max(votes.values())
+    # dicts keep insertion order: the first id to reach the best count was seen first.
+    return next(mid for mid, n in votes.items() if n == best)
+
+
+def resolve_card_agent(
+    content: str | None,
+    label: str | None = "",
+    messages: dict | None = None,
+    models: dict | None = None,
+    order: list[str] | tuple[str, ...] | None = None,
+    current: dict | None = None,
+) -> dict:
+    """Who worked a card, worked out every time it is read and never written into
+    it: ``{id, family, source}``. The sources are tried in ``order`` (default
+    consts.json ``models.agentSources``) and the first that answers wins:
+
+    - ``line``: the card's Agent line, as ``card_agent`` reads it -- the id
+      as written; family from the id's row, else the id as written.
+    - ``assigned``: a card with NO Agent line whose ``**Assigned:**``
+      value (``card_assigned``) names a worker -- a size, which
+      ``Route -Assign <size>`` writes on a card with no issue. Read tolerantly: a
+      key of the map's ``current`` block (ignoring case) is its model, id ``current[size]`` and
+      family that id's (else the id as written); any other value is the worker
+      as written, id None and family the value. Empty, ``rituals.assignMe``
+      (``me``, in any case) and an ``@<login>`` do not answer.
+    - ``trailer``: only when ``messages`` is given -- the card's own commit
+      bullets (``regex.commitBullet``, the squash-merged bullet among them,
+      distinct by their first seven characters, in bullet order) looked up in
+      ``messages``; each commit votes once for every model its ``Co-Authored-By``
+      trailers name, most votes wins, a tie to the first seen in bullet then
+      trailer order; a name no row carries is ignored, a hash with no message
+      skipped.
+    - ``label``: not in the shipped order, read only where ``order`` names it --
+      the card's issue's worker label, trimmed: id None, family the label as
+      written.
+    - ``none``: a person worked it alone -- id and family None.
+
+    An order that leaves ``none`` out still ends in it. ``messages`` is short
+    hash -> message (``git_messages``; a longer key is cut to seven) or None for
+    not read; ``models`` the map, None for the shipped one; ``current`` its ``current`` block. The mirror of
+    ``Resolve-P20CardAgent``; ``Tests/fixtures/parsers/agent-source.json`` holds
+    the two to one table."""
+    rows = read_model_map() if models is None else models
+    # The map's ``current`` block (worker size -> model id): the shipped one with
+    # the shipped map, else what the caller passes (none is empty).
+    if current is None:
+        current = read_model_current() if models is None else {}
+    # Keyed in lower case: a size matches ignoring case, as models.current_model matches it.
+    sizes = {str(k).lower(): v for k, v in (current or {}).items()} if isinstance(current, dict) else {}
+    for source in model_agent_sources() if order is None else order:
+        if source == "line":
+            mid = card_agent(content or "")
+            if mid:
+                row = rows.get(mid)
+                family = row.get("family") if isinstance(row, dict) else None
+                return {"id": mid, "family": family or mid, "source": "line"}
+        elif source == "assigned":
+            # A size's model may later come from the map's own size lookup
+            # (models.current_model, the CLI's Get-P20ModelForSize); the step stays here.
+            if card_agent(content or ""):
+                continue
+            size = card_assigned(content or "")
+            if not size or size.lower() == rituals_assign_me().lower() or size.startswith("@"):
+                continue
+            mid = sizes.get(size.lower())
+            if not mid:
+                return {"id": None, "family": size, "source": "assigned"}
+            row = rows.get(mid)
+            family = row.get("family") if isinstance(row, dict) else None
+            return {"id": str(mid), "family": family or str(mid), "source": "assigned"}
+        elif source == "trailer":
+            if messages is None:
+                continue
+            mid = _trailer_model(content or "", messages, rows)
+            if mid:
+                row = rows.get(mid)
+                family = row.get("family") if isinstance(row, dict) else None
+                return {"id": mid, "family": family or mid, "source": "trailer"}
+        elif source == "label":
+            text = (label or "").strip()
+            if text:
+                return {"id": None, "family": text, "source": "label"}
+        elif source == "none":
+            break
+    return {"id": None, "family": None, "source": "none"}
 
 
 def card_from_record(content: str) -> str | None:
@@ -490,7 +665,7 @@ def backlog_rows(
 def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES, folder: str = "") -> dict:
     """Extract the file-content-derived fields of PromptInfo.
 
-    Returns a dict with keys: title, type, name, linked, tracker, billable, assigned, from_record, sprint,
+    Returns a dict with keys: title, type, name, linked, tracker, billable, assigned, agent, from_record, sprint,
     milestone, tags, progress, checked, total, ado_url, pr_url, previous_round, design, commits, status --
     the content half of the Card model (docs/hub/cards.md, "The model, as the agent serves it").
     ``id`` comes from the FILENAME (``card_id``), so the caller adds it. Fields that need filesystem access (file
@@ -558,6 +733,8 @@ def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES, folder:
         "billable": card_billable(content),
         # Who takes it: the **Assigned:** line's value (me, or a size), "" for nobody.
         "assigned": card_assigned(content),
+        # Who did the work, when an agent did: the **Agent:** line's model id, "" for none.
+        "agent": card_agent(content),
         # The meeting record an agenda line came from: the **From:** line's
         # record stem, None when the card names none (NewPrompt -From writes it).
         "from_record": card_from_record(content),

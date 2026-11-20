@@ -26,6 +26,11 @@ blank line and no heading goes inside.
 
 A change nobody would notice adds no file.
 
+An entry is linted like any other document (`npm run lint:md` in `web/`, and the check on every pull
+request), so what a release folds into `CHANGELOG.md` already passes there. One rule is off in this
+folder, in `.markdownlint-cli2.jsonc` beside this page: the one that wants a file to open with a
+heading.
+
 ## At a release
 
 The release pull request folds this folder into `CHANGELOG.md` before it renames the section:

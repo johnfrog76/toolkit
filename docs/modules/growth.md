@@ -17,15 +17,15 @@ cannot tell it is there.
 
 - [The flag, and why it is the engineer's](#the-flag-and-why-it-is-the-engineers)
 - [What the module owns](#what-the-module-owns)
+- [Turning it on](#turning-it-on)
 - [The verbs](#the-verbs)
+- [D-CM: how any module contributes commands](#d-cm-how-any-module-contributes-commands)
 - [The routes](#the-routes)
 - [The web UI](#the-web-ui)
 - [The file shape](#the-file-shape)
-- [Turning it on](#turning-it-on)
+- [How a review decides what is in it](#how-a-review-decides-what-is-in-it)
 - [The tests](#the-tests)
 - [Known gaps](#known-gaps)
-- [D-CM: how any module contributes commands](#d-cm-how-any-module-contributes-commands)
-- [How a review decides what is in it](#how-a-review-decides-what-is-in-it)
 
 ---
 
@@ -95,6 +95,45 @@ two halves must not disagree about where the store is.
 `pr-comments/` is the one thing this module writes that is **org**-scoped:
 reviewing a colleague's PR happens inside one engagement, so `LogPeerReview`
 writes under `<promptsRoot>/<promptsFolder>/pr-comments/`.
+
+---
+
+## Turning it on
+
+```jsonc
+// config.local.json -- gitignored, per machine
+{
+  "promptsRoot": "/path/to/your/hub",
+  "features": { "growth": true }
+}
+```
+
+Then, in a fresh shell:
+
+```powershell
+Import-Module ./Prompt20Toolkit/Prompt20Toolkit.psd1 -Force
+tkMenu -All          # the six verbs appear under Growth and Reviews
+tkNewGrowth -Help
+```
+
+and for the web half:
+
+```powershell
+tkWeb -Dev           # the agent and the dev server
+```
+
+`/growth` lists what is in the hub's `growth/current/`, `/skills` renders
+`resume/resume.md`, and the Growth nav entry is there. Switch the flag off and
+all three are gone, with no restart of anything but the shell (an open shell keeps its verbs until it re-imports: [Configuration](../CONFIGURATION.md), "A module flag and an open shell").
+
+### Autoload
+
+A module verb **is not in the autoload manifest**, which is generated from the
+committed config where every module flag is off, so it resolves after
+`Import-Module` rather than in a profile-less shell. A flag set only in
+`config.local.json` never reaches the manifest: the alias-discovery shell reads
+`Get-P20Features -CommittedOnly`. The whole rule is
+[Module verbs and autoload](README.md#module-verbs-and-autoload).
 
 ---
 
@@ -274,6 +313,44 @@ out of the command table's own file and within reach of the suites.
 
 ---
 
+## D-CM: how any module contributes commands
+
+Growth contributes its verbs (`NewGrowth`, `NewWorkReview`, `PublishWorkReview`,
+`WorkReview`, `LogPeerReview`, `UpdateResume`) the way every module does:
+`Config/growth.commands.psd1` is the data file (`Feature = 'growth'`, the
+`Commands` rows, `Order`, `Help`), and `Config/growth.commands.ps1` holds one
+wrapper per row, in the pattern of the core wrappers in `utilities.psm1`:
+
+```powershell
+function global:New-P20GrowthItem {
+    [CmdletBinding()]
+    param(
+        [ValidateSet('training', 'presentation', 'goal')]
+        [string]$Type = 'training',
+        [string]$Title,
+        # ... the rest of the verb's parameters ...
+        [switch]$Help
+    )
+    $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'NewGrowth'
+    if ($Help) { Show-CommandHelp 'NewGrowth'; return }
+    $pkgRoot = (Get-P20ModuleState).PackageRoot
+    Invoke-ToolkitScript -Path "$($pkgRoot)/Scripts/New-GrowthItem.ps1" -Parameters $PSBoundParameters `
+        -Name $inv.Name -Prefix $inv.Prefix -Detail $Type
+}
+```
+
+The package root is read inside the function, from `(Get-P20ModuleState).PackageRoot`,
+never from a free `$repoRoot`: a `function global:` reached from a script the module
+launched resolves a free name against that script (AGENTS.md, "Traps worth knowing").
+`Invoke-ToolkitScript` is the one guard every wrapper goes through, so the refusal
+contract holds for a module verb as it does for a core one. `Resolve-InvokedCommand` reads the prefix back
+off the alias the user actually typed, so nothing names it. The contract -- the
+data file's keys, why it is a plain hashtable, what the loader does and in which
+order, and how to add a module -- is
+[How a module contributes commands (D-CM)](README.md#how-a-module-contributes-commands-d-cm).
+
+---
+
 ## The routes
 
 Mounted by `agent/growth/__init__.py`'s `growth_router()`, which declares the
@@ -349,17 +426,30 @@ those tags exist.
 
 `GrowthPage` is `ReviewArchive` + `Goals`, under the quarter line when there is one.
 
-**A review's row** shows its Spaces as chips -- one `Badge` per Space, by the Space's name -- and a
+**Both panels are list panels** (`ListPanel`, [`web/COMPONENTS.md`](../../web/COMPONENTS.md)): one
+fixed height beside each other and the deck launcher, every entry the same height with its text cut
+by an ellipsis, one **Open** button and the rest in the entry's `...` menu, and a page in the foot
+sized to the room the list has. Neither file draws an entry or a pager of its own; the dialogs they
+open are files beside them (`NewGrowthDialog.tsx`, `ReviewDialogs.tsx`). **Goals** splits its list
+with a row of status chips -- All, New, Active, Complete, each with its count -- and an entry shows
+the item's status beside its title, its facts as the file has them on the line under it (a
+training's provider and hours, then the dates), and its type and due date on the last line.
+**Reviews** splits its list with a row of chips -- All, Reviews, Resume, Archived -- and narrows the
+reviews to one Space with the **Space** select in its header; the resume is the engineer's and not
+a Space's, so it shows while no Space is picked. What a review is and how one is made is the panel's
+info icon, beside its title.
+
+**A review's entry** shows its Spaces as badges -- one per Space, by the Space's name -- and a
 summary that is the review's first line of prose, never its frontmatter (it used to print the raw
-`orgs: [...]` line). Its menu offers the row vocabulary's **Archive** and **Delete**, each
+`orgs: [...]` line), as plain words on two lines at most. Its menu offers the row vocabulary's **Archive** and **Delete**, each
 `WorkReview` through the bridge (`POST /api/cmd/WorkReview`, argv `buildWorkReviewParams`, the
 review's name from the row's `review` field). Archive runs at once, as the vocabulary's archive does
 on a row that only moves a file; Delete asks first, through the house's one confirm
-(`shared/ConfirmDialog`), which names the review's range and its Spaces. A refusal is shown in the
-verb's own words. A legacy review with no slug-set folder has no name the verb takes, so its row has
-no menu. **Archived reviews are their own filter value**: the default list (`GET
-/api/engagement/{slug}/reviews`) never reads `reviews/archive/`, and the filter's *Archived* option
-reads only it (`?archived=true`), where a row offers Delete and opens the review as before. The 1:1s are the communication
+(`shared/ConfirmDialog`), which names the review's range and its Spaces. A refused Archive is said
+once, on the panel over the list, in the verb's own words; a refused Delete stays in the confirm. A legacy review with no slug-set folder has no name the verb takes, so its entry has
+no menu. **Archived reviews are their own chip**: the default list (`GET
+/api/engagement/{slug}/reviews`) never reads `reviews/archive/`, and the *Archived* chip
+reads only it (`?archived=true`), where an entry offers Delete and opens the review as before. The 1:1s are the communication
 module's ([`communication.md`](communication.md)).
 
 `ReviewArchive` -- the **Reviews** card -- writes into the hub (a generated review is a file in
@@ -443,42 +533,31 @@ row above is pinned, case by case, in `Tests/test_growth_status.py`; the long ve
 
 ---
 
-## Turning it on
+## How a review decides what is in it
 
-```jsonc
-// config.local.json -- gitignored, per machine
-{
-  "promptsRoot": "/path/to/your/hub",
-  "features": { "growth": true }
-}
-```
+**A card is in a review when it was open at some point in the window**: `**Created:**` on or before
+the end date, and not `**Closed:**` before the start date. The card's own dates decide, not git: a
+commit touching a card is not the same as having worked on it -- a reorganisation, a link refresh or
+a stamp backfill touches every card it lands on -- and a hub that is not a git repository has no
+commits to read.
 
-Then, in a fresh shell:
+| | |
+| --- | --- |
+| **A stamped file** | judged by its dates. A commit that touched it proves nothing, in either direction |
+| **A file with no `**Created:**`** | falls back to git -- "touched in the window" -- so nothing a hub's history could find is lost. `growth/` items and pre-move history at the hub root come this way |
+| **Completed or Active** | as of the **end of the window**, not as of today. A card open all through May and archived in June is *active* in a May review, though it sits in `archive/` now |
+| **The bullet** | says what happened inside the window: `opened 05-04, closed 05-15`. Nothing, for dates outside it |
+| **Dotfiles** | never work items. An editor's stray `.US-316614-....prompt.md` was once listed as completed work |
+| **The JSON** | `selected_by_stamps` and `selected_by_git`, counted over the items that are in the review |
 
-```powershell
-Import-Module ./Prompt20Toolkit/Prompt20Toolkit.psd1 -Force
-tkMenu -All          # the six verbs appear under Growth and Reviews
-tkNewGrowth -Help
-```
+Cards written before the stamps existed get them from `Scripts/Backfill-CardStamps.ps1`
+([The CLI](../CLI.md#the-two-dates-a-card-carries-and-the-cards-that-never-got-them)), which also
+dates the plain `.md` plans and explorations an org's `archive/` holds, since a review lists those
+as work too.
 
-and for the web half:
-
-```powershell
-tkWeb -Dev           # the agent and the dev server
-```
-
-`/growth` lists what is in the hub's `growth/current/`, `/skills` renders
-`resume/resume.md`, and the Growth nav entry is there. Switch the flag off and
-all three are gone, with no restart of anything but the shell (an open shell keeps its verbs until it re-imports: [Configuration](../CONFIGURATION.md), "A module flag and an open shell").
-
-### Autoload
-
-A module verb **is not in the autoload manifest**, which is generated from the
-committed config where every module flag is off, so it resolves after
-`Import-Module` rather than in a profile-less shell. A flag set only in
-`config.local.json` never reaches the manifest: the alias-discovery shell reads
-`Get-P20Features -CommittedOnly`. The whole rule is
-[Module verbs and autoload](README.md#module-verbs-and-autoload).
+The Review suite holds both paths: its unstamped fixture cards go through git, and a stamped hub
+runs twice -- as a repository whose history is deliberately misleading, and with no git at all --
+with the same bullets word for word.
 
 ---
 
@@ -491,7 +570,8 @@ committed config where every module flag is off, so it resolves after
 | `pytest Tests/test_growth.py` | the routes against the fixture hub, the 404 gate, and the heading reader: an empty provider is `None`, not the writer's `---`, and a file made from the template reads its comments as nothing |
 | `tkTestToolkit -WorkReview` | `WorkReview` typed in a fresh shell over a scratch git hub: off means no verb, `-Help` names both moves, `-WhatIf` writes nothing, `-Archive` moves the folder with `**Closed:**` in `review.md`, `-Delete` removes it, `storeSync: git` commits that review's paths only, every refusal exit 2 |
 | `pytest Tests/test_reviews_multi_org.py` | a review folder's membership is split-on-`+` SET membership, not a substring search; `reviews/archive/` is off the default scan and the only thing `archived=True` reads; a summary is never the frontmatter |
-| `npm test -- ReviewArchive.rows` | a review's row offers Archive and Delete through `WorkReview`, Delete only after the confirm naming the range and Spaces, and archived reviews only under the Archived filter |
+| `npm test -- ReviewArchive.rows` | a review's entry offers Archive and Delete through `WorkReview`, a refused Archive said on the panel, Delete only after the confirm naming the range and Spaces, and archived reviews only under the Archived chip |
+| `npm test -- filters.names` | Goals' status chips and Reviews' chips are named groups, and Reviews' Space select has a name |
 | `npm test -- GoalActions` | a goal's row and page offer Complete and Archive while it is not complete and Archive alone once it is; a training or a talk keeps Archive alone; Complete asks, then runs `NewGrowth -Complete <file>`, and Archive `NewGrowth -Close <file>` |
 | `npm test -- Goals.create` | the New Growth Item dialog runs `NewGrowth` through the bridge with the dialog's fields as argv, opens the file the verb names, and keeps a refusal or an "Already there" in the dialog |
 | `npm test -- registry.growth` | the module contributes routes and nav only when the flag is true, and no home cards of its own |
@@ -525,67 +605,3 @@ This one is a choice, not an omission, and is not on [Known gaps](../KNOWN-GAPS.
 | # | Choice | What you see |
 | --- | --- | --- |
 | GR3 | `ReviewPage` ownership settled as (a): it stays an ADO card and this module serves its routes | `/review` says "No reviews yet" when growth is off. Not an error, and not a bug |
-
----
-
-## D-CM: how any module contributes commands
-
-Growth contributes its verbs (`NewGrowth`, `NewWorkReview`, `PublishWorkReview`,
-`WorkReview`, `LogPeerReview`, `UpdateResume`) the way every module does:
-`Config/growth.commands.psd1` is the data file (`Feature = 'growth'`, the
-`Commands` rows, `Order`, `Help`), and `Config/growth.commands.ps1` holds one
-wrapper per row, in the pattern of the core wrappers in `utilities.psm1`:
-
-```powershell
-function global:New-P20GrowthItem {
-    [CmdletBinding()]
-    param(
-        [ValidateSet('training', 'presentation', 'goal')]
-        [string]$Type = 'training',
-        [string]$Title,
-        # ... the rest of the verb's parameters ...
-        [switch]$Help
-    )
-    $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'NewGrowth'
-    if ($Help) { Show-CommandHelp 'NewGrowth'; return }
-    $pkgRoot = (Get-P20ModuleState).PackageRoot
-    Invoke-ToolkitScript -Path "$($pkgRoot)/Scripts/New-GrowthItem.ps1" -Parameters $PSBoundParameters `
-        -Name $inv.Name -Prefix $inv.Prefix -Detail $Type
-}
-```
-
-The package root is read inside the function, from `(Get-P20ModuleState).PackageRoot`,
-never from a free `$repoRoot`: a `function global:` reached from a script the module
-launched resolves a free name against that script (AGENTS.md, "Traps worth knowing").
-`Invoke-ToolkitScript` is the one guard every wrapper goes through, so the refusal
-contract holds for a module verb as it does for a core one. `Resolve-InvokedCommand` reads the prefix back
-off the alias the user actually typed, so nothing names it. The contract -- the
-data file's keys, why it is a plain hashtable, what the loader does and in which
-order, and how to add a module -- is
-[How a module contributes commands (D-CM)](README.md#how-a-module-contributes-commands-d-cm).
-
-## How a review decides what is in it
-
-**A card is in a review when it was open at some point in the window**: `**Created:**` on or before
-the end date, and not `**Closed:**` before the start date. The card's own dates decide, not git: a
-commit touching a card is not the same as having worked on it -- a reorganisation, a link refresh or
-a stamp backfill touches every card it lands on -- and a hub that is not a git repository has no
-commits to read.
-
-| | |
-| --- | --- |
-| **A stamped file** | judged by its dates. A commit that touched it proves nothing, in either direction |
-| **A file with no `**Created:**`** | falls back to git -- "touched in the window" -- so nothing a hub's history could find is lost. `growth/` items and pre-move history at the hub root come this way |
-| **Completed or Active** | as of the **end of the window**, not as of today. A card open all through May and archived in June is *active* in a May review, though it sits in `archive/` now |
-| **The bullet** | says what happened inside the window: `opened 05-04, closed 05-15`. Nothing, for dates outside it |
-| **Dotfiles** | never work items. An editor's stray `.US-316614-....prompt.md` was once listed as completed work |
-| **The JSON** | `selected_by_stamps` and `selected_by_git`, counted over the items that are in the review |
-
-Cards written before the stamps existed get them from `Scripts/Backfill-CardStamps.ps1`
-([The CLI](../CLI.md#the-two-dates-a-card-carries-and-the-cards-that-never-got-them)), which also
-dates the plain `.md` plans and explorations an org's `archive/` holds, since a review lists those
-as work too.
-
-The Review suite holds both paths: its unstamped fixture cards go through git, and a stamped hub
-runs twice -- as a repository whose history is deliberately misleading, and with no git at all --
-with the same bullets word for word.

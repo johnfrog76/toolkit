@@ -30,6 +30,8 @@ const refetched: string[] = [];
 let refreshedLedger = 0;
 // A GitHub Space whose tracker has nothing to say (not connected yet).
 let unsupportedReport: string[] = [];
+// A GitHub Space's design counts, as the ledger says them; absent is null (no design/).
+let designOf: Record<string, { in_flight: number; specs: number; not_stamped: number }> = {};
 
 let envAnswer: unknown;
 // The pager's rules do not depend on how many rows a page holds: this suite
@@ -82,6 +84,7 @@ function mockLedgerEntry(slug: string) {
       visibility: failingVisibility.includes(slug) ? "unknown" : (visibilityOf[slug] ?? "unknown"),
       repos: [],
     },
+    design: designOf[slug] ?? null,
   };
 }
 jest.mock("./api.studio", () => ({
@@ -233,6 +236,7 @@ describe("the foyer", () => {
     refetched.length = 0;
     refreshedLedger = 0;
     unsupportedReport = [];
+    designOf = {};
     window.localStorage.clear();
     envAnswer = { config: { activeSpace: "acme", spaces: SPACES } };
   });
@@ -268,6 +272,18 @@ describe("the foyer", () => {
     mount();
     expect(screen.getByText("Visibility unknown; 4 open; no deploys yet")).toBeTruthy();
     expect(screen.getByText("Visibility unknown; no open issues; no deploys yet")).toBeTruthy();
+  });
+
+  it("a GitHub row whose repository keeps designs counts them; one with no design/ says nothing of them", () => {
+    designOf = { toolkit: { in_flight: 3, specs: 1, not_stamped: 2 } };
+    mount();
+    expect(
+      screen.getByText(
+        "Public; 4 open; no deploys yet; 3 designs in flight, 1 spec; 2 files not stamped with an id",
+      ),
+    ).toBeTruthy();
+    // Wasteland's ledger has design: null -- no design words, not a zero.
+    expect(screen.getByText("Private; no open issues; no deploys yet")).toBeTruthy();
   });
 
   it("a ledger read the agent did not answer settles every GitHub row, saying so", () => {
@@ -501,6 +517,7 @@ describe("the Spaces card's filter", () => {
 
   beforeEach(() => {
     window.localStorage.clear();
+    designOf = {};
     envAnswer = { config: { activeSpace: "acme", spaces: MIXED } };
   });
 
@@ -630,6 +647,7 @@ describe("the Spaces card's load, Refresh and pager", () => {
     askedLedger.length = 0;
     ledgerFails = false;
     unsupportedReport = [];
+    designOf = {};
     failingSpaceStatus = [];
     failingVisibility = [];
     visibilityOf = { toolkit: "public", wasteland: "private" };

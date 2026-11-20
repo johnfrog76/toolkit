@@ -346,7 +346,8 @@ try {
     Assert-Equal 'the record is the documented one, byte for byte' $expected $firstText
     Assert-True 'UTF-8 with no BOM' (-not ($firstBytes.Length -ge 3 -and $firstBytes[0] -eq 0xEF -and $firstBytes[1] -eq 0xBB -and $firstBytes[2] -eq 0xBF))
     Assert-True 'LF, no CR, one newline at the end' ((-not $firstText.Contains("`r")) -and $firstText.EndsWith("}`n") -and -not $firstText.EndsWith("`n`n"))
-    Assert-True 'the console names the derived cost and the price table' ($s.Text.Contains('$0.17 derived') -and $s.Text.Contains('as of 2026-10-06') -and $s.Text.Contains('claude-mystery-9')) $s.Text
+    Assert-True 'the console names the derived cost and the price table' ($s.Text.Contains('$0.17 derived') -and $s.Text.Contains('as of 2026-11-16') -and $s.Text.Contains('claude-mystery-9')) $s.Text
+    Assert-True '  and the cost line itself says it is not counting the unpriced model' ($s.Text.Contains('$0.17 derived, not counting claude-mystery-9')) $s.Text
     Test-NoPrivateText 'the documented record' $firstText
 
     Write-Host ""
@@ -458,6 +459,12 @@ try {
     $liveDir = Join-Path $claudeRoot 'live'
     $liveLines = @([pscustomobject]@{ t = '+09:00'; id = 'msg-live'; model = 'claude-opus-5-5'; out = 400; sid = '44444444-dddd-4ddd-8ddd-000000000004'; cwd = '/Users/alex/Repos/demo' })
     New-ProjectsTree ([pscustomobject]@{ 'demo/44444444-dddd-4ddd-8ddd-000000000004.jsonl' = $liveLines }) $liveDir $dayStart
+    $mysteryDir = Join-Path $claudeRoot 'mystery'
+    $mysteryLines = @(
+        [pscustomobject]@{ t = '+09:00'; id = 'msg-known'; model = 'claude-opus-5-5'; out = 400; sid = '55555555-eeee-4eee-8eee-000000000005'; cwd = '/Users/alex/Repos/demo' },
+        [pscustomobject]@{ t = '+09:01'; id = 'msg-new'; model = 'claude-new-1'; out = 100; sid = '55555555-eeee-4eee-8eee-000000000005'; cwd = '/Users/alex/Repos/demo' }
+    )
+    New-ProjectsTree ([pscustomobject]@{ 'demo/55555555-eeee-4eee-8eee-000000000005.jsonl' = $mysteryLines }) $mysteryDir $dayStart
     & $writeRecord $usageDir 'laptop' '2026-07-13' 'claude-haiku-5-5' 2 20
     & $writeRecord $usageDir 'laptop' $dayKey 'claude-haiku-5-5' 3 30
     & $writeRecord $usageDir $machine $dayKey 'claude-opus-5-5' 100 1000
@@ -467,6 +474,7 @@ try {
     $before = Get-TreeSnapshot $claudeRoot
     $snippet = "`$env:CLAUDE_CONFIG_DIR = '$($liveDir -replace "'", "''")'`n"
     $snippet += "'BEGIN:json'`ntkBurn -AsJson -At '$at'`n'END:json=' + `$LASTEXITCODE`n'BEGIN:console'`ntkBurn -At '$at'`n'END:console=' + `$LASTEXITCODE`n"
+    $snippet += "`$env:CLAUDE_CONFIG_DIR = '$($mysteryDir -replace "'", "''")'`n'BEGIN:unpriced'`ntkBurn -At '$at'`n'END:unpriced=' + `$LASTEXITCODE`n`$env:CLAUDE_CONFIG_DIR = '$($liveDir -replace "'", "''")'`n"
     $snippet += "'BEGIN:atbad'`ntkBurn -At 2026-7-15`n'END:atbad=' + `$LASTEXITCODE`n"
     $snippet += "'BEGIN:atfuture'`ntkBurn -At '$((Get-Date).AddDays(2).ToString('yyyy-MM-dd HH:mm', $inv))'`n'END:atfuture=' + `$LASTEXITCODE`n"
     $snippet += "'BEGIN:atlog'`ntkBurn -Log -At '$at'`n'END:atlog=' + `$LASTEXITCODE`n"
@@ -507,6 +515,10 @@ try {
     Assert-True 'Burn -At: exit 0, today and this week, the cost derived, never a share of the plan' ($s.Exit -eq '0' -and $burnAt -ge 0 -and $s.Text.Contains("as of $at") -and $s.Text.Contains('Today, ') -and $s.Text.Contains('This week, from ') -and $s.Text.Contains('the week starts Friday 05:00, burn.weekStarts') -and $s.Text.Contains("not the plan's allocation") -and $burnPart -notmatch '\d%') $s.Text
     Assert-True '  and opens with the burndown, no reading yet, saying how to record one' ($burnAt -gt $s.Text.IndexOf('Weekly burndown') -and $s.Text.IndexOf('Weekly burndown') -ge 0 -and $s.Text.Contains('no reading this week') -and $s.Text.Contains('tkBurn -Reading general=<n>,premium=<n>')) $s.Text
     Assert-True '  and says Haiku is priced at its lower rate card' ($s.Text.Contains('claude-haiku-5-5 is priced at its lower rate card')) $s.Text
+    Assert-True '  and with every model priced the cost line carries no "not counting"' (-not $s.Text.Contains('not counting')) $s.Text
+    $s = Get-Section $r.All 'unpriced'
+    $costLines = @($s.Text -split "`n" | Where-Object { $_ -match '^\s+(Today|This week), .* messages, ' })
+    Assert-True 'Burn with an unpriced model: each window'' cost line says what the figure leaves out' ($s.Exit -eq '0' -and $costLines.Count -eq 2 -and @($costLines | Where-Object { $_ -match ' derived, not counting claude-new-1\s*$' }).Count -eq 2) $s.Text
     $s = Get-Section $r.All 'atbad'
     Assert-True '-At that is not a time: exit 2, one Error block' ($s.Exit -eq '2' -and $s.Text.Contains('is not a time') -and (@([regex]::Matches($s.Text, '(?m)^Error: ')).Count -eq 1)) $s.Text
     $s = Get-Section $r.All 'atfuture'

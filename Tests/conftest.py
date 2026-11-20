@@ -39,7 +39,20 @@ engineer's own machine state.
    files, so a shell that holds them points every test that copies
    ``samples/hub`` at a Space or folder that hub lacks. They are removed here for
    the run and put back afterwards, exactly as the webhooks are; a test that means
-   to exercise an override sets it itself.
+   to exercise an override sets it itself. ``P20_STANDUP_AS_OF``
+   (``env.standupAsOf``) goes with them: under the run marker the CLI's Standup
+   reads it as the clock, and a bridge child would inherit it.
+
+5. **The tracker's tools.** No test reaches a real ``az`` or ``gh``: a machine
+   that is signed in must not answer differently from one that is not, and the
+   next unmocked call may not be a read. ``Tests/_tracker_cli.py`` puts a
+   stand-in for each first on ``PATH`` and refuses either one in this process;
+   after every test the recorded calls are read here, and a call the test did
+   not ask for fails it, naming the command. A test asks by standing in for the
+   tool, or with ``@unreachable("az", "gh")`` (the marker
+   ``tracker_cli_unreachable``) when "not there" is the answer it wants. The
+   tier probe's and the identity's kept answers are forgotten per test with the
+   rest, so which test meets the call does not depend on the order they run in.
 
 **The log redirect happens at IMPORT time, not in a fixture.** conftest is
 imported before test modules are collected, and collection runs module-level
@@ -62,6 +75,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # Tests/, for _rmtree
+import _tracker_cli
 from _rmtree import remove_tree
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # the package root, for agent
@@ -83,7 +97,7 @@ WEBHOOK_PREFIX = _CONSTS["env"]["teamsWebhookPrefix"]
 AGENT_CACHE_ENV = _CONSTS["env"]["agentCacheDir"]
 TEST_HISTORY_ENV = _CONSTS["env"]["testHistoryDir"]
 TEST_RUN_MARKER = _CONSTS["env"]["testRunMarker"]
-RUN_OVERRIDES = (_CONSTS["env"]["activeSpace"], _CONSTS["env"]["promptsRoot"])
+RUN_OVERRIDES = (_CONSTS["env"]["activeSpace"], _CONSTS["env"]["promptsRoot"], _CONSTS["env"]["standupAsOf"])
 
 # See the module docstring: at import, because collection logs.
 USAGE_LOG_DIR = tempfile.mkdtemp(prefix="p20-test-logs-")
@@ -95,6 +109,10 @@ atexit.register(remove_tree, AGENT_CACHE_DIR)
 TEST_HISTORY_DIR = tempfile.mkdtemp(prefix="p20-test-history-")
 os.environ[TEST_HISTORY_ENV] = TEST_HISTORY_DIR
 atexit.register(remove_tree, TEST_HISTORY_DIR)
+
+
+# See the module docstring, job 5: at import, because collection starts children.
+_tracker_cli.install()
 
 
 def scrub_webhooks(environ) -> dict:
@@ -139,8 +157,43 @@ def _fresh_agent_cache(tmp_path, monkeypatch):
     (agent/solitaire/tracker.py, standup.py): a fixture's repo is whatever the
     test says it holds, and a read one test kept must never answer for another."""
     monkeypatch.setenv(AGENT_CACHE_ENV, str(tmp_path / "agent-cache"))
+    from agent.core import identity, tier
     from agent.solitaire import standup, tracker
 
     tracker.forget()
     standup.clear_dressed()
+    tier.probe_cache_clear()
+    identity.identity_cache_clear()
     yield
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        f"{_tracker_cli.MARKER}(*tools): the code under test asks az or gh in passing; the named tools stay out "
+        "of reach and the calls are not held against the test (Tests/_tracker_cli.py)",
+    )
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """Fail the test that reached ``az`` or ``gh`` unasked (the docstring, job 5).
+
+    Read after each phase, so a call made in a fixture's setup or teardown is
+    reported there. In the report rather than raised, because the reads under
+    test catch every exception: the refusal alone never reaches the test."""
+    outcome = yield
+    report = outcome.get_result()
+    declared = tuple(str(tool) for mark in item.iter_markers(_tracker_cli.MARKER) for tool in mark.args)
+    calls = _tracker_cli.unasked(_tracker_cli.drain(), declared)
+    if not calls:
+        return
+    listed = "\n".join(f"  {command}" for command in calls)
+    message = (
+        f"{item.nodeid} reached a tracker tool it did not stand in for ({call.when}):\n{listed}\n"
+        "No test calls a real az or gh. Stand in for the tool, or mark the test "
+        '@unreachable("az", "gh") if "not there" is the answer it needs (Tests/_tracker_cli.py).'
+    )
+    earlier = "" if report.passed else f"\n\n{report.longrepr}"
+    report.outcome = "failed"
+    report.longrepr = message + earlier

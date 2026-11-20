@@ -15,9 +15,12 @@
  * An entry with `answers` ("How do you want to work in {space}?") is
  * asked here, not only answered: the Space's question, one radio per answer,
  * and a pick runs `Config -Set <answerKey>=<value> -Hub` through PUT
- * /api/config -- the one writer, the same line a terminal types. What is
- * checked, and what can be picked, is the agent's answer for the Space you are
- * in (/env howIWork); the web never re-derives it.
+ * /api/config -- the one writer, the same line a terminal types. For How do
+ * you want to work?, what is checked, and what can be picked, is the agent's
+ * answer for the Space you are in (/env howIWork); the web never re-derives it.
+ * Any other asking entry (How many are in my standup?) checks the value the
+ * Space's own entry holds at its key -- none while it is unset -- and its
+ * answers are live by the Space's tracker (/env tracker).
  */
 import { useState } from "react";
 import {
@@ -37,14 +40,15 @@ import {
 import { ChevronDownRegular, ChevronRightRegular } from "@fluentui/react-icons";
 import { useNavigate } from "react-router";
 import { useGetEnvQuery, useGetSurfacesQuery } from "./api";
-import type { HowIWork } from "./api";
 import { useOpenSettings } from "./cards";
 import { useWriteConfigMutation, useWriteHowWeWork } from "./registry";
 import type { HowWeWorkOutcome } from "../modules/studio/howWeWork";
 import {
   WORKFLOW_ENTRIES,
   answerLive,
+  answerStored,
   answerTarget,
+  asksHowIWork,
   entryAnchor,
   entryConfigLines,
   entryQuestion,
@@ -135,6 +139,16 @@ const useStyles = makeStyles({
   },
 });
 
+/** What an asking entry's radios start from: the Space's tracker, whether its
+ *  answer is locked (derived), the answer checked, and -- for howIWork only --
+ *  Team Agile's own switch as set. /env's `howIWork` is exactly this shape. */
+export interface AnswerState {
+  tracker: TrackerKind;
+  locked: boolean;
+  answer?: string;
+  switch?: boolean | null;
+}
+
 /**
  * The radios of an entry that asks. Every answer is drawn -- one the
  * Space cannot make is disabled, never hidden, and `why` says in one sentence
@@ -160,7 +174,7 @@ function Answers({
   question: string;
   target: string;
   slug: string;
-  how: HowIWork | undefined;
+  how: AnswerState | undefined;
 }) {
   const styles = useStyles();
   const baseId = useId("how-answer");
@@ -176,7 +190,10 @@ function Answers({
   const locked = how ? how.locked : true;
   const value = picked ?? how?.answer ?? "";
   const why = how ? entry.why?.[tracker] : undefined;
-  const waitsOnSwitch = !!how && !locked && value === "agents" && how.switch !== true;
+  // How do you want to work?'s own: the answer that waits on Team Agile's switch,
+  // and the Space's how-we-work note a With agents pick writes.
+  const howIWork = asksHowIWork(entry);
+  const waitsOnSwitch = howIWork && !!how && !locked && value === "agents" && how.switch !== true;
 
   async function pick(next: string) {
     const answer = answers.find((a) => a.value === next);
@@ -190,7 +207,7 @@ function Answers({
       if (reply.result.status !== "success") {
         setPicked(undefined);
         setRefused(reply.result.error || reply.result.output || "Config -Set refused.");
-      } else if (next === "agents" && slug) {
+      } else if (howIWork && next === "agents" && slug) {
         setNote(await writeHowWeWork(slug));
       }
     } catch {
@@ -346,7 +363,18 @@ export function HowDoI({ anchor }: { anchor?: string }) {
                     question={question}
                     target={answerKey}
                     slug={activeSpace}
-                    how={env?.howIWork}
+                    how={
+                      asksHowIWork(entry)
+                        ? env?.howIWork
+                        : env && {
+                            tracker: env.tracker ?? "none",
+                            locked: false,
+                            answer: answerStored(
+                              entry,
+                              declared.find((s) => s.slug === activeSpace),
+                            ),
+                          }
+                    }
                   />
                 ) : null}
               </div>

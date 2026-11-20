@@ -1,5 +1,5 @@
 {
-  "_comment": "Which orgs a person is OFFERED to pick from (feature-local-example-first-run, item 6). ONE table, two readers: Tests/Test-Config.ps1 runs Scripts/Select-OfferedSpaces.ps1 over it, Tests/test_offered_orgs.py runs agent/core/config.py's offered_orgs. Each row is one org: dismissed is isDemoDismissed, example is the org's own example flag, active is whether it is the active Space. If the halves ever disagree about a row, one of them is wrong.",
+  "_comment": "Which orgs a person is OFFERED to pick from (feature-local-example-first-run, item 6). ONE table, two readers: Tests/Test-Config.ps1 runs Scripts/Select-OfferedSpaces.ps1 over it, Tests/test_offered_orgs.py runs agent/core/config.py's offered_orgs. Each row is one org: dismissed is isDemoDismissed, example is the org's own example flag, retired is whether its status is archive (absent: false), active is whether it is the active Space. If the halves ever disagree about a row, one of them is wrong.",
   "rows": [
     { "dismissed": false, "example": false, "active": false, "offered": true,  "why": "not dismissed: an ordinary org is offered" },
     { "dismissed": false, "example": true,  "active": false, "offered": true,  "why": "not dismissed: the Example org is offered too" },
@@ -8,6 +8,9 @@
     { "dismissed": true,  "example": false, "active": false, "offered": true,  "why": "dismissed: an ordinary org is untouched" },
     { "dismissed": true,  "example": true,  "active": false, "offered": false, "why": "dismissed: the Example org is left out" },
     { "dismissed": true,  "example": false, "active": true,  "offered": true,  "why": "dismissed: the active ordinary org is offered" },
-    { "dismissed": true,  "example": true,  "active": true,  "offered": true,  "why": "dismissed, but you are IN Example: never hide where you are" }
+    { "dismissed": true,  "example": true,  "active": true,  "offered": true,  "why": "dismissed, but you are IN Example: never hide where you are" },
+    { "dismissed": false, "example": false, "retired": true,  "active": false, "offered": false, "why": "retired and not active: left off the switcher" },
+    { "dismissed": false, "example": false, "retired": true,  "active": true,  "offered": true,  "why": "retired but active: never hide where you are" },
+    { "dismissed": true,  "example": true,  "retired": true,  "active": false, "offered": false, "why": "dismissed and retired: left out" }
   ]
 }

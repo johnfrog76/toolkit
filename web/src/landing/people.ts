@@ -1,5 +1,5 @@
 // The studio's people: three of the cast, one for each way of working, each
-// in their own window with one line in their own voice (the design note, "The
+// on their own card with one line in their own voice (the design note, "The
 // three people", D-LP5). The cast's mottos stay in the stage's cast.tsx;
 // these lines are the page's.
 
@@ -9,7 +9,7 @@ import type { WayId } from "./copy";
 export interface LandingPerson {
   /** A cast id from the stage's cast.tsx. */
   castId: "minimalist" | "pm" | "dev-hero";
-  /** The character's title on the stage. */
+  /** The character's title, on their card's plate. */
   title: string;
   /** The way of working this person stands for. */
   way: WayId;

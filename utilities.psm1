@@ -2113,6 +2113,22 @@ function global:Set-P20CardBillable {
         -Name $inv.Name -Prefix $inv.Prefix
 }
 
+# Daily: the week's timesheet from the cards -- the web UI's Daily page, as the
+# text its Copy All copies. This week, -LastWeek, or -Since/-Until. Read-only.
+function global:Get-P20Daily {
+    [CmdletBinding()]
+    param(
+        [switch]$LastWeek,
+        [string]$Since,
+        [string]$Until,
+        [switch]$Compact,
+        [switch]$Help
+    )
+    $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'Daily'
+    Invoke-ToolkitScript -Path "$toolkitRoot\Scripts\Get-Daily.ps1" -Parameters $PSBoundParameters `
+        -Name $inv.Name -Prefix $inv.Prefix
+}
+
 function global:Set-P20CardCover {
     [CmdletBinding()]
     param(
@@ -2483,7 +2499,12 @@ function global:Test-P20Toolkit {
     $forwardArgs = @()
     if ($Help) { $forwardArgs += '-Help' }
     if ($Rest) { $forwardArgs += $Rest }
-    & pwsh -NoProfile -File "$toolkitRoot\Tests\Test-Toolkit.ps1" @forwardArgs
+    # The runner starts in the host this verb was typed in: typed in Windows
+    # PowerShell 5.1, the suites run in 5.1. Get-P20TestHost is the one thing
+    # that names the running host, the same one the runner starts each suite with.
+    . "$toolkitRoot\Tests\Get-TestHost.ps1"
+    $runnerHost = Get-P20TestHost
+    & $runnerHost -NoProfile -File "$toolkitRoot\Tests\Test-Toolkit.ps1" @forwardArgs
 }
 
 # All three halves -- the agent's pytest, this runner, the web UI's npm test --
@@ -2495,6 +2516,8 @@ function global:Invoke-P20TestAll {
         [ValidateSet('cli', 'agent', 'web')]
         [string]$Half,
         [switch]$Fast,
+        [switch]$Isolated,
+        [switch]$Keep,
         [switch]$Help
     )
     if ($Help) { Show-CommandHelp 'Test'; return }
@@ -2543,6 +2566,7 @@ $script:ModuleState.CommandMap = [ordered]@{
     'Archive'          = 'Move-P20PromptToArchive'
     'Status'           = 'Get-P20PromptStatus'
     'Billable'         = 'Set-P20CardBillable'
+    'Daily'            = 'Get-P20Daily'            # the week's timesheet, as the Daily page copies it
     'Cover'            = 'Set-P20CardCover'
     'Move'             = 'Move-P20CardLane'
     'Plan'             = 'Set-P20CardSprint'
