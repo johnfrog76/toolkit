@@ -108,7 +108,8 @@ component import creeps back in. The smoke test's off mode asserts that no modul
 happened when you switch org, and a 1:1 history spans engagements, so a module that flickered as
 you moved between an active engagement and an archived one would be wrong. The exceptions are the
 Space-scoped switches, which describe one Space: `sprintAwareness`, the ADO core's own flag for
-one org's board, and `suggestions`, both read from `spaces[].features`. The
+one org's board, and `suggestions`, both read from `spaces[].features`; and `spaces[].howIWork`, the
+Space's answer to how you work there, which turns Team Agile on or off in that Space. The
 rule, and where each half reads it, is
 [Flags have a scope](../ARCHITECTURE.md#the-shell-owns-the-chrome-a-module-owns-the-rest) in [the web UI overview](../ARCHITECTURE.md#the-web-ui);
 `Tests/test_features.py` pins it.
@@ -144,7 +145,7 @@ generated work reviews, and the resume.
 Its three folders are **hub-root siblings** of the per-org folders, not children of one, for the
 same reason the flag is the engineer's -- resolved through the same `PROMPTS_ROOT`-first rule every
 module follows (`Get-P20PromptsRoot` / `hub_root()`). The one thing it writes that **is**
-org-scoped is `LogPeerReview`'s output, in the active Space's `pr-comments/`. Its nine routes are all
+org-scoped is `LogPeerReview`'s output, in the active Space's `pr-comments/`. Its routes are all
 Tier 2 or lower and all 404 with the flag off; two of them (`GET /api/reviews/{folder}`,
 `GET /api/review-preview`) are read by `ReviewPage`, which **stays an ADO card** (decision D-RP
 (a)) rather than moving here. [`docs/modules/growth.md`](growth.md) has the routes table, the pages,
@@ -160,7 +161,7 @@ tests. The module decides where it surfaces and what gates it.
 | --- | --- |
 | Flag | `features.communication` -- top-level, engineer-scoped |
 | Verbs | `SendTeams`, `NewMeeting`, `MeetingAgenda`. Each answers `-Help`; flags are in [the command reference](../CLI.md#the-opt-in-modules-verbs) |
-| Agent | `agent/communication/` -- `manager.py` (the routes) and `comms.py` (the engine, carried whole with its 21 tests) |
+| Agent | `agent/communication/` -- `manager.py` (the routes) and `comms.py` (the engine, carried whole with its tests) |
 | Web UI | `web/src/modules/communication/index.tsx`, export `communicationModule` |
 | Hub folder | `manager/current/` and `manager/archive/`, a hub-root sibling -- [`docs/hub/manager.md`](../hub/manager.md) is the session-file contract |
 | Everything else | [`docs/modules/communication.md`](communication.md) |
