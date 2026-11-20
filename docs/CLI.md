@@ -932,7 +932,10 @@ test run. So `-Stop` walks the descendants (`pgrep -P` on macOS and Linux,
 start is named with its PID either way, but it is only *stopped* if its image is `node`, which is
 what Vite runs in, **and** it belongs to this checkout: its command line or working directory is
 under this package's `web/` (on Windows the command line alone, since the working directory is not
-readable there; a listener whose owner cannot be read counts as not this checkout's). A `node`
+readable there; a listener whose owner cannot be read counts as not this checkout's). Recognising
+`node` holds on macOS and Windows. On Linux the name read is the process's main thread, which Node calls
+`MainThread`, so no dev server is recognised there and every listener is left running --
+[a known gap](KNOWN-GAPS.md#on-linux-the-dev-port-sweep-does-not-recognise-a-dev-server). A `node`
 serving that port from another checkout is named -- `Port 5174 is held by a node (PID <n>) that
 belongs to another checkout; not stopping it` -- and left running, from `-Status`, `-Stop` and
 `-Restart` alike. Anything that is not `node` gets `Port 5174 is held by <name> (PID <n>) -- not a dev server; not stopping it`
@@ -1332,7 +1335,7 @@ cannot start a second entry or move a column. `Write-P20TestResult` does the sam
 `test-results.<MACHINE>.log`.
 
 **A test run does not write into it.** `P20_USAGE_LOG_DIR` moves the log -- a **directory**, read by
-both halves (`Get-ToolkitLogDir` in `utilities.psm1`, `log_dir()` in `agent/core/log_writer.py`),
+both halves (`Get-P20ToolkitLogDir` in `utilities.psm1`, `log_dir()` in `agent/core/log_writer.py`),
 and by the readers as well as the writers, since `tkLog`, the scoring engine, the error count and
 the web UI's Log card all glob `usage.*.log`. Unset, the log is beside the module.
 `tkTestToolkit` points it at a temp directory for the length of the run and restores it afterwards,
