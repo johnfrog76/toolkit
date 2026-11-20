@@ -627,3 +627,67 @@ export function NotAllowed() {
     </>
   );
 }
+
+describe("where the pickers and the search sit", () => {
+  const controls = (inBody: boolean) => (
+    <ListPanel
+      title="Notes"
+      items={notes(3)}
+      item={toItem}
+      empty={none}
+      controlsInBody={inBody || undefined}
+      lead={{ chart: { label: "Notes by group", chart: <div>chart</div> } }}
+      search={{ label: "Search notes", value: "", onChange: () => undefined }}
+      pickers={[
+        {
+          label: "Order",
+          value: "new",
+          options: [{ value: "new", label: "Newest" }],
+          onChange: () => undefined,
+        },
+      ]}
+      action={{ label: "Clear", glyph: <DocumentRegular />, onClick: () => undefined }}
+      refresh={{ onClick: () => undefined, isFetching: false }}
+      count={3}
+    />
+  );
+
+  it("without the prop they are in the header, as every panel has them", () => {
+    render(controls(false));
+    const root = panel();
+    expect(root.querySelector("[data-panel-controls]")).toBeNull();
+    const header = root.querySelector("header") ?? root;
+    expect(
+      within(header as HTMLElement).getByRole("searchbox", { name: "Search notes" }),
+    ).toBeTruthy();
+    expect(root.querySelector("[data-panel-body] select")).toBeNull();
+  });
+
+  it("with controlsInBody they are a row in the body above the lead, not in the header", () => {
+    render(controls(true));
+    const root = panel();
+    const row = root.querySelector("[data-panel-controls]") as HTMLElement;
+    const lead = root.querySelector("[data-panel-lead]") as HTMLElement;
+    expect(row.querySelector("select")).not.toBeNull();
+    expect(within(row).getByRole("searchbox", { name: "Search notes" })).toBeTruthy();
+    expect(row.compareDocumentPosition(lead) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(root.querySelector("[data-panel-body]")?.contains(row)).toBe(true);
+  });
+
+  it("the header then runs the action, the refresh, the count", () => {
+    render(controls(true));
+    const count = panel().querySelector("[data-panel-count]") as HTMLElement;
+    const action = screen.getByRole("button", { name: "Clear" });
+    const refresh = screen.getByRole("button", { name: /refresh/i });
+    const before = (a: Element, b: Element) =>
+      Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(before(action, refresh)).toBe(true);
+    expect(before(refresh, count)).toBe(true);
+  });
+
+  it("the controls row is counted in the page size", () => {
+    const plain = { density: "line", lead: true } as const;
+    expect(listPageSize({ ...plain, controlsRow: true })).toBeLessThanOrEqual(listPageSize(plain));
+    expect(listChromePx({ ...plain, controlsRow: true })).toBeGreaterThan(listChromePx(plain));
+  });
+});

@@ -374,7 +374,7 @@ are the engineer's:
 | `communication` | `manager/current/`, `manager/archive/` | [`../docs/hub/manager.md`](../docs/hub/manager.md) |
 | `organize` | `reminders/current/` | [`../docs/modules/organize.md`](../docs/modules/organize.md) |
 | `studio` | `design/` | [`../docs/hub/design.md`](../docs/hub/design.md) |
-| `solitaire` | none -- it reads the tracker, and writes nothing to the hub | [`../docs/modules/solitaire-agile.md`](../docs/modules/solitaire-agile.md), "The file shape, and how a standup is read" |
+| `solitaire` | `org.json` at the hub root (`consts.json` `org.file`), read only; the rest it reads from the tracker, and it writes nothing to the hub | [`../docs/modules/solitaire-agile.md`](../docs/modules/solitaire-agile.md), "The file shape, and how a standup is read"; [`../docs/hub/org.md`](../docs/hub/org.md) for `org.json` |
 
 Those folder names are defaults, not constants: they are what `hub.json`'s `folders` block declares,
 and every path above is resolved through `hub_folder()`.

@@ -11,13 +11,14 @@ import {
 import { useChartColors } from "../../hooks/chartPalette";
 import { useWornTheme } from "../../hooks/useWornTheme";
 import { ChartWrapper } from "../../shared/ChartWrapper";
+import { leadChartPlotHeightPx, logChartPlotHeightPx } from "../../shell/layoutTokens";
 import type { LogEntry } from "./api.ado";
 import { buildChartData } from "./logChart";
 
 // The Log panel's lead: the entries by day and type, stacked.
 const useStyles = makeStyles({
   chartArea: {
-    minHeight: "120px",
+    minHeight: `${leadChartPlotHeightPx}px`,
   },
 });
 
@@ -70,7 +71,7 @@ export function LogTypeChart({ entries }: { entries: LogEntry[] }) {
   return (
     <ChartWrapper>
       <div className={styles.chartArea}>
-        <ResponsiveContainer width="100%" height={102}>
+        <ResponsiveContainer width="100%" height={logChartPlotHeightPx}>
           <AreaChart data={chartData}>
             <defs>
               <linearGradient id="lgCMD" x1="0" y1="0" x2="0" y2="1">

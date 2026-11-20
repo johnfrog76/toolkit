@@ -6,6 +6,23 @@ meeting through its stages (Plan, Prep, Retro, then Close), keeps one file per m
 posts through the Teams engine, carried whole from the predecessor with its tests. One flag
 switches all of it. This document is for anyone working on the module, and it stands alone.
 
+## The flag, and its scope
+
+`features.communication` is the **engineer's**, not the org's. It lives in the top-level `features`
+block and an org cannot override it, because a 1:1 history spans engagements: switching from an
+active org to an archived one must not make this module appear and disappear. One part of the module
+is read from the active Space: its `communication.recipients`, read after the `managerWorkflow`
+recipients, wherever that Space is declared (`SendTeams`, under [The verbs](#the-verbs), says how). Beside
+that, only the ADO core's own org-scoped keys are read from the active Space.
+
+The engine's own gate reads the merged features map that `load_config()` produces, which is the same
+map `/env` serves and the same one the web shell filters modules on.
+
+**Off means absent.** No route, no nav entry, no card, no chunk; no `SendTeams`, `NewMeeting` or
+`MeetingAgenda` alias, and nothing in `Menu`. Not hidden, not disabled, not a 403.
+
+## What it owns
+
 | | |
 | --- | --- |
 | Flag | `features.communication` — **engineer-scoped**, top-level, holds across orgs |
@@ -14,18 +31,33 @@ switches all of it. This document is for anyone working on the module, and it st
 | Frontend | `web/src/modules/communication/` — export `communicationModule` |
 | Hub data | `<promptsRoot>/manager/` — see [`docs/hub/manager.md`](../hub/manager.md) |
 
-## The flag, and its scope
+Beside it, and not its own: the bridge (`POST /api/cmd/{name}`), which runs its verbs from the browser;
+the one shared closing writer, `Scripts/Add-ClosedStamp.ps1`, which `MeetingAgenda -Close` calls; and an
+org's cards, which it never writes.
 
-`features.communication` is the **engineer's**, not the org's. It lives in the top-level `features`
-block and an org cannot override it, because a 1:1 history spans engagements: switching from an
-active org to an archived one must not make this module appear and disappear. Only the ADO core's
-own org-scoped keys are read from the active Space.
+## Running it live
 
-The engine's own gate reads the merged features map that `load_config()` produces, which is the same
-map `/env` serves and the same one the web shell filters modules on.
+```bash
+# config.local.json at the repo root -- gitignored, per machine.
+# The flag is TOP-LEVEL, never on an org.
+{
+  "promptsRoot": "Tests/fixtures/hub",
+  "activeSpace": "test",
+  "features": { "communication": true }
+}
+```
 
-**Off means absent.** No route, no nav entry, no card, no chunk; no `SendTeams`, `NewMeeting` or
-`MeetingAgenda` alias, and nothing in `Menu`. Not hidden, not disabled, not a 403.
+```bash
+python3 -m uvicorn agent.app:app --port 4100      # Windows: python or py -3
+curl -s localhost:4100/api/manager
+curl -s localhost:4100/api/env | python3 -c "import json,sys; print(json.load(sys.stdin)['communication'])"
+```
+
+With `TEAMS_WEBHOOK_MANAGER` unset, `/env` reports the recipient unconfigured and names the
+variable; set it to anything and `configured` flips to true. `sendingOff` is true only on a server
+started with the run marker. **`/api/comms/send` posts for real** —
+the engine takes whatever is in that variable at face value. Use `-WhatIf` from the CLI, or
+`"dryRun": true` on the body, to exercise the path without sending.
 
 ## Two gates, and they are not the same thing
 
@@ -417,30 +449,6 @@ fixture is what makes that document testable rather than aspirational. The conte
 design: a reporting decision and a queue timeout, nobody's name, no employer.
 
 There is no `archive/` in the fixture, on purpose: a hub without one must still serve `GET /manager`.
-
-## Running it live
-
-```bash
-# config.local.json at the repo root -- gitignored, per machine.
-# The flag is TOP-LEVEL, never on an org.
-{
-  "promptsRoot": "Tests/fixtures/hub",
-  "activeSpace": "test",
-  "features": { "communication": true }
-}
-```
-
-```bash
-python3 -m uvicorn agent.app:app --port 4100      # Windows: python or py -3
-curl -s localhost:4100/api/manager
-curl -s localhost:4100/api/env | python3 -c "import json,sys; print(json.load(sys.stdin)['communication'])"
-```
-
-With `TEAMS_WEBHOOK_MANAGER` unset, `/env` reports the recipient unconfigured and names the
-variable; set it to anything and `configured` flips to true. `sendingOff` is true only on a server
-started with the run marker. **`/api/comms/send` posts for real** —
-the engine takes whatever is in that variable at face value. Use `-WhatIf` from the CLI, or
-`"dryRun": true` on the body, to exercise the path without sending.
 
 ## Tests
 
