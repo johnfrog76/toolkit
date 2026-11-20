@@ -110,15 +110,15 @@ web/
     │   ├── ThemePicker.tsx the first section of the settings drawer
     │   ├── store.ts        one Redux store: the api slice and the filters slice
     │   ├── filtersSlice.ts the filter drawer's six values; a successful Space switch clears them, and the Docs and Design filters with them
-    │   ├── api.ts          createApi, and exactly two endpoints: /env and /switch-mode
-    │   ├── registry.ts     ToolkitModule, CardContext, and the four functions that read them
+    │   ├── api.ts          createApi, and the shell's own endpoints: /env and /switch-mode
+    │   ├── registry.ts     ToolkitModule, CardContext, and the functions that read them
     │   ├── registry.test.tsx
     │   └── cards.tsx       ShellContext: the card pages and the filter tuple, passed down;
     │                       PageGrid and PanelRow, a page's rows of panels
     ├── modules/ado/      the ADO prompt-engineering module -- always on, no flag
     │   ├── index.tsx       the ToolkitModule export: routes, nav, homeCards, systemCards
     │   ├── routes.tsx      AdoHome and AdoSystem -- what sits around the shell's card grid
-    │   ├── api.ado.ts      the module's endpoints, injected into the shell's slice; tag types Status, PrComments, Config, Billing, Issues, Issue
+    │   ├── api.ado.ts      the module's endpoints, injected into the shell's slice; tag types Status, PrComments, Config, Billing, Issues, Issue, Connect
     │   └── *.tsx           every card and detail page (see "The module's surface")
     ├── modules/growth/    opt-in, features.growth
     │   ├── index.tsx       export growthModule, plus ReviewArchive and SkillsSnapshot by name
@@ -131,7 +131,7 @@ web/
     │   ├── sendButton.ts   the send button's rule, as a pure function
     │   └── OneOnOne, NewMeetingDialog, ManagerDetailPage, ManagerSessionPage, Timer
     ├── modules/organize/   opt-in, features.organize -- the Organize tab
-    │   ├── index.tsx       export organizeModule: one route, one nav entry, the header bell, no cards elsewhere
+    │   ├── index.tsx       export organizeModule: its routes, one nav entry, the header bell, no cards elsewhere
     │   ├── paths.ts        the module's route path, and the router state that opens a bucket
     │   ├── ReminderBell    the header bell: asleep (zz) or awake with the past-due count
     │   ├── useOverdueReminders  the past-due slice of the reminders read, polled each minute
@@ -165,6 +165,20 @@ web/
     │       ├── RefinedDesk.tsx a window with nobody in it, in the refined cast and full colour: a flat-backed chair, a shut laptop and a steaming drink
     │       ├── standupDeck.tsx the standup response -> an audiobook Deck: the board, the open, a call and a turn a member, the chair's status, the close
     │       └── StandupPlay     /deck/ritual/standup: the resolver, handed to the deck engine's GeneratedDeckHost
+    ├── modules/deck/      opt-in, features.deck -- web-only, the presentation engine (docs/modules/deck.md)
+    │   ├── index.tsx       export deckModule: the deck, notes, list and deck-page routes, the Growth page's launcher slot, Home's first-run banner; every part lazy
+    │   ├── DeckPickerCard  the launcher: the decks, and this machine's archived ones under a filter
+    │   ├── DeckPage        one deck's page: what its file says, Play, Archive
+    │   ├── DeckHost        the player; GeneratedDeckHost beside it plays a deck built from data
+    │   └── engine/         carried code: Connected Deck's engine (see "The deck module")
+    ├── modules/studio/    core, no flag (D-S13) -- the foyer, one row per Space (docs/modules/studio.md)
+    │   ├── index.tsx       export studioModule: /studio, a design note's and a prompt's reading rooms, one nav entry; its pages lazy
+    │   ├── api.studio.ts   the ledger, the hub's design notes and the prompts, read; the Space verbs through the bridge
+    │   ├── StudioPage      the foyer, the Designs card and the Prompts card
+    │   └── FoyerCard, DesignsCard, PromptsCard, NewSpaceDialog, SpaceLifecycleDialog, MoveDesignDialog
+    ├── modules/lounge/    opt-in, features.lounge -- web-only, the ambient room (docs/modules/lounge.md)
+    │   ├── index.tsx       export loungeModule: /lounge and a Lounge nav entry, last by module order
+    │   └── Lounge, GoBoard, TicTacToe, WordRing, SkinsDialog
     ├── landing/          the landing page: no router, no store, no agent (see "The landing page")
     │   ├── main.tsx        the entry: the page, or the commercial playing
     │   ├── words.ts        the page's words, read from README.md and THIRD-PARTY-NOTICES.md
@@ -284,8 +298,8 @@ The other modules each have a document that owns their detail:
   **Agenda** -- what moved since the last standup, and what is waiting on you as tiles built from the
   board's card face, each waiting one with **Work it now** or **Review it** -- and its Detail, Work and
   Brief tabs show the agent's `text` verbatim, its first line as the card's header and the rest in a
-  monospace block, each `#<n>` the response names linked to its issue. Under the tab, a Standup | Triage
-  strip: Triage (`/solitaire-agile/triage`) asks the open issues one at a time -- milestone,
+  monospace block, each `#<n>` the response names linked to its issue. Under the tab, a Standup | Triage |
+  Releases | Org strip: Triage (`/solitaire-agile/triage`) asks the open issues one at a time -- milestone,
   severity, size -- and each answer is the CLI's `Route` through `POST /api/cmd/Route`.
 - **lounge** (`features.lounge`, [`../docs/modules/lounge.md`](../docs/modules/lounge.md)) -- web-only,
   like deck: `/lounge` and a **Lounge** nav entry, last by module order, and no cards anywhere else.
@@ -332,8 +346,10 @@ including that module's own page components.
 
 That is not tidiness. A registry test is about the registry's *filtering*, so a one-line stand-in
 (`{ id: "growth", feature: "growth", routes: [] }`) is the correct subject. And the practical reason
-is sharp: a sibling's real tree left to load pulls in `react-markdown` -- ESM, which ts-jest cannot
-take -- so the suite goes red for a reason that has nothing to do with the registry.
+is sharp: a sibling's real tree left to load pulls in `react-markdown` -- ESM, which ts-jest takes only
+through the `transformIgnorePatterns` allow-list in `jest.config.mjs`, there for the one suite that renders
+it for real (`markdownPlugins.test.tsx`), and slow to transform -- so the suite pays for a tree that has
+nothing to do with the registry.
 
 **Adding a module means adding a mock line to every one of these files.**
 
@@ -890,8 +906,9 @@ fun, and `FacePicker` is drawn by the Lounge (spec D-L24).
 **A line that explains a page is `Body1` (14px) with `spacingVerticalL spacingHorizontalS` of padding
 -- 1rem and 0.5rem.** The owner's rule: "the general rule is Body1 for these intro texts or
 14px and same padding." Three lines are this: the one above the board's lanes (`Board.tsx`,
-`barText`), the one under Home's tabs (`routes.tsx`, `explain`, one per tab), and the one at the foot
-of a local org's Home (`connectLine`, which becomes the tips row).
+`barText`), the one under Home's tabs (`routes.tsx`, `explain`, one per tab), and the tips row at Home's
+foot (`Tips`, `shared/Tips.tsx`, which replaced a local org's connect line). The `homeFoot` line under the
+tips is the landing page's link, not an intro text.
 
 Fluent's `Link` draws at 14px whatever the sentence around it does, so a `Caption1` intro line puts
 two sizes on one row. **The size comes from the typography component, never from a number** -- `Body1`, not
@@ -1294,7 +1311,7 @@ are prompts, and agile lanes are a better view for how multiple items flow for h
   serves the card model's `tracker` (the tracker rule over the card's OWN link, never the Space's
   address), and `TrackerBadge.tsx` is the one chip for it -- the Issues tab's rows wear the same one. And
   **the repo row's rule is stated**: it appears only when the org
-  declares projects -- an Azure DevOps org -- and `unlinkedHiddenByRepo` keeps saying how many cards it hid.
+  declares projects -- an Azure DevOps org.
   Left alone on purpose: the repo row's counts count configuration, and the
   state row mixes two vocabularies.
 - **A second write, and it is not a move**: a card's menu also offers **Mark not billable** / **Make billable
@@ -1344,8 +1361,7 @@ are prompts, and agile lanes are a better view for how multiple items flow for h
   display name from `/env` `config.laneNames` (`laneLabel`, pure and tested); the headings, the menu, the
   list's status badge and the filter's chips all print it, and the contract word is still what is
   compared. Demo reads To do / Doing / Waiting / Done; an org that says nothing reads the contract's words.
-- **The tab row spans the centre block, flush both ends.** Home's row above the cards (`viewBar`: flex,
-  space-between) has the tabs at its left edge, level with the cards below. **New card
+- **The tab row spans the centre block, flush both ends.** Home's row above the cards has the tabs at its left edge, level with the cards below. **New card
   follows the explain text** on both rows: on the board, after the milestone, sprint and tag filters, at the row's end; the
   text wraps inside itself so the buttons keep the row. The System page has a tab strip of its own above its cards, and no pager.
 - **The board owns the height; a lane scrolls inside itself.** The owner: "they all expand to fill the
@@ -1759,7 +1775,7 @@ Routes: `/growth` (`GrowthPage` = `ReviewArchive` + `Goals`), `/growth/goals/:fi
 No cards of its own; `ReviewArchive` and `SkillsSnapshot` are exported by name for the ADO module's
 archive-mode home.
 
-`api.growth.ts` injects nine endpoints into the shell's slice and adds the tag types `Growth`,
+`api.growth.ts` injects its endpoints into the shell's slice and adds the tag types `Growth`,
 `Resume` and `Reviews`. Three of those endpoints are reads of a CLI verb run through the bridge on
 the agent's side (`/api/review-preview`, `/api/resume-preview`, `POST /api/review/generate`), which
 is invisible from here -- they are ordinary queries.
