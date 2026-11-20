@@ -213,19 +213,8 @@ clock.
 
 **The bucket rule**, implemented twice -- `Get-P20ReminderBucket` in `Scripts/Reminder-Rules.ps1` and
 `reminder_bucket` in `agent/organize/reminders.py` -- and held to one table,
-`Tests/fixtures/reminders/buckets.json`, asserted from both suites:
-
-| Due | Bucket |
-| --- | --- |
-| none | upcoming |
-| a date before today | overdue |
-| today's date, no time | today -- a date is due at the END of its day |
-| a later date | upcoming |
-| a time whose minute has passed | overdue |
-| a time later today, or this very minute | today |
-| a time on a later day (midnight included) | upcoming |
-
-Times are **local, with no offset**. That is the simplest honest answer for one engineer's hub.
+`Tests/fixtures/reminders/buckets.json`, asserted from both suites. The rule, row by row, is
+[`docs/hub/reminders.md`](../hub/reminders.md#how-it-is-read), "How it is read".
 
 ### A ref that names a card
 

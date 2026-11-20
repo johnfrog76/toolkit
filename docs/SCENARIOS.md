@@ -15,7 +15,7 @@ A machine is in exactly one cell of each axis at a time:
 | --- | --- | --- |
 | **Space status** | `active`, `local`, `archive` | `spaces[].status` in `hub.json` / config; `Start` makes a `local` one |
 | **Tier** | 1 (the tracker answers), 2 (the tracker's CLI is there but not signed in or unreachable), 3 (no tracker CLI at all) | the agent's probe, `GET /api/env` -- `Tests/test_tier_parity.py` holds the CLI and the agent to one table |
-| **Tracker** | `github`, `ado`, `none` | derived from the active Space's address (`Scripts/Resolve-Tracker.ps1`, `agent/ado/tracker.py`) |
+| **Tracker** | `github`, `ado`, `none` | derived from the active Space's address (`Scripts/Resolve-Tracker.ps1`, `tracker()` in `agent/core/config.py`) |
 | **Azure DevOps shown** | on, off | DERIVED: `features.ado` if set, else the status AND the tracker -- on only in an `active` Space whose address is Azure DevOps, so a connected GitHub Space reads off with its tracker named -- **the one shared table**, `Tests/fixtures/ado-enabled/table.json`, read by `tkTestToolkit -Setup` and `Tests/test_ado_enabled.py` |
 | **Modules** | `growth`, `communication`, `deck`, `organize`, `solitaireAgile`, `lounge`, each on / off / not configured | top-level `features` in `config.local.json`; the engineer's, never an org's (`Tests/test_features.py`). The Studio is not on this axis: it is core (D-S13), and a `features.studio` left in a config is ignored |
 | **Sprint awareness** | on, off | `spaces[].features.sprintAwareness` -- a Space-scoped flag |

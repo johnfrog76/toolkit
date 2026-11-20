@@ -46,8 +46,21 @@ a new reminder. The bytes are the card's: UTF-8 with no BOM, LF on create, the f
 
 **Nothing derived is stored.** The bucket -- overdue, today, upcoming -- and the words "Yesterday" or
 "2:00 PM" are worked out at read time against the local clock; a file that stored them would be wrong by
-morning. The bucket rule is in [the module's document](../modules/organize.md#the-file-shape-and-how-a-reminders-bucket-is-read),
-held from both halves by `Tests/fixtures/reminders/buckets.json`.
+morning. The bucket rule is implemented twice -- `Get-P20ReminderBucket` in `Scripts/Reminder-Rules.ps1` and
+`reminder_bucket` in `agent/organize/reminders.py` -- and held from both halves by one table,
+`Tests/fixtures/reminders/buckets.json`:
+
+| Due | Bucket |
+| --- | --- |
+| none | upcoming |
+| a date before today | overdue |
+| today's date, no time | today -- a date is due at the END of its day |
+| a later date | upcoming |
+| a time whose minute has passed | overdue |
+| a time later today, or this very minute | today |
+| a time on a later day (midnight included) | upcoming |
+
+Times are **local, with no offset**. That is the simplest honest answer for one engineer's hub.
 
 ## Samples and fixtures
 

@@ -779,8 +779,8 @@ tkWeb -Dev)`, `(--port)` or `(default)`.
 **That default is why an orphaned dev server matters.** If something is already on 5174 when
 `npm run dev` starts, Vite silently takes 5175 and the smoke run drives the *other* server -- code
 that is no longer the tree, passing or failing for reasons that are not yours. `Web -Status` names
-any listener on the dev port that it did not start, and `Web -Stop` ends it if it is a dev server --
-anything else it reports and leaves alone ([the command reference](CLI.md#the-other-two-halves)). After a stop, check
+any listener on the dev port that it did not start, and `Web -Stop` ends it if it is a dev server of this checkout --
+anything else, including another checkout's dev server, it reports and leaves alone ([the command reference](CLI.md#the-other-two-halves)). After a stop, check
 with `lsof -nP -i:5174` (`netstat -ano | findstr :5174` on Windows) and expect nothing, or
 a named process that is not yours. The agent half follows the same rule: `Web -Stop`
 ends this checkout's agent even when another shell started it, and a `PROMPTS_ROOT` set after the

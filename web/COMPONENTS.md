@@ -49,23 +49,23 @@ height or a margin on it from outside.
 
 Props:
 
-| Prop | Type | Notes |
-| --- | --- | --- |
-| `headerLeft` | `ReactNode` | Title side of the header; a rule follows when either side is set. |
-| `headerRight` | `ReactNode` | Actions side: pickers, search, refresh, the count chip. |
-| `body` | `ReactNode` | The body slot: what the panel holds, named like every other slot. |
-| `children` | `ReactNode` | The default slot: it fills `body`. Pass `body` or children, never both: the types refuse both, and the frame throws when drawn with both. |
-| `toast` | `ReactNode` | A `StatusMessage` under the body; hidden while loading. |
-| `footer` | `ReactNode` | A single foot cell, used only when no foot slot is set. |
-| `footerLeft` | `ReactNode` | Foot, left: usually a sentence. |
-| `footerCenter` | `ReactNode` | Foot, middle: the pager. Keeps its width on one line; the two sides share what is left. |
-| `footerRight` | `ReactNode` | Foot, right: usually a `CreateButton`. |
-| `footNote` | `ReactNode` | One line under the foot row, the width of the panel. |
-| `scrollable` | `boolean` | The body in the frame's thin-scrollbar scroll area, the header and foot fixed. The one sanctioned scroll form, for a panel whose body is a single block; a list panel never uses it, because it pages. |
-| `loading` | `boolean` | Draws the spinner instead of the body, toast and foot. |
-| `loadingLabel` | `string` | The spinner's label; default `Loading...`. |
-| `empty` | `ReactNode` | Replaces the body; hand it an `EmptyState`. The header and foot stay, so a filter that hid everything stays reachable. |
-| `className` | `string` | Merged onto the box. |
+| Prop           | Type        | Notes                                                                                                                                                                                                  |
+| -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `headerLeft`   | `ReactNode` | Title side of the header; a rule follows when either side is set.                                                                                                                                      |
+| `headerRight`  | `ReactNode` | Actions side: pickers, search, refresh, the count chip.                                                                                                                                                |
+| `body`         | `ReactNode` | The body slot: what the panel holds, named like every other slot.                                                                                                                                      |
+| `children`     | `ReactNode` | The default slot: it fills `body`. Pass `body` or children, never both: the types refuse both, and the frame throws when drawn with both.                                                              |
+| `toast`        | `ReactNode` | A `StatusMessage` under the body; hidden while loading.                                                                                                                                                |
+| `footer`       | `ReactNode` | A single foot cell, used only when no foot slot is set.                                                                                                                                                |
+| `footerLeft`   | `ReactNode` | Foot, left: usually a sentence.                                                                                                                                                                        |
+| `footerCenter` | `ReactNode` | Foot, middle: the pager. Keeps its width on one line; the two sides share what is left.                                                                                                                |
+| `footerRight`  | `ReactNode` | Foot, right: usually a `CreateButton`.                                                                                                                                                                 |
+| `footNote`     | `ReactNode` | One line under the foot row, the width of the panel.                                                                                                                                                   |
+| `scrollable`   | `boolean`   | The body in the frame's thin-scrollbar scroll area, the header and foot fixed. The one sanctioned scroll form, for a panel whose body is a single block; a list panel never uses it, because it pages. |
+| `loading`      | `boolean`   | Draws the spinner instead of the body, toast and foot.                                                                                                                                                 |
+| `loadingLabel` | `string`    | The spinner's label; default `Loading...`.                                                                                                                                                             |
+| `empty`        | `ReactNode` | Replaces the body; hand it an `EmptyState`. The header and foot stay, so a filter that hid everything stays reachable.                                                                                 |
+| `className`    | `string`    | Merged onto the box.                                                                                                                                                                                   |
 
 **The foot holds the bottom.** The frame is a column and its body grows (`flex-grow: 1`, one rule in
 the frame's styles), so the foot sits at the frame's bottom edge however short the content is, with the
@@ -77,14 +77,14 @@ wrapped in one element (`data-panel-frame-body`) that keeps the frame's 12 px ga
 A panel reads as named slots. `PANEL_SLOTS` (`src/shell/panelHeight.ts`) names them once, in this
 order; the last column is the `PanelFrame` prop that fills each today.
 
-| Slot | What fills it | Optional | `PanelFrame` prop today |
-| --- | --- | --- | --- |
-| `header` | the panel's icon and title | no for a kind (`title` is required); optional on the frame | `headerLeft` |
-| `info` | one sentence about what the panel holds, behind the info icon after the title | yes | `headerLeft` (an `InfoTip` after the title) |
-| `actions` | the header's controls: pickers, search, the panel's one action, refresh, the count chip | yes | `headerRight` |
-| `filters` | rows of filter chips, each chip with its count | yes | the top of `body` (a list panel draws them over its list) |
-| `body` | what the panel holds: a list panel's card list, paged; a block kind's content, scrolled when it overflows | no (a kind always has one; `empty` or `loading` stand in for it) | `body`, or children as the default slot |
-| `foot` | the foot row (words at the left, the pager in the centre, the **+** at the right) and one line under it | yes | `footerLeft`, `footerCenter`, `footerRight`, `footNote` |
+| Slot      | What fills it                                                                                             | Optional                                                         | `PanelFrame` prop today                                   |
+| --------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------- |
+| `header`  | the panel's icon and title                                                                                | no for a kind (`title` is required); optional on the frame       | `headerLeft`                                              |
+| `info`    | one sentence about what the panel holds, behind the info icon after the title                             | yes                                                              | `headerLeft` (an `InfoTip` after the title)               |
+| `actions` | the header's controls: pickers, search, the panel's one action, refresh, the count chip                   | yes                                                              | `headerRight`                                             |
+| `filters` | rows of filter chips, each chip with its count                                                            | yes                                                              | the top of `body` (a list panel draws them over its list) |
+| `body`    | what the panel holds: a list panel's card list, paged; a block kind's content, scrolled when it overflows | no (a kind always has one; `empty` or `loading` stand in for it) | `body`, or children as the default slot                   |
+| `foot`    | the foot row (words at the left, the pager in the centre, the **+** at the right) and one line under it   | yes                                                              | `footerLeft`, `footerCenter`, `footerRight`, `footNote`   |
 
 A panel with a maximum height holds what does not fit in one of two forms, chosen by its kind and named
 in `PANEL_BODY` (`src/shell/panelHeight.ts`): `paged` (card items, the pager at the foot) or `scroll`
@@ -109,7 +109,7 @@ draws it. **Do not use it** for a body that is one block (a set of checks, a cha
 <ListPanel
   title="Reminders"
   items={reminders}
-  item={toItem}                      // (entry) => CardItemData: data, not JSX
+  item={toItem} // (entry) => CardItemData: data, not JSX
   empty={{ icon, title: "No reminders yet" }}
   create={{ label: "New Reminder", onClick: add }}
 />
@@ -117,30 +117,31 @@ draws it. **Do not use it** for a body that is one block (a set of checks, a cha
 
 Props:
 
-| Prop | Type | Notes |
-| --- | --- | --- |
-| `title` | `string` | Required. The header's title. |
-| `icon` | `ReactElement` | Before the title. |
-| `info` | `ReactNode` | What the panel holds, behind the info icon after the title. |
-| `infoLabel` | `string` | The info icon's accessible name; default `About <title>`. |
-| `items` | `T[]` | Required. Every item, after the panel's own filtering; the kind pages them. |
-| `item` | `(entry: T) => CardItemData` | Required. One entry as data. With `density="compact"` it returns `CompactItemData` (no `description`); with `density="line"`, `LineItemData`. |
-| `density` | `"full" \| "compact" \| "line"` | The item size for every item of the panel: three bands (default), the title and meta bands, or one band. An item never chooses it, and it never changes the panel's height. |
-| `empty` | `EmptyMessage` | Required. Shown when there are no items: nothing yet, or nothing could be read (`tone: "error"`). |
-| `filteredEmpty` | `EmptyMessage` | Shown instead when a filter or a search hid every item. |
-| `filters` | `FilterRow[]` | Rows of chips: `{ label, chips: [{ id, label, count?, active, onSelect }] }`. The rows sit in one wrapper (`data-panel-filters`), a column spaced by `filterRowGap` (Fluent's XS, 4 px, `src/shell/layoutTokens.ts`); a row has no margin and no tint of its own. The wrapper owns the space below the rows, `filtersSpaceBelow` (`controlRowsSpace`, Fluent's M, 12 px), and the list under it drops its own top padding, so the chips sit 12 px under the header rule and 12 px over the first item. |
-| `pickers` | `SelectSlot[]` | Small header selects: `{ label, value, options, onChange, disabled? }`. |
-| `search` | `SearchSlot` | The header's search box: `{ label, placeholder?, value, onChange }`. What a deeper search finds is handed to the kind as `items`, never drawn as a block over the list. |
-| `action` | `ActionSlot` | One header button for a thing the whole panel does: `{ label, glyph, onClick, disabled?, title? }`. |
-| `refresh` | `RefreshSlot` | `{ onClick, isFetching?, disabled? }`. |
-| `count` | `number \| string` | The count chip. A string is a count that needs a word: `latest 500`. |
-| `countLabel` | `string` | The count chip's accessible name: `12 prompts`. |
-| `lead` | `ListLead` | What sits above the items, either or both: rows of figures, `stats: [{ label, stats: [{ id, count, label, tone?, detail? }] }]`, drawn as `StatTile`s with `detail` as the native title, then a chart, `chart: { label, chart }`. |
-| `status` | `PanelStatus` | What a write came to (`success` or `error`, dismissable) or what the panel is doing (`busy`). |
-| `create` | `CreateSlot` | The foot's **+**: `{ label, onClick }`; the label is the title of the dialog it opens. |
-| `footLeft` | `string` | Words at the foot's left. |
-| `footNote` | `ReactElement` | One line under the foot. |
-| `loading` | `LoadingSlot` | `{ label }`, present while the panel is reading. |
+| Prop             | Type                            | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ---------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `title`          | `string`                        | Required. The header's title.                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `icon`           | `ReactElement`                  | Before the title.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `info`           | `ReactNode`                     | What the panel holds, behind the info icon after the title.                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `infoLabel`      | `string`                        | The info icon's accessible name; default `About <title>`.                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `items`          | `T[]`                           | Required. Every item, after the panel's own filtering; the kind pages them.                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `item`           | `(entry: T) => CardItemData`    | Required. One entry as data. With `density="compact"` it returns `CompactItemData` (no `description`); with `density="line"`, `LineItemData`.                                                                                                                                                                                                                                                                                                                                                          |
+| `density`        | `"full" \| "compact" \| "line"` | The item size for every item of the panel: three bands (default), the title and meta bands, or one band. An item never chooses it, and it never changes the panel's height.                                                                                                                                                                                                                                                                                                                            |
+| `empty`          | `EmptyMessage`                  | Required. Shown when there are no items: nothing yet, or nothing could be read (`tone: "error"`).                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `filteredEmpty`  | `EmptyMessage`                  | Shown instead when a filter or a search hid every item.                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `filters`        | `FilterRow[]`                   | Rows of chips: `{ label, chips: [{ id, label, count?, active, onSelect }] }`. The rows sit in one wrapper (`data-panel-filters`), a column spaced by `filterRowGap` (Fluent's XS, 4 px, `src/shell/layoutTokens.ts`); a row has no margin and no tint of its own. The wrapper owns the space below the rows, `filtersSpaceBelow` (`controlRowsSpace`, Fluent's M, 12 px), and the list under it drops its own top padding, so the chips sit 12 px under the header rule and 12 px over the first item. |
+| `pickers`        | `SelectSlot[]`                  | Small selects, in the header unless `controlsInBody` is set: `{ label, value, options, onChange, disabled? }`.                                                                                                                                                                                                                                                                                                                                                                                         |
+| `search`         | `SearchSlot`                    | The header's search box: `{ label, placeholder?, value, onChange }`. What a deeper search finds is handed to the kind as `items`, never drawn as a block over the list.                                                                                                                                                                                                                                                                                                                                |
+| `controlsInBody` | `boolean`                       | Set, `pickers` and `search` sit in a row at the top of the body, above the lead and under the `filtersSpaceBelow` rule, and the header runs the action, refresh and count alone. Unset, they stay in the header. The Log card sets it.                                                                                                                                                                                                                                                                 |
+| `action`         | `ActionSlot`                    | One header button for a thing the whole panel does: `{ label, glyph, onClick, disabled?, title? }`.                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `refresh`        | `RefreshSlot`                   | `{ onClick, isFetching?, disabled? }`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `count`          | `number \| string`              | The count chip. A string is a count that needs a word: `latest 500`.                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `countLabel`     | `string`                        | The count chip's accessible name: `12 prompts`.                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `lead`           | `ListLead`                      | What sits above the items, either or both: rows of figures, `stats: [{ label, stats: [{ id, count, label, tone?, detail? }] }]`, drawn as `StatTile`s with `detail` as the native title, then a chart, `chart: { label, chart }`.                                                                                                                                                                                                                                                                      |
+| `status`         | `PanelStatus`                   | What a write came to (`success` or `error`, dismissable) or what the panel is doing (`busy`).                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `create`         | `CreateSlot`                    | The foot's **+**: `{ label, onClick }`; the label is the title of the dialog it opens.                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `footLeft`       | `string`                        | Words at the foot's left.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `footNote`       | `ReactElement`                  | One line under the foot.                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `loading`        | `LoadingSlot`                   | `{ label }`, present while the panel is reading.                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
 There is no `className`, `style`, `height`, `children`, `pageSize` or pager slot.
 
@@ -189,19 +190,19 @@ A card item is one entry inside a list panel, drawn by `ListPanel` from `CardIte
 (`src/shell/CardItem.tsx`). A panel never renders one itself. It is a plain element styled with Fluent
 tokens, not a Fluent `Card`.
 
-| Field of `CardItemData` | Type | Notes |
-| --- | --- | --- |
-| `id` | `string` | Stable among the panel's items; the position on the page when left out. |
-| `title` | `string` | Required. One line, clamped, plain text: never a link. |
-| `description` | `string` | Two lines, clamped; the band stays, empty, when there is none. |
-| `badges` | `BadgeSpec[]` | Status badges beside the title: `{ label, color?, appearance?, shape?, glyph?, title? }`. |
-| `meta` | `MetaItem[]` | The meta band: `{ badge: BadgeSpec }` or `{ text, title?, shrink?, tone?, mono? }`. |
-| `thumb` | `ThumbSpec` | A small picture at the start of the meta band: `{ url, label }`. |
-| `progress` | `{ done: number; total: number }` | A bar and `done/total` in the meta band; nothing when `total` is 0. |
-| `primary` | `PrimaryAction` | Required. The one exposed action, Open, built from `ROW.open.action()`. |
-| `menu` | `MenuAction[]` | Every other action, in the `...` menu; an external link is drawn last. |
-| `name` | `string` | The menu's accessible name is `Actions for <name>`; the title when left out. |
-| `busy` | `boolean` | A write on this item is running: the menu trigger spins. |
+| Field of `CardItemData` | Type                              | Notes                                                                                     |
+| ----------------------- | --------------------------------- | ----------------------------------------------------------------------------------------- |
+| `id`                    | `string`                          | Stable among the panel's items; the position on the page when left out.                   |
+| `title`                 | `string`                          | Required. One line, clamped, plain text: never a link.                                    |
+| `description`           | `string`                          | Two lines, clamped; the band stays, empty, when there is none.                            |
+| `badges`                | `BadgeSpec[]`                     | Status badges beside the title: `{ label, color?, appearance?, shape?, glyph?, title? }`. |
+| `meta`                  | `MetaItem[]`                      | The meta band: `{ badge: BadgeSpec }` or `{ text, title?, shrink?, tone?, mono? }`.       |
+| `thumb`                 | `ThumbSpec`                       | A small picture at the start of the meta band: `{ url, label }`.                          |
+| `progress`              | `{ done: number; total: number }` | A bar and `done/total` in the meta band; nothing when `total` is 0.                       |
+| `primary`               | `PrimaryAction`                   | Required. The one exposed action, Open, built from `ROW.open.action()`.                   |
+| `menu`                  | `MenuAction[]`                    | Every other action, in the `...` menu; an external link is drawn last.                    |
+| `name`                  | `string`                          | The menu's accessible name is `Actions for <name>`; the title when left out.              |
+| `busy`                  | `boolean`                         | A write on this item is running: the menu trigger spins.                                  |
 
 `CompactItemData` (`density="compact"`) is `CardItemData` without `description`: the title band and the
 meta band. My Work and GitHub Issues use it. `LineItemData` (`density="line"`) is one band (`meta`
@@ -211,22 +212,21 @@ optional: a line that opens nothing, such as a log entry, has no action.
 Every length inside an item is a token in `src/shell/cardItemTokens.ts`, and each size's height is
 their sum, so a change to a padding or a band changes the height with it:
 
-| Token | Value | What it is |
-| --- | --- | --- |
-| `CARD_ITEM_BORDER_PX` | 1 | The outline, each edge. |
-| `CARD_ITEM_PADDING_Y_PX` | 12 | The one vertical padding, top and bottom; Fluent's `tokens.spacingVerticalM`. |
-| `CARD_ITEM_TITLE_BAND_PX` | 24 | The title band: the title's line height and the controls' height. |
-| `CARD_ITEM_DESCRIPTION_LINE_PX` | 15 | One description line; `CARD_ITEM_DESCRIPTION_LINES` (2) of them make the band. |
-| `CARD_ITEM_META_BAND_PX` | 16 | The meta band: a small badge's height. |
-| `CARD_ITEM_META_GAP_PX` | 8 | Between a full item's description band and its meta band, a track of the item's grid; `tokens.spacingVerticalS`. |
-| `CARD_ITEM_COMPACT_BAND_GAP_PX` | 8 | Between a compact item's two bands; `tokens.spacingVerticalS`. |
-| `CARD_ITEM_LINE_BAND_PX` | 28 | A line item's one band. |
-| `CARD_ITEM_HEIGHT_PX` | 104 | Full, derived: 1 + 12 + 24 + 30 + 8 + 16 + 12 + 1. |
-| `CARD_ITEM_COMPACT_HEIGHT_PX` | 74 | Compact, derived: 1 + 12 + 24 + 8 + 16 + 12 + 1. |
-| `CARD_ITEM_LINE_HEIGHT_PX` | 28 | Line: its band. |
+| Token                           | Value | What it is                                                                                                       |
+| ------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------- |
+| `CARD_ITEM_BORDER_PX`           | 1     | The outline, each edge.                                                                                          |
+| `CARD_ITEM_PADDING_Y_PX`        | 12    | The one vertical padding, top and bottom; Fluent's `tokens.spacingVerticalM`.                                    |
+| `CARD_ITEM_TITLE_BAND_PX`       | 24    | The title band: the title's line height and the controls' height.                                                |
+| `CARD_ITEM_DESCRIPTION_LINE_PX` | 15    | One description line; `CARD_ITEM_DESCRIPTION_LINES` (2) of them make the band.                                   |
+| `CARD_ITEM_META_BAND_PX`        | 16    | The meta band: a small badge's height.                                                                           |
+| `CARD_ITEM_META_GAP_PX`         | 8     | Between a full item's description band and its meta band, a track of the item's grid; `tokens.spacingVerticalS`. |
+| `CARD_ITEM_COMPACT_BAND_GAP_PX` | 8     | Between a compact item's two bands; `tokens.spacingVerticalS`.                                                   |
+| `CARD_ITEM_LINE_BAND_PX`        | 28    | A line item's one band.                                                                                          |
+| `CARD_ITEM_HEIGHT_PX`           | 104   | Full, derived: 1 + 12 + 24 + 30 + 8 + 16 + 12 + 1.                                                               |
+| `CARD_ITEM_COMPACT_HEIGHT_PX`   | 74    | Compact, derived: 1 + 12 + 24 + 8 + 16 + 12 + 1.                                                                 |
+| `CARD_ITEM_LINE_HEIGHT_PX`      | 28    | Line: its band.                                                                                                  |
 
-Every spacing value in the panel layer is a Fluent spacing token on the 4 px grid; the bands (24, 15,
-16) are content sizes and are not held to it. Text is clamped with an ellipsis and stays whole in the
+Every spacing value in the panel layer is a Fluent spacing token on the 4 px grid; the bands (24, 15, 16) are content sizes and are not held to it. Text is clamped with an ellipsis and stays whole in the
 DOM, with no tooltip on it; a badge or a short word in the meta band may carry a native `title`.
 
 **Used by:** Active Cards, My Work, GitHub Issues, the Log, Decks and the Studio's lists. **Pattern:** a
@@ -252,13 +252,13 @@ buttons or a dialog's footer, and do not type a `CardAction` by hand: build it f
 
 Props:
 
-| Prop | Type | Notes |
-| --- | --- | --- |
-| `primaryAction` | `CardAction` | The one exposed action, drawn as a flat button. |
+| Prop               | Type           | Notes                                                                |
+| ------------------ | -------------- | -------------------------------------------------------------------- |
+| `primaryAction`    | `CardAction`   | The one exposed action, drawn as a flat button.                      |
 | `secondaryActions` | `CardAction[]` | The menu's items; the external link is drawn last, behind a divider. |
-| `forceOverflow` | `boolean` | Draw the menu even with no secondary action. |
-| `menuLabel` | `string` | The trigger's accessible name: `Actions for <the row's title>`. |
-| `busy` | `boolean` | A write is running: the trigger spins and cannot be opened. |
+| `forceOverflow`    | `boolean`      | Draw the menu even with no secondary action.                         |
+| `menuLabel`        | `string`       | The trigger's accessible name: `Actions for <the row's title>`.      |
+| `busy`             | `boolean`      | A write is running: the trigger spins and cannot be opened.          |
 
 **Used by:** the row menus of My Work, My PRs, the board and the card attachments.
 
@@ -275,18 +275,18 @@ so an action typed by hand with a word of its own does not compile.
 
 Props:
 
-| Prop | Type | Notes |
-| --- | --- | --- |
-| `move` | `string` | The vocabulary key (`archive`, `external`) or a module's own (`reminder.snooze`). |
-| `icon` | `ReactElement` | Drawn in the button and the menu item. |
-| `label` | `string` | The word, then its detail. |
-| `tooltip` | `string` | The move's tooltip, from the vocabulary. |
-| `external` | `boolean` | The link out: drawn last in the menu, behind a divider. |
-| `onClick` | `() => void` | What the action does. |
-| `href` | `string` | A link instead of a handler. |
-| `disabled` | `boolean` | Shown and explained, not removed. |
-| `whyNot` | `string` | Why a disabled action cannot be taken yet. |
-| `dividerBefore` | `boolean` | A divider above this item in the menu. |
+| Prop            | Type           | Notes                                                                             |
+| --------------- | -------------- | --------------------------------------------------------------------------------- |
+| `move`          | `string`       | The vocabulary key (`archive`, `external`) or a module's own (`reminder.snooze`). |
+| `icon`          | `ReactElement` | Drawn in the button and the menu item.                                            |
+| `label`         | `string`       | The word, then its detail.                                                        |
+| `tooltip`       | `string`       | The move's tooltip, from the vocabulary.                                          |
+| `external`      | `boolean`      | The link out: drawn last in the menu, behind a divider.                           |
+| `onClick`       | `() => void`   | What the action does.                                                             |
+| `href`          | `string`       | A link instead of a handler.                                                      |
+| `disabled`      | `boolean`      | Shown and explained, not removed.                                                 |
+| `whyNot`        | `string`       | Why a disabled action cannot be taken yet.                                        |
+| `dividerBefore` | `boolean`      | A divider above this item in the menu.                                            |
 
 **Used by:** every file that builds a row menu (see `ROW`). **Pattern:** a record built by a
 vocabulary function. **Test:** [`CardActions.test.tsx`](src/shared/CardActions.test.tsx).
@@ -325,10 +325,10 @@ static test reads it from the source.
 
 Props (its parameters):
 
-| Prop | Type | Notes |
-| --- | --- | --- |
-| `record` | `string` | The record's name; keys are listed in the README as `record.key`. |
-| `table` | `Record<K, RowMoveDef>` | Each move's word, icon, tooltip and optional `differentMove`. |
+| Prop     | Type                    | Notes                                                             |
+| -------- | ----------------------- | ----------------------------------------------------------------- |
+| `record` | `string`                | The record's name; keys are listed in the README as `record.key`. |
+| `table`  | `Record<K, RowMoveDef>` | Each move's word, icon, tooltip and optional `differentMove`.     |
 
 **Used by:** the modules that declare their own moves, such as reminders and designs. **Pattern:** a registry table, checked by a source-reading test. **Test:**
 [`rowVocabulary.test.ts`](src/shared/rowVocabulary.test.ts).
@@ -355,17 +355,17 @@ Submit. **Do not use it** as a form dialog; the act itself stays with the caller
 
 Props:
 
-| Prop | Type | Notes |
-| --- | --- | --- |
-| `open` | `boolean` | Whether the dialog is showing. |
-| `what` | `ReactNode` | The act, named, with one sentence of what follows. |
-| `onConfirm` | `() => void` | Runs on Submit only. |
-| `onCancel` | `() => void` | Cancel, the dismiss, Escape and the scrim. |
-| `title` | `string` | Default `Are you sure?`. |
-| `confirmLabel` | `string` | Default `Submit`. |
-| `busy` | `boolean` | The act is running: Submit spins, both buttons are held. |
-| `confirmDisabled` | `boolean` | Submit cannot be pressed; nothing spins. |
-| `message` | `ReactNode` | A stated refusal, shown under the act while the dialog stays open. |
+| Prop              | Type         | Notes                                                              |
+| ----------------- | ------------ | ------------------------------------------------------------------ |
+| `open`            | `boolean`    | Whether the dialog is showing.                                     |
+| `what`            | `ReactNode`  | The act, named, with one sentence of what follows.                 |
+| `onConfirm`       | `() => void` | Runs on Submit only.                                               |
+| `onCancel`        | `() => void` | Cancel, the dismiss, Escape and the scrim.                         |
+| `title`           | `string`     | Default `Are you sure?`.                                           |
+| `confirmLabel`    | `string`     | Default `Submit`.                                                  |
+| `busy`            | `boolean`    | The act is running: Submit spins, both buttons are held.           |
+| `confirmDisabled` | `boolean`    | Submit cannot be pressed; nothing spins.                           |
+| `message`         | `ReactNode`  | A stated refusal, shown under the act while the dialog stays open. |
 
 **Used by:** archive, close and retire flows: Prompts, the board and the Land card hook. **Pattern:** a controlled dialog; the caller owns `open`. **Test:**
 [`ConfirmDialog.test.tsx`](src/shared/ConfirmDialog.test.tsx).
@@ -380,11 +380,11 @@ a module component is refused by `lazyModules.test.ts`.
 
 Props (its parameters):
 
-| Prop | Type | Notes |
-| --- | --- | --- |
-| `load` | `() => Promise<M>` | The dynamic `import()`. |
-| `pick` | `(m: M) => ComponentType<P>` | Names the export, because components are exported by name. |
-| `fallback` | `ReactElement \| null` | What shows while loading; default `lazyFallback`. |
+| Prop       | Type                         | Notes                                                      |
+| ---------- | ---------------------------- | ---------------------------------------------------------- |
+| `load`     | `() => Promise<M>`           | The dynamic `import()`.                                    |
+| `pick`     | `(m: M) => ComponentType<P>` | Names the export, because components are exported by name. |
+| `fallback` | `ReactElement \| null`       | What shows while loading; default `lazyFallback`.          |
 
 **Used by:** the registry and the modules' descriptors. **Pattern:** a Suspense boundary per
 part, so a loading card shows its own spinner in its own place. **Test:**
@@ -412,13 +412,13 @@ filter), `error` (nothing was read -- never dressed as empty). **Do not use it**
 
 Props:
 
-| Prop | Type | Notes |
-| --- | --- | --- |
-| `icon` | `ReactElement` | The card's own icon, for the plain empty case. |
-| `title` | `ReactNode` | What is true. |
-| `detail` | `ReactNode` | A reason, or what to do next. |
-| `tone` | `"empty" \| "filtered" \| "error"` | Default `empty`; `error` is announced. |
-| `action` | `ReactNode` | A button or link under the text. |
+| Prop     | Type                               | Notes                                          |
+| -------- | ---------------------------------- | ---------------------------------------------- |
+| `icon`   | `ReactElement`                     | The card's own icon, for the plain empty case. |
+| `title`  | `ReactNode`                        | What is true.                                  |
+| `detail` | `ReactNode`                        | A reason, or what to do next.                  |
+| `tone`   | `"empty" \| "filtered" \| "error"` | Default `empty`; `error` is announced.         |
+| `action` | `ReactNode`                        | A button or link under the text.               |
 
 **Used by:** nearly every panel, among them Prompts, the Dashboard and Configuration. **Pattern:** one component, three tones. **Test:** none of its own yet.
 
@@ -431,12 +431,12 @@ reset or any action that is not a re-read.
 
 Props:
 
-| Prop | Type | Notes |
-| --- | --- | --- |
-| `onClick` | `() => void` | Re-reads. |
-| `isFetching` | `boolean` | Shows a spinner and disables the button. |
-| `disabled` | `boolean` | Disabled without spinning. |
-| `title` | `string` | Tooltip; default `Refresh`. |
+| Prop         | Type         | Notes                                    |
+| ------------ | ------------ | ---------------------------------------- |
+| `onClick`    | `() => void` | Re-reads.                                |
+| `isFetching` | `boolean`    | Shows a spinner and disables the button. |
+| `disabled`   | `boolean`    | Disabled without spinning.               |
+| `title`      | `string`     | Tooltip; default `Refresh`.              |
 
 **Used by:** most data panels: Prompts, the Dashboard, Milestones and PR Comments. **Pattern:** a subtle small icon button. **Test:** none of its own yet.
 
@@ -449,11 +449,11 @@ not use it** for an action that does not open a creating dialog.
 
 Props:
 
-| Prop | Type | Notes |
-| --- | --- | --- |
-| `label` | `string` | The dialog's own title; it is the tooltip and the accessible name. |
-| `onClick` | `() => void` | Opens the dialog. |
-| `disabled` | `boolean` | Disabled. |
+| Prop       | Type         | Notes                                                              |
+| ---------- | ------------ | ------------------------------------------------------------------ |
+| `label`    | `string`     | The dialog's own title; it is the tooltip and the accessible name. |
+| `onClick`  | `() => void` | Opens the dialog.                                                  |
+| `disabled` | `boolean`    | Disabled.                                                          |
 
 **Used by:** the panels that make something: Prompts, My Work and the Studio cards. **Pattern:** the label promises exactly what appears. **Test:** none of its own
 yet.
@@ -467,15 +467,15 @@ not use it** for a status label: it is a control.
 
 Props:
 
-| Prop | Type | Notes |
-| --- | --- | --- |
-| `label` | `string` | The chip's text. |
-| `count` | `number \| null` | Required: the count beside the label, zero drawn too. `null` says no count on purpose, for a chip that is a tab and not a filter. |
-| `active` | `boolean` | Selected. |
-| `onClick` | `() => void` | Toggle; Space and Enter work too. |
+| Prop         | Type                    | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------ | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `label`      | `string`                | The chip's text.                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `count`      | `number \| null`        | Required: the count beside the label, zero drawn too. `null` says no count on purpose, for a chip that is a tab and not a filter.                                                                                                                                                                                                                                                                                                         |
+| `active`     | `boolean`               | Selected.                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `onClick`    | `() => void`            | Toggle; Space and Enter work too.                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `appearance` | `FilterBadgeAppearance` | A slot, not a colour: `tabColorOne` (default), `tabColorTwo`, `tabColorThree` or `tabColorFour`. `tabColorOne` is the theme's interactive colour, the one its links, selected nav item and tab strip use; the other three are for rows that group by colour. The selected border takes the slot's colour from the theme in force (`chips` in `shell/themeList.ts`), so it follows dark and light, and each row of chips keeps one colour. |
-| `children` | `ReactNode` | Extra content after the label. |
-| `multi` | `boolean` | Checkbox semantics instead of radio. |
+| `children`   | `ReactNode`             | Extra content after the label.                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `multi`      | `boolean`               | Checkbox semantics instead of radio.                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 **Used by:** the doc filters, Create Prompt, the Dashboard and the design groups. **Pattern:** an ARIA radio or checkbox on a div. **Test:** [`FilterBadge.test.tsx`](src/shared/FilterBadge.test.tsx), and `themeList.test.ts` for the colours.
 
@@ -487,10 +487,10 @@ Props:
 
 Props:
 
-| Prop | Type | Notes |
-| --- | --- | --- |
-| `children` | `ReactNode` | The tiles, or a tile wrapped in a `Tooltip`. |
-| `className` | `string` | Merged onto the row. |
+| Prop        | Type        | Notes                                        |
+| ----------- | ----------- | -------------------------------------------- |
+| `children`  | `ReactNode` | The tiles, or a tile wrapped in a `Tooltip`. |
+| `className` | `string`    | Merged onto the row.                         |
 
 **Used by:** Milestones, Test Health and the engagement summary. **Pattern:** a layout wrapper. **Test:**
 [`StatTile.test.tsx`](src/shared/StatTile.test.tsx).
@@ -505,11 +505,11 @@ the box, so a `Tooltip` can wrap one; those are plain `div` attributes and are n
 
 Props:
 
-| Prop | Type | Notes |
-| --- | --- | --- |
-| `count` | `ReactNode` | The number (or `3/5`, `42%`), already formatted. |
-| `label` | `ReactNode` | What it counts. |
-| `color` | `string` | A health colour for the number, when the count is a verdict. |
+| Prop    | Type        | Notes                                                        |
+| ------- | ----------- | ------------------------------------------------------------ |
+| `count` | `ReactNode` | The number (or `3/5`, `42%`), already formatted.             |
+| `label` | `ReactNode` | What it counts.                                              |
+| `color` | `string`    | A health colour for the number, when the count is a verdict. |
 
 **Used by:** Milestones, Burn, the issue report, and `ListPanel`'s lead (Test Health's figures). **Pattern:** a ref-forwarding presentational box. **Test:**
 [`StatTile.test.tsx`](src/shared/StatTile.test.tsx).
@@ -523,12 +523,12 @@ stays until dismissed. **Do not use it** for a state of the page (use `EmptyStat
 
 Props:
 
-| Prop | Type | Notes |
-| --- | --- | --- |
-| `status` | `"success" \| "error"` | Colours the box; `error` is announced as an alert. |
-| `children` | `ReactNode` | The message. |
-| `onDismiss` | `() => void` | Called when the person dismisses it or it hides itself. |
-| `autoHideMs` | `number` | Overrides the 30 s success default; `0` never hides. |
+| Prop         | Type                   | Notes                                                   |
+| ------------ | ---------------------- | ------------------------------------------------------- |
+| `status`     | `"success" \| "error"` | Colours the box; `error` is announced as an alert.      |
+| `children`   | `ReactNode`            | The message.                                            |
+| `onDismiss`  | `() => void`           | Called when the person dismisses it or it hides itself. |
+| `autoHideMs` | `number`               | Overrides the 30 s success default; `0` never hides.    |
 
 **Used by:** Prompts, Configuration, the plan dialog and Create Prompt. **Pattern:** a dismissible live region. **Test:**
 [`StatusMessage.test.tsx`](src/shared/StatusMessage.test.tsx).
@@ -542,10 +542,10 @@ body. **Do not use it** for the only copy of something a person must read.
 
 Props:
 
-| Prop | Type | Notes |
-| --- | --- | --- |
-| `content` | `ReactNode` | What the tooltip says. |
-| `label` | `string` | The icon's accessible name; default `About this`. |
+| Prop      | Type        | Notes                                             |
+| --------- | ----------- | ------------------------------------------------- |
+| `content` | `ReactNode` | What the tooltip says.                            |
+| `label`   | `string`    | The icon's accessible name; default `About this`. |
 
 **Used by:** Create Prompt and the Prompts panel. **Pattern:** a keyboard-reachable description tooltip. **Test:** none of its own
 yet.
@@ -562,22 +562,24 @@ Standup panel's Agenda and grain tabs. Two rows that stack go in one `TabRows`. 
 
 Props:
 
-| Prop | Type | Notes |
-| --- | --- | --- |
+| Prop       | Type        | Notes                        |
+| ---------- | ----------- | ---------------------------- |
 | `children` | `ReactNode` | One tab row, or two stacked. |
 
 What is drawn:
 
 ```html
-<div class="tabRows" data-tab-rows>   <!-- column; padding-block: tabRowsPadding; row-gap: tabRowGap -->
-  <!-- TabList --> <!-- TabList -->
+<div class="tabRows" data-tab-rows>
+  <!-- column; padding-block: tabRowsPadding; row-gap: tabRowGap -->
+  <!-- TabList -->
+  <!-- TabList -->
 </div>
 ```
 
-| Token (`src/shell/layoutTokens.ts`) | Value | What it is |
-| --- | --- | --- |
-| `tabRowsPadding` | `controlRowsSpace`: `tokens.spacingVerticalM`, 12 px | Above and below the rows. The same value as the space under a list panel's filter chips, so tab rows and chip rows read as one family. |
-| `tabRowGap` | `tokens.spacingVerticalS`, 8 px | Between two rows stacked in one wrapper. |
+| Token (`src/shell/layoutTokens.ts`) | Value                                                | What it is                                                                                                                             |
+| ----------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `tabRowsPadding`                    | `controlRowsSpace`: `tokens.spacingVerticalM`, 12 px | Above and below the rows. The same value as the space under a list panel's filter chips, so tab rows and chip rows read as one family. |
+| `tabRowGap`                         | `tokens.spacingVerticalS`, 8 px                      | Between two rows stacked in one wrapper.                                                                                               |
 
 **Used by:** Home's strip (`src/modules/ado/routes.tsx`), `RitualTabs`
 (`src/modules/solitaireAgile/RitualPage.tsx`) and the Standup panel. **Pattern:** a wrapper that owns
@@ -599,8 +601,8 @@ retyping it. `data-tab-rows` marks the same element. **Used by:** `TabRows` and 
 
 Props:
 
-| Prop | Type | Notes |
-| --- | --- | --- |
+| Prop    | Type            | Notes                             |
+| ------- | --------------- | --------------------------------- |
 | `style` | `CSSProperties` | Merged over the rule's own style. |
 
 **Used by:** the Dashboard, Test Health, Configuration and `PanelFrame`. **Pattern:** a styled `hr`. **Test:** none of its own yet.

@@ -7,7 +7,7 @@ nine of the ten were assertions -- the bridge's refusal cases, a fixture hub's
 config warnings, a comms dry run, the rewrite route declining an unset key.
 
 ``P20_USAGE_LOG_DIR`` is the one override both halves read (``log_writer.py``
-here, ``Get-ToolkitLogDir`` in ``utilities.psm1``), and ``Tests/conftest.py``
+here, ``Get-P20ToolkitLogDir`` in ``utilities.psm1``), and ``Tests/conftest.py``
 points it at a temp directory for the whole session. These cases assert the
 mechanism and, for the run they are part of, the outcome.
 

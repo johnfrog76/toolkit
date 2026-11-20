@@ -282,7 +282,12 @@ the review generator counts the boxes.
 ## How reviews pick these up
 
 `{cliPrefix}NewWorkReview` scans `archive/`, `current/` and the growth folder
-for markdown committed in the period, and groups what it finds by folder. Growth
+for the files that were open at some point in the period, and groups what it finds by folder. A file
+that carries a `**Created:**` line is judged by its own dates: in when it was created on or before the
+period's end and not `**Closed:**` before its start, whatever git says. Only a file with no
+`**Created:**` falls back to git, and is in when a commit touched it in the period -- which is how most
+growth items are found, since they carry no stamps
+([How a review decides what is in it](../modules/growth.md#how-a-review-decides-what-is-in-it)). Growth
 items land under a **Professional Development** heading. Nothing about that is
 special-cased for this module: the growth folder is simply one of the folders
 scanned, which is why growth data has to be in the hub rather than somewhere

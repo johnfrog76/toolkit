@@ -96,8 +96,8 @@ table; this is the shape of it:
 
 | Scope | Keys | Goes to |
 | --- | --- | --- |
-| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `web.agentPort`, `web.corsOrigins`, `limits.inPlay`, `burn.weekStarts`, `burn.cacheHours`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display`, `spaceCheckouts.<slug>.path`, `managerWorkflow.communication.recipients.<key>.type` / `.display` / `.webhookEnv` | `config.local.json`, created as a sparse patch if it is not there |
-| **org** | `spaces.<slug>.name` / `.status` / `.orgType` / `.org` / `.tenant` / `.promptsFolder` / `.projects` / `.howIWork` / `.features.sprintAwareness` / `.features.suggestions` / `.features.trainingHoursPerQuarter` / `.features.teamSize` / `.communication.recipients.<key>.type` / `.display` / `.webhookEnv` | the hub's `hub.json` -- or `config.local.json`'s `spaces.<slug>` patch with **`-Local`** |
+| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `isDemoDismissed`, `firstRun.welcome`, `deck.archived`, `web.agentPort`, `web.corsOrigins`, `limits.inPlay`, `burn.weekStarts`, `burn.cacheHours`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display`, `spaceCheckouts.<slug>.path`, `managerWorkflow.communication.recipients.<key>.type` / `.display` / `.webhookEnv`, `startWork.prompts.<kind>` (one per kind the shipped config's `startWork.prompts` names) | `config.local.json`, created as a sparse patch if it is not there |
+| **org** | `spaces.<slug>.name` / `.status` / `.orgType` / `.org` / `.tenant` / `.promptsFolder` / `.projects` / `.laneNames.<lane>` (`backlog`, `active`, `inProgress`, `codeReview`, `done`) / `.howIWork` / `.features.sprintAwareness` / `.features.suggestions` / `.features.trainingHoursPerQuarter` / `.features.teamSize` / `.communication.recipients.<key>.type` / `.display` / `.webhookEnv` | the hub's `hub.json` -- or `config.local.json`'s `spaces.<slug>` patch with **`-Local`** |
 | **hub** | `storeSync`, `folders.<name>` | the hub's `hub.json`, and only with **`-Hub`** |
 | **default** | `commands`, `workItemTypes`, `cliVersion`, `managerWorkflow` (all of it but its recipients) | nowhere. These are the team's, and a `-Set` on one is refused by name |
 
@@ -904,18 +904,6 @@ keeps its default, which is its own name.
 hub's fact, so one hub kept in sync from two machines declares it once, in the file both share. A value that is neither `git` nor `none` warns and the configured value
 stands.
 
-### The org chart in the hub
-
-`org.json` is a second file at the hub root, beside `hub.json` -- `consts.json` `org.file`, the one name
-the CLI, the agent and the web all read it from. `hub.json` stays as it is (orgs, folder names and
-`storeSync`, "and nothing else"): positions and seats are not a Space's declaration, so they have a file of
-their own rather than a key a manifest would have to learn. It is found where the hub is (`PROMPTS_ROOT`,
-else `promptsRoot`), is read as UTF-8, and is validated whole before anything is drawn. Its shape, each
-field, the states and the checks are [`docs/hub/org.md`](hub/org.md); `OrgChart` prints it, and it is read
-only where Team Agile is on ([the scope](hub/org.md#the-scope----where-it-is-and-is-not-there)). No key in
-any config file turns it on: a file at the hub root is all it takes, and the inventory names it either way
-(`tkEnv`, the **Org chart** row).
-
 Nothing about this is required. **A hub with no `hub.json` declares nothing** and the other two files
 decide everything, a malformed
 one is a warning naming the path rather than a crash, and an org entry without `slug` or
@@ -940,6 +928,18 @@ Confirm the machine is set up correctly:
 tkSetup      # validates prerequisites and reports what is missing
 tkEnv        # machine, OS, tier, hub, active org, az identity, and what the tier allows
 ```
+
+### The org chart in the hub
+
+`org.json` is a second file at the hub root, beside `hub.json` -- `consts.json` `org.file`, the one name
+the CLI, the agent and the web all read it from. `hub.json` stays as it is (orgs, folder names and
+`storeSync`, "and nothing else"): positions and seats are not a Space's declaration, so they have a file of
+their own rather than a key a manifest would have to learn. It is found where the hub is (`PROMPTS_ROOT`,
+else `promptsRoot`), is read as UTF-8, and is validated whole before anything is drawn. Its shape, each
+field, the states and the checks are [`docs/hub/org.md`](hub/org.md); `OrgChart` prints it, and it is read
+only where Team Agile is on ([the scope](hub/org.md#the-scope----where-it-is-and-is-not-there)). No key in
+any config file turns it on: a file at the hub root is all it takes, and the inventory names it either way
+(`tkEnv`, the **Org chart** row).
 
 ## The container's keys: `spaces` and `activeSpace`
 
